@@ -83,10 +83,10 @@ function shell(reviewBody: () => Record<string, unknown>) {
       }),
     ),
     http.get('*/api/v1/alerts/firing', () => HttpResponse.json(paged([]))),
-    http.get(`*/api/v1/clusters/${CLUSTER}/queues`, () =>
+    http.get(`*/api/v1/clusters/${CLUSTER}/subscriptions`, () =>
       HttpResponse.json({ data: [], count: 0, page: 1, pageSize: 50 }),
     ),
-    http.get(`*/api/v1/clusters/${CLUSTER}/setup-review`, () => HttpResponse.json(reviewBody())),
+    http.get(`*/api/v1/clusters/${CLUSTER}/artemis/setup-review`, () => HttpResponse.json(reviewBody())),
     http.get(`*/api/v1/clusters/${CLUSTER}`, () =>
       HttpResponse.json({
         id: CLUSTER,
@@ -177,7 +177,7 @@ describe('Setup review', () => {
   it('accepts a risk with a required reason, by keyboard, and returns focus', async () => {
     let body: Record<string, unknown> | null = null;
     server.use(
-      http.post(`*/api/v1/clusters/${CLUSTER}/setup-review/acceptances`, async ({ request }) => {
+      http.post(`*/api/v1/clusters/${CLUSTER}/artemis/setup-review/acceptances`, async ({ request }) => {
         body = (await request.json()) as Record<string, unknown>;
         return HttpResponse.json(
           review({
@@ -229,7 +229,7 @@ describe('Setup review', () => {
 
   it('reports a review that was too soon as one that did not run, in words', async () => {
     server.use(
-      http.post(`*/api/v1/clusters/${CLUSTER}/setup-review/run`, () =>
+      http.post(`*/api/v1/clusters/${CLUSTER}/artemis/setup-review/run`, () =>
         HttpResponse.json(
           review({ notice: 'Reviewed 3s ago; the next review can run in 27s. Showing the last review.' }),
         ),
@@ -248,7 +248,7 @@ describe('Setup review', () => {
 
   it('says the review could not be loaded, with a retry, instead of showing nothing', async () => {
     server.use(
-      http.get(`*/api/v1/clusters/${CLUSTER}/setup-review`, () =>
+      http.get(`*/api/v1/clusters/${CLUSTER}/artemis/setup-review`, () =>
         HttpResponse.json({ title: 'Unavailable', detail: 'The database is down' }, { status: 503 }),
       ),
     );
@@ -262,7 +262,7 @@ describe('Setup review', () => {
 
   it('says a review that failed to run did not run, and what next', async () => {
     server.use(
-      http.post(`*/api/v1/clusters/${CLUSTER}/setup-review/run`, () =>
+      http.post(`*/api/v1/clusters/${CLUSTER}/artemis/setup-review/run`, () =>
         HttpResponse.json({ title: 'Unavailable', detail: 'No node answered.' }, { status: 503 }),
       ),
     );
@@ -276,7 +276,7 @@ describe('Setup review', () => {
   });
 
   it('announces a finished review', async () => {
-    server.use(http.post(`*/api/v1/clusters/${CLUSTER}/setup-review/run`, () => HttpResponse.json(review())));
+    server.use(http.post(`*/api/v1/clusters/${CLUSTER}/artemis/setup-review/run`, () => HttpResponse.json(review())));
     const user = userEvent.setup();
     renderView();
 
@@ -304,7 +304,7 @@ describe('Setup review', () => {
 
   it('keeps the dialog open and says why a risk was not accepted', async () => {
     server.use(
-      http.post(`*/api/v1/clusters/${CLUSTER}/setup-review/acceptances`, () =>
+      http.post(`*/api/v1/clusters/${CLUSTER}/artemis/setup-review/acceptances`, () =>
         HttpResponse.json({ title: 'Conflict', detail: 'This finding no longer exists.' }, { status: 409 }),
       ),
     );
@@ -333,7 +333,7 @@ describe('Setup review', () => {
     });
     shell(() => review({ findings: [accepted], open: { critical: 0, warning: 0, info: 0 }, accepted: 1 }));
     let reply: Response = HttpResponse.json({ title: 'Conflict', detail: 'It was revoked already.' }, { status: 409 });
-    server.use(http.delete(`*/api/v1/clusters/${CLUSTER}/setup-review/acceptances`, () => reply));
+    server.use(http.delete(`*/api/v1/clusters/${CLUSTER}/artemis/setup-review/acceptances`, () => reply));
     const user = userEvent.setup();
     renderView();
 

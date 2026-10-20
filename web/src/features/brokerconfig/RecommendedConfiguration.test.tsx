@@ -86,7 +86,7 @@ describe('RecommendedConfiguration', () => {
   it('declares the chosen settings, announces it and hands over to the review of the plan', async () => {
     let body: unknown;
     server.use(
-      http.post('*/api/v1/clusters/c1/config/recommendations/declare', async ({ request }) => {
+      http.post('*/api/v1/clusters/c1/artemis/config/recommendations/declare', async ({ request }) => {
         body = await request.json();
         return HttpResponse.json({});
       }),
@@ -182,7 +182,7 @@ describe('RecommendedConfiguration', () => {
   it('states a failed declaration with its cause and offers it again', async () => {
     let attempts = 0;
     server.use(
-      http.post('*/api/v1/clusters/c1/config/recommendations/declare', () => {
+      http.post('*/api/v1/clusters/c1/artemis/config/recommendations/declare', () => {
         attempts += 1;
         return attempts === 1
           ? HttpResponse.json({ title: 'Down', detail: 'The configuration store is not answering.' }, { status: 503 })

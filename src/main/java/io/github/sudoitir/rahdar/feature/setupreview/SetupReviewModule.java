@@ -12,7 +12,7 @@ public final class SetupReviewModule {
             .id("setupreview")
             .title("Setup review")
             .kind(FeatureDescriptor.Kind.FEATURE)
-            .apiPrefix("/api/v1/clusters/{clusterId}/setup-review")
+            .apiPrefix("/api/v1/clusters/{clusterId}/artemis/setup-review")
             .settingKey(SetupReviewSettings.INTERVAL)
             .settingKey(SetupReviewSettings.MIN_INTERVAL)
             .streamTopic(TopicDef.signal(SetupReviewService.TOPIC))

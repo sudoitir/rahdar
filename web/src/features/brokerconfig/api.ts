@@ -55,7 +55,7 @@ export const keys = {
 export function useNodeConfig(clusterId: string, nodeId: string | undefined): UseQueryResult<NodeConfigView, ApiError> {
   return useQuery({
     queryKey: ['clusters', clusterId, 'nodes', nodeId, 'config'] as const,
-    queryFn: () => request<NodeConfigView>(`/clusters/${clusterId}/nodes/${nodeId}/config`),
+    queryFn: () => request<NodeConfigView>(`/clusters/${clusterId}/artemis/nodes/${nodeId}/config`),
     enabled: Boolean(nodeId),
   });
 }
@@ -69,12 +69,12 @@ export function useNodeConfig(clusterId: string, nodeId: string | undefined): Us
 export function useConfigDiff(clusterId: string): UseQueryResult<ConfigDiffView, ApiError> {
   return useQuery({
     queryKey: ['clusters', clusterId, 'config-diff'] as const,
-    queryFn: () => request<ConfigDiffView>(`/clusters/${clusterId}/config-diff`),
+    queryFn: () => request<ConfigDiffView>(`/clusters/${clusterId}/artemis/config-diff`),
     staleTime: 30_000,
   });
 }
 
-const configBase = (clusterId: string) => `/clusters/${clusterId}/config`;
+const configBase = (clusterId: string) => `/clusters/${clusterId}/artemis/config`;
 
 /** The declaration with each node's last evaluation; `declared: false` is the empty state, not an error. */
 export function useBrokerConfig(clusterId: string): UseQueryResult<ConfigDeclarationView, ApiError> {

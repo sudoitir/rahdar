@@ -26,7 +26,7 @@ beforeEach(() => {
   server.use(
     meHandler(),
     http.get('*/api/v1/clusters/c1', () => HttpResponse.json(cluster())),
-    http.post('*/api/v1/clusters/c1/config/apply', async ({ request }) => {
+    http.post('*/api/v1/clusters/c1/artemis/config/apply', async ({ request }) => {
       const url = new URL(request.url);
       const dryRun = url.searchParams.get('dryRun') === 'true';
       calls.push({
@@ -129,7 +129,7 @@ describe('ReviewApplyDrawer: the plan', () => {
 
   it('says a plan could not be made, and that nothing changed', async () => {
     server.use(
-      http.post('*/api/v1/clusters/c1/config/apply', () =>
+      http.post('*/api/v1/clusters/c1/artemis/config/apply', () =>
         HttpResponse.json({ title: 'Invalid', detail: 'The declaration does not validate.' }, { status: 422 }),
       ),
     );
@@ -154,7 +154,7 @@ describe('ReviewApplyDrawer: the plan', () => {
   it('offers to plan again when the plan failed for a reason trying again can fix', async () => {
     let attempts = 0;
     server.use(
-      http.post('*/api/v1/clusters/c1/config/apply', () => {
+      http.post('*/api/v1/clusters/c1/artemis/config/apply', () => {
         attempts += 1;
         return attempts === 1
           ? HttpResponse.json({ title: 'Down', detail: 'No node answered the plan.' }, { status: 503 })

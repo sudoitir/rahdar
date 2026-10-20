@@ -21,8 +21,9 @@ public final class BrokerConfigModule {
                     BrokerConfigPermissions.CONFIG_APPLY,
                     "Apply declared broker configuration to brokers",
                     BrokerConfigPermissions.CONFIG_WRITE))
-            .apiPrefix("/api/v1/clusters/{clusterId}/config")
-            .apiPrefix("/api/v1/clusters/{clusterId}/config-diff")
+            .apiPrefix("/api/v1/clusters/{clusterId}/artemis/config")
+            .apiPrefix("/api/v1/clusters/{clusterId}/artemis/config-diff")
+            .apiPrefix("/api/v1/clusters/{clusterId}/artemis/nodes/{nodeId}/config")
             .settingKey(BrokerConfigSettings.DRIFT_INTERVAL)
             .settingKey(BrokerConfigSettings.APPLY_STEP_CAP)
             .streamTopic(TopicDef.data(BrokerConfigDriftService.SSE_TOPIC, null))

@@ -329,7 +329,7 @@ class BrokerConfigApplyRealBrokerTest extends PostgresIntegrationTest {
     }
 
     private JsonNode apply(String query, String body) throws Exception {
-        var response = mvc.perform(post("/api/v1/clusters/" + clusterId + "/config/apply" + query)
+        var response = mvc.perform(post("/api/v1/clusters/" + clusterId + "/artemis/config/apply" + query)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
                 .andReturn()

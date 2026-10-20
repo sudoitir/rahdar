@@ -107,7 +107,7 @@ class SecretLeakTest extends PostgresIntegrationTest {
         send(patch(base)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"management\":{\"username\":\"admin\",\"password\":\"" + CLUSTER_PASSWORD + "\"}}"));
-        send(put(base + "/config/bridge-credentials/remote-a")
+        send(put(base + "/artemis/config/bridge-credentials/remote-a")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"username\":\"bridge\",\"password\":\"" + BRIDGE_PASSWORD + "\"}"));
         send(post("/api/v1/channels")
@@ -135,8 +135,8 @@ class SecretLeakTest extends PostgresIntegrationTest {
         String base = "/api/v1/clusters/" + clusterId;
         send(get("/api/v1/clusters"));
         send(get(base));
-        send(get(base + "/config/bridge-credentials"));
-        send(get(base + "/config/export-xml"));
+        send(get(base + "/artemis/config/bridge-credentials"));
+        send(get(base + "/artemis/config/export-xml"));
         send(get("/api/v1/channels"));
         send(get("/api/v1/settings/secrets"));
 

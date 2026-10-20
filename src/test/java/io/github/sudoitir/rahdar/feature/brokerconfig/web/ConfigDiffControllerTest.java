@@ -160,7 +160,7 @@ class ConfigDiffControllerTest extends PostgresIntegrationTest {
     void comparesEveryNodeAndNamesTheOutlierAgainstTheMajority() throws Exception {
         threeNodes("NIO");
 
-        mvc.perform(get("/api/v1/clusters/{c}/config-diff", clusterId))
+        mvc.perform(get("/api/v1/clusters/{c}/artemis/config-diff", clusterId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.comparable").value(true))
                 .andExpect(jsonPath("$.nodes.length()").value(3))
@@ -184,7 +184,7 @@ class ConfigDiffControllerTest extends PostgresIntegrationTest {
     void stateIsCarriedAsAWordNotOnlyAsAnEnum() throws Exception {
         threeNodes("NIO");
 
-        mvc.perform(get("/api/v1/clusters/{c}/config-diff", clusterId))
+        mvc.perform(get("/api/v1/clusters/{c}/artemis/config-diff", clusterId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath(broker("/JournalType") + ".stateWord").value(Matchers.hasItem("different")));
     }
@@ -195,7 +195,7 @@ class ConfigDiffControllerTest extends PostgresIntegrationTest {
         when(artemisNodes.on(clusterId, at(B_URL))).thenReturn(client("backup", "NIO", true));
         when(artemisNodes.on(clusterId, at(C_URL))).thenReturn(unauthorized());
 
-        mvc.perform(get("/api/v1/clusters/{c}/config-diff", clusterId))
+        mvc.perform(get("/api/v1/clusters/{c}/artemis/config-diff", clusterId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.comparable").value(true))
                 .andExpect(nodeIs("node-c", "available", false))
@@ -213,7 +213,7 @@ class ConfigDiffControllerTest extends PostgresIntegrationTest {
         when(artemisNodes.on(clusterId, at(B_URL))).thenReturn(unauthorized());
         when(artemisNodes.on(clusterId, at(C_URL))).thenReturn(unauthorized());
 
-        mvc.perform(get("/api/v1/clusters/{c}/config-diff", clusterId))
+        mvc.perform(get("/api/v1/clusters/{c}/artemis/config-diff", clusterId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.comparable").value(false))
                 .andExpect(nodeIs("node-b", "unavailableKind", "CREDENTIALS_REJECTED"))
@@ -228,14 +228,14 @@ class ConfigDiffControllerTest extends PostgresIntegrationTest {
         when(artemisNodes.on(clusterId, at(A_URL))).thenReturn(client("primary", "ASYNCIO", true));
         when(artemisNodes.on(clusterId, at(B_URL))).thenReturn(client("backup", "NIO", true));
 
-        mvc.perform(get("/api/v1/clusters/{c}/config-diff", clusterId).param("nodes", aId + "," + bId))
+        mvc.perform(get("/api/v1/clusters/{c}/artemis/config-diff", clusterId).param("nodes", aId + "," + bId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.nodes.length()").value(2));
     }
 
     @Test
     void namingFewerThanTwoNodesIsRefused() throws Exception {
-        mvc.perform(get("/api/v1/clusters/{c}/config-diff", clusterId).param("nodes", aId.toString()))
+        mvc.perform(get("/api/v1/clusters/{c}/artemis/config-diff", clusterId).param("nodes", aId.toString()))
                 .andExpect(status().isBadRequest());
     }
 
@@ -249,7 +249,7 @@ class ConfigDiffControllerTest extends PostgresIntegrationTest {
         when(artemisNodes.on(clusterId, at(B_URL))).thenReturn(client("backup", "ASYNCIO", false, "[]"));
         when(artemisNodes.on(clusterId, at(C_URL))).thenReturn(client("third", "ASYNCIO", true));
 
-        mvc.perform(get("/api/v1/clusters/{c}/config-diff", clusterId))
+        mvc.perform(get("/api/v1/clusters/{c}/artemis/config-diff", clusterId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.comparable").value(true))
                 .andExpect(nodeIs("node-b", "reducedSurface", false))
@@ -261,7 +261,7 @@ class ConfigDiffControllerTest extends PostgresIntegrationTest {
         long before = auditEvents.count();
         threeNodes("ASYNCIO");
 
-        mvc.perform(get("/api/v1/clusters/{c}/config-diff", clusterId)).andExpect(status().isOk());
+        mvc.perform(get("/api/v1/clusters/{c}/artemis/config-diff", clusterId)).andExpect(status().isOk());
 
         Assertions.assertThat(auditEvents.count()).isEqualTo(before);
     }

@@ -22,7 +22,7 @@ describe('AdoptionSuggestion', () => {
   it('reads the live nodes once on arrival, as a card under its own heading, and not again on a re-render', async () => {
     const read = vi.fn();
     server.use(
-      http.post('*/api/v1/clusters/c1/config/adopt', () => {
+      http.post('*/api/v1/clusters/c1/artemis/config/adopt', () => {
         read();
         return HttpResponse.json({ document: EMPTY, notes: [], disagreements: [], closes: [] });
       }),
@@ -42,7 +42,7 @@ describe('AdoptionSuggestion', () => {
 
   it('says the reason Rahdar does not adopt on its own from a control that takes focus', async () => {
     server.use(
-      http.post('*/api/v1/clusters/c1/config/adopt', () =>
+      http.post('*/api/v1/clusters/c1/artemis/config/adopt', () =>
         HttpResponse.json({ document: EMPTY, notes: [], disagreements: [], closes: [] }),
       ),
     );
@@ -57,7 +57,7 @@ describe('AdoptionSuggestion', () => {
 
   it('keeps the adopt control visible and states why it is unavailable without the permission', async () => {
     server.use(
-      http.post('*/api/v1/clusters/c1/config/adopt', () =>
+      http.post('*/api/v1/clusters/c1/artemis/config/adopt', () =>
         HttpResponse.json({ document: EMPTY, notes: [], disagreements: [], closes: [] }),
       ),
     );
@@ -70,7 +70,7 @@ describe('AdoptionSuggestion', () => {
   it('says a failed read is not the same as nothing to adopt, and reads again on retry', async () => {
     let attempts = 0;
     server.use(
-      http.post('*/api/v1/clusters/c1/config/adopt', () => {
+      http.post('*/api/v1/clusters/c1/artemis/config/adopt', () => {
         attempts += 1;
         return attempts === 1
           ? HttpResponse.json({ title: 'Down', detail: 'No live node answered.' }, { status: 503 })

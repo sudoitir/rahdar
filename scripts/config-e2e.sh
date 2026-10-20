@@ -165,7 +165,7 @@ pass "$LIVE live node(s)"
 # ── 2. adopt → declare ────────────────────────────────────────────────────────
 
 say "2. adopting the running configuration"
-adoption=$(api POST "/clusters/$CLUSTER/config/adopt")
+adoption=$(api POST "/clusters/$CLUSTER/artemis/config/adopt")
 ADOPT_SETTINGS=$(py "len(d['document']['addressSettings'])" <<<"$adoption")
 note "adoption proposes $ADOPT_SETTINGS address-setting match(es), \
 $(py "len(d['document']['securitySettings'])" <<<"$adoption") security-setting(s), \
@@ -181,20 +181,20 @@ fi
 
 say "saving the adopted document as revision 1"
 doc=$(py "json.dumps(d['document'])" <<<"$adoption")
-saved=$(api PUT "/clusters/$CLUSTER/config" \
+saved=$(api PUT "/clusters/$CLUSTER/artemis/config" \
   -d "{\"document\": $doc, \"expectedRevision\": 0, \"note\": \"adopted by config-e2e\", \"source\": \"ADOPT\"}")
 REVISION=$(py "d['revision']" <<<"$saved" 2>/dev/null || echo "")
 [ -n "$REVISION" ] || die "save returned no revision: $saved"
 pass "revision $REVISION saved"
 
 # DEFECT PROBE P-1b: is the adoption recorded as ADOPT, or laundered as EDIT?
-src=$(api GET "/clusters/$CLUSTER/config/revisions" | py "d[0]['source']")
+src=$(api GET "/clusters/$CLUSTER/artemis/config/revisions" | py "d[0]['source']")
 expect "P-1b revision records its source as ADOPT" "ADOPT" "$src"
 
 # ── 3. dry run → apply → verify ───────────────────────────────────────────────
 
 say "3. dry run of the adopted declaration (expect: nothing to do)"
-plan=$(api POST "/clusters/$CLUSTER/config/apply?dryRun=true" -d '{}')
+plan=$(api POST "/clusters/$CLUSTER/artemis/config/apply?dryRun=true" -d '{}')
 STEPS=$(py "d['plan']['stepCount']" <<<"$plan")
 PLANHASH=$(py "d['plan']['planHash']" <<<"$plan")
 expect "an adopted declaration plans zero steps" "0" "$STEPS"
@@ -208,13 +208,13 @@ d = json.load(sys.stdin)
 doc = d['document']
 doc['addressSettings'].append({'match': 'CONFIG.E2E.#', 'values': {'maxDeliveryAttempts': 7}})
 print(json.dumps(doc))" <<<"$adoption")
-saved=$(api PUT "/clusters/$CLUSTER/config" -d "{\"document\": $doc2, \"expectedRevision\": $REVISION, \"note\": \"config-e2e probe setting\"}")
+saved=$(api PUT "/clusters/$CLUSTER/artemis/config" -d "{\"document\": $doc2, \"expectedRevision\": $REVISION, \"note\": \"config-e2e probe setting\"}")
 PREVIOUS_REVISION=$REVISION
 REVISION=$(py "d['revision']" <<<"$saved" 2>/dev/null || echo "")
 [ -n "$REVISION" ] || die "save of the probe setting returned no revision: $saved"
 pass "revision $REVISION declares CONFIG.E2E.#"
 
-plan=$(api POST "/clusters/$CLUSTER/config/apply?dryRun=true" -d '{}')
+plan=$(api POST "/clusters/$CLUSTER/artemis/config/apply?dryRun=true" -d '{}')
 STEPS=$(py "d['plan']['stepCount']" <<<"$plan")
 PLANHASH=$(py "d['plan']['planHash']" <<<"$plan")
 CANARY=$(py "d['plan']['canaryNodeId']" <<<"$plan")
@@ -223,12 +223,12 @@ note "plan: $STEPS step(s), canary $CANARY, high hazards $HAZARDS"
 [ "$STEPS" -ge 1 ] && pass "the new setting produced a step" || fail "no step planned for a setting the broker lacks"
 
 say "stale planHash is refused"
-code=$(status POST "/clusters/$CLUSTER/config/apply?dryRun=false" \
+code=$(status POST "/clusters/$CLUSTER/artemis/config/apply?dryRun=false" \
   -d "{\"expectedPlanHash\": \"deadbeef\", \"acknowledgedHazards\": $HAZARDS}")
 expect "stale planHash → 409" "409" "$code"
 
 say "stale revision is refused"
-code=$(status POST "/clusters/$CLUSTER/config/apply?dryRun=false" \
+code=$(status POST "/clusters/$CLUSTER/artemis/config/apply?dryRun=false" \
   -d "{\"revision\": $PREVIOUS_REVISION, \"expectedPlanHash\": \"$PLANHASH\", \"acknowledgedHazards\": $HAZARDS}")
 expect "stale revision → 409" "409" "$code"
 
@@ -240,7 +240,7 @@ STREAM_LOG=$(mktemp)
 curl -sN -b "$COOKIES" "$RAHDAR/api/v1/stream?clusterId=$CLUSTER&topics=config" >"$STREAM_LOG" &
 STREAM_PID=$!
 sleep 1
-outcome=$(api POST "/clusters/$CLUSTER/config/apply?dryRun=false" \
+outcome=$(api POST "/clusters/$CLUSTER/artemis/config/apply?dryRun=false" \
   -d "{\"expectedPlanHash\": \"$PLANHASH\", \"acknowledgedHazards\": $HAZARDS}")
 sleep 1
 kill "$STREAM_PID" 2>/dev/null
@@ -262,7 +262,7 @@ unverified=$(py "sum(1 for n in d['nodes'] for s in n['steps'] if s['status']=='
 expect "no applied step left unverified" "0" "$unverified"
 
 say "re-running converges (every step ALREADY, nothing written)"
-plan=$(api POST "/clusters/$CLUSTER/config/apply?dryRun=true" -d '{}')
+plan=$(api POST "/clusters/$CLUSTER/artemis/config/apply?dryRun=true" -d '{}')
 expect "second dry run plans zero steps" "0" "$(py "d['plan']['stepCount']" <<<"$plan")"
 
 # ── 4. drift ──────────────────────────────────────────────────────────────────
@@ -270,10 +270,10 @@ expect "second dry run plans zero steps" "0" "$(py "d['plan']['stepCount']" <<<"
 say "4. drift evaluation after a verified apply"
 # The screen reads "last evaluated 4m ago" against this; an age with no cadence
 # beside it cannot be told apart from a scheduler that has stopped.
-cadence=$(py "d['driftIntervalSeconds']" <<<"$(api GET "/clusters/$CLUSTER/config")")
+cadence=$(py "d['driftIntervalSeconds']" <<<"$(api GET "/clusters/$CLUSTER/artemis/config")")
 [ "$cadence" -gt 0 ] && pass "the declaration carries the cadence it is evaluated on (${cadence}s)" \
   || fail "the declaration does not say how often it is evaluated"
-report=$(api POST "/clusters/$CLUSTER/config/drift/evaluate")
+report=$(api POST "/clusters/$CLUSTER/artemis/config/drift/evaluate")
 drifted=$(py "sum(1 for n in d['nodes'] if n['state']=='DRIFTED')" <<<"$report")
 expect "no node drifted right after a verified apply" "0" "$drifted"
 
@@ -288,12 +288,12 @@ say "changing the broker underneath the declaration"
 # Take the setting away on the primary only; the declaration still wants it.
 removal=$(broker_exec artemis-primary 'removeAddressSettings(java.lang.String)' 'CONFIG.E2E.#')
 py "d['status']" <<<"$removal" | grep -q 200 || fail "the out-of-band removal itself failed: $(head -c 200 <<<"$removal")"
-report=$(api POST "/clusters/$CLUSTER/config/drift/evaluate")
+report=$(api POST "/clusters/$CLUSTER/artemis/config/drift/evaluate")
 drifted=$(py "sum(1 for n in d['nodes'] if n['state']=='DRIFTED')" <<<"$report")
 [ "$drifted" -ge 1 ] && pass "drift is seen after an out-of-band change" || fail "an out-of-band removal produced no drift"
 
 say "adopting while drift is open"
-adoption=$(api POST "/clusters/$CLUSTER/config/adopt")
+adoption=$(api POST "/clusters/$CLUSTER/artemis/config/adopt")
 doc3=$(py "json.dumps(d['document'])" <<<"$adoption")
 closes=$(py "len(d['closes'])" <<<"$adoption")
 [ "$closes" -ge 1 ] && pass "P-1 the preview names the $closes finding(s) it would close" \
@@ -301,19 +301,19 @@ closes=$(py "len(d['closes'])" <<<"$adoption")
 
 # Unconfirmed, it is refused: the effect is indistinguishable from an apply and
 # the meaning is its opposite — the broker keeps doing whatever it is doing.
-code=$(status PUT "/clusters/$CLUSTER/config" \
+code=$(status PUT "/clusters/$CLUSTER/artemis/config" \
   -d "{\"document\": $doc3, \"expectedRevision\": $REVISION, \"note\": \"adopt over open drift\", \"source\": \"ADOPT\"}")
 expect "P-1 an unconfirmed adoption over open drift is refused" "409" "$code"
 
-api PUT "/clusters/$CLUSTER/config" \
+api PUT "/clusters/$CLUSTER/artemis/config" \
   -d "{\"document\": $doc3, \"expectedRevision\": $REVISION, \"note\": \"adopt over open drift\",
        \"source\": \"ADOPT\", \"confirm\": \"$CLUSTER_NAME\"}" >/dev/null
-report=$(api POST "/clusters/$CLUSTER/config/drift/evaluate")
+report=$(api POST "/clusters/$CLUSTER/artemis/config/drift/evaluate")
 after=$(py "sum(1 for n in d['nodes'] if n['state']=='DRIFTED')" <<<"$report")
 note "drifted nodes after a confirmed adoption: $after (was $drifted) — the broker was NOT written"
 basis=$(py "next((n.get('basis') for n in d['nodes'] if n['state']=='IN_SYNC'), 'none')" <<<"$report")
 expect "P-1 the node now says it agrees because it was adopted" "ADOPTED" "$basis"
-REVISION=$(api GET "/clusters/$CLUSTER/config" | py "d['revision']")
+REVISION=$(api GET "/clusters/$CLUSTER/artemis/config" | py "d['revision']")
 
 # ── 5. concurrency, caps, modes ───────────────────────────────────────────────
 
@@ -326,18 +326,18 @@ import json, sys
 doc = json.load(sys.stdin)['document']
 for i in range(12):
     doc['addressSettings'].append({'match': f'CONFIG.E2E.RACE{i}.#', 'values': {'maxDeliveryAttempts': 5}})
-print(json.dumps(doc))" <<<"$(api GET "/clusters/$CLUSTER/config")")
-saved=$(api PUT "/clusters/$CLUSTER/config" -d "{\"document\": $doc4, \"expectedRevision\": $REVISION, \"note\": \"config-e2e race probe\"}")
+print(json.dumps(doc))" <<<"$(api GET "/clusters/$CLUSTER/artemis/config")")
+saved=$(api PUT "/clusters/$CLUSTER/artemis/config" -d "{\"document\": $doc4, \"expectedRevision\": $REVISION, \"note\": \"config-e2e race probe\"}")
 REVISION=$(py "d['revision']" <<<"$saved" 2>/dev/null || echo "$REVISION")
 
-plan=$(api POST "/clusters/$CLUSTER/config/apply?dryRun=true" -d '{}')
+plan=$(api POST "/clusters/$CLUSTER/artemis/config/apply?dryRun=true" -d '{}')
 note "race plan: $(py "d['plan']['stepCount']" <<<"$plan") step(s)"
 PLANHASH=$(py "d['plan']['planHash']" <<<"$plan")
 HAZARDS=$(py "json.dumps(d['plan'].get('highHazardIds', []))" <<<"$plan")
-status POST "/clusters/$CLUSTER/config/apply?dryRun=false" \
+status POST "/clusters/$CLUSTER/artemis/config/apply?dryRun=false" \
   -d "{\"expectedPlanHash\": \"$PLANHASH\", \"acknowledgedHazards\": $HAZARDS}" >/tmp/config-e2e-a.code &
 first=$!
-second=$(status POST "/clusters/$CLUSTER/config/apply?dryRun=false" \
+second=$(status POST "/clusters/$CLUSTER/artemis/config/apply?dryRun=false" \
   -d "{\"expectedPlanHash\": \"$PLANHASH\", \"acknowledgedHazards\": $HAZARDS}")
 wait $first
 firstcode=$(cat /tmp/config-e2e-a.code)
@@ -354,18 +354,18 @@ else
 fi
 
 say "config-managed mode refuses an apply server-side"
-api PATCH "/clusters/$CLUSTER/config/mode" \
+api PATCH "/clusters/$CLUSTER/artemis/config/mode" \
   -d '{"applyMode": "CONFIG_MANAGED", "reportUndeclared": false, "undeclaredExclusions": []}' >/dev/null
-plan=$(api POST "/clusters/$CLUSTER/config/apply?dryRun=true" -d '{}')
+plan=$(api POST "/clusters/$CLUSTER/artemis/config/apply?dryRun=true" -d '{}')
 PLANHASH=$(py "d['plan']['planHash']" <<<"$plan")
-code=$(status POST "/clusters/$CLUSTER/config/apply?dryRun=false" \
+code=$(status POST "/clusters/$CLUSTER/artemis/config/apply?dryRun=false" \
   -d "{\"expectedPlanHash\": \"$PLANHASH\", \"acknowledgedHazards\": []}")
 if [ "$code" = "409" ] || [ "$code" = "422" ]; then
   pass "P-5 a config-managed cluster refuses apply over HTTP ($code)"
 else
   fail "P-5 a config-managed cluster applied over HTTP anyway ($code) — only the UI gates it"
 fi
-api PATCH "/clusters/$CLUSTER/config/mode" \
+api PATCH "/clusters/$CLUSTER/artemis/config/mode" \
   -d '{"applyMode": "RAHDAR_MANAGED", "reportUndeclared": false, "undeclaredExclusions": []}' >/dev/null
 
 # ── 6. import hardening ───────────────────────────────────────────────────────
@@ -373,8 +373,8 @@ api PATCH "/clusters/$CLUSTER/config/mode" \
 say "6. import refuses what it cannot honour"
 unknown=$(mktemp)
 printf '%s' '<core><address-settings><address-setting match="#"><max-size-byte>10</max-size-byte></address-setting></address-settings></core>' >"$unknown"
-code=$(xml_import_status "/clusters/$CLUSTER/config/import-xml" "$unknown")
-body=$(xml_import "/clusters/$CLUSTER/config/import-xml" "$unknown")
+code=$(xml_import_status "/clusters/$CLUSTER/artemis/config/import-xml" "$unknown")
+body=$(xml_import "/clusters/$CLUSTER/artemis/config/import-xml" "$unknown")
 note "unknown-key import returned $code"
 if py "any('max-size-byte' in json.dumps(v) for v in d.get('errors', []))" <<<"$body" | grep -q True; then
   pass "P-8 an unknown address-setting key is a violation"
@@ -387,7 +387,7 @@ rm -f "$unknown"
 say "import refuses an XXE payload"
 xxefile=$(mktemp)
 printf '%s' '<?xml version="1.0"?><!DOCTYPE core [<!ENTITY xxe SYSTEM "file:///etc/passwd">]><core><address-settings><address-setting match="&xxe;"/></address-settings></core>' >"$xxefile"
-body=$(xml_import "/clusters/$CLUSTER/config/import-xml" "$xxefile")
+body=$(xml_import "/clusters/$CLUSTER/artemis/config/import-xml" "$xxefile")
 if grep -q "root:" <<<"$body"; then
   fail "SECURITY external entity was resolved by the import parser"
 else
@@ -404,7 +404,7 @@ sys.stdout.write('<address-setting match=\"A.#\"><max-delivery-attempts>1</max-d
 sys.stdout.write('</address-settings></core>')" >"$bigfile"
 # A preview reports what it refuses in `errors` and answers 200, the same shape
 # malformed XML already uses; the refusal is the errors list, not the status.
-body=$(xml_import "/clusters/$CLUSTER/config/import-xml" "$bigfile")
+body=$(xml_import "/clusters/$CLUSTER/artemis/config/import-xml" "$bigfile")
 if py "any('KiB' in json.dumps(v) for v in d.get('errors', []))" <<<"$body" | grep -q True; then
   pass "P-7 an oversized import is refused by the size cap"
 else
@@ -414,8 +414,8 @@ rm -f "$bigfile"
 
 say "export → import round-trips"
 roundtrip=$(mktemp)
-curl -sS -b "$COOKIES" -c "$COOKIES" "$RAHDAR/api/v1/clusters/$CLUSTER/config/export-xml" >"$roundtrip"
-body=$(xml_import "/clusters/$CLUSTER/config/import-xml" "$roundtrip")
+curl -sS -b "$COOKIES" -c "$COOKIES" "$RAHDAR/api/v1/clusters/$CLUSTER/artemis/config/export-xml" >"$roundtrip"
+body=$(xml_import "/clusters/$CLUSTER/artemis/config/import-xml" "$roundtrip")
 # An error body carries neither key, so assert the parse actually happened.
 if ! py "'sections' in d or 'document' in d or 'unsupported' in d" <<<"$body" | grep -q True; then
   fail "round-trip import did not return a parse result: $(head -c 200 <<<"$body")"
@@ -472,7 +472,7 @@ fi
 # ── 8. capability gaps close from the declaration ─────────────────────────────
 
 say "8. declaring the capability probe's recommendations (P-9)"
-recs=$(api GET "/clusters/$CLUSTER/config/recommendations")
+recs=$(api GET "/clusters/$CLUSTER/artemis/config/recommendations")
 appliable=$(py "', '.join(r['capability'] for r in d['recommendations'] if r['appliable'])" <<<"$recs" 2>/dev/null || echo "")
 note "appliable: ${appliable:-none}; seeded from $(py "d['seededFrom']" <<<"$recs" 2>/dev/null || echo unknown)"
 
@@ -490,7 +490,7 @@ else
 fi
 
 if [ -n "$appliable" ]; then
-  declared=$(api POST "/clusters/$CLUSTER/config/recommendations/declare" -d '{}')
+  declared=$(api POST "/clusters/$CLUSTER/artemis/config/recommendations/declare" -d '{}')
   revnow=$(py "d['revision']" <<<"$declared" 2>/dev/null || echo "")
   src=$(py "d['source']" <<<"$declared" 2>/dev/null || echo "")
   if [ "$src" = "RECOMMENDED" ]; then
@@ -499,7 +499,7 @@ if [ -n "$appliable" ]; then
     fail "declaring the recommendations recorded source '$src'"
   fi
 
-  plan=$(api POST "/clusters/$CLUSTER/config/apply?dryRun=true" -d '{}')
+  plan=$(api POST "/clusters/$CLUSTER/artemis/config/apply?dryRun=true" -d '{}')
   steps=$(py "d['plan']['stepCount']" <<<"$plan" 2>/dev/null || echo 0)
   if [ "$steps" -gt 0 ]; then
     pass "the recommendations produce a real plan ($steps steps) — nothing written yet"
@@ -511,7 +511,7 @@ if [ -n "$appliable" ]; then
   # checkbox on; a plan that replaces an address setting usually carries one.
   hz=$(py "json.dumps([z['id'] for z in d['plan']['hazards'] if z['hazardClass'] == 'HIGH'])" <<<"$plan")
   note "hazards: $(py "', '.join(z['hazardClass'] + ' ' + z['kind'] for z in d['plan']['hazards']) or 'none'" <<<"$plan")"
-  applied=$(api POST "/clusters/$CLUSTER/config/apply?dryRun=false" -d "{\"expectedPlanHash\": \"$h\", \"acknowledgedHazards\": $hz}")
+  applied=$(api POST "/clusters/$CLUSTER/artemis/config/apply?dryRun=false" -d "{\"expectedPlanHash\": \"$h\", \"acknowledgedHazards\": $hz}")
   outcome=$(py "d['outcome']" <<<"$applied" 2>/dev/null || echo unparsed)
   if [ "$outcome" = "APPLIED" ]; then
     pass "the recommended configuration applied and verified by read-back"
@@ -519,7 +519,7 @@ if [ -n "$appliable" ]; then
     fail "applying the recommended configuration ended $outcome"
   fi
 
-  after=$(api GET "/clusters/$CLUSTER/config/recommendations")
+  after=$(api GET "/clusters/$CLUSTER/artemis/config/recommendations")
   left=$(py "', '.join(r['capability'] for r in d['recommendations'] if r['appliable'])" <<<"$after" 2>/dev/null || echo "")
   if [ -z "$left" ]; then
     pass "the probe re-run finds no appliable gap left"

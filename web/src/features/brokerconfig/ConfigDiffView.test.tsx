@@ -29,7 +29,9 @@ vi.mock('@tanstack/react-router', async (importOriginal) => ({
 const { ConfigDiffView } = await import('./ConfigDiffView.tsx');
 
 function serve(d: Diff | Response = diff()) {
-  server.use(http.get('*/api/v1/clusters/c1/config-diff', () => (d instanceof Response ? d : HttpResponse.json(d))));
+  server.use(
+    http.get('*/api/v1/clusters/c1/artemis/config-diff', () => (d instanceof Response ? d : HttpResponse.json(d))),
+  );
 }
 
 /** What the last navigation asked the search to become, from the empty one. */

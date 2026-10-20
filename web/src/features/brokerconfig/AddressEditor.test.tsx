@@ -17,7 +17,7 @@ const ORDERS = DECLARED.document.addresses[0]!;
 function captureSave() {
   const saved = vi.fn();
   server.use(
-    http.put('*/api/v1/clusters/c1/config', async ({ request }) => {
+    http.put('*/api/v1/clusters/c1/artemis/config', async ({ request }) => {
       saved(await request.json());
       return HttpResponse.json(DECLARED);
     }),
@@ -174,7 +174,7 @@ describe('AddressEditor', () => {
 
   it('states a stale revision with what to do next, and Cancel closes without saving', async () => {
     server.use(
-      http.put('*/api/v1/clusters/c1/config', () =>
+      http.put('*/api/v1/clusters/c1/artemis/config', () =>
         HttpResponse.json(
           { type: 'urn:rahdar:stale-revision', title: 'Declaration changed', detail: 'Revision 4 exists.' },
           { status: 409 },
@@ -214,7 +214,7 @@ describe('AddressEditor', () => {
 
   it('keeps the save control busy while the request runs, and re-enables it when it fails', async () => {
     server.use(
-      http.put('*/api/v1/clusters/c1/config', async () => {
+      http.put('*/api/v1/clusters/c1/artemis/config', async () => {
         await new Promise((r) => setTimeout(r, 100));
         return HttpResponse.json({ title: 'Down', detail: 'Store down.' }, { status: 503 });
       }),

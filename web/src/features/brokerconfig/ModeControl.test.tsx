@@ -9,7 +9,7 @@ import { notify } from '../../ui/notify.ts';
 import { declaration } from './fixtures.ts';
 import { ModeControl } from './ModeControl.tsx';
 
-const PATCH = '*/api/v1/clusters/c1/config/mode';
+const PATCH = '*/api/v1/clusters/c1/artemis/config/mode';
 async function openPopover(canWrite: boolean) {
   const user = userEvent.setup();
   renderWithProviders(<ModeControl declaration={declaration()} canWrite={canWrite} />);

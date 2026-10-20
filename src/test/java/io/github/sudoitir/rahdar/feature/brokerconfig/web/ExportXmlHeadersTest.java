@@ -50,7 +50,7 @@ class ExportXmlHeadersTest extends PostgresIntegrationTest {
 
     @Test
     void theExportIsAnXmlAttachment() throws Exception {
-        mvc.perform(get("/api/v1/clusters/" + clusterId + "/config/export-xml"))
+        mvc.perform(get("/api/v1/clusters/" + clusterId + "/artemis/config/export-xml"))
                 .andExpect(status().isOk())
                 .andExpect(header().string("Content-Type", Matchers.startsWith(MediaType.APPLICATION_XML_VALUE)))
                 .andExpect(header().string("Content-Disposition", Matchers.startsWith("attachment;")))
