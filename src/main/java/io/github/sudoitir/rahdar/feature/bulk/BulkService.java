@@ -32,6 +32,8 @@ import io.github.sudoitir.rahdar.kernel.security.ClusterAccessGuard.Requirement;
 import io.github.sudoitir.rahdar.kernel.security.OperatorHandoff;
 import io.github.sudoitir.rahdar.kernel.security.OperatorHandoff.Operator;
 import io.github.sudoitir.rahdar.kernel.security.Permissions;
+import io.github.sudoitir.rahdar.kernel.security.ResourceIdTexts;
+import io.github.sudoitir.rahdar.kernel.security.ResourceIdTexts.Of;
 import io.github.sudoitir.rahdar.kernel.security.ResourceRef;
 import io.github.sudoitir.rahdar.kernel.settings.SettingsService;
 import io.github.sudoitir.rahdar.platform.broker.BrokerSettings;
@@ -81,6 +83,7 @@ public class BulkService {
     private final ObjectMapper json;
     private final ReplicaRegistry replicas;
     private final OperationGate gate;
+    private final ResourceIdTexts ids;
 
     /**
      * What the gate holds of a bulk run: the run, the plan it was previewed with (its hash, operation and queue
@@ -112,17 +115,19 @@ public class BulkService {
         // Every queue of the plan, before anything is stored: one the caller may not read is not found,
         // one they may read and not change is refused, and the run is not planned at all.
         clusterAccess.requireAll(clusterId, requirements(names, operation.permission()));
-        int queueCap = settings.intValue(BrokerSettings.BULK_QUEUE_CAP);
+        int subscriptionCap = settings.intValue(BrokerSettings.BULK_SUBSCRIPTION_CAP);
         if (names.isEmpty()) {
             throw new BulkRefusedException(
-                    HttpStatus.UNPROCESSABLE_ENTITY, "bulk-nothing-selected", "No queue matches this selection.");
+                    HttpStatus.UNPROCESSABLE_ENTITY,
+                    "bulk-nothing-selected",
+                    "No subscription matches this selection.");
         }
-        if (names.size() > queueCap) {
+        if (names.size() > subscriptionCap) {
             throw new BulkRefusedException(
                     HttpStatus.UNPROCESSABLE_ENTITY,
-                    "bulk-queue-cap-exceeded",
-                    "%d queues matched; a bulk run is capped at %d queues (safety.bulk-queue-cap). Narrow the selection."
-                            .formatted(names.size(), queueCap));
+                    "bulk-subscription-cap-exceeded",
+                    "%d subscriptions matched; a bulk run is capped at %d subscriptions (safety.bulk-subscription-cap). Narrow the selection."
+                            .formatted(names.size(), subscriptionCap));
         }
 
         List<Planned> plan = names.stream()
@@ -458,7 +463,7 @@ public class BulkService {
     private List<Requirement> requirements(BulkRunEntity run, String permission) {
         return requirements(
                 items.findByRunIdOrderByOrdinal(run.getId()).stream()
-                        .map(BulkRunItemEntity::getQueueName)
+                        .map(BulkRunItemEntity::getSubscription)
                         .toList(),
                 permission);
     }
@@ -468,8 +473,9 @@ public class BulkService {
     }
 
     private BulkRunDetailView detail(BulkRunEntity run) {
+        Of idTexts = ids.of(run.getClusterId());
         List<BulkItemView> rows = items.findByRunIdOrderByOrdinal(run.getId()).stream()
-                .map(this::view)
+                .map(item -> view(idTexts, item))
                 .toList();
         return new BulkRunDetailView(view(run), rows);
     }
@@ -482,11 +488,15 @@ public class BulkService {
                 options(run));
     }
 
-    private BulkItemView view(BulkRunItemEntity item) {
+    private BulkItemView view(Of idTexts, BulkRunItemEntity item) {
         List<NodeOutcome> outcome = item.getOutcome() == null
                 ? null
                 : json.readValue(item.getOutcome(), new TypeReference<List<NodeOutcome>>() {});
-        return views.toView(item, json.readValue(item.getEstimate(), ItemEstimate.class), outcome);
+        return views.toView(
+                item,
+                idTexts.subscription(item.getSubscription()),
+                json.readValue(item.getEstimate(), ItemEstimate.class),
+                outcome);
     }
 
     private RunOptions options(BulkRunEntity run) {

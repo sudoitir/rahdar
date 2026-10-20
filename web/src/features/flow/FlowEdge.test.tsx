@@ -12,7 +12,7 @@ describe('flow edge', () => {
         kind: 'ROUTE',
         delivery: 'COPY',
         rate: 12.5,
-        rateSource: 'QUEUE_METRIC',
+        rateSource: 'SUBSCRIPTION_METRIC',
         stale: false,
         faults: [],
         bypassed: false,
@@ -65,7 +65,7 @@ describe('flow edge', () => {
       targetY: 0,
       sourcePosition: Position.Right,
       targetPosition: Position.Left,
-      data: { view: { rateSource: 'QUEUE_METRIC', stale: false, faults: [], ...view }, dots: 0, dimmed: false },
+      data: { view: { rateSource: 'SUBSCRIPTION_METRIC', stale: false, faults: [], ...view }, dots: 0, dimmed: false },
     } as unknown as EdgeProps;
     const { container } = render(
       <ReactFlowProvider>
@@ -92,7 +92,7 @@ describe('flow edge', () => {
   });
 
   it('keeps the double line of a bridge in proportion', () => {
-    const [outer, inner] = drawEdge({ kind: 'BRIDGE', rate: 1000 });
+    const [outer, inner] = drawEdge({ kind: 'LINK', rate: 1000 });
     expect(outer.style.getPropertyValue('--edge-width')).toBe('12px');
     expect(inner.style.getPropertyValue('--edge-width')).toBe('12px');
   });

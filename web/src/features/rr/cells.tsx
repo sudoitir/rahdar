@@ -20,8 +20,8 @@ export function FlowStateBadge({ state }: Readonly<{ state: string }>) {
  * actually being browsed this minute. A pattern matching nothing yet is normal — the
  * responder has not started — so it reads as a state, not an error.
  */
-export function ReplyAddressesCell({ expectation: e }: Readonly<{ expectation: ExpectationView }>) {
-  if (e.replyAddresses.length === 0) {
+export function ReplyDestinationsCell({ expectation: e }: Readonly<{ expectation: ExpectationView }>) {
+  if (e.replyDestinations.length === 0) {
     return (
       <Text size="sm" c="dimmed">
         temporary queues
@@ -29,19 +29,19 @@ export function ReplyAddressesCell({ expectation: e }: Readonly<{ expectation: E
     );
   }
 
-  const resolved = e.resolvedReplyAddresses;
-  const patterns = e.replyAddresses.filter((a) => a.includes('*'));
+  const resolved = e.resolvedReplyDestinations;
+  const patterns = e.replyDestinations.filter((a) => a.includes('*'));
 
   return (
     <Stack gap="xs">
-      <Text size="sm">{e.replyAddresses.join(', ')}</Text>
-      {patterns.length > 0 || e.replyAddressesCapped ? (
+      <Text size="sm">{e.replyDestinations.join(', ')}</Text>
+      {patterns.length > 0 || e.replyDestinationsCapped ? (
         <Text
           size="xs"
-          c={e.replyAddressesCapped || resolved.length === 0 ? undefined : 'dimmed'}
-          className={e.replyAddressesCapped || resolved.length === 0 ? classes.warn : undefined}
+          c={e.replyDestinationsCapped || resolved.length === 0 ? undefined : 'dimmed'}
+          className={e.replyDestinationsCapped || resolved.length === 0 ? classes.warn : undefined}
         >
-          {resolutionWords(e.replyAddressesCapped, resolved.length)}
+          {resolutionWords(e.replyDestinationsCapped, resolved.length)}
         </Text>
       ) : null}
     </Stack>
@@ -104,7 +104,7 @@ export function ExpectationEnabled({
   return (
     <Switch
       size="sm"
-      aria-label={`Trace ${e.requestAddress}`}
+      aria-label={`Trace ${e.requestDestination}`}
       checked={e.enabled}
       disabled={controls.denied || controls.savingId === e.id}
       onChange={(event) => controls.onToggle(e, event.currentTarget.checked)}
@@ -120,7 +120,7 @@ export function ExpectationRemove({
   return (
     <ActionIcon
       variant="subtle"
-      aria-label={`Remove ${e.requestAddress}`}
+      aria-label={`Remove ${e.requestDestination}`}
       disabled={controls.denied || controls.removingId === e.id}
       onClick={() => controls.onRemove(e)}
     >

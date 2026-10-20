@@ -22,7 +22,7 @@ import { OPERATIONS, plural } from './words.ts';
 
 const hasProblem = (i: BulkItemView) => i.status === 'REFUSED' || Boolean(i.warning);
 
-const rowKey = (i: BulkItemView) => i.queueName;
+const rowKey = (i: BulkItemView) => i.subscription;
 
 const START = { verb: 'Start', past: 'Started', progressive: 'Starting' } as const;
 

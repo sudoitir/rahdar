@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { Stack, Text } from '@mantine/core';
 import { CompositeChart } from '@mantine/charts';
 
+import { subscriptionIdOf } from '../../kernel/api/resourceId.ts';
 import { useServerNow } from '../../kernel/time/time.ts';
 import { ErrorState } from '../../ui/ErrorState.tsx';
 import { LoadingState } from '../../ui/LoadingState.tsx';
@@ -165,8 +166,7 @@ export function NodeSplitPanels({
     clusterId,
     {
       metrics: METRICS,
-      subjectType: 'QUEUE',
-      subject: queueName,
+      resource: subscriptionIdOf(queueName),
       from: new Date(from).toISOString(),
       to: new Date(to).toISOString(),
       step: spec.step,

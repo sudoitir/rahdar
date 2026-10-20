@@ -67,10 +67,9 @@ public class RahdarLoadSimulation extends Simulation {
                 .exec(http("ui.queues.search").get("/clusters/#{clusterId}/queues?size=50&q=load.q.1&sort=name"))
                 .exec(http("ui.addresses.page").get("/clusters/#{clusterId}/addresses?size=100"))
                 .pause(1, 3)
-                .exec(http("ui.metrics.cluster")
-                        .get("/clusters/#{clusterId}/metrics?metric=messageCount&subjectType=CLUSTER"))
+                .exec(http("ui.metrics.cluster").get("/clusters/#{clusterId}/metrics?metric=messageCount"))
                 .exec(http("ui.metrics.queue")
-                        .get("/clusters/#{clusterId}/metrics?metric=messageCount&subjectType=QUEUE&subject=#{queue}"))
+                        .get("/clusters/#{clusterId}/metrics?metric=messageCount&resource=artemis.queue%2F#{queue}"))
                 .pause(1, 3);
     }
 

@@ -1,11 +1,11 @@
 import { Button, Code, Stack, TagsInput, Text } from '@mantine/core';
 
-import { useReplyAddressResolution } from './useReplyAddressResolution.ts';
+import { useReplyDestinationResolution } from './useReplyDestinationResolution.ts';
 import classes from './rr.module.css';
 
 const PREVIEW_LIMIT = 6;
 
-export interface ReplyAddressesInputProps {
+export interface ReplyDestinationsInputProps {
   clusterId: string;
   value: string[];
   onChange: (value: string[]) => void;
@@ -24,18 +24,18 @@ export interface ReplyAddressesInputProps {
  * several entries, and it distinguishes "I meant temporary queues" from "I have not
  * filled this in" by saying out loud what an empty set means.
  *
- * The saying-out-loud is {@link ReplyAddressesHelp}, which the caller renders below
+ * The saying-out-loud is {@link ReplyDestinationsHelp}, which the caller renders below
  * the form row rather than under the field: four lines of prose inside a
  * bottom-aligned row was what pushed this control above every other one on the form.
  */
-export function ReplyAddressesInput({
+export function ReplyDestinationsInput({
   clusterId,
   value,
   onChange,
   label = 'Reply addresses',
   w,
-}: Readonly<ReplyAddressesInputProps>) {
-  const { known } = useReplyAddressResolution(clusterId, value);
+}: Readonly<ReplyDestinationsInputProps>) {
+  const { known } = useReplyDestinationResolution(clusterId, value);
 
   return (
     <TagsInput
@@ -60,8 +60,8 @@ function resolvedWords(count: number, preview: string, overflow: number): string
 }
 
 /** What an empty set means, what a glob covers, and what it resolves to right now. */
-export function ReplyAddressesHelp({ clusterId, value }: Readonly<{ clusterId: string; value: string[] }>) {
-  const { resolved, unmatched, isError, retry } = useReplyAddressResolution(clusterId, value);
+export function ReplyDestinationsHelp({ clusterId, value }: Readonly<{ clusterId: string; value: string[] }>) {
+  const { resolved, unmatched, isError, retry } = useReplyDestinationResolution(clusterId, value);
 
   const preview = resolved.slice(0, PREVIEW_LIMIT).join(', ');
   const overflow = resolved.length - PREVIEW_LIMIT;

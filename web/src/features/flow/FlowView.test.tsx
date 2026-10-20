@@ -20,10 +20,10 @@ const { FlowView } = await import('./FlowView.tsx');
 function graph(over: Record<string, unknown> = {}) {
   return {
     nodes: [
-      { id: 'address:orders', kind: 'ADDRESS', label: 'orders', routingTypes: ['ANYCAST'], faults: [] },
+      { id: 'destination:orders', kind: 'DESTINATION', label: 'orders', routingTypes: ['ANYCAST'], faults: [] },
       {
-        id: 'queue:ORDERS.inbound',
-        kind: 'QUEUE',
+        id: 'subscription:ORDERS.inbound',
+        kind: 'SUBSCRIPTION',
         label: 'orders',
         messageCount: 1200,
         consumerCount: 0,
@@ -35,10 +35,10 @@ function graph(over: Record<string, unknown> = {}) {
       {
         id: 'route:orders->orders',
         kind: 'ROUTE',
-        source: 'address:orders',
-        target: 'queue:ORDERS.inbound',
+        source: 'destination:orders',
+        target: 'subscription:ORDERS.inbound',
         rate: 42,
-        rateSource: 'QUEUE_METRIC',
+        rateSource: 'SUBSCRIPTION_METRIC',
         asOf: '2026-09-14T10:00:00Z',
         stale: false,
         delivery: 'SHARED',
@@ -48,7 +48,7 @@ function graph(over: Record<string, unknown> = {}) {
         id: 'produce:order-svc->orders',
         kind: 'PRODUCE',
         source: 'producer:order-svc',
-        target: 'address:orders',
+        target: 'destination:orders',
         rateSource: 'SAMPLER',
         stale: false,
         members: 2,
@@ -91,7 +91,7 @@ function serve(body: Record<string, unknown>, seen: string[] = []) {
 function splitGraph() {
   const base = graph({ measuring: false, sampledAt: '2026-09-14T10:00:00Z' });
   const nodes = (base.nodes as Array<Record<string, unknown>>).map((n) =>
-    n.kind === 'QUEUE'
+    n.kind === 'SUBSCRIPTION'
       ? {
           ...n,
           byNode: [
@@ -206,7 +206,7 @@ describe('FlowView', () => {
   });
 
   it('says a narrowed table is narrowed, and clears the focus and the layers on request', async () => {
-    routerState.search = { tab: 'table', layers: 'BRIDGES' };
+    routerState.search = { tab: 'table', layers: 'ROUTES' };
     serve(graph({ nodes: [], edges: [], brokerNodes: [] }));
     renderWithProviders(<FlowView />);
 
@@ -214,7 +214,7 @@ describe('FlowView', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Clear filters' }));
 
     const call = routerState.navigate.mock.calls.at(-1)?.[0] as { search: (prev: object) => Record<string, unknown> };
-    expect(call.search({ tab: 'table', layers: 'BRIDGES' })).toEqual({
+    expect(call.search({ tab: 'table', layers: 'ROUTES' })).toEqual({
       tab: 'table',
       layers: undefined,
       focus: undefined,
@@ -276,7 +276,7 @@ describe('FlowView', () => {
   });
 
   it('says when a focus matches nothing and clears it through the URL', async () => {
-    routerState.search = { focus: 'queue:ARCHIVE.gone' };
+    routerState.search = { focus: 'subscription:ARCHIVE.gone' };
     serve(
       graph({
         nodes: [],
@@ -292,7 +292,7 @@ describe('FlowView', () => {
     await userEvent.click(screen.getAllByRole('button', { name: 'Clear focus' })[0]);
 
     const call = routerState.navigate.mock.calls.at(-1)?.[0] as { search: (prev: object) => Record<string, unknown> };
-    expect(call.search({ focus: 'queue:ARCHIVE.gone', rank: 'OUT' })).toEqual({
+    expect(call.search({ focus: 'subscription:ARCHIVE.gone', rank: 'OUT' })).toEqual({
       focus: undefined,
       hops: undefined,
       rank: 'OUT',
@@ -342,7 +342,7 @@ describe('FlowView', () => {
     await userEvent.click(await screen.findByRole('checkbox', { name: 'Dead letter & expiry' }));
 
     const call = routerState.navigate.mock.calls.at(-1)?.[0] as { search: (prev: object) => Record<string, unknown> };
-    expect(call.search({})).toEqual({ layers: 'BRIDGES,CLUSTER,DEAD_LETTER,DIVERTS' });
+    expect(call.search({})).toEqual({ layers: 'CLUSTER,DEAD_LETTER,ROUTES' });
   });
 
   it('offers ranking, grouping and the bound as labelled controls', async () => {
@@ -376,7 +376,7 @@ describe('FlowView', () => {
   });
 
   it('restores the selection from the address, states imbalance in words, and never reads a silent node as zero', async () => {
-    routerState.search = { tab: 'split', node: 'queue:ORDERS.inbound' };
+    routerState.search = { tab: 'split', node: 'subscription:ORDERS.inbound' };
     const seen: string[] = [];
     serve(splitGraph(), seen);
     serveHistory();
@@ -401,18 +401,21 @@ describe('FlowView', () => {
   });
 
   it('clears the selection through the address', async () => {
-    routerState.search = { tab: 'split', node: 'queue:ORDERS.inbound' };
+    routerState.search = { tab: 'split', node: 'subscription:ORDERS.inbound' };
     serve(splitGraph());
     serveHistory();
     renderWithProviders(<FlowView />);
 
     await userEvent.click(await screen.findByRole('button', { name: 'Clear selection' }));
     const call = routerState.navigate.mock.calls.at(-1)?.[0] as { search: (prev: object) => Record<string, unknown> };
-    expect(call.search({ tab: 'split', node: 'queue:ORDERS.inbound' })).toEqual({ tab: 'split', node: undefined });
+    expect(call.search({ tab: 'split', node: 'subscription:ORDERS.inbound' })).toEqual({
+      tab: 'split',
+      node: undefined,
+    });
   });
 
   it('opens the inspector for a selection in the address in the graph layout', async () => {
-    routerState.search = { node: 'queue:ORDERS.inbound' };
+    routerState.search = { node: 'subscription:ORDERS.inbound' };
     serve(graph());
     renderWithProviders(<FlowView />);
 
@@ -504,20 +507,20 @@ describe('FlowView controls', () => {
   });
 
   it('states the focus, widens its reach by hops, and steps back to the neighbours', async () => {
-    routerState.search = { focus: 'queue:orders', hops: 2 };
+    routerState.search = { focus: 'subscription:orders', hops: 2 };
     serve(graph({ focus: { kind: 'queue', name: 'orders', hops: 2, matched: true } }));
     const user = userEvent.setup();
     renderWithProviders(<FlowView />);
 
-    expect(await screen.findByText('Focused on queue orders')).toBeInTheDocument();
+    expect(await screen.findByText('Focused on subscription orders')).toBeInTheDocument();
     // A focused view has reached everything it can, so it does not suggest raising the limit.
     expect(screen.queryByText(/Raise the limit, or focus/)).not.toBeInTheDocument();
     expect(screen.getByRole('radio', { name: '+1 hop' })).toBeChecked();
 
     await user.click(screen.getByRole('radio', { name: '+2 hops' }));
-    expect(nextSearch({ focus: 'queue:orders' })).toEqual({ focus: 'queue:orders', hops: 3 });
+    expect(nextSearch({ focus: 'subscription:orders' })).toEqual({ focus: 'subscription:orders', hops: 3 });
     await user.click(screen.getByRole('radio', { name: 'Neighbours' }));
-    expect(nextSearch({ focus: 'queue:orders' })).toEqual({ focus: 'queue:orders', hops: undefined });
+    expect(nextSearch({ focus: 'subscription:orders' })).toEqual({ focus: 'subscription:orders', hops: undefined });
   });
 
   it('states why the flow could not be read and asks again on request', async () => {
@@ -600,7 +603,7 @@ describe('FlowView controls', () => {
     await user.click(selectInput('Find in this view'));
     await user.click(await screen.findByRole('option', { name: 'order-svc' }));
 
-    expect(nextSearch({ node: 'queue:ORDERS.inbound', hops: 3 })).toEqual({
+    expect(nextSearch({ node: 'subscription:ORDERS.inbound', hops: 3 })).toEqual({
       node: undefined,
       hops: undefined,
       focus: 'client:order-svc',
@@ -626,25 +629,25 @@ describe('FlowView controls', () => {
   });
 
   it('focuses from the inspector, and closes it back to no selection', async () => {
-    routerState.search = { node: 'queue:ORDERS.inbound' };
+    routerState.search = { node: 'subscription:ORDERS.inbound' };
     serve(graph());
     const user = userEvent.setup();
     renderWithProviders(<FlowView />);
 
     const inspector = await screen.findByRole('complementary', { name: 'Details of Queue orders' });
     await user.click(within(inspector).getByRole('button', { name: /^Focus/ }));
-    expect(nextSearch({ node: 'queue:ORDERS.inbound' })).toEqual({
-      focus: 'queue:orders',
+    expect(nextSearch({ node: 'subscription:ORDERS.inbound' })).toEqual({
+      focus: 'subscription:orders',
       hops: undefined,
       node: undefined,
     });
 
     await user.click(within(inspector).getByRole('button', { name: 'Close details' }));
-    expect(nextSearch({ node: 'queue:ORDERS.inbound' })).toEqual({ node: undefined });
+    expect(nextSearch({ node: 'subscription:ORDERS.inbound' })).toEqual({ node: undefined });
   });
 
   it('changes the window of the monitoring pane, leaving the default out of the address', async () => {
-    routerState.search = { tab: 'split', node: 'queue:ORDERS.inbound' };
+    routerState.search = { tab: 'split', node: 'subscription:ORDERS.inbound' };
     serve(splitGraph());
     serveHistory();
     const user = userEvent.setup();
@@ -656,7 +659,7 @@ describe('FlowView controls', () => {
   });
 
   it('drops the range from the address when the pane goes back to an hour', async () => {
-    routerState.search = { tab: 'split', node: 'queue:ORDERS.inbound', range: '6h' };
+    routerState.search = { tab: 'split', node: 'subscription:ORDERS.inbound', range: '6h' };
     serve(splitGraph());
     serveHistory();
     const user = userEvent.setup();

@@ -75,8 +75,8 @@ class AlertPayloadsTest {
     @Test
     void subjectsAreLabelledReadably() {
         Map<String, String> names = Map.of(nodeId.toString(), "primary-1");
-        assertThat(AlertPayloads.label("node:" + nodeId + "/queue:orders", "prod", names))
-                .isEqualTo("node primary-1 / queue orders");
+        assertThat(AlertPayloads.label("node:" + nodeId + "/subscription:orders", "prod", names))
+                .isEqualTo("node primary-1 / subscription orders");
         assertThat(AlertPayloads.label("cluster", "prod", names)).isEqualTo("cluster prod");
         assertThat(AlertPayloads.label("rahdar", "prod", names)).isEqualTo("Rahdar host");
         assertThat(AlertPayloads.label("setup:HA_SINGLE_PAIR_QUORUM:cluster", "prod", names))

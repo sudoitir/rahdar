@@ -17,7 +17,7 @@ const LONG_SELECTOR = 'payment.customer.billing.address.line1.customerIdentifica
 const rule = (over: Partial<RuleView> = {}): RuleView =>
   ({
     id: 'r1',
-    addressPattern: null,
+    destinationPattern: null,
     target: 'BODY_PATH',
     selector: 'authorization',
     dataClass: 'CREDENTIAL',
@@ -34,7 +34,7 @@ const rule = (over: Partial<RuleView> = {}): RuleView =>
 const finding = (over: Partial<FindingView> = {}): FindingView =>
   ({
     id: 'f1',
-    address: 'orders.eu.customers.registration.verification.requests',
+    destination: 'orders.eu.customers.registration.verification.requests',
     location: 'BODY',
     fieldPath: LONG_SELECTOR,
     dataClass: 'EMAIL',
@@ -47,7 +47,11 @@ const finding = (over: Partial<FindingView> = {}): FindingView =>
   }) as FindingView;
 
 const rules = [
-  rule({ selector: LONG_SELECTOR, addressPattern: 'orders.eu.customers.registration.verification.#', exception: true }),
+  rule({
+    selector: LONG_SELECTOR,
+    destinationPattern: 'orders.eu.customers.registration.verification.#',
+    exception: true,
+  }),
   rule({ id: 'r2', builtin: true, target: 'HEADER' }),
   rule({ id: 'r3', selector: 'customerEmail', target: 'PROPERTY' }),
 ];

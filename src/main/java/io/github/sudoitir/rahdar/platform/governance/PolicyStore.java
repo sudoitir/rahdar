@@ -56,7 +56,7 @@ class PolicyStore {
     static Rule toRule(GovernanceRuleEntity e) {
         return new Rule(
                 e.getId(),
-                e.getAddressPattern(),
+                e.getDestinationPattern(),
                 RuleTarget.valueOf(e.getTarget()),
                 e.getSelector(),
                 DataClass.valueOf(e.getDataClass()),

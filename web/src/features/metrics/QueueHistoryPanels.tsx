@@ -3,6 +3,7 @@ import { Button, Group, Stack, Text } from '@mantine/core';
 import { useNavigate } from '@tanstack/react-router';
 
 import { useMetrics } from './api.ts';
+import { subscriptionIdOf } from '../../kernel/api/resourceId.ts';
 import { serverNow } from '../../kernel/time/time.ts';
 import { DepthChart } from './DepthChart.tsx';
 import { rangeSpec } from './ranges.ts';
@@ -39,8 +40,7 @@ export function QueueHistoryPanels({
     clusterId,
     {
       metrics: ['openbroker.backlog', 'openbroker.enqueued', 'openbroker.acknowledged'],
-      subjectType: 'QUEUE',
-      subject: queueName,
+      resource: subscriptionIdOf(queueName),
       from,
       to,
     },

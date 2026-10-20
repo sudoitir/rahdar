@@ -7,8 +7,8 @@ import classes from './FlowView.module.css';
 
 const KIND: Record<string, string> = {
   PRODUCER: 'client',
-  ADDRESS: 'address',
-  QUEUE: 'queue',
+  DESTINATION: 'address',
+  SUBSCRIPTION: 'queue',
   CONSUMER: 'client',
   REMOTE: 'remote',
 };

@@ -139,10 +139,10 @@ public final class McpViews {
      * available" — a distinct fact from zero, and one a model must not flatten into
      * "no throughput".
      */
-    public record QueueDiagnosis(
+    public record SubscriptionDiagnosis(
             UUID clusterId,
-            String queue,
-            String address,
+            String subscription,
+            String destination,
             String verdict,
             int severity,
             String cause,
@@ -198,7 +198,7 @@ public final class McpViews {
     /** A message header row from {@code browse_messages}; bodies are a separate, explicit call. */
     public record MessageHeader(
             String messageId,
-            String queue,
+            String subscription,
             String node,
             Instant timestamp,
             Long size,

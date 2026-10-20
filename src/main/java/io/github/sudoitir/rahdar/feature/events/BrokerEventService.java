@@ -101,7 +101,7 @@ public class BrokerEventService {
                 clusterAccess.holds(clusterId, Permissions.CLUSTER_READ),
                 blankToNull(query.type()),
                 query.nodeId(),
-                blankToNull(query.address()),
+                blankToNull(query.destination()),
                 query.from() != null ? query.from() : Instant.EPOCH,
                 query.to() != null ? query.to() : Instant.parse("9999-12-31T23:59:59Z"));
         Routed<Slice> routed = heavy.run(
@@ -132,7 +132,7 @@ public class BrokerEventService {
             boolean unaddressed,
             String type,
             UUID nodeId,
-            String address,
+            String destination,
             Instant from,
             Instant to) {}
 
@@ -158,7 +158,7 @@ public class BrokerEventService {
         }
         optional(conditions, params, "type", w.type());
         optional(conditions, params, "node_id", w.nodeId());
-        optional(conditions, params, "destination", w.address());
+        optional(conditions, params, "destination", w.destination());
         Cursor after = query.after();
         String sql = "SELECT " + COLUMNS + " FROM broker_event WHERE " + conditions
                 + (after == null ? "" : " AND seq < :afterSeq")

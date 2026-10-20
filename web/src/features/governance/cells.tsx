@@ -98,7 +98,7 @@ export function FindingDecision({
         disabled={locked}
         loading={decidingHere === 'confirm'}
         onClick={() => controls.onDecide(f, 'confirm')}
-        aria-label={`Confirm ${fieldOf(f)} on ${f.address} as ${f.dataClassLabel}`}
+        aria-label={`Confirm ${fieldOf(f)} on ${f.destination} as ${f.dataClassLabel}`}
       >
         Confirm
       </Button>
@@ -108,7 +108,7 @@ export function FindingDecision({
         disabled={locked}
         loading={decidingHere === 'dismiss'}
         onClick={() => controls.onDecide(f, 'dismiss')}
-        aria-label={`Dismiss ${fieldOf(f)} on ${f.address} as not ${f.dataClassLabel}`}
+        aria-label={`Dismiss ${fieldOf(f)} on ${f.destination} as not ${f.dataClassLabel}`}
       >
         Dismiss
       </Button>

@@ -109,7 +109,7 @@ class EventControllerTest extends PostgresIntegrationTest {
 
     @Test
     void filtersByAddress() throws Exception {
-        mvc.perform(get("/api/v1/clusters/{c}/events", clusterId).param("address", "payments"))
+        mvc.perform(get("/api/v1/clusters/{c}/events", clusterId).param("destination", "payments"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.count").value(1));
     }

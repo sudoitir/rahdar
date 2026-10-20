@@ -3609,7 +3609,7 @@ export interface components {
             mappings: components["schemas"]["GroupMappingView"][];
         };
         RuleRequest: {
-            addressPattern?: string | null;
+            destinationPattern?: string | null;
             target: string;
             selector: string;
             dataClass: string;
@@ -3619,7 +3619,7 @@ export interface components {
         RuleView: {
             /** Format: uuid */
             id: string;
-            addressPattern?: string | null;
+            destinationPattern?: string | null;
             target: string;
             selector: string;
             dataClass: string;
@@ -3654,7 +3654,7 @@ export interface components {
             quotaWarnPercent: number;
         };
         UpdateExpectationRequest: {
-            replyAddresses?: string[];
+            replyDestinations?: string[];
             correlationProperty?: string;
             /** Format: int32 */
             deadlineMs?: number;
@@ -3666,12 +3666,12 @@ export interface components {
         ExpectationView: {
             /** Format: uuid */
             id: string;
-            requestAddress: string;
-            replyAddresses: string[];
-            /** @description What replyAddresses currently expands to, from the last scrape's addresses */
-            resolvedReplyAddresses: string[];
+            requestDestination: string;
+            replyDestinations: string[];
+            /** @description What replyDestinations currently expands to, from the last scrape's addresses */
+            resolvedReplyDestinations: string[];
             /** @description The resolution cap cut the expansion short */
-            replyAddressesCapped: boolean;
+            replyDestinationsCapped: boolean;
             correlationProperty?: string | null;
             /** Format: int32 */
             deadlineMs?: number | null;
@@ -4334,7 +4334,7 @@ export interface components {
         FindingView: {
             /** Format: uuid */
             id: string;
-            address: string;
+            destination: string;
             location: string;
             fieldPath: string;
             dataClass: string;
@@ -4547,8 +4547,8 @@ export interface components {
             /** Format: uuid */
             nodeId: string;
             nodeName: string;
-            queue: string;
-            address: string;
+            subscription: string;
+            destination: string;
         };
         TransferRunView: {
             /** Format: uuid */
@@ -4621,12 +4621,12 @@ export interface components {
             planHash: string;
             override: boolean;
             acknowledged?: string[] | null;
-            confirmQueue?: string | null;
+            confirmSubscription?: string | null;
         };
         TransferPreviewRequest: {
             /** @enum {string} */
             mode: "MOVE" | "COPY";
-            sourceQueue: string;
+            source: string;
             /** Format: uuid */
             sourceNodeId: string;
             selection: components["schemas"]["TransferSelection"];
@@ -4634,14 +4634,13 @@ export interface components {
             targetClusterId: string;
             /** Format: uuid */
             targetNodeId: string;
-            targetQueue: string;
-            targetAddress?: string | null;
+            target: string;
         };
         OrphanReturnRequest: {
             /** Format: uuid */
             nodeId: string;
             stagingQueue: string;
-            targetQueue: string;
+            target: string;
         };
         OrphanReturnView: {
             stagingQueue: string;
@@ -4655,7 +4654,7 @@ export interface components {
         VerifyRequest: {
             /** Format: uuid */
             nodeId?: string;
-            queueName?: string;
+            subscription?: string;
             /** Format: int64 */
             messageId: number;
             /** Format: int64 */
@@ -4720,14 +4719,16 @@ export interface components {
             /** Format: uuid */
             nodeId?: string;
             nodeName?: string;
-            queueName?: string;
-            address?: string;
+            /** @description The subscription's id. */
+            subscription?: string;
+            /** @description The id of the destination the subscription is bound to. */
+            destination?: string;
             /** Format: int64 */
             messageCount: number;
         };
         /** @description A request to start capturing a queue's messages into the index. */
         IndexSubscriptionRequest: {
-            queuePattern?: string;
+            subscriptionPattern?: string;
             /** Format: int32 */
             retentionDays?: number;
             /** Format: int64 */
@@ -4779,7 +4780,7 @@ export interface components {
         IndexSubscriptionView: {
             /** Format: uuid */
             id?: string;
-            queuePattern?: string;
+            subscriptionPattern?: string;
             /** Format: int32 */
             retentionDays: number;
             /** Format: int64 */
@@ -4820,8 +4821,8 @@ export interface components {
         };
         /** @description What creating a capture subscription would do, without doing it: what it covers, where, how much it may hold, and the broker objects and configuration it amounts to. */
         CapturePreviewView: {
-            /** @description The addresses the pattern resolves to. Rahdar's own capture addresses are never included. */
-            addresses?: string[];
+            /** @description The ids of the destinations the pattern resolves to. Rahdar's own capture destinations are never included. */
+            destinations?: string[];
             /** @description The live nodes the tap would be installed on. */
             nodes?: string[];
             /**
@@ -4927,8 +4928,8 @@ export interface components {
             expiresAt?: string | null;
         };
         CreateExpectationRequest: {
-            requestAddress: string;
-            replyAddresses?: string[];
+            requestDestination: string;
+            replyDestinations?: string[];
             correlationProperty?: string;
             /** Format: int32 */
             deadlineMs?: number;
@@ -5314,7 +5315,8 @@ export interface components {
         BulkItemView: {
             /** Format: int32 */
             ordinal: number;
-            queueName: string;
+            /** @description The subscription's id. */
+            subscription: string;
             /** @enum {string} */
             status: "PENDING" | "REFUSED" | "RUNNING" | "SUCCEEDED" | "PARTIAL" | "FAILED" | "SKIPPED" | "CANCELLED" | "UNKNOWN";
             error?: string | null;
@@ -6546,12 +6548,14 @@ export interface components {
         RowView: {
             /**
              * Format: uuid
-             * @description The node holding the message. Identity is (node, queue, messageId).
+             * @description The node holding the message. Identity is (node, subscription, messageId).
              */
             nodeId?: string;
             nodeName?: string;
-            queueName?: string;
-            address?: string;
+            /** @description The subscription's id. */
+            subscription?: string;
+            /** @description The id of the destination the subscription is bound to. */
+            destination?: string;
             /** Format: int64 */
             messageId: number;
             /** Format: int32 */
@@ -6599,7 +6603,8 @@ export interface components {
             /** Format: uuid */
             nodeId?: string;
             nodeName?: string;
-            queueName?: string;
+            /** @description The subscription's id. */
+            subscription?: string;
             /** @description ANSWERED, FAILED or NOT_READ. */
             status?: string;
             /** Format: int64 */
@@ -6688,8 +6693,8 @@ export interface components {
             /** @description The actions of the catalogue that apply to this row and that the caller holds on it, such as subscription:purge. The console gates its controls from this. */
             allowedActions: string[];
         };
-        AddressStatsView: {
-            address: string;
+        DestinationStatsView: {
+            destination: string;
             /** Format: int64 */
             inFlight: number;
             /** Format: int64 */
@@ -6715,7 +6720,7 @@ export interface components {
             windowMs: number;
         };
         StatsResponse: {
-            addresses: components["schemas"]["AddressStatsView"][];
+            destinations: components["schemas"]["DestinationStatsView"][];
         };
         FlowView: {
             /** Format: uuid */
@@ -6724,7 +6729,7 @@ export interface components {
             clusterId: string;
             /** Format: uuid */
             nodeId?: string | null;
-            requestAddress?: string | null;
+            requestDestination?: string | null;
             replyDestination?: string | null;
             replyKind: string;
             state: string;
@@ -6814,7 +6819,7 @@ export interface components {
         ExpectationDiagnosticsView: {
             /** Format: uuid */
             expectationId: string;
-            requestAddress: string;
+            requestDestination: string;
             enabled: boolean;
             /** Format: date-time */
             lastAttemptAt?: string | null;
@@ -7157,13 +7162,13 @@ export interface components {
         FlowEdgeView: {
             id?: string;
             /** @enum {string} */
-            kind?: "PRODUCE" | "ROUTE" | "CONSUME" | "DIVERT" | "BRIDGE" | "CLUSTER_HOP" | "WILDCARD" | "DEAD_LETTER" | "EXPIRY";
+            kind?: "PRODUCE" | "ROUTE" | "CONSUME" | "FORWARD" | "LINK" | "CLUSTER_HOP" | "WILDCARD" | "DEAD_LETTER" | "EXPIRY";
             source?: string;
             target?: string;
             /** Format: double */
             rate?: number | null;
             /** @enum {string} */
-            rateSource?: "SAMPLER" | "QUEUE_METRIC" | "NONE";
+            rateSource?: "SAMPLER" | "SUBSCRIPTION_METRIC" | "NONE";
             /** Format: date-time */
             asOf?: string | null;
             /** Format: int64 */
@@ -7182,7 +7187,7 @@ export interface components {
             /** Format: int32 */
             presentOf?: number | null;
             rahdar: boolean;
-            faults?: ("NO_CONSUMER" | "STALLED" | "BRIDGE_DOWN" | "PARTIAL_PRESENCE")[];
+            faults?: ("NO_CONSUMER" | "STALLED" | "LINK_DOWN" | "PARTIAL_PRESENCE")[];
             byNode?: components["schemas"]["FlowNodeRate"][] | null;
         };
         FlowFocusView: {
@@ -7244,9 +7249,9 @@ export interface components {
         FlowNodeView: {
             id?: string;
             /** @enum {string} */
-            kind?: "PRODUCER" | "ADDRESS" | "QUEUE" | "CONSUMER" | "REMOTE";
+            kind?: "PRODUCER" | "DESTINATION" | "SUBSCRIPTION" | "CONSUMER" | "REMOTE";
             /** @enum {string|null} */
-            role?: "STORE_AND_FORWARD" | "TEMPORARY" | "ANONYMOUS" | "CAPTURE" | "DEAD_LETTER" | "EXPIRY" | "CLUSTER_NODE" | "BRIDGE_TARGET" | null;
+            role?: "STORE_AND_FORWARD" | "TEMPORARY" | "ANONYMOUS" | "CAPTURE" | "DEAD_LETTER" | "EXPIRY" | "CLUSTER_NODE" | "LINK_TARGET" | null;
             label?: string;
             /** Format: int32 */
             members?: number | null;
@@ -7259,7 +7264,7 @@ export interface components {
             hosts?: string[];
             users?: string[];
             brokerNodes?: string[];
-            faults?: ("NO_CONSUMER" | "STALLED" | "BRIDGE_DOWN" | "PARTIAL_PRESENCE")[];
+            faults?: ("NO_CONSUMER" | "STALLED" | "LINK_DOWN" | "PARTIAL_PRESENCE")[];
             byNode?: components["schemas"]["FlowNodeShare"][] | null;
         };
         FlowTotals: {
@@ -7305,7 +7310,7 @@ export interface components {
             /** Format: date-time */
             receivedAt: string;
             type: string;
-            address?: string | null;
+            destination?: string | null;
             routingName?: string | null;
             consumerName?: string | null;
             sessionName?: string | null;
@@ -7420,8 +7425,10 @@ export interface components {
             hasNext: boolean;
         };
         ConsumerHealthView: {
-            address: string;
-            queueName: string;
+            /** @description The destination's id. */
+            destination: string;
+            /** @description The subscription's id. */
+            subscription: string;
             /** @description One of INSUFFICIENT_DATA, PAUSED, NO_CONSUMERS, BROKER_SLOW, STALLED, STARVED, FALLING_BEHIND, DRAINING, HEALTHY. */
             verdict: string;
             /**
@@ -19788,7 +19795,7 @@ export interface operations {
         parameters: {
             query?: {
                 state?: string;
-                address?: string;
+                destination?: string;
                 correlationId?: string;
                 from?: string;
                 to?: string;
@@ -20265,8 +20272,7 @@ export interface operations {
         parameters: {
             query: {
                 metric: string[];
-                subjectType?: string;
-                subject?: string;
+                resource?: string;
                 from?: string;
                 to?: string;
                 step?: string;
@@ -20516,7 +20522,7 @@ export interface operations {
             query?: {
                 type?: string;
                 nodeId?: string;
-                address?: string;
+                destination?: string;
                 from?: string;
                 to?: string;
                 page?: number;
@@ -20814,7 +20820,7 @@ export interface operations {
         parameters: {
             query?: {
                 q?: string;
-                queue?: string;
+                subscription?: string;
                 sort?: string;
                 page?: number;
                 size?: number;

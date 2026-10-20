@@ -13,8 +13,8 @@ import classes from './FlowView.module.css';
 const KIND_WORD: Record<string, string> = {
   PRODUCER: 'Producing client',
   CONSUMER: 'Consuming client',
-  ADDRESS: 'Address',
-  QUEUE: 'Queue',
+  DESTINATION: 'Address',
+  SUBSCRIPTION: 'Queue',
   REMOTE: 'Remote',
 };
 
@@ -26,14 +26,14 @@ const ROLE_WORD: Record<string, string> = {
   DEAD_LETTER: 'Dead-letter address',
   EXPIRY: 'Expiry address',
   CLUSTER_NODE: 'Another node of this cluster',
-  BRIDGE_TARGET: 'A bridge target outside this cluster',
+  LINK_TARGET: 'A bridge target outside this cluster',
 };
 
 /** What the inspector states about a node, as term and value; each kind contributes what it has. */
 function nodeFacts(node: FlowNodeView): DescriptionItem[] {
   const facts: DescriptionItem[] = [];
   if (node.role) facts.push({ term: 'What it is', value: ROLE_WORD[node.role] ?? node.role.toLowerCase() });
-  if (node.kind === 'QUEUE') {
+  if (node.kind === 'SUBSCRIPTION') {
     facts.push(
       {
         term: 'Backlog',
@@ -51,7 +51,7 @@ function nodeFacts(node: FlowNodeView): DescriptionItem[] {
       },
     );
   }
-  if (node.kind === 'ADDRESS' && node.routingTypes?.length)
+  if (node.kind === 'DESTINATION' && node.routingTypes?.length)
     facts.push({ term: 'Routing', value: node.routingTypes.join(', ').toLowerCase() });
   if (node.members) facts.push({ term: 'Connections', value: String(node.members) });
   if (node.protocols?.length) facts.push({ term: 'Protocols', value: node.protocols.join(', ') });
@@ -71,12 +71,12 @@ function InspectorActions({
 }>) {
   return (
     <Stack gap="xs">
-      {node.kind === 'QUEUE' && !node.role ? (
+      {node.kind === 'SUBSCRIPTION' && !node.role ? (
         <Button size="xs" variant="subtle" onClick={() => open('queues', { queue: node.label })}>
           Open in Queues
         </Button>
       ) : null}
-      {node.kind === 'ADDRESS' && !node.role ? (
+      {node.kind === 'DESTINATION' && !node.role ? (
         <Button size="xs" variant="subtle" onClick={() => open('addresses')}>
           Open in Addresses
         </Button>

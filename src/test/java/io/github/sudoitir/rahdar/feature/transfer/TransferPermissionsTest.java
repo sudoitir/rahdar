@@ -50,7 +50,13 @@ class TransferPermissionsTest extends TransferTestSupport {
         UUID nowhere = UUID.randomUUID();
         UUID sourceCluster = clusterP.id();
         var request = new TransferPreviewRequest(
-                TransferMode.MOVE, src, clusterP.node(), everything, nowhere, clusterD.node(), "q", null);
+                TransferMode.MOVE,
+                ids.subscription(clusterP.id(), src),
+                clusterP.node(),
+                everything,
+                nowhere,
+                clusterD.node(),
+                "artemis.queue/q");
         assertThatThrownBy(() -> transfers.preview(sourceCluster, request)).isInstanceOf(NotFoundException.class);
     }
 

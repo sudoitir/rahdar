@@ -34,7 +34,7 @@ public class EventController {
             @PathVariable UUID clusterId,
             @RequestParam(required = false) String type,
             @RequestParam(required = false) UUID nodeId,
-            @RequestParam(required = false) String address,
+            @RequestParam(required = false) String destination,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant to,
             @RequestParam(required = false) Integer page,
@@ -44,7 +44,7 @@ public class EventController {
         return events.page(
                 clusterId,
                 new BrokerEventQuery(
-                        type, nodeId, address, from, to, paging.page(), paging.size(), Cursor.decode(after)));
+                        type, nodeId, destination, from, to, paging.page(), paging.size(), Cursor.decode(after)));
     }
 
     /** One event by its seq, for a shared link; 404 once retention has reaped it. */

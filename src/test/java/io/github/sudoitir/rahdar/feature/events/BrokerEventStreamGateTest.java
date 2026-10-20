@@ -39,15 +39,15 @@ class BrokerEventStreamGateTest {
         when(permissions.can(principal, clusterId, ResourceRef.destination("orders"), Permissions.DESTINATION_READ))
                 .thenReturn(true);
 
-        assertThat(mayRead("{\"address\":\"orders\"}")).isTrue();
-        assertThat(mayRead("{\"address\":\"billing\"}")).isFalse();
+        assertThat(mayRead("{\"destination\":\"orders\"}")).isTrue();
+        assertThat(mayRead("{\"destination\":\"billing\"}")).isFalse();
     }
 
     @Test
     void anEventNamingAQueueNeedsThatQueueToo() {
         when(permissions.can(eq(principal), eq(clusterId), eq(ResourceRef.destination("orders")), any()))
                 .thenReturn(true);
-        String event = "{\"address\":\"orders\",\"routingName\":\"billing.in\"}";
+        String event = "{\"destination\":\"orders\",\"routingName\":\"billing.in\"}";
 
         assertThat(mayRead(event)).isFalse();
 

@@ -32,8 +32,10 @@ public interface BulkRunMapper {
     @Mapping(target = "disconnectConsumers", source = "options.disconnectConsumers")
     BulkRunView toView(BulkRunEntity run, long cap, BulkSelection chosen, RunOptions options);
 
+    @Mapping(target = "subscription", source = "subscriptionId")
     @Mapping(target = "nodes", source = "figures.nodes")
     @Mapping(target = "warning", source = "figures.warning")
     @Mapping(target = "outcome", source = "nodeOutcomes")
-    BulkItemView toView(BulkRunItemEntity item, ItemEstimate figures, List<NodeOutcome> nodeOutcomes);
+    BulkItemView toView(
+            BulkRunItemEntity item, String subscriptionId, ItemEstimate figures, List<NodeOutcome> nodeOutcomes);
 }

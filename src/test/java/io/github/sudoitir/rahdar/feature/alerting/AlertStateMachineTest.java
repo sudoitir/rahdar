@@ -15,7 +15,7 @@ class AlertStateMachineTest {
     private static final Instant T0 = Instant.parse("2026-01-01T00:00:00Z");
 
     private static AlertStateEntity fresh() {
-        return new AlertStateEntity(UUID.randomUUID(), "queue:orders");
+        return new AlertStateEntity(UUID.randomUUID(), "subscription:orders");
     }
 
     @Test
@@ -39,7 +39,7 @@ class AlertStateMachineTest {
                 .isNull();
 
         Transition t = AlertStateMachine.advance(state, true, 12.0, 30, T0.plusSeconds(31));
-        assertThat(t).isEqualTo(new Transition("queue:orders", TransitionKind.FIRED, 12.0));
+        assertThat(t).isEqualTo(new Transition("subscription:orders", TransitionKind.FIRED, 12.0));
         assertThat(state.getState()).isEqualTo("FIRING");
     }
 
@@ -47,7 +47,7 @@ class AlertStateMachineTest {
     void zeroDurationFiresImmediately() {
         AlertStateEntity state = fresh();
         Transition t = AlertStateMachine.advance(state, true, 5.0, 0, T0);
-        assertThat(t).isEqualTo(new Transition("queue:orders", TransitionKind.FIRED, 5.0));
+        assertThat(t).isEqualTo(new Transition("subscription:orders", TransitionKind.FIRED, 5.0));
         assertThat(state.getState()).isEqualTo("FIRING");
     }
 
@@ -57,7 +57,7 @@ class AlertStateMachineTest {
         AlertStateMachine.advance(state, true, 5.0, 0, T0);
 
         Transition t = AlertStateMachine.advance(state, false, null, 0, T0.plusSeconds(5));
-        assertThat(t).isEqualTo(new Transition("queue:orders", TransitionKind.RESOLVED, 5.0));
+        assertThat(t).isEqualTo(new Transition("subscription:orders", TransitionKind.RESOLVED, 5.0));
         assertThat(state.getState()).isEqualTo("OK");
         assertThat(state.getSince()).isNull();
     }

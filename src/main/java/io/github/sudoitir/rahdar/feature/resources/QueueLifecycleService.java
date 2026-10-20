@@ -433,9 +433,9 @@ public class QueueLifecycleService {
             try {
                 return QueueCalls.deleteAddress(node, address);
             } catch (ManagementRefusal e) {
-                if (e.kind() == ManagementRefusal.Kind.BOUND_QUEUES) {
+                if (e.kind() == ManagementRefusal.Kind.BOUND_SUBSCRIPTIONS) {
                     throw new ManagementRefusal(
-                            ManagementRefusal.Kind.BOUND_QUEUES, boundQueuesMessage(node, address, readable));
+                            ManagementRefusal.Kind.BOUND_SUBSCRIPTIONS, boundQueuesMessage(node, address, readable));
                 }
                 throw e;
             }

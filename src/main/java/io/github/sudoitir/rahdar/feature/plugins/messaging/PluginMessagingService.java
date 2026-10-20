@@ -102,7 +102,7 @@ public class PluginMessagingService implements PluginScopedBeans {
             if (existing.isPresent()) {
                 RegistrationEntity e = existing.get();
                 boolean sameTarget = e.getClusterId().equals(spec.clusterId())
-                        && e.getQueue().equals(spec.source().name())
+                        && e.getSubscription().equals(spec.source().name())
                         && e.getMode() == spec.mode();
                 if (sameTarget) {
                     // A changed concurrency is converged by the pass below, which restarts the drains.
@@ -122,7 +122,7 @@ public class PluginMessagingService implements PluginScopedBeans {
             row.setPluginId(pluginId);
             row.setKey(spec.key());
             row.setClusterId(spec.clusterId());
-            row.setQueue(spec.source().name());
+            row.setSubscription(spec.source().name());
             row.setMode(spec.mode());
             row.setConcurrency(spec.concurrency());
             row.setActingUserId(spec.actingUserId());
@@ -156,7 +156,7 @@ public class PluginMessagingService implements PluginScopedBeans {
                         PLUGIN,
                         pluginId,
                         "source",
-                        reg.getQueue(),
+                        reg.getSubscription(),
                         "mode",
                         reg.getMode().name()),
                 false);
@@ -333,7 +333,7 @@ public class PluginMessagingService implements PluginScopedBeans {
         return new MessageRegistration(
                 reg.getKey(),
                 reg.getClusterId(),
-                ResourceRef.subscription(reg.getQueue()),
+                ResourceRef.subscription(reg.getSubscription()),
                 reg.getMode(),
                 reg.getConcurrency(),
                 reg.getActingUserId(),

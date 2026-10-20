@@ -2,6 +2,7 @@ import { UnstyledButton } from '@mantine/core';
 import { Link } from '@tanstack/react-router';
 
 import linkClasses from '../../ui/InlineLink.module.css';
+import { resourceName } from '../../kernel/api/resourceId.ts';
 import { absoluteLabel } from '../../kernel/time/time.ts';
 import { StatusBadge } from '../../ui/StatusBadge.tsx';
 import { MiddleTruncate } from '../../ui/table/MiddleTruncate.tsx';
@@ -24,15 +25,18 @@ export function RunOutcome({ run }: Readonly<{ run: BulkRunView }>) {
 }
 
 /** A queue as a real button, so its node detail is reachable from the keyboard. */
-export function QueueButton({ item, onOpen }: Readonly<{ item: BulkItemView; onOpen: (queueName: string) => void }>) {
+export function QueueButton({
+  item,
+  onOpen,
+}: Readonly<{ item: BulkItemView; onOpen: (subscription: string) => void }>) {
   return (
     <UnstyledButton
       className={linkClasses.link}
       maw="100%"
-      aria-label={`Show node detail for ${item.queueName}`}
-      onClick={() => onOpen(item.queueName)}
+      aria-label={`Show node detail for ${resourceName(item.subscription)}`}
+      onClick={() => onOpen(item.subscription)}
     >
-      <MiddleTruncate text={item.queueName} />
+      <MiddleTruncate text={resourceName(item.subscription)} />
     </UnstyledButton>
   );
 }

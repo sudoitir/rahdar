@@ -98,8 +98,8 @@ export const END = (clusterId: string, nodeId: string, nodeName: string, queue: 
   clusterId,
   nodeId,
   nodeName,
-  queue,
-  address: queue,
+  subscription: `artemis.queue/${queue}`,
+  destination: `artemis.address/${queue}`,
 });
 
 export function run(over: Partial<TransferRunView> = {}): TransferRunView {

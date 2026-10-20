@@ -41,9 +41,9 @@ public class ContentPolicy {
     }
 
     /** Whether the caller holds {@code message:clear} on every queue the pattern can match. */
-    public boolean mayClear(UUID clusterId, String queuePattern) {
+    public boolean mayClear(UUID clusterId, String subscriptionPattern) {
         return permissions.canOnAll(
-                clusterId, ResourceType.SUBSCRIPTION, queuePattern, GovernancePermissions.MESSAGE_CLEAR);
+                clusterId, ResourceType.SUBSCRIPTION, subscriptionPattern, GovernancePermissions.MESSAGE_CLEAR);
     }
 
     /** Govern a message for the caller described by {@code context}. */

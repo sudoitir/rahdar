@@ -10,7 +10,7 @@ export type BrokerEventView = Schemas['BrokerEventView'];
 export interface EventFilter {
   type?: string;
   nodeId?: string;
-  address?: string;
+  destination?: string;
   from?: string;
   to?: string;
   page?: number;

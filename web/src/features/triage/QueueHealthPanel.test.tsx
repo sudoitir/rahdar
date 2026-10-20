@@ -8,8 +8,8 @@ import { QueueHealthPanel } from './QueueHealthPanel.tsx';
 
 function row(over: Record<string, unknown> = {}) {
   return {
-    address: 'orders',
-    queueName: 'orders',
+    destination: 'artemis.address/orders',
+    subscription: 'artemis.queue/orders',
     verdict: 'STALLED',
     severity: 4,
     cause: 'The consumer is blocked, or a message it cannot process is being redelivered.',

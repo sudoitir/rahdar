@@ -84,7 +84,9 @@ public class SlowConsumerCondition implements AlertCondition {
             if (!hasBacklogWithConsumers(row) || !inScope(row, scope, nodeScoped)) {
                 continue;
             }
-            String key = nodeScoped ? "node:" + row.nodeId() + "/queue:" + row.queueName() : "queue:" + row.queueName();
+            String key = nodeScoped
+                    ? "node:" + row.nodeId() + "/subscription:" + row.queueName()
+                    : "subscription:" + row.queueName();
             consumersBySubject.merge(key, row.consumerCount(), Long::sum);
             queueNameBySubject.put(key, row.queueName());
         }
@@ -97,8 +99,8 @@ public class SlowConsumerCondition implements AlertCondition {
     }
 
     private static boolean inScope(QueueSnapshot row, AlertScope scope, boolean nodeScoped) {
-        return scope.matchesAddress(row.address())
-                && scope.matchesQueue(row.queueName())
+        return scope.matchesDestination(row.address())
+                && scope.matchesSubscription(row.queueName())
                 && (!nodeScoped || scope.node().equals(row.nodeId().toString()));
     }
 

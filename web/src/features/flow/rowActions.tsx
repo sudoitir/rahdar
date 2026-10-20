@@ -33,11 +33,11 @@ function ShowInFlow({
 }
 
 export function QueueInFlow({ clusterId, target }: Readonly<ActionProps<QueueTarget>>) {
-  return <ShowInFlow clusterId={clusterId} focus={`queue:${target.queueName}`} />;
+  return <ShowInFlow clusterId={clusterId} focus={`subscription:${target.queueName}`} />;
 }
 
 export function AddressInFlow({ clusterId, target }: Readonly<ActionProps<AddressTarget>>) {
-  return <ShowInFlow clusterId={clusterId} focus={`address:${target.address}`} />;
+  return <ShowInFlow clusterId={clusterId} focus={`destination:${target.address}`} />;
 }
 
 export function ConnectionInFlow({ clusterId, target }: Readonly<ActionProps<ConnectionTarget>>) {
@@ -54,7 +54,7 @@ export function ConnectionInFlow({ clusterId, target }: Readonly<ActionProps<Con
 
 export function DivertInFlow({ clusterId, target }: Readonly<ActionProps<DivertTarget>>) {
   const address = target.snapshot?.address;
-  return <ShowInFlow clusterId={clusterId} focus={address ? `address:${address}` : null} />;
+  return <ShowInFlow clusterId={clusterId} focus={address ? `destination:${address}` : null} />;
 }
 
 /** A flow client: focus the view on it. */
@@ -99,7 +99,7 @@ export function FlowNodeActions({
 }>) {
   const label = node.label ?? '';
   switch (node.kind) {
-    case 'QUEUE':
+    case 'SUBSCRIPTION':
       return (
         <ResourceActions
           kind="queue"
@@ -109,7 +109,7 @@ export function FlowNodeActions({
           restoreFocus={restoreFocus}
         />
       );
-    case 'ADDRESS':
+    case 'DESTINATION':
       return (
         <ResourceActions
           kind="address"

@@ -98,7 +98,7 @@ public class AlertPayloads {
     }
 
     /**
-     * {@code node:<uuid>/queue:orders} → {@code node primary-1 / queue orders}. A part Rahdar does
+     * {@code node:<uuid>/subscription:orders} → {@code node primary-1 / subscription orders}. A part Rahdar does
      * not recognise is kept as it is: an unfamiliar key is still more useful than nothing.
      */
     static String label(String subject, String clusterName, Map<String, String> nodeNames) {
@@ -128,8 +128,8 @@ public class AlertPayloads {
             String name = nodeNames.get(part.substring("node:".length()));
             return name != null ? "node " + name : part;
         }
-        if (part.startsWith("queue:")) {
-            return "queue " + part.substring("queue:".length());
+        if (part.startsWith("subscription:")) {
+            return "subscription " + part.substring("subscription:".length());
         }
         return part;
     }

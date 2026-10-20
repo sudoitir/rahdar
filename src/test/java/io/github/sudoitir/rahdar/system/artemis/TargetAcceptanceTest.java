@@ -92,7 +92,7 @@ class TargetAcceptanceTest {
                         f -> {},
                         i -> i.sameQueueSameNode = true,
                         FindingKind.REFUSE,
-                        "same-queue"),
+                        "same-subscription"),
                 row("split-brain", f -> {}, i -> i.splitBrain = true, FindingKind.REFUSE, "target-split-brain"),
                 row("backup", f -> {}, i -> i.backup = true, FindingKind.REFUSE, "target-backup"),
                 row("not live", f -> {}, i -> i.live = false, FindingKind.REFUSE, "target-not-live"),
@@ -103,7 +103,7 @@ class TargetAcceptanceTest {
                             f.settings = "{\"autoCreateQueues\":false}";
                         },
                         FindingKind.REFUSE,
-                        "queue-missing"),
+                        "subscription-missing"),
                 row(
                         "missing queue, auto-create unknown",
                         f -> {
@@ -111,7 +111,7 @@ class TargetAcceptanceTest {
                             f.settings = "{}";
                         },
                         FindingKind.UNKNOWN,
-                        "queue-missing"),
+                        "subscription-missing"),
                 row("filtered queue", f -> f.filter = "region = 'eu'", FindingKind.REFUSE, "target-filtered"),
                 row(
                         "address-full DROP",
@@ -188,7 +188,7 @@ class TargetAcceptanceTest {
                         FindingKind.WARN,
                         "may-redistribute"),
                 // What could not be read is stated as unknown, never as a pass.
-                row("queue did not answer", f -> f.queueExists = null, FindingKind.UNKNOWN, "queue-unknown"),
+                row("queue did not answer", f -> f.queueExists = null, FindingKind.UNKNOWN, "subscription-unknown"),
                 row("filter did not answer", f -> f.filter = null, FindingKind.UNKNOWN, "filter-unknown"),
                 row("settings did not answer", settings(null), FindingKind.UNKNOWN, "address-settings"),
                 row("disk did not answer", f -> f.disk = null, FindingKind.UNKNOWN, "disk-unknown"),

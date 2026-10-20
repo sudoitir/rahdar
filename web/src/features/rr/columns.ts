@@ -8,11 +8,11 @@ import {
   ExpectationRemove,
   ExpectationStatus,
   FlowStateBadge,
-  ReplyAddressesCell,
+  ReplyDestinationsCell,
   type ExpectationControls,
 } from './cells.tsx';
 import { stateLabel } from './rrState.ts';
-import { replyAddressesText, statusText } from './words.ts';
+import { replyDestinationsText, statusText } from './words.ts';
 
 /**
  * The flows grid's columns. The state and the request address identify a flow and are never hidden;
@@ -33,7 +33,7 @@ export function flowColumns(now: number): Column<FlowView>[] {
     {
       id: 'address',
       header: 'Address',
-      accessor: (f) => f.requestAddress,
+      accessor: (f) => f.requestDestination,
       kind: 'identifier',
       priority: 'essential',
     },
@@ -76,17 +76,17 @@ export interface ExpectationRows {
 export function expectationColumns({ now, statusOf, controls }: ExpectationRows): Column<ExpectationView>[] {
   return [
     {
-      id: 'requestAddress',
+      id: 'requestDestination',
       header: 'Request address',
-      accessor: (e) => e.requestAddress,
+      accessor: (e) => e.requestDestination,
       kind: 'identifier',
       priority: 'essential',
     },
     {
-      id: 'replyAddresses',
+      id: 'replyDestinations',
       header: 'Reply addresses',
-      accessor: replyAddressesText,
-      cell: (e) => createElement(ReplyAddressesCell, { expectation: e }),
+      accessor: replyDestinationsText,
+      cell: (e) => createElement(ReplyDestinationsCell, { expectation: e }),
       kind: 'text',
       wrap: true,
       priority: 'high',
@@ -126,7 +126,7 @@ export function expectationColumns({ now, statusOf, controls }: ExpectationRows)
     {
       id: 'remove',
       header: 'Remove',
-      accessor: (e) => `Remove ${e.requestAddress}`,
+      accessor: (e) => `Remove ${e.requestDestination}`,
       cell: (e) => createElement(ExpectationRemove, { expectation: e, controls }),
       kind: 'status',
       priority: 'essential',
@@ -138,9 +138,9 @@ export function expectationColumns({ now, statusOf, controls }: ExpectationRows)
 export function diagnosticsColumns(now: number): Column<ExpectationDiagnosticsView>[] {
   return [
     {
-      id: 'requestAddress',
+      id: 'requestDestination',
       header: 'Request address',
-      accessor: (e) => e.requestAddress,
+      accessor: (e) => e.requestDestination,
       kind: 'identifier',
       priority: 'essential',
     },

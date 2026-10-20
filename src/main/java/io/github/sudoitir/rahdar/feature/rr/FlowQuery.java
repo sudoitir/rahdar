@@ -6,7 +6,7 @@ import java.time.Instant;
  * The filters and page of a request-reply flow list; a blank or null filter matches everything.
  *
  * @param state the flow state
- * @param address the request address
+ * @param destination the request destination
  * @param correlationId the correlation id
  * @param from earliest timestamp, inclusive
  * @param to latest timestamp, inclusive
@@ -14,4 +14,4 @@ import java.time.Instant;
  * @param size rows per page, at most 500
  */
 public record FlowQuery(
-        String state, String address, String correlationId, Instant from, Instant to, int page, int size) {}
+        String state, String destination, String correlationId, Instant from, Instant to, int page, int size) {}

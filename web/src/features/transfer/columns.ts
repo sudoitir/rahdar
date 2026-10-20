@@ -1,5 +1,6 @@
 import { createElement } from 'react';
 
+import { resourceName } from '../../kernel/api/resourceId.ts';
 import { absoluteLabel } from '../../kernel/time/time.ts';
 import { AUTO, localZone } from '../../kernel/time/timezone.ts';
 import type { Column } from '../../ui/table/index.ts';
@@ -23,9 +24,9 @@ export interface TransferColumnDeps {
  */
 export function transferColumns({ clusterId, clusterName, zone }: TransferColumnDeps): Column<TransferRunView>[] {
   const end = (run: TransferRunView, which: 'source' | 'target') => {
-    const { queue, nodeName, clusterId: endCluster } = run[which];
+    const { subscription, nodeName, clusterId: endCluster } = run[which];
     const where = endCluster === clusterId ? '' : ` (${clusterName(endCluster)})`;
-    return `${queue} on ${nodeName}${where}`;
+    return `${resourceName(subscription)} on ${nodeName}${where}`;
   };
 
   return [

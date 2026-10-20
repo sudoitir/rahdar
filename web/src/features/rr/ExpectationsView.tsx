@@ -13,7 +13,7 @@ import { Section } from '../../ui/Section.tsx';
 import { DataTable } from '../../ui/table/index.ts';
 import { AddressPicker } from '../queues/index.ts';
 import { CaptureHint } from '../sql/index.ts';
-import { ReplyAddressesHelp, ReplyAddressesInput } from './ReplyAddressesInput.tsx';
+import { ReplyDestinationsHelp, ReplyDestinationsInput } from './ReplyDestinationsInput.tsx';
 import {
   useCreateRrExpectation,
   useDeleteRrExpectation,
@@ -70,34 +70,34 @@ export function ExpectationsView({ clusterId }: Readonly<{ clusterId: string }>)
   const [removeOpen, setRemoveOpen] = useState(false);
 
   const form = useForm<{
-    requestAddress: string;
-    replyAddresses: string[];
+    requestDestination: string;
+    replyDestinations: string[];
     deadlineMs: Figure;
     samplePerMin: Figure;
     capturePayload: boolean;
   }>({
     initialValues: {
-      requestAddress: '',
-      replyAddresses: [],
+      requestDestination: '',
+      replyDestinations: [],
       deadlineMs: '',
       samplePerMin: DEFAULT_SAMPLES,
       capturePayload: false,
     },
     validateInputOnBlur: true,
     validate: {
-      requestAddress: (v) => (v.trim() ? null : 'Enter the request address to trace, such as orders.request.'),
+      requestDestination: (v) => (v.trim() ? null : 'Enter the request address to trace, such as orders.request.'),
       deadlineMs: deadlineProblem,
       samplePerMin: samplesProblem,
     },
   });
 
   const submit = form.onSubmit((values) => {
-    const address = values.requestAddress.trim();
+    const address = values.requestDestination.trim();
     const subject = `traced address ${address}`;
     create.mutate(
       {
-        requestAddress: address,
-        replyAddresses: values.replyAddresses,
+        requestDestination: address,
+        replyDestinations: values.replyDestinations,
         correlationProperty: undefined,
         deadlineMs: isWhole(values.deadlineMs) ? values.deadlineMs : undefined,
         samplePerMin: isWhole(values.samplePerMin) ? values.samplePerMin : DEFAULT_SAMPLES,
@@ -121,12 +121,12 @@ export function ExpectationsView({ clusterId }: Readonly<{ clusterId: string }>)
 
   const toggle = (e: ExpectationView, enabled: boolean) => {
     const action = enabled ? ENABLE : DISABLE;
-    const subject = `tracing of ${e.requestAddress}`;
+    const subject = `tracing of ${e.requestDestination}`;
     update.mutate(
       {
         id: e.id,
         body: {
-          replyAddresses: e.replyAddresses,
+          replyDestinations: e.replyDestinations,
           correlationProperty: e.correlationProperty ?? undefined,
           deadlineMs: e.deadlineMs ?? undefined,
           samplePerMin: e.samplePerMin,
@@ -151,11 +151,11 @@ export function ExpectationsView({ clusterId }: Readonly<{ clusterId: string }>)
 
   const confirmRemove = (e: ExpectationView) =>
     remove.mutate(e.id, {
-      onSuccess: () => notify.succeeded({ action: REMOVE, subject: `traced address ${e.requestAddress}` }),
+      onSuccess: () => notify.succeeded({ action: REMOVE, subject: `traced address ${e.requestDestination}` }),
       onError: (error) =>
         notify.settle(error, {
           action: REMOVE,
-          subject: `traced address ${e.requestAddress}`,
+          subject: `traced address ${e.requestDestination}`,
           cause: error.message,
           next: 'It is still listed; reload to see its current state.',
         }),
@@ -196,15 +196,15 @@ export function ExpectationsView({ clusterId }: Readonly<{ clusterId: string }>)
             clusterId={clusterId}
             label="Request address"
             placeholder="orders.request"
-            {...form.getInputProps('requestAddress')}
-            value={form.values.requestAddress}
+            {...form.getInputProps('requestDestination')}
+            value={form.values.requestDestination}
             unknownHint="No address on this cluster has that name yet."
             w="100%"
           />
-          <ReplyAddressesInput
+          <ReplyDestinationsInput
             clusterId={clusterId}
-            value={form.values.replyAddresses}
-            onChange={(next) => form.setFieldValue('replyAddresses', next)}
+            value={form.values.replyDestinations}
+            onChange={(next) => form.setFieldValue('replyDestinations', next)}
             w="100%"
           />
           <NumberInput
@@ -222,7 +222,7 @@ export function ExpectationsView({ clusterId }: Readonly<{ clusterId: string }>)
             </Button>
           </div>
           <div className={classes.help}>
-            <ReplyAddressesHelp clusterId={clusterId} value={form.values.replyAddresses} />
+            <ReplyDestinationsHelp clusterId={clusterId} value={form.values.replyDestinations} />
           </div>
         </form>
       </Section>
@@ -232,7 +232,7 @@ export function ExpectationsView({ clusterId }: Readonly<{ clusterId: string }>)
         purpose="request-reply tracing"
         addresses={(expectations.data ?? [])
           .filter((e) => e.enabled)
-          .flatMap((e) => [e.requestAddress, ...e.resolvedReplyAddresses])}
+          .flatMap((e) => [e.requestDestination, ...e.resolvedReplyDestinations])}
       />
 
       <Section headingLevel={3} title="Declared addresses">
@@ -271,7 +271,7 @@ export function ExpectationsView({ clusterId }: Readonly<{ clusterId: string }>)
         consequence={
           removing ? (
             <>
-              Rahdar stops reconstructing request-reply flows for <strong>{removing.requestAddress}</strong>. Its
+              Rahdar stops reconstructing request-reply flows for <strong>{removing.requestDestination}</strong>. Its
               settings (reply addresses, deadline, sample rate and payload capture) are deleted and cannot be restored.
               Flows already recorded stay.
             </>

@@ -60,11 +60,11 @@ class TransferAcceptanceTest extends TransferTestSupport {
 
         String missing = "accept.missing." + sfx;
         settingsFor(missing, "{\"autoCreateQueues\":false}");
-        refusal(preview(TransferMode.COPY, src, all(), missing), "queue-missing");
+        refusal(preview(TransferMode.COPY, src, all(), missing), "subscription-missing");
 
         refusal(
                 preview(TransferMode.MOVE, clusterP, clusterP.node(), src, all(), clusterP, clusterP.node(), src),
-                "same-queue");
+                "same-subscription");
 
         // What Rahdar last read of the target node: it has become the backup of its pair.
         BrokerNodeEntity node = brokerNodes.findById(clusterD.node()).orElseThrow();

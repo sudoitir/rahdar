@@ -7,12 +7,12 @@ import java.util.regex.Pattern;
  * One masking rule, or — when {@code exception} — a dismissed finding that stops a detector from
  * masking one class in one field (ADR-0075 D4).
  *
- * @param addressPattern Artemis wildcard pattern, or null for every address
+ * @param destinationPattern Artemis wildcard pattern, or null for every address
  * @param action overrides the class default; null means the default
  */
 public record Rule(
         UUID id,
-        String addressPattern,
+        String destinationPattern,
         RuleTarget target,
         String selector,
         DataClass dataClass,
@@ -35,8 +35,8 @@ public record Rule(
         static Compiled of(Rule rule) {
             return new Compiled(
                     rule,
-                    rule.addressPattern() == null ? null : AddressPattern.compile(rule.addressPattern()),
-                    AddressPattern.glob(rule.selector()));
+                    rule.destinationPattern() == null ? null : DestinationPattern.compile(rule.destinationPattern()),
+                    DestinationPattern.glob(rule.selector()));
         }
 
         boolean appliesTo(String address) {

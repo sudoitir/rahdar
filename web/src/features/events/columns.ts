@@ -41,7 +41,7 @@ export function eventColumns(zone: string): Column<BrokerEventView>[] {
     },
     { id: 'type', header: 'Type', accessor: (e) => e.type, kind: 'code', priority: 'high' },
     { id: 'family', header: 'Family', accessor: (e) => family(e.type), kind: 'status', priority: 'low' },
-    { id: 'address', header: 'Address', accessor: (e) => e.address ?? '—', kind: 'identifier', priority: 'high' },
+    { id: 'address', header: 'Address', accessor: (e) => e.destination ?? '—', kind: 'identifier', priority: 'high' },
     { id: 'subject', header: 'Subject', accessor: subjectOf, kind: 'identifier', priority: 'high' },
     { id: 'remote', header: 'Remote', accessor: (e) => e.remoteAddress ?? '—', kind: 'code', priority: 'low' },
   ];

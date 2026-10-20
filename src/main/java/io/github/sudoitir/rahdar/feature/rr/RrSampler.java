@@ -51,7 +51,7 @@ public class RrSampler {
     private final ClusterOwnership ownership;
     private final BrokerMessages messages;
     private final ObjectProvider<RrObservationSink> sink;
-    private final ReplyAddressResolver replyAddresses;
+    private final ReplyDestinationResolver replyDestinations;
     private final ClockOffsetService clocks;
     private final QueueTargetResolver queueTargets;
     private final RrSamplerHealth health;
@@ -85,7 +85,10 @@ public class RrSampler {
             try {
                 sampleExpectation(expectation, target);
             } catch (RuntimeException e) {
-                log.warn("Request-reply sampling failed for '{}': {}", expectation.getRequestAddress(), e.toString());
+                log.warn(
+                        "Request-reply sampling failed for '{}': {}",
+                        expectation.getRequestDestination(),
+                        e.toString());
             }
         }
     }
@@ -113,8 +116,8 @@ public class RrSampler {
     private void sampleExpectation(RrExpectationEntity expectation, RrObservationSink target) {
         UUID clusterId = expectation.getClusterId();
         List<String> replyTargets =
-                replyAddresses.resolve(clusterId, expectation).addresses();
-        RrSamplerHealth.Tick tick = health.begin(expectation.getId(), clusterId, expectation.getRequestAddress());
+                replyDestinations.resolve(clusterId, expectation).addresses();
+        RrSamplerHealth.Tick tick = health.begin(expectation.getId(), clusterId, expectation.getRequestDestination());
 
         List<ClusterNode> serving = servingNodes(clusterId);
         if (serving.isEmpty()) {
@@ -127,7 +130,7 @@ public class RrSampler {
                     expectation.getId() + "|no-core",
                     () -> log.warn(
                             "Request-reply tracing for '{}' sampled nothing: {}",
-                            expectation.getRequestAddress(),
+                            expectation.getRequestDestination(),
                             NO_CORE_ENDPOINT));
             return;
         }
@@ -163,17 +166,17 @@ public class RrSampler {
         // through CaptureBus, so browsing it here would be broker load for facts
         // Rahdar already has (ADR-0062). Sampling continues for everything else, and
         // for this address on any node capture has not reached.
-        if (captured(clusterId, node.getId(), expectation.getRequestAddress())) {
+        if (captured(clusterId, node.getId(), expectation.getRequestDestination())) {
             tick.skipped(node.getName(), "captured on this node; correlation comes from the capture stream");
         } else {
-            for (BrowsedMessage m : browse(clusterId, node, expectation.getRequestAddress(), tick)) {
+            for (BrowsedMessage m : browse(clusterId, node, expectation.getRequestDestination(), tick)) {
                 browsed += 1;
                 emitted += 1;
                 target.accept(new Observation.RequestSeen(
                         clusterId,
                         node.getId(),
                         Instant.now(),
-                        expectation.getRequestAddress(),
+                        expectation.getRequestDestination(),
                         String.valueOf(m.messageId()),
                         correlationOf(expectation, m),
                         m.replyTo() != null ? CoreDestinationName.extract(m.replyTo()) : null,
@@ -184,19 +187,19 @@ public class RrSampler {
             }
         }
 
-        for (String replyAddress : replyTargets) {
-            if (captured(clusterId, node.getId(), replyAddress)) {
+        for (String replyDestination : replyTargets) {
+            if (captured(clusterId, node.getId(), replyDestination)) {
                 tick.skipped(node.getName(), "captured on this node; correlation comes from the capture stream");
                 continue;
             }
-            for (BrowsedMessage m : browse(clusterId, node, replyAddress, tick)) {
+            for (BrowsedMessage m : browse(clusterId, node, replyDestination, tick)) {
                 browsed += 1;
                 emitted += 1;
                 target.accept(new Observation.ReplySeen(
                         clusterId,
                         node.getId(),
                         Instant.now(),
-                        replyAddress,
+                        replyDestination,
                         String.valueOf(m.messageId()),
                         correlationOf(expectation, m),
                         m.bodyPreview(),
@@ -224,7 +227,7 @@ public class RrSampler {
         lastReported.put(key, now);
         log.warn(
                 "Request-reply sampling failed for '{}' on node {}: {}",
-                expectation.getRequestAddress(),
+                expectation.getRequestDestination(),
                 node.getName(),
                 e.toString());
     }

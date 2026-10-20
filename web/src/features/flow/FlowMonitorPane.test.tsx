@@ -27,7 +27,12 @@ const share = (over: Partial<FlowNodeShare>): FlowNodeShare => ({
   ...over,
 });
 
-const node = (over: Partial<FlowNodeView>): FlowNodeView => ({ id: 'q1', kind: 'QUEUE', label: 'orders', ...over });
+const node = (over: Partial<FlowNodeView>): FlowNodeView => ({
+  id: 'q1',
+  kind: 'SUBSCRIPTION',
+  label: 'orders',
+  ...over,
+});
 
 function graph(over: Partial<FlowGraphView> = {}): FlowGraphView {
   return { measuring: false, sampleIntervalSeconds: 5, ...over };
@@ -202,7 +207,7 @@ describe('FlowMonitorPane with a queue selected', () => {
     unmount();
 
     panels = [{ id: 'p', order: 1, Component: () => <p>panel</p> }];
-    show(graph({ nodes: [node({ kind: 'ADDRESS', label: 'orders', byNode: [share({})] })] }), 'q1');
+    show(graph({ nodes: [node({ kind: 'DESTINATION', label: 'orders', byNode: [share({})] })] }), 'q1');
     expect(screen.getByRole('region', { name: 'Address orders' })).toBeInTheDocument();
     expect(screen.queryByText('panel')).not.toBeInTheDocument();
   });

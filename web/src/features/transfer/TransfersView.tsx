@@ -6,6 +6,7 @@ import { Link, useParams } from '@tanstack/react-router';
 import { useClusters } from '../clusters/index.ts';
 import { AddressPicker } from '../queues/index.ts';
 import { useCan } from '../../kernel/auth/useCan.ts';
+import { subscriptionIdOf } from '../../kernel/api/resourceId.ts';
 import { useDisplayZone } from '../../kernel/time/timezone.ts';
 import { CapabilityGate } from '../../ui/CapabilityGate.tsx';
 import { gateFor } from '../../ui/capabilityGate.ts';
@@ -43,7 +44,7 @@ function Orphans({ clusterId }: Readonly<{ clusterId: string }>) {
   const returnMessages = form.onSubmit(({ queue }) => {
     if (!chosen) return;
     returnOrphan.mutate(
-      { nodeId: chosen.nodeId, stagingQueue: chosen.stagingQueue, targetQueue: queue.trim() },
+      { nodeId: chosen.nodeId, stagingQueue: chosen.stagingQueue, target: subscriptionIdOf(queue.trim()) },
       { onSuccess: () => setChosen(null) },
     );
   }, focusFirstInvalid(form.getInputNode));

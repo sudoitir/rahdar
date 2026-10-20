@@ -252,7 +252,7 @@ public class QueueLifecycleOperations {
     /**
      * Delete an address, force-free (D8). The broker itself refuses with
      * {@code AMQ229205} while queues are bound, which surfaces as
-     * {@link ManagementRefusal.Kind#BOUND_QUEUES}; the caller names the queues,
+     * {@link ManagementRefusal.Kind#BOUND_SUBSCRIPTIONS}; the caller names the queues,
      * because the broker's own message does not.
      */
     public void deleteAddress(ArtemisNode client, String brokerMbean, String address) {
@@ -261,7 +261,7 @@ public class QueueLifecycleOperations {
         require(res, "deleteAddress");
     }
 
-    /** The queues bound to an address — what a {@link ManagementRefusal.Kind#BOUND_QUEUES} refusal names. */
+    /** The queues bound to an address — what a {@link ManagementRefusal.Kind#BOUND_SUBSCRIPTIONS} refusal names. */
     public List<String> boundQueues(ArtemisNode client, String addressMbean) {
         ManagementResponse res = client.single(ManagementRequest.read(addressMbean, QUEUE_NAMES));
         if (!res.ok()) {

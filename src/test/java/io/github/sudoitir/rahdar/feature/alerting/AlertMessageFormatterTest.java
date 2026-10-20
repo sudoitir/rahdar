@@ -24,7 +24,7 @@ class AlertMessageFormatterTest {
                 List.of(
                         new AlertMessage.Line(
                                 "node:1", "node primary-1", true, 1.0, Instant.parse("2026-09-24T10:00:00Z")),
-                        new AlertMessage.Line("queue:orders", "queue orders", false, 12.5, null)));
+                        new AlertMessage.Line("subscription:orders", "subscription orders", false, 12.5, null)));
     }
 
     @Test
@@ -51,18 +51,18 @@ class AlertMessageFormatterTest {
         assertThat(AlertMessageFormatter.line(m.transitions().get(0)))
                 .isEqualTo("FIRING — node primary-1 (value 1) at 2026-09-24 10:00:00 UTC");
         assertThat(AlertMessageFormatter.line(m.transitions().get(1)))
-                .isEqualTo("RESOLVED — queue orders (value 12.500)");
+                .isEqualTo("RESOLVED — subscription orders (value 12.500)");
     }
 
     @Test
     void aVersionOnePayloadStillRenders() {
         String v1 = """
                 {"ruleId":"%s","ruleName":"Depth","severity":"WARNING",
-                 "transitions":[{"subject":"queue:orders","kind":"FIRED","value":5}]}""".formatted(UUID.randomUUID());
+                 "transitions":[{"subject":"subscription:orders","kind":"FIRED","value":5}]}""".formatted(UUID.randomUUID());
         AlertMessage m = AlertMessage.parse(v1, mapper);
         assertThat(m.clusterName()).isNull();
         assertThat(m.transitions()).singleElement().satisfies(t -> {
-            assertThat(t.label()).isEqualTo("queue:orders");
+            assertThat(t.label()).isEqualTo("subscription:orders");
             assertThat(t.fired()).isTrue();
             assertThat(t.value()).isEqualTo(5.0);
         });

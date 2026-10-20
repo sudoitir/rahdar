@@ -36,7 +36,7 @@ export function rateSourceLabel(edge: Pick<FlowEdgeView, 'rateSource' | 'average
   switch (edge.rateSource) {
     case 'SAMPLER':
       return 'sampled clients';
-    case 'QUEUE_METRIC':
+    case 'SUBSCRIPTION_METRIC':
       return edge.averagedOverSeconds
         ? `queue metrics, ~${Math.round(edge.averagedOverSeconds / 60)} min average`
         : 'queue metrics';
@@ -48,7 +48,7 @@ export function rateSourceLabel(edge: Pick<FlowEdgeView, 'rateSource' | 'average
 export const FAULT_LABELS: Record<string, string> = {
   NO_CONSUMER: 'no consumer',
   STALLED: 'stalled',
-  BRIDGE_DOWN: 'not connected',
+  LINK_DOWN: 'not connected',
   PARTIAL_PRESENCE: 'partly deployed',
 };
 
@@ -57,8 +57,8 @@ export const RELATION: Record<string, string> = {
   PRODUCE: 'produces to',
   ROUTE: 'routes to',
   CONSUME: 'consumed by',
-  DIVERT: 'diverts to',
-  BRIDGE: 'bridges to',
+  FORWARD: 'diverts to',
+  LINK: 'bridges to',
   CLUSTER_HOP: 'redistributes to',
   WILDCARD: 'also reaches',
   DEAD_LETTER: 'dead-letters to',
@@ -119,10 +119,10 @@ function kindParts(view: FlowEdgeView): string[] {
     case 'ROUTE':
       parts.push(...routeParts(view));
       break;
-    case 'DIVERT':
+    case 'FORWARD':
       parts.push(...divertParts(view));
       break;
-    case 'BRIDGE':
+    case 'LINK':
       parts.push('bridge', rateLabel(view));
       break;
     case 'CLUSTER_HOP':

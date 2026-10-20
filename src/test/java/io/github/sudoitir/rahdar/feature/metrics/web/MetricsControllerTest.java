@@ -81,8 +81,7 @@ class MetricsControllerTest extends PostgresIntegrationTest {
     void aQueueSplitByNodeNamesEachNodeBesideTheUnchangedTotal() throws Exception {
         mvc.perform(get("/api/v1/clusters/{id}/metrics", clusterId)
                         .param("metric", "openbroker.backlog")
-                        .param("subjectType", "QUEUE")
-                        .param("subject", "orders")
+                        .param("resource", "artemis.queue/orders")
                         .param("splitBy", "NODE"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.splitBy").value("NODE"))

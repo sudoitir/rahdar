@@ -4,6 +4,7 @@ import { Link, useParams } from '@tanstack/react-router';
 
 import { useClusters } from '../clusters/index.ts';
 import { useCan } from '../../kernel/auth/useCan.ts';
+import { resourceName } from '../../kernel/api/resourceId.ts';
 import { absoluteLabel } from '../../kernel/time/time.ts';
 import { useDisplayZone } from '../../kernel/time/timezone.ts';
 import { CapabilityGate } from '../../ui/CapabilityGate.tsx';
@@ -43,7 +44,7 @@ function sentence(run: Run): string {
     case 'WAITING_FOR_CAPACITY':
       return `Waiting for the target to have room, and continuing by itself once it does.${held}`;
     case 'RETURNING':
-      return `Returning the held messages to ${run.source.queue}.${held}`;
+      return `Returning the held messages to ${resourceName(run.source.subscription)}.${held}`;
     case 'SUCCEEDED':
       return `This run finished. Succeeded: every selected message was ${MODE[run.mode].past}.`;
     case 'PARTIAL':
@@ -55,7 +56,7 @@ function sentence(run: Run): string {
     case 'FAILED':
       return `This run failed.${held} Nothing held is lost; resume it once the cause is fixed${stages(run) ? ', or return the held messages' : ''}.`;
     case 'RETURNED':
-      return `Returned: ${plural(run.returned, 'held message')} ${run.returned === 1 ? 'is' : 'are'} back on ${run.source.queue}.`;
+      return `Returned: ${plural(run.returned, 'held message')} ${run.returned === 1 ? 'is' : 'are'} back on ${resourceName(run.source.subscription)}.`;
   }
 }
 
@@ -189,9 +190,10 @@ function ReturnDialog({
       title="Return the held messages to the source?"
       consequence={
         <>
-          Every message held in staging, {plural(run.held, 'message')} now, goes back on {run.source.queue} on{' '}
-          {run.source.nodeName}, and the staging queue is removed. Messages already delivered to {run.target.queue} stay
-          there. The run ends as returned and cannot be resumed.
+          Every message held in staging, {plural(run.held, 'message')} now, goes back on{' '}
+          {resourceName(run.source.subscription)} on {run.source.nodeName}, and the staging queue is removed. Messages
+          already delivered to {resourceName(run.target.subscription)} stay there. The run ends as returned and cannot
+          be resumed.
         </>
       }
       confirmLabel={`Return ${plural(run.held, 'message')}`}
@@ -364,8 +366,9 @@ export function TransferRunView() {
         description={
           <>
             <div>
-              From {run.source.queue} on {run.source.nodeName} ({clusterName(run.source.clusterId)}) to{' '}
-              {run.target.queue} on {run.target.nodeName} ({clusterName(run.target.clusterId)}).
+              From {resourceName(run.source.subscription)} on {run.source.nodeName} ({clusterName(run.source.clusterId)}
+              ) to {resourceName(run.target.subscription)} on {run.target.nodeName} ({clusterName(run.target.clusterId)}
+              ).
             </div>
             <div>
               By {run.username}

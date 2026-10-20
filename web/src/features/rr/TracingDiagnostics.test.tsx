@@ -24,7 +24,7 @@ function diagnostics(over: Record<string, unknown> = {}) {
     expectations: [
       {
         expectationId: 'e1',
-        requestAddress: 'orders.request',
+        requestDestination: 'orders.request',
         enabled: true,
         lastAttemptAt: '2026-09-06T12:00:00Z',
         lastSuccessAt: '2026-09-06T12:00:00Z',

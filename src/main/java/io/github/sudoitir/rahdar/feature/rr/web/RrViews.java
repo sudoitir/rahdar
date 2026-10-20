@@ -17,16 +17,16 @@ public final class RrViews {
 
     public record ExpectationView(
             @Schema(requiredMode = REQUIRED) UUID id,
-            @Schema(requiredMode = REQUIRED) String requestAddress,
-            @Schema(requiredMode = REQUIRED) List<String> replyAddresses,
+            @Schema(requiredMode = REQUIRED) String requestDestination,
+            @Schema(requiredMode = REQUIRED) List<String> replyDestinations,
 
             @Schema(
                     requiredMode = REQUIRED,
-                    description = "What replyAddresses currently expands to, from the last scrape's addresses")
-            List<String> resolvedReplyAddresses,
+                    description = "What replyDestinations currently expands to, from the last scrape's addresses")
+            List<String> resolvedReplyDestinations,
 
             @Schema(requiredMode = REQUIRED, description = "The resolution cap cut the expansion short")
-            boolean replyAddressesCapped,
+            boolean replyDestinationsCapped,
 
             @Schema(nullable = true) String correlationProperty,
             @Schema(nullable = true) Integer deadlineMs,
@@ -35,15 +35,15 @@ public final class RrViews {
             @Schema(requiredMode = REQUIRED) boolean enabled) {}
 
     public record CreateExpectationRequest(
-            @NotBlank String requestAddress,
-            List<String> replyAddresses,
+            @NotBlank String requestDestination,
+            List<String> replyDestinations,
             String correlationProperty,
             @Min(1) Integer deadlineMs,
             @Min(1) int samplePerMin,
             boolean capturePayload) {}
 
     public record UpdateExpectationRequest(
-            List<String> replyAddresses,
+            List<String> replyDestinations,
             String correlationProperty,
             @Min(1) Integer deadlineMs,
             @Min(1) int samplePerMin,
@@ -61,7 +61,7 @@ public final class RrViews {
             @Schema(requiredMode = REQUIRED) UUID id,
             @Schema(requiredMode = REQUIRED) UUID clusterId,
             @Schema(nullable = true) UUID nodeId,
-            @Schema(nullable = true) String requestAddress,
+            @Schema(nullable = true) String requestDestination,
             @Schema(nullable = true) String replyDestination,
             @Schema(requiredMode = REQUIRED) String replyKind,
             @Schema(requiredMode = REQUIRED) String state,
@@ -94,8 +94,8 @@ public final class RrViews {
             @Schema(nullable = true) Long replySkewMs,
             @Schema(nullable = true) List<RrEventView> events) {}
 
-    public record AddressStatsView(
-            @Schema(requiredMode = REQUIRED) String address,
+    public record DestinationStatsView(
+            @Schema(requiredMode = REQUIRED) String destination,
             @Schema(requiredMode = REQUIRED) long inFlight,
             @Schema(nullable = true) Long oldestInFlightMs,
             @Schema(requiredMode = REQUIRED) long completed,
@@ -110,7 +110,7 @@ public final class RrViews {
             @Schema(requiredMode = REQUIRED) long windowMs) {}
 
     public record StatsResponse(
-            @Schema(requiredMode = REQUIRED) List<AddressStatsView> addresses) {}
+            @Schema(requiredMode = REQUIRED) List<DestinationStatsView> destinations) {}
 
     /**
      * One reason an operator might be seeing no flows, and what to do about it.
@@ -127,7 +127,7 @@ public final class RrViews {
     /** What the sampler did for one traced address on its most recent tick. */
     public record ExpectationDiagnosticsView(
             @Schema(requiredMode = REQUIRED) UUID expectationId,
-            @Schema(requiredMode = REQUIRED) String requestAddress,
+            @Schema(requiredMode = REQUIRED) String requestDestination,
             @Schema(requiredMode = REQUIRED) boolean enabled,
             @Schema(nullable = true) Instant lastAttemptAt,
             @Schema(nullable = true) Instant lastSuccessAt,

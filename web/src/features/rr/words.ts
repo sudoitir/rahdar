@@ -7,14 +7,14 @@ export function resolutionWords(capped: boolean, resolved: number): string {
 }
 
 /** The plain text of an expectation's reply addresses, as a cell copies and measures it. */
-export function replyAddressesText(e: ExpectationView): string {
-  if (e.replyAddresses.length === 0) return 'temporary queues';
-  const patterns = e.replyAddresses.some((a) => a.includes('*'));
+export function replyDestinationsText(e: ExpectationView): string {
+  if (e.replyDestinations.length === 0) return 'temporary queues';
+  const patterns = e.replyDestinations.some((a) => a.includes('*'));
   const resolution =
-    patterns || e.replyAddressesCapped
-      ? ` · ${resolutionWords(e.replyAddressesCapped, e.resolvedReplyAddresses.length)}`
+    patterns || e.replyDestinationsCapped
+      ? ` · ${resolutionWords(e.replyDestinationsCapped, e.resolvedReplyDestinations.length)}`
       : '';
-  return `${e.replyAddresses.join(', ')}${resolution}`;
+  return `${e.replyDestinations.join(', ')}${resolution}`;
 }
 
 /** `4s ago`, `3m ago` — the shared duration label, plus the word. */

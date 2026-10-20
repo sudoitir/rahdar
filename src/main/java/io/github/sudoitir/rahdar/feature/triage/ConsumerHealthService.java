@@ -77,8 +77,8 @@ public class ConsumerHealthService {
         ResourceFilter readable = permissions.filter(clusterId, ResourceType.SUBSCRIPTION);
         List<ConsumerHealth> rows = evaluated(clusterId);
         List<ConsumerHealth> matched = rows.stream()
-                .filter(h -> readable.readable(h.queueName()))
-                .filter(h -> query.matches(h.queueName()) || query.matches(h.address()))
+                .filter(h -> readable.readable(h.subscription()))
+                .filter(h -> query.matches(h.subscription()) || query.matches(h.destination()))
                 .toList();
         if (query.sortField() == null) {
             // Worst first, then the biggest backlog, then by name so the order is stable
@@ -91,10 +91,10 @@ public class ConsumerHealthService {
 
     /** One queue's verdict, for the drawer panel and the {@code diagnose} tool. */
     @Transactional(readOnly = true)
-    public Optional<ConsumerHealth> forQueue(UUID clusterId, String queueName) {
+    public Optional<ConsumerHealth> forSubscription(UUID clusterId, String queueName) {
         clusterAccess.requireResource(clusterId, ResourceRef.subscription(queueName), Permissions.SUBSCRIPTION_READ);
         return evaluated(clusterId).stream()
-                .filter(h -> h.queueName().equals(queueName))
+                .filter(h -> h.subscription().equals(queueName))
                 .findFirst();
     }
 
@@ -114,7 +114,7 @@ public class ConsumerHealthService {
         // Unguarded on purpose: this is also the scheduler's path. The alert evaluator
         // runs on a scrape thread with no authenticated principal, so a permission check
         // here protects nothing and fails as a 404 about a cluster that plainly exists.
-        // The guard belongs at the request boundary — page() and forQueue() apply it —
+        // The guard belongs at the request boundary — page() and forSubscription() apply it —
         // which is the same split the other alert conditions make by reading
         // subscription_snapshot directly.
         List<QueueView> rows = queues.rollUp(clusterId);
@@ -266,10 +266,11 @@ public class ConsumerHealthService {
         List<BrokerEventView> recent = brokerEvents.recentOfType(
                 clusterId, BROKER_SLOW_EVENT, now.minus(properties.brokerSlowWindow()), now, BROKER_SLOW_CAP);
         for (BrokerEventView e : recent) {
-            if (e.address() == null) {
+            if (e.destination() == null) {
                 continue;
             }
-            byAddress.merge(e.address(), e, (a, bEvent) -> a.occurredAt().isAfter(bEvent.occurredAt()) ? a : bEvent);
+            byAddress.merge(
+                    e.destination(), e, (a, bEvent) -> a.occurredAt().isAfter(bEvent.occurredAt()) ? a : bEvent);
         }
         return byAddress;
     }
@@ -299,13 +300,13 @@ public class ConsumerHealthService {
         return Comparator.<ConsumerHealth>comparingInt(h -> -h.verdict().severity())
                 .thenComparing(h -> h.verdict() == Verdict.INSUFFICIENT_DATA ? 0 : 1)
                 .thenComparing(Comparator.comparingLong(ConsumerHealth::depth).reversed())
-                .thenComparing(ConsumerHealth::queueName);
+                .thenComparing(ConsumerHealth::subscription);
     }
 
     private static Comparator<ConsumerHealth> comparatorFor(String field) {
         return switch (field) {
-            case "queueName" -> Comparator.comparing(ConsumerHealth::queueName);
-            case "address" -> Comparator.comparing(ConsumerHealth::address);
+            case "subscription" -> Comparator.comparing(ConsumerHealth::subscription);
+            case "destination" -> Comparator.comparing(ConsumerHealth::destination);
             case "depth" -> Comparator.comparingLong(ConsumerHealth::depth);
             case "consumers" -> Comparator.comparingLong(ConsumerHealth::consumers);
             case "delivering" -> Comparator.comparingLong(ConsumerHealth::delivering);

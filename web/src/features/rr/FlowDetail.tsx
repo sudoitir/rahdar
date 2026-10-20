@@ -164,7 +164,7 @@ export function FlowDetail({
       position="right"
       size="lg"
       closeButtonProps={{ 'aria-label': 'Close the flow' }}
-      title={f ? `Flow on ${f.requestAddress}` : 'Flow'}
+      title={f ? `Flow on ${f.requestDestination}` : 'Flow'}
     >
       {flowNotice(detail) ?? (f ? <FlowContent f={f} /> : null)}
     </Drawer>

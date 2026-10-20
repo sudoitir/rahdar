@@ -8,21 +8,21 @@ import type { FlowEdgeView, FlowGraphView, FlowNodeView } from './api.ts';
  * tested with the real engine and run unchanged in a web worker.
  */
 
-export const COLUMNS = ['PRODUCER', 'ADDRESS', 'QUEUE', 'CONSUMER', 'REMOTE'] as const;
+export const COLUMNS = ['PRODUCER', 'DESTINATION', 'SUBSCRIPTION', 'CONSUMER', 'REMOTE'] as const;
 export type Column = (typeof COLUMNS)[number];
 
 export const COLUMN_TITLES: Record<Column, string> = {
   PRODUCER: 'Producers',
-  ADDRESS: 'Addresses',
-  QUEUE: 'Queues',
+  DESTINATION: 'Addresses',
+  SUBSCRIPTION: 'Queues',
   CONSUMER: 'Consumers',
   REMOTE: 'Other nodes and brokers',
 };
 
 export const NODE_SIZE: Record<Column, { width: number; height: number }> = {
   PRODUCER: { width: 216, height: 64 },
-  ADDRESS: { width: 208, height: 58 },
-  QUEUE: { width: 228, height: 78 },
+  DESTINATION: { width: 208, height: 58 },
+  SUBSCRIPTION: { width: 228, height: 78 },
   CONSUMER: { width: 216, height: 64 },
   REMOTE: { width: 208, height: 60 },
 };
@@ -80,7 +80,7 @@ export interface LaneData extends Record<string, unknown> {
 }
 
 function column(node: FlowNodeView): Column {
-  return (COLUMNS as readonly string[]).includes(node.kind ?? '') ? (node.kind as Column) : 'QUEUE';
+  return (COLUMNS as readonly string[]).includes(node.kind ?? '') ? (node.kind as Column) : 'SUBSCRIPTION';
 }
 
 /**
@@ -179,7 +179,9 @@ export function toReactFlow(
   const deepest = Math.max(1, ...placed.map((n) => n.messageCount ?? 0));
   const nodes: Node[] = placed.map((n) => ({
     id: n.id!,
-    type: { QUEUE: 'queue', ADDRESS: 'address', REMOTE: 'remote', PRODUCER: 'client', CONSUMER: 'client' }[column(n)],
+    type: { SUBSCRIPTION: 'queue', DESTINATION: 'address', REMOTE: 'remote', PRODUCER: 'client', CONSUMER: 'client' }[
+      column(n)
+    ],
     position: positions[n.id!],
     ...NODE_SIZE[column(n)],
     draggable: false,
@@ -187,7 +189,7 @@ export function toReactFlow(
     focusable: false,
     data: {
       view: n,
-      depth: column(n) === 'QUEUE' ? Math.min(1, (n.messageCount ?? 0) / deepest) : 0,
+      depth: column(n) === 'SUBSCRIPTION' ? Math.min(1, (n.messageCount ?? 0) / deepest) : 0,
       dimmed: emphasis !== null && !emphasis.has(n.id!),
     } satisfies FlowNodeData,
   }));

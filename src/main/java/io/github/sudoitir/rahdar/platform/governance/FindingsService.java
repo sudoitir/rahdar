@@ -67,17 +67,17 @@ public class FindingsService {
                 actors.resolve(),
                 action,
                 TARGET_TYPE,
-                finding.getAddress() + " " + finding.getLocation() + ":" + finding.getFieldPath(),
+                finding.getDestination() + " " + finding.getLocation() + ":" + finding.getFieldPath(),
                 null,
                 null,
                 Map.of(
-                        "address", finding.getAddress(),
+                        "destination", finding.getDestination(),
                         "location", finding.getLocation(),
                         "fieldPath", finding.getFieldPath(),
                         "dataClass", finding.getDataClass()),
                 false);
         rules.createUnaudited(new GovernanceRuleEntity(
-                finding.getAddress(),
+                finding.getDestination(),
                 targetOf(finding.getLocation()),
                 finding.getFieldPath(),
                 finding.getDataClass(),
@@ -99,7 +99,7 @@ public class FindingsService {
     static FindingView toView(ClassificationFindingEntity e) {
         return new FindingView(
                 e.getId(),
-                e.getAddress(),
+                e.getDestination(),
                 e.getLocation(),
                 e.getFieldPath(),
                 e.getDataClass(),

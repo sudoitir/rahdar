@@ -38,8 +38,7 @@ import { FlowTable } from './FlowTable.tsx';
 import classes from './FlowView.module.css';
 
 const LAYER_LABELS: Record<string, string> = {
-  DIVERTS: 'Diverts',
-  BRIDGES: 'Bridges',
+  ROUTES: 'Diverts and bridges',
   CLUSTER: 'Cluster hops',
   DEAD_LETTER: 'Dead letter & expiry',
   TEMPORARY: 'Temporary queues',
@@ -48,8 +47,8 @@ const LAYER_LABELS: Record<string, string> = {
 
 const FIND_GROUPS: Array<{ group: string; kinds: string[] }> = [
   { group: 'Clients', kinds: ['PRODUCER', 'CONSUMER'] },
-  { group: 'Addresses', kinds: ['ADDRESS'] },
-  { group: 'Queues', kinds: ['QUEUE'] },
+  { group: 'Addresses', kinds: ['DESTINATION'] },
+  { group: 'Queues', kinds: ['SUBSCRIPTION'] },
 ];
 
 /**

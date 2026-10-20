@@ -18,7 +18,7 @@ public final class EventViews {
             @Schema(requiredMode = REQUIRED) Instant occurredAt,
             @Schema(requiredMode = REQUIRED) Instant receivedAt,
             @Schema(requiredMode = REQUIRED) String type,
-            @Schema(nullable = true) String address,
+            @Schema(nullable = true) String destination,
             @Schema(nullable = true) String routingName,
             @Schema(nullable = true) String consumerName,
             @Schema(nullable = true) String sessionName,

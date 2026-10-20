@@ -17,7 +17,7 @@ _Others_
 
 * `i.g.s.r.f.r.CaptureRrSink`
 * `i.g.s.r.f.r.QueueTargetResolver`
-* `i.g.s.r.f.r.ReplyAddressResolver`
+* `i.g.s.r.f.r.ReplyDestinationResolver`
 * `i.g.s.r.f.r.RrDeadlineSweep`
 * `i.g.s.r.f.r.RrFeature`
 * `i.g.s.r.f.r.RrNotificationObserver`

@@ -1,7 +1,7 @@
 package io.github.sudoitir.rahdar.feature.rr;
 
 import io.github.sudoitir.rahdar.feature.rr.internal.persistence.RrFlowRepository;
-import io.github.sudoitir.rahdar.feature.rr.web.RrViews.AddressStatsView;
+import io.github.sudoitir.rahdar.feature.rr.web.RrViews.DestinationStatsView;
 import io.github.sudoitir.rahdar.feature.rr.web.RrViews.StatsResponse;
 import io.github.sudoitir.rahdar.kernel.plugin.ResourceType;
 import io.github.sudoitir.rahdar.kernel.security.ClusterAccessGuard;
@@ -80,31 +80,31 @@ public class RrMetrics {
     public StatsResponse stats(UUID clusterId, Duration window) {
         clusterAccess.requireVisible(clusterId);
         ResourceFilter readable = permissions.filter(clusterId, ResourceType.DESTINATION);
-        List<String> addresses = flows.findDistinctRequestAddressByClusterId(clusterId).stream()
+        List<String> addresses = flows.findDistinctRequestDestinationByClusterId(clusterId).stream()
                 .filter(readable::readable)
                 .toList();
         Instant since = Instant.now().minus(window);
-        List<AddressStatsView> views = addresses.stream()
+        List<DestinationStatsView> views = addresses.stream()
                 .map(a -> addressStats(clusterId, a, since, window))
                 .toList();
         return new StatsResponse(views);
     }
 
-    private AddressStatsView addressStats(UUID clusterId, String address, Instant since, Duration window) {
+    private DestinationStatsView addressStats(UUID clusterId, String address, Instant since, Duration window) {
         long inFlight =
-                flows.countByClusterIdAndRequestAddressAndState(clusterId, address, RrState.AWAITING_REPLY.name());
-        Long oldestMs = flows.findFirstByClusterIdAndRequestAddressAndStateOrderByRequestedAtAsc(
+                flows.countByClusterIdAndRequestDestinationAndState(clusterId, address, RrState.AWAITING_REPLY.name());
+        Long oldestMs = flows.findFirstByClusterIdAndRequestDestinationAndStateOrderByRequestedAtAsc(
                         clusterId, address, RrState.AWAITING_REPLY.name())
                 .map(f -> Duration.between(f.getRequestedAt(), Instant.now()).toMillis())
                 .orElse(null);
 
-        long completed = flows.countByClusterIdAndRequestAddressAndStateAndRequestedAtAfter(
+        long completed = flows.countByClusterIdAndRequestDestinationAndStateAndRequestedAtAfter(
                 clusterId, address, RrState.COMPLETED.name(), since);
-        long timedOut = flows.countByClusterIdAndRequestAddressAndStateAndRequestedAtAfter(
+        long timedOut = flows.countByClusterIdAndRequestDestinationAndStateAndRequestedAtAfter(
                 clusterId, address, RrState.TIMED_OUT.name(), since);
-        long orphaned = flows.countByClusterIdAndRequestAddressAndStateAndRequestedAtAfter(
+        long orphaned = flows.countByClusterIdAndRequestDestinationAndStateAndRequestedAtAfter(
                 clusterId, address, RrState.ORPHANED.name(), since);
-        long responderDropped = flows.countByClusterIdAndRequestAddressAndStateAndRequestedAtAfter(
+        long responderDropped = flows.countByClusterIdAndRequestDestinationAndStateAndRequestedAtAfter(
                 clusterId, address, RrState.RESPONDER_DROPPED.name(), since);
 
         Timer t = registry.find(METRIC)
@@ -124,7 +124,7 @@ public class RrMetrics {
 
         Double coverage = estimateCoverage(clusterId, address, completed + timedOut + orphaned + responderDropped);
 
-        return new AddressStatsView(
+        return new DestinationStatsView(
                 address,
                 inFlight,
                 oldestMs,

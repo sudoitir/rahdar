@@ -30,7 +30,7 @@ class PagerDutySenderTest {
         StringBuilder t = new StringBuilder();
         for (int i = 0; i < kinds.length; i++) {
             t.append(i > 0 ? "," : "")
-                    .append("{\"subject\":\"queue:q")
+                    .append("{\"subject\":\"subscription:q")
                     .append(i)
                     .append("\",\"subjectLabel\":\"queue q")
                     .append(i)
@@ -108,7 +108,7 @@ class PagerDutySenderTest {
                 null,
                 null,
                 null,
-                List.of(new AlertMessage.Line("queue:" + "x".repeat(400), "l", true, null, Instant.now())));
+                List.of(new AlertMessage.Line("subscription:" + "x".repeat(400), "l", true, null, Instant.now())));
         String key = PagerDutySender.dedupKey(m, m.transitions().get(0));
         assertThat(key)
                 .hasSize(64)

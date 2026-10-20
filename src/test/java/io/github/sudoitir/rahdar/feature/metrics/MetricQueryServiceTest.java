@@ -14,6 +14,7 @@ import io.github.sudoitir.rahdar.kernel.core.NotFoundException;
 import io.github.sudoitir.rahdar.kernel.lifecycle.LifecycleRegistry;
 import io.github.sudoitir.rahdar.kernel.plugin.internal.descriptor.PluginDescriptor;
 import io.github.sudoitir.rahdar.kernel.security.ClusterAccessGuard;
+import io.github.sudoitir.rahdar.kernel.security.ResourceRef;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
 import io.github.sudoitir.rahdar.platform.scrape.MetricSamples;
@@ -78,7 +79,6 @@ class MetricQueryServiceTest {
                 clusterId,
                 new MetricQuery(
                         List.of("openbroker.enqueued"),
-                        "CLUSTER",
                         null,
                         bucket,
                         bucket.plusSeconds(60),
@@ -98,8 +98,7 @@ class MetricQueryServiceTest {
         Instant to = Instant.now();
         Instant from = to.minus(Duration.ofDays(7));
         MetricSeriesResponse response = service.query(
-                clusterId,
-                new MetricQuery(List.of("openbroker.backlog"), "CLUSTER", null, from, to, Duration.ofSeconds(1), null));
+                clusterId, new MetricQuery(List.of("openbroker.backlog"), null, from, to, Duration.ofSeconds(1), null));
 
         assertThat(response.truncated()).isTrue();
         assertThat(Duration.parse(response.step())).isGreaterThan(Duration.ofSeconds(1));
@@ -112,8 +111,8 @@ class MetricQueryServiceTest {
 
         Instant to = Instant.now();
         Instant from = to.minus(Duration.ofDays(30));
-        MetricSeriesResponse response = service.query(
-                clusterId, new MetricQuery(List.of("openbroker.backlog"), "CLUSTER", null, from, to, null, null));
+        MetricSeriesResponse response =
+                service.query(clusterId, new MetricQuery(List.of("openbroker.backlog"), null, from, to, null, null));
 
         assertThat(response.truncated()).isTrue();
         assertThat(response.from()).isAfter(from);
@@ -145,7 +144,12 @@ class MetricQueryServiceTest {
         MetricSeriesResponse response = service.query(
                 clusterId,
                 new MetricQuery(
-                        List.of("openbroker.enqueued"), "QUEUE", "orders", to.minusSeconds(3600), to, null, "NODE"));
+                        List.of("openbroker.enqueued"),
+                        ResourceRef.subscription("orders"),
+                        to.minusSeconds(3600),
+                        to,
+                        null,
+                        "NODE"));
 
         assertThat(response.splitBy()).isEqualTo("NODE");
         assertThat(response.series().get(0).points()).hasSize(1);
@@ -169,8 +173,7 @@ class MetricQueryServiceTest {
                 clusterId,
                 new MetricQuery(
                         List.of("openbroker.backlog"),
-                        "QUEUE",
-                        "orders",
+                        ResourceRef.subscription("orders"),
                         to.minus(Duration.ofHours(24)),
                         to,
                         Duration.ofSeconds(60),
@@ -185,12 +188,17 @@ class MetricQueryServiceTest {
     void aSplitIsRefusedForTheClusterScopeAndForAnyOtherDimension() {
         Instant to = Instant.now();
         MetricQuery clusterSplit =
-                new MetricQuery(List.of("openbroker.backlog"), "CLUSTER", null, to.minusSeconds(60), to, null, "NODE");
+                new MetricQuery(List.of("openbroker.backlog"), null, to.minusSeconds(60), to, null, "NODE");
         assertThatThrownBy(() -> service.query(clusterId, clusterSplit))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("needs one queue");
+                .hasMessageContaining("needs one subscription");
         MetricQuery addressSplit = new MetricQuery(
-                List.of("openbroker.backlog"), "QUEUE", "orders", to.minusSeconds(60), to, null, "ADDRESS");
+                List.of("openbroker.backlog"),
+                ResourceRef.subscription("orders"),
+                to.minusSeconds(60),
+                to,
+                null,
+                "ADDRESS");
         assertThatThrownBy(() -> service.query(clusterId, addressSplit))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("splitBy must be NODE");

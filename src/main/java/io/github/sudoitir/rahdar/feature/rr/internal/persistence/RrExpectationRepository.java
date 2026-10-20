@@ -6,9 +6,9 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface RrExpectationRepository extends JpaRepository<RrExpectationEntity, UUID> {
 
-    List<RrExpectationEntity> findByClusterIdOrderByRequestAddress(UUID clusterId);
+    List<RrExpectationEntity> findByClusterIdOrderByRequestDestination(UUID clusterId);
 
     List<RrExpectationEntity> findByEnabledTrue();
 
-    boolean existsByClusterIdAndRequestAddress(UUID clusterId, String requestAddress);
+    boolean existsByClusterIdAndRequestDestination(UUID clusterId, String requestDestination);
 }

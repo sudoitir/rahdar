@@ -6,6 +6,7 @@ import { useMetrics, type MetricSeries } from './api.ts';
 import dayjs from 'dayjs';
 import duration from 'dayjs/plugin/duration';
 
+import { subscriptionIdOf } from '../../kernel/api/resourceId.ts';
 import { elapsedLabel, useServerNow } from '../../kernel/time/time.ts';
 import { rangeSpec, type MetricRange } from './ranges.ts';
 import { RangePicker } from './RangePicker.tsx';
@@ -136,8 +137,7 @@ export function MetricsView() {
     clusterId,
     {
       metrics: METRICS,
-      subjectType: subject ? 'QUEUE' : 'CLUSTER',
-      subject,
+      resource: subject ? subscriptionIdOf(subject) : undefined,
       from,
       to,
       step: live ? spec.step : undefined,

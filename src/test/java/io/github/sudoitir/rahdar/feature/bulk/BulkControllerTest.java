@@ -56,7 +56,7 @@ class BulkControllerTest extends BulkTestSupport {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.run.operation").value(operation.name()))
                 .andExpect(jsonPath("$.run.total").value(2))
-                .andExpect(jsonPath("$.items[0].queueName").value("orders.a"));
+                .andExpect(jsonPath("$.items[0].subscription").value("artemis.queue/orders.a"));
     }
 
     @ParameterizedTest
@@ -132,13 +132,13 @@ class BulkControllerTest extends BulkTestSupport {
 
     @Test
     void refusesASelectionOverTheQueueCap() throws Exception {
-        settings.put(BrokerSettings.BULK_QUEUE_CAP, "1");
+        settings.put(BrokerSettings.BULK_SUBSCRIPTION_CAP, "1");
 
         preview("""
                         {"operation":"PAUSE","names":null,"q":"orders","disconnectConsumers":false}
                         """)
                 .andExpect(status().isUnprocessableContent())
-                .andExpect(jsonPath("$.type").value(endsWith("bulk-queue-cap-exceeded")));
+                .andExpect(jsonPath("$.type").value(endsWith("bulk-subscription-cap-exceeded")));
     }
 
     @Test

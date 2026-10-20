@@ -57,7 +57,7 @@ class EmailSenderTest {
     void theSubjectIsOneLineAndTheMessageHasBothParts() throws Exception {
         String payload = """
                 {"ruleId":"%s","ruleName":"Depth\\r\\nBcc: attacker@example.com","severity":"WARNING","clusterName":"prod",
-                 "transitions":[{"subject":"queue:orders","subjectLabel":"queue orders","kind":"FIRED","value":900}]}""".formatted(UUID.randomUUID());
+                 "transitions":[{"subject":"subscription:orders","subjectLabel":"subscription orders","kind":"FIRED","value":900}]}""".formatted(UUID.randomUUID());
         MimeMessage mime = new MimeMessage(Session.getInstance(new Properties()));
 
         EmailSender.compose(mime, config, AlertMessage.parse(payload, mapper), 42);

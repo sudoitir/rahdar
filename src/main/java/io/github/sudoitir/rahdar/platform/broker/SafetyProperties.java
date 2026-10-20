@@ -8,9 +8,9 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  * count above this is a {@code 422} unless the caller passes {@code ?override=true} behind
  * the UI's typed confirmation.
  *
- * <p>{@code bulkQueueCap} bounds how many queues one bulk run may act on (ADR-0093), with no override.
+ * <p>{@code bulkSubscriptionCap} bounds how many queues one bulk run may act on (ADR-0093), with no override.
  */
 @ConfigurationProperties(prefix = "rahdar.safety")
 public record SafetyProperties(
         @DefaultValue("1000") int bulkCap,
-        @DefaultValue("200") int bulkQueueCap) {}
+        @DefaultValue("200") int bulkSubscriptionCap) {}

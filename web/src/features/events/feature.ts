@@ -7,7 +7,7 @@ import { lazyFeatureView } from '../../kernel/routing/lazy.tsx';
 
 function validateEventsSearch(raw: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = {};
-  for (const k of ['type', 'address'] as const) {
+  for (const k of ['type', 'destination'] as const) {
     if (typeof raw[k] === 'string' && raw[k]) out[k] = raw[k];
   }
   const event = Number(raw.event);

@@ -32,7 +32,7 @@ import org.springframework.stereotype.Component;
  */
 @Component
 @RequiredArgsConstructor
-public class ReplyAddressResolver {
+public class ReplyDestinationResolver {
 
     /**
      * The most concrete reply addresses one expectation may expand to. A pattern of
@@ -56,7 +56,7 @@ public class ReplyAddressResolver {
 
     /** The concrete addresses to browse for this expectation, capped at {@link #MAX_RESOLVED}. */
     public Resolution resolve(UUID clusterId, RrExpectationEntity expectation) {
-        List<String> declared = expectation.getReplyAddresses();
+        List<String> declared = expectation.getReplyDestinations();
         if (declared.isEmpty()) {
             return new Resolution(List.of(), false, false);
         }
@@ -113,7 +113,7 @@ public class ReplyAddressResolver {
         if (address == null) {
             return false;
         }
-        for (String entry : expectation.getReplyAddresses()) {
+        for (String entry : expectation.getReplyDestinations()) {
             if (isPattern(entry) ? patternFor(entry).matcher(address).matches() : entry.equals(address)) {
                 return true;
             }
@@ -156,7 +156,7 @@ public class ReplyAddressResolver {
     }
 
     private Pattern patternFor(String glob) {
-        return compiled.computeIfAbsent(glob, ReplyAddressResolver::compile);
+        return compiled.computeIfAbsent(glob, ReplyDestinationResolver::compile);
     }
 
     private Set<String> knownAddresses(UUID clusterId) {

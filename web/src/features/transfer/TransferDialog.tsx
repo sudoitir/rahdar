@@ -6,6 +6,7 @@ import { useNavigate } from '@tanstack/react-router';
 import { useCluster, useClusters } from '../clusters/index.ts';
 import { AddressPicker } from '../queues/index.ts';
 import { useCan } from '../../kernel/auth/useCan.ts';
+import { resourceName, subscriptionIdOf } from '../../kernel/api/resourceId.ts';
 import type { MessageSelection } from '../../kernel/slots.ts';
 import { CapabilityGate } from '../../ui/CapabilityGate.tsx';
 import { gateFor } from '../../ui/capabilityGate.ts';
@@ -93,8 +94,8 @@ function blastRadius(run: TransferRunView, clusterName: (id: string) => string):
       ? 'the selected messages (how many is not known until the run counts them)'
       : `${plural(run.estimate, 'message')} (${bytes(run.estimateBytes)})`;
   const where =
-    `from ${source.queue} on ${source.nodeName} (${clusterName(source.clusterId)}) ` +
-    `to ${target.queue} on ${target.nodeName} (${clusterName(target.clusterId)})`;
+    `from ${resourceName(source.subscription)} on ${source.nodeName} (${clusterName(source.clusterId)}) ` +
+    `to ${resourceName(target.subscription)} on ${target.nodeName} (${clusterName(target.clusterId)})`;
   return run.mode === 'MOVE'
     ? `Move ${what} ${where}. They leave the source queue.`
     : `Copy ${what} ${where}. The source queue is unchanged.`;
@@ -461,13 +462,12 @@ export function TransferDialog({
     setAcked(new Set());
     preview.mutate({
       mode: effectiveMode,
-      sourceQueue: queueName,
+      source: subscriptionIdOf(queueName),
       sourceNodeId: sourceNode.id,
       selection: selectionRequest(selection),
       targetClusterId: redistribute ? clusterId : values.targetClusterId,
       targetNodeId: chosenNode,
-      targetQueue: redistribute ? queueName : values.targetQueue.trim(),
-      targetAddress: null,
+      target: subscriptionIdOf(redistribute ? queueName : values.targetQueue.trim()),
     });
   }, focusFirstInvalid(form.getInputNode));
 
@@ -489,7 +489,7 @@ export function TransferDialog({
           // Typing the queue name is the override: it is only armed where the preview said so.
           override: data.overCap,
           acknowledged: warnings.map((f) => f.code),
-          confirmQueue: data.source.queue,
+          confirmSubscription: resourceName(data.source.subscription),
         },
       },
       {

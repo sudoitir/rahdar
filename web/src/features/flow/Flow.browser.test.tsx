@@ -38,10 +38,10 @@ const share = (nodeId: string, node: string, over: Record<string, unknown> = {})
 function graph(byNode: boolean) {
   return {
     nodes: [
-      { id: 'address:orders', kind: 'ADDRESS', label: 'orders', routingTypes: ['ANYCAST'], faults: [] },
+      { id: 'destination:orders', kind: 'DESTINATION', label: 'orders', routingTypes: ['ANYCAST'], faults: [] },
       {
-        id: 'queue:ORDERS.inbound',
-        kind: 'QUEUE',
+        id: 'subscription:ORDERS.inbound',
+        kind: 'SUBSCRIPTION',
         label: 'ORDERS.inbound',
         messageCount: 1200,
         consumerCount: 0,
@@ -56,10 +56,10 @@ function graph(byNode: boolean) {
       {
         id: 'route:orders->orders',
         kind: 'ROUTE',
-        source: 'address:orders',
-        target: 'queue:ORDERS.inbound',
+        source: 'destination:orders',
+        target: 'subscription:ORDERS.inbound',
         rate: 42,
-        rateSource: 'QUEUE_METRIC',
+        rateSource: 'SUBSCRIPTION_METRIC',
         asOf: '2026-09-14T10:00:00Z',
         stale: false,
         delivery: 'SHARED',
@@ -69,7 +69,7 @@ function graph(byNode: boolean) {
         id: 'produce:order-svc->orders',
         kind: 'PRODUCE',
         source: 'producer:order-svc',
-        target: 'address:orders',
+        target: 'destination:orders',
         rateSource: 'SAMPLER',
         stale: false,
         members: 2,

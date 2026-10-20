@@ -53,26 +53,25 @@ public record FlowQuery(
 
     /** Optional routing drawn on top of produce, route and consume (flow-visualization spec). */
     public enum Layer {
-        DIVERTS,
-        BRIDGES,
+        ROUTES,
         CLUSTER,
         DEAD_LETTER,
         TEMPORARY,
         CAPTURE
     }
 
-    public static final Set<Layer> DEFAULT_LAYERS = Set.copyOf(EnumSet.of(Layer.DIVERTS, Layer.BRIDGES, Layer.CLUSTER));
+    public static final Set<Layer> DEFAULT_LAYERS = Set.copyOf(EnumSet.of(Layer.ROUTES, Layer.CLUSTER));
 
     public enum FocusKind {
         CLIENT,
-        ADDRESS,
-        QUEUE
+        DESTINATION,
+        SUBSCRIPTION
     }
 
     public record Focus(FocusKind kind, String name) {}
 
     /**
-     * @param focus {@code client:<name>}, {@code address:<name>} or {@code queue:<name>}, or blank for none
+     * @param focus {@code client:<name>}, {@code destination:<name>} or {@code subscription:<name>}, or blank for none
      * @param layers comma-separated {@link Layer} names; blank for the default layers
      * @throws IllegalArgumentException for a focus or a layer that is not one of those shapes
      */
@@ -115,7 +114,7 @@ public record FlowQuery(
             return null;
         }
         int colon = focus.indexOf(':');
-        String message = "focus must be client:<name>, address:<name> or queue:<name>, not '" + focus + "'";
+        String message = "focus must be client:<name>, destination:<name> or subscription:<name>, not '" + focus + "'";
         if (colon <= 0 || colon == focus.length() - 1) {
             throw new IllegalArgumentException(message);
         }

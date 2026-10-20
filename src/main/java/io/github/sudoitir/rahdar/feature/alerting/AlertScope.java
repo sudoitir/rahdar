@@ -5,13 +5,13 @@ import java.util.stream.Collectors;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * {@code alert_rule.scope} ({@code {addressPattern, queuePattern, node, subjectPattern}}), where
+ * {@code alert_rule.scope} ({@code {destinationPattern, subscriptionPattern, node, subjectPattern}}), where
  * {@code subjectPattern} narrows a plugin-metric rule to some of its subjects (ADR-0113).
  * A pattern with no {@code *} must match exactly; {@code *} is a wildcard
  * translated to a regex — enough for "starts with", "ends with", "contains"
  * without pulling in a glob library for three field-level filters.
  */
-public record AlertScope(String addressPattern, String queuePattern, String node, String subjectPattern) {
+public record AlertScope(String destinationPattern, String subscriptionPattern, String node, String subjectPattern) {
 
     public static final AlertScope NONE = new AlertScope(null, null, null, null);
 
@@ -32,21 +32,21 @@ public record AlertScope(String addressPattern, String queuePattern, String node
      * matches the same names and more. A {@code *} inside a word has no such spelling and is left as written,
      * so it matches only through a grant that reaches every queue.
      */
-    public String queueNames() {
-        if (queuePattern == null || queuePattern.isBlank()) {
+    public String subscriptionNames() {
+        if (subscriptionPattern == null || subscriptionPattern.isBlank()) {
             return "#";
         }
-        return Arrays.stream(queuePattern.split("\\.", -1))
+        return Arrays.stream(subscriptionPattern.split("\\.", -1))
                 .map(word -> "*".equals(word) ? "#" : word)
                 .collect(Collectors.joining("."));
     }
 
-    public boolean matchesAddress(String address) {
-        return matches(addressPattern, address);
+    public boolean matchesDestination(String address) {
+        return matches(destinationPattern, address);
     }
 
-    public boolean matchesQueue(String queueName) {
-        return matches(queuePattern, queueName);
+    public boolean matchesSubscription(String queueName) {
+        return matches(subscriptionPattern, queueName);
     }
 
     public boolean matchesSubject(String subject) {

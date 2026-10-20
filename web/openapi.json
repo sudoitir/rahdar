@@ -19188,7 +19188,7 @@
             "type" : "string"
           }
         }, {
-          "name" : "address",
+          "name" : "destination",
           "in" : "query",
           "required" : false,
           "schema" : {
@@ -20015,15 +20015,7 @@
             }
           }
         }, {
-          "name" : "subjectType",
-          "in" : "query",
-          "required" : false,
-          "schema" : {
-            "type" : "string",
-            "default" : "CLUSTER"
-          }
-        }, {
-          "name" : "subject",
+          "name" : "resource",
           "in" : "query",
           "required" : false,
           "schema" : {
@@ -20518,7 +20510,7 @@
             "format" : "uuid"
           }
         }, {
-          "name" : "address",
+          "name" : "destination",
           "in" : "query",
           "required" : false,
           "schema" : {
@@ -21028,7 +21020,7 @@
             "type" : "string"
           }
         }, {
-          "name" : "queue",
+          "name" : "subscription",
           "in" : "query",
           "required" : false,
           "schema" : {
@@ -26809,7 +26801,7 @@
       "RuleRequest" : {
         "type" : "object",
         "properties" : {
-          "addressPattern" : {
+          "destinationPattern" : {
             "type" : [ "string", "null" ],
             "maxLength" : 255,
             "minLength" : 0,
@@ -26845,7 +26837,7 @@
             "type" : "string",
             "format" : "uuid"
           },
-          "addressPattern" : {
+          "destinationPattern" : {
             "type" : [ "string", "null" ]
           },
           "target" : {
@@ -26943,7 +26935,7 @@
       "UpdateExpectationRequest" : {
         "type" : "object",
         "properties" : {
-          "replyAddresses" : {
+          "replyDestinations" : {
             "type" : "array",
             "items" : {
               "type" : "string"
@@ -26978,23 +26970,23 @@
             "type" : "string",
             "format" : "uuid"
           },
-          "requestAddress" : {
+          "requestDestination" : {
             "type" : "string"
           },
-          "replyAddresses" : {
+          "replyDestinations" : {
             "type" : "array",
             "items" : {
               "type" : "string"
             }
           },
-          "resolvedReplyAddresses" : {
+          "resolvedReplyDestinations" : {
             "type" : "array",
-            "description" : "What replyAddresses currently expands to, from the last scrape's addresses",
+            "description" : "What replyDestinations currently expands to, from the last scrape's addresses",
             "items" : {
               "type" : "string"
             }
           },
-          "replyAddressesCapped" : {
+          "replyDestinationsCapped" : {
             "type" : "boolean",
             "description" : "The resolution cap cut the expansion short"
           },
@@ -27016,7 +27008,7 @@
             "type" : "boolean"
           }
         },
-        "required" : [ "capturePayload", "enabled", "id", "replyAddresses", "replyAddressesCapped", "requestAddress", "resolvedReplyAddresses", "samplePerMin" ]
+        "required" : [ "capturePayload", "enabled", "id", "replyDestinations", "replyDestinationsCapped", "requestDestination", "resolvedReplyDestinations", "samplePerMin" ]
       },
       "AssignEnvironmentRequest" : {
         "type" : "object",
@@ -28754,7 +28746,7 @@
             "type" : "string",
             "format" : "uuid"
           },
-          "address" : {
+          "destination" : {
             "type" : "string"
           },
           "location" : {
@@ -28785,7 +28777,7 @@
             "format" : "date-time"
           }
         },
-        "required" : [ "address", "dataClass", "dataClassLabel", "fieldPath", "firstSeenAt", "hitCount", "id", "lastSeenAt", "location", "status" ]
+        "required" : [ "dataClass", "dataClassLabel", "destination", "fieldPath", "firstSeenAt", "hitCount", "id", "lastSeenAt", "location", "status" ]
       },
       "PreviewRequest" : {
         "type" : "object",
@@ -29336,14 +29328,14 @@
           "nodeName" : {
             "type" : "string"
           },
-          "queue" : {
+          "subscription" : {
             "type" : "string"
           },
-          "address" : {
+          "destination" : {
             "type" : "string"
           }
         },
-        "required" : [ "address", "clusterId", "nodeId", "nodeName", "queue" ]
+        "required" : [ "clusterId", "destination", "nodeId", "nodeName", "subscription" ]
       },
       "TransferRunView" : {
         "type" : "object",
@@ -29525,7 +29517,7 @@
               "type" : "string"
             }
           },
-          "confirmQueue" : {
+          "confirmSubscription" : {
             "type" : [ "string", "null" ]
           }
         },
@@ -29538,7 +29530,7 @@
             "type" : "string",
             "enum" : [ "MOVE", "COPY" ]
           },
-          "sourceQueue" : {
+          "source" : {
             "type" : "string",
             "minLength" : 1
           },
@@ -29557,15 +29549,12 @@
             "type" : "string",
             "format" : "uuid"
           },
-          "targetQueue" : {
+          "target" : {
             "type" : "string",
             "minLength" : 1
-          },
-          "targetAddress" : {
-            "type" : [ "string", "null" ]
           }
         },
-        "required" : [ "mode", "selection", "sourceNodeId", "sourceQueue", "targetClusterId", "targetNodeId", "targetQueue" ]
+        "required" : [ "mode", "selection", "source", "sourceNodeId", "target", "targetClusterId", "targetNodeId" ]
       },
       "OrphanReturnRequest" : {
         "type" : "object",
@@ -29578,12 +29567,12 @@
             "type" : "string",
             "minLength" : 1
           },
-          "targetQueue" : {
+          "target" : {
             "type" : "string",
             "minLength" : 1
           }
         },
-        "required" : [ "nodeId", "stagingQueue", "targetQueue" ]
+        "required" : [ "nodeId", "stagingQueue", "target" ]
       },
       "OrphanReturnView" : {
         "type" : "object",
@@ -29613,7 +29602,7 @@
             "type" : "string",
             "format" : "uuid"
           },
-          "queueName" : {
+          "subscription" : {
             "type" : "string"
           },
           "messageId" : {
@@ -29757,11 +29746,13 @@
           "nodeName" : {
             "type" : "string"
           },
-          "queueName" : {
-            "type" : "string"
+          "subscription" : {
+            "type" : "string",
+            "description" : "The subscription's id."
           },
-          "address" : {
-            "type" : "string"
+          "destination" : {
+            "type" : "string",
+            "description" : "The id of the destination the subscription is bound to."
           },
           "messageCount" : {
             "type" : "integer",
@@ -29774,7 +29765,7 @@
         "type" : "object",
         "description" : "A request to start capturing a queue's messages into the index.",
         "properties" : {
-          "queuePattern" : {
+          "subscriptionPattern" : {
             "type" : "string"
           },
           "retentionDays" : {
@@ -29857,7 +29848,7 @@
             "type" : "string",
             "format" : "uuid"
           },
-          "queuePattern" : {
+          "subscriptionPattern" : {
             "type" : "string"
           },
           "retentionDays" : {
@@ -29939,9 +29930,9 @@
         "type" : "object",
         "description" : "What creating a capture subscription would do, without doing it: what it covers, where, how much it may hold, and the broker objects and configuration it amounts to.",
         "properties" : {
-          "addresses" : {
+          "destinations" : {
             "type" : "array",
-            "description" : "The addresses the pattern resolves to. Rahdar's own capture addresses are never included.",
+            "description" : "The ids of the destinations the pattern resolves to. Rahdar's own capture destinations are never included.",
             "items" : {
               "type" : "string"
             }
@@ -30230,11 +30221,11 @@
       "CreateExpectationRequest" : {
         "type" : "object",
         "properties" : {
-          "requestAddress" : {
+          "requestDestination" : {
             "type" : "string",
             "minLength" : 1
           },
-          "replyAddresses" : {
+          "replyDestinations" : {
             "type" : "array",
             "items" : {
               "type" : "string"
@@ -30257,7 +30248,7 @@
             "type" : "boolean"
           }
         },
-        "required" : [ "capturePayload", "requestAddress", "samplePerMin" ]
+        "required" : [ "capturePayload", "requestDestination", "samplePerMin" ]
       },
       "CreateQueueRequest" : {
         "type" : "object",
@@ -31153,8 +31144,9 @@
             "type" : "integer",
             "format" : "int32"
           },
-          "queueName" : {
-            "type" : "string"
+          "subscription" : {
+            "type" : "string",
+            "description" : "The subscription's id."
           },
           "status" : {
             "type" : "string",
@@ -31191,7 +31183,7 @@
             "format" : "date-time"
           }
         },
-        "required" : [ "nodes", "ordinal", "queueName", "status" ]
+        "required" : [ "nodes", "ordinal", "status", "subscription" ]
       },
       "BulkRunDetailView" : {
         "type" : "object",
@@ -34126,16 +34118,18 @@
           "nodeId" : {
             "type" : "string",
             "format" : "uuid",
-            "description" : "The node holding the message. Identity is (node, queue, messageId)."
+            "description" : "The node holding the message. Identity is (node, subscription, messageId)."
           },
           "nodeName" : {
             "type" : "string"
           },
-          "queueName" : {
-            "type" : "string"
+          "subscription" : {
+            "type" : "string",
+            "description" : "The subscription's id."
           },
-          "address" : {
-            "type" : "string"
+          "destination" : {
+            "type" : "string",
+            "description" : "The id of the destination the subscription is bound to."
           },
           "messageId" : {
             "type" : "integer",
@@ -34239,8 +34233,9 @@
           "nodeName" : {
             "type" : "string"
           },
-          "queueName" : {
-            "type" : "string"
+          "subscription" : {
+            "type" : "string",
+            "description" : "The subscription's id."
           },
           "status" : {
             "type" : "string",
@@ -34438,10 +34433,10 @@
         },
         "required" : [ "allowedActions", "consumerCount", "nodeId", "nodeName", "producerCount" ]
       },
-      "AddressStatsView" : {
+      "DestinationStatsView" : {
         "type" : "object",
         "properties" : {
-          "address" : {
+          "destination" : {
             "type" : "string"
           },
           "inFlight" : {
@@ -34492,19 +34487,19 @@
             "format" : "int64"
           }
         },
-        "required" : [ "address", "completed", "inFlight", "orphaned", "responderDropped", "sampled", "timedOut", "windowMs" ]
+        "required" : [ "completed", "destination", "inFlight", "orphaned", "responderDropped", "sampled", "timedOut", "windowMs" ]
       },
       "StatsResponse" : {
         "type" : "object",
         "properties" : {
-          "addresses" : {
+          "destinations" : {
             "type" : "array",
             "items" : {
-              "$ref" : "#/components/schemas/AddressStatsView"
+              "$ref" : "#/components/schemas/DestinationStatsView"
             }
           }
         },
-        "required" : [ "addresses" ]
+        "required" : [ "destinations" ]
       },
       "FlowView" : {
         "type" : "object",
@@ -34521,7 +34516,7 @@
             "type" : [ "string", "null" ],
             "format" : "uuid"
           },
-          "requestAddress" : {
+          "requestDestination" : {
             "type" : [ "string", "null" ]
           },
           "replyDestination" : {
@@ -34708,7 +34703,7 @@
             "type" : "string",
             "format" : "uuid"
           },
-          "requestAddress" : {
+          "requestDestination" : {
             "type" : "string"
           },
           "enabled" : {
@@ -34761,7 +34756,7 @@
             "description" : "The requested rate is faster than rr.sample-interval can deliver; the global interval is the floor"
           }
         },
-        "required" : [ "enabled", "expectationId", "messagesBrowsed", "nodesSampled", "nodesTotal", "observations", "rateExceedsInterval", "requestAddress", "samplePerMin", "skipped" ]
+        "required" : [ "enabled", "expectationId", "messagesBrowsed", "nodesSampled", "nodesTotal", "observations", "rateExceedsInterval", "requestDestination", "samplePerMin", "skipped" ]
       },
       "RrDiagnosticsView" : {
         "type" : "object",
@@ -35571,7 +35566,7 @@
           },
           "kind" : {
             "type" : "string",
-            "enum" : [ "PRODUCE", "ROUTE", "CONSUME", "DIVERT", "BRIDGE", "CLUSTER_HOP", "WILDCARD", "DEAD_LETTER", "EXPIRY" ]
+            "enum" : [ "PRODUCE", "ROUTE", "CONSUME", "FORWARD", "LINK", "CLUSTER_HOP", "WILDCARD", "DEAD_LETTER", "EXPIRY" ]
           },
           "source" : {
             "type" : "string"
@@ -35585,7 +35580,7 @@
           },
           "rateSource" : {
             "type" : "string",
-            "enum" : [ "SAMPLER", "QUEUE_METRIC", "NONE" ]
+            "enum" : [ "SAMPLER", "SUBSCRIPTION_METRIC", "NONE" ]
           },
           "asOf" : {
             "type" : [ "string", "null" ],
@@ -35633,7 +35628,7 @@
             "type" : "array",
             "items" : {
               "type" : "string",
-              "enum" : [ "NO_CONSUMER", "STALLED", "BRIDGE_DOWN", "PARTIAL_PRESENCE" ]
+              "enum" : [ "NO_CONSUMER", "STALLED", "LINK_DOWN", "PARTIAL_PRESENCE" ]
             }
           },
           "byNode" : {
@@ -35812,11 +35807,11 @@
           },
           "kind" : {
             "type" : "string",
-            "enum" : [ "PRODUCER", "ADDRESS", "QUEUE", "CONSUMER", "REMOTE" ]
+            "enum" : [ "PRODUCER", "DESTINATION", "SUBSCRIPTION", "CONSUMER", "REMOTE" ]
           },
           "role" : {
             "type" : [ "string", "null" ],
-            "enum" : [ "STORE_AND_FORWARD", "TEMPORARY", "ANONYMOUS", "CAPTURE", "DEAD_LETTER", "EXPIRY", "CLUSTER_NODE", "BRIDGE_TARGET", null ]
+            "enum" : [ "STORE_AND_FORWARD", "TEMPORARY", "ANONYMOUS", "CAPTURE", "DEAD_LETTER", "EXPIRY", "CLUSTER_NODE", "LINK_TARGET", null ]
           },
           "label" : {
             "type" : "string"
@@ -35867,7 +35862,7 @@
             "type" : "array",
             "items" : {
               "type" : "string",
-              "enum" : [ "NO_CONSUMER", "STALLED", "BRIDGE_DOWN", "PARTIAL_PRESENCE" ]
+              "enum" : [ "NO_CONSUMER", "STALLED", "LINK_DOWN", "PARTIAL_PRESENCE" ]
             }
           },
           "byNode" : {
@@ -35966,7 +35961,7 @@
           "type" : {
             "type" : "string"
           },
-          "address" : {
+          "destination" : {
             "type" : [ "string", "null" ]
           },
           "routingName" : {
@@ -36251,11 +36246,13 @@
       "ConsumerHealthView" : {
         "type" : "object",
         "properties" : {
-          "address" : {
-            "type" : "string"
+          "destination" : {
+            "type" : "string",
+            "description" : "The destination's id."
           },
-          "queueName" : {
-            "type" : "string"
+          "subscription" : {
+            "type" : "string",
+            "description" : "The subscription's id."
           },
           "verdict" : {
             "type" : "string",
@@ -36344,7 +36341,7 @@
             "format" : "int32"
           }
         },
-        "required" : [ "address", "cause", "consumers", "delivering", "depth", "nodesPresent", "nodesTotal", "paused", "queueName", "scheduled", "severity", "source", "stale", "verdict" ]
+        "required" : [ "cause", "consumers", "delivering", "depth", "destination", "nodesPresent", "nodesTotal", "paused", "scheduled", "severity", "source", "stale", "subscription", "verdict" ]
       },
       "PagedViewConsumerHealthView" : {
         "type" : "object",
