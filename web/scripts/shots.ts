@@ -165,7 +165,7 @@ async function main() {
       // no broker is touched by any of these captures, which is why there is no
       // post-apply shot here.
       before: async () => {
-        const current = await page.request.get(`${BASE}/api/v1/clusters/${clusterId}/config`);
+        const current = await page.request.get(`${BASE}/api/v1/clusters/${clusterId}/artemis/config`);
         const declaration = (await current.json()) as { revision: number; document: unknown };
         const document = declaration.document as {
           addressSettings: Array<{ match: string; values: Record<string, unknown> }>;
@@ -174,7 +174,7 @@ async function main() {
           ...document.addressSettings.filter((s) => s.match !== 'ORDERS.#'),
           { match: 'ORDERS.#', values: { addressFullMessagePolicy: 'DROP', maxSizeBytes: 52_428_800 } },
         ];
-        await page.request.put(`${BASE}/api/v1/clusters/${clusterId}/config`, {
+        await page.request.put(`${BASE}/api/v1/clusters/${clusterId}/artemis/config`, {
           headers: { 'X-XSRF-TOKEN': await xsrf(page) },
           data: {
             document: declaration.document,

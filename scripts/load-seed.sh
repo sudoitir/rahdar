@@ -116,7 +116,7 @@ while [ "$n" -lt "$LOAD_AUDIT_ROWS" ]; do
 done
 
 say "creating $LOAD_ACCOUNTS accounts and the flood account"
-role=$(api POST /roles -d '{"name":"LOAD","requiresMfa":false,"teamAssignable":false,"permissions":["cluster:read","queue:read","address:read","message:read","connection:read","alert:read","audit:export","data:read"]}' | json 'd["id"]')
+role=$(api POST /roles -d '{"name":"LOAD","requiresMfa":false,"teamAssignable":false,"permissions":["cluster:read","subscription:read","destination:read","message:read","connection:read","alert:read","audit:export","data:read"]}' | json 'd["id"]')
 printf 'username,password\n' > "$SEED_DIR/users.csv"
 printf 'username,password\n' > "$SEED_DIR/flood.csv"
 make_account() { # username file

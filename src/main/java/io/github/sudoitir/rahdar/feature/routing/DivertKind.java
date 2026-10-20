@@ -7,7 +7,7 @@ import io.github.sudoitir.rahdar.feature.resources.ResourcePermissions;
  * MCP tool so a kind cannot be reachable through one and not the other.
  *
  * <p>A divert changes where traffic goes rather than what a queue holds, so it has its own authority
- * ({@code divert:write}) and not the queue ones. Deleting one destroys no messages, but it is marked
+ * ({@code route:write}) and not the queue ones. Deleting one destroys no messages, but it is marked
  * destructive because it silently changes routing for every producer on the source address and cannot be
  * noticed by them.
  */

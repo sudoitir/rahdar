@@ -223,8 +223,8 @@ async function main() {
   await editor.waitFor({ state: 'hidden' });
   const roles = await list<{ id: string; name: string; permissions: string[] }>(api, '/roles');
   const role = roles.find((r) => r.name === roleName);
-  // The editor adds what the plugin's permissions require (`queue:read`), so a role is never saved half-usable.
-  if (!role || [...role.permissions].sort().join() !== `${ID}:read,${ID}:write,queue:read`) {
+  // The editor adds what the plugin's permissions require (`subscription:read`), so a role is never saved half-usable.
+  if (!role || [...role.permissions].sort().join() !== `${ID}:read,${ID}:write,subscription:read`) {
     throw new Error(`role saved with ${JSON.stringify(role?.permissions)}`);
   }
   await browser.close();

@@ -220,7 +220,7 @@ public class DivertLifecycleService {
 
     /**
      * The addresses the divert runs between on every node that has it, which deleting it needs
-     * {@code divert:write} on: it is destroyed wherever it is deployed. A caller who may not read or write
+     * {@code route:write} on: it is destroyed wherever it is deployed. A caller who may not read or write
      * all of them is told the divert does not exist, as is one whom nothing is known of it, so a name
      * cannot be told from a missing one.
      */

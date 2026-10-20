@@ -22,7 +22,7 @@ import org.springframework.web.bind.annotation.RestController;
 /**
  * Creating and deleting diverts, which only Artemis has, so they live under its namespace.
  *
- * <p>Both need {@code divert:write} — a divert changes where traffic goes rather than what a queue
+ * <p>Both need {@code route:write} — a divert changes where traffic goes rather than what a queue
  * holds, so the queue authorities are the wrong ones — and fan out across every live node with the same
  * per-node outcomes as every other topology mutation.
  *

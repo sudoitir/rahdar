@@ -241,13 +241,13 @@ reader=$(ensure /roles name READER '{
   "name": "READER",
   "requiresMfa": false,
   "teamAssignable": false,
-  "permissions": ["cluster:read", "queue:read", "message:read"]
+  "permissions": ["cluster:read", "subscription:read", "message:read"]
 }')
 operator=$(ensure /roles name OPERATOR '{
   "name": "OPERATOR",
   "requiresMfa": false,
   "teamAssignable": false,
-  "permissions": ["cluster:read", "queue:read", "queue:pause", "message:read", "message:move"]
+  "permissions": ["cluster:read", "subscription:read", "subscription:pause", "message:read", "message:move"]
 }')
 
 # A random password per run, printed nowhere: these accounts exist to populate the

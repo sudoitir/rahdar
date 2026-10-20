@@ -59,7 +59,7 @@ find_id() {
   api GET "$1?size=500" | python3 -c "import json,sys; print(next((r['id'] for r in json.load(sys.stdin)['data'] if r['$2']=='$3'), ''))"
 }
 role=$(find_id /roles name QA_SETTINGS)
-[ -n "$role" ] || role=$(api POST /roles -d '{"name":"QA_SETTINGS","requiresMfa":false,"teamAssignable":false,"permissions":["settings:read","settings:write","cluster:read","queue:read","message:read"]}' \
+[ -n "$role" ] || role=$(api POST /roles -d '{"name":"QA_SETTINGS","requiresMfa":false,"teamAssignable":false,"permissions":["settings:read","settings:write","cluster:read","subscription:read","message:read"]}' \
   | python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])')
 if [ -z "$(find_id /users username qa-requester)" ]; then
   initial=$(openssl rand -hex 16)
