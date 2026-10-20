@@ -16,8 +16,8 @@ import io.github.sudoitir.rahdar.kernel.security.internal.persistence.RoleReposi
 import io.github.sudoitir.rahdar.kernel.security.internal.persistence.UserRoleRepository;
 import io.github.sudoitir.rahdar.kernel.settings.SettingsService;
 import io.github.sudoitir.rahdar.platform.broker.Attempt;
+import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
 import io.github.sudoitir.rahdar.platform.broker.BrokerSettings;
-import io.github.sudoitir.rahdar.platform.broker.CoreRelay;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterService;
@@ -47,7 +47,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
 /**
- * End-to-end transfer runs (cross-broker-message-transfer group 5): real brokers, the real Core relay
+ * End-to-end transfer runs (cross-broker-message-transfer group 5): real brokers, the real relay
  * and real Postgres, driven through {@link TransferService} as the controller drives it.
  *
  * <p>Two clusters are registered for each test: {@code P}, the suite's shared broker, and {@code D},
@@ -87,7 +87,7 @@ abstract class TransferTestSupport extends PostgresIntegrationTest {
     ClusterRepository clusters;
 
     @Autowired
-    CoreRelay relay;
+    BrokerGateway gateway;
 
     @Autowired
     SettingsService settings;
@@ -156,7 +156,7 @@ abstract class TransferTestSupport extends PostgresIntegrationTest {
         }
         cleanups.reversed().forEach(TransferTestSupport::quietly);
         for (Registered c : registered) {
-            relay.forget(c.id());
+            gateway.forget(c.id());
             clusters.deleteById(c.id());
         }
         for (String key : List.of(

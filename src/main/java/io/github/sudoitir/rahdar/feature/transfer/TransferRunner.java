@@ -18,16 +18,16 @@ import io.github.sudoitir.rahdar.kernel.security.ResourceRef;
 import io.github.sudoitir.rahdar.kernel.settings.SettingsService;
 import io.github.sudoitir.rahdar.kernel.stream.SseHub;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
+import io.github.sudoitir.rahdar.platform.broker.BrokerRelay;
 import io.github.sudoitir.rahdar.platform.broker.BrokerXmlSnippets;
-import io.github.sudoitir.rahdar.platform.broker.CoreRelay;
-import io.github.sudoitir.rahdar.platform.broker.FrozenFilter;
 import io.github.sudoitir.rahdar.platform.broker.NodeCallLimiter;
-import io.github.sudoitir.rahdar.platform.broker.OutboundMessages.Provenance;
 import io.github.sudoitir.rahdar.platform.broker.RelayLink;
+import io.github.sudoitir.rahdar.platform.broker.RelayedMessages.Provenance;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
 import io.github.sudoitir.rahdar.system.artemis.AcceptanceProbe;
 import io.github.sudoitir.rahdar.system.artemis.AcceptanceProbe.Facts;
 import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisSelectors;
 import io.github.sudoitir.rahdar.system.artemis.MessageOperations;
 import io.github.sudoitir.rahdar.system.artemis.MessageOperations.BulkResult;
 import io.github.sudoitir.rahdar.system.artemis.StagingQueues;
@@ -40,6 +40,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -87,7 +88,7 @@ class TransferRunner {
     private final TransferLedger ledger;
     private final TransferNodes nodes;
     private final TransferFaults faults;
-    private final CoreRelay relay;
+    private final BrokerRelay relay;
     private final MessageOperations messages;
     private final StagingQueues staging;
     private final AcceptanceProbe probe;
@@ -152,7 +153,7 @@ class TransferRunner {
         }
 
         String frozenFilter() {
-            return FrozenFilter.compose(selection.filter(), run.getT0());
+            return ArtemisSelectors.frozen(selection.filter(), run.getT0());
         }
 
         String sourceMbean(ArtemisNode client) {
@@ -234,7 +235,7 @@ class TransferRunner {
                     BrokerXmlSnippets.STAGING_SECURITY_SETTING);
         }
         RelayLink.Route route = new RelayLink.Route(
-                stagingQueue, true, null, s.run.getTargetAddress(), s.run.getTargetQueue(), provenance(s, true));
+                stagingQueue, true, null, Optional.empty(), s.run.getTargetQueue(), provenance(s, true));
         InDoubt inDoubt = new InDoubt(s.id());
         Staged progress = new Staged();
         Link link = new Link();
@@ -445,11 +446,12 @@ class TransferRunner {
 
     private End copy(Segment s) throws IOException {
         Set<Long> ids = s.selection.kind() == SelectionKind.IDS ? Set.copyOf(s.selection.ids()) : null;
+        // The selection's end is when the run started: a filter or the whole queue is read as it was then.
         RelayLink.Route route = new RelayLink.Route(
                 s.run.getSourceQueue(),
                 false,
-                ids == null ? s.frozenFilter() : null,
-                s.run.getTargetAddress(),
+                ids == null ? s.selection.filter() : null,
+                ids == null ? Optional.of(s.run.getT0()) : Optional.empty(),
                 s.run.getTargetQueue(),
                 provenance(s, false));
         RelayLink.Hooks hooks = new RelayLink.Hooks() {
@@ -592,7 +594,7 @@ class TransferRunner {
                 StagingQueues.queueName(s.id()),
                 true,
                 null,
-                s.run.getTargetAddress(),
+                Optional.empty(),
                 s.run.getTargetQueue(),
                 provenance(s, true));
         RelayLink.Hooks only = new RelayLink.Hooks() {

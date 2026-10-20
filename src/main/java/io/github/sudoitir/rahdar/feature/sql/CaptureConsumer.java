@@ -2,7 +2,6 @@ package io.github.sudoitir.rahdar.feature.sql;
 
 import io.github.sudoitir.openbroker.messaging.Disposition;
 import io.github.sudoitir.openbroker.messaging.Message;
-import io.github.sudoitir.openbroker.messaging.PropertyValue;
 import io.github.sudoitir.openbroker.messaging.ReceiveOptions;
 import io.github.sudoitir.openbroker.messaging.Receiver;
 import io.github.sudoitir.rahdar.feature.sql.QueryAst.Source;
@@ -45,16 +44,13 @@ import org.springframework.stereotype.Component;
  *
  * <p>Identity comes from the queue being drained, not from a header (D2): this
  * consumer was started for a known source address, so every message it receives is
- * attributed to that address whatever the broker did or did not copy into
- * {@code _AMQ_ORIG_ADDRESS}.
+ * attributed to that address whatever the broker did or did not record as its
+ * origin.
  */
 @Component
 @RequiredArgsConstructor
 @Slf4j
 public class CaptureConsumer {
-
-    /** The broker's own name for the source message's id, which a divert copies onto the copy. */
-    private static final String ORIG_MESSAGE_ID = "_AMQ_ORIG_MESSAGE_ID";
 
     /** Messages acknowledged in one go. Larger trades redelivery risk for fewer round trips. */
     static final int ACK_BATCH = 50;
@@ -332,7 +328,7 @@ public class CaptureConsumer {
                     spec.clusterId(),
                     toRow(browsed),
                     message.headers().origin().orElse(null),
-                    longProperty(message, ORIG_MESSAGE_ID),
+                    message.headers().originId().map(CaptureConsumer::parseLong).orElse(null),
                     Instant.now());
         }
 
@@ -515,15 +511,6 @@ public class CaptureConsumer {
                 Thread.currentThread().interrupt();
             }
         }
-    }
-
-    private static Long longProperty(Message message, String name) {
-        return switch (message.properties().get(name)) {
-            case PropertyValue.OfLong l -> l.value();
-            case PropertyValue.OfInt i -> (long) i.value();
-            case PropertyValue.OfString t -> parseLong(t.value());
-            case null, default -> null;
-        };
     }
 
     private static Long parseLong(String text) {

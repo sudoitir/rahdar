@@ -14,8 +14,6 @@ import org.springframework.stereotype.Component;
 public class BrokerSessions {
 
     private final BrokerNotifications subscriptions;
-    private final CorePool pool;
-    private final CoreRelay relay;
     private final BrokerGateway gateway;
 
     /**
@@ -23,8 +21,6 @@ public class BrokerSessions {
      */
     public void release(UUID clusterId) {
         subscriptions.forget(clusterId);
-        pool.forget(clusterId);
-        relay.forget(clusterId);
         gateway.forget(clusterId);
     }
 
@@ -34,8 +30,6 @@ public class BrokerSessions {
      */
     public void releaseAllBut(Set<UUID> existing) {
         Set<UUID> gone = new HashSet<>(subscriptions.clusterIds());
-        gone.addAll(pool.clusterIds());
-        gone.addAll(relay.clusterIds());
         gone.addAll(gateway.clusterIds());
         gone.removeAll(existing);
         gone.forEach(this::release);

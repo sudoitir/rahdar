@@ -20,10 +20,7 @@ class BrokerShutdownSteps {
     }
 
     @Bean
-    ShutdownStep corePoolShutdown(CorePool pool, CoreRelay relay) {
-        return new ShutdownStep("core-pool", ShutdownPhases.CORE_POOL, () -> {
-            relay.closeAll();
-            pool.closeAll();
-        });
+    ShutdownStep connectionsShutdown(BrokerGateway gateway) {
+        return new ShutdownStep("core-pool", ShutdownPhases.CORE_POOL, gateway::destroy);
     }
 }

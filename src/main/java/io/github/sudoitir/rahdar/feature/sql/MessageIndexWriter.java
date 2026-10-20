@@ -141,8 +141,8 @@ public class MessageIndexWriter {
      * observation of the same message to fold into, and {@code last_seen_at} is the
      * moment it was drained rather than the last poll that still saw it.
      *
-     * <p>{@code origAddress} and {@code sourceMessageId} come from the broker's
-     * {@code _AMQ_ORIG_*} headers and are both nullable. The row's own
+     * <p>{@code origAddress} and {@code sourceMessageId} come from the message's origin
+     * headers and are both nullable. The row's own
      * {@code queue_name} and {@code address} are Rahdar's answer, resolved from which
      * capture queue the message was drained from, so a query by the original queue
      * name works whether or not the broker copied a header (D2). Where the two

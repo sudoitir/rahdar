@@ -12,11 +12,10 @@ import io.github.sudoitir.rahdar.kernel.jobs.ScheduledJob;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionSettings;
 import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
-import io.github.sudoitir.rahdar.platform.broker.CoreConnectionSettings;
-import io.github.sudoitir.rahdar.platform.broker.CorePool;
 import io.github.sudoitir.rahdar.platform.broker.NodeCallLimiter;
 import io.github.sudoitir.rahdar.platform.broker.ProbeSession;
 import io.github.sudoitir.rahdar.support.ArtemisIntegrationTest;
+import io.github.sudoitir.rahdar.support.CoreProbe;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.nio.file.Files;
@@ -66,9 +65,6 @@ class ObservabilityAssetsIntegrationTest extends PostgresIntegrationTest {
     BrokerGateway clients;
 
     @Autowired
-    CorePool corePool;
-
-    @Autowired
     JobRunner jobs;
 
     @Autowired
@@ -110,16 +106,7 @@ class ObservabilityAssetsIntegrationTest extends PostgresIntegrationTest {
                 cluster, ArtemisIntegrationTest.BROKER_USER, ArtemisIntegrationTest.BROKER_PASSWORD))) {
             session.node(ArtemisIntegrationTest.jolokiaUrl()).describe();
         }
-        corePool.borrow(
-                        cluster,
-                        ArtemisIntegrationTest.coreUrl(),
-                        new CoreConnectionSettings(
-                                cluster,
-                                ArtemisIntegrationTest.BROKER_USER,
-                                ArtemisIntegrationTest.BROKER_PASSWORD,
-                                null,
-                                true))
-                .close();
+        CoreProbe.send(clients, cluster);
         await().atMost(Duration.ofSeconds(10))
                 .until(() -> meters.find("rahdar.job").tag("job.id", ASSETS_JOB).timer() != null);
         // A permit that cannot come within the wait is the only way a timeout counter exists. The

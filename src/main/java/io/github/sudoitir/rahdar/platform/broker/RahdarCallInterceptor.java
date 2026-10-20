@@ -40,7 +40,7 @@ public class RahdarCallInterceptor implements CallInterceptor {
     static final String CORE = "rahdar.broker.core";
 
     /** The Core calls that take a permit from the node's ceiling. */
-    private static final Set<String> LIMITED_CORE = Set.of("sample", "browse", "send");
+    private static final Set<String> LIMITED_CORE = Set.of("browse", "send");
 
     private static final Duration REFRESH = Duration.ofSeconds(30);
 

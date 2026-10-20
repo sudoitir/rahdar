@@ -40,7 +40,6 @@ import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
 import io.github.sudoitir.rahdar.platform.broker.BrokerSettings;
 import io.github.sudoitir.rahdar.platform.broker.BrokerXmlSnippets;
 import io.github.sudoitir.rahdar.platform.broker.BulkCapExceededException;
-import io.github.sudoitir.rahdar.platform.broker.FrozenFilter;
 import io.github.sudoitir.rahdar.platform.clusters.CapabilityLedger;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
@@ -49,6 +48,7 @@ import io.github.sudoitir.rahdar.platform.clusters.SplitBrainStatus;
 import io.github.sudoitir.rahdar.system.artemis.AcceptanceProbe;
 import io.github.sudoitir.rahdar.system.artemis.AcceptanceProbe.Facts;
 import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisSelectors;
 import io.github.sudoitir.rahdar.system.artemis.MessageOperations;
 import io.github.sudoitir.rahdar.system.artemis.QueueLocator;
 import io.github.sudoitir.rahdar.system.artemis.QueueLocator.QueueLocation;
@@ -250,7 +250,7 @@ public class TransferService {
                             "transfer-nothing-selected",
                             "A filter selection needs a filter. Choose the whole queue instead to take everything.");
                 }
-                if (!FrozenFilter.isCompleteExpression(selection.filter())) {
+                if (!ArtemisSelectors.isCompleteExpression(selection.filter())) {
                     throw new TransferRefusedException(
                             HttpStatus.UNPROCESSABLE_ENTITY,
                             "transfer-invalid-filter",
@@ -334,7 +334,7 @@ public class TransferService {
                 try {
                     String mbean = ArtemisMBeans.queue(
                             client.resolveBrokerObjectName(), from.address(), from.queueName(), from.routingType());
-                    yield messages.countMessages(client, mbean, FrozenFilter.compose(selection.filter(), t0));
+                    yield messages.countMessages(client, mbean, ArtemisSelectors.frozen(selection.filter(), t0));
                 } catch (BrokerConnectionException _) {
                     yield null;
                 }

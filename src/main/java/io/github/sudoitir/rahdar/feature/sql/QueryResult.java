@@ -60,7 +60,7 @@ public record QueryResult(
             String origin,
             /**
              * The message's id on its <em>source</em> queue, for a captured row. Null
-             * when the broker did not copy {@code _AMQ_ORIG_MESSAGE_ID}, which leaves
+             * when the broker did not record the message's origin id, which leaves
              * the row perfectly usable and only makes verifying it against the live
              * broker impossible — stated, never hidden.
              */

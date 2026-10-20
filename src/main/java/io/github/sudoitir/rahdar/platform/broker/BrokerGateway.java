@@ -12,8 +12,13 @@ import io.github.sudoitir.openbroker.NodeId;
 import io.github.sudoitir.openbroker.NodeSpec;
 import io.github.sudoitir.openbroker.Plane;
 import io.github.sudoitir.openbroker.TlsProvider;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Clock;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -21,7 +26,10 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.UnaryOperator;
+import java.util.stream.Stream;
 import org.springframework.beans.factory.DisposableBean;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
 /**
@@ -43,6 +51,12 @@ public class BrokerGateway implements DisposableBean {
     public static final String JOLOKIA = "jolokia";
 
     public static final String CORE = "core";
+
+    /**
+     * Where large message bodies are spooled while a relay or a drain holds them. Nothing needs one
+     * once Rahdar has restarted: a resumed run or a drain receives again.
+     */
+    static final Path SPOOL = Path.of(System.getProperty("java.io.tmpdir"), "rahdar-spool");
 
     private final BrokerDrivers drivers;
     private final NodeDirectory directory;
@@ -182,6 +196,28 @@ public class BrokerGateway implements DisposableBean {
                 .withTls(clusterTls)
                 .withClock(Clock.systemUTC())
                 .withContextPropagation(UnaryOperator.identity())
+                .withSpoolDirectory(SPOOL)
                 .withTimeouts(timeouts);
+    }
+
+    /** Spool files left by a Rahdar that stopped mid-relay are useless now. */
+    @EventListener(ApplicationReadyEvent.class)
+    void sweepSpool() {
+        if (!Files.exists(SPOOL)) {
+            return;
+        }
+        try (Stream<Path> paths = Files.walk(SPOOL)) {
+            paths.sorted(Comparator.reverseOrder())
+                    .filter(p -> !p.equals(SPOOL))
+                    .forEach(p -> {
+                        try {
+                            Files.deleteIfExists(p);
+                        } catch (IOException _) {
+                            // One undeletable file must not stop the rest being swept.
+                        }
+                    });
+        } catch (IOException e) {
+            throw new UncheckedIOException("Could not sweep the large-message spool " + SPOOL, e);
+        }
     }
 }

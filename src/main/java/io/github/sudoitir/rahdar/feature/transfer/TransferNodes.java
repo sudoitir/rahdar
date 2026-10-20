@@ -2,8 +2,7 @@ package io.github.sudoitir.rahdar.feature.transfer;
 
 import io.github.sudoitir.rahdar.kernel.core.NotFoundException;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
-import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
-import io.github.sudoitir.rahdar.platform.broker.CoreRelay;
+import io.github.sudoitir.rahdar.platform.broker.BrokerRelay;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
 import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
@@ -22,7 +21,6 @@ import org.springframework.stereotype.Component;
 class TransferNodes {
 
     private final ClusterDirectory directory;
-    private final BrokerConnections connections;
     private final ArtemisNodes artemisNodes;
 
     /** A node of this cluster by Rahdar's id; 404 when it is not one. */
@@ -56,13 +54,13 @@ class TransferNodes {
         return artemisNodes.on(node.getClusterId(), node.getId());
     }
 
-    CoreRelay.Endpoint core(ClusterNode node) {
+    /** The node as a relay end: one it reaches over its data plane, which it must have. */
+    BrokerRelay.Endpoint core(ClusterNode node) {
         if (node.getCoreUrl() == null) {
             throw new BrokerConnectionException(
                     BrokerConnectionException.Kind.UNREACHABLE,
                     "Node " + node.getName() + " has no Core URL, so Rahdar cannot relay messages to or from it.");
         }
-        return new CoreRelay.Endpoint(
-                node.getClusterId(), node.getCoreUrl(), connections.coreSettingsFor(node.getClusterId()));
+        return new BrokerRelay.Endpoint(node.getClusterId(), node.getId());
     }
 }

@@ -17,7 +17,7 @@ import org.springframework.stereotype.Component;
 /**
  * The {@code brokers} contributor: for every registered node, when a management call last
  * succeeded and failed and how long calls last waited on the per-node rate limit; for every
- * cluster, how many Core connections are open. Degraded while any node's latest call failed.
+ * cluster, whether Rahdar holds a broker connection for it. Degraded while any node's latest call failed.
  * Built entirely from what earlier calls recorded — a health read never calls a broker.
  */
 @Component
@@ -27,7 +27,7 @@ class BrokersHealthIndicator extends AbstractHealthIndicator {
     private final NodeDirectory nodes;
     private final NodeCallHealth calls;
     private final NodeCallLimiter limiter;
-    private final CorePool corePool;
+    private final BrokerGateway gateway;
 
     @Override
     protected void doHealthCheck(Health.Builder builder) {
@@ -51,10 +51,11 @@ class BrokersHealthIndicator extends AbstractHealthIndicator {
             failing |= latest.map(Calls::failing).orElse(false);
             perNode.put(node.id().toString(), detail);
         }
-        Map<String, Integer> coreConnections = new LinkedHashMap<>();
-        clusters.forEach(id -> coreConnections.put(id.toString(), corePool.connections(id)));
+        Set<UUID> connected = gateway.clusterIds();
+        Map<String, Boolean> connections = new LinkedHashMap<>();
+        clusters.forEach(id -> connections.put(id.toString(), connected.contains(id)));
         builder.status(failing ? RahdarHealth.DEGRADED : Status.UP)
                 .withDetail("nodes", perNode)
-                .withDetail("coreConnections", coreConnections);
+                .withDetail("connections", connections);
     }
 }

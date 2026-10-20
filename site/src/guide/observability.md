@@ -45,8 +45,9 @@ A trace follows an HTTP request or a background job run through everything it ca
 
 - the HTTP request;
 - each **Jolokia** management call (`jolokia`), tagged with the node's `host:port` and its outcome;
-- each **Core** message-transport call (`core sample`, `core browse`, `core send`, `core borrow`,
-  and `relay.open` / `relay.commit` for a transfer), tagged with the node and the operation;
+- each **Core** call (`core browse`, `core send`, and `core receiver.open`, `core sender.open`,
+  `core receiver.commit` / `core sender.commit` for a drain or a transfer), tagged with the node and
+  the operation;
 - each **job** run (`job <id>`), so a scrape tick is a root span with its Jolokia calls beneath it;
 - each **database** query, with its statement text and never its parameter values.
 
