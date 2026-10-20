@@ -254,7 +254,7 @@ describe('useClusterStream topic dispatch', () => {
     const queues = vi.fn<TopicHandler>();
     const rr = vi.fn<TopicHandler>();
     const features = [
-      defineFeature({ contract: CONTRACT, id: 'queues', streamTopics: { queues } }),
+      defineFeature({ contract: CONTRACT, id: 'resources', streamTopics: { queues } }),
       defineFeature({ contract: CONTRACT, id: 'rr', streamTopics: { rr } }),
     ];
     const qc = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });

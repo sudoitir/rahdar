@@ -25,7 +25,6 @@ export const FEATURE_IDS = [
   'scrape',
   'artemis',
   'mcp',
-  'queues',
   'resources',
   'messages',
   'routing',

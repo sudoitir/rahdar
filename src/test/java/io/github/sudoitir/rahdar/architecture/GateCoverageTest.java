@@ -92,25 +92,25 @@ class GateCoverageTest extends PostgresIntegrationTest {
             Map.entry(
                     "feature.plugins.web.PluginAdminController.upload",
                     "stores a pending upload; plugin.activate-upload installs it"),
-            Map.entry("feature.queues.web.QueueLifecycleController.createAddress", "creates and removes nothing"),
-            Map.entry("feature.queues.web.QueueLifecycleController.createQueue", "creates and removes nothing"),
+            Map.entry("feature.resources.web.QueueLifecycleController.createAddress", "creates and removes nothing"),
+            Map.entry("feature.resources.web.QueueLifecycleController.createQueue", "creates and removes nothing"),
             Map.entry(
-                    "feature.queues.web.QueueLifecycleController.pauseQueue",
+                    "feature.resources.web.QueueLifecycleController.pauseQueue",
                     "loses no message; pausing many queues at once is bulk.execute"),
             Map.entry(
-                    "feature.queues.web.QueueLifecycleController.resumeQueue",
+                    "feature.resources.web.QueueLifecycleController.resumeQueue",
                     "loses no message; resuming many queues at once is bulk.execute"),
             Map.entry(
-                    "feature.queues.web.QueueLifecycleController.resetCounter",
+                    "feature.resources.web.QueueLifecycleController.resetCounter",
                     "resets a statistic and touches no message"),
             Map.entry(
-                    "feature.queues.web.QueueLifecycleController.updateQueue",
+                    "feature.resources.web.QueueLifecycleController.updateQueue",
                     "changes a queue's attributes and loses no message"),
             Map.entry(
-                    "feature.routing.web.RoutingController.createDivert",
+                    "feature.routing.web.DivertController.createDivert",
                     "routing is outside the catalogue; a divert copies or moves messages and deletes none"),
             Map.entry(
-                    "feature.routing.web.RoutingController.deleteDivert",
+                    "feature.routing.web.DivertController.deleteDivert",
                     "routing is outside the catalogue; removing a divert deletes no message"),
             Map.entry(
                     "feature.transfer.web.TransferController.preview",

@@ -13,7 +13,7 @@ import io.github.sudoitir.rahdar.feature.bulk.web.BulkViews.BulkExecuteRequest;
 import io.github.sudoitir.rahdar.feature.bulk.web.BulkViews.BulkItemView;
 import io.github.sudoitir.rahdar.feature.bulk.web.BulkViews.BulkRunDetailView;
 import io.github.sudoitir.rahdar.feature.messages.MessageService;
-import io.github.sudoitir.rahdar.feature.queues.QueueLifecycleService;
+import io.github.sudoitir.rahdar.feature.resources.QueueLifecycleService;
 import io.github.sudoitir.rahdar.kernel.audit.AuditScope;
 import io.github.sudoitir.rahdar.kernel.core.ConflictException;
 import io.github.sudoitir.rahdar.kernel.jobs.BackgroundRuns;

@@ -1,6 +1,6 @@
 package io.github.sudoitir.rahdar.feature.brokerconfig;
 
-import io.github.sudoitir.rahdar.feature.queues.DeclaredDiverts;
+import io.github.sudoitir.rahdar.feature.resources.DeclaredDiverts;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;

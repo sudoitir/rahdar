@@ -7,7 +7,6 @@ import static org.springframework.security.test.web.servlet.setup.SecurityMockMv
 import static org.springframework.test.web.servlet.setup.MockMvcBuilders.webAppContextSetup;
 
 import io.github.sudoitir.rahdar.feature.messages.MessagePermissions;
-import io.github.sudoitir.rahdar.feature.queues.QueuePermissions;
 import io.github.sudoitir.rahdar.feature.resources.ResourcePermissions;
 import io.github.sudoitir.rahdar.kernel.security.Grant;
 import io.github.sudoitir.rahdar.kernel.security.Permissions;
@@ -93,9 +92,9 @@ class ConnectionControlAuthorizationTest extends PostgresIntegrationTest {
         assertThat(status(
                         "/api/v1/clusters/" + clusterId + "/addresses/orders/consumers/close?dryRun=true",
                         Permissions.CLUSTER_READ,
-                        QueuePermissions.SUBSCRIPTION_CREATE,
-                        QueuePermissions.SUBSCRIPTION_DELETE,
-                        QueuePermissions.SUBSCRIPTION_PAUSE))
+                        ResourcePermissions.SUBSCRIPTION_CREATE,
+                        ResourcePermissions.SUBSCRIPTION_DELETE,
+                        ResourcePermissions.SUBSCRIPTION_PAUSE))
                 .isEqualTo(404);
     }
 

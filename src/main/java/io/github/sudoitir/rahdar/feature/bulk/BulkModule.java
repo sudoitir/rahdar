@@ -11,9 +11,8 @@ public final class BulkModule {
             .id("bulk")
             .title("Bulk operations")
             .kind(FeatureDescriptor.Kind.FEATURE)
-            .require("queues")
-            .require("messages")
             .require("resources")
+            .require("messages")
             .apiPrefix("/api/v1/clusters/{clusterId}/bulk")
             .streamTopic(TopicDef.data(BulkRunner.TOPIC, Permissions.SUBSCRIPTION_READ))
             .build();

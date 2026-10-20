@@ -5,7 +5,10 @@ import io.github.sudoitir.openbroker.ClusterConnection;
 import io.github.sudoitir.openbroker.NodeId;
 import io.github.sudoitir.openbroker.model.ClusterMember;
 import io.github.sudoitir.openbroker.model.NodeDescription;
+import io.github.sudoitir.openbroker.model.ResourceId;
 import io.github.sudoitir.openbroker.model.Scope;
+import io.github.sudoitir.openbroker.operation.Operation;
+import io.github.sudoitir.openbroker.operation.OperationResult;
 import java.util.List;
 
 /**
@@ -31,6 +34,15 @@ public record BrokerTarget(ClusterConnection connection, NodeId node) {
     public List<ClusterMember> members() {
         try {
             return connection.nodes().members(scope()).orThrow();
+        } catch (BrokerException e) {
+            throw BrokerFailures.translate(e);
+        }
+    }
+
+    /** Runs an operation on this node alone, in Rahdar's failures. */
+    public OperationResult execute(ResourceId resource, Operation operation) {
+        try {
+            return connection.operations().execute(resource, operation, scope()).orThrow();
         } catch (BrokerException e) {
             throw BrokerFailures.translate(e);
         }

@@ -1,6 +1,5 @@
 package io.github.sudoitir.rahdar.feature.routing;
 
-import io.github.sudoitir.rahdar.feature.queues.LifecycleKind;
 import io.github.sudoitir.rahdar.feature.routing.web.RoutingViews.BridgeNodeCell;
 import io.github.sudoitir.rahdar.feature.routing.web.RoutingViews.BridgeView;
 import io.github.sudoitir.rahdar.feature.routing.web.RoutingViews.DivertView;
@@ -13,17 +12,15 @@ import io.github.sudoitir.rahdar.kernel.security.ClusterAccessGuard;
 import io.github.sudoitir.rahdar.kernel.security.PermissionResolver;
 import io.github.sudoitir.rahdar.kernel.security.ResourceFilter;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
-import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
+import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
+import io.github.sudoitir.rahdar.platform.broker.BrokerTarget;
 import io.github.sudoitir.rahdar.platform.broker.BrokerXmlSnippets;
+import io.github.sudoitir.rahdar.platform.broker.DivertRoute;
+import io.github.sudoitir.rahdar.platform.broker.DivertSettings;
 import io.github.sudoitir.rahdar.platform.broker.RahdarNames;
+import io.github.sudoitir.rahdar.platform.broker.SystemExtensions;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
-import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
-import io.github.sudoitir.rahdar.system.artemis.ArtemisNodes;
-import io.github.sudoitir.rahdar.system.artemis.BridgeOperations;
-import io.github.sudoitir.rahdar.system.artemis.BridgeRow;
-import io.github.sudoitir.rahdar.system.artemis.DivertOperations;
-import io.github.sudoitir.rahdar.system.artemis.DivertRow;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -66,28 +63,38 @@ public class RoutingService {
     private static final String OWNER_OPERATOR = "OPERATOR";
 
     private final ClusterDirectory nodes;
-    private final BrokerConnections connections;
-    private final DivertOperations divertOps;
-    private final BridgeOperations bridgeOps;
+    private final BrokerGateway gateway;
+    private final SystemExtensions extensions;
     private final ClusterAccessGuard clusterAccess;
     private final PermissionResolver permissions;
     private final AuditService audit;
-    private final ArtemisNodes artemisNodes;
+
+    /** A divert and the node it was read from. */
+    private record NodeDivert(UUID nodeId, String nodeName, DivertRoute route, boolean retroactive) {}
+
+    /** A bridge and the node it was read from. */
+    private record NodeBridge(UUID nodeId, String nodeName, BridgeRoute route) {}
 
     public PagedView<DivertView> diverts(UUID clusterId, ResourceQuery query) {
         clusterAccess.requireVisible(clusterId);
         ResourceFilter addresses = permissions.filter(clusterId, ResourceType.DESTINATION);
+        DivertSettings settings = extensions.require(clusterId, DivertSettings.class);
         List<ClusterNode> serving = servingManageableNodes(clusterId);
         int nodesTotal = serving.size();
         Set<String> ownedByOperator = operatorOwnedDivertNames(clusterId);
 
-        List<DivertRow> rows = fanOut(clusterId, serving, divertOps::listDiverts);
+        List<NodeDivert> rows = fanOut(clusterId, serving, (target, nodeId, nodeName) -> {
+            Set<String> retroactive = settings.retroactiveDiverts(target);
+            return DivertRoute.list(target).stream()
+                    .map(route -> new NodeDivert(nodeId, nodeName, route, retroactive.contains(route.name())))
+                    .toList();
+        });
 
         // Merged on the whole routing shape, not on the name: the same name pointing
         // somewhere else on one node is a divergence, and collapsing it would hide
         // exactly the thing an operator opened this view to find.
-        Map<List<String>, List<DivertRow>> merged = new LinkedHashMap<>();
-        for (DivertRow row : rows) {
+        Map<List<String>, List<NodeDivert>> merged = new LinkedHashMap<>();
+        for (NodeDivert row : rows) {
             merged.computeIfAbsent(divertKey(row), k -> new ArrayList<>()).add(row);
         }
 
@@ -111,11 +118,16 @@ public class RoutingService {
         List<ClusterNode> serving = servingManageableNodes(clusterId);
         int nodesTotal = serving.size();
 
-        List<BridgeRow> rows = fanOut(clusterId, serving, bridgeOps::listBridges);
+        List<NodeBridge> rows = fanOut(
+                clusterId,
+                serving,
+                (target, nodeId, nodeName) -> BridgeRoute.list(target).stream()
+                        .map(route -> new NodeBridge(nodeId, nodeName, route))
+                        .toList());
 
-        Map<String, List<BridgeRow>> merged = new LinkedHashMap<>();
-        for (BridgeRow row : rows) {
-            merged.computeIfAbsent(String.valueOf(row.name()), k -> new ArrayList<>())
+        Map<String, List<NodeBridge>> merged = new LinkedHashMap<>();
+        for (NodeBridge row : rows) {
+            merged.computeIfAbsent(String.valueOf(row.route().name()), k -> new ArrayList<>())
                     .add(row);
         }
         List<BridgeView> views = merged.values().stream()
@@ -143,7 +155,7 @@ public class RoutingService {
     /** What one node contributes to a routing view. */
     @FunctionalInterface
     private interface NodeRead<T> {
-        List<T> apply(ArtemisNode client, UUID nodeId, String nodeName);
+        List<T> apply(BrokerTarget target, UUID nodeId, String nodeName);
     }
 
     private <T> List<T> fanOut(UUID clusterId, List<ClusterNode> serving, NodeRead<T> read) {
@@ -156,8 +168,7 @@ public class RoutingService {
         BrokerConnectionException firstError = null;
         for (ClusterNode node : serving) {
             try {
-                ArtemisNode client = artemisNodes.on(clusterId, node.getId());
-                merged.addAll(read.apply(client, node.getId(), node.getName()));
+                merged.addAll(read.apply(gateway.node(clusterId, node.getId()), node.getId(), node.getName()));
             } catch (BrokerConnectionException e) {
                 if (firstError == null) {
                     firstError = e;
@@ -174,23 +185,24 @@ public class RoutingService {
 
     // ---- merging ---------------------------------------------------------
 
-    private static List<String> divertKey(DivertRow row) {
+    private static List<String> divertKey(NodeDivert row) {
+        DivertRoute route = row.route();
         return Arrays.asList(
-                row.uniqueName(),
-                row.address(),
-                row.forwardingAddress(),
-                row.filter(),
-                row.routingType(),
-                String.valueOf(row.exclusive()));
+                route.name(),
+                route.address(),
+                route.forwardingAddress(),
+                route.filter(),
+                route.routingType(),
+                String.valueOf(route.exclusive()));
     }
 
     private static String operatorOwner(String name, Set<String> ownedByOperator) {
         return ownedByOperator.contains(name) ? OWNER_OPERATOR : null;
     }
 
-    private DivertView toDivertView(List<DivertRow> group, int nodesTotal, Set<String> ownedByOperator) {
-        DivertRow first = group.get(0);
-        String name = first.uniqueName();
+    private DivertView toDivertView(List<NodeDivert> group, int nodesTotal, Set<String> ownedByOperator) {
+        DivertRoute first = group.get(0).route();
+        String name = first.name();
         boolean capture = name != null && name.startsWith(RahdarNames.CAPTURE_PREFIX);
         String owner = capture ? OWNER_CAPTURE : operatorOwner(name, ownedByOperator);
         return new DivertView(
@@ -202,7 +214,7 @@ public class RoutingService {
                 first.routingType(),
                 first.transformerClassName(),
                 first.exclusive(),
-                first.retroactiveResource(),
+                group.get(0).retroactive(),
                 owner,
                 capture ? captureSubscriptionId(name) : null,
                 OWNER_OPERATOR.equals(owner)
@@ -220,8 +232,8 @@ public class RoutingService {
                 group.stream().map(r -> new NodeRef(r.nodeId(), r.nodeName())).toList());
     }
 
-    private static BridgeView toBridgeView(List<BridgeRow> group, int nodesTotal) {
-        BridgeRow first = group.get(0);
+    private static BridgeView toBridgeView(List<NodeBridge> group, int nodesTotal) {
+        BridgeRoute first = group.get(0).route();
         return new BridgeView(
                 first.name(),
                 first.queueName(),
@@ -230,12 +242,12 @@ public class RoutingService {
                 first.discoveryGroupName(),
                 first.transformerClassName(),
                 first.staticConnectors(),
-                group.stream().mapToLong(BridgeRow::messagesAcknowledged).sum(),
+                group.stream().mapToLong(r -> r.route().messagesAcknowledged()).sum(),
                 group.stream()
-                        .mapToLong(BridgeRow::messagesPendingAcknowledgement)
+                        .mapToLong(r -> r.route().messagesPendingAcknowledgement())
                         .sum(),
-                group.stream().anyMatch(BridgeRow::started),
-                group.stream().anyMatch(BridgeRow::connected),
+                group.stream().anyMatch(r -> r.route().started()),
+                group.stream().anyMatch(r -> r.route().connected()),
                 first.useDuplicateDetection(),
                 first.highlyAvailable(),
                 group.size(),
@@ -244,10 +256,10 @@ public class RoutingService {
                         .map(r -> new BridgeNodeCell(
                                 r.nodeId(),
                                 r.nodeName(),
-                                r.started(),
-                                r.connected(),
-                                r.messagesAcknowledged(),
-                                r.messagesPendingAcknowledgement()))
+                                r.route().started(),
+                                r.route().connected(),
+                                r.route().messagesAcknowledged(),
+                                r.route().messagesPendingAcknowledgement()))
                         .toList());
     }
 
@@ -288,9 +300,9 @@ public class RoutingService {
     private Set<String> operatorOwnedDivertNames(UUID clusterId) {
         return audit.ownedTargetNames(
                 clusterId,
-                LifecycleKind.CREATE_DIVERT.targetType(),
-                LifecycleKind.CREATE_DIVERT.auditName(),
-                LifecycleKind.DELETE_DIVERT.auditName());
+                DivertKind.TARGET_TYPE,
+                DivertKind.CREATE_DIVERT.auditName(),
+                DivertKind.DELETE_DIVERT.auditName());
     }
 
     // ---- plumbing --------------------------------------------------------

@@ -124,6 +124,22 @@ class ResourceCheckCoverageTest {
                     "system.artemis.ArtemisQueueCounters",
                     "broker primitive behind QueueCounters; QueueLifecycleService checks before it calls it"),
             Map.entry(
+                    "system.artemis.ArtemisDivertSettings",
+                    "broker primitive behind DivertSettings; the divert and routing services check before they call it"),
+            Map.entry(
+                    "system.artemis.ArtemisQueueSettings",
+                    "broker primitive behind QueueSettings; QueueConfigurationReader checks before it calls it"),
+            Map.entry(
+                    "system.artemis.ArtemisTaps",
+                    "broker primitive behind MessageTaps; the capture and plugin messaging services check before they"
+                            + " call it"),
+            Map.entry(
+                    "system.artemis.ArtemisTransferAcceptance",
+                    "broker primitive behind TransferAcceptance; the transfer services check before they call it"),
+            Map.entry(
+                    "system.artemis.ArtemisTransferStaging",
+                    "broker primitive behind TransferStaging; the transfer services check before they call it"),
+            Map.entry(
                     "platform.scrape.QueueSnapshotUpsert",
                     "the scrape's own bookkeeping, driven by the broker and no caller"),
             Map.entry(
@@ -182,10 +198,7 @@ class ResourceCheckCoverageTest {
                     "'source' names the module or plugin that posted the notice, not a queue"),
             Map.entry(
                     "feature.plugins.messaging.internal.AccessCheck.needsOf",
-                    "only lists the needs of a registration; AccessCheck.denial checks them for the acting user"),
-            Map.entry(
-                    "feature.plugins.messaging.internal.AccessCheck.sendNeeds",
-                    "only lists the needs of a send; AccessCheck.denial checks them for the acting user"));
+                    "only lists the needs of a registration; AccessCheck.denial checks them for the acting user"));
 
     /** What a scan found: the methods it looked at, each with how it fares, and how many check call sites it reaches. */
     private record Subject(String id, boolean checked, boolean composite, boolean coversEachName, int sites) {}
@@ -233,7 +246,7 @@ class ResourceCheckCoverageTest {
                 .contains(
                         "feature.messages.MessageService.purge",
                         "feature.messages.MessageService.execute",
-                        "feature.queues.QueueLifecycleService.deleteQueue",
+                        "feature.resources.QueueLifecycleService.deleteQueue",
                         "feature.transfer.TransferService.preview",
                         "feature.sql.MessageIndexService.create");
         assertThat(subjects)

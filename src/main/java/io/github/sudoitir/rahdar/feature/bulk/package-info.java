@@ -6,7 +6,6 @@
         displayName = "Bulk operations",
         allowedDependencies = {
             "feature.messages",
-            "feature.queues",
             "feature.resources",
             "feature.resources :: web",
             "kernel.audit",

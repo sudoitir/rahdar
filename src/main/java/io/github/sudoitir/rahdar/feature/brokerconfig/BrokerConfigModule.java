@@ -13,7 +13,7 @@ public final class BrokerConfigModule {
             .id("brokerconfig")
             .title("Broker configuration")
             .kind(FeatureDescriptor.Kind.FEATURE)
-            .require("queues")
+            .require("resources")
             .require("routing")
             .permission(PermissionDef.cluster(
                     BrokerConfigPermissions.CONFIG_WRITE, "Edit a cluster's declared broker configuration"))

@@ -4,6 +4,7 @@ import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
 import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
 import io.github.sudoitir.rahdar.platform.broker.BrokerMessages;
 import io.github.sudoitir.rahdar.platform.broker.BrokerNotifications;
+import io.github.sudoitir.rahdar.platform.broker.SystemExtensions;
 import io.github.sudoitir.rahdar.platform.clusters.BrokerCommands;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterEnvironmentIndex;
@@ -31,6 +32,10 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
  */
 @ApplicationModuleTest(mode = BootstrapMode.DIRECT_DEPENDENCIES, extraIncludes = "system.artemis")
 class BulkModuleTest extends ModuleIntegrationTest {
+
+    /** Queue configuration, in a direct dependency, finds the cluster's system extension through the broker module. */
+    @MockitoBean
+    SystemExtensions systemExtensions;
 
     /** Queue lifecycle, a direct dependency, locates queues through the scrape module. */
     @MockitoBean

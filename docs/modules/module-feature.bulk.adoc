@@ -14,7 +14,7 @@ _Others_
 |Bean references
 |* `i.g.s.r.k.a.AuditService` (in Audit log)
 * `i.g.s.r.k.r.ReplicaRegistry` (in Replicas)
-* `i.g.s.r.f.q.QueueLifecycleService` (in Queues)
+* `i.g.s.r.f.r.QueueLifecycleService` (in Resources)
 * `i.g.s.r.f.m.MessageService` (in Messages)
 * `i.g.s.r.k.s.OperatorHandoff` (in Security)
 * `i.g.s.r.k.s.SseHub` (in Event stream)

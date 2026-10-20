@@ -1,7 +1,7 @@
 package io.github.sudoitir.rahdar.feature.transfer;
 
 import io.github.sudoitir.rahdar.feature.messages.MessagePermissions;
-import io.github.sudoitir.rahdar.feature.queues.QueuePermissions;
+import io.github.sudoitir.rahdar.feature.resources.ResourcePermissions;
 import io.github.sudoitir.rahdar.feature.transfer.TransferRunMapper.Derived;
 import io.github.sudoitir.rahdar.feature.transfer.internal.persistence.TransferRunEntity;
 import io.github.sudoitir.rahdar.feature.transfer.internal.persistence.TransferRunRepository;
@@ -319,7 +319,7 @@ public class TransferService {
         }
         String address = supplied != null ? supplied : request.targetQueue();
         access.requireCreate(
-                cluster, ResourceRef.subscription(request.targetQueue()), QueuePermissions.SUBSCRIPTION_CREATE);
+                cluster, ResourceRef.subscription(request.targetQueue()), ResourcePermissions.SUBSCRIPTION_CREATE);
         access.requireAll(
                 cluster, List.of(new Requirement(ResourceRef.destination(address), MessagePermissions.MESSAGE_SEND)));
         return address;

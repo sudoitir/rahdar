@@ -26,7 +26,7 @@ function cluster(id: string, name: string, over: Partial<ClusterSummary> = {}): 
 /** A cheap view of a cluster, at the path of the real Queues view, so what is under test is the switcher and not a screen. */
 const QUEUES = defineFeature({
   contract: CONTRACT,
-  id: 'queues',
+  id: 'resources',
   routes: {
     cluster: [
       createRoute({ getParentRoute: () => clusterRoute, path: 'queues', component: () => <p>A cluster's queues</p> }),

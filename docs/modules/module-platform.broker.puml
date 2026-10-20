@@ -22,6 +22,7 @@ System_Boundary("RahdarApplication_boundary", "RahdarApplication", $tags="") {
     Component(RahdarApplication.RahdarApplication.Plugincontract, "Plugin contract", $techn="Module", $descr="", $tags="", $link="")
     Component(RahdarApplication.RahdarApplication.Replicas, "Replicas", $techn="Module", $descr="", $tags="", $link="")
     Component(RahdarApplication.RahdarApplication.Scheduledjobs, "Scheduled jobs", $techn="Module", $descr="", $tags="", $link="")
+    Component(RahdarApplication.RahdarApplication.Security, "Security", $techn="Module", $descr="", $tags="", $link="")
     Component(RahdarApplication.RahdarApplication.Settings, "Settings", $techn="Module", $descr="", $tags="", $link="")
   }
 
@@ -32,6 +33,7 @@ Rel(RahdarApplication.RahdarApplication.Brokerconnectivity, RahdarApplication.Ra
 Rel(RahdarApplication.RahdarApplication.Brokerconnectivity, RahdarApplication.RahdarApplication.Replicas, "listens to", $techn="", $tags="", $link="")
 Rel(RahdarApplication.RahdarApplication.Brokerconnectivity, RahdarApplication.RahdarApplication.Replicas, "uses", $techn="", $tags="", $link="")
 Rel(RahdarApplication.RahdarApplication.Brokerconnectivity, RahdarApplication.RahdarApplication.Scheduledjobs, "uses", $techn="", $tags="", $link="")
+Rel(RahdarApplication.RahdarApplication.Brokerconnectivity, RahdarApplication.RahdarApplication.Security, "depends on", $techn="", $tags="", $link="")
 Rel(RahdarApplication.RahdarApplication.Brokerconnectivity, RahdarApplication.RahdarApplication.Settings, "depends on", $techn="", $tags="", $link="")
 Rel(RahdarApplication.RahdarApplication.Plugincontract, RahdarApplication.RahdarApplication.Core, "depends on", $techn="", $tags="", $link="")
 Rel(RahdarApplication.RahdarApplication.Plugincontract, RahdarApplication.RahdarApplication.Replicas, "listens to", $techn="", $tags="", $link="")
@@ -41,11 +43,18 @@ Rel(RahdarApplication.RahdarApplication.Scheduledjobs, RahdarApplication.RahdarA
 Rel(RahdarApplication.RahdarApplication.Scheduledjobs, RahdarApplication.RahdarApplication.Plugincontract, "depends on", $techn="", $tags="", $link="")
 Rel(RahdarApplication.RahdarApplication.Scheduledjobs, RahdarApplication.RahdarApplication.Replicas, "listens to", $techn="", $tags="", $link="")
 Rel(RahdarApplication.RahdarApplication.Scheduledjobs, RahdarApplication.RahdarApplication.Replicas, "uses", $techn="", $tags="", $link="")
+Rel(RahdarApplication.RahdarApplication.Scheduledjobs, RahdarApplication.RahdarApplication.Security, "uses", $techn="", $tags="", $link="")
+Rel(RahdarApplication.RahdarApplication.Security, RahdarApplication.RahdarApplication.Core, "depends on", $techn="", $tags="", $link="")
+Rel(RahdarApplication.RahdarApplication.Security, RahdarApplication.RahdarApplication.Plugincontract, "listens to", $techn="", $tags="", $link="")
+Rel(RahdarApplication.RahdarApplication.Security, RahdarApplication.RahdarApplication.Plugincontract, "uses", $techn="", $tags="", $link="")
+Rel(RahdarApplication.RahdarApplication.Security, RahdarApplication.RahdarApplication.Replicas, "listens to", $techn="", $tags="", $link="")
+Rel(RahdarApplication.RahdarApplication.Security, RahdarApplication.RahdarApplication.Replicas, "uses", $techn="", $tags="", $link="")
 Rel(RahdarApplication.RahdarApplication.Settings, RahdarApplication.RahdarApplication.Core, "depends on", $techn="", $tags="", $link="")
 Rel(RahdarApplication.RahdarApplication.Settings, RahdarApplication.RahdarApplication.Plugincontract, "uses", $techn="", $tags="", $link="")
 Rel(RahdarApplication.RahdarApplication.Settings, RahdarApplication.RahdarApplication.Replicas, "listens to", $techn="", $tags="", $link="")
 Rel(RahdarApplication.RahdarApplication.Settings, RahdarApplication.RahdarApplication.Replicas, "uses", $techn="", $tags="", $link="")
 Rel(RahdarApplication.RahdarApplication.Settings, RahdarApplication.RahdarApplication.Scheduledjobs, "uses", $techn="", $tags="", $link="")
+Rel(RahdarApplication.RahdarApplication.Settings, RahdarApplication.RahdarApplication.Security, "uses", $techn="", $tags="", $link="")
 
 SHOW_LEGEND(true)
 hide stereotypes

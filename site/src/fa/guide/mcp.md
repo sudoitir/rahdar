@@ -59,7 +59,8 @@ curl -s https://rahdar.example.com/mcp \
 | Tool | `trace_request_reply` | جریان‌ها، آمار تأخیر و timeout، انتظارات پیکربندی‌شده |
 | Tool | `activity_log` | رویدادهای بروکر، یا مسیر ممیزی خود Rahdar |
 | Tool | `message_action` | انتقال / retry / حذف / انقضا / purge |
-| Tool | `queue_lifecycle` | ساخت، به‌روزرسانی، توقف، ازسرگیری یا نابودی یک صف، آدرس یا divert |
+| Tool | `queue_lifecycle` | ساخت، به‌روزرسانی، توقف، ازسرگیری یا نابودی یک صف یا آدرس |
+| Tool | `divert_lifecycle` | ساخت یا حذف یک divert |
 | Tool | `broker_config_change` | اعلام یک پیکربندی، یا اعمال آن اول روی قناری با تصدیق خطرها بر اساس شناسه |
 | Tool | `connection_action` | بستن یک اتصال، نشست، مصرف‌کننده یا مصرف‌کننده‌های یک آدرس |
 | Tool | `send_message` | صف‌کردن یک پیام |

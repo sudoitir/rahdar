@@ -41,6 +41,7 @@ Rel(RahdarApplication.RahdarApplication.Auditlog, RahdarApplication.RahdarApplic
 Rel(RahdarApplication.RahdarApplication.Auditlog, RahdarApplication.RahdarApplication.Security, "uses", $techn="", $tags="", $link="")
 Rel(RahdarApplication.RahdarApplication.Brokerconnectivity, RahdarApplication.RahdarApplication.Core, "depends on", $techn="", $tags="", $link="")
 Rel(RahdarApplication.RahdarApplication.Brokerconnectivity, RahdarApplication.RahdarApplication.Plugincontract, "depends on", $techn="", $tags="", $link="")
+Rel(RahdarApplication.RahdarApplication.Brokerconnectivity, RahdarApplication.RahdarApplication.Security, "depends on", $techn="", $tags="", $link="")
 Rel(RahdarApplication.RahdarApplication.Brokerconnectivity, RahdarApplication.RahdarApplication.Settings, "depends on", $techn="", $tags="", $link="")
 Rel(RahdarApplication.RahdarApplication.Clusters, RahdarApplication.RahdarApplication.Approvalgatecontract, "uses", $techn="", $tags="", $link="")
 Rel(RahdarApplication.RahdarApplication.Clusters, RahdarApplication.RahdarApplication.Auditlog, "uses", $techn="", $tags="", $link="")

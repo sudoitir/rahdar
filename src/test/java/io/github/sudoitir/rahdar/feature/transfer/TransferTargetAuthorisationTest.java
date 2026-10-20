@@ -8,7 +8,7 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 
 import io.github.sudoitir.rahdar.feature.messages.MessagePermissions;
-import io.github.sudoitir.rahdar.feature.queues.QueuePermissions;
+import io.github.sudoitir.rahdar.feature.resources.ResourcePermissions;
 import io.github.sudoitir.rahdar.feature.transfer.web.TransferViews.SelectionKind;
 import io.github.sudoitir.rahdar.feature.transfer.web.TransferViews.TransferPreviewRequest;
 import io.github.sudoitir.rahdar.feature.transfer.web.TransferViews.TransferSelection;
@@ -104,7 +104,8 @@ class TransferTargetAuthorisationTest {
 
         assertThat(address).isEqualTo("orders.addr");
         verify(access)
-                .requireCreate(CLUSTER, ResourceRef.subscription("orders.new"), QueuePermissions.SUBSCRIPTION_CREATE);
+                .requireCreate(
+                        CLUSTER, ResourceRef.subscription("orders.new"), ResourcePermissions.SUBSCRIPTION_CREATE);
         verify(access)
                 .requireAll(
                         CLUSTER,

@@ -88,10 +88,6 @@
     "kind" : "FEATURE",
     "required" : false
   }, {
-    "id" : "queues",
-    "kind" : "FEATURE",
-    "required" : false
-  }, {
     "id" : "resources",
     "kind" : "FEATURE",
     "required" : false

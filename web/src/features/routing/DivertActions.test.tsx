@@ -86,7 +86,7 @@ describe('creating a divert', () => {
     server.use(
       clusterHandler(),
       meHandler(),
-      http.post('*/api/v1/clusters/c1/diverts', () =>
+      http.post('*/api/v1/clusters/c1/artemis/diverts', () =>
         HttpResponse.json({ outcome: outcome(true), brokerXml: BROKER_XML }),
       ),
     );
@@ -130,7 +130,7 @@ describe('the divert form', () => {
     server.use(
       clusterHandler(),
       meHandler(),
-      http.post('*/api/v1/clusters/c1/diverts', () =>
+      http.post('*/api/v1/clusters/c1/artemis/diverts', () =>
         HttpResponse.json(
           {
             type: 'validation',
@@ -162,7 +162,7 @@ describe('the divert form', () => {
     server.use(
       clusterHandler(),
       meHandler(),
-      http.post('*/api/v1/clusters/c1/diverts', () =>
+      http.post('*/api/v1/clusters/c1/artemis/diverts', () =>
         HttpResponse.json({
           outcome: {
             ...outcome(true),
@@ -228,7 +228,7 @@ describe('deleting a divert', () => {
     server.use(
       clusterHandler(),
       meHandler(),
-      http.delete('*/api/v1/clusters/c1/diverts/audit-copy', ({ request }) =>
+      http.delete('*/api/v1/clusters/c1/artemis/diverts/audit-copy', ({ request }) =>
         HttpResponse.json(outcome(new URL(request.url).searchParams.get('dryRun') === 'true')),
       ),
     );
@@ -246,7 +246,7 @@ describe('deleting a divert', () => {
     server.use(
       clusterHandler(),
       meHandler(),
-      http.delete('*/api/v1/clusters/c1/diverts/audit-copy', () => HttpResponse.json(outcome(true))),
+      http.delete('*/api/v1/clusters/c1/artemis/diverts/audit-copy', () => HttpResponse.json(outcome(true))),
     );
     const user = userEvent.setup();
     renderWithProviders(<DeleteDivertAction clusterId="c1" divert={DIVERT} />);
@@ -267,7 +267,7 @@ describe('a divert delete that could not be previewed', () => {
     server.use(
       clusterHandler(),
       meHandler(),
-      http.delete('*/api/v1/clusters/c1/diverts/audit-copy', () =>
+      http.delete('*/api/v1/clusters/c1/artemis/diverts/audit-copy', () =>
         HttpResponse.json({ title: 'Preview failed', detail: 'node-a did not answer.' }, { status: 502 }),
       ),
     );
@@ -291,7 +291,7 @@ describe('a divert delete that could not be previewed', () => {
     server.use(
       clusterHandler(),
       meHandler(),
-      http.delete('*/api/v1/clusters/c1/diverts/audit-copy', ({ request }) =>
+      http.delete('*/api/v1/clusters/c1/artemis/diverts/audit-copy', ({ request }) =>
         HttpResponse.json(outcome(new URL(request.url).searchParams.get('dryRun') === 'true')),
       ),
     );

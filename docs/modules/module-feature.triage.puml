@@ -49,6 +49,7 @@ Rel(RahdarApplication.RahdarApplication.Auditlog, RahdarApplication.RahdarApplic
 Rel(RahdarApplication.RahdarApplication.Auditlog, RahdarApplication.RahdarApplication.Security, "uses", $techn="", $tags="", $link="")
 Rel(RahdarApplication.RahdarApplication.Brokerconnectivity, RahdarApplication.RahdarApplication.Core, "depends on", $techn="", $tags="", $link="")
 Rel(RahdarApplication.RahdarApplication.Brokerconnectivity, RahdarApplication.RahdarApplication.Plugincontract, "depends on", $techn="", $tags="", $link="")
+Rel(RahdarApplication.RahdarApplication.Brokerconnectivity, RahdarApplication.RahdarApplication.Security, "depends on", $techn="", $tags="", $link="")
 Rel(RahdarApplication.RahdarApplication.Brokerevents, RahdarApplication.RahdarApplication.Brokerconnectivity, "depends on", $techn="", $tags="", $link="")
 Rel(RahdarApplication.RahdarApplication.Brokerevents, RahdarApplication.RahdarApplication.Core, "uses", $techn="", $tags="", $link="")
 Rel(RahdarApplication.RahdarApplication.Brokerevents, RahdarApplication.RahdarApplication.Plugincontract, "depends on", $techn="", $tags="", $link="")

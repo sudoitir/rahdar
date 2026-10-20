@@ -9662,213 +9662,6 @@
         }
       }
     },
-    "/api/v1/clusters/{clusterId}/diverts" : {
-      "get" : {
-        "tags" : [ "routing-controller" ],
-        "operationId" : "diverts",
-        "parameters" : [ {
-          "name" : "clusterId",
-          "in" : "path",
-          "required" : true,
-          "schema" : {
-            "type" : "string",
-            "format" : "uuid"
-          }
-        }, {
-          "name" : "query",
-          "in" : "query",
-          "required" : true,
-          "schema" : {
-            "$ref" : "#/components/schemas/ResourceQuery"
-          }
-        } ],
-        "responses" : {
-          "200" : {
-            "description" : "OK",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/PagedViewDivertView"
-                }
-              }
-            }
-          },
-          "4XX" : {
-            "description" : "Client error",
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
-          },
-          "5XX" : {
-            "description" : "Server error",
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
-          },
-          "429" : {
-            "description" : "Too many requests. Wait for Retry-After seconds.",
-            "headers" : {
-              "Retry-After" : {
-                "description" : "Seconds to wait before retrying.",
-                "schema" : {
-                  "type" : "integer",
-                  "format" : "int32"
-                }
-              },
-              "RateLimit-Limit" : {
-                "description" : "Requests allowed in the window (API tokens).",
-                "schema" : {
-                  "type" : "integer",
-                  "format" : "int32"
-                }
-              },
-              "RateLimit-Remaining" : {
-                "description" : "Requests left in the window (API tokens).",
-                "schema" : {
-                  "type" : "integer",
-                  "format" : "int32"
-                }
-              },
-              "RateLimit-Reset" : {
-                "description" : "Seconds until the window resets (API tokens).",
-                "schema" : {
-                  "type" : "integer",
-                  "format" : "int32"
-                }
-              }
-            },
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
-          }
-        }
-      },
-      "post" : {
-        "tags" : [ "routing-controller" ],
-        "operationId" : "createDivert",
-        "parameters" : [ {
-          "name" : "clusterId",
-          "in" : "path",
-          "required" : true,
-          "schema" : {
-            "type" : "string",
-            "format" : "uuid"
-          }
-        }, {
-          "name" : "dryRun",
-          "in" : "query",
-          "required" : false,
-          "schema" : {
-            "type" : "boolean",
-            "default" : false
-          }
-        }, {
-          "name" : "Idempotency-Key",
-          "in" : "header",
-          "description" : "Makes the request safe to retry. Within 24 hours a repeat by the same user with the same method, path, query and body returns the first result with `Idempotent-Replayed: true` and applies nothing again. The same key with another request is 422 `idempotency-key-reused`; while the first is still running it is 409 `idempotency-in-progress`. 1 to 255 printable ASCII characters; not accepted on multipart uploads. Server errors and 401, 403 and 429 are not recorded, so the retry runs.",
-          "required" : false,
-          "schema" : {
-            "type" : "string",
-            "maxLength" : 255,
-            "minLength" : 1
-          }
-        } ],
-        "requestBody" : {
-          "content" : {
-            "application/json" : {
-              "schema" : {
-                "$ref" : "#/components/schemas/CreateDivertRequest"
-              }
-            }
-          },
-          "required" : true
-        },
-        "responses" : {
-          "200" : {
-            "description" : "OK",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/DivertMutationView"
-                }
-              }
-            }
-          },
-          "4XX" : {
-            "description" : "Client error",
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
-          },
-          "5XX" : {
-            "description" : "Server error",
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
-          },
-          "429" : {
-            "description" : "Too many requests. Wait for Retry-After seconds.",
-            "headers" : {
-              "Retry-After" : {
-                "description" : "Seconds to wait before retrying.",
-                "schema" : {
-                  "type" : "integer",
-                  "format" : "int32"
-                }
-              },
-              "RateLimit-Limit" : {
-                "description" : "Requests allowed in the window (API tokens).",
-                "schema" : {
-                  "type" : "integer",
-                  "format" : "int32"
-                }
-              },
-              "RateLimit-Remaining" : {
-                "description" : "Requests left in the window (API tokens).",
-                "schema" : {
-                  "type" : "integer",
-                  "format" : "int32"
-                }
-              },
-              "RateLimit-Reset" : {
-                "description" : "Seconds until the window resets (API tokens).",
-                "schema" : {
-                  "type" : "integer",
-                  "format" : "int32"
-                }
-              }
-            },
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/v1/clusters/{clusterId}/config/recommendations/declare" : {
       "post" : {
         "tags" : [ "broker-config-controller" ],
@@ -10676,6 +10469,121 @@
               "*/*" : {
                 "schema" : {
                   "$ref" : "#/components/schemas/BulkRunDetailView"
+                }
+              }
+            }
+          },
+          "4XX" : {
+            "description" : "Client error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "5XX" : {
+            "description" : "Server error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "429" : {
+            "description" : "Too many requests. Wait for Retry-After seconds.",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds to wait before retrying.",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Limit" : {
+                "description" : "Requests allowed in the window (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Remaining" : {
+                "description" : "Requests left in the window (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Reset" : {
+                "description" : "Seconds until the window resets (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              }
+            },
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/clusters/{clusterId}/artemis/diverts" : {
+      "post" : {
+        "tags" : [ "divert-controller" ],
+        "operationId" : "createDivert",
+        "parameters" : [ {
+          "name" : "clusterId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "name" : "dryRun",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "boolean",
+            "default" : false
+          }
+        }, {
+          "name" : "Idempotency-Key",
+          "in" : "header",
+          "description" : "Makes the request safe to retry. Within 24 hours a repeat by the same user with the same method, path, query and body returns the first result with `Idempotent-Replayed: true` and applies nothing again. The same key with another request is 422 `idempotency-key-reused`; while the first is still running it is 409 `idempotency-in-progress`. 1 to 255 printable ASCII characters; not accepted on multipart uploads. Server errors and 401, 403 and 429 are not recorded, so the retry runs.",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "maxLength" : 255,
+            "minLength" : 1
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CreateDivertRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/DivertMutationView"
                 }
               }
             }
@@ -20912,6 +20820,100 @@
         }
       }
     },
+    "/api/v1/clusters/{clusterId}/diverts" : {
+      "get" : {
+        "tags" : [ "routing-controller" ],
+        "operationId" : "diverts",
+        "parameters" : [ {
+          "name" : "clusterId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "name" : "query",
+          "in" : "query",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/ResourceQuery"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PagedViewDivertView"
+                }
+              }
+            }
+          },
+          "4XX" : {
+            "description" : "Client error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "5XX" : {
+            "description" : "Server error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "429" : {
+            "description" : "Too many requests. Wait for Retry-After seconds.",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds to wait before retrying.",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Limit" : {
+                "description" : "Requests allowed in the window (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Remaining" : {
+                "description" : "Requests left in the window (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Reset" : {
+                "description" : "Seconds until the window resets (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              }
+            },
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/clusters/{clusterId}/consumers" : {
       "get" : {
         "tags" : [ "cluster-resource-controller" ],
@@ -25501,9 +25503,9 @@
         }
       }
     },
-    "/api/v1/clusters/{clusterId}/diverts/{name}" : {
+    "/api/v1/clusters/{clusterId}/artemis/diverts/{name}" : {
       "delete" : {
-        "tags" : [ "routing-controller" ],
+        "tags" : [ "divert-controller" ],
         "operationId" : "deleteDivert",
         "parameters" : [ {
           "name" : "clusterId",
@@ -30543,73 +30545,6 @@
         },
         "required" : [ "confirmToken", "connectionId", "consumerCount", "sessionCount" ]
       },
-      "CreateDivertRequest" : {
-        "type" : "object",
-        "properties" : {
-          "name" : {
-            "type" : "string",
-            "description" : "The divert's unique name on each node.",
-            "maxLength" : 200,
-            "minLength" : 0,
-            "pattern" : "[^\\s,=:*?\"\\\\]*"
-          },
-          "routingName" : {
-            "type" : [ "string", "null" ],
-            "description" : "The routing name; defaults to the divert's name.",
-            "maxLength" : 200,
-            "minLength" : 0,
-            "pattern" : "[^\\s,=:*?\"\\\\]*"
-          },
-          "address" : {
-            "type" : "string",
-            "description" : "The address whose messages are diverted.",
-            "maxLength" : 200,
-            "minLength" : 0
-          },
-          "forwardingAddress" : {
-            "type" : "string",
-            "description" : "The address messages are diverted to.",
-            "maxLength" : 200,
-            "minLength" : 0
-          },
-          "exclusive" : {
-            "type" : "boolean",
-            "default" : false,
-            "description" : "Take the message rather than copy it. Exclusive diverts are evaluated before non-exclusive ones."
-          },
-          "filter" : {
-            "type" : [ "string", "null" ],
-            "description" : "A filter limiting which messages are diverted.",
-            "maxLength" : 4000,
-            "minLength" : 0
-          },
-          "routingType" : {
-            "type" : [ "string", "null" ],
-            "description" : "Routing type applied to the diverted copy.",
-            "enum" : [ "ANYCAST", "MULTICAST", "PASS", "STRIP", null ],
-            "pattern" : "(?i)ANYCAST|MULTICAST|PASS|STRIP"
-          },
-          "acknowledgeCaptureShadowing" : {
-            "type" : "boolean",
-            "default" : false,
-            "description" : "Create an exclusive divert even though its source address is being captured. Capture of that address then observes nothing, because Artemis applies exclusive diverts before every other one."
-          }
-        },
-        "required" : [ "address", "forwardingAddress", "name" ]
-      },
-      "DivertMutationView" : {
-        "type" : "object",
-        "properties" : {
-          "outcome" : {
-            "$ref" : "#/components/schemas/LifecycleOutcomeView"
-          },
-          "brokerXml" : {
-            "type" : "string",
-            "description" : "The <divert> element that would make this broker's own configuration carry the divert. A divert created over management persists across restarts but is absent from configuration, and this is what closes that gap."
-          }
-        },
-        "required" : [ "brokerXml", "outcome" ]
-      },
       "DeclareRecommendedRequest" : {
         "type" : "object",
         "description" : "Declare the capability probe's recommendations as a new revision. Nothing is applied; the plan is opened next",
@@ -31319,6 +31254,73 @@
             "type" : "string"
           }
         }
+      },
+      "CreateDivertRequest" : {
+        "type" : "object",
+        "properties" : {
+          "name" : {
+            "type" : "string",
+            "description" : "The divert's unique name on each node.",
+            "maxLength" : 200,
+            "minLength" : 0,
+            "pattern" : "[^\\s,=:*?\"\\\\]*"
+          },
+          "routingName" : {
+            "type" : [ "string", "null" ],
+            "description" : "The routing name; defaults to the divert's name.",
+            "maxLength" : 200,
+            "minLength" : 0,
+            "pattern" : "[^\\s,=:*?\"\\\\]*"
+          },
+          "address" : {
+            "type" : "string",
+            "description" : "The address whose messages are diverted.",
+            "maxLength" : 200,
+            "minLength" : 0
+          },
+          "forwardingAddress" : {
+            "type" : "string",
+            "description" : "The address messages are diverted to.",
+            "maxLength" : 200,
+            "minLength" : 0
+          },
+          "exclusive" : {
+            "type" : "boolean",
+            "default" : false,
+            "description" : "Take the message rather than copy it. Exclusive diverts are evaluated before non-exclusive ones."
+          },
+          "filter" : {
+            "type" : [ "string", "null" ],
+            "description" : "A filter limiting which messages are diverted.",
+            "maxLength" : 4000,
+            "minLength" : 0
+          },
+          "routingType" : {
+            "type" : [ "string", "null" ],
+            "description" : "Routing type applied to the diverted copy.",
+            "enum" : [ "ANYCAST", "MULTICAST", "PASS", "STRIP", null ],
+            "pattern" : "(?i)ANYCAST|MULTICAST|PASS|STRIP"
+          },
+          "acknowledgeCaptureShadowing" : {
+            "type" : "boolean",
+            "default" : false,
+            "description" : "Create an exclusive divert even though its source address is being captured. Capture of that address then observes nothing, because Artemis applies exclusive diverts before every other one."
+          }
+        },
+        "required" : [ "address", "forwardingAddress", "name" ]
+      },
+      "DivertMutationView" : {
+        "type" : "object",
+        "properties" : {
+          "outcome" : {
+            "$ref" : "#/components/schemas/LifecycleOutcomeView"
+          },
+          "brokerXml" : {
+            "type" : "string",
+            "description" : "The <divert> element that would make this broker's own configuration carry the divert. A divert created over management persists across restarts but is absent from configuration, and this is what closes that gap."
+          }
+        },
+        "required" : [ "brokerXml", "outcome" ]
       },
       "CreateAddressRequest" : {
         "type" : "object",
