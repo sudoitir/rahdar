@@ -17,6 +17,7 @@ import io.github.sudoitir.rahdar.kernel.stream.SseHub;
 import io.github.sudoitir.rahdar.platform.broker.Attempt;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
+import io.github.sudoitir.rahdar.platform.broker.BrokerMessages;
 import io.github.sudoitir.rahdar.platform.broker.ManagementRefusal;
 import io.github.sudoitir.rahdar.platform.clusters.BrokerCommands;
 import io.github.sudoitir.rahdar.platform.clusters.BrokerCommands.Check;
@@ -102,6 +103,7 @@ public class QueueLifecycleService {
     private final Validator validator;
     private final OperationGate gate;
     private final ArtemisNodes artemisNodes;
+    private final BrokerMessages messages;
 
     /** What a delete would touch: how many messages, and the target's identity for the gate's state key. */
     public record Reach(long count, String identity) {}
@@ -182,8 +184,8 @@ public class QueueLifecycleService {
     }
 
     /**
-     * What deleting the queue would remove now, read without an audit row or a broker call: the messages the
-     * scrape counts on its nodes, and the queue's identity for the gate's state key.
+     * What deleting the queue would remove now, read without an audit row: the messages the scrape counts on its
+     * nodes, and the queue's identity across the cluster for the gate's state key, which the broker reports.
      */
     public Reach reachOfQueueDelete(UUID clusterId, String queueName) {
         access.requireResource(clusterId, ResourceRef.queue(queueName), LifecycleKind.DELETE_QUEUE.permission());
@@ -192,8 +194,7 @@ public class QueueLifecycleService {
             throw new NotFoundException("queue", queueName);
         }
         return new Reach(
-                found.stream().mapToLong(QueueLocation::messageCount).sum(),
-                found.getFirst().address() + "|" + found.getFirst().routingType());
+                found.stream().mapToLong(QueueLocation::messageCount).sum(), messages.identity(clusterId, queueName));
     }
 
     private Attempt<LifecycleOutcome> runDeleteQueue(

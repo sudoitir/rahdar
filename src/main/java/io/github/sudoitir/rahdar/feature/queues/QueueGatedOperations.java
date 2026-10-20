@@ -22,7 +22,7 @@ import org.springframework.context.annotation.Configuration;
 /**
  * The gated queue and address deletes: {@code queue.delete} and {@code address.delete} (ADR-0179). Both are
  * destructive and run as the requester once approved. The queue's estimate is the messages the scrape counts on it,
- * pinned to the address and routing type it is bound with; an address has no identity beyond its name.
+ * pinned to which nodes hold it and the incarnation each holds; an address has no identity beyond its name.
  */
 @Configuration(proxyBeanMethods = false)
 class QueueGatedOperations {

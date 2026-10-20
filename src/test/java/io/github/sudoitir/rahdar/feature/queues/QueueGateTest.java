@@ -22,6 +22,7 @@ import io.github.sudoitir.rahdar.kernel.gate.OperationHeldException;
 import io.github.sudoitir.rahdar.kernel.gate.Trait;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
 import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
+import io.github.sudoitir.rahdar.platform.broker.BrokerMessages;
 import io.github.sudoitir.rahdar.platform.broker.BrokerTarget;
 import io.github.sudoitir.rahdar.platform.broker.ManagementRefusal;
 import io.github.sudoitir.rahdar.platform.broker.QueueRow;
@@ -98,6 +99,9 @@ class QueueGateTest extends PostgresIntegrationTest {
 
     @MockitoBean
     BrokerGateway gateway;
+
+    @MockitoBean
+    BrokerMessages messages;
 
     @MockitoBean
     QueueLifecycleOperations ops;
@@ -193,23 +197,22 @@ class QueueGateTest extends PostgresIntegrationTest {
 
     @Test
     void aQueueDeleteIsEstimatedFromTheScrapeAndPinnedToTheQueuesIdentity() {
-        assertThat(lifecycle.reachOfQueueDelete(clusterId, QUEUE)).isEqualTo(new Reach(5, "orders.addr|ANYCAST"));
+        when(messages.identity(clusterId, QUEUE)).thenReturn("etag-1");
+        assertThat(lifecycle.reachOfQueueDelete(clusterId, QUEUE)).isEqualTo(new Reach(5, "etag-1"));
 
         Effect effect = queueDeleteOperation.estimate(new QueueDeleteParams(clusterId, QUEUE, false, false));
 
-        assertThat(effect).isEqualTo(new Effect(5, "messages", "orders.addr|ANYCAST", null));
+        assertThat(effect).isEqualTo(new Effect(5, "messages", "etag-1", null));
         assertThat(queueDeleteOperation.traits(new QueueDeleteParams(clusterId, QUEUE, false, false)))
                 .isEqualTo(Set.of(Trait.DESTRUCTIVE));
     }
 
     @Test
-    void aQueueBoundAnotherWayAfterTheRequestHasAnotherStateKey() {
+    void aQueueRecreatedAfterTheRequestHasAnotherStateKey() {
+        when(messages.identity(clusterId, QUEUE)).thenReturn("etag-1", "etag-2");
         String asked = queueDeleteOperation
                 .estimate(new QueueDeleteParams(clusterId, QUEUE, false, false))
                 .stateKey();
-        jdbc.update("DELETE FROM queue_snapshot WHERE cluster_id = ?", clusterId);
-        upsert.upsertBatch(List.of(
-                new QueueRow(clusterId, nodeId, "other.addr", QUEUE, "MULTICAST", true, 5, 0, 0, 0, 0, 0, 0, false)));
 
         String now = queueDeleteOperation
                 .estimate(new QueueDeleteParams(clusterId, QUEUE, false, false))

@@ -212,6 +212,19 @@ public class BrokerMessages {
     }
 
     /**
+     * The queue's identity across the cluster, as the approval gate pins a delete: which nodes hold it and
+     * which incarnation each holds. A queue recreated, or a node that took it on since, changes it.
+     */
+    public String identity(UUID clusterId, String queue) {
+        return translated(() -> {
+            ClusterConnection c = gateway.cluster(clusterId);
+            return c.operations()
+                    .preview(queueId(c, queue), new Operation.Delete(false, false), Scope.whole())
+                    .etag();
+        });
+    }
+
+    /**
      * A receiver on the queue on the node, for a drain that takes messages off it. The caller owns it
      * and closes it. Its failures, opening it included, are the SDK's own {@link BrokerException}: a
      * drain tells a lost connection from a queue that admits no more consumers by their reason.
