@@ -15,13 +15,9 @@
 * `i.g.s.r.s.a.CapabilityProbe`
 * `i.g.s.r.s.a.DivertOperations`
 * `i.g.s.r.s.a.MessageOperations`
-* `i.g.s.r.s.a.QueueConfigurationReader`
 * `i.g.s.r.s.a.QueueLifecycleOperations`
 * `i.g.s.r.s.a.StagingQueues`
 |Bean references
 |* `i.g.s.r.p.s.QueueLocator` (in Scraping)
 * `i.g.s.r.p.b.BrokerGateway` (in Broker connectivity)
-* `i.g.s.r.p.c.ClusterDirectory` (in Clusters)
-* `i.g.s.r.p.b.BrokerConnections` (in Broker connectivity)
-* `i.g.s.r.k.s.ClusterAccessGuard` (in Security)
 |===

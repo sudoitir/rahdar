@@ -5,6 +5,7 @@ import io.github.sudoitir.openbroker.ErrorReasons;
 import io.github.sudoitir.openbroker.Plane;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Supplier;
 
 /**
  * The SDK's failures in Rahdar's terms: each standard reason maps to exactly one {@link
@@ -20,9 +21,19 @@ public final class BrokerFailures {
     public static final String NATIVE_ERROR = "artemis.error";
 
     private static final String NATIVE_CODE = "artemis.code";
+    private static final String DIFFERING = "differing";
     private static final String MBEAN_ABSENT = "InstanceNotFoundException";
 
     private BrokerFailures() {}
+
+    /** The call's result, or the Rahdar exception for the failure it raised. */
+    public static <T> T translated(Supplier<T> call) {
+        try {
+            return call.get();
+        } catch (BrokerException e) {
+            throw translate(e);
+        }
+    }
 
     /** The Rahdar exception for a failure. */
     public static RuntimeException translate(BrokerException e) {
@@ -44,7 +55,13 @@ public final class BrokerFailures {
                                 "The queue or address is no longer on this node — it was destroyed, or it has not"
                                         + " been created here. Refresh the listing: " + nativeError)
                         : new ManagementRefusal(ManagementRefusal.Kind.ALREADY, e.getMessage());
-            case ErrorReasons.RESOURCE_EXISTS -> new ManagementRefusal(ManagementRefusal.Kind.ALREADY, e.getMessage());
+            case ErrorReasons.RESOURCE_EXISTS ->
+                // The driver names the differing fields when what exists is not what was asked for.
+                new ManagementRefusal(
+                        metadata.containsKey(DIFFERING)
+                                ? ManagementRefusal.Kind.ARGUMENT
+                                : ManagementRefusal.Kind.ALREADY,
+                        e.getMessage());
             case ErrorReasons.HAS_CHILDREN ->
                 new ManagementRefusal(ManagementRefusal.Kind.BOUND_QUEUES, e.getMessage());
             case ErrorReasons.HAS_CONSUMERS ->

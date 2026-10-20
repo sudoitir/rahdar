@@ -12,6 +12,7 @@ const featureEdges = {
   audit: ['security'],
   brokerconfig: ['messages'],
   messages: ['queues'],
+  resources: ['queues'],
   rr: ['queues', 'sql'],
   sql: ['messages', 'queues'],
   transfer: ['queues'],

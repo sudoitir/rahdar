@@ -1,7 +1,7 @@
 package io.github.sudoitir.rahdar.feature.routing.web;
 
-import io.github.sudoitir.rahdar.feature.queues.LifecycleRequests.CreateDivertRequest;
-import io.github.sudoitir.rahdar.feature.queues.QueueLifecycleService;
+import io.github.sudoitir.rahdar.feature.routing.CreateDivertRequest;
+import io.github.sudoitir.rahdar.feature.routing.DivertLifecycleService;
 import io.github.sudoitir.rahdar.feature.routing.RoutingService;
 import io.github.sudoitir.rahdar.feature.routing.web.RoutingViews.BridgeView;
 import io.github.sudoitir.rahdar.feature.routing.web.RoutingViews.DivertMutationView;
@@ -29,14 +29,8 @@ import org.springframework.web.bind.annotation.RestController;
 /**
  * A cluster's routing: its diverts and its bridges.
  *
- * <p>Reading either needs only {@code cluster:read}. Creating or deleting a divert
- * needs {@code divert:write} — a divert changes where traffic goes rather than what
- * a queue holds, so the queue authorities are the wrong ones — and fans out across
- * every live node with the same per-node outcomes as every other topology mutation.
- *
- * <p>There is no update route, on purpose: Artemis' {@code updateDivert} replaces
- * the configuration, and presenting a partially applied replacement as an atomic
- * edit is what the routing spec forbids. Changing a divert is a delete and a create.
+ * <p>Reading either needs only {@code cluster:read}. Creating and deleting a divert
+ * are {@link DivertController}'s, under the Artemis namespace.
  *
  * <p>Bridges are read-only, permanently. Creating or changing one alters how a
  * cluster is wired to other brokers and is invisible to whatever manages that
@@ -48,7 +42,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class RoutingController {
 
     private final RoutingService routing;
-    private final QueueLifecycleService lifecycle;
+    private final DivertLifecycleService lifecycle;
 
     @GetMapping("/diverts")
     public PagedView<DivertView> diverts(@PathVariable UUID clusterId, ResourceQuery query) {
@@ -60,14 +54,6 @@ public class RoutingController {
         return routing.bridges(clusterId, query);
     }
 
-    /**
-     * Create a divert on every live node.
-     *
-     * <p>The response always carries the {@code broker.xml} that would make the
-     * broker's own configuration match, built from the values just submitted. With
-     * {@code ?dryRun=true} nothing is changed, so the form can show the blast radius
-     * and that configuration together, before the creating control is armed.
-     */
     @PostMapping("/diverts")
     public DivertMutationView createDivert(
             @PathVariable UUID clusterId,
@@ -85,11 +71,6 @@ public class RoutingController {
                         request.routingType()));
     }
 
-    /**
-     * Delete a divert from every live node. Nothing else removes one: a divert
-     * created over management outlives the broker process (ADR-0065), so this route
-     * is the only thing that takes it away.
-     */
     @DeleteMapping("/diverts/{name}")
     public LifecycleOutcomeView deleteDivert(
             @PathVariable UUID clusterId,

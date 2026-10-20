@@ -7335,7 +7335,6 @@ export interface components {
             transformerClassName?: string | null;
             /** @description Exclusive diverts take the message rather than copying it, and Artemis evaluates them before non-exclusive ones. The difference between traffic being duplicated and traffic being taken away. */
             exclusive: boolean;
-            retroactiveResource: boolean;
             /** @description What in Rahdar owns this divert, when Rahdar's own records say it does: MESSAGE_CAPTURE for a capture tap, OPERATOR for one created through the routing screen. Null means Rahdar has no record of it, which is not a claim that it came from broker configuration. */
             owner?: string | null;
             /**

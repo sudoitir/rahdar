@@ -278,7 +278,6 @@ const divert = (f: Fixture, i: number): DivertView => ({
   routingType: 'MULTICAST',
   transformerClassName: null,
   exclusive: i % 2 === 0,
-  retroactiveResource: false,
   owner: ['MESSAGE_CAPTURE', 'OPERATOR', null][i % 3],
   captureSubscriptionId: null,
   brokerXml: null,

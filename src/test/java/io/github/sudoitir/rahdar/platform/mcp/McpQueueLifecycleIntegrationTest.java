@@ -2,18 +2,18 @@ package io.github.sudoitir.rahdar.platform.mcp;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyBoolean;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 
+import io.github.sudoitir.openbroker.model.Scope;
+import io.github.sudoitir.openbroker.operation.Operation;
+import io.github.sudoitir.openbroker.operation.Operations;
 import io.github.sudoitir.rahdar.feature.apitokens.ApiTokenService;
 import io.github.sudoitir.rahdar.feature.messages.MessagePermissions;
-import io.github.sudoitir.rahdar.feature.queues.QueuePermissions;
+import io.github.sudoitir.rahdar.feature.resources.ResourcePermissions;
 import io.github.sudoitir.rahdar.kernel.audit.internal.persistence.AuditEventRepository;
 import io.github.sudoitir.rahdar.kernel.security.Grant;
 import io.github.sudoitir.rahdar.kernel.security.Permissions;
@@ -34,9 +34,7 @@ import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshotUpsert;
 import io.github.sudoitir.rahdar.support.McpFixture;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
 import io.github.sudoitir.rahdar.support.Targets;
-import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
 import io.github.sudoitir.rahdar.system.artemis.ArtemisNodes;
-import io.github.sudoitir.rahdar.system.artemis.QueueLifecycleOperations;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -100,11 +98,10 @@ class McpQueueLifecycleIntegrationTest extends PostgresIntegrationTest {
     @MockitoBean
     BrokerGateway gateway;
 
-    @MockitoBean
-    QueueLifecycleOperations ops;
-
     private MockMvc mvc;
     private UUID clusterId;
+    private BrokerTarget target;
+    private Operations ops;
 
     @BeforeEach
     void setUp() {
@@ -121,15 +118,15 @@ class McpQueueLifecycleIntegrationTest extends PostgresIntegrationTest {
         upsert.upsertBatch(List.of(new QueueRow(
                 clusterId, nodeId, QUEUE, QUEUE, "ANYCAST", true, 9, 0, 0, 0, 0, 0, 0, false, "artemis.queue")));
 
-        ArtemisNode client = mock(ArtemisNode.class);
-        when(client.resolveBrokerObjectName()).thenReturn("org.apache.activemq.artemis:broker=\"b\"");
-        when(artemisNodes.on(eq(clusterId), any(UUID.class))).thenReturn(client);
-        when(artemisNodes.on(any(BrokerTarget.class))).thenReturn(client);
-        BrokerTarget anyNode = Targets.target();
-        when(gateway.node(any(UUID.class), any(UUID.class))).thenReturn(anyNode);
-        when(ops.messageCount(any(), anyString())).thenReturn(9L);
-        when(ops.deleteState(any(), anyString(), anyString(), anyString(), anyString()))
-                .thenReturn(new QueueLifecycleOperations.DeleteState(true, 0L, List.of(QUEUE)));
+        target = Targets.target();
+        ops = Targets.operations(target);
+        when(gateway.node(any(UUID.class), any(UUID.class))).thenReturn(target);
+        queueHolds(0);
+    }
+
+    /** The queue as the node lists it: nine messages and these consumers. */
+    private void queueHolds(long consumers) {
+        Targets.holding(target, Targets.queue(QUEUE, QUEUE, consumers, 9));
     }
 
     @AfterEach
@@ -146,7 +143,7 @@ class McpQueueLifecycleIntegrationTest extends PostgresIntegrationTest {
     @Test
     void theDefaultInvocationPreviewsAndDestroysNothing() throws Exception {
         McpFixture.Key key =
-                keyWith(Set.of(Permissions.CLUSTER_READ, Permissions.QUEUE_READ, QueuePermissions.QUEUE_DELETE));
+                keyWith(Set.of(Permissions.CLUSTER_READ, Permissions.QUEUE_READ, ResourcePermissions.QUEUE_DELETE));
 
         JsonNode response = McpFixture.callTool(
                 mvc,
@@ -160,13 +157,13 @@ class McpQueueLifecycleIntegrationTest extends PostgresIntegrationTest {
                 .isFalse();
         assertThat(outcome.path("dryRun").asBoolean()).isTrue();
         assertThat(outcome.path("totalAffected").asLong()).isEqualTo(9L);
-        verify(ops, never()).destroyQueue(any(), anyString(), anyString(), anyBoolean());
+        verify(ops, never()).execute(any(), any(), any());
     }
 
     @Test
     void aRealDestroyWithoutAMatchingConfirmationIsRefused() throws Exception {
         McpFixture.Key key =
-                keyWith(Set.of(Permissions.CLUSTER_READ, Permissions.QUEUE_READ, QueuePermissions.QUEUE_DELETE));
+                keyWith(Set.of(Permissions.CLUSTER_READ, Permissions.QUEUE_READ, ResourcePermissions.QUEUE_DELETE));
 
         JsonNode response = McpFixture.callTool(
                 mvc,
@@ -186,7 +183,7 @@ class McpQueueLifecycleIntegrationTest extends PostgresIntegrationTest {
 
         assertThat(response.path("error").path("code").asInt()).isEqualTo(-32602);
         assertThat(response.path("error").path("message").asString()).contains(QUEUE);
-        verify(ops, never()).destroyQueue(any(), anyString(), anyString(), anyBoolean());
+        verify(ops, never()).execute(any(), any(), any());
     }
 
     @Test
@@ -207,7 +204,7 @@ class McpQueueLifecycleIntegrationTest extends PostgresIntegrationTest {
                         || response.path("error").isObject())
                 .describedAs("%s", response)
                 .isTrue();
-        verify(ops, never()).destroyQueue(any(), anyString(), anyString(), anyBoolean());
+        verify(ops, never()).execute(any(), any(), any());
     }
 
     @Test
@@ -219,7 +216,7 @@ class McpQueueLifecycleIntegrationTest extends PostgresIntegrationTest {
         nodes.save(dead);
 
         McpFixture.Key key =
-                keyWith(Set.of(Permissions.CLUSTER_READ, Permissions.QUEUE_READ, QueuePermissions.QUEUE_PAUSE));
+                keyWith(Set.of(Permissions.CLUSTER_READ, Permissions.QUEUE_READ, ResourcePermissions.QUEUE_PAUSE));
 
         JsonNode response = McpFixture.callTool(
                 mvc,
@@ -235,10 +232,9 @@ class McpQueueLifecycleIntegrationTest extends PostgresIntegrationTest {
 
     @Test
     void aQueueWithConsumersIsDeletedOnlyWithDisconnectConsumers() throws Exception {
-        when(ops.deleteState(any(), anyString(), anyString(), anyString(), anyString()))
-                .thenReturn(new QueueLifecycleOperations.DeleteState(true, 1L, List.of(QUEUE)));
+        queueHolds(1);
         McpFixture.Key key =
-                keyWith(Set.of(Permissions.CLUSTER_READ, Permissions.QUEUE_READ, QueuePermissions.QUEUE_DELETE));
+                keyWith(Set.of(Permissions.CLUSTER_READ, Permissions.QUEUE_READ, ResourcePermissions.QUEUE_DELETE));
 
         JsonNode refused = McpFixture.callTool(
                 mvc,
@@ -271,6 +267,10 @@ class McpQueueLifecycleIntegrationTest extends PostgresIntegrationTest {
                         QUEUE,
                         "disconnectConsumers",
                         true));
-        verify(ops).destroyQueue(any(), anyString(), eq(QUEUE), eq(true));
+        verify(ops)
+                .execute(
+                        eq(Targets.id("artemis.queue", QUEUE)),
+                        eq(new Operation.Delete(false, true)),
+                        any(Scope.class));
     }
 }

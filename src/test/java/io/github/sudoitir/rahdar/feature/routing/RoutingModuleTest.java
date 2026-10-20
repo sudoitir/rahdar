@@ -1,5 +1,6 @@
 package io.github.sudoitir.rahdar.feature.routing;
 
+import io.github.sudoitir.rahdar.platform.broker.QueueCounters;
 import io.github.sudoitir.rahdar.platform.scrape.QueueLocator;
 import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshotUpsert;
 import io.github.sudoitir.rahdar.support.ModuleIntegrationTest;
@@ -10,6 +11,10 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 /** Routing starts with its direct dependencies only (task 5.14). */
 @ApplicationModuleTest(mode = BootstrapMode.DIRECT_DEPENDENCIES)
 class RoutingModuleTest extends ModuleIntegrationTest {
+
+    /** Queue lifecycle, in a direct dependency, resets counters through the system module, which is not started. */
+    @MockitoBean
+    QueueCounters counters;
 
     /** Queue lifecycle, a direct dependency, locates queues through the scrape module. */
     @MockitoBean

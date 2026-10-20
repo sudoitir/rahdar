@@ -86,7 +86,8 @@ can be run again.
 | Tool | `trace_request_reply` | flows, latency and timeout statistics, configured expectations |
 | Tool | `activity_log` | broker events, or Rahdar's own audit trail |
 | Tool | `message_action` | move / retry / delete / expire / purge |
-| Tool | `queue_lifecycle` | create, update, pause, resume or destroy a queue, address or divert |
+| Tool | `queue_lifecycle` | create, update, pause, resume or destroy a queue or address |
+| Tool | `divert_lifecycle` | create or delete a divert |
 | Tool | `broker_config_change` | declare a configuration, or apply it canary-first with hazards acknowledged by id |
 | Tool | `connection_action` | close a connection, session, consumer or an address's consumers |
 | Tool | `send_message` | enqueue one message |

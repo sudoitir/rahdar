@@ -59,7 +59,8 @@ curl -s https://rahdar.example.com/mcp \
 | Tool | `trace_request_reply` | 流、延迟与超时统计、已配置的预期 |
 | Tool | `activity_log` | Broker 事件，或 Rahdar 自身的审计链路 |
 | Tool | `message_action` | 移动 / 重投 / 删除 / 过期 / 清空 |
-| Tool | `queue_lifecycle` | 创建、更新、暂停、恢复或销毁队列、地址或 divert |
+| Tool | `queue_lifecycle` | 创建、更新、暂停、恢复或销毁队列或地址 |
+| Tool | `divert_lifecycle` | 创建或删除 divert |
 | Tool | `broker_config_change` | 声明一份配置，或以金丝雀优先、按 id 确认危害的方式应用它 |
 | Tool | `connection_action` | 关闭连接、会话、消费者或某个地址的全部消费者 |
 | Tool | `send_message` | 投递一条消息 |

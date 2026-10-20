@@ -1,15 +1,15 @@
 package io.github.sudoitir.rahdar.feature.bulk;
 
 import io.github.sudoitir.rahdar.feature.messages.MessagePermissions;
-import io.github.sudoitir.rahdar.feature.queues.QueuePermissions;
+import io.github.sudoitir.rahdar.feature.resources.ResourcePermissions;
 import java.util.Locale;
 
 /** The single-queue operation a bulk run applies, and the permission it needs. */
 public enum BulkOperation {
-    PAUSE(QueuePermissions.QUEUE_PAUSE, false),
-    RESUME(QueuePermissions.QUEUE_PAUSE, false),
+    PAUSE(ResourcePermissions.QUEUE_PAUSE, false),
+    RESUME(ResourcePermissions.QUEUE_PAUSE, false),
     PURGE(MessagePermissions.QUEUE_PURGE, true),
-    DELETE(QueuePermissions.QUEUE_DELETE, true);
+    DELETE(ResourcePermissions.QUEUE_DELETE, true);
 
     private final String permission;
     private final boolean destructive;

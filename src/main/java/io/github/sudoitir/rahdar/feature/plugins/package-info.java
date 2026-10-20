@@ -7,7 +7,7 @@
         displayName = "Plugins",
         allowedDependencies = {
             "feature.messages",
-            "feature.queues",
+            "feature.resources",
             "feature.sql",
             "kernel.audit",
             "kernel.audit::web",

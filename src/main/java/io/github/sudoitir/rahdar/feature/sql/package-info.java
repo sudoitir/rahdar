@@ -5,7 +5,7 @@
         displayName = "SQL console",
         allowedDependencies = {
             "feature.messages",
-            "feature.queues",
+            "feature.resources",
             "feature.routing",
             "kernel.audit",
             "kernel.core",

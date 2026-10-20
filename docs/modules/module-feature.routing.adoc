@@ -5,19 +5,18 @@
 |Spring components
 |_Services_
 
+* `i.g.s.r.f.r.DivertLifecycleService`
 * `i.g.s.r.f.r.RoutingService`
 
 _Others_
 
 * `i.g.s.r.f.r.RoutingFeature`
 |Bean references
-|* `i.g.s.r.p.c.ClusterDirectory` (in Clusters)
-* `i.g.s.r.p.b.BrokerConnections` (in Broker connectivity)
-* `i.g.s.r.s.a.DivertOperations` (in Artemis)
-* `i.g.s.r.s.a.BridgeOperations` (in Artemis)
+|* `i.g.s.r.k.s.SseHub` (in Event stream)
+* `i.g.s.r.p.c.BrokerCommands` (in Clusters)
 * `i.g.s.r.k.s.ClusterAccessGuard` (in Security)
+* `i.g.s.r.p.c.ClusterDirectory` (in Clusters)
+* `i.g.s.r.p.b.BrokerGateway` (in Broker connectivity)
 * `i.g.s.r.k.s.PermissionResolver` (in Security)
 * `i.g.s.r.k.a.AuditService` (in Audit log)
-* `i.g.s.r.s.a.ArtemisNodes` (in Artemis)
-* `i.g.s.r.f.q.QueueLifecycleService` (in Queues)
 |===

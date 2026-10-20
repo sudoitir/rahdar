@@ -124,6 +124,19 @@ class ResourceCheckCoverageTest {
                     "system.artemis.ArtemisQueueCounters",
                     "broker primitive behind QueueCounters; QueueLifecycleService checks before it calls it"),
             Map.entry(
+                    "system.artemis.ArtemisQueueSettings",
+                    "broker primitive behind QueueSettings; QueueConfigurationReader checks before it calls it"),
+            Map.entry(
+                    "system.artemis.ArtemisTaps",
+                    "broker primitive behind MessageTaps; the capture and plugin messaging services check before they"
+                            + " call it"),
+            Map.entry(
+                    "system.artemis.ArtemisTransferAcceptance",
+                    "broker primitive behind TransferAcceptance; the transfer services check before they call it"),
+            Map.entry(
+                    "system.artemis.ArtemisTransferStaging",
+                    "broker primitive behind TransferStaging; the transfer services check before they call it"),
+            Map.entry(
                     "platform.scrape.QueueSnapshotUpsert",
                     "the scrape's own bookkeeping, driven by the broker and no caller"),
             Map.entry(
@@ -233,7 +246,7 @@ class ResourceCheckCoverageTest {
                 .contains(
                         "feature.messages.MessageService.purge",
                         "feature.messages.MessageService.execute",
-                        "feature.queues.QueueLifecycleService.deleteQueue",
+                        "feature.resources.QueueLifecycleService.deleteQueue",
                         "feature.transfer.TransferService.preview",
                         "feature.sql.MessageIndexService.create");
         assertThat(subjects)

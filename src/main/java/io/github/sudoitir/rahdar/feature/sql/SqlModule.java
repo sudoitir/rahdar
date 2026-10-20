@@ -12,7 +12,7 @@ public final class SqlModule {
             .id("sql")
             .title("SQL console")
             .kind(FeatureDescriptor.Kind.FEATURE)
-            .require("queues")
+            .require("resources")
             .require("routing")
             .permission(PermissionDef.resource(
                     SqlPermissions.CAPTURE_WRITE,

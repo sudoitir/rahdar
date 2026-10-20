@@ -73,7 +73,6 @@ const DIVERT: DivertView = {
   routingType: null,
   transformerClassName: null,
   exclusive: false,
-  retroactiveResource: false,
   owner: 'OPERATOR',
   captureSubscriptionId: null,
   nodesPresent: 1,

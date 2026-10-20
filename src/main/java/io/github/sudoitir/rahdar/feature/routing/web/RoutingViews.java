@@ -40,8 +40,6 @@ public final class RoutingViews {
                             + " being duplicated and traffic being taken away.")
             boolean exclusive,
 
-            @Schema(requiredMode = REQUIRED) boolean retroactiveResource,
-
             @Schema(
                     requiredMode = RequiredMode.NOT_REQUIRED,
                     nullable = true,
