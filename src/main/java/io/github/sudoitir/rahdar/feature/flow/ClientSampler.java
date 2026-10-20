@@ -147,8 +147,8 @@ public class ClientSampler {
                             e.clientId(),
                             e.user(),
                             e.remoteHost(),
-                            e.address(),
-                            e.queue(),
+                            e.destination(),
+                            e.subscription(),
                             e.memberCount(),
                             rounded(e.rate()),
                             e.stalled())));
@@ -253,8 +253,8 @@ public class ClientSampler {
                     m.user(),
                     m.remoteAddress(),
                     m.protocol(),
-                    m.address(),
-                    m.queue(),
+                    m.destination(),
+                    m.subscription(),
                     rate == null ? null : rate.rate(),
                     reading.unacked(),
                     rate != null && rate.stalled()));

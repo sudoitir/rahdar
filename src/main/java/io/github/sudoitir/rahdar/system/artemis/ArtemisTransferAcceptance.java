@@ -15,7 +15,7 @@ import org.springframework.stereotype.Component;
  */
 @Component
 @RequiredArgsConstructor
-public class ArtemisTransferAcceptance implements TransferAcceptance {
+class ArtemisTransferAcceptance implements TransferAcceptance {
 
     private final ArtemisNodes nodes;
     private final AcceptanceProbe probe;

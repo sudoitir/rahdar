@@ -2,9 +2,8 @@ package io.github.sudoitir.rahdar.feature.flow;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -22,17 +21,14 @@ import io.github.sudoitir.rahdar.kernel.stream.SseHub;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
 import io.github.sudoitir.rahdar.platform.broker.FlowSampler;
+import io.github.sudoitir.rahdar.platform.broker.FlowSampler.FlowMember;
+import io.github.sudoitir.rahdar.platform.broker.FlowSampler.FlowRoute;
+import io.github.sudoitir.rahdar.platform.broker.FlowSampler.FlowSample;
 import io.github.sudoitir.rahdar.platform.broker.SystemExtensions;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterLock;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterOwnership;
-import io.github.sudoitir.rahdar.system.artemis.ArtemisFlowSampler;
-import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
-import io.github.sudoitir.rahdar.system.artemis.ArtemisNodes;
-import io.github.sudoitir.rahdar.system.artemis.ListRows;
-import io.github.sudoitir.rahdar.system.artemis.ManagementRequest;
-import io.github.sudoitir.rahdar.system.artemis.ManagementResponse;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Clock;
 import java.time.Duration;
@@ -49,21 +45,20 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
-import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.ObjectMapper;
-import tools.jackson.databind.json.JsonMapper;
 
-/** The sampler against a stubbed Jolokia batch: what one node's POST becomes, and how each part fails alone. */
+/**
+ * The sampler against a stubbed {@link FlowSampler}: what one node's sample becomes, and what a sweep
+ * persists, rates and signals. How a system's own answer becomes a sample is that system's test.
+ */
 class ClientSamplerTest {
 
-    private static final ObjectMapper MAPPER = JsonMapper.builder().build();
     private static final Instant T0 = Instant.parse("2026-01-01T00:00:00Z");
 
     private final FlowStore store = mock(FlowStore.class);
     private final ClusterDirectory directory = mock(ClusterDirectory.class);
     private final BrokerConnections connections = mock(BrokerConnections.class);
-    ArtemisNodes artemisNodes = mock(ArtemisNodes.class);
-    SystemExtensions extensions = mock(SystemExtensions.class);
+    private final FlowSampler flowSampler = mock(FlowSampler.class);
+    private final SystemExtensions extensions = mock(SystemExtensions.class);
     private final ClusterLock lock = mock(ClusterLock.class);
     private final ClusterOwnership ownership = mock(ClusterOwnership.class);
     private final SettingsService settings = mock(SettingsService.class);
@@ -84,7 +79,7 @@ class ClientSamplerTest {
                     return true;
                 });
         when(ownership.owns(clusterId)).thenReturn(true);
-        when(extensions.require(any(), eq(FlowSampler.class))).thenReturn(new ArtemisFlowSampler(artemisNodes));
+        when(extensions.require(any(), eq(FlowSampler.class))).thenReturn(flowSampler);
         sampler = new ClientSampler(
                 store, directory, connections, lock, ownership, settings, hub, meters, clock, extensions);
     }
@@ -118,123 +113,78 @@ class ClientSamplerTest {
         }
     }
 
-    private static JsonNode json(String json) {
-        return MAPPER.readTree(json);
-    }
-
-    private static ManagementResponse ok(String json) {
-        return new ManagementResponse(200, json(json), null, null, null);
-    }
-
-    private static ManagementResponse failed(int status, String error) {
-        return new ManagementResponse(status, null, error, null, null);
-    }
-
-    private static ManagementResponse listing(long count, String... rows) {
-        return ok("{\"count\":" + count + ",\"data\":[" + String.join(",", rows) + "]}");
-    }
-
-    private static ManagementResponse pattern(String... attributes) {
-        StringBuilder value = new StringBuilder("{");
-        for (int i = 0; i < attributes.length; i++) {
-            value.append(i == 0 ? "" : ",")
-                    .append("\"mbean")
-                    .append(i)
-                    .append("\":")
-                    .append(attributes[i]);
-        }
-        return ok(value.append('}').toString());
-    }
-
-    private static String producer(int id, Integer sent) {
-        return "{\"id\":" + id + ",\"session\":\"s" + id + "\",\"clientID\":\"app\",\"user\":\"u\","
-                + "\"remoteAddress\":\"/10.0.0.1:5000\",\"protocol\":\"CORE\",\"address\":\"orders\""
-                + (sent == null ? "" : ",\"msgSent\":" + sent) + "}";
-    }
-
-    private static String consumer(int id, Integer acked) {
-        return "{\"id\":" + id + ",\"session\":\"c" + id + "\",\"clientID\":\"app\",\"validatedUser\":\" \","
-                + "\"user\":\"u\",\"remoteAddress\":\"/10.0.0.1:5001\",\"protocol\":\"CORE\","
-                + "\"address\":\"orders\",\"queue\":\"orders\",\"messagesInTransit\":1"
-                + (acked == null ? "" : ",\"messagesAcknowledged\":" + acked) + "}";
-    }
-
-    /** The eight entries of one node's POST, in request order, defaulting to "nothing here". */
-    private static final class Batch {
-        ManagementResponse producers = listing(0);
-        ManagementResponse consumers = listing(0);
-        ManagementResponse diverts = failed(404, "no diverts");
-        ManagementResponse bridges = failed(404, "no bridges");
-        ManagementResponse storeAndForward = listing(0);
-        ManagementResponse temporary = listing(0);
-        ManagementResponse filtered = listing(0);
-        ManagementResponse addressSettings = ok("{}");
-
-        List<ManagementResponse> entries() {
-            return List.of(
-                    producers, consumers, diverts, bridges, storeAndForward, temporary, filtered, addressSettings);
-        }
-    }
-
-    private ArtemisNode client(List<ManagementResponse> entries) {
-        ArtemisNode client = mock(ArtemisNode.class);
-        when(client.resolveBrokerObjectName()).thenReturn("org.apache.activemq.artemis:broker=\"b\"");
-        when(client.batch(anyList())).thenReturn(entries);
-        when(client.parsed(any())).thenAnswer(inv -> ((ManagementResponse) inv.getArgument(0)).value());
-        return client;
-    }
-
-    private static ClusterNode node(UUID id, String name, String jolokiaUrl, String artemisNodeId, Boolean active) {
+    private static ClusterNode node(UUID id, String name, String jolokiaUrl, String nativeNodeId, Boolean active) {
         ClusterNode node = mock(ClusterNode.class);
         when(node.getId()).thenReturn(id);
         when(node.getName()).thenReturn(name);
         when(node.getManagementUrl()).thenReturn(jolokiaUrl);
-        when(node.getNativeNodeId()).thenReturn(artemisNodeId);
+        when(node.getNativeNodeId()).thenReturn(nativeNodeId);
         when(node.getActive()).thenReturn(active);
         return node;
     }
 
     private void serving(ClusterNode... nodes) {
-        List<ClusterNode> list = List.of(nodes);
-        when(directory.nodes(clusterId)).thenReturn(list);
+        when(directory.nodes(clusterId)).thenReturn(List.of(nodes));
     }
 
-    private void answers(ArtemisNode client) {
-        when(artemisNodes.on(eq(clusterId), any(UUID.class))).thenReturn(client);
+    private static FlowMember producer(int id, long sent) {
+        return new FlowMember(id + "@s" + id, "app", "u", "/10.0.0.1:5000", "CORE", "orders", null, sent, 0);
     }
 
-    private NodeResult sample(Batch batch) {
+    private static FlowMember consumer(int id, long acked) {
+        return new FlowMember(id + "@c" + id, "app", "u", "/10.0.0.1:5001", "CORE", "orders", "orders", acked, 1);
+    }
+
+    private static FlowRoute bridge(String name, long acknowledged) {
+        return new FlowRoute("BRIDGE", name, "q", "fa", "x", null, false, true, acknowledged);
+    }
+
+    /** A sample whose totals are the rows it carries, with the error the broker's answer carried, if any. */
+    private static FlowSample sampleOf(
+            List<FlowMember> producers, List<FlowMember> consumers, List<FlowRoute> routes, String errorKind) {
+        return new FlowSample(
+                producers,
+                producers.size(),
+                consumers,
+                consumers.size(),
+                routes,
+                errorKind == null ? null : "the broker said so",
+                errorKind);
+    }
+
+    private static FlowSample nothing() {
+        return sampleOf(List.of(), List.of(), List.of(), null);
+    }
+
+    private NodeResult sampled(FlowSample sample) {
         ClusterNode node = node(UUID.randomUUID(), "n1", "http://n1/jolokia", "N1", true);
-        answers(client(batch.entries()));
+        when(flowSampler.sample(eq(clusterId), any(UUID.class), anyInt())).thenReturn(sample);
         return sampler.sampleNode(clusterId, node, 100);
     }
 
     // ---- sampleNode ----------------------------------------------------
 
     private NodeResult oneHealthyPost() {
-        Batch batch = new Batch();
-        batch.producers = listing(1, producer(1, 5));
-        batch.consumers = listing(1, consumer(2, 3));
-        batch.diverts = pattern(
-                "{\"UniqueName\":\"d1\",\"Address\":\"a\",\"ForwardingAddress\":\"b\",\"Filter\":\"f\","
-                        + "\"TransformerClassName\":\"T\",\"Exclusive\":true}",
-                "\"not an object\"");
-        batch.bridges = pattern("{\"Name\":\"br\",\"QueueName\":\"q\",\"ForwardingAddress\":\"fa\","
-                + "\"FilterString\":\"x\",\"Connected\":true,\"MessagesAcknowledged\":7}");
-        batch.storeAndForward = listing(
-                2,
-                "{\"name\":\"$.artemis.internal.sf.my-cluster.node-b\",\"address\":\"$.artemis.internal.sf.my-cluster.node-b\",\"messagesAdded\":11}",
-                "{\"name\":\"other-queue\",\"address\":\"x\"}",
-                "{\"address\":\"nameless\"}");
-        batch.temporary = listing(1, "{\"name\":\"tmp-1\",\"address\":\"tmp-addr\"}");
-        batch.filtered = listing(
-                3,
-                "{\"name\":\"f1\",\"address\":\"fa\",\"filter\":\"color='red'\"}",
-                "{\"name\":\"f2\",\"address\":\"fa\",\"filter\":\" \"}",
-                "{\"name\":\"f3\",\"address\":\"fa\"}");
-        batch.addressSettings = ok("{\"deadLetterAddress\":\"DLQ\",\"expiryAddress\":\" \"}");
-
-        return sample(batch);
+        return sampled(sampleOf(
+                List.of(producer(1, 5)),
+                List.of(consumer(2, 3)),
+                List.of(
+                        new FlowRoute("DIVERT", "d1", "a", "b", "f", "T", true, true, 0),
+                        bridge("br", 7),
+                        new FlowRoute(
+                                "STORE_AND_FORWARD",
+                                "$.sf.my-cluster.node-b",
+                                "sf-addr",
+                                "node-b",
+                                null,
+                                null,
+                                false,
+                                true,
+                                11),
+                        new FlowRoute("TEMPORARY_QUEUE", "tmp-1", "tmp-addr", "tmp-1", null, null, false, true, 0),
+                        new FlowRoute("QUEUE_FILTER", "f1", "fa", "f1", "color='red'", null, false, true, 0),
+                        new FlowRoute("DEAD_LETTER", "#", "#", "DLQ", null, null, false, true, 0)),
+                null));
     }
 
     @Test
@@ -258,12 +208,9 @@ class ClientSamplerTest {
         assertThat(result.members()).hasSize(2);
         assertThat(result.members().get(0).kind()).isEqualTo(Kind.PRODUCE);
         assertThat(result.members().get(0).user()).isEqualTo("u");
-        assertThat(result.members().get(0).queue()).isNull();
+        assertThat(result.members().get(0).subscription()).isNull();
         assertThat(result.members().get(1).kind()).isEqualTo(Kind.CONSUME);
-        assertThat(result.members().get(1).user())
-                .as("a blank validated user falls back")
-                .isEqualTo("u");
-        assertThat(result.members().get(1).queue()).isEqualTo("orders");
+        assertThat(result.members().get(1).subscription()).isEqualTo("orders");
         assertThat(result.producerReadings()).singleElement().satisfies(r -> {
             assertThat(r.memberId()).isEqualTo("1@s1");
             assertThat(r.counter()).isEqualTo(5);
@@ -294,185 +241,74 @@ class ClientSamplerTest {
         Route bridge = result.routes().get(1);
         assertThat(bridge.connected()).isTrue();
         assertThat(bridge.counter()).isEqualTo(7);
-        Route sf = result.routes().get(2);
-        assertThat(sf.target()).as("the receiving node id is the last segment").isEqualTo("node-b");
-        assertThat(sf.counter()).isEqualTo(11);
+        assertThat(result.routes().get(2).target()).isEqualTo("node-b");
+        assertThat(result.routes().get(2).counter()).isEqualTo(11);
         assertThat(result.routes().get(3).name()).isEqualTo("tmp-1");
         assertThat(result.routes().get(4).filter()).isEqualTo("color='red'");
         assertThat(result.routes().get(5).target()).isEqualTo("DLQ");
     }
 
     @Test
-    void anIncompleteBatchIsABadResponse() {
-        ClusterNode node = node(UUID.randomUUID(), "n1", "http://n1/jolokia", "N1", true);
-        answers(client(List.of(ok("{}"))));
+    void aSampleThatFailedWithNothingReadIsNotPartial() {
+        for (String kind : List.of(FlowSampler.PERMISSION_DENIED, FlowSampler.BAD_RESPONSE)) {
+            NodeResult result = sampled(sampleOf(List.of(), List.of(), List.of(), kind));
 
-        NodeResult result = sampler.sampleNode(clusterId, node, 100);
-
-        assertThat(result.sample().errorKind()).isEqualTo("BAD_RESPONSE");
-        assertThat(result.sample().error()).isEqualTo("The broker returned an incomplete response.");
-        assertThat(result.partial()).isFalse();
-        assertThat(result.members()).isEmpty();
+            assertThat(result.sample().errorKind()).isEqualTo(kind);
+            assertThat(result.partial())
+                    .as("nothing was listed, nothing to keep")
+                    .isFalse();
+            assertThat(result.members()).isEmpty();
+        }
     }
 
     @Test
-    void aFailedProducerListingIsClassifiedByStatusOrByWhatTheBrokerSaid() {
-        Batch forbidden = new Batch();
-        forbidden.producers = failed(403, "nope");
-        assertThat(sample(forbidden).sample().errorKind()).isEqualTo("PERMISSION_DENIED");
+    void aFailureAfterSomeRowsWereReadKeepsThem() {
+        NodeResult result = sampled(sampleOf(List.of(producer(1, 1)), List.of(), List.of(), FlowSampler.BAD_RESPONSE));
 
-        Batch security = new Batch();
-        security.producers = failed(500, "Security exception: access denied");
-        assertThat(sample(security).sample().errorKind()).isEqualTo("PERMISSION_DENIED");
-
-        Batch permission = new Batch();
-        permission.producers = failed(500, "no Permission for listProducers");
-        assertThat(sample(permission).sample().errorKind()).isEqualTo("PERMISSION_DENIED");
-
-        Batch other = new Batch();
-        other.producers = failed(500, null);
-        NodeResult result = sample(other);
-        assertThat(result.sample().errorKind()).isEqualTo("BAD_RESPONSE");
-        assertThat(result.sample().error()).isEqualTo("status 500");
-        assertThat(result.partial()).as("nothing was listed, nothing to keep").isFalse();
-    }
-
-    @Test
-    void aFailedConsumerListingKeepsTheProducersItDidRead() {
-        Batch batch = new Batch();
-        batch.producers = listing(1, producer(1, 1));
-        batch.consumers = failed(500, "consumers down");
-
-        NodeResult result = sample(batch);
-
-        assertThat(result.sample().errorKind()).isEqualTo("BAD_RESPONSE");
-        assertThat(result.sample().error()).isEqualTo("consumers down");
+        assertThat(result.sample().errorKind()).isEqualTo(FlowSampler.BAD_RESPONSE);
+        assertThat(result.sample().error()).isEqualTo("the broker said so");
         assertThat(result.partial()).isTrue();
         assertThat(result.members()).hasSize(1);
     }
 
     @Test
-    void aFailedConsumerListingWithNoRowsAnywhereIsNotPartial() {
-        Batch batch = new Batch();
-        batch.consumers = failed(403, "no");
+    void aMissingCounterOrRoutingIsReportedButTheRowsAreStillUsable() {
+        for (String kind : List.of(FlowSampler.COUNTER_UNAVAILABLE, FlowSampler.ROUTING_UNAVAILABLE)) {
+            NodeResult result = sampled(sampleOf(List.of(producer(1, 1)), List.of(), List.of(), kind));
 
-        NodeResult result = sample(batch);
-
-        assertThat(result.sample().errorKind()).isEqualTo("PERMISSION_DENIED");
-        assertThat(result.partial()).isFalse();
+            assertThat(result.sample().errorKind()).isEqualTo(kind);
+            assertThat(result.partial()).isTrue();
+            assertThat(result.members()).hasSize(1);
+            assertThat(result.routes()).isEmpty();
+        }
     }
 
     @Test
-    void aMissingCounterIsReportedButTheRowsAreStillUsable() {
-        Batch noSent = new Batch();
-        noSent.producers = listing(1, producer(1, null));
-        NodeResult producersResult = sample(noSent);
-        assertThat(producersResult.sample().errorKind()).isEqualTo("COUNTER_UNAVAILABLE");
-        assertThat(producersResult.partial()).isTrue();
+    void aTotalAboveTheRowsReturnedIsTruncation() {
+        NodeResult producersOver = sampled(
+                new FlowSample(List.of(producer(1, 1)), 250, List.of(consumer(2, 1)), 1, List.of(), null, null));
 
-        Batch noAcked = new Batch();
-        noAcked.consumers = listing(1, consumer(1, null));
-        assertThat(sample(noAcked).sample().errorKind()).isEqualTo("COUNTER_UNAVAILABLE");
-    }
+        assertThat(producersOver.truncated()).isTrue();
+        assertThat(producersOver.sample().producersSeen()).isEqualTo(1);
+        assertThat(producersOver.sample().producersTotal()).isEqualTo(250);
 
-    @Test
-    void oneFailingRoutingEntryLosesOnlyItself() {
-        Batch batch = new Batch();
-        batch.producers = listing(1, producer(1, 1));
-        batch.diverts = failed(500, "divert boom");
-        batch.bridges = failed(500, null);
-        batch.filtered = failed(500, "filter boom");
-        batch.addressSettings = failed(500, "settings boom");
-
-        NodeResult result = sample(batch);
-
-        assertThat(result.sample().errorKind()).isEqualTo("ROUTING_UNAVAILABLE");
-        assertThat(result.sample().error()).isEqualTo("divert boom");
-        assertThat(result.partial()).isTrue();
-        assertThat(result.members()).hasSize(1);
-        assertThat(result.routes()).isEmpty();
-    }
-
-    @Test
-    void anAddressSettingsFailureAloneIsAlsoARoutingError() {
-        Batch batch = new Batch();
-        batch.addressSettings = failed(500, null);
-
-        NodeResult result = sample(batch);
-
-        assertThat(result.sample().errorKind()).isEqualTo("ROUTING_UNAVAILABLE");
-        assertThat(result.sample().error()).isEqualTo("status 500");
-    }
-
-    @Test
-    void aPatternReadThatIsNotAnObjectIsNone() {
-        Batch batch = new Batch();
-        batch.diverts = ok("[]");
-        batch.bridges = ok("null");
-
-        NodeResult result = sample(batch);
-
-        assertThat(result.sample().errorKind()).isNull();
-        assertThat(result.routes()).isEmpty();
-    }
-
-    @Test
-    void aCountAboveTheRowsReturnedIsTruncation() {
-        Batch batch = new Batch();
-        batch.producers = listing(250, producer(1, 1));
-        batch.consumers = listing(1, consumer(2, 1));
-
-        NodeResult result = sample(batch);
-
-        assertThat(result.truncated()).isTrue();
-        assertThat(result.sample().producersSeen()).isEqualTo(1);
-        assertThat(result.sample().producersTotal()).isEqualTo(250);
-
-        Batch consumersOver = new Batch();
-        consumersOver.consumers = listing(9, consumer(2, 1));
-        assertThat(sample(consumersOver).truncated()).isTrue();
-    }
-
-    @Test
-    void aListingWithoutACountOrDataFallsBackToWhatItHas() {
-        Batch batch = new Batch();
-        batch.producers = ok("{\"data\":[" + producer(1, 1) + "]}");
-        batch.consumers = ok("{}");
-
-        NodeResult result = sample(batch);
-
-        assertThat(result.sample().producersTotal()).isEqualTo(1);
-        assertThat(result.sample().consumersTotal()).isZero();
-        assertThat(result.truncated()).isFalse();
-    }
-
-    @Test
-    void aNullParsedListingIsEmptyNotAFailure() {
-        Batch batch = new Batch();
-        batch.producers = ok("null");
-        ClusterNode node = node(UUID.randomUUID(), "n1", "http://n1/jolokia", "N1", true);
-        ArtemisNode client = client(batch.entries());
-        when(client.parsed(batch.producers)).thenReturn(null);
-        answers(client);
-
-        NodeResult result = sampler.sampleNode(clusterId, node, 100);
-
-        assertThat(result.sample().errorKind()).isNull();
-        assertThat(result.sample().producersTotal()).isZero();
+        NodeResult consumersOver =
+                sampled(new FlowSample(List.of(), 0, List.of(consumer(2, 1)), 9, List.of(), null, null));
+        assertThat(consumersOver.truncated()).isTrue();
     }
 
     @Test
     void aConnectionFailureNamesItsKindAndARuntimeFailureIsABadResponse() {
         ClusterNode node = node(UUID.randomUUID(), "n1", "http://n1/jolokia", "N1", true);
-        doThrow(BrokerConnectionException.of(BrokerConnectionException.Kind.UNREACHABLE))
-                .when(artemisNodes)
-                .on(any(UUID.class), any(UUID.class));
+        when(flowSampler.sample(eq(clusterId), any(UUID.class), anyInt()))
+                .thenThrow(BrokerConnectionException.of(BrokerConnectionException.Kind.UNREACHABLE));
         NodeResult unreachable = sampler.sampleNode(clusterId, node, 100);
         assertThat(unreachable.sample().errorKind()).isEqualTo("UNREACHABLE");
         assertThat(unreachable.sample().error()).isEqualTo(BrokerConnectionException.Kind.UNREACHABLE.defaultMessage());
         assertThat(unreachable.partial()).isFalse();
 
-        doThrow(new IllegalStateException("garbled")).when(artemisNodes).on(any(UUID.class), any(UUID.class));
+        when(flowSampler.sample(eq(clusterId), any(UUID.class), anyInt()))
+                .thenThrow(new IllegalStateException("garbled"));
         NodeResult garbled = sampler.sampleNode(clusterId, node, 100);
         assertThat(garbled.sample().errorKind()).isEqualTo("BAD_RESPONSE");
         assertThat(garbled.sample().error()).isEqualTo("garbled");
@@ -480,12 +316,8 @@ class ClientSamplerTest {
 
     // ---- sweep ---------------------------------------------------------
 
-    private ArtemisNode stableClient() {
-        Batch batch = new Batch();
-        batch.producers = listing(1, producer(1, 100));
-        batch.consumers = listing(1, consumer(2, 50));
-        batch.bridges = pattern("{\"Name\":\"br\",\"QueueName\":\"q\",\"Connected\":true,\"MessagesAcknowledged\":7}");
-        return client(batch.entries());
+    private FlowSample stable() {
+        return sampleOf(List.of(producer(1, 100)), List.of(consumer(2, 50)), List.of(bridge("br", 7)), null);
     }
 
     @Test
@@ -499,7 +331,7 @@ class ClientSamplerTest {
                 node(active, "active", "http://active/jolokia", "SHARED", true),
                 node(solo, "solo", "http://solo/jolokia", null, null),
                 node(unmanaged, "unmanaged", null, "OTHER", true));
-        when(artemisNodes.on(eq(clusterId), any(UUID.class))).thenAnswer(inv -> stableClient());
+        when(flowSampler.sample(eq(clusterId), any(UUID.class), anyInt())).thenAnswer(inv -> stable());
 
         sampler.sweep(clusterId);
         clock.advance(Duration.ofSeconds(10));
@@ -540,7 +372,7 @@ class ClientSamplerTest {
     @Test
     void aSweepSignalsOnlyWhenWhatWasPersistedChanged() {
         serving(node(UUID.randomUUID(), "n", "http://n/j", "N", true));
-        when(artemisNodes.on(eq(clusterId), any(UUID.class))).thenAnswer(inv -> stableClient());
+        when(flowSampler.sample(eq(clusterId), any(UUID.class), anyInt())).thenAnswer(inv -> stable());
 
         sampler.sweep(clusterId); // first: signals
         clock.advance(Duration.ofSeconds(10));
@@ -553,11 +385,9 @@ class ClientSamplerTest {
 
     @Test
     void anUnusableNodeIsPersistedWithItsErrorAndNoEdgesOrRoutes() {
-        UUID id = UUID.randomUUID();
-        serving(node(id, "n", "http://n/j", "N", true));
-        doThrow(BrokerConnectionException.of(BrokerConnectionException.Kind.CREDENTIALS_REJECTED))
-                .when(artemisNodes)
-                .on(any(UUID.class), any(UUID.class));
+        serving(node(UUID.randomUUID(), "n", "http://n/j", "N", true));
+        when(flowSampler.sample(eq(clusterId), any(UUID.class), anyInt()))
+                .thenThrow(BrokerConnectionException.of(BrokerConnectionException.Kind.CREDENTIALS_REJECTED));
 
         sampler.sweep(clusterId);
 
@@ -568,10 +398,9 @@ class ClientSamplerTest {
 
     @Test
     void aTruncatedNodeIsCounted() {
-        Batch batch = new Batch();
-        batch.producers = listing(500, producer(1, 1));
         serving(node(UUID.randomUUID(), "n", "http://n/j", "N", true));
-        answers(client(batch.entries()));
+        when(flowSampler.sample(eq(clusterId), any(UUID.class), anyInt()))
+                .thenReturn(new FlowSample(List.of(producer(1, 1)), 500, List.of(), 0, List.of(), null, null));
 
         sampler.sweep(clusterId);
 
@@ -581,16 +410,13 @@ class ClientSamplerTest {
     @Test
     void theRowCapIsAtLeastOne() {
         when(settings.intValue(FlowSettings.MAX_ROWS_PER_NODE)).thenReturn(0);
-        serving(node(UUID.randomUUID(), "n", "http://n/j", "N", true));
-        ArtemisNode client = client(new Batch().entries());
-        answers(client);
+        ClusterNode node = node(UUID.randomUUID(), "n", "http://n/j", "N", true);
+        serving(node);
+        when(flowSampler.sample(eq(clusterId), any(UUID.class), anyInt())).thenReturn(nothing());
 
         sampler.sweep(clusterId);
 
-        @SuppressWarnings("unchecked")
-        ArgumentCaptor<List<ManagementRequest>> requests = ArgumentCaptor.forClass(List.class);
-        verify(client).batch(requests.capture());
-        assertThat(requests.getValue().get(0).arguments()).containsExactly(ListRows.ALL, 1, 1);
+        verify(flowSampler).sample(eq(clusterId), any(UUID.class), eq(1));
     }
 
     // ---- sweepObserved -------------------------------------------------

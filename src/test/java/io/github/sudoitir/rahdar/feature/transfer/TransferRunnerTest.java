@@ -39,19 +39,18 @@ import io.github.sudoitir.rahdar.platform.broker.BrokerRelay;
 import io.github.sudoitir.rahdar.platform.broker.BrokerXmlSnippets;
 import io.github.sudoitir.rahdar.platform.broker.BulkResult;
 import io.github.sudoitir.rahdar.platform.broker.NodeCallLimiter;
+import io.github.sudoitir.rahdar.platform.broker.RahdarNames;
 import io.github.sudoitir.rahdar.platform.broker.RelayLink;
 import io.github.sudoitir.rahdar.platform.broker.RelayLink.Batch;
 import io.github.sudoitir.rahdar.platform.broker.RelayLink.Hooks;
 import io.github.sudoitir.rahdar.platform.broker.RelayLink.Outcome;
+import io.github.sudoitir.rahdar.platform.broker.TransferAcceptance;
+import io.github.sudoitir.rahdar.platform.broker.TransferAcceptance.AcceptanceFacts;
+import io.github.sudoitir.rahdar.platform.broker.TransferAcceptance.AcceptanceFinding;
+import io.github.sudoitir.rahdar.platform.broker.TransferAcceptance.BatchVerdict;
+import io.github.sudoitir.rahdar.platform.broker.TransferAcceptance.FindingKind;
+import io.github.sudoitir.rahdar.platform.broker.TransferStaging;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
-import io.github.sudoitir.rahdar.system.artemis.AcceptanceProbe;
-import io.github.sudoitir.rahdar.system.artemis.AcceptanceProbe.Facts;
-import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
-import io.github.sudoitir.rahdar.system.artemis.ArtemisNodes;
-import io.github.sudoitir.rahdar.system.artemis.ArtemisTransferAcceptance;
-import io.github.sudoitir.rahdar.system.artemis.ArtemisTransferStaging;
-import io.github.sudoitir.rahdar.system.artemis.MessageOperations;
-import io.github.sudoitir.rahdar.system.artemis.StagingQueues;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
@@ -68,7 +67,6 @@ import org.mockito.Mockito;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
-import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
@@ -91,9 +89,8 @@ class TransferRunnerTest {
     private TransferNodes nodes;
     private TransferFaults faults;
     private BrokerRelay relay;
-    private MessageOperations messages;
-    private StagingQueues staging;
-    private AcceptanceProbe probe;
+    private TransferStaging staging;
+    private TransferAcceptance acceptance;
     private NodeCallLimiter limiter;
     private OperatorHandoff handoff;
     private AuditService audit;
@@ -103,7 +100,6 @@ class TransferRunnerTest {
     private ReplicaRegistry replicas;
     private ClusterNode sourceNode;
     private ClusterNode targetNode;
-    private ArtemisNode client;
     private RelayLink link;
     private TransferRunner runner;
     private final Operator operator = new Operator(null, null, null);
@@ -115,9 +111,8 @@ class TransferRunnerTest {
         nodes = mock(TransferNodes.class);
         faults = mock(TransferFaults.class);
         relay = mock(BrokerRelay.class);
-        messages = mock(MessageOperations.class);
-        staging = mock(StagingQueues.class);
-        probe = mock(AcceptanceProbe.class);
+        staging = mock(TransferStaging.class);
+        acceptance = mock(TransferAcceptance.class);
         limiter = mock(NodeCallLimiter.class);
         handoff = mock(OperatorHandoff.class);
         audit = mock(AuditService.class);
@@ -127,7 +122,6 @@ class TransferRunnerTest {
         replicas = mock(ReplicaRegistry.class);
         sourceNode = mock(ClusterNode.class);
         targetNode = mock(ClusterNode.class);
-        client = mock(ArtemisNode.class);
         link = mock(RelayLink.class);
 
         when(sourceNode.getManagementUrl()).thenReturn("http://src");
@@ -136,14 +130,11 @@ class TransferRunnerTest {
         when(targetNode.getDataUrl()).thenReturn("core-tgt");
         when(nodes.serving(eq(SRC_CLUSTER), any(), any())).thenReturn(sourceNode);
         when(nodes.serving(eq(TGT_CLUSTER), any(), any())).thenReturn(targetNode);
-        ArtemisNodes artemisNodes = mock(ArtemisNodes.class);
-        when(artemisNodes.on(any(), any())).thenReturn(client);
-        when(nodes.staging(any(ClusterNode.class)))
-                .thenReturn(new ArtemisTransferStaging(artemisNodes, staging, messages));
-        when(nodes.acceptance(any(ClusterNode.class))).thenReturn(new ArtemisTransferAcceptance(artemisNodes, probe));
-        when(client.resolveBrokerObjectName()).thenReturn("broker");
+        when(nodes.staging(any(ClusterNode.class))).thenReturn(staging);
+        when(nodes.acceptance(any(ClusterNode.class))).thenReturn(acceptance);
         when(relay.link(any(), any(), any())).thenReturn(link);
-        when(probe.read(any(), any(), any(), any())).thenReturn(facts(null));
+        when(acceptance.read(any(), any(), any())).thenReturn(TARGET_FACTS);
+        when(acceptance.batch(any(), anyLong(), anyInt(), any(), any())).thenReturn(PROCEED);
         when(handoff.stillHolds(any(), any(), any(), any())).thenReturn(true);
         when(settings.intValue(TransferSettings.BATCH_SIZE)).thenReturn(BATCH);
         when(settings.intValue(TransferSettings.MESSAGES_PER_SECOND)).thenReturn(1_000_000);
@@ -181,26 +172,32 @@ class TransferRunnerTest {
 
     // ---- fixtures ----------------------------------------------------------
 
-    private Facts facts(String addressSettingsJson) {
-        JsonNode settingsNode = addressSettingsJson == null ? null : json.readTree(addressSettingsJson);
-        return new Facts(
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                settingsNode,
-                null,
-                null,
-                null,
-                null,
-                null);
+    /** What the target node said about the queue; the verdicts below are the system's own, stubbed per test. */
+    private static final AcceptanceFacts TARGET_FACTS = new AcceptanceFacts() {
+        @Override
+        public Long messageCount() {
+            return null;
+        }
+
+        @Override
+        public Long persistentSize() {
+            return null;
+        }
+
+        @Override
+        public int filterCountLimit() {
+            return 0;
+        }
+    };
+
+    private static final BatchVerdict PROCEED = new BatchVerdict(null, null);
+
+    private static BatchVerdict refusing(String code, String words, String snippet) {
+        return new BatchVerdict(new AcceptanceFinding(FindingKind.REFUSE, code, words, snippet), null);
+    }
+
+    private static BatchVerdict waiting(String reason) {
+        return new BatchVerdict(null, reason);
     }
 
     private TransferRunEntity run(
@@ -445,7 +442,7 @@ class TransferRunnerTest {
         copyOfAll(null);
         relaying(empty());
         when(ledger.count(RUN)).thenReturn(1L);
-        when(messages.countMessages(any(), anyString(), anyString())).thenReturn(4L);
+        when(staging.countSelected(any(), any(), any(), any(), any())).thenReturn(4L);
 
         TransferRunEntity run = execute();
 
@@ -546,7 +543,11 @@ class TransferRunnerTest {
     @Test
     void aTargetThatNowDropsMessagesFailsTheRunWithTheSnippetThatFixesIt() {
         TransferRunEntity run = copyOfAll(0L);
-        when(probe.read(any(), any(), any(), any())).thenReturn(facts("{\"addressFullMessagePolicy\":\"DROP\"}"));
+        when(acceptance.batch(any(), anyLong(), anyInt(), any(), any()))
+                .thenReturn(refusing(
+                        "address-full-drop",
+                        "Address TGT.A drops messages silently when it is full.",
+                        "<address-setting match=\"TGT.A\"><address-full-policy>FAIL</address-full-policy>"));
 
         execute();
 
@@ -558,25 +559,8 @@ class TransferRunnerTest {
     @Test
     void aTargetQueueThatNowHasAFilterFailsTheRun() {
         TransferRunEntity run = copyOfAll(0L);
-        when(probe.read(any(), any(), any(), any()))
-                .thenReturn(new Facts(
-                        true,
-                        "color = 'red'",
-                        null,
-                        null,
-                        null,
-                        null,
-                        null,
-                        null,
-                        null,
-                        null,
-                        null,
-                        null,
-                        null,
-                        null,
-                        null,
-                        null,
-                        null));
+        when(acceptance.batch(any(), anyLong(), anyInt(), any(), any()))
+                .thenReturn(refusing("target-filtered", "Queue TGT.Q now has the filter color = 'red'.", null));
 
         execute();
 
@@ -585,40 +569,18 @@ class TransferRunnerTest {
         assertThat(run.getErrorSnippet()).isNull();
     }
 
-    private static final String NEAR_FULL = "{\"addressFullMessagePolicy\":\"FAIL\",\"maxSizeBytes\":100}";
-
-    private Facts nearFull() {
-        Facts f = facts(NEAR_FULL);
-        return new Facts(
-                f.queueExists(),
-                f.filter(),
-                f.routingType(),
-                f.ringSize(),
-                f.lastValue(),
-                f.consumerCount(),
-                f.messageCount(),
-                f.persistentSize(),
-                95L,
-                f.paging(),
-                f.addressLimitPercent(),
-                f.addressSettings(),
-                f.diskStoreUsage(),
-                f.maxDiskUsage(),
-                f.addressMemoryUsagePercentage(),
-                f.idCacheSize(),
-                f.persistIdCache());
-    }
+    private static final BatchVerdict NEAR_FULL = waiting("the target is nearly full");
 
     @Test
     void aTargetNearFullMakesTheRunWaitAndThenCarryOn() throws Exception {
         copyOfAll(0L);
-        when(probe.read(any(), any(), any(), any())).thenReturn(nearFull(), facts(null));
+        when(acceptance.batch(any(), anyLong(), anyInt(), any(), any())).thenReturn(NEAR_FULL, PROCEED);
         relaying(empty());
 
         TransferRunEntity run = execute();
 
         assertThat(run.getState()).isEqualTo(TransferState.SUCCEEDED);
-        verify(probe, times(2)).read(any(), any(), any(), any());
+        verify(acceptance, times(2)).read(any(), any(), any());
         ArgumentCaptor<TransferProgress> progress = ArgumentCaptor.forClass(TransferProgress.class);
         verify(sse, Mockito.atLeastOnce())
                 .publishAbout(eq(SRC_CLUSTER), eq("transfer"), progress.capture(), anyCollection(), anyCollection());
@@ -630,7 +592,7 @@ class TransferRunnerTest {
     @Test
     void aTargetThatStaysFullStopsTheRunResumably() {
         TransferRunEntity run = copyOfAll(0L);
-        when(probe.read(any(), any(), any(), any())).thenReturn(nearFull());
+        when(acceptance.batch(any(), anyLong(), anyInt(), any(), any())).thenReturn(NEAR_FULL);
         when(settings.duration(TransferSettings.CAPACITY_WAIT)).thenReturn(Duration.ZERO);
 
         execute();
@@ -642,7 +604,7 @@ class TransferRunnerTest {
     @Test
     void anOperatorStopWhileWaitingForRoomEndsTheWait() {
         TransferRunEntity run = copyOfAll(0L);
-        when(probe.read(any(), any(), any(), any())).thenReturn(nearFull());
+        when(acceptance.batch(any(), anyLong(), anyInt(), any(), any())).thenReturn(NEAR_FULL);
         when(background.stopRequested(RUN)).thenReturn(false, true);
 
         execute();
@@ -654,23 +616,26 @@ class TransferRunnerTest {
     @Test
     void aTargetThatBecomesUnreadableWhileWaitingKeepsTheRunWaiting() throws Exception {
         TransferRunEntity run = copyOfAll(0L);
-        when(probe.read(any(), any(), any(), any()))
-                .thenReturn(nearFull())
+        when(acceptance.read(any(), any(), any()))
+                .thenReturn(TARGET_FACTS)
                 .thenThrow(new BrokerConnectionException(BrokerConnectionException.Kind.UNREACHABLE, "down"))
-                .thenReturn(facts(null));
+                .thenReturn(TARGET_FACTS);
+        when(acceptance.batch(any(), anyLong(), anyInt(), any(), any())).thenReturn(NEAR_FULL, PROCEED);
         relaying(empty());
 
         execute();
 
         assertThat(run.getState()).isEqualTo(TransferState.SUCCEEDED);
-        verify(probe, times(3)).read(any(), any(), any(), any());
+        verify(acceptance, times(3)).read(any(), any(), any());
     }
 
     @Test
     void aTargetThatTurnsIntoADroppingOneWhileWaitingFailsTheRun() {
         TransferRunEntity run = copyOfAll(0L);
-        when(probe.read(any(), any(), any(), any()))
-                .thenReturn(nearFull(), facts("{\"addressFullMessagePolicy\":\"DROP\"}"));
+        when(acceptance.batch(any(), anyLong(), anyInt(), any(), any()))
+                .thenReturn(
+                        NEAR_FULL,
+                        refusing("address-full-drop", "The address now drops messages silently.", "snippet"));
 
         execute();
 
@@ -693,13 +658,13 @@ class TransferRunnerTest {
     void aBatchesBytesPerMessageFeedTheCapacityCheck() throws Exception {
         // 100 bytes over 10 messages is 10 bytes a message, 20 for a batch of two: 95 + 20 is over the line
         run(TransferMode.COPY, false, SelectionKind.ALL, null, null, 10L, 100L);
-        when(probe.read(any(), any(), any(), any())).thenReturn(nearFull(), facts(null));
+        when(acceptance.batch(any(), anyLong(), anyInt(), any(), any())).thenReturn(NEAR_FULL, PROCEED);
         relaying(empty());
 
         TransferRunEntity run = execute();
 
         assertThat(run.getState()).isNotEqualTo(TransferState.FAILED);
-        verify(probe, times(2)).read(any(), any(), any(), any());
+        verify(acceptance, times(2)).batch(any(), eq(20L), anyInt(), any(), any());
     }
 
     // ---- failures ---------------------------------------------------------------
@@ -721,7 +686,7 @@ class TransferRunnerTest {
     @Test
     void aRelayFailureOnACrossNodeMoveSaysTheMessagesAreHeldInStaging() throws Exception {
         TransferRunEntity run = moveAcross(SelectionKind.ALL, null);
-        when(messages.moveMessages(any(), anyString(), anyInt(), any(), anyString(), anyBoolean(), anyInt()))
+        when(staging.moveSelected(any(), any(), any(), any(), any(), anyInt(), anyString()))
                 .thenReturn(0L);
         when(link.relay(anyInt(), any())).thenThrow(new IOException("socket closed"));
 
@@ -735,7 +700,7 @@ class TransferRunnerTest {
     @Test
     void anUnexpectedFailureIsRecordedRatherThanLost() {
         TransferRunEntity run = copyOfAll(0L);
-        when(probe.read(any(), any(), any(), any())).thenThrow(new IllegalStateException("bug"));
+        when(acceptance.read(any(), any(), any())).thenThrow(new IllegalStateException("bug"));
 
         execute();
 
@@ -748,9 +713,9 @@ class TransferRunnerTest {
     @Test
     void aMoveOnOneNodeLetsTheBrokerMoveBatchesUntilOneComesUpShort() {
         TransferRunEntity run = moveOnOneNode(SelectionKind.ALL, null);
-        when(messages.moveMessages(any(), anyString(), eq(BATCH), anyString(), eq("TGT.Q"), eq(false), eq(BATCH)))
+        when(staging.moveSelected(any(), any(), any(), any(), any(), eq(BATCH), eq("TGT.Q")))
                 .thenReturn(2L, 1L);
-        when(messages.countMessages(any(), anyString(), anyString())).thenReturn(0L);
+        when(staging.countSelected(any(), any(), any(), any(), any())).thenReturn(0L);
 
         execute();
 
@@ -763,9 +728,9 @@ class TransferRunnerTest {
     @Test
     void aMoveOnOneNodeThatLeftMessagesBehindIsPartial() {
         TransferRunEntity run = moveOnOneNode(SelectionKind.ALL, null);
-        when(messages.moveMessages(any(), anyString(), anyInt(), anyString(), anyString(), anyBoolean(), anyInt()))
+        when(staging.moveSelected(any(), any(), any(), any(), any(), anyInt(), anyString()))
                 .thenReturn(1L);
-        when(messages.countMessages(any(), anyString(), anyString())).thenReturn(4L);
+        when(staging.countSelected(any(), any(), any(), any(), any())).thenReturn(4L);
 
         execute();
 
@@ -776,10 +741,9 @@ class TransferRunnerTest {
     @Test
     void aMoveOfIdsOnOneNodeWalksTheIdsInBatches() {
         TransferRunEntity run = moveOnOneNode(SelectionKind.IDS, List.of(1L, 2L, 3L));
-        when(messages.moveByIds(any(), anyString(), eq(List.of(1L, 2L)), eq("TGT.Q")))
+        when(staging.moveIds(any(), any(), any(), eq(List.of(1L, 2L)), eq("TGT.Q")))
                 .thenReturn(bulk(2, null));
-        when(messages.moveByIds(any(), anyString(), eq(List.of(3L)), eq("TGT.Q")))
-                .thenReturn(bulk(0, null));
+        when(staging.moveIds(any(), any(), any(), eq(List.of(3L)), eq("TGT.Q"))).thenReturn(bulk(0, null));
 
         execute();
 
@@ -797,13 +761,13 @@ class TransferRunnerTest {
         execute();
 
         assertThat(run.getState()).isEqualTo(TransferState.SUCCEEDED);
-        verify(messages, never()).moveByIds(any(), anyString(), anyList(), anyString());
+        verify(staging, never()).moveIds(any(), any(), any(), anyList(), anyString());
     }
 
     @Test
     void aMoveOfIdsThatTheBrokerStoppedPartwayFailsWithWhatWasMoved() {
         TransferRunEntity run = moveOnOneNode(SelectionKind.IDS, List.of(1L, 2L));
-        when(messages.moveByIds(any(), anyString(), anyList(), anyString())).thenReturn(bulk(1, "broker said no", 2L));
+        when(staging.moveIds(any(), any(), any(), anyList(), anyString())).thenReturn(bulk(1, "broker said no", 2L));
 
         execute();
 
@@ -819,13 +783,13 @@ class TransferRunnerTest {
     @Test
     void aStagedMoveTakesIntoStagingRelaysAndRemovesStaging() throws Exception {
         TransferRunEntity run = moveAcross(SelectionKind.ALL, null);
-        String stagingQueue = StagingQueues.queueName(RUN);
+        String stagingQueue = RahdarNames.stagingQueue(RUN);
         // fewer than the four asked for: the source is drained
-        when(messages.moveMessages(any(), anyString(), eq(4), anyString(), eq(stagingQueue), eq(false), eq(4)))
+        when(staging.moveSelected(any(), any(), any(), any(), any(), eq(4), eq(stagingQueue)))
                 .thenReturn(3L);
-        when(messages.messageCount(any(), anyString())).thenReturn(0L);
-        when(messages.countMessages(any(), anyString(), anyString())).thenReturn(0L);
-        when(staging.destroyIfEmpty(client, stagingQueue)).thenReturn(true);
+        when(staging.stagedCount(any(), any(), anyString())).thenReturn(0L);
+        when(staging.countSelected(any(), any(), any(), any(), any())).thenReturn(0L);
+        when(staging.destroyIfEmpty(any(), any(), eq(stagingQueue))).thenReturn(true);
         relaying(relayed(2, 20, 1L, 2L), relayed(1, 10, 3L), empty());
 
         execute();
@@ -833,7 +797,7 @@ class TransferRunnerTest {
         assertThat(run.getState()).isEqualTo(TransferState.SUCCEEDED);
         assertThat(run.getStaged()).isEqualTo(3);
         assertThat(run.getDelivered()).isEqualTo(3);
-        verify(staging).create(client, RUN);
+        verify(staging).create(any(), any(), eq(RUN));
         verify(ledger).remove(RUN, List.of(1L, 2L));
         verify(ledger).forget(RUN);
     }
@@ -841,11 +805,11 @@ class TransferRunnerTest {
     @Test
     void theInDoubtHooksRecordEachBatchBeforeTheTargetCommitAndUndoARefusedOne() throws Exception {
         moveAcross(SelectionKind.ALL, null);
-        when(messages.moveMessages(any(), anyString(), anyInt(), anyString(), anyString(), anyBoolean(), anyInt()))
+        when(staging.moveSelected(any(), any(), any(), any(), any(), anyInt(), anyString()))
                 .thenReturn(0L);
-        when(messages.messageCount(any(), anyString())).thenReturn(0L);
+        when(staging.stagedCount(any(), any(), anyString())).thenReturn(0L);
         when(ledger.known(RUN, List.of(1L, 2L))).thenReturn(Set.of(1L));
-        when(staging.destroyIfEmpty(any(), anyString())).thenReturn(true);
+        when(staging.destroyIfEmpty(any(), any(), anyString())).thenReturn(true);
         AtomicBoolean first = new AtomicBoolean(true);
         when(link.relay(anyInt(), any())).thenAnswer(call -> {
             Hooks hooks = call.getArgument(1);
@@ -870,13 +834,13 @@ class TransferRunnerTest {
         TransferRunEntity run = moveAcross(SelectionKind.ALL, null);
         doThrow(new BrokerConnectionException(BrokerConnectionException.Kind.BAD_RESPONSE, "denied"))
                 .when(staging)
-                .create(any(), any());
+                .create(any(), any(), any());
 
         execute();
 
         assertThat(run.getState()).isEqualTo(TransferState.FAILED);
         assertThat(run.getLastError())
-                .contains(StagingQueues.queueName(RUN))
+                .contains(RahdarNames.stagingQueue(RUN))
                 .contains("denied")
                 .contains("rahdar.transfer.#");
         assertThat(run.getErrorSnippet()).isEqualTo(BrokerXmlSnippets.STAGING_SECURITY_SETTING);
@@ -885,11 +849,11 @@ class TransferRunnerTest {
     @Test
     void aStagingQueueThatFilledAgainIsKeptAndTheRunStops() throws Exception {
         TransferRunEntity run = moveAcross(SelectionKind.ALL, null);
-        when(messages.moveMessages(any(), anyString(), anyInt(), anyString(), anyString(), anyBoolean(), anyInt()))
+        when(staging.moveSelected(any(), any(), any(), any(), any(), anyInt(), anyString()))
                 .thenReturn(0L);
-        when(messages.messageCount(any(), anyString())).thenReturn(0L);
-        when(messages.countMessages(any(), anyString(), anyString())).thenReturn(0L);
-        when(staging.destroyIfEmpty(any(), anyString())).thenReturn(false);
+        when(staging.stagedCount(any(), any(), anyString())).thenReturn(0L);
+        when(staging.countSelected(any(), any(), any(), any(), any())).thenReturn(0L);
+        when(staging.destroyIfEmpty(any(), any(), anyString())).thenReturn(false);
         relaying(empty());
 
         execute();
@@ -903,7 +867,7 @@ class TransferRunnerTest {
     void messagesThatCannotBeReceivedFromStagingStopTheRunAfterThreeEmptyBatches() throws Exception {
         TransferRunEntity run = moveAcross(SelectionKind.ALL, null);
         // deep enough that no refill is needed, and never received
-        when(messages.messageCount(any(), anyString())).thenReturn(5L);
+        when(staging.stagedCount(any(), any(), anyString())).thenReturn(5L);
         relaying(empty());
 
         execute();
@@ -918,38 +882,38 @@ class TransferRunnerTest {
     @Test
     void aStagedMoveOfIdsTakesThemByIdAndDoesNotCountTheSourceAgain() throws Exception {
         TransferRunEntity run = moveAcross(SelectionKind.IDS, List.of(10L, 20L, 30L));
-        String stagingQueue = StagingQueues.queueName(RUN);
-        when(messages.moveByIds(any(), anyString(), eq(List.of(10L, 20L, 30L)), eq(stagingQueue)))
+        String stagingQueue = RahdarNames.stagingQueue(RUN);
+        when(staging.moveIds(any(), any(), any(), eq(List.of(10L, 20L, 30L)), eq(stagingQueue)))
                 .thenReturn(bulk(3, null));
-        when(messages.messageCount(any(), anyString())).thenReturn(0L);
-        when(staging.destroyIfEmpty(any(), anyString())).thenReturn(true);
+        when(staging.stagedCount(any(), any(), anyString())).thenReturn(0L);
+        when(staging.destroyIfEmpty(any(), any(), anyString())).thenReturn(true);
         relaying(relayed(2, 20, 10L, 20L), relayed(1, 10, 30L), empty());
 
         execute();
 
         assertThat(run.getState()).isEqualTo(TransferState.SUCCEEDED);
         assertThat(run.getIdCursor()).isEqualTo(3);
-        verify(messages, never()).countMessages(any(), anyString(), anyString());
+        verify(staging, never()).countSelected(any(), any(), any(), any(), any());
     }
 
     @Test
     void aStagedMoveOfNoIdsHasNothingToTake() throws Exception {
         TransferRunEntity run = moveAcross(SelectionKind.IDS, List.of());
-        when(messages.messageCount(any(), anyString())).thenReturn(0L);
-        when(staging.destroyIfEmpty(any(), anyString())).thenReturn(true);
+        when(staging.stagedCount(any(), any(), anyString())).thenReturn(0L);
+        when(staging.destroyIfEmpty(any(), any(), anyString())).thenReturn(true);
         relaying(empty());
 
         execute();
 
         assertThat(run.getState()).isEqualTo(TransferState.SUCCEEDED);
-        verify(messages, never()).moveByIds(any(), anyString(), anyList(), anyString());
+        verify(staging, never()).moveIds(any(), any(), any(), anyList(), anyString());
     }
 
     @Test
     void aStagedMoveThatTheBrokerStoppedTakingIntoStagingFailsWithItsReason() {
         TransferRunEntity run = moveAcross(SelectionKind.IDS, List.of(10L, 20L));
-        when(messages.messageCount(any(), anyString())).thenReturn(0L);
-        when(messages.moveByIds(any(), anyString(), anyList(), anyString())).thenReturn(bulk(1, "disk full", 20L));
+        when(staging.stagedCount(any(), any(), anyString())).thenReturn(0L);
+        when(staging.moveIds(any(), any(), any(), anyList(), anyString())).thenReturn(bulk(1, "disk full", 20L));
 
         execute();
 
@@ -961,11 +925,11 @@ class TransferRunnerTest {
     @Test
     void whatWasStagedButNeitherDeliveredNorReturnedIsCountedAsExpired() throws Exception {
         TransferRunEntity run = moveAcross(SelectionKind.ALL, null);
-        when(messages.moveMessages(any(), anyString(), eq(4), anyString(), anyString(), anyBoolean(), eq(4)))
+        when(staging.moveSelected(any(), any(), any(), any(), any(), eq(4), anyString()))
                 .thenReturn(3L);
-        when(messages.messageCount(any(), anyString())).thenReturn(0L);
-        when(messages.countMessages(any(), anyString(), anyString())).thenReturn(0L);
-        when(staging.destroyIfEmpty(any(), anyString())).thenReturn(true);
+        when(staging.stagedCount(any(), any(), anyString())).thenReturn(0L);
+        when(staging.countSelected(any(), any(), any(), any(), any())).thenReturn(0L);
+        when(staging.destroyIfEmpty(any(), any(), anyString())).thenReturn(true);
         relaying(relayed(2, 20, 1L, 2L), empty());
 
         execute();
@@ -977,17 +941,17 @@ class TransferRunnerTest {
     @Test
     void aBatchTheTargetRefusedForRoomInAStagedMoveWaitsAndCarriesOn() throws Exception {
         TransferRunEntity run = moveAcross(SelectionKind.ALL, null);
-        when(messages.moveMessages(any(), anyString(), anyInt(), anyString(), anyString(), anyBoolean(), anyInt()))
+        when(staging.moveStaged(any(), any(), anyString(), anyInt(), anyString()))
                 .thenReturn(0L);
-        when(messages.messageCount(any(), anyString())).thenReturn(0L);
-        when(messages.countMessages(any(), anyString(), anyString())).thenReturn(0L);
-        when(staging.destroyIfEmpty(any(), anyString())).thenReturn(true);
+        when(staging.stagedCount(any(), any(), anyString())).thenReturn(0L);
+        when(staging.countSelected(any(), any(), any(), any(), any())).thenReturn(0L);
+        when(staging.destroyIfEmpty(any(), any(), anyString())).thenReturn(true);
         relaying(addressFull(), empty());
 
         execute();
 
         assertThat(run.getState()).isEqualTo(TransferState.SUCCEEDED);
-        verify(probe, Mockito.atLeast(2)).read(any(), any(), any(), any());
+        verify(acceptance, Mockito.atLeast(2)).read(any(), any(), any());
     }
 
     // ---- return to source ------------------------------------------------------------
@@ -1002,9 +966,9 @@ class TransferRunnerTest {
     void aReturnPutsEverythingStagingHoldsBackInBatchesAndRemovesStaging() {
         TransferRunEntity run = returning();
         when(ledger.all(RUN)).thenReturn(Set.of());
-        when(messages.moveMessages(any(), anyString(), eq(BATCH), eq(""), eq("SRC.Q"), eq(false), eq(BATCH)))
+        when(staging.moveStaged(any(), any(), anyString(), eq(BATCH), eq("SRC.Q")))
                 .thenReturn(2L, 1L);
-        when(staging.destroyIfEmpty(any(), anyString())).thenReturn(true);
+        when(staging.destroyIfEmpty(any(), any(), anyString())).thenReturn(true);
 
         execute();
 
@@ -1017,10 +981,10 @@ class TransferRunnerTest {
     void aReturnThatCannotEmptyStagingKeepsItAndFails() {
         TransferRunEntity run = returning();
         when(ledger.all(RUN)).thenReturn(Set.of());
-        when(messages.moveMessages(any(), anyString(), anyInt(), anyString(), anyString(), anyBoolean(), anyInt()))
+        when(staging.moveStaged(any(), any(), anyString(), anyInt(), anyString()))
                 .thenReturn(0L);
-        when(messages.messageCount(any(), anyString())).thenReturn(7L);
-        when(staging.destroyIfEmpty(any(), anyString())).thenReturn(false);
+        when(staging.stagedCount(any(), any(), anyString())).thenReturn(7L);
+        when(staging.destroyIfEmpty(any(), any(), anyString())).thenReturn(false);
 
         execute();
 
@@ -1035,9 +999,9 @@ class TransferRunnerTest {
         TransferRunEntity run = returning();
         when(ledger.all(RUN)).thenReturn(Set.of(1L, 2L));
         when(link.relay(anyInt(), any())).thenReturn(relayed(2, 20, 1L, 2L));
-        when(messages.moveMessages(any(), anyString(), anyInt(), anyString(), anyString(), anyBoolean(), anyInt()))
+        when(staging.moveStaged(any(), any(), anyString(), anyInt(), anyString()))
                 .thenReturn(0L);
-        when(staging.destroyIfEmpty(any(), anyString())).thenReturn(true);
+        when(staging.destroyIfEmpty(any(), any(), anyString())).thenReturn(true);
 
         execute();
 
@@ -1053,8 +1017,8 @@ class TransferRunnerTest {
         when(ledger.all(RUN)).thenReturn(Set.of(1L, 2L));
         when(nodes.serving(eq(TGT_CLUSTER), any(), any()))
                 .thenThrow(new BrokerConnectionException(BrokerConnectionException.Kind.UNREACHABLE, "target down"));
-        when(messages.listIds(any(), anyString())).thenReturn(List.of(1L, 2L, 3L));
-        when(messages.moveByIds(any(), anyString(), eq(List.of(3L)), eq("SRC.Q")))
+        when(staging.stagedIds(any(), any(), anyString())).thenReturn(List.of(1L, 2L, 3L));
+        when(staging.moveStagedIds(any(), any(), anyString(), eq(List.of(3L)), eq("SRC.Q")))
                 .thenReturn(bulk(1, null));
 
         execute();
@@ -1062,7 +1026,7 @@ class TransferRunnerTest {
         assertThat(run.getState()).isEqualTo(TransferState.FAILED);
         assertThat(run.getReturned()).isEqualTo(1);
         assertThat(run.getLastError()).contains("2 messages in staging queue").contains("may already be on the target");
-        verify(staging, never()).destroyIfEmpty(any(), anyString());
+        verify(staging, never()).destroyIfEmpty(any(), any(), anyString());
     }
 
     @Test
@@ -1070,8 +1034,9 @@ class TransferRunnerTest {
         TransferRunEntity run = returning();
         when(ledger.all(RUN)).thenReturn(Set.of(1L));
         when(link.relay(anyInt(), any())).thenReturn(empty());
-        when(messages.listIds(any(), anyString())).thenReturn(List.of(1L));
-        when(messages.moveByIds(any(), anyString(), eq(List.of()), anyString())).thenReturn(bulk(0, null));
+        when(staging.stagedIds(any(), any(), anyString())).thenReturn(List.of(1L));
+        when(staging.moveStagedIds(any(), any(), anyString(), eq(List.of()), anyString()))
+                .thenReturn(bulk(0, null));
 
         execute();
 
@@ -1111,7 +1076,7 @@ class TransferRunnerTest {
         AuditEvent target = mock(AuditEvent.class);
         when(audit.byId(11L)).thenReturn(Optional.of(source));
         when(audit.byId(12L)).thenReturn(Optional.of(target));
-        when(probe.read(any(), any(), any(), any())).thenThrow(new IllegalStateException("bug"));
+        when(acceptance.read(any(), any(), any())).thenThrow(new IllegalStateException("bug"));
 
         execute();
 
@@ -1141,9 +1106,9 @@ class TransferRunnerTest {
         AuditEvent source = mock(AuditEvent.class);
         when(audit.byId(11L)).thenReturn(Optional.of(source));
         when(ledger.all(RUN)).thenReturn(Set.of());
-        when(messages.moveMessages(any(), anyString(), anyInt(), anyString(), anyString(), anyBoolean(), anyInt()))
+        when(staging.moveStaged(any(), any(), anyString(), anyInt(), anyString()))
                 .thenReturn(1L);
-        when(staging.destroyIfEmpty(any(), anyString())).thenReturn(true);
+        when(staging.destroyIfEmpty(any(), any(), anyString())).thenReturn(true);
 
         execute();
 
@@ -1169,7 +1134,7 @@ class TransferRunnerTest {
 
         verify(limiter).acquire("http://src", 1, "transfer");
         verify(limiter).acquire("http://tgt", 1, "transfer");
-        verify(staging, never()).create(any(), any());
+        verify(staging, never()).create(any(), any(), any());
         verify(ledger, never()).remove(any(), any());
     }
 }
