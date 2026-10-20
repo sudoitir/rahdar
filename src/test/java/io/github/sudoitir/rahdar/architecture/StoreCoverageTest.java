@@ -86,7 +86,7 @@ class StoreCoverageTest extends PostgresIntegrationTest {
             Map.entry("flow_demand", "current state: trimmed on every flow sample"),
             Map.entry("flow_node_sample", "current state: trimmed on every flow sample"),
             Map.entry("flow_route", "current state: trimmed on every flow sample"),
-            Map.entry("setup_finding_acceptance", "configuration: an operator's accepted risks"),
+            Map.entry("artemis_setup_finding_acceptance", "configuration: an operator's accepted risks"),
             Map.entry("plugin_message_registration", "configuration"),
             Map.entry("plugin_message_registration_node", "current state: one row per node and registration"),
             Map.entry(

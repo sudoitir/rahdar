@@ -11,9 +11,9 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-/** Maps {@code setup_finding_acceptance}: an operator's audited decision that a finding is a known risk. */
+/** Maps {@code artemis_setup_finding_acceptance}: an operator's audited decision that a finding is a known risk. */
 @Entity
-@Table(name = "setup_finding_acceptance")
+@Table(name = "artemis_setup_finding_acceptance")
 @IdClass(FindingKey.class)
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)

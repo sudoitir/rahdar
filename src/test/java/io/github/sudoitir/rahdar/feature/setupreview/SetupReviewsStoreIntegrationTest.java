@@ -33,7 +33,7 @@ class SetupReviewsStoreIntegrationTest extends PostgresIntegrationTest {
                 UUID.class,
                 "hist-" + UUID.randomUUID());
         jdbc.update(
-                "INSERT INTO setup_review (reviewed_at, duration_ms, nodes_total, nodes_reviewed, nodes,"
+                "INSERT INTO artemis_setup_review (reviewed_at, duration_ms, nodes_total, nodes_reviewed, nodes,"
                         + " not_assessed, cluster_id, cluster_evaluated) VALUES (" + OLD
                         + ", 1, 1, 0, '[]', '[]', ?, true)",
                 clusterId);
@@ -42,7 +42,7 @@ class SetupReviewsStoreIntegrationTest extends PostgresIntegrationTest {
         }
         finding("current", "now()");
         jdbc.update(
-                "INSERT INTO setup_finding_acceptance (created_at, code, subject, reason, accepted_by, cluster_id)"
+                "INSERT INTO artemis_setup_finding_acceptance (created_at, code, subject, reason, accepted_by, cluster_id)"
                         + " VALUES (" + OLD + ", 'stale-0', 'node:a', 'known', 'test', ?)",
                 clusterId);
     }
@@ -54,7 +54,7 @@ class SetupReviewsStoreIntegrationTest extends PostgresIntegrationTest {
 
     private void finding(String code, String lastSeenAt) {
         jdbc.update(
-                "INSERT INTO setup_finding (first_seen_at, last_seen_at, code, subject, severity, category, finding,"
+                "INSERT INTO artemis_setup_finding (first_seen_at, last_seen_at, code, subject, severity, category, finding,"
                         + " cluster_id) VALUES (" + OLD + ", " + lastSeenAt + ", ?, 'node:a', 'INFO', 'HA', '{}', ?)",
                 code,
                 clusterId);
@@ -70,8 +70,8 @@ class SetupReviewsStoreIntegrationTest extends PostgresIntegrationTest {
 
         assertThat(store.preview(cutoff).rows()).isEqualTo(3);
 
-        assertThat(count("setup_finding")).isEqualTo(4);
-        assertThat(count("setup_review")).isEqualTo(1);
+        assertThat(count("artemis_setup_finding")).isEqualTo(4);
+        assertThat(count("artemis_setup_review")).isEqualTo(1);
     }
 
     @Test
@@ -87,8 +87,8 @@ class SetupReviewsStoreIntegrationTest extends PostgresIntegrationTest {
 
         assertThat(total).isEqualTo(3);
         assertThat(store.purgeBatch(cutoff, 2)).isZero();
-        assertThat(count("setup_finding")).isEqualTo(1);
-        assertThat(count("setup_review")).isEqualTo(1);
-        assertThat(count("setup_finding_acceptance")).isEqualTo(1);
+        assertThat(count("artemis_setup_finding")).isEqualTo(1);
+        assertThat(count("artemis_setup_review")).isEqualTo(1);
+        assertThat(count("artemis_setup_finding_acceptance")).isEqualTo(1);
     }
 }

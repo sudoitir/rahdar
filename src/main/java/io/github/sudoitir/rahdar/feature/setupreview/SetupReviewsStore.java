@@ -14,24 +14,24 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
 /**
- * The setup review under the data lifecycle (ADR-0134). {@code setup_review} holds one row per
+ * The setup review under the data lifecycle (ADR-0134). {@code artemis_setup_review} holds one row per
  * cluster, the latest review, rewritten in place, so no review is ever older than the newest one
- * of its cluster and none is purged (a cluster's delete cascades to it). {@code setup_finding} is
+ * of its cluster and none is purged (a cluster's delete cascades to it). {@code artemis_setup_finding} is
  * the latest finding per subject; the stale ones are those a run could not re-check, whose
- * {@code last_seen_at} stopped advancing, and only those go. {@code setup_finding_acceptance} is
+ * {@code last_seen_at} stopped advancing, and only those go. {@code artemis_setup_finding_acceptance} is
  * configuration and is not touched.
  */
 @Component
 @RequiredArgsConstructor
 class SetupReviewsStore implements HousekeepingContributor, ManagedStore {
 
-    private static final String FINDING_TABLE = "setup_finding";
+    private static final String FINDING_TABLE = "artemis_setup_finding";
     private static final String STALE_FINDINGS = "last_seen_at < ?";
 
     private static final StoreDef DEF = new StoreDef(
             "setup-reviews",
             "Setup reviews",
-            List.of("setup_review", FINDING_TABLE),
+            List.of("artemis_setup_review", FINDING_TABLE),
             StoreDef.QuotaUnit.ROWS,
             Duration.ofDays(90),
             Duration.ofDays(1),

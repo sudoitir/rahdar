@@ -14,12 +14,12 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
 /**
- * Maps {@code setup_finding}: the latest rendering of one finding. {@code lastSeenAt} older than
+ * Maps {@code artemis_setup_finding}: the latest rendering of one finding. {@code lastSeenAt} older than
  * the cluster's last review means the review could not re-check it — its node did not answer — and
  * it is kept rather than resolved on no evidence.
  */
 @Entity
-@Table(name = "setup_finding")
+@Table(name = "artemis_setup_finding")
 @IdClass(FindingKey.class)
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
