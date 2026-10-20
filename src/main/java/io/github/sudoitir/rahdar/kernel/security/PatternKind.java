@@ -1,23 +1,23 @@
 package io.github.sudoitir.rahdar.kernel.security;
 
-import io.github.sudoitir.rahdar.kernel.plugin.ResourceKind;
+import io.github.sudoitir.rahdar.kernel.plugin.ResourceType;
 import java.util.EnumSet;
 import java.util.Set;
 
-/** What a team pattern or a share covers: queue names, address names, or both. */
+/** What a team pattern or a share covers: subscription names, destination names, or any. */
 public enum PatternKind {
-    QUEUE(EnumSet.of(ResourceKind.QUEUE)),
-    ADDRESS(EnumSet.of(ResourceKind.ADDRESS)),
-    BOTH(EnumSet.allOf(ResourceKind.class));
+    SUBSCRIPTION(EnumSet.of(ResourceType.SUBSCRIPTION)),
+    DESTINATION(EnumSet.of(ResourceType.DESTINATION)),
+    ANY(EnumSet.allOf(ResourceType.class));
 
-    private final Set<ResourceKind> kinds;
+    private final Set<ResourceType> types;
 
-    PatternKind(Set<ResourceKind> kinds) {
-        this.kinds = kinds;
+    PatternKind(Set<ResourceType> types) {
+        this.types = types;
     }
 
-    /** The resource kinds whose names it covers. */
-    public Set<ResourceKind> kinds() {
-        return kinds;
+    /** The resource types whose names it covers. */
+    public Set<ResourceType> types() {
+        return types;
     }
 }

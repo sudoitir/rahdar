@@ -10,7 +10,7 @@ import static org.mockito.Mockito.when;
 
 import io.github.sudoitir.rahdar.kernel.core.NotFoundException;
 import io.github.sudoitir.rahdar.kernel.core.ResourceForbiddenException;
-import io.github.sudoitir.rahdar.kernel.plugin.ResourceKind;
+import io.github.sudoitir.rahdar.kernel.plugin.ResourceType;
 import io.github.sudoitir.rahdar.kernel.security.ClusterAccessGuard.Requirement;
 import java.util.List;
 import java.util.UUID;
@@ -29,9 +29,9 @@ class ClusterAccessGuardTest {
     private final ApplicationEventPublisher events = mock(ApplicationEventPublisher.class);
     private final ClusterAccessGuard guard = new ClusterAccessGuard(perm, events);
 
-    private static final ResourceRef ORDERS = ResourceRef.queue("orders.in");
-    private static final ResourceRef BILLING = ResourceRef.queue("billing.in");
-    private static final ResourceRef BILLING_ADDRESS = ResourceRef.address("billing.in");
+    private static final ResourceRef ORDERS = ResourceRef.subscription("orders.in");
+    private static final ResourceRef BILLING = ResourceRef.subscription("billing.in");
+    private static final ResourceRef BILLING_ADDRESS = ResourceRef.destination("billing.in");
 
     private void canRead(ResourceRef resource) {
         when(perm.can(cluster, resource, resource.readPermission())).thenReturn(true);
@@ -44,9 +44,9 @@ class ClusterAccessGuardTest {
 
     @Test
     void aResourceThatMayBeReadAndActedOnPasses() {
-        canDo(ORDERS, "queue:purge");
+        canDo(ORDERS, "subscription:purge");
 
-        assertThatCode(() -> guard.requireResource(cluster, ORDERS, "queue:purge"))
+        assertThatCode(() -> guard.requireResource(cluster, ORDERS, "subscription:purge"))
                 .doesNotThrowAnyException();
     }
 
@@ -54,14 +54,14 @@ class ClusterAccessGuardTest {
     void aResourceThatCannotBeReadIsNotFoundLikeAMissingOne() {
         when(perm.canSeeCluster(cluster)).thenReturn(true);
 
-        assertThatThrownBy(() -> guard.requireResource(cluster, BILLING, "queue:purge"))
+        assertThatThrownBy(() -> guard.requireResource(cluster, BILLING, "subscription:purge"))
                 .isInstanceOf(NotFoundException.class)
-                .hasMessage(new NotFoundException("queue", "billing.in").getMessage());
+                .hasMessage(new NotFoundException("subscription", "billing.in").getMessage());
     }
 
     @Test
     void anUnreadableResourceOfAClusterTheCallerCannotSeeIsTheClusterNotFound() {
-        assertThatThrownBy(() -> guard.requireResource(cluster, BILLING, "queue:purge"))
+        assertThatThrownBy(() -> guard.requireResource(cluster, BILLING, "subscription:purge"))
                 .isInstanceOf(NotFoundException.class)
                 .hasMessage(new NotFoundException("cluster", cluster).getMessage());
     }
@@ -70,12 +70,12 @@ class ClusterAccessGuardTest {
     void aReadableResourceWithoutThePermissionIsForbiddenNamingBoth() {
         canRead(ORDERS);
 
-        assertThatThrownBy(() -> guard.requireResource(cluster, ORDERS, "queue:purge"))
+        assertThatThrownBy(() -> guard.requireResource(cluster, ORDERS, "subscription:purge"))
                 .isInstanceOfSatisfying(ResourceForbiddenException.class, e -> {
-                    assertThat(e.permission()).isEqualTo("queue:purge");
-                    assertThat(e.kind()).isEqualTo("queue");
+                    assertThat(e.permission()).isEqualTo("subscription:purge");
+                    assertThat(e.kind()).isEqualTo("subscription");
                     assertThat(e.name()).isEqualTo("orders.in");
-                    assertThat(e.getMessage()).contains("queue:purge", "orders.in");
+                    assertThat(e.getMessage()).contains("subscription:purge", "orders.in");
                 });
     }
 
@@ -86,7 +86,7 @@ class ClusterAccessGuardTest {
         assertThatThrownBy(() -> guard.requireResource(cluster, BILLING_ADDRESS, "message:send"))
                 .isInstanceOfSatisfying(
                         ResourceForbiddenException.class,
-                        e -> assertThat(e.kind()).isEqualTo("address"));
+                        e -> assertThat(e.kind()).isEqualTo("destination"));
     }
 
     @Test
@@ -121,12 +121,12 @@ class ClusterAccessGuardTest {
 
     @Test
     void mayAllIsTheSameQuestionWithoutTheRefusal() {
-        canDo(ORDERS, "queue:purge");
+        canDo(ORDERS, "subscription:purge");
         canRead(BILLING);
 
-        assertThat(guard.mayAll(cluster, List.of(new Requirement(ORDERS, "queue:purge"))))
+        assertThat(guard.mayAll(cluster, List.of(new Requirement(ORDERS, "subscription:purge"))))
                 .isTrue();
-        assertThat(guard.mayAll(cluster, List.of(new Requirement(BILLING, "queue:purge"))))
+        assertThat(guard.mayAll(cluster, List.of(new Requirement(BILLING, "subscription:purge"))))
                 .isFalse();
     }
 
@@ -134,23 +134,26 @@ class ClusterAccessGuardTest {
 
     @Test
     void aNameTheCallerMayCreateIsAllowedWithoutBeingReadableFirst() {
-        when(perm.can(cluster, ResourceRef.queue("orders.retry"), "queue:create"))
+        when(perm.can(cluster, ResourceRef.subscription("orders.retry"), "subscription:create"))
                 .thenReturn(true);
 
-        assertThatCode(() -> guard.requireCreate(cluster, ResourceRef.queue("orders.retry"), "queue:create"))
+        assertThatCode(() ->
+                        guard.requireCreate(cluster, ResourceRef.subscription("orders.retry"), "subscription:create"))
                 .doesNotThrowAnyException();
     }
 
     @Test
     void aNameOutsideTheCallersPatternsIsRefusedNamingWhereTheyMayCreate() {
         when(perm.canSeeCluster(cluster)).thenReturn(true);
-        when(perm.patternsHolding(cluster, ResourceKind.QUEUE, "queue:create")).thenReturn(List.of("orders.#"));
+        when(perm.patternsHolding(cluster, ResourceType.SUBSCRIPTION, "subscription:create"))
+                .thenReturn(List.of("orders.#"));
 
-        assertThatThrownBy(() -> guard.requireCreate(cluster, ResourceRef.queue("misc.temp"), "queue:create"))
+        assertThatThrownBy(() ->
+                        guard.requireCreate(cluster, ResourceRef.subscription("misc.temp"), "subscription:create"))
                 .isInstanceOfSatisfying(ResourceForbiddenException.class, e -> {
-                    assertThat(e.permission()).isEqualTo("queue:create");
+                    assertThat(e.permission()).isEqualTo("subscription:create");
                     assertThat(e.name()).isEqualTo("misc.temp");
-                    assertThat(e.getMessage()).contains("queue:create", "misc.temp", "orders.#");
+                    assertThat(e.getMessage()).contains("subscription:create", "misc.temp", "orders.#");
                 });
     }
 
@@ -158,7 +161,8 @@ class ClusterAccessGuardTest {
     void aCallerWithNoPatternsIsToldNothingAboutWhereTheyMayCreate() {
         when(perm.canSeeCluster(cluster)).thenReturn(true);
 
-        assertThatThrownBy(() -> guard.requireCreate(cluster, ResourceRef.queue("misc.temp"), "queue:create"))
+        assertThatThrownBy(() ->
+                        guard.requireCreate(cluster, ResourceRef.subscription("misc.temp"), "subscription:create"))
                 .isInstanceOfSatisfying(
                         ResourceForbiddenException.class,
                         e -> assertThat(e.getMessage()).doesNotContain("under"));
@@ -166,9 +170,9 @@ class ClusterAccessGuardTest {
 
     @Test
     void creatingOnAClusterTheCallerCannotSeeIsTheClusterNotFound() {
-        ResourceRef misc = ResourceRef.queue("misc.temp");
+        ResourceRef misc = ResourceRef.subscription("misc.temp");
 
-        assertThatThrownBy(() -> guard.requireCreate(cluster, misc, "queue:create"))
+        assertThatThrownBy(() -> guard.requireCreate(cluster, misc, "subscription:create"))
                 .isInstanceOf(NotFoundException.class)
                 .hasMessage(new NotFoundException("cluster", cluster).getMessage());
     }
@@ -186,10 +190,10 @@ class ClusterAccessGuardTest {
 
     @Test
     void aPatternTheCallerHoldsOnEveryNameOfPasses() {
-        when(perm.canOnAll(cluster, ResourceKind.QUEUE, "orders.#", "capture:write"))
+        when(perm.canOnAll(cluster, ResourceType.SUBSCRIPTION, "orders.#", "capture:write"))
                 .thenReturn(true);
 
-        assertThatCode(() -> guard.requireOnAll(cluster, ResourceKind.QUEUE, "orders.#", "capture:write"))
+        assertThatCode(() -> guard.requireOnAll(cluster, ResourceType.SUBSCRIPTION, "orders.#", "capture:write"))
                 .doesNotThrowAnyException();
     }
 
@@ -197,7 +201,7 @@ class ClusterAccessGuardTest {
     void aPatternThatCouldReachOtherNamesIsForbiddenAndAsksForANarrowerOne() {
         when(perm.canSeeCluster(cluster)).thenReturn(true);
 
-        assertThatThrownBy(() -> guard.requireOnAll(cluster, ResourceKind.QUEUE, "#", "capture:write"))
+        assertThatThrownBy(() -> guard.requireOnAll(cluster, ResourceType.SUBSCRIPTION, "#", "capture:write"))
                 .isInstanceOfSatisfying(ResourceForbiddenException.class, e -> {
                     assertThat(e.permission()).isEqualTo("capture:write");
                     assertThat(e.name()).isEqualTo("#");
@@ -207,7 +211,7 @@ class ClusterAccessGuardTest {
 
     @Test
     void aPatternOnAClusterTheCallerCannotSeeIsTheClusterNotFound() {
-        assertThatThrownBy(() -> guard.requireOnAll(cluster, ResourceKind.QUEUE, "#", "capture:write"))
+        assertThatThrownBy(() -> guard.requireOnAll(cluster, ResourceType.SUBSCRIPTION, "#", "capture:write"))
                 .isInstanceOf(NotFoundException.class)
                 .hasMessage(new NotFoundException("cluster", cluster).getMessage());
     }
@@ -218,20 +222,20 @@ class ClusterAccessGuardTest {
     void aForbiddenResourceIsRefusedAsForbidden() {
         canRead(ORDERS);
 
-        assertThatThrownBy(() -> guard.requireResource(cluster, ORDERS, "queue:purge"))
+        assertThatThrownBy(() -> guard.requireResource(cluster, ORDERS, "subscription:purge"))
                 .isInstanceOf(ResourceForbiddenException.class);
 
-        verify(events).publishEvent(new AccessRefused(cluster, "queue:purge", ORDERS, false));
+        verify(events).publishEvent(new AccessRefused(cluster, "subscription:purge", ORDERS, false));
     }
 
     @Test
     void anUnreadableResourceIsRefusedAsHiddenOnTheReadPermission() {
         when(perm.canSeeCluster(cluster)).thenReturn(true);
 
-        assertThatThrownBy(() -> guard.requireResource(cluster, BILLING, "queue:purge"))
+        assertThatThrownBy(() -> guard.requireResource(cluster, BILLING, "subscription:purge"))
                 .isInstanceOf(NotFoundException.class);
 
-        verify(events).publishEvent(new AccessRefused(cluster, "queue:read", BILLING, true));
+        verify(events).publishEvent(new AccessRefused(cluster, "subscription:read", BILLING, true));
     }
 
     @Test
@@ -245,9 +249,9 @@ class ClusterAccessGuardTest {
 
     @Test
     void aCheckThatPassesPublishesNothing() {
-        canDo(ORDERS, "queue:purge");
+        canDo(ORDERS, "subscription:purge");
 
-        guard.requireResource(cluster, ORDERS, "queue:purge");
+        guard.requireResource(cluster, ORDERS, "subscription:purge");
 
         verify(events, never()).publishEvent(ArgumentMatchers.any(AccessRefused.class));
     }

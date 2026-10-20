@@ -1,8 +1,5 @@
 package io.github.sudoitir.rahdar.feature.resources;
 
-import static io.github.sudoitir.rahdar.kernel.plugin.ResourceKind.ADDRESS;
-import static io.github.sudoitir.rahdar.kernel.plugin.ResourceKind.QUEUE;
-
 import io.github.sudoitir.openbroker.BrokerException;
 import io.github.sudoitir.openbroker.model.Resource;
 import io.github.sudoitir.openbroker.model.ResourceClass;
@@ -15,6 +12,7 @@ import io.github.sudoitir.rahdar.feature.resources.web.ResourceViews.ProducerVie
 import io.github.sudoitir.rahdar.feature.resources.web.ResourceViews.SessionView;
 import io.github.sudoitir.rahdar.kernel.core.PagedView;
 import io.github.sudoitir.rahdar.kernel.core.ResourceQuery;
+import io.github.sudoitir.rahdar.kernel.plugin.ResourceType;
 import io.github.sudoitir.rahdar.kernel.security.ClusterAccessGuard;
 import io.github.sudoitir.rahdar.kernel.security.PermissionResolver;
 import io.github.sudoitir.rahdar.kernel.security.ResourceFilter;
@@ -70,14 +68,14 @@ public class PagedListService {
 
     public PagedView<AddressView> addresses(UUID clusterId, ResourceQuery query) {
         clusterAccess.requireVisible(clusterId);
-        ResourceFilter readable = permissions.filter(clusterId, ADDRESS);
+        ResourceFilter readable = permissions.filter(clusterId, ResourceType.DESTINATION);
         List<AddressView> rows = gather(clusterId, ResourceClass.DESTINATION, mapper::address).stream()
                 .filter(a -> readable.readable(a.name()))
                 .toList();
         return page(rows, query, List.of(AddressView::name), nameComparator())
                 .map(a -> a.withAccess(
                         readable.allowedActions(a.name()),
-                        teams.ownerTeamOf(clusterId, ResourceRef.address(a.name()))
+                        teams.ownerTeamOf(clusterId, ResourceRef.destination(a.name()))
                                 .orElse(null)));
     }
 
@@ -131,7 +129,7 @@ public class PagedListService {
 
     /** A consumer is seen through its queue. */
     private List<ConsumerView> readableConsumers(UUID clusterId) {
-        ResourceFilter readable = permissions.filter(clusterId, QUEUE);
+        ResourceFilter readable = permissions.filter(clusterId, ResourceType.SUBSCRIPTION);
         return gather(clusterId, ResourceClass.CONSUMER, mapper::consumer).stream()
                 .filter(c -> readable.readable(c.queueName()))
                 .toList();
@@ -139,7 +137,7 @@ public class PagedListService {
 
     /** A producer is seen through its address. */
     private List<ProducerView> readableProducers(UUID clusterId) {
-        ResourceFilter readable = permissions.filter(clusterId, ADDRESS);
+        ResourceFilter readable = permissions.filter(clusterId, ResourceType.DESTINATION);
         return gather(clusterId, ResourceClass.PRODUCER, mapper::producer).stream()
                 .filter(p -> readable.readable(p.address()))
                 .toList();

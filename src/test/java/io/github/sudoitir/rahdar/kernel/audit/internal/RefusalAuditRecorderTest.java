@@ -59,7 +59,7 @@ class RefusalAuditRecorderTest {
 
     @Test
     void aRefusalIsAnEventNamingActorPermissionClusterAndResource() {
-        refused(ResourceRef.queue("orders.in"), "queue:purge", false);
+        refused(ResourceRef.subscription("orders.in"), "subscription:purge", false);
 
         ArgumentCaptor<Map<String, Object>> params = ArgumentCaptor.captor();
         verify(audit)
@@ -72,13 +72,13 @@ class RefusalAuditRecorderTest {
                         params.capture(),
                         any());
         assertThat(params.getValue())
-                .containsEntry("permission", "queue:purge")
+                .containsEntry("permission", "subscription:purge")
                 .containsEntry("visibility", "forbidden");
     }
 
     @Test
     void aResourceTheCallerWasToldDoesNotExistIsRecordedAsHidden() {
-        refused(ResourceRef.queue("billing.in"), "queue:read", true);
+        refused(ResourceRef.subscription("billing.in"), "subscription:read", true);
 
         ArgumentCaptor<Map<String, Object>> params = ArgumentCaptor.captor();
         verify(audit).refused(any(), any(), eq("QUEUE"), eq("billing.in"), eq(cluster), params.capture(), any());
@@ -95,7 +95,7 @@ class RefusalAuditRecorderTest {
     @Test
     void repeatedRefusalsWithinAMinuteAreOneEventWithACount() {
         for (int i = 0; i < 50; i++) {
-            refused(ResourceRef.queue("orders.in"), "queue:purge", false);
+            refused(ResourceRef.subscription("orders.in"), "subscription:purge", false);
         }
 
         verify(audit, times(1)).refused(any(), any(), any(), any(), any(), any(), any());
@@ -104,21 +104,21 @@ class RefusalAuditRecorderTest {
 
     @Test
     void aRefusalAfterTheMinuteIsANewEvent() {
-        refused(ResourceRef.queue("orders.in"), "queue:purge", false);
+        refused(ResourceRef.subscription("orders.in"), "subscription:purge", false);
         nanos.addAndGet(Duration.ofSeconds(61).toNanos());
-        refused(ResourceRef.queue("orders.in"), "queue:purge", false);
+        refused(ResourceRef.subscription("orders.in"), "subscription:purge", false);
 
         verify(audit, times(2)).refused(any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test
     void refusalsThatDifferInActorPermissionOrResourceAreNotMerged() {
-        refused(ResourceRef.queue("orders.in"), "queue:purge", false);
-        refused(ResourceRef.queue("orders.in"), "message:send", false);
-        refused(ResourceRef.queue("orders.out"), "queue:purge", false);
-        refused(ResourceRef.queue("orders.in"), "queue:purge", true);
+        refused(ResourceRef.subscription("orders.in"), "subscription:purge", false);
+        refused(ResourceRef.subscription("orders.in"), "message:send", false);
+        refused(ResourceRef.subscription("orders.out"), "subscription:purge", false);
+        refused(ResourceRef.subscription("orders.in"), "subscription:purge", true);
         when(actors.resolve()).thenReturn(new Actor("bob", "10.0.0.2", "req-2", UUID.randomUUID()));
-        refused(ResourceRef.queue("orders.in"), "queue:purge", false);
+        refused(ResourceRef.subscription("orders.in"), "subscription:purge", false);
 
         verify(audit, times(5)).refused(any(), any(), any(), any(), any(), any(), any());
         verify(audit, never()).recount(any(), anyLong());
@@ -127,7 +127,7 @@ class RefusalAuditRecorderTest {
     @Test
     void aCallerThatAuditsItsOwnRefusalIsNotRecordedTwice() {
         ScopedValue.where(AuditScope.OWN_REFUSAL, true)
-                .run(() -> refused(ResourceRef.queue("orders.in"), "queue:purge", false));
+                .run(() -> refused(ResourceRef.subscription("orders.in"), "subscription:purge", false));
 
         verify(audit, never()).refused(any(), any(), any(), any(), any(), any(), any());
     }

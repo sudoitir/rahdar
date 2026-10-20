@@ -20,7 +20,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 /**
- * The gated queue and address deletes: {@code queue.delete} and {@code address.delete} (ADR-0179). Both are
+ * The gated queue and address deletes: {@code subscription.delete} and {@code destination.delete} (ADR-0179). Both are
  * destructive and run as the requester once approved. The queue's estimate is the messages the scrape counts on it,
  * pinned to which nodes hold it and the incarnation each holds; an address has no identity beyond its name.
  */
@@ -33,7 +33,7 @@ class QueueGatedOperations {
         return new GatedOperation<>() {
             @Override
             public String type() {
-                return "queue.delete";
+                return "subscription.delete";
             }
 
             @Override
@@ -99,7 +99,7 @@ class QueueGatedOperations {
         return new GatedOperation<>() {
             @Override
             public String type() {
-                return "address.delete";
+                return "destination.delete";
             }
 
             @Override

@@ -164,7 +164,7 @@ async function openPreview(user: ReturnType<typeof userEvent.setup>, label = 'De
 
 describe('BulkActionBar', () => {
   it('keeps an action the operator may not take visible, disabled, with a reachable reason', async () => {
-    server.use(meHandler(['queue:pause', 'cluster:read']), clusterHandler());
+    server.use(meHandler(['subscription:pause', 'cluster:read']), clusterHandler());
     const user = userEvent.setup();
     renderWithProviders(<Bar />);
 

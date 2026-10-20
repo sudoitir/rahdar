@@ -1,6 +1,6 @@
 package io.github.sudoitir.rahdar.platform.governance;
 
-import io.github.sudoitir.rahdar.kernel.plugin.ResourceKind;
+import io.github.sudoitir.rahdar.kernel.plugin.ResourceType;
 import io.github.sudoitir.rahdar.kernel.security.PermissionResolver;
 import io.github.sudoitir.rahdar.kernel.security.ResourceRef;
 import io.github.sudoitir.rahdar.kernel.settings.SettingsService;
@@ -37,12 +37,13 @@ public class ContentPolicy {
         return new GovernContext(
                 clusterId,
                 address,
-                permissions.can(clusterId, ResourceRef.queue(queueName), GovernancePermissions.MESSAGE_CLEAR));
+                permissions.can(clusterId, ResourceRef.subscription(queueName), GovernancePermissions.MESSAGE_CLEAR));
     }
 
     /** Whether the caller holds {@code message:clear} on every queue the pattern can match. */
     public boolean mayClear(UUID clusterId, String queuePattern) {
-        return permissions.canOnAll(clusterId, ResourceKind.QUEUE, queuePattern, GovernancePermissions.MESSAGE_CLEAR);
+        return permissions.canOnAll(
+                clusterId, ResourceType.SUBSCRIPTION, queuePattern, GovernancePermissions.MESSAGE_CLEAR);
     }
 
     /** Govern a message for the caller described by {@code context}. */

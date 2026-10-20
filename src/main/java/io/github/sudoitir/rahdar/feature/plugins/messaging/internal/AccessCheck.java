@@ -34,17 +34,17 @@ public class AccessCheck {
      * because consuming removes messages.
      */
     public static List<Need> needsOf(RegistrationMode mode, String queue) {
-        ResourceRef resource = ResourceRef.queue(queue);
+        ResourceRef resource = ResourceRef.subscription(queue);
         return mode == RegistrationMode.TAP
                 ? List.of(new Need(resource, MessagePermissions.MESSAGE_READ))
                 : List.of(
                         new Need(resource, MessagePermissions.MESSAGE_READ),
-                        new Need(resource, MessagePermissions.QUEUE_PURGE));
+                        new Need(resource, MessagePermissions.SUBSCRIPTION_PURGE));
     }
 
     /** What a send needs: {@code message:send} on the address it goes to. */
     public static List<Need> sendNeeds(String address) {
-        return List.of(new Need(ResourceRef.address(address), MessagePermissions.MESSAGE_SEND));
+        return List.of(new Need(ResourceRef.destination(address), MessagePermissions.MESSAGE_SEND));
     }
 
     /** Why the user may not, in words, or empty when they may. */
@@ -64,7 +64,7 @@ public class AccessCheck {
             if (!perm.can(principal, clusterId, need.resource(), need.permission())) {
                 return Optional.of("The acting user '" + account.get().username() + "' does not hold "
                         + need.permission() + " on "
-                        + need.resource().kind().name().toLowerCase(Locale.ROOT) + " "
+                        + need.resource().type().name().toLowerCase(Locale.ROOT) + " "
                         + need.resource().name() + " of cluster " + clusterId + ".");
             }
         }

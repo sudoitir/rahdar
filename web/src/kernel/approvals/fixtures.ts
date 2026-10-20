@@ -6,7 +6,7 @@ export const HELD_ID = '0b1f6a3e-6f4e-4d4a-9a8e-1c2d3e4f5a6b';
 export function summary(over: Partial<HeldOperationSummary> = {}): HeldOperationSummary {
   return {
     id: HELD_ID,
-    type: 'queue.purge',
+    type: 'subscription.purge',
     state: 'HELD',
     summary: 'Purge queue orders.dlq on prod-eu',
     requesterId: 'u-alice',

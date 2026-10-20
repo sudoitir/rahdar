@@ -165,7 +165,7 @@ describe('ResourceView addresses of teams', () => {
       delivery: ['POINT_TO_POINT'],
       queueCount: 1,
       messageCount: 3,
-      allowedActions: ['address:read'],
+      allowedActions: ['destination:read'],
       ...(ownerTeam ? { ownerTeam } : {}),
     };
   }
@@ -182,7 +182,7 @@ describe('ResourceView addresses of teams', () => {
           ...access,
           canSeeCluster: clusterId ? true : null,
           teams: [],
-          createPatterns: { queue: [], address: [] },
+          createPatterns: { subscription: [], destination: [] },
         });
       }),
     );
@@ -190,7 +190,7 @@ describe('ResourceView addresses of teams', () => {
 
   it('shows the team that owns each address, and says when none does', async () => {
     serveAddresses([address('orders.in', { id: 't1', name: 'Orders' }), address('legacy.in')], {
-      permissions: ['address:read', 'user:admin'],
+      permissions: ['destination:read', 'user:admin'],
       anywhere: [],
     });
     renderWithProviders(<ResourceView kind="addresses" />);
@@ -201,7 +201,7 @@ describe('ResourceView addresses of teams', () => {
   });
 
   it("says there are no addresses in the caller's teams when they reach addresses only through a team", async () => {
-    serveAddresses([], { permissions: [], anywhere: ['address:read'] });
+    serveAddresses([], { permissions: [], anywhere: ['destination:read'] });
     renderWithProviders(<ResourceView kind="addresses" />);
 
     expect(await screen.findByText('No addresses in your teams on this cluster')).toBeInTheDocument();

@@ -6,7 +6,7 @@ import io.github.sudoitir.rahdar.feature.metrics.web.MetricViews.MetricPoint;
 import io.github.sudoitir.rahdar.feature.metrics.web.MetricViews.MetricSeries;
 import io.github.sudoitir.rahdar.feature.metrics.web.MetricViews.MetricSeriesResponse;
 import io.github.sudoitir.rahdar.kernel.lifecycle.LifecycleRegistry;
-import io.github.sudoitir.rahdar.kernel.plugin.ResourceKind;
+import io.github.sudoitir.rahdar.kernel.plugin.ResourceType;
 import io.github.sudoitir.rahdar.kernel.security.ClusterAccessGuard;
 import io.github.sudoitir.rahdar.kernel.security.Permissions;
 import io.github.sudoitir.rahdar.kernel.security.ResourceRef;
@@ -49,7 +49,7 @@ public class MetricQueryService {
 
     private static final int MAX_POINTS = 500;
 
-    private static final String QUEUE_SUBJECT = ResourceKind.QUEUE.name();
+    private static final String QUEUE_SUBJECT = "QUEUE";
     private static final String GAUGE = "GAUGE";
 
     /** A split by node draws at most this many nodes (ADR-0110). */
@@ -120,9 +120,10 @@ public class MetricQueryService {
         if (QUEUE_SUBJECT.equals(query.subjectType())
                 && query.subject() != null
                 && !query.subject().isBlank()) {
-            clusterAccess.requireResource(clusterId, ResourceRef.queue(query.subject()), Permissions.QUEUE_READ);
+            clusterAccess.requireResource(
+                    clusterId, ResourceRef.subscription(query.subject()), Permissions.SUBSCRIPTION_READ);
         } else {
-            clusterAccess.requireOnAll(clusterId, ResourceKind.QUEUE, "#", Permissions.QUEUE_READ);
+            clusterAccess.requireOnAll(clusterId, ResourceType.SUBSCRIPTION, "#", Permissions.SUBSCRIPTION_READ);
         }
     }
 

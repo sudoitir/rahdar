@@ -28,16 +28,16 @@ const CATALOGUE = [
     featureId: 'clusters',
     featureTitle: 'Clusters',
     scope: 'CLUSTER',
-    resourceKinds: [],
+    resourceTypes: [],
     requires: [],
   },
   {
-    action: 'queue:purge',
+    action: 'subscription:purge',
     label: 'Purge queues',
     featureId: 'queues',
     featureTitle: 'Queues',
     scope: 'CLUSTER',
-    resourceKinds: [],
+    resourceTypes: [],
     requires: [],
   },
   {
@@ -46,7 +46,7 @@ const CATALOGUE = [
     featureId: 'messages',
     featureTitle: 'Messages',
     scope: 'RESOURCE',
-    resourceKinds: ['QUEUE'],
+    resourceTypes: ['SUBSCRIPTION'],
     requires: [],
   },
 ];
@@ -189,7 +189,7 @@ describe('ApiKeysPanel', () => {
     await user.click(await screen.findByRole('checkbox', { name: 'Select all in Clusters' }));
     await user.click(await screen.findByRole('checkbox', { name: 'Select all in Messages' }));
     await user.click(screen.getByRole('combobox', { name: 'Limit to' }));
-    await user.click(await screen.findByRole('option', { name: 'Queues whose names match a pattern', hidden: true }));
+    await user.click(await screen.findByRole('option', { name: 'Subscriptions whose names match a pattern', hidden: true }));
     await user.type(await screen.findByRole('textbox', { name: /Name pattern/ }), 'orders.#');
     await user.click(screen.getByRole('button', { name: 'Create key' }));
 
@@ -201,7 +201,7 @@ describe('ApiKeysPanel', () => {
           action: 'message:read',
           scopeType: 'GLOBAL',
           scopeId: null,
-          resourceKind: 'QUEUE',
+          resourceType: 'SUBSCRIPTION',
           resourcePattern: 'orders.#',
         },
       ]),
@@ -217,7 +217,7 @@ describe('ApiKeysPanel', () => {
     await user.type(await screen.findByRole('textbox', { name: /Name/ }), 'orders');
     await user.click(await screen.findByRole('checkbox', { name: 'Select all in Messages' }));
     await user.click(screen.getByRole('combobox', { name: 'Limit to' }));
-    await user.click(await screen.findByRole('option', { name: 'Queues whose names match a pattern', hidden: true }));
+    await user.click(await screen.findByRole('option', { name: 'Subscriptions whose names match a pattern', hidden: true }));
     await user.click(screen.getByRole('button', { name: 'Create key' }));
 
     expect(await screen.findByText('Give the pattern the names must match, such as orders.#')).toBeInTheDocument();

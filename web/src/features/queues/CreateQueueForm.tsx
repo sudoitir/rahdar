@@ -60,8 +60,8 @@ export function CreateQueueForm({
   const [advanced, setAdvanced] = useState(false);
 
   const create = useCreateQueue(clusterId);
-  const queueRule = useCreateRule(clusterId, 'queue');
-  const addressRule = useCreateRule(clusterId, 'address');
+  const queueRule = useCreateRule(clusterId, 'subscription');
+  const addressRule = useCreateRule(clusterId, 'destination');
   const form = useForm<FormState>({
     initialValues: EMPTY,
     validateInputOnBlur: true,

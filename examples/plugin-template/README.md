@@ -97,11 +97,11 @@ update signed by a different trusted key is allowed, but the installer must conf
 - **Describe every permission, and declare its scope.** Each `permissions` entry needs a
   `description`, which the role editor shows, and a `scope`. A permission your guards check without a cluster
   (`@perm.can('acme-notes:admin')`) takes effect only through a global grant, so declare it `"scope": "global"`;
-  one checked against a cluster is `"cluster"`; one checked against a queue or address is `"resource"` and also
-  names the `resourceKinds` (`"queue"`, `"address"`) it acts on, and is checked with
+  one checked against a cluster is `"cluster"`; one checked against a subscription or destination is `"resource"` and also
+  names the `resourceTypes` (`"subscription"`, `"destination"`) it acts on, and is checked with
   `ClusterAccessGuard.requireResource` and `PermissionResolver.filter`, as `NotesController` does, so a team
   member holds it on the queues their team owns and nowhere else. An assistant tool guarded by one is
-  `"scope": "resource"` and names its `resourceArg` and `resourceKind`. A permission that is only useful together with
+  `"scope": "resource"` and names its `resourceArg` and `resourceType`. A permission that is only useful together with
   another lists it under `requires` (`acme-notes:write` requires `acme-notes:read`), and the role editor adds it.
   The role editor and the effective-permissions preview show the scope. Rahdar's
   `permissions` health check (in `/actuator/health/rahdar`) reports a guard or manifest entry naming a

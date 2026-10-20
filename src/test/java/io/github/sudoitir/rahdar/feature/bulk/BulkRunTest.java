@@ -242,7 +242,7 @@ class BulkRunTest extends BulkTestSupport {
         assertThat(statuses(run))
                 .containsExactly(
                         BulkItemStatus.SUCCEEDED, BulkItemStatus.FAILED, BulkItemStatus.FAILED, BulkItemStatus.FAILED);
-        assertThat(run.items().get(3).error()).contains("queue:pause").contains("no longer");
+        assertThat(run.items().get(3).error()).contains("subscription:pause").contains("no longer");
         assertThat(seen).containsExactly("orders.1");
     }
 

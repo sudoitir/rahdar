@@ -197,10 +197,10 @@ class ResourceEnforcementIntegrationTest extends PostgresIntegrationTest {
                 .get(0);
 
         assertThat(viewerRow.get("allowedActions").valueStream().map(JsonNode::asString))
-                .contains("queue:read", "message:read")
-                .doesNotContain("queue:purge");
+                .contains("subscription:read", "message:read")
+                .doesNotContain("subscription:purge");
         assertThat(operatorRow.get("allowedActions").valueStream().map(JsonNode::asString))
-                .contains("queue:purge", "queue:update", "queue:delete");
+                .contains("subscription:purge", "subscription:update", "subscription:delete");
     }
 
     @Test
@@ -215,7 +215,7 @@ class ResourceEnforcementIntegrationTest extends PostgresIntegrationTest {
                         .get("allowedActions")
                         .valueStream()
                         .map(JsonNode::asString))
-                .contains("queue:purge", "queue:delete");
+                .contains("subscription:purge", "subscription:delete");
     }
 
     @Test
@@ -261,8 +261,8 @@ class ResourceEnforcementIntegrationTest extends PostgresIntegrationTest {
         assertThat(response.getStatus()).isEqualTo(403);
         JsonNode problem = body(response);
         assertThat(problem.get("type").asString()).endsWith("/resource-forbidden");
-        assertThat(problem.get("detail").asString()).contains("queue:purge", "orders.in");
-        assertThat(problem.get("permission").asString()).isEqualTo("queue:purge");
+        assertThat(problem.get("detail").asString()).contains("subscription:purge", "orders.in");
+        assertThat(problem.get("permission").asString()).isEqualTo("subscription:purge");
     }
 
     @Test
@@ -358,7 +358,7 @@ class ResourceEnforcementIntegrationTest extends PostgresIntegrationTest {
                 postJson(base() + "/queues?dryRun=true", createQueue("misc.temp"), ordersOperator);
 
         assertThat(response.getStatus()).isEqualTo(403);
-        assertThat(body(response).get("detail").asString()).contains("queue:create", "misc.temp", "orders.#");
+        assertThat(body(response).get("detail").asString()).contains("subscription:create", "misc.temp", "orders.#");
     }
 
     @Test
@@ -376,7 +376,7 @@ class ResourceEnforcementIntegrationTest extends PostgresIntegrationTest {
                 ordersOperator);
 
         assertThat(response.getStatus()).isEqualTo(403);
-        assertThat(body(response).get("permission").asString()).isEqualTo("address:create");
+        assertThat(body(response).get("permission").asString()).isEqualTo("destination:create");
     }
 
     @Test
@@ -439,7 +439,7 @@ class ResourceEnforcementIntegrationTest extends PostgresIntegrationTest {
                 postJson(base() + "/diverts?dryRun=true", divert("orders.in", "orders.out"), ordersViewer);
 
         assertThat(response.getStatus()).isEqualTo(403);
-        assertThat(body(response).get("permission").asString()).isEqualTo("divert:write");
+        assertThat(body(response).get("permission").asString()).isEqualTo("route:write");
     }
 
     // ---- capture and queries -------------------------------------------------------------------------
@@ -451,7 +451,7 @@ class ResourceEnforcementIntegrationTest extends PostgresIntegrationTest {
     /** A member of Orders in a team role that may also capture. */
     private UsernamePasswordAuthenticationToken ordersCapturer() {
         String role = "capturer-" + UUID.randomUUID();
-        roleService.create(new RoleRequest(role, List.of("queue:read", "capture:write"), false, true));
+        roleService.create(new RoleRequest(role, List.of("subscription:read", "capture:write"), false, true));
         return fixture.session(fixture.member(orders, role));
     }
 
@@ -682,7 +682,7 @@ class ResourceEnforcementIntegrationTest extends PostgresIntegrationTest {
                 .isEqualTo(201);
         MockHttpServletResponse refused = postJson(base() + "/alerts/rules", rule("theirs", "billing.*"), alerter);
         assertThat(refused.getStatus()).isEqualTo(403);
-        assertThat(body(refused).get("permission").asString()).isEqualTo("queue:read");
+        assertThat(body(refused).get("permission").asString()).isEqualTo("subscription:read");
         assertThat(postJson(base() + "/alerts/rules", rule("everything", "*"), alerter)
                         .getStatus())
                 .isEqualTo(403);
@@ -732,7 +732,7 @@ class ResourceEnforcementIntegrationTest extends PostgresIntegrationTest {
         assertThat(json.readTree(refused.get("params").asString())
                         .get("permission")
                         .asString())
-                .isEqualTo("queue:purge");
+                .isEqualTo("subscription:purge");
         assertThat(json.readTree(refused.get("params").asString())
                         .get("visibility")
                         .asString())
@@ -781,7 +781,7 @@ class ResourceEnforcementIntegrationTest extends PostgresIntegrationTest {
         assertThat(json.readTree(events.get(0).get("params").asString())
                         .get("permission")
                         .asString())
-                .isEqualTo("queue:pause");
+                .isEqualTo("subscription:pause");
     }
 
     @Test

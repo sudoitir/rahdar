@@ -6,7 +6,7 @@ teams can share one broker cluster, and each sees and operates only what it owns
 
 ## Roles and where a permission acts
 
-A role is a set of permissions such as `queue:read`, `message:send` or `queue:purge`. Each
+A role is a set of permissions such as `subscription:read`, `message:send` or `subscription:purge`. Each
 permission acts at one of three levels, shown as a badge in the role editor:
 
 - **Global**: only a grant for the whole installation gives it (managing users, environments,
@@ -16,8 +16,8 @@ permission acts at one of three levels, shown as a badge in the role editor:
 - **Resource**: one queue or address. A grant gives it on every resource the grant covers; a team
   role or a share gives it only on the names the team owns or receives.
 
-Some permissions need others: `queue:purge` needs `queue:read`, `message:send` needs
-`address:read`. The role editor adds what is required and says so, and Rahdar refuses a role that
+Some permissions need others: `subscription:purge` needs `subscription:read`, `message:send` needs
+`destination:read`. The role editor adds what is required and says so, and Rahdar refuses a role that
 lacks it.
 
 Grant roles to users or directory groups under **Settings → Access → Users** or **Group mapping**,

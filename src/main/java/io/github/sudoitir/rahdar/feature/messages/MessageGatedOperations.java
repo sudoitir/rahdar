@@ -23,7 +23,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 /**
- * The gated message operations: {@code queue.purge} and {@code message.move/retry/delete/expire} (ADR-0179). Each is
+ * The gated message operations: {@code subscription.purge} and {@code message.move/retry/delete/expire} (ADR-0179). Each is
  * destructive and runs as the requester once approved. Their estimates read the same counts a dry run does, without its
  * audit row, and pin the queue's identity so a queue recreated under the same name is refused when it would run.
  */
@@ -35,7 +35,7 @@ class MessageGatedOperations {
         return new GatedOperation<>() {
             @Override
             public String type() {
-                return "queue.purge";
+                return "subscription.purge";
             }
 
             @Override

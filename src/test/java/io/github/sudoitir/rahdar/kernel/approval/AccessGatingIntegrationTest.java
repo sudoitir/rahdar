@@ -190,7 +190,7 @@ class AccessGatingIntegrationTest extends GatedAccessTestBase {
     void grantingAndRevokingARoleAreHeldThenRun() {
         setUp();
         AppUserEntity user = target();
-        UUID role = aRole(Permissions.QUEUE_READ);
+        UUID role = aRole(Permissions.SUBSCRIPTION_READ);
         BooleanSupplier granted = () -> userRoles.findByIdUserId(user.getId()).stream()
                 .anyMatch(ur -> ur.getRoleId().equals(role));
 
@@ -268,7 +268,7 @@ class AccessGatingIntegrationTest extends GatedAccessTestBase {
         String name = "gate-new-" + UUID.randomUUID().toString().substring(0, 8);
         heldThenRun(
                 "role.create",
-                () -> roleService.create(new RoleRequest(name, List.of(Permissions.QUEUE_READ), false, false)),
+                () -> roleService.create(new RoleRequest(name, List.of(Permissions.SUBSCRIPTION_READ), false, false)),
                 () -> roles.findByName(name).isPresent());
         RoleEntity role = roles.findByName(name).orElseThrow();
         BooleanSupplier widened =
@@ -278,7 +278,11 @@ class AccessGatingIntegrationTest extends GatedAccessTestBase {
                 "role.update",
                 () -> roleService.update(
                         role.getId(),
-                        new RoleRequest(name, List.of(Permissions.QUEUE_READ, Permissions.ADDRESS_READ), false, false)),
+                        new RoleRequest(
+                                name,
+                                List.of(Permissions.SUBSCRIPTION_READ, Permissions.DESTINATION_READ),
+                                false,
+                                false)),
                 widened);
 
         UUID delete = hold(alice, () -> roleService.delete(role.getId()));
@@ -291,7 +295,7 @@ class AccessGatingIntegrationTest extends GatedAccessTestBase {
     @Test
     void aRoleGainingTheApproverPermissionCarriesGateIntegrityAndOneThatDoesNotDoesNot() {
         setUp();
-        UUID role = aRole(Permissions.QUEUE_READ);
+        UUID role = aRole(Permissions.SUBSCRIPTION_READ);
         arm();
 
         hold(
@@ -299,7 +303,10 @@ class AccessGatingIntegrationTest extends GatedAccessTestBase {
                 () -> roleService.update(
                         role,
                         new RoleRequest(
-                                "gate-role-" + UUID.randomUUID(), List.of(Permissions.ADDRESS_READ), false, false)));
+                                "gate-role-" + UUID.randomUUID(),
+                                List.of(Permissions.DESTINATION_READ),
+                                false,
+                                false)));
         assertTraits("role.update", Trait.ACCESS_CONTROL);
 
         hold(
@@ -308,7 +315,7 @@ class AccessGatingIntegrationTest extends GatedAccessTestBase {
                         role,
                         new RoleRequest(
                                 "gate-role-" + UUID.randomUUID(),
-                                List.of(Permissions.QUEUE_READ, GateTestKit.APPROVER_PERMISSION),
+                                List.of(Permissions.SUBSCRIPTION_READ, GateTestKit.APPROVER_PERMISSION),
                                 false,
                                 false)));
         assertTraits("role.update", Trait.ACCESS_CONTROL, Trait.GATE_INTEGRITY);
@@ -325,7 +332,7 @@ class AccessGatingIntegrationTest extends GatedAccessTestBase {
         setUp();
         AppUserEntity user = target();
         UUID approverRole = aRole(GateTestKit.APPROVER_PERMISSION);
-        UUID plainRole = aRole(Permissions.QUEUE_READ);
+        UUID plainRole = aRole(Permissions.SUBSCRIPTION_READ);
         arm();
 
         hold(alice, () -> userService.addGrant(user.getId(), new GrantRequest(plainRole, "GLOBAL", null)));
@@ -359,7 +366,7 @@ class AccessGatingIntegrationTest extends GatedAccessTestBase {
         heldThenRun("team.rename", () -> teamService.rename(team, renamed), () -> teamNamed(renamed));
         heldThenRun(
                 "team.pattern.add",
-                () -> teamService.addPattern(team, new PatternRequest(cluster, PatternKind.BOTH, "orders.#")),
+                () -> teamService.addPattern(team, new PatternRequest(cluster, PatternKind.ANY, "orders.#")),
                 () -> patternCount(team) == 1);
         heldThenRun(
                 "team.member.add",
@@ -369,7 +376,7 @@ class AccessGatingIntegrationTest extends GatedAccessTestBase {
         heldThenRun(
                 "team.share.add",
                 () -> teamService.addShare(
-                        team, new ShareRequest(other, cluster, PatternKind.BOTH, "orders.#", teamRole)),
+                        team, new ShareRequest(other, cluster, PatternKind.ANY, "orders.#", teamRole)),
                 () -> shareCount(team) == 1);
 
         UUID pattern = jdbc.queryForObject("SELECT id FROM team_pattern WHERE team_id = ?", UUID.class, team);
@@ -420,7 +427,7 @@ class AccessGatingIntegrationTest extends GatedAccessTestBase {
                         new IdentityProviderListing.Entry("gate-sso", IdentityProviderListing.REDIRECT, "SSO", "/sso")))
                 .when(catalog)
                 .providers();
-        UUID plain = aRole(Permissions.QUEUE_READ);
+        UUID plain = aRole(Permissions.SUBSCRIPTION_READ);
         UUID approverRole = aRole(GateTestKit.APPROVER_PERMISSION);
 
         heldThenRun(

@@ -8,7 +8,7 @@ import io.github.sudoitir.rahdar.feature.routing.web.RoutingViews.NodeRef;
 import io.github.sudoitir.rahdar.kernel.audit.AuditService;
 import io.github.sudoitir.rahdar.kernel.core.PagedView;
 import io.github.sudoitir.rahdar.kernel.core.ResourceQuery;
-import io.github.sudoitir.rahdar.kernel.plugin.ResourceKind;
+import io.github.sudoitir.rahdar.kernel.plugin.ResourceType;
 import io.github.sudoitir.rahdar.kernel.security.ClusterAccessGuard;
 import io.github.sudoitir.rahdar.kernel.security.PermissionResolver;
 import io.github.sudoitir.rahdar.kernel.security.ResourceFilter;
@@ -75,7 +75,7 @@ public class RoutingService {
 
     public PagedView<DivertView> diverts(UUID clusterId, ResourceQuery query) {
         clusterAccess.requireVisible(clusterId);
-        ResourceFilter addresses = permissions.filter(clusterId, ResourceKind.ADDRESS);
+        ResourceFilter addresses = permissions.filter(clusterId, ResourceType.DESTINATION);
         List<ClusterNode> serving = servingManageableNodes(clusterId);
         int nodesTotal = serving.size();
         Set<String> ownedByOperator = operatorOwnedDivertNames(clusterId);
@@ -106,7 +106,7 @@ public class RoutingService {
 
     public PagedView<BridgeView> bridges(UUID clusterId, ResourceQuery query) {
         clusterAccess.requireVisible(clusterId);
-        ResourceFilter queues = permissions.filter(clusterId, ResourceKind.QUEUE);
+        ResourceFilter queues = permissions.filter(clusterId, ResourceType.SUBSCRIPTION);
         List<ClusterNode> serving = servingManageableNodes(clusterId);
         int nodesTotal = serving.size();
 

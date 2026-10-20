@@ -10,7 +10,7 @@ import io.github.sudoitir.rahdar.feature.alerting.AlertPermissions;
 import io.github.sudoitir.rahdar.feature.messages.MessagePermissions;
 import io.github.sudoitir.rahdar.kernel.plugin.CatalogueEntry;
 import io.github.sudoitir.rahdar.kernel.plugin.FeatureRegistry;
-import io.github.sudoitir.rahdar.kernel.plugin.ResourceKind;
+import io.github.sudoitir.rahdar.kernel.plugin.ResourceType;
 import io.github.sudoitir.rahdar.kernel.security.internal.persistence.RolePermissionEntity;
 import io.github.sudoitir.rahdar.kernel.security.internal.persistence.RolePermissionRepository;
 import io.github.sudoitir.rahdar.kernel.security.internal.persistence.TeamPatternEntity;
@@ -41,18 +41,18 @@ import org.springframework.security.core.context.SecurityContextHolder;
  */
 class PermissionResolverTest {
 
-    static final String QUEUE_PURGE = MessagePermissions.QUEUE_PURGE;
-    static final String QUEUE_READ = Permissions.QUEUE_READ;
+    static final String SUBSCRIPTION_PURGE = MessagePermissions.SUBSCRIPTION_PURGE;
+    static final String SUBSCRIPTION_READ = Permissions.SUBSCRIPTION_READ;
     static final String MESSAGE_SEND = MessagePermissions.MESSAGE_SEND;
-    static final String QUEUE_CREATE = "queue:create";
+    static final String SUBSCRIPTION_CREATE = "subscription:create";
 
     static final Set<String> TEAM_VIEWER =
-            Set.of(QUEUE_READ, Permissions.ADDRESS_READ, MessagePermissions.MESSAGE_READ);
+            Set.of(SUBSCRIPTION_READ, Permissions.DESTINATION_READ, MessagePermissions.MESSAGE_READ);
     static final Set<String> TEAM_OPERATOR = Set.of(
-            QUEUE_READ,
-            Permissions.ADDRESS_READ,
+            SUBSCRIPTION_READ,
+            Permissions.DESTINATION_READ,
             MessagePermissions.MESSAGE_READ,
-            QUEUE_PURGE,
+            SUBSCRIPTION_PURGE,
             MESSAGE_SEND,
             MessagePermissions.MESSAGE_DELETE);
 
@@ -82,7 +82,7 @@ class PermissionResolverTest {
         catalogue = RahdarFeatures.descriptors().stream()
                 .flatMap(d -> d.permissions().stream()
                         .map(p -> new CatalogueEntry(
-                                p.action(), p.label(), d.id(), d.title(), p.scope(), p.resourceKinds(), p.requires())))
+                                p.action(), p.label(), d.id(), d.title(), p.scope(), p.resourceTypes(), p.requires())))
                 .collect(Collectors.toMap(CatalogueEntry::action, e -> e));
         when(features.permission(anyString()))
                 .thenAnswer(i -> Optional.ofNullable(catalogue.get(i.<String>getArgument(0))));
@@ -136,7 +136,8 @@ class PermissionResolverTest {
         SecurityContextHolder.clearContext();
 
         assertThat(resolver.can(clusterId, Permissions.CLUSTER_READ)).isFalse();
-        assertThat(resolver.can(clusterId, ResourceRef.queue("a"), QUEUE_READ)).isFalse();
+        assertThat(resolver.can(clusterId, ResourceRef.subscription("a"), SUBSCRIPTION_READ))
+                .isFalse();
         assertThat(resolver.canSeeCluster(clusterId)).isFalse();
     }
 
@@ -174,13 +175,13 @@ class PermissionResolverTest {
     @Test
     void wildcardsGrantWhatTheyCover() {
         access(Set.of(global(Permissions.WILDCARD)), Map.of());
-        assertThat(resolver.can(clusterId, QUEUE_PURGE)).isTrue();
+        assertThat(resolver.can(clusterId, SUBSCRIPTION_PURGE)).isTrue();
         assertThat(resolver.can(Permissions.USER_ADMIN)).isTrue();
 
         access(Set.of(global("message:*")), Map.of());
         assertThat(resolver.can(clusterId, MESSAGE_SEND)).isTrue();
         assertThat(resolver.can(clusterId, MessagePermissions.MESSAGE_DELETE)).isTrue();
-        assertThat(resolver.can(clusterId, QUEUE_PURGE)).isFalse();
+        assertThat(resolver.can(clusterId, SUBSCRIPTION_PURGE)).isFalse();
     }
 
     @Test
@@ -193,7 +194,7 @@ class PermissionResolverTest {
 
         assertThat(resolver.can(clusterId, Permissions.CLUSTER_READ)).isTrue();
         assertThat(resolver.can(clusterId, MESSAGE_SEND)).isTrue();
-        assertThat(resolver.can(clusterId, QUEUE_PURGE)).isFalse();
+        assertThat(resolver.can(clusterId, SUBSCRIPTION_PURGE)).isFalse();
     }
 
     // ---- scope ---------------------------------------------------------------------------------------
@@ -228,11 +229,11 @@ class PermissionResolverTest {
     @Test
     void aResourcePermissionAskedAboutAClusterAsAWholeIsAnsweredByGrantsOnly() {
         UUID team = orders;
-        owns(team, clusterId, "BOTH", "orders.#");
+        owns(team, clusterId, "ANY", "orders.#");
         access(Set.of(), Map.of(team, TEAM_OPERATOR));
 
-        assertThat(resolver.can(clusterId, QUEUE_PURGE)).isFalse();
-        assertThat(resolver.can(clusterId, ResourceRef.queue("orders.in"), QUEUE_PURGE))
+        assertThat(resolver.can(clusterId, SUBSCRIPTION_PURGE)).isFalse();
+        assertThat(resolver.can(clusterId, ResourceRef.subscription("orders.in"), SUBSCRIPTION_PURGE))
                 .isTrue();
     }
 
@@ -240,83 +241,83 @@ class PermissionResolverTest {
 
     @Test
     void aTeamMemberActsOnWhatTheTeamOwnsAndNothingElse() {
-        owns(orders, clusterId, "BOTH", "orders.#");
-        owns(billing, clusterId, "BOTH", "billing.#");
+        owns(orders, clusterId, "ANY", "orders.#");
+        owns(billing, clusterId, "ANY", "billing.#");
         access(Set.of(), Map.of(orders, TEAM_OPERATOR));
 
-        assertThat(resolver.can(clusterId, ResourceRef.queue("orders.in"), QUEUE_PURGE))
+        assertThat(resolver.can(clusterId, ResourceRef.subscription("orders.in"), SUBSCRIPTION_PURGE))
                 .isTrue();
-        assertThat(resolver.can(clusterId, ResourceRef.queue("orders"), QUEUE_PURGE))
+        assertThat(resolver.can(clusterId, ResourceRef.subscription("orders"), SUBSCRIPTION_PURGE))
                 .isTrue();
-        assertThat(resolver.can(clusterId, ResourceRef.queue("billing.in"), QUEUE_PURGE))
+        assertThat(resolver.can(clusterId, ResourceRef.subscription("billing.in"), SUBSCRIPTION_PURGE))
                 .isFalse();
-        assertThat(resolver.can(clusterId, ResourceRef.queue("legacy.inbox"), QUEUE_READ))
+        assertThat(resolver.can(clusterId, ResourceRef.subscription("legacy.inbox"), SUBSCRIPTION_READ))
                 .isFalse();
     }
 
     @Test
     void theTeamRoleLimitsWhatTheMemberMayDo() {
-        owns(orders, clusterId, "BOTH", "orders.#");
+        owns(orders, clusterId, "ANY", "orders.#");
         access(Set.of(), Map.of(orders, TEAM_VIEWER));
 
-        assertThat(resolver.can(clusterId, ResourceRef.queue("orders.in"), QUEUE_READ))
+        assertThat(resolver.can(clusterId, ResourceRef.subscription("orders.in"), SUBSCRIPTION_READ))
                 .isTrue();
-        assertThat(resolver.can(clusterId, ResourceRef.queue("orders.in"), QUEUE_PURGE))
+        assertThat(resolver.can(clusterId, ResourceRef.subscription("orders.in"), SUBSCRIPTION_PURGE))
                 .isFalse();
     }
 
     @Test
     void aTeamsNamesOnOneClusterSayNothingOnAnother() {
-        owns(orders, clusterId, "BOTH", "orders.#");
+        owns(orders, clusterId, "ANY", "orders.#");
         access(Set.of(), Map.of(orders, TEAM_OPERATOR));
 
-        assertThat(resolver.can(otherClusterId, ResourceRef.queue("orders.in"), QUEUE_PURGE))
+        assertThat(resolver.can(otherClusterId, ResourceRef.subscription("orders.in"), SUBSCRIPTION_PURGE))
                 .isFalse();
         assertThat(resolver.canSeeCluster(otherClusterId)).isFalse();
     }
 
     @Test
     void aPatternOfOneKindDoesNotReachTheOther() {
-        owns(orders, clusterId, "QUEUE", "orders.#");
-        owns(billing, clusterId, "ADDRESS", "billing.#");
-        owns(billing, clusterId, "BOTH", "both.#");
+        owns(orders, clusterId, "SUBSCRIPTION", "orders.#");
+        owns(billing, clusterId, "DESTINATION", "billing.#");
+        owns(billing, clusterId, "ANY", "both.#");
         access(Set.of(), Map.of(orders, TEAM_OPERATOR, billing, TEAM_OPERATOR));
 
-        assertThat(resolver.can(clusterId, ResourceRef.queue("orders.in"), QUEUE_PURGE))
+        assertThat(resolver.can(clusterId, ResourceRef.subscription("orders.in"), SUBSCRIPTION_PURGE))
                 .isTrue();
-        assertThat(resolver.can(clusterId, ResourceRef.address("orders.in"), MESSAGE_SEND))
+        assertThat(resolver.can(clusterId, ResourceRef.destination("orders.in"), MESSAGE_SEND))
                 .isFalse();
-        assertThat(resolver.can(clusterId, ResourceRef.address("billing.in"), MESSAGE_SEND))
+        assertThat(resolver.can(clusterId, ResourceRef.destination("billing.in"), MESSAGE_SEND))
                 .isTrue();
-        assertThat(resolver.can(clusterId, ResourceRef.queue("billing.in"), QUEUE_PURGE))
+        assertThat(resolver.can(clusterId, ResourceRef.subscription("billing.in"), SUBSCRIPTION_PURGE))
                 .isFalse();
-        assertThat(resolver.can(clusterId, ResourceRef.queue("both.x"), QUEUE_PURGE))
+        assertThat(resolver.can(clusterId, ResourceRef.subscription("both.x"), SUBSCRIPTION_PURGE))
                 .isTrue();
-        assertThat(resolver.can(clusterId, ResourceRef.address("both.x"), MESSAGE_SEND))
+        assertThat(resolver.can(clusterId, ResourceRef.destination("both.x"), MESSAGE_SEND))
                 .isTrue();
     }
 
     @Test
     void aPermissionIsOnlyCheckedOnTheKindsItActsOn() {
-        owns(orders, clusterId, "BOTH", "orders.#");
+        owns(orders, clusterId, "ANY", "orders.#");
         access(Set.of(), Map.of(orders, TEAM_OPERATOR));
 
         // message:send acts on an address, so a team right on a queue named the same does not carry it
-        assertThat(resolver.can(clusterId, ResourceRef.queue("orders.in"), MESSAGE_SEND))
+        assertThat(resolver.can(clusterId, ResourceRef.subscription("orders.in"), MESSAGE_SEND))
                 .isFalse();
-        assertThat(resolver.can(clusterId, ResourceRef.address("orders.in"), MESSAGE_SEND))
+        assertThat(resolver.can(clusterId, ResourceRef.destination("orders.in"), MESSAGE_SEND))
                 .isTrue();
     }
 
     @Test
     void teamsRightsAddUpAcrossTeams() {
-        owns(orders, clusterId, "BOTH", "orders.#");
-        owns(billing, clusterId, "BOTH", "billing.#");
+        owns(orders, clusterId, "ANY", "orders.#");
+        owns(billing, clusterId, "ANY", "billing.#");
         access(Set.of(), Map.of(orders, TEAM_VIEWER, billing, TEAM_OPERATOR));
 
-        assertThat(resolver.can(clusterId, ResourceRef.queue("billing.x"), QUEUE_PURGE))
+        assertThat(resolver.can(clusterId, ResourceRef.subscription("billing.x"), SUBSCRIPTION_PURGE))
                 .isTrue();
-        assertThat(resolver.can(clusterId, ResourceRef.queue("orders.x"), QUEUE_PURGE))
+        assertThat(resolver.can(clusterId, ResourceRef.subscription("orders.x"), SUBSCRIPTION_PURGE))
                 .isFalse();
     }
 
@@ -324,52 +325,52 @@ class PermissionResolverTest {
 
     @Test
     void aShareGivesTheReceivingTeamItsRoleOnWhatItCovers() {
-        owns(orders, clusterId, "BOTH", "orders.#");
-        shares(orders, billing, clusterId, "BOTH", "orders.events.#", TEAM_VIEWER);
+        owns(orders, clusterId, "ANY", "orders.#");
+        shares(orders, billing, clusterId, "ANY", "orders.events.#", TEAM_VIEWER);
         access(Set.of(), Map.of(billing, TEAM_OPERATOR));
 
-        assertThat(resolver.can(clusterId, ResourceRef.queue("orders.events.paid"), QUEUE_READ))
+        assertThat(resolver.can(clusterId, ResourceRef.subscription("orders.events.paid"), SUBSCRIPTION_READ))
                 .isTrue();
-        assertThat(resolver.can(clusterId, ResourceRef.queue("orders.events.paid"), QUEUE_PURGE))
+        assertThat(resolver.can(clusterId, ResourceRef.subscription("orders.events.paid"), SUBSCRIPTION_PURGE))
                 .as("the share's role, not the member's own team role")
                 .isFalse();
-        assertThat(resolver.can(clusterId, ResourceRef.queue("orders.in"), QUEUE_READ))
+        assertThat(resolver.can(clusterId, ResourceRef.subscription("orders.in"), SUBSCRIPTION_READ))
                 .isFalse();
     }
 
     @Test
     void aShareDoesNotReachTheTeamsThatDidNotReceiveIt() {
         UUID audit = UUID.randomUUID();
-        owns(orders, clusterId, "BOTH", "orders.#");
-        shares(orders, billing, clusterId, "BOTH", "orders.events.#", TEAM_VIEWER);
+        owns(orders, clusterId, "ANY", "orders.#");
+        shares(orders, billing, clusterId, "ANY", "orders.events.#", TEAM_VIEWER);
         access(Set.of(), Map.of(audit, TEAM_OPERATOR));
 
-        assertThat(resolver.can(clusterId, ResourceRef.queue("orders.events.paid"), QUEUE_READ))
+        assertThat(resolver.can(clusterId, ResourceRef.subscription("orders.events.paid"), SUBSCRIPTION_READ))
                 .isFalse();
     }
 
     @Test
     void aShareOutsideWhatTheOwnerOwnsGrantsNothing() {
-        owns(orders, clusterId, "BOTH", "orders.#");
-        shares(orders, billing, clusterId, "BOTH", "billing.#", TEAM_VIEWER);
-        shares(orders, billing, clusterId, "BOTH", "orders.#.x", TEAM_VIEWER);
+        owns(orders, clusterId, "ANY", "orders.#");
+        shares(orders, billing, clusterId, "ANY", "billing.#", TEAM_VIEWER);
+        shares(orders, billing, clusterId, "ANY", "orders.#.x", TEAM_VIEWER);
         access(Set.of(), Map.of(billing, TEAM_OPERATOR));
 
-        assertThat(resolver.can(clusterId, ResourceRef.queue("billing.in"), QUEUE_READ))
+        assertThat(resolver.can(clusterId, ResourceRef.subscription("billing.in"), SUBSCRIPTION_READ))
                 .isFalse();
-        assertThat(resolver.can(clusterId, ResourceRef.queue("orders.a.x"), QUEUE_READ))
+        assertThat(resolver.can(clusterId, ResourceRef.subscription("orders.a.x"), SUBSCRIPTION_READ))
                 .isTrue();
     }
 
     @Test
     void aShareOfAKindTheOwnerOnlyOwnsInPartGrantsOnlyThatPart() {
-        owns(orders, clusterId, "QUEUE", "orders.#");
-        shares(orders, billing, clusterId, "BOTH", "orders.events.#", TEAM_VIEWER);
+        owns(orders, clusterId, "SUBSCRIPTION", "orders.#");
+        shares(orders, billing, clusterId, "ANY", "orders.events.#", TEAM_VIEWER);
         access(Set.of(), Map.of(billing, TEAM_VIEWER));
 
-        assertThat(resolver.can(clusterId, ResourceRef.queue("orders.events.a"), QUEUE_READ))
+        assertThat(resolver.can(clusterId, ResourceRef.subscription("orders.events.a"), SUBSCRIPTION_READ))
                 .isTrue();
-        assertThat(resolver.can(clusterId, ResourceRef.address("orders.events.a"), Permissions.ADDRESS_READ))
+        assertThat(resolver.can(clusterId, ResourceRef.destination("orders.events.a"), Permissions.DESTINATION_READ))
                 .isFalse();
     }
 
@@ -377,65 +378,69 @@ class PermissionResolverTest {
 
     @Test
     void aPlatformGrantCoversEveryResourceOnTheClusterOwnedOrNot() {
-        owns(orders, clusterId, "BOTH", "orders.#");
-        access(Set.of(new Grant(Grant.ScopeType.CLUSTER, clusterId, Set.of(QUEUE_PURGE))), Map.of());
+        owns(orders, clusterId, "ANY", "orders.#");
+        access(Set.of(new Grant(Grant.ScopeType.CLUSTER, clusterId, Set.of(SUBSCRIPTION_PURGE))), Map.of());
 
-        assertThat(resolver.can(clusterId, ResourceRef.queue("orders.in"), QUEUE_PURGE))
+        assertThat(resolver.can(clusterId, ResourceRef.subscription("orders.in"), SUBSCRIPTION_PURGE))
                 .isTrue();
-        assertThat(resolver.can(clusterId, ResourceRef.queue("legacy.inbox"), QUEUE_PURGE))
+        assertThat(resolver.can(clusterId, ResourceRef.subscription("legacy.inbox"), SUBSCRIPTION_PURGE))
                 .isTrue();
-        assertThat(resolver.can(otherClusterId, ResourceRef.queue("legacy.inbox"), QUEUE_PURGE))
+        assertThat(resolver.can(otherClusterId, ResourceRef.subscription("legacy.inbox"), SUBSCRIPTION_PURGE))
                 .isFalse();
     }
 
     @Test
     void platformGrantsAndTeamRolesAdd() {
-        owns(orders, clusterId, "BOTH", "orders.#");
+        owns(orders, clusterId, "ANY", "orders.#");
         access(
-                Set.of(new Grant(Grant.ScopeType.CLUSTER, clusterId, Set.of(QUEUE_READ))),
+                Set.of(new Grant(Grant.ScopeType.CLUSTER, clusterId, Set.of(SUBSCRIPTION_READ))),
                 Map.of(orders, TEAM_OPERATOR));
 
-        assertThat(resolver.can(clusterId, ResourceRef.queue("legacy.inbox"), QUEUE_READ))
+        assertThat(resolver.can(clusterId, ResourceRef.subscription("legacy.inbox"), SUBSCRIPTION_READ))
                 .isTrue();
-        assertThat(resolver.can(clusterId, ResourceRef.queue("legacy.inbox"), QUEUE_PURGE))
+        assertThat(resolver.can(clusterId, ResourceRef.subscription("legacy.inbox"), SUBSCRIPTION_PURGE))
                 .isFalse();
-        assertThat(resolver.can(clusterId, ResourceRef.queue("orders.in"), QUEUE_PURGE))
+        assertThat(resolver.can(clusterId, ResourceRef.subscription("orders.in"), SUBSCRIPTION_PURGE))
                 .isTrue();
     }
 
     @Test
     void aGlobalPermissionIsNotReachedThroughATeamRole() {
-        owns(orders, clusterId, "BOTH", "orders.#");
+        owns(orders, clusterId, "ANY", "orders.#");
         access(Set.of(), Map.of(orders, Set.of(Permissions.USER_ADMIN, Permissions.CLUSTER_READ)));
 
-        assertThat(resolver.can(clusterId, ResourceRef.queue("orders.in"), Permissions.USER_ADMIN))
+        assertThat(resolver.can(clusterId, ResourceRef.subscription("orders.in"), Permissions.USER_ADMIN))
                 .isFalse();
-        assertThat(resolver.can(clusterId, ResourceRef.queue("orders.in"), Permissions.CLUSTER_READ))
+        assertThat(resolver.can(clusterId, ResourceRef.subscription("orders.in"), Permissions.CLUSTER_READ))
                 .isFalse();
     }
 
     @Test
     void aTeamRolePermissionOutsideTheCatalogueGrantsNothing() {
-        owns(orders, clusterId, "BOTH", "orders.#");
-        catalogue.remove(QUEUE_PURGE);
+        owns(orders, clusterId, "ANY", "orders.#");
+        catalogue.remove(SUBSCRIPTION_PURGE);
         access(Set.of(), Map.of(orders, Set.of(Permissions.WILDCARD)));
 
-        assertThat(resolver.can(clusterId, ResourceRef.queue("orders.in"), QUEUE_PURGE))
+        assertThat(resolver.can(clusterId, ResourceRef.subscription("orders.in"), SUBSCRIPTION_PURGE))
                 .isFalse();
-        assertThat(resolver.can(clusterId, ResourceRef.queue("orders.in"), QUEUE_READ))
+        assertThat(resolver.can(clusterId, ResourceRef.subscription("orders.in"), SUBSCRIPTION_READ))
                 .isTrue();
     }
 
     @Test
     void aPrincipalThatCarriesItsOwnGrantsGetsNoTeamAccess() {
-        owns(orders, clusterId, "BOTH", "orders.#");
+        owns(orders, clusterId, "ANY", "orders.#");
         access(Set.of(), Map.of(orders, TEAM_OPERATOR));
         RahdarPrincipal key = new RahdarPrincipal(
-                userId, "key", Set.of(new Grant(Grant.ScopeType.CLUSTER, clusterId, Set.of(QUEUE_READ))), false, "ci");
+                userId,
+                "key",
+                Set.of(new Grant(Grant.ScopeType.CLUSTER, clusterId, Set.of(SUBSCRIPTION_READ))),
+                false,
+                "ci");
 
-        assertThat(resolver.can(key, clusterId, ResourceRef.queue("legacy.q"), QUEUE_READ))
+        assertThat(resolver.can(key, clusterId, ResourceRef.subscription("legacy.q"), SUBSCRIPTION_READ))
                 .isTrue();
-        assertThat(resolver.can(key, clusterId, ResourceRef.queue("orders.in"), QUEUE_PURGE))
+        assertThat(resolver.can(key, clusterId, ResourceRef.subscription("orders.in"), SUBSCRIPTION_PURGE))
                 .isFalse();
     }
 
@@ -443,32 +448,32 @@ class PermissionResolverTest {
 
     @Test
     void canAnywhereOffersWhatSomeTeamOrShareOnTheClusterAllows() {
-        owns(orders, clusterId, "QUEUE", "orders.#");
+        owns(orders, clusterId, "SUBSCRIPTION", "orders.#");
         access(Set.of(), Map.of(orders, TEAM_OPERATOR));
 
-        assertThat(resolver.canAnywhere(clusterId, QUEUE_PURGE)).isTrue();
+        assertThat(resolver.canAnywhere(clusterId, SUBSCRIPTION_PURGE)).isTrue();
         assertThat(resolver.canAnywhere(clusterId, MESSAGE_SEND))
                 .as("the team owns no address here")
                 .isFalse();
         assertThat(resolver.canAnywhere(clusterId, MessagePermissions.MESSAGE_MOVE))
                 .as("the team role lacks it")
                 .isFalse();
-        assertThat(resolver.canAnywhere(otherClusterId, QUEUE_PURGE)).isFalse();
+        assertThat(resolver.canAnywhere(otherClusterId, SUBSCRIPTION_PURGE)).isFalse();
     }
 
     @Test
     void canAnywhereCountsASharedPattern() {
-        owns(orders, clusterId, "BOTH", "orders.#");
-        shares(orders, billing, clusterId, "BOTH", "orders.events.#", TEAM_VIEWER);
+        owns(orders, clusterId, "ANY", "orders.#");
+        shares(orders, billing, clusterId, "ANY", "orders.events.#", TEAM_VIEWER);
         access(Set.of(), Map.of(billing, TEAM_OPERATOR));
 
-        assertThat(resolver.canAnywhere(clusterId, QUEUE_READ)).isTrue();
-        assertThat(resolver.canAnywhere(clusterId, QUEUE_PURGE)).isFalse();
+        assertThat(resolver.canAnywhere(clusterId, SUBSCRIPTION_READ)).isTrue();
+        assertThat(resolver.canAnywhere(clusterId, SUBSCRIPTION_PURGE)).isFalse();
     }
 
     @Test
     void aClusterIsSeenThroughAnyReadOfItsResourcesButGrantsNothingClusterWide() {
-        owns(orders, clusterId, "ADDRESS", "orders.#");
+        owns(orders, clusterId, "DESTINATION", "orders.#");
         access(Set.of(), Map.of(orders, TEAM_VIEWER));
 
         assertThat(resolver.canSeeCluster(clusterId)).isTrue();
@@ -481,11 +486,11 @@ class PermissionResolverTest {
 
     @Test
     void aUserWithNoAccessSeesNothing() {
-        owns(orders, clusterId, "BOTH", "orders.#");
+        owns(orders, clusterId, "ANY", "orders.#");
         when(access.of(userId)).thenReturn(AccessSnapshot.NONE);
 
         assertThat(resolver.canSeeCluster(clusterId)).isFalse();
-        assertThat(resolver.can(clusterId, ResourceRef.queue("orders.in"), QUEUE_READ))
+        assertThat(resolver.can(clusterId, ResourceRef.subscription("orders.in"), SUBSCRIPTION_READ))
                 .isFalse();
     }
 
@@ -493,10 +498,10 @@ class PermissionResolverTest {
 
     @Test
     void aFilterLetsThroughOnlyTheNamesTheCallersTeamsCover() {
-        owns(orders, clusterId, "BOTH", "orders.#");
+        owns(orders, clusterId, "ANY", "orders.#");
         access(Set.of(), Map.of(orders, TEAM_VIEWER));
 
-        ResourceFilter filter = resolver.filter(clusterId, ResourceKind.QUEUE);
+        ResourceFilter filter = resolver.filter(clusterId, ResourceType.SUBSCRIPTION);
 
         assertThat(filter.everything()).isFalse();
         assertThat(filter.readable("orders.in")).isTrue();
@@ -506,59 +511,66 @@ class PermissionResolverTest {
 
     @Test
     void aFilterOfACallerWhoReadsTheWholeClusterNeedsNoPerNameCheck() {
-        access(Set.of(global(QUEUE_READ, QUEUE_PURGE)), Map.of());
+        access(Set.of(global(SUBSCRIPTION_READ, SUBSCRIPTION_PURGE)), Map.of());
 
-        ResourceFilter filter = resolver.filter(clusterId, ResourceKind.QUEUE);
+        ResourceFilter filter = resolver.filter(clusterId, ResourceType.SUBSCRIPTION);
 
         assertThat(filter.everything()).isTrue();
         assertThat(filter.readable("anything")).isTrue();
-        assertThat(filter.allowedActions("anything")).containsExactly(QUEUE_PURGE, QUEUE_READ);
+        assertThat(filter.allowedActions("anything")).containsExactly(SUBSCRIPTION_PURGE, SUBSCRIPTION_READ);
     }
 
     @Test
     void aRowCarriesTheActionsOfItsKindThatTheCallerHoldsOnIt() {
-        owns(orders, clusterId, "BOTH", "orders.#");
+        owns(orders, clusterId, "ANY", "orders.#");
         access(Set.of(), Map.of(orders, TEAM_OPERATOR));
 
-        ResourceFilter queues = resolver.filter(clusterId, ResourceKind.QUEUE);
-        ResourceFilter addresses = resolver.filter(clusterId, ResourceKind.ADDRESS);
+        ResourceFilter queues = resolver.filter(clusterId, ResourceType.SUBSCRIPTION);
+        ResourceFilter addresses = resolver.filter(clusterId, ResourceType.DESTINATION);
 
         assertThat(queues.allowedActions("orders.in"))
-                .contains(QUEUE_READ, QUEUE_PURGE, MessagePermissions.MESSAGE_DELETE)
-                .doesNotContain(MESSAGE_SEND, Permissions.ADDRESS_READ);
+                .contains(SUBSCRIPTION_READ, SUBSCRIPTION_PURGE, MessagePermissions.MESSAGE_DELETE)
+                .doesNotContain(MESSAGE_SEND, Permissions.DESTINATION_READ);
         assertThat(addresses.allowedActions("orders.in"))
-                .contains(Permissions.ADDRESS_READ, MESSAGE_SEND)
-                .doesNotContain(QUEUE_PURGE);
+                .contains(Permissions.DESTINATION_READ, MESSAGE_SEND)
+                .doesNotContain(SUBSCRIPTION_PURGE);
         assertThat(queues.allowedActions("billing.in")).isEmpty();
     }
 
     @Test
     void aShareAddsItsActionsToTheRowsItCovers() {
-        owns(billing, clusterId, "BOTH", "billing.#");
-        shares(billing, orders, clusterId, "BOTH", "billing.in", TEAM_VIEWER);
+        owns(billing, clusterId, "ANY", "billing.#");
+        shares(billing, orders, clusterId, "ANY", "billing.in", TEAM_VIEWER);
         access(Set.of(), Map.of(orders, TEAM_VIEWER));
 
-        ResourceFilter queues = resolver.filter(clusterId, ResourceKind.QUEUE);
+        ResourceFilter queues = resolver.filter(clusterId, ResourceType.SUBSCRIPTION);
 
         assertThat(queues.readable("billing.in")).isTrue();
         assertThat(queues.readable("billing.payments")).isFalse();
-        assertThat(queues.allowedActions("billing.in")).containsExactly(MessagePermissions.MESSAGE_READ, QUEUE_READ);
+        assertThat(queues.allowedActions("billing.in"))
+                .containsExactly(MessagePermissions.MESSAGE_READ, SUBSCRIPTION_READ);
     }
 
     // ---- where a caller may create ------------------------------------------------------------------
 
     @Test
     void thePatternsACallerMayCreateUnderAreThoseOfTheirTeamsThatTheirRoleAllowsIt() {
-        owns(orders, clusterId, "BOTH", "orders.#");
-        owns(billing, clusterId, "BOTH", "billing.#");
-        shares(billing, orders, clusterId, "QUEUE", "billing.shared.#", Set.of(QUEUE_READ, QUEUE_CREATE));
-        access(Set.of(), Map.of(orders, Set.of(QUEUE_READ, QUEUE_CREATE)));
+        owns(orders, clusterId, "ANY", "orders.#");
+        owns(billing, clusterId, "ANY", "billing.#");
+        shares(
+                billing,
+                orders,
+                clusterId,
+                "SUBSCRIPTION",
+                "billing.shared.#",
+                Set.of(SUBSCRIPTION_READ, SUBSCRIPTION_CREATE));
+        access(Set.of(), Map.of(orders, Set.of(SUBSCRIPTION_READ, SUBSCRIPTION_CREATE)));
 
-        assertThat(resolver.patternsHolding(clusterId, ResourceKind.QUEUE, QUEUE_CREATE))
+        assertThat(resolver.patternsHolding(clusterId, ResourceType.SUBSCRIPTION, SUBSCRIPTION_CREATE))
                 .containsExactly("billing.shared.#", "orders.#");
-        assertThat(resolver.patternsHolding(clusterId, ResourceKind.ADDRESS, QUEUE_CREATE))
+        assertThat(resolver.patternsHolding(clusterId, ResourceType.DESTINATION, SUBSCRIPTION_CREATE))
                 .isEmpty();
-        assertThat(resolver.patternsHolding(otherClusterId, ResourceKind.QUEUE, QUEUE_CREATE))
+        assertThat(resolver.patternsHolding(otherClusterId, ResourceType.SUBSCRIPTION, SUBSCRIPTION_CREATE))
                 .isEmpty();
     }
 
@@ -566,47 +578,47 @@ class PermissionResolverTest {
 
     @Test
     void aPatternIsHeldWhenOneOfTheCallersPatternsCoversEveryNameItCanMatch() {
-        owns(orders, clusterId, "BOTH", "orders.#");
+        owns(orders, clusterId, "ANY", "orders.#");
         access(Set.of(), Map.of(orders, TEAM_OPERATOR));
 
-        assertThat(resolver.canOnAll(clusterId, ResourceKind.QUEUE, "orders.#", QUEUE_PURGE))
+        assertThat(resolver.canOnAll(clusterId, ResourceType.SUBSCRIPTION, "orders.#", SUBSCRIPTION_PURGE))
                 .isTrue();
-        assertThat(resolver.canOnAll(clusterId, ResourceKind.QUEUE, "orders.*.in", QUEUE_PURGE))
+        assertThat(resolver.canOnAll(clusterId, ResourceType.SUBSCRIPTION, "orders.*.in", SUBSCRIPTION_PURGE))
                 .isTrue();
-        assertThat(resolver.canOnAll(clusterId, ResourceKind.QUEUE, "orders.in", QUEUE_PURGE))
+        assertThat(resolver.canOnAll(clusterId, ResourceType.SUBSCRIPTION, "orders.in", SUBSCRIPTION_PURGE))
                 .isTrue();
-        assertThat(resolver.canOnAll(clusterId, ResourceKind.QUEUE, "#", QUEUE_PURGE))
+        assertThat(resolver.canOnAll(clusterId, ResourceType.SUBSCRIPTION, "#", SUBSCRIPTION_PURGE))
                 .isFalse();
-        assertThat(resolver.canOnAll(clusterId, ResourceKind.QUEUE, "*.in", QUEUE_PURGE))
+        assertThat(resolver.canOnAll(clusterId, ResourceType.SUBSCRIPTION, "*.in", SUBSCRIPTION_PURGE))
                 .isFalse();
-        assertThat(resolver.canOnAll(clusterId, ResourceKind.QUEUE, "billing.in", QUEUE_PURGE))
+        assertThat(resolver.canOnAll(clusterId, ResourceType.SUBSCRIPTION, "billing.in", SUBSCRIPTION_PURGE))
                 .isFalse();
     }
 
     @Test
     void aPatternNeedsThePermissionInTheRoleOfThePatternThatCoversIt() {
-        owns(orders, clusterId, "BOTH", "orders.#");
-        shares(orders, billing, clusterId, "BOTH", "orders.events.#", TEAM_VIEWER);
+        owns(orders, clusterId, "ANY", "orders.#");
+        shares(orders, billing, clusterId, "ANY", "orders.events.#", TEAM_VIEWER);
         access(Set.of(), Map.of(billing, TEAM_OPERATOR));
 
-        assertThat(resolver.canOnAll(clusterId, ResourceKind.QUEUE, "orders.events.*", QUEUE_READ))
+        assertThat(resolver.canOnAll(clusterId, ResourceType.SUBSCRIPTION, "orders.events.*", SUBSCRIPTION_READ))
                 .isTrue();
-        assertThat(resolver.canOnAll(clusterId, ResourceKind.QUEUE, "orders.events.*", QUEUE_PURGE))
+        assertThat(resolver.canOnAll(clusterId, ResourceType.SUBSCRIPTION, "orders.events.*", SUBSCRIPTION_PURGE))
                 .as("the share's role does not purge")
                 .isFalse();
     }
 
     @Test
     void aWildcardInsideAWordIsHeldOnlyThroughAGrantThatReachesTheCluster() {
-        owns(orders, clusterId, "BOTH", "orders.#");
+        owns(orders, clusterId, "ANY", "orders.#");
         access(Set.of(), Map.of(orders, TEAM_OPERATOR));
 
-        assertThat(resolver.canOnAll(clusterId, ResourceKind.QUEUE, "orders*", QUEUE_READ))
+        assertThat(resolver.canOnAll(clusterId, ResourceType.SUBSCRIPTION, "orders*", SUBSCRIPTION_READ))
                 .isFalse();
 
-        access(Set.of(new Grant(Grant.ScopeType.CLUSTER, clusterId, Set.of(QUEUE_READ))), Map.of());
+        access(Set.of(new Grant(Grant.ScopeType.CLUSTER, clusterId, Set.of(SUBSCRIPTION_READ))), Map.of());
 
-        assertThat(resolver.canOnAll(clusterId, ResourceKind.QUEUE, "orders*", QUEUE_READ))
+        assertThat(resolver.canOnAll(clusterId, ResourceType.SUBSCRIPTION, "orders*", SUBSCRIPTION_READ))
                 .isTrue();
     }
 
@@ -622,22 +634,22 @@ class PermissionResolverTest {
     @Test
     void aKeyCannotDoWhatItsGrantsDoNotSay() {
         access(Set.of(global(Permissions.WILDCARD)), Map.of());
-        keyOf(TokenGrant.of(Grant.ScopeType.CLUSTER, clusterId, QUEUE_READ));
+        keyOf(TokenGrant.of(Grant.ScopeType.CLUSTER, clusterId, SUBSCRIPTION_READ));
 
-        assertThat(resolver.can(clusterId, QUEUE_READ)).isTrue();
-        assertThat(resolver.can(clusterId, QUEUE_PURGE)).isFalse();
-        assertThat(resolver.can(otherClusterId, QUEUE_READ)).isFalse();
+        assertThat(resolver.can(clusterId, SUBSCRIPTION_READ)).isTrue();
+        assertThat(resolver.can(clusterId, SUBSCRIPTION_PURGE)).isFalse();
+        assertThat(resolver.can(otherClusterId, SUBSCRIPTION_READ)).isFalse();
     }
 
     @Test
     void aKeyCannotDoWhatItsOwnerNoLongerHolds() {
-        access(Set.of(global(QUEUE_READ)), Map.of());
-        keyOf(TokenGrant.of(Grant.ScopeType.GLOBAL, ScopeIds.GLOBAL, QUEUE_READ));
-        assertThat(resolver.can(clusterId, QUEUE_READ)).isTrue();
+        access(Set.of(global(SUBSCRIPTION_READ)), Map.of());
+        keyOf(TokenGrant.of(Grant.ScopeType.GLOBAL, ScopeIds.GLOBAL, SUBSCRIPTION_READ));
+        assertThat(resolver.can(clusterId, SUBSCRIPTION_READ)).isTrue();
 
         when(access.of(userId)).thenReturn(new AccessSnapshot(Set.of(), Map.of()));
 
-        assertThat(resolver.can(clusterId, QUEUE_READ)).isFalse();
+        assertThat(resolver.can(clusterId, SUBSCRIPTION_READ)).isFalse();
     }
 
     @Test
@@ -663,15 +675,15 @@ class PermissionResolverTest {
 
     @Test
     void aKeyReachesWhatItsOwnersTeamsOwnAndNothingMore() {
-        owns(orders, clusterId, "BOTH", "orders.#");
+        owns(orders, clusterId, "ANY", "orders.#");
         access(Set.of(), Map.of(orders, TEAM_VIEWER));
-        keyOf(TokenGrant.of(Grant.ScopeType.CLUSTER, clusterId, QUEUE_READ));
+        keyOf(TokenGrant.of(Grant.ScopeType.CLUSTER, clusterId, SUBSCRIPTION_READ));
 
-        assertThat(resolver.can(clusterId, ResourceRef.queue("orders.in"), QUEUE_READ))
+        assertThat(resolver.can(clusterId, ResourceRef.subscription("orders.in"), SUBSCRIPTION_READ))
                 .isTrue();
-        assertThat(resolver.can(clusterId, ResourceRef.queue("billing.in"), QUEUE_READ))
+        assertThat(resolver.can(clusterId, ResourceRef.subscription("billing.in"), SUBSCRIPTION_READ))
                 .isFalse();
-        assertThat(resolver.can(clusterId, QUEUE_READ))
+        assertThat(resolver.can(clusterId, SUBSCRIPTION_READ))
                 .as("a team grants nothing on the cluster as a whole")
                 .isFalse();
     }
@@ -683,15 +695,15 @@ class PermissionResolverTest {
                 Grant.ScopeType.CLUSTER,
                 clusterId,
                 MessagePermissions.MESSAGE_READ,
-                ResourceKind.QUEUE,
+                ResourceType.SUBSCRIPTION,
                 ResourcePattern.parse("orders.#")));
 
-        assertThat(resolver.can(clusterId, ResourceRef.queue("orders.in"), MessagePermissions.MESSAGE_READ))
+        assertThat(resolver.can(clusterId, ResourceRef.subscription("orders.in"), MessagePermissions.MESSAGE_READ))
                 .isTrue();
-        assertThat(resolver.can(clusterId, ResourceRef.queue("orders2.in"), MessagePermissions.MESSAGE_READ))
+        assertThat(resolver.can(clusterId, ResourceRef.subscription("orders2.in"), MessagePermissions.MESSAGE_READ))
                 .as("the owner reads it, the key is not for it")
                 .isFalse();
-        assertThat(resolver.can(clusterId, ResourceRef.address("orders.in"), MessagePermissions.MESSAGE_READ))
+        assertThat(resolver.can(clusterId, ResourceRef.destination("orders.in"), MessagePermissions.MESSAGE_READ))
                 .as("a pattern of queues is not one of addresses")
                 .isFalse();
         assertThat(resolver.can(clusterId, MessagePermissions.MESSAGE_READ))
@@ -703,14 +715,18 @@ class PermissionResolverTest {
 
     @Test
     void aKeyLimitedToAPatternStillNeedsItsOwnerToHoldThePermissionOnTheName() {
-        owns(orders, clusterId, "BOTH", "orders.#");
+        owns(orders, clusterId, "ANY", "orders.#");
         access(Set.of(), Map.of(orders, TEAM_VIEWER));
         keyOf(new TokenGrant(
-                Grant.ScopeType.CLUSTER, clusterId, QUEUE_READ, ResourceKind.QUEUE, ResourcePattern.parse("#")));
+                Grant.ScopeType.CLUSTER,
+                clusterId,
+                SUBSCRIPTION_READ,
+                ResourceType.SUBSCRIPTION,
+                ResourcePattern.parse("#")));
 
-        assertThat(resolver.can(clusterId, ResourceRef.queue("orders.in"), QUEUE_READ))
+        assertThat(resolver.can(clusterId, ResourceRef.subscription("orders.in"), SUBSCRIPTION_READ))
                 .isTrue();
-        assertThat(resolver.can(clusterId, ResourceRef.queue("billing.in"), QUEUE_READ))
+        assertThat(resolver.can(clusterId, ResourceRef.subscription("billing.in"), SUBSCRIPTION_READ))
                 .isFalse();
     }
 

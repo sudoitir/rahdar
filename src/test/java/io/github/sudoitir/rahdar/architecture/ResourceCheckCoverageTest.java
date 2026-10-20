@@ -276,12 +276,12 @@ class ResourceCheckCoverageTest {
         private ClusterAccessGuard guard;
 
         public void purge(UUID cluster, String queueName) {
-            guard.requireResource(cluster, ResourceRef.queue(queueName), "queue:purge");
+            guard.requireResource(cluster, ResourceRef.subscription(queueName), "subscription:purge");
         }
 
         /** Two names, one check: the second is never looked at. */
         public void copy(UUID cluster, String sourceQueue, String targetQueue) {
-            guard.requireResource(cluster, ResourceRef.queue(sourceQueue), "queue:read");
+            guard.requireResource(cluster, ResourceRef.subscription(sourceQueue), "subscription:read");
             Objects.requireNonNull(targetQueue, "named, and used, but never checked");
         }
     }

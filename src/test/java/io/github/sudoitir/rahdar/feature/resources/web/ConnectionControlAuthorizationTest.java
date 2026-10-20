@@ -84,7 +84,7 @@ class ConnectionControlAuthorizationTest extends PostgresIntegrationTest {
                         MessagePermissions.MESSAGE_SEND,
                         MessagePermissions.MESSAGE_MOVE,
                         MessagePermissions.MESSAGE_DELETE,
-                        MessagePermissions.QUEUE_PURGE))
+                        MessagePermissions.SUBSCRIPTION_PURGE))
                 .isEqualTo(404);
     }
 
@@ -93,9 +93,9 @@ class ConnectionControlAuthorizationTest extends PostgresIntegrationTest {
         assertThat(status(
                         "/api/v1/clusters/" + clusterId + "/addresses/orders/consumers/close?dryRun=true",
                         Permissions.CLUSTER_READ,
-                        QueuePermissions.QUEUE_CREATE,
-                        QueuePermissions.QUEUE_DELETE,
-                        QueuePermissions.QUEUE_PAUSE))
+                        QueuePermissions.SUBSCRIPTION_CREATE,
+                        QueuePermissions.SUBSCRIPTION_DELETE,
+                        QueuePermissions.SUBSCRIPTION_PAUSE))
                 .isEqualTo(404);
     }
 

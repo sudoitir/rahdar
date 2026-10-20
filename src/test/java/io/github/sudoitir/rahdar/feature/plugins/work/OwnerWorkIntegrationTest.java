@@ -69,7 +69,7 @@ class OwnerWorkIntegrationTest extends PostgresIntegrationTest {
         cluster = clusters.save(new ClusterEntity("work-" + UUID.randomUUID(), null, null))
                 .getId();
         orders = teams.create("orders-" + UUID.randomUUID()).id();
-        teams.addPattern(orders, new PatternRequest(cluster, PatternKind.BOTH, "orders.#"));
+        teams.addPattern(orders, new PatternRequest(cluster, PatternKind.ANY, "orders.#"));
         owner = user();
         memberId = teams.addMember(
                         orders, new MemberRequest(PrincipalType.USER, owner, null, null, role("TEAM_OPERATOR")))
@@ -89,17 +89,17 @@ class OwnerWorkIntegrationTest extends PostgresIntegrationTest {
 
     private List<WorkNeed> needs() {
         return List.of(
-                WorkNeed.on(cluster, ResourceRef.queue("orders.in"), "message:move"),
-                WorkNeed.on(cluster, ResourceRef.address("orders.out"), "message:send"));
+                WorkNeed.on(cluster, ResourceRef.subscription("orders.in"), "message:move"),
+                WorkNeed.on(cluster, ResourceRef.destination("orders.out"), "message:send"));
     }
 
     @Test
     void publishingWithoutSendRightsOnATargetIsRefusedNamingThePermissionAndTheResource() {
-        List<WorkNeed> toBilling = List.of(WorkNeed.on(cluster, ResourceRef.address("billing.in"), "message:send"));
+        List<WorkNeed> toBilling = List.of(WorkNeed.on(cluster, ResourceRef.destination("billing.in"), "message:send"));
 
         assertThatThrownBy(() -> work.publish("forward", owner, toBilling))
                 .isInstanceOf(WorkRefusedException.class)
-                .hasMessageContaining("message:send on address billing.in")
+                .hasMessageContaining("message:send on destination billing.in")
                 .hasMessageContaining(cluster.toString());
         assertThat(work.status("forward")).isEmpty();
     }
@@ -107,13 +107,13 @@ class OwnerWorkIntegrationTest extends PostgresIntegrationTest {
     @Test
     void everyMissingNeedIsNamed() {
         List<WorkNeed> wanted = List.of(
-                WorkNeed.on(cluster, ResourceRef.address("billing.in"), "message:send"),
-                WorkNeed.on(cluster, ResourceRef.queue("billing.dlq"), "message:move"),
-                WorkNeed.on(cluster, ResourceRef.queue("orders.in"), "message:read"));
+                WorkNeed.on(cluster, ResourceRef.destination("billing.in"), "message:send"),
+                WorkNeed.on(cluster, ResourceRef.subscription("billing.dlq"), "message:move"),
+                WorkNeed.on(cluster, ResourceRef.subscription("orders.in"), "message:read"));
 
         assertThatThrownBy(() -> work.publish("forward", owner, wanted))
-                .hasMessageContaining("message:send on address billing.in")
-                .hasMessageContaining("message:move on queue billing.dlq")
+                .hasMessageContaining("message:send on destination billing.in")
+                .hasMessageContaining("message:move on subscription billing.dlq")
                 .satisfies(e -> assertThat(e.getMessage()).doesNotContain("orders.in"));
     }
 
@@ -140,8 +140,8 @@ class OwnerWorkIntegrationTest extends PostgresIntegrationTest {
         assertThat(checked.state()).isEqualTo(WorkState.SUSPENDED);
         assertThat(checked.runnable()).isFalse();
         assertThat(checked.reason())
-                .contains("message:move on queue orders.in")
-                .contains("message:send on address orders.out")
+                .contains("message:move on subscription orders.in")
+                .contains("message:send on destination orders.out")
                 .contains("enabled");
         // The suspension is kept: a later reader sees it without another check.
         assertThat(work.status("forward"))
@@ -170,7 +170,7 @@ class OwnerWorkIntegrationTest extends PostgresIntegrationTest {
 
         assertThatThrownBy(() -> work.enable("forward"))
                 .isInstanceOf(WorkRefusedException.class)
-                .hasMessageContaining("message:move on queue orders.in");
+                .hasMessageContaining("message:move on subscription orders.in");
         assertThat(work.status("forward"))
                 .get()
                 .satisfies(s -> assertThat(s.runnable()).isFalse());
@@ -233,7 +233,7 @@ class OwnerWorkIntegrationTest extends PostgresIntegrationTest {
 
     @Test
     void aNeedOnAResourceNamesItsCluster() {
-        ResourceRef ordersIn = ResourceRef.queue("orders.in");
+        ResourceRef ordersIn = ResourceRef.subscription("orders.in");
         assertThatThrownBy(() -> WorkNeed.on(null, ordersIn, "message:read"))
                 .isInstanceOf(IllegalArgumentException.class);
     }

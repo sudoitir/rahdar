@@ -25,7 +25,7 @@ function serveAccess(permissions: string[], teamAdmin: boolean) {
         anywhere: [],
         canSeeCluster: null,
         teams: [{ teamId: 't1', teamName: 'Orders', roleId: 'r1', roleName: 'TEAM_VIEWER', teamAdmin }],
-        createPatterns: { queue: [], address: [] },
+        createPatterns: { subscription: [], destination: [] },
       }),
     ),
   );

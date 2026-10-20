@@ -94,7 +94,7 @@ class McpToolCatalogueTest extends PostgresIntegrationTest {
                 null,
                 Set.of(
                         Permissions.CLUSTER_READ,
-                        MessagePermissions.QUEUE_PURGE,
+                        MessagePermissions.SUBSCRIPTION_PURGE,
                         MessagePermissions.MESSAGE_SEND,
                         SettingsPermissions.SETTINGS_WRITE));
 

@@ -15,9 +15,9 @@ import { KindField } from '../../ui/KindField.tsx';
 import { RoleGrants } from './RoleGrants.tsx';
 import { useScopeLabel } from './scope.ts';
 
-type Where = { clusterId: string | null; kind: 'QUEUE' | 'ADDRESS'; name: string };
+type Where = { clusterId: string | null; kind: 'SUBSCRIPTION' | 'DESTINATION'; name: string };
 
-const NOWHERE: Where = { clusterId: null, kind: 'QUEUE', name: '' };
+const NOWHERE: Where = { clusterId: null, kind: 'SUBSCRIPTION', name: '' };
 
 const rowKey = (v: AccessCheckView) => v.action;
 
@@ -26,13 +26,13 @@ function placeText(where: Where, cluster: string | undefined): string {
   if (!where.clusterId) return 'Rahdar itself, with no cluster';
   const name = where.name.trim();
   const on = cluster ?? 'the cluster';
-  const noun = where.kind === 'QUEUE' ? 'queue' : 'address';
+  const noun = where.kind === 'SUBSCRIPTION' ? 'subscription' : 'destination';
   return name ? `${noun} ${name} on ${on}` : `${on} as a whole`;
 }
 
 /**
  * A user's access, checked for a place (operator-ui spec): every permission with whether the user holds it there
- * and each source that gives it, a role granted at a scope, a team role on the team that owns the queue or address,
+ * and each source that gives it, a role granted at a scope, a team role on the team that owns the subscription or destination,
  * or a share from the owning team. Below it, the roles the user holds.
  */
 export function AccessCheckDrawer({
@@ -42,7 +42,7 @@ export function AccessCheckDrawer({
 }: Readonly<{
   user: { id: string; username: string } | null;
   /** Where to check to begin with, such as the queue the drawer was opened from; none starts at Rahdar itself. */
-  place?: { clusterId: string; kind: 'QUEUE' | 'ADDRESS'; name: string };
+  place?: { clusterId: string; kind: 'SUBSCRIPTION' | 'DESTINATION'; name: string };
   onClose: () => void;
 }>) {
   return (
@@ -108,20 +108,20 @@ function AccessCheck({ userId, place }: Readonly<{ userId: string; place?: Where
               clearable
             />
           </FieldRow>
-          {/* The kind first, then the name it qualifies, read as one phrase: "Queue orders". */}
+          {/* The kind first, then the name it qualifies, read as one phrase: "Subscription orders". */}
           <FieldRow>
             <KindField
               label="Kind"
               data={[
-                { value: 'QUEUE', label: 'Queue' },
-                { value: 'ADDRESS', label: 'Address' },
+                { value: 'SUBSCRIPTION', label: 'Subscription' },
+                { value: 'DESTINATION', label: 'Destination' },
               ]}
               value={draft.kind}
               onChange={(kind) => setDraft({ ...draft, kind })}
               disabled={!draft.clusterId}
             />
             <TextInput
-              label={draft.kind === 'QUEUE' ? 'Queue' : 'Address'}
+              label={draft.kind === 'SUBSCRIPTION' ? 'Subscription' : 'Destination'}
               description={draft.clusterId ? 'Leave empty to check the cluster as a whole.' : 'Choose a cluster first.'}
               value={draft.name}
               disabled={!draft.clusterId}

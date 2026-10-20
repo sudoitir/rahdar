@@ -14,21 +14,21 @@ const CLUSTER_ID = 'c1c1c1c1-0000-0000-0000-000000000000';
 const ENV_ID = 'e2e2e2e2-0000-0000-0000-000000000000';
 
 const perm = (over: Partial<EffectivePermissionView>): EffectivePermissionView => ({
-  action: 'queue:read',
+  action: 'subscription:read',
   description: null,
   scopeType: 'GLOBAL',
   scopeId: null,
   roleId: 'r-1',
   roleName: 'operator',
-  via: over.action ?? 'queue:read',
+  via: over.action ?? 'subscription:read',
   effective: true,
   reason: null,
   ...over,
 });
 
 const PERMISSIONS: EffectivePermissionView[] = [
-  perm({ action: 'queue:read', description: 'See queues' }),
-  perm({ action: 'queue:write', via: 'queue:*' }),
+  perm({ action: 'subscription:read', description: 'See queues' }),
+  perm({ action: 'subscription:write', via: 'subscription:*' }),
   perm({
     action: 'cluster:manage',
     scopeType: 'CLUSTER',
@@ -72,28 +72,28 @@ describe('RoleGrants', () => {
 
     serve(PERMISSIONS);
     await user.click(within(alert).getByRole('button', { name: 'Retry' }));
-    expect(await screen.findByText('queue:read')).toBeInTheDocument();
+    expect(await screen.findByText('subscription:read')).toBeInTheDocument();
   });
 
   it('groups permissions per scope and names the role and wildcard each came through', async () => {
     serve(PERMISSIONS);
     renderGrants();
 
-    await screen.findByText('queue:read');
+    await screen.findByText('subscription:read');
     expect(screen.getByText('Global')).toBeInTheDocument();
     expect(screen.getByText(`Cluster ${CLUSTER_ID.slice(0, 8)}`)).toBeInTheDocument();
     expect(screen.getByText(`Environment ${ENV_ID.slice(0, 8)}`)).toBeInTheDocument();
     // A scope with no id still names its kind.
     expect(screen.getByText('Environment')).toBeInTheDocument();
 
-    const read = screen.getByRole('row', { name: /queue:read/ });
+    const read = screen.getByRole('row', { name: /subscription:read/ });
     expect(read).toHaveTextContent('See queues');
     expect(read).toHaveTextContent('operator');
     expect(read).toHaveTextContent('Granted');
     expect(read).not.toHaveTextContent('through');
 
     // Granted by a wildcard: the pattern is named.
-    expect(screen.getByRole('row', { name: /queue:write/ })).toHaveTextContent('through queue:*');
+    expect(screen.getByRole('row', { name: /subscription:write/ })).toHaveTextContent('through subscription:*');
   });
 
   it('states a permission that has no effect at its scope, with the reason', async () => {
@@ -114,13 +114,13 @@ describe('RoleGrants', () => {
     const filter = await screen.findByRole('textbox', { name: 'Filter by permission or role' });
     await user.type(filter, 'AUDITOR');
     expect(screen.getByText('audit:read')).toBeInTheDocument();
-    expect(screen.queryByText('queue:read')).toBeNull();
+    expect(screen.queryByText('subscription:read')).toBeNull();
     // A scope whose rows are all filtered out disappears with them.
     expect(screen.queryByText('Global')).toBeNull();
 
     await user.clear(filter);
-    await user.type(filter, 'queue:w');
-    expect(screen.getByText('queue:write')).toBeInTheDocument();
+    await user.type(filter, 'subscription:w');
+    expect(screen.getByText('subscription:write')).toBeInTheDocument();
     expect(screen.queryByText('audit:read')).toBeNull();
 
     await user.clear(filter);
@@ -128,6 +128,6 @@ describe('RoleGrants', () => {
     expect(screen.getByText('Nothing matches “nothing-like-this”')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Clear filters' }));
     expect(filter).toHaveValue('');
-    expect(screen.getByText('queue:read')).toBeInTheDocument();
+    expect(screen.getByText('subscription:read')).toBeInTheDocument();
   });
 });

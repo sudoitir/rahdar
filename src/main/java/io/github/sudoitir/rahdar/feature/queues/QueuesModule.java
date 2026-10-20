@@ -3,7 +3,7 @@ package io.github.sudoitir.rahdar.feature.queues;
 import io.github.sudoitir.rahdar.kernel.plugin.FeatureDescriptor;
 import io.github.sudoitir.rahdar.kernel.plugin.McpToolDef;
 import io.github.sudoitir.rahdar.kernel.plugin.PermissionDef;
-import io.github.sudoitir.rahdar.kernel.plugin.ResourceKind;
+import io.github.sudoitir.rahdar.kernel.plugin.ResourceType;
 import io.github.sudoitir.rahdar.kernel.security.Permissions;
 import java.util.List;
 
@@ -15,44 +15,54 @@ public final class QueuesModule {
             .title("Queues")
             .kind(FeatureDescriptor.Kind.FEATURE)
             .permission(PermissionDef.resource(
-                    Permissions.QUEUE_READ, "See queues and their configuration", ResourceKind.QUEUE))
+                    Permissions.SUBSCRIPTION_READ,
+                    "See subscriptions and their configuration",
+                    ResourceType.SUBSCRIPTION))
             .permission(PermissionDef.resource(
-                    Permissions.ADDRESS_READ, "See addresses, their bindings and diverts", ResourceKind.ADDRESS))
+                    Permissions.DESTINATION_READ,
+                    "See destinations, their bindings and routes",
+                    ResourceType.DESTINATION))
             .permission(PermissionDef.resource(
-                    QueuePermissions.ADDRESS_CREATE,
-                    "Create addresses",
-                    ResourceKind.ADDRESS,
-                    Permissions.ADDRESS_READ))
+                    QueuePermissions.DESTINATION_CREATE,
+                    "Create destinations",
+                    ResourceType.DESTINATION,
+                    Permissions.DESTINATION_READ))
             .permission(PermissionDef.resource(
-                    QueuePermissions.ADDRESS_DELETE,
-                    "Destroy addresses",
-                    ResourceKind.ADDRESS,
-                    Permissions.ADDRESS_READ))
+                    QueuePermissions.DESTINATION_DELETE,
+                    "Destroy destinations",
+                    ResourceType.DESTINATION,
+                    Permissions.DESTINATION_READ))
             .permission(PermissionDef.resource(
-                    QueuePermissions.QUEUE_CREATE, "Create queues", ResourceKind.QUEUE, Permissions.QUEUE_READ))
+                    QueuePermissions.SUBSCRIPTION_CREATE,
+                    "Create subscriptions",
+                    ResourceType.SUBSCRIPTION,
+                    Permissions.SUBSCRIPTION_READ))
             .permission(PermissionDef.resource(
-                    QueuePermissions.QUEUE_DELETE, "Destroy queues", ResourceKind.QUEUE, Permissions.QUEUE_READ))
+                    QueuePermissions.SUBSCRIPTION_DELETE,
+                    "Destroy subscriptions",
+                    ResourceType.SUBSCRIPTION,
+                    Permissions.SUBSCRIPTION_READ))
             .permission(PermissionDef.resource(
-                    QueuePermissions.QUEUE_UPDATE,
-                    "Change a queue's configuration",
-                    ResourceKind.QUEUE,
-                    Permissions.QUEUE_READ))
+                    QueuePermissions.SUBSCRIPTION_UPDATE,
+                    "Change a subscription's configuration",
+                    ResourceType.SUBSCRIPTION,
+                    Permissions.SUBSCRIPTION_READ))
             .permission(PermissionDef.resource(
-                    QueuePermissions.QUEUE_PAUSE,
-                    "Pause and resume queues",
-                    ResourceKind.QUEUE,
-                    Permissions.QUEUE_READ))
+                    QueuePermissions.SUBSCRIPTION_PAUSE,
+                    "Pause and resume subscriptions",
+                    ResourceType.SUBSCRIPTION,
+                    Permissions.SUBSCRIPTION_READ))
             .permission(PermissionDef.resource(
-                    QueuePermissions.DIVERT_WRITE,
-                    "Create and delete diverts",
-                    ResourceKind.ADDRESS,
-                    Permissions.ADDRESS_READ))
+                    QueuePermissions.ROUTE_WRITE,
+                    "Create and delete routes",
+                    ResourceType.DESTINATION,
+                    Permissions.DESTINATION_READ))
             .apiPrefix("/api/v1/clusters/{clusterId}/queues")
             .apiPrefix("/api/v1/clusters/{clusterId}/addresses")
             .mcpTool(new McpToolDef(
                     "queue_lifecycle",
                     McpToolDef.Posture.MUTATE,
-                    "Create, update, pause, resume or destroy a queue, address or divert, cluster-wide.",
+                    "Create, update, pause, resume or destroy a subscription, destination or route, cluster-wide.",
                     List.of(
                             McpToolDef.Param.enumValues("kind", LifecycleKind.values(), null),
                             McpToolDef.Param.shape(

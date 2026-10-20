@@ -197,7 +197,7 @@ function pauseLabel(paused: boolean | undefined): string {
 }
 
 export function PauseResumeQueue({ clusterId, target, host }: Readonly<ActionProps<QueueTarget>>) {
-  const { hidden, verdict: gate } = useWriteGate(clusterId, target, 'queue:pause', 'Pause and resume queues');
+  const { hidden, verdict: gate } = useWriteGate(clusterId, target, 'subscription:pause', 'Pause and resume queues');
   const { queue } = useQueue(clusterId, target.queueName, target.snapshot);
   const paused = queue ? queue.perNode.some((n) => n.paused) : undefined;
   const label = pauseLabel(paused);
@@ -220,7 +220,7 @@ export function PauseResumeQueue({ clusterId, target, host }: Readonly<ActionPro
 }
 
 export function EditQueue({ clusterId, target, host }: Readonly<ActionProps<QueueTarget>>) {
-  const { hidden, verdict: gate } = useWriteGate(clusterId, target, 'queue:update', "Change a queue's configuration");
+  const { hidden, verdict: gate } = useWriteGate(clusterId, target, 'subscription:update', "Change a queue's configuration");
   if (hidden) return null;
   return (
     <ActionMenuItem
@@ -240,7 +240,7 @@ export function EditQueue({ clusterId, target, host }: Readonly<ActionProps<Queu
 }
 
 export function DeleteQueue({ clusterId, target, host }: Readonly<ActionProps<QueueTarget>>) {
-  const { hidden, verdict: gate } = useWriteGate(clusterId, target, 'queue:delete', 'Destroy queues and addresses');
+  const { hidden, verdict: gate } = useWriteGate(clusterId, target, 'subscription:delete', 'Destroy queues and addresses');
   if (hidden) return null;
   return (
     <ActionMenuItem

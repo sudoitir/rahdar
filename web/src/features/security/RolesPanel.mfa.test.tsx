@@ -46,7 +46,7 @@ function serve(roles: RoleView[]) {
             featureId: 'audit',
             featureTitle: 'Audit',
             scope: 'CLUSTER',
-            resourceKinds: [],
+            resourceTypes: [],
             requires: [],
           },
         ]),

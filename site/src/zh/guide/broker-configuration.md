@@ -138,7 +138,7 @@ Drift 标签页以一句话给出结论——*All 3 live nodes match revision 7*
 | `config:write` | 保存版本、导入、采纳、更改模式 |
 | `config:apply` | 预览并应用 |
 
-`config:apply` 是创建与更新的权限：它从不意味着删除队列或 address。内置管理员角色拥有全部权限；把两个 `config:*` 权限授予操作员角色，方式与 `queue:create` 或 `divert:write` 相同。
+`config:apply` 是创建与更新的权限：它从不意味着删除队列或 address。内置管理员角色拥有全部权限；把两个 `config:*` 权限授予操作员角色，方式与 `subscription:create` 或 `route:write` 相同。
 
 ## 通过 MCP
 

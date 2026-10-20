@@ -30,7 +30,7 @@ import org.springframework.web.bind.annotation.RestController;
  * A cluster's routing: its diverts and its bridges.
  *
  * <p>Reading either needs only {@code cluster:read}. Creating or deleting a divert
- * needs {@code divert:write} — a divert changes where traffic goes rather than what
+ * needs {@code route:write} — a divert changes where traffic goes rather than what
  * a queue holds, so the queue authorities are the wrong ones — and fans out across
  * every live node with the same per-node outcomes as every other topology mutation.
  *

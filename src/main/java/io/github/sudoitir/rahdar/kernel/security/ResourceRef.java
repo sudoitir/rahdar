@@ -1,22 +1,22 @@
 package io.github.sudoitir.rahdar.kernel.security;
 
 import io.github.sudoitir.rahdar.kernel.plugin.PluginApi;
-import io.github.sudoitir.rahdar.kernel.plugin.ResourceKind;
+import io.github.sudoitir.rahdar.kernel.plugin.ResourceType;
 
-/** A queue or an address of a cluster, by name: what a resource permission is checked against. */
+/** A subscription or a destination of a cluster, by name: what a resource permission is checked against. */
 @PluginApi
-public record ResourceRef(ResourceKind kind, String name) {
+public record ResourceRef(ResourceType type, String name) {
 
-    /** The permission that lets a caller see a resource of this kind at all, and that every other permission on it requires. */
+    /** The permission that lets a caller see a resource of this type at all, and that every other permission on it requires. */
     public String readPermission() {
-        return Permissions.readOf(kind);
+        return Permissions.readOf(type);
     }
 
-    public static ResourceRef queue(String name) {
-        return new ResourceRef(ResourceKind.QUEUE, name);
+    public static ResourceRef subscription(String name) {
+        return new ResourceRef(ResourceType.SUBSCRIPTION, name);
     }
 
-    public static ResourceRef address(String name) {
-        return new ResourceRef(ResourceKind.ADDRESS, name);
+    public static ResourceRef destination(String name) {
+        return new ResourceRef(ResourceType.DESTINATION, name);
     }
 }

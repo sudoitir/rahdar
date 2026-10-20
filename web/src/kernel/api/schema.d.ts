@@ -3517,7 +3517,7 @@ export interface components {
             /** Format: uuid */
             clusterId: string;
             /** @enum {string} */
-            kind: "QUEUE" | "ADDRESS" | "BOTH";
+            kind: "SUBSCRIPTION" | "DESTINATION" | "ANY";
             pattern: string;
         };
         /** @description covered is false when the owner's patterns no longer contain the shared pattern; the share then grants nothing until they do again. */
@@ -3533,7 +3533,7 @@ export interface components {
             /** Format: uuid */
             clusterId: string;
             /** @enum {string} */
-            kind: "QUEUE" | "ADDRESS" | "BOTH";
+            kind: "SUBSCRIPTION" | "DESTINATION" | "ANY";
             pattern: string;
             /** Format: uuid */
             roleId: string;
@@ -3560,7 +3560,7 @@ export interface components {
             permissions: string[];
             /** @description Whether password accounts holding this role need a second factor. Single sign-on users rely on their identity provider's own MFA. */
             requiresMfa: boolean;
-            /** @description Whether the role may be given to a team's members or in a share. A team role holds only permissions that act on a queue or address, and team:admin. */
+            /** @description Whether the role may be given to a team's members or in a share. A team role holds only permissions that act on a subscription or destination, and team:admin. */
             teamAssignable: boolean;
         };
         RoleView: {
@@ -4089,9 +4089,9 @@ export interface components {
             scopeType: string;
             /** Format: uuid */
             scopeId?: string | null;
-            /** @description QUEUE or ADDRESS: limits the grant to names matching resourcePattern */
-            resourceKind?: string | null;
-            /** @description An Artemis wildcard pattern, with resourceKind; absent for the whole scope */
+            /** @description SUBSCRIPTION or DESTINATION: limits the grant to names matching resourcePattern */
+            resourceType?: string | null;
+            /** @description An Artemis wildcard pattern, with resourceType; absent for the whole scope */
             resourcePattern?: string | null;
         };
         CreatedTokenView: {
@@ -4103,7 +4103,7 @@ export interface components {
             scopeType: string;
             /** Format: uuid */
             scopeId: string;
-            resourceKind?: string | null;
+            resourceType?: string | null;
             resourcePattern?: string | null;
         };
         TokenView: {
@@ -4132,7 +4132,7 @@ export interface components {
             /** Format: uuid */
             clusterId: string;
             /** @enum {string} */
-            kind: "QUEUE" | "ADDRESS" | "BOTH";
+            kind: "SUBSCRIPTION" | "DESTINATION" | "ANY";
             pattern: string;
             /** Format: uuid */
             roleId: string;
@@ -4141,7 +4141,7 @@ export interface components {
             /** Format: uuid */
             clusterId: string;
             /** @enum {string} */
-            kind: "QUEUE" | "ADDRESS" | "BOTH";
+            kind: "SUBSCRIPTION" | "DESTINATION" | "ANY";
             pattern: string;
         };
         /** @description A user (userId), or a directory group (providerId and groupName). */
@@ -4288,7 +4288,7 @@ export interface components {
         HeldOperationSummaryView: {
             /** Format: uuid */
             id: string;
-            /** @description The operation type, such as queue.purge. */
+            /** @description The operation type, such as subscription.purge. */
             type: string;
             /** @enum {string} */
             state: "HELD" | "APPROVED" | "EXECUTING" | "REJECTED" | "CANCELLED" | "EXPIRED" | "SUCCEEDED" | "FAILED" | "REFUSED" | "OUTCOME_UNKNOWN";
@@ -5810,29 +5810,29 @@ export interface components {
             teamId: string;
             teamName: string;
             /** @enum {string} */
-            kind: "QUEUE" | "ADDRESS" | "BOTH";
+            kind: "SUBSCRIPTION" | "DESTINATION" | "ANY";
             pattern: string;
         };
         PatternPreview: {
             /** Format: uuid */
             clusterId: string;
             /** @enum {string} */
-            kind: "QUEUE" | "ADDRESS" | "BOTH";
+            kind: "SUBSCRIPTION" | "DESTINATION" | "ANY";
             pattern: string;
             /**
              * Format: int32
-             * @description Queues on the cluster the pattern matches.
+             * @description Subscriptions on the cluster the pattern matches.
              */
-            queueMatches: number;
+            subscriptionMatches: number;
             /**
              * Format: int32
-             * @description Addresses on the cluster the pattern matches.
+             * @description Destinations on the cluster the pattern matches.
              */
-            addressMatches: number;
-            /** @description Up to 20 matching queue names. */
-            queueExamples: string[];
-            /** @description Up to 20 matching address names. */
-            addressExamples: string[];
+            destinationMatches: number;
+            /** @description Up to 20 matching subscription names. */
+            subscriptionExamples: string[];
+            /** @description Up to 20 matching destination names. */
+            destinationExamples: string[];
             conflicts: components["schemas"]["PatternConflict"][];
         };
         PagedViewUserLookup: {
@@ -5861,7 +5861,7 @@ export interface components {
             featureTitle: string;
             /** @enum {string} */
             scope: "GLOBAL" | "CLUSTER" | "RESOURCE";
-            resourceKinds: ("QUEUE" | "ADDRESS")[];
+            resourceTypes: ("DESTINATION" | "SUBSCRIPTION")[];
             requires: string[];
         };
         /** @description The team roles a team admin may give, and the catalogue entries their permissions name. */
@@ -6110,18 +6110,18 @@ export interface components {
         AccessSummary: {
             /** @description Every catalogue permission the caller holds on the cluster, or globally when no cluster is asked about: through a role grant at global, environment or cluster scope. */
             permissions: string[];
-            /** @description Resource permissions the caller holds on some queue or address of the cluster, through a grant, a team or a share. Empty when no cluster is asked about. */
+            /** @description Resource permissions the caller holds on some subscription or destination of the cluster, through a grant, a team or a share. Empty when no cluster is asked about. */
             anywhere: string[];
             /** @description Whether the caller may see the cluster at all; null when no cluster is asked about. */
             canSeeCluster?: boolean | null;
             teams: components["schemas"]["TeamMembership"][];
-            /** @description Patterns on which the caller may create a queue or address through a team or a share. A grant that reaches the cluster allows any name and shows in permissions. */
+            /** @description Patterns on which the caller may create a subscription or destination through a team or a share. A grant that reaches the cluster allows any name and shows in permissions. */
             createPatterns: components["schemas"]["CreatePatterns"];
         };
         /** @description Name patterns, as written, that the caller may create under. Empty when none. */
         CreatePatterns: {
-            queue: string[];
-            address: string[];
+            subscription: string[];
+            destination: string[];
         };
         /** @description A team the caller belongs to, with the team role they hold in it. */
         TeamMembership: {
@@ -6134,7 +6134,7 @@ export interface components {
             /** @description Whether the team role holds team:admin. */
             teamAdmin: boolean;
         };
-        /** @description What the caller may do with one queue or address: the actions they hold on it. */
+        /** @description What the caller may do with one subscription or destination: the actions they hold on it. */
         MyResourceAccess: {
             /** @description The resource permissions the caller holds on it, through a grant, a team or a share, including plugins'. Empty for a resource they may not read. */
             actions: string[];
@@ -6669,7 +6669,7 @@ export interface components {
             /** Format: int64 */
             producerCount: number;
             creationTime?: string | null;
-            /** @description The actions of the catalogue that apply to this row and that the caller holds on it, such as queue:purge. The console gates its controls from this. */
+            /** @description The actions of the catalogue that apply to this row and that the caller holds on it, such as subscription:purge. The console gates its controls from this. */
             allowedActions: string[];
         };
         AddressStatsView: {
@@ -6841,12 +6841,12 @@ export interface components {
             summary: string;
             remedy: string;
         };
-        /** @description Who has access to one queue or address through teams: its owner and every share. */
+        /** @description Who has access to one subscription or destination through teams: its owner and every share. */
         ResourceAccessView: {
             ownerTeam?: components["schemas"]["TeamRef"] | null;
             grants: components["schemas"]["ResourceTeamGrant"][];
         };
-        /** @description One team role that reaches a queue or address, and how many members hold it: a role of the owning team, or the role a share gives another team. */
+        /** @description One team role that reaches a subscription or destination, and how many members hold it: a role of the owning team, or the role a share gives another team. */
         ResourceTeamGrant: {
             /** Format: uuid */
             teamId: string;
@@ -6920,7 +6920,7 @@ export interface components {
             /** @description True when the queue is paused on at least one node. A queue paused on some nodes and not others is a divergence the operator needs to see, so this is deliberately 'any', not 'all' — perNode says which. */
             paused: boolean;
             perNode: components["schemas"]["QueueNodeCell"][];
-            /** @description The actions of the catalogue that apply to this row and that the caller holds on it, such as queue:purge. The console gates its controls from this. */
+            /** @description The actions of the catalogue that apply to this row and that the caller holds on it, such as subscription:purge. The console gates its controls from this. */
             allowedActions: string[];
             ownerTeam?: components["schemas"]["TeamRef"] | null;
         };
@@ -7048,7 +7048,7 @@ export interface components {
             protocol?: string | null;
             /** Format: int64 */
             messagesSent: number;
-            /** @description The actions of the catalogue that apply to this row and that the caller holds on it, such as queue:purge. The console gates its controls from this. */
+            /** @description The actions of the catalogue that apply to this row and that the caller holds on it, such as subscription:purge. The console gates its controls from this. */
             allowedActions: string[];
         };
         /** @description One configuration key on one node */
@@ -7387,7 +7387,7 @@ export interface components {
              * @description Messages delivered to this consumer and not yet acknowledged.
              */
             messagesInFlight: number;
-            /** @description The actions of the catalogue that apply to this row and that the caller holds on it, such as queue:purge. The console gates its controls from this. */
+            /** @description The actions of the catalogue that apply to this row and that the caller holds on it, such as subscription:purge. The console gates its controls from this. */
             allowedActions: string[];
         };
         PagedViewConsumerView: {
@@ -7485,7 +7485,7 @@ export interface components {
             /** Format: int64 */
             sessionCount: number;
             creationTime?: string | null;
-            /** @description The actions of the catalogue that apply to this row and that the caller holds on it, such as queue:purge. The console gates its controls from this. */
+            /** @description The actions of the catalogue that apply to this row and that the caller holds on it, such as subscription:purge. The console gates its controls from this. */
             allowedActions: string[];
         };
         PagedViewConnectionView: {
@@ -7919,7 +7919,7 @@ export interface components {
             queueCount: number;
             /** Format: int64 */
             messageCount: number;
-            /** @description The actions of the catalogue that apply to this row and that the caller holds on it, such as queue:purge. The console gates its controls from this. */
+            /** @description The actions of the catalogue that apply to this row and that the caller holds on it, such as subscription:purge. The console gates its controls from this. */
             allowedActions: string[];
             ownerTeam?: components["schemas"]["TeamRef"] | null;
         };
@@ -17650,7 +17650,7 @@ export interface operations {
         parameters: {
             query?: {
                 clusterId?: string;
-                kind?: "QUEUE" | "ADDRESS";
+                type?: "DESTINATION" | "SUBSCRIPTION";
                 name?: string;
                 page?: number;
                 size?: number;
@@ -17882,7 +17882,7 @@ export interface operations {
         parameters: {
             query: {
                 clusterId: string;
-                kind: "QUEUE" | "ADDRESS" | "BOTH";
+                kind: "SUBSCRIPTION" | "DESTINATION" | "ANY";
                 pattern: string;
             };
             header?: never;
@@ -18509,7 +18509,7 @@ export interface operations {
         parameters: {
             query: {
                 clusterId: string;
-                kind: "QUEUE" | "ADDRESS";
+                type: "DESTINATION" | "SUBSCRIPTION";
                 name: string;
             };
             header?: never;
@@ -19300,7 +19300,7 @@ export interface operations {
     unowned: {
         parameters: {
             query: {
-                kind: "QUEUE" | "ADDRESS";
+                type: "DESTINATION" | "SUBSCRIPTION";
                 page?: number;
                 size?: number;
             };
@@ -20010,7 +20010,7 @@ export interface operations {
     resourceAccess: {
         parameters: {
             query: {
-                kind: "QUEUE" | "ADDRESS";
+                type: "DESTINATION" | "SUBSCRIPTION";
                 name: string;
             };
             header?: never;

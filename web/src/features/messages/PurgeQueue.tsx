@@ -68,7 +68,7 @@ export function PurgeQueue({
   const [preview, setPreview] = useState<DryRunView | null>(null);
   const [failure, setFailure] = useState<ApiError | null>(null);
   const overCap = preview?.overCap ?? false;
-  const gate = useMessageGate(clusterId, 'queue:purge', 'Purge queues', 'messageIo');
+  const gate = useMessageGate(clusterId, 'subscription:purge', 'Purge queues', 'messageIo');
 
   const estimate = () => {
     setPreview(null);

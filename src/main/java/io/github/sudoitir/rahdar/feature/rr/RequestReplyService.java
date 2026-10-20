@@ -21,7 +21,7 @@ import io.github.sudoitir.rahdar.kernel.audit.AuditService;
 import io.github.sudoitir.rahdar.kernel.core.ConflictException;
 import io.github.sudoitir.rahdar.kernel.core.NotFoundException;
 import io.github.sudoitir.rahdar.kernel.core.PagedView;
-import io.github.sudoitir.rahdar.kernel.plugin.ResourceKind;
+import io.github.sudoitir.rahdar.kernel.plugin.ResourceType;
 import io.github.sudoitir.rahdar.kernel.security.ActorResolver;
 import io.github.sudoitir.rahdar.kernel.security.ClusterAccessGuard;
 import io.github.sudoitir.rahdar.kernel.security.ClusterAccessGuard.Requirement;
@@ -94,7 +94,7 @@ public class RequestReplyService {
 
     /** The cluster's expectations whose request and reply addresses the caller may all read. */
     private List<RrExpectationEntity> readableExpectations(UUID clusterId) {
-        ResourceFilter addresses = permissions.filter(clusterId, ResourceKind.ADDRESS);
+        ResourceFilter addresses = permissions.filter(clusterId, ResourceType.DESTINATION);
         return expectations.findByClusterIdOrderByRequestAddress(clusterId).stream()
                 .filter(e -> readable(addresses, e.getRequestAddress(), e.getReplyAddresses()))
                 .toList();
@@ -113,7 +113,7 @@ public class RequestReplyService {
         clusterAccess.requireAll(
                 clusterId,
                 Stream.concat(Stream.of(requestAddress), replyAddresses.stream())
-                        .map(a -> new Requirement(ResourceRef.address(a), Permissions.ADDRESS_READ))
+                        .map(a -> new Requirement(ResourceRef.destination(a), Permissions.DESTINATION_READ))
                         .toList());
     }
 
@@ -197,7 +197,7 @@ public class RequestReplyService {
     /** The expectation, when the caller may read the addresses it traces: otherwise it is not there for them. */
     private RrExpectationEntity writable(UUID clusterId, UUID expectationId) {
         clusterAccess.requireCluster(clusterId, RrPermissions.RR_WRITE);
-        ResourceFilter addresses = permissions.filter(clusterId, ResourceKind.ADDRESS);
+        ResourceFilter addresses = permissions.filter(clusterId, ResourceType.DESTINATION);
         return expectations
                 .findById(expectationId)
                 .filter(e -> e.getClusterId().equals(clusterId))
@@ -243,7 +243,7 @@ public class RequestReplyService {
     @Transactional(readOnly = true)
     public PagedView<FlowView> flowPage(UUID clusterId, FlowQuery query) {
         clusterAccess.requireVisible(clusterId);
-        ResourceFilter addresses = permissions.filter(clusterId, ResourceKind.ADDRESS);
+        ResourceFilter addresses = permissions.filter(clusterId, ResourceType.DESTINATION);
         // Filtered in the query, before paging, so a total never counts a flow on an address the caller cannot read.
         List<String> readable = addresses.everything()
                 ? List.of("")
@@ -271,7 +271,7 @@ public class RequestReplyService {
     @Transactional(readOnly = true)
     public FlowView flow(UUID clusterId, UUID flowId) {
         clusterAccess.requireVisible(clusterId);
-        ResourceFilter addresses = permissions.filter(clusterId, ResourceKind.ADDRESS);
+        ResourceFilter addresses = permissions.filter(clusterId, ResourceType.DESTINATION);
         RrFlowEntity entity = flows.findById(flowId)
                 .filter(f -> f.getClusterId().equals(clusterId))
                 .filter(f -> addresses.readable(f.getRequestAddress()))

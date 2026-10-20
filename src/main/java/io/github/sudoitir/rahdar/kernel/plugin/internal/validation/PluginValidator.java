@@ -54,11 +54,11 @@ public class PluginValidator {
             "Declare that permission under permissions, or name one that is declared.";
 
     private static final Pattern METRIC_NAME = Pattern.compile("[a-z0-9-]+:[a-z][a-z0-9_.]{0,63}");
-    private static final String RESOURCE_KINDS_CODE = "permission-resource-kinds";
+    private static final String RESOURCE_TYPES_CODE = "permission-resource-types";
     private static final String SCOPE_RESOURCE = "resource";
     private static final String MCP_TOOL_RESOURCE = "mcp-tool-resource";
     private static final Set<String> SCOPES = Set.of("global", "cluster", SCOPE_RESOURCE);
-    private static final Set<String> RESOURCE_KINDS = Set.of("queue", "address");
+    private static final Set<String> RESOURCE_TYPES = Set.of("subscription", "destination");
     private static final Set<String> METRIC_UNITS = Set.of("count", "per_second", "ms", "ratio");
     private static final Set<String> DENIED_MANIFEST_ATTRIBUTES =
             Set.of("Class-Path", "Launcher-Agent-Class", "Add-Opens", "Add-Exports", "Enable-Native-Access");
@@ -540,25 +540,25 @@ public class PluginValidator {
                         "Permission \"%s\" declares scope \"%s\", which is not one of global, cluster or resource."
                                 .formatted(action, permission.scope()),
                         "Declare scope as \"global\", \"cluster\" or \"resource\"."));
-            } else if (resource && permission.resourceKinds().isEmpty()) {
+            } else if (resource && permission.resourceTypes().isEmpty()) {
                 violations.add(new Violation(
-                        RESOURCE_KINDS_CODE,
-                        "Permission \"%s\" has scope \"resource\" but names no resourceKinds.".formatted(action),
-                        "Declare resourceKinds as [\"queue\"], [\"address\"] or both."));
-            } else if (!resource && !permission.resourceKinds().isEmpty()) {
+                        RESOURCE_TYPES_CODE,
+                        "Permission \"%s\" has scope \"resource\" but names no resourceTypes.".formatted(action),
+                        "Declare resourceTypes as [\"subscription\"], [\"destination\"] or both."));
+            } else if (!resource && !permission.resourceTypes().isEmpty()) {
                 violations.add(new Violation(
-                        RESOURCE_KINDS_CODE,
-                        "Permission \"%s\" names resourceKinds but its scope is \"%s\"."
+                        RESOURCE_TYPES_CODE,
+                        "Permission \"%s\" names resourceTypes but its scope is \"%s\"."
                                 .formatted(action, permission.scope()),
-                        "Remove resourceKinds, or change the scope to \"resource\"."));
+                        "Remove resourceTypes, or change the scope to \"resource\"."));
             }
-            permission.resourceKinds().stream()
-                    .filter(kind -> !RESOURCE_KINDS.contains(kind))
+            permission.resourceTypes().stream()
+                    .filter(kind -> !RESOURCE_TYPES.contains(kind))
                     .forEach(kind -> violations.add(new Violation(
-                            RESOURCE_KINDS_CODE,
-                            "Permission \"%s\" names resource kind \"%s\", which is not queue or address."
+                            RESOURCE_TYPES_CODE,
+                            "Permission \"%s\" names resource type \"%s\", which is not subscription or destination."
                                     .formatted(action, kind),
-                            "Name \"queue\", \"address\" or both.")));
+                            "Name \"subscription\", \"destination\" or both.")));
             permission.requires().stream()
                     .filter(String::isBlank)
                     .forEach(required -> violations.add(new Violation(
@@ -605,25 +605,25 @@ public class PluginValidator {
             PluginDescriptor.McpTool tool, PluginDescriptor.Permission permission, List<Violation> violations) {
         boolean resource = SCOPE_RESOURCE.equals(tool.scope());
         boolean named = tool.resourceArg() != null && !tool.resourceArg().isBlank();
-        if (resource && (!named || tool.resourceKind() == null)) {
+        if (resource && (!named || tool.resourceType() == null)) {
             violations.add(new Violation(
                     MCP_TOOL_RESOURCE,
-                    "Assistant tool \"%s\" has scope \"resource\" but does not name resourceArg and resourceKind."
+                    "Assistant tool \"%s\" has scope \"resource\" but does not name resourceArg and resourceType."
                             .formatted(tool.name()),
-                    "Name the tool's string argument that holds the queue or address, as resourceArg, and its"
-                            + " resourceKind, \"queue\" or \"address\"."));
-        } else if (!resource && (named || tool.resourceKind() != null)) {
+                    "Name the tool's string argument that holds the subscription or destination, as resourceArg, and its"
+                            + " resourceType, \"subscription\" or \"destination\"."));
+        } else if (!resource && (named || tool.resourceType() != null)) {
             violations.add(new Violation(
                     MCP_TOOL_RESOURCE,
-                    "Assistant tool \"%s\" names a resourceArg or resourceKind but its scope is \"%s\"."
+                    "Assistant tool \"%s\" names a resourceArg or resourceType but its scope is \"%s\"."
                             .formatted(tool.name(), tool.scope()),
                     "Remove them, or change the scope to \"resource\"."));
-        } else if (resource && permission != null && !permission.resourceKinds().contains(tool.resourceKind())) {
+        } else if (resource && permission != null && !permission.resourceTypes().contains(tool.resourceType())) {
             violations.add(new Violation(
                     MCP_TOOL_RESOURCE,
                     "Assistant tool \"%s\" acts on a %s but its permission \"%s\" acts on %s."
-                            .formatted(tool.name(), tool.resourceKind(), tool.permission(), permission.resourceKinds()),
-                    "Name a resourceKind the permission's resourceKinds include."));
+                            .formatted(tool.name(), tool.resourceType(), tool.permission(), permission.resourceTypes()),
+                    "Name a resourceType the permission's resourceTypes include."));
         }
     }
 

@@ -9,7 +9,7 @@ import io.github.sudoitir.rahdar.kernel.plugin.CatalogueEntry;
 import io.github.sudoitir.rahdar.kernel.plugin.FeatureRegistry;
 import io.github.sudoitir.rahdar.kernel.plugin.PermissionScope;
 import io.github.sudoitir.rahdar.kernel.plugin.PluginHandle;
-import io.github.sudoitir.rahdar.kernel.plugin.ResourceKind;
+import io.github.sudoitir.rahdar.kernel.plugin.ResourceType;
 import io.github.sudoitir.rahdar.kernel.plugin.internal.descriptor.PluginDescriptor;
 import io.github.sudoitir.rahdar.kernel.security.Permissions;
 import java.util.List;
@@ -29,7 +29,7 @@ class PermissionDeclarationsTest {
             // Only the annotation is read.
         }
 
-        @PreAuthorize("@perm.can(#clusterId, 'queue:read') and @perm.can(#clusterId, #permission)")
+        @PreAuthorize("@perm.can(#clusterId, 'subscription:read') and @perm.can(#clusterId, #permission)")
         public void literalWithCluster(String clusterId, String permission) {
             // Only the annotation is read.
         }
@@ -54,7 +54,7 @@ class PermissionDeclarationsTest {
                 "security",
                 "Security",
                 scope,
-                scope == PermissionScope.RESOURCE ? Set.of(ResourceKind.QUEUE) : Set.of(),
+                scope == PermissionScope.RESOURCE ? Set.of(ResourceType.SUBSCRIPTION) : Set.of(),
                 Set.of(requires));
     }
 
@@ -71,12 +71,15 @@ class PermissionDeclarationsTest {
     void guardsReadConstantsAndLiteralsAndSkipVariablesAndWildcards() {
         assertThat(GuardPermissions.of(Guarded.class, getClass().getClassLoader()))
                 .extracting(GuardPermissions.GuardRef::permission, GuardPermissions.GuardRef::withCluster)
-                .containsExactlyInAnyOrder(Tuple.tuple(Permissions.USER_ADMIN, false), Tuple.tuple("queue:read", true));
+                .containsExactlyInAnyOrder(
+                        Tuple.tuple(Permissions.USER_ADMIN, false), Tuple.tuple("subscription:read", true));
     }
 
     @Test
     void healthyWhenEveryGuardedPermissionIsRegisteredAndDescribed() {
-        catalogue(entry(Permissions.USER_ADMIN, PermissionScope.GLOBAL), entry("queue:read", PermissionScope.RESOURCE));
+        catalogue(
+                entry(Permissions.USER_ADMIN, PermissionScope.GLOBAL),
+                entry("subscription:read", PermissionScope.RESOURCE));
         rahdarBeans();
 
         assertThat(declarations.mismatches()).isEmpty();
@@ -90,12 +93,14 @@ class PermissionDeclarationsTest {
         assertThat(declarations.mismatches())
                 .singleElement()
                 .asString()
-                .contains("'queue:read'", "Guarded#literalWithCluster", "not in the permission catalogue");
+                .contains("'subscription:read'", "Guarded#literalWithCluster", "not in the permission catalogue");
     }
 
     @Test
     void reportsAGlobalPermissionCheckedAgainstACluster() {
-        catalogue(entry(Permissions.USER_ADMIN, PermissionScope.GLOBAL), entry("queue:read", PermissionScope.GLOBAL));
+        catalogue(
+                entry(Permissions.USER_ADMIN, PermissionScope.GLOBAL),
+                entry("subscription:read", PermissionScope.GLOBAL));
         rahdarBeans();
 
         assertThat(declarations.mismatches()).singleElement().asString().contains("global scope");
@@ -103,12 +108,12 @@ class PermissionDeclarationsTest {
 
     @Test
     void reportsARequiredPermissionThatIsNotInTheCatalogue() {
-        catalogue(entry("queue:purge", PermissionScope.RESOURCE, "queue:read"));
+        catalogue(entry("subscription:purge", PermissionScope.RESOURCE, "subscription:read"));
 
         assertThat(declarations.mismatches())
                 .singleElement()
                 .asString()
-                .contains("'queue:purge'", "requires 'queue:read'", "not in the permission catalogue");
+                .contains("'subscription:purge'", "requires 'subscription:read'", "not in the permission catalogue");
     }
 
     @Test
@@ -128,7 +133,7 @@ class PermissionDeclarationsTest {
     @Test
     void reportsAResourcePermissionThatNamesNoKind() {
         catalogue(new CatalogueEntry(
-                "queue:read", "Read", "queues", "Queues", PermissionScope.RESOURCE, Set.of(), Set.of()));
+                "subscription:read", "Read", "queues", "Queues", PermissionScope.RESOURCE, Set.of(), Set.of()));
 
         assertThat(declarations.mismatches()).singleElement().asString().contains("names no kind");
     }
@@ -138,7 +143,7 @@ class PermissionDeclarationsTest {
         catalogue(RahdarFeatures.descriptors().stream()
                 .flatMap(d -> d.permissions().stream()
                         .map(p -> new CatalogueEntry(
-                                p.action(), p.label(), d.id(), d.title(), p.scope(), p.resourceKinds(), p.requires())))
+                                p.action(), p.label(), d.id(), d.title(), p.scope(), p.resourceTypes(), p.requires())))
                 .toArray(CatalogueEntry[]::new));
 
         assertThat(declarations.mismatches()).isEmpty();
@@ -147,7 +152,13 @@ class PermissionDeclarationsTest {
     @Test
     void reportsAnUndescribedEntry() {
         catalogue(new CatalogueEntry(
-                "queue:read", " ", "queues", "Queues", PermissionScope.RESOURCE, Set.of(ResourceKind.QUEUE), Set.of()));
+                "subscription:read",
+                " ",
+                "queues",
+                "Queues",
+                PermissionScope.RESOURCE,
+                Set.of(ResourceType.SUBSCRIPTION),
+                Set.of()));
 
         assertThat(declarations.mismatches()).singleElement().asString().contains("no description");
     }

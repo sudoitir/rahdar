@@ -195,7 +195,7 @@ class PluginMessagingRealBrokerTest extends PostgresIntegrationTest {
                 clusterId, node.getId(), new NodeOverrideRequest(null, ArtemisIntegrationTest.coreUrl()));
         client = ArtemisIntegrationTest.jolokiaClient(ArtemisIntegrationTest.jolokiaUrl());
         broker = client.resolveBrokerObjectName();
-        operator = user(Set.of("message:read", "message:send", "queue:purge"));
+        operator = user(Set.of("message:read", "message:send", "subscription:purge"));
 
         ActiveMQConnectionFactory factory = new ActiveMQConnectionFactory(ArtemisIntegrationTest.coreUrl());
         jms = factory.createConnection(ArtemisIntegrationTest.BROKER_USER, ArtemisIntegrationTest.BROKER_PASSWORD);
@@ -698,7 +698,7 @@ class PluginMessagingRealBrokerTest extends PostgresIntegrationTest {
                 .hasMessageContaining("message:read");
         assertThatThrownBy(() -> messaging.register(unpurgeable))
                 .isInstanceOf(RegistrationRefusedException.class)
-                .hasMessageContaining("queue:purge");
+                .hasMessageContaining("subscription:purge");
         assertThatThrownBy(() -> messaging.register(reserved))
                 .isInstanceOf(RegistrationRefusedException.class)
                 .hasMessageContaining("reserved");

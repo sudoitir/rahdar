@@ -338,7 +338,7 @@ export function ResourceView({ kind }: Readonly<{ kind: Kind }>) {
             about={config.about}
             filterText={search.q ?? ''}
             unreachable={unreachable}
-            reach={kind === 'addresses' ? reach('address:read', clusterId) : 'grant'}
+            reach={kind === 'addresses' ? reach('destination:read', clusterId) : 'grant'}
             onClearFilter={() => {
               setFilter('');
               void navigate({

@@ -135,7 +135,7 @@ public class TransferService {
      */
     public TransferRunView preview(UUID clusterId, TransferPreviewRequest request) {
         TransferMode mode = request.mode();
-        access.requireResource(clusterId, ResourceRef.queue(request.sourceQueue()), mode.sourcePermission());
+        access.requireResource(clusterId, ResourceRef.subscription(request.sourceQueue()), mode.sourcePermission());
         access.requireVisible(request.targetClusterId());
         TransferSelection selection = normalise(request.selection());
 
@@ -298,8 +298,9 @@ public class TransferService {
             access.requireAll(
                     cluster,
                     List.of(
-                            new Requirement(ResourceRef.queue(request.targetQueue()), Permissions.QUEUE_READ),
-                            new Requirement(ResourceRef.address(bound), MessagePermissions.MESSAGE_SEND)));
+                            new Requirement(
+                                    ResourceRef.subscription(request.targetQueue()), Permissions.SUBSCRIPTION_READ),
+                            new Requirement(ResourceRef.destination(bound), MessagePermissions.MESSAGE_SEND)));
             if (supplied != null && !supplied.equals(bound)) {
                 throw new TransferRefusedException(
                         HttpStatus.UNPROCESSABLE_ENTITY,
@@ -310,9 +311,10 @@ public class TransferService {
             return bound;
         }
         String address = supplied != null ? supplied : request.targetQueue();
-        access.requireCreate(cluster, ResourceRef.queue(request.targetQueue()), QueuePermissions.QUEUE_CREATE);
+        access.requireCreate(
+                cluster, ResourceRef.subscription(request.targetQueue()), QueuePermissions.SUBSCRIPTION_CREATE);
         access.requireAll(
-                cluster, List.of(new Requirement(ResourceRef.address(address), MessagePermissions.MESSAGE_SEND)));
+                cluster, List.of(new Requirement(ResourceRef.destination(address), MessagePermissions.MESSAGE_SEND)));
         return address;
     }
 
@@ -653,7 +655,7 @@ public class TransferService {
                 loaded,
                 () -> access.requireResource(
                         loaded.getSourceClusterId(),
-                        ResourceRef.queue(loaded.getSourceQueue()),
+                        ResourceRef.subscription(loaded.getSourceQueue()),
                         MessagePermissions.MESSAGE_MOVE));
         TransferRunEntity run = loaded;
         requireReadable(run);
@@ -786,11 +788,13 @@ public class TransferService {
         access.requireVisible(clusterId);
         return runs.history(clusterId, Limit.of(HISTORY)).stream()
                 .filter(r -> permissions.can(
-                                r.getSourceClusterId(), ResourceRef.queue(r.getSourceQueue()), Permissions.QUEUE_READ)
+                                r.getSourceClusterId(),
+                                ResourceRef.subscription(r.getSourceQueue()),
+                                Permissions.SUBSCRIPTION_READ)
                         && permissions.can(
                                 r.getTargetClusterId(),
-                                ResourceRef.address(r.getTargetAddress()),
-                                Permissions.ADDRESS_READ))
+                                ResourceRef.destination(r.getTargetAddress()),
+                                Permissions.DESTINATION_READ))
                 .map(this::view)
                 .toList();
     }
@@ -833,9 +837,10 @@ public class TransferService {
         access.requireAll(
                 clusterId,
                 List.of(
-                        new Requirement(ResourceRef.queue(request.stagingQueue()), MessagePermissions.MESSAGE_MOVE),
-                        new Requirement(ResourceRef.queue(request.targetQueue()), Permissions.QUEUE_READ),
-                        new Requirement(ResourceRef.address(returnAddress), MessagePermissions.MESSAGE_SEND)));
+                        new Requirement(
+                                ResourceRef.subscription(request.stagingQueue()), MessagePermissions.MESSAGE_MOVE),
+                        new Requirement(ResourceRef.subscription(request.targetQueue()), Permissions.SUBSCRIPTION_READ),
+                        new Requirement(ResourceRef.destination(returnAddress), MessagePermissions.MESSAGE_SEND)));
         ClusterNode node = nodes.node(clusterId, request.nodeId());
         String queue = request.stagingQueue();
         if (!queue.startsWith(StagingQueues.PREFIX)) {
@@ -927,14 +932,15 @@ public class TransferService {
         asRun(run, () -> {
             access.requireResource(
                     run.getSourceClusterId(),
-                    ResourceRef.queue(run.getSourceQueue()),
+                    ResourceRef.subscription(run.getSourceQueue()),
                     run.getMode().sourcePermission());
             access.requireAll(
                     run.getTargetClusterId(),
                     List.of(
-                            new Requirement(ResourceRef.queue(run.getTargetQueue()), Permissions.QUEUE_READ),
                             new Requirement(
-                                    ResourceRef.address(run.getTargetAddress()), MessagePermissions.MESSAGE_SEND)));
+                                    ResourceRef.subscription(run.getTargetQueue()), Permissions.SUBSCRIPTION_READ),
+                            new Requirement(
+                                    ResourceRef.destination(run.getTargetAddress()), MessagePermissions.MESSAGE_SEND)));
         });
     }
 
@@ -954,9 +960,13 @@ public class TransferService {
     private void requireReadable(TransferRunEntity run) {
         asRun(run, () -> {
             access.requireResource(
-                    run.getSourceClusterId(), ResourceRef.queue(run.getSourceQueue()), Permissions.QUEUE_READ);
+                    run.getSourceClusterId(),
+                    ResourceRef.subscription(run.getSourceQueue()),
+                    Permissions.SUBSCRIPTION_READ);
             access.requireResource(
-                    run.getTargetClusterId(), ResourceRef.address(run.getTargetAddress()), Permissions.ADDRESS_READ);
+                    run.getTargetClusterId(),
+                    ResourceRef.destination(run.getTargetAddress()),
+                    Permissions.DESTINATION_READ);
         });
     }
 

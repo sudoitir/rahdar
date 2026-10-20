@@ -267,7 +267,7 @@ describe.each(SCHEMES)('SQL Console in the %s scheme at 1280 px', (scheme) => {
     });
 
     it('says why it cannot estimate or run when messages cannot be read', async () => {
-      const { container } = mount(scheme, seeded(['queue:read']));
+      const { container } = mount(scheme, seeded(['subscription:read']));
       await settled(container);
       expect(await screen.findByText('This console cannot read messages here')).toBeVisible();
       expect(screen.getByRole('button', { name: 'Run' })).toBeDisabled();

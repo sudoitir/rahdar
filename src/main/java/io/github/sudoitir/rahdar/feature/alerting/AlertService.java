@@ -55,7 +55,7 @@ public class AlertService {
     @Transactional(readOnly = true)
     public List<AlertFiringView> firingNow(UUID clusterId) {
         clusterAccess.requireCluster(clusterId, AlertPermissions.ALERT_READ);
-        boolean everything = clusterAccess.holds(clusterId, Permissions.QUEUE_READ);
+        boolean everything = clusterAccess.holds(clusterId, Permissions.SUBSCRIPTION_READ);
         List<AlertFiringEntity> open = firingRepo.findOpenVisible(
                 clusterId, perm.can(AlertPermissions.ALERT_READ), everything, visibleRuleIds(clusterId, everything));
         Map<UUID, String> names = ruleNames(open);
@@ -74,7 +74,7 @@ public class AlertService {
         if (after == null) {
             HistoryPage.requireReachable(paging);
         }
-        boolean everything = clusterAccess.holds(clusterId, Permissions.QUEUE_READ);
+        boolean everything = clusterAccess.holds(clusterId, Permissions.SUBSCRIPTION_READ);
         boolean installation = perm.can(AlertPermissions.ALERT_READ);
         List<UUID> ruleIds = visibleRuleIds(clusterId, everything);
         Routed<Slice> routed = heavy.run(
@@ -167,7 +167,7 @@ public class AlertService {
     private long visibleCount(UUID clusterId, long firing) {
         if (clusterId == null
                 || !perm.can(clusterId, AlertPermissions.ALERT_READ)
-                || clusterAccess.holds(clusterId, Permissions.QUEUE_READ)) {
+                || clusterAccess.holds(clusterId, Permissions.SUBSCRIPTION_READ)) {
             return firing;
         }
         return firingRepo.countByClusterIdAndResolvedAtIsNullAndRuleIdIn(clusterId, visibleRuleIds(clusterId, false));

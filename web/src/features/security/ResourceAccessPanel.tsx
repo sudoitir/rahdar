@@ -24,10 +24,10 @@ export function ResourceAccessPanel({
   clusterId,
   kind,
   name,
-}: Readonly<{ clusterId: string; kind: 'QUEUE' | 'ADDRESS'; name: string }>) {
+}: Readonly<{ clusterId: string; kind: 'SUBSCRIPTION' | 'DESTINATION'; name: string }>) {
   const { can } = useCan();
   const mayAdminister = can('user:admin') || can('team:admin');
-  const noun = kind === 'QUEUE' ? 'queue' : 'address';
+  const noun = kind === 'SUBSCRIPTION' ? 'subscription' : 'destination';
   const access = useResourceAccess(clusterId, kind, name, mayAdminister);
   const columns = useMemo(resourceGrantColumns, []);
   const userAdmin = can('user:admin');
@@ -88,7 +88,7 @@ export function ResourceAccessPanel({
 
 /** A queue's panel in its detail drawer. */
 export function QueueAccessPanel({ clusterId, queueName }: Readonly<{ clusterId: string; queueName: string }>) {
-  return <ResourceAccessPanel clusterId={clusterId} kind="QUEUE" name={queueName} />;
+  return <ResourceAccessPanel clusterId={clusterId} kind="SUBSCRIPTION" name={queueName} />;
 }
 
 /** An address's access, opened from its row, since an address has no detail page of its own. */
@@ -100,7 +100,7 @@ export function AddressAccessDrawer({
 }: Readonly<{ opened: boolean; onClose: () => void; clusterId: string; address: string }>) {
   return (
     <Drawer opened={opened} onClose={onClose} position="right" size="lg" title={`Access to ${address}`}>
-      <ResourceAccessPanel clusterId={clusterId} kind="ADDRESS" name={address} />
+      <ResourceAccessPanel clusterId={clusterId} kind="DESTINATION" name={address} />
     </Drawer>
   );
 }

@@ -4,7 +4,7 @@ import io.github.sudoitir.rahdar.kernel.plugin.CatalogueEntry;
 import io.github.sudoitir.rahdar.kernel.plugin.FeatureRegistry;
 import io.github.sudoitir.rahdar.kernel.plugin.PermissionScope;
 import io.github.sudoitir.rahdar.kernel.plugin.PluginApi;
-import io.github.sudoitir.rahdar.kernel.plugin.ResourceKind;
+import io.github.sudoitir.rahdar.kernel.plugin.ResourceType;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
@@ -99,14 +99,14 @@ public class PermissionResolver {
                             clusterId,
                             action,
                             g -> !g.limited()
-                                    || (g.kind() == resource.kind()
+                                    || (g.kind() == resource.type()
                                             && g.pattern().matches(resource.name())))
                     && can(token.owner(), clusterId, resource, action);
         }
         if (grantsAllow(principal, entry, clusterId, action)) {
             return true;
         }
-        if (!teamsApply(principal, entry, clusterId) || !entry.resourceKinds().contains(resource.kind())) {
+        if (!teamsApply(principal, entry, clusterId) || !entry.resourceTypes().contains(resource.type())) {
             return false;
         }
         AccessSnapshot snapshot = access.of(principal.userId());
@@ -143,7 +143,7 @@ public class PermissionResolver {
                             entry,
                             clusterId,
                             action,
-                            g -> !g.limited() || entry.resourceKinds().contains(g.kind()))
+                            g -> !g.limited() || entry.resourceTypes().contains(g.kind()))
                     && canAnywhere(token.owner(), clusterId, action);
         }
         if (grantsAllow(principal, entry, clusterId, action)) {
@@ -155,10 +155,10 @@ public class PermissionResolver {
         AccessSnapshot snapshot = access.of(principal.userId());
         Set<UUID> member = snapshot.teamPermissions().keySet();
         return teams.ownedOn(clusterId).stream()
-                        .anyMatch(o -> intersects(o.kinds(), entry.resourceKinds())
+                        .anyMatch(o -> intersects(o.types(), entry.resourceTypes())
                                 && snapshot.holdsInTeam(o.teamId(), action))
                 || teams.sharedOn(clusterId).stream()
-                        .anyMatch(s -> intersects(s.kinds(), entry.resourceKinds())
+                        .anyMatch(s -> intersects(s.types(), entry.resourceTypes())
                                 && member.contains(s.targetTeamId())
                                 && Grant.covers(s.permissions(), action));
     }
@@ -174,19 +174,19 @@ public class PermissionResolver {
     /** The same question for a given principal rather than the current one. */
     public boolean canSeeCluster(RahdarPrincipal principal, UUID clusterId) {
         return can(principal, clusterId, Permissions.CLUSTER_READ)
-                || canAnywhere(principal, clusterId, Permissions.QUEUE_READ)
-                || canAnywhere(principal, clusterId, Permissions.ADDRESS_READ);
+                || canAnywhere(principal, clusterId, Permissions.SUBSCRIPTION_READ)
+                || canAnywhere(principal, clusterId, Permissions.DESTINATION_READ);
     }
 
     /**
      * The queues or addresses of the cluster the current principal may read, for filtering a list before it
      * is sorted, paged and counted, and for stating what they may do with each row.
      */
-    public ResourceFilter filter(UUID clusterId, ResourceKind kind) {
+    public ResourceFilter filter(UUID clusterId, ResourceType kind) {
         RahdarPrincipal principal = currentPrincipal();
         List<String> actions = features.catalogue().stream()
                 .filter(e -> e.scope() == PermissionScope.RESOURCE
-                        && e.resourceKinds().contains(kind))
+                        && e.resourceTypes().contains(kind))
                 .map(CatalogueEntry::action)
                 .sorted()
                 .toList();
@@ -204,12 +204,12 @@ public class PermissionResolver {
      * grant reaches. For a capture or a rule that watches a set of names, which must not reach names the
      * caller may not use.
      */
-    public boolean canOnAll(UUID clusterId, ResourceKind kind, String patternText, String action) {
+    public boolean canOnAll(UUID clusterId, ResourceType kind, String patternText, String action) {
         return canOnAll(currentPrincipal(), clusterId, kind, patternText, action);
     }
 
     private boolean canOnAll(
-            RahdarPrincipal principal, UUID clusterId, ResourceKind kind, String patternText, String action) {
+            RahdarPrincipal principal, UUID clusterId, ResourceType kind, String patternText, String action) {
         CatalogueEntry entry =
                 principal == null ? null : features.permission(action).orElse(null);
         if (entry == null) {
@@ -233,17 +233,17 @@ public class PermissionResolver {
         }
         if (pattern == null
                 || !teamsApply(principal, entry, clusterId)
-                || !entry.resourceKinds().contains(kind)) {
+                || !entry.resourceTypes().contains(kind)) {
             return false;
         }
         AccessSnapshot snapshot = access.of(principal.userId());
         Set<UUID> member = snapshot.teamPermissions().keySet();
         return teams.ownedOn(clusterId).stream()
-                        .anyMatch(o -> o.kinds().contains(kind)
+                        .anyMatch(o -> o.types().contains(kind)
                                 && snapshot.holdsInTeam(o.teamId(), action)
                                 && ResourcePattern.covers(o.pattern(), pattern))
                 || teams.sharedOn(clusterId).stream()
-                        .anyMatch(s -> s.kinds().contains(kind)
+                        .anyMatch(s -> s.types().contains(kind)
                                 && member.contains(s.targetTeamId())
                                 && Grant.covers(s.permissions(), action)
                                 && ResourcePattern.covers(s.pattern(), pattern));
@@ -253,23 +253,23 @@ public class PermissionResolver {
      * The patterns of the cluster on which the current principal holds {@code action} through a team or a
      * share, as the text they were written in: where they may create names, for a refusal to say so.
      */
-    public List<String> patternsHolding(UUID clusterId, ResourceKind kind, String action) {
+    public List<String> patternsHolding(UUID clusterId, ResourceType kind, String action) {
         RahdarPrincipal principal = currentPrincipal();
         CatalogueEntry entry =
                 principal == null ? null : features.permission(action).orElse(null);
         if (entry == null
                 || !teamsApply(principal, entry, clusterId)
-                || !entry.resourceKinds().contains(kind)) {
+                || !entry.resourceTypes().contains(kind)) {
             return List.of();
         }
         AccessSnapshot snapshot = access.of(principal.userId());
         Set<UUID> member = snapshot.teamPermissions().keySet();
         return Stream.concat(
                         teams.ownedOn(clusterId).stream()
-                                .filter(o -> o.kinds().contains(kind) && snapshot.holdsInTeam(o.teamId(), action))
+                                .filter(o -> o.types().contains(kind) && snapshot.holdsInTeam(o.teamId(), action))
                                 .map(o -> o.pattern().text()),
                         teams.sharedOn(clusterId).stream()
-                                .filter(s -> s.kinds().contains(kind)
+                                .filter(s -> s.types().contains(kind)
                                         && member.contains(s.targetTeamId())
                                         && Grant.covers(s.permissions(), action))
                                 .map(s -> s.pattern().text()))
@@ -389,7 +389,7 @@ public class PermissionResolver {
         }
     }
 
-    private static boolean intersects(Set<ResourceKind> a, Set<ResourceKind> b) {
+    private static boolean intersects(Set<ResourceType> a, Set<ResourceType> b) {
         return !Collections.disjoint(a, b);
     }
 

@@ -19,14 +19,14 @@
       "action": "acme-notes:read",
       "description": "Read the notes on a queue",
       "scope": "resource",
-      "resourceKinds": ["queue"],
-      "requires": ["queue:read"]
+      "resourceTypes": ["subscription"],
+      "requires": ["subscription:read"]
     },
     {
       "action": "acme-notes:write",
       "description": "Write and delete the notes on a queue",
       "scope": "resource",
-      "resourceKinds": ["queue"],
+      "resourceTypes": ["subscription"],
       "requires": ["acme-notes:read"]
     }
   ],
@@ -39,7 +39,7 @@
       "scope": "resource",
       "permission": "acme-notes:read",
       "resourceArg": "queue",
-      "resourceKind": "queue",
+      "resourceType": "subscription",
       "description": "Lists the notes on a queue."
     }
   ],

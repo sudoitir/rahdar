@@ -378,7 +378,7 @@ A plugin's `@McpTool` beans join Rahdar's MCP endpoint while it runs. Declare ea
   owner, as it is for every other call.
 - **`scope`** is the scope of the permission, and Rahdar refuses a tool whose scope differs.
   **`scope: resource`** checks it on the queue or address named by the argument `resourceArg` (a
-  required string the tool takes), of the kind `resourceKind` (`queue` or `address`), on the cluster
+  required string the tool takes), of the kind `resourceType` (`subscription` or `destination`), on the cluster
   named by the required string `clusterId`. A caller who may not read that queue or address is told
   *No such queue or address, or this key has no grant on it*, whether or not it exists, and one who
   may read it and may not use it is told which permission is missing.
@@ -436,7 +436,7 @@ class Orders implements PluginMessageHandler {
   attempt: return it when the message is not the problem (the service your handler calls is down)
   and you are stopping the registration until it recovers. The broker offers a released message
   again at once, so releasing in a loop that keeps receiving only spins. It needs `message:read`
-  and `queue:purge` on the queue.
+  and `subscription:purge` on the queue.
 - **`send(OutboundMessage)`** sends a body, headers and properties to an address. It needs
   `message:send` on the address.
 - **`checkSend(clusterId, address, actingUserId)`** answers why such a send would be refused (a
@@ -941,7 +941,7 @@ extension contract 10", so rebuild it and set `<rahdar.contract>11</rahdar.contr
 
 - An assistant tool's `scope` must be the scope of its permission (`resource`, `cluster` or `global`),
   and a `resource` tool names `resourceArg`, the string argument that holds the queue or address, and
-  `resourceKind`. A tool whose scope differs from its permission's, or a resource tool without them, is
+  `resourceType`. A tool whose scope differs from its permission's, or a resource tool without them, is
   refused when the plugin is activated.
 - A permission you check against a queue or address should be `resource`, and be checked with
   `ClusterAccessGuard.requireResource` rather than `@PreAuthorize("@perm.can(#clusterId, …)")`, which
@@ -960,7 +960,7 @@ Contract 10 makes permissions resource-scoped. Rahdar refuses a plugin built for
 rebuild it against the new API and set `<rahdar.contract>10</rahdar.contract>` in its `pom.xml`:
 
 - In `plugin.json`, each permission declares `scope` (`global`, `cluster` or `resource`) in place of
-  `globalOnly`; a `resource` permission also lists `resourceKinds` (`queue`, `address`). A manifest
+  `globalOnly`; a `resource` permission also lists `resourceTypes` (`subscription`, `destination`). A manifest
   that still says `globalOnly` is refused at install.
 - `PermissionResolver`'s constructor changed (a plugin receives it as a bean and never builds it),
   and `RahdarPrincipal.grants()` is gone: ask `PermissionResolver.can(...)` instead of reading
@@ -999,7 +999,7 @@ name, or through a share. Check it the way Rahdar does, so your answers are exac
   resources before anything is done.
 - **`PermissionResolver.can(clusterId, ResourceRef, action)`** answers for the current user, and
   `can(principal, clusterId, ResourceRef, action)` for another, such as the owner of work that runs later.
-- **`PermissionResolver.filter(clusterId, ResourceKind.QUEUE)`** returns a `ResourceFilter` for a list: call
+- **`PermissionResolver.filter(clusterId, ResourceType.QUEUE)`** returns a `ResourceFilter` for a list: call
   `readable(name)` for each row, and `allowedActions(name)` for the actions the caller holds on it, yours
   included. Filter before you sort, page and count, so a total never counts what the caller cannot see.
   `everything()` is true for a caller who reads the whole cluster, so they pay nothing for it.

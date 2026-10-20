@@ -173,7 +173,7 @@ class CrossNodeAggregatorTest extends PostgresIntegrationTest {
         Fixture f = pairPlusStandalone();
         upsert.upsertBatch(List.of(row(f.nodeA(), "ORDERS", "orders.in", 1), row(f.nodeA(), "OTHER", "other", 1)));
         TeamEntity team = teams.save(new TeamEntity("owner-" + UUID.randomUUID()));
-        teamPatterns.save(new TeamPatternEntity(team.getId(), clusterId, "QUEUE", "orders.#"));
+        teamPatterns.save(new TeamPatternEntity(team.getId(), clusterId, "SUBSCRIPTION", "orders.#"));
         accessChanges.changed();
 
         try {

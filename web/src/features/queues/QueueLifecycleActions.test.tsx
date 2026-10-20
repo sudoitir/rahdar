@@ -54,11 +54,11 @@ function queue(over: Partial<QueueView> = {}): QueueView {
     address: 'orders.addr',
     queueName: 'orders',
     allowedActions: [
-      'queue:read',
-      'queue:pause',
-      'queue:update',
-      'queue:delete',
-      'queue:purge',
+      'subscription:read',
+      'subscription:pause',
+      'subscription:update',
+      'subscription:delete',
+      'subscription:purge',
       'message:read',
       'message:move',
     ],
@@ -137,7 +137,7 @@ describe('QueueLifecycleActions capability gating', () => {
 
   it('hides an action the caller cannot take anywhere on the cluster', async () => {
     // Every lifecycle permission except delete, held on the cluster itself: delete is not theirs to be offered.
-    server.use(meHandler(['queue:create', 'queue:update', 'queue:pause', 'cluster:read']), clusterHandler(AVAILABLE));
+    server.use(meHandler(['subscription:create', 'subscription:update', 'subscription:pause', 'cluster:read']), clusterHandler(AVAILABLE));
     renderWithProviders(<Harness />);
 
     await waitFor(() => expect(screen.queryByRole('button', { name: 'Delete queue' })).not.toBeInTheDocument());
@@ -152,10 +152,10 @@ describe('QueueLifecycleActions capability gating', () => {
         const clusterId = new URL(request.url).searchParams.get('clusterId');
         return HttpResponse.json({
           permissions: [],
-          anywhere: ['queue:pause', 'queue:update', 'queue:delete'],
+          anywhere: ['subscription:pause', 'subscription:update', 'subscription:delete'],
           canSeeCluster: clusterId ? true : null,
           teams: [],
-          createPatterns: { queue: [], address: [] },
+          createPatterns: { subscription: [], destination: [] },
         });
       });
     }
@@ -165,7 +165,7 @@ describe('QueueLifecycleActions capability gating', () => {
         <QueueLifecycleActions
           clusterId="c1"
           queue={queue({
-            allowedActions: ['queue:read', 'queue:pause'],
+            allowedActions: ['subscription:read', 'subscription:pause'],
             ownerTeam: { id: 't1', name: 'Orders' },
           })}
           onClose={() => {}}
@@ -184,7 +184,7 @@ describe('QueueLifecycleActions capability gating', () => {
       await user.click(screen.getByRole('button', { name: 'Why deleting this queue is unavailable' }));
       expect(
         await screen.findByText(
-          'You do not have the "Destroy queues and addresses" permission (queue:delete) on this queue. Ask an admin of team Orders.',
+          'You do not have the "Destroy queues and addresses" permission (subscription:delete) on this queue. Ask an admin of team Orders.',
         ),
       ).toBeInTheDocument();
     });
@@ -202,7 +202,7 @@ describe('QueueLifecycleActions capability gating', () => {
 
       await user.keyboard('{Enter}');
       expect(
-        await screen.findByText(/\(queue:update\) on this queue\. Ask an admin of team Orders\./),
+        await screen.findByText(/\(subscription:update\) on this queue\. Ask an admin of team Orders\./),
       ).toBeInTheDocument();
     });
 
@@ -210,7 +210,7 @@ describe('QueueLifecycleActions capability gating', () => {
       server.use(teamAccess(), clusterHandler(AVAILABLE));
       const user = userEvent.setup();
       renderWithProviders(
-        <QueueLifecycleActions clusterId="c1" queue={queue({ allowedActions: ['queue:read'] })} onClose={() => {}} />,
+        <QueueLifecycleActions clusterId="c1" queue={queue({ allowedActions: ['subscription:read'] })} onClose={() => {}} />,
       );
 
       await user.click(await screen.findByRole('button', { name: 'Why deleting this queue is unavailable' }));

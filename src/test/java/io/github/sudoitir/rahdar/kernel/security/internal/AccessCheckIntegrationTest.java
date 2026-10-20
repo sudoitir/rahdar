@@ -4,7 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import io.github.sudoitir.rahdar.kernel.core.NotFoundException;
-import io.github.sudoitir.rahdar.kernel.plugin.ResourceKind;
+import io.github.sudoitir.rahdar.kernel.plugin.ResourceType;
 import io.github.sudoitir.rahdar.kernel.security.AccessChanges;
 import io.github.sudoitir.rahdar.kernel.security.Grant;
 import io.github.sudoitir.rahdar.kernel.security.PatternKind;
@@ -117,36 +117,36 @@ class AccessCheckIntegrationTest extends PostgresIntegrationTest {
         UUID inLive = cluster(live);
         UUID elsewhere = cluster(null);
         var role = roleService.create(new RoleRequest(
-                "check-reader-" + UUID.randomUUID(), List.of("queue:read", "user:admin"), false, false));
+                "check-reader-" + UUID.randomUUID(), List.of("subscription:read", "user:admin"), false, false));
         AppUserEntity someone = user();
         userRoles.save(new UserRoleEntity(someone.getId(), role.id(), "ENVIRONMENT", live));
 
         var here = effective.check(someone.getId(), inLive, null, null);
         var there = effective.check(someone.getId(), elsewhere, null, null);
 
-        assertThat(of(here, "queue:read").allowed()).isTrue();
-        assertThat(of(here, "queue:read").sources()).singleElement().satisfies(s -> {
+        assertThat(of(here, "subscription:read").allowed()).isTrue();
+        assertThat(of(here, "subscription:read").sources()).singleElement().satisfies(s -> {
             assertThat(s.type()).isEqualTo(SourceType.ROLE_GRANT);
             assertThat(s.roleName()).isEqualTo(role.name());
             assertThat(s.scopeType()).isEqualTo("ENVIRONMENT");
             assertThat(s.scopeId()).isEqualTo(live);
         });
-        assertThat(of(here, "queue:purge").allowed()).isFalse();
+        assertThat(of(here, "subscription:purge").allowed()).isFalse();
         // a global-scope permission does not take effect through an environment grant
         assertThat(of(here, "user:admin").allowed()).isFalse();
-        assertThat(of(there, "queue:read").allowed()).isFalse();
+        assertThat(of(there, "subscription:read").allowed()).isFalse();
     }
 
     @Test
     void aGlobalGrantReachesEveryClusterAndAWildcardIsExpanded() {
-        var role =
-                roleService.create(new RoleRequest("check-all-" + UUID.randomUUID(), List.of("queue:*"), false, false));
+        var role = roleService.create(
+                new RoleRequest("check-all-" + UUID.randomUUID(), List.of("subscription:*"), false, false));
         AppUserEntity someone = user();
         userRoles.save(new UserRoleEntity(someone.getId(), role.id(), "GLOBAL", ScopeIds.GLOBAL));
 
         var result = effective.check(someone.getId(), cluster(null), null, null);
 
-        assertThat(of(result, "queue:purge").sources()).singleElement().satisfies(s -> {
+        assertThat(of(result, "subscription:purge").sources()).singleElement().satisfies(s -> {
             assertThat(s.scopeType()).isEqualTo("GLOBAL");
             assertThat(s.scopeId()).isNull();
         });
@@ -157,26 +157,28 @@ class AccessCheckIntegrationTest extends PostgresIntegrationTest {
     void aTeamRoleAllowsOnlyWhatTheTeamOwnsAndSaysWhichTeam() {
         UUID prod = cluster(null);
         UUID orders = team("orders");
-        teams.addPattern(orders, new PatternRequest(prod, PatternKind.QUEUE, "orders.#"));
+        teams.addPattern(orders, new PatternRequest(prod, PatternKind.SUBSCRIPTION, "orders.#"));
         AppUserEntity operator = user();
         teams.addMember(
                 orders, new MemberRequest(PrincipalType.USER, operator.getId(), null, null, role("TEAM_OPERATOR")));
 
-        var owned = effective.check(operator.getId(), prod, ResourceKind.QUEUE, "orders.in");
-        var foreign = effective.check(operator.getId(), prod, ResourceKind.QUEUE, "billing.in");
+        var owned = effective.check(operator.getId(), prod, ResourceType.SUBSCRIPTION, "orders.in");
+        var foreign = effective.check(operator.getId(), prod, ResourceType.SUBSCRIPTION, "billing.in");
         var clusterWide = effective.check(operator.getId(), prod, null, null);
 
-        assertThat(of(owned, "queue:purge").sources()).singleElement().satisfies(s -> {
+        assertThat(of(owned, "subscription:purge").sources()).singleElement().satisfies(s -> {
             assertThat(s.type()).isEqualTo(SourceType.TEAM);
             assertThat(s.teamId()).isEqualTo(orders);
             assertThat(s.roleName()).isEqualTo("TEAM_OPERATOR");
         });
-        assertThat(of(foreign, "queue:purge").allowed()).isFalse();
+        assertThat(of(foreign, "subscription:purge").allowed()).isFalse();
         // a queue permission does not reach an address, and a team gives nothing cluster-wide
-        assertThat(of(effective.check(operator.getId(), prod, ResourceKind.ADDRESS, "orders.in"), "queue:purge")
+        assertThat(of(
+                                effective.check(operator.getId(), prod, ResourceType.DESTINATION, "orders.in"),
+                                "subscription:purge")
                         .allowed())
                 .isFalse();
-        assertThat(of(clusterWide, "queue:purge").allowed()).isFalse();
+        assertThat(of(clusterWide, "subscription:purge").allowed()).isFalse();
     }
 
     @Test
@@ -184,31 +186,34 @@ class AccessCheckIntegrationTest extends PostgresIntegrationTest {
         UUID prod = cluster(null);
         UUID orders = team("orders");
         UUID billing = team("billing");
-        teams.addPattern(orders, new PatternRequest(prod, PatternKind.QUEUE, "orders.#"));
+        teams.addPattern(orders, new PatternRequest(prod, PatternKind.SUBSCRIPTION, "orders.#"));
         teams.addShare(
-                orders, new ShareRequest(billing, prod, PatternKind.QUEUE, "orders.events.#", role("TEAM_VIEWER")));
+                orders,
+                new ShareRequest(billing, prod, PatternKind.SUBSCRIPTION, "orders.events.#", role("TEAM_VIEWER")));
         AppUserEntity biller = user();
         teams.addMember(
                 billing, new MemberRequest(PrincipalType.USER, biller.getId(), null, null, role("TEAM_OPERATOR")));
 
-        var result = effective.check(biller.getId(), prod, ResourceKind.QUEUE, "orders.events.created");
+        var result = effective.check(biller.getId(), prod, ResourceType.SUBSCRIPTION, "orders.events.created");
 
-        assertThat(of(result, "queue:read").sources()).singleElement().satisfies(s -> {
+        assertThat(of(result, "subscription:read").sources()).singleElement().satisfies(s -> {
             assertThat(s.type()).isEqualTo(SourceType.SHARE);
             assertThat(s.roleName()).isEqualTo("TEAM_VIEWER");
             assertThat(s.teamId()).isEqualTo(billing);
             assertThat(s.ownerTeamName()).startsWith("orders-");
         });
-        assertThat(of(result, "queue:purge").allowed()).isFalse();
-        assertThat(of(effective.check(biller.getId(), prod, ResourceKind.QUEUE, "orders.audit.x"), "queue:read")
+        assertThat(of(result, "subscription:purge").allowed()).isFalse();
+        assertThat(of(
+                                effective.check(biller.getId(), prod, ResourceType.SUBSCRIPTION, "orders.audit.x"),
+                                "subscription:read")
                         .allowed())
                 .isFalse();
     }
 
     @Test
     void aDisabledUserHoldsNothing() {
-        var role =
-                roleService.create(new RoleRequest("check-off-" + UUID.randomUUID(), List.of("queue:*"), false, false));
+        var role = roleService.create(
+                new RoleRequest("check-off-" + UUID.randomUUID(), List.of("subscription:*"), false, false));
         AppUserEntity someone = user();
         userRoles.save(new UserRoleEntity(someone.getId(), role.id(), "GLOBAL", ScopeIds.GLOBAL));
         someone.setDisabled(true);
@@ -224,11 +229,11 @@ class AccessCheckIntegrationTest extends PostgresIntegrationTest {
         UUID someone = user().getId();
         UUID prod = cluster(null);
 
-        assertThatThrownBy(() -> effective.check(someone, prod, ResourceKind.QUEUE, null))
+        assertThatThrownBy(() -> effective.check(someone, prod, ResourceType.SUBSCRIPTION, null))
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> effective.check(someone, prod, null, "orders.in"))
                 .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> effective.check(someone, null, ResourceKind.QUEUE, "orders.in"))
+        assertThatThrownBy(() -> effective.check(someone, null, ResourceType.SUBSCRIPTION, "orders.in"))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 

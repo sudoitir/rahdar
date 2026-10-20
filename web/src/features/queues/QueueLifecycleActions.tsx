@@ -39,9 +39,9 @@ export function QueueLifecycleActions({
   const setPaused = useSetQueuePaused(clusterId, queue.queueName);
 
   const base = { clusterId, noun: 'queue', resource: queue, capability: write, pending: cluster.isPending } as const;
-  const pause = useResourceGate({ ...base, permission: 'queue:pause', label: 'Pause and resume queues' });
-  const update = useResourceGate({ ...base, permission: 'queue:update', label: "Change a queue's configuration" });
-  const remove = useResourceGate({ ...base, permission: 'queue:delete', label: 'Destroy queues and addresses' });
+  const pause = useResourceGate({ ...base, permission: 'subscription:pause', label: 'Pause and resume queues' });
+  const update = useResourceGate({ ...base, permission: 'subscription:update', label: "Change a queue's configuration" });
+  const remove = useResourceGate({ ...base, permission: 'subscription:delete', label: 'Destroy queues and addresses' });
   const pauseGate = pause.verdict;
   const updateGate = update.verdict;
   const deleteGate = remove.verdict;

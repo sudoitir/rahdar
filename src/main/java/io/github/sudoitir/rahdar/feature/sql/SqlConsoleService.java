@@ -5,7 +5,7 @@ import io.github.sudoitir.rahdar.feature.sql.QueryAst.Source;
 import io.github.sudoitir.rahdar.kernel.audit.AuditEvent;
 import io.github.sudoitir.rahdar.kernel.audit.AuditService;
 import io.github.sudoitir.rahdar.kernel.core.HeavyRequests;
-import io.github.sudoitir.rahdar.kernel.plugin.ResourceKind;
+import io.github.sudoitir.rahdar.kernel.plugin.ResourceType;
 import io.github.sudoitir.rahdar.kernel.security.Actor;
 import io.github.sudoitir.rahdar.kernel.security.ActorResolver;
 import io.github.sudoitir.rahdar.kernel.security.ClusterAccessGuard;
@@ -113,7 +113,8 @@ public class SqlConsoleService {
     private QueryAst parseReadable(UUID clusterId, String sql) {
         clusterAccess.requireVisible(clusterId);
         QueryAst ast = parser.parse(sql);
-        clusterAccess.requireOnAll(clusterId, ResourceKind.QUEUE, ast.queuePattern(), MessagePermissions.MESSAGE_READ);
+        clusterAccess.requireOnAll(
+                clusterId, ResourceType.SUBSCRIPTION, ast.queuePattern(), MessagePermissions.MESSAGE_READ);
         return ast;
     }
 

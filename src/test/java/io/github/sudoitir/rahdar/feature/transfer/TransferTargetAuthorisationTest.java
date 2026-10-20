@@ -68,8 +68,9 @@ class TransferTargetAuthorisationTest {
                 .requireAll(
                         CLUSTER,
                         List.of(
-                                new Requirement(ResourceRef.queue("billing.in"), Permissions.QUEUE_READ),
-                                new Requirement(ResourceRef.address("billing.addr"), MessagePermissions.MESSAGE_SEND)));
+                                new Requirement(ResourceRef.subscription("billing.in"), Permissions.SUBSCRIPTION_READ),
+                                new Requirement(
+                                        ResourceRef.destination("billing.addr"), MessagePermissions.MESSAGE_SEND)));
     }
 
     @Test
@@ -102,11 +103,13 @@ class TransferTargetAuthorisationTest {
         String address = service.authorisedTargetAddress(request("orders.new", "orders.addr"), Optional.empty());
 
         assertThat(address).isEqualTo("orders.addr");
-        verify(access).requireCreate(CLUSTER, ResourceRef.queue("orders.new"), QueuePermissions.QUEUE_CREATE);
+        verify(access)
+                .requireCreate(CLUSTER, ResourceRef.subscription("orders.new"), QueuePermissions.SUBSCRIPTION_CREATE);
         verify(access)
                 .requireAll(
                         CLUSTER,
-                        List.of(new Requirement(ResourceRef.address("orders.addr"), MessagePermissions.MESSAGE_SEND)));
+                        List.of(new Requirement(
+                                ResourceRef.destination("orders.addr"), MessagePermissions.MESSAGE_SEND)));
     }
 
     @Test

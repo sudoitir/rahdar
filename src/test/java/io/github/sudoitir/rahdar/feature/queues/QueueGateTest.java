@@ -58,7 +58,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /**
  * Queue and address deletes through the approval gate (ADR-0179): authorized first, a dry run never gated, a real run
- * gated as {@code queue.delete} or {@code address.delete}, held without a broker call, estimated from the scrape and
+ * gated as {@code subscription.delete} or {@code destination.delete}, held without a broker call, estimated from the scrape and
  * pinned to the queue's identity. The gate is a stand-in; the engine's own tests prove what it does with each answer.
  */
 @ExtendWith(AdminAuthenticationExtension.class)

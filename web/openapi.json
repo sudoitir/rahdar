@@ -15826,12 +15826,12 @@
             "format" : "uuid"
           }
         }, {
-          "name" : "kind",
+          "name" : "type",
           "in" : "query",
           "required" : false,
           "schema" : {
             "type" : "string",
-            "enum" : [ "QUEUE", "ADDRESS" ]
+            "enum" : [ "DESTINATION", "SUBSCRIPTION" ]
           }
         }, {
           "name" : "name",
@@ -16209,7 +16209,7 @@
           "required" : true,
           "schema" : {
             "type" : "string",
-            "enum" : [ "QUEUE", "ADDRESS", "BOTH" ]
+            "enum" : [ "SUBSCRIPTION", "DESTINATION", "ANY" ]
           }
         }, {
           "name" : "pattern",
@@ -17171,12 +17171,12 @@
             "format" : "uuid"
           }
         }, {
-          "name" : "kind",
+          "name" : "type",
           "in" : "query",
           "required" : true,
           "schema" : {
             "type" : "string",
-            "enum" : [ "QUEUE", "ADDRESS" ]
+            "enum" : [ "DESTINATION", "SUBSCRIPTION" ]
           }
         }, {
           "name" : "name",
@@ -18403,12 +18403,12 @@
             "format" : "uuid"
           }
         }, {
-          "name" : "kind",
+          "name" : "type",
           "in" : "query",
           "required" : true,
           "schema" : {
             "type" : "string",
-            "enum" : [ "QUEUE", "ADDRESS" ]
+            "enum" : [ "DESTINATION", "SUBSCRIPTION" ]
           }
         }, {
           "name" : "page",
@@ -19595,12 +19595,12 @@
             "format" : "uuid"
           }
         }, {
-          "name" : "kind",
+          "name" : "type",
           "in" : "query",
           "required" : true,
           "schema" : {
             "type" : "string",
-            "enum" : [ "QUEUE", "ADDRESS" ]
+            "enum" : [ "DESTINATION", "SUBSCRIPTION" ]
           }
         }, {
           "name" : "name",
@@ -26595,7 +26595,7 @@
           },
           "kind" : {
             "type" : "string",
-            "enum" : [ "QUEUE", "ADDRESS", "BOTH" ]
+            "enum" : [ "SUBSCRIPTION", "DESTINATION", "ANY" ]
           },
           "pattern" : {
             "type" : "string"
@@ -26631,7 +26631,7 @@
           },
           "kind" : {
             "type" : "string",
-            "enum" : [ "QUEUE", "ADDRESS", "BOTH" ]
+            "enum" : [ "SUBSCRIPTION", "DESTINATION", "ANY" ]
           },
           "pattern" : {
             "type" : "string"
@@ -26719,7 +26719,7 @@
           },
           "teamAssignable" : {
             "type" : "boolean",
-            "description" : "Whether the role may be given to a team's members or in a share. A team role holds only permissions that act on a queue or address, and team:admin."
+            "description" : "Whether the role may be given to a team's members or in a share. A team role holds only permissions that act on a subscription or destination, and team:admin."
           }
         },
         "required" : [ "name", "permissions", "requiresMfa", "teamAssignable" ]
@@ -28183,13 +28183,13 @@
             "type" : [ "string", "null" ],
             "format" : "uuid"
           },
-          "resourceKind" : {
+          "resourceType" : {
             "type" : [ "string", "null" ],
-            "description" : "QUEUE or ADDRESS: limits the grant to names matching resourcePattern"
+            "description" : "SUBSCRIPTION or DESTINATION: limits the grant to names matching resourcePattern"
           },
           "resourcePattern" : {
             "type" : [ "string", "null" ],
-            "description" : "An Artemis wildcard pattern, with resourceKind; absent for the whole scope"
+            "description" : "An Artemis wildcard pattern, with resourceType; absent for the whole scope"
           }
         },
         "required" : [ "action", "scopeType" ]
@@ -28219,7 +28219,7 @@
             "type" : "string",
             "format" : "uuid"
           },
-          "resourceKind" : {
+          "resourceType" : {
             "type" : [ "string", "null" ]
           },
           "resourcePattern" : {
@@ -28295,7 +28295,7 @@
           },
           "kind" : {
             "type" : "string",
-            "enum" : [ "QUEUE", "ADDRESS", "BOTH" ]
+            "enum" : [ "SUBSCRIPTION", "DESTINATION", "ANY" ]
           },
           "pattern" : {
             "type" : "string",
@@ -28317,7 +28317,7 @@
           },
           "kind" : {
             "type" : "string",
-            "enum" : [ "QUEUE", "ADDRESS", "BOTH" ]
+            "enum" : [ "SUBSCRIPTION", "DESTINATION", "ANY" ]
           },
           "pattern" : {
             "type" : "string",
@@ -28684,7 +28684,7 @@
           },
           "type" : {
             "type" : "string",
-            "description" : "The operation type, such as queue.purge."
+            "description" : "The operation type, such as subscription.purge."
           },
           "state" : {
             "type" : "string",
@@ -32429,7 +32429,7 @@
           },
           "kind" : {
             "type" : "string",
-            "enum" : [ "QUEUE", "ADDRESS", "BOTH" ]
+            "enum" : [ "SUBSCRIPTION", "DESTINATION", "ANY" ]
           },
           "pattern" : {
             "type" : "string"
@@ -32446,31 +32446,31 @@
           },
           "kind" : {
             "type" : "string",
-            "enum" : [ "QUEUE", "ADDRESS", "BOTH" ]
+            "enum" : [ "SUBSCRIPTION", "DESTINATION", "ANY" ]
           },
           "pattern" : {
             "type" : "string"
           },
-          "queueMatches" : {
+          "subscriptionMatches" : {
             "type" : "integer",
             "format" : "int32",
-            "description" : "Queues on the cluster the pattern matches."
+            "description" : "Subscriptions on the cluster the pattern matches."
           },
-          "addressMatches" : {
+          "destinationMatches" : {
             "type" : "integer",
             "format" : "int32",
-            "description" : "Addresses on the cluster the pattern matches."
+            "description" : "Destinations on the cluster the pattern matches."
           },
-          "queueExamples" : {
+          "subscriptionExamples" : {
             "type" : "array",
-            "description" : "Up to 20 matching queue names.",
+            "description" : "Up to 20 matching subscription names.",
             "items" : {
               "type" : "string"
             }
           },
-          "addressExamples" : {
+          "destinationExamples" : {
             "type" : "array",
-            "description" : "Up to 20 matching address names.",
+            "description" : "Up to 20 matching destination names.",
             "items" : {
               "type" : "string"
             }
@@ -32482,7 +32482,7 @@
             }
           }
         },
-        "required" : [ "addressExamples", "addressMatches", "clusterId", "conflicts", "kind", "pattern", "queueExamples", "queueMatches" ]
+        "required" : [ "clusterId", "conflicts", "destinationExamples", "destinationMatches", "kind", "pattern", "subscriptionExamples", "subscriptionMatches" ]
       },
       "PagedViewUserLookup" : {
         "type" : "object",
@@ -32545,11 +32545,11 @@
             "type" : "string",
             "enum" : [ "GLOBAL", "CLUSTER", "RESOURCE" ]
           },
-          "resourceKinds" : {
+          "resourceTypes" : {
             "type" : "array",
             "items" : {
               "type" : "string",
-              "enum" : [ "QUEUE", "ADDRESS" ]
+              "enum" : [ "DESTINATION", "SUBSCRIPTION" ]
             }
           },
           "requires" : {
@@ -32559,7 +32559,7 @@
             }
           }
         },
-        "required" : [ "action", "featureId", "featureTitle", "label", "requires", "resourceKinds", "scope" ]
+        "required" : [ "action", "featureId", "featureTitle", "label", "requires", "resourceTypes", "scope" ]
       },
       "TeamRoleLookup" : {
         "type" : "object",
@@ -33079,7 +33079,7 @@
           },
           "anywhere" : {
             "type" : "array",
-            "description" : "Resource permissions the caller holds on some queue or address of the cluster, through a grant, a team or a share. Empty when no cluster is asked about.",
+            "description" : "Resource permissions the caller holds on some subscription or destination of the cluster, through a grant, a team or a share. Empty when no cluster is asked about.",
             "items" : {
               "type" : "string"
             }
@@ -33096,7 +33096,7 @@
           },
           "createPatterns" : {
             "$ref" : "#/components/schemas/CreatePatterns",
-            "description" : "Patterns on which the caller may create a queue or address through a team or a share. A grant that reaches the cluster allows any name and shows in permissions."
+            "description" : "Patterns on which the caller may create a subscription or destination through a team or a share. A grant that reaches the cluster allows any name and shows in permissions."
           }
         },
         "required" : [ "anywhere", "createPatterns", "permissions", "teams" ]
@@ -33105,20 +33105,20 @@
         "type" : "object",
         "description" : "Name patterns, as written, that the caller may create under. Empty when none.",
         "properties" : {
-          "queue" : {
+          "subscription" : {
             "type" : "array",
             "items" : {
               "type" : "string"
             }
           },
-          "address" : {
+          "destination" : {
             "type" : "array",
             "items" : {
               "type" : "string"
             }
           }
         },
-        "required" : [ "address", "queue" ]
+        "required" : [ "destination", "subscription" ]
       },
       "TeamMembership" : {
         "type" : "object",
@@ -33147,7 +33147,7 @@
       },
       "MyResourceAccess" : {
         "type" : "object",
-        "description" : "What the caller may do with one queue or address: the actions they hold on it.",
+        "description" : "What the caller may do with one subscription or destination: the actions they hold on it.",
         "properties" : {
           "actions" : {
             "type" : "array",
@@ -34428,7 +34428,7 @@
           },
           "allowedActions" : {
             "type" : "array",
-            "description" : "The actions of the catalogue that apply to this row and that the caller holds on it, such as queue:purge. The console gates its controls from this.",
+            "description" : "The actions of the catalogue that apply to this row and that the caller holds on it, such as subscription:purge. The console gates its controls from this.",
             "items" : {
               "type" : "string"
             }
@@ -34818,7 +34818,7 @@
       },
       "ResourceAccessView" : {
         "type" : "object",
-        "description" : "Who has access to one queue or address through teams: its owner and every share.",
+        "description" : "Who has access to one subscription or destination through teams: its owner and every share.",
         "properties" : {
           "ownerTeam" : {
             "anyOf" : [ {
@@ -34838,7 +34838,7 @@
       },
       "ResourceTeamGrant" : {
         "type" : "object",
-        "description" : "One team role that reaches a queue or address, and how many members hold it: a role of the owning team, or the role a share gives another team.",
+        "description" : "One team role that reaches a subscription or destination, and how many members hold it: a role of the owning team, or the role a share gives another team.",
         "properties" : {
           "teamId" : {
             "type" : "string",
@@ -35002,7 +35002,7 @@
           },
           "allowedActions" : {
             "type" : "array",
-            "description" : "The actions of the catalogue that apply to this row and that the caller holds on it, such as queue:purge. The console gates its controls from this.",
+            "description" : "The actions of the catalogue that apply to this row and that the caller holds on it, such as subscription:purge. The console gates its controls from this.",
             "items" : {
               "type" : "string"
             }
@@ -35318,7 +35318,7 @@
           },
           "allowedActions" : {
             "type" : "array",
-            "description" : "The actions of the catalogue that apply to this row and that the caller holds on it, such as queue:purge. The console gates its controls from this.",
+            "description" : "The actions of the catalogue that apply to this row and that the caller holds on it, such as subscription:purge. The console gates its controls from this.",
             "items" : {
               "type" : "string"
             }
@@ -36210,7 +36210,7 @@
           },
           "allowedActions" : {
             "type" : "array",
-            "description" : "The actions of the catalogue that apply to this row and that the caller holds on it, such as queue:purge. The console gates its controls from this.",
+            "description" : "The actions of the catalogue that apply to this row and that the caller holds on it, such as subscription:purge. The console gates its controls from this.",
             "items" : {
               "type" : "string"
             }
@@ -36403,7 +36403,7 @@
           },
           "allowedActions" : {
             "type" : "array",
-            "description" : "The actions of the catalogue that apply to this row and that the caller holds on it, such as queue:purge. The console gates its controls from this.",
+            "description" : "The actions of the catalogue that apply to this row and that the caller holds on it, such as subscription:purge. The console gates its controls from this.",
             "items" : {
               "type" : "string"
             }
@@ -37473,7 +37473,7 @@
           },
           "allowedActions" : {
             "type" : "array",
-            "description" : "The actions of the catalogue that apply to this row and that the caller holds on it, such as queue:purge. The console gates its controls from this.",
+            "description" : "The actions of the catalogue that apply to this row and that the caller holds on it, such as subscription:purge. The console gates its controls from this.",
             "items" : {
               "type" : "string"
             }

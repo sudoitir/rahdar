@@ -39,11 +39,11 @@ function queue(name: string, over: Record<string, unknown> = {}) {
     address: name,
     queueName: name,
     allowedActions: [
-      'queue:read',
-      'queue:pause',
-      'queue:update',
-      'queue:delete',
-      'queue:purge',
+      'subscription:read',
+      'subscription:pause',
+      'subscription:update',
+      'subscription:delete',
+      'subscription:purge',
       'message:read',
       'message:move',
     ],
@@ -165,7 +165,7 @@ describe('the queue row menu (ADR-0107)', () => {
         [
           queue('orders'),
           queue('payments', {
-            allowedActions: ['queue:read'],
+            allowedActions: ['subscription:read'],
             ownerTeam: { id: 't9', name: 'Payments' },
           }),
         ],
@@ -174,10 +174,10 @@ describe('the queue row menu (ADR-0107)', () => {
         const clusterId = new URL(request.url).searchParams.get('clusterId');
         return HttpResponse.json({
           permissions: ['cluster:read'],
-          anywhere: ['queue:delete', 'queue:pause', 'queue:update'],
+          anywhere: ['subscription:delete', 'subscription:pause', 'subscription:update'],
           canSeeCluster: clusterId ? true : null,
           teams: [],
-          createPatterns: { queue: [], address: [] },
+          createPatterns: { subscription: [], destination: [] },
         });
       }),
     );
@@ -189,7 +189,7 @@ describe('the queue row menu (ADR-0107)', () => {
     const del = await within(menu).findByRole('menuitem', { name: /Delete queue/ });
     await waitFor(() => expect(del).toHaveAttribute('aria-disabled', 'true'));
     expect(del).toHaveAccessibleDescription(
-      /do not have the "Destroy queues and addresses" permission \(queue:delete\)/,
+      /do not have the "Destroy queues and addresses" permission \(subscription:delete\)/,
     );
 
     // Reachable with the arrow keys — a disabled item would be skipped.
@@ -201,7 +201,7 @@ describe('the queue row menu (ADR-0107)', () => {
 
   it('leaves out an action the caller cannot take anywhere on the cluster', async () => {
     search = {};
-    server.use(...handlers(['cluster:read', 'queue:pause']));
+    server.use(...handlers(['cluster:read', 'subscription:pause']));
     const user = userEvent.setup();
     renderWithProviders(<QueuesView />);
 

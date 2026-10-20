@@ -1,6 +1,6 @@
 package io.github.sudoitir.rahdar.kernel.security.web;
 
-import io.github.sudoitir.rahdar.kernel.plugin.ResourceKind;
+import io.github.sudoitir.rahdar.kernel.plugin.ResourceType;
 import io.github.sudoitir.rahdar.kernel.security.internal.MyAccess;
 import io.github.sudoitir.rahdar.kernel.security.web.AccessViews.AccessSummary;
 import io.github.sudoitir.rahdar.kernel.security.web.AccessViews.MyResourceAccess;
@@ -26,7 +26,7 @@ public class AccessController {
     /** What the caller may do with one queue or address of a cluster, for gating a control on that row. */
     @GetMapping("/me/access/resource")
     public MyResourceAccess resource(
-            @RequestParam UUID clusterId, @RequestParam ResourceKind kind, @RequestParam String name) {
-        return access.onResource(clusterId, kind, name);
+            @RequestParam UUID clusterId, @RequestParam ResourceType type, @RequestParam String name) {
+        return access.onResource(clusterId, type, name);
     }
 }

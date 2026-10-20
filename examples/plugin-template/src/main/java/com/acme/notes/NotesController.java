@@ -1,6 +1,6 @@
 package com.acme.notes;
 
-import io.github.sudoitir.rahdar.kernel.plugin.ResourceKind;
+import io.github.sudoitir.rahdar.kernel.plugin.ResourceType;
 import io.github.sudoitir.rahdar.kernel.security.ClusterAccessGuard;
 import io.github.sudoitir.rahdar.kernel.security.PermissionResolver;
 import io.github.sudoitir.rahdar.kernel.security.ResourceFilter;
@@ -63,7 +63,7 @@ public class NotesController {
         if (!perm.canAnywhere(clusterId, READ)) {
             throw new AccessDeniedException("You hold " + READ + " on no queue of this cluster.");
         }
-        ResourceFilter queues = perm.filter(clusterId, ResourceKind.QUEUE);
+        ResourceFilter queues = perm.filter(clusterId, ResourceType.SUBSCRIPTION);
         return notes.recent(clusterId).stream()
                 .filter(n -> queues.allowedActions(n.getQueue()).contains(READ))
                 .map(NoteView::of)
@@ -72,14 +72,14 @@ public class NotesController {
 
     @GetMapping("/queues/{queue}/notes")
     public List<NoteView> list(@PathVariable UUID clusterId, @PathVariable String queue) {
-        guard.requireResource(clusterId, ResourceRef.queue(queue), READ);
+        guard.requireResource(clusterId, ResourceRef.subscription(queue), READ);
         return notes.list(clusterId, queue).stream().map(NoteView::of).toList();
     }
 
     @PostMapping("/queues/{queue}/notes")
     @ResponseStatus(HttpStatus.CREATED)
     public NoteView add(@PathVariable UUID clusterId, @PathVariable String queue, @RequestBody NewNote note) {
-        guard.requireResource(clusterId, ResourceRef.queue(queue), WRITE);
+        guard.requireResource(clusterId, ResourceRef.subscription(queue), WRITE);
         return NoteView.of(notes.add(clusterId, queue, note.body() == null ? "" : note.body()));
     }
 
@@ -94,7 +94,7 @@ public class NotesController {
     public void delete(@PathVariable UUID clusterId, @PathVariable UUID noteId) {
         // A note is on a queue, and the right to delete it is the right on that queue.
         notes.queueOf(clusterId, noteId)
-                .ifPresent(queue -> guard.requireResource(clusterId, ResourceRef.queue(queue), WRITE));
+                .ifPresent(queue -> guard.requireResource(clusterId, ResourceRef.subscription(queue), WRITE));
         notes.delete(clusterId, noteId);
     }
 }

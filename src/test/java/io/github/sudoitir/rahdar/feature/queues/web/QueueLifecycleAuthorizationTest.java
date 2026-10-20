@@ -82,7 +82,8 @@ class QueueLifecycleAuthorizationTest extends PostgresIntegrationTest {
                         .content(CREATE_BODY))
                 .andExpect(result -> {
                     assertThat(result.getResponse().getStatus()).isEqualTo(403);
-                    assertThat(result.getResponse().getContentAsString()).contains(QueuePermissions.QUEUE_CREATE);
+                    assertThat(result.getResponse().getContentAsString())
+                            .contains(QueuePermissions.SUBSCRIPTION_CREATE);
                 });
     }
 
@@ -92,10 +93,13 @@ class QueueLifecycleAuthorizationTest extends PostgresIntegrationTest {
         mvc.perform(MockMvcRequestBuilders.delete("/api/v1/clusters/" + clusterId + "/queues/q?dryRun=true")
                         .with(csrf())
                         .with(authentication(callerWith(
-                                Permissions.CLUSTER_READ, Permissions.QUEUE_READ, MessagePermissions.QUEUE_PURGE))))
+                                Permissions.CLUSTER_READ,
+                                Permissions.SUBSCRIPTION_READ,
+                                MessagePermissions.SUBSCRIPTION_PURGE))))
                 .andExpect(result -> {
                     assertThat(result.getResponse().getStatus()).isEqualTo(403);
-                    assertThat(result.getResponse().getContentAsString()).contains(QueuePermissions.QUEUE_DELETE);
+                    assertThat(result.getResponse().getContentAsString())
+                            .contains(QueuePermissions.SUBSCRIPTION_DELETE);
                 });
     }
 
@@ -104,10 +108,12 @@ class QueueLifecycleAuthorizationTest extends PostgresIntegrationTest {
         mvc.perform(MockMvcRequestBuilders.post("/api/v1/clusters/" + clusterId + "/queues/q/pause?dryRun=true")
                         .with(csrf())
                         .with(authentication(callerWith(
-                                Permissions.CLUSTER_READ, Permissions.QUEUE_READ, QueuePermissions.QUEUE_UPDATE))))
+                                Permissions.CLUSTER_READ,
+                                Permissions.SUBSCRIPTION_READ,
+                                QueuePermissions.SUBSCRIPTION_UPDATE))))
                 .andExpect(result -> {
                     assertThat(result.getResponse().getStatus()).isEqualTo(403);
-                    assertThat(result.getResponse().getContentAsString()).contains(QueuePermissions.QUEUE_PAUSE);
+                    assertThat(result.getResponse().getContentAsString()).contains(QueuePermissions.SUBSCRIPTION_PAUSE);
                 });
     }
 
@@ -117,12 +123,12 @@ class QueueLifecycleAuthorizationTest extends PostgresIntegrationTest {
                         .with(csrf())
                         .with(authentication(callerWith(
                                 Permissions.CLUSTER_READ,
-                                Permissions.ADDRESS_READ,
-                                QueuePermissions.QUEUE_CREATE,
-                                QueuePermissions.ADDRESS_CREATE))))
+                                Permissions.DESTINATION_READ,
+                                QueuePermissions.SUBSCRIPTION_CREATE,
+                                QueuePermissions.DESTINATION_CREATE))))
                 .andExpect(result -> {
                     assertThat(result.getResponse().getStatus()).isEqualTo(403);
-                    assertThat(result.getResponse().getContentAsString()).contains(QueuePermissions.ADDRESS_DELETE);
+                    assertThat(result.getResponse().getContentAsString()).contains(QueuePermissions.DESTINATION_DELETE);
                 });
     }
 
@@ -130,7 +136,8 @@ class QueueLifecycleAuthorizationTest extends PostgresIntegrationTest {
     void aQueueTheCallerMayNotReadIsNotFoundWhateverElseTheyHold() throws Exception {
         mvc.perform(MockMvcRequestBuilders.delete("/api/v1/clusters/" + clusterId + "/queues/q?dryRun=true")
                         .with(csrf())
-                        .with(authentication(callerWith(Permissions.CLUSTER_READ, QueuePermissions.QUEUE_DELETE))))
+                        .with(authentication(
+                                callerWith(Permissions.CLUSTER_READ, QueuePermissions.SUBSCRIPTION_DELETE))))
                 .andExpect(
                         result -> assertThat(result.getResponse().getStatus()).isEqualTo(404));
     }
@@ -147,7 +154,7 @@ class QueueLifecycleAuthorizationTest extends PostgresIntegrationTest {
                 Set.of(new Grant(
                         Grant.ScopeType.CLUSTER,
                         UUID.randomUUID(),
-                        Set.of(Permissions.CLUSTER_READ, QueuePermissions.QUEUE_CREATE))),
+                        Set.of(Permissions.CLUSTER_READ, QueuePermissions.SUBSCRIPTION_CREATE))),
                 false);
         var caller = UsernamePasswordAuthenticationToken.authenticated(principal, null, principal.getAuthorities());
 
@@ -181,10 +188,10 @@ class QueueLifecycleAuthorizationTest extends PostgresIntegrationTest {
                         .with(csrf())
                         .with(authentication(callerWith(
                                 Permissions.CLUSTER_READ,
-                                Permissions.QUEUE_READ,
-                                Permissions.ADDRESS_READ,
-                                QueuePermissions.QUEUE_CREATE,
-                                QueuePermissions.ADDRESS_CREATE)))
+                                Permissions.SUBSCRIPTION_READ,
+                                Permissions.DESTINATION_READ,
+                                QueuePermissions.SUBSCRIPTION_CREATE,
+                                QueuePermissions.DESTINATION_CREATE)))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(CREATE_BODY))
                 .andReturn()

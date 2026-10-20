@@ -1,11 +1,10 @@
 package io.github.sudoitir.rahdar.feature.resources;
 
-import static io.github.sudoitir.rahdar.kernel.plugin.ResourceKind.QUEUE;
-
 import io.github.sudoitir.rahdar.feature.resources.QueueViewMapper.QueueKey;
 import io.github.sudoitir.rahdar.feature.resources.web.ResourceViews.QueueView;
 import io.github.sudoitir.rahdar.kernel.core.PagedView;
 import io.github.sudoitir.rahdar.kernel.core.ResourceQuery;
+import io.github.sudoitir.rahdar.kernel.plugin.ResourceType;
 import io.github.sudoitir.rahdar.kernel.security.ClusterAccessGuard;
 import io.github.sudoitir.rahdar.kernel.security.PermissionResolver;
 import io.github.sudoitir.rahdar.kernel.security.ResourceFilter;
@@ -48,14 +47,14 @@ public class CrossNodeAggregator {
 
     @Transactional(readOnly = true)
     public PagedView<QueueView> queues(UUID clusterId, ResourceQuery query) {
-        ResourceFilter readable = permissions.filter(clusterId, QUEUE);
+        ResourceFilter readable = permissions.filter(clusterId, ResourceType.SUBSCRIPTION);
         List<QueueView> rows = accessibleQueues(clusterId, readable).stream()
                 .filter(v -> query.matches(v.queueName()) || query.matches(v.address()))
                 .toList();
         return query.paginate(rows, comparatorFor(query.sortField()))
                 .map(v -> v.withAccess(
                         readable.allowedActions(v.queueName()),
-                        teams.ownerTeamOf(clusterId, ResourceRef.queue(v.queueName()))
+                        teams.ownerTeamOf(clusterId, ResourceRef.subscription(v.queueName()))
                                 .orElse(null)));
     }
 
@@ -70,7 +69,7 @@ public class CrossNodeAggregator {
      */
     @Transactional(readOnly = true)
     public List<QueueView> allQueues(UUID clusterId) {
-        return accessibleQueues(clusterId, permissions.filter(clusterId, QUEUE));
+        return accessibleQueues(clusterId, permissions.filter(clusterId, ResourceType.SUBSCRIPTION));
     }
 
     /** The cluster's queues that the caller may read, so a total never counts a hidden one. */

@@ -1,9 +1,9 @@
 package io.github.sudoitir.rahdar.feature.resources;
 
+import io.github.sudoitir.rahdar.feature.resources.mcp.ResourcesMcpReadTools.ListKind;
 import io.github.sudoitir.rahdar.kernel.plugin.FeatureDescriptor;
 import io.github.sudoitir.rahdar.kernel.plugin.McpToolDef;
 import io.github.sudoitir.rahdar.kernel.plugin.PermissionDef;
-import io.github.sudoitir.rahdar.kernel.plugin.ResourceKind;
 import io.github.sudoitir.rahdar.kernel.plugin.TopicDef;
 import java.util.List;
 
@@ -35,7 +35,7 @@ public final class ResourcesModule {
                     "list_resources",
                     McpToolDef.Posture.READ,
                     "Merged cross-node listing of one kind of cluster resource.",
-                    List.of(McpToolDef.Param.enumValues("kind", ResourceKind.values(), null))))
+                    List.of(McpToolDef.Param.enumValues("kind", ListKind.values(), null))))
             .mcpTool(new McpToolDef(
                     "connection_action",
                     McpToolDef.Posture.MUTATE,

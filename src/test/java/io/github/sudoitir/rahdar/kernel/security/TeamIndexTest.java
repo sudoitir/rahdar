@@ -38,32 +38,35 @@ class TeamIndexTest {
         when(patterns.findAll()).thenAnswer(read -> {
             // A change commits and is announced while this read is in flight, so what it returns is old.
             index.invalidate();
-            rows.add(new TeamPatternEntity(orders, cluster, "BOTH", "orders.#"));
+            rows.add(new TeamPatternEntity(orders, cluster, "ANY", "orders.#"));
             return before;
         });
 
-        assertThat(index.ownerOf(cluster, ResourceRef.queue("orders.in")))
+        assertThat(index.ownerOf(cluster, ResourceRef.subscription("orders.in")))
                 .as("this call may still be answered from what it read")
                 .isEmpty();
 
         when(patterns.findAll()).thenAnswer(read -> List.copyOf(rows));
-        assertThat(index.ownerOf(cluster, ResourceRef.queue("orders.in")))
+        assertThat(index.ownerOf(cluster, ResourceRef.subscription("orders.in")))
                 .as("but the next call reads again and sees the change")
                 .contains(orders);
     }
 
     @Test
     void aBuiltIndexIsKeptUntilItIsInvalidated() {
-        rows.add(new TeamPatternEntity(orders, cluster, "BOTH", "orders.#"));
+        rows.add(new TeamPatternEntity(orders, cluster, "ANY", "orders.#"));
         when(patterns.findAll()).thenAnswer(read -> List.copyOf(rows));
         when(shares.findAll()).thenReturn(List.of());
-        assertThat(index.ownerOf(cluster, ResourceRef.queue("orders.in"))).contains(orders);
+        assertThat(index.ownerOf(cluster, ResourceRef.subscription("orders.in")))
+                .contains(orders);
 
         rows.clear();
-        assertThat(index.ownerOf(cluster, ResourceRef.queue("orders.in"))).contains(orders);
+        assertThat(index.ownerOf(cluster, ResourceRef.subscription("orders.in")))
+                .contains(orders);
 
         index.invalidate();
-        assertThat(index.ownerOf(cluster, ResourceRef.queue("orders.in"))).isEmpty();
+        assertThat(index.ownerOf(cluster, ResourceRef.subscription("orders.in")))
+                .isEmpty();
         Mockito.verify(rolePermissions, Mockito.never()).findByIdRoleId(any());
     }
 
@@ -71,19 +74,20 @@ class TeamIndexTest {
     void theOwnerTeamIsNamedAndARenameShowsOnceTheIndexIsInvalidated() {
         TeamEntity team = new TeamEntity("Orders");
         ReflectionTestUtils.setField(team, "id", orders);
-        rows.add(new TeamPatternEntity(orders, cluster, "BOTH", "orders.#"));
+        rows.add(new TeamPatternEntity(orders, cluster, "ANY", "orders.#"));
         when(patterns.findAll()).thenAnswer(read -> List.copyOf(rows));
         when(shares.findAll()).thenReturn(List.of());
         when(teams.findAll()).thenAnswer(read -> List.of(team));
 
-        assertThat(index.ownerTeamOf(cluster, ResourceRef.queue("orders.in"))).contains(new TeamRef(orders, "Orders"));
-        assertThat(index.ownerTeamOf(cluster, ResourceRef.address("billing.in")))
+        assertThat(index.ownerTeamOf(cluster, ResourceRef.subscription("orders.in")))
+                .contains(new TeamRef(orders, "Orders"));
+        assertThat(index.ownerTeamOf(cluster, ResourceRef.destination("billing.in")))
                 .isEmpty();
 
         team.setName("Orders and returns");
         index.invalidate();
 
-        assertThat(index.ownerTeamOf(cluster, ResourceRef.queue("orders.in")))
+        assertThat(index.ownerTeamOf(cluster, ResourceRef.subscription("orders.in")))
                 .contains(new TeamRef(orders, "Orders and returns"));
     }
 }

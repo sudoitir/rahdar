@@ -28,7 +28,7 @@ import io.github.sudoitir.rahdar.feature.flow.web.FlowViews.NodeRole;
 import io.github.sudoitir.rahdar.feature.flow.web.FlowViews.NodeSampleState;
 import io.github.sudoitir.rahdar.feature.flow.web.FlowViews.RateSource;
 import io.github.sudoitir.rahdar.kernel.core.HeavyRequests;
-import io.github.sudoitir.rahdar.kernel.plugin.ResourceKind;
+import io.github.sudoitir.rahdar.kernel.plugin.ResourceType;
 import io.github.sudoitir.rahdar.kernel.security.ClusterAccessGuard;
 import io.github.sudoitir.rahdar.kernel.security.PermissionResolver;
 import io.github.sudoitir.rahdar.kernel.security.ResourceFilter;
@@ -112,7 +112,8 @@ public class FlowGraphService {
         access.requireVisible(clusterId);
         demand.renew(clusterId);
         Readable readable = new Readable(
-                permissions.filter(clusterId, ResourceKind.QUEUE), permissions.filter(clusterId, ResourceKind.ADDRESS));
+                permissions.filter(clusterId, ResourceType.SUBSCRIPTION),
+                permissions.filter(clusterId, ResourceType.DESTINATION));
 
         Instant now = clock.instant();
         Duration sampleInterval = FlowSettings.sampleInterval(settings);

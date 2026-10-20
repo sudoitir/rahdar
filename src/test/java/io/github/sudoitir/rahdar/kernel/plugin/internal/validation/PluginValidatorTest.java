@@ -260,15 +260,15 @@ class PluginValidatorTest {
     @Test
     void aResourcePermissionNeedsAtLeastOneKnownKind() throws Exception {
         var none = validatePermission(Map.of(
-                "action", "acme-notes:read", "description", "x", "scope", "resource", "resourceKinds", List.of()));
+                "action", "acme-notes:read", "description", "x", "scope", "resource", "resourceTypes", List.of()));
         var unknown = validatePermission(Map.of(
                 "action", "acme-notes:read",
                 "description", "x",
                 "scope", "resource",
-                "resourceKinds", List.of("topic")));
+                "resourceTypes", List.of("topic")));
 
-        assertThat(has(none, "permission-resource-kinds")).isTrue();
-        assertThat(has(unknown, "permission-resource-kinds")).isTrue();
+        assertThat(has(none, "permission-resource-types")).isTrue();
+        assertThat(has(unknown, "permission-resource-types")).isTrue();
     }
 
     @Test
@@ -277,9 +277,9 @@ class PluginValidatorTest {
                 "action", "acme-notes:read",
                 "description", "x",
                 "scope", "cluster",
-                "resourceKinds", List.of("queue")));
+                "resourceTypes", List.of("subscription")));
 
-        assertThat(has(violations, "permission-resource-kinds")).isTrue();
+        assertThat(has(violations, "permission-resource-types")).isTrue();
     }
 
     @Test
@@ -292,13 +292,13 @@ class PluginValidatorTest {
                                         "action", "acme-notes:read",
                                         "description", "x",
                                         "scope", "resource",
-                                        "resourceKinds", List.of("queue", "address")),
+                                        "resourceTypes", List.of("subscription", "destination")),
                                 Map.of(
                                         "action", "acme-notes:write",
                                         "description", "x",
                                         "scope", "resource",
-                                        "resourceKinds", List.of("queue"),
-                                        "requires", List.of("acme-notes:read", "queue:read")),
+                                        "resourceTypes", List.of("subscription"),
+                                        "requires", List.of("acme-notes:read", "subscription:read")),
                                 Map.of("action", "acme-notes:admin", "description", "x", "scope", "global")));
 
         assertThat(validate(jar)).noneMatch(v -> v.code().startsWith("permission-"));
@@ -400,8 +400,8 @@ class PluginValidatorTest {
                                 "Read notes",
                                 "scope",
                                 "resource",
-                                "resourceKinds",
-                                List.of("queue"))))
+                                "resourceTypes",
+                                List.of("subscription"))))
                 .descriptorField("mcpTools", List.of(tool));
     }
 
@@ -415,7 +415,7 @@ class PluginValidatorTest {
             tool.put("resourceArg", arg);
         }
         if (kind != null) {
-            tool.put("resourceKind", kind);
+            tool.put("resourceType", kind);
         }
         tool.put("description", "x");
         return tool;
@@ -423,7 +423,7 @@ class PluginValidatorTest {
 
     @Test
     void aResourceToolNamingItsArgumentAndKindPassesClean() throws Exception {
-        var violations = validate(resourcePlugin(resourceTool("resource", "queue", "queue")));
+        var violations = validate(resourcePlugin(resourceTool("resource", "queue", "subscription")));
         assertThat(violations).noneMatch(v -> v.code().startsWith("mcp-tool"));
     }
 
@@ -438,17 +438,17 @@ class PluginValidatorTest {
     @Test
     void aToolThatIsNotAResourceToolMayNotNameAResource() throws Exception {
         var jar = validPlugin("acme-notes")
-                .descriptorField("mcpTools", List.of(resourceTool("cluster", "queue", "queue")));
+                .descriptorField("mcpTools", List.of(resourceTool("cluster", "queue", "subscription")));
         assertThat(has(validate(jar), "mcp-tool-resource")).isTrue();
     }
 
     @Test
     void aResourceToolMustNameAKindItsPermissionActsOn() throws Exception {
-        var violations = validate(resourcePlugin(resourceTool("resource", "address", "address")));
+        var violations = validate(resourcePlugin(resourceTool("resource", "address", "destination")));
         assertThat(violations)
                 .filteredOn(v -> v.code().equals("mcp-tool-resource"))
                 .singleElement()
-                .satisfies(v -> assertThat(v.message()).contains("address").contains("queue"));
+                .satisfies(v -> assertThat(v.message()).contains("destination").contains("subscription"));
     }
 
     private static Map<String, String> metric(String name, String unit, String permission) {
@@ -528,7 +528,7 @@ class PluginValidatorTest {
     @Test
     void anApprovalProviderNamingAPermissionTheyDoNotDeclareIsRefused() throws Exception {
         var jar = validPlugin("acme-notes")
-                .descriptorField("approvalProvider", Map.of("approverPermission", "queue:purge"));
+                .descriptorField("approvalProvider", Map.of("approverPermission", "subscription:purge"));
         assertThat(has(validate(jar), "approval-provider-permission")).isTrue();
     }
 

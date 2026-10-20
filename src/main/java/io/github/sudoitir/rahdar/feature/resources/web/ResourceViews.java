@@ -47,7 +47,7 @@ public final class ResourceViews {
             @Schema(
                     requiredMode = REQUIRED,
                     description = "The actions of the catalogue that apply to this row and that the caller holds"
-                            + " on it, such as queue:purge. The console gates its controls from this.")
+                            + " on it, such as subscription:purge. The console gates its controls from this.")
             List<String> allowedActions,
 
             @Schema(nullable = true, description = "The team whose patterns own this queue; null when no team does.")
@@ -115,7 +115,7 @@ public final class ResourceViews {
             @Schema(
                     requiredMode = REQUIRED,
                     description = "The actions of the catalogue that apply to this row and that the caller holds"
-                            + " on it, such as queue:purge. The console gates its controls from this.")
+                            + " on it, such as subscription:purge. The console gates its controls from this.")
             List<String> allowedActions,
 
             @Schema(nullable = true, description = "The team whose patterns own this address; null when no team does.")
@@ -145,7 +145,7 @@ public final class ResourceViews {
             @Schema(
                     requiredMode = REQUIRED,
                     description = "The actions of the catalogue that apply to this row and that the caller holds"
-                            + " on it, such as queue:purge. The console gates its controls from this.")
+                            + " on it, such as subscription:purge. The console gates its controls from this.")
             List<String> allowedActions) {
 
         public ConsumerView withAllowedActions(List<String> actions) {
@@ -177,7 +177,7 @@ public final class ResourceViews {
             @Schema(
                     requiredMode = REQUIRED,
                     description = "The actions of the catalogue that apply to this row and that the caller holds"
-                            + " on it, such as queue:purge. The console gates its controls from this.")
+                            + " on it, such as subscription:purge. The console gates its controls from this.")
             List<String> allowedActions) {
 
         public SessionView withAllowedActions(List<String> actions) {
@@ -221,7 +221,7 @@ public final class ResourceViews {
             @Schema(
                     requiredMode = REQUIRED,
                     description = "The actions of the catalogue that apply to this row and that the caller holds"
-                            + " on it, such as queue:purge. The console gates its controls from this.")
+                            + " on it, such as subscription:purge. The console gates its controls from this.")
             List<String> allowedActions) {
 
         public ConnectionView withAllowedActions(List<String> actions) {
@@ -265,7 +265,7 @@ public final class ResourceViews {
             @Schema(
                     requiredMode = REQUIRED,
                     description = "The actions of the catalogue that apply to this row and that the caller holds"
-                            + " on it, such as queue:purge. The console gates its controls from this.")
+                            + " on it, such as subscription:purge. The console gates its controls from this.")
             List<String> allowedActions) {
 
         public ProducerView withAllowedActions(List<String> actions) {

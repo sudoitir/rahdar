@@ -118,7 +118,7 @@ public final class McpViews {
         }
     }
 
-    /** A row of {@code list_resources}, flattened across every {@code ResourceKind}. */
+    /** A row of {@code list_resources}, flattened across every {@code ResourceType}. */
     public record ResourceRow(String kind, String name, String node, String detail, Long count) {}
 
     /** One bucket of {@code metric_series}. */

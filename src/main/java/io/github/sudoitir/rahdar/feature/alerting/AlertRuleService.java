@@ -11,7 +11,7 @@ import io.github.sudoitir.rahdar.feature.alerting.web.AlertViews.PluginMetricVie
 import io.github.sudoitir.rahdar.kernel.audit.AuditEvent;
 import io.github.sudoitir.rahdar.kernel.audit.AuditService;
 import io.github.sudoitir.rahdar.kernel.core.NotFoundException;
-import io.github.sudoitir.rahdar.kernel.plugin.ResourceKind;
+import io.github.sudoitir.rahdar.kernel.plugin.ResourceType;
 import io.github.sudoitir.rahdar.kernel.security.ActorResolver;
 import io.github.sudoitir.rahdar.kernel.security.ClusterAccessGuard;
 import io.github.sudoitir.rahdar.kernel.security.PermissionResolver;
@@ -179,9 +179,9 @@ public class AlertRuleService {
                 || !rule.isThreshold()
                 || clusterAccess.mayOnAll(
                         clusterId,
-                        ResourceKind.QUEUE,
+                        ResourceType.SUBSCRIPTION,
                         AlertScope.parse(rule.getScope(), json).queueNames(),
-                        Permissions.QUEUE_READ);
+                        Permissions.SUBSCRIPTION_READ);
     }
 
     /** A rule is created or changed only to watch queues the caller may read: it would report on the rest. */
@@ -189,9 +189,9 @@ public class AlertRuleService {
         if (rule.isThreshold()) {
             clusterAccess.requireOnAll(
                     clusterId,
-                    ResourceKind.QUEUE,
+                    ResourceType.SUBSCRIPTION,
                     AlertScope.parse(rule.getScope(), json).queueNames(),
-                    Permissions.QUEUE_READ);
+                    Permissions.SUBSCRIPTION_READ);
         }
     }
 

@@ -15,7 +15,7 @@ import io.github.sudoitir.rahdar.kernel.core.ReadRouting;
 import io.github.sudoitir.rahdar.kernel.core.ResourceQuery;
 import io.github.sudoitir.rahdar.kernel.core.Routed;
 import io.github.sudoitir.rahdar.kernel.core.StatementTimeout;
-import io.github.sudoitir.rahdar.kernel.plugin.ResourceKind;
+import io.github.sudoitir.rahdar.kernel.plugin.ResourceType;
 import io.github.sudoitir.rahdar.kernel.security.ActorResolver;
 import io.github.sudoitir.rahdar.kernel.security.ClusterAccessGuard;
 import io.github.sudoitir.rahdar.kernel.security.PermissionResolver;
@@ -385,8 +385,8 @@ public class AuditQueryService {
         boolean everything = clusterAccess.holds(clusterId, Permissions.CLUSTER_READ);
         return new Scope(
                 everything,
-                everything ? List.of("") : readable(clusterId, "QUEUE", ResourceKind.QUEUE),
-                everything ? List.of("") : readable(clusterId, "ADDRESS", ResourceKind.ADDRESS),
+                everything ? List.of("") : readable(clusterId, "QUEUE", ResourceType.SUBSCRIPTION),
+                everything ? List.of("") : readable(clusterId, "ADDRESS", ResourceType.DESTINATION),
                 everything ? null : redaction(clusterId));
     }
 
@@ -416,8 +416,8 @@ public class AuditQueryService {
     public AuditEventView get(UUID clusterId, long id) {
         clusterAccess.requireVisible(clusterId);
         boolean everything = clusterAccess.holds(clusterId, Permissions.CLUSTER_READ);
-        ResourceFilter queues = permissions.filter(clusterId, ResourceKind.QUEUE);
-        ResourceFilter addresses = permissions.filter(clusterId, ResourceKind.ADDRESS);
+        ResourceFilter queues = permissions.filter(clusterId, ResourceType.SUBSCRIPTION);
+        ResourceFilter addresses = permissions.filter(clusterId, ResourceType.DESTINATION);
         return events.findByIdAndClusterId(id, clusterId)
                 .filter(e -> everything
                         || ("QUEUE".equals(e.getTargetType()) && queues.readable(e.getTargetName()))
@@ -439,7 +439,7 @@ public class AuditQueryService {
     }
 
     /** The names of one target type that the caller may read; never empty, as an empty collection cannot be bound. */
-    private List<String> readable(UUID clusterId, String targetType, ResourceKind kind) {
+    private List<String> readable(UUID clusterId, String targetType, ResourceType kind) {
         ResourceFilter filter = permissions.filter(clusterId, kind);
         List<String> names = events.findDistinctTargetNames(clusterId, targetType).stream()
                 .filter(filter::readable)
@@ -463,7 +463,8 @@ public class AuditQueryService {
 
     private Redaction redaction(UUID clusterId) {
         return new Redaction(
-                permissions.filter(clusterId, ResourceKind.QUEUE), permissions.filter(clusterId, ResourceKind.ADDRESS));
+                permissions.filter(clusterId, ResourceType.SUBSCRIPTION),
+                permissions.filter(clusterId, ResourceType.DESTINATION));
     }
 
     /**

@@ -274,7 +274,7 @@ class DivertLifecycleRealBrokerTest extends PostgresIntegrationTest {
                 tokens,
                 Grant.ScopeType.CLUSTER,
                 clusterId,
-                Set.of(Permissions.CLUSTER_READ, QueuePermissions.DIVERT_WRITE));
+                Set.of(Permissions.CLUSTER_READ, QueuePermissions.ROUTE_WRITE));
 
         JsonNode response = McpFixture.callTool(
                 mvc,

@@ -108,7 +108,7 @@ class McpAuthorizationIntegrationTest extends PostgresIntegrationTest {
                 tokens,
                 Grant.ScopeType.CLUSTER,
                 clusterId,
-                Set.of(Permissions.CLUSTER_READ, Permissions.QUEUE_READ, MessagePermissions.MESSAGE_READ));
+                Set.of(Permissions.CLUSTER_READ, Permissions.SUBSCRIPTION_READ, MessagePermissions.MESSAGE_READ));
 
         JsonNode response = McpFixture.callTool(
                 mvc,
@@ -122,7 +122,7 @@ class McpAuthorizationIntegrationTest extends PostgresIntegrationTest {
                 .describedAs("a missing permission must not surface as a JSON-RPC error: %s", response)
                 .isFalse();
         assertThat(response.path("result").path("isError").asBoolean(false))
-                .describedAs("purge without queue:purge came back as a success: %s", response)
+                .describedAs("purge without subscription:purge came back as a success: %s", response)
                 .isTrue();
     }
 
@@ -138,7 +138,7 @@ class McpAuthorizationIntegrationTest extends PostgresIntegrationTest {
                 tokens,
                 Grant.ScopeType.CLUSTER,
                 clusterId,
-                Set.of(Permissions.CLUSTER_READ, Permissions.QUEUE_READ, MessagePermissions.MESSAGE_READ));
+                Set.of(Permissions.CLUSTER_READ, Permissions.SUBSCRIPTION_READ, MessagePermissions.MESSAGE_READ));
 
         JsonNode response = McpFixture.callTool(
                 mvc, key, "list_resources", Map.of("clusterId", clusterId.toString(), "kind", "queues"));

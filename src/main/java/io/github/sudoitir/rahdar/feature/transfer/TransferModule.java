@@ -18,7 +18,7 @@ public final class TransferModule {
             .settingKey(TransferSettings.CAPACITY_THRESHOLD_PERCENT)
             .settingKey(TransferSettings.CAPACITY_WAIT)
             .apiPrefix("/api/v1/clusters/{clusterId}/transfers")
-            .streamTopic(TopicDef.data(TransferRunner.TOPIC, Permissions.QUEUE_READ))
+            .streamTopic(TopicDef.data(TransferRunner.TOPIC, Permissions.SUBSCRIPTION_READ))
             .build();
 
     private TransferModule() {}

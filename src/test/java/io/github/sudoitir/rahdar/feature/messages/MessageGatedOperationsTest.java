@@ -53,7 +53,7 @@ class MessageGatedOperationsTest {
         GatedOperation<QueuePurgeParams> purge = operations.queuePurgeOperation(messages, clusters);
         QueuePurgeParams params = new QueuePurgeParams(CLUSTER, "orders.dlq", null, false);
 
-        assertThat(purge.type()).isEqualTo("queue.purge");
+        assertThat(purge.type()).isEqualTo("subscription.purge");
         assertThat(purge.traits(params)).containsExactly(Trait.DESTRUCTIVE);
         assertThat(purge.mode()).isEqualTo(ExecutionMode.ON_APPROVAL);
         assertThat(purge.scope(params)).isEqualTo(OperationScope.cluster(CLUSTER, ENVIRONMENT));

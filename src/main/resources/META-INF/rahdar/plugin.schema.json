@@ -66,11 +66,11 @@
           "description": { "type": "string" },
           "scope": {
             "enum": ["global", "cluster", "resource"],
-            "description": "Where the permission takes effect. global: checked without a cluster, only a global grant makes it take effect. cluster: checked against a cluster, a global, environment or cluster grant makes it take effect. resource: checked against a queue or address of a cluster; a platform grant, a team role or a share makes it take effect."
+            "description": "Where the permission takes effect. global: checked without a cluster, only a global grant makes it take effect. cluster: checked against a cluster, a global, environment or cluster grant makes it take effect. resource: checked against a subscription or destination of a cluster; a platform grant, a team role or a share makes it take effect."
           },
-          "resourceKinds": {
+          "resourceTypes": {
             "type": "array",
-            "items": { "enum": ["queue", "address"] },
+            "items": { "enum": ["subscription", "destination"] },
             "uniqueItems": true,
             "description": "What a resource permission acts on. Required, and not empty, when scope is resource; refused for any other scope."
           },
@@ -78,7 +78,7 @@
             "type": "array",
             "items": { "type": "string", "minLength": 1 },
             "uniqueItems": true,
-            "description": "Permissions a role must hold with this one, from the plugin or from Rahdar (for example queue:read). The role editor adds them, and saving a role without them is refused."
+            "description": "Permissions a role must hold with this one, from the plugin or from Rahdar (for example subscription:read). The role editor adds them, and saving a role without them is refused."
           }
         }
       }
@@ -162,7 +162,7 @@
           },
           "scope": {
             "enum": ["resource", "cluster", "global"],
-            "description": "Matches the scope of the permission. resource: Rahdar checks the permission on the queue or address named by the tool's resourceArg, on the cluster named by its required clusterId argument. cluster: on that cluster. global: globally."
+            "description": "Matches the scope of the permission. resource: Rahdar checks the permission on the subscription or destination named by the tool's resourceArg, on the cluster named by its required clusterId argument. cluster: on that cluster. global: globally."
           },
           "permission": {
             "type": "string",
@@ -170,11 +170,11 @@
           },
           "resourceArg": {
             "type": "string",
-            "description": "Required for scope resource, refused otherwise: the tool's required string argument holding the queue or address name."
+            "description": "Required for scope resource, refused otherwise: the tool's required string argument holding the subscription or destination name."
           },
-          "resourceKind": {
-            "enum": ["queue", "address"],
-            "description": "Required for scope resource, refused otherwise: what resourceArg names. The permission's resourceKinds must include it."
+          "resourceType": {
+            "enum": ["subscription", "destination"],
+            "description": "Required for scope resource, refused otherwise: what resourceArg names. The permission's resourceTypes must include it."
           },
           "description": { "type": "string" },
           "params": {

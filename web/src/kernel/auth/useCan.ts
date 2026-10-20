@@ -4,12 +4,12 @@ import { useQueries, useQuery } from '@tanstack/react-query';
 import { accessQuery, resourceAccessQuery, type AccessSummary } from './api.ts';
 
 /**
- * A queue or address of a cluster, for a check on one resource. Pass the `allowedActions` a row already
+ * A subscription or destination of a cluster, for a check on one resource. Pass the `allowedActions` a row already
  * carries from the server to answer from it with no request.
  */
 export interface ResourceWhere {
   clusterId: string;
-  kind: 'queue' | 'address';
+  type: 'subscription' | 'destination';
   name: string;
   allowedActions?: AllowedActions;
 }
@@ -18,15 +18,15 @@ export interface ResourceWhere {
 export type AllowedActions = readonly string[];
 
 /** One thing the hook has asked the server about: a cluster as a whole, or one queue or address of it. */
-type Ask = { id: string; clusterId: string; resource?: { kind: 'QUEUE' | 'ADDRESS'; name: string } };
+type Ask = { id: string; clusterId: string; resource?: { type: 'SUBSCRIPTION' | 'DESTINATION'; name: string } };
 
 const askFor = (where: string | ResourceWhere): Ask =>
   typeof where === 'string'
     ? { id: where, clusterId: where }
     : {
-        id: `${where.clusterId}|${where.kind}|${where.name}`,
+        id: `${where.clusterId}|${where.type}|${where.name}`,
         clusterId: where.clusterId,
-        resource: { kind: where.kind === 'queue' ? 'QUEUE' : 'ADDRESS', name: where.name },
+        resource: { type: where.type === 'subscription' ? 'SUBSCRIPTION' : 'DESTINATION', name: where.name },
       };
 
 /**
@@ -36,13 +36,13 @@ const askFor = (where: string | ResourceWhere): Ask =>
  * counted as the server counts them.
  *
  * <p>`can(permission)` is about the whole installation. `can(permission, clusterId)` is about one cluster, and
- * `can(permission, { clusterId, kind, name })` about one queue or address, with a team's or share's rights counted.
+ * `can(permission, { clusterId, type, name })` about one subscription or destination, with a team's or share's rights counted.
  * Each is fetched the first time it is asked. Until it arrives the control is offered, as it is while grants load:
  * blocking on an answer not yet known would lock out someone the server lets in. For a resource permission the
- * cluster answer counts grants only; what a team or share gives on some queue or address is in the summary's
+ * cluster answer counts grants only; what a team or share gives on some subscription or address is in the summary's
  * `anywhere`, and on one named queue or address in its own answer, or in the row's `allowedActions`.
  *
- * <p>`canAnywhere` is the page-level right: held on the cluster by a grant, or on some queue or address through a team
+ * <p>`canAnywhere` is the page-level right: held on the cluster by a grant, or on some subscription or address through a team
  * or a share. A control is hidden only when it is false. `canOn` is the right on one row the server sent, from the
  * row's `allowedActions`: false there is a control shown disabled, with its reason. `createPatterns` are the name
  * patterns a team or share lets the caller create queues and addresses under.
@@ -53,7 +53,7 @@ export function useCan() {
   const knownAsked = useRef(new Set<string>());
   const answers = useQueries({
     queries: asked.map((a) =>
-      a.resource ? resourceAccessQuery(a.clusterId, a.resource.kind, a.resource.name) : accessQuery(a.clusterId),
+      a.resource ? resourceAccessQuery(a.clusterId, a.resource.type, a.resource.name) : accessQuery(a.clusterId),
     ),
   });
   const byAsk = new Map<string, readonly string[] | undefined>(
@@ -94,7 +94,7 @@ export function useCan() {
   }
 
   /**
-   * Whether the caller holds the permission on the cluster, or, for a resource permission, on some queue or
+   * Whether the caller holds the permission on the cluster, or, for a resource permission, on some subscription or
    * address of it through a team or share: whether to offer a page, not whether to allow a change.
    */
   function canAnywhere(permission: string, clusterId: string): boolean {
@@ -117,10 +117,10 @@ export function useCan() {
     return known.anywhere.includes(permission) ? 'teams' : 'none';
   }
 
-  function createPatterns(clusterId: string, kind: 'queue' | 'address'): string[] | undefined {
+  function createPatterns(clusterId: string, type: 'subscription' | 'destination'): string[] | undefined {
     const known = clusterSummaries.get(clusterId);
     if (!known) ask(askFor(clusterId));
-    return known?.createPatterns[kind];
+    return known?.createPatterns[type];
   }
 
   return {

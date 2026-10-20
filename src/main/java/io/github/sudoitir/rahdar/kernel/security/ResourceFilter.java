@@ -1,7 +1,7 @@
 package io.github.sudoitir.rahdar.kernel.security;
 
 import io.github.sudoitir.rahdar.kernel.plugin.PluginApi;
-import io.github.sudoitir.rahdar.kernel.plugin.ResourceKind;
+import io.github.sudoitir.rahdar.kernel.plugin.ResourceType;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -21,7 +21,7 @@ public final class ResourceFilter {
     private final PermissionResolver resolver;
     private final RahdarPrincipal principal;
     private final UUID clusterId;
-    private final ResourceKind kind;
+    private final ResourceType kind;
     private final String readAction;
     private final List<String> actions;
     private final Set<String> wholeCluster;
@@ -30,7 +30,7 @@ public final class ResourceFilter {
             PermissionResolver resolver,
             RahdarPrincipal principal,
             UUID clusterId,
-            ResourceKind kind,
+            ResourceType kind,
             String readAction,
             List<String> actions,
             Set<String> wholeCluster) {

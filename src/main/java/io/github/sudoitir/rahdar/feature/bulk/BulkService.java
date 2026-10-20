@@ -409,7 +409,7 @@ public class BulkService {
     public BulkRunDetailView get(UUID clusterId, UUID runId) {
         clusterAccess.requireVisible(clusterId);
         BulkRunEntity run = load(clusterId, runId);
-        requireOnRun(clusterId, run, Permissions.QUEUE_READ);
+        requireOnRun(clusterId, run, Permissions.SUBSCRIPTION_READ);
         return detail(run);
     }
 
@@ -419,7 +419,7 @@ public class BulkService {
      */
     public PagedView<BulkRunView> history(UUID clusterId, ResourceQuery query) {
         clusterAccess.requireVisible(clusterId);
-        if (clusterAccess.holds(clusterId, Permissions.QUEUE_READ)) {
+        if (clusterAccess.holds(clusterId, Permissions.SUBSCRIPTION_READ)) {
             return PagedView.of(
                     runs.findByClusterIdAndStatusNotOrderByCreatedAtDesc(
                             clusterId, BulkRunStatus.PREVIEWED, PageRequest.of(query.page() - 1, query.size())),
@@ -429,7 +429,7 @@ public class BulkService {
                 .findByClusterIdAndStatusNotOrderByCreatedAtDesc(
                         clusterId, BulkRunStatus.PREVIEWED, PageRequest.of(0, HISTORY_SCAN))
                 .stream()
-                .filter(run -> clusterAccess.mayAll(clusterId, requirements(run, Permissions.QUEUE_READ)))
+                .filter(run -> clusterAccess.mayAll(clusterId, requirements(run, Permissions.SUBSCRIPTION_READ)))
                 .map(this::view)
                 .toList();
         return query.paginate(readable, null);
@@ -450,7 +450,7 @@ public class BulkService {
     /** What acting on {@code names} with the permission needs: the permission on each queue. */
     private static List<Requirement> requirements(List<String> names, String permission) {
         return names.stream()
-                .map(name -> new Requirement(ResourceRef.queue(name), permission))
+                .map(name -> new Requirement(ResourceRef.subscription(name), permission))
                 .toList();
     }
 

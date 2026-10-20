@@ -59,7 +59,7 @@ function groupPermissions(catalogue: PermissionView[], selected: string[], teamR
   const groups = new Map<string, PermissionGroup>();
   for (const p of catalogue) {
     const group = groups.get(p.featureId) ?? { id: p.featureId, title: p.featureTitle, entries: [] };
-    group.entries.push({ action: p.action, label: p.label, scope: p.scope, kinds: p.resourceKinds });
+    group.entries.push({ action: p.action, label: p.label, scope: p.scope, kinds: p.resourceTypes });
     groups.set(p.featureId, group);
   }
   // A team role holds only what the catalogue offers it; what else it holds is listed apart, to be removed.
@@ -228,7 +228,7 @@ export function PermissionPicker({
             </Button>
           }
         >
-          A team role holds only permissions that act on a queue or address, and team:admin. Saving is refused while it
+          A team role holds only permissions that act on a subscription or destination, and team:admin. Saving is refused while it
           holds {barred.join(', ')}.
         </Notice>
       ) : null}

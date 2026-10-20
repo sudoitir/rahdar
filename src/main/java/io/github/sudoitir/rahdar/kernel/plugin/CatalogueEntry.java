@@ -12,7 +12,7 @@ public record CatalogueEntry(
         String featureId,
         String featureTitle,
         PermissionScope scope,
-        Set<ResourceKind> resourceKinds,
+        Set<ResourceType> resourceTypes,
         Set<String> requires) {
 
     static CatalogueEntry of(FeatureDescriptor owner, PermissionDef permission) {
@@ -22,7 +22,7 @@ public record CatalogueEntry(
                 owner.id(),
                 owner.title() == null ? owner.id() : owner.title(),
                 permission.scope(),
-                permission.resourceKinds(),
+                permission.resourceTypes(),
                 permission.requires());
     }
 }

@@ -73,8 +73,8 @@ class CanonicalJsonTest {
     void hashesTypeVersionAndForm() {
         String canonical = CanonicalJson.write(golden());
 
-        assertThat(HexFormat.of().formatHex(CanonicalJson.hash("queue.purge", 1, canonical)))
-                .isEqualTo("13d3a14622d5ca7b113e161a00463d5def567488f701693370c00720ea63342a");
+        assertThat(HexFormat.of().formatHex(CanonicalJson.hash("subscription.purge", 1, canonical)))
+                .isEqualTo("f26e5f827f632394a9f2d9cf58ebe1a77d4959d83d64fbaf3da3548879d02d90");
         assertThat(HexFormat.of().formatHex(CanonicalJson.hash("t", 1, "{}")))
                 .isEqualTo("0aac668f8d910d54b2ca42539cb8ba55882ef398a8c04dd003bcddf160243668");
     }
@@ -82,10 +82,10 @@ class CanonicalJsonTest {
     @Test
     void theHashChangesWithTheTypeAndTheVersion() {
         String canonical = CanonicalJson.write(golden());
-        byte[] hash = CanonicalJson.hash("queue.purge", 1, canonical);
+        byte[] hash = CanonicalJson.hash("subscription.purge", 1, canonical);
 
-        assertThat(CanonicalJson.hash("queue.purge", 2, canonical)).isNotEqualTo(hash);
-        assertThat(CanonicalJson.hash("queue.delete", 1, canonical)).isNotEqualTo(hash);
+        assertThat(CanonicalJson.hash("subscription.purge", 2, canonical)).isNotEqualTo(hash);
+        assertThat(CanonicalJson.hash("subscription.delete", 1, canonical)).isNotEqualTo(hash);
     }
 
     @Test

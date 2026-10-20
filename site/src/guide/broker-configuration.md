@@ -291,7 +291,7 @@ compares every node with the declaration. The two link to each other.
 `config:apply` is a create-and-update authority: it never implies deleting a
 queue or an address. The built-in administrator role holds every permission;
 grant the two `config:*` permissions to an operator role as you would
-`queue:create` or `divert:write`.
+`subscription:create` or `route:write`.
 
 ## Over MCP
 

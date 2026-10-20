@@ -32,7 +32,7 @@ export const keys = {
 export const accessKeys = {
   all: ['access'] as const,
   of: (clusterId?: string) => ['access', clusterId ?? 'global'] as const,
-  resource: (clusterId: string, kind: string, name: string) => ['access', 'resource', clusterId, kind, name] as const,
+  resource: (clusterId: string, type: string, name: string) => ['access', 'resource', clusterId, type, name] as const,
 };
 
 /**
@@ -49,11 +49,11 @@ export function accessQuery(clusterId?: string) {
   });
 }
 
-/** What the signed-in user may do with one queue or address: the actions they hold on it, as the server decides. */
-export function resourceAccessQuery(clusterId: string, kind: 'QUEUE' | 'ADDRESS', name: string) {
+/** What the signed-in user may do with one subscription or destination: the actions they hold on it, as the server decides. */
+export function resourceAccessQuery(clusterId: string, type: 'SUBSCRIPTION' | 'DESTINATION', name: string) {
   return queryOptions({
-    queryKey: accessKeys.resource(clusterId, kind, name),
-    queryFn: () => request<MyResourceAccess>(`/me/access/resource?${new URLSearchParams({ clusterId, kind, name })}`),
+    queryKey: accessKeys.resource(clusterId, type, name),
+    queryFn: () => request<MyResourceAccess>(`/me/access/resource?${new URLSearchParams({ clusterId, type, name })}`),
     retry: false,
     staleTime: 30_000,
   });

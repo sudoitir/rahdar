@@ -6,6 +6,7 @@ import com.github.benmanes.caffeine.cache.Ticker;
 import io.github.sudoitir.rahdar.kernel.audit.AuditEvent;
 import io.github.sudoitir.rahdar.kernel.audit.AuditScope;
 import io.github.sudoitir.rahdar.kernel.audit.AuditService;
+import io.github.sudoitir.rahdar.kernel.plugin.ResourceType;
 import io.github.sudoitir.rahdar.kernel.security.AccessRefused;
 import io.github.sudoitir.rahdar.kernel.security.Actor;
 import io.github.sudoitir.rahdar.kernel.security.ActorResolver;
@@ -91,7 +92,7 @@ class RefusalAuditRecorder {
         record(
                 refused.permission(),
                 refused.clusterId(),
-                resource == null ? "CLUSTER" : resource.kind().name(),
+                resource == null ? "CLUSTER" : auditTarget(resource),
                 resource == null ? null : resource.name(),
                 refused.hidden());
     }
@@ -187,5 +188,10 @@ class RefusalAuditRecorder {
                 return "";
             }
         });
+    }
+
+    /** The audit target type of a resource: audit rows keep naming queues and addresses. */
+    private static String auditTarget(ResourceRef resource) {
+        return resource.type() == ResourceType.SUBSCRIPTION ? "QUEUE" : "ADDRESS";
     }
 }

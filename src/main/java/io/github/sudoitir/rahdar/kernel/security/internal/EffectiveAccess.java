@@ -4,7 +4,7 @@ import io.github.sudoitir.rahdar.kernel.core.NotFoundException;
 import io.github.sudoitir.rahdar.kernel.plugin.CatalogueEntry;
 import io.github.sudoitir.rahdar.kernel.plugin.FeatureRegistry;
 import io.github.sudoitir.rahdar.kernel.plugin.PermissionScope;
-import io.github.sudoitir.rahdar.kernel.plugin.ResourceKind;
+import io.github.sudoitir.rahdar.kernel.plugin.ResourceType;
 import io.github.sudoitir.rahdar.kernel.security.Grant;
 import io.github.sudoitir.rahdar.kernel.security.ResourceRef;
 import io.github.sudoitir.rahdar.kernel.security.ScopeHierarchy;
@@ -116,7 +116,7 @@ public class EffectiveAccess {
      */
     @PreAuthorize("@perm.can(T(io.github.sudoitir.rahdar.kernel.security.Permissions).USER_ADMIN)")
     @Transactional(readOnly = true)
-    public List<AccessCheckView> check(UUID userId, UUID clusterId, ResourceKind kind, String name) {
+    public List<AccessCheckView> check(UUID userId, UUID clusterId, ResourceType kind, String name) {
         AppUserEntity user = users.findById(userId).orElseThrow(() -> new NotFoundException("user", userId));
         if ((kind == null) != (name == null || name.isBlank())) {
             throw new IllegalArgumentException("Give both the kind and the name of the queue or address, or neither.");
@@ -146,7 +146,7 @@ public class EffectiveAccess {
             List<AccessSource> sources = new ArrayList<>(roleGrantSources(entry, context));
             if (entry.scope() == PermissionScope.RESOURCE
                     && resource != null
-                    && entry.resourceKinds().contains(resource.kind())) {
+                    && entry.resourceTypes().contains(resource.type())) {
                 sources.addAll(teamSources(entry, context));
                 sources.addAll(shareSources(entry, context));
             }

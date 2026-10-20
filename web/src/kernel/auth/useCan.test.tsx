@@ -11,7 +11,7 @@ type Summary = {
   anywhere?: string[];
   canSeeCluster?: boolean | null;
   teams?: { teamId: string; teamName: string; roleId: string; roleName: string; teamAdmin: boolean }[];
-  createPatterns?: { queue: string[]; address: string[] };
+  createPatterns?: { subscription: string[]; destination: string[] };
 };
 
 /** Serves `/me/access`: the installation summary, and each cluster's by id. */
@@ -24,7 +24,7 @@ function serveAccess(installation: Summary, byCluster: Record<string, Summary> =
         anywhere: [],
         canSeeCluster: clusterId ? false : null,
         teams: [],
-        createPatterns: { queue: [], address: [] },
+        createPatterns: { subscription: [], destination: [] },
         ...summary,
       });
     }),
@@ -84,16 +84,16 @@ describe('useCan', () => {
   });
 
   it('counts a grant on the environment of a cluster, which the grants of /auth/me cannot show', async () => {
-    serveAccess({ permissions: [] }, { 'c-live': { permissions: ['queue:purge'] } });
+    serveAccess({ permissions: [] }, { 'c-live': { permissions: ['subscription:purge'] } });
     renderWithProviders(
       <>
-        <Probe permission="queue:purge" clusterId="c-live" />
-        <Probe permission="queue:purge" clusterId="c-other" />
+        <Probe permission="subscription:purge" clusterId="c-live" />
+        <Probe permission="subscription:purge" clusterId="c-other" />
       </>,
     );
 
-    expect(await screen.findByText('queue:purge c-live: yes')).toBeInTheDocument();
-    await waitFor(() => expect(screen.getByText('queue:purge c-other: no')).toBeInTheDocument());
+    expect(await screen.findByText('subscription:purge c-live: yes')).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText('subscription:purge c-other: no')).toBeInTheDocument());
   });
 
   it('offers the control until the cluster it was asked about has answered, then follows the answer', async () => {
@@ -108,15 +108,15 @@ describe('useCan', () => {
           anywhere: [],
           canSeeCluster: clusterId ? false : null,
           teams: [],
-          createPatterns: { queue: [], address: [] },
+          createPatterns: { subscription: [], destination: [] },
         });
       }),
     );
-    renderWithProviders(<Probe permission="queue:purge" clusterId="c-live" />);
+    renderWithProviders(<Probe permission="subscription:purge" clusterId="c-live" />);
 
-    expect(await screen.findByText('queue:purge c-live: yes')).toBeInTheDocument();
+    expect(await screen.findByText('subscription:purge c-live: yes')).toBeInTheDocument();
     release();
-    await waitFor(() => expect(screen.getByText('queue:purge c-live: no')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('subscription:purge c-live: no')).toBeInTheDocument());
   });
 
   it('counts the admin of a team as holding team:admin, though no role grants it globally', async () => {
@@ -150,13 +150,13 @@ describe('useCan', () => {
       const { can, canAnywhere, canOn, reach, createPatterns } = useCan();
       return (
         <ul>
-          <li>grant: {can('queue:purge', clusterId) ? 'yes' : 'no'}</li>
-          <li>anywhere: {canAnywhere('queue:purge', clusterId) ? 'yes' : 'no'}</li>
-          <li>anywhere other: {canAnywhere('queue:delete', clusterId) ? 'yes' : 'no'}</li>
-          <li>on mine: {canOn('queue:purge', { allowedActions: ['queue:purge'] }) ? 'yes' : 'no'}</li>
-          <li>on theirs: {canOn('queue:purge', { allowedActions: ['queue:read'] }) ? 'yes' : 'no'}</li>
-          <li>reach: {reach('queue:purge', clusterId)}</li>
-          <li>patterns: {createPatterns(clusterId, 'queue')?.join(',') ?? 'unknown'}</li>
+          <li>grant: {can('subscription:purge', clusterId) ? 'yes' : 'no'}</li>
+          <li>anywhere: {canAnywhere('subscription:purge', clusterId) ? 'yes' : 'no'}</li>
+          <li>anywhere other: {canAnywhere('subscription:delete', clusterId) ? 'yes' : 'no'}</li>
+          <li>on mine: {canOn('subscription:purge', { allowedActions: ['subscription:purge'] }) ? 'yes' : 'no'}</li>
+          <li>on theirs: {canOn('subscription:purge', { allowedActions: ['subscription:read'] }) ? 'yes' : 'no'}</li>
+          <li>reach: {reach('subscription:purge', clusterId)}</li>
+          <li>patterns: {createPatterns(clusterId, 'subscription')?.join(',') ?? 'unknown'}</li>
         </ul>
       );
     }
@@ -164,7 +164,7 @@ describe('useCan', () => {
     it('separates the page-level right from the right on one row', async () => {
       serveAccess(
         { permissions: [] },
-        { c1: { permissions: [], anywhere: ['queue:purge'], createPatterns: { queue: ['orders.#'], address: [] } } },
+        { c1: { permissions: [], anywhere: ['subscription:purge'], createPatterns: { subscription: ['orders.#'], destination: [] } } },
       );
       renderWithProviders(<Reach clusterId="c1" />);
 
@@ -192,21 +192,21 @@ describe('useCan', () => {
     server.use(
       http.get('*/api/v1/me/access/resource', ({ request }) => {
         const url = new URL(request.url);
-        asked.push(`${url.searchParams.get('kind')} ${url.searchParams.get('name')}`);
+        asked.push(`${url.searchParams.get('type')} ${url.searchParams.get('name')}`);
         const own = url.searchParams.get('name') === 'orders.in';
-        return HttpResponse.json({ actions: own ? ['queue:read', 'acme:peek'] : [] });
+        return HttpResponse.json({ actions: own ? ['subscription:read', 'acme:peek'] : [] });
       }),
     );
     renderWithProviders(
       <>
-        <ResourceProbe permission="acme:peek" where={{ clusterId: 'c1', kind: 'queue', name: 'orders.in' }} />
-        <ResourceProbe permission="acme:peek" where={{ clusterId: 'c1', kind: 'queue', name: 'billing.in' }} />
+        <ResourceProbe permission="acme:peek" where={{ clusterId: 'c1', type: 'subscription', name: 'orders.in' }} />
+        <ResourceProbe permission="acme:peek" where={{ clusterId: 'c1', type: 'subscription', name: 'billing.in' }} />
       </>,
     );
 
     await waitFor(() => expect(screen.getByText('acme:peek on billing.in: no')).toBeInTheDocument());
     expect(screen.getByText('acme:peek on orders.in: yes')).toBeInTheDocument();
-    expect(asked.sort()).toEqual(['QUEUE billing.in', 'QUEUE orders.in']);
+    expect(asked.sort()).toEqual(['SUBSCRIPTION billing.in', 'SUBSCRIPTION orders.in']);
   });
 
   it('answers from the allowedActions a row carries, with no request', async () => {
@@ -216,11 +216,11 @@ describe('useCan', () => {
       <>
         <ResourceProbe
           permission="acme:write"
-          where={{ clusterId: 'c1', kind: 'queue', name: 'a', allowedActions: ['acme:write'] }}
+          where={{ clusterId: 'c1', type: 'subscription', name: 'a', allowedActions: ['acme:write'] }}
         />
         <ResourceProbe
           permission="acme:write"
-          where={{ clusterId: 'c1', kind: 'queue', name: 'b', allowedActions: ['acme:read'] }}
+          where={{ clusterId: 'c1', type: 'subscription', name: 'b', allowedActions: ['acme:read'] }}
         />
       </>,
     );

@@ -26,12 +26,12 @@ function admin() {
 }
 
 /** A team member: nothing is granted on the cluster, and a team lets them create under these patterns. */
-function teamMember(createPatterns: { queue: string[]; address: string[] }) {
+function teamMember(createPatterns: { subscription: string[]; destination: string[] }) {
   return http.get('*/api/v1/me/access', ({ request }) => {
     const clusterId = new URL(request.url).searchParams.get('clusterId');
     return HttpResponse.json({
       permissions: [],
-      anywhere: ['queue:create', 'address:create'],
+      anywhere: ['subscription:create', 'destination:create'],
       canSeeCluster: clusterId ? true : null,
       teams: [],
       createPatterns,
@@ -131,17 +131,17 @@ describe('CreateQueueForm', () => {
 
   describe('for a member of a team', () => {
     it('shows the patterns they may create under, and checks the name as it is typed', async () => {
-      server.use(teamMember({ queue: ['orders.#'], address: ['orders.#'] }), emptyQueues());
+      server.use(teamMember({ subscription: ['orders.#'], destination: ['orders.#'] }), emptyQueues());
       const user = userEvent.setup();
       renderWithProviders(<Harness />);
 
       const name = await screen.findByRole('textbox', { name: /queue name/i });
-      expect(await screen.findByText('You may create queues under: orders.#.')).toBeInTheDocument();
+      expect(await screen.findByText('You may create subscriptions under: orders.#.')).toBeInTheDocument();
 
       // No blur, no submit: the problem shows while the name is being typed.
       await user.type(name, 'billing.in');
       expect(
-        await screen.findByText(/billing\.in is outside the patterns you may create queues under/),
+        await screen.findByText(/billing\.in is outside the patterns you may create subscriptions under/),
       ).toBeInTheDocument();
 
       await user.clear(name);
@@ -150,16 +150,16 @@ describe('CreateQueueForm', () => {
     });
 
     it('checks the address against the address patterns, which may differ from the queue ones', async () => {
-      server.use(teamMember({ queue: ['orders.#'], address: ['orders.addr.#'] }), emptyQueues());
+      server.use(teamMember({ subscription: ['orders.#'], destination: ['orders.addr.#'] }), emptyQueues());
       const user = userEvent.setup();
       renderWithProviders(<Harness />);
 
       const address = await screen.findByRole('textbox', { name: /address/i });
-      expect(await screen.findByText(/You may create addresses under: orders\.addr\.#\./)).toBeInTheDocument();
+      expect(await screen.findByText(/You may create destinations under: orders\.addr\.#\./)).toBeInTheDocument();
       await user.type(address, 'orders.in');
 
       expect(
-        await screen.findByText(/orders\.in is outside the patterns you may create addresses under/),
+        await screen.findByText(/orders\.in is outside the patterns you may create destinations under/),
       ).toBeInTheDocument();
     });
 
@@ -169,7 +169,7 @@ describe('CreateQueueForm', () => {
       renderWithProviders(<Harness />);
 
       await user.type(await screen.findByRole('textbox', { name: /queue name/i }), 'anything.at.all');
-      expect(screen.queryByText(/You may create queues under/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/You may create subscriptions under/)).not.toBeInTheDocument();
       expect(screen.queryByText(/is outside the patterns/)).not.toBeInTheDocument();
     });
   });

@@ -153,7 +153,7 @@ class McpMessagesGovernanceTest extends PostgresIntegrationTest {
                 tokens,
                 Grant.ScopeType.GLOBAL,
                 null,
-                Set.of(Permissions.CLUSTER_READ, Permissions.QUEUE_READ, "message:read"));
+                Set.of(Permissions.CLUSTER_READ, Permissions.SUBSCRIPTION_READ, "message:read"));
 
         JsonNode response = McpFixture.callTool(
                 mvc,

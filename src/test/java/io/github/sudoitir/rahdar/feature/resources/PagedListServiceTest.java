@@ -14,7 +14,7 @@ import io.github.sudoitir.rahdar.feature.resources.web.ResourceViews.ConsumerVie
 import io.github.sudoitir.rahdar.feature.resources.web.ResourceViews.SessionView;
 import io.github.sudoitir.rahdar.kernel.core.PagedView;
 import io.github.sudoitir.rahdar.kernel.core.ResourceQuery;
-import io.github.sudoitir.rahdar.kernel.plugin.ResourceKind;
+import io.github.sudoitir.rahdar.kernel.plugin.ResourceType;
 import io.github.sudoitir.rahdar.kernel.security.ClusterAccessGuard;
 import io.github.sudoitir.rahdar.kernel.security.PermissionResolver;
 import io.github.sudoitir.rahdar.kernel.security.ResourceFilter;
@@ -140,8 +140,9 @@ class PagedListServiceTest {
     void anAddressRowNamesTheTeamThatOwnsIt() {
         UUID clusterId = oneNodeServing("search-broker.json", "list-addresses.json");
         TeamRef orders = new TeamRef(UUID.randomUUID(), "Orders");
-        when(teams.ownerTeamOf(clusterId, ResourceRef.address("orders.in"))).thenReturn(Optional.of(orders));
-        when(teams.ownerTeamOf(clusterId, ResourceRef.address("billing.in"))).thenReturn(Optional.empty());
+        when(teams.ownerTeamOf(clusterId, ResourceRef.destination("orders.in"))).thenReturn(Optional.of(orders));
+        when(teams.ownerTeamOf(clusterId, ResourceRef.destination("billing.in")))
+                .thenReturn(Optional.empty());
 
         PagedView<AddressView> page = service.addresses(clusterId, ResourceQuery.of(null, 1, 50, null));
 
@@ -258,8 +259,8 @@ class PagedListServiceTest {
     private void readable(UUID clusterId, String[] queues, String[] addresses) {
         ResourceFilter readableQueues = reading(queues);
         ResourceFilter readableAddresses = reading(addresses);
-        when(permissions.filter(clusterId, ResourceKind.QUEUE)).thenReturn(readableQueues);
-        when(permissions.filter(clusterId, ResourceKind.ADDRESS)).thenReturn(readableAddresses);
+        when(permissions.filter(clusterId, ResourceType.SUBSCRIPTION)).thenReturn(readableQueues);
+        when(permissions.filter(clusterId, ResourceType.DESTINATION)).thenReturn(readableAddresses);
     }
 
     private static ResourceFilter reading(String... names) {

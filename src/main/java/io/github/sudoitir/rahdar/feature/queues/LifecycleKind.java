@@ -13,21 +13,21 @@ import java.util.Optional;
  * keeps, the other removes the resource itself.
  *
  * <p>A divert changes where traffic goes rather than what a queue holds, so it has
- * its own authority ({@code divert:write}) and not the queue ones. Deleting one
+ * its own authority ({@code route:write}) and not the queue ones. Deleting one
  * destroys no messages, but it is marked destructive because it silently changes
  * routing for every producer on the source address and cannot be noticed by them.
  */
 public enum LifecycleKind {
-    CREATE_QUEUE("CREATE_QUEUE", LifecycleKind.QUEUE_TARGET, QueuePermissions.QUEUE_CREATE, false),
-    UPDATE_QUEUE("UPDATE_QUEUE", LifecycleKind.QUEUE_TARGET, QueuePermissions.QUEUE_UPDATE, false),
-    DELETE_QUEUE("DELETE_QUEUE", LifecycleKind.QUEUE_TARGET, QueuePermissions.QUEUE_DELETE, true),
-    PAUSE_QUEUE("PAUSE_QUEUE", LifecycleKind.QUEUE_TARGET, QueuePermissions.QUEUE_PAUSE, false),
-    RESUME_QUEUE("RESUME_QUEUE", LifecycleKind.QUEUE_TARGET, QueuePermissions.QUEUE_PAUSE, false),
-    RESET_QUEUE_COUNTER("RESET_QUEUE_COUNTER", LifecycleKind.QUEUE_TARGET, QueuePermissions.QUEUE_UPDATE, false),
-    CREATE_ADDRESS("CREATE_ADDRESS", LifecycleKind.ADDRESS_TARGET, QueuePermissions.ADDRESS_CREATE, false),
-    DELETE_ADDRESS("DELETE_ADDRESS", LifecycleKind.ADDRESS_TARGET, QueuePermissions.ADDRESS_DELETE, true),
-    CREATE_DIVERT("CREATE_DIVERT", "DIVERT", QueuePermissions.DIVERT_WRITE, false),
-    DELETE_DIVERT("DELETE_DIVERT", "DIVERT", QueuePermissions.DIVERT_WRITE, true);
+    CREATE_QUEUE("CREATE_QUEUE", LifecycleKind.QUEUE_TARGET, QueuePermissions.SUBSCRIPTION_CREATE, false),
+    UPDATE_QUEUE("UPDATE_QUEUE", LifecycleKind.QUEUE_TARGET, QueuePermissions.SUBSCRIPTION_UPDATE, false),
+    DELETE_QUEUE("DELETE_QUEUE", LifecycleKind.QUEUE_TARGET, QueuePermissions.SUBSCRIPTION_DELETE, true),
+    PAUSE_QUEUE("PAUSE_QUEUE", LifecycleKind.QUEUE_TARGET, QueuePermissions.SUBSCRIPTION_PAUSE, false),
+    RESUME_QUEUE("RESUME_QUEUE", LifecycleKind.QUEUE_TARGET, QueuePermissions.SUBSCRIPTION_PAUSE, false),
+    RESET_QUEUE_COUNTER("RESET_QUEUE_COUNTER", LifecycleKind.QUEUE_TARGET, QueuePermissions.SUBSCRIPTION_UPDATE, false),
+    CREATE_ADDRESS("CREATE_ADDRESS", LifecycleKind.ADDRESS_TARGET, QueuePermissions.DESTINATION_CREATE, false),
+    DELETE_ADDRESS("DELETE_ADDRESS", LifecycleKind.ADDRESS_TARGET, QueuePermissions.DESTINATION_DELETE, true),
+    CREATE_DIVERT("CREATE_DIVERT", "DIVERT", QueuePermissions.ROUTE_WRITE, false),
+    DELETE_DIVERT("DELETE_DIVERT", "DIVERT", QueuePermissions.ROUTE_WRITE, true);
 
     private static final String QUEUE_TARGET = "QUEUE";
     private static final String ADDRESS_TARGET = "ADDRESS";
@@ -76,8 +76,8 @@ public enum LifecycleKind {
      */
     public Optional<ResourceRef> resource(String name) {
         return switch (targetType) {
-            case QUEUE_TARGET -> Optional.of(ResourceRef.queue(name));
-            case ADDRESS_TARGET -> Optional.of(ResourceRef.address(name));
+            case QUEUE_TARGET -> Optional.of(ResourceRef.subscription(name));
+            case ADDRESS_TARGET -> Optional.of(ResourceRef.destination(name));
             default -> Optional.empty();
         };
     }

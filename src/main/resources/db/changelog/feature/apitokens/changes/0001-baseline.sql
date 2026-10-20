@@ -32,11 +32,11 @@ CREATE TABLE api_token (
 CREATE TABLE api_token_grant (
     action text NOT NULL,
     scope_type text DEFAULT 'GLOBAL'::text NOT NULL,
-    resource_kind text DEFAULT ''::text NOT NULL,
+    resource_type text DEFAULT ''::text NOT NULL,
     resource_pattern text DEFAULT ''::text NOT NULL,
     token_id uuid NOT NULL,
     scope_id uuid DEFAULT '00000000-0000-0000-0000-000000000000'::uuid NOT NULL,
-    CONSTRAINT ck_api_token_grant_resource CHECK ((((resource_kind = ''::text) AND (resource_pattern = ''::text)) OR ((resource_kind = ANY (ARRAY['QUEUE'::text, 'ADDRESS'::text])) AND (resource_pattern <> ''::text)))),
+    CONSTRAINT ck_api_token_grant_resource CHECK ((((resource_type = ''::text) AND (resource_pattern = ''::text)) OR ((resource_type = ANY (ARRAY['SUBSCRIPTION'::text, 'DESTINATION'::text])) AND (resource_pattern <> ''::text)))),
     CONSTRAINT ck_api_token_grant_scope CHECK ((scope_type = ANY (ARRAY['GLOBAL'::text, 'ENVIRONMENT'::text, 'CLUSTER'::text])))
 );
 
@@ -69,7 +69,7 @@ ALTER TABLE ONLY api_token
     ADD CONSTRAINT pk_api_token PRIMARY KEY (id);
 
 ALTER TABLE ONLY api_token_grant
-    ADD CONSTRAINT pk_api_token_grant PRIMARY KEY (token_id, action, scope_type, scope_id, resource_kind, resource_pattern);
+    ADD CONSTRAINT pk_api_token_grant PRIMARY KEY (token_id, action, scope_type, scope_id, resource_type, resource_pattern);
 
 ALTER TABLE ONLY api_token_usage
     ADD CONSTRAINT pk_api_token_usage PRIMARY KEY (token_id, hour);

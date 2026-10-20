@@ -13,7 +13,7 @@ import { UNOWNED_PAGE_SIZE, useUnowned, type PatternKind, type UnownedView } fro
 import { useTeamAccess } from './teamAccess.ts';
 import { unownedColumns } from './teamColumns.tsx';
 
-type Kind = 'QUEUE' | 'ADDRESS';
+type Kind = 'SUBSCRIPTION' | 'DESTINATION';
 
 const rowKey = (u: UnownedView) => u.name;
 
@@ -33,12 +33,12 @@ export function TeamUnowned({
   const clusters = useClusters();
   const { userAdmin } = useTeamAccess();
   const [clusterId, setClusterId] = useState<string | null>(null);
-  const [kind, setKind] = useState<Kind>('QUEUE');
+  const [kind, setKind] = useState<Kind>('SUBSCRIPTION');
   const [page, setPage] = useState(1);
   const unowned = useUnowned(clusterId, kind, page, userAdmin);
   const cluster = clusters.data?.find((c) => c.id === clusterId)?.name;
   const pages = pageCount(unowned.data, page);
-  const [one, many] = kind === 'QUEUE' ? ['queue', 'queues'] : ['address', 'addresses'];
+  const [one, many] = kind === 'SUBSCRIPTION' ? ['subscription', 'subscriptions'] : ['destination', 'destinations'];
   const count = unowned.data?.count;
   const error = unowned.isError ? (
     <ErrorState error={unowned.error} onRetry={() => void unowned.refetch()} />
@@ -89,8 +89,8 @@ export function TeamUnowned({
         <SegmentedControl
           aria-label="Unowned kind"
           data={[
-            { value: 'QUEUE', label: 'Queues' },
-            { value: 'ADDRESS', label: 'Addresses' },
+            { value: 'SUBSCRIPTION', label: 'Subscriptions' },
+            { value: 'DESTINATION', label: 'Destinations' },
           ]}
           value={kind}
           onChange={(next) => {

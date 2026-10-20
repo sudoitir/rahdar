@@ -722,7 +722,7 @@ describe('SqlConsoleView permission and capability', () => {
   });
 
   it('keeps Run and Live tail visible but disabled, and says what is missing', async () => {
-    mockCluster({ permissions: ['queue:read'] });
+    mockCluster({ permissions: ['subscription:read'] });
     mockPlan();
     renderWithProviders(<SqlConsoleView />);
 

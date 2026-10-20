@@ -811,14 +811,15 @@ class MessageServiceTest {
 
         service.browse(CLUSTER, "orders", null, null, 1, 50);
 
-        verify(access).requireResource(CLUSTER, ResourceRef.queue("orders"), MessagePermissions.MESSAGE_READ);
+        verify(access).requireResource(CLUSTER, ResourceRef.subscription("orders"), MessagePermissions.MESSAGE_READ);
     }
 
     @Test
     void purgingNeedsQueuePurgeOnTheQueueBeforeAnythingIsLookedUp() {
         service.purge(CLUSTER, "orders", null, true, false);
 
-        verify(access).requireResource(CLUSTER, ResourceRef.queue("orders"), MessagePermissions.QUEUE_PURGE);
+        verify(access)
+                .requireResource(CLUSTER, ResourceRef.subscription("orders"), MessagePermissions.SUBSCRIPTION_PURGE);
     }
 
     @Test
@@ -830,15 +831,16 @@ class MessageServiceTest {
                 new SendMessageRequest(MessageKind.TEXT, true, "hi", Map.of(), Map.of()),
                 true);
 
-        verify(access).requireResource(CLUSTER, ResourceRef.queue("orders"), Permissions.QUEUE_READ);
-        verify(access).requireResource(CLUSTER, ResourceRef.address("orders.addr"), MessagePermissions.MESSAGE_SEND);
+        verify(access).requireResource(CLUSTER, ResourceRef.subscription("orders"), Permissions.SUBSCRIPTION_READ);
+        verify(access)
+                .requireResource(CLUSTER, ResourceRef.destination("orders.addr"), MessagePermissions.MESSAGE_SEND);
     }
 
     @Test
     void aQueueWhoseAddressTheCallerMayNotUseIsNotFoundToThemNamingNoAddress() {
         doThrow(new NotFoundException("address", "orders.addr"))
                 .when(access)
-                .requireResource(CLUSTER, ResourceRef.address("orders.addr"), MessagePermissions.MESSAGE_SEND);
+                .requireResource(CLUSTER, ResourceRef.destination("orders.addr"), MessagePermissions.MESSAGE_SEND);
 
         SendMessageRequest request = new SendMessageRequest(MessageKind.TEXT, true, "hi", Map.of(), Map.of());
 
@@ -852,7 +854,8 @@ class MessageServiceTest {
         service.execute(CLUSTER, "orders", null, MessageAction.DELETE, filter("f", null), true, false);
 
         assertThat(required())
-                .containsExactly(new Requirement(ResourceRef.queue("orders"), MessagePermissions.MESSAGE_DELETE));
+                .containsExactly(
+                        new Requirement(ResourceRef.subscription("orders"), MessagePermissions.MESSAGE_DELETE));
     }
 
     @Test
@@ -864,9 +867,9 @@ class MessageServiceTest {
 
         assertThat(required())
                 .containsExactly(
-                        new Requirement(ResourceRef.queue("orders"), MessagePermissions.MESSAGE_MOVE),
-                        new Requirement(ResourceRef.queue("billing"), Permissions.QUEUE_READ),
-                        new Requirement(ResourceRef.address("billing.addr"), MessagePermissions.MESSAGE_SEND));
+                        new Requirement(ResourceRef.subscription("orders"), MessagePermissions.MESSAGE_MOVE),
+                        new Requirement(ResourceRef.subscription("billing"), Permissions.SUBSCRIPTION_READ),
+                        new Requirement(ResourceRef.destination("billing.addr"), MessagePermissions.MESSAGE_SEND));
     }
 
     @Test
@@ -893,8 +896,8 @@ class MessageServiceTest {
                 .requireAll(
                         CLUSTER,
                         List.of(
-                                new Requirement(ResourceRef.address("a"), MessagePermissions.MESSAGE_SEND),
-                                new Requirement(ResourceRef.address("b"), MessagePermissions.MESSAGE_SEND)));
+                                new Requirement(ResourceRef.destination("a"), MessagePermissions.MESSAGE_SEND),
+                                new Requirement(ResourceRef.destination("b"), MessagePermissions.MESSAGE_SEND)));
     }
 
     @Test

@@ -137,12 +137,12 @@ function Matches({
   cluster,
 }: Readonly<{ preview: PatternPreview; kind: PatternKind; cluster: string }>) {
   const parts = [
-    kind === 'ADDRESS'
+    kind === 'DESTINATION'
       ? null
-      : { word: 'queue', plural: 'queues', count: preview.queueMatches, examples: preview.queueExamples },
-    kind === 'QUEUE'
+      : { word: 'subscription', plural: 'subscriptions', count: preview.subscriptionMatches, examples: preview.subscriptionExamples },
+    kind === 'SUBSCRIPTION'
       ? null
-      : { word: 'address', plural: 'addresses', count: preview.addressMatches, examples: preview.addressExamples },
+      : { word: 'destination', plural: 'destinations', count: preview.destinationMatches, examples: preview.destinationExamples },
   ].filter((p) => p !== null);
   const total = parts.reduce((sum, p) => sum + p.count, 0);
   if (total === 0) {
@@ -179,7 +179,7 @@ function AddPattern({
   const form = useForm<{ clusterId: string | null; kind: PatternKind; pattern: string }>({
     initialValues: {
       clusterId: initial?.clusterId ?? null,
-      kind: initial?.kind ?? 'QUEUE',
+      kind: initial?.kind ?? 'SUBSCRIPTION',
       pattern: initial?.pattern ?? '',
     },
     validateInputOnBlur: true,
@@ -346,16 +346,16 @@ function RemovePattern({
   const preview = usePatternPreview(
     team.id,
     pattern?.clusterId ?? null,
-    pattern?.kind ?? 'QUEUE',
+    pattern?.kind ?? 'SUBSCRIPTION',
     pattern?.pattern ?? '',
     pattern !== null,
   );
 
   let covers: string;
   if (preview.isPending) covers = 'Counting what it matches now…';
-  else if (preview.isError) covers = 'How many queues and addresses it matches is unavailable right now.';
+  else if (preview.isError) covers = 'How many subscriptions and destinations it matches is unavailable right now.';
   else
-    covers = `It matches ${preview.data.queueMatches} queue${preview.data.queueMatches === 1 ? '' : 's'} and ${preview.data.addressMatches} address${preview.data.addressMatches === 1 ? '' : 'es'} on ${clusterName(preview.data.clusterId)} now.`;
+    covers = `It matches ${preview.data.subscriptionMatches} subscription${preview.data.subscriptionMatches === 1 ? '' : 's'} and ${preview.data.destinationMatches} destination${preview.data.destinationMatches === 1 ? '' : 's'} on ${clusterName(preview.data.clusterId)} now.`;
 
   return (
     <ConfirmDialog

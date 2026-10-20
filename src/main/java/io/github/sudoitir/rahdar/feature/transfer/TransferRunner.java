@@ -645,22 +645,25 @@ class TransferRunner {
         }
         String sourcePermission = s.run.getMode().sourcePermission();
         if (!handoff.stillHolds(
-                s.operator, s.run.getSourceClusterId(), ResourceRef.queue(s.run.getSourceQueue()), sourcePermission)) {
+                s.operator,
+                s.run.getSourceClusterId(),
+                ResourceRef.subscription(s.run.getSourceQueue()),
+                sourcePermission)) {
             return End.stopped("The permission %s on the source queue was withdrawn, so the run stopped."
                     .formatted(sourcePermission));
         }
         if (!handoff.stillHolds(
                 s.operator,
                 s.run.getTargetClusterId(),
-                ResourceRef.queue(s.run.getTargetQueue()),
-                Permissions.QUEUE_READ)) {
+                ResourceRef.subscription(s.run.getTargetQueue()),
+                Permissions.SUBSCRIPTION_READ)) {
             return End.stopped("The permission %s on the target queue was withdrawn, so the run stopped."
-                    .formatted(Permissions.QUEUE_READ));
+                    .formatted(Permissions.SUBSCRIPTION_READ));
         }
         if (!handoff.stillHolds(
                 s.operator,
                 s.run.getTargetClusterId(),
-                ResourceRef.address(s.run.getTargetAddress()),
+                ResourceRef.destination(s.run.getTargetAddress()),
                 MessagePermissions.MESSAGE_SEND)) {
             return End.stopped("The permission %s on the target address was withdrawn, so the run stopped."
                     .formatted(MessagePermissions.MESSAGE_SEND));

@@ -18,7 +18,7 @@ public final class FlowModule {
             .settingKey(FlowSettings.SAMPLE_INTERVAL)
             .settingKey(FlowSettings.MAX_ROWS_PER_NODE)
             .settingKey(FlowSettings.DEMAND_LEASE)
-            .streamTopic(TopicDef.signal(TOPIC, Permissions.QUEUE_READ))
+            .streamTopic(TopicDef.signal(TOPIC, Permissions.SUBSCRIPTION_READ))
             .build();
 
     private FlowModule() {}

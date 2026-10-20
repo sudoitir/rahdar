@@ -233,7 +233,7 @@ class McpConnectionControlIntegrationTest extends PostgresIntegrationTest {
                         MessagePermissions.MESSAGE_SEND,
                         MessagePermissions.MESSAGE_MOVE,
                         MessagePermissions.MESSAGE_DELETE,
-                        MessagePermissions.QUEUE_PURGE));
+                        MessagePermissions.SUBSCRIPTION_PURGE));
 
         JsonNode response = McpFixture.callTool(mvc, messageOnly, "connection_action", args());
 

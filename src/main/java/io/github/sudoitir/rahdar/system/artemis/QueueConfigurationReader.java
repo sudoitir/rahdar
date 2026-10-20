@@ -54,7 +54,7 @@ public class QueueConfigurationReader {
             String queueName, String address, String routingType, List<NodeConfiguration> nodes) {}
 
     public QueueConfiguration read(UUID clusterId, String queueName) {
-        access.requireResource(clusterId, ResourceRef.queue(queueName), Permissions.QUEUE_READ);
+        access.requireResource(clusterId, ResourceRef.subscription(queueName), Permissions.SUBSCRIPTION_READ);
         List<QueueLocation> locations = queueLocator.locate(clusterId, queueName);
         if (locations.isEmpty()) {
             throw new NotFoundException("queue", queueName);

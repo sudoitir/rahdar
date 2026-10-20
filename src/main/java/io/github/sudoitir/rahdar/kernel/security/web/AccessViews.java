@@ -34,8 +34,9 @@ public final class AccessViews {
 
             @Schema(
                     requiredMode = REQUIRED,
-                    description = "Resource permissions the caller holds on some queue or address of the cluster, "
-                            + "through a grant, a team or a share. Empty when no cluster is asked about.")
+                    description =
+                            "Resource permissions the caller holds on some subscription or destination of the cluster, "
+                                    + "through a grant, a team or a share. Empty when no cluster is asked about.")
             List<String> anywhere,
 
             @Schema(
@@ -47,16 +48,17 @@ public final class AccessViews {
 
             @Schema(
                     requiredMode = REQUIRED,
-                    description = "Patterns on which the caller may create a queue or address through a team or a "
-                            + "share. A grant that reaches the cluster allows any name and shows in permissions.")
+                    description =
+                            "Patterns on which the caller may create a subscription or destination through a team or a "
+                                    + "share. A grant that reaches the cluster allows any name and shows in permissions.")
             CreatePatterns createPatterns) {}
 
     @Schema(description = "Name patterns, as written, that the caller may create under. Empty when none.")
     public record CreatePatterns(
-            @Schema(requiredMode = REQUIRED) List<String> queue,
-            @Schema(requiredMode = REQUIRED) List<String> address) {}
+            @Schema(requiredMode = REQUIRED) List<String> subscription,
+            @Schema(requiredMode = REQUIRED) List<String> destination) {}
 
-    @Schema(description = "What the caller may do with one queue or address: the actions they hold on it.")
+    @Schema(description = "What the caller may do with one subscription or destination: the actions they hold on it.")
     public record MyResourceAccess(
             @Schema(
                     requiredMode = REQUIRED,

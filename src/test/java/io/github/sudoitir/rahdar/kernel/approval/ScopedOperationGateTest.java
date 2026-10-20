@@ -30,13 +30,13 @@ class ScopedOperationGateTest {
 
     @Test
     void aRahdarTypeIsRefusedAndNeverReachesTheEngine() {
-        registered("queue.purge");
+        registered("subscription.purge");
         OperationGate gate = new ScopedOperationGate(engine, registry, "acme");
         Operation operation = Operation.of(new Params("a"));
 
         assertThatThrownBy(() -> gate.run(operation, () -> "ran"))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("queue.purge");
+                .hasMessageContaining("subscription.purge");
         assertThatThrownBy(() -> gate.preview(operation)).isInstanceOf(IllegalArgumentException.class);
         verifyNoInteractions(engine);
     }

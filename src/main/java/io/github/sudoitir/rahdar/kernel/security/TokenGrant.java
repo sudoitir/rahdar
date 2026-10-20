@@ -1,6 +1,6 @@
 package io.github.sudoitir.rahdar.kernel.security;
 
-import io.github.sudoitir.rahdar.kernel.plugin.ResourceKind;
+import io.github.sudoitir.rahdar.kernel.plugin.ResourceType;
 import java.util.Set;
 import java.util.UUID;
 
@@ -14,7 +14,7 @@ import java.util.UUID;
  * @param pattern {@code null} exactly when {@code kind} is
  */
 public record TokenGrant(
-        Grant.ScopeType scopeType, UUID scopeId, String action, ResourceKind kind, ResourcePattern pattern) {
+        Grant.ScopeType scopeType, UUID scopeId, String action, ResourceType kind, ResourcePattern pattern) {
 
     public TokenGrant {
         if ((kind == null) != (pattern == null)) {

@@ -56,52 +56,53 @@ class RoleServiceIntegrationTest extends PostgresIntegrationTest {
     @Test
     void aRoleMissingAPermissionTheOnesItHoldsRequireIsRefusedNamingWhatIsMissing() {
         rejected(
-                () -> create(false, "queue:purge", "message:send"),
+                () -> create(false, "subscription:purge", "message:send"),
                 "role-missing-requirements",
-                "queue:purge needs queue:read",
-                "message:send needs address:read");
+                "subscription:purge needs subscription:read",
+                "message:send needs destination:read");
     }
 
     @Test
     void aRoleHoldingWhatItsPermissionsRequireIsSaved() {
-        RoleView role = create(false, "queue:purge", "queue:read");
+        RoleView role = create(false, "subscription:purge", "subscription:read");
 
-        assertThat(role.permissions()).containsExactlyInAnyOrder("queue:purge", "queue:read");
+        assertThat(role.permissions()).containsExactlyInAnyOrder("subscription:purge", "subscription:read");
         assertThat(role.teamAssignable()).isFalse();
     }
 
     @Test
     void aWildcardSatisfiesTheRequirementsItCoversAndIsCheckedForWhatItStandsFor() {
         create(false, "*");
-        create(false, "queue:*", "message:read");
+        create(false, "subscription:*", "message:read");
 
-        rejected(() -> create(false, "message:*"), "role-missing-requirements", "needs queue:read");
+        rejected(() -> create(false, "message:*"), "role-missing-requirements", "needs subscription:read");
     }
 
     @Test
     void aRoleUpdateIsCheckedTheSameWay() {
-        RoleView role = create(false, "queue:purge", "queue:read");
+        RoleView role = create(false, "subscription:purge", "subscription:read");
 
         rejected(
-                () -> roleService.update(role.id(), new RoleRequest(role.name(), List.of("queue:purge"), false, false)),
+                () -> roleService.update(
+                        role.id(), new RoleRequest(role.name(), List.of("subscription:purge"), false, false)),
                 "role-missing-requirements",
-                "queue:purge needs queue:read");
+                "subscription:purge needs subscription:read");
     }
 
     @Test
     void aTeamRoleHoldsOnlyResourcePermissionsAndTeamAdmin() {
-        RoleView role = create(true, "queue:read", "queue:purge", "team:admin");
+        RoleView role = create(true, "subscription:read", "subscription:purge", "team:admin");
         assertThat(role.teamAssignable()).isTrue();
 
-        rejected(() -> create(true, "queue:read", "cluster:read"), "team-role-permissions", "cluster:read");
-        rejected(() -> create(true, "queue:read", "user:admin"), "team-role-permissions", "user:admin");
+        rejected(() -> create(true, "subscription:read", "cluster:read"), "team-role-permissions", "cluster:read");
+        rejected(() -> create(true, "subscription:read", "user:admin"), "team-role-permissions", "user:admin");
         rejected(() -> create(true, "*"), "team-role-permissions", "*");
         rejected(() -> create(true, "not:catalogued"), "team-role-permissions", "not:catalogued");
     }
 
     @Test
     void aRoleCannotBecomeATeamRoleWhileItHoldsOtherPermissions() {
-        RoleView role = create(false, "cluster:read", "queue:read");
+        RoleView role = create(false, "cluster:read", "subscription:read");
 
         rejected(
                 () -> roleService.update(role.id(), new RoleRequest(role.name(), role.permissions(), false, true)),
@@ -130,7 +131,7 @@ class RoleServiceIntegrationTest extends PostgresIntegrationTest {
 
     @Test
     void aRoleThatIsATeamMembersRoleCannotBeDeletedOrStopBeingATeamRole() {
-        RoleView role = create(true, "queue:read");
+        RoleView role = create(true, "subscription:read");
         UUID team = teams.create("roles-" + UUID.randomUUID()).id();
         String username = "role-member-" + UUID.randomUUID();
         var user = AppUserEntity.local(username, null, "{noop}x");
@@ -155,7 +156,7 @@ class RoleServiceIntegrationTest extends PostgresIntegrationTest {
         SecurityContextHolder.getContext()
                 .setAuthentication(UsernamePasswordAuthenticationToken.authenticated(nobody, null, List.of()));
         try {
-            assertThat(roleService.catalogue()).extracting(p -> p.action()).contains("queue:read");
+            assertThat(roleService.catalogue()).extracting(p -> p.action()).contains("subscription:read");
             assertThatThrownBy(roleService::list).isInstanceOf(AccessDeniedException.class);
         } finally {
             SecurityContextHolder.clearContext();

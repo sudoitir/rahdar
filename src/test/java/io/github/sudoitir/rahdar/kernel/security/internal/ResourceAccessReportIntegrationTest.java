@@ -67,9 +67,10 @@ class ResourceAccessReportIntegrationTest extends PostgresIntegrationTest {
                 .getId();
         orders = teams.create("orders-" + UUID.randomUUID()).id();
         billing = teams.create("billing-" + UUID.randomUUID()).id();
-        teams.addPattern(orders, new PatternRequest(prod, PatternKind.BOTH, "orders.#"));
+        teams.addPattern(orders, new PatternRequest(prod, PatternKind.ANY, "orders.#"));
         teams.addShare(
-                orders, new ShareRequest(billing, prod, PatternKind.QUEUE, "orders.events.#", role("TEAM_VIEWER")));
+                orders,
+                new ShareRequest(billing, prod, PatternKind.SUBSCRIPTION, "orders.events.#", role("TEAM_VIEWER")));
     }
 
     private UUID user() {
@@ -101,7 +102,7 @@ class ResourceAccessReportIntegrationTest extends PostgresIntegrationTest {
         member(billing, user(), "TEAM_OPERATOR");
         member(billing, user(), "TEAM_VIEWER");
 
-        ResourceAccessView view = report.of(prod, ResourceRef.queue("orders.events.created"));
+        ResourceAccessView view = report.of(prod, ResourceRef.subscription("orders.events.created"));
 
         assertThat(view.ownerTeam())
                 .isEqualTo(new TeamRef(orders, teams.get(orders).name()));
@@ -137,9 +138,9 @@ class ResourceAccessReportIntegrationTest extends PostgresIntegrationTest {
     void aNameOutsideTheSharedPatternHasTheOwnerOnlyAndAnUnownedNameNothing() {
         member(orders, user(), "TEAM_VIEWER");
 
-        ResourceAccessView outsideShare = report.of(prod, ResourceRef.queue("orders.in"));
-        ResourceAccessView addressKind = report.of(prod, ResourceRef.address("orders.events.created"));
-        ResourceAccessView unowned = report.of(prod, ResourceRef.queue("other"));
+        ResourceAccessView outsideShare = report.of(prod, ResourceRef.subscription("orders.in"));
+        ResourceAccessView addressKind = report.of(prod, ResourceRef.destination("orders.events.created"));
+        ResourceAccessView unowned = report.of(prod, ResourceRef.subscription("other"));
 
         assertThat(outsideShare.grants()).extracting(g -> g.source()).containsOnly(GrantSource.OWNER);
         assertThat(addressKind.grants()).extracting(g -> g.source()).containsOnly(GrantSource.OWNER);
@@ -151,7 +152,7 @@ class ResourceAccessReportIntegrationTest extends PostgresIntegrationTest {
     void aRenamedOwnerShowsUnderItsNewName() {
         teams.rename(orders, "Renamed-" + orders);
 
-        assertThat(report.of(prod, ResourceRef.queue("orders.in")).ownerTeam())
+        assertThat(report.of(prod, ResourceRef.subscription("orders.in")).ownerTeam())
                 .isEqualTo(new TeamRef(orders, "Renamed-" + orders));
     }
 
@@ -163,18 +164,20 @@ class ResourceAccessReportIntegrationTest extends PostgresIntegrationTest {
         member(orders, operator, "TEAM_OPERATOR");
 
         asUser(boss);
-        assertThat(report.of(prod, ResourceRef.queue("orders.in")).ownerTeam().id())
+        assertThat(report.of(prod, ResourceRef.subscription("orders.in"))
+                        .ownerTeam()
+                        .id())
                 .isEqualTo(orders);
 
         asUser(operator);
-        ResourceRef ordersIn = ResourceRef.queue("orders.in");
+        ResourceRef ordersIn = ResourceRef.subscription("orders.in");
         assertThatThrownBy(() -> report.of(prod, ordersIn)).isInstanceOf(AccessDeniedException.class);
     }
 
     @Test
     void anUnknownClusterIsNotFound() {
         UUID unknown = UUID.randomUUID();
-        ResourceRef ordersIn = ResourceRef.queue("orders.in");
+        ResourceRef ordersIn = ResourceRef.subscription("orders.in");
         assertThatThrownBy(() -> report.of(unknown, ordersIn)).isInstanceOf(NotFoundException.class);
     }
 }

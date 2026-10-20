@@ -6,7 +6,7 @@ import static org.mockito.Mockito.when;
 
 import io.github.sudoitir.rahdar.kernel.core.ConflictException;
 import io.github.sudoitir.rahdar.kernel.core.NotFoundException;
-import io.github.sudoitir.rahdar.kernel.plugin.ResourceKind;
+import io.github.sudoitir.rahdar.kernel.plugin.ResourceType;
 import io.github.sudoitir.rahdar.kernel.security.PatternKind;
 import io.github.sudoitir.rahdar.kernel.security.PermissionResolver;
 import io.github.sudoitir.rahdar.kernel.security.RahdarPrincipal;
@@ -157,11 +157,11 @@ class TeamServiceIntegrationTest extends PostgresIntegrationTest {
     void aMalformedPatternIsRefusedNamingTheFault() {
         UUID id = team("t");
 
-        var request = pattern(prod, PatternKind.BOTH, "a..b");
+        var request = pattern(prod, PatternKind.ANY, "a..b");
         assertThatThrownBy(() -> teams.addPattern(id, request))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("empty word");
-        var request2 = pattern(prod, PatternKind.BOTH, "a*");
+        var request2 = pattern(prod, PatternKind.ANY, "a*");
         assertThatThrownBy(() -> teams.addPattern(id, request2))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("mixes a wildcard");
@@ -171,9 +171,9 @@ class TeamServiceIntegrationTest extends PostgresIntegrationTest {
     void aPatternThatOverlapsAnotherTeamIsRefusedNamingThatTeamAndPattern() {
         UUID orders = team("orders");
         UUID audit = team("audit");
-        teams.addPattern(orders, pattern(prod, PatternKind.QUEUE, "orders.#"));
+        teams.addPattern(orders, pattern(prod, PatternKind.SUBSCRIPTION, "orders.#"));
 
-        var request3 = pattern(prod, PatternKind.QUEUE, "orders.audit.*");
+        var request3 = pattern(prod, PatternKind.SUBSCRIPTION, "orders.audit.*");
         assertThatThrownBy(() -> teams.addPattern(audit, request3))
                 .isInstanceOfSatisfying(ConflictException.class, e -> {
                     assertThat(e.slug()).isEqualTo("team-pattern-overlap");
@@ -185,11 +185,11 @@ class TeamServiceIntegrationTest extends PostgresIntegrationTest {
     void theSamePatternOnAnotherClusterOrAnotherKindOrDisjointNamesIsAllowed() {
         UUID orders = team("orders");
         UUID other = team("other");
-        teams.addPattern(orders, pattern(prod, PatternKind.QUEUE, "orders.#"));
+        teams.addPattern(orders, pattern(prod, PatternKind.SUBSCRIPTION, "orders.#"));
 
-        teams.addPattern(other, pattern(staging, PatternKind.QUEUE, "orders.#"));
-        teams.addPattern(other, pattern(prod, PatternKind.ADDRESS, "orders.#"));
-        teams.addPattern(other, pattern(prod, PatternKind.QUEUE, "billing.*"));
+        teams.addPattern(other, pattern(staging, PatternKind.SUBSCRIPTION, "orders.#"));
+        teams.addPattern(other, pattern(prod, PatternKind.DESTINATION, "orders.#"));
+        teams.addPattern(other, pattern(prod, PatternKind.SUBSCRIPTION, "billing.*"));
 
         assertThat(teams.get(other).patterns()).hasSize(3);
     }
@@ -198,21 +198,21 @@ class TeamServiceIntegrationTest extends PostgresIntegrationTest {
     void bothOverlapsEitherKind() {
         UUID orders = team("orders");
         UUID other = team("other");
-        teams.addPattern(orders, pattern(prod, PatternKind.ADDRESS, "orders.#"));
+        teams.addPattern(orders, pattern(prod, PatternKind.DESTINATION, "orders.#"));
 
-        var request4 = pattern(prod, PatternKind.BOTH, "orders.in");
+        var request4 = pattern(prod, PatternKind.ANY, "orders.in");
         assertThatThrownBy(() -> teams.addPattern(other, request4)).isInstanceOf(ConflictException.class);
     }
 
     @Test
     void aTeamMayOverlapItself() {
         UUID orders = team("orders");
-        teams.addPattern(orders, pattern(prod, PatternKind.QUEUE, "orders.#"));
+        teams.addPattern(orders, pattern(prod, PatternKind.SUBSCRIPTION, "orders.#"));
 
-        teams.addPattern(orders, pattern(prod, PatternKind.QUEUE, "orders.in"));
+        teams.addPattern(orders, pattern(prod, PatternKind.SUBSCRIPTION, "orders.in"));
 
         assertThat(teams.get(orders).patterns()).hasSize(2);
-        var request5 = pattern(prod, PatternKind.QUEUE, "orders.in");
+        var request5 = pattern(prod, PatternKind.SUBSCRIPTION, "orders.in");
         assertThatThrownBy(() -> teams.addPattern(orders, request5))
                 .isInstanceOfSatisfying(
                         ConflictException.class, e -> assertThat(e.slug()).isEqualTo("duplicate-team-pattern"));
@@ -222,7 +222,7 @@ class TeamServiceIntegrationTest extends PostgresIntegrationTest {
     void aPatternNeedsAnExistingCluster() {
         UUID id = team("t");
 
-        var request6 = pattern(UUID.randomUUID(), PatternKind.BOTH, "a.#");
+        var request6 = pattern(UUID.randomUUID(), PatternKind.ANY, "a.#");
         assertThatThrownBy(() -> teams.addPattern(id, request6)).isInstanceOf(NotFoundException.class);
     }
 
@@ -230,18 +230,18 @@ class TeamServiceIntegrationTest extends PostgresIntegrationTest {
     void removingAPatternEndsTheAccessItGave() {
         UUID orders = team("orders");
         UUID alice = user();
-        var added = teams.addPattern(orders, pattern(prod, PatternKind.QUEUE, "orders.#"));
+        var added = teams.addPattern(orders, pattern(prod, PatternKind.SUBSCRIPTION, "orders.#"));
         teams.addMember(orders, new MemberRequest(PrincipalType.USER, alice, null, null, role("TEAM_OPERATOR")));
 
         asUser(alice);
-        assertThat(perm.can(prod, ResourceRef.queue("orders.in"), "queue:purge"))
+        assertThat(perm.can(prod, ResourceRef.subscription("orders.in"), "subscription:purge"))
                 .isTrue();
 
         new AdminAuthenticationExtension().beforeEach(null);
         teams.removePattern(orders, added.id());
 
         asUser(alice);
-        assertThat(perm.can(prod, ResourceRef.queue("orders.in"), "queue:purge"))
+        assertThat(perm.can(prod, ResourceRef.subscription("orders.in"), "subscription:purge"))
                 .isFalse();
     }
 
@@ -249,7 +249,7 @@ class TeamServiceIntegrationTest extends PostgresIntegrationTest {
     void deletingATeamEndsItsMembersAccessAtOnce() {
         UUID orders = team("orders");
         UUID alice = user();
-        teams.addPattern(orders, pattern(prod, PatternKind.BOTH, "orders.#"));
+        teams.addPattern(orders, pattern(prod, PatternKind.ANY, "orders.#"));
         teams.addMember(orders, new MemberRequest(PrincipalType.USER, alice, null, null, role("TEAM_VIEWER")));
         asUser(alice);
         assertThat(perm.canSeeCluster(prod)).isTrue();
@@ -270,12 +270,12 @@ class TeamServiceIntegrationTest extends PostgresIntegrationTest {
                 .thenReturn(IntStream.range(0, 30).mapToObj(i -> "orders.q" + i).toList());
         when(names.addresses(prod)).thenReturn(List.of("orders", "billing.in"));
 
-        var preview = teams.preview(id, prod, PatternKind.BOTH, "orders.#");
+        var preview = teams.preview(id, prod, PatternKind.ANY, "orders.#");
 
-        assertThat(preview.queueMatches()).isEqualTo(30);
-        assertThat(preview.queueExamples()).hasSize(20);
-        assertThat(preview.addressMatches()).isEqualTo(1);
-        assertThat(preview.addressExamples()).containsExactly("orders");
+        assertThat(preview.subscriptionMatches()).isEqualTo(30);
+        assertThat(preview.subscriptionExamples()).hasSize(20);
+        assertThat(preview.destinationMatches()).isEqualTo(1);
+        assertThat(preview.destinationExamples()).containsExactly("orders");
         assertThat(preview.conflicts()).isEmpty();
     }
 
@@ -283,13 +283,13 @@ class TeamServiceIntegrationTest extends PostgresIntegrationTest {
     void thePreviewNamesTheClashesAndOnlyCountsTheKindAsked() {
         UUID orders = team("orders");
         UUID other = team("other");
-        teams.addPattern(orders, pattern(prod, PatternKind.QUEUE, "orders.#"));
+        teams.addPattern(orders, pattern(prod, PatternKind.SUBSCRIPTION, "orders.#"));
         when(names.queues(prod)).thenReturn(List.of("orders.in"));
         when(names.addresses(prod)).thenReturn(List.of("orders.in"));
 
-        var preview = teams.preview(other, prod, PatternKind.QUEUE, "orders.*");
+        var preview = teams.preview(other, prod, PatternKind.SUBSCRIPTION, "orders.*");
 
-        assertThat(preview.addressMatches()).isZero();
+        assertThat(preview.destinationMatches()).isZero();
         assertThat(preview.conflicts()).singleElement().satisfies(c -> {
             assertThat(c.teamId()).isEqualTo(orders);
             assertThat(c.pattern()).isEqualTo("orders.#");
@@ -299,12 +299,12 @@ class TeamServiceIntegrationTest extends PostgresIntegrationTest {
     @Test
     void unownedListsTheNamesNoTeamOwnsOfThatKind() {
         UUID orders = team("orders");
-        teams.addPattern(orders, pattern(prod, PatternKind.QUEUE, "orders.#"));
+        teams.addPattern(orders, pattern(prod, PatternKind.SUBSCRIPTION, "orders.#"));
         when(names.queues(prod)).thenReturn(List.of("orders.in", "legacy.inbox"));
         when(names.addresses(prod)).thenReturn(List.of("orders.in", "legacy.inbox"));
 
-        assertThat(teams.unowned(prod, ResourceKind.QUEUE)).containsExactly("legacy.inbox");
-        assertThat(teams.unowned(prod, ResourceKind.ADDRESS)).containsExactly("orders.in", "legacy.inbox");
+        assertThat(teams.unowned(prod, ResourceType.SUBSCRIPTION)).containsExactly("legacy.inbox");
+        assertThat(teams.unowned(prod, ResourceType.DESTINATION)).containsExactly("orders.in", "legacy.inbox");
     }
 
     // ---- members ------------------------------------------------------------------------------------
@@ -352,7 +352,10 @@ class TeamServiceIntegrationTest extends PostgresIntegrationTest {
         UUID boss = user();
         teams.addMember(orders, new MemberRequest(PrincipalType.USER, boss, null, null, role("TEAM_ADMIN")));
         var wider = roleService.create(new RoleRequest(
-                "wider-" + UUID.randomUUID(), List.of("queue:read", "queue:update", "capture:write"), false, true));
+                "wider-" + UUID.randomUUID(),
+                List.of("subscription:read", "subscription:update", "capture:write"),
+                false,
+                true));
         UUID newcomer = user();
 
         asUser(boss);
@@ -378,9 +381,9 @@ class TeamServiceIntegrationTest extends PostgresIntegrationTest {
 
         asUser(boss);
 
-        var request7 = pattern(prod, PatternKind.BOTH, "a.#");
+        var request7 = pattern(prod, PatternKind.ANY, "a.#");
         assertThatThrownBy(() -> teams.addPattern(orders, request7)).isInstanceOf(AccessDeniedException.class);
-        var share = new ShareRequest(billing, prod, PatternKind.BOTH, "a.#", role("TEAM_VIEWER"));
+        var share = new ShareRequest(billing, prod, PatternKind.ANY, "a.#", role("TEAM_VIEWER"));
         assertThatThrownBy(() -> teams.addShare(orders, share)).isInstanceOf(AccessDeniedException.class);
         assertThatThrownBy(() -> teams.get(billing)).isInstanceOf(NotFoundException.class);
         var member5 = new MemberRequest(PrincipalType.USER, user(), null, null, role("TEAM_VIEWER"));
@@ -467,9 +470,9 @@ class TeamServiceIntegrationTest extends PostgresIntegrationTest {
         assertThat(lookup.roles()).extracting(r -> r.name()).contains("TEAM_VIEWER", "TEAM_OPERATOR", "TEAM_ADMIN");
         assertThat(lookup.permissions())
                 .extracting(p -> p.action())
-                .contains("queue:read", "team:admin")
+                .contains("subscription:read", "team:admin")
                 .doesNotContain("user:admin");
-        assertThat(lookup.roles()).flatExtracting(r -> r.permissions()).contains("queue:read");
+        assertThat(lookup.roles()).flatExtracting(r -> r.permissions()).contains("subscription:read");
     }
 
     @Test
@@ -494,8 +497,8 @@ class TeamServiceIntegrationTest extends PostgresIntegrationTest {
     @Test
     void theTeamListSummarisesEachTeamsPatternsWithTheirCluster() {
         UUID orders = team("orders");
-        teams.addPattern(orders, pattern(prod, PatternKind.QUEUE, "orders.#"));
-        teams.addPattern(orders, pattern(staging, PatternKind.ADDRESS, "orders.*"));
+        teams.addPattern(orders, pattern(prod, PatternKind.SUBSCRIPTION, "orders.#"));
+        teams.addPattern(orders, pattern(staging, PatternKind.DESTINATION, "orders.*"));
 
         var summary = teams.list().stream()
                 .filter(t -> t.id().equals(orders))
@@ -504,7 +507,7 @@ class TeamServiceIntegrationTest extends PostgresIntegrationTest {
 
         assertThat(summary.patterns())
                 .extracting(p -> p.clusterId() + " " + p.kind() + " " + p.pattern())
-                .containsExactlyInAnyOrder(prod + " QUEUE orders.#", staging + " ADDRESS orders.*");
+                .containsExactlyInAnyOrder(prod + " SUBSCRIPTION orders.#", staging + " DESTINATION orders.*");
     }
 
     @Test
@@ -526,24 +529,23 @@ class TeamServiceIntegrationTest extends PostgresIntegrationTest {
     void aSharedPatternMustLieWithinOneOfTheOwnersPatterns() {
         UUID orders = team("orders");
         UUID billing = team("billing");
-        teams.addPattern(orders, pattern(prod, PatternKind.BOTH, "orders.#"));
-        teams.addPattern(orders, pattern(prod, PatternKind.QUEUE, "audit.*"));
+        teams.addPattern(orders, pattern(prod, PatternKind.ANY, "orders.#"));
+        teams.addPattern(orders, pattern(prod, PatternKind.SUBSCRIPTION, "audit.*"));
         UUID viewer = role("TEAM_VIEWER");
 
-        var share =
-                teams.addShare(orders, new ShareRequest(billing, prod, PatternKind.BOTH, "orders.events.#", viewer));
+        var share = teams.addShare(orders, new ShareRequest(billing, prod, PatternKind.ANY, "orders.events.#", viewer));
 
         assertThat(share.covered()).isTrue();
         assertThat(teams.get(billing).sharesIn()).hasSize(1);
-        var share2 = new ShareRequest(billing, prod, PatternKind.BOTH, "billing.#", viewer);
+        var share2 = new ShareRequest(billing, prod, PatternKind.ANY, "billing.#", viewer);
         assertThatThrownBy(() -> teams.addShare(orders, share2))
                 .isInstanceOfSatisfying(
                         ConflictException.class, e -> assertThat(e.slug()).isEqualTo("share-outside-owner"));
-        var share3 = new ShareRequest(billing, prod, PatternKind.BOTH, "audit.x", viewer);
+        var share3 = new ShareRequest(billing, prod, PatternKind.ANY, "audit.x", viewer);
         assertThatThrownBy(() -> teams.addShare(orders, share3))
                 .as("the owner owns audit.* for queues only")
                 .isInstanceOf(ConflictException.class);
-        var share4 = new ShareRequest(billing, staging, PatternKind.BOTH, "orders.events.#", viewer);
+        var share4 = new ShareRequest(billing, staging, PatternKind.ANY, "orders.events.#", viewer);
         assertThatThrownBy(() -> teams.addShare(orders, share4))
                 .as("owned on prod, not on staging")
                 .isInstanceOf(ConflictException.class);
@@ -553,17 +555,17 @@ class TeamServiceIntegrationTest extends PostgresIntegrationTest {
     void aShareNeedsAnotherTeamAndATeamRole() {
         UUID orders = team("orders");
         UUID billing = team("billing");
-        teams.addPattern(orders, pattern(prod, PatternKind.BOTH, "orders.#"));
+        teams.addPattern(orders, pattern(prod, PatternKind.ANY, "orders.#"));
 
-        var share5 = new ShareRequest(orders, prod, PatternKind.BOTH, "orders.#", role("TEAM_VIEWER"));
+        var share5 = new ShareRequest(orders, prod, PatternKind.ANY, "orders.#", role("TEAM_VIEWER"));
         assertThatThrownBy(() -> teams.addShare(orders, share5))
                 .isInstanceOfSatisfying(
                         ConflictException.class, e -> assertThat(e.slug()).isEqualTo("share-with-self"));
-        var share6 = new ShareRequest(billing, prod, PatternKind.BOTH, "orders.#", role("VIEWER"));
+        var share6 = new ShareRequest(billing, prod, PatternKind.ANY, "orders.#", role("VIEWER"));
         assertThatThrownBy(() -> teams.addShare(orders, share6))
                 .isInstanceOfSatisfying(
                         ConflictException.class, e -> assertThat(e.slug()).isEqualTo("not-a-team-role"));
-        var share7 = new ShareRequest(UUID.randomUUID(), prod, PatternKind.BOTH, "orders.#", role("TEAM_VIEWER"));
+        var share7 = new ShareRequest(UUID.randomUUID(), prod, PatternKind.ANY, "orders.#", role("TEAM_VIEWER"));
         assertThatThrownBy(() -> teams.addShare(orders, share7)).isInstanceOf(NotFoundException.class);
     }
 
@@ -572,22 +574,22 @@ class TeamServiceIntegrationTest extends PostgresIntegrationTest {
         UUID orders = team("orders");
         UUID billing = team("billing");
         UUID carol = user();
-        teams.addPattern(orders, pattern(prod, PatternKind.BOTH, "orders.#"));
+        teams.addPattern(orders, pattern(prod, PatternKind.ANY, "orders.#"));
         teams.addMember(billing, new MemberRequest(PrincipalType.USER, carol, null, null, role("TEAM_OPERATOR")));
         var share = teams.addShare(
-                orders, new ShareRequest(billing, prod, PatternKind.BOTH, "orders.events.#", role("TEAM_VIEWER")));
+                orders, new ShareRequest(billing, prod, PatternKind.ANY, "orders.events.#", role("TEAM_VIEWER")));
 
         asUser(carol);
-        assertThat(perm.can(prod, ResourceRef.queue("orders.events.a"), "queue:read"))
+        assertThat(perm.can(prod, ResourceRef.subscription("orders.events.a"), "subscription:read"))
                 .isTrue();
-        assertThat(perm.can(prod, ResourceRef.queue("orders.events.a"), "queue:purge"))
+        assertThat(perm.can(prod, ResourceRef.subscription("orders.events.a"), "subscription:purge"))
                 .isFalse();
 
         new AdminAuthenticationExtension().beforeEach(null);
         teams.removeShare(orders, share.id());
 
         asUser(carol);
-        assertThat(perm.can(prod, ResourceRef.queue("orders.events.a"), "queue:read"))
+        assertThat(perm.can(prod, ResourceRef.subscription("orders.events.a"), "subscription:read"))
                 .isFalse();
     }
 
@@ -595,9 +597,9 @@ class TeamServiceIntegrationTest extends PostgresIntegrationTest {
     void aShareThatTheOwnersPatternsNoLongerCoverIsShownAsNotCovered() {
         UUID orders = team("orders");
         UUID billing = team("billing");
-        var owned = teams.addPattern(orders, pattern(prod, PatternKind.BOTH, "orders.#"));
+        var owned = teams.addPattern(orders, pattern(prod, PatternKind.ANY, "orders.#"));
         teams.addShare(
-                orders, new ShareRequest(billing, prod, PatternKind.BOTH, "orders.events.#", role("TEAM_VIEWER")));
+                orders, new ShareRequest(billing, prod, PatternKind.ANY, "orders.events.#", role("TEAM_VIEWER")));
 
         teams.removePattern(orders, owned.id());
 
@@ -611,11 +613,11 @@ class TeamServiceIntegrationTest extends PostgresIntegrationTest {
     void everyChangeIsAudited() {
         UUID orders = team("orders");
         UUID billing = team("billing");
-        var owned = teams.addPattern(orders, pattern(prod, PatternKind.BOTH, "orders.#"));
+        var owned = teams.addPattern(orders, pattern(prod, PatternKind.ANY, "orders.#"));
         var member =
                 teams.addMember(orders, new MemberRequest(PrincipalType.USER, user(), null, null, role("TEAM_VIEWER")));
         var share = teams.addShare(
-                orders, new ShareRequest(billing, prod, PatternKind.BOTH, "orders.#", role("TEAM_VIEWER")));
+                orders, new ShareRequest(billing, prod, PatternKind.ANY, "orders.#", role("TEAM_VIEWER")));
         teams.changeMemberRole(orders, member.id(), role("TEAM_OPERATOR"));
         teams.removeShare(orders, share.id());
         teams.removeMember(orders, member.id());
@@ -642,7 +644,7 @@ class TeamServiceIntegrationTest extends PostgresIntegrationTest {
         return roleService
                 .create(new RoleRequest(
                         "wider-" + UUID.randomUUID(),
-                        List.of("queue:read", "queue:update", "capture:write"),
+                        List.of("subscription:read", "subscription:update", "capture:write"),
                         false,
                         true))
                 .id();
@@ -740,7 +742,7 @@ class TeamServiceIntegrationTest extends PostgresIntegrationTest {
         start.await();
         new AdminAuthenticationExtension().beforeEach(null);
         try {
-            teams.addPattern(team, pattern(cluster, PatternKind.QUEUE, pattern));
+            teams.addPattern(team, pattern(cluster, PatternKind.SUBSCRIPTION, pattern));
             return true;
         } catch (ConflictException _) {
             return false;

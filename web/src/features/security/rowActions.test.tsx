@@ -45,7 +45,7 @@ describe('AddressAccess', () => {
   });
 
   it('leaves it out for someone who administers nothing', async () => {
-    signInWith(['address:read']);
+    signInWith(['destination:read']);
     renderItem();
 
     await new Promise((resolve) => setTimeout(resolve, 100));

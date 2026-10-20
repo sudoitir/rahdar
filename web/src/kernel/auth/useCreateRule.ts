@@ -8,16 +8,16 @@ function restrictionOf(nouns: string, patterns: string[]): string {
 }
 
 /**
- * Where the caller may create a queue or an address on a cluster: anywhere when a grant reaches the cluster,
+ * Where the caller may create a subscription or a destination on a cluster: anywhere when a grant reaches the cluster,
  * otherwise only under the name patterns a team or share gives. `restriction` says so for a form to show, and
  * `problem` checks a name as it is typed. Unknown while the summary loads, which restricts nothing; the server
  * refuses a name outside the patterns either way.
  */
-export function useCreateRule(clusterId: string, kind: 'queue' | 'address') {
+export function useCreateRule(clusterId: string, type: 'subscription' | 'destination') {
   const { can, createPatterns } = useCan();
-  const anywhere = can(`${kind}:create`, clusterId);
-  const nouns = kind === 'queue' ? 'queues' : 'addresses';
-  const patterns = anywhere ? [] : (createPatterns(clusterId, kind) ?? []);
+  const anywhere = can(`${type}:create`, clusterId);
+  const nouns = type === 'subscription' ? 'subscriptions' : 'destinations';
+  const patterns = anywhere ? [] : (createPatterns(clusterId, type) ?? []);
   return {
     anywhere,
     patterns,

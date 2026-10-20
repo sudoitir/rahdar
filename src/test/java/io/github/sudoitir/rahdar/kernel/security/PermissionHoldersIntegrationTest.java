@@ -18,7 +18,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 class PermissionHoldersIntegrationTest extends PostgresIntegrationTest {
 
     private static final int ALL = 10_000;
-    private static final String QUEUE_DELETE = "queue:delete";
+    private static final String SUBSCRIPTION_DELETE = "subscription:delete";
 
     @Autowired
     PermissionHolders holders;
@@ -47,7 +47,8 @@ class PermissionHoldersIntegrationTest extends PostgresIntegrationTest {
     }
 
     private UUID onCluster(UUID cluster) {
-        return OperatorFixture.signInOnCluster(users, roles, rolePermissions, userRoles, grants, cluster, QUEUE_DELETE);
+        return OperatorFixture.signInOnCluster(
+                users, roles, rolePermissions, userRoles, grants, cluster, SUBSCRIPTION_DELETE);
     }
 
     @Test
@@ -55,17 +56,17 @@ class PermissionHoldersIntegrationTest extends PostgresIntegrationTest {
         UUID cluster = UUID.randomUUID();
         UUID holder = onCluster(cluster);
 
-        assertThat(holders.holders(cluster, QUEUE_DELETE, ALL)).contains(holder);
-        assertThat(holders.holders(UUID.randomUUID(), QUEUE_DELETE, ALL)).doesNotContain(holder);
-        assertThat(holders.holders(null, QUEUE_DELETE, ALL)).doesNotContain(holder);
+        assertThat(holders.holders(cluster, SUBSCRIPTION_DELETE, ALL)).contains(holder);
+        assertThat(holders.holders(UUID.randomUUID(), SUBSCRIPTION_DELETE, ALL)).doesNotContain(holder);
+        assertThat(holders.holders(null, SUBSCRIPTION_DELETE, ALL)).doesNotContain(holder);
     }
 
     @Test
     void aGlobalGrantHoldsAtEveryScope() {
         UUID global = OperatorFixture.signIn(users, roles, rolePermissions, userRoles, grants);
 
-        assertThat(holders.holders(null, QUEUE_DELETE, ALL)).contains(global);
-        assertThat(holders.holders(UUID.randomUUID(), QUEUE_DELETE, ALL)).contains(global);
+        assertThat(holders.holders(null, SUBSCRIPTION_DELETE, ALL)).contains(global);
+        assertThat(holders.holders(UUID.randomUUID(), SUBSCRIPTION_DELETE, ALL)).contains(global);
     }
 
     @Test
@@ -77,7 +78,7 @@ class PermissionHoldersIntegrationTest extends PostgresIntegrationTest {
         users.save(user);
         accessChanges.changedFor(holder);
 
-        assertThat(holders.holders(cluster, QUEUE_DELETE, ALL)).doesNotContain(holder);
+        assertThat(holders.holders(cluster, SUBSCRIPTION_DELETE, ALL)).doesNotContain(holder);
     }
 
     @Test
@@ -87,6 +88,6 @@ class PermissionHoldersIntegrationTest extends PostgresIntegrationTest {
         onCluster(cluster);
         onCluster(cluster);
 
-        assertThat(holders.holders(cluster, QUEUE_DELETE, 2)).hasSize(2);
+        assertThat(holders.holders(cluster, SUBSCRIPTION_DELETE, 2)).hasSize(2);
     }
 }

@@ -14,7 +14,7 @@ const grantsLabel = (t: TokenView) =>
     : t.grants
         .map((g) => {
           const where = g.scopeType === 'GLOBAL' ? g.action : `${g.action} (cluster)`;
-          return g.resourcePattern ? `${where} on ${g.resourceKind?.toLowerCase()}s ${g.resourcePattern}` : where;
+          return g.resourcePattern ? `${where} on ${g.resourceType?.toLowerCase()}s ${g.resourcePattern}` : where;
         })
         .join(', ');
 

@@ -24,7 +24,7 @@ function purge(snapshot: Partial<QueueView>) {
   );
 }
 
-/** Holds queue:purge through a team, somewhere on the cluster; nothing on the cluster itself. */
+/** Holds subscription:purge through a team, somewhere on the cluster; nothing on the cluster itself. */
 function teamHoldsPurge(held: boolean) {
   const available = { status: 'AVAILABLE', reason: '', brokerXmlSnippet: null };
   server.use(
@@ -50,10 +50,10 @@ function teamHoldsPurge(held: boolean) {
       const clusterId = new URL(request.url).searchParams.get('clusterId');
       return HttpResponse.json({
         permissions: [],
-        anywhere: held ? ['queue:purge'] : [],
+        anywhere: held ? ['subscription:purge'] : [],
         canSeeCluster: clusterId ? true : null,
         teams: [],
-        createPatterns: { queue: [], address: [] },
+        createPatterns: { subscription: [], destination: [] },
       });
     }),
   );
@@ -62,17 +62,17 @@ function teamHoldsPurge(held: boolean) {
 describe('PurgeQueue on a queue row', () => {
   it('is disabled on a queue the team does not allow it on, naming the permission and the owner to ask', async () => {
     teamHoldsPurge(true);
-    purge({ allowedActions: ['queue:read'], ownerTeam: { id: 't1', name: 'Orders' } });
+    purge({ allowedActions: ['subscription:read'], ownerTeam: { id: 't1', name: 'Orders' } });
 
     const item = await screen.findByRole('menuitem', { name: /Purge messages/ });
     // aria-disabled, not disabled: it stays in the arrow-key order, so a keyboard user can reach its reason.
     await waitFor(() => expect(item).toHaveAttribute('aria-disabled', 'true'));
-    expect(item).toHaveAccessibleDescription(/\(queue:purge\) on this queue\./);
+    expect(item).toHaveAccessibleDescription(/\(subscription:purge\) on this queue\./);
   });
 
   it('is offered on a queue the row allows it on', async () => {
     teamHoldsPurge(true);
-    purge({ allowedActions: ['queue:read', 'queue:purge'] });
+    purge({ allowedActions: ['subscription:read', 'subscription:purge'] });
 
     const item = await screen.findByRole('menuitem', { name: /Purge messages/ });
     expect(item).not.toHaveAttribute('aria-disabled');
@@ -80,7 +80,7 @@ describe('PurgeQueue on a queue row', () => {
 
   it('is left out for someone who can purge nowhere on the cluster', async () => {
     teamHoldsPurge(false);
-    purge({ allowedActions: ['queue:read'] });
+    purge({ allowedActions: ['subscription:read'] });
 
     await new Promise((resolve) => setTimeout(resolve, 100));
     expect(screen.queryByRole('menuitem', { name: /Purge messages/ })).not.toBeInTheDocument();

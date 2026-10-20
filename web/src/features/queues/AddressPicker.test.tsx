@@ -140,7 +140,7 @@ describe('AddressPicker', () => {
         ),
         http.get('*/api/v1/clusters/c1/addresses', () =>
           HttpResponse.json({
-            data: [address('orders.in', ['message:send']), address('billing.in', ['address:read'])],
+            data: [address('orders.in', ['message:send']), address('billing.in', ['destination:read'])],
             count: 2,
             page: 1,
             pageSize: 300,

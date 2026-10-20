@@ -3,7 +3,7 @@ package io.github.sudoitir.rahdar.kernel.security.web;
 import static io.swagger.v3.oas.annotations.media.Schema.RequiredMode.REQUIRED;
 
 import io.github.sudoitir.rahdar.kernel.plugin.PermissionScope;
-import io.github.sudoitir.rahdar.kernel.plugin.ResourceKind;
+import io.github.sudoitir.rahdar.kernel.plugin.ResourceType;
 import io.github.sudoitir.rahdar.kernel.security.SessionFacts;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
@@ -81,7 +81,7 @@ public final class UserViews {
             @Schema(
                     requiredMode = REQUIRED,
                     description = "Whether the role may be given to a team's members or in a share. A team role "
-                            + "holds only permissions that act on a queue or address, and team:admin.")
+                            + "holds only permissions that act on a subscription or destination, and team:admin.")
             boolean teamAssignable) {}
 
     public record RoleView(
@@ -98,7 +98,7 @@ public final class UserViews {
             @Schema(requiredMode = REQUIRED) String featureId,
             @Schema(requiredMode = REQUIRED) String featureTitle,
             @Schema(requiredMode = REQUIRED) PermissionScope scope,
-            @Schema(requiredMode = REQUIRED) List<ResourceKind> resourceKinds,
+            @Schema(requiredMode = REQUIRED) List<ResourceType> resourceTypes,
             @Schema(requiredMode = REQUIRED) List<String> requires) {}
 
     /**

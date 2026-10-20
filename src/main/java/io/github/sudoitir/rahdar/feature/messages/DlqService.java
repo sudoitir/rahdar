@@ -4,7 +4,7 @@ import io.github.sudoitir.rahdar.feature.messages.web.MessageViews.DlqAddress;
 import io.github.sudoitir.rahdar.feature.messages.web.MessageViews.DlqQueue;
 import io.github.sudoitir.rahdar.feature.messages.web.MessageViews.DlqQueueDepth;
 import io.github.sudoitir.rahdar.feature.messages.web.MessageViews.DlqView;
-import io.github.sudoitir.rahdar.kernel.plugin.ResourceKind;
+import io.github.sudoitir.rahdar.kernel.plugin.ResourceType;
 import io.github.sudoitir.rahdar.kernel.security.ClusterAccessGuard;
 import io.github.sudoitir.rahdar.kernel.security.PermissionResolver;
 import io.github.sudoitir.rahdar.kernel.security.ResourceFilter;
@@ -45,8 +45,8 @@ public class DlqService {
 
     public DlqView view(UUID clusterId) {
         clusterAccess.requireVisible(clusterId);
-        ResourceFilter readableQueues = permissions.filter(clusterId, ResourceKind.QUEUE);
-        ResourceFilter readableAddresses = permissions.filter(clusterId, ResourceKind.ADDRESS);
+        ResourceFilter readableQueues = permissions.filter(clusterId, ResourceType.SUBSCRIPTION);
+        ResourceFilter readableAddresses = permissions.filter(clusterId, ResourceType.DESTINATION);
         ClusterNode manageable = brokerNodes.nodes(clusterId).stream()
                 .filter(n -> n.getManagementUrl() != null)
                 .findFirst()

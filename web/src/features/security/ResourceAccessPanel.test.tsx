@@ -66,7 +66,7 @@ function serve(permissions: string[], teamAdmin = false) {
               anywhere: [],
               canSeeCluster: null,
               teams: [{ teamId: 't-orders', teamName: 'Orders', roleId: 'r', roleName: 'Team Admin', teamAdmin: true }],
-              createPatterns: { queue: [], address: [] },
+              createPatterns: { subscription: [], destination: [] },
             }),
           ),
         ]
@@ -92,7 +92,7 @@ function serve(permissions: string[], teamAdmin = false) {
 describe('ResourceAccessPanel', () => {
   it('shows the owner team, and each team and role that may act, with how they got it', async () => {
     const asked = serve(['user:admin']);
-    renderWithProviders(<ResourceAccessPanel clusterId="c1" kind="QUEUE" name="orders.in" />);
+    renderWithProviders(<ResourceAccessPanel clusterId="c1" kind="SUBSCRIPTION" name="orders.in" />);
 
     expect(await screen.findByRole('heading', { level: 3, name: 'Access' })).toBeInTheDocument();
     expect(await screen.findByRole('link', { name: 'Owner: team Orders' })).toBeInTheDocument();
@@ -103,12 +103,12 @@ describe('ResourceAccessPanel', () => {
     expect(rows[1]).toHaveTextContent('Owns it');
     expect(rows[2]).toHaveTextContent('Shared by Orders (orders.#)');
     expect(rows[2]).toHaveTextContent('5');
-    expect(asked).toContain('?kind=QUEUE&name=orders.in');
+    expect(asked).toContain('?type=SUBSCRIPTION&name=orders.in');
   });
 
   it('is offered to the admin of a team, who is no user administrator', async () => {
     serve([], true);
-    renderWithProviders(<ResourceAccessPanel clusterId="c1" kind="QUEUE" name="orders.in" />);
+    renderWithProviders(<ResourceAccessPanel clusterId="c1" kind="SUBSCRIPTION" name="orders.in" />);
 
     expect(await screen.findByRole('table', { name: /Teams and roles with access/ })).toBeInTheDocument();
     // Checking one user's access needs the user list, which only a user administrator may read.
@@ -116,8 +116,8 @@ describe('ResourceAccessPanel', () => {
   });
 
   it('is not there for someone who administers nothing, and asks the server nothing', async () => {
-    const asked = serve(['queue:read']);
-    renderWithProviders(<ResourceAccessPanel clusterId="c1" kind="QUEUE" name="orders.in" />);
+    const asked = serve(['subscription:read']);
+    renderWithProviders(<ResourceAccessPanel clusterId="c1" kind="SUBSCRIPTION" name="orders.in" />);
 
     await new Promise((resolve) => setTimeout(resolve, 100));
     expect(screen.queryByRole('heading', { name: 'Access' })).not.toBeInTheDocument();
@@ -129,22 +129,22 @@ describe('ResourceAccessPanel', () => {
     server.use(
       http.get('*/api/v1/clusters/c1/resource-access', () => HttpResponse.json({ ownerTeam: null, grants: [] })),
     );
-    renderWithProviders(<ResourceAccessPanel clusterId="c1" kind="ADDRESS" name="legacy.in" />);
+    renderWithProviders(<ResourceAccessPanel clusterId="c1" kind="DESTINATION" name="legacy.in" />);
 
-    expect(await screen.findByText('No team has access to this address')).toBeInTheDocument();
+    expect(await screen.findByText('No team has access to this destination')).toBeInTheDocument();
     expect(screen.getByText('No owner')).toBeInTheDocument();
   });
 
   it("opens one user's access check at this queue, from the keyboard", async () => {
     const asked = serve(['user:admin']);
     const person = userEvent.setup();
-    renderWithProviders(<ResourceAccessPanel clusterId="c1" kind="QUEUE" name="orders.in" />);
+    renderWithProviders(<ResourceAccessPanel clusterId="c1" kind="SUBSCRIPTION" name="orders.in" />);
 
     await screen.findByRole('table', { name: /Teams and roles with access/ });
     await choose(person, screen, "Check one user's access", 'alice');
 
     expect(await screen.findByRole('dialog', { name: 'Access check for alice' })).toBeInTheDocument();
-    await waitFor(() => expect(asked.at(-1)).toMatch(/^check\?clusterId=c1&kind=QUEUE&name=orders.in&/));
+    await waitFor(() => expect(asked.at(-1)).toMatch(/^check\?clusterId=c1&type=SUBSCRIPTION&name=orders.in&/));
   });
 });
 

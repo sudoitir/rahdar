@@ -3,7 +3,7 @@ package io.github.sudoitir.rahdar.kernel.security.web;
 import io.github.sudoitir.rahdar.kernel.core.PagedView;
 import io.github.sudoitir.rahdar.kernel.core.ResourceQuery;
 import io.github.sudoitir.rahdar.kernel.gate.HeldResponse;
-import io.github.sudoitir.rahdar.kernel.plugin.ResourceKind;
+import io.github.sudoitir.rahdar.kernel.plugin.ResourceType;
 import io.github.sudoitir.rahdar.kernel.security.ReauthenticationRequiredException;
 import io.github.sudoitir.rahdar.kernel.security.SecondFactorRequiredException;
 import io.github.sudoitir.rahdar.kernel.security.SessionAuthentication;
@@ -67,12 +67,12 @@ public class UsersController {
     public PagedView<AccessCheckView> accessCheck(
             @PathVariable UUID userId,
             @RequestParam(required = false) UUID clusterId,
-            @RequestParam(required = false) ResourceKind kind,
+            @RequestParam(required = false) ResourceType type,
             @RequestParam(required = false) String name,
             @RequestParam(required = false) Integer page,
             @RequestParam(required = false) Integer size) {
         return ResourceQuery.ofPage(page, size)
-                .paginate(effectivePermissions.check(userId, clusterId, kind, name), null);
+                .paginate(effectivePermissions.check(userId, clusterId, type, name), null);
     }
 
     @GetMapping("/{userId}/sessions")

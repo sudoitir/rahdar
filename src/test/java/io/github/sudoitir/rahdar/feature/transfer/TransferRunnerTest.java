@@ -495,7 +495,7 @@ class TransferRunnerTest {
         when(handoff.stillHolds(
                         any(),
                         eq(SRC_CLUSTER),
-                        eq(ResourceRef.queue("SRC.Q")),
+                        eq(ResourceRef.subscription("SRC.Q")),
                         eq(run.getMode().sourcePermission())))
                 .thenReturn(false);
 
@@ -511,7 +511,10 @@ class TransferRunnerTest {
     void aWithdrawnTargetPermissionStopsTheRunAndNamesIt() {
         TransferRunEntity run = copyOfAll(0L);
         when(handoff.stillHolds(
-                        any(), eq(TGT_CLUSTER), eq(ResourceRef.address("TGT.A")), eq(MessagePermissions.MESSAGE_SEND)))
+                        any(),
+                        eq(TGT_CLUSTER),
+                        eq(ResourceRef.destination("TGT.A")),
+                        eq(MessagePermissions.MESSAGE_SEND)))
                 .thenReturn(false);
 
         execute();
@@ -526,14 +529,14 @@ class TransferRunnerTest {
         when(handoff.stillHolds(
                         any(),
                         eq(TGT_CLUSTER),
-                        eq(ResourceRef.queue(run.getTargetQueue())),
-                        eq(Permissions.QUEUE_READ)))
+                        eq(ResourceRef.subscription(run.getTargetQueue())),
+                        eq(Permissions.SUBSCRIPTION_READ)))
                 .thenReturn(false);
 
         execute();
 
         assertThat(run.getState()).isEqualTo(TransferState.STOPPED);
-        assertThat(run.getLastError()).contains(Permissions.QUEUE_READ).contains("target queue");
+        assertThat(run.getLastError()).contains(Permissions.SUBSCRIPTION_READ).contains("target queue");
     }
 
     @Test

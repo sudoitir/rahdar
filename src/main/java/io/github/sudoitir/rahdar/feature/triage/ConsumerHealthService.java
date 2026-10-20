@@ -11,7 +11,7 @@ import io.github.sudoitir.rahdar.feature.triage.ConsumerHealth.Source;
 import io.github.sudoitir.rahdar.feature.triage.ConsumerHealth.Verdict;
 import io.github.sudoitir.rahdar.kernel.core.PagedView;
 import io.github.sudoitir.rahdar.kernel.core.ResourceQuery;
-import io.github.sudoitir.rahdar.kernel.plugin.ResourceKind;
+import io.github.sudoitir.rahdar.kernel.plugin.ResourceType;
 import io.github.sudoitir.rahdar.kernel.security.ClusterAccessGuard;
 import io.github.sudoitir.rahdar.kernel.security.PermissionResolver;
 import io.github.sudoitir.rahdar.kernel.security.Permissions;
@@ -74,7 +74,7 @@ public class ConsumerHealthService {
     @Transactional(readOnly = true)
     public PagedView<ConsumerHealth> page(UUID clusterId, ResourceQuery query) {
         clusterAccess.requireVisible(clusterId);
-        ResourceFilter readable = permissions.filter(clusterId, ResourceKind.QUEUE);
+        ResourceFilter readable = permissions.filter(clusterId, ResourceType.SUBSCRIPTION);
         List<ConsumerHealth> rows = evaluated(clusterId);
         List<ConsumerHealth> matched = rows.stream()
                 .filter(h -> readable.readable(h.queueName()))
@@ -92,7 +92,7 @@ public class ConsumerHealthService {
     /** One queue's verdict, for the drawer panel and the {@code diagnose} tool. */
     @Transactional(readOnly = true)
     public Optional<ConsumerHealth> forQueue(UUID clusterId, String queueName) {
-        clusterAccess.requireResource(clusterId, ResourceRef.queue(queueName), Permissions.QUEUE_READ);
+        clusterAccess.requireResource(clusterId, ResourceRef.subscription(queueName), Permissions.SUBSCRIPTION_READ);
         return evaluated(clusterId).stream()
                 .filter(h -> h.queueName().equals(queueName))
                 .findFirst();

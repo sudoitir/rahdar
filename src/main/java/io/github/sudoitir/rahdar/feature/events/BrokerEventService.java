@@ -11,7 +11,7 @@ import io.github.sudoitir.rahdar.kernel.core.NotFoundException;
 import io.github.sudoitir.rahdar.kernel.core.ReadRouting;
 import io.github.sudoitir.rahdar.kernel.core.ResourceQuery;
 import io.github.sudoitir.rahdar.kernel.core.Routed;
-import io.github.sudoitir.rahdar.kernel.plugin.ResourceKind;
+import io.github.sudoitir.rahdar.kernel.plugin.ResourceType;
 import io.github.sudoitir.rahdar.kernel.security.ActorResolver;
 import io.github.sudoitir.rahdar.kernel.security.ClusterAccessGuard;
 import io.github.sudoitir.rahdar.kernel.security.PermissionResolver;
@@ -85,7 +85,7 @@ public class BrokerEventService {
         if (query.after() == null) {
             HistoryPage.requireReachable(paging);
         }
-        ResourceFilter addresses = permissions.filter(clusterId, ResourceKind.ADDRESS);
+        ResourceFilter addresses = permissions.filter(clusterId, ResourceType.DESTINATION);
         // Filtered in the query, before paging, so a total never counts an event about an address the caller
         // may not read. An event about no address belongs to the cluster, and is read with it.
         List<String> readable = addresses.everything()
@@ -215,7 +215,7 @@ public class BrokerEventService {
      * read that queue, as it would name it. A routing name that is no queue of theirs is such a name too.
      */
     private List<String> readableRoutingNames(UUID clusterId, ResourceFilter addresses) {
-        ResourceFilter queues = permissions.filter(clusterId, ResourceKind.QUEUE);
+        ResourceFilter queues = permissions.filter(clusterId, ResourceType.SUBSCRIPTION);
         List<String> names = events.findDistinctSubscriptionByClusterId(clusterId).stream()
                 .filter(name -> queues.readable(name) || addresses.readable(name))
                 .toList();
@@ -226,14 +226,14 @@ public class BrokerEventService {
         if (routingName == null) {
             return true;
         }
-        return permissions.filter(clusterId, ResourceKind.QUEUE).readable(routingName)
-                || permissions.filter(clusterId, ResourceKind.ADDRESS).readable(routingName);
+        return permissions.filter(clusterId, ResourceType.SUBSCRIPTION).readable(routingName)
+                || permissions.filter(clusterId, ResourceType.DESTINATION).readable(routingName);
     }
 
     @Transactional(readOnly = true)
     public BrokerEventView get(UUID clusterId, long seq) {
         clusterAccess.requireVisible(clusterId);
-        ResourceFilter addresses = permissions.filter(clusterId, ResourceKind.ADDRESS);
+        ResourceFilter addresses = permissions.filter(clusterId, ResourceType.DESTINATION);
         boolean clusterWide = clusterAccess.holds(clusterId, Permissions.CLUSTER_READ);
         return events.findByClusterIdAndSeq(clusterId, seq)
                 .filter(e -> e.getDestination() == null ? clusterWide : addresses.readable(e.getDestination()))

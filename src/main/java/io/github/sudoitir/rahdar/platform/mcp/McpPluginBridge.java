@@ -6,7 +6,7 @@ import io.github.sudoitir.rahdar.kernel.plugin.McpToolDef;
 import io.github.sudoitir.rahdar.kernel.plugin.PluginBridge;
 import io.github.sudoitir.rahdar.kernel.plugin.PluginHandle;
 import io.github.sudoitir.rahdar.kernel.plugin.PluginRuntimeStatus;
-import io.github.sudoitir.rahdar.kernel.plugin.ResourceKind;
+import io.github.sudoitir.rahdar.kernel.plugin.ResourceType;
 import io.github.sudoitir.rahdar.kernel.plugin.internal.descriptor.PluginDescriptor;
 import io.github.sudoitir.rahdar.kernel.security.ClusterAccessGuard;
 import io.github.sudoitir.rahdar.kernel.security.PermissionResolver;
@@ -243,9 +243,9 @@ class McpPluginBridge implements PluginBridge {
         Object raw = request.arguments() == null ? null : request.arguments().get(declaration.resourceArg());
         if (!(raw instanceof String name) || name.isBlank()) {
             throw McpErrors.invalidParams(declaration.resourceArg() + " must be the name of a "
-                    + declaration.resourceKind() + " on the cluster.");
+                    + declaration.resourceType() + " on the cluster.");
         }
-        ResourceKind kind = ResourceKind.valueOf(declaration.resourceKind().toUpperCase(Locale.ROOT));
+        ResourceType kind = ResourceType.valueOf(declaration.resourceType().toUpperCase(Locale.ROOT));
         try {
             clusterAccess.requireResource(clusterId, new ResourceRef(kind, name), declaration.permission());
         } catch (ResourceForbiddenException e) {

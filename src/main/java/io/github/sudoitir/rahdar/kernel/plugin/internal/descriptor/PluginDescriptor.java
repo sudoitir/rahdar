@@ -3,7 +3,7 @@ package io.github.sudoitir.rahdar.kernel.plugin.internal.descriptor;
 import io.github.sudoitir.rahdar.kernel.plugin.McpToolDef;
 import io.github.sudoitir.rahdar.kernel.plugin.PermissionDef;
 import io.github.sudoitir.rahdar.kernel.plugin.PermissionScope;
-import io.github.sudoitir.rahdar.kernel.plugin.ResourceKind;
+import io.github.sudoitir.rahdar.kernel.plugin.ResourceType;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
@@ -80,7 +80,7 @@ public record PluginDescriptor(
 
     /**
      * @param scope {@code global}, {@code cluster} or {@code resource}: where the permission takes effect
-     * @param resourceKinds {@code queue} and {@code address}: what a {@code resource} permission acts on;
+     * @param resourceTypes {@code subscription} and {@code destination}: what a {@code resource} permission acts on;
      *     required for that scope and refused for the others
      * @param requires permissions a role must hold with this one
      * @param globalOnly replaced by {@code scope}; read only so that the validator can refuse it by name
@@ -89,23 +89,23 @@ public record PluginDescriptor(
             String action,
             String description,
             String scope,
-            List<String> resourceKinds,
+            List<String> resourceTypes,
             List<String> requires,
             Boolean globalOnly) {
 
         public Permission {
-            resourceKinds = resourceKinds == null ? List.of() : List.copyOf(resourceKinds);
+            resourceTypes = resourceTypes == null ? List.of() : List.copyOf(resourceTypes);
             requires = requires == null ? List.of() : List.copyOf(requires);
         }
 
-        /** @throws IllegalArgumentException when the scope or a kind is not one Rahdar knows (the validator refuses it first) */
+        /** @throws IllegalArgumentException when the scope or a resource type is not one Rahdar knows (the validator refuses it first) */
         public PermissionDef toDef() {
             return new PermissionDef(
                     action,
                     description,
                     PermissionScope.valueOf(scope.toUpperCase(Locale.ROOT)),
-                    resourceKinds.stream()
-                            .map(kind -> ResourceKind.valueOf(kind.toUpperCase(Locale.ROOT)))
+                    resourceTypes.stream()
+                            .map(kind -> ResourceType.valueOf(kind.toUpperCase(Locale.ROOT)))
                             .collect(Collectors.toSet()),
                     Set.copyOf(requires));
         }
@@ -121,7 +121,7 @@ public record PluginDescriptor(
      * @param scope {@code resource}, {@code cluster} or {@code global}; it matches the scope of the permission
      * @param permission one of the plugin's declared permission actions
      * @param resourceArg a {@code resource} tool's required string argument holding the queue or address name
-     * @param resourceKind {@code queue} or {@code address}: what that argument names
+     * @param resourceType {@code subscription} or {@code destination}: what that argument names
      * @param params the detail the tool's schema leaves out, shown by {@code rahdar_help}
      */
     public record McpTool(
@@ -130,7 +130,7 @@ public record PluginDescriptor(
             String scope,
             String permission,
             String resourceArg,
-            String resourceKind,
+            String resourceType,
             String description,
             List<McpParam> params) {
 
@@ -147,7 +147,7 @@ public record PluginDescriptor(
                     params.stream()
                             .map(p -> new McpToolDef.Param(p.name(), p.values(), p.shape(), p.note()))
                             .toList(),
-                    new McpToolDef.Access(permission, scope, resourceArg, resourceKind));
+                    new McpToolDef.Access(permission, scope, resourceArg, resourceType));
         }
     }
 

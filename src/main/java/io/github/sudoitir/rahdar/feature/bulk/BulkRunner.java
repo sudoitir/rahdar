@@ -178,7 +178,8 @@ class BulkRunner {
         LifecycleOutcome[] result = new LifecycleOutcome[1];
         String[] failure = new String[1];
         String permission = run.getOperation().permission();
-        if (!handoff.stillHolds(operator, run.getClusterId(), ResourceRef.queue(item.getQueueName()), permission)) {
+        if (!handoff.stillHolds(
+                operator, run.getClusterId(), ResourceRef.subscription(item.getQueueName()), permission)) {
             failure[0] =
                     "The permission %s on this queue is no longer held, so it was not acted on.".formatted(permission);
         } else {

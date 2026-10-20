@@ -21,7 +21,7 @@ public final class RrModule {
             .settingKey(RrSettings.PAYLOAD_CAPTURE_BYTES)
             .settingKey(RrSettings.SWEEP_INTERVAL)
             .settingKey(RrSettings.SAMPLE_INTERVAL)
-            .streamTopic(TopicDef.signal("rr", Permissions.ADDRESS_READ))
+            .streamTopic(TopicDef.signal("rr", Permissions.DESTINATION_READ))
             .mcpTool(new McpToolDef(
                     "trace_request_reply",
                     McpToolDef.Posture.READ,

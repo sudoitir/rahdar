@@ -3,7 +3,7 @@ package io.github.sudoitir.rahdar.feature.rr;
 import io.github.sudoitir.rahdar.feature.rr.internal.persistence.RrFlowRepository;
 import io.github.sudoitir.rahdar.feature.rr.web.RrViews.AddressStatsView;
 import io.github.sudoitir.rahdar.feature.rr.web.RrViews.StatsResponse;
-import io.github.sudoitir.rahdar.kernel.plugin.ResourceKind;
+import io.github.sudoitir.rahdar.kernel.plugin.ResourceType;
 import io.github.sudoitir.rahdar.kernel.security.ClusterAccessGuard;
 import io.github.sudoitir.rahdar.kernel.security.PermissionResolver;
 import io.github.sudoitir.rahdar.kernel.security.ResourceFilter;
@@ -79,7 +79,7 @@ public class RrMetrics {
     @Transactional(readOnly = true)
     public StatsResponse stats(UUID clusterId, Duration window) {
         clusterAccess.requireVisible(clusterId);
-        ResourceFilter readable = permissions.filter(clusterId, ResourceKind.ADDRESS);
+        ResourceFilter readable = permissions.filter(clusterId, ResourceType.DESTINATION);
         List<String> addresses = flows.findDistinctRequestAddressByClusterId(clusterId).stream()
                 .filter(readable::readable)
                 .toList();

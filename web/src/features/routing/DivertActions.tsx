@@ -214,7 +214,7 @@ export function CreateDivertAction({ clusterId }: Readonly<{ clusterId: string }
   const { can, loading } = useCan();
   const cluster = useCluster(clusterId);
   const write = cluster.data?.capabilities.managementWrite;
-  const gate = gateFor(can('divert:write', clusterId), PERMISSION_LABEL, write, loading || cluster.isPending);
+  const gate = gateFor(can('route:write', clusterId), PERMISSION_LABEL, write, loading || cluster.isPending);
 
   const [open, setOpen] = useState(false);
   const [preview, setPreview] = useState<DivertMutationView | null>(null);

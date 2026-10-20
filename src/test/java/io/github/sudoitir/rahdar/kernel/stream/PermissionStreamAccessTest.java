@@ -47,7 +47,7 @@ import tools.jackson.databind.json.JsonMapper;
 class PermissionStreamAccessTest {
 
     private static final Set<String> TEAM_VIEWER =
-            Set.of(Permissions.QUEUE_READ, Permissions.ADDRESS_READ, MessagePermissions.MESSAGE_READ);
+            Set.of(Permissions.SUBSCRIPTION_READ, Permissions.DESTINATION_READ, MessagePermissions.MESSAGE_READ);
 
     private final UUID clusterId = UUID.randomUUID();
     private final UUID userId = UUID.randomUUID();
@@ -63,7 +63,7 @@ class PermissionStreamAccessTest {
         Map<String, CatalogueEntry> catalogue = RahdarFeatures.descriptors().stream()
                 .flatMap(d -> d.permissions().stream()
                         .map(p -> new CatalogueEntry(
-                                p.action(), p.label(), d.id(), d.title(), p.scope(), p.resourceKinds(), p.requires())))
+                                p.action(), p.label(), d.id(), d.title(), p.scope(), p.resourceTypes(), p.requires())))
                 .collect(Collectors.toMap(CatalogueEntry::action, e -> e));
         FeatureRegistry features = mock(FeatureRegistry.class);
         when(features.permission(anyString()))
@@ -77,7 +77,7 @@ class PermissionStreamAccessTest {
                 access,
                 new TeamIndex(mock(TeamRepository.class), patterns, shares, mock(RolePermissionRepository.class)),
                 features);
-        when(topics.definition("queues")).thenReturn(TopicDef.signal("queues", Permissions.QUEUE_READ));
+        when(topics.definition("queues")).thenReturn(TopicDef.signal("queues", Permissions.SUBSCRIPTION_READ));
         when(topics.definition("alerts")).thenReturn(TopicDef.signal("alerts", AlertPermissions.ALERT_READ));
         when(topics.definition("health")).thenReturn(TopicDef.signal("health"));
         @SuppressWarnings("unchecked")
@@ -85,7 +85,7 @@ class PermissionStreamAccessTest {
         when(gates.orderedStream()).thenAnswer(i -> Stream.<StreamGate>empty());
         streamAccess = new PermissionStreamAccess(
                 resolver, topics, JsonMapper.builder().build(), gates);
-        ownedRows.add(new TeamPatternEntity(orders, clusterId, "QUEUE", "orders.#"));
+        ownedRows.add(new TeamPatternEntity(orders, clusterId, "SUBSCRIPTION", "orders.#"));
     }
 
     private void teamMember() {
@@ -125,7 +125,7 @@ class PermissionStreamAccessTest {
         teamMember();
         assertThat(shown("queues", null)).isNull();
 
-        grant(Permissions.QUEUE_READ);
+        grant(Permissions.SUBSCRIPTION_READ);
         assertThat(shown("queues", null)).isNotNull();
         assertThat(shown("queues", BusFrame.About.queue("billing.in"))).isNotNull();
     }

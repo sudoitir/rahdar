@@ -7,7 +7,7 @@ export function useDivertWriteGate(clusterId: string): GateVerdict {
   const { can, loading } = useCan();
   const cluster = useCluster(clusterId);
   return gateFor(
-    can('divert:write', clusterId),
+    can('route:write', clusterId),
     'Create and delete diverts',
     cluster.data?.capabilities.managementWrite,
     loading || cluster.isPending,

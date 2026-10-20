@@ -67,11 +67,11 @@ function queue(name: string) {
     address: name,
     queueName: name,
     allowedActions: [
-      'queue:read',
-      'queue:pause',
-      'queue:update',
-      'queue:delete',
-      'queue:purge',
+      'subscription:read',
+      'subscription:pause',
+      'subscription:update',
+      'subscription:delete',
+      'subscription:purge',
       'message:read',
       'message:move',
     ],
@@ -157,10 +157,10 @@ function serve({
 /** What `/me/access` says for someone who holds nothing on the cluster itself, and some rights through teams. */
 function teamAccess({
   anywhere = [],
-  createPatterns = { queue: [], address: [] },
+  createPatterns = { subscription: [], destination: [] },
 }: {
   anywhere?: string[];
-  createPatterns?: { queue: string[]; address: string[] };
+  createPatterns?: { subscription: string[]; destination: string[] };
 } = {}) {
   return http.get('*/api/v1/me/access', ({ request }) => {
     const clusterId = new URL(request.url).searchParams.get('clusterId');
@@ -428,7 +428,7 @@ describe('QueuesView empty grid', () => {
 
   it('does not offer to create the first queue to someone who may not', async () => {
     search = {};
-    serve({ permissions: ['queue:read'] });
+    serve({ permissions: ['subscription:read'] });
     renderWithProviders(<QueuesView />);
 
     expect(await screen.findByText('No queues yet')).toBeInTheDocument();
@@ -457,7 +457,7 @@ describe('QueuesView ownership and teams', () => {
   it("says there are no queues in the caller's teams when they reach queues only through a team", async () => {
     search = {};
     serve({ permissions: [] });
-    server.use(teamAccess({ anywhere: ['queue:read'] }));
+    server.use(teamAccess({ anywhere: ['subscription:read'] }));
     renderWithProviders(<QueuesView />);
 
     expect(await screen.findByText('No queues in your teams on this cluster')).toBeInTheDocument();
@@ -496,7 +496,7 @@ describe('QueuesView creating a queue', () => {
 
   it('does not offer New queue to a read-only operator, who has nothing to create with', async () => {
     search = {};
-    serve({ queues: [queue('a')], permissions: ['queue:read'] });
+    serve({ queues: [queue('a')], permissions: ['subscription:read'] });
     renderWithProviders(<QueuesView />);
 
     // While grants load the control is offered; it goes once they say the caller can create nowhere.
@@ -508,7 +508,7 @@ describe('QueuesView creating a queue', () => {
     search = {};
     serve({ queues: [queue('a')], permissions: [] });
     server.use(
-      teamAccess({ anywhere: ['queue:read'], createPatterns: { queue: ['orders.#'], address: ['orders.#'] } }),
+      teamAccess({ anywhere: ['subscription:read'], createPatterns: { subscription: ['orders.#'], destination: ['orders.#'] } }),
     );
     renderWithProviders(<QueuesView />);
 

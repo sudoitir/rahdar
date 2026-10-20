@@ -269,7 +269,7 @@ export function QueuesView() {
   const [createOpen, setCreateOpen] = useState(false);
   const { can, reach, createPatterns, loading: grantsLoading } = useCan();
   // Through a team or a share the caller may create under their patterns; only with neither is the control not theirs.
-  const mayCreate = can('queue:create', clusterId) || (createPatterns(clusterId, 'queue')?.length ?? 0) > 0;
+  const mayCreate = can('subscription:create', clusterId) || (createPatterns(clusterId, 'subscription')?.length ?? 0) > 0;
 
   // An empty grid has three quite different causes, and presenting an absence as
   // a fact is the one that misleads: a node Rahdar could not reach contributes no
@@ -394,7 +394,7 @@ export function QueuesView() {
           <QueuesEmpty
             filterText={search.q ?? ''}
             unreachable={unreachable}
-            reach={reach('queue:read', clusterId)}
+            reach={reach('subscription:read', clusterId)}
             mayCreate={mayCreate}
             onClearFilter={clearFilter}
             onCreate={() => setCreateOpen(true)}

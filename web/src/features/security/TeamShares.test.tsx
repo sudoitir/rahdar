@@ -20,7 +20,7 @@ const share = (over: Partial<ShareView> = {}): ShareView => ({
   targetTeamId: 't-billing',
   targetTeamName: 'Billing',
   clusterId: CLUSTER.id,
-  kind: 'QUEUE',
+  kind: 'SUBSCRIPTION',
   pattern: 'orders.events.#',
   roleId: TEAM_VIEWER.id,
   roleName: TEAM_VIEWER.name,
@@ -92,7 +92,7 @@ describe('TeamShares', () => {
       expect(body).toEqual({
         targetTeamId: 't-billing',
         clusterId: 'c-prod',
-        kind: 'QUEUE',
+        kind: 'SUBSCRIPTION',
         pattern: 'orders.events.#',
         roleId: TEAM_VIEWER.id,
       }),

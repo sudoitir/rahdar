@@ -24,18 +24,18 @@ describe('gateFor', () => {
 
   it('names the permission and the owning team when a queue the caller can see does not allow it', () => {
     const verdict = gateFor(false, 'Purge queues', undefined, false, 'cluster', {
-      permission: 'queue:purge',
+      permission: 'subscription:purge',
       noun: 'queue',
       owner: 'Orders',
     });
     expect(verdict.kind === 'blocked' && verdict.reason).toBe(
-      'You do not have the "Purge queues" permission (queue:purge) on this queue. Ask an admin of team Orders.',
+      'You do not have the "Purge queues" permission (subscription:purge) on this queue. Ask an admin of team Orders.',
     );
   });
 
   it('points at a platform administrator when no team owns the resource', () => {
     const verdict = gateFor(false, 'Purge queues', undefined, false, 'cluster', {
-      permission: 'queue:purge',
+      permission: 'subscription:purge',
       noun: 'queue',
       owner: null,
     });

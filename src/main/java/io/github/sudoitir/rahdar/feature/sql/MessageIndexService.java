@@ -10,7 +10,7 @@ import io.github.sudoitir.rahdar.kernel.audit.AuditService;
 import io.github.sudoitir.rahdar.kernel.core.Ids;
 import io.github.sudoitir.rahdar.kernel.core.NotFoundException;
 import io.github.sudoitir.rahdar.kernel.lifecycle.LifecycleRegistry;
-import io.github.sudoitir.rahdar.kernel.plugin.ResourceKind;
+import io.github.sudoitir.rahdar.kernel.plugin.ResourceType;
 import io.github.sudoitir.rahdar.kernel.security.ActorResolver;
 import io.github.sudoitir.rahdar.kernel.security.ClusterAccessGuard;
 import io.github.sudoitir.rahdar.kernel.security.SettingsPermissions;
@@ -84,7 +84,7 @@ public class MessageIndexService {
     @Transactional(readOnly = true)
     public Preview preview(UUID clusterId, Spec spec) {
         String pattern = validPattern(spec.queuePattern());
-        clusterAccess.requireOnAll(clusterId, ResourceKind.QUEUE, pattern, SqlPermissions.CAPTURE_WRITE);
+        clusterAccess.requireOnAll(clusterId, ResourceType.SUBSCRIPTION, pattern, SqlPermissions.CAPTURE_WRITE);
         MessageIndexSubscriptionEntity draft = new MessageIndexSubscriptionEntity();
         draft.setId(Ids.v7());
         draft.setClusterId(clusterId);
@@ -370,7 +370,7 @@ public class MessageIndexService {
      */
     private void requireMayChange(UUID clusterId, CaptureMode mode, String pattern) {
         if (mode == CaptureMode.CAPTURE) {
-            clusterAccess.requireOnAll(clusterId, ResourceKind.QUEUE, pattern, SqlPermissions.CAPTURE_WRITE);
+            clusterAccess.requireOnAll(clusterId, ResourceType.SUBSCRIPTION, pattern, SqlPermissions.CAPTURE_WRITE);
         } else {
             clusterAccess.requireCluster(clusterId, SettingsPermissions.SETTINGS_WRITE);
         }
@@ -379,7 +379,7 @@ public class MessageIndexService {
     /** A subscription is seen by a caller who may read every message it indexes. */
     private boolean readable(UUID clusterId, MessageIndexSubscriptionEntity subscription) {
         return clusterAccess.mayOnAll(
-                clusterId, ResourceKind.QUEUE, subscription.getQueuePattern(), MessagePermissions.MESSAGE_READ);
+                clusterId, ResourceType.SUBSCRIPTION, subscription.getQueuePattern(), MessagePermissions.MESSAGE_READ);
     }
 
     /** The largest capture queue, in messages (ADR-0079). The byte bound on the broker is the other half. */

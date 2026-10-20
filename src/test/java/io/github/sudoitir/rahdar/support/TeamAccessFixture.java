@@ -35,7 +35,7 @@ public final class TeamAccessFixture {
     public UUID team(String name, UUID clusterId, String... patterns) {
         UUID team = teams.create(name + "-" + UUID.randomUUID()).id();
         for (String pattern : patterns) {
-            teams.addPattern(team, new PatternRequest(clusterId, PatternKind.BOTH, pattern));
+            teams.addPattern(team, new PatternRequest(clusterId, PatternKind.ANY, pattern));
         }
         return team;
     }
@@ -64,7 +64,7 @@ public final class TeamAccessFixture {
                 new ShareRequest(
                         target,
                         clusterId,
-                        PatternKind.BOTH,
+                        PatternKind.ANY,
                         pattern,
                         roles.findByName(role).orElseThrow().getId()));
     }

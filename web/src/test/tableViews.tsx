@@ -366,7 +366,7 @@ const auditEvent = (f: Fixture, i: number): AuditEventView => ({
   username: f === 'normal' ? 'a.rahimi' : name(f, 'operator', i),
   sourceIp: '10.0.0.4',
   requestId: null,
-  action: f === 'normal' ? 'queue.purge' : `${BLOCK.repeat(2).slice(0, 80)}queue.purge`,
+  action: f === 'normal' ? 'subscription.purge' : `${BLOCK.repeat(2).slice(0, 80)}subscription.purge`,
   targetType: 'queue',
   targetName: name(f, 'orders', i),
   affectedCount: num(f, 120 + i),

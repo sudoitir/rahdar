@@ -173,9 +173,9 @@ class TokenOperations {
         String scope = "GLOBAL".equals(grant.scopeType())
                 ? "everywhere"
                 : grant.scopeType().toLowerCase() + " " + grant.scopeId();
-        String limit = grant.resourceKind() == null
+        String limit = grant.resourceType() == null
                 ? ""
-                : ", only " + grant.resourceKind().toLowerCase() + "s matching " + grant.resourcePattern();
+                : ", only " + grant.resourceType().toLowerCase() + "s matching " + grant.resourcePattern();
         return grant.action() + " (" + scope + limit + ")";
     }
 }

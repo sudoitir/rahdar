@@ -3,7 +3,7 @@ package io.github.sudoitir.rahdar.kernel.security;
 import io.github.sudoitir.rahdar.kernel.core.NotFoundException;
 import io.github.sudoitir.rahdar.kernel.core.ResourceForbiddenException;
 import io.github.sudoitir.rahdar.kernel.plugin.PluginApi;
-import io.github.sudoitir.rahdar.kernel.plugin.ResourceKind;
+import io.github.sudoitir.rahdar.kernel.plugin.ResourceType;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
@@ -114,7 +114,7 @@ public class ClusterAccessGuard {
             throw hiddenCluster(clusterId, permission);
         }
         events.publishEvent(new AccessRefused(clusterId, permission, resource, false));
-        List<String> patterns = perm.patternsHolding(clusterId, resource.kind(), permission);
+        List<String> patterns = perm.patternsHolding(clusterId, resource.type(), permission);
         String where = patterns.isEmpty()
                 ? ""
                 : " You may create " + kindOf(resource) + "s under: " + String.join(", ", patterns) + ".";
@@ -131,7 +131,7 @@ public class ClusterAccessGuard {
      * the permission covers the whole pattern. Otherwise a caller who sees the cluster is refused and told
      * to narrow the pattern; one who does not is told the cluster does not exist.
      */
-    public void requireOnAll(UUID clusterId, ResourceKind kind, String pattern, String permission) {
+    public void requireOnAll(UUID clusterId, ResourceType kind, String pattern, String permission) {
         if (perm.canOnAll(clusterId, kind, pattern, permission)) {
             return;
         }
@@ -149,7 +149,7 @@ public class ClusterAccessGuard {
     }
 
     /** Whether {@link #requireOnAll} would pass, for filtering a list rather than refusing a request. */
-    public boolean mayOnAll(UUID clusterId, ResourceKind kind, String pattern, String permission) {
+    public boolean mayOnAll(UUID clusterId, ResourceType kind, String pattern, String permission) {
         return perm.canOnAll(clusterId, kind, pattern, permission);
     }
 
@@ -176,6 +176,6 @@ public class ClusterAccessGuard {
     }
 
     private static String kindOf(ResourceRef resource) {
-        return resource.kind().name().toLowerCase(Locale.ROOT);
+        return resource.type().name().toLowerCase(Locale.ROOT);
     }
 }

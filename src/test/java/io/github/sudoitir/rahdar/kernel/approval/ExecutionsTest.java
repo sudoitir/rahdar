@@ -16,7 +16,7 @@ class ExecutionsTest {
                 new Executions(null, null, null, null, null, null, null, Optional.empty(), null, null, null, null);
         HeldRow row = new HeldRow(
                 UUID.randomUUID(),
-                "queue.purge",
+                "subscription.purge",
                 1,
                 HeldState.APPROVED,
                 null,

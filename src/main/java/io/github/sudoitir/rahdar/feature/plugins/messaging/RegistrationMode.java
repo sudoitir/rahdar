@@ -14,7 +14,7 @@ public enum RegistrationMode {
     /**
      * The plugin competes with the queue's other consumers and settles each message it receives:
      * {@link Disposition#ACCEPT} removes it, anything else leaves it for redelivery. Needs
-     * {@code message:read} and {@code queue:purge} on the queue, because consuming removes messages.
+     * {@code message:read} and {@code subscription:purge} on the queue, because consuming removes messages.
      */
     CONSUME
 }

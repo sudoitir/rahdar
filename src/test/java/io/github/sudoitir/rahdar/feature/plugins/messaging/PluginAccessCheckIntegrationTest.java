@@ -56,7 +56,7 @@ class PluginAccessCheckIntegrationTest extends PostgresIntegrationTest {
         cluster = clusters.save(new ClusterEntity("msg-" + UUID.randomUUID(), null, null))
                 .getId();
         UUID orders = teams.create("orders-" + UUID.randomUUID()).id();
-        teams.addPattern(orders, new PatternRequest(cluster, PatternKind.BOTH, "orders.#"));
+        teams.addPattern(orders, new PatternRequest(cluster, PatternKind.ANY, "orders.#"));
         AppUserEntity user = AppUserEntity.local("op-" + UUID.randomUUID(), null, "{noop}x");
         user.setMustChangePassword(false);
         operator = users.save(user).getId();
@@ -79,7 +79,7 @@ class PluginAccessCheckIntegrationTest extends PostgresIntegrationTest {
                 .get()
                 .asString()
                 .contains("message:read")
-                .contains("queue billing.in");
+                .contains("subscription billing.in");
     }
 
     @Test
@@ -88,7 +88,7 @@ class PluginAccessCheckIntegrationTest extends PostgresIntegrationTest {
                 .isEmpty();
         assertThat(AccessCheck.needsOf(RegistrationMode.CONSUME, "orders.in"))
                 .extracting(AccessCheck.Need::permission)
-                .containsExactly("message:read", "queue:purge");
+                .containsExactly("message:read", "subscription:purge");
     }
 
     @Test
@@ -100,7 +100,7 @@ class PluginAccessCheckIntegrationTest extends PostgresIntegrationTest {
                 .get()
                 .asString()
                 .contains("message:send")
-                .contains("address billing.in");
+                .contains("destination billing.in");
     }
 
     @Test

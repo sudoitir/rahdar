@@ -27,8 +27,8 @@ public class ApiTokenGrantEntity {
     private Key id;
 
     public ApiTokenGrantEntity(
-            UUID tokenId, String action, String scopeType, UUID scopeId, String resourceKind, String resourcePattern) {
-        this.id = new Key(tokenId, action, scopeType, scopeId, resourceKind, resourcePattern);
+            UUID tokenId, String action, String scopeType, UUID scopeId, String resourceType, String resourcePattern) {
+        this.id = new Key(tokenId, action, scopeType, scopeId, resourceType, resourcePattern);
     }
 
     public UUID getTokenId() {
@@ -47,8 +47,8 @@ public class ApiTokenGrantEntity {
         return id.scopeId;
     }
 
-    public String getResourceKind() {
-        return id.resourceKind;
+    public String getResourceType() {
+        return id.resourceType;
     }
 
     public String getResourcePattern() {
@@ -71,18 +71,18 @@ public class ApiTokenGrantEntity {
         @Column(name = "scope_id")
         private UUID scopeId;
 
-        @Column(name = "resource_kind")
-        private String resourceKind;
+        @Column(name = "resource_type")
+        private String resourceType;
 
         @Column(name = "resource_pattern")
         private String resourcePattern;
 
-        Key(UUID tokenId, String action, String scopeType, UUID scopeId, String resourceKind, String resourcePattern) {
+        Key(UUID tokenId, String action, String scopeType, UUID scopeId, String resourceType, String resourcePattern) {
             this.tokenId = tokenId;
             this.action = action;
             this.scopeType = scopeType;
             this.scopeId = scopeId;
-            this.resourceKind = resourceKind;
+            this.resourceType = resourceType;
             this.resourcePattern = resourcePattern;
         }
 
@@ -94,13 +94,13 @@ public class ApiTokenGrantEntity {
                     && Objects.equals(action, key.action)
                     && Objects.equals(scopeType, key.scopeType)
                     && Objects.equals(scopeId, key.scopeId)
-                    && Objects.equals(resourceKind, key.resourceKind)
+                    && Objects.equals(resourceType, key.resourceType)
                     && Objects.equals(resourcePattern, key.resourcePattern);
         }
 
         @Override
         public int hashCode() {
-            return Objects.hash(tokenId, action, scopeType, scopeId, resourceKind, resourcePattern);
+            return Objects.hash(tokenId, action, scopeType, scopeId, resourceType, resourcePattern);
         }
     }
 }

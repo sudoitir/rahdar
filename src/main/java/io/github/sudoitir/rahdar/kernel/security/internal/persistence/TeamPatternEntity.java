@@ -13,7 +13,7 @@ import org.hibernate.annotations.UuidGenerator;
 
 /**
  * Maps {@code team_pattern} (changeset kernel-security 0010): a queue or address name pattern a team
- * owns on one cluster. {@code kind} is {@code QUEUE}, {@code ADDRESS} or {@code BOTH}.
+ * owns on one cluster. {@code kind} is {@code SUBSCRIPTION}, {@code DESTINATION} or {@code ANY}.
  */
 @Entity
 @Table(name = "team_pattern")

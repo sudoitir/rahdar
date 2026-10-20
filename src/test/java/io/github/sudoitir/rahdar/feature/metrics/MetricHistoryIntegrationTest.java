@@ -124,7 +124,7 @@ class MetricHistoryIntegrationTest extends PostgresIntegrationTest {
 
     @Test
     void aUserWithQueueReadReadsAQueuesDepth() {
-        UUID user = userWith(Permissions.CLUSTER_READ, Permissions.QUEUE_READ);
+        UUID user = userWith(Permissions.CLUSTER_READ, Permissions.SUBSCRIPTION_READ);
 
         MetricSeriesResponse series = history.read(user, clusterId, depthQuery(now.minusSeconds(900)));
 
@@ -191,7 +191,7 @@ class MetricHistoryIntegrationTest extends PostgresIntegrationTest {
 
     @Test
     void aRangeOlderThanRetentionIsClampedAndSaysSo() {
-        UUID user = userWith(Permissions.CLUSTER_READ, Permissions.QUEUE_READ);
+        UUID user = userWith(Permissions.CLUSTER_READ, Permissions.SUBSCRIPTION_READ);
 
         MetricSeriesResponse series = history.read(user, clusterId, depthQuery(now.minus(Duration.ofDays(5 * 365))));
 
@@ -201,7 +201,7 @@ class MetricHistoryIntegrationTest extends PostgresIntegrationTest {
 
     @Test
     void aGrantRemovedBetweenTwoReadsTurnsTheSecondIntoNotFound() {
-        UUID user = userWith(Permissions.CLUSTER_READ, Permissions.QUEUE_READ);
+        UUID user = userWith(Permissions.CLUSTER_READ, Permissions.SUBSCRIPTION_READ);
         var query = depthQuery(now.minusSeconds(900));
         assertThat(history.read(user, clusterId, query).series()).isNotEmpty();
 

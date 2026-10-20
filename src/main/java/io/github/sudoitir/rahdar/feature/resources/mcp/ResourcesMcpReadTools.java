@@ -38,7 +38,7 @@ public class ResourcesMcpReadTools {
      * cost six schemas on every {@code tools/list} to describe what is, to a model,
      * one question with a parameter.
      */
-    private enum ListKind {
+    public enum ListKind {
         QUEUES,
         ADDRESSES,
         CONSUMERS,

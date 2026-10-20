@@ -31,15 +31,17 @@ class BrokerEventStreamGate implements StreamGate {
         String address = text(data, "address");
         boolean readsAddress = address == null
                 ? permissions.can(principal, clusterId, Permissions.CLUSTER_READ)
-                : permissions.can(principal, clusterId, ResourceRef.address(address), Permissions.ADDRESS_READ);
+                : permissions.can(principal, clusterId, ResourceRef.destination(address), Permissions.DESTINATION_READ);
         if (!readsAddress) {
             return false;
         }
         String routingName = text(data, "routingName");
         return routingName == null
-                || permissions.can(principal, clusterId, Permissions.ADDRESS_READ)
-                || permissions.can(principal, clusterId, ResourceRef.queue(routingName), Permissions.QUEUE_READ)
-                || permissions.can(principal, clusterId, ResourceRef.address(routingName), Permissions.ADDRESS_READ);
+                || permissions.can(principal, clusterId, Permissions.DESTINATION_READ)
+                || permissions.can(
+                        principal, clusterId, ResourceRef.subscription(routingName), Permissions.SUBSCRIPTION_READ)
+                || permissions.can(
+                        principal, clusterId, ResourceRef.destination(routingName), Permissions.DESTINATION_READ);
     }
 
     private static String text(JsonNode data, String field) {

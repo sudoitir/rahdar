@@ -13,7 +13,7 @@ import { AccessCheckDrawer } from './AccessCheckDrawer.tsx';
 const USER = { id: 'u-1', username: 'alice' };
 
 const check = (over: Partial<AccessCheckView>): AccessCheckView => ({
-  action: 'queue:read',
+  action: 'subscription:read',
   description: 'See queues',
   scope: 'RESOURCE',
   allowed: false,
@@ -23,23 +23,23 @@ const check = (over: Partial<AccessCheckView>): AccessCheckView => ({
 
 const GLOBAL_RESULT: AccessCheckView[] = [
   check({
-    action: 'queue:read',
+    action: 'subscription:read',
     allowed: true,
     sources: [{ type: 'ROLE_GRANT', roleName: 'VIEWER', scopeType: 'GLOBAL' }],
   }),
-  check({ action: 'queue:purge' }),
+  check({ action: 'subscription:purge' }),
 ];
 
 const TEAM_RESULT: AccessCheckView[] = [
   check({
-    action: 'queue:read',
+    action: 'subscription:read',
     allowed: true,
     sources: [
       { type: 'TEAM', roleName: 'TEAM_OPERATOR', teamId: 't1', teamName: 'Orders' },
       { type: 'SHARE', roleName: 'TEAM_VIEWER', teamId: 't2', teamName: 'Billing', ownerTeamName: 'Orders' },
     ],
   }),
-  check({ action: 'queue:purge' }),
+  check({ action: 'subscription:purge' }),
 ];
 
 /** Serves the access check, recording the query each call carried. */
@@ -50,7 +50,7 @@ function serve(answer: (params: URLSearchParams) => AccessCheckView[] | Response
       const url = new URL(request.url);
       asked.push(
         Object.fromEntries(
-          ['clusterId', 'kind', 'name'].flatMap((k) => (url.searchParams.has(k) ? [[k, url.searchParams.get(k)]] : [])),
+          ['clusterId', 'type', 'name'].flatMap((k) => (url.searchParams.has(k) ? [[k, url.searchParams.get(k)]] : [])),
         ),
       );
       const result = answer(url.searchParams);
@@ -76,10 +76,10 @@ describe('AccessCheckDrawer', () => {
     renderDrawer();
 
     expect(await screen.findByRole('dialog', { name: 'Access check for alice' })).toBeInTheDocument();
-    const read = await screen.findByRole('row', { name: /queue:read/ });
+    const read = await screen.findByRole('row', { name: /subscription:read/ });
     expect(read).toHaveTextContent('Allowed');
     expect(read).toHaveTextContent('VIEWER, granted global');
-    expect(screen.getByRole('row', { name: /queue:purge/ })).toHaveTextContent('Not allowed');
+    expect(screen.getByRole('row', { name: /subscription:purge/ })).toHaveTextContent('Not allowed');
     expect(asked).toEqual([{}]);
     expect(screen.getByText(/1 of 2 permissions are allowed on Rahdar itself/)).toBeInTheDocument();
   });
@@ -90,16 +90,16 @@ describe('AccessCheckDrawer', () => {
     const person = userEvent.setup();
     renderDrawer();
 
-    await screen.findByRole('row', { name: /queue:read/ });
+    await screen.findByRole('row', { name: /subscription:read/ });
     await choose(person, screen, 'Cluster', CLUSTER.name);
-    await person.type(screen.getByRole('textbox', { name: 'Queue' }), 'orders.in');
+    await person.type(screen.getByRole('textbox', { name: 'Subscription' }), 'orders.in');
     await person.click(screen.getByRole('button', { name: 'Check access' }));
 
-    await waitFor(() => expect(asked.at(-1)).toEqual({ clusterId: CLUSTER.id, kind: 'QUEUE', name: 'orders.in' }));
-    const read = await screen.findByRole('row', { name: /queue:read/ });
+    await waitFor(() => expect(asked.at(-1)).toEqual({ clusterId: CLUSTER.id, type: 'SUBSCRIPTION', name: 'orders.in' }));
+    const read = await screen.findByRole('row', { name: /subscription:read/ });
     await waitFor(() => expect(read).toHaveTextContent('TEAM_OPERATOR in team Orders'));
     expect(read).toHaveTextContent('TEAM_VIEWER shared by team Orders with team Billing');
-    expect(screen.getByText(/allowed on queue orders.in on prod/)).toBeInTheDocument();
+    expect(screen.getByText(/allowed on subscription orders.in on prod/)).toBeInTheDocument();
   });
 
   it('asks about an address when the kind is chosen', async () => {
@@ -108,13 +108,13 @@ describe('AccessCheckDrawer', () => {
     const person = userEvent.setup();
     renderDrawer();
 
-    await screen.findByRole('row', { name: /queue:read/ });
+    await screen.findByRole('row', { name: /subscription:read/ });
     await choose(person, screen, 'Cluster', CLUSTER.name);
-    await person.click(screen.getByRole('radio', { name: 'Address' }));
-    await person.type(screen.getByRole('textbox', { name: 'Address' }), 'orders');
+    await person.click(screen.getByRole('radio', { name: 'Destination' }));
+    await person.type(screen.getByRole('textbox', { name: 'Destination' }), 'orders');
     await person.click(screen.getByRole('button', { name: 'Check access' }));
 
-    await waitFor(() => expect(asked.at(-1)).toEqual({ clusterId: CLUSTER.id, kind: 'ADDRESS', name: 'orders' }));
+    await waitFor(() => expect(asked.at(-1)).toEqual({ clusterId: CLUSTER.id, type: 'DESTINATION', name: 'orders' }));
   });
 
   it('keeps the name unavailable, with the reason, until a cluster is chosen', async () => {
@@ -122,7 +122,7 @@ describe('AccessCheckDrawer', () => {
     serve(() => GLOBAL_RESULT);
     renderDrawer();
 
-    const name = await screen.findByRole('textbox', { name: 'Queue' });
+    const name = await screen.findByRole('textbox', { name: 'Subscription' });
     expect(name).toBeDisabled();
     expect(screen.getByText('Choose a cluster first.')).toBeInTheDocument();
   });
@@ -133,11 +133,11 @@ describe('AccessCheckDrawer', () => {
     const person = userEvent.setup();
     renderDrawer();
 
-    await screen.findByRole('row', { name: /queue:purge/ });
+    await screen.findByRole('row', { name: /subscription:purge/ });
     await person.type(screen.getByRole('textbox', { name: 'Filter by permission' }), 'purge');
 
-    expect(screen.queryByRole('row', { name: /queue:read/ })).toBeNull();
-    expect(screen.getByRole('row', { name: /queue:purge/ })).toBeInTheDocument();
+    expect(screen.queryByRole('row', { name: /subscription:read/ })).toBeNull();
+    expect(screen.getByRole('row', { name: /subscription:purge/ })).toBeInTheDocument();
   });
 
   it('shows only the allowed permissions when asked', async () => {
@@ -146,11 +146,11 @@ describe('AccessCheckDrawer', () => {
     const person = userEvent.setup();
     renderDrawer();
 
-    await screen.findByRole('row', { name: /queue:purge/ });
+    await screen.findByRole('row', { name: /subscription:purge/ });
     await person.click(screen.getByRole('switch', { name: 'Allowed only' }));
 
-    expect(screen.queryByRole('row', { name: /queue:purge/ })).toBeNull();
-    expect(screen.getByRole('row', { name: /queue:read/ })).toBeInTheDocument();
+    expect(screen.queryByRole('row', { name: /subscription:purge/ })).toBeNull();
+    expect(screen.getByRole('row', { name: /subscription:read/ })).toBeInTheDocument();
   });
 
   it('states why a check failed and retries it', async () => {
@@ -170,7 +170,7 @@ describe('AccessCheckDrawer', () => {
     const person = userEvent.setup();
     renderDrawer(USER, onClose);
 
-    await screen.findByRole('row', { name: /queue:read/ });
+    await screen.findByRole('row', { name: /subscription:read/ });
     await person.keyboard('{Escape}');
     expect(onClose).toHaveBeenCalled();
   });
