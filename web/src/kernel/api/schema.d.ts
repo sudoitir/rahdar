@@ -996,22 +996,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/clusters/{clusterId}/diverts": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["diverts"];
-        put?: never;
-        post: operations["createDivert"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/v1/clusters/{clusterId}/config/recommendations/declare": {
         parameters: {
             query?: never;
@@ -1134,6 +1118,22 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["preview_3"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/clusters/{clusterId}/artemis/diverts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["createDivert"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2596,6 +2596,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/clusters/{clusterId}/diverts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["diverts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/clusters/{clusterId}/consumers": {
         parameters: {
             query?: never;
@@ -3300,7 +3316,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/clusters/{clusterId}/diverts/{name}": {
+    "/api/v1/clusters/{clusterId}/artemis/diverts/{name}": {
         parameters: {
             query?: never;
             header?: never;
@@ -5060,38 +5076,6 @@ export interface components {
             messagesInTransit?: number | null;
             confirmToken: string;
         };
-        CreateDivertRequest: {
-            /** @description The divert's unique name on each node. */
-            name: string;
-            /** @description The routing name; defaults to the divert's name. */
-            routingName?: string | null;
-            /** @description The address whose messages are diverted. */
-            address: string;
-            /** @description The address messages are diverted to. */
-            forwardingAddress: string;
-            /**
-             * @description Take the message rather than copy it. Exclusive diverts are evaluated before non-exclusive ones.
-             * @default false
-             */
-            exclusive: boolean;
-            /** @description A filter limiting which messages are diverted. */
-            filter?: string | null;
-            /**
-             * @description Routing type applied to the diverted copy.
-             * @enum {string|null}
-             */
-            routingType?: "ANYCAST" | "MULTICAST" | "PASS" | "STRIP" | null;
-            /**
-             * @description Create an exclusive divert even though its source address is being captured. Capture of that address then observes nothing, because Artemis applies exclusive diverts before every other one.
-             * @default false
-             */
-            acknowledgeCaptureShadowing: boolean;
-        };
-        DivertMutationView: {
-            outcome: components["schemas"]["LifecycleOutcomeView"];
-            /** @description The <divert> element that would make this broker's own configuration carry the divert. A divert created over management persists across restarts but is absent from configuration, and this is what closes that gap. */
-            brokerXml: string;
-        };
         /** @description Declare the capability probe's recommendations as a new revision. Nothing is applied; the plan is opened next */
         DeclareRecommendedRequest: {
             /** @description Capability names to take; empty or null takes every appliable one */
@@ -5367,6 +5351,38 @@ export interface components {
             /** Format: int64 */
             affected?: number;
             error?: string;
+        };
+        CreateDivertRequest: {
+            /** @description The divert's unique name on each node. */
+            name: string;
+            /** @description The routing name; defaults to the divert's name. */
+            routingName?: string | null;
+            /** @description The address whose messages are diverted. */
+            address: string;
+            /** @description The address messages are diverted to. */
+            forwardingAddress: string;
+            /**
+             * @description Take the message rather than copy it. Exclusive diverts are evaluated before non-exclusive ones.
+             * @default false
+             */
+            exclusive: boolean;
+            /** @description A filter limiting which messages are diverted. */
+            filter?: string | null;
+            /**
+             * @description Routing type applied to the diverted copy.
+             * @enum {string|null}
+             */
+            routingType?: "ANYCAST" | "MULTICAST" | "PASS" | "STRIP" | null;
+            /**
+             * @description Create an exclusive divert even though its source address is being captured. Capture of that address then observes nothing, because Artemis applies exclusive diverts before every other one.
+             * @default false
+             */
+            acknowledgeCaptureShadowing: boolean;
+        };
+        DivertMutationView: {
+            outcome: components["schemas"]["LifecycleOutcomeView"];
+            /** @description The <divert> element that would make this broker's own configuration carry the divert. A divert created over management persists across restarts but is absent from configuration, and this is what closes that gap. */
+            brokerXml: string;
         };
         CreateAddressRequest: {
             /** @description The address name. */
@@ -13926,131 +13942,6 @@ export interface operations {
             };
         };
     };
-    diverts: {
-        parameters: {
-            query: {
-                query: components["schemas"]["ResourceQuery"];
-            };
-            header?: never;
-            path: {
-                clusterId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["PagedViewDivertView"];
-                };
-            };
-            /** @description Too many requests. Wait for Retry-After seconds. */
-            429: {
-                headers: {
-                    /** @description Seconds to wait before retrying. */
-                    "Retry-After"?: number;
-                    /** @description Requests allowed in the window (API tokens). */
-                    "RateLimit-Limit"?: number;
-                    /** @description Requests left in the window (API tokens). */
-                    "RateLimit-Remaining"?: number;
-                    /** @description Seconds until the window resets (API tokens). */
-                    "RateLimit-Reset"?: number;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ProblemDetail"];
-                };
-            };
-            /** @description Client error */
-            "4XX": {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ProblemDetail"];
-                };
-            };
-            /** @description Server error */
-            "5XX": {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ProblemDetail"];
-                };
-            };
-        };
-    };
-    createDivert: {
-        parameters: {
-            query?: {
-                dryRun?: boolean;
-            };
-            header?: {
-                /** @description Makes the request safe to retry. Within 24 hours a repeat by the same user with the same method, path, query and body returns the first result with `Idempotent-Replayed: true` and applies nothing again. The same key with another request is 422 `idempotency-key-reused`; while the first is still running it is 409 `idempotency-in-progress`. 1 to 255 printable ASCII characters; not accepted on multipart uploads. Server errors and 401, 403 and 429 are not recorded, so the retry runs. */
-                "Idempotency-Key"?: string;
-            };
-            path: {
-                clusterId: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CreateDivertRequest"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["DivertMutationView"];
-                };
-            };
-            /** @description Too many requests. Wait for Retry-After seconds. */
-            429: {
-                headers: {
-                    /** @description Seconds to wait before retrying. */
-                    "Retry-After"?: number;
-                    /** @description Requests allowed in the window (API tokens). */
-                    "RateLimit-Limit"?: number;
-                    /** @description Requests left in the window (API tokens). */
-                    "RateLimit-Remaining"?: number;
-                    /** @description Seconds until the window resets (API tokens). */
-                    "RateLimit-Reset"?: number;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ProblemDetail"];
-                };
-            };
-            /** @description Client error */
-            "4XX": {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ProblemDetail"];
-                };
-            };
-            /** @description Server error */
-            "5XX": {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ProblemDetail"];
-                };
-            };
-        };
-    };
     declareRecommended: {
         parameters: {
             query?: never;
@@ -14520,6 +14411,72 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["BulkRunDetailView"];
+                };
+            };
+            /** @description Too many requests. Wait for Retry-After seconds. */
+            429: {
+                headers: {
+                    /** @description Seconds to wait before retrying. */
+                    "Retry-After"?: number;
+                    /** @description Requests allowed in the window (API tokens). */
+                    "RateLimit-Limit"?: number;
+                    /** @description Requests left in the window (API tokens). */
+                    "RateLimit-Remaining"?: number;
+                    /** @description Seconds until the window resets (API tokens). */
+                    "RateLimit-Reset"?: number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Client error */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Server error */
+            "5XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
+    createDivert: {
+        parameters: {
+            query?: {
+                dryRun?: boolean;
+            };
+            header?: {
+                /** @description Makes the request safe to retry. Within 24 hours a repeat by the same user with the same method, path, query and body returns the first result with `Idempotent-Replayed: true` and applies nothing again. The same key with another request is 422 `idempotency-key-reused`; while the first is still running it is 409 `idempotency-in-progress`. 1 to 255 printable ASCII characters; not accepted on multipart uploads. Server errors and 401, 403 and 429 are not recorded, so the retry runs. */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                clusterId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateDivertRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["DivertMutationView"];
                 };
             };
             /** @description Too many requests. Wait for Retry-After seconds. */
@@ -20695,6 +20652,65 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["DlqView"];
+                };
+            };
+            /** @description Too many requests. Wait for Retry-After seconds. */
+            429: {
+                headers: {
+                    /** @description Seconds to wait before retrying. */
+                    "Retry-After"?: number;
+                    /** @description Requests allowed in the window (API tokens). */
+                    "RateLimit-Limit"?: number;
+                    /** @description Requests left in the window (API tokens). */
+                    "RateLimit-Remaining"?: number;
+                    /** @description Seconds until the window resets (API tokens). */
+                    "RateLimit-Reset"?: number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Client error */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Server error */
+            "5XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
+    diverts: {
+        parameters: {
+            query: {
+                query: components["schemas"]["ResourceQuery"];
+            };
+            header?: never;
+            path: {
+                clusterId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PagedViewDivertView"];
                 };
             };
             /** @description Too many requests. Wait for Retry-After seconds. */

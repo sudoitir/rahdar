@@ -247,7 +247,7 @@ class DivertLifecycleRealBrokerTest extends PostgresIntegrationTest {
     @Test
     void anInvalidRequestIsRejectedPerFieldAndACaptureNameIsRefusedOverRest() throws Exception {
         MockMvc mvc = MockMvcBuilders.webAppContextSetup(webContext).build();
-        String path = "/api/v1/clusters/" + clusterId + "/diverts";
+        String path = "/api/v1/clusters/" + clusterId + "/artemis/diverts";
 
         mvc.perform(post(path).contentType(MediaType.APPLICATION_JSON).content("""
                                 {"name":"bad,name","address":"A","forwardingAddress":"B","routingType":"SIDEWAYS"}"""))

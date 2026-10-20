@@ -128,10 +128,10 @@ routing "wildcard address"       /addresses '{"name":"ORDERS.#","routingTypes":"
 routing "wildcard queue"         /queues '{"address":"ORDERS.#","name":"ORDERS.all.monitor","routingType":"MULTICAST","durable":true}'
 routing "filtered queue"         /queues '{"address":"SHIPPING.events","name":"SHIPPING.express","routingType":"ANYCAST","durable":true,"filter":"express = true"}'
 routing "legacy address"         /addresses '{"name":"LEGACY.orders","routingTypes":"ANYCAST"}'
-routing "exclusive divert"       /diverts '{"name":"legacy-erp-reroute","address":"LEGACY.orders","forwardingAddress":"ORDERS.inbound","exclusive":true,"routingType":"ANYCAST"}'
-routing "copy divert"            /diverts '{"name":"orders-audit-copy","address":"ORDERS.inbound","forwardingAddress":"AUDIT.trail","exclusive":false,"routingType":"ANYCAST"}'
+routing "exclusive divert"       /artemis/diverts '{"name":"legacy-erp-reroute","address":"LEGACY.orders","forwardingAddress":"ORDERS.inbound","exclusive":true,"routingType":"ANYCAST"}'
+routing "copy divert"            /artemis/diverts '{"name":"orders-audit-copy","address":"ORDERS.inbound","forwardingAddress":"AUDIT.trail","exclusive":false,"routingType":"ANYCAST"}'
 routing "priority address"       /queues '{"address":"SHIPPING.priority","name":"SHIPPING.priority","routingType":"ANYCAST","durable":true,"autoCreateAddress":true}'
-routing "filtered copy divert"   /diverts '{"name":"shipping-priority-copy","address":"SHIPPING.events","forwardingAddress":"SHIPPING.priority","exclusive":false,"filter":"priority > 6","routingType":"ANYCAST"}'
+routing "filtered copy divert"   /artemis/diverts '{"name":"shipping-priority-copy","address":"SHIPPING.events","forwardingAddress":"SHIPPING.priority","exclusive":false,"filter":"priority > 6","routingType":"ANYCAST"}'
 routing "capture subscription"   /sql/index '{"queuePattern":"PAYMENTS.capture","mode":"CAPTURE","retentionDays":1,"ringSize":10000}'
 
 # A bridge from the primary pair to the secondary one: audit records archived in the other

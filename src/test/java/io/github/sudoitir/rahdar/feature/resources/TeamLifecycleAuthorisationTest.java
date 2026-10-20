@@ -127,7 +127,7 @@ class TeamLifecycleAuthorisationTest extends PostgresIntegrationTest {
     }
 
     private MockHttpServletResponse deleteDivert(String name) throws Exception {
-        return mvc.perform(delete("/api/v1/clusters/" + cluster + "/diverts/" + name + "?dryRun=true")
+        return mvc.perform(delete("/api/v1/clusters/" + cluster + "/artemis/diverts/" + name + "?dryRun=true")
                         .with(authentication(ordersOperator))
                         .with(csrf()))
                 .andReturn()

@@ -37,7 +37,7 @@ export function useCreateDivert(clusterId: string) {
   const qc = useQueryClient();
   return useMutation<DivertMutationView, ApiError, LifecycleVars & { body: CreateDivertRequest }>({
     mutationFn: ({ body, dryRun }) =>
-      request(`${lifecycleBase(clusterId)}/diverts${lifecycleQuery(dryRun)}`, {
+      request(`${lifecycleBase(clusterId)}/artemis/diverts${lifecycleQuery(dryRun)}`, {
         method: 'POST',
         body: JSON.stringify(body),
       }),
@@ -56,7 +56,7 @@ export function useDeleteDivert(clusterId: string, name: string) {
   const qc = useQueryClient();
   return useMutation<LifecycleOutcomeView, ApiError, LifecycleVars>({
     mutationFn: ({ dryRun }) =>
-      request(`${lifecycleBase(clusterId)}/diverts/${encodeURIComponent(name)}${lifecycleQuery(dryRun)}`, {
+      request(`${lifecycleBase(clusterId)}/artemis/diverts/${encodeURIComponent(name)}${lifecycleQuery(dryRun)}`, {
         method: 'DELETE',
       }),
     onSuccess: (result) => {

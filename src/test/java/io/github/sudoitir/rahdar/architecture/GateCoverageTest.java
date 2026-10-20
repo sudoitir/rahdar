@@ -107,10 +107,10 @@ class GateCoverageTest extends PostgresIntegrationTest {
                     "feature.resources.web.QueueLifecycleController.updateQueue",
                     "changes a queue's attributes and loses no message"),
             Map.entry(
-                    "feature.routing.web.RoutingController.createDivert",
+                    "feature.routing.web.DivertController.createDivert",
                     "routing is outside the catalogue; a divert copies or moves messages and deletes none"),
             Map.entry(
-                    "feature.routing.web.RoutingController.deleteDivert",
+                    "feature.routing.web.DivertController.deleteDivert",
                     "routing is outside the catalogue; removing a divert deletes no message"),
             Map.entry(
                     "feature.transfer.web.TransferController.preview",
