@@ -19,7 +19,7 @@ class BrokerAccountRolesTest {
     private final BrokerAccountRoles accountRoles = new BrokerAccountRoles();
 
     /** A client that gets the broker search answered, then each given fixture in turn. */
-    private ArtemisNode client(String url, String... fixtures) {
+    private ArtemisNode client(String... fixtures) {
         FixtureJolokia server = new FixtureJolokia();
         server.expect()
                 .andExpect(method(HttpMethod.POST))
@@ -43,8 +43,7 @@ class BrokerAccountRolesTest {
 
     @Test
     void readsTheRolesOfTheAccountSorted() {
-        BrokerAccountRoles.Read read =
-                accountRoles.read(client("http://roles-ok:8161/jolokia", "list-user.json"), "artemis");
+        BrokerAccountRoles.Read read = accountRoles.read(client("list-user.json"), "artemis");
 
         assertThat(read.readable()).isTrue();
         assertThat(read.roles()).containsExactly("amq", "ops");
@@ -52,8 +51,7 @@ class BrokerAccountRolesTest {
 
     @Test
     void aLoginModuleThatCannotListUsersIsAReasonNotAFailure() {
-        BrokerAccountRoles.Read read =
-                accountRoles.read(client("http://roles-ldap:8161/jolokia", "list-user-unsupported.json"), "artemis");
+        BrokerAccountRoles.Read read = accountRoles.read(client("list-user-unsupported.json"), "artemis");
 
         assertThat(read.readable()).isFalse();
         assertThat(read.roles()).isEmpty();
@@ -63,16 +61,14 @@ class BrokerAccountRolesTest {
 
     @Test
     void anAccountWithoutManagementRightsSaysSo() {
-        BrokerAccountRoles.Read read =
-                accountRoles.read(client("http://roles-denied:8161/jolokia", "list-user-refused.json"), "artemis");
+        BrokerAccountRoles.Read read = accountRoles.read(client("list-user-refused.json"), "artemis");
 
         assertThat(read.unreadableReason()).isEqualTo("this account is not allowed to read the broker's users");
     }
 
     @Test
     void aUserTheBrokerListsNoRolesForIsUnreadable() {
-        BrokerAccountRoles.Read read =
-                accountRoles.read(client("http://roles-empty:8161/jolokia", "list-user-empty.json"), "artemis");
+        BrokerAccountRoles.Read read = accountRoles.read(client("list-user-empty.json"), "artemis");
 
         assertThat(read.readable()).isFalse();
         assertThat(read.unreadableReason()).isEqualTo("the broker lists no roles for artemis");

@@ -33,11 +33,13 @@ other nodes or other clusters.
 
 ### Requirement: Reconnect is Rahdar-driven and does not block callers
 
-The system SHALL drive its own reconnection for a dropped or failed Core
-subscription, with a bounded exponential backoff between attempts, rather than
-relying on the client library's automatic reconnect. Connection attempts SHALL
-NOT consume the per-node management-call rate limiter, and a slow or unreachable
-node SHALL NOT block scrape ticks or operator requests.
+The system SHALL drive reconnection for a dropped or failed Core subscription, with a
+bounded exponential backoff between attempts, rather than relying on the client
+library's automatic reconnect. The broker SDK's driver performs the reconnection and
+reports a gap for the node, after which Rahdar re-lists what the lost notifications
+would have told it. Connection attempts SHALL NOT consume the per-node management-call
+rate limiter, and a slow or unreachable node SHALL NOT block scrape ticks or operator
+requests.
 
 #### Scenario: A dropped subscription is retried with backoff
 
@@ -48,6 +50,11 @@ node SHALL NOT block scrape ticks or operator requests.
 
 - **WHEN** a node's Core endpoint is unreachable
 - **THEN** scrape ticks and operator requests for that cluster continue unaffected while reconnection is retried in the background
+
+#### Scenario: A reconnect is followed by a re-list
+
+- **WHEN** a node's subscription reconnects after notifications may have been lost
+- **THEN** Rahdar receives a gap for that node and refreshes that node's state before applying new notifications
 
 ### Requirement: Each notification is normalised to a typed domain event
 
