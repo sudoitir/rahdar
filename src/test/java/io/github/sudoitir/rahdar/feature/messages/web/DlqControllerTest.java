@@ -3,7 +3,6 @@ package io.github.sudoitir.rahdar.feature.messages.web;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
-import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -39,15 +38,12 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.context.WebApplicationContext;
-import tools.jackson.databind.json.JsonMapper;
 
 /** {@code GET .../dlq} — addresses from broker settings, per-node depth from the cache, honest unavailable path. */
 @ExtendWith(AdminAuthenticationExtension.class)
 class DlqControllerTest extends PostgresIntegrationTest {
 
     private static final String URL = "http://a:8161/console/jolokia";
-
-    private final JsonMapper mapper = new JsonMapper();
 
     MockMvc mvc;
 
@@ -94,14 +90,14 @@ class DlqControllerTest extends PostgresIntegrationTest {
     private ArtemisNode client(String... bodies) {
         FixtureJolokia server = new FixtureJolokia();
         for (String b : bodies) {
-            server.expect(requestTo(URL)).andRespond(withSuccess(b, MediaType.APPLICATION_JSON));
+            server.expect().andRespond(withSuccess(b, MediaType.APPLICATION_JSON));
         }
         return server.node();
     }
 
     private ArtemisNode unauthorized() {
         FixtureJolokia server = new FixtureJolokia();
-        server.expect(requestTo(URL)).andRespond(withStatus(HttpStatus.UNAUTHORIZED));
+        server.expect().andRespond(withStatus(HttpStatus.UNAUTHORIZED));
         return server.node();
     }
 

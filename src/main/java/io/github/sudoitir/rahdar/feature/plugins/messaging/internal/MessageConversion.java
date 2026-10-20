@@ -64,15 +64,15 @@ final class MessageConversion {
 
     private static Object plain(PropertyValue value) {
         return switch (value) {
-            case PropertyValue.OfBoolean b -> b.value();
-            case PropertyValue.OfByte b -> b.value();
-            case PropertyValue.OfShort s -> s.value();
-            case PropertyValue.OfInt i -> i.value();
-            case PropertyValue.OfLong l -> l.value();
-            case PropertyValue.OfFloat f -> f.value();
-            case PropertyValue.OfDouble d -> d.value();
-            case PropertyValue.OfString s -> s.value();
-            case PropertyValue.OfBytes b -> b.value().toByteArray();
+            case PropertyValue.OfBoolean(var b) -> b;
+            case PropertyValue.OfByte(var b) -> b;
+            case PropertyValue.OfShort(var s) -> s;
+            case PropertyValue.OfInt(var i) -> i;
+            case PropertyValue.OfLong(var l) -> l;
+            case PropertyValue.OfFloat(var f) -> f;
+            case PropertyValue.OfDouble(var d) -> d;
+            case PropertyValue.OfString(var s) -> s;
+            case PropertyValue.OfBytes(var b) -> b.toByteArray();
         };
     }
 }

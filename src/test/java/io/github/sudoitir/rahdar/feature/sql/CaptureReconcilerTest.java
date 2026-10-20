@@ -119,7 +119,7 @@ class CaptureReconcilerTest {
     }
 
     @Test
-    void installsTheTapThatIsMissing() throws Exception {
+    void installsTheTapThatIsMissing() {
         when(tap.installedNames(any(), eq(INSTANCE))).thenReturn(List.of());
 
         reconciler.reconcile();
@@ -129,7 +129,7 @@ class CaptureReconcilerTest {
     }
 
     @Test
-    void doesNotVisitAClusterThisReplicaDoesNotOwn() throws Exception {
+    void doesNotVisitAClusterThisReplicaDoesNotOwn() {
         when(ownership.owns(CLUSTER)).thenReturn(false);
 
         reconciler.reconcile();
@@ -140,7 +140,7 @@ class CaptureReconcilerTest {
     }
 
     @Test
-    void doesNothingWhenNothingHasDrifted() throws Exception {
+    void doesNothingWhenNothingHasDrifted() {
         when(tap.installedNames(any(), eq(INSTANCE))).thenReturn(List.of(WANTED));
         when(consumers.isDraining(NODE, WANTED)).thenReturn(true);
         when(consumers.drainingOn(NODE)).thenReturn(Set.of(WANTED));

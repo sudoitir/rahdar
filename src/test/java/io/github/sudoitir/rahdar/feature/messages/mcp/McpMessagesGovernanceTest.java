@@ -3,7 +3,6 @@ package io.github.sudoitir.rahdar.feature.messages.mcp;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
-import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 import io.github.sudoitir.rahdar.feature.apitokens.ApiTokenService;
@@ -41,14 +40,11 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.json.JsonMapper;
 
 /** {@code browse_messages} through MCP is governed exactly like the REST read (mcp-server spec, data-governance). */
 class McpMessagesGovernanceTest extends PostgresIntegrationTest {
 
     private static final String URL_A = "http://a:8161/console/jolokia";
-
-    private final JsonMapper mapper = new JsonMapper();
 
     @Autowired
     WebApplicationContext webContext;
@@ -124,15 +120,14 @@ class McpMessagesGovernanceTest extends PostgresIntegrationTest {
     /** The node as the broker SDK reads it: the broker and queue searches, then one batched browse. */
     private void serving() {
         FixtureJolokia server = new FixtureJolokia();
-        server.expect(requestTo(URL_A))
-                .andRespond(withSuccess(fixture("search-broker.json"), MediaType.APPLICATION_JSON));
-        server.expect(requestTo(URL_A))
+        server.expect().andRespond(withSuccess(fixture("search-broker.json"), MediaType.APPLICATION_JSON));
+        server.expect()
                 .andRespond(withSuccess(
                         "{\"status\":200,\"value\":[\"org.apache.activemq.artemis:address=\\\"PHASE3.SRC\\\","
                                 + "broker=\\\"primary\\\",component=addresses,queue=\\\"PHASE3.SRC\\\","
                                 + "routing-type=\\\"anycast\\\",subcomponent=queues\"]}",
                         MediaType.APPLICATION_JSON));
-        server.expect(requestTo(URL_A))
+        server.expect()
                 .andRespond(withSuccess(
                         "[" + fixture("browse-sensitive.json") + ",{\"value\":1,\"status\":200}]",
                         MediaType.APPLICATION_JSON));

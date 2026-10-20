@@ -37,17 +37,16 @@ public final class BrowsedMessages {
         Map<String, Boolean> booleans = new LinkedHashMap<>();
         m.properties().forEach((name, value) -> {
             switch (value) {
-                case PropertyValue.OfBoolean b -> booleans.put(name, b.value());
-                case PropertyValue.OfByte b -> ints.put(name, (long) b.value());
-                case PropertyValue.OfShort s -> ints.put(name, (long) s.value());
-                case PropertyValue.OfInt i -> ints.put(name, (long) i.value());
-                case PropertyValue.OfLong l -> longs.put(name, l.value());
-                case PropertyValue.OfFloat f -> doubles.put(name, (double) f.value());
-                case PropertyValue.OfDouble d -> doubles.put(name, d.value());
-                case PropertyValue.OfString s -> strings.put(name, s.value());
-                case PropertyValue.OfBytes b ->
-                    strings.put(
-                            name, Base64.getEncoder().encodeToString(b.value().toByteArray()));
+                case PropertyValue.OfBoolean(var b) -> booleans.put(name, b);
+                case PropertyValue.OfByte(var b) -> ints.put(name, (long) b);
+                case PropertyValue.OfShort(var s) -> ints.put(name, (long) s);
+                case PropertyValue.OfInt(var i) -> ints.put(name, (long) i);
+                case PropertyValue.OfLong(var l) -> longs.put(name, l);
+                case PropertyValue.OfFloat(var f) -> doubles.put(name, (double) f);
+                case PropertyValue.OfDouble(var d) -> doubles.put(name, d);
+                case PropertyValue.OfString(var s) -> strings.put(name, s);
+                case PropertyValue.OfBytes(var b) ->
+                    strings.put(name, Base64.getEncoder().encodeToString(b.toByteArray()));
             }
         });
         return new BrowsedMessage(

@@ -256,11 +256,9 @@ public class BrokerQueryExecutor {
                     if (fetched.failure() != null) {
                         return fetched.failure();
                     }
-                    List<BrowsedMessage> messages = fetched.page().messages();
-                    scan(read, messages);
-                    more = messages.size() >= PAGE_SIZE
-                            && rows.size() < plan.effectiveLimit()
-                            && page < maxPagesPerTarget;
+                    List<BrowsedMessage> batch = fetched.page().messages();
+                    scan(read, batch);
+                    more = batch.size() >= PAGE_SIZE && rows.size() < plan.effectiveLimit() && page < maxPagesPerTarget;
                     page++;
                 }
             }

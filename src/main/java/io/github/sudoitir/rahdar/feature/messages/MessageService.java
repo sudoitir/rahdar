@@ -136,13 +136,13 @@ public class MessageService {
         int size = Math.min(requestedSize, BROKER_PAGE_CAP);
         BrowsePage result = messages.browse(clusterId, resolved.node().getId(), queueName, page, size, filter);
         GovernContext context = contentPolicy.context(clusterId, resolved.address(), queueName);
-        List<BrowsedMessage> messages = result.messages();
-        List<GovernedMessage> governed = messages.stream()
+        List<BrowsedMessage> browsed = result.messages();
+        List<GovernedMessage> governed = browsed.stream()
                 .map(m -> contentPolicy.govern(context, content(m)))
                 .toList();
-        List<MessageSummaryView> rows = new ArrayList<>(messages.size());
-        for (int i = 0; i < messages.size(); i++) {
-            rows.add(toSummary(messages.get(i), governed.get(i)));
+        List<MessageSummaryView> rows = new ArrayList<>(browsed.size());
+        for (int i = 0; i < browsed.size(); i++) {
+            rows.add(toSummary(browsed.get(i), governed.get(i)));
         }
         clearViews.recordClear(context, "QUEUE", queueName, governed);
         Long total = result.total();

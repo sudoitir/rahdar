@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
-import static org.springframework.test.web.client.match.MockRestRequestMatchers.anything;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withException;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
@@ -96,7 +95,7 @@ class PagedListServiceTest {
     private static FixtureJolokia agent(String... fixtures) {
         FixtureJolokia server = new FixtureJolokia();
         for (String fixture : fixtures) {
-            server.expect(anything()).andRespond(body(fixture));
+            server.expect().andRespond(body(fixture));
         }
         return server;
     }
@@ -104,7 +103,7 @@ class PagedListServiceTest {
     /** An agent that answers nothing: the connection closes before any response. */
     private static FixtureJolokia unreachable() {
         FixtureJolokia server = new FixtureJolokia();
-        server.expect(anything()).andRespond(withException(new ConnectException("Connection refused")));
+        server.expect().andRespond(withException(new ConnectException("Connection refused")));
         return server;
     }
 
@@ -193,7 +192,7 @@ class PagedListServiceTest {
         BrokerNodeEntity a = node(clusterId, "node-a", URL_A);
         when(nodes.nodes(clusterId)).thenReturn(List.of(a));
         FixtureJolokia refusing = new FixtureJolokia();
-        refusing.expect(anything()).andRespond(withStatus(HttpStatus.UNAUTHORIZED));
+        refusing.expect().andRespond(withStatus(HttpStatus.UNAUTHORIZED));
         serving(clusterId, Map.of(a.getId(), refusing));
 
         ResourceQuery firstPage = ResourceQuery.of(null, 1, 50, null);

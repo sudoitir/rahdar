@@ -17,6 +17,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -118,9 +119,9 @@ public class PluginDrains {
             drain.close();
             throw e;
         }
-        drain.slots.forEach(slot -> slot.thread = Thread.ofVirtual()
+        drain.slots.forEach(slot -> slot.thread.set(Thread.ofVirtual()
                 .name("plugin-" + spec.pluginId() + "-" + spec.key())
-                .start(slot::run));
+                .start(slot::run)));
         String key = key(spec.registrationId(), spec.nodeId());
         running.put(key, drain);
         if (drain.closed) {
@@ -202,18 +203,6 @@ public class PluginDrains {
         });
     }
 
-    /** A slot lost its receiver: the drain ends, and the next pass starts it again. */
-    private void failed(Drain drain, RuntimeException failure) {
-        if (running.remove(key(drain.spec.registrationId(), drain.spec.nodeId()), drain)) {
-            log.warn(
-                    "Plugin delivery of {} on {} lost its broker connection and restarts on the next pass: {}",
-                    drain.spec.queue(),
-                    drain.spec.nodeName(),
-                    failure.getMessage());
-        }
-        drain.closed = true;
-    }
-
     private static String reason(Exception e) {
         return e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
     }
@@ -246,7 +235,7 @@ public class PluginDrains {
 
         private final Drain drain;
         private final Receiver receiver;
-        private volatile Thread thread;
+        private final AtomicReference<Thread> thread = new AtomicReference<>();
 
         Slot(Drain drain, Receiver receiver) {
             this.drain = drain;
@@ -262,7 +251,7 @@ public class PluginDrains {
                 }
             } catch (RuntimeException e) {
                 if (!drain.closed) {
-                    failed(drain, e);
+                    lost(e);
                 }
             } finally {
                 receiver.close();
@@ -294,18 +283,30 @@ public class PluginDrains {
             receiver.settle(message, settlement(spec.mode(), outcome.get()));
         }
 
+        /** The slot lost its receiver: the drain ends, and the next pass starts it again. */
+        private void lost(RuntimeException failure) {
+            if (running.remove(key(drain.spec.registrationId(), drain.spec.nodeId()), drain)) {
+                log.warn(
+                        "Plugin delivery of {} on {} lost its broker connection and restarts on the next pass: {}",
+                        drain.spec.queue(),
+                        drain.spec.nodeName(),
+                        failure.getMessage());
+            }
+            drain.closed = true;
+        }
+
         /** Wait for the slot's thread to leave its handler and close its receiver. */
         void awaitStopped() {
-            Thread running = thread;
-            if (running == null) {
+            Thread owner = thread.get();
+            if (owner == null) {
                 receiver.close();
                 return;
             }
-            if (running == Thread.currentThread()) {
+            if (owner == Thread.currentThread()) {
                 return;
             }
             try {
-                if (!running.join(STOP_WAIT)) {
+                if (!owner.join(STOP_WAIT)) {
                     log.warn("A plugin drain on {} did not stop within {}", drain.spec.nodeName(), STOP_WAIT);
                 }
             } catch (InterruptedException _) {

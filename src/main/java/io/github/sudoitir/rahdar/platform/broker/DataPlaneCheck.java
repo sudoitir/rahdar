@@ -95,7 +95,7 @@ public class DataPlaneCheck {
 
     /** Each node's stream once it is established or has failed, or as it stands when time runs out. */
     private static Map<NodeId, StreamState> settled(Notifications notifications, List<NodeSpec> nodes) {
-        try (AutoCloseable subscription = notifications.subscribe(Scope.whole(), IGNORED)) {
+        try (AutoCloseable _ = notifications.subscribe(Scope.whole(), IGNORED)) {
             Instant until = Instant.now().plus(SETTLE);
             Map<NodeId, StreamState> states = notifications.state();
             while (!allSettled(states, nodes) && Instant.now().isBefore(until)) {
@@ -103,7 +103,7 @@ public class DataPlaneCheck {
                 states = notifications.state();
             }
             return Map.copyOf(states);
-        } catch (InterruptedException e) {
+        } catch (InterruptedException _) {
             Thread.currentThread().interrupt();
             return notifications.state();
         } catch (Exception e) {

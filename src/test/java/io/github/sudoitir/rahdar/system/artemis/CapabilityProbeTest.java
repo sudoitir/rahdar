@@ -2,7 +2,6 @@ package io.github.sudoitir.rahdar.system.artemis;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
-import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 import io.github.sudoitir.rahdar.platform.broker.BrokerCapabilities;
@@ -25,8 +24,6 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 class CapabilityProbeTest {
-
-    private static final String URL = "http://broker-1:8161/console/jolokia";
 
     private final JsonMapper mapper = new JsonMapper();
     private final CapabilityProbe probe = new CapabilityProbe(new ArtemisNodes(null));
@@ -64,7 +61,7 @@ class CapabilityProbeTest {
     private Fixture fixture(String... orderedFixtureNames) {
         FixtureJolokia server = new FixtureJolokia();
         for (String name : orderedFixtureNames) {
-            server.expect(requestTo(URL))
+            server.expect()
                     .andExpect(method(HttpMethod.POST))
                     .andExpect(readOnly())
                     .andRespond(withSuccess(body(name), MediaType.APPLICATION_JSON));

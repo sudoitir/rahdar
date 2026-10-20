@@ -100,7 +100,7 @@ class ObservabilityAssetsIntegrationTest extends PostgresIntegrationTest {
                 .isSubsetOf(served);
     }
 
-    private void exerciseTheMeters() throws Exception {
+    private void exerciseTheMeters() {
         UUID cluster = UUID.randomUUID();
         try (ProbeSession session = clients.probe(BrokerConnectionSettings.basicAuth(
                 cluster, ArtemisIntegrationTest.BROKER_USER, ArtemisIntegrationTest.BROKER_PASSWORD))) {

@@ -97,7 +97,7 @@ public final class FixtureJolokia implements AutoCloseable {
     }
 
     /** The next request is answered by what {@code andRespond} creates. */
-    public Expectation expect(RequestMatcher ignored) {
+    public Expectation expect() {
         return new Expectation();
     }
 
@@ -182,7 +182,7 @@ public final class FixtureJolokia implements AutoCloseable {
         for (AutoCloseable c : opened) {
             try {
                 c.close();
-            } catch (Exception ignored) {
+            } catch (Exception _) {
                 // A test helper: nothing to do about a close that fails.
             }
         }
@@ -209,7 +209,7 @@ public final class FixtureJolokia implements AutoCloseable {
             ClientHttpResponse response;
             try {
                 response = creator.createResponse(null);
-            } catch (IOException e) {
+            } catch (IOException _) {
                 response = null;
             }
             answers.add(new Answer(List.copyOf(matchers), response));

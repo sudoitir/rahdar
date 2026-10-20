@@ -70,9 +70,9 @@ final class RecordingProxy {
             List<JsonNode> out = new ArrayList<>();
             JSON.readTree(value.asString()).forEach(out::add);
             return out;
-        } catch (IOException | RuntimeException e) {
+        } catch (IOException | RuntimeException _) {
             return List.of();
-        } catch (InterruptedException e) {
+        } catch (InterruptedException _) {
             Thread.currentThread().interrupt();
             return List.of();
         }
@@ -122,7 +122,7 @@ final class RecordingProxy {
             byte[] out = response.body();
             exchange.sendResponseHeaders(response.statusCode(), out.length == 0 ? -1 : out.length);
             exchange.getResponseBody().write(out);
-        } catch (InterruptedException e) {
+        } catch (InterruptedException _) {
             Thread.currentThread().interrupt();
         }
     }

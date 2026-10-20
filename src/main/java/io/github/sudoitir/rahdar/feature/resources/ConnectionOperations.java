@@ -190,10 +190,10 @@ public class ConnectionOperations {
                     .estimate()
                     .count();
             return switch (estimate) {
-                case Count.Exact e -> e.value();
-                case Count.Estimate e -> e.value();
-                case Count.Unavailable u ->
-                    throw new IllegalStateException("The broker did not count the consumers: " + u.reason());
+                case Count.Exact(var e) -> e;
+                case Count.Estimate(var e) -> e;
+                case Count.Unavailable(var u) ->
+                    throw new IllegalStateException("The broker did not count the consumers: " + u);
             };
         });
     }

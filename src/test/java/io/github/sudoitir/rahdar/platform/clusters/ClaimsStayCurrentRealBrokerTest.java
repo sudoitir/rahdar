@@ -165,7 +165,7 @@ class ClaimsStayCurrentRealBrokerTest extends PostgresIntegrationTest {
     }
 
     @Test
-    void aNodeIdThatChangesMovesTheClaim() throws Exception {
+    void aNodeIdThatChangesMovesTheClaim() {
         UUID first = registered("first", ArtemisIntegrationTest.jolokiaUrl());
         String replaced = run + "-new-journal";
 

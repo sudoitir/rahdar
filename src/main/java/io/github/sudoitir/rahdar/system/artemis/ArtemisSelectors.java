@@ -24,7 +24,7 @@ public final class ArtemisSelectors {
         try {
             frozen(filter, Instant.EPOCH);
             return true;
-        } catch (IllegalArgumentException e) {
+        } catch (IllegalArgumentException _) {
             return false;
         }
     }

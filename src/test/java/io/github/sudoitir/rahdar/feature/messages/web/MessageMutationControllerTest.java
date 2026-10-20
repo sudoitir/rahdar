@@ -2,7 +2,6 @@ package io.github.sudoitir.rahdar.feature.messages.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
-import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -40,7 +39,6 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.context.WebApplicationContext;
-import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Send / move / retry / delete / expire / purge over one queue: audit lifecycle,
@@ -52,8 +50,6 @@ class MessageMutationControllerTest extends PostgresIntegrationTest {
 
     private static final String URL = "http://a:8161/console/jolokia";
     private static final String Q = "PHASE3.SRC";
-
-    private final JsonMapper mapper = new JsonMapper();
 
     MockMvc mvc;
 
@@ -114,7 +110,7 @@ class MessageMutationControllerTest extends PostgresIntegrationTest {
 
     private void unauthorized() {
         FixtureJolokia server = new FixtureJolokia();
-        server.expect(requestTo(URL)).andRespond(withStatus(HttpStatus.UNAUTHORIZED));
+        server.expect().andRespond(withStatus(HttpStatus.UNAUTHORIZED));
         when(gateway.cluster(clusterId)).thenReturn(FixtureJolokia.cluster(Map.of(nodeId, server)));
     }
 

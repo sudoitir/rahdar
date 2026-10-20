@@ -8,7 +8,6 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -64,7 +63,6 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.context.WebApplicationContext;
-import tools.jackson.databind.json.JsonMapper;
 
 @ExtendWith(AdminAuthenticationExtension.class)
 class ClusterControllerTest extends PostgresIntegrationTest {
@@ -73,8 +71,6 @@ class ClusterControllerTest extends PostgresIntegrationTest {
     private static final String OVERRIDE_URL = "http://broker-2:8261/console/jolokia";
     /** The backup's management URL: the seed's scheme, port and path with the host of its connector. */
     private static final String BACKUP_URL = "http://artemis-backup:8161/console/jolokia";
-
-    private final JsonMapper mapper = new JsonMapper();
 
     MockMvc mvc;
 
@@ -134,14 +130,14 @@ class ClusterControllerTest extends PostgresIntegrationTest {
     private BrokerTarget client(String url, String... fixtures) {
         FixtureJolokia server = new FixtureJolokia();
         for (String fixture : fixtures) {
-            server.expect(requestTo(url)).andRespond(withSuccess(body(fixture), MediaType.APPLICATION_JSON));
+            server.expect().andRespond(withSuccess(body(fixture), MediaType.APPLICATION_JSON));
         }
         return server.target();
     }
 
     private BrokerTarget unauthorizedClient(String url) {
         FixtureJolokia server = new FixtureJolokia();
-        server.expect(requestTo(url)).andRespond(withStatus(HttpStatus.UNAUTHORIZED));
+        server.expect().andRespond(withStatus(HttpStatus.UNAUTHORIZED));
         return server.target();
     }
 

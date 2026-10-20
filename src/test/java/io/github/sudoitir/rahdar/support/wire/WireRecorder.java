@@ -12,6 +12,8 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListSet;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import tools.jackson.core.JacksonException;
@@ -49,7 +51,11 @@ public final class WireRecorder {
     static {
         if (enabled()) {
             Runtime.getRuntime().addShutdownHook(Thread.ofPlatform().unstarted(WireRecorder::flush));
-            Thread.ofPlatform().daemon().name("wire-core-sampler").start(WireRecorder::sampleCore);
+            Executors.newSingleThreadScheduledExecutor(Thread.ofPlatform()
+                            .daemon()
+                            .name("wire-core-sampler")
+                            .factory())
+                    .scheduleWithFixedDelay(WireRecorder::snapshotCore, 250, 250, TimeUnit.MILLISECONDS);
         }
     }
 
@@ -103,7 +109,7 @@ public final class WireRecorder {
                 return "[" + String.join(",", entries) + "]";
             }
             return JSON.writeValueAsString(canonical);
-        } catch (JacksonException e) {
+        } catch (JacksonException _) {
             return text;
         }
     }
@@ -125,7 +131,7 @@ public final class WireRecorder {
             if (t.startsWith("{") || t.startsWith("[")) {
                 try {
                     return JSON.getNodeFactory().stringNode(JSON.writeValueAsString(canonical(JSON.readTree(t))));
-                } catch (JacksonException e) {
+                } catch (JacksonException _) {
                     return node;
                 }
             }
@@ -138,17 +144,6 @@ public final class WireRecorder {
      * they read (queue, filter, browse-only, protocol), so a change in how Rahdar consumes shows up too.
      * Rahdar's consumers live during a test, so they are sampled while it runs.
      */
-    private static void sampleCore() {
-        while (true) {
-            try {
-                Thread.sleep(250);
-            } catch (InterruptedException e) {
-                return;
-            }
-            snapshotCore();
-        }
-    }
-
     private static void snapshotCore() {
         PROXIES.values()
                 .forEach(proxy -> proxy.consumers().forEach(c -> {

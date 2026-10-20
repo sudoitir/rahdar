@@ -1,7 +1,6 @@
 package io.github.sudoitir.rahdar.feature.messages.web;
 
 import static org.mockito.Mockito.when;
-import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -38,15 +37,12 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.context.WebApplicationContext;
-import tools.jackson.databind.json.JsonMapper;
 
 /** {@code GET .../queues/{q}/messages} — page shape, single-message detail + 404, node echo, bad filter, capability path. */
 @ExtendWith(AdminAuthenticationExtension.class)
 class MessageBrowseControllerTest extends PostgresIntegrationTest {
 
     private static final String URL_A = "http://a:8161/console/jolokia";
-
-    private final JsonMapper mapper = new JsonMapper();
 
     MockMvc mvc;
 
@@ -109,10 +105,9 @@ class MessageBrowseControllerTest extends PostgresIntegrationTest {
      */
     private void serving(UUID node, String queue, String batchBody) {
         FixtureJolokia server = new FixtureJolokia();
-        server.expect(requestTo(server.url()))
-                .andRespond(withSuccess(fixture("search-broker.json"), MediaType.APPLICATION_JSON));
-        server.expect(requestTo(server.url())).andRespond(withSuccess(queueSearch(queue), MediaType.APPLICATION_JSON));
-        server.expect(requestTo(server.url())).andRespond(withSuccess(batchBody, MediaType.APPLICATION_JSON));
+        server.expect().andRespond(withSuccess(fixture("search-broker.json"), MediaType.APPLICATION_JSON));
+        server.expect().andRespond(withSuccess(queueSearch(queue), MediaType.APPLICATION_JSON));
+        server.expect().andRespond(withSuccess(batchBody, MediaType.APPLICATION_JSON));
         when(gateway.cluster(clusterId)).thenReturn(FixtureJolokia.cluster(Map.of(node, server)));
     }
 
@@ -124,7 +119,7 @@ class MessageBrowseControllerTest extends PostgresIntegrationTest {
 
     private void unauthorized() {
         FixtureJolokia server = new FixtureJolokia();
-        server.expect(requestTo(server.url())).andRespond(withStatus(HttpStatus.UNAUTHORIZED));
+        server.expect().andRespond(withStatus(HttpStatus.UNAUTHORIZED));
         when(gateway.cluster(clusterId)).thenReturn(FixtureJolokia.cluster(Map.of(nodeAId, server)));
     }
 
@@ -265,13 +260,10 @@ class MessageBrowseControllerTest extends PostgresIntegrationTest {
                 + "\\\"routingType\\\":\\\"ANYCAST\\\",\\\"messageCount\\\":\\\"4\\\"}],"
                 + "\\\"count\\\":1}\"}";
         FixtureJolokia server = new FixtureJolokia();
-        server.expect(requestTo(server.url()))
-                .andRespond(withSuccess(fixture("search-broker.json"), MediaType.APPLICATION_JSON));
-        server.expect(requestTo(server.url())).andRespond(withSuccess(listed, MediaType.APPLICATION_JSON));
-        server.expect(requestTo(server.url()))
-                .andRespond(withSuccess(queueSearch("FRESH"), MediaType.APPLICATION_JSON));
-        server.expect(requestTo(server.url()))
-                .andRespond(withSuccess(batch("browse.json", 4), MediaType.APPLICATION_JSON));
+        server.expect().andRespond(withSuccess(fixture("search-broker.json"), MediaType.APPLICATION_JSON));
+        server.expect().andRespond(withSuccess(listed, MediaType.APPLICATION_JSON));
+        server.expect().andRespond(withSuccess(queueSearch("FRESH"), MediaType.APPLICATION_JSON));
+        server.expect().andRespond(withSuccess(batch("browse.json", 4), MediaType.APPLICATION_JSON));
         when(gateway.cluster(clusterId)).thenReturn(FixtureJolokia.cluster(Map.of(nodeAId, server)));
 
         mvc.perform(get("/api/v1/clusters/{c}/queues/{q}/messages", clusterId, "FRESH"))

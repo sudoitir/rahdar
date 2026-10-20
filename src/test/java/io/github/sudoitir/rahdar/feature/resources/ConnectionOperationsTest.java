@@ -1,7 +1,6 @@
 package io.github.sudoitir.rahdar.feature.resources;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.springframework.test.web.client.match.MockRestRequestMatchers.anything;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 import io.github.sudoitir.rahdar.feature.resources.ConnectionOperations.ConnectionSnapshot;
@@ -55,7 +54,7 @@ class ConnectionOperationsTest {
 
     private void answer(String... bodies) {
         for (String body : bodies) {
-            server.expect(anything()).andRespond(withSuccess(body, MediaType.APPLICATION_JSON));
+            server.expect().andRespond(withSuccess(body, MediaType.APPLICATION_JSON));
         }
     }
 

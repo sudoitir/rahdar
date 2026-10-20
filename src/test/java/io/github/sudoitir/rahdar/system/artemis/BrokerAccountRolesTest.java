@@ -3,7 +3,6 @@ package io.github.sudoitir.rahdar.system.artemis;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
-import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 import io.github.sudoitir.rahdar.support.FixtureJolokia;
@@ -22,11 +21,11 @@ class BrokerAccountRolesTest {
     /** A client that gets the broker search answered, then each given fixture in turn. */
     private ArtemisNode client(String url, String... fixtures) {
         FixtureJolokia server = new FixtureJolokia();
-        server.expect(requestTo(url))
+        server.expect()
                 .andExpect(method(HttpMethod.POST))
                 .andRespond(withSuccess(body("search-broker.json"), MediaType.APPLICATION_JSON));
         for (String fixture : fixtures) {
-            server.expect(requestTo(url))
+            server.expect()
                     .andExpect(method(HttpMethod.POST))
                     .andRespond(withSuccess(body(fixture), MediaType.APPLICATION_JSON));
         }

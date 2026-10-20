@@ -45,7 +45,7 @@ public class BrokerMessages {
     public static final int PAGE_CAP = 200;
 
     /** The most body bytes a browse reads of one message; a longer body is marked truncated. */
-    public static final long MAX_BODY_BYTES = 1024 * 1024;
+    public static final long MAX_BODY_BYTES = 1024L * 1024;
 
     private final BrokerGateway gateway;
 
@@ -69,9 +69,9 @@ public class BrokerMessages {
             List<BrowsedMessage> messages =
                     result.messages().stream().map(BrowsedMessages::of).toList();
             return switch (result.total().count()) {
-                case Count.Exact e -> new BrowsePage(messages, e.value());
-                case Count.Estimate e -> new BrowsePage(messages, e.value());
-                case Count.Unavailable u -> new BrowsePage(messages, null, u.reason());
+                case Count.Exact(var e) -> new BrowsePage(messages, e);
+                case Count.Estimate(var e) -> new BrowsePage(messages, e);
+                case Count.Unavailable(var u) -> new BrowsePage(messages, null, u);
             };
         });
     }
@@ -259,11 +259,11 @@ public class BrokerMessages {
 
     private static long exact(Count count) {
         return switch (count) {
-            case Count.Exact e -> e.value();
-            case Count.Estimate e -> e.value();
-            case Count.Unavailable u ->
+            case Count.Exact(var e) -> e;
+            case Count.Estimate(var e) -> e;
+            case Count.Unavailable(var u) ->
                 throw new BrokerConnectionException(
-                        BrokerConnectionException.Kind.BAD_RESPONSE, "The broker did not count: " + u.reason());
+                        BrokerConnectionException.Kind.BAD_RESPONSE, "The broker did not count: " + u);
         };
     }
 

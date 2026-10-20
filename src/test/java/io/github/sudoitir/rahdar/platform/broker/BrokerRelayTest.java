@@ -106,14 +106,14 @@ class BrokerRelayTest extends ArtemisIntegrationTest {
         UUID run = UUID.randomUUID();
 
         // First pass: the target commits, then Rahdar "dies" before the source acknowledges.
+        Hooks dieBetweenCommits = new Hooks() {
+            @Override
+            public void afterTargetCommit(List<Long> sourceIds) {
+                throw new IllegalStateException("stopped between the commits");
+            }
+        };
         try (RelayLink link = relay.link(node, node, staged(source, target, run))) {
-            assertThatThrownBy(() -> link.relay(10, new Hooks() {
-                        @Override
-                        public void afterTargetCommit(List<Long> sourceIds) {
-                            throw new IllegalStateException("stopped between the commits");
-                        }
-                    }))
-                    .isInstanceOf(IllegalStateException.class);
+            assertThatThrownBy(() -> link.relay(10, dieBetweenCommits)).isInstanceOf(IllegalStateException.class);
         }
 
         // Second pass: the same messages again. The target refuses each as a duplicate.
@@ -146,14 +146,14 @@ class BrokerRelayTest extends ArtemisIntegrationTest {
         UUID run = UUID.randomUUID();
 
         // First pass: the batch is sent, then Rahdar "dies" before the target commits it.
+        Hooks dieBeforeTargetCommit = new Hooks() {
+            @Override
+            public void beforeTargetCommit(List<Long> sourceIds) {
+                throw new IllegalStateException("stopped in the middle of the batch");
+            }
+        };
         try (RelayLink link = relay.link(node, node, staged(source, target, run))) {
-            assertThatThrownBy(() -> link.relay(10, new Hooks() {
-                        @Override
-                        public void beforeTargetCommit(List<Long> sourceIds) {
-                            throw new IllegalStateException("stopped in the middle of the batch");
-                        }
-                    }))
-                    .isInstanceOf(IllegalStateException.class);
+            assertThatThrownBy(() -> link.relay(10, dieBeforeTargetCommit)).isInstanceOf(IllegalStateException.class);
         }
 
         // Second pass: nothing reached the target, so every message is delivered once, none a duplicate.

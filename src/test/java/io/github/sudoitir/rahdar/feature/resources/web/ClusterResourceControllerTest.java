@@ -1,7 +1,6 @@
 package io.github.sudoitir.rahdar.feature.resources.web;
 
 import static org.mockito.Mockito.when;
-import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -38,7 +37,6 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.context.WebApplicationContext;
-import tools.jackson.databind.json.JsonMapper;
 
 /** {@code /api/v1/clusters/{id}/{queues,consumers,...}} — one endpoint per resource, plus the capability-gated path. */
 @ExtendWith(AdminAuthenticationExtension.class)
@@ -46,8 +44,6 @@ class ClusterResourceControllerTest extends PostgresIntegrationTest {
 
     private static final String URL_A = "http://a:8161/console/jolokia";
     private static final String URL_B = "http://b:8161/console/jolokia";
-
-    private final JsonMapper mapper = new JsonMapper();
 
     MockMvc mvc;
 
@@ -96,14 +92,14 @@ class ClusterResourceControllerTest extends PostgresIntegrationTest {
     private static FixtureJolokia client(String url, String... fixtures) {
         FixtureJolokia server = new FixtureJolokia();
         for (String fixture : fixtures) {
-            server.expect(requestTo(url)).andRespond(withSuccess(body(fixture), MediaType.APPLICATION_JSON));
+            server.expect().andRespond(withSuccess(body(fixture), MediaType.APPLICATION_JSON));
         }
         return server;
     }
 
     private static FixtureJolokia unauthorized(String url) {
         FixtureJolokia server = new FixtureJolokia();
-        server.expect(requestTo(url)).andRespond(withStatus(HttpStatus.UNAUTHORIZED));
+        server.expect().andRespond(withStatus(HttpStatus.UNAUTHORIZED));
         return server;
     }
 

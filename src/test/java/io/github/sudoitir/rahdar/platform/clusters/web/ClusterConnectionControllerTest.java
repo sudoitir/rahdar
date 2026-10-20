@@ -9,7 +9,6 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
@@ -59,7 +58,6 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.context.WebApplicationContext;
-import tools.jackson.databind.json.JsonMapper;
 
 /** {@code PATCH /clusters/{id}}: the connection edit, checked first and saved after. */
 @ExtendWith(AdminAuthenticationExtension.class)
@@ -79,8 +77,6 @@ class ClusterConnectionControllerTest extends PostgresIntegrationTest {
             + "\"},\"core\":{\"username\":\"core-user\",\"password\":\"" + CORE_SECRET + "\"}";
 
     private static final String ROW = "$.nodes[?(@.name == '%s')]";
-
-    private final JsonMapper mapper = new JsonMapper();
 
     MockMvc mvc;
 
@@ -157,16 +153,16 @@ class ClusterConnectionControllerTest extends PostgresIntegrationTest {
 
     private BrokerTarget client(String url, String... fixtures) {
         FixtureJolokia server = new FixtureJolokia();
-        server.expect(requestTo(url)).andRespond(withSuccess(body("search-broker.json"), MediaType.APPLICATION_JSON));
+        server.expect().andRespond(withSuccess(body("search-broker.json"), MediaType.APPLICATION_JSON));
         for (String fixture : fixtures) {
-            server.expect(requestTo(url)).andRespond(withSuccess(body(fixture), MediaType.APPLICATION_JSON));
+            server.expect().andRespond(withSuccess(body(fixture), MediaType.APPLICATION_JSON));
         }
         return server.target();
     }
 
     private BrokerTarget refusing(String url) {
         FixtureJolokia server = new FixtureJolokia();
-        server.expect(requestTo(url)).andRespond(withStatus(HttpStatus.UNAUTHORIZED));
+        server.expect().andRespond(withStatus(HttpStatus.UNAUTHORIZED));
         return server.target();
     }
 

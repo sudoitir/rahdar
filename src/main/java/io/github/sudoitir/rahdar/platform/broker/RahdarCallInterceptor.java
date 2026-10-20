@@ -74,25 +74,8 @@ public class RahdarCallInterceptor implements CallInterceptor {
         if (management || LIMITED_CORE.contains(call.operation())) {
             acquire(call, managementUrl, management ? call.operation() : "core");
         }
-        try {
-            guard.check();
-        } catch (IllegalStateException e) {
-            throw new BrokerException(
-                    Status.FAILED_PRECONDITION,
-                    ErrorInfo.of(ErrorReasons.CALL_REFUSED, Map.of(BrokerFailures.GUARD, "true")),
-                    Dispatch.NOT_SENT,
-                    call.node(),
-                    e.getMessage());
-        }
-        Observation observation = management
-                ? Observation.createNotStarted(MANAGEMENT, observations)
-                        .contextualName("jolokia")
-                        .lowCardinalityKeyValue("node", NodeAddress.hostPort(call.endpoint()))
-                : Observation.createNotStarted(CORE, observations)
-                        .contextualName("core " + call.operation())
-                        .lowCardinalityKeyValue("operation", call.operation())
-                        .lowCardinalityKeyValue("node", NodeAddress.hostPort(managementUrl))
-                        .highCardinalityKeyValue("core.address", NodeAddress.hostPort(call.endpoint()));
+        checkGuard(call);
+        Observation observation = observation(call, management, managementUrl);
         observation.start();
         long t0 = clockOffsets.now();
         return new Permit() {
@@ -101,18 +84,8 @@ public class RahdarCallInterceptor implements CallInterceptor {
             @Override
             public void complete(Outcome outcome, Optional<Instant> serverTime) {
                 done = true;
-                long t1 = clockOffsets.now();
                 if (management) {
-                    if (outcome.success()) {
-                        serverTime.ifPresent(
-                                t -> clockOffsets.recordReading(call.endpoint(), t.getEpochSecond(), t0, t1));
-                        health.succeeded(call.endpoint());
-                    } else {
-                        health.failed(
-                                call.endpoint(),
-                                outcome.failure().map(Throwable::getMessage).orElse(""));
-                    }
-                    observation.lowCardinalityKeyValue(KeyValue.of("outcome", outcome.success() ? "SUCCESS" : "ERROR"));
+                    managementDone(call, outcome, serverTime, t0, observation);
                 }
                 outcome.failure().ifPresent(observation::error);
                 observation.stop();
@@ -125,6 +98,46 @@ public class RahdarCallInterceptor implements CallInterceptor {
                 }
             }
         };
+    }
+
+    private void checkGuard(CallInfo call) {
+        try {
+            guard.check();
+        } catch (IllegalStateException e) {
+            throw new BrokerException(
+                    Status.FAILED_PRECONDITION,
+                    ErrorInfo.of(ErrorReasons.CALL_REFUSED, Map.of(BrokerFailures.GUARD, "true")),
+                    Dispatch.NOT_SENT,
+                    call.node(),
+                    e.getMessage());
+        }
+    }
+
+    private Observation observation(CallInfo call, boolean management, String managementUrl) {
+        return management
+                ? Observation.createNotStarted(MANAGEMENT, observations)
+                        .contextualName("jolokia")
+                        .lowCardinalityKeyValue("node", NodeAddress.hostPort(call.endpoint()))
+                : Observation.createNotStarted(CORE, observations)
+                        .contextualName("core " + call.operation())
+                        .lowCardinalityKeyValue("operation", call.operation())
+                        .lowCardinalityKeyValue("node", NodeAddress.hostPort(managementUrl))
+                        .highCardinalityKeyValue("core.address", NodeAddress.hostPort(call.endpoint()));
+    }
+
+    /** A management call's node health, clock reading and outcome tag. */
+    private void managementDone(
+            CallInfo call, Outcome outcome, Optional<Instant> serverTime, long t0, Observation observation) {
+        long t1 = clockOffsets.now();
+        if (outcome.success()) {
+            serverTime.ifPresent(t -> clockOffsets.recordReading(call.endpoint(), t.getEpochSecond(), t0, t1));
+            health.succeeded(call.endpoint());
+        } else {
+            health.failed(
+                    call.endpoint(),
+                    outcome.failure().map(Throwable::getMessage).orElse(""));
+        }
+        observation.lowCardinalityKeyValue(KeyValue.of("outcome", outcome.success() ? "SUCCESS" : "ERROR"));
     }
 
     private void acquire(CallInfo call, String key, String kind) {
@@ -160,7 +173,7 @@ public class RahdarCallInterceptor implements CallInterceptor {
                             .forEach(n -> byNode.put(n.id().toString(), n.managementUrl()));
                 }
                 current = new Snapshot(byNode, now);
-            } catch (RuntimeException e) {
+            } catch (RuntimeException _) {
                 // Telemetry and limits never fail a call for the directory: keep the last map.
                 current = new Snapshot(current.byNode(), now);
             }

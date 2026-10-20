@@ -127,7 +127,6 @@ class BrokerConfigApplyServiceTest extends PostgresIntegrationTest {
 
         // One client per node, so a write can be attributed to the node it went to.
         for (UUID id : List.of(firstId, secondId, deadId)) {
-            BrokerNodeEntity n = nodes.findById(id).orElseThrow();
             ArtemisNode client = mock(ArtemisNode.class);
             when(client.resolveBrokerObjectName()).thenReturn("org.apache.activemq.artemis:broker=\"b\"");
             when(artemisNodes.on(clusterId, id)).thenReturn(client);

@@ -38,58 +38,63 @@ public class RrNotificationObserver implements BrokerEventSink {
     @Override
     public void accept(BrokerEvent event) {
         switch (event.type()) {
-            case EventTypes.CONSUMER_ATTACHED -> {
-                if (correlator.isTracedRequestAddress(event.clusterId(), event.destination())) {
-                    correlator.accept(new Observation.ResponderUp(
-                            event.clusterId(),
-                            event.nodeId(),
-                            event.occurredAt(),
-                            event.destination(),
-                            event.consumer()));
-                }
-            }
-            case EventTypes.CONSUMER_DETACHED -> {
-                if (correlator.isTracedRequestAddress(event.clusterId(), event.destination())) {
-                    correlator.accept(new Observation.ResponderDown(
-                            event.clusterId(),
-                            event.nodeId(),
-                            event.occurredAt(),
-                            event.destination(),
-                            event.consumer(),
-                            consumerCount(event)));
-                }
-            }
-            case EventTypes.RESOURCE_DELETED -> {
-                // A subscription going away; a destination going away names none.
-                if (event.subscription() != null
-                        && correlator.hasOpenTempQueueFlow(event.clusterId(), event.subscription())) {
-                    correlator.accept(new Observation.TempQueueUnbound(
-                            event.clusterId(), event.nodeId(), event.occurredAt(), event.subscription()));
-                }
-            }
-            case EventTypes.MESSAGE_DELIVERED -> {
-                // Two ways a delivery is a reply: it closes a temp-queue flow, or it
-                // landed on an address some expectation's reply patterns cover.
-                if (correlator.hasOpenTempQueueFlow(event.clusterId(), event.subscription())
-                        || correlator.isTracedReplyAddress(event.clusterId(), event.destination())
-                        || correlator.isTracedReplyAddress(event.clusterId(), event.subscription())) {
-                    correlator.accept(new Observation.ReplySeen(
-                            event.clusterId(),
-                            event.nodeId(),
-                            event.occurredAt(),
-                            event.subscription(),
-                            messageId(event),
-                            null,
-                            null,
-                            Map.of()));
-                }
-            }
+            case EventTypes.CONSUMER_ATTACHED -> responderUp(event);
+            case EventTypes.CONSUMER_DETACHED -> responderDown(event);
+            case EventTypes.RESOURCE_DELETED -> subscriptionGone(event);
+            case EventTypes.MESSAGE_DELIVERED -> delivered(event);
             case EventTypes.MESSAGE_EXPIRED ->
                 correlator.accept(new Observation.MessageExpired(
                         event.clusterId(), event.nodeId(), event.occurredAt(), event.destination(), messageId(event)));
             default -> {
                 // Every other event is retained by BrokerEventWriter but carries no rr_flow signal.
             }
+        }
+    }
+
+    private void responderUp(BrokerEvent event) {
+        if (correlator.isTracedRequestAddress(event.clusterId(), event.destination())) {
+            correlator.accept(new Observation.ResponderUp(
+                    event.clusterId(), event.nodeId(), event.occurredAt(), event.destination(), event.consumer()));
+        }
+    }
+
+    private void responderDown(BrokerEvent event) {
+        if (correlator.isTracedRequestAddress(event.clusterId(), event.destination())) {
+            correlator.accept(new Observation.ResponderDown(
+                    event.clusterId(),
+                    event.nodeId(),
+                    event.occurredAt(),
+                    event.destination(),
+                    event.consumer(),
+                    consumerCount(event)));
+        }
+    }
+
+    /** A subscription going away; a destination going away names none. */
+    private void subscriptionGone(BrokerEvent event) {
+        if (event.subscription() != null && correlator.hasOpenTempQueueFlow(event.clusterId(), event.subscription())) {
+            correlator.accept(new Observation.TempQueueUnbound(
+                    event.clusterId(), event.nodeId(), event.occurredAt(), event.subscription()));
+        }
+    }
+
+    /**
+     * Two ways a delivery is a reply: it closes a temp-queue flow, or it landed on an address some
+     * expectation's reply patterns cover.
+     */
+    private void delivered(BrokerEvent event) {
+        if (correlator.hasOpenTempQueueFlow(event.clusterId(), event.subscription())
+                || correlator.isTracedReplyAddress(event.clusterId(), event.destination())
+                || correlator.isTracedReplyAddress(event.clusterId(), event.subscription())) {
+            correlator.accept(new Observation.ReplySeen(
+                    event.clusterId(),
+                    event.nodeId(),
+                    event.occurredAt(),
+                    event.subscription(),
+                    messageId(event),
+                    null,
+                    null,
+                    Map.of()));
         }
     }
 

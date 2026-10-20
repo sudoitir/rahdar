@@ -22,6 +22,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -158,7 +159,7 @@ public class CaptureConsumer {
                 ReceiveOptions.consume().asTransacted());
         Drain drain = new Drain(spec, receiver);
         running.put(key, drain);
-        drain.thread = Thread.ofVirtual().name("capture-" + spec.name()).start(drain::run);
+        drain.thread.set(Thread.ofVirtual().name("capture-" + spec.name()).start(drain::run));
         log.info("Draining capture queue {} for {} on {}", spec.captureQueue(), spec.sourceAddress(), spec.nodeName());
     }
 
@@ -236,7 +237,7 @@ public class CaptureConsumer {
 
         private final Spec spec;
         private final Receiver receiver;
-        private volatile Thread thread;
+        private final AtomicReference<Thread> thread = new AtomicReference<>();
 
         /** Rows received and accepted since the last commit. */
         private final List<MessageIndexWriter.Captured> batch = new ArrayList<>(ACK_BATCH);
@@ -499,12 +500,12 @@ public class CaptureConsumer {
                 closed = true;
                 notifyAll();
             }
-            Thread running = thread;
-            if (running == null || running == Thread.currentThread()) {
+            Thread owner = thread.get();
+            if (owner == null || owner == Thread.currentThread()) {
                 return;
             }
             try {
-                if (!running.join(STOP_WAIT)) {
+                if (!owner.join(STOP_WAIT)) {
                     log.warn("Capture drain of {} did not stop within {}", spec.captureQueue(), STOP_WAIT);
                 }
             } catch (InterruptedException _) {

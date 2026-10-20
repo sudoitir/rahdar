@@ -9,7 +9,6 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withException;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
@@ -47,7 +46,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.client.ResponseCreator;
-import tools.jackson.databind.json.JsonMapper;
 
 class TopologyDiscoveryTest extends PostgresIntegrationTest {
 
@@ -55,7 +53,6 @@ class TopologyDiscoveryTest extends PostgresIntegrationTest {
     private static final String PATTERN = "http://{host}:8161/console/jolokia";
     private static final String BACKUP_URL = "http://artemis-backup:8161/console/jolokia";
     private static final String OTHER_NODE_ID = "00000000-0000-0000-0000-000000000000";
-    private final JsonMapper mapper = new JsonMapper();
 
     @Autowired
     TopologyDiscovery discovery;
@@ -104,25 +101,25 @@ class TopologyDiscoveryTest extends PostgresIntegrationTest {
 
     private ProbedSeed seed(String url, String haFixture, String topologyFixture) {
         FixtureJolokia server = new FixtureJolokia();
-        server.expect(requestTo(url)).andRespond(json("search-broker.json"));
-        server.expect(requestTo(url)).andRespond(json(haFixture));
-        server.expect(requestTo(url)).andRespond(json(topologyFixture));
+        server.expect().andRespond(json("search-broker.json"));
+        server.expect().andRespond(json(haFixture));
+        server.expect().andRespond(json(topologyFixture));
         return new ProbedSeed(url, server.target());
     }
 
     /** A seed whose broker is down: the first call, resolving the broker's MBean, gets no answer. */
     private ProbedSeed deadSeed(String url) {
         FixtureJolokia server = new FixtureJolokia();
-        server.expect(requestTo(url)).andRespond(withException(new ConnectException("Connection refused")));
+        server.expect().andRespond(withException(new ConnectException("Connection refused")));
         return new ProbedSeed(url, server.target());
     }
 
     /** The client the factory hands out for a derived URL: search broker, then HA read, answered as given. */
     private void derivedAnswers(String url, ResponseCreator search, ResponseCreator ha) {
         FixtureJolokia server = new FixtureJolokia();
-        server.expect(requestTo(url)).andRespond(search);
+        server.expect().andRespond(search);
         if (ha != null) {
-            server.expect(requestTo(url)).andRespond(ha);
+            server.expect().andRespond(ha);
         }
         when(session.node(url)).thenReturn(server.target());
     }

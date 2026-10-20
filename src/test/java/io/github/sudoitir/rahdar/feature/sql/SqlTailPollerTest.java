@@ -89,24 +89,24 @@ class SqlTailPollerTest {
 
     @Test
     void thePollPushesTheHighWaterMarkIntoTheSelectorRatherThanRereadingTheQueue() {
-        RecordingTransport transport = new RecordingTransport(3);
+        RecordingTransport recording = new RecordingTransport(3);
         CollectingListener listener = new CollectingListener();
         SqlTailPoller poller = poller();
-        start(poller, plan("SELECT * FROM \"ORDER.IN\""), transport, listener);
+        start(poller, plan("SELECT * FROM \"ORDER.IN\""), recording, listener);
 
         poller.tick();
         await(() -> !listener.statuses.isEmpty());
 
-        assertThat(transport.filters).isNotEmpty();
-        assertThat(transport.filters.getFirst()).contains("AMQTimestamp >= " + NOW.toEpochMilli());
+        assertThat(recording.filters).isNotEmpty();
+        assertThat(recording.filters.getFirst()).contains("AMQTimestamp >= " + NOW.toEpochMilli());
     }
 
     @Test
     void aMessageAlreadyShownIsNotShownAgainOnTheNextPoll() {
-        RecordingTransport transport = new RecordingTransport(3);
+        RecordingTransport recording = new RecordingTransport(3);
         CollectingListener listener = new CollectingListener();
         SqlTailPoller poller = poller();
-        start(poller, plan("SELECT * FROM \"ORDER.IN\""), transport, listener);
+        start(poller, plan("SELECT * FROM \"ORDER.IN\""), recording, listener);
 
         poller.tick();
         await(() -> listener.statuses.size() == 1);
@@ -129,17 +129,17 @@ class SqlTailPollerTest {
         when(coverage.isCaptured(any(), any())).thenReturn(true);
         when(indexExecutor.execute(any(), any(), any(), any()))
                 .thenReturn(new QueryResult(List.of(), List.of(), List.of(), List.of()));
-        RecordingTransport transport = new RecordingTransport(3);
+        RecordingTransport recording = new RecordingTransport(3);
         CollectingListener listener = new CollectingListener();
         SqlTailPoller poller = poller();
         QueryPlan plan = plan("SELECT * FROM \"ORDER.IN\"");
         assertThat(plan.resolvedSource()).isEqualTo(QueryAst.Source.INDEX);
-        start(poller, plan, transport, listener);
+        start(poller, plan, recording, listener);
 
         poller.tick();
         await(() -> !listener.statuses.isEmpty());
 
-        assertThat(transport.filters).as("no broker read").isEmpty();
+        assertThat(recording.filters).as("no broker read").isEmpty();
         Mockito.verify(indexExecutor).execute(eq(CLUSTER), eq(plan), any(), any(Instant.class));
     }
 
@@ -226,38 +226,38 @@ class SqlTailPollerTest {
 
     @Test
     void aClientThatHasGoneAwayStopsTheTailWithoutAnotherBrokerRead() {
-        RecordingTransport transport = new RecordingTransport(3);
+        RecordingTransport recording = new RecordingTransport(3);
         CollectingListener listener = new CollectingListener();
         SqlTailPoller poller = poller();
-        start(poller, plan("SELECT * FROM \"ORDER.IN\""), transport, listener);
+        start(poller, plan("SELECT * FROM \"ORDER.IN\""), recording, listener);
 
         listener.cancelled = true;
         poller.tick();
 
         assertThat(poller.activeTails()).isZero();
-        assertThat(transport.filters).isEmpty();
+        assertThat(recording.filters).isEmpty();
     }
 
     @Test
     void stoppingATailRemovesItEvenWhileItsListenerIsStillAlive() {
-        RecordingTransport transport = new RecordingTransport(3);
+        RecordingTransport recording = new RecordingTransport(3);
         CollectingListener listener = new CollectingListener();
         SqlTailPoller poller = poller();
-        SqlTailPoller.Tail tail = start(poller, plan("SELECT * FROM \"ORDER.IN\""), transport, listener);
+        SqlTailPoller.Tail tail = start(poller, plan("SELECT * FROM \"ORDER.IN\""), recording, listener);
 
         tail.stop();
         poller.tick();
 
         assertThat(poller.activeTails()).isZero();
-        assertThat(transport.filters).isEmpty();
+        assertThat(recording.filters).isEmpty();
     }
 
     @Test
     void theObservedGapIsReportedFromTheMessagesAddedDeltaRatherThanImplied() {
-        RecordingTransport transport = new RecordingTransport(3);
+        RecordingTransport recording = new RecordingTransport(3);
         CollectingListener listener = new CollectingListener();
         SqlTailPoller poller = poller();
-        start(poller, plan("SELECT * FROM \"ORDER.IN\""), transport, listener);
+        start(poller, plan("SELECT * FROM \"ORDER.IN\""), recording, listener);
 
         // Thirty arrived; the poll saw three of them still on the queue. The rest
         // were consumed between reads and are exactly what a sample cannot show.
@@ -286,15 +286,15 @@ class SqlTailPollerTest {
 
     @Test
     void aDeepBacklogIsWalkedABoundedNumberOfPagesPerTickAndSaysItIsStillGoing() {
-        DeepTransport transport = new DeepTransport();
+        DeepTransport deep = new DeepTransport();
         CollectingListener listener = new CollectingListener();
         SqlTailPoller poller = poller();
-        start(poller, plan("SELECT * FROM \"ORDER.IN\""), transport, listener, Duration.ZERO, true);
+        start(poller, plan("SELECT * FROM \"ORDER.IN\""), deep, listener, Duration.ZERO, true);
 
         poller.tick();
         await(() -> !listener.statuses.isEmpty());
 
-        assertThat(transport.pagesRead.get()).isEqualTo(SqlTailPoller.BACKLOG_PAGES_PER_TICK);
+        assertThat(deep.pagesRead.get()).isEqualTo(SqlTailPoller.BACKLOG_PAGES_PER_TICK);
         assertThat(listener.statuses.getLast().backlogInProgress()).isTrue();
     }
 

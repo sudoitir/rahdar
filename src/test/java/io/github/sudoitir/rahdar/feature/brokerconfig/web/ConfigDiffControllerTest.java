@@ -1,7 +1,6 @@
 package io.github.sudoitir.rahdar.feature.brokerconfig.web;
 
 import static org.mockito.Mockito.when;
-import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -34,7 +33,6 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultMatcher;
 import org.springframework.web.context.WebApplicationContext;
-import tools.jackson.databind.json.JsonMapper;
 
 /**
  * {@code GET .../config-diff} — every node against the majority, the expected-vs-drift
@@ -48,8 +46,6 @@ class ConfigDiffControllerTest extends PostgresIntegrationTest {
     private static final String B_URL = "http://b:8261/console/jolokia";
     private static final String C_URL = "http://c:8361/console/jolokia";
     private static final String NODE_ID = "shared-node-id";
-
-    private final JsonMapper mapper = new JsonMapper();
 
     MockMvc mvc;
 
@@ -106,8 +102,8 @@ class ConfigDiffControllerTest extends PostgresIntegrationTest {
 
     private ArtemisNode client(String url, String brokerName, String journalType, boolean active, String addressNames) {
         FixtureJolokia server = new FixtureJolokia();
-        server.expect(requestTo(url)).andRespond(withSuccess(search(brokerName), MediaType.APPLICATION_JSON));
-        server.expect(requestTo(url))
+        server.expect().andRespond(withSuccess(search(brokerName), MediaType.APPLICATION_JSON));
+        server.expect()
                 .andRespond(
                         withSuccess(batch(brokerName, journalType, active, addressNames), MediaType.APPLICATION_JSON));
         return server.node();
@@ -115,7 +111,7 @@ class ConfigDiffControllerTest extends PostgresIntegrationTest {
 
     private ArtemisNode unauthorized(String url) {
         FixtureJolokia server = new FixtureJolokia();
-        server.expect(requestTo(url)).andRespond(withStatus(HttpStatus.UNAUTHORIZED));
+        server.expect().andRespond(withStatus(HttpStatus.UNAUTHORIZED));
         return server.node();
     }
 
