@@ -29,6 +29,10 @@ public final class RrModule {
                     List.of(
                             McpToolDef.Param.values(
                                     "mode", List.of("flows", "stats", "expectations", "diagnostics"), "Default flows."),
+                            McpToolDef.Param.note(
+                                    "destination",
+                                    "flows only: a destination's id from list_resources, to list the flows "
+                                            + "requested of it."),
                             McpToolDef.Param.note("window", "e.g. 15m. Defaults to 15m."))))
             .build();
 

@@ -154,11 +154,11 @@ class McpBrokerConfigRealBrokerTest extends PostgresIntegrationTest {
 
         // 1. Declare. The dry run by default is the contract an agent relies on.
         JsonNode preview = structured(call(
-                "broker_config_change",
+                "artemis_config_change",
                 Map.of("clusterId", clusterId.toString(), "op", "declare", "document", document)));
         assertThat(preview.path("valid").asBoolean()).isTrue();
         assertThat(preview.path("message").asString()).contains("Nothing was saved");
-        assertThat(structured(call("broker_config", Map.of("clusterId", clusterId.toString(), "kind", "declaration")))
+        assertThat(structured(call("artemis_config", Map.of("clusterId", clusterId.toString(), "kind", "declaration")))
                         .path("declared")
                         .asBoolean())
                 .describedAs("a dry-run declare saved nothing")
@@ -175,14 +175,14 @@ class McpBrokerConfigRealBrokerTest extends PostgresIntegrationTest {
                 false,
                 "confirm",
                 clusterName));
-        assertThat(structured(call("broker_config_change", save))
+        assertThat(structured(call("artemis_config_change", save))
                         .path("revision")
                         .asInt())
                 .isEqualTo(1);
 
         // 2. Plan. A real broker's own catch-all is what the step is computed against.
         JsonNode plan =
-                structured(call("broker_config_change", Map.of("clusterId", clusterId.toString(), "op", "apply")));
+                structured(call("artemis_config_change", Map.of("clusterId", clusterId.toString(), "op", "apply")));
         assertThat(plan.path("dryRun").asBoolean()).isTrue();
         assertThat(plan.path("stepCount").asInt()).isPositive();
         List<String> acknowledge =
@@ -203,7 +203,7 @@ class McpBrokerConfigRealBrokerTest extends PostgresIntegrationTest {
         if (!acknowledge.isEmpty()) {
             real.put("acknowledge", String.join(",", acknowledge));
         }
-        JsonNode applied = structured(call("broker_config_change", real));
+        JsonNode applied = structured(call("artemis_config_change", real));
         assertThat(applied.path("outcome").asString()).isEqualTo("APPLIED");
 
         // 4. The broker echoed what was written: every applied step verified by a
@@ -216,7 +216,7 @@ class McpBrokerConfigRealBrokerTest extends PostgresIntegrationTest {
                         || "VERIFIED".equals(s.path("verified").asString()));
 
         // 5. Re-running converges: the plan is now empty because the broker agrees.
-        assertThat(structured(call("broker_config_change", Map.of("clusterId", clusterId.toString(), "op", "apply")))
+        assertThat(structured(call("artemis_config_change", Map.of("clusterId", clusterId.toString(), "op", "apply")))
                         .path("stepCount")
                         .asInt())
                 .isZero();
@@ -228,7 +228,7 @@ class McpBrokerConfigRealBrokerTest extends PostgresIntegrationTest {
                 {"version":1,"addresses":[],"addressSettings":[{"match":"%s","values":{"maxDeliveryAttempts":7}}],
                  "securitySettings":[],"diverts":[]}""".formatted(MATCH);
         call(
-                "broker_config_change",
+                "artemis_config_change",
                 new HashMap<>(Map.of(
                         "clusterId",
                         clusterId.toString(),
@@ -240,24 +240,24 @@ class McpBrokerConfigRealBrokerTest extends PostgresIntegrationTest {
                         false,
                         "confirm",
                         clusterName)));
-        call("broker_config_change", Map.of("clusterId", clusterId.toString(), "op", "apply"));
+        call("artemis_config_change", Map.of("clusterId", clusterId.toString(), "op", "apply"));
 
         JsonNode declaration =
-                structured(call("broker_config", Map.of("clusterId", clusterId.toString(), "kind", "declaration")));
+                structured(call("artemis_config", Map.of("clusterId", clusterId.toString(), "kind", "declaration")));
         assertThat(declaration.path("declared").asBoolean()).isTrue();
         assertThat(declaration.path("document").path("addressSettings")).hasSize(1);
 
         // Drift is the same read the scheduled pass makes, against a live broker.
-        JsonNode drift = structured(call("broker_config", Map.of("clusterId", clusterId.toString(), "kind", "drift")));
+        JsonNode drift = structured(call("artemis_config", Map.of("clusterId", clusterId.toString(), "kind", "drift")));
         assertThat(drift.path("nodes")).isNotEmpty();
 
-        JsonNode xml = call("broker_config", Map.of("clusterId", clusterId.toString(), "kind", "xml"));
+        JsonNode xml = call("artemis_config", Map.of("clusterId", clusterId.toString(), "kind", "xml"));
         assertThat(xml.toString()).contains(MATCH).contains("address-setting");
 
         // The dry run above is an apply and is in the history, flagged as one. The
         // kind returns a bare list, so the assertion is on the payload rather than
         // on a named field.
-        JsonNode applies = call("broker_config", Map.of("clusterId", clusterId.toString(), "kind", "applies"));
+        JsonNode applies = call("artemis_config", Map.of("clusterId", clusterId.toString(), "kind", "applies"));
         assertThat(applies.toString()).contains("DRY_RUN");
     }
 }

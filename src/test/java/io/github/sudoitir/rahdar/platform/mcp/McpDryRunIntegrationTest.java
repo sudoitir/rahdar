@@ -128,11 +128,11 @@ class McpDryRunIntegrationTest extends PostgresIntegrationTest {
                 Map.of(
                         "clusterId",
                         clusterId.toString(),
-                        "queue",
-                        QUEUE,
+                        "subscription",
+                        "artemis.queue/" + QUEUE,
                         "action",
                         "delete",
-                        "messageIds",
+                        "positions",
                         "11,12,13"));
 
         JsonNode outcome = response.path("result").path("structuredContent");
@@ -158,11 +158,11 @@ class McpDryRunIntegrationTest extends PostgresIntegrationTest {
                 Map.of(
                         "clusterId",
                         clusterId.toString(),
-                        "queue",
-                        QUEUE,
+                        "subscription",
+                        "artemis.queue/" + QUEUE,
                         "action",
                         "delete",
-                        "messageIds",
+                        "positions",
                         "11",
                         "dryRun",
                         false,
@@ -185,11 +185,11 @@ class McpDryRunIntegrationTest extends PostgresIntegrationTest {
                 Map.of(
                         "clusterId",
                         clusterId.toString(),
-                        "queue",
-                        QUEUE,
+                        "subscription",
+                        "artemis.queue/" + QUEUE,
                         "action",
                         "delete",
-                        "messageIds",
+                        "positions",
                         "11",
                         "dryRun",
                         false));

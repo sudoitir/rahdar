@@ -38,6 +38,7 @@ import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.NodeEndpoint
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.TopologyView;
 import io.github.sudoitir.rahdar.platform.mcp.McpErrors;
 import io.github.sudoitir.rahdar.platform.mcp.McpProperties;
+import io.github.sudoitir.rahdar.platform.mcp.McpResourcesFixture;
 import io.github.sudoitir.rahdar.platform.mcp.McpViews;
 import io.modelcontextprotocol.spec.McpError;
 import io.modelcontextprotocol.spec.McpSchema;
@@ -94,7 +95,8 @@ class TriageMcpToolsTest {
                 clusterRepo,
                 alerts,
                 perm,
-                clocks);
+                clocks,
+                McpResourcesFixture.resolving());
 
         RegisteredCluster registered = mock(RegisteredCluster.class);
         when(registered.getName()).thenReturn("prod");
@@ -299,7 +301,7 @@ class TriageMcpToolsTest {
                         null));
 
         McpViews.SubscriptionDiagnosis d = (McpViews.SubscriptionDiagnosis)
-                tools.diagnose(CLUSTER.toString(), " ORDERS.DLQ ").structuredContent();
+                tools.diagnose(CLUSTER.toString(), "artemis.queue/ORDERS.DLQ").structuredContent();
 
         assertThat(d.subscription()).isEqualTo("ORDERS.DLQ");
         assertThat(d.verdict()).isEqualTo("STALLED");
@@ -334,7 +336,7 @@ class TriageMcpToolsTest {
                 .thenReturn(new BrokerEventPageView(List.of(), 1, 10, 0L, false, null, false, 0, null));
 
         McpViews.SubscriptionDiagnosis d = (McpViews.SubscriptionDiagnosis)
-                tools.diagnose(CLUSTER.toString(), "ORDERS").structuredContent();
+                tools.diagnose(CLUSTER.toString(), "artemis.queue/ORDERS").structuredContent();
 
         assertThat(d.findings()).isEmpty();
         assertThat(d.dlq()).isNull();
@@ -352,7 +354,7 @@ class TriageMcpToolsTest {
                     .thenReturn(Optional.of(health("a", 0, false, 1, 1, null, null)));
 
             McpViews.SubscriptionDiagnosis d = (McpViews.SubscriptionDiagnosis)
-                    tools.diagnose(CLUSTER.toString(), name).structuredContent();
+                    tools.diagnose(CLUSTER.toString(), "artemis.queue/" + name).structuredContent();
 
             assertThat(d.dlq()).as(name).isNotNull();
         }
@@ -362,7 +364,7 @@ class TriageMcpToolsTest {
     void anUnknownQueueIsTheHiddenDenial() {
         when(consumerHealth.forSubscription(CLUSTER, "nope")).thenReturn(Optional.empty());
 
-        McpSchema.CallToolResult result = tools.diagnose(CLUSTER.toString(), "nope");
+        McpSchema.CallToolResult result = tools.diagnose(CLUSTER.toString(), "artemis.queue/nope");
 
         assertThat(result.isError()).isTrue();
     }

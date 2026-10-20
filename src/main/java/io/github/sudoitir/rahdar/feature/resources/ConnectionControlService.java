@@ -98,7 +98,7 @@ public class ConnectionControlService {
     }
 
     public Attempt<CloseResult> closeSession(UUID clusterId, UUID nodeId, String sessionId, boolean dryRun) {
-        return byId(clusterId, nodeId, ConnectionCloseKind.SESSION, sessionId, dryRun);
+        return byId(clusterId, nodeId, ConnectionCloseKind.CHANNEL, sessionId, dryRun);
     }
 
     public Attempt<CloseResult> closeConsumerConnection(
@@ -179,7 +179,7 @@ public class ConnectionControlService {
                 ConnectionSnapshot target = ops.readConnection(node, id);
                 return target == null ? null : new Resolved(ResourceIds.of(c, ResourceClass.CONNECTION, id), target);
             }
-            case SESSION -> {
+            case CHANNEL -> {
                 ConnectionSnapshot target = ops.readSession(node, id);
                 if (target == null || target.connectionId() == null) {
                     return null;
@@ -218,7 +218,7 @@ public class ConnectionControlService {
      */
     public Attempt<CloseResult> closeAddressConsumers(
             UUID clusterId, String address, boolean dryRun, boolean override) {
-        ConnectionCloseKind kind = ConnectionCloseKind.ADDRESS_CONSUMERS;
+        ConnectionCloseKind kind = ConnectionCloseKind.DESTINATION;
         clusterAccess.requireCluster(clusterId, kind.permission());
         String subject = requireId(kind, address);
         LifecycleOutcome outcome = commands.run(Command.builder()
@@ -257,7 +257,7 @@ public class ConnectionControlService {
     private static String requireId(ConnectionCloseKind kind, String id) {
         if (id == null || id.isBlank()) {
             throw new IllegalArgumentException(
-                    kind == ConnectionCloseKind.ADDRESS_CONSUMERS ? "An address is required." : "An id is required.");
+                    kind == ConnectionCloseKind.DESTINATION ? "A destination is required." : "An id is required.");
         }
         return id.trim();
     }

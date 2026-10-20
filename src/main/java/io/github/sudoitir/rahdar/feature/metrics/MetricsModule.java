@@ -28,7 +28,8 @@ public final class MetricsModule {
                                             MetricKeys.ACKNOWLEDGED.name(),
                                             MetricKeys.EXPIRED.name()),
                                     null),
-                            McpToolDef.Param.note("queue", "Omit for the whole cluster."),
+                            McpToolDef.Param.note(
+                                    "resource", "A subscription's id from list_resources. Omit for the whole cluster."),
                             McpToolDef.Param.note("window", "e.g. 15m, 6h, 2d. Units s, m, h, d. Defaults to 1h."))))
             .build();
 

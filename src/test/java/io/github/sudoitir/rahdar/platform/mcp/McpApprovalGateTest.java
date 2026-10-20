@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 
+import io.github.sudoitir.openbroker.model.ResourceClass;
 import io.github.sudoitir.rahdar.feature.apitokens.ApiTokenService;
 import io.github.sudoitir.rahdar.feature.messages.MessageService;
 import io.github.sudoitir.rahdar.kernel.gate.ApprovalUnavailableException;
@@ -21,6 +22,8 @@ import io.github.sudoitir.rahdar.kernel.security.internal.persistence.RolePermis
 import io.github.sudoitir.rahdar.kernel.security.internal.persistence.RoleRepository;
 import io.github.sudoitir.rahdar.kernel.security.internal.persistence.UserRoleRepository;
 import io.github.sudoitir.rahdar.platform.broker.Attempt;
+import io.github.sudoitir.rahdar.platform.broker.ResourceIds;
+import io.github.sudoitir.rahdar.platform.clusters.ResourceTargets;
 import io.github.sudoitir.rahdar.support.McpFixture;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
 import java.time.Instant;
@@ -49,6 +52,10 @@ class McpApprovalGateTest extends PostgresIntegrationTest {
     @MockitoBean
     MessageService messages;
 
+    /** The subscription the tool names is read as written: no cluster is registered behind this test. */
+    @MockitoBean
+    ResourceTargets targets;
+
     @Autowired
     WebApplicationContext webContext;
 
@@ -72,6 +79,9 @@ class McpApprovalGateTest extends PostgresIntegrationTest {
 
     @BeforeEach
     void setUp() {
+        when(targets.require(any(), any(), any(), any()))
+                .thenAnswer(call -> new ResourceTargets.Target(
+                        ResourceIds.parse(call.getArgument(1), call.getArgument(2)), ResourceClass.SUBSCRIPTION));
         mvc = MockMvcBuilders.webAppContextSetup(webContext)
                 .apply(springSecurity())
                 .build();
@@ -90,8 +100,8 @@ class McpApprovalGateTest extends PostgresIntegrationTest {
         Map<String, Object> arguments = new HashMap<>(Map.of(
                 "clusterId",
                 CLUSTER.toString(),
-                "queue",
-                "orders",
+                "subscription",
+                "artemis.queue/orders",
                 "action",
                 "purge",
                 "dryRun",

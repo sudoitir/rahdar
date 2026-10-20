@@ -147,7 +147,8 @@ public record PluginDescriptor(
                     params.stream()
                             .map(p -> new McpToolDef.Param(p.name(), p.values(), p.shape(), p.note()))
                             .toList(),
-                    new McpToolDef.Access(permission, scope, resourceArg, resourceType));
+                    new McpToolDef.Access(permission, scope, resourceArg, resourceType),
+                    null);
         }
     }
 

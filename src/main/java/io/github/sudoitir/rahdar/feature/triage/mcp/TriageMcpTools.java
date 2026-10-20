@@ -1,5 +1,6 @@
 package io.github.sudoitir.rahdar.feature.triage.mcp;
 
+import io.github.sudoitir.openbroker.model.ResourceClass;
 import io.github.sudoitir.rahdar.feature.alerting.AlertPermissions;
 import io.github.sudoitir.rahdar.feature.alerting.AlertService;
 import io.github.sudoitir.rahdar.feature.events.BrokerEventQuery;
@@ -20,6 +21,7 @@ import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews;
 import io.github.sudoitir.rahdar.platform.mcp.McpArgs;
 import io.github.sudoitir.rahdar.platform.mcp.McpErrors;
 import io.github.sudoitir.rahdar.platform.mcp.McpProperties;
+import io.github.sudoitir.rahdar.platform.mcp.McpResources;
 import io.github.sudoitir.rahdar.platform.mcp.McpViews;
 import io.modelcontextprotocol.spec.McpSchema;
 import java.time.Instant;
@@ -34,10 +36,11 @@ import org.springframework.stereotype.Component;
 
 /**
  * The {@code diagnose} and {@code activity_log} MCP tools: triage questions that read across
- * clusters, resources, metrics, events, alerts and the audit trail. *
+ * clusters, resources, metrics, events, alerts and the audit trail.
+ *
  * <p>Reads only: nothing here needs the dry-run/confirm contract, which is the review
  * boundary ADR-0045 draws between read and mutating tool classes. Every method is a thin
- * adapter over the services the REST layer already uses — including the queue diagnosis,
+ * adapter over the services the REST layer already uses — including the subscription diagnosis,
  * which reads {@link ConsumerHealthService} rather than deriving a second opinion
  * (ADR-0089).
  */
@@ -54,9 +57,10 @@ public class TriageMcpTools {
     private final ObjectProvider<AlertService> alerts;
     private final PermissionResolver perm;
     private final ClockOffsetService clocks;
+    private final McpResources resources;
 
     /**
-     * Cluster health and single-queue diagnosis behind one optional argument
+     * Cluster health and single-subscription diagnosis behind one optional argument
      * (ADR-0054).
      *
      * <p>They merge because they share both conditions the grouping rule requires:
@@ -65,13 +69,13 @@ public class TriageMcpTools {
      * {@code metric_series} already uses for the same reason.
      *
      * <p>It is also the pair a model most often has to choose between blind: "is
-     * this cluster healthy" and "why is this queue backing up" are the same triage
+     * this cluster healthy" and "why is this subscription backing up" are the same triage
      * step at two scopes, and making the scope an argument removes a selection
      * decision rather than adding one.
      */
     @McpTool(
             name = "diagnose",
-            description = "Cluster health, or one queue end to end. Start here.",
+            description = "Cluster health, or one subscription end to end. Start here.",
             annotations =
                     @McpTool.McpAnnotations(
                             readOnlyHint = true,
@@ -79,13 +83,16 @@ public class TriageMcpTools {
                             idempotentHint = true,
                             openWorldHint = false))
     public McpSchema.CallToolResult diagnose(
-            @McpToolParam(required = true) String clusterId, @McpToolParam(required = false) String queue) {
+            @McpToolParam(required = true) String clusterId, @McpToolParam(required = false) String subscription) {
         UUID id = McpArgs.uuid("clusterId", clusterId);
-        if (queue == null || queue.isBlank()) {
+        if (subscription == null || subscription.isBlank()) {
             return McpErrors.guard(() -> health(id));
         }
-        String name = queue.trim();
-        return McpErrors.guard(() -> diagnose(id, name));
+        return McpErrors.guard(() -> diagnose(
+                id,
+                resources
+                        .require(id, "subscription", subscription, ResourceClass.SUBSCRIPTION)
+                        .name()));
     }
 
     private McpViews.ClusterHealth health(UUID clusterId) {
@@ -151,18 +158,18 @@ public class TriageMcpTools {
                 assessment.at());
     }
 
-    private McpViews.SubscriptionDiagnosis diagnose(UUID clusterId, String queue) {
+    private McpViews.SubscriptionDiagnosis diagnose(UUID clusterId, String subscription) {
         // The shared verdict (ADR-0089) — the same evaluation the console and the alert
         // condition read. This method used to derive its own trend from two points and its
         // own slow-consumer guess from a ratio, which is how an agent and a screen came to
-        // describe one queue differently.
+        // describe one subscription differently.
         ConsumerHealth health = consumerHealth
-                .forSubscription(clusterId, queue)
-                .orElseThrow(() -> new NotFoundException("queue", queue));
+                .forSubscription(clusterId, subscription)
+                .orElseThrow(() -> new NotFoundException("subscription", subscription));
 
         List<String> findings = new ArrayList<>();
         if (health.nodesPresent() < health.nodesTotal()) {
-            findings.add("The queue exists on " + health.nodesPresent() + " of " + health.nodesTotal()
+            findings.add("The subscription exists on " + health.nodesPresent() + " of " + health.nodesTotal()
                     + " nodes; the numbers here cover only the nodes reporting it.");
         }
         if (health.stale()) {
@@ -176,8 +183,8 @@ public class TriageMcpTools {
 
         // A DLQ relationship is a naming convention, not broker metadata: say what was
         // observed rather than asserting a link the broker never declared.
-        String dlq = queue.startsWith("DLQ") || queue.contains(".DLQ") || queue.endsWith(".dlq")
-                ? "This queue looks like a dead-letter queue by name."
+        String dlq = subscription.startsWith("DLQ") || subscription.contains(".DLQ") || subscription.endsWith(".dlq")
+                ? "This subscription looks like a dead-letter queue by name."
                 : null;
 
         List<McpViews.ActivityRow> recent = brokerEvents
@@ -189,7 +196,7 @@ public class TriageMcpTools {
 
         return new McpViews.SubscriptionDiagnosis(
                 clusterId,
-                queue,
+                subscription,
                 health.destination(),
                 health.verdict().name(),
                 health.verdict().severity(),

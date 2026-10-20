@@ -159,7 +159,13 @@ class McpMessagesGovernanceTest extends PostgresIntegrationTest {
                 mvc,
                 key,
                 "browse_messages",
-                Map.of("clusterId", clusterId.toString(), "queue", "PHASE3.SRC", "messageId", "501"));
+                Map.of(
+                        "clusterId",
+                        clusterId.toString(),
+                        "subscription",
+                        "artemis.queue/PHASE3.SRC",
+                        "position",
+                        "501"));
 
         String text = response.toString();
         assertThat(response.path("result").path("isError").asBoolean(false))

@@ -44,31 +44,41 @@ public final class MessagesModule {
             .mcpTool(new McpToolDef(
                     "browse_messages",
                     McpToolDef.Posture.READ,
-                    "Message headers on a queue, or the full body of one message.",
+                    "Message headers on a subscription, or the full body of one message.",
                     List.of(
                             McpToolDef.Param.note(
-                                    "messageId",
-                                    "Omit for a capped page of headers. Give the numeric id from a header row "
+                                    "subscription",
+                                    "The subscription's id from list_resources, such as artemis.queue/orders."),
+                            McpToolDef.Param.note(
+                                    "position",
+                                    "Omit for a capped page of headers. Give the position from a header row "
                                             + "for that message's full body and properties."),
                             McpToolDef.Param.note("filter", "Broker filter expression, e.g. JMSPriority > 5."))))
             .mcpTool(new McpToolDef(
                     "message_action",
                     McpToolDef.Posture.MUTATE,
-                    "Move, retry, delete, expire or purge messages on a queue.",
+                    "Move, retry, delete, expire or purge messages on a subscription.",
                     List.of(
+                            McpToolDef.Param.note(
+                                    "subscription",
+                                    "The subscription's id from list_resources, such as artemis.queue/orders. "
+                                            + "confirm must equal its name."),
                             McpToolDef.Param.enumValues("action", MessageAction.values(), "purge is also accepted."),
                             McpToolDef.Param.note(
-                                    "messageIds",
-                                    "Comma-separated ids from browse_messages, or use filter instead. move "
-                                            + "additionally needs targetQueue."),
+                                    "positions",
+                                    "Comma-separated positions from browse_messages, or use filter instead. move "
+                                            + "additionally needs target, the id of the subscription to move into."),
                             McpToolDef.Param.note("dryRun", McpToolDef.DRY_RUN),
                             McpToolDef.Param.note("confirm", McpToolDef.CONFIRM),
                             McpToolDef.Param.note("override", McpToolDef.OVERRIDE))))
             .mcpTool(new McpToolDef(
                     "send_message",
                     McpToolDef.Posture.MUTATE,
-                    "Enqueue one message. Adds, never removes.",
+                    "Enqueue one message on a subscription. Adds, never removes.",
                     List.of(
+                            McpToolDef.Param.note(
+                                    "subscription",
+                                    "The subscription's id from list_resources, such as artemis.queue/orders."),
                             McpToolDef.Param.enumValues(
                                     "kind", MessageKind.values(), "Default TEXT. BYTES: body is base64."),
                             McpToolDef.Param.note("durable", "Default true."),

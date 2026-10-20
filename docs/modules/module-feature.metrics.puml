@@ -42,7 +42,7 @@ Rel(RahdarApplication.RahdarApplication.MCPserver, RahdarApplication.RahdarAppli
 Rel(RahdarApplication.RahdarApplication.Metrics, RahdarApplication.RahdarApplication.Clusters, "uses", $techn="", $tags="", $link="")
 Rel(RahdarApplication.RahdarApplication.Metrics, RahdarApplication.RahdarApplication.Core, "depends on", $techn="", $tags="", $link="")
 Rel(RahdarApplication.RahdarApplication.Metrics, RahdarApplication.RahdarApplication.Datalifecycle, "uses", $techn="", $tags="", $link="")
-Rel(RahdarApplication.RahdarApplication.Metrics, RahdarApplication.RahdarApplication.MCPserver, "depends on", $techn="", $tags="", $link="")
+Rel(RahdarApplication.RahdarApplication.Metrics, RahdarApplication.RahdarApplication.MCPserver, "uses", $techn="", $tags="", $link="")
 Rel(RahdarApplication.RahdarApplication.Metrics, RahdarApplication.RahdarApplication.Plugincontract, "depends on", $techn="", $tags="", $link="")
 Rel(RahdarApplication.RahdarApplication.Metrics, RahdarApplication.RahdarApplication.Scraping, "uses", $techn="", $tags="", $link="")
 Rel(RahdarApplication.RahdarApplication.Metrics, RahdarApplication.RahdarApplication.Security, "uses", $techn="", $tags="", $link="")

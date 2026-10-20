@@ -40,7 +40,7 @@ public class McpRunbookPrompts {
         return prompt("Triage runbook", """
                 Triage %s in this order, and stop as soon as one step explains the symptom.
 
-                1. diagnose with no queue. A splitBrain of CRITICAL is the whole answer — stop and \
+                1. diagnose with no subscription. A splitBrain of CRITICAL is the whole answer — stop and \
                 escalate; two nodes are accepting writes and the journals are diverging. \
                 SUSPECTED during a failover is normal for a few seconds.
                 2. If alertsVisible is false, this key cannot see alerts. Say so rather than \
@@ -49,10 +49,10 @@ public class McpRunbookPrompts {
                 against a clock that disagrees, so treat those numbers as suspect and say so.
                 3. replicationBehind means the backup cannot take over cleanly yet. That is a \
                 risk, not an outage.
-                4. list_resources kind=queues, sorted by depth. A deep queue with zero consumers \
-                is a stuck consumer, not a broker fault.
-                5. diagnose queue=<the worst queue>. Its trend separates a backlog that is \
-                draining from one that is growing.
+                4. list_resources role=subscription, sorted by depth. A deep subscription with zero \
+                consumers is a stuck consumer, not a broker fault.
+                5. diagnose subscription=<the id of the worst subscription>. Its trend separates a \
+                backlog that is draining from one that is growing.
                 6. activity_log source=broker_events for what the broker itself reported around \
                 the time the symptom started.
 
@@ -61,31 +61,37 @@ public class McpRunbookPrompts {
     }
 
     @McpPrompt(
-            name = "investigate_queue",
-            description = "How to work out why one queue is deep, and what would actually fix it.")
-    public McpSchema.GetPromptResult investigateQueue(
+            name = "investigate_subscription",
+            description = "How to work out why one subscription is deep, and what would actually fix it.")
+    public McpSchema.GetPromptResult investigateSubscription(
             @McpArg(name = "clusterId", description = "Cluster id", required = false) String clusterId,
-            @McpArg(name = "queue", description = "Queue name", required = false) String queue) {
+            @McpArg(
+                            name = "subscription",
+                            description = "Subscription id, such as artemis.queue/orders",
+                            required = false)
+                    String subscription) {
         return prompt(
-                "Queue investigation runbook",
+                "Subscription investigation runbook",
                 """
                 Investigate %s on %s.
 
-                1. diagnose with the queue name. Read trend before depth: a deep queue that is draining needs \
+                1. diagnose with the subscription id. Read trend before depth: a deep subscription that is draining needs \
                 patience, not intervention.
                 2. Zero consumers with a growing depth is a consumer-side problem. The broker is \
                 working. Fixing it here — by purging — destroys the evidence and the messages.
-                3. list_resources kind=consumers filtered to this queue, to see whether consumers \
+                3. list_resources role=consumer filtered to this subscription, to see whether consumers \
                 are attached but not acknowledging.
                 4. browse_messages for a few headers. Check whether they are all one type, one \
                 correlation id, or all expired.
-                5. Only read a body (browse_messages with messageId) once the headers have narrowed \
+                5. Only read a body (browse_messages with position) once the headers have narrowed \
                 it to a specific message worth looking at.
-                6. activity_log source=broker_events filtered to the address, for consumer \
+                6. activity_log source=broker_events filtered to its destination, for consumer \
                 connect/disconnect churn.
 
                 State the cause before proposing an action. If the cause is consumer-side, say so \
-                and stop — no broker-side action fixes it.""".formatted(queue == null || queue.isBlank() ? "the queue" : queue, target(clusterId)),
+                and stop — no broker-side action fixes it.""".formatted(
+                                subscription == null || subscription.isBlank() ? "the subscription" : subscription,
+                                target(clusterId)),
                 DIAGNOSE,
                 "list_resources",
                 "browse_messages",
@@ -94,10 +100,14 @@ public class McpRunbookPrompts {
 
     @McpPrompt(
             name = "before_you_purge",
-            description = "The checks to run before any destructive queue operation, and where to stop.")
+            description = "The checks to run before any destructive subscription operation, and where to stop.")
     public McpSchema.GetPromptResult beforeYouPurge(
             @McpArg(name = "clusterId", description = "Cluster id", required = false) String clusterId,
-            @McpArg(name = "queue", description = "Queue name", required = false) String queue) {
+            @McpArg(
+                            name = "subscription",
+                            description = "Subscription id, such as artemis.queue/orders",
+                            required = false)
+                    String subscription) {
         return prompt(
                 "Pre-purge checklist",
                 """
@@ -106,11 +116,11 @@ public class McpRunbookPrompts {
 
                 1. message_action with the defaults. dryRun is true unless you set it false, so this \
                 returns the count that would be affected and changes nothing.
-                2. diagnose with the queue name. If consumers are attached and the depth is falling, the queue is \
+                2. diagnose with the subscription id. If consumers are attached and the depth is falling, it is \
                 draining on its own — purging is the wrong action.
                 3. browse_messages. Look at what is actually there. Messages that a fixed consumer \
                 would process are messages a purge would destroy.
-                4. Check whether the queue is a DLQ. Purging a DLQ discards the record of what \
+                4. Check whether the subscription is a dead-letter queue. Purging one discards the record of what \
                 already failed.
                 5. If the dry run reports overCap, the count is above the configured safety cap. \
                 That is a signal about scale, not an obstacle to route around.
@@ -118,7 +128,7 @@ public class McpRunbookPrompts {
                 Then stop. Report the count, what the messages appear to be, and your \
                 recommendation — and ask the operator to confirm. Do not call message_action with \
                 dryRun=false on your own initiative; the confirm argument exists so that a human \
-                decision is what unlocks a destructive run, and supplying it yourself defeats it.""".formatted(subject(queue, clusterId)),
+                decision is what unlocks a destructive run, and supplying it yourself defeats it.""".formatted(subject(subscription, clusterId)),
                 "message_action",
                 DIAGNOSE,
                 "browse_messages");
@@ -135,11 +145,11 @@ public class McpRunbookPrompts {
                 1. rahdar_setting op=get. Read the current scrape intervals, the per-node rate \
                 limit and the bulk cap together — they interact.
                 2. Rahdar batches its reads: one management call per node per tier, not one per \
-                queue. A cluster with thousands of queues costs the same per tick as a small one, \
-                so queue count alone is not evidence.
+                subscription. A cluster with thousands of subscriptions costs the same per tick as a small one, \
+                so their count alone is not evidence.
                 3. metric_series on openbroker.backlog for the cluster over 6h. If broker load tracks \
                 message volume rather than a fixed cadence, Rahdar is not the cause.
-                4. If it is the cause, raise tier-c first — the full queue walk is the expensive \
+                4. If it is the cause, raise tier-c first — the full subscription walk is the expensive \
                 one and the least time-sensitive. Leave tier-a alone: it is what detects \
                 split-brain, and slowing it delays the one alert that matters most.
                 5. Lower the per-node rate limit only if the broker is rejecting calls. It \
@@ -152,9 +162,9 @@ public class McpRunbookPrompts {
         return clusterId == null || clusterId.isBlank() ? "the cluster" : "cluster " + clusterId;
     }
 
-    private static String subject(String queue, String clusterId) {
-        String q = queue == null || queue.isBlank() ? "the queue" : "queue " + queue;
-        return q + " on " + target(clusterId);
+    private static String subject(String subscription, String clusterId) {
+        String s = subscription == null || subscription.isBlank() ? "the subscription" : "subscription " + subscription;
+        return s + " on " + target(clusterId);
     }
 
     private McpSchema.GetPromptResult prompt(String description, String text, String... tools) {

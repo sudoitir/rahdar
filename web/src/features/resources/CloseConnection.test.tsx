@@ -263,7 +263,7 @@ describe('closing every consumer on an address', () => {
   }
 
   const reply = (dryRun: boolean) => ({
-    kind: 'ADDRESS_CONSUMERS',
+    kind: 'DESTINATION',
     subject: 'orders',
     alreadyGone: false,
     outcome: {

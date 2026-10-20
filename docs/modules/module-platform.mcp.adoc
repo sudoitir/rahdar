@@ -15,6 +15,7 @@ _Others_
 
 * `i.g.s.r.p.m.McpCatalogResources`
 * `i.g.s.r.p.m.McpHelpTool`
+* `i.g.s.r.p.m.McpResources`
 * `i.g.s.r.p.m.McpRunbookPrompts`
 * `i.g.s.r.p.m.McpSettings`
 * `i.g.s.r.p.m.SettingsMcpTools`
@@ -25,6 +26,9 @@ _Others_
 * `i.g.s.r.k.s.ActorResolver` (in Security)
 * `i.g.s.r.k.p.PluginRuntimeStatus` (in Plugin contract)
 * `i.g.s.r.k.s.ClusterAccessGuard` (in Security)
+* `i.g.s.r.p.c.ResourceTargets` (in Clusters)
 * `i.g.s.r.k.p.FeatureRegistry` (in Plugin contract)
+* `i.g.s.r.p.c.ClusterDirectory` (in Clusters)
+* `i.g.s.r.p.b.BrokerSystems` (in Broker connectivity)
 * `i.g.s.r.k.s.SettingsService` (in Settings)
 |===

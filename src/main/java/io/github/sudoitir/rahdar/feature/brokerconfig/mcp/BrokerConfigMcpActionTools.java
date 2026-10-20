@@ -29,7 +29,7 @@ import org.springframework.ai.mcp.annotation.McpToolParam;
 import org.springframework.stereotype.Component;
 
 /**
- * The {@code broker_config_change} MCP tool. *
+ * The {@code artemis_config_change} MCP tool. *
  * <p>Mutating tools (ADR-0045). They go through the same services the REST layer calls, so
  * authorization, the bulk cap and the audit row are the existing ones; this class adds only
  * the model-facing gate: {@code dryRun} defaults to true, a real destructive run needs
@@ -52,7 +52,7 @@ public class BrokerConfigMcpActionTools {
      * Declare or apply a cluster's broker configuration (ADR-0067), as one tool with
      * an {@code op} discriminator.
      *
-     * <p>{@code declare} takes the document as JSON (the same shape {@code broker_config}
+     * <p>{@code declare} takes the document as JSON (the same shape {@code artemis_config}
      * returns) or a {@code broker.xml} fragment as {@code xml}; a dry run validates and
      * saves nothing. {@code apply} dry-runs to a plan whose {@code acknowledge} list is
      * exactly what a real run must carry in {@code acknowledge}, alongside
@@ -61,7 +61,7 @@ public class BrokerConfigMcpActionTools {
      * the model-facing gate and nothing else.
      */
     @McpTool(
-            name = "broker_config_change",
+            name = "artemis_config_change",
             description =
                     "Declare or apply a cluster's broker configuration. Previews by default; apply is canary-first.",
             annotations =
@@ -73,7 +73,7 @@ public class BrokerConfigMcpActionTools {
                             // Re-running an apply converges (steps that match are ALREADY).
                             idempotentHint = true,
                             openWorldHint = false))
-    public McpSchema.CallToolResult brokerConfigChange(
+    public McpSchema.CallToolResult artemisConfigChange(
             @McpToolParam(required = true) String clusterId,
             @McpToolParam(required = true) String op,
             @McpToolParam(required = false) String document,

@@ -21,6 +21,7 @@ import io.github.sudoitir.rahdar.feature.messages.web.MessageRequests.SendMessag
 import io.github.sudoitir.rahdar.platform.broker.Attempt;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
 import io.github.sudoitir.rahdar.platform.broker.MessageKind;
+import io.github.sudoitir.rahdar.platform.mcp.McpResourcesFixture;
 import io.github.sudoitir.rahdar.platform.mcp.McpViews.MutationOutcome;
 import io.modelcontextprotocol.spec.McpError;
 import io.modelcontextprotocol.spec.McpSchema.CallToolResult;
@@ -34,7 +35,7 @@ import org.mockito.ArgumentCaptor;
 class MessagesMcpActionToolsTest {
 
     private final MessageService messages = mock(MessageService.class);
-    private final MessagesMcpActionTools tools = new MessagesMcpActionTools(messages);
+    private final MessagesMcpActionTools tools = new MessagesMcpActionTools(messages, McpResourcesFixture.resolving());
     private final UUID cluster = UUID.randomUUID();
     private final UUID node = UUID.randomUUID();
 
@@ -50,8 +51,16 @@ class MessagesMcpActionToolsTest {
     }
 
     private CallToolResult action(String action, String ids, Boolean dryRun, String confirm, Boolean override) {
-        return tools.queueAction(
-                cluster.toString(), "orders", action, ids, "color='red'", "dlq", dryRun, confirm, override);
+        return tools.messageAction(
+                cluster.toString(),
+                "artemis.queue/orders",
+                action,
+                ids,
+                "color='red'",
+                "artemis.queue/dlq",
+                dryRun,
+                confirm,
+                override);
     }
 
     @Test
@@ -100,7 +109,7 @@ class MessagesMcpActionToolsTest {
     }
 
     @Test
-    void aRealRunWithoutTheExactQueueNameIsRejectedBeforeTouchingTheService() {
+    void aRealRunWithoutTheExactSubscriptionNameIsRejectedBeforeTouchingTheService() {
         assertThatThrownBy(() -> action("delete", "1", false, null, null))
                 .isInstanceOf(McpError.class)
                 .hasMessageContaining("confirm to be exactly \"orders\"");
@@ -167,11 +176,12 @@ class MessagesMcpActionToolsTest {
     void malformedArgumentsAreProtocolErrors() {
         String clusterId = cluster.toString();
 
-        assertThatThrownBy(() -> tools.queueAction("not-a-uuid", "orders", "move", null, null, null, true, null, null))
+        assertThatThrownBy(() -> tools.messageAction(
+                        "not-a-uuid", "artemis.queue/orders", "move", null, null, null, true, null, null))
                 .isInstanceOf(McpError.class);
-        assertThatThrownBy(() -> tools.queueAction(clusterId, " ", "move", null, null, null, true, null, null))
+        assertThatThrownBy(() -> tools.messageAction(clusterId, " ", "move", null, null, null, true, null, null))
                 .isInstanceOf(McpError.class)
-                .hasMessageContaining("queue is required");
+                .hasMessageContaining("subscription is required");
         assertThatThrownBy(() -> action("explode", null, true, null, null))
                 .isInstanceOf(McpError.class)
                 .hasMessageContaining("action must be one of");
@@ -180,7 +190,7 @@ class MessagesMcpActionToolsTest {
                 .hasMessageContaining("action is required");
         assertThatThrownBy(() -> action("move", "1,abc", true, null, null))
                 .isInstanceOf(McpError.class)
-                .hasMessageContaining("messageIds must be comma-separated numbers; got \"abc\"");
+                .hasMessageContaining("positions must be comma-separated numbers; got \"abc\"");
     }
 
     @Test
@@ -201,7 +211,7 @@ class MessagesMcpActionToolsTest {
                 .thenReturn(new Attempt.Ok<>(new Outcome.DryRun(1, 100, false, node)));
 
         MutationOutcome outcome =
-                structured(tools.sendMessage(cluster.toString(), "orders", "hello", null, null, null));
+                structured(tools.sendMessage(cluster.toString(), "artemis.queue/orders", "hello", null, null, null));
 
         assertThat(outcome.action()).isEqualTo("send");
         assertThat(outcome.dryRun()).isTrue();
@@ -218,7 +228,7 @@ class MessagesMcpActionToolsTest {
                 .thenReturn(new Attempt.Ok<>(new Outcome.Affected(1, node)));
 
         MutationOutcome outcome =
-                structured(tools.sendMessage(cluster.toString(), "orders", "x", "bytes", false, false));
+                structured(tools.sendMessage(cluster.toString(), "artemis.queue/orders", "x", "bytes", false, false));
 
         assertThat(outcome.dryRun()).isFalse();
         assertThat(outcome.message()).isEqualTo("Applied.");
@@ -232,7 +242,7 @@ class MessagesMcpActionToolsTest {
     void sendMessageRefusesAnUnknownKind() {
         String clusterId = cluster.toString();
 
-        assertThatThrownBy(() -> tools.sendMessage(clusterId, "orders", "x", "3", null, null))
+        assertThatThrownBy(() -> tools.sendMessage(clusterId, "artemis.queue/orders", "x", "3", null, null))
                 .isInstanceOf(McpError.class);
         verifyNoInteractions(messages);
     }
@@ -241,7 +251,7 @@ class MessagesMcpActionToolsTest {
     void sendMessageRequiresABodyAndAQueue() {
         String clusterId = cluster.toString();
 
-        assertThatThrownBy(() -> tools.sendMessage(clusterId, "orders", " ", null, null, null))
+        assertThatThrownBy(() -> tools.sendMessage(clusterId, "artemis.queue/orders", " ", null, null, null))
                 .isInstanceOf(McpError.class)
                 .hasMessageContaining("body is required");
         assertThatThrownBy(() -> tools.sendMessage(clusterId, null, "x", null, null, null))

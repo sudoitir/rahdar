@@ -44,4 +44,5 @@ _Others_
 * `i.g.s.r.p.c.ClusterOwnership` (in Clusters)
 * `i.g.s.r.p.b.BrokerMessages` (in Broker connectivity)
 * `i.g.s.r.p.m.McpProperties` (in MCP server)
+* `i.g.s.r.p.m.McpResources` (in MCP server)
 |===

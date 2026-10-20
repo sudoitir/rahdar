@@ -25,6 +25,15 @@ public class BrokerSystems {
         return drivers.systems().stream().map(BrokerSystem::id).collect(Collectors.toUnmodifiableSet());
     }
 
+    /** The name of the installed driver's system with this id, or the id when none is installed. */
+    public String nameOf(String systemId) {
+        return drivers.systems().stream()
+                .filter(s -> s.id().equals(systemId))
+                .findFirst()
+                .map(BrokerSystem::name)
+                .orElse(systemId);
+    }
+
     /** The id of the system the cluster runs. */
     public String idOf(UUID clusterId) {
         return directory.system(clusterId);

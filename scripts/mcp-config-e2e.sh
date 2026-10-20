@@ -111,21 +111,21 @@ curl -sS -o /dev/null "$RAHDAR/mcp" -H "Authorization: Bearer $KEY" \
 
 listed=$(rpc tools/list '{}')
 names=$(py "','.join(t['name'] for t in d['result']['tools'])" <<<"$listed" 2>/dev/null || echo "")
-grep -q 'broker_config' <<<"$names" && pass "tools/list carries the configuration tools" \
-  || fail "broker_config is not in the catalogue: $names"
+grep -q 'artemis_config' <<<"$names" && pass "tools/list carries the configuration tools" \
+  || fail "artemis_config is not in the catalogue: $names"
 
 say "2. declaring over MCP previews by default"
 DOC="{\"version\":1,\"addresses\":[],\"addressSettings\":[{\"match\":\"$MATCH\",\"values\":{\"maxDeliveryAttempts\":7}}],\"securitySettings\":[],\"diverts\":[]}"
-preview=$(tool broker_config_change "{\"clusterId\":\"$CLUSTER\",\"op\":\"declare\",\"document\":$(python3 -c 'import json,sys;print(json.dumps(sys.argv[1]))' "$DOC")}")
+preview=$(tool artemis_config_change "{\"clusterId\":\"$CLUSTER\",\"op\":\"declare\",\"document\":$(python3 -c 'import json,sys;print(json.dumps(sys.argv[1]))' "$DOC")}")
 grep -q 'Nothing was saved' <<<"$preview" && pass "a declare without dryRun=false saves nothing and says so" \
   || fail "the dry-run declare did not say it saved nothing: $(head -c 300 <<<"$preview")"
 
-saved=$(tool broker_config_change "{\"clusterId\":\"$CLUSTER\",\"op\":\"declare\",\"document\":$(python3 -c 'import json,sys;print(json.dumps(sys.argv[1]))' "$DOC"),\"dryRun\":false,\"confirm\":\"$CLUSTER_NAME\"}")
+saved=$(tool artemis_config_change "{\"clusterId\":\"$CLUSTER\",\"op\":\"declare\",\"document\":$(python3 -c 'import json,sys;print(json.dumps(sys.argv[1]))' "$DOC"),\"dryRun\":false,\"confirm\":\"$CLUSTER_NAME\"}")
 REV=$(py "d['result']['structuredContent']['revision']" <<<"$saved" 2>/dev/null || echo "")
 [ -n "$REV" ] && pass "declared as revision $REV" || fail "declare failed: $(head -c 300 <<<"$saved")"
 
 say "3. planning names the hazards to acknowledge"
-plan=$(tool broker_config_change "{\"clusterId\":\"$CLUSTER\",\"op\":\"apply\"}")
+plan=$(tool artemis_config_change "{\"clusterId\":\"$CLUSTER\",\"op\":\"apply\"}")
 HASH=$(py "d['result']['structuredContent']['planHash']" <<<"$plan" 2>/dev/null || echo "")
 STEPS=$(py "d['result']['structuredContent']['stepCount']" <<<"$plan" 2>/dev/null || echo 0)
 ACK=$(py "','.join(d['result']['structuredContent'].get('acknowledge', []))" <<<"$plan" 2>/dev/null || echo "")
@@ -139,29 +139,29 @@ say "4. a real run without the acknowledgement is refused"
 if [ -z "$ACK" ]; then
   note "this plan carries no High hazard; the withholding path is covered by McpBrokerConfigIntegrationTest"
 else
-  refused=$(tool broker_config_change "{\"clusterId\":\"$CLUSTER\",\"op\":\"apply\",\"dryRun\":false,\"confirm\":\"$CLUSTER_NAME\",\"expectedPlanHash\":\"$HASH\"}")
+  refused=$(tool artemis_config_change "{\"clusterId\":\"$CLUSTER\",\"op\":\"apply\",\"dryRun\":false,\"confirm\":\"$CLUSTER_NAME\",\"expectedPlanHash\":\"$HASH\"}")
   grep -qi 'acknowledge' <<<"$refused" && pass "refused, naming what to acknowledge" \
     || fail "an unacknowledged run was not refused: $(head -c 300 <<<"$refused")"
 fi
 
 say "5. a stale plan hash is refused"
-stale=$(tool broker_config_change "{\"clusterId\":\"$CLUSTER\",\"op\":\"apply\",\"dryRun\":false,\"confirm\":\"$CLUSTER_NAME\",\"expectedPlanHash\":\"deadbeef\"${ACK:+,\"acknowledge\":\"$ACK\"}}")
+stale=$(tool artemis_config_change "{\"clusterId\":\"$CLUSTER\",\"op\":\"apply\",\"dryRun\":false,\"confirm\":\"$CLUSTER_NAME\",\"expectedPlanHash\":\"deadbeef\"${ACK:+,\"acknowledge\":\"$ACK\"}}")
 grep -qi 'plan' <<<"$stale" && grep -qiE 'changed|stale|moved|hash' <<<"$stale" \
   && pass "a plan the cluster has moved past is refused" \
   || fail "a stale planHash was not refused: $(head -c 300 <<<"$stale")"
 
 say "6. applying for real, canary first"
-applied=$(tool broker_config_change "{\"clusterId\":\"$CLUSTER\",\"op\":\"apply\",\"dryRun\":false,\"confirm\":\"$CLUSTER_NAME\",\"expectedPlanHash\":\"$HASH\"${ACK:+,\"acknowledge\":\"$ACK\"}}")
+applied=$(tool artemis_config_change "{\"clusterId\":\"$CLUSTER\",\"op\":\"apply\",\"dryRun\":false,\"confirm\":\"$CLUSTER_NAME\",\"expectedPlanHash\":\"$HASH\"${ACK:+,\"acknowledge\":\"$ACK\"}}")
 OUTCOME=$(py "d['result']['structuredContent']['outcome']" <<<"$applied" 2>/dev/null || echo "")
 [ "$OUTCOME" = "APPLIED" ] && pass "applied and verified by read-back" || fail "apply outcome was '$OUTCOME': $(head -c 400 <<<"$applied")"
 
-again=$(tool broker_config_change "{\"clusterId\":\"$CLUSTER\",\"op\":\"apply\"}")
+again=$(tool artemis_config_change "{\"clusterId\":\"$CLUSTER\",\"op\":\"apply\"}")
 [ "$(py "d['result']['structuredContent']['stepCount']" <<<"$again" 2>/dev/null || echo -1)" = "0" ] \
   && pass "re-planning converges to zero steps" || fail "a second plan still has steps"
 
 say "7. every read kind answers"
 for kind in declaration drift xml applies; do
-  out=$(tool broker_config "{\"clusterId\":\"$CLUSTER\",\"kind\":\"$kind\"}")
+  out=$(tool artemis_config "{\"clusterId\":\"$CLUSTER\",\"kind\":\"$kind\"}")
   if [ -z "$out" ] || grep -q '"isError":true' <<<"$out" || grep -q '"error"' <<<"$out"; then
     fail "kind=$kind did not answer: $(head -c 200 <<<"$out")"
   else
@@ -175,11 +175,11 @@ say "cleaning up"
 # the next run finds the broker already matching and plans nothing. Rahdar removes
 # only what Rahdar applied (ADR-0067 D6), which is exactly this.
 EMPTY='{"version":1,"addresses":[],"addressSettings":[],"securitySettings":[],"diverts":[]}'
-tool broker_config_change "{\"clusterId\":\"$CLUSTER\",\"op\":\"declare\",\"document\":$(python3 -c 'import json,sys;print(json.dumps(sys.argv[1]))' "$EMPTY"),\"dryRun\":false,\"confirm\":\"$CLUSTER_NAME\"}" >/dev/null
-teardown=$(tool broker_config_change "{\"clusterId\":\"$CLUSTER\",\"op\":\"apply\"}")
+tool artemis_config_change "{\"clusterId\":\"$CLUSTER\",\"op\":\"declare\",\"document\":$(python3 -c 'import json,sys;print(json.dumps(sys.argv[1]))' "$EMPTY"),\"dryRun\":false,\"confirm\":\"$CLUSTER_NAME\"}" >/dev/null
+teardown=$(tool artemis_config_change "{\"clusterId\":\"$CLUSTER\",\"op\":\"apply\"}")
 TEARDOWN_HASH=$(py "d['result']['structuredContent']['planHash']" <<<"$teardown" 2>/dev/null || echo "")
 TEARDOWN_ACK=$(py "','.join(d['result']['structuredContent'].get('acknowledge', []))" <<<"$teardown" 2>/dev/null || echo "")
-removed=$(tool broker_config_change "{\"clusterId\":\"$CLUSTER\",\"op\":\"apply\",\"dryRun\":false,\"confirm\":\"$CLUSTER_NAME\",\"expectedPlanHash\":\"$TEARDOWN_HASH\"${TEARDOWN_ACK:+,\"acknowledge\":\"$TEARDOWN_ACK\"}}")
+removed=$(tool artemis_config_change "{\"clusterId\":\"$CLUSTER\",\"op\":\"apply\",\"dryRun\":false,\"confirm\":\"$CLUSTER_NAME\",\"expectedPlanHash\":\"$TEARDOWN_HASH\"${TEARDOWN_ACK:+,\"acknowledge\":\"$TEARDOWN_ACK\"}}")
 grep -q '"outcome":"APPLIED"' <<<"$removed" \
   && pass "what this run applied was removed again, so the run repeats" \
   || note "nothing to remove (the broker had no leftover from this run)"

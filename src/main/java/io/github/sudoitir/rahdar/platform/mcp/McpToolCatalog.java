@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 import org.springframework.beans.factory.ObjectProvider;
@@ -24,7 +25,7 @@ import org.springframework.stereotype.Component;
  * {@code rahdar_help} tool, the {@code rahdar://tools} resource, and the
  * {@code instructions} block sent at initialisation. Before this existed the
  * instructions were retyped by hand in {@code application.yml} and had drifted —
- * they omitted {@code queue_lifecycle} and {@code message_body}, so the one text a
+ * they omitted {@code resource_lifecycle} and {@code message_body}, so the one text a
  * tool-searching host is guaranteed to read asserted, by omission, that two
  * capabilities did not exist. That is non-negotiable #5 broken by a duplicate, and
  * the fix is to have no duplicate.
@@ -34,7 +35,9 @@ import org.springframework.stereotype.Component;
  * review does not catch drift, a build failure does.
  *
  * <p>What it describes is narrowed to the caller (ADR-0137): a token's MCP tool allow-list and the
- * installation's read-only mode decide what is {@linkplain #offered offered}, and every description
+ * installation's read-only mode decide what is {@linkplain #offered offered}, and so does the broker
+ * system: a tool that exists for one system (such as {@code artemis_config}) is offered only to a caller who
+ * can read a cluster that runs it (ADR-0207). Every description
  * below — index, detail, instructions — names only offered tools, so a restricted token learns
  * nothing about the rest. {@code rahdar_help} is always offered.
  *
@@ -49,14 +52,19 @@ class McpToolCatalog {
     /** The discovery tool's own name, referenced from rejection messages. */
     static final String HELP_TOOL = "rahdar_help";
 
+    /** The tool that returns resource ids, referenced from rejection messages. */
+    static final String LIST_TOOL = "list_resources";
+
     private final List<McpToolDef> builtin;
     private final Map<String, List<McpToolDef>> pluginEntries = new ConcurrentHashMap<>();
     private final FeatureRegistry features;
     private final ObjectProvider<SettingsService> settings;
+    private final McpSystems systems;
     private volatile List<McpToolDef> entries;
 
-    McpToolCatalog(FeatureRegistry features, ObjectProvider<SettingsService> settings) {
+    McpToolCatalog(FeatureRegistry features, ObjectProvider<SettingsService> settings, McpSystems systems) {
         this.features = features;
+        this.systems = systems;
         this.builtin =
                 features.enabled().stream().flatMap(d -> d.mcpTools().stream()).toList();
         this.settings = settings;
@@ -73,9 +81,23 @@ class McpToolCatalog {
         return entries.stream().filter(e -> offered(e.name())).toList();
     }
 
-    /** Whether the current caller is offered this tool: allowed by its token and not refused as read-only. */
+    /**
+     * Whether the current caller is offered this tool: allowed by its token, not refused as read-only,
+     * and, for a tool of one broker system, able to read a cluster that runs it (ADR-0207).
+     */
     boolean offered(String tool) {
-        return allowedByToken(tool) && !refusedAsReadOnly(tool);
+        return allowedByToken(tool) && !refusedAsReadOnly(tool) && appliesToCaller(tool);
+    }
+
+    private boolean appliesToCaller(String tool) {
+        McpToolDef def = definition(tool);
+        return def == null || def.system() == null || systems.readsAny(def.system());
+    }
+
+    /** The tool error for calling {@code tool} on a cluster that runs another broker system, or {@code null}. */
+    String refusedOnCluster(String tool, UUID clusterId) {
+        McpToolDef def = definition(tool);
+        return def == null ? null : systems.refusal(def, clusterId);
     }
 
     /** The help tool always; anything else when the caller's token has no allow-list or lists it. */
@@ -189,11 +211,15 @@ class McpToolCatalog {
                 .map(McpToolDef::name)
                 .collect(Collectors.joining(", "));
         String mutating = mutatingSentence(mutations);
-        return "Rahdar: cluster-wide management and observability for Apache ActiveMQ Artemis brokers. "
+        return "Rahdar: cluster-wide management and observability for message brokers. "
                 + "Read tools: " + reads + ". "
                 + mutating
                 + "Call " + HELP_TOOL + " for the accepted values and JSON body shapes the tool schemas leave "
                 + "out; the schemas are deliberately terse and " + HELP_TOOL + " is the complete reference. "
+                + "Resources are named by the role they play (destination, subscription, route, connection, channel, "
+                + "consumer, producer) and every tool takes their canonical ids, such as artemis.queue/orders, "
+                + "as " + LIST_TOOL + " returns them; a tool prefixed with a system's id applies to that system's "
+                + "clusters only. "
                 + "Resources mirror the same detail for hosts that read them: rahdar://clusters (the source of "
                 + "cluster ids this key can see), rahdar://permissions (what it may do), rahdar://tools, "
                 + "cluster://{id}/topology, cluster://{id}/capabilities, "

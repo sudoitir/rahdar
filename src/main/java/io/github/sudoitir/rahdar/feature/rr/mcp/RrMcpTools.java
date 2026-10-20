@@ -1,5 +1,6 @@
 package io.github.sudoitir.rahdar.feature.rr.mcp;
 
+import io.github.sudoitir.openbroker.model.ResourceClass;
 import io.github.sudoitir.rahdar.feature.rr.FlowQuery;
 import io.github.sudoitir.rahdar.feature.rr.RequestReplyService;
 import io.github.sudoitir.rahdar.feature.rr.RrMetrics;
@@ -8,6 +9,7 @@ import io.github.sudoitir.rahdar.kernel.core.PagedView;
 import io.github.sudoitir.rahdar.platform.mcp.McpArgs;
 import io.github.sudoitir.rahdar.platform.mcp.McpErrors;
 import io.github.sudoitir.rahdar.platform.mcp.McpProperties;
+import io.github.sudoitir.rahdar.platform.mcp.McpResources;
 import io.github.sudoitir.rahdar.platform.mcp.McpViews;
 import io.modelcontextprotocol.spec.McpSchema;
 import java.time.Duration;
@@ -19,7 +21,8 @@ import org.springframework.ai.mcp.annotation.McpToolParam;
 import org.springframework.stereotype.Component;
 
 /**
- * The {@code trace_request_reply} MCP tool. *
+ * The {@code trace_request_reply} MCP tool.
+ *
  * <p>Reads only: nothing here needs the dry-run/confirm contract, which is the review
  * boundary ADR-0045 draws between read and mutating tool classes. Every method is a thin
  * adapter over the services the REST layer already uses.
@@ -31,6 +34,7 @@ public class RrMcpTools {
     private final McpProperties props;
     private final RequestReplyService requestReply;
     private final RrMetrics rrMetrics;
+    private final McpResources resources;
 
     private enum RrMode {
         FLOWS,
@@ -52,7 +56,7 @@ public class RrMcpTools {
     public McpSchema.CallToolResult traceRequestReply(
             @McpToolParam(required = true) String clusterId,
             @McpToolParam(required = false) String mode,
-            @McpToolParam(required = false) String address,
+            @McpToolParam(required = false) String destination,
             @McpToolParam(required = false) String window,
             @McpToolParam(required = false) Integer limit) {
         UUID id = McpArgs.uuid("clusterId", clusterId);
@@ -60,7 +64,7 @@ public class RrMcpTools {
         Duration w = McpArgs.window(window == null ? "15m" : window);
         int capped = props.clamp(limit);
         return McpErrors.guard(() -> switch (m) {
-            case FLOWS -> flows(id, address, capped);
+            case FLOWS -> flows(id, destination, capped);
             case STATS -> rrMetrics.stats(id, w);
             case EXPECTATIONS -> requestReply.list(id);
             // Answers the question a model otherwise cannot: an empty flow list means
@@ -70,9 +74,14 @@ public class RrMcpTools {
         });
     }
 
-    private McpViews.Page<McpViews.FlowRow> flows(UUID clusterId, String address, int limit) {
+    private McpViews.Page<McpViews.FlowRow> flows(UUID clusterId, String destination, int limit) {
+        String name = destination == null || destination.isBlank()
+                ? null
+                : resources
+                        .require(clusterId, "destination", destination, ResourceClass.DESTINATION)
+                        .name();
         PagedView<RrViews.FlowView> page =
-                requestReply.flowPage(clusterId, new FlowQuery(null, address, null, null, null, 1, limit + 1));
+                requestReply.flowPage(clusterId, new FlowQuery(null, name, null, null, null, 1, limit + 1));
         List<McpViews.FlowRow> rows = page.data().stream()
                 .map(f -> new McpViews.FlowRow(
                         f.correlationId(),

@@ -121,6 +121,7 @@ class McpConnectionControlIntegrationTest extends PostgresIntegrationTest {
 
         client = Targets.target();
         when(gateway.node(eq(clusterId), any(UUID.class))).thenReturn(client);
+        when(gateway.cluster(clusterId)).thenReturn(client.connection());
 
         key = McpFixture.mintKey(
                 users,
@@ -146,7 +147,7 @@ class McpConnectionControlIntegrationTest extends PostgresIntegrationTest {
                 "kind",
                 "connection",
                 "target",
-                CONNECTION,
+                "artemis.connection/" + CONNECTION,
                 "nodeId",
                 nodeId.toString()));
         for (int i = 0; i < extra.length; i += 2) {

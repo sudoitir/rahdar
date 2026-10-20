@@ -51,11 +51,11 @@ import org.springframework.web.context.WebApplicationContext;
 import tools.jackson.databind.JsonNode;
 
 /**
- * The {@code queue_lifecycle} tool's contract from the model's side of the wire
+ * The {@code resource_lifecycle} tool's contract from the model's side of the wire
  * (ADR-0049): preview by default, a matching {@code confirm} before anything is
  * destroyed, the caller's own permissions, and the full per-node outcome.
  */
-class McpQueueLifecycleIntegrationTest extends PostgresIntegrationTest {
+class McpResourceLifecycleIntegrationTest extends PostgresIntegrationTest {
 
     private static final String QUEUE = "MCP.LIFECYCLE";
 
@@ -121,6 +121,7 @@ class McpQueueLifecycleIntegrationTest extends PostgresIntegrationTest {
         target = Targets.target();
         ops = Targets.operations(target);
         when(gateway.node(any(UUID.class), any(UUID.class))).thenReturn(target);
+        when(gateway.cluster(any(UUID.class))).thenReturn(target.connection());
         queueHolds(0);
     }
 
@@ -148,8 +149,14 @@ class McpQueueLifecycleIntegrationTest extends PostgresIntegrationTest {
         JsonNode response = McpFixture.callTool(
                 mvc,
                 key,
-                "queue_lifecycle",
-                Map.of("clusterId", clusterId.toString(), "kind", "delete_subscription", "name", QUEUE));
+                "resource_lifecycle",
+                Map.of(
+                        "clusterId",
+                        clusterId.toString(),
+                        "kind",
+                        "delete_subscription",
+                        "resource",
+                        "artemis.queue/" + QUEUE));
 
         JsonNode outcome = response.path("result").path("structuredContent");
         assertThat(response.path("result").path("isError").asBoolean(false))
@@ -168,14 +175,14 @@ class McpQueueLifecycleIntegrationTest extends PostgresIntegrationTest {
         JsonNode response = McpFixture.callTool(
                 mvc,
                 key,
-                "queue_lifecycle",
+                "resource_lifecycle",
                 Map.of(
                         "clusterId",
                         clusterId.toString(),
                         "kind",
                         "delete_subscription",
-                        "name",
-                        QUEUE,
+                        "resource",
+                        "artemis.queue/" + QUEUE,
                         "dryRun",
                         false,
                         "confirm",
@@ -195,8 +202,14 @@ class McpQueueLifecycleIntegrationTest extends PostgresIntegrationTest {
         JsonNode response = McpFixture.callTool(
                 mvc,
                 key,
-                "queue_lifecycle",
-                Map.of("clusterId", clusterId.toString(), "kind", "delete_subscription", "name", QUEUE));
+                "resource_lifecycle",
+                Map.of(
+                        "clusterId",
+                        clusterId.toString(),
+                        "kind",
+                        "delete_subscription",
+                        "resource",
+                        "artemis.queue/" + QUEUE));
 
         // Refused on the same basis as the HTTP request: a not-found that reveals
         // nothing about whether the cluster exists.
@@ -221,14 +234,14 @@ class McpQueueLifecycleIntegrationTest extends PostgresIntegrationTest {
         JsonNode response = McpFixture.callTool(
                 mvc,
                 key,
-                "queue_lifecycle",
+                "resource_lifecycle",
                 Map.of(
                         "clusterId",
                         clusterId.toString(),
                         "kind",
                         "pause_subscription",
-                        "name",
-                        QUEUE,
+                        "resource",
+                        "artemis.queue/" + QUEUE,
                         "dryRun",
                         false));
 
@@ -247,8 +260,14 @@ class McpQueueLifecycleIntegrationTest extends PostgresIntegrationTest {
         JsonNode refused = McpFixture.callTool(
                 mvc,
                 key,
-                "queue_lifecycle",
-                Map.of("clusterId", clusterId.toString(), "kind", "delete_subscription", "name", QUEUE));
+                "resource_lifecycle",
+                Map.of(
+                        "clusterId",
+                        clusterId.toString(),
+                        "kind",
+                        "delete_subscription",
+                        "resource",
+                        "artemis.queue/" + QUEUE));
         assertThat(refused.path("result")
                         .path("structuredContent")
                         .path("nodes")
@@ -261,14 +280,14 @@ class McpQueueLifecycleIntegrationTest extends PostgresIntegrationTest {
         McpFixture.callTool(
                 mvc,
                 key,
-                "queue_lifecycle",
+                "resource_lifecycle",
                 Map.of(
                         "clusterId",
                         clusterId.toString(),
                         "kind",
                         "delete_subscription",
-                        "name",
-                        QUEUE,
+                        "resource",
+                        "artemis.queue/" + QUEUE,
                         "dryRun",
                         false,
                         "confirm",
