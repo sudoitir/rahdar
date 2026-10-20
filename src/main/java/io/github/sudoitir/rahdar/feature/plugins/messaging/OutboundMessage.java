@@ -1,6 +1,7 @@
 package io.github.sudoitir.rahdar.feature.plugins.messaging;
 
 import io.github.sudoitir.rahdar.kernel.plugin.PluginApi;
+import io.github.sudoitir.rahdar.kernel.security.ResourceRef;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.Objects;
@@ -9,7 +10,8 @@ import java.util.UUID;
 /**
  * A message a plugin sends.
  *
- * @param address an address, or a fully qualified queue name ({@code address::queue})
+ * @param target where it goes: a destination, which routes it to its subscriptions, or a subscription,
+ *     which receives it directly where the system supports sending to one
  * @param body the body; sent as a text message when {@code text}, else as bytes
  * @param headers string properties set on the message, as Rahdar's own send sets them
  * @param properties typed properties (string, boolean, int, long, double)
@@ -18,7 +20,7 @@ import java.util.UUID;
 @PluginApi
 public record OutboundMessage(
         UUID clusterId,
-        String address,
+        ResourceRef target,
         byte[] body,
         boolean text,
         Map<String, String> headers,
@@ -33,7 +35,7 @@ public record OutboundMessage(
                         instanceof
                         OutboundMessage(
                                 var otherClusterId,
-                                var otherAddress,
+                                var otherTarget,
                                 var otherBody,
                                 var otherText,
                                 var otherHeaders,
@@ -41,7 +43,7 @@ public record OutboundMessage(
                                 var otherDurable,
                                 var otherActingUserId)
                 && Objects.equals(clusterId, otherClusterId)
-                && Objects.equals(address, otherAddress)
+                && Objects.equals(target, otherTarget)
                 && Arrays.equals(body, otherBody)
                 && text == otherText
                 && Objects.equals(headers, otherHeaders)
@@ -52,14 +54,13 @@ public record OutboundMessage(
 
     @Override
     public int hashCode() {
-        return Objects.hash(
-                clusterId, address, Arrays.hashCode(body), text, headers, properties, durable, actingUserId);
+        return Objects.hash(clusterId, target, Arrays.hashCode(body), text, headers, properties, durable, actingUserId);
     }
 
     /** The body is reported by length only, so a message's content never lands in a log line. */
     @Override
     public String toString() {
-        return "OutboundMessage[clusterId=" + clusterId + ", address=" + address + ", body="
+        return "OutboundMessage[clusterId=" + clusterId + ", target=" + target + ", body="
                 + (body == null ? "null" : body.length + " bytes") + ", text=" + text + ", headers=" + headers
                 + ", properties=" + properties + ", durable=" + durable + ", actingUserId=" + actingUserId + "]";
     }

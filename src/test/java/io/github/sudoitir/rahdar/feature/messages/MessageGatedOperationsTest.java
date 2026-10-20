@@ -131,7 +131,7 @@ class MessageGatedOperationsTest {
                 .messageExpireOperation(messages, clusters)
                 .estimate(new MessageActionParams.MessageExpireParams(CLUSTER, "orders", null, request, false));
 
-        assertThat(effect.stateKey()).isEqualTo("orders.addr|ANYCAST");
+        assertThat(effect.etag()).isEqualTo("orders.addr|ANYCAST");
         assertThat(effect.count()).isEqualTo(3);
     }
 

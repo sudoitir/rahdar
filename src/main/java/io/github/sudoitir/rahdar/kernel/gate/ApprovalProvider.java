@@ -8,7 +8,7 @@ import io.github.sudoitir.rahdar.kernel.plugin.PluginApi;
  * type; at most one provider is active. Every method must be pure and return quickly: Rahdar bounds
  * each call (3 seconds by default) and treats a throw or a timeout as "unavailable", which fails
  * closed. Rahdar owns held operations, applies its own approver rules before {@link #checkVote}
- * (ADR-0181), and enforces {@link Effect#stateKey()} itself before {@link #checkRun}.
+ * (ADR-0181), and enforces {@link Effect#etag()} itself before {@link #checkRun}.
  */
 @PluginApi
 public interface ApprovalProvider {

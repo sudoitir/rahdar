@@ -111,7 +111,7 @@ class ApplySettingsOperation implements GatedOperation<SettingsChangeSet> {
     @Override
     public Effect estimate(SettingsChangeSet params) {
         List<String> keys = params.changes().stream().map(SettingChange::key).toList();
-        return new Effect(keys.size(), "settings", settings.stateKey(keys), null);
+        return new Effect(keys.size(), "settings", settings.etag(keys), null);
     }
 
     @Override

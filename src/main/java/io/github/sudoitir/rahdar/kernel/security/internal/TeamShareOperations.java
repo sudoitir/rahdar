@@ -74,7 +74,7 @@ class TeamShareOperations {
                 return new Effect(
                         1,
                         "share",
-                        stateKey(p.ownerTeamId(), p.targetTeamId(), p.clusterId(), p.kind(), p.pattern(), p.roleId()),
+                        etag(p.ownerTeamId(), p.targetTeamId(), p.clusterId(), p.kind(), p.pattern(), p.roleId()),
                         null);
             }
 
@@ -114,7 +114,7 @@ class TeamShareOperations {
 
             @Override
             public Effect estimate(RemoveShare p) {
-                return new Effect(1, "share", stateKey(p.ownerTeamId(), p.shareId(), share(p).getPattern()), null);
+                return new Effect(1, "share", etag(p.ownerTeamId(), p.shareId(), share(p).getPattern()), null);
             }
 
             @Override

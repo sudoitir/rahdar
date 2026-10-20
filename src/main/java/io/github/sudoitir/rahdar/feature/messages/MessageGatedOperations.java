@@ -187,8 +187,8 @@ class MessageGatedOperations {
         public Effect estimate(P p) {
             MessageActionRequest request = p.request();
             Reach reach = messages.reach(p.clusterId(), p.queue(), p.nodeId(), action, request);
-            String stateKey = request.byFilter() ? reach.identity() + "|" + request.filter() : reach.identity();
-            return new Effect(reach.count(), "messages", stateKey, null);
+            String etag = request.byFilter() ? reach.identity() + "|" + request.filter() : reach.identity();
+            return new Effect(reach.count(), "messages", etag, null);
         }
 
         @Override

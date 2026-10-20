@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import io.github.sudoitir.rahdar.feature.plugins.messaging.internal.AccessCheck;
 import io.github.sudoitir.rahdar.kernel.security.PatternKind;
 import io.github.sudoitir.rahdar.kernel.security.ResourceNames;
+import io.github.sudoitir.rahdar.kernel.security.ResourceRef;
 import io.github.sudoitir.rahdar.kernel.security.internal.TeamService;
 import io.github.sudoitir.rahdar.kernel.security.internal.persistence.AppUserEntity;
 import io.github.sudoitir.rahdar.kernel.security.internal.persistence.AppUserRepository;
@@ -93,10 +94,10 @@ class PluginAccessCheckIntegrationTest extends PostgresIntegrationTest {
 
     @Test
     void aSendIsAllowedToATeamsAddressAndRefusedToAnother() {
-        assertThat(access.denial(operator, cluster, AccessCheck.sendNeeds("orders.out")))
+        assertThat(access.denial(operator, cluster, AccessCheck.sendNeeds(ResourceRef.destination("orders.out"))))
                 .isEmpty();
 
-        assertThat(access.denial(operator, cluster, AccessCheck.sendNeeds("billing.in")))
+        assertThat(access.denial(operator, cluster, AccessCheck.sendNeeds(ResourceRef.destination("billing.in"))))
                 .get()
                 .asString()
                 .contains("message:send")
@@ -105,11 +106,12 @@ class PluginAccessCheckIntegrationTest extends PostgresIntegrationTest {
 
     @Test
     void aDisabledOrUnknownUserIsRefused() {
-        assertThat(access.denial(UUID.randomUUID(), cluster, AccessCheck.sendNeeds("orders.out")))
+        assertThat(access.denial(
+                        UUID.randomUUID(), cluster, AccessCheck.sendNeeds(ResourceRef.destination("orders.out"))))
                 .get()
                 .asString()
                 .contains("no longer exists");
-        assertThat(access.denial(null, cluster, AccessCheck.sendNeeds("orders.out")))
+        assertThat(access.denial(null, cluster, AccessCheck.sendNeeds(ResourceRef.destination("orders.out"))))
                 .isPresent();
     }
 }

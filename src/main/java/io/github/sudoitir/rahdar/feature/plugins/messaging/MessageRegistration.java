@@ -1,6 +1,7 @@
 package io.github.sudoitir.rahdar.feature.plugins.messaging;
 
 import io.github.sudoitir.rahdar.kernel.plugin.PluginApi;
+import io.github.sudoitir.rahdar.kernel.security.ResourceRef;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -8,6 +9,7 @@ import java.util.UUID;
 /**
  * A registration as Rahdar holds it, with what the last pass found on each node.
  *
+ * @param source the subscription it receives from
  * @param concurrency the messages handled at once on each serving node, as registered
  * @param state the overall state: {@link RegistrationState#ACTIVE} when every node it covers is
  *     active, otherwise the state that most needs attention
@@ -19,7 +21,7 @@ import java.util.UUID;
 public record MessageRegistration(
         String key,
         UUID clusterId,
-        String queue,
+        ResourceRef source,
         RegistrationMode mode,
         int concurrency,
         UUID actingUserId,

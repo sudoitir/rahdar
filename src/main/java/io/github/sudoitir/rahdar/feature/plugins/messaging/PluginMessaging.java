@@ -1,6 +1,7 @@
 package io.github.sudoitir.rahdar.feature.plugins.messaging;
 
 import io.github.sudoitir.rahdar.kernel.plugin.PluginApi;
+import io.github.sudoitir.rahdar.kernel.security.ResourceRef;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -30,8 +31,8 @@ public final class PluginMessaging {
     /**
      * Store a registration, replacing any under the same key, and try to make it true at once.
      *
-     * @throws RegistrationRefusedException when the acting user may not use the queue in this mode,
-     *     the cluster is unknown, or the queue is one Rahdar reserves for itself
+     * @throws RegistrationRefusedException when the acting user may not use the subscription in this mode,
+     *     the cluster is unknown, or the subscription is one Rahdar reserves for itself
      */
     public MessageRegistration register(RegistrationSpec spec) {
         return service.register(pluginId, spec);
@@ -52,19 +53,19 @@ public final class PluginMessaging {
 
     /**
      * Check a send without making it: the reason {@link #send} would refuse a message to
-     * {@code address} on the cluster as {@code actingUserId} (a missing or too-long address, an
-     * address Rahdar or the broker reserves, an unknown cluster, a missing {@code message:send}), or
+     * {@code target} on the cluster as {@code actingUserId} (a missing or too-long name, a
+     * resource Rahdar or the broker reserves, an unknown cluster, a missing {@code message:send}), or
      * empty when it would be allowed. Use it to refuse a bad target when a user configures it rather
      * than when the first message goes out; {@link #send} still checks every message.
      */
-    public Optional<String> checkSend(UUID clusterId, String address, UUID actingUserId) {
-        return service.sendDenial(clusterId, address, actingUserId);
+    public Optional<String> checkSend(UUID clusterId, ResourceRef target, UUID actingUserId) {
+        return service.sendDenial(clusterId, target, actingUserId);
     }
 
     /**
      * Send a message through a serving node of the cluster.
      *
-     * @throws RegistrationRefusedException when the acting user lacks {@code message:send} on the address
+     * @throws RegistrationRefusedException when the acting user lacks {@code message:send} on the target
      */
     public void send(OutboundMessage message) {
         service.send(pluginId, message);

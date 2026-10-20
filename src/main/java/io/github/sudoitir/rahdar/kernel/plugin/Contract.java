@@ -7,7 +7,7 @@ package io.github.sudoitir.rahdar.kernel.plugin;
  */
 public final class Contract {
 
-    public static final int VERSION = 16;
+    public static final int VERSION = 17;
 
     /** The startup property that enables or disables a feature. */
     public static String enabledProperty(String featureId) {

@@ -90,7 +90,7 @@ class TeamOperations {
 
             @Override
             public Effect estimate(CreateTeam p) {
-                return new Effect(1, "team", stateKey(p.name().toLowerCase()), null);
+                return new Effect(1, "team", etag(p.name().toLowerCase()), null);
             }
 
             @Override
@@ -115,8 +115,7 @@ class TeamOperations {
 
             @Override
             public Effect estimate(RenameTeam p) {
-                return new Effect(
-                        1, "team", stateKey(p.teamId(), team(p.teamId()).getName()), null);
+                return new Effect(1, "team", etag(p.teamId(), team(p.teamId()).getName()), null);
             }
 
             @Override
@@ -155,7 +154,7 @@ class TeamOperations {
                 return new Effect(
                         count,
                         "members",
-                        stateKey(
+                        etag(
                                 p.teamId(),
                                 team(p.teamId()).getName(),
                                 count,
@@ -195,7 +194,7 @@ class TeamOperations {
 
             @Override
             public Effect estimate(AddPattern p) {
-                return new Effect(1, "pattern", stateKey(p.teamId(), p.clusterId(), p.kind(), p.pattern()), null);
+                return new Effect(1, "pattern", etag(p.teamId(), p.clusterId(), p.kind(), p.pattern()), null);
             }
 
             @Override
@@ -232,10 +231,7 @@ class TeamOperations {
             @Override
             public Effect estimate(RemovePattern p) {
                 return new Effect(
-                        1,
-                        "pattern",
-                        stateKey(p.teamId(), p.patternId(), pattern(p).getPattern()),
-                        null);
+                        1, "pattern", etag(p.teamId(), p.patternId(), pattern(p).getPattern()), null);
             }
 
             @Override
@@ -271,7 +267,7 @@ class TeamOperations {
                 return new Effect(
                         1,
                         UNIT_MEMBER,
-                        stateKey(p.teamId(), p.principalType(), p.userId(), p.providerId(), p.groupName(), p.roleId()),
+                        etag(p.teamId(), p.principalType(), p.userId(), p.providerId(), p.groupName(), p.roleId()),
                         null);
             }
 
@@ -310,7 +306,7 @@ class TeamOperations {
                 return new Effect(
                         1,
                         UNIT_MEMBER,
-                        stateKey(
+                        etag(
                                 p.teamId(),
                                 p.memberId(),
                                 member(p.teamId(), p.memberId()).getRoleId()),
@@ -350,7 +346,7 @@ class TeamOperations {
                 return new Effect(
                         1,
                         UNIT_MEMBER,
-                        stateKey(
+                        etag(
                                 p.teamId(),
                                 p.memberId(),
                                 member(p.teamId(), p.memberId()).getRoleId()),

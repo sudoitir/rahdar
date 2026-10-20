@@ -285,7 +285,7 @@ class Executions {
             log.warn("approval-run id={} estimate failed", row.id(), e);
             throw new Refusal("Rahdar could not estimate what this would do now, so it was not run.");
         }
-        if (now == null || !Objects.equals(now.stateKey(), payload.stateKey())) {
+        if (now == null || !Objects.equals(now.etag(), payload.etag())) {
             throw new Refusal("What this acts on changed since it was requested; request it again.");
         }
         RunCheck verdict;

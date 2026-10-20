@@ -225,11 +225,11 @@ class QueueGateTest extends PostgresIntegrationTest {
         when(messages.identity(clusterId, QUEUE)).thenReturn("etag-1", "etag-2");
         String asked = queueDeleteOperation
                 .estimate(new QueueDeleteParams(clusterId, QUEUE, false, false))
-                .stateKey();
+                .etag();
 
         String now = queueDeleteOperation
                 .estimate(new QueueDeleteParams(clusterId, QUEUE, false, false))
-                .stateKey();
+                .etag();
 
         assertThat(now).isNotEqualTo(asked);
     }
