@@ -706,7 +706,7 @@ export const VIEWS: TableView_[] = [
     rowKey: (r) => `${r.nodeId}/${r.name}`,
     menu: true,
     identifiers: ['name'],
-    visible1280: ['name', 'owner', 'routing', 'queues', 'depth', 'node', 'action'],
+    visible1280: ['name', 'owner', 'delivery', 'queues', 'depth', 'node', 'action'],
   }),
   view({
     name: 'consumers',
@@ -716,7 +716,7 @@ export const VIEWS: TableView_[] = [
     rowKey: (r) => `${r.nodeId}/${r.consumerId}`,
     menu: true,
     identifiers: ['queue', 'address'],
-    visible1280: ['queue', 'address', 'protocol', 'delivered', 'acked', 'status', 'node', 'action'],
+    visible1280: ['queue', 'address', 'protocol', 'delivered', 'acked', 'inFlight', 'node', 'action'],
   }),
   view({
     name: 'sessions',
@@ -746,7 +746,7 @@ export const VIEWS: TableView_[] = [
     rowKey: (r) => `${r.nodeId}/${r.producerId}`,
     menu: true,
     identifiers: ['address'],
-    visible1280: ['address', 'name', 'protocol', 'sent', 'node'],
+    visible1280: ['address', 'client', 'protocol', 'sent', 'node'],
   }),
   view({
     name: 'diverts',
