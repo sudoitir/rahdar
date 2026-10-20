@@ -110,7 +110,7 @@ class ScrapeSchedulerTest {
     MetricSampleWriter metrics;
 
     @Mock
-    BrokerNotifications coreSubscriptions;
+    BrokerNotifications notifications;
 
     @Mock
     SettingsService settings;
@@ -146,7 +146,7 @@ class ScrapeSchedulerTest {
                 upsert,
                 metrics,
                 new StreamSignals(Mockito.mock(SseHub.class)),
-                coreSubscriptions,
+                notifications,
                 eventPublisher);
     }
 
@@ -396,7 +396,7 @@ class ScrapeSchedulerTest {
         scheduler.onDutyReleased(new ClusterDutyReleased(clusterId));
 
         assertThat(scrapeCycle.current(clusterId)).isZero();
-        verify(coreSubscriptions, timeout(5000)).forget(clusterId);
+        verify(notifications, timeout(5000)).forget(clusterId);
     }
 
     @Test
@@ -408,7 +408,7 @@ class ScrapeSchedulerTest {
 
         scheduler.tierA();
 
-        verify(coreSubscriptions).forget(cluster.getId());
+        verify(notifications).forget(cluster.getId());
     }
 
     @Test

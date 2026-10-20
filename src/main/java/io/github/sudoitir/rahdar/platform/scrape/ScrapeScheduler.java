@@ -104,7 +104,7 @@ public class ScrapeScheduler implements DisposableBean {
     private final QueueSnapshotUpsert upsert;
     private final MetricSampleWriter metrics;
     private final StreamSignals streamSignals;
-    private final BrokerNotifications coreSubscriptions;
+    private final BrokerNotifications notifications;
     private final ApplicationEventPublisher eventPublisher;
 
     private record QueuesPage(List<QueueRow> rows, Optional<String> next) {}
@@ -164,10 +164,10 @@ public class ScrapeScheduler implements DisposableBean {
             streamSignals.afterTierA(clusterId, endpoints);
             // Follow failover: reconcile Core notification subscriptions against
             // who is live now. Never in a transaction, on this virtual-thread pool.
-            coreSubscriptions.reconcile(clusterId, endpoints);
+            notifications.reconcile(clusterId, endpoints);
             if (!ownership.owns(clusterId)) {
                 // Ownership moved while this pass ran, after the release had already dropped its state.
-                coreSubscriptions.forget(clusterId);
+                notifications.forget(clusterId);
             }
         } catch (RuntimeException e) {
             log.warn("Split-brain corroboration failed for cluster {}: {}", clusterId, e.toString());
@@ -218,7 +218,7 @@ public class ScrapeScheduler implements DisposableBean {
         scrapeCycle.forget(clusterId);
         streamSignals.forget(clusterId);
         lastFailures.keySet().removeIf(key -> key.startsWith(clusterId + "/"));
-        Thread.startVirtualThread(() -> coreSubscriptions.forget(clusterId));
+        Thread.startVirtualThread(() -> notifications.forget(clusterId));
     }
 
     public void tierB() {
