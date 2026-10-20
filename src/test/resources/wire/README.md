@@ -25,7 +25,8 @@ The bodies differ in these ways, each deliberate:
 - **MBean names list their keys in the broker's order.** The searched name comes back as
   `address=…,broker=…,component=…`; it is the same MBean.
 - **A queue the scrape has not reached is found with `listQueues`** filtered by name, instead of a pattern
-  read of `MessageCount`.
+  read of `MessageCount`. Unpaged lists ask for page 1 of size 2147483647: a page and size of -1 return no
+  rows on Artemis 2.33.0.
 - **A node's version comes with its HA state.** The register and health probes read `Active`, `Started`,
   `Backup`, `ReplicaSync`, `NodeID`, `Clustered` and `Version` in one read instead of `Version` alone.
 - **A filtered browse may run over Core** as a browse-only consumer, with the count from `countMessages`; the
