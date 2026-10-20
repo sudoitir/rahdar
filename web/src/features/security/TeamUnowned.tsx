@@ -24,8 +24,8 @@ function pageCount(data: PagedView<UnownedView> | undefined, page: number): numb
 }
 
 /**
- * The queues or addresses of a cluster that no team's pattern covers, reachable only through role grants. Each can
- * be assigned to this team as a queue, address or both pattern, which pre-fills the pattern form with its exact name.
+ * The subscriptions or destinations of a cluster that no team's pattern covers, reachable only through role grants. Each can
+ * be assigned to this team as a subscription, destination or both pattern, which pre-fills the pattern form with its exact name.
  */
 export function TeamUnowned({
   onAssign,
@@ -63,7 +63,7 @@ export function TeamUnowned({
     <Section
       title="Unowned resources"
       headingLevel={3}
-      description="Queues and addresses that no team's pattern covers. Only role grants reach them, so a team member sees none of them."
+      description="Subscriptions and destinations that no team's pattern covers. Only role grants reach them, so a team member sees none of them."
     >
       {userAdmin ? null : (
         <Notice title="Needs user:admin">

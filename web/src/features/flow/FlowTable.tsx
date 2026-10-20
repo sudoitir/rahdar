@@ -14,7 +14,7 @@ const rowKey = (r: PathRow) => r.id;
 
 /**
  * The same paths the graph draws, as rows (flow-visualization spec: the table presents the same
- * paths as the graph). One row per edge; activating a row focuses its client or queue, and its
+ * paths as the graph). One row per edge; activating a row focuses its client or subscription, and its
  * menu opens that resource elsewhere, never changing the broker.
  */
 export function FlowTable({
@@ -89,7 +89,7 @@ function toRows(graph: FlowGraphView): PathRow[] {
   });
 }
 
-/** The resource a row is about: its client, its queue, or the address it diverts to. */
+/** The resource a row is about: its client, its subscription, or the destination it forwards to. */
 function subjectOf(row: PathRow): FlowNodeView | undefined {
   switch (row.edge.kind) {
     case 'PRODUCE':
@@ -171,7 +171,7 @@ function NoPaths({
     <EmptyState
       kind="empty"
       title="No paths to list"
-      description="A path is one hop of a message's journey: a client producing to an address, an address routing to a queue, a queue consumed by a client. Rahdar draws a path once it sees a producer, a consumer or a binding on this cluster, so an empty table means none has been seen yet."
+      description="A path is one hop of a message's journey: a client producing to a destination, a destination routing to a subscription, a subscription consumed by a client. Rahdar draws a path once it sees a producer, a consumer or a binding on this cluster, so an empty table means none has been seen yet."
     />
   );
 }

@@ -3,10 +3,10 @@ import { Button, Group, Modal, NumberInput, Stack, Switch, Text, TextInput } fro
 import { useForm } from '@mantine/form';
 
 import {
-  addressOf,
+  destinationOf,
   routingTypeOf,
-  useQueueConfiguration,
-  useUpdateQueue,
+  useSubscriptionConfiguration,
+  useUpdateSubscription,
   type LifecycleOutcomeView,
   type SubscriptionConfiguration,
   type SubscriptionView,
@@ -54,15 +54,15 @@ const EMPTY: FormState = { filter: '', maxConsumers: '', purgeOnNoConsumers: fal
 const FIELDS = Object.keys(EMPTY);
 
 /**
- * Change the configuration of a live queue.
+ * Change the configuration of a live subscription.
  *
- * <p>The form opens on what the queue runs now, read from the nodes that have it,
+ * <p>The form opens on what the subscription runs now, read from the nodes that have it,
  * and sends only the fields the operator changed. It used to open blank under
- * "leave blank to keep the current value", which could not say what the queue ran
+ * "leave blank to keep the current value", which could not say what the subscription ran
  * and — reopened after an update — could not say whether the update had taken.
  *
  * <p>Only the fields the broker will actually accept are offered. Routing type,
- * address, name and durability are fixed for the life of the queue and are shown
+ * destination, name and durability are fixed for the life of the subscription and are shown
  * as such with the reason — presented as *immutable*, which is a different thing
  * from disabled: one can never change, the other is merely unavailable right now,
  * and an operator who cannot tell them apart will keep looking for the way to
@@ -71,14 +71,14 @@ const FIELDS = Object.keys(EMPTY);
  * <p>The filter <em>is</em> editable. That was verified against a live broker
  * rather than assumed; see ADR-0049 D7.
  */
-export function EditQueueForm({
+export function EditSubscriptionForm({
   clusterId,
-  queue,
+  subscription,
   opened,
   onClose,
 }: Readonly<{
   clusterId: string;
-  queue: SubscriptionView;
+  subscription: SubscriptionView;
   opened: boolean;
   onClose: () => void;
 }>) {
@@ -95,11 +95,11 @@ export function EditQueueForm({
   });
   const { setValues, resetDirty } = form;
 
-  const update = useUpdateQueue(clusterId, queue.name);
-  // What the queue runs right now, per node. The form is seeded from it, so the
+  const update = useUpdateSubscription(clusterId, subscription.name);
+  // What the subscription runs right now, per node. The form is seeded from it, so the
   // operator edits the real configuration rather than guessing at blank inputs —
   // and after an update the reopened form shows what was written.
-  const configuration = useQueueConfiguration(clusterId, queue.name, opened);
+  const configuration = useSubscriptionConfiguration(clusterId, subscription.name, opened);
   const current = currentValues(configuration.data);
   const seeded = configuration.data?.nodes?.find((n) => !n.unavailableReason);
   const seededFrom = seeded?.nodeName ?? '';
@@ -124,7 +124,7 @@ export function EditQueueForm({
     // form from what the broker now reports rather than from the operator's typing.
   }, [configuration.dataUpdatedAt, current, setValues, resetDirty]);
 
-  // Only what the operator actually changed is sent. The server reads the queue's
+  // Only what the operator actually changed is sent. The server reads the subscription's
   // current configuration and merges this over it, because the broker's update
   // replaces rather than merges and would otherwise clear every omitted field.
   const changes = ({ filter, maxConsumers, purgeOnNoConsumers, exclusive, ringSize }: FormState) => ({
@@ -165,22 +165,22 @@ export function EditQueueForm({
     );
 
   return (
-    <Modal opened={opened} onClose={close} title={`Edit ${queue.name}`} size="lg">
+    <Modal opened={opened} onClose={close} title={`Edit ${subscription.name}`} size="lg">
       <form noValidate onSubmit={submit(false)}>
         <Stack gap="md">
-          {/* Immutable, not disabled — stated as facts about the queue rather than
+          {/* Immutable, not disabled — stated as facts about the subscription rather than
             as inputs that happen to be switched off. */}
           <DescriptionList
-            label="Fixed for the life of the queue"
+            label="Fixed for the life of the subscription"
             items={[
-              { term: 'Address', value: addressOf(queue) },
-              { term: 'Routing type', value: routingTypeOf(queue) },
-              { term: 'Durable', value: queue.durable ? 'yes' : 'no' },
+              { term: 'Destination', value: destinationOf(subscription) },
+              { term: 'Routing type', value: routingTypeOf(subscription) },
+              { term: 'Durable', value: subscription.durable ? 'yes' : 'no' },
             ]}
           />
           <Text size="xs" c="dimmed">
-            These are fixed for the life of the queue — the broker refuses to change them on a queue that exists. To
-            change one, delete this queue and create a new one.
+            These are fixed for the life of the subscription — the broker refuses to change them on a subscription that
+            exists. To change one, delete this subscription and create a new one.
           </Text>
 
           {configuration.isError ? (
@@ -197,7 +197,7 @@ export function EditQueueForm({
           ) : null}
 
           {configuration.isPending ? (
-            <LoadingState label="Loading what this queue runs" blockSize="18rem" />
+            <LoadingState label="Loading what this subscription runs" blockSize="18rem" />
           ) : (
             <>
               <TextInput

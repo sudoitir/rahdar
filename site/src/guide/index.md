@@ -22,7 +22,7 @@ nothing here starts a broker.
 | | |
 |---|---|
 | **Topology** | Live/backup pairs, replication state, shared-NodeID grouping, on one canvas. HA role is polled from every node on every cycle — never inferred from configuration. Two live in a pair is a critical split-brain alert. |
-| **Cross-node resources** | Queues, addresses, consumers, sessions, connections and producers across every node in one virtualised table, attributed per node, updating over SSE. |
+| **Cross-node resources** | Subscriptions, destinations, consumers, channels, connections and producers across every node in one virtualised table, attributed per node, updating over SSE. |
 | **Message operations** | Browse, send, move, retry, expire, delete, purge — with a dry run that answers with the affected count without acting, a server-enforced bulk cap, and per-node outcome reporting. |
 | **[SQL Console](/guide/sql-console)** | A restricted read-only SQL dialect over the messages in a cluster, including the body, with an optional retention-bounded index and a live tail. |
 | **Request-reply tracing** | Requests correlated to their replies across addresses and nodes, with latency and timeout statistics against expectations you declare. |

@@ -28,23 +28,23 @@ import { subscriptionColumns } from './subscriptionColumns.ts';
  * starts mutating broker routing on a schedule, so the whole blast radius is here.
  */
 function CaptureBlastRadius({ pattern, retentionDays }: Readonly<{ pattern: string; retentionDays: number }>) {
-  const target = pattern.trim() || 'these queues';
+  const target = pattern.trim() || 'these subscriptions';
   return (
     <Notice tone="warning" title="This changes routing on every live node">
       <Stack gap={6}>
         <Text size="sm">
           On each live node Rahdar will create a <strong>non-exclusive divert</strong> from {target}, a{' '}
-          <strong>ring-bounded, non-durable queue</strong> to hold the copies, an <strong>address setting</strong> that
-          stops the broker paging or blocking on Rahdar&apos;s account, and a <strong>security setting</strong>{' '}
-          restricting that queue to Rahdar&apos;s own role. Production routing is untouched — the divert copies, it does
-          not take.
+          <strong>ring-bounded, non-durable subscription</strong> to hold the copies, an{' '}
+          <strong>address setting</strong> that stops the broker paging or blocking on Rahdar&apos;s account, and a{' '}
+          <strong>security setting</strong> restricting that subscription to Rahdar&apos;s own role. Production routing
+          is untouched — the divert copies, it does not take.
         </Text>
         <Text size="sm">
           None of those objects disappears when the broker restarts. Removing this subscription is what removes them;
           nothing else will.
         </Text>
         <Text size="sm">
-          Every message the address routes is stored — headers, properties and the body — for {retentionDays} day
+          Every message the destination routes is stored — headers, properties and the body — for {retentionDays} day
           {retentionDays === 1 ? '' : 's'} or until the size bound is reached, whichever comes first, and is searchable
           by anyone who can read messages on this cluster.
         </Text>
@@ -71,7 +71,7 @@ interface Limit {
 const LIMITS = {
   ringSize: {
     label: 'Ring size (messages per node)',
-    description: 'How many copies each capture queue holds before the broker drops the oldest.',
+    description: 'How many copies each capture subscription holds before the broker drops the oldest.',
     min: 100,
     max: 1_000_000,
   },
@@ -83,7 +83,7 @@ const LIMITS = {
   },
   maxRate: {
     label: 'Rate limit (messages per second)',
-    description: 'Capture slows to this rate; the capture queue holds the backlog up to its bound.',
+    description: 'Capture slows to this rate; the capture subscription holds the backlog up to its bound.',
     min: 1,
     max: 1_000_000,
   },
@@ -160,18 +160,18 @@ function CapturePreview({ preview }: Readonly<{ preview: SqlCapturePreviewView }
       </Notice>
     );
   }
-  const addresses = (preview.destinations ?? []).map(nameOf);
+  const destinations = (preview.destinations ?? []).map(nameOf);
   const nodes = preview.nodes ?? [];
   return (
     <Stack gap={6} role="status" aria-live="polite">
       <Text size="sm">
-        Covers {addresses.length} address{addresses.length === 1 ? '' : 'es'}: {addresses.join(', ')}
+        Covers {destinations.length} destination{destinations.length === 1 ? '' : 's'}: {destinations.join(', ')}
       </Text>
       <Text size="sm">
         Installed on {nodes.length} live node{nodes.length === 1 ? '' : 's'}: {nodes.join(', ')}
       </Text>
       <Text size="sm">
-        Each capture queue holds at most {(preview.ringMessages ?? 0).toLocaleString()} messages or{' '}
+        Each capture subscription holds at most {(preview.ringMessages ?? 0).toLocaleString()} messages or{' '}
         {bytes(preview.ringBytes ?? 0)}, whichever is reached first. Past that the broker drops the oldest copy and
         Rahdar reports it as missed.
       </Text>
@@ -235,7 +235,7 @@ function blockedReason(permitted: boolean, capture: boolean, pattern: string, in
       ? 'Turning capture on needs the capture write permission.'
       : 'Creating a subscription needs the settings write permission.';
   }
-  if (pattern.trim().length === 0) return 'Enter a queue or pattern first.';
+  if (pattern.trim().length === 0) return 'Enter a subscription or pattern first.';
   return invalid ? 'Correct the highlighted fields first.' : null;
 }
 
@@ -248,12 +248,12 @@ function StoresBodiesNotice({
   return (
     <Notice tone="warning" title="This stores message bodies">
       <Text size="sm">
-        Rahdar will keep a copy of every message it observes on {pattern.trim() || 'these queues'} — headers,
+        Rahdar will keep a copy of every message it observes on {pattern.trim() || 'these subscriptions'} — headers,
         application properties and the body — in its own database for {retention} day
         {retention === 1 ? '' : 's'}, and then delete it. That copy is searchable by anyone who can read messages on
         this cluster.{' '}
         {capture
-          ? 'Capture records everything the address routed, up to its bounds; anything past them is counted as missed, never silently dropped.'
+          ? 'Capture records everything the destination routed, up to its bounds; anything past them is counted as missed, never silently dropped.'
           : 'Sampling records what was seen, not everything that passed through.'}{' '}
         Sensitive values are stored masked and credentials are never stored; the originals of other masked values are
         sealed, and only users with <code>message:clear</code> can see them.
@@ -390,8 +390,8 @@ function CreateSubscription({
   return (
     <Stack gap="xs" maw={520}>
       <TextInput
-        label="Queue or pattern"
-        description="Artemis wildcards: * is one level, # is many. ORDER.# captures every ORDER queue."
+        label="Subscription or pattern"
+        description="Artemis wildcards: * is one level, # is many. ORDER.# captures every ORDER subscription."
         placeholder="ORDER.IN"
         value={pattern}
         readOnly={frozen}
@@ -410,8 +410,8 @@ function CreateSubscription({
       />
       <Text size="xs" c="dimmed">
         {mode === 'SAMPLE'
-          ? 'Just sampling: Rahdar polls these queues and records what it saw. A message that arrives and is consumed between two polls is never recorded.'
-          : "Rahdar installs a divert-fed tap on every live node and records everything the address routed, whether or not anything consumed it. It changes the broker's routing configuration."}
+          ? 'Just sampling: Rahdar polls these subscriptions and records what it saw. A message that arrives and is consumed between two polls is never recorded.'
+          : "Rahdar installs a divert-fed tap on every live node and records everything the destination routed, whether or not anything consumed it. It changes the broker's routing configuration."}
       </Text>
       {capture ? (
         <TextInput
@@ -489,7 +489,7 @@ function CreateSubscription({
 }
 
 /**
- * Index subscriptions for this cluster (ADR-0059). The index is opt-in, per queue,
+ * Index subscriptions for this cluster (ADR-0059). The index is opt-in, per subscription,
  * retention-bounded and disposable, and this screen is where all four of those are
  * true or not.
  */
@@ -529,13 +529,13 @@ export function IndexSubscriptions() {
             <EmptyState
               kind="empty"
               title="Nothing is being indexed"
-              description="No queue on this cluster is captured, so the SQL Console answers every query from the live brokers and cannot find a message that has already been consumed. Index a queue below to change that — it stores message payload, so it is a deliberate choice rather than a default."
+              description="No subscription on this cluster is captured, so the SQL Console answers every query from the live brokers and cannot find a message that has already been consumed. Index a subscription below to change that — it stores message payload, so it is a deliberate choice rather than a default."
             />
           }
         />
       </Section>
 
-      <Section title="Index a queue" headingLevel={3}>
+      <Section title="Index a subscription" headingLevel={3}>
         <CreateSubscription clusterId={clusterId} canWrite={canWrite} canCapture={canCapture} />
       </Section>
     </Stack>

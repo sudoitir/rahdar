@@ -1,11 +1,11 @@
-import { nameOf } from '../../kernel/api/resourceId.ts';
+import { nameOf, refOf } from '../../kernel/api/resourceId.ts';
 import type { ReactNode } from 'react';
 
 import { OwnerChip } from '../../kernel/auth/OwnerChip.tsx';
 import { ResourceLink } from '../../kernel/actions/ResourceLink.tsx';
-import { MiddleTruncate, type Column } from '../../ui/table/index.ts';
+import { kindColumn, MiddleTruncate, type Column } from '../../ui/table/index.ts';
 import type { DestinationView, ConnectionView, ConsumerView, ProducerView, ChannelView } from './api.ts';
-import { CloseAddressConsumersAction, CloseConnectionAction } from './CloseConnection.tsx';
+import { CloseDestinationConsumersAction, CloseConnectionAction } from './CloseConnection.tsx';
 
 /** What a row action needs that the row itself does not carry. */
 export interface ColumnDeps {
@@ -14,24 +14,21 @@ export interface ColumnDeps {
   fetchedAt: number | null;
 }
 
-const LINK_TARGET = {
-  queue: (value: string) => ({ queueName: value }),
-  address: (value: string) => ({ address: value }),
-  connection: (value: string) => ({ connectionId: value, nodeId: '', nodeName: '' }),
-  session: (value: string) => ({ sessionId: value, nodeId: '', nodeName: '' }),
-};
-
 /**
  * A value that names another resource, as a link to it (ADR-0107) — or as plain text when the
  * feature presenting it is disabled, or when the broker gave no value. Its text is shortened in the
  * middle like any identifier, so names that differ only at the end stay apart.
  */
-function linked(kind: 'queue' | 'address' | 'connection' | 'session', value: string | null | undefined): ReactNode {
-  if (!value) return '';
-  const target = LINK_TARGET[kind](value) as never;
+function linked(
+  role: 'subscription' | 'destination' | 'connection' | 'channel',
+  id: string | null | undefined,
+): ReactNode {
+  if (!id) return '';
+  const ref = refOf(id);
+  const target = (role === 'connection' || role === 'channel' ? { ...ref, nodeId: '', nodeName: '' } : ref) as never;
   return (
-    <ResourceLink kind={kind} target={target}>
-      <MiddleTruncate text={value} />
+    <ResourceLink kind={role} target={target}>
+      <MiddleTruncate text={ref.name} />
     </ResourceLink>
   );
 }
@@ -59,7 +56,7 @@ function nodeColumn<T extends { nodeName: string }>(): Column<T> {
   return { id: 'node', header: 'Node', accessor: (r) => r.nodeName, kind: 'identifier', priority: 'essential' };
 }
 
-/** How an address delivers, as an operator reads it. */
+/** How an destination delivers, as an operator reads it. */
 const DELIVERY: Record<DestinationView['delivery'][number], string> = {
   POINT_TO_POINT: 'Point to point',
   PUBLISH_SUBSCRIBE: 'Publish-subscribe',
@@ -67,19 +64,20 @@ const DELIVERY: Record<DestinationView['delivery'][number], string> = {
 
 /** Each resource's columns. The first column identifies a row; the node column is never hidden. */
 export const resourceColumns = {
-  addresses: ({ clusterId }: ColumnDeps): Column<DestinationView>[] => [
+  destinations: ({ clusterId }: ColumnDeps): Column<DestinationView>[] => [
     {
       id: 'name',
-      header: 'Address',
+      header: 'Destination',
       accessor: (r) => r.name,
       kind: 'identifier',
       priority: 'essential',
       sortKey: 'name',
     },
+    kindColumn<DestinationView>(),
     {
       id: 'owner',
       header: 'Owner',
-      description: 'The team whose patterns own this address',
+      description: 'The team whose patterns own this destination',
       accessor: (r) => r.ownerTeam?.name ?? '',
       cell: (r) => <OwnerChip team={r.ownerTeam} />,
       kind: 'status',
@@ -96,31 +94,38 @@ export const resourceColumns = {
       kind: 'status',
       priority: 'low',
     },
-    { id: 'queues', header: 'Queues', accessor: (r) => r.subscriptionCount, kind: 'number', priority: 'high' },
+    {
+      id: 'subscriptions',
+      header: 'Subscriptions',
+      accessor: (r) => r.subscriptionCount,
+      kind: 'number',
+      priority: 'high',
+    },
     { id: 'depth', header: 'Messages', accessor: (r) => r.messageCount, kind: 'number', priority: 'high' },
     nodeColumn<DestinationView>(),
     actionColumn<DestinationView>('Close consumers', (row) => (
-      <CloseAddressConsumersAction clusterId={clusterId} address={row.name} />
+      <CloseDestinationConsumersAction clusterId={clusterId} destination={row.name} resourceKind={row.kind} />
     )),
   ],
   consumers: ({ clusterId, fetchedAt }: ColumnDeps): Column<ConsumerView>[] => [
     {
-      id: 'queue',
-      header: 'Queue',
+      id: 'subscription',
+      header: 'Subscription',
       accessor: (r) => nameOf(r.subscription),
-      cell: (r) => linked('queue', nameOf(r.subscription)),
+      cell: (r) => linked('subscription', r.subscription),
       kind: 'identifier',
       priority: 'essential',
-      sortKey: 'queue',
+      sortKey: 'subscription',
     },
     {
-      id: 'address',
-      header: 'Address',
+      id: 'destination',
+      header: 'Destination',
       accessor: (r) => nameOf(r.destination),
-      cell: (r) => linked('address', nameOf(r.destination)),
+      cell: (r) => linked('destination', r.destination),
       kind: 'identifier',
       priority: 'high',
     },
+    kindColumn<ConsumerView>(),
     { id: 'protocol', header: 'Protocol', accessor: (r) => r.protocol ?? '', kind: 'status', priority: 'low' },
     { id: 'delivered', header: 'Delivered', accessor: (r) => r.messagesDelivered, kind: 'number', priority: 'high' },
     { id: 'acked', header: 'Acked', accessor: (r) => r.messagesAcknowledged, kind: 'number', priority: 'low' },
@@ -145,21 +150,22 @@ export const resourceColumns = {
       />
     )),
   ],
-  sessions: ({ clusterId, fetchedAt }: ColumnDeps): Column<ChannelView>[] => [
+  channels: ({ clusterId, fetchedAt }: ColumnDeps): Column<ChannelView>[] => [
     {
-      id: 'session',
-      header: 'Session',
+      id: 'channel',
+      header: 'Channel',
       accessor: (r) => nameOf(r.id),
       kind: 'identifier',
       priority: 'essential',
-      sortKey: 'session',
+      sortKey: 'channel',
     },
+    kindColumn<ChannelView>(),
     { id: 'user', header: 'User', accessor: (r) => r.user ?? '', kind: 'text', priority: 'high' },
     {
       id: 'conn',
       header: 'Connection',
       accessor: (r) => nameOf(r.connection),
-      cell: (r) => linked('connection', nameOf(r.connection)),
+      cell: (r) => linked('connection', r.connection),
       kind: 'identifier',
       priority: 'low',
     },
@@ -169,7 +175,7 @@ export const resourceColumns = {
     actionColumn<ChannelView>('Close', (row) => (
       <CloseConnectionAction
         clusterId={clusterId}
-        kind="session"
+        kind="channel"
         nodeId={row.nodeId}
         nodeName={row.nodeName}
         targetId={row.id}
@@ -187,9 +193,10 @@ export const resourceColumns = {
       priority: 'essential',
       sortKey: 'remote',
     },
+    kindColumn<ConnectionView>(),
     { id: 'protocol', header: 'Protocol', accessor: (r) => r.protocol ?? '', kind: 'status', priority: 'low' },
     { id: 'client', header: 'Client id', accessor: (r) => r.clientId ?? '', kind: 'identifier', priority: 'high' },
-    { id: 'sessions', header: 'Sessions', accessor: (r) => r.channelCount, kind: 'number', priority: 'high' },
+    { id: 'channels', header: 'Channels', accessor: (r) => r.channelCount, kind: 'number', priority: 'high' },
     nodeColumn<ConnectionView>(),
     actionColumn<ConnectionView>('Close', (row) => (
       <CloseConnectionAction
@@ -205,14 +212,15 @@ export const resourceColumns = {
   ],
   producers: (): Column<ProducerView>[] => [
     {
-      id: 'address',
-      header: 'Address',
+      id: 'destination',
+      header: 'Destination',
       accessor: (r) => nameOf(r.destination),
-      cell: (r) => linked('address', nameOf(r.destination)),
+      cell: (r) => linked('destination', r.destination),
       kind: 'identifier',
       priority: 'essential',
-      sortKey: 'address',
+      sortKey: 'destination',
     },
+    kindColumn<ProducerView>(),
     { id: 'client', header: 'Client', accessor: (r) => r.clientId ?? '', kind: 'text', priority: 'high' },
     { id: 'protocol', header: 'Protocol', accessor: (r) => r.protocol ?? '', kind: 'status', priority: 'low' },
     { id: 'sent', header: 'Sent', accessor: (r) => r.messagesSent, kind: 'number', priority: 'high' },

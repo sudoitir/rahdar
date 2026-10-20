@@ -69,7 +69,7 @@ export function EmptyState(props: EmptyStateProps) {
 export type EmptyStateProps = Readonly<
   | {
       kind: 'empty';
-      /** What is missing, such as "No queues". */
+      /** What is missing, such as "No subscriptions". */
       title: string;
       /** What the resource is and why there is none. */
       description: ReactNode;

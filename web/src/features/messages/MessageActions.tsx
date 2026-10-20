@@ -13,22 +13,22 @@ import { useMessageAction, type MessageActionKind } from './api.ts';
 import { BulkActionPreview } from './BulkActionPreview.tsx';
 import { useActionGate } from './gates.ts';
 import { announceFailure, announceResult, destroys, messageCount, VERBS } from './outcomes.ts';
-import { AddressPicker } from '../queues/index.ts';
+import { DestinationPicker } from '../resources/index.ts';
 
 const ACTIONS = ['move', 'retry', 'delete', 'expire'] as const;
 
 /** What an action does to the selected messages, stated before it can be confirmed. */
-function consequenceOf(action: MessageActionKind, count: number, queueName: string): string {
+function consequenceOf(action: MessageActionKind, count: number, subscriptionName: string): string {
   const selected = messageCount(count);
   switch (action) {
     case 'move':
-      return `Moves the ${selected} selected from ${queueName} to the queue you name, on the node they were read from.`;
+      return `Moves the ${selected} selected from ${subscriptionName} to the subscription you name, on the node they were read from.`;
     case 'retry':
-      return `Sends the ${selected} selected, dead-lettered, back to the queue each came from.`;
+      return `Sends the ${selected} selected, dead-lettered, back to the subscription each came from.`;
     case 'delete':
-      return `Removes the ${selected} selected from ${queueName}, by id. This cannot be undone.`;
+      return `Removes the ${selected} selected from ${subscriptionName}, by id. This cannot be undone.`;
     case 'expire':
-      return `Expires the ${selected} selected in ${queueName}, by id. This cannot be undone.`;
+      return `Expires the ${selected} selected in ${subscriptionName}, by id. This cannot be undone.`;
   }
 }
 
@@ -70,23 +70,23 @@ function SelectionAction({
 /**
  * The by-selector entry point into {@link BulkActionPreview}, and, when the selection is non-empty,
  * the by-id actions on it. Each by-id action confirms with the number it acts on; a delete or expire
- * is armed by typing the queue's name. The outcome is announced: done, failed with its cause, or
+ * is armed by typing the subscription's name. The outcome is announced: done, failed with its cause, or
  * stopped part-way with the ids left undone.
  */
 export function MessageActions({
   clusterId,
-  queueName,
+  subscriptionName,
   node,
   selected,
   onCleared,
 }: Readonly<{
   clusterId: string;
-  queueName: string;
+  subscriptionName: string;
   node?: string;
   selected: ReadonlySet<string>;
   onCleared: () => void;
 }>) {
-  const run = useMessageAction(clusterId, queueName);
+  const run = useMessageAction(clusterId, subscriptionName);
   const roleIds = useRoleIds(clusterId);
   // The action stays set while the dialog closes, so its text does not change during the exit.
   const [action, setAction] = useState<MessageActionKind>('move');
@@ -96,7 +96,7 @@ export function MessageActions({
     validateInputOnBlur: true,
     // Checked on activation, so the confirm button is never disabled with no reason given.
     validate: {
-      target: (value) => (action === 'move' && !value.trim() ? 'Name the queue to move the messages to.' : null),
+      target: (value) => (action === 'move' && !value.trim() ? 'Name the subscription to move the messages to.' : null),
     },
   });
   const [bulk, setBulk] = useState<MessageActionKind | null>(null);
@@ -118,12 +118,14 @@ export function MessageActions({
       },
       {
         onSuccess: (r) => {
-          announceResult(action, queueName, r, ids.length);
+          announceResult(action, subscriptionName, r, ids.length);
           setOpened(false);
           onCleared();
         },
         onError: (e) =>
-          announceFailure(action, `${messageCount(ids.length)} in queue "${queueName}"`, e, () => setOpened(false)),
+          announceFailure(action, `${messageCount(ids.length)} in subscription "${subscriptionName}"`, e, () =>
+            setOpened(false),
+          ),
       },
     );
   }, focusFirstInvalid(form.getInputNode));
@@ -170,12 +172,12 @@ export function MessageActions({
         title={`${verb} ${messageCount(ids.length)}`}
         consequence={
           <Stack gap="sm">
-            <Text size="sm">{consequenceOf(action, ids.length, queueName)}</Text>
+            <Text size="sm">{consequenceOf(action, ids.length, subscriptionName)}</Text>
             {action === 'move' ? (
-              <AddressPicker
+              <DestinationPicker
                 clusterId={clusterId}
-                label="Target queue"
-                description="The queue receives the messages on the same node."
+                label="Target subscription"
+                description="The subscription receives the messages on the same node."
                 permission="message:send"
                 {...form.getInputProps('target')}
                 value={form.values.target}
@@ -192,7 +194,7 @@ export function MessageActions({
       {bulk ? (
         <BulkActionPreview
           clusterId={clusterId}
-          queueName={queueName}
+          subscriptionName={subscriptionName}
           action={bulk}
           node={node}
           opened={bulk !== null}

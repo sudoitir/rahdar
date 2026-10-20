@@ -6,7 +6,7 @@ import link from '../../ui/InlineLink.module.css';
 import { useCan } from './useCan.ts';
 
 /**
- * The team that owns a queue or address, as a link to the team when the caller may open it (an installation
+ * The team that owns a subscription or destination, as a link to the team when the caller may open it (an installation
  * administrator, or that team's own admin); otherwise the name alone, because the team page would answer not found.
  * Or that no team owns it.
  */

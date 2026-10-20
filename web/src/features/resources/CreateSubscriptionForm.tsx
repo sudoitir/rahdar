@@ -5,15 +5,15 @@ import { useForm } from '@mantine/form';
 import { useCreateRule } from '../../kernel/auth/useCreateRule.ts';
 import { kindOfRole } from '../../kernel/api/resourceId.ts';
 import { useCluster, useRoleIds } from '../clusters/index.ts';
-import { useCreateQueue, type CreateSubscriptionRequest, type LifecycleOutcomeView } from './api.ts';
+import { useCreateSubscription, type CreateSubscriptionRequest, type LifecycleOutcomeView } from './api.ts';
 import { ErrorState } from '../../ui/ErrorState.tsx';
 import { focusFirstInvalid, serverFieldErrors } from '../../ui/formErrors.ts';
 import { NodeOutcomeSummary } from '../../ui/NodeOutcomeSummary.tsx';
-import { AddressPicker } from './AddressPicker.tsx';
+import { DestinationPicker } from './DestinationPicker.tsx';
 
-/** Only the fields that identify the queue are required; the rest have broker defaults. */
+/** Only the fields that identify the subscription are required; the rest have broker defaults. */
 interface FormState {
-  address: string;
+  destination: string;
   name: string;
   routingType: 'ANYCAST' | 'MULTICAST';
   durable: boolean;
@@ -25,7 +25,7 @@ interface FormState {
 }
 
 const EMPTY: FormState = {
-  address: '',
+  destination: '',
   name: '',
   routingType: 'ANYCAST',
   durable: true,
@@ -38,17 +38,17 @@ const EMPTY: FormState = {
 
 const FIELDS = Object.keys(EMPTY);
 const ADDRESS_HELP =
-  'Messages are sent to an address; the queue binds to it. An address that does not exist yet is created with the queue.';
+  'Messages are sent to an destination; the subscription binds to it. An destination that does not exist yet is created with the subscription.';
 
 /**
- * Create a queue across every live node of a cluster.
+ * Create a subscription across every live node of a cluster.
  *
  * <p>Previews before it acts: the operator sees which nodes will be targeted, in
  * the same summary component the result is rendered with, so the two are
  * comparable. Creation is not destructive, so there is no typed confirmation —
  * the preview is the safety step.
  */
-export function CreateQueueForm({
+export function CreateSubscriptionForm({
   clusterId,
   opened,
   onClose,
@@ -61,20 +61,20 @@ export function CreateQueueForm({
   const [result, setResult] = useState<LifecycleOutcomeView | null>(null);
   const [advanced, setAdvanced] = useState(false);
 
-  const create = useCreateQueue(clusterId);
+  const create = useCreateSubscription(clusterId);
   const kinds = useCluster(clusterId).data?.kinds;
   const ids = useRoleIds(clusterId);
-  const queueRule = useCreateRule(clusterId, 'subscription');
-  const addressRule = useCreateRule(clusterId, 'destination');
+  const subscriptionRule = useCreateRule(clusterId, 'subscription');
+  const destinationRule = useCreateRule(clusterId, 'destination');
   const form = useForm<FormState>({
     initialValues: EMPTY,
     validateInputOnBlur: true,
     // The names are checked against the patterns the caller may create under as they are typed.
-    validateInputOnChange: ['address', 'name'],
+    validateInputOnChange: ['destination', 'name'],
     validate: {
-      address: (value) =>
-        value.trim() ? addressRule.problem(value) : 'An address is required — a queue binds to one.',
-      name: (value) => (value.trim() ? queueRule.problem(value) : 'A queue name is required.'),
+      destination: (value) =>
+        value.trim() ? destinationRule.problem(value) : 'An destination is required — a subscription binds to one.',
+      name: (value) => (value.trim() ? subscriptionRule.problem(value) : 'A subscription name is required.'),
     },
     // What was previewed or created no longer describes the form once a field changes.
     onValuesChange: () => {
@@ -87,7 +87,7 @@ export function CreateQueueForm({
   const body = (values: FormState): CreateSubscriptionRequest => ({
     kind: kindOfRole(kinds, 'SUBSCRIPTION'),
     name: values.name.trim(),
-    destination: ids.destination(values.address.trim()),
+    destination: ids.destination(values.destination.trim()),
     attributes: {
       routingType: values.routingType,
       durable: values.durable,
@@ -96,7 +96,7 @@ export function CreateQueueForm({
       purgeOnNoConsumers: values.purgeOnNoConsumers,
       exclusive: values.exclusive,
       ringSize: values.ringSize === '' ? undefined : Number(values.ringSize),
-      autoCreateAddress: true,
+      autoCreateDestination: true,
     },
   });
 
@@ -126,27 +126,27 @@ export function CreateQueueForm({
   };
 
   return (
-    <Modal opened={opened} onClose={close} title="New queue" size="lg">
+    <Modal opened={opened} onClose={close} title="New subscription" size="lg">
       <form noValidate onSubmit={submit(false)}>
         <Stack gap="md">
-          <AddressPicker
+          <DestinationPicker
             clusterId={clusterId}
-            {...form.getInputProps('address')}
-            value={form.values.address}
-            label="Address"
-            description={[ADDRESS_HELP, addressRule.restriction].filter(Boolean).join(' ')}
+            {...form.getInputProps('destination')}
+            value={form.values.destination}
+            label="Destination"
+            description={[ADDRESS_HELP, destinationRule.restriction].filter(Boolean).join(' ')}
           />
 
           <TextInput
-            label="Queue name"
-            description={queueRule.restriction ?? undefined}
+            label="Subscription name"
+            description={subscriptionRule.restriction ?? undefined}
             {...form.getInputProps('name')}
             required
           />
 
           <Radio.Group
             label="Routing type"
-            description="ANYCAST delivers each message to one consumer; MULTICAST delivers to every subscriber. This cannot be changed once the queue exists."
+            description="ANYCAST delivers each message to one consumer; MULTICAST delivers to every subscriber. This cannot be changed once the subscription exists."
             {...form.getInputProps('routingType')}
           >
             <Group gap="lg" mt="xs">
@@ -157,7 +157,7 @@ export function CreateQueueForm({
 
           <Switch
             label="Durable"
-            description="A durable queue and its messages survive a broker restart."
+            description="A durable subscription and its messages survive a broker restart."
             {...form.getInputProps('durable', { type: 'checkbox' })}
           />
 
@@ -240,7 +240,7 @@ export function CreateQueueForm({
                 loading={create.isPending && create.variables?.dryRun !== true}
                 disabled={result !== null}
               >
-                Create queue
+                Create subscription
               </Button>
             </Group>
           </Group>

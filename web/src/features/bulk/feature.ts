@@ -6,7 +6,7 @@ import { clusterRoute } from '../../kernel/routing/roots.ts';
 import { lazyFeatureView } from '../../kernel/routing/lazy.tsx';
 import { keys } from './api.ts';
 import { BulkActionBar } from './BulkActionBar.tsx';
-import { PurgeQueue } from './rowActions.tsx';
+import { PurgeSubscription } from './rowActions.tsx';
 
 const runsRoute = createRoute({
   getParentRoute: () => clusterRoute,
@@ -20,7 +20,7 @@ const runRoute = createRoute({
   component: lazyFeatureView('bulk', () => import('./BulkRunView.tsx'), 'BulkRunView'),
 });
 
-/** Pause, resume, purge or delete many queues as one previewed, persisted run (ADR-0093). */
+/** Pause, resume, purge or delete many subscriptions as one previewed, persisted run (ADR-0093). */
 export const bulkFeature = defineFeature({
   contract: CONTRACT,
   id: 'bulk',
@@ -37,8 +37,8 @@ export const bulkFeature = defineFeature({
     },
   ],
   slots: {
-    'queue.actions': [{ id: 'bulk.purge', order: 5, section: 'destroy', Component: PurgeQueue }],
-    'queues.selection': [{ id: 'bulk-actions', order: 10, Component: BulkActionBar }],
+    'subscription.actions': [{ id: 'bulk.purge', order: 5, section: 'destroy', Component: PurgeSubscription }],
+    'subscriptions.selection': [{ id: 'bulk-actions', order: 10, Component: BulkActionBar }],
   },
   streamTopics: {
     bulk: ({ clusterId, invalidate }) => invalidate(keys.all(clusterId)),

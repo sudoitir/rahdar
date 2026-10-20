@@ -13,7 +13,7 @@ export function FlowStateBadge({ state }: Readonly<{ state: string }>) {
 }
 
 /**
- * One expectation's declared reply addresses, and what they resolve to right now.
+ * One expectation's declared reply destinations, and what they resolve to right now.
  *
  * The declaration and the resolution are both shown because they answer different
  * questions: the patterns say what the operator meant, the resolved set says what is
@@ -24,7 +24,7 @@ export function ReplyDestinationsCell({ expectation: e }: Readonly<{ expectation
   if (e.replyDestinations.length === 0) {
     return (
       <Text size="sm" c="dimmed">
-        temporary queues
+        temporary subscriptions
       </Text>
     );
   }
@@ -49,7 +49,7 @@ export function ReplyDestinationsCell({ expectation: e }: Readonly<{ expectation
 }
 
 /**
- * One traced address's last tick, in a sentence an operator can act on.
+ * One traced destination's last tick, in a sentence an operator can act on.
  *
  * The interesting states are all "Rahdar looked and found nothing" versus "Rahdar
  * never looked", which the flows list alone cannot distinguish.
@@ -85,7 +85,7 @@ export function ExpectationStatus({
   );
 }
 
-/** What a traced address's row controls need from their view: what is gated and busy right now, and what a click does. */
+/** What a traced destination's row controls need from their view: what is gated and busy right now, and what a click does. */
 export interface ExpectationControls {
   denied: boolean;
   /** The expectation being saved, whose switch is locked until the write settles. */

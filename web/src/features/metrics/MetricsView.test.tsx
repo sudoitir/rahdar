@@ -29,7 +29,7 @@ describe('MetricsView', () => {
       http.get('*/api/v1/clusters/c1/metrics', () =>
         HttpResponse.json({ title: 'Upstream unavailable', detail: 'the broker did not answer' }, { status: 502 }),
       ),
-      http.get('*/api/v1/clusters/c1/rr/stats', () => HttpResponse.json({ addresses: [] })),
+      http.get('*/api/v1/clusters/c1/rr/stats', () => HttpResponse.json({ destinations: [] })),
     );
 
     renderWithProviders(<MetricsView />);
@@ -56,7 +56,7 @@ describe('MetricsView', () => {
           ],
         }),
       ),
-      http.get('*/api/v1/clusters/c1/rr/stats', () => HttpResponse.json({ addresses: [] })),
+      http.get('*/api/v1/clusters/c1/rr/stats', () => HttpResponse.json({ destinations: [] })),
     );
 
     renderWithProviders(<MetricsView />);
@@ -87,7 +87,7 @@ describe('MetricsView', () => {
           ],
         }),
       ),
-      http.get('*/api/v1/clusters/c1/rr/stats', () => HttpResponse.json({ addresses: [] })),
+      http.get('*/api/v1/clusters/c1/rr/stats', () => HttpResponse.json({ destinations: [] })),
     );
     const user = userEvent.setup();
     renderWithProviders(<MetricsView />);
@@ -123,7 +123,7 @@ describe('MetricsView', () => {
           series: [],
         }),
       ),
-      http.get('*/api/v1/clusters/c1/rr/stats', () => HttpResponse.json({ addresses: [] })),
+      http.get('*/api/v1/clusters/c1/rr/stats', () => HttpResponse.json({ destinations: [] })),
     );
     renderWithProviders(<MetricsView />);
 
@@ -148,7 +148,7 @@ describe('MetricsView', () => {
           series: [],
         });
       }),
-      http.get('*/api/v1/clusters/c1/rr/stats', () => HttpResponse.json({ addresses: [] })),
+      http.get('*/api/v1/clusters/c1/rr/stats', () => HttpResponse.json({ destinations: [] })),
     );
 
     try {
@@ -186,7 +186,7 @@ describe('MetricsView', () => {
           series: [],
         }),
       ),
-      http.get('*/api/v1/clusters/c1/rr/stats', () => HttpResponse.json({ addresses: [] })),
+      http.get('*/api/v1/clusters/c1/rr/stats', () => HttpResponse.json({ destinations: [] })),
     );
 
     const user = userEvent.setup();
@@ -195,7 +195,7 @@ describe('MetricsView', () => {
 
     await user.click(await screen.findByRole('radio', { name: '6h' }));
     expect(navigateSpy).toHaveBeenCalledTimes(1);
-    // The range is merged into whatever else the URL carries, so a queue scope
+    // The range is merged into whatever else the URL carries, so a subscription scope
     // survives it; an absolute window is what choosing a relative range clears.
     const { search } = navigateSpy.mock.calls[0][0] as {
       search: (prev: Record<string, unknown>) => Record<string, unknown>;
@@ -208,7 +208,7 @@ describe('MetricsView', () => {
     });
   });
 
-  it('splits a queue by broker node on request, one chart per node, and says which node was not sampled', async () => {
+  it('splits a subscription by broker node on request, one chart per node, and says which node was not sampled', async () => {
     const urls: string[] = [];
     server.use(
       http.get('*/api/v1/clusters/c1/metrics', ({ request }) => {
@@ -237,7 +237,7 @@ describe('MetricsView', () => {
             : {}),
         });
       }),
-      http.get('*/api/v1/clusters/c1/rr/stats', () => HttpResponse.json({ addresses: [] })),
+      http.get('*/api/v1/clusters/c1/rr/stats', () => HttpResponse.json({ destinations: [] })),
     );
 
     currentSearch = { range: '1h', subject: 'orders' };
@@ -269,7 +269,7 @@ describe('MetricsView', () => {
           series: [],
         });
       }),
-      http.get('*/api/v1/clusters/c1/rr/stats', () => HttpResponse.json({ addresses: [] })),
+      http.get('*/api/v1/clusters/c1/rr/stats', () => HttpResponse.json({ destinations: [] })),
     );
     renderWithProviders(<MetricsView />);
     await screen.findByRole('heading', { name: 'Metrics' });

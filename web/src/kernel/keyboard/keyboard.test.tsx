@@ -25,7 +25,7 @@ function Harness({ dialog = false }: { dialog?: boolean }) {
   return (
     <>
       <label>
-        Filter queues
+        Filter subscriptions
         <input ref={filter} />
       </label>
       <button type="button">elsewhere</button>
@@ -49,16 +49,16 @@ describe('single-key shortcuts (ADR-0109)', () => {
     renderWithProviders(<Harness />);
     screen.getByRole('button', { name: 'elsewhere' }).focus();
     await user.keyboard('gq');
-    expect(navigate).toHaveBeenCalledWith({ to: '/clusters/c1/queues' });
+    expect(navigate).toHaveBeenCalledWith({ to: '/clusters/c1/subscriptions' });
   });
 
   it('is not taken while typing in a field', async () => {
     const user = userEvent.setup();
     renderWithProviders(<Harness />);
-    await user.click(screen.getByRole('textbox', { name: 'Filter queues' }));
+    await user.click(screen.getByRole('textbox', { name: 'Filter subscriptions' }));
     await user.keyboard('gq');
     expect(navigate).not.toHaveBeenCalled();
-    expect(screen.getByRole('textbox', { name: 'Filter queues' })).toHaveValue('gq');
+    expect(screen.getByRole('textbox', { name: 'Filter subscriptions' })).toHaveValue('gq');
   });
 
   it('never navigates away from an open dialog', async () => {
@@ -87,7 +87,7 @@ describe('single-key shortcuts (ADR-0109)', () => {
     expect(screen.getByText('help is open')).toBeInTheDocument();
     screen.getByRole('button', { name: 'elsewhere' }).focus();
     await user.keyboard('/');
-    expect(screen.getByRole('textbox', { name: 'Filter queues' })).toHaveFocus();
+    expect(screen.getByRole('textbox', { name: 'Filter subscriptions' })).toHaveFocus();
   });
 
   it('reads the physical key on a non-Latin layout', () => {
@@ -96,7 +96,7 @@ describe('single-key shortcuts (ADR-0109)', () => {
     // A Persian keyboard: the keys under G and Q.
     fireEvent.keyDown(target, { key: 'گ', code: 'KeyG' });
     fireEvent.keyDown(target, { key: 'ض', code: 'KeyQ' });
-    expect(navigate).toHaveBeenCalledWith({ to: '/clusters/c1/queues' });
+    expect(navigate).toHaveBeenCalledWith({ to: '/clusters/c1/subscriptions' });
   });
 });
 

@@ -2,13 +2,9 @@ import { http, HttpResponse } from 'msw';
 
 import type { Finding, TransferRunView } from './api.ts';
 import { paged } from '../../kernel/api/paging.ts';
+import { ARTEMIS_KINDS, ARTEMIS_SYSTEM } from '../../test/wire.ts';
 
 /** Test fixtures for the transfer screens. Placeholder names only. */
-
-const KINDS = [
-  { id: 'artemis.queue', resourceClass: 'SUBSCRIPTION', label: 'Queue', verbs: [] },
-  { id: 'artemis.address', resourceClass: 'DESTINATION', label: 'Address', verbs: [] },
-];
 
 export const AVAILABLE = { status: 'AVAILABLE', reason: 'ok', brokerXmlSnippet: null };
 
@@ -61,7 +57,8 @@ export function clusterHandlers(
     name,
     description: null,
     topology: topologyOf(id),
-    kinds: KINDS,
+    system: ARTEMIS_SYSTEM,
+    kinds: ARTEMIS_KINDS,
     capabilities: {
       managementRead: AVAILABLE,
       managementWrite: AVAILABLE,
@@ -100,12 +97,12 @@ export function meHandler(permissions: string[] = ['*']) {
   );
 }
 
-export const END = (clusterId: string, nodeId: string, nodeName: string, queue: string) => ({
+export const END = (clusterId: string, nodeId: string, nodeName: string, subscription: string) => ({
   clusterId,
   nodeId,
   nodeName,
-  subscription: `artemis.queue/${queue}`,
-  destination: `artemis.address/${queue}`,
+  subscription: `artemis.queue/${subscription}`,
+  destination: `artemis.address/${subscription}`,
 });
 
 export function run(over: Partial<TransferRunView> = {}): TransferRunView {

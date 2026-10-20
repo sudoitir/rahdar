@@ -3,7 +3,8 @@ import { Button, Select, Text, TextInput } from '@mantine/core';
 import { Link, useNavigate, useParams, useSearch } from '@tanstack/react-router';
 import { useDebouncedValue } from '@mantine/hooks';
 
-import { CapabilityLedger, useCluster } from '../clusters/index.ts';
+import { CapabilityLedger, useCluster, useRoleIds } from '../clusters/index.ts';
+import { refOf } from '../../kernel/api/resourceId.ts';
 import { useMessages, type MessageSummaryView } from './api.ts';
 import { CapabilityGate } from '../../ui/CapabilityGate.tsx';
 import { EmptyState } from '../../ui/EmptyState.tsx';
@@ -18,7 +19,7 @@ import { messageColumns } from './columns.ts';
 import { useMessageGate } from './gates.ts';
 import { MessageDetailPanel } from './MessageDetailPanel.tsx';
 import { MessageActions } from './MessageActions.tsx';
-import { PurgeQueue } from './PurgeQueue.tsx';
+import { PurgeSubscription } from './PurgeSubscription.tsx';
 import { SendMessage } from './SendMessage.tsx';
 import { useDisplayZone } from '../../kernel/time/timezone.ts';
 import { useSlot, type MessageSelection } from '../../kernel/slots.ts';
@@ -39,7 +40,7 @@ function countLabel(page: { count?: number | null; countUnavailable?: string | n
   return `${page.count} message${page.count === 1 ? '' : 's'}`;
 }
 
-/** Picked rows win; otherwise the selector in force, otherwise the whole queue. */
+/** Picked rows win; otherwise the selector in force, otherwise the whole subscription. */
 function selectionOf(pickedIds: number[], filter: string | undefined): MessageSelection {
   if (pickedIds.length > 0) return { kind: 'ids', ids: pickedIds };
   return filter ? { kind: 'filter', filter } : { kind: 'all' };
@@ -50,7 +51,7 @@ function selectionTotalOf(selection: MessageSelection, total: number | null | un
   return selection.kind === 'all' ? (total ?? null) : null;
 }
 
-/** Why the grid is empty: the selector, nodes that did not answer, or genuinely nothing in the queue. */
+/** Why the grid is empty: the selector, nodes that did not answer, or genuinely nothing in the subscription. */
 function MessagesEmpty({
   filtered,
   unreachable,
@@ -61,7 +62,7 @@ function MessagesEmpty({
       <EmptyState
         kind="filtered"
         title="No message matches this selector"
-        description="The selector excludes every message in this queue. Clear it to browse them all."
+        description="The selector excludes every message in this subscription. Clear it to browse them all."
         onClearFilters={onClearSelector}
       />
     );
@@ -72,14 +73,14 @@ function MessagesEmpty({
   return (
     <EmptyState
       kind="empty"
-      title="This queue has no messages"
-      description="Messages wait in a queue until a consumer takes them. Produce to the queue, or use Send above to add one. Messages here are read over Jolokia as text — faithful binary bodies need the Core client."
+      title="This subscription has no messages"
+      description="Messages wait in a subscription until a consumer takes them. Produce to the subscription, or use Send above to add one. Messages here are read over Jolokia as text — faithful binary bodies need the Core client."
     />
   );
 }
 
 /**
- * Browse one queue's messages (ADR-0021). Reached from a queue row, not a
+ * Browse one subscription's messages (ADR-0021). Reached from a subscription row, not a
  * top-level tab. Node, filter and page are URL-owned (non-negotiable #9);
  * message selection is ephemeral (added in a later slice). The whole view is
  * gated on the `messageIo` capability — when it is not available the ledger
@@ -93,21 +94,27 @@ export function MessagesView() {
   // Absolute timestamps here read the display zone from module state, so this
   // subscribes the view to a zone change (`app/timezone.ts`).
   const zone = useDisplayZone();
-  const { clusterId, queueName } = useParams({ strict: false }) as {
+  const { clusterId, subscriptionName } = useParams({ strict: false }) as {
     clusterId: string;
-    queueName: string;
+    subscriptionName: string;
   };
   const search = useSearch({ strict: false }) as { node?: string; filter?: string; page?: number; message?: string };
   const navigate = useNavigate();
 
   const cluster = useCluster(clusterId);
+  const roleIds = useRoleIds(clusterId);
+  // The subscription's reference needs its kind, which the cluster view gives; until then nothing offers it.
+  const subscription = useMemo(
+    () => (roleIds.loaded ? refOf(roleIds.subscription(subscriptionName)) : undefined),
+    [roleIds, subscriptionName],
+  );
   const sendGate = useMessageGate(clusterId, 'message:send', 'Send messages', 'messageIo');
   const columns = useMemo(() => messageColumns(zone), [zone]);
   const [filter, setFilter] = useState(search.filter ?? '');
   const [debounced] = useDebouncedValue(filter, 250);
-  // The open message is in the address, so a link to one message opens it (non-negotiable #9).
+  // The open message is in the destination, so a link to one message opens it (non-negotiable #9).
   const openId = search.message ?? null;
-  useTitlePart('resource', openId ? `${queueName} › message ${openId}` : queueName);
+  useTitlePart('resource', openId ? `${subscriptionName} › message ${openId}` : subscriptionName);
   const setOpenId = (id: string | null) =>
     navigate({ to: '.', search: (prev: Record<string, unknown>) => ({ ...prev, message: id ?? undefined }) });
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -149,7 +156,7 @@ export function MessagesView() {
     [cluster.data],
   );
 
-  const messages = useMessages(clusterId, queueName, {
+  const messages = useMessages(clusterId, subscriptionName, {
     node: search.node,
     filter: search.filter,
     page,
@@ -169,10 +176,10 @@ export function MessagesView() {
       title="Messages"
       meta={
         <>
-          <Link to={`/clusters/${clusterId}/queues`} className={linkClasses.link}>
-            All queues
+          <Link to={`/clusters/${clusterId}/subscriptions`} className={linkClasses.link}>
+            All subscriptions
           </Link>
-          <span className={classes.queue}>{queueName}</span>
+          <span className={classes.subscription}>{subscriptionName}</span>
         </>
       }
       description={
@@ -180,7 +187,7 @@ export function MessagesView() {
           ? `${countLabel(messages.data)} · read from ${
               endpoints.find((e) => e.id === messages.data.node)?.name ?? 'the live node'
             }`
-          : 'Reading the queue…'
+          : 'Reading the subscription…'
       }
       actions={
         <>
@@ -189,7 +196,7 @@ export function MessagesView() {
               Send
             </Button>
           </CapabilityGate>
-          <PurgeQueue clusterId={clusterId} queueName={queueName} node={search.node} />
+          <PurgeSubscription clusterId={clusterId} subscriptionName={subscriptionName} node={search.node} />
         </>
       }
     />
@@ -225,18 +232,18 @@ export function MessagesView() {
   const total = messages.data?.count;
   const lastPage = total == null ? null : Math.max(1, Math.ceil(total / PAGE_SIZE));
 
-  // Picked rows win; otherwise the selector in force, otherwise the whole queue.
+  // Picked rows win; otherwise the selector in force, otherwise the whole subscription.
   const pickedIds = [...selected].map(Number).filter((n) => Number.isFinite(n));
   const selection = selectionOf(pickedIds, search.filter);
-  // A selector's match count is the preview's to establish; the page's total is the whole queue.
+  // A selector's match count is the preview's to establish; the page's total is the whole subscription.
   const selectionTotal = selectionTotalOf(selection, total);
 
-  // A node Rahdar could not reach contributes no rows, which looks exactly like a queue with none.
+  // A node Rahdar could not reach contributes no rows, which looks exactly like a subscription with none.
   const unreachable = (cluster.data?.topology.nodes ?? [])
     .flatMap((n) => n.endpoints)
     .filter((e) => e.lastError)
     .map((e) => e.name);
-  // The address follows the field once typing pauses, so clearing the field clears the selector.
+  // The destination follows the field once typing pauses, so clearing the field clears the selector.
   const clearSelector = () => setFilter('');
 
   const setNode = (node: string | null) =>
@@ -282,24 +289,26 @@ export function MessagesView() {
             <Text size="xs" c="dimmed">
               {lastPage == null ? `page ${page} · total unavailable` : `page ${page} of ${lastPage}`}
             </Text>
-            {selectionSlot.map(({ id, Component }) => (
-              <Component
-                key={id}
-                clusterId={clusterId}
-                queueName={queueName}
-                node={search.node}
-                selection={selection}
-                total={selectionTotal}
-                clear={() => setSelected(new Set())}
-              />
-            ))}
+            {subscription
+              ? selectionSlot.map(({ id, Component }) => (
+                  <Component
+                    key={id}
+                    clusterId={clusterId}
+                    subscription={subscription}
+                    node={search.node}
+                    selection={selection}
+                    total={selectionTotal}
+                    clear={() => setSelected(new Set())}
+                  />
+                ))
+              : null}
           </>
         }
       />
 
       <MessageActions
         clusterId={clusterId}
-        queueName={queueName}
+        subscriptionName={subscriptionName}
         node={search.node}
         selected={selected}
         onCleared={() => setSelected(new Set())}
@@ -323,14 +332,15 @@ export function MessagesView() {
         onToggleAll={toggleAll}
         rowMenu={{
           label: (m) => `message ${m.position}`,
-          render: (m, menu) => (
-            <ResourceActions
-              kind="message"
-              clusterId={clusterId}
-              target={{ queueName, position: m.position, node: search.node }}
-              restoreFocus={menu.restoreFocus}
-            />
-          ),
+          render: (m, menu) =>
+            subscription ? (
+              <ResourceActions
+                kind="message"
+                clusterId={clusterId}
+                target={{ subscription, position: m.position, node: search.node }}
+                restoreFocus={menu.restoreFocus}
+              />
+            ) : null,
         }}
         empty={
           <MessagesEmpty filtered={Boolean(search.filter)} unreachable={unreachable} onClearSelector={clearSelector} />
@@ -339,7 +349,7 @@ export function MessagesView() {
 
       <MessageDetailPanel
         clusterId={clusterId}
-        queueName={queueName}
+        subscriptionName={subscriptionName}
         messageId={openId}
         node={search.node}
         filter={search.filter}
@@ -348,7 +358,7 @@ export function MessagesView() {
 
       <SendMessage
         clusterId={clusterId}
-        queueName={queueName}
+        subscriptionName={subscriptionName}
         node={search.node}
         opened={sendOpen}
         onClose={() => setSendOpen(false)}

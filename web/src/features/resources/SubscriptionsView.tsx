@@ -4,7 +4,7 @@ import { useNavigate, useParams, useSearch } from '@tanstack/react-router';
 import { useDebouncedCallback } from '@mantine/hooks';
 
 import { useCluster } from '../clusters/index.ts';
-import { addressOf, routingTypeOf, useQueue, useQueues, type SubscriptionView } from './api.ts';
+import { destinationOf, routingTypeOf, useSubscription, useSubscriptions, type SubscriptionView } from './api.ts';
 import { DataTable } from '../../ui/table/index.ts';
 import { EmptyState } from '../../ui/EmptyState.tsx';
 import { ErrorState } from '../../ui/ErrorState.tsx';
@@ -12,29 +12,29 @@ import { Page } from '../../ui/Page.tsx';
 import { PageHeader } from '../../ui/PageHeader.tsx';
 import { Pager } from '../../ui/Pager.tsx';
 import { Toolbar } from '../../ui/Toolbar.tsx';
-import { QueueDetailDrawer } from './QueueDetailDrawer.tsx';
-import { CreateQueueForm } from './CreateQueueForm.tsx';
+import { SubscriptionDetailDrawer } from './SubscriptionDetailDrawer.tsx';
+import { CreateSubscriptionForm } from './CreateSubscriptionForm.tsx';
 import { useCan } from '../../kernel/auth/useCan.ts';
-import { useSlot, type QueueSelection } from '../../kernel/slots.ts';
+import { useSlot, type SubscriptionSelection } from '../../kernel/slots.ts';
 import { ResourceActions } from '../../kernel/actions/ResourceActions.tsx';
 import { useTitlePart } from '../../kernel/shell/pageTitle.ts';
 import { CapabilityGate } from '../../ui/CapabilityGate.tsx';
 import { gateFor } from '../../ui/capabilityGate.ts';
 import { useFilterShortcut } from '../../kernel/keyboard/filterShortcut.ts';
-import { queueColumns } from './columns.ts';
+import { subscriptionColumns } from './subscriptionColumns.ts';
 
 const PAGE_SIZE = 200;
 
-const rowKey = (r: SubscriptionView) => `${addressOf(r)}::${r.name}::${routingTypeOf(r)}`;
+const rowKey = (r: SubscriptionView) => `${destinationOf(r)}::${r.name}::${routingTypeOf(r)}`;
 
 /** What the selection says, in words. */
 function selectionWords(count: number, total: number, matching: string, allMatching: boolean): string {
-  if (count === 0) return 'No queues selected. Select queues in the grid to act on them together.';
-  if (allMatching) return `All ${total.toLocaleString()} queues${matching} are selected.`;
-  return `${count.toLocaleString()} ${count === 1 ? 'queue' : 'queues'} selected`;
+  if (count === 0) return 'No subscriptions selected. Select subscriptions in the grid to act on them together.';
+  if (allMatching) return `All ${total.toLocaleString()} subscriptions${matching} are selected.`;
+  return `${count.toLocaleString()} ${count === 1 ? 'subscription' : 'subscriptions'} selected`;
 }
 
-/** How many queues are picked, and the actions that apply to them. */
+/** How many subscriptions are picked, and the actions that apply to them. */
 function SelectionBar({
   count,
   total,
@@ -55,14 +55,14 @@ function SelectionBar({
   children: React.ReactNode;
 }>) {
   return (
-    <Group gap="sm" justify="space-between" role="region" aria-label="Selected queues">
+    <Group gap="sm" justify="space-between" role="region" aria-label="Selected subscriptions">
       <Group gap="xs">
         <Text size="sm" fw={count > 0 ? 600 : undefined}>
           {selectionWords(count, total, matching, allMatching)}
         </Text>
         {canSelectAll ? (
           <Button size="xs" variant="subtle" onClick={onSelectAll}>
-            {`Select all ${total.toLocaleString()} queues${matching}`}
+            {`Select all ${total.toLocaleString()} subscriptions${matching}`}
           </Button>
         ) : null}
         {count > 0 ? (
@@ -77,7 +77,7 @@ function SelectionBar({
 }
 
 /** Why the grid is empty: the filter, nodes that did not answer, or genuinely nothing yet. */
-function QueuesEmpty({
+function SubscriptionsEmpty({
   filterText,
   unreachable,
   reach,
@@ -87,7 +87,7 @@ function QueuesEmpty({
 }: Readonly<{
   filterText: string;
   unreachable: string[];
-  /** How the caller reaches queues on this cluster; a team member sees only theirs, and may see none. */
+  /** How the caller reaches subscriptions on this cluster; a team member sees only theirs, and may see none. */
   reach: 'grant' | 'teams' | 'none' | 'unknown';
   mayCreate: boolean;
   onClearFilter: () => void;
@@ -97,8 +97,8 @@ function QueuesEmpty({
     return (
       <EmptyState
         kind="filtered"
-        title={`No queue matches "${filterText}"`}
-        description="Queues may still exist on this cluster; none of them match this filter."
+        title={`No subscription matches "${filterText}"`}
+        description="Subscriptions may still exist on this cluster; none of them match this filter."
         onClearFilters={onClearFilter}
       />
     );
@@ -112,7 +112,7 @@ function QueuesEmpty({
             ? `${unreachable[0]} could not be reached`
             : `${unreachable.length} nodes could not be reached`
         }
-        description={`There may be queues here that Rahdar cannot currently see. ${
+        description={`There may be subscriptions here that Rahdar cannot currently see. ${
           unreachable.length === 1 ? 'This node' : 'These nodes'
         } did not answer the last scrape, so this is an incomplete view rather than an empty cluster.`}
         nodes={unreachable}
@@ -124,25 +124,25 @@ function QueuesEmpty({
       <EmptyState
         kind="empty"
         title="You're not in any team on this cluster"
-        description="Queues here belong to teams, and you are in none that owns queues on this cluster. Ask a platform administrator to add you to a team."
+        description="Subscriptions here belong to teams, and you are in none that owns subscriptions on this cluster. Ask a platform administrator to add you to a team."
       />
     );
   }
   return (
     <EmptyState
       kind="empty"
-      title={reach === 'teams' ? 'No queues in your teams on this cluster' : 'No queues yet'}
+      title={reach === 'teams' ? 'No subscriptions in your teams on this cluster' : 'No subscriptions yet'}
       description={
         <>
-          A queue is where messages wait for a consumer. Rahdar fills this grid from each broker's{' '}
-          <code>listQueues</code>, so a queue appears here within a scrape tick of being created or of the first message
-          produced to its address.
+          A subscription is where messages wait for a consumer. Rahdar fills this grid from each broker's{' '}
+          <code>listSubscriptions</code>, so a subscription appears here within a scrape tick of being created or of the
+          first message produced to its destination.
         </>
       }
       action={
         mayCreate ? (
           <Button size="xs" variant="light" onClick={onCreate}>
-            Create the first queue
+            Create the first subscription
           </Button>
         ) : undefined
       }
@@ -152,10 +152,10 @@ function QueuesEmpty({
 
 /**
  * Selection is local and belongs to the filter it was made under: a new filter is a new set of
- * queues, and carrying picks across it would act on queues the operator can no longer see.
- * Picks are keyed by row, holding the queue name the bulk actions need.
+ * subscriptions, and carrying picks across it would act on subscriptions the operator can no longer see.
+ * Picks are keyed by row, holding the subscription name the bulk actions need.
  */
-function useQueueSelection(rows: SubscriptionView[], total: number, q: string | undefined) {
+function useSubscriptionSelection(rows: SubscriptionView[], total: number, q: string | undefined) {
   const [picked, setPicked] = useState<Map<string, string>>(new Map());
   const [allMatching, setAllMatching] = useState(false);
   const clearSelection = () => {
@@ -166,7 +166,7 @@ function useQueueSelection(rows: SubscriptionView[], total: number, q: string | 
     setPicked(new Map());
     setAllMatching(false);
   }, [q]);
-  // "All matching" is a filter, not a list of names: the queues on the other pages were never loaded.
+  // "All matching" is a filter, not a list of names: the subscriptions on the other pages were never loaded.
   // Changing any one row turns it back into names, starting from this page.
   const pageNames = () => new Map(rows.map((r) => [rowKey(r), r.name]));
   const toggleRow = (key: string) => {
@@ -187,7 +187,7 @@ function useQueueSelection(rows: SubscriptionView[], total: number, q: string | 
   const count = allMatching ? total : picked.size;
   const pageAllPicked = rows.length > 0 && rows.every((r) => picked.has(rowKey(r)));
   const matching = q ? ` matching "${q}"` : ' on this cluster';
-  const selection: QueueSelection = allMatching
+  const selection: SubscriptionSelection = allMatching
     ? { kind: 'filter', q: q ?? '', total }
     : { kind: 'names', names: [...picked.values()] };
 
@@ -207,16 +207,16 @@ function useQueueSelection(rows: SubscriptionView[], total: number, q: string | 
 }
 
 /**
- * The headline view: every queue across every node, in one virtualized grid.
+ * The headline view: every subscription across every node, in one virtualized grid.
  * Sort, filter and page are URL-owned (non-negotiable #9); the grid is
- * server-driven through `useQueues`.
+ * server-driven through `useSubscriptions`.
  */
-export function QueuesView() {
+export function SubscriptionsView() {
   // `/` focuses this view's filter (ADR-0109).
   const filterRef = useRef<HTMLInputElement>(null);
   useFilterShortcut(filterRef);
   const { clusterId } = useParams({ strict: false }) as { clusterId: string };
-  const search = useSearch({ strict: false }) as { q?: string; sort?: string; page?: number; queue?: string };
+  const search = useSearch({ strict: false }) as { q?: string; sort?: string; page?: number; subscription?: string };
   const navigate = useNavigate();
 
   const [filter, setFilter] = useState(search.q ?? '');
@@ -234,7 +234,7 @@ export function QueuesView() {
     setFilter(q);
     writeFilter(q);
   };
-  // Cancelling first: a write still waiting on the debounce would put the old filter back in the address.
+  // Cancelling first: a write still waiting on the debounce would put the old filter back in the destination.
   const clearFilter = () => {
     writeFilter.cancel();
     setFilter('');
@@ -244,28 +244,29 @@ export function QueuesView() {
     });
   };
 
-  const query = useQueues(clusterId, {
+  const query = useSubscriptions(clusterId, {
     q: search.q,
     sort: search.sort,
     page,
     size: PAGE_SIZE,
   });
 
-  // The open queue is an address, not a copy: held as a name and looked up in the
+  // The open subscription is an destination, not a copy: held as a name and looked up in the
   // rows each render, so a pause, an edit or a delete that refetches the listing is
-  // reflected in the panel instead of leaving it showing the queue as it was when
+  // reflected in the panel instead of leaving it showing the subscription as it was when
   // it was opened (non-negotiable #9).
   //
-  // A shared or palette link can name a queue that is not on the loaded page; it is looked up by
+  // A shared or palette link can name a subscription that is not on the loaded page; it is looked up by
   // name then, rather than the link silently opening nothing.
-  const onPage = (query.data?.data ?? []).find((q) => q.name === search.queue);
-  const offPage = useQueue(clusterId, onPage ? undefined : search.queue);
-  const selected = onPage ?? offPage.queue ?? null;
+  const onPage = (query.data?.data ?? []).find((q) => q.name === search.subscription);
+  const offPage = useSubscription(clusterId, onPage ? undefined : search.subscription);
+  const selected = onPage ?? offPage.subscription ?? null;
   // Neither the page nor an exact lookup has it: gone, or no longer visible to the caller. Not while still asking.
-  const missing = !selected && search.queue && !offPage.isPending && !offPage.isError ? search.queue : undefined;
+  const missing =
+    !selected && search.subscription && !offPage.isPending && !offPage.isError ? search.subscription : undefined;
   useTitlePart('resource', selected?.name);
-  const setSelected = (queue: SubscriptionView | null) =>
-    navigate({ to: '.', search: (prev: Record<string, unknown>) => ({ ...prev, queue: queue?.name }) });
+  const setSelected = (subscription: SubscriptionView | null) =>
+    navigate({ to: '.', search: (prev: Record<string, unknown>) => ({ ...prev, subscription: subscription?.name }) });
   const [createOpen, setCreateOpen] = useState(false);
   const { can, reach, createPatterns, loading: grantsLoading } = useCan();
   // Through a team or a share the caller may create under their patterns; only with neither is the control not theirs.
@@ -274,12 +275,12 @@ export function QueuesView() {
 
   // An empty grid has three quite different causes, and presenting an absence as
   // a fact is the one that misleads: a node Rahdar could not reach contributes no
-  // rows, which looks exactly like a cluster with no queues.
+  // rows, which looks exactly like a cluster with no subscriptions.
   const cluster = useCluster(clusterId);
   // Offered while grants load, and never hidden: an operator without the grant sees why (non-negotiable #5).
   const createGate = gateFor(
     mayCreate,
-    'Create queues and addresses',
+    'Create subscriptions and destinations',
     cluster.data?.capabilities.managementWrite,
     grantsLoading || cluster.isPending,
   );
@@ -288,14 +289,14 @@ export function QueuesView() {
     .filter((e) => e.lastError)
     .map((e) => e.name);
 
-  const selectionSlot = useSlot('queues.selection');
+  const selectionSlot = useSlot('subscriptions.selection');
 
   const setSort = (sort: string | undefined) =>
     navigate({ to: '.', search: (prev: Record<string, unknown>) => ({ ...prev, sort, page: undefined }) });
   const setPage = (next: number) =>
     navigate({ to: '.', search: (prev: Record<string, unknown>) => ({ ...prev, page: next > 1 ? next : undefined }) });
 
-  const columns = useMemo(queueColumns, []);
+  const columns = useMemo(subscriptionColumns, []);
   const rows = query.data?.data ?? [];
   const total = query.data?.count ?? 0;
 
@@ -310,21 +311,21 @@ export function QueuesView() {
     pageAllPicked,
     matching,
     selection,
-  } = useQueueSelection(rows, total, search.q);
+  } = useSubscriptionSelection(rows, total, search.q);
 
   return (
     <Page fill>
       <PageHeader
-        title="Queues"
-        description="Every queue across the cluster's nodes, with its depth and consumers. Select a row to open its detail and actions."
+        title="Subscriptions"
+        description="Every subscription across the cluster's nodes, with its depth and consumers. Select a row to open its detail and actions."
       />
       <Toolbar
-        label="Queue filters"
+        label="Subscription filters"
         start={
           <TextInput
             ref={filterRef}
-            label="Filter queues"
-            placeholder="Queue or address name"
+            label="Filter subscriptions"
+            placeholder="Subscription or destination name"
             value={filter}
             onChange={(e) => typeFilter(e.currentTarget.value)}
             w="17.5rem"
@@ -333,9 +334,9 @@ export function QueuesView() {
         }
         end={
           mayCreate ? (
-            <CapabilityGate verdict={createGate} what="creating a queue">
+            <CapabilityGate verdict={createGate} what="creating a subscription">
               <Button size="xs" disabled={createGate.kind === 'blocked'} onClick={() => setCreateOpen(true)}>
-                New queue
+                New subscription
               </Button>
             </CapabilityGate>
           ) : undefined
@@ -358,8 +359,8 @@ export function QueuesView() {
       </SelectionBar>
 
       <DataTable
-        label="Queues"
-        storageKey="queues"
+        label="Subscriptions"
+        storageKey="subscriptions"
         height="fill"
         columns={columns}
         data={rows}
@@ -375,24 +376,24 @@ export function QueuesView() {
         onToggleAll={toggleAll}
         toolbar={{
           // The count and position live in the pager, stated once. Not before the first page lands:
-          // "No queues" while loading would claim there are none.
+          // "No subscriptions" while loading would claim there are none.
           end: query.data ? (
-            <Pager page={page} pageSize={PAGE_SIZE} total={total} onChange={setPage} label="queues" />
+            <Pager page={page} pageSize={PAGE_SIZE} total={total} onChange={setPage} label="subscriptions" />
           ) : undefined,
         }}
         rowMenu={{
           label: (r) => r.name,
           render: (r, menu) => (
             <ResourceActions
-              kind="queue"
+              kind="subscription"
               clusterId={clusterId}
-              target={{ queueName: r.name, address: addressOf(r), snapshot: r }}
+              target={{ id: r.id, kind: r.kind, name: r.name, destination: r.destination, snapshot: r }}
               restoreFocus={menu.restoreFocus}
             />
           ),
         }}
         empty={
-          <QueuesEmpty
+          <SubscriptionsEmpty
             filterText={search.q ?? ''}
             unreachable={unreachable}
             reach={reach('subscription:read', clusterId)}
@@ -403,8 +404,8 @@ export function QueuesView() {
         }
       />
 
-      <QueueDetailDrawer queue={selected} missing={missing} onClose={() => setSelected(null)} />
-      <CreateQueueForm clusterId={clusterId} opened={createOpen} onClose={() => setCreateOpen(false)} />
+      <SubscriptionDetailDrawer subscription={selected} missing={missing} onClose={() => setSelected(null)} />
+      <CreateSubscriptionForm clusterId={clusterId} opened={createOpen} onClose={() => setCreateOpen(false)} />
     </Page>
   );
 }

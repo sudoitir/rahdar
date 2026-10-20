@@ -4,11 +4,11 @@ import { ApiError } from '../../kernel/api/request.ts';
 import type { SqlPlanView } from './api.ts';
 import { costVerdict, type CostInput } from './costVerdict.ts';
 
-const target = (nodeId: string, queueName: string) => ({
+const target = (nodeId: string, subscriptionName: string) => ({
   nodeId,
   nodeName: nodeId,
-  subscription: `artemis.queue/${queueName}`,
-  destination: `artemis.address/${queueName}`,
+  subscription: `artemis.queue/${subscriptionName}`,
+  destination: `artemis.address/${subscriptionName}`,
   messageCount: 10,
 });
 
@@ -102,11 +102,11 @@ describe('costVerdict', () => {
     expect(costVerdict(input({ plan: plan({ targets: [] }) }))).toEqual({
       badge: 'No cost',
       tone: 'neutral',
-      sentence: 'Reads nothing: no queue matches the FROM pattern.',
+      sentence: 'Reads nothing: no subscription matches the FROM pattern.',
     });
   });
 
-  it('says the index is read, with the row limit and the queues, and that no broker is', () => {
+  it('says the index is read, with the row limit and the subscriptions, and that no broker is', () => {
     const indexed = plan({
       source: 'INDEX',
       effectiveLimit: 1000,
@@ -115,11 +115,11 @@ describe('costVerdict', () => {
     expect(costVerdict(input({ plan: indexed }))).toEqual({
       badge: 'Index',
       tone: 'neutral',
-      sentence: "Reads Rahdar's index, up to 1,000 rows from 2 queues. No broker is read.",
+      sentence: "Reads Rahdar's index, up to 1,000 rows from 2 subscriptions. No broker is read.",
     });
   });
 
-  it('warns that a scan reads and examines messages, with queues and nodes', () => {
+  it('warns that a scan reads and examines messages, with subscriptions and nodes', () => {
     const scan = plan({
       requiresScan: true,
       estimatedMessagesExamined: 1_200_000,
@@ -128,14 +128,14 @@ describe('costVerdict', () => {
     expect(costVerdict(input({ plan: scan }))).toEqual({
       badge: 'Scan',
       tone: 'warning',
-      sentence: 'Rahdar reads and examines about 1,200,000 messages on 2 queues across 3 nodes.',
+      sentence: 'Rahdar reads and examines about 1,200,000 messages on 2 subscriptions across 3 nodes.',
     });
   });
 
-  it('says one queue on one node in the singular', () => {
+  it('says one subscription on one node in the singular', () => {
     const scan = plan({ requiresScan: true, estimatedMessagesExamined: 1 });
     expect(costVerdict(input({ plan: scan })).sentence).toBe(
-      'Rahdar reads and examines about 1 message on 1 queue across 1 node.',
+      'Rahdar reads and examines about 1 message on 1 subscription across 1 node.',
     );
   });
 
@@ -143,17 +143,17 @@ describe('costVerdict', () => {
     expect(costVerdict(input())).toEqual({
       badge: 'Broker-filtered',
       tone: 'neutral',
-      sentence: 'The brokers filter; Rahdar examines at most 100 messages from 1 queue.',
+      sentence: 'The brokers filter; Rahdar examines at most 100 messages from 1 subscription.',
     });
   });
 
   it('never shows an unknown figure as 0', () => {
     const scan = plan({ requiresScan: true, estimatedMessagesExamined: undefined });
     expect(costVerdict(input({ plan: scan })).sentence).toBe(
-      'Rahdar reads and examines about an unknown number of messages on 1 queue across 1 node.',
+      'Rahdar reads and examines about an unknown number of messages on 1 subscription across 1 node.',
     );
     expect(costVerdict(input({ plan: plan({ effectiveLimit: undefined }) })).sentence).toBe(
-      'The brokers filter; Rahdar examines at most an unknown number of messages from 1 queue.',
+      'The brokers filter; Rahdar examines at most an unknown number of messages from 1 subscription.',
     );
     expect(costVerdict(input({ plan: plan({ source: 'INDEX', effectiveLimit: undefined }) })).sentence).toContain(
       'up to an unknown number of rows',

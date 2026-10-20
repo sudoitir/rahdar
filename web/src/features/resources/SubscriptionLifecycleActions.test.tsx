@@ -7,7 +7,7 @@ import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from '../../test/render.tsx';
 import { server } from '../../test/setup.ts';
 import type { CapabilityView, SubscriptionView } from './api.ts';
-import { QueueLifecycleActions } from './QueueLifecycleActions.tsx';
+import { SubscriptionLifecycleActions } from './SubscriptionLifecycleActions.tsx';
 import { holdButton, holdByKeyboard } from '../../test/hold.ts';
 
 const AVAILABLE: CapabilityView = { status: 'AVAILABLE', reason: 'ok', brokerXmlSnippet: null };
@@ -51,7 +51,7 @@ function meHandler(permissions: string[] = ['*']) {
   );
 }
 
-function queue(over: Partial<SubscriptionView> = {}): SubscriptionView {
+function subscription(over: Partial<SubscriptionView> = {}): SubscriptionView {
   return {
     ...subscriptionIdentity('orders', 'orders.addr'),
     allowedActions: [
@@ -89,10 +89,10 @@ function queue(over: Partial<SubscriptionView> = {}): SubscriptionView {
 }
 
 function Harness() {
-  return <QueueLifecycleActions clusterId="c1" queue={queue()} onClose={() => {}} />;
+  return <SubscriptionLifecycleActions clusterId="c1" subscription={subscription()} onClose={() => {}} />;
 }
 
-describe('QueueLifecycleActions capability gating', () => {
+describe('SubscriptionLifecycleActions capability gating', () => {
   it('offers the actions and states the uncertainty when the capability is unknown', async () => {
     server.use(
       meHandler(),
@@ -107,7 +107,7 @@ describe('QueueLifecycleActions capability gating', () => {
     // The uncertainty is stated once the capability ledger has loaded...
     expect(await screen.findByText(/has not yet seen a management write on this connection/i)).toBeInTheDocument();
     // ...and absence of evidence still does not block the operator.
-    expect(screen.getByRole('button', { name: 'Delete queue' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Delete subscription' })).toBeEnabled();
     expect(screen.getByRole('button', { name: 'Pause' })).toBeEnabled();
   });
 
@@ -124,11 +124,11 @@ describe('QueueLifecycleActions capability gating', () => {
     renderWithProviders(<Harness />);
 
     // Visible and disabled — never silently absent (non-negotiable #5).
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Delete queue' })).toBeDisabled());
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Delete subscription' })).toBeDisabled());
 
     // And the reason is reachable without a pointer hover: the wrapper is a real
     // focusable control carrying the explanation.
-    const why = screen.getByRole('button', { name: 'Why deleting this queue is unavailable' });
+    const why = screen.getByRole('button', { name: 'Why deleting this subscription is unavailable' });
     await user.click(why);
 
     expect(await screen.findByText('The broker refused a management write for these credentials.')).toBeInTheDocument();
@@ -143,13 +143,15 @@ describe('QueueLifecycleActions capability gating', () => {
     );
     renderWithProviders(<Harness />);
 
-    await waitFor(() => expect(screen.queryByRole('button', { name: 'Delete queue' })).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Delete subscription' })).not.toBeInTheDocument());
     expect(screen.getByRole('button', { name: 'Pause' })).toBeEnabled();
-    expect(screen.queryByRole('button', { name: 'Why deleting this queue is unavailable' })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Why deleting this subscription is unavailable' }),
+    ).not.toBeInTheDocument();
   });
 
-  describe('for a team member on a queue the team does not own', () => {
-    /** Holds pause, edit and delete through teams somewhere on the cluster, and on this queue only pause. */
+  describe('for a team member on a subscription the team does not own', () => {
+    /** Holds pause, edit and delete through teams somewhere on the cluster, and on this subscription only pause. */
     function teamAccess() {
       return http.get('*/api/v1/me/access', ({ request }) => {
         const clusterId = new URL(request.url).searchParams.get('clusterId');
@@ -163,11 +165,11 @@ describe('QueueLifecycleActions capability gating', () => {
       });
     }
 
-    function SharedQueue() {
+    function SharedSubscription() {
       return (
-        <QueueLifecycleActions
+        <SubscriptionLifecycleActions
           clusterId="c1"
-          queue={queue({
+          subscription={subscription({
             allowedActions: ['subscription:read', 'subscription:pause'],
             ownerTeam: { id: 't1', name: 'Orders' },
           })}
@@ -179,15 +181,15 @@ describe('QueueLifecycleActions capability gating', () => {
     it('shows the others disabled, naming the permission and the team to ask', async () => {
       server.use(teamAccess(), clusterHandler(AVAILABLE));
       const user = userEvent.setup();
-      renderWithProviders(<SharedQueue />);
+      renderWithProviders(<SharedSubscription />);
 
-      await waitFor(() => expect(screen.getByRole('button', { name: 'Delete queue' })).toBeDisabled());
+      await waitFor(() => expect(screen.getByRole('button', { name: 'Delete subscription' })).toBeDisabled());
       expect(screen.getByRole('button', { name: 'Pause' })).toBeEnabled();
 
-      await user.click(screen.getByRole('button', { name: 'Why deleting this queue is unavailable' }));
+      await user.click(screen.getByRole('button', { name: 'Why deleting this subscription is unavailable' }));
       expect(
         await screen.findByText(
-          'You do not have the "Destroy queues and addresses" permission (subscription:delete) on this queue. Ask an admin of team Orders.',
+          'You do not have the "Destroy subscriptions and destinations" permission (subscription:delete) on this subscription. Ask an admin of team Orders.',
         ),
       ).toBeInTheDocument();
     });
@@ -195,32 +197,32 @@ describe('QueueLifecycleActions capability gating', () => {
     it('puts the reason one Tab from the enabled control, and opens it from the keyboard', async () => {
       server.use(teamAccess(), clusterHandler(AVAILABLE));
       const user = userEvent.setup();
-      renderWithProviders(<SharedQueue />);
+      renderWithProviders(<SharedSubscription />);
 
       await waitFor(() => expect(screen.getByRole('button', { name: 'Edit' })).toBeDisabled());
       screen.getByRole('button', { name: 'Pause' }).focus();
       // The disabled Edit takes no focus; the control beside it that carries its reason does.
       await user.tab();
-      expect(screen.getByRole('button', { name: 'Why editing this queue is unavailable' })).toHaveFocus();
+      expect(screen.getByRole('button', { name: 'Why editing this subscription is unavailable' })).toHaveFocus();
 
       await user.keyboard('{Enter}');
       expect(
-        await screen.findByText(/\(subscription:update\) on this queue\. Ask an admin of team Orders\./),
+        await screen.findByText(/\(subscription:update\) on this subscription\. Ask an admin of team Orders\./),
       ).toBeInTheDocument();
     });
 
-    it('points at a platform administrator when no team owns the queue', async () => {
+    it('points at a platform administrator when no team owns the subscription', async () => {
       server.use(teamAccess(), clusterHandler(AVAILABLE));
       const user = userEvent.setup();
       renderWithProviders(
-        <QueueLifecycleActions
+        <SubscriptionLifecycleActions
           clusterId="c1"
-          queue={queue({ allowedActions: ['subscription:read'] })}
+          subscription={subscription({ allowedActions: ['subscription:read'] })}
           onClose={() => {}}
         />,
       );
 
-      await user.click(await screen.findByRole('button', { name: 'Why deleting this queue is unavailable' }));
+      await user.click(await screen.findByRole('button', { name: 'Why deleting this subscription is unavailable' }));
       expect(await screen.findByText(/Ask a platform administrator\./)).toBeInTheDocument();
     });
   });
@@ -246,15 +248,15 @@ describe('the destructive flow is keyboard-complete', () => {
     renderWithProviders(<Harness />);
 
     // Wait for the gate to settle so the control is the real, ungated button.
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Delete queue' })).toBeEnabled());
-    await user.click(screen.getByRole('button', { name: 'Delete queue' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Delete subscription' })).toBeEnabled());
+    await user.click(screen.getByRole('button', { name: 'Delete subscription' }));
 
     const dialog = await screen.findByRole('dialog');
     // The blast radius is named before the confirmation can arm.
     expect(await within(dialog).findByText('would destroy 12 messages')).toBeInTheDocument();
     expect(within(dialog).getByText('node-a')).toBeInTheDocument();
 
-    const confirm = within(dialog).getByRole('button', { name: 'Delete this queue' });
+    const confirm = within(dialog).getByRole('button', { name: 'Delete this subscription' });
     await waitFor(() => expect(confirm).toBeEnabled());
 
     await user.keyboard('{Escape}');
@@ -272,15 +274,15 @@ describe('the destructive flow is keyboard-complete', () => {
         const dryRun = url.searchParams.get('dryRun') === 'true';
         const disconnect = url.searchParams.get('disconnectConsumers') === 'true';
         const note =
-          "2 consumers will be disconnected. Removed with the queue, because they forward into 'orders.addr'" +
-          " and this is its last queue: 'feed' (incoming → orders.addr, routing name feed, routing type STRIP).";
+          "2 consumers will be disconnected. Removed with the subscription, because they forward into 'orders.addr'" +
+          " and this is its last subscription: 'feed' (incoming → orders.addr, routing name feed, routing type STRIP).";
         const node = !disconnect
           ? {
               nodeId: 'n1',
               nodeName: 'node-a',
               status: 'FAILED',
               affected: null,
-              error: "Queue 'orders' has 2 consumers attached on this node. Delete with disconnectConsumers.",
+              error: "Subscription 'orders' has 2 consumers attached on this node. Delete with disconnectConsumers.",
             }
           : {
               nodeId: 'n1',
@@ -301,10 +303,14 @@ describe('the destructive flow is keyboard-complete', () => {
     );
     const user = userEvent.setup();
     renderWithProviders(
-      <QueueLifecycleActions clusterId="c1" queue={queue({ totalConsumerCount: 2 })} onClose={() => {}} />,
+      <SubscriptionLifecycleActions
+        clusterId="c1"
+        subscription={subscription({ totalConsumerCount: 2 })}
+        onClose={() => {}}
+      />,
     );
 
-    const trigger = screen.getByRole('button', { name: 'Delete queue' });
+    const trigger = screen.getByRole('button', { name: 'Delete subscription' });
     await waitFor(() => expect(trigger).toBeEnabled());
     trigger.focus();
     await user.keyboard('{Enter}');
@@ -316,17 +322,17 @@ describe('the destructive flow is keyboard-complete', () => {
     // The headline agrees with the row: a refused node is not one the delete would apply to.
     expect(within(dialog).getByText('Would apply to 0 of 1 nodes, 1 refused')).toBeInTheDocument();
 
-    const disconnect = within(dialog).getByRole('checkbox', { name: /Disconnect this queue's consumers/ });
+    const disconnect = within(dialog).getByRole('checkbox', { name: /Disconnect this subscription's consumers/ });
     disconnect.focus();
     await user.keyboard(' ');
     expect(disconnect).toBeChecked();
 
-    // The preview is taken again with the flag, and names the divert that goes with the queue.
+    // The preview is taken again with the flag, and names the divert that goes with the subscription.
     expect(await within(dialog).findByText(/'feed' \(incoming → orders\.addr/)).toBeInTheDocument();
     expect(urls.at(-1)).toContain('disconnectConsumers=true');
     expect(urls.at(-1)).toContain('dryRun=true');
 
-    await holdByKeyboard(within(dialog).getByRole('button', { name: 'Delete this queue' }));
+    await holdByKeyboard(within(dialog).getByRole('button', { name: 'Delete this subscription' }));
 
     const result = await screen.findByRole('dialog', { name: /result of deleting orders/i });
     expect(await within(result).findByText('applied')).toBeInTheDocument();
@@ -370,14 +376,14 @@ describe('the destructive flow is keyboard-complete', () => {
     const user = userEvent.setup();
     renderWithProviders(<Harness />);
 
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Delete queue' })).toBeEnabled());
-    await user.click(screen.getByRole('button', { name: 'Delete queue' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Delete subscription' })).toBeEnabled());
+    await user.click(screen.getByRole('button', { name: 'Delete subscription' }));
     const dialog = await screen.findByRole('dialog');
     expect(await within(dialog).findByText('would destroy 12 messages')).toBeInTheDocument();
 
-    await holdButton(within(dialog).getByRole('button', { name: 'Delete this queue' }));
+    await holdButton(within(dialog).getByRole('button', { name: 'Delete this subscription' }));
 
-    const disconnect = within(dialog).getByRole('checkbox', { name: /Disconnect this queue's consumers/ });
+    const disconnect = within(dialog).getByRole('checkbox', { name: /Disconnect this subscription's consumers/ });
     await waitFor(() => expect(disconnect).toBeDisabled());
     await user.click(disconnect);
 
@@ -389,7 +395,7 @@ describe('the destructive flow is keyboard-complete', () => {
 });
 
 describe('a delete that failed everywhere', () => {
-  it('leaves the queue open instead of closing it as though the queue were gone', async () => {
+  it('leaves the subscription open instead of closing it as though the subscription were gone', async () => {
     server.use(
       meHandler(),
       clusterHandler(AVAILABLE),
@@ -399,7 +405,7 @@ describe('a delete that failed everywhere', () => {
           dryRun,
           cap: 1000,
           overCap: false,
-          // Every node failed, so the run is not partial — and the queue is still there.
+          // Every node failed, so the run is not partial — and the subscription is still there.
           partial: false,
           totalAffected: dryRun ? 12 : 0,
           nodes: [
@@ -416,14 +422,16 @@ describe('a delete that failed everywhere', () => {
     );
     const user = userEvent.setup();
     const onClose = vi.fn();
-    renderWithProviders(<QueueLifecycleActions clusterId="c1" queue={queue()} onClose={onClose} />);
+    renderWithProviders(
+      <SubscriptionLifecycleActions clusterId="c1" subscription={subscription()} onClose={onClose} />,
+    );
 
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Delete queue' })).toBeEnabled());
-    await user.click(screen.getByRole('button', { name: 'Delete queue' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Delete subscription' })).toBeEnabled());
+    await user.click(screen.getByRole('button', { name: 'Delete subscription' }));
 
     const dialog = await screen.findByRole('dialog');
     expect(await within(dialog).findByText('would destroy 12 messages')).toBeInTheDocument();
-    await holdButton(within(dialog).getByRole('button', { name: 'Delete this queue' }));
+    await holdButton(within(dialog).getByRole('button', { name: 'Delete this subscription' }));
 
     const result = await screen.findByRole('dialog', { name: /result of deleting orders/i });
     expect(await within(result).findByText('Failed on every node')).toBeInTheDocument();
@@ -435,7 +443,7 @@ describe('a delete that failed everywhere', () => {
 });
 
 describe('a delete no node was live for', () => {
-  it('leaves the queue open, because nothing was deleted', async () => {
+  it('leaves the subscription open, because nothing was deleted', async () => {
     server.use(
       meHandler(),
       clusterHandler(AVAILABLE),
@@ -462,14 +470,16 @@ describe('a delete no node was live for', () => {
     );
     const user = userEvent.setup();
     const onClose = vi.fn();
-    renderWithProviders(<QueueLifecycleActions clusterId="c1" queue={queue()} onClose={onClose} />);
+    renderWithProviders(
+      <SubscriptionLifecycleActions clusterId="c1" subscription={subscription()} onClose={onClose} />,
+    );
 
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Delete queue' })).toBeEnabled());
-    await user.click(screen.getByRole('button', { name: 'Delete queue' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Delete subscription' })).toBeEnabled());
+    await user.click(screen.getByRole('button', { name: 'Delete subscription' }));
 
     const dialog = await screen.findByRole('dialog');
     expect(await within(dialog).findByText('would destroy 12 messages')).toBeInTheDocument();
-    await holdButton(within(dialog).getByRole('button', { name: 'Delete this queue' }));
+    await holdButton(within(dialog).getByRole('button', { name: 'Delete this subscription' }));
 
     const result = await screen.findByRole('dialog', { name: /result of deleting orders/i });
     expect(await within(result).findByText('No node was live, so nothing was applied')).toBeInTheDocument();
@@ -481,7 +491,7 @@ describe('a delete no node was live for', () => {
 });
 
 describe('the edit form', () => {
-  /** What the broker reports for the queue, and what a PATCH is sent as. */
+  /** What the broker reports for the subscription, and what a PATCH is sent as. */
   function editHandlers(values: Record<string, unknown>, onPatch?: (body: unknown) => void) {
     let current = { ...values };
     return [
@@ -510,7 +520,7 @@ describe('the edit form', () => {
     ];
   }
 
-  it('opens on what the queue runs, sends only what changed, and shows the applied value again', async () => {
+  it('opens on what the subscription runs, sends only what changed, and shows the applied value again', async () => {
     const patched = vi.fn();
     server.use(...editHandlers({ 'max-consumers': -1, 'ring-size': -1, 'filter-string': null }, patched));
     const user = userEvent.setup();
@@ -584,10 +594,10 @@ describe('the delete result', () => {
     const user = userEvent.setup();
     renderWithProviders(<Harness />);
 
-    const trigger = await screen.findByRole('button', { name: 'Delete queue' });
+    const trigger = await screen.findByRole('button', { name: 'Delete subscription' });
     await user.click(trigger);
     const confirmation = await screen.findByRole('dialog', { name: 'Delete orders' });
-    await holdButton(within(confirmation).getByRole('button', { name: 'Delete this queue' }));
+    await holdButton(within(confirmation).getByRole('button', { name: 'Delete this subscription' }));
 
     // Partial is read per node, where the typed confirmation was.
     const result = await screen.findByRole('dialog', { name: 'Result of deleting orders' });

@@ -48,7 +48,7 @@ function shell() {
   ];
 }
 
-describe('the consumer health address', () => {
+describe('the consumer health destination', () => {
   it('reaches the ranked view, worst first', async () => {
     server.use(
       ...shell(),
@@ -90,8 +90,8 @@ describe('the consumer health address', () => {
 
     renderAppAt('/clusters/c1/consumer-health');
 
-    // The real router resolves the address to the feature's view.
+    // The real router resolves the destination to the feature's view.
     expect(await screen.findByText('No consumers')).toBeInTheDocument();
-    expect(await screen.findByRole('textbox', { name: 'Filter queues' })).toBeInTheDocument();
+    expect(await screen.findByRole('textbox', { name: 'Filter subscriptions' })).toBeInTheDocument();
   });
 });

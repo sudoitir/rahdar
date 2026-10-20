@@ -13,7 +13,7 @@ vi.mock('@tanstack/react-router', async (importOriginal) => ({
   useParams: () => ({ clusterId: 'c1' }),
   useSearch: () => search,
   useNavigate: () => () => {},
-  // The drawer's "Browse messages" and the queue link need no router to be asserted here.
+  // The drawer's "Browse messages" and the subscription link need no router to be asserted here.
   Link: ({
     children,
     to,
@@ -31,11 +31,11 @@ vi.mock('@tanstack/react-router', async (importOriginal) => ({
   ),
 }));
 
-const { QueuesView } = await import('./QueuesView.tsx');
+const { SubscriptionsView } = await import('./SubscriptionsView.tsx');
 
 const AVAILABLE = { status: 'AVAILABLE', reason: 'ok', brokerXmlSnippet: null };
 
-function queue(name: string, over: Record<string, unknown> = {}) {
+function subscription(name: string, over: Record<string, unknown> = {}) {
   return {
     ...subscriptionIdentity(name, name),
     allowedActions: [
@@ -72,7 +72,7 @@ function queue(name: string, over: Record<string, unknown> = {}) {
   };
 }
 
-function handlers(permissions: string[], rows = [queue('orders'), queue('payments')]) {
+function handlers(permissions: string[], rows = [subscription('orders'), subscription('payments')]) {
   return [
     http.get('*/api/v1/auth/me', () =>
       HttpResponse.json({
@@ -106,8 +106,8 @@ function handlers(permissions: string[], rows = [queue('orders'), queue('payment
   ];
 }
 
-describe('the queue row menu (ADR-0107)', () => {
-  it('deletes a queue from the keyboard alone, and hands focus back to the row', async () => {
+describe('the subscription row menu (ADR-0107)', () => {
+  it('deletes a subscription from the keyboard alone, and hands focus back to the row', async () => {
     search = {};
     const urls: string[] = [];
     server.use(
@@ -129,17 +129,17 @@ describe('the queue row menu (ADR-0107)', () => {
       }),
     );
     const user = userEvent.setup();
-    renderWithProviders(<QueuesView />);
+    renderWithProviders(<SubscriptionsView />);
     await screen.findByRole('button', { name: 'Actions for orders' });
 
-    // Into the grid (one tab stop), onto the first queue, and open its menu.
-    const grid = screen.getByRole('grid', { name: 'Queues' });
+    // Into the grid (one tab stop), onto the first subscription, and open its menu.
+    const grid = screen.getByRole('grid', { name: 'Subscriptions' });
     within(grid).getAllByText('orders')[0].closest<HTMLElement>('[role="rowheader"]')!.focus();
     await user.keyboard('{Shift>}{F10}{/Shift}');
     const menu = await screen.findByRole('menu', { name: 'Actions for orders' });
     expect(within(menu).getByText('Destroy')).toBeInTheDocument();
 
-    const del = within(menu).getByRole('menuitem', { name: /Delete queue/ });
+    const del = within(menu).getByRole('menuitem', { name: /Delete subscription/ });
     // Type-ahead to the item, as a keyboard user would.
     await waitFor(() => expect(within(menu).getByRole('menuitem', { name: /Open details/ })).toHaveFocus());
     while (document.activeElement !== del) await user.keyboard('{ArrowDown}');
@@ -163,8 +163,8 @@ describe('the queue row menu (ADR-0107)', () => {
       ...handlers(
         ['cluster:read'],
         [
-          queue('orders'),
-          queue('payments', {
+          subscription('orders'),
+          subscription('payments', {
             allowedActions: ['subscription:read'],
             ownerTeam: { id: 't9', name: 'Payments' },
           }),
@@ -182,20 +182,20 @@ describe('the queue row menu (ADR-0107)', () => {
       }),
     );
     const user = userEvent.setup();
-    renderWithProviders(<QueuesView />);
+    renderWithProviders(<SubscriptionsView />);
 
     await user.click(await screen.findByRole('button', { name: 'Actions for payments' }));
     const menu = await screen.findByRole('menu', { name: 'Actions for payments' });
-    const del = await within(menu).findByRole('menuitem', { name: /Delete queue/ });
+    const del = await within(menu).findByRole('menuitem', { name: /Delete subscription/ });
     await waitFor(() => expect(del).toHaveAttribute('aria-disabled', 'true'));
     expect(del).toHaveAccessibleDescription(
-      /do not have the "Destroy queues and addresses" permission \(subscription:delete\)/,
+      /do not have the "Destroy subscriptions and destinations" permission \(subscription:delete\)/,
     );
 
     // Reachable with the arrow keys — a disabled item would be skipped.
     while (document.activeElement !== del) await user.keyboard('{ArrowDown}');
     await user.keyboard('{Enter}');
-    const why = await screen.findByRole('dialog', { name: 'Why deleting this queue is unavailable' });
+    const why = await screen.findByRole('dialog', { name: 'Why deleting this subscription is unavailable' });
     expect(within(why).getByText(/Ask an admin of team Payments/)).toBeInTheDocument();
   });
 
@@ -203,26 +203,28 @@ describe('the queue row menu (ADR-0107)', () => {
     search = {};
     server.use(...handlers(['cluster:read', 'subscription:pause']));
     const user = userEvent.setup();
-    renderWithProviders(<QueuesView />);
+    renderWithProviders(<SubscriptionsView />);
 
     await user.click(await screen.findByRole('button', { name: 'Actions for payments' }));
     const menu = await screen.findByRole('menu', { name: 'Actions for payments' });
     await within(menu).findByRole('menuitem', { name: /Open details/ });
-    await waitFor(() => expect(within(menu).queryByRole('menuitem', { name: /Delete queue/ })).not.toBeInTheDocument());
+    await waitFor(() =>
+      expect(within(menu).queryByRole('menuitem', { name: /Delete subscription/ })).not.toBeInTheDocument(),
+    );
   });
 
-  it('opens a linked queue that is not on the loaded page', async () => {
-    search = { queue: 'archive.2019' };
-    server.use(...handlers(['*'], [queue('orders'), queue('archive.2019')]));
+  it('opens a linked subscription that is not on the loaded page', async () => {
+    search = { subscription: 'archive.2019' };
+    server.use(...handlers(['*'], [subscription('orders'), subscription('archive.2019')]));
     // The listing's first page does not hold it; the lookup by name does.
     server.use(
       http.get('*/api/v1/clusters/c1/subscriptions', ({ request }) => {
         const q = new URL(request.url).searchParams.get('q');
-        const data = q === 'archive.2019' ? [queue('archive.2019')] : [queue('orders')];
+        const data = q === 'archive.2019' ? [subscription('archive.2019')] : [subscription('orders')];
         return HttpResponse.json({ data, count: q ? 1 : 2, page: 1, pageSize: 200 });
       }),
     );
-    renderWithProviders(<QueuesView />);
+    renderWithProviders(<SubscriptionsView />);
     expect(await screen.findByRole('dialog', { name: /archive\.2019/ })).toBeInTheDocument();
   });
 });

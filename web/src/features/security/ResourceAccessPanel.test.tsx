@@ -28,7 +28,7 @@ vi.mock('@tanstack/react-router', async (importOriginal) => ({
   ),
 }));
 
-const { ResourceAccessPanel, AddressAccessDrawer } = await import('./ResourceAccessPanel.tsx');
+const { ResourceAccessPanel, DestinationAccessDrawer } = await import('./ResourceAccessPanel.tsx');
 
 const ACCESS: ResourceAccessView = {
   ownerTeam: { id: 't-orders', name: 'Orders' },
@@ -135,7 +135,7 @@ describe('ResourceAccessPanel', () => {
     expect(screen.getByText('No owner')).toBeInTheDocument();
   });
 
-  it("opens one user's access check at this queue, from the keyboard", async () => {
+  it("opens one user's access check at this subscription, from the keyboard", async () => {
     const asked = serve(['user:admin']);
     const person = userEvent.setup();
     renderWithProviders(<ResourceAccessPanel clusterId="c1" kind="SUBSCRIPTION" name="orders.in" />);
@@ -148,10 +148,10 @@ describe('ResourceAccessPanel', () => {
   });
 });
 
-describe('AddressAccessDrawer', () => {
-  it("shows an address's access in a drawer of its own", async () => {
+describe('DestinationAccessDrawer', () => {
+  it("shows a destination's access in a drawer of its own", async () => {
     serve(['user:admin']);
-    renderWithProviders(<AddressAccessDrawer opened onClose={() => {}} clusterId="c1" address="orders.addr" />);
+    renderWithProviders(<DestinationAccessDrawer opened onClose={() => {}} clusterId="c1" destination="orders.addr" />);
 
     expect(await screen.findByRole('dialog', { name: 'Access to orders.addr' })).toBeInTheDocument();
     expect(

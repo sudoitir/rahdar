@@ -78,13 +78,16 @@ describe('BulkRunsView', () => {
     expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
   });
 
-  it('teaches what a bulk run is when there are none, and links to Queues', async () => {
+  it('teaches what a bulk run is when there are none, and links to Subscriptions', async () => {
     server.use(http.get('*/api/v1/clusters/c1/bulk/runs', () => HttpResponse.json(paged([]))));
     renderWithProviders(<BulkRunsView />);
 
     expect(await screen.findByText('No bulk runs yet')).toBeInTheDocument();
-    expect(screen.getByText(/pauses, resumes, purges or deletes many queues at once/)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Go to Queues' })).toHaveAttribute('href', '/clusters/c1/queues');
+    expect(screen.getByText(/pauses, resumes, purges or deletes many subscriptions at once/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Go to Subscriptions' })).toHaveAttribute(
+      'href',
+      '/clusters/c1/subscriptions',
+    );
     // The empty state is beside the grid, never in it: the grid has only its header row.
     expect(screen.getByRole('grid', { name: 'Bulk runs' })).toHaveAttribute('aria-rowcount', '1');
   });

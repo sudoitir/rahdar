@@ -1,13 +1,13 @@
-/* The wrapper is the flex/grid item the caller lays out; the unknown-address
+/* The wrapper is the flex/grid item the caller lays out; the unknown-destination
    message is positioned out of flow against it (see .error). */
 .root {
   position: relative;
 }
 
 /* Two lines, not two columns. Squeezed into one row the meta column is
-   `flex: none` and the address is not, so inside a narrow field every option
-   collapsed to an ellipsis — exactly the addresses the picker exists to tell
-   apart. Stacked, the address is never the thing that gives way. */
+   `flex: none` and the destination is not, so inside a narrow field every option
+   collapsed to an ellipsis — exactly the destinations the picker exists to tell
+   apart. Stacked, the destination is never the thing that gives way. */
 .option {
   display: flex;
   flex-direction: column;
@@ -32,7 +32,7 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* Wider than the field it hangs off: a request address is long and the field is
+/* Wider than the field it hangs off: a request destination is long and the field is
    one cell of a form row. `min-inline-size` beats the inline width floating-ui
    writes for a target-width dropdown, so this widens it without a fixed prop. */
 .dropdown {

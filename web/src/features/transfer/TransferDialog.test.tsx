@@ -30,7 +30,7 @@ function open(
   renderWithProviders(
     <TransferDialog
       clusterId="c1"
-      queueName="orders"
+      subscriptionName="orders"
       selection={{ kind: 'all' }}
       total={1200}
       opened
@@ -53,7 +53,7 @@ const previewButton = (dialog: HTMLElement) => within(dialog).getByRole('button'
 
 describe('TransferDialog what it transfers', () => {
   it.each<[string, Partial<Parameters<typeof open>[0]>, string]>([
-    ['every message of a queue', { total: 1200 }, 'From all 1,200 messages of orders on node-a.'],
+    ['every message of a subscription', { total: 1200 }, 'From all 1,200 messages of orders on node-a.'],
     ['an unknown number of messages', { total: null }, 'From every message of orders on node-a.'],
     [
       'the picked messages',
@@ -110,7 +110,7 @@ describe('TransferDialog destination', () => {
     expect(
       await within(dialog).findByText(/Copy 1,200 messages \(84 MB\) from orders on node-a \(primary\)/),
     ).toBeInTheDocument();
-    expect(within(dialog).getByText(/The source queue is unchanged\./)).toBeInTheDocument();
+    expect(within(dialog).getByText(/The source subscription is unchanged\./)).toBeInTheDocument();
   });
 
   it('targets another cluster, whose nodes are all choosable, and names it in the preview', async () => {
@@ -136,32 +136,32 @@ describe('TransferDialog destination', () => {
     const nodeA = await screen.findByRole('option', { name: 'node-a' });
     expect(nodeA).not.toHaveAttribute('data-combobox-disabled');
     await user.click(nodeA);
-    const queue = within(dialog).getByRole('textbox', { name: 'Target queue' });
-    await user.clear(queue);
-    await user.type(queue, '  orders-dr  ');
+    const subscription = within(dialog).getByRole('textbox', { name: 'Target subscription' });
+    await user.clear(subscription);
+    await user.type(subscription, '  orders-dr  ');
     await user.click(previewButton(dialog));
 
     await waitFor(() => expect(bodies).toHaveLength(1));
     expect(bodies[0]).toMatchObject({ targetClusterId: 'c2', targetNodeId: 'n1', target: 'artemis.queue/orders-dr' });
     expect(
-      await within(dialog).findByText(/to orders-dr on node-a \(dr-site\)\. They leave the source queue\./),
+      await within(dialog).findByText(/to orders-dr on node-a \(dr-site\)\. They leave the source subscription\./),
     ).toBeInTheDocument();
   });
 
-  it('asks for a queue name when it is emptied, focuses it, and clears the complaint once one is typed', async () => {
+  it('asks for a subscription name when it is emptied, focuses it, and clears the complaint once one is typed', async () => {
     server.use(meHandler(), ...clusterHandlers());
     const user = userEvent.setup();
     open();
 
     const dialog = await pickNode(user, 'node-b');
-    const queue = within(dialog).getByRole('textbox', { name: 'Target queue' });
-    await user.clear(queue);
+    const subscription = within(dialog).getByRole('textbox', { name: 'Target subscription' });
+    await user.clear(subscription);
     await user.click(previewButton(dialog));
 
-    expect(await within(dialog).findByText('Name the queue the messages go to.')).toBeInTheDocument();
-    expect(queue).toHaveFocus();
-    await user.type(queue, 'x');
-    await waitFor(() => expect(within(dialog).queryByText('Name the queue the messages go to.')).toBeNull());
+    expect(await within(dialog).findByText('Name the subscription the messages go to.')).toBeInTheDocument();
+    expect(subscription).toHaveFocus();
+    await user.type(subscription, 'x');
+    await waitFor(() => expect(within(dialog).queryByText('Name the subscription the messages go to.')).toBeNull());
   });
 
   it('complains about the node on blur, and stops once one is chosen', async () => {
@@ -185,7 +185,7 @@ describe('TransferDialog destination', () => {
     const { onClose } = open();
 
     const dialog = await screen.findByRole('dialog');
-    await user.type(within(dialog).getByRole('textbox', { name: 'Target queue' }), '-copy');
+    await user.type(within(dialog).getByRole('textbox', { name: 'Target subscription' }), '-copy');
     await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
 
     expect(onClose).toHaveBeenCalledTimes(1);
@@ -193,15 +193,15 @@ describe('TransferDialog destination', () => {
 });
 
 describe('TransferDialog redistribution', () => {
-  it('fixes the target to the same queue and picks the only other node for the operator', async () => {
+  it('fixes the target to the same subscription and picks the only other node for the operator', async () => {
     const bodies: unknown[] = [];
     server.use(meHandler(), ...clusterHandlers(), previewHandler(run(), bodies));
     const user = userEvent.setup();
     open({ redistribute: true });
 
     const dialog = await screen.findByRole('dialog', { name: 'Redistribute from orders to another node' });
-    expect(within(dialog).getByText(/land on that node.s own queue\./)).toBeInTheDocument();
-    expect(within(dialog).queryByRole('textbox', { name: 'Target queue' })).toBeNull();
+    expect(within(dialog).getByText(/land on that node.s own subscription\./)).toBeInTheDocument();
+    expect(within(dialog).queryByRole('textbox', { name: 'Target subscription' })).toBeNull();
     expect(within(dialog).queryByRole('combobox', { name: 'Target cluster' })).toBeNull();
     expect(within(dialog).queryByText('Mode')).toBeNull();
     await waitFor(() => expect(within(dialog).getByRole('combobox', { name: 'Target node' })).toHaveValue('node-b'));
@@ -319,7 +319,7 @@ describe('TransferDialog preview', () => {
 
     expect(
       within(dialog).getByText(
-        'Move the selected messages (how many is not known until the run counts them) from orders on node-a (primary) to orders on node-a (dr-site). They leave the source queue.',
+        'Move the selected messages (how many is not known until the run counts them) from orders on node-a (primary) to orders on node-a (dr-site). They leave the source subscription.',
       ),
     ).toBeInTheDocument();
     expect(within(dialog).getByText('The target can accept it.')).toBeInTheDocument();

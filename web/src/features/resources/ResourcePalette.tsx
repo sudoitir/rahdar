@@ -5,10 +5,10 @@ import type { PaletteSource } from '../../kernel/feature.ts';
 
 const VIEWS = [
   { view: 'connections', noun: 'connections', by: 'remote address, client id or connection id' },
-  { view: 'consumers', noun: 'consumers', by: 'queue or session id' },
-  { view: 'sessions', noun: 'sessions', by: 'session id, connection id or user' },
-  { view: 'producers', noun: 'producers', by: 'address, name or session id' },
-  { view: 'addresses', noun: 'addresses', by: 'name' },
+  { view: 'consumers', noun: 'consumers', by: 'subscription or channel id' },
+  { view: 'channels', noun: 'channels', by: 'channel id, connection id or user' },
+  { view: 'producers', noun: 'producers', by: 'destination, name or channel id' },
+  { view: 'destinations', noun: 'destinations', by: 'name' },
 ] as const;
 
 /**

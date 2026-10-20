@@ -6,8 +6,8 @@ import { dependentsOf, withRequired } from './permissionRequires.ts';
 const perm = (action: string, requires: string[] = []): PermissionView => ({
   action,
   label: action,
-  featureId: 'queues',
-  featureTitle: 'Queues',
+  featureId: 'subscriptions',
+  featureTitle: 'Subscriptions',
   scope: 'RESOURCE',
   resourceTypes: ['SUBSCRIPTION'],
   requires,

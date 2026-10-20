@@ -2,13 +2,13 @@ import { elapsedLabel } from '../../kernel/time/time.ts';
 import type { ExpectationDiagnosticsView, ExpectationView } from './api.ts';
 
 export function resolutionWords(capped: boolean, resolved: number): string {
-  if (capped) return `too broad — only the first ${resolved} addresses are traced`;
-  return resolved === 0 ? 'no matching queue yet' : `${resolved} matching now`;
+  if (capped) return `too broad — only the first ${resolved} destinations are traced`;
+  return resolved === 0 ? 'no matching subscription yet' : `${resolved} matching now`;
 }
 
-/** The plain text of an expectation's reply addresses, as a cell copies and measures it. */
+/** The plain text of an expectation's reply destinations, as a cell copies and measures it. */
 export function replyDestinationsText(e: ExpectationView): string {
-  if (e.replyDestinations.length === 0) return 'temporary queues';
+  if (e.replyDestinations.length === 0) return 'temporary subscriptions';
   const patterns = e.replyDestinations.some((a) => a.includes('*'));
   const resolution =
     patterns || e.replyDestinationsCapped

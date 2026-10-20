@@ -82,7 +82,7 @@ export function TeamPatterns({
       <Section
         title="Owned patterns"
         headingLevel={3}
-        description="The queue and address names this team owns on each cluster. Two teams cannot own the same name on one cluster."
+        description="The subscription and destination names this team owns on each cluster. Two teams cannot own the same name on one cluster."
       >
         <DataTable
           variant="static"
@@ -95,7 +95,7 @@ export function TeamPatterns({
             <EmptyState
               kind="empty"
               title="No patterns"
-              description="A pattern gives this team the queues and addresses whose names it matches on one cluster. Until one is added, the team owns nothing and its members see no queue or address."
+              description="A pattern gives this team the subscriptions and destinations whose names it matches on one cluster. Until one is added, the team owns nothing and its members see no subscription or destination."
               action={
                 userAdmin ? (
                   <Button size="xs" variant="default" onClick={() => firstField.current?.focus()}>

@@ -114,7 +114,7 @@ const TABS = [
   { name: 'Stuck', search: '?tab=stuck', ready: 'Stuck flows', row: /^timed out$/ },
   { name: 'Latency', search: '?tab=latency', ready: 'Latency', row: /Sampled, not exhaustive/ },
   { name: 'Flows', search: '', ready: 'Flows', row: /^timed out$/ },
-  { name: 'Expectations', search: '?tab=expectations', ready: 'Traced addresses', row: /^or\s*ders\.request$/ },
+  { name: 'Expectations', search: '?tab=expectations', ready: 'Traced destinations', row: /^or\s*ders\.request$/ },
 ] as const;
 
 const WIDTHS = [

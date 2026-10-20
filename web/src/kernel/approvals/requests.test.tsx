@@ -74,7 +74,7 @@ describe('MyRequests', () => {
     expect(within(items[0]!).getByText('Waiting for approval')).toBeInTheDocument();
     expect(within(items[1]!).getByText('Rejected')).toBeInTheDocument();
     expect(within(items[2]!).getByText('Failed')).toBeInTheDocument();
-    expect(within(items[0]!).getByRole('link', { name: 'Purge queue orders.dlq on prod-eu' })).toHaveAttribute(
+    expect(within(items[0]!).getByRole('link', { name: 'Purge subscription orders.dlq on prod-eu' })).toHaveAttribute(
       'href',
       `/approvals/${HELD_ID}`,
     );
@@ -95,9 +95,11 @@ describe('MyRequests', () => {
     );
     renderAt('/account', MyRequests);
     const user = userEvent.setup();
-    await user.click(await screen.findByRole('button', { name: 'Cancel request "Purge queue orders.dlq on prod-eu"' }));
+    await user.click(
+      await screen.findByRole('button', { name: 'Cancel request "Purge subscription orders.dlq on prod-eu"' }),
+    );
     const dialog = await screen.findByRole('dialog', { name: 'Cancel this request?' });
-    expect(dialog).toHaveTextContent('Purge queue orders.dlq on prod-eu');
+    expect(dialog).toHaveTextContent('Purge subscription orders.dlq on prod-eu');
     await user.click(within(dialog).getByRole('button', { name: 'Cancel request' }));
     await waitFor(() => expect(cancelled).toBe(1));
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
@@ -122,7 +124,7 @@ describe('ApprovalsView', () => {
     expect(await screen.findByRole('heading', { level: 1, name: 'Approval requests' })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'Waiting for me' })).toHaveAttribute('aria-selected', 'true');
     const table = await screen.findByRole('table', { name: 'Requests waiting for your decision' });
-    expect(within(table).getByRole('link', { name: 'Purge queue orders.dlq on prod-eu' })).toBeInTheDocument();
+    expect(within(table).getByRole('link', { name: 'Purge subscription orders.dlq on prod-eu' })).toBeInTheDocument();
     expect(within(table).getByText('carol')).toBeInTheDocument();
     expect(within(table).getByRole('columnheader', { name: /Requested by/ })).toBeInTheDocument();
     expect(asked[0]?.get('scope')).toBe('DECIDABLE');

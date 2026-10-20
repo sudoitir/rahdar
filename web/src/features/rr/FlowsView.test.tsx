@@ -191,7 +191,7 @@ describe('FlowsView', () => {
 
       expect(await screen.findByText('No flow matches these filters')).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Clear filters' })).toBeInTheDocument();
-      expect(screen.getByRole('textbox', { name: 'Filter by address' })).toBeInTheDocument();
+      expect(screen.getByRole('textbox', { name: 'Filter by destination' })).toBeInTheDocument();
       expect(screen.getByRole('combobox', { name: 'State' })).toBeInTheDocument();
     } finally {
       routerSearch = {};

@@ -4,7 +4,7 @@ import { useForm } from '@mantine/form';
 import { Link, useParams } from '@tanstack/react-router';
 
 import { useClusters } from '../clusters/index.ts';
-import { AddressPicker } from '../queues/index.ts';
+import { DestinationPicker } from '../resources/index.ts';
 import { useCan } from '../../kernel/auth/useCan.ts';
 import { useRoleIds } from '../clusters/index.ts';
 import { useDisplayZone } from '../../kernel/time/timezone.ts';
@@ -27,7 +27,7 @@ import { plural } from './words.ts';
 /**
  * Staging left on a broker by a run Rahdar no longer has: the one way messages could strand.
  * It is never cleaned up behind the operator's back — each one is listed with its depth and a
- * return action that names the queue the messages go back to.
+ * return action that names the subscription the messages go back to.
  */
 function Orphans({ clusterId }: Readonly<{ clusterId: string }>) {
   const query = useOrphans(clusterId);
@@ -36,16 +36,20 @@ function Orphans({ clusterId }: Readonly<{ clusterId: string }>) {
   const { canAnywhere, loading } = useCan();
   const [chosen, setChosen] = useState<OrphanView | null>(null);
   const form = useForm({
-    initialValues: { queue: '' },
+    initialValues: { subscription: '' },
     validateInputOnBlur: true,
-    validate: { queue: (v) => (v.trim() ? null : 'Name the queue the messages go back to.') },
+    validate: { subscription: (v) => (v.trim() ? null : 'Name the subscription the messages go back to.') },
   });
   const gate = gateFor(canAnywhere('message:move', clusterId), 'Move or retry messages', undefined, loading);
 
-  const returnMessages = form.onSubmit(({ queue }) => {
+  const returnMessages = form.onSubmit(({ subscription }) => {
     if (!chosen) return;
     returnOrphan.mutate(
-      { nodeId: chosen.nodeId, stagingQueue: chosen.stagingQueue, target: ids.subscription(queue.trim()) },
+      {
+        nodeId: chosen.nodeId,
+        stagingQueue: chosen.stagingQueue,
+        target: ids.subscription(subscription.trim()),
+      },
       { onSuccess: () => setChosen(null) },
     );
   }, focusFirstInvalid(form.getInputNode));
@@ -54,7 +58,7 @@ function Orphans({ clusterId }: Readonly<{ clusterId: string }>) {
   if (query.isError) {
     return (
       <Section
-        title="Staging queues with no run"
+        title="Staging subscriptions with no run"
         description="Rahdar could not check for them. If a transfer was interrupted, its messages may still be held on a broker."
       >
         <ErrorState variant="inline" error={query.error} onRetry={() => void query.refetch()} />
@@ -66,8 +70,8 @@ function Orphans({ clusterId }: Readonly<{ clusterId: string }>) {
 
   return (
     <Section
-      title="Staging queues with no run"
-      description="These hold messages a transfer took off a queue before Rahdar lost the run. Nothing is lost: return each one to the queue the messages came from, and Rahdar removes the staging queue afterwards."
+      title="Staging subscriptions with no run"
+      description="These hold messages a transfer took off a subscription before Rahdar lost the run. Nothing is lost: return each one to the subscription the messages came from, and Rahdar removes the staging subscription afterwards."
     >
       {query.data.map((orphan) => (
         <Group key={`${orphan.nodeId}:${orphan.stagingQueue}`} gap="sm">
@@ -97,8 +101,8 @@ function Orphans({ clusterId }: Readonly<{ clusterId: string }>) {
           <Text size="sm">
             {plural(returnOrphan.data.returned, 'message')} returned from {returnOrphan.data.stagingQueue}.{' '}
             {returnOrphan.data.removed
-              ? 'The staging queue is gone.'
-              : `${plural(returnOrphan.data.remaining, 'message')} could not be taken and the staging queue is still there.`}
+              ? 'The staging subscription is gone.'
+              : `${plural(returnOrphan.data.remaining, 'message')} could not be taken and the staging subscription is still there.`}
           </Text>
         ) : null}
       </div>
@@ -111,20 +115,23 @@ function Orphans({ clusterId }: Readonly<{ clusterId: string }>) {
         {chosen ? (
           <Stack gap="sm">
             <Text size="sm">
-              Every message in {chosen.stagingQueue} on {chosen.nodeName} moves to the queue you name, on that same
-              node, and the staging queue is then removed.
+              Every message in {chosen.stagingQueue} on {chosen.nodeName} moves to the subscription you name, on that
+              same node, and the staging subscription is then removed.
             </Text>
-            <AddressPicker
+            <DestinationPicker
               clusterId={clusterId}
               label="Return them to"
               permission="message:send"
-              description="The queue the transfer took them from."
-              {...form.getInputProps('queue')}
-              value={form.values.queue}
-              unknownHint="No queue by that name on this cluster. Check it before returning messages to it."
+              description="The subscription the transfer took them from."
+              {...form.getInputProps('subscription')}
+              value={form.values.subscription}
+              unknownHint="No subscription by that name on this cluster. Check it before returning messages to it."
             />
             {returnOrphan.isError ? (
-              <ErrorState error={returnOrphan.error} next="Nothing was returned. Check the queue, then try again." />
+              <ErrorState
+                error={returnOrphan.error}
+                next="Nothing was returned. Check the subscription, then try again."
+              />
             ) : null}
             <HoldToConfirm
               label="Return the messages"
@@ -162,7 +169,7 @@ export function TransfersView() {
     <Page fill>
       <PageHeader
         title="Message transfers"
-        description="Messages moved or copied between queues on other nodes or clusters, newest first, each with its outcome."
+        description="Messages moved or copied between subscriptions on other nodes or clusters, newest first, each with its outcome."
       />
       <Orphans clusterId={clusterId} />
       <DataTable
@@ -178,10 +185,10 @@ export function TransfersView() {
           <EmptyState
             kind="empty"
             title="No transfers yet"
-            description="A transfer moves or copies messages from a queue to a queue on another node or another cluster, after a preview that checks the target can accept them. None has been run from or to this cluster yet. Select messages on the Messages screen to start one."
+            description="A transfer moves or copies messages from a subscription to a subscription on another node or another cluster, after a preview that checks the target can accept them. None has been run from or to this cluster yet. Select messages on the Messages screen to start one."
             action={
-              <Link to={`/clusters/${clusterId}/queues`} className={linkClasses.link}>
-                Go to Queues
+              <Link to={`/clusters/${clusterId}/subscriptions`} className={linkClasses.link}>
+                Go to Subscriptions
               </Link>
             }
           />

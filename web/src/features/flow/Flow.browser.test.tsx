@@ -124,10 +124,10 @@ function page(search: string) {
 
 const LAYOUTS = [
   { name: 'graph', tab: undefined, search: '' },
-  { name: 'graph with its inspector', tab: undefined, search: '?node=queue%3AORDERS.inbound' },
+  { name: 'graph with its inspector', tab: undefined, search: '?node=subscription%3AORDERS.inbound' },
   { name: 'table', tab: 'table', search: '?tab=table' },
   { name: 'split, nothing selected', tab: 'split', search: '?tab=split' },
-  { name: 'split, a queue selected', tab: 'split', search: '?tab=split&node=queue%3AORDERS.inbound' },
+  { name: 'split, a subscription selected', tab: 'split', search: '?tab=split&node=subscription%3AORDERS.inbound' },
 ] as const;
 
 describe.each(LAYOUTS)('Flow, $name', ({ tab, search }) => {

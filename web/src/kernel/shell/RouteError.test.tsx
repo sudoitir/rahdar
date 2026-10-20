@@ -16,9 +16,11 @@ describe('RouteError', () => {
   it('names the cause and the next step of a refused request, and retries through the router', async () => {
     const reset = vi.fn();
     renderWithProviders(
-      <RouteError error={new ApiError(403, { title: 'Forbidden', permission: 'queues:read' })} reset={reset} />,
+      <RouteError error={new ApiError(403, { title: 'Forbidden', permission: 'subscriptions:read' })} reset={reset} />,
     );
-    expect(screen.getByRole('alert')).toHaveTextContent('Your role does not include the queues:read permission.');
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Your role does not include the subscriptions:read permission.',
+    );
     // A missing permission is not helped by trying again, so no retry is offered.
     expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument();
 

@@ -4,10 +4,11 @@ import userEvent from '@testing-library/user-event';
 import type { ComponentType } from 'react';
 
 import { renderWithProviders } from '../../test/render.tsx';
+import type { ResourceRef } from '../../kernel/api/resourceId.ts';
 import type { MetricRange } from '../../kernel/time/ranges.ts';
 import type { FlowGraphView, FlowNodeShare, FlowNodeView } from './api.ts';
 
-type Panel = ComponentType<{ clusterId: string; queueName: string; range: MetricRange }>;
+type Panel = ComponentType<{ clusterId: string; subscription: ResourceRef; range: MetricRange }>;
 let panels: { id: string; order: number; Component: Panel }[] = [];
 vi.mock('../../kernel/slots.ts', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../kernel/slots.ts')>()),
@@ -90,7 +91,9 @@ describe('FlowMonitorPane with nothing selected', () => {
     );
 
     const region = screen.getByRole('region', { name: 'Broker nodes' });
-    expect(within(region).getByText(/Select a client, address or queue to break it down per node/)).toBeInTheDocument();
+    expect(
+      within(region).getByText(/Select a client, destination or subscription to break it down per node/),
+    ).toBeInTheDocument();
     expect(within(region).queryByText(/not in the shown paths/)).not.toBeInTheDocument();
     const grid = await within(region).findByRole('grid', { name: 'Totals per broker node' });
     expect(within(grid).getByText('1,234')).toBeInTheDocument();
@@ -112,8 +115,8 @@ describe('FlowMonitorPane with nothing selected', () => {
   });
 });
 
-describe('FlowMonitorPane with a queue selected', () => {
-  it('names the queue and its faults, breaks it down per node and states the imbalance in words', async () => {
+describe('FlowMonitorPane with a subscription selected', () => {
+  it('names the subscription and its faults, breaks it down per node and states the imbalance in words', async () => {
     const q = node({
       faults: ['NO_CONSUMER', 'PARTIAL_PRESENCE', 'SOMETHING_NEW' as never],
       byNode: [
@@ -124,8 +127,8 @@ describe('FlowMonitorPane with a queue selected', () => {
     });
     const { onClear, user } = show(graph({ nodes: [q] }), 'q1');
 
-    const region = screen.getByRole('region', { name: 'Queue orders' });
-    expect(within(region).getByRole('heading', { level: 3, name: 'Queue orders' })).toBeInTheDocument();
+    const region = screen.getByRole('region', { name: 'Subscription orders' });
+    expect(within(region).getByRole('heading', { level: 3, name: 'Subscription orders' })).toBeInTheDocument();
     expect(within(region).getByText('no consumer, partly deployed, something_new')).toBeInTheDocument();
 
     const statements = within(region).getByRole('list', { name: 'Balance across nodes' });
@@ -162,7 +165,7 @@ describe('FlowMonitorPane with a queue selected', () => {
     expect(screen.getByText('Served by one node, node-a.')).toBeInTheDocument();
   });
 
-  it('says it is still breaking the queue down while the graph is the one from before it was asked for', () => {
+  it('says it is still breaking the subscription down while the graph is the one from before it was asked for', () => {
     show(graph({ nodes: [node({ byNode: [] })] }), 'q1', { pending: true });
 
     expect(screen.getByRole('status')).toHaveTextContent('Breaking this down per node');
@@ -178,21 +181,22 @@ describe('FlowMonitorPane with a queue selected', () => {
     ).toBeInTheDocument();
   });
 
-  it('offers a history range and hands each contributed panel the queue and the range', async () => {
+  it('offers a history range and hands each contributed panel the subscription and the range', async () => {
     const seen = vi.fn();
     panels = [
       {
         id: 'metrics.flow',
         order: 1,
-        Component: ({ clusterId, queueName, range }) => {
-          seen(clusterId, queueName, range);
-          return <p>history of {queueName}</p>;
+        Component: ({ clusterId, subscription, range }) => {
+          seen(clusterId, subscription.name, range);
+          return <p>history of {subscription.name}</p>;
         },
       },
     ];
     const { user, onRangeChange } = show(graph({ nodes: [node({ byNode: [share({})] })] }), 'q1', { range: '6h' });
 
-    expect(screen.getByRole('heading', { name: 'Over time' })).toBeInTheDocument();
+    // The history waits for the cluster's kinds, which say what a subscription's id is.
+    expect(await screen.findByRole('heading', { name: 'Over time' })).toBeInTheDocument();
     expect(screen.getByText('history of orders')).toBeInTheDocument();
     expect(seen).toHaveBeenCalledWith('c1', 'orders', '6h');
     expect(screen.getByRole('radio', { name: '6h' })).toBeChecked();
@@ -201,14 +205,14 @@ describe('FlowMonitorPane with a queue selected', () => {
     expect(onRangeChange).toHaveBeenCalledWith('24h');
   });
 
-  it('shows no history for a queue when nothing contributes one, or for an address', () => {
+  it('shows no history for a subscription when nothing contributes one, or for a destination', () => {
     const { unmount } = show(graph({ nodes: [node({ byNode: [share({})] })] }), 'q1');
     expect(screen.queryByRole('heading', { name: 'Over time' })).not.toBeInTheDocument();
     unmount();
 
     panels = [{ id: 'p', order: 1, Component: () => <p>panel</p> }];
     show(graph({ nodes: [node({ kind: 'DESTINATION', label: 'orders', byNode: [share({})] })] }), 'q1');
-    expect(screen.getByRole('region', { name: 'Address orders' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Destination orders' })).toBeInTheDocument();
     expect(screen.queryByText('panel')).not.toBeInTheDocument();
   });
 

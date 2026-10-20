@@ -24,8 +24,8 @@ export function RunOutcome({ run }: Readonly<{ run: BulkRunView }>) {
   return <StatusBadge tone={tone}>{text}</StatusBadge>;
 }
 
-/** A queue as a real button, so its node detail is reachable from the keyboard. */
-export function QueueButton({
+/** A subscription as a real button, so its node detail is reachable from the keyboard. */
+export function SubscriptionButton({
   item,
   onOpen,
 }: Readonly<{ item: BulkItemView; onOpen: (subscription: string) => void }>) {
@@ -41,7 +41,7 @@ export function QueueButton({
   );
 }
 
-/** The queue's outcome in words; colour only emphasises one that was refused, failed or is unknown. */
+/** The subscription's outcome in words; colour only emphasises one that was refused, failed or is unknown. */
 export function ItemOutcome({ item }: Readonly<{ item: BulkItemView }>) {
   const { text, tone } = itemStatus(item.status);
   return <StatusBadge tone={tone}>{text}</StatusBadge>;

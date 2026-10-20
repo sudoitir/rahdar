@@ -4,7 +4,7 @@ import { useForm, type UseFormReturnType } from '@mantine/form';
 import { useNavigate } from '@tanstack/react-router';
 
 import { useCluster, useClusters, useRoleIds } from '../clusters/index.ts';
-import { AddressPicker } from '../queues/index.ts';
+import { DestinationPicker } from '../resources/index.ts';
 import { useCan } from '../../kernel/auth/useCan.ts';
 import { nameOf } from '../../kernel/api/resourceId.ts';
 import type { MessageSelection } from '../../kernel/slots.ts';
@@ -32,14 +32,16 @@ const PERMISSION: Record<TransferMode, { id: string; label: string }> = {
   COPY: { id: 'message:read', label: 'Browse messages' },
 };
 
-function selectionWords(selection: MessageSelection, queueName: string, total: number | null): string {
+function selectionWords(selection: MessageSelection, subscriptionName: string, total: number | null): string {
   switch (selection.kind) {
     case 'ids':
-      return `the ${plural(selection.ids.length, 'selected message')} of ${queueName}`;
+      return `the ${plural(selection.ids.length, 'selected message')} of ${subscriptionName}`;
     case 'filter':
-      return `every message of ${queueName} matching ${selection.filter}`;
+      return `every message of ${subscriptionName} matching ${selection.filter}`;
     case 'all':
-      return total == null ? `every message of ${queueName}` : `all ${plural(total, 'message')} of ${queueName}`;
+      return total == null
+        ? `every message of ${subscriptionName}`
+        : `all ${plural(total, 'message')} of ${subscriptionName}`;
   }
 }
 
@@ -58,10 +60,10 @@ interface Destination {
   mode: TransferMode;
   targetClusterId: string;
   targetNodeId: string | null;
-  targetQueue: string;
+  targetSubscription: string;
 }
 
-/** The selection as the API takes it: ids, a filter, or the whole queue. */
+/** The selection as the API takes it: ids, a filter, or the whole subscription. */
 function selectionRequest(selection: MessageSelection) {
   if (selection.kind === 'ids') return { kind: 'IDS' as const, ids: selection.ids, filter: null };
   if (selection.kind === 'filter') return { kind: 'FILTER' as const, ids: null, filter: selection.filter };
@@ -97,8 +99,8 @@ function blastRadius(run: TransferRunView, clusterName: (id: string) => string):
     `from ${nameOf(source.subscription)} on ${source.nodeName} (${clusterName(source.clusterId)}) ` +
     `to ${nameOf(target.subscription)} on ${target.nodeName} (${clusterName(target.clusterId)})`;
   return run.mode === 'MOVE'
-    ? `Move ${what} ${where}. They leave the source queue.`
-    : `Copy ${what} ${where}. The source queue is unchanged.`;
+    ? `Move ${what} ${where}. They leave the source subscription.`
+    : `Copy ${what} ${where}. The source subscription is unchanged.`;
 }
 
 const START = { verb: 'Start', past: 'Started', progressive: 'Starting' } as const;
@@ -121,9 +123,9 @@ function Snippet({ snippet }: Readonly<{ snippet?: string | null }>) {
   );
 }
 
-/** The first step: where the messages go — mode, target cluster, node and queue — before anything is previewed. */
+/** The first step: where the messages go — mode, target cluster, node and subscription — before anything is previewed. */
 function DestinationForm({
-  queueName,
+  subscriptionName,
   redistribute,
   form,
   clusterOptions,
@@ -138,7 +140,7 @@ function DestinationForm({
   onCancel,
   onPreview,
 }: Readonly<{
-  queueName: string;
+  subscriptionName: string;
   redistribute: boolean;
   form: UseFormReturnType<Destination>;
   clusterOptions: { value: string; label: string; disabled: boolean }[];
@@ -172,7 +174,8 @@ function DestinationForm({
         ) : null}
         {redistribute ? (
           <Text size="sm">
-            The messages move to {queueName} on the node you choose, and land on that node&rsquo;s own queue.
+            The messages move to {subscriptionName} on the node you choose, and land on that node&rsquo;s own
+            subscription.
           </Text>
         ) : (
           <>
@@ -213,14 +216,14 @@ function DestinationForm({
           nothingFoundMessage="This cluster has no nodes Rahdar knows of."
         />
         {redistribute ? null : (
-          <AddressPicker
+          <DestinationPicker
             clusterId={targetClusterId}
-            label="Target queue"
+            label="Target subscription"
             permission="message:send"
-            description="The queue on the target node. A queue that does not exist is checked in the preview."
-            {...form.getInputProps('targetQueue')}
-            value={form.values.targetQueue}
-            unknownHint="No queue by that name on this cluster yet. The preview says whether the broker would create it."
+            description="The subscription on the target node. A subscription that does not exist is checked in the preview."
+            {...form.getInputProps('targetSubscription')}
+            value={form.values.targetSubscription}
+            unknownHint="No subscription by that name on this cluster yet. The preview says whether the broker would create it."
           />
         )}
         {uncertain && !blocked ? (
@@ -318,7 +321,7 @@ function FindingsPanel({
       {!refused && data.overCap ? (
         <Section title="Over the safety cap" headingLevel={3} variant="card">
           <Text size="sm">
-            {overCapWords(data)} Typing the queue name below overrides the cap for this run, and the override is
+            {overCapWords(data)} Typing the subscription name below overrides the cap for this run, and the override is
             recorded in the audit log.
           </Text>
         </Section>
@@ -374,13 +377,13 @@ function FindingsPanel({
  * Destination → preview → confirm for one message transfer (ADR-0097). Nothing touches a broker
  * until the frozen plan is confirmed: the preview states the blast radius and every acceptance
  * finding, a warning is acknowledged one by one, and a move, or anything over the safety cap, is
- * armed by typing the source queue's name. Once the run is accepted the operator is taken to it.
+ * armed by typing the source subscription's name. Once the run is accepted the operator is taken to it.
  *
- * `redistribute` fixes the target to the same queue in the same cluster, on another node.
+ * `redistribute` fixes the target to the same subscription in the same cluster, on another node.
  */
 export function TransferDialog({
   clusterId,
-  queueName,
+  subscriptionName,
   node,
   selection,
   total,
@@ -390,7 +393,7 @@ export function TransferDialog({
   onStarted,
 }: Readonly<{
   clusterId: string;
-  queueName: string;
+  subscriptionName: string;
   node?: string;
   selection: MessageSelection;
   total: number | null;
@@ -407,12 +410,17 @@ export function TransferDialog({
   const execute = useTransferExecute(clusterId);
 
   const form = useForm<Destination>({
-    initialValues: { mode: 'MOVE', targetClusterId: clusterId, targetNodeId: null, targetQueue: queueName },
+    initialValues: {
+      mode: 'MOVE',
+      targetClusterId: clusterId,
+      targetNodeId: null,
+      targetSubscription: subscriptionName,
+    },
     validateInputOnBlur: true,
     validate: {
       // The node the operator sees may be the one chosen for them, so it is checked as shown (see `chosenNode`).
       targetNodeId: () => (chosenNode ? null : 'Choose the node the messages go to.'),
-      targetQueue: (v) => (redistribute || v.trim() ? null : 'Name the queue the messages go to.'),
+      targetSubscription: (v) => (redistribute || v.trim() ? null : 'Name the subscription the messages go to.'),
     },
   });
   const { mode, targetClusterId, targetNodeId } = form.values;
@@ -464,12 +472,12 @@ export function TransferDialog({
     setAcked(new Set());
     preview.mutate({
       mode: effectiveMode,
-      source: sourceIds.subscription(queueName),
+      source: sourceIds.subscription(subscriptionName),
       sourceNodeId: sourceNode.id,
       selection: selectionRequest(selection),
       targetClusterId: redistribute ? clusterId : values.targetClusterId,
       targetNodeId: chosenNode,
-      target: targetIds.subscription(redistribute ? queueName : values.targetQueue.trim()),
+      target: targetIds.subscription(redistribute ? subscriptionName : values.targetSubscription.trim()),
     });
   }, focusFirstInvalid(form.getInputNode));
 
@@ -488,7 +496,7 @@ export function TransferDialog({
         runId: data.id,
         body: {
           planHash: data.planHash,
-          // Typing the queue name is the override: it is only armed where the preview said so.
+          // Typing the subscription name is the override: it is only armed where the preview said so.
           override: data.overCap,
           acknowledged: warnings.map((f) => f.code),
           confirmSubscription: nameOf(data.source.subscription),
@@ -514,19 +522,21 @@ export function TransferDialog({
     };
   });
 
-  const title = redistribute ? `Redistribute from ${queueName} to another node` : `Transfer messages from ${queueName}`;
+  const title = redistribute
+    ? `Redistribute from ${subscriptionName} to another node`
+    : `Transfer messages from ${subscriptionName}`;
 
   return (
     <Modal opened={opened} onClose={close} title={title} size="xl">
       <Stack gap="md">
         <Text size="sm">
-          From {selectionWords(selection, queueName, total)}
+          From {selectionWords(selection, subscriptionName, total)}
           {sourceNode ? ` on ${sourceNode.name}` : ''}.
         </Text>
 
         {!data ? (
           <DestinationForm
-            queueName={queueName}
+            subscriptionName={subscriptionName}
             redistribute={redistribute}
             form={form}
             clusterOptions={clusterOptions}

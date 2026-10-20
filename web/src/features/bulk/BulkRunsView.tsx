@@ -24,7 +24,7 @@ export function BulkRunsView() {
     <Page fill>
       <PageHeader
         title="Bulk runs"
-        description="Pauses, resumes, purges and deletes applied to many queues at once, newest first, each with its outcome."
+        description="Pauses, resumes, purges and deletes applied to many subscriptions at once, newest first, each with its outcome."
       />
       <DataTable
         label="Bulk runs"
@@ -39,10 +39,10 @@ export function BulkRunsView() {
           <EmptyState
             kind="empty"
             title="No bulk runs yet"
-            description="A bulk run pauses, resumes, purges or deletes many queues at once, one queue at a time, after a preview you confirm. Nothing has been run on this cluster yet. Select queues on the Queues screen to start one, and it is listed here with its outcome."
+            description="A bulk run pauses, resumes, purges or deletes many subscriptions at once, one subscription at a time, after a preview you confirm. Nothing has been run on this cluster yet. Select subscriptions on the Subscriptions screen to start one, and it is listed here with its outcome."
             action={
-              <Link to={`/clusters/${clusterId}/queues`} className={linkClasses.link}>
-                Go to Queues
+              <Link to={`/clusters/${clusterId}/subscriptions`} className={linkClasses.link}>
+                Go to Subscriptions
               </Link>
             }
           />

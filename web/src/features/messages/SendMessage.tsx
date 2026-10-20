@@ -47,18 +47,18 @@ function check({ kind, body, props }: FormState): Record<string, string> {
 /** Enqueue one message, as text or as bytes given in base64. */
 export function SendMessage({
   clusterId,
-  queueName,
+  subscriptionName,
   node,
   opened,
   onClose,
 }: Readonly<{
   clusterId: string;
-  queueName: string;
+  subscriptionName: string;
   node?: string;
   opened: boolean;
   onClose: () => void;
 }>) {
-  const send = useSendMessage(clusterId, queueName);
+  const send = useSendMessage(clusterId, subscriptionName);
   const form = useForm<FormState>({
     initialValues: { kind: 'TEXT', durable: true, body: '', props: [] },
     validateInputOnBlur: true,
@@ -71,13 +71,13 @@ export function SendMessage({
       { body: { kind, durable, body, headers: {}, properties }, node },
       {
         onSuccess: () => {
-          notify.succeeded({ action: VERBS.send, subject: `a message to queue "${queueName}"` });
+          notify.succeeded({ action: VERBS.send, subject: `a message to subscription "${subscriptionName}"` });
           form.setFieldValue('body', '');
           form.setFieldValue('props', []);
           form.clearErrors();
           onClose();
         },
-        onError: (e) => announceFailure('send', `a message to queue "${queueName}"`, e),
+        onError: (e) => announceFailure('send', `a message to subscription "${subscriptionName}"`, e),
       },
     );
   }, focusFirstInvalid(form.getInputNode));
@@ -86,7 +86,7 @@ export function SendMessage({
     <Modal
       opened={opened}
       onClose={onClose}
-      title={`Send to ${queueName}`}
+      title={`Send to ${subscriptionName}`}
       size="lg"
       closeOnEscape={!send.isPending}
       closeOnClickOutside={!send.isPending}

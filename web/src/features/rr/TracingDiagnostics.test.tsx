@@ -71,7 +71,7 @@ describe('TracingDiagnostics', () => {
               {
                 ...diagnostics().expectations[0],
                 nodesSampled: 1,
-                skipped: ["broker-1: no queue for address 'orders.request' in the last scrape"],
+                skipped: ["broker-1: no subscription for destination 'orders.request' in the last scrape"],
               },
             ],
           }),
@@ -80,7 +80,7 @@ describe('TracingDiagnostics', () => {
     );
     renderWithProviders(<TracingDiagnostics clusterId="c1" />);
 
-    expect(await screen.findByText(/no queue for address/)).toBeInTheDocument();
+    expect(await screen.findByText(/no subscription for destination/)).toBeInTheDocument();
   });
 
   it('says when Rahdar itself is the suspect rather than blaming every broker', async () => {
@@ -105,11 +105,11 @@ describe('TracingDiagnostics', () => {
     expect(await screen.findByText(/Rahdar.s own host/)).toBeInTheDocument();
   });
 
-  it('lists what the sampler did for each traced address in a table, with its heading level under the section', async () => {
+  it('lists what the sampler did for each traced destination in a table, with its heading level under the section', async () => {
     server.use(http.get('*/api/v1/clusters/c1/rr/diagnostics', () => HttpResponse.json(diagnostics())));
     renderWithProviders(<TracingDiagnostics clusterId="c1" />);
 
-    const table = await screen.findByRole('table', { name: 'What the sampler did for each traced address' });
+    const table = await screen.findByRole('table', { name: 'What the sampler did for each traced destination' });
     expect(within(table).getByRole('rowheader', { name: 'orders.request' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 3, name: /here is what Rahdar did/ })).toBeInTheDocument();
   });

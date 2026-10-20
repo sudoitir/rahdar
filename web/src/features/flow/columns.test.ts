@@ -29,7 +29,7 @@ describe('flow columns', () => {
   it('measures a path end by what its cell shows: its kind, its name and its client count', () => {
     const [from, , to] = pathColumns(0);
     expect(from.accessor(row())).toBe('client app-1 ×3');
-    expect(to.accessor(row())).toBe('queue orders');
+    expect(to.accessor(row())).toBe('subscription orders');
   });
 
   it('puts the node first and attributes every figure to it, whatever the shape', () => {

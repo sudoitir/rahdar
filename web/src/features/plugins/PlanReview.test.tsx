@@ -53,7 +53,7 @@ describe('PlanReview', () => {
 
     expect(screen.getByText('Notes 1.0.0')).toBeInTheDocument();
     expect(screen.getByText('by Acme · Apache-2.0 · supports Rahdar 2026.01.0 and later')).toBeInTheDocument();
-    expect(screen.getByText('Shared notes on queues.')).toBeInTheDocument();
+    expect(screen.getByText('Shared notes on subscriptions.')).toBeInTheDocument();
     expect(screen.getByText(/Add screens to Rahdar, which act with the rights of whoever views them/)).toBeVisible();
     expect(screen.getByText(/Run code inside Rahdar/)).toBeVisible();
     expect(screen.getByText('Give the assistant 1 read-only tool: notes_search.')).toBeVisible();

@@ -12,7 +12,7 @@ import {
 import { useNavigate } from '@tanstack/react-router';
 
 import { useResourceGate } from '../../kernel/auth/useResourceGate.ts';
-import type { ActionProps, HostedDialogProps, MessageTarget, QueueTarget } from '../../kernel/actions/types.ts';
+import type { ActionProps, HostedDialogProps, MessageTarget, SubscriptionTarget } from '../../kernel/actions/types.ts';
 import { absoluteHref, clusterHref } from '../../kernel/routing/href.ts';
 import { ActionMenuItem } from '../../ui/ActionMenuItem.tsx';
 import { useRoleIds } from '../clusters/index.ts';
@@ -22,20 +22,20 @@ import { notify } from '../../ui/notify.ts';
 import { useMessageAction } from './api.ts';
 import { useActionGate } from './gates.ts';
 import { announceFailure, VERBS } from './outcomes.ts';
-import { AddressPicker } from '../queues/index.ts';
+import { DestinationPicker } from '../resources/index.ts';
 
-/** "Browse messages" on a queue's row: the message browser for that queue. */
-export function BrowseQueueMessages({ clusterId, target }: Readonly<ActionProps<QueueTarget>>) {
+/** "Browse messages" on a subscription's row: the message browser for that subscription. */
+export function BrowseSubscriptionMessages({ clusterId, target }: Readonly<ActionProps<SubscriptionTarget>>) {
   const navigate = useNavigate();
   const { hidden, verdict: gate } = useResourceGate({
     clusterId,
-    noun: 'queue',
+    noun: 'subscription',
     permission: 'message:read',
     label: 'Browse messages',
     resource: target.snapshot,
   });
   if (hidden) return null;
-  const path = `queues/${encodeURIComponent(target.queueName)}/messages`;
+  const path = `subscriptions/${encodeURIComponent(target.name)}/messages`;
   return (
     <ActionMenuItem
       label="Browse messages"
@@ -47,9 +47,9 @@ export function BrowseQueueMessages({ clusterId, target }: Readonly<ActionProps<
   );
 }
 
-/** Where one message opens: its queue's browser with the message's detail, on the node browsed. */
+/** Where one message opens: its subscription's browser with the message's detail, on the node browsed. */
 function messagePath(target: MessageTarget) {
-  return `queues/${encodeURIComponent(target.queueName)}/messages`;
+  return `subscriptions/${encodeURIComponent(target.subscription.name)}/messages`;
 }
 
 function messageSearch(target: MessageTarget) {
@@ -97,22 +97,22 @@ export function CopyMessage({ clusterId, target, host }: Readonly<ActionProps<Me
 
 type OneAction = 'move' | 'retry' | 'delete';
 
-const ONE: Record<OneAction, { what: string; confirmLabel: string; intro: (queueName: string) => string }> = {
+const ONE: Record<OneAction, { what: string; confirmLabel: string; intro: (subscriptionName: string) => string }> = {
   move: {
     what: 'moving this message',
     confirmLabel: 'Move message',
-    intro: (queueName) =>
-      `Moves this one message from ${queueName} to the queue you name, on the node it was read from.`,
+    intro: (subscriptionName) =>
+      `Moves this one message from ${subscriptionName} to the subscription you name, on the node it was read from.`,
   },
   retry: {
     what: 'retrying this message',
     confirmLabel: 'Retry message',
-    intro: () => 'Sends this dead-lettered message back to the queue it originally came from.',
+    intro: () => 'Sends this dead-lettered message back to the subscription it originally came from.',
   },
   delete: {
     what: 'deleting this message',
     confirmLabel: 'Delete this message',
-    intro: (queueName) => `Removes this one message from ${queueName}. It cannot be brought back.`,
+    intro: (subscriptionName) => `Removes this one message from ${subscriptionName}. It cannot be brought back.`,
   },
 };
 
@@ -132,7 +132,7 @@ function OneMessageDialog({
   target,
   action,
 }: HostedDialogProps & { clusterId: string; target: MessageTarget; action: OneAction }) {
-  const run = useMessageAction(clusterId, target.queueName);
+  const run = useMessageAction(clusterId, target.subscription.name);
   const ids = useRoleIds(clusterId);
   const form = useForm({
     initialValues: { destination: '' },
@@ -140,11 +140,11 @@ function OneMessageDialog({
     // Checked on activation, so the confirm button is never disabled with no reason given.
     validate: {
       destination: (value) =>
-        action === 'move' && !value.trim() ? 'Name the target queue to move the message.' : null,
+        action === 'move' && !value.trim() ? 'Name the target subscription to move the message.' : null,
     },
   });
   const one = ONE[action];
-  const subject = `message ${target.position} in queue "${target.queueName}"`;
+  const subject = `message ${target.position} in subscription "${target.subscription.name}"`;
 
   const submit = form.onSubmit(({ destination }) => {
     run.mutate(
@@ -161,7 +161,7 @@ function OneMessageDialog({
               action: VERBS[action],
               subject,
               cause: 'notDone' in r ? r.error : NOT_FOUND,
-              next: 'Nothing was changed. Reload the queue to see what is there now.',
+              next: 'Nothing was changed. Reload the subscription to see what is there now.',
             });
           } else {
             notify.succeeded({ action: VERBS[action], subject });
@@ -180,12 +180,12 @@ function OneMessageDialog({
       title={`${VERBS[action].verb} message ${target.position}`}
       consequence={
         <Stack gap="sm">
-          <Text size="sm">{one.intro(target.queueName)}</Text>
+          <Text size="sm">{one.intro(target.subscription.name)}</Text>
           {action === 'move' ? (
-            <AddressPicker
+            <DestinationPicker
               clusterId={clusterId}
-              label="Target queue"
-              description="The queue receives the message on the same node."
+              label="Target subscription"
+              description="The subscription receives the message on the same node."
               permission="message:send"
               {...form.getInputProps('destination')}
               value={form.values.destination}

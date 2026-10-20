@@ -45,7 +45,7 @@ export function RemoveClusterSection({ clusterId }: Readonly<{ clusterId: string
           </List.Item>
         </List>
         <Text size="sm">
-          Nothing on the broker changes: queues, messages and any capture diverts stay. The audit trail is kept.
+          Nothing on the broker changes: subscriptions, messages and any capture diverts stay. The audit trail is kept.
           Registering the cluster again starts from scratch.
         </Text>
 

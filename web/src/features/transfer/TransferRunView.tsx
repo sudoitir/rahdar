@@ -175,7 +175,7 @@ function StopDialog({
   );
 }
 
-/** Returning the held messages ends the run; it is armed by typing the source queue's name. */
+/** Returning the held messages ends the run; it is armed by typing the source subscription's name. */
 function ReturnDialog({
   opened,
   run,
@@ -191,8 +191,9 @@ function ReturnDialog({
       consequence={
         <>
           Every message held in staging, {plural(run.held, 'message')} now, goes back on{' '}
-          {nameOf(run.source.subscription)} on {run.source.nodeName}, and the staging queue is removed. Messages already
-          delivered to {nameOf(run.target.subscription)} stay there. The run ends as returned and cannot be resumed.
+          {nameOf(run.source.subscription)} on {run.source.nodeName}, and the staging subscription is removed. Messages
+          already delivered to {nameOf(run.target.subscription)} stay there. The run ends as returned and cannot be
+          resumed.
         </>
       }
       confirmLabel={`Return ${plural(run.held, 'message')}`}

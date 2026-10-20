@@ -3,7 +3,7 @@ import { createElement } from 'react';
 import { StatusBadge } from '../../ui/StatusBadge.tsx';
 import type { Column } from '../../ui/table/index.ts';
 import type { SqlIndexSubscriptionView } from './api.ts';
-import { DeleteCell, HeldCell, QueuesCell, StateCell } from './subscriptionCells.tsx';
+import { DeleteCell, HeldCell, SubscriptionsCell, StateCell } from './subscriptionCells.tsx';
 
 const retentionWords = (days: number) => `${days} day${days === 1 ? '' : 's'}`;
 
@@ -20,10 +20,10 @@ export function subscriptionColumns({
   const mayChange = (s: SqlIndexSubscriptionView) => (s.mode === 'CAPTURE' ? canCapture : canWrite);
   return [
     {
-      id: 'queues',
-      header: 'Queues',
+      id: 'subscriptions',
+      header: 'Subscriptions',
       accessor: (s) => s.subscriptionPattern ?? '',
-      cell: (s) => createElement(QueuesCell, { subscription: s }),
+      cell: (s) => createElement(SubscriptionsCell, { subscription: s }),
       kind: 'text',
       priority: 'essential',
       wrap: true,

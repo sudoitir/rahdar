@@ -4,20 +4,20 @@ import { screen, waitFor } from '@testing-library/react';
 
 import { renderWithProviders } from '../../test/render.tsx';
 import { server } from '../../test/setup.ts';
-import { useQueues } from './api.ts';
+import { useSubscriptions } from './api.ts';
 
 function Probe({ clusterId }: { clusterId: string }) {
-  const q = useQueues(clusterId);
+  const q = useSubscriptions(clusterId);
   return <div>{`${q.fetchStatus}/${q.isError ? 'error' : 'ok'}`}</div>;
 }
 
 /**
  * The command palette mounts on every route and has no cluster id outside one.
- * Before this guard it requested `/clusters//queues`, a 400, and an errored
+ * Before this guard it requested `/clusters//subscriptions`, a 400, and an errored
  * observed query puts the whole shell into its offline state — so every
  * cluster-less screen claimed Rahdar had lost contact with the brokers.
  */
-describe('useQueues without a cluster', () => {
+describe('useSubscriptions without a cluster', () => {
   it('requests nothing, and reports no error', async () => {
     const seen: string[] = [];
     server.use(

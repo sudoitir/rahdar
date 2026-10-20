@@ -1,8 +1,8 @@
+import type { ResourceRef } from '../../kernel/api/resourceId.ts';
 import { useMemo } from 'react';
 import { Stack, Text } from '@mantine/core';
 import { CompositeChart } from '@mantine/charts';
 
-import { useRoleIds } from '../clusters/index.ts';
 import { useServerNow } from '../../kernel/time/time.ts';
 import { ErrorState } from '../../ui/ErrorState.tsx';
 import { LoadingState } from '../../ui/LoadingState.tsx';
@@ -38,7 +38,7 @@ const peak = (nodes: MetricNodeSeries[], metrics: string[]) => {
 };
 
 /**
- * A queue's history as small multiples, one per broker node, on one shared scale (ADR-0110): a
+ * A subscription's history as small multiples, one per broker node, on one shared scale (ADR-0110): a
  * node's chart is comparable with its neighbour's at a glance, and no node is told apart by colour.
  * Each node leads with its latest figures in words, so the charts are never the only carrier.
  */
@@ -74,7 +74,7 @@ export function NodeSplitCharts({
   if (nodes.length === 0) {
     return (
       <Text size="sm" c="dimmed">
-        No node has served this queue in this window.
+        No node has served this subscription in this window.
       </Text>
     );
   }
@@ -146,35 +146,34 @@ export function NodeSplitCharts({
   );
 }
 
-/** A queue's per-node history in the flow view's pane (`flow.selection.panels`). */
+/** A subscription's per-node history in the flow view's pane (`flow.selection.panels`). */
 export function NodeSplitPanels({
   clusterId,
-  queueName,
+  subscription,
   range,
 }: Readonly<{
   clusterId: string;
-  queueName: string;
+  subscription: ResourceRef;
   range: MetricRange;
 }>) {
+  const subscriptionName = subscription.name;
   const spec = rangeSpec(range);
   const tick = useServerNow(spec.stepMs);
   const { from, to } = useMemo(() => {
     const end = Math.floor(tick / spec.stepMs) * spec.stepMs;
     return { from: end - spec.windowMs, to: end };
   }, [tick, spec.stepMs, spec.windowMs]);
-  const ids = useRoleIds(clusterId);
   const metrics = useMetrics(
     clusterId,
     {
       metrics: METRICS,
-      resource: ids.loaded ? ids.subscription(queueName) : undefined,
+      resource: subscription.id,
       from: new Date(from).toISOString(),
       to: new Date(to).toISOString(),
       step: spec.step,
       splitBy: 'NODE',
     },
     Math.max(15_000, spec.stepMs),
-    ids.loaded,
   );
 
   if (metrics.isError) {
@@ -187,7 +186,7 @@ export function NodeSplitPanels({
       range={range}
       from={from}
       to={to}
-      syncId={`flow-split-${clusterId}-${queueName}`}
+      syncId={`flow-split-${clusterId}-${subscriptionName}`}
     />
   );
 }

@@ -30,7 +30,7 @@ const ORDER: Record<string, (a: TeamSummary, b: TeamSummary) => number> = {
 };
 
 /**
- * Teams (team-access spec): who owns which queue and address name patterns, and who may act on them.
+ * Teams (team-access spec): who owns which subscription and destination name patterns, and who may act on them.
  * The open team, and the list's filter and sort, are in the address, so each can be shared.
  */
 export function TeamsPanel() {
@@ -101,7 +101,7 @@ function TeamList({ search, onCreated }: Readonly<{ search: TeamsSearch; onCreat
 
   const title = 'Teams';
   const description =
-    'A team owns queue and address name patterns on clusters. Its members see and operate only what those patterns cover. Open a team by its name.';
+    'A team owns subscription and destination name patterns on clusters. Its members see and operate only what those patterns cover. Open a team by its name.';
 
   // Until access is known the caller counts as an admin, so a non-admin's notice would appear late and push the
   // table down: wait for it, so the notice and the table arrive together.
@@ -136,7 +136,7 @@ function TeamList({ search, onCreated }: Readonly<{ search: TeamsSearch; onCreat
       <EmptyState
         kind="empty"
         title="No teams"
-        description="A team owns queue and address name patterns on clusters, and its members see and operate only what those patterns cover. Create one to share a cluster between groups of people."
+        description="A team owns subscription and destination name patterns on clusters, and its members see and operate only what those patterns cover. Create one to share a cluster between groups of people."
         action={
           <Button size="xs" onClick={() => setNaming('new')}>
             Create team

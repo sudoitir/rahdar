@@ -7,7 +7,7 @@ import { flowColumns } from './columns.ts';
 
 const rowKey = (f: FlowView) => f.id;
 
-/** One flow's state, address, correlation id, age, and latency (or none yet); a row opens the flow. */
+/** One flow's state, destination, correlation id, age, and latency (or none yet); a row opens the flow. */
 export function FlowsTable({
   label,
   storageKey,

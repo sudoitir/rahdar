@@ -6,7 +6,7 @@ import { CapabilityGate } from '../../ui/CapabilityGate.tsx';
 import { ConfirmDialog } from '../../ui/ConfirmDialog.tsx';
 import { ErrorState } from '../../ui/ErrorState.tsx';
 import { Notice } from '../../ui/Notice.tsx';
-import { usePurgeQueue, type DryRunView } from './api.ts';
+import { usePurgeSubscription, type DryRunView } from './api.ts';
 import { useMessageGate } from './gates.ts';
 import { announceFailure, announceResult, messageCount } from './outcomes.ts';
 
@@ -17,17 +17,17 @@ import { announceFailure, announceResult, messageCount } from './outcomes.ts';
  * number it is being overridden for, never on an unknown depth.
  */
 function Consequence({
-  queueName,
+  subscriptionName,
   preview,
   failure,
-}: Readonly<{ queueName: string; preview: DryRunView | null; failure: ApiError | null }>) {
+}: Readonly<{ subscriptionName: string; preview: DryRunView | null; failure: ApiError | null }>) {
   if (failure) {
     return (
       <Stack gap="sm">
         <Text size="sm">
-          Rahdar could not take an estimate, so it cannot tell you how many messages purging {queueName} would destroy.
-          The purge can still proceed. This cannot be undone. The broker's bulk safety cap still applies: if the depth
-          turns out to be over it, the purge is refused.
+          Rahdar could not take an estimate, so it cannot tell you how many messages purging {subscriptionName} would
+          destroy. The purge can still proceed. This cannot be undone. The broker's bulk safety cap still applies: if
+          the depth turns out to be over it, the purge is refused.
         </Text>
         <ErrorState variant="inline" error={failure} />
       </Stack>
@@ -37,8 +37,8 @@ function Consequence({
   return (
     <Stack gap="sm">
       <Text size="sm">
-        This will remove approximately {messageCount(preview.affectedCount)} from {queueName} (point-in-time estimate).
-        This cannot be undone.
+        This will remove approximately {messageCount(preview.affectedCount)} from {subscriptionName} (point-in-time
+        estimate). This cannot be undone.
       </Text>
       {preview.overCap ? (
         <Notice tone="warning" title="Over the safety cap">
@@ -52,15 +52,15 @@ function Consequence({
 }
 
 /**
- * Purge the whole queue: the estimate first (the button is busy while it is taken), then a
- * confirmation that states it and arms only when the queue's name is typed.
+ * Purge the whole subscription: the estimate first (the button is busy while it is taken), then a
+ * confirmation that states it and arms only when the subscription's name is typed.
  */
-export function PurgeQueue({
+export function PurgeSubscription({
   clusterId,
-  queueName,
+  subscriptionName,
   node,
-}: Readonly<{ clusterId: string; queueName: string; node?: string }>) {
-  const purge = usePurgeQueue(clusterId, queueName);
+}: Readonly<{ clusterId: string; subscriptionName: string; node?: string }>) {
+  const purge = usePurgeSubscription(clusterId, subscriptionName);
   const [estimating, setEstimating] = useState(false);
   const [opened, setOpened] = useState(false);
   // The whole preview, not just its count: the cap and whether the estimate is over it decide both
@@ -68,7 +68,7 @@ export function PurgeQueue({
   const [preview, setPreview] = useState<DryRunView | null>(null);
   const [failure, setFailure] = useState<ApiError | null>(null);
   const overCap = preview?.overCap ?? false;
-  const gate = useMessageGate(clusterId, 'subscription:purge', 'Purge queues', 'messageIo');
+  const gate = useMessageGate(clusterId, 'subscription:purge', 'Purge subscriptions', 'messageIo');
 
   const estimate = () => {
     setPreview(null);
@@ -92,26 +92,26 @@ export function PurgeQueue({
       { node, override: overCap },
       {
         onSuccess: (r) => {
-          announceResult('purge', queueName, r, preview?.affectedCount ?? 0);
+          announceResult('purge', subscriptionName, r, preview?.affectedCount ?? 0);
           setOpened(false);
         },
-        onError: (e) => announceFailure('purge', `queue "${queueName}"`, e, () => setOpened(false)),
+        onError: (e) => announceFailure('purge', `subscription "${subscriptionName}"`, e, () => setOpened(false)),
       },
     );
 
   return (
     <>
-      <CapabilityGate verdict={gate} what="purging this queue">
+      <CapabilityGate verdict={gate} what="purging this subscription">
         <Button variant="default" disabled={gate.kind === 'blocked'} loading={estimating} onClick={estimate}>
-          Purge queue
+          Purge subscription
         </Button>
       </CapabilityGate>
       <ConfirmDialog
         opened={opened}
         onClose={() => setOpened(false)}
-        title={`Purge queue ${queueName}`}
-        consequence={<Consequence queueName={queueName} preview={preview} failure={failure} />}
-        confirmLabel={overCap ? 'Purge anyway, over the cap' : 'Purge queue'}
+        title={`Purge subscription ${subscriptionName}`}
+        consequence={<Consequence subscriptionName={subscriptionName} preview={preview} failure={failure} />}
+        confirmLabel={overCap ? 'Purge anyway, over the cap' : 'Purge subscription'}
         tone="danger"
         pending={purge.isPending}
         onConfirm={confirm}

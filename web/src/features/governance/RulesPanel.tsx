@@ -93,7 +93,7 @@ function selectorProblem(selector: string, target: string): string | null {
 
 function addressProblem(destinationPattern: string | null | undefined): string | null {
   return destinationPattern && /\s/.test(destinationPattern)
-    ? 'An address pattern has no spaces. Use a pattern such as orders.# or orders.*.'
+    ? 'A destination pattern has no spaces. Use a pattern such as orders.# or orders.*.'
     : null;
 }
 
@@ -267,8 +267,8 @@ export function RulesPanel() {
               required
             />
             <TextInput
-              label="Addresses"
-              description="Optional. An address pattern such as orders.#; empty means every address."
+              label="Destinations"
+              description="Optional. A destination pattern such as orders.#; empty means every destination."
               {...form.getInputProps('destinationPattern')}
               value={form.values.destinationPattern ?? ''}
             />
@@ -309,7 +309,7 @@ export function RulesPanel() {
           deleting ? (
             <>
               Values this rule masks become visible to every user who can read messages on{' '}
-              {deleting.destinationPattern ? <code>{deleting.destinationPattern}</code> : 'every address'}, unless a
+              {deleting.destinationPattern ? <code>{deleting.destinationPattern}</code> : 'every destination'}, unless a
               detector still recognises them. Stored messages are re-masked under the new policy.
             </>
           ) : null

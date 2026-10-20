@@ -12,7 +12,7 @@ import classes from './ConfirmDialog.module.css';
  * <ul>
  *   <li>With `tone="danger"` the action is confirmed by pressing and holding the button until it
  *       fills ({@link HoldToConfirm}), never by a click or by typing; use it for anything that removes
- *       or overwrites. The button names the action and its count, such as "Delete 37 queues".
+ *       or overwrites. The button names the action and its count, such as "Delete 37 subscriptions".
  *   <li>Focus enters the dialog on Cancel, Escape closes it, and focus returns to the control that
  *       opened it.
  *   <li>While `pending` the button is busy and cannot be pressed again, and the dialog stays
@@ -122,11 +122,11 @@ export function ConfirmDialog({
 export type ConfirmDialogProps = Readonly<{
   opened: boolean;
   onClose: () => void;
-  /** The action as a plain line, such as "Delete queue". */
+  /** The action as a plain line, such as "Delete subscription". */
   title: string;
   /** What it affects: the resource, the nodes and how much data goes. */
   consequence: ReactNode;
-  /** The exact action, such as "Delete queue". */
+  /** The exact action, such as "Delete subscription". */
   confirmLabel: string;
   /**
    * The button that dismisses without acting; defaults to "Cancel". Name what is kept, such as "Keep

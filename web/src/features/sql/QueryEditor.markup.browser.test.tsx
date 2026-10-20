@@ -31,13 +31,13 @@ describe('QueryEditor under Trusted Types', () => {
           onCancel={vi.fn()}
           onMaximise={vi.fn()}
           onEscape={vi.fn()}
-          queues={['orders.<new>&co']}
+          subscriptions={['orders.<new>&co']}
         />
       </MantineProvider>,
     );
 
     await userEvent.click(screen.getByRole('textbox', { name: 'Query' }));
-    await userEvent.keyboard("select * from queues where name = '<b>&amp;</b>'");
+    await userEvent.keyboard("select * from subscriptions where name = '<b>&amp;</b>'");
     await waitFor(() => expect(onChange).toHaveBeenCalled());
     expect(onChange.mock.lastCall?.[0]).toContain("'<b>&amp;</b>'");
     expect(container.querySelector('b, script, img')).toBeNull();

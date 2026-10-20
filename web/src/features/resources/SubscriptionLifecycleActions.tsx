@@ -2,7 +2,12 @@ import { useCallback, useEffect, useState } from 'react';
 import { Button, Checkbox, Group, Stack, Text } from '@mantine/core';
 
 import { useCluster } from '../clusters/index.ts';
-import { useDeleteQueue, useSetQueuePaused, type LifecycleOutcomeView, type SubscriptionView } from './api.ts';
+import {
+  useDeleteSubscription,
+  useSetSubscriptionPaused,
+  type LifecycleOutcomeView,
+  type SubscriptionView,
+} from './api.ts';
 import { useResourceGate } from '../../kernel/auth/useResourceGate.ts';
 import { CapabilityGate } from '../../ui/CapabilityGate.tsx';
 import { ConfirmDialog } from '../../ui/ConfirmDialog.tsx';
@@ -10,23 +15,23 @@ import { ErrorState } from '../../ui/ErrorState.tsx';
 import { appliedEverywhere } from '../../ui/nodeOutcome.ts';
 import { NodeOutcomeSummary } from '../../ui/NodeOutcomeSummary.tsx';
 import { Notice } from '../../ui/Notice.tsx';
-import { EditQueueForm } from './EditQueueForm.tsx';
+import { EditSubscriptionForm } from './EditSubscriptionForm.tsx';
 
 /**
- * Pause, resume, edit and delete for one queue, across every live node.
+ * Pause, resume, edit and delete for one subscription, across every live node.
  *
  * <p>Each action previews before it acts. The delete additionally requires the
- * queue's name typed exactly, because it destroys messages that no dry run can
+ * subscription's name typed exactly, because it destroys messages that no dry run can
  * bring back — and the confirmation names the nodes and the message count first,
  * so what is being agreed to is a real number rather than a warning adjective.
  */
-export function QueueLifecycleActions({
+export function SubscriptionLifecycleActions({
   clusterId,
-  queue,
+  subscription,
   onClose,
 }: Readonly<{
   clusterId: string;
-  queue: SubscriptionView;
+  subscription: SubscriptionView;
   onClose: () => void;
 }>) {
   const cluster = useCluster(clusterId);
@@ -36,25 +41,35 @@ export function QueueLifecycleActions({
   const [editOpen, setEditOpen] = useState(false);
   const [pauseOutcome, setPauseOutcome] = useState<LifecycleOutcomeView | null>(null);
 
-  const setPaused = useSetQueuePaused(clusterId, queue.name);
+  const setPaused = useSetSubscriptionPaused(clusterId, subscription.name);
 
-  const base = { clusterId, noun: 'queue', resource: queue, capability: write, pending: cluster.isPending } as const;
-  const pause = useResourceGate({ ...base, permission: 'subscription:pause', label: 'Pause and resume queues' });
+  const base = {
+    clusterId,
+    noun: 'subscription',
+    resource: subscription,
+    capability: write,
+    pending: cluster.isPending,
+  } as const;
+  const pause = useResourceGate({ ...base, permission: 'subscription:pause', label: 'Pause and resume subscriptions' });
   const update = useResourceGate({
     ...base,
     permission: 'subscription:update',
-    label: "Change a queue's configuration",
+    label: "Change a subscription's configuration",
   });
-  const remove = useResourceGate({ ...base, permission: 'subscription:delete', label: 'Destroy queues and addresses' });
+  const remove = useResourceGate({
+    ...base,
+    permission: 'subscription:delete',
+    label: 'Destroy subscriptions and destinations',
+  });
   const pauseGate = pause.verdict;
   const updateGate = update.verdict;
   const deleteGate = remove.verdict;
 
-  // What the queue runs, from the scrape snapshot the listing is built from — and,
+  // What the subscription runs, from the scrape snapshot the listing is built from — and,
   // until that catches up, what this screen just had the broker do. A pause applied
   // on every node but not yet swept showed a button still offering to pause, which
   // reads as an action that did nothing.
-  const observedPaused = queue.perNode.some((n) => n.paused);
+  const observedPaused = subscription.perNode.some((n) => n.paused);
   const appliedPaused = pauseOutcome?.nodes.every((n) => n.status === 'APPLIED')
     ? setPaused.variables?.paused
     : undefined;
@@ -65,7 +80,10 @@ export function QueueLifecycleActions({
     <Stack gap="xs">
       <Group gap="xs">
         {pause.hidden ? null : (
-          <CapabilityGate verdict={pauseGate} what={paused ? 'resuming this queue' : 'pausing this queue'}>
+          <CapabilityGate
+            verdict={pauseGate}
+            what={paused ? 'resuming this subscription' : 'pausing this subscription'}
+          >
             <Button
               size="xs"
               variant="default"
@@ -79,7 +97,7 @@ export function QueueLifecycleActions({
         )}
 
         {update.hidden ? null : (
-          <CapabilityGate verdict={updateGate} what="editing this queue">
+          <CapabilityGate verdict={updateGate} what="editing this subscription">
             <Button
               size="xs"
               variant="default"
@@ -92,14 +110,14 @@ export function QueueLifecycleActions({
         )}
 
         {remove.hidden ? null : (
-          <CapabilityGate verdict={deleteGate} what="deleting this queue">
+          <CapabilityGate verdict={deleteGate} what="deleting this subscription">
             <Button
               size="xs"
               variant="default"
               disabled={deleteGate.kind === 'blocked'}
               onClick={() => setDeleteOpen(true)}
             >
-              Delete queue
+              Delete subscription
             </Button>
           </CapabilityGate>
         )}
@@ -124,11 +142,16 @@ export function QueueLifecycleActions({
         {pauseOutcome ? <NodeOutcomeSummary outcome={pauseOutcome} /> : null}
       </div>
 
-      <EditQueueForm clusterId={clusterId} queue={queue} opened={editOpen} onClose={() => setEditOpen(false)} />
-
-      <DeleteQueueDialog
+      <EditSubscriptionForm
         clusterId={clusterId}
-        queue={queue}
+        subscription={subscription}
+        opened={editOpen}
+        onClose={() => setEditOpen(false)}
+      />
+
+      <DeleteSubscriptionDialog
+        clusterId={clusterId}
+        subscription={subscription}
         opened={deleteOpen}
         onClose={() => setDeleteOpen(false)}
         onDeleted={onClose}
@@ -140,27 +163,27 @@ export function QueueLifecycleActions({
 /**
  * The destructive flow. Opens on a preview, so the typed confirmation is armed
  * only once the operator has been shown the blast radius: which nodes, how many
- * messages will be destroyed on each, and which diverts go with the queue.
+ * messages will be destroyed on each, and which routes go with the subscription.
  *
  * <p>Disconnecting consumers is the operator's explicit choice (ADR-0084). Changing
  * it takes the preview again, so what is confirmed is always what was previewed. The result of
  * the delete replaces the confirmation, per node, so a partial delete is read before the dialog is
  * dismissed.
  */
-export function DeleteQueueDialog({
+export function DeleteSubscriptionDialog({
   clusterId,
-  queue,
+  subscription,
   opened,
   onClose,
   onDeleted,
 }: Readonly<{
   clusterId: string;
-  queue: SubscriptionView;
+  subscription: SubscriptionView;
   opened: boolean;
   onClose: () => void;
   onDeleted: () => void;
 }>) {
-  const remove = useDeleteQueue(clusterId, queue.name);
+  const remove = useDeleteSubscription(clusterId, subscription.name);
   const [preview, setPreview] = useState<LifecycleOutcomeView | null>(null);
   const [result, setResult] = useState<LifecycleOutcomeView | null>(null);
   const [previewFailed, setPreviewFailed] = useState<Error | null>(null);
@@ -192,7 +215,7 @@ export function DeleteQueueDialog({
     onClose();
   };
 
-  // The queue view behind this dialog is dismissed only when the queue is really gone, which is a
+  // The subscription view behind this dialog is dismissed only when the subscription is really gone, which is a
   // positive check on every node: a run that failed everywhere, or reached no live node at all, is
   // not partial either.
   const dismiss = () => {
@@ -207,9 +230,9 @@ export function DeleteQueueDialog({
     <ConfirmDialog
       opened={opened}
       onClose={dismiss}
-      title={result ? `Result of deleting ${queue.name}` : `Delete ${queue.name}`}
+      title={result ? `Result of deleting ${subscription.name}` : `Delete ${subscription.name}`}
       tone="danger"
-      confirmLabel={overCap ? 'Delete anyway, over the cap' : 'Delete this queue'}
+      confirmLabel={overCap ? 'Delete anyway, over the cap' : 'Delete this subscription'}
       // Also locked while the preview is being taken, so the typed name cannot arm a delete that
       // has not been shown its blast radius.
       pending={remove.isPending}
@@ -220,7 +243,7 @@ export function DeleteQueueDialog({
       consequence={
         result ? null : (
           <DeleteConsequence
-            consumers={queue.totalConsumerCount}
+            consumers={subscription.totalConsumerCount}
             disconnectConsumers={disconnectConsumers}
             pending={remove.isPending}
             preview={preview}
@@ -237,7 +260,7 @@ export function DeleteQueueDialog({
   );
 }
 
-/** What deleting a queue destroys, as the confirmation states it: the preview, the cap and the consumer choice. */
+/** What deleting a subscription destroys, as the confirmation states it: the preview, the cap and the consumer choice. */
 function DeleteConsequence({
   consumers,
   disconnectConsumers,
@@ -258,20 +281,20 @@ function DeleteConsequence({
   return (
     <Stack gap="md">
       <Text size="sm">
-        This destroys the queue on every live node of the cluster, along with every message it holds. Nothing here can
-        be undone, and a queue recreated afterwards is a new, empty one.
+        This destroys the subscription on every live node of the cluster, along with every message it holds. Nothing
+        here can be undone, and a subscription recreated afterwards is a new, empty one.
       </Text>
       <Text size="sm">
-        A divert that forwards into this queue&apos;s address is removed with it when the delete leaves nothing bound
-        there — otherwise the divert would bring the queue back, or break its producers. Each node below names the
-        diverts it removes and the ones it keeps.
+        A forward route into this subscription&apos;s destination is removed with it when the delete leaves nothing
+        bound there — otherwise the route would bring the subscription back, or break its producers. Each node below
+        names the routes it removes and the ones it keeps.
       </Text>
 
       <Checkbox
-        label="Disconnect this queue's consumers"
+        label="Disconnect this subscription's consumers"
         description={`${consumers.toLocaleString()} ${
           consumers === 1 ? 'consumer was' : 'consumers were'
-        } attached at the last scrape. Without this, a node where the queue has consumers refuses the delete. A client that reconnects can create the queue again if auto-create is on.`}
+        } attached at the last scrape. Without this, a node where the subscription has consumers refuses the delete. A client that reconnects can create the subscription again if auto-create is on.`}
         checked={disconnectConsumers}
         // Locked while any call is in flight: a new preview on the same mutation would drop
         // the real delete's result, and the operator would never see what it did.

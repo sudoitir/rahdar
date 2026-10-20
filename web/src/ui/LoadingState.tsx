@@ -14,7 +14,7 @@ export function LoadingState({
   blockSize,
   inlineSize,
 }: Readonly<{
-  /** What is loading, such as "Loading queues". Read aloud, not shown. */
+  /** What is loading, such as "Loading subscriptions". Read aloud, not shown. */
   label: string;
   /** `block` fills the width it is in; `inline` sits in a line of text. */
   variant?: 'block' | 'inline';

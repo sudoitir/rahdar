@@ -114,7 +114,7 @@ function EventsEmpty({
       <EmptyState
         kind="filtered"
         title="No event matches these filters"
-        description="Events are recorded on this cluster, but none has this type or address. Clear the filters to see them all."
+        description="Events are recorded on this cluster, but none has this type or destination. Clear the filters to see them all."
         onClearFilters={onClearFilters}
       />
     );
@@ -137,7 +137,7 @@ function EventsEmpty({
     <EmptyState
       kind="empty"
       title="No broker events yet"
-      description="A broker event is a notification a broker raises when a consumer, session, connection or binding is created or closed. Rahdar records them as they arrive and keeps them for a limited time, so the first appears here as soon as a client connects or consumes. Leave Live on to watch them as they happen."
+      description="A broker event is a notification a broker raises when a consumer, channel, connection or binding is created or closed. Rahdar records them as they arrive and keeps them for a limited time, so the first appears here as soon as a client connects or consumes. Leave Live on to watch them as they happen."
     />
   );
 }
@@ -169,7 +169,7 @@ function EventDetail({
         columns={2}
         items={[
           { term: 'Time', value: occurredAt(selected) },
-          { term: 'Address', value: selected.destination ?? 'no address' },
+          { term: 'Destination', value: selected.destination ?? 'no destination' },
           { term: 'Subject', value: subjectOf(selected) },
           { term: 'Remote address', value: selected.remoteAddress ?? '—' },
         ]}
@@ -212,8 +212,8 @@ export function EventsView() {
   const cluster = useCluster(clusterId);
   const notifications = cluster.data?.capabilities.notifications;
 
-  const [address, setAddress] = useState(search.destination ?? '');
-  const [debouncedAddress] = useDebouncedValue(address, 250);
+  const [destination, setDestination] = useState(search.destination ?? '');
+  const [debouncedDestination] = useDebouncedValue(destination, 250);
   const page = search.page ?? 1;
 
   const [live, setLive] = useState(true);
@@ -227,12 +227,12 @@ export function EventsView() {
 
   const query = useEvents(clusterId, {
     type: search.type,
-    destination: debouncedAddress || undefined,
+    destination: debouncedDestination || undefined,
     page,
     size: PAGE_SIZE,
   });
 
-  // The open event is an address, not a copy: held in the URL as its id and looked up in the rows
+  // The open event is a destination, not a copy: held in the URL as its id and looked up in the rows
   // each render. A shared link can name an event that is not on the loaded page; it is fetched by
   // id then, rather than the link silently opening nothing.
   const setOpen = (e: BrokerEventView | null) =>
@@ -247,13 +247,13 @@ export function EventsView() {
   // On page 1 with no filter, merge the live buffer over the fetched history.
   const historyData = query.data?.data;
   const rows = useMemo(
-    () => mergeLive(historyData ?? [], buffer, page === 1 && !search.type && !debouncedAddress),
-    [buffer, historyData, page, search.type, debouncedAddress],
+    () => mergeLive(historyData ?? [], buffer, page === 1 && !search.type && !debouncedDestination),
+    [buffer, historyData, page, search.type, debouncedDestination],
   );
 
   // A live feed prepends rows, which moves the content under a reader who has scrolled away from the
   // top. Until they return, the grid keeps the rows it had; a new filter or page starts afresh.
-  const holdKey = `${page}|${search.type ?? ''}|${debouncedAddress}`;
+  const holdKey = `${page}|${search.type ?? ''}|${debouncedDestination}`;
   const [held, setHeld] = useState<{ key: string; rows: BrokerEventView[] } | null>(null);
   const shown = held?.key === holdKey ? held.rows : rows;
   const onAtTopChange = (atTop: boolean) =>
@@ -266,9 +266,9 @@ export function EventsView() {
     .flatMap((n) => n.endpoints)
     .filter((e) => e.lastError)
     .map((e) => e.name);
-  const filtered = Boolean(search.type || debouncedAddress);
+  const filtered = Boolean(search.type || debouncedDestination);
   const clearFilters = () => {
-    setAddress('');
+    setDestination('');
     void setParam({ type: undefined, destination: undefined });
   };
 
@@ -277,7 +277,7 @@ export function EventsView() {
   const selected = onPage ?? offPage.data ?? null;
 
   // Notifications not available: name the gap, show the broker.xml, infer nothing
-  // (same stance as DlqView on address settings). All hooks run above this.
+  // (same stance as DeadLettersView on address settings). All hooks run above this.
   if (notifications && notifications.status !== 'AVAILABLE') {
     return <NotificationsUnavailable notifications={notifications} />;
   }
@@ -307,11 +307,11 @@ export function EventsView() {
             />
             <TextInput
               ref={filterRef}
-              label="Filter by address"
-              placeholder="Filter by address"
-              value={address}
-              onChange={(e) => setAddress(e.currentTarget.value)}
-              onBlur={() => setParam({ destination: debouncedAddress || undefined })}
+              label="Filter by destination"
+              placeholder="Filter by destination"
+              value={destination}
+              onChange={(e) => setDestination(e.currentTarget.value)}
+              onBlur={() => setParam({ destination: debouncedDestination || undefined })}
               size="xs"
               w="13.75rem"
             />

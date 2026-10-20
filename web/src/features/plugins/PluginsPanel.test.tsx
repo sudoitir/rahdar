@@ -22,7 +22,7 @@ const NOW = new Date().toISOString();
 const INFO = {
   name: 'acme-notes',
   title: 'Notes',
-  description: 'Shared notes on queues.',
+  description: 'Shared notes on subscriptions.',
   vendor: { name: 'Acme', url: 'https://acme.example', email: null },
   license: 'Apache-2.0',
   changeNotes: null,

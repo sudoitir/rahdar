@@ -1,7 +1,9 @@
 import { useMemo } from 'react';
 import { CloseButton, SegmentedControl, Text } from '@mantine/core';
 
+import { refOf } from '../../kernel/api/resourceId.ts';
 import { useSlot } from '../../kernel/slots.ts';
+import { useRoleIds } from '../clusters/index.ts';
 import { METRIC_RANGES, type MetricRange } from '../../kernel/time/ranges.ts';
 import { EmptyState } from '../../ui/EmptyState.tsx';
 import { LoadingState } from '../../ui/LoadingState.tsx';
@@ -16,8 +18,8 @@ import classes from './FlowView.module.css';
 const KIND_WORD: Record<string, string> = {
   PRODUCER: 'Producing client',
   CONSUMER: 'Consuming client',
-  DESTINATION: 'Address',
-  SUBSCRIPTION: 'Queue',
+  DESTINATION: 'Destination',
+  SUBSCRIPTION: 'Subscription',
   REMOTE: 'Remote',
 };
 
@@ -81,7 +83,8 @@ function BrokerNodeTotals({ graph, stale }: Readonly<{ graph: FlowGraphView; sta
         description={
           <>
             {stale ? 'The selection is not in the shown paths any more. ' : ''}
-            Select a client, address or queue to break it down per node. These are each node&rsquo;s totals now.
+            Select a client, destination or subscription to break it down per node. These are each node&rsquo;s totals
+            now.
           </>
         }
       >
@@ -139,7 +142,7 @@ function Breakdown({
   );
 }
 
-/** A queue's history per node from the contributed panels; a client keeps none. */
+/** A subscription's history per node from the contributed panels; a client keeps none. */
 function History({
   clusterId,
   node,
@@ -155,6 +158,7 @@ function History({
   range: MetricRange;
   onRangeChange: (range: MetricRange) => void;
 }>) {
+  const ids = useRoleIds(clusterId);
   if (client) {
     return (
       <Text size="sm" c="dimmed">
@@ -162,7 +166,8 @@ function History({
       </Text>
     );
   }
-  if (node.kind !== 'SUBSCRIPTION' || panels.length === 0) return null;
+  if (node.kind !== 'SUBSCRIPTION' || panels.length === 0 || !ids.loaded) return null;
+  const subscription = refOf(ids.subscription(node.label ?? ''));
   return (
     <Section
       headingLevel={3}
@@ -178,7 +183,7 @@ function History({
       }
     >
       {panels.map(({ id, Component }) => (
-        <Component key={id} clusterId={clusterId} queueName={node.label ?? ''} range={range} />
+        <Component key={id} clusterId={clusterId} subscription={subscription} range={range} />
       ))}
     </Section>
   );
@@ -186,7 +191,7 @@ function History({
 
 /**
  * The Split layout's monitoring pane (flow-visualization spec, ADR-0110): what the selection is
- * now, per broker node, with any imbalance stated in words; for a queue, its history per node from
+ * now, per broker node, with any imbalance stated in words; for a subscription, its history per node from
  * whichever feature contributes `flow.selection.panels`. With nothing selected, each broker node's
  * totals. It reads only what the flow graph already carries, and never changes the broker.
  */

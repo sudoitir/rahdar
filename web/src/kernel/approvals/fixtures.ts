@@ -8,7 +8,7 @@ export function summary(over: Partial<HeldOperationSummary> = {}): HeldOperation
     id: HELD_ID,
     type: 'subscription.purge',
     state: 'HELD',
-    summary: 'Purge queue orders.dlq on prod-eu',
+    summary: 'Purge subscription orders.dlq on prod-eu',
     requesterId: 'u-alice',
     requesterUsername: 'alice',
     authKind: 'SESSION',
@@ -34,7 +34,7 @@ export function detail(
     traits: ['DESTRUCTIVE'],
     environmentId: null,
     display: [
-      { label: 'Queue', from: null, to: 'orders.dlq' },
+      { label: 'Subscription', from: null, to: 'orders.dlq' },
       { label: 'Cluster', from: null, to: 'prod-eu' },
     ],
     params: '{"queue":"orders.dlq"}',

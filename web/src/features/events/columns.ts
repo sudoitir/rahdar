@@ -15,7 +15,7 @@ export function subjectOf(e: BrokerEventView): string {
 /** The word for what an event is about, from its type's prefix, so the grid can be read by family. */
 export function family(type: string): string {
   if (type.startsWith('CONSUMER')) return 'consumer';
-  if (type.startsWith('SESSION')) return 'session';
+  if (type.startsWith('SESSION')) return 'channel';
   if (type.startsWith('CONNECTION')) return 'connection';
   if (type.startsWith('BINDING') || type.startsWith('ADDRESS')) return 'binding';
   if (type.startsWith('MESSAGE')) return 'message';
@@ -41,7 +41,13 @@ export function eventColumns(zone: string): Column<BrokerEventView>[] {
     },
     { id: 'type', header: 'Type', accessor: (e) => e.type, kind: 'code', priority: 'high' },
     { id: 'family', header: 'Family', accessor: (e) => family(e.type), kind: 'status', priority: 'low' },
-    { id: 'address', header: 'Address', accessor: (e) => e.destination ?? '—', kind: 'identifier', priority: 'high' },
+    {
+      id: 'destination',
+      header: 'Destination',
+      accessor: (e) => e.destination ?? '—',
+      kind: 'identifier',
+      priority: 'high',
+    },
     { id: 'subject', header: 'Subject', accessor: subjectOf, kind: 'identifier', priority: 'high' },
     { id: 'remote', header: 'Remote', accessor: (e) => e.remoteAddress ?? '—', kind: 'code', priority: 'low' },
   ];

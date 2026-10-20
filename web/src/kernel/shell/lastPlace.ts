@@ -8,7 +8,7 @@ import { useSyncExternalStore } from 'react';
 export interface LastPlace {
   clusterId: string;
   clusterName: string;
-  /** The view the operator was in, such as "Queues". */
+  /** The view the operator was in, such as "Subscriptions". */
   label: string;
   /** The address, and the search it was opened with. */
   to: string;

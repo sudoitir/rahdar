@@ -1,28 +1,29 @@
+import type { ResourceRef } from '../../kernel/api/resourceId.ts';
 import { Stack, Text } from '@mantine/core';
 
 import { DescriptionList } from '../../ui/DescriptionList.tsx';
 import { ErrorState } from '../../ui/ErrorState.tsx';
 import { LoadingState } from '../../ui/LoadingState.tsx';
 import { Section } from '../../ui/Section.tsx';
-import { useQueueHealth } from './api.ts';
+import { useSubscriptionHealth } from './api.ts';
 import { HealthVerdict } from './HealthVerdict.tsx';
 import { formatCount, formatDuration, formatRate, trendPhrase, verdictCopy } from './verdict.ts';
 
 /**
- * One queue's consumer health in its detail drawer (`queue.detail.panels`).
+ * One subscription's consumer health in its detail drawer (`subscription.detail.panels`).
  *
  * It sits above the metrics history panel and links nowhere of its own: the
  * charts already exist on the metrics view, and redrawing them here would be a
  * second answer to a question already answered.
  */
-export function QueueHealthPanel({
+export function SubscriptionHealthPanel({
   clusterId,
-  queueName,
+  subscription,
 }: Readonly<{
   clusterId: string;
-  queueName: string;
+  subscription: ResourceRef;
 }>) {
-  const query = useQueueHealth(clusterId, queueName);
+  const query = useSubscriptionHealth(clusterId, subscription);
 
   if (query.isPending) {
     return (
@@ -39,7 +40,7 @@ export function QueueHealthPanel({
         variant="card"
         headingLevel={3}
         title="Consumer health"
-        description="Consumer health is unavailable: the verdict for this queue could not be read, so nothing here says whether its consumers are keeping up."
+        description="Consumer health is unavailable: the verdict for this subscription could not be read, so nothing here says whether its consumers are keeping up."
       >
         <ErrorState error={query.error} onRetry={() => void query.refetch()} />
       </Section>

@@ -5,15 +5,15 @@ import { AUTO } from '../kernel/time/timezone.ts';
 import { auditColumns } from '../features/audit/columns.tsx';
 import { nodeFacts, type NodeFacts } from '../features/clusters/nodeFacts.ts';
 import { topologyColumns } from '../features/clusters/topologyColumns.tsx';
-import { bridgeColumns, divertColumns } from '../features/routing/columns.ts';
+import { routeColumns } from '../features/routing/columns.ts';
 import { eventColumns } from '../features/events/columns.ts';
 import { healthColumns, storeColumns } from '../features/lifecycle/columns.ts';
 import { itemColumns, previewColumns, runColumns } from '../features/bulk/columns.ts';
-import { dlqColumns, messageColumns, type DlqRow } from '../features/messages/columns.ts';
+import { deadLetterColumns, messageColumns, type DeadLetterRow } from '../features/messages/columns.ts';
 import { consumerHealthColumns } from '../features/triage/columns.ts';
 import { nodeColumns, pathColumns, type NodeRow, type PathRow } from '../features/flow/columns.ts';
 import { pluginColumns } from '../features/plugins/columns.ts';
-import { queueColumns } from '../features/queues/columns.ts';
+import { subscriptionColumns } from '../features/resources/subscriptionColumns.ts';
 import { resourceColumns } from '../features/resources/columns.tsx';
 import { resultColumns } from '../features/sql/columns.ts';
 import { transferColumns } from '../features/transfer/columns.ts';
@@ -26,8 +26,8 @@ import type { FlowEdgeView, FlowNodeView } from '../features/flow/api.ts';
 import type { MessageSummaryView } from '../features/messages/api.ts';
 import type { PluginUpdateView, PluginView } from '../features/plugins/api.ts';
 import { resourceId } from '../kernel/api/resourceId.ts';
-import { ADDRESS_KIND, addressId, QUEUE_KIND, queueId } from './wire.ts';
-import type { SubscriptionView } from '../features/queues/api.ts';
+import { ADDRESS_KIND, destinationId, QUEUE_KIND, subscriptionId } from './wire.ts';
+import type { SubscriptionView } from '../features/resources/api.ts';
 import type {
   DestinationView,
   ConnectionView,
@@ -35,7 +35,7 @@ import type {
   ProducerView,
   ChannelView,
 } from '../features/resources/api.ts';
-import type { BridgeRow, DivertRow } from '../features/routing/api.ts';
+import type { RouteView } from '../features/routing/api.ts';
 import type { SqlRowView } from '../features/sql/api.ts';
 import type { StoreView, TableView } from '../features/lifecycle/api.ts';
 import type { TransferRunView } from '../features/transfer/api.ts';
@@ -202,7 +202,7 @@ function view<T>(spec: Spec<T>): TableView_ {
 
 /** The identity fields of a queue's subscription row. */
 const subscriptionIdentity = (name: string) => ({
-  id: queueId(name),
+  id: subscriptionId(name),
   kind: QUEUE_KIND,
   kindLabel: 'Queue',
   name,
@@ -210,7 +210,7 @@ const subscriptionIdentity = (name: string) => ({
 
 const queue = (f: Fixture, i: number): SubscriptionView => ({
   ...subscriptionIdentity(name(f, 'orders', i)),
-  destination: addressId(address(f, i)),
+  destination: destinationId(address(f, i)),
   nativeAttributes: { routingType: i % 2 ? 'ANYCAST' : 'MULTICAST' },
   durable: i % 3 !== 0,
   totalMessageCount: num(f, 12_840 + i),
@@ -226,7 +226,7 @@ const queue = (f: Fixture, i: number): SubscriptionView => ({
 
 const address_ = (f: Fixture, i: number): DestinationView => ({
   ...NODE(f, i),
-  id: addressId(address(f, i)),
+  id: destinationId(address(f, i)),
   kind: ADDRESS_KIND,
   kindLabel: 'Address',
   name: address(f, i),
@@ -242,8 +242,8 @@ const consumer = (f: Fixture, i: number): ConsumerView => ({
   kind: 'artemis.consumer',
   kindLabel: 'Consumer',
   channel: resourceId('artemis.session', ident(f, 'session', i)),
-  subscription: queueId(name(f, 'orders', i)),
-  destination: addressId(address(f, i)),
+  subscription: subscriptionId(name(f, 'orders', i)),
+  destination: destinationId(address(f, i)),
   protocol: 'AMQP',
   messagesDelivered: num(f, 8_431 + i),
   messagesAcknowledged: num(f, 8_400 + i),
@@ -284,47 +284,51 @@ const producer = (f: Fixture, i: number): ProducerView => ({
   kindLabel: 'Producer',
   clientId: f === 'normal' ? 'order-writer' : name(f, 'writer', i),
   channel: resourceId('artemis.session', ident(f, 'session', i)),
-  destination: addressId(address(f, i)),
+  destination: destinationId(address(f, i)),
   protocol: 'CORE',
   messagesSent: num(f, 55_120 + i),
   allowedActions: [],
 });
 
-const divert = (f: Fixture, i: number): DivertRow => ({
+const divert = (f: Fixture, i: number): RouteView => ({
+  id: resourceId('artemis.divert', name(f, 'divert', i)),
+  kind: 'artemis.divert',
+  kindLabel: 'Divert',
   name: name(f, 'divert', i),
-  routingName: name(f, 'divert', i),
-  address: address(f, i),
-  forwardingAddress: address(f, i + 1),
-  filter: f === 'normal' ? "region = 'eu'" : `${BLOCK.repeat(3)}region = 'eu'`,
-  routingType: 'MULTICAST',
-  transformerClassName: null,
-  exclusive: i % 2 === 0,
-  retroactiveResource: false,
+  routeClass: 'FORWARD',
+  source: destinationId(address(f, i)),
+  target: destinationId(address(f, i + 1)),
+  nativeAttributes: {
+    routingName: name(f, 'divert', i),
+    filter: f === 'normal' ? "region = 'eu'" : `${BLOCK.repeat(3)}region = 'eu'`,
+    routingType: 'MULTICAST',
+    exclusive: String(i % 2 === 0),
+  },
   owner: ['MESSAGE_CAPTURE', 'OPERATOR', null][i % 3],
-  captureSubscriptionId: null,
-  brokerXml: null,
   nodesPresent: 2,
   nodesTotal: 2,
   perNode: [],
 });
 
-const bridge = (f: Fixture, i: number): BridgeRow => ({
+const bridge = (f: Fixture, i: number): RouteView => ({
+  id: resourceId('artemis.bridge', name(f, 'bridge', i)),
+  kind: 'artemis.bridge',
+  kindLabel: 'Bridge',
   name: name(f, 'bridge', i),
-  queueName: name(f, 'orders', i),
-  forwardingAddress: address(f, i),
-  filterString: null,
-  discoveryGroupName: null,
-  transformerClassName: null,
-  staticConnectors: [],
-  messagesAcknowledged: num(f, 1_000 + i),
-  messagesPendingAcknowledgement: num(f, 12 + i),
-  started: true,
-  connected: i !== 2,
-  useDuplicateDetection: true,
-  highlyAvailable: false,
+  routeClass: 'LINK',
+  source: subscriptionId(name(f, 'orders', i)),
+  target: null,
+  nativeAttributes: { forwardingAddress: address(f, i), started: 'true', connected: String(i !== 2) },
   nodesPresent: 2,
   nodesTotal: 2,
-  perNode: [],
+  perNode: [
+    {
+      nodeId: 'node-1',
+      nodeName: 'broker-1',
+      messagesAcknowledged: num(f, 1_000 + i),
+      messagesPendingAcknowledgement: num(f, 12 + i),
+    },
+  ],
 });
 
 const message = (f: Fixture, i: number): MessageSummaryView => ({
@@ -343,12 +347,12 @@ const message = (f: Fixture, i: number): MessageSummaryView => ({
   redactions: [],
 });
 
-const dlqRow = (f: Fixture, i: number): DlqRow => ({
-  address: f === 'normal' ? ['DLQ', 'ExpiryQueue'][i % 2] : address(f, i),
+const dlqRow = (f: Fixture, i: number): DeadLetterRow => ({
+  destination: f === 'normal' ? ['DLQ', 'ExpiryQueue'][i % 2] : address(f, i),
   kind: i % 2 ? 'expiry' : 'dead-letter',
-  queue: {
+  subscription: {
     ...subscriptionIdentity(name(f, 'DLQ.orders', i)),
-    destination: addressId(f === 'normal' ? ['DLQ', 'ExpiryQueue'][i % 2] : address(f, i)),
+    destination: destinationId(f === 'normal' ? ['DLQ', 'ExpiryQueue'][i % 2] : address(f, i)),
     totalDepth: num(f, 1_204 + i),
     perNode: [
       { nodeId: 'node-1', nodeName: 'broker-1', depth: num(f, 600 + i) },
@@ -697,37 +701,37 @@ const clusterName = (id: string) => `Cluster ${id}`;
 
 export const VIEWS: TableView_[] = [
   view({
-    name: 'queues',
-    label: 'Queues',
-    columns: queueColumns(),
+    name: 'subscriptions',
+    label: 'Subscriptions',
+    columns: subscriptionColumns(),
     rows: (f) => ROWS.map((i) => queue(f, i)),
     rowKey: (r) => r.name,
     selectable: true,
     menu: true,
-    identifiers: ['address', 'queueName'],
+    identifiers: ['destination', 'subscription'],
     visible1280: [
-      'address',
-      'queueName',
+      'destination',
+      'subscription',
+      'kind',
       'owner',
       'routingType',
       'depth',
       'consumers',
       'delivering',
       'scheduled',
-      'durable',
       'paused',
       'nodes',
     ],
   }),
   view({
-    name: 'addresses',
-    label: 'Address',
-    columns: resourceColumns.addresses(deps),
+    name: 'destinations',
+    label: 'Destination',
+    columns: resourceColumns.destinations(deps),
     rows: (f) => ROWS.map((i) => address_(f, i)),
     rowKey: (r) => `${r.nodeId}/${r.name}`,
     menu: true,
     identifiers: ['name'],
-    visible1280: ['name', 'owner', 'delivery', 'queues', 'depth', 'node', 'action'],
+    visible1280: ['name', 'kind', 'owner', 'subscriptions', 'depth', 'node', 'action'],
   }),
   view({
     name: 'consumers',
@@ -736,18 +740,28 @@ export const VIEWS: TableView_[] = [
     rows: (f) => ROWS.map((i) => consumer(f, i)),
     rowKey: (r) => `${r.nodeId}/${r.id}`,
     menu: true,
-    identifiers: ['queue', 'address'],
-    visible1280: ['queue', 'address', 'protocol', 'delivered', 'acked', 'inFlight', 'node', 'action'],
+    identifiers: ['subscription', 'destination'],
+    visible1280: [
+      'subscription',
+      'destination',
+      'kind',
+      'protocol',
+      'delivered',
+      'acked',
+      'inFlight',
+      'node',
+      'action',
+    ],
   }),
   view({
-    name: 'sessions',
-    label: 'Sessions',
-    columns: resourceColumns.sessions(deps),
+    name: 'channels',
+    label: 'Channels',
+    columns: resourceColumns.channels(deps),
     rows: (f) => ROWS.map((i) => session(f, i)),
     rowKey: (r) => `${r.nodeId}/${r.id}`,
     menu: true,
     identifiers: ['session', 'conn'],
-    visible1280: ['session', 'user', 'conn', 'consumers', 'producers', 'node', 'action'],
+    visible1280: ['channel', 'kind', 'user', 'conn', 'consumers', 'producers', 'node', 'action'],
   }),
   view({
     name: 'connections',
@@ -757,7 +771,7 @@ export const VIEWS: TableView_[] = [
     rowKey: (r) => `${r.nodeId}/${r.id}`,
     menu: true,
     identifiers: ['remote'],
-    visible1280: ['remote', 'protocol', 'client', 'sessions', 'node', 'action'],
+    visible1280: ['remote', 'kind', 'protocol', 'client', 'channels', 'node', 'action'],
   }),
   view({
     name: 'producers',
@@ -767,26 +781,17 @@ export const VIEWS: TableView_[] = [
     rowKey: (r) => `${r.nodeId}/${r.id}`,
     menu: true,
     identifiers: ['address'],
-    visible1280: ['address', 'client', 'protocol', 'sent', 'node'],
+    visible1280: ['destination', 'kind', 'client', 'protocol', 'sent', 'node'],
   }),
   view({
-    name: 'diverts',
-    label: 'Diverts',
-    columns: divertColumns(CLUSTER),
-    rows: (f) => ROWS.map((i) => divert(f, i)),
-    rowKey: (r) => r.name,
+    name: 'routes',
+    label: 'Routes',
+    columns: routeColumns(CLUSTER),
+    rows: (f) => ROWS.map((i) => (i % 3 === 2 ? bridge(f, i) : divert(f, i))),
+    rowKey: (r) => r.id,
     menu: true,
     identifiers: ['name'],
-    visible1280: ['name', 'direction', 'exclusive', 'filter', 'owner', 'nodes', 'action'],
-  }),
-  view({
-    name: 'bridges',
-    label: 'Bridges',
-    columns: bridgeColumns(),
-    rows: (f) => ROWS.map((i) => bridge(f, i)),
-    rowKey: (r) => r.name,
-    identifiers: ['name'],
-    visible1280: ['name', 'direction', 'state', 'pending', 'acked', 'nodes'],
+    visible1280: ['name', 'kind', 'direction', 'state', 'pending', 'acked', 'nodes'],
   }),
   view({
     name: 'messages',
@@ -800,14 +805,14 @@ export const VIEWS: TableView_[] = [
     visible1280: ['position', 'timestamp', 'priority', 'durable', 'size', 'props', 'body'],
   }),
   view({
-    name: 'dead-letter queues',
-    label: 'Dead-letter queues',
-    columns: dlqColumns(CLUSTER),
+    name: 'dead letters',
+    label: 'Dead letters',
+    columns: deadLetterColumns(CLUSTER),
     rows: (f) => ROWS.map((i) => dlqRow(f, i)),
-    rowKey: (r) => r.queue.name,
+    rowKey: (r) => r.subscription.name,
     menu: true,
-    identifiers: ['queue', 'address'],
-    visible1280: ['queue', 'address', 'kind', 'depth', 'nodes'],
+    identifiers: ['subscription', 'destination'],
+    visible1280: ['subscription', 'destination', 'kind', 'purpose', 'depth', 'nodes'],
   }),
   view({
     name: 'events',
@@ -816,7 +821,7 @@ export const VIEWS: TableView_[] = [
     rows: (f) => ROWS.map((i) => brokerEvent(f, i)),
     rowKey: (r) => String(r.seq),
     identifiers: ['address', 'subject'],
-    visible1280: ['time', 'type', 'family', 'address', 'subject', 'remote'],
+    visible1280: ['time', 'type', 'family', 'destination', 'subject', 'remote'],
   }),
   view({
     name: 'audit',
@@ -851,8 +856,8 @@ export const VIEWS: TableView_[] = [
     columns: resultColumns(CLUSTER, AUTO),
     rows: (f) => ROWS.map((i) => sqlRow(f, i)),
     rowKey: (r) => `${r.nodeId}/${r.messageId}`,
-    identifiers: ['queue'],
-    visible1280: ['messageId', 'queue', 'node', 'source', 'timestamp', 'body', 'priority', 'size'],
+    identifiers: ['subscription'],
+    visible1280: ['messageId', 'subscription', 'node', 'source', 'timestamp', 'body', 'priority', 'size'],
   }),
   view({
     name: 'bulk runs',
@@ -861,27 +866,27 @@ export const VIEWS: TableView_[] = [
     rows: (f) => ROWS.map((i) => runRow(f, i)),
     rowKey: (r) => r.id,
     identifiers: [],
-    visible1280: ['when', 'operation', 'queues', 'user', 'outcome'],
+    visible1280: ['when', 'operation', 'subscriptions', 'user', 'outcome'],
   }),
   view({
-    name: 'bulk run queues',
-    label: 'Queues in this run',
+    name: 'bulk run subscriptions',
+    label: 'Subscriptions in this run',
     columns: itemColumns(true, () => {}),
     rows: (f) => ROWS.map((i) => bulkItem(f, i)),
     rowKey: (r) => r.subscription,
     height: { maxRows: 12 },
     identifiers: [],
-    visible1280: ['queue', 'status', 'affected', 'note'],
+    visible1280: ['subscription', 'status', 'affected', 'note'],
   }),
   view({
     name: 'bulk preview',
-    label: 'Queues in this plan',
+    label: 'Subscriptions in this plan',
     columns: previewColumns(true),
     rows: (f) => ROWS.map((i) => bulkItem(f, i)),
     rowKey: (r) => r.subscription,
     height: { maxRows: 8 },
-    identifiers: ['queue'],
-    visible1280: ['queue', 'messages', 'nodes', 'plan', 'note'],
+    identifiers: ['subscription'],
+    visible1280: ['subscription', 'messages', 'nodes', 'plan', 'note'],
   }),
   view({
     name: 'storage health',

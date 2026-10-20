@@ -6,7 +6,7 @@ import userEvent from '@testing-library/user-event';
 
 import { renderWithProviders } from '../../test/render.tsx';
 import { server } from '../../test/setup.ts';
-import type { CapabilityView, DivertRow } from './api.ts';
+import type { CapabilityView, RouteView } from './api.ts';
 import { CreateDivertAction, DeleteDivertAction } from './DivertActions.tsx';
 
 const AVAILABLE: CapabilityView = { status: 'AVAILABLE', reason: 'ok', brokerXmlSnippet: null };
@@ -64,18 +64,16 @@ function outcome(dryRun: boolean) {
 
 const BROKER_XML = '<diverts>\n  <divert name="audit-copy">\n  </divert>\n</diverts>\n';
 
-const DIVERT: DivertRow = {
+const DIVERT: RouteView = {
+  id: 'artemis.divert/audit-copy',
+  kind: 'artemis.divert',
+  kindLabel: 'Divert',
   name: 'audit-copy',
-  routingName: 'audit-copy',
-  address: 'ORDER.IN',
-  forwardingAddress: 'AUDIT.IN',
-  filter: null,
-  routingType: null,
-  transformerClassName: null,
-  exclusive: false,
-  retroactiveResource: false,
+  routeClass: 'FORWARD',
+  source: 'artemis.address/ORDER.IN',
+  target: 'artemis.address/AUDIT.IN',
+  nativeAttributes: { exclusive: 'false' },
   owner: 'OPERATOR',
-  captureSubscriptionId: null,
   nodesPresent: 1,
   nodesTotal: 1,
   perNode: [{ nodeId: 'n1', nodeName: 'node-a' }],

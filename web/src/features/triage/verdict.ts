@@ -18,11 +18,15 @@ interface VerdictCopy {
 }
 
 const COPY: Record<string, VerdictCopy> = {
-  NO_CONSUMERS: { label: 'No consumers', headline: 'Nothing is draining this queue', tone: 'danger' },
+  NO_CONSUMERS: { label: 'No consumers', headline: 'Nothing is draining this subscription', tone: 'danger' },
   STALLED: { label: 'Stalled', headline: 'Consumers are holding messages and acknowledging none', tone: 'danger' },
   BROKER_SLOW: { label: 'Slow consumer', headline: 'The broker reported a slow consumer', tone: 'danger' },
   STARVED: { label: 'Starved', headline: 'Consumers are attached but receiving nothing', tone: 'warning' },
-  FALLING_BEHIND: { label: 'Falling behind', headline: 'Acknowledging slower than the queue fills', tone: 'warning' },
+  FALLING_BEHIND: {
+    label: 'Falling behind',
+    headline: 'Acknowledging slower than the subscription fills',
+    tone: 'warning',
+  },
   DRAINING: { label: 'Draining', headline: 'Recovering — the backlog is clearing', tone: null },
   PAUSED: { label: 'Paused', headline: 'Paused, so the backlog is expected', tone: null },
   HEALTHY: { label: 'Healthy', headline: 'Keeping up with what arrives', tone: null },

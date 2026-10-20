@@ -46,7 +46,7 @@ describe('a message that carries markup', () => {
     );
 
     const { container } = renderWithProviders(
-      <MessageDetailPanel clusterId="c1" queueName="PHASE3.SRC" messageId="146" onClose={() => {}} />,
+      <MessageDetailPanel clusterId="c1" subscriptionName="PHASE3.SRC" messageId="146" onClose={() => {}} />,
     );
 
     expect(await screen.findByText(HEADER_VALUE)).toBeInTheDocument();

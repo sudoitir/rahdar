@@ -3,7 +3,7 @@ import type { FlowNodeView } from './api.ts';
 
 /**
  * What the flow view is showing, as URL search params (non-negotiable #9): a shared or reloaded
- * address restores the same focus, ranking, grouping, bound, layers, sort, layout and selection.
+ * destination restores the same focus, ranking, grouping, bound, layers, sort, layout and selection.
  */
 
 export const FLOW_RANKS = ['IN', 'OUT', 'BACKLOG'] as const;
@@ -11,7 +11,7 @@ export const FLOW_GROUPINGS = ['CLIENT_ID', 'USER', 'HOST'] as const;
 export const FLOW_LIMITS = [20, 40, 100, 200] as const;
 export const DEFAULT_LIMIT = 40;
 
-/** Routing drawn around the paths; the server's default is diverts, bridges and cluster hops. */
+/** Routing drawn around the paths; the server's default is forwards, links and cluster hops. */
 export const FLOW_LAYERS = ['ROUTES', 'CLUSTER', 'DEAD_LETTER', 'TEMPORARY', 'CAPTURE'] as const;
 
 export type FlowRank = (typeof FLOW_RANKS)[number];

@@ -14,7 +14,7 @@ describe('flow formatting', () => {
 
   it('names a slow-tier rate as an average', () => {
     expect(rateSourceLabel({ rateSource: 'SUBSCRIPTION_METRIC', averagedOverSeconds: 300 })).toBe(
-      'queue metrics, ~5 min average',
+      'subscription metrics, ~5 min average',
     );
   });
 
@@ -56,7 +56,7 @@ describe('routing edge text', () => {
         rahdar: false,
         faults: ['LINK_DOWN'],
       }),
-    ).toBe('bridge · 5 msg/s · not connected');
+    ).toBe('link · 5 msg/s · not connected');
     expect(
       edgeText({
         kind: 'ROUTE',
@@ -68,7 +68,7 @@ describe('routing edge text', () => {
         rahdar: false,
         faults: [],
       }),
-    ).toBe('shared · bypassed by an exclusive divert · 2 msg/s');
+    ).toBe('shared · bypassed by an exclusive forward · 2 msg/s');
     expect(
       edgeText({ kind: 'WILDCARD', rateSource: 'NONE', stale: false, bypassed: false, rahdar: false, faults: [] }),
     ).toBe('matches');

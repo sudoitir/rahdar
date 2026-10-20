@@ -14,7 +14,7 @@ vi.mock('@tanstack/react-router', async (importOriginal) => ({
   Link: ({ children, to }: { children: React.ReactNode; to: string }) => <a href={to}>{children}</a>,
 }));
 
-const { DlqView } = await import('./DlqView.tsx');
+const { DeadLettersView } = await import('./DeadLettersView.tsx');
 
 const AVAILABLE = { status: 'AVAILABLE', reason: 'ok', brokerXmlSnippet: null };
 
@@ -67,21 +67,21 @@ const QUEUE = {
   ],
 };
 
-describe('DlqView', () => {
-  it('is one page named Dead-letter queues, listing each queue with its depth as a link to its messages', async () => {
+describe('DeadLettersView', () => {
+  it('is one page named Dead-letter subscriptions, listing each subscription with its depth as a link to its messages', async () => {
     signedInWith(['*']);
     dlq({
       settingsAvailable: true,
       destinations: [{ ...destinationIdentity('DLQ'), purpose: 'dead-letter', subscriptions: [QUEUE] }],
     });
-    renderWithProviders(<DlqView />);
+    renderWithProviders(<DeadLettersView />);
 
-    expect(await screen.findByRole('heading', { level: 1, name: 'Dead-letter queues' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 1, name: 'Dead-letter subscriptions' })).toBeInTheDocument();
     expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
-    const grid = await screen.findByRole('grid', { name: 'Dead-letter queues' });
+    const grid = await screen.findByRole('grid', { name: 'Dead-letter subscriptions' });
     expect(await within(grid).findByRole('link', { name: 'DLQ.orders' })).toHaveAttribute(
       'href',
-      '/clusters/c1/queues/DLQ.orders/messages',
+      '/clusters/c1/subscriptions/DLQ.orders/messages',
     );
     expect(within(grid).getByRole('gridcell', { name: '7' })).toBeInTheDocument();
   });
@@ -93,9 +93,9 @@ describe('DlqView', () => {
       destinations: [{ ...destinationIdentity('DLQ'), purpose: 'dead-letter', subscriptions: [QUEUE] }],
     });
     const user = userEvent.setup();
-    renderWithProviders(<DlqView />);
+    renderWithProviders(<DeadLettersView />);
 
-    await user.click(await screen.findByRole('button', { name: /^Actions for dead-letter queue DLQ.orders/ }));
+    await user.click(await screen.findByRole('button', { name: /^Actions for dead-letter subscription DLQ.orders/ }));
     await user.click(await screen.findByRole('menuitem', { name: 'Per-node breakdown' }));
 
     const dialog = await screen.findByRole('dialog', { name: 'DLQ.orders by node' });
@@ -112,19 +112,19 @@ describe('DlqView', () => {
       destinations: [{ ...destinationIdentity('DLQ'), purpose: 'dead-letter', subscriptions: [QUEUE] }],
     });
     const user = userEvent.setup();
-    renderWithProviders(<DlqView />);
+    renderWithProviders(<DeadLettersView />);
 
-    await user.click(await screen.findByRole('button', { name: /^Actions for dead-letter queue DLQ.orders/ }));
+    await user.click(await screen.findByRole('button', { name: /^Actions for dead-letter subscription DLQ.orders/ }));
     const item = await screen.findByRole('menuitem', { name: /^Replay all…/ });
     await waitFor(() => expect(item).toHaveAttribute('aria-disabled', 'true'));
     await user.click(item);
 
-    expect(await screen.findByRole('dialog', { name: 'Why replaying this queue is unavailable' })).toHaveTextContent(
-      'Move or retry messages',
-    );
+    expect(
+      await screen.findByRole('dialog', { name: 'Why replaying this subscription is unavailable' }),
+    ).toHaveTextContent('Move or retry messages');
   });
 
-  it('previews a replay of the queue chosen from its row', async () => {
+  it('previews a replay of the subscription chosen from its row', async () => {
     signedInWith(['*']);
     dlq({
       settingsAvailable: true,
@@ -136,44 +136,44 @@ describe('DlqView', () => {
       ),
     );
     const user = userEvent.setup();
-    renderWithProviders(<DlqView />);
+    renderWithProviders(<DeadLettersView />);
 
-    await user.click(await screen.findByRole('button', { name: /^Actions for dead-letter queue DLQ.orders/ }));
+    await user.click(await screen.findByRole('button', { name: /^Actions for dead-letter subscription DLQ.orders/ }));
     await user.click(await screen.findByRole('menuitem', { name: /^Replay all…/ }));
     await user.click(await screen.findByRole('button', { name: 'Preview' }));
 
     expect(await screen.findByRole('button', { name: 'Retry 7 messages' })).toBeEnabled();
   });
 
-  it('says the dead-letter settings could not be read, and infers no queue from its name', async () => {
+  it('says the dead-letter settings could not be read, and infers no subscription from its name', async () => {
     signedInWith(['*']);
     dlq({ settingsAvailable: false, destinations: [] });
-    renderWithProviders(<DlqView />);
+    renderWithProviders(<DeadLettersView />);
 
     expect(await screen.findByText('Dead-letter configuration unavailable')).toBeInTheDocument();
-    expect(screen.getByText(/will not guess which queues are dead-letter queues/)).toBeInTheDocument();
+    expect(screen.getByText(/will not guess which subscriptions are dead-letter/)).toBeInTheDocument();
   });
 
-  it('teaches what is empty when nothing is dead-lettered, naming the dead-letter address', async () => {
+  it('teaches what is empty when nothing is dead-lettered, naming the dead-letter destination', async () => {
     signedInWith(['*']);
     dlq({
       settingsAvailable: true,
       destinations: [{ ...destinationIdentity('DLQ'), purpose: 'dead-letter', subscriptions: [] }],
     });
-    renderWithProviders(<DlqView />);
+    renderWithProviders(<DeadLettersView />);
 
     expect(await screen.findByText('No dead-lettered messages')).toBeInTheDocument();
     expect(screen.getByText('DLQ')).toBeInTheDocument();
   });
 
-  it('states why the queues could not be read, with a retry, in place of the rows', async () => {
+  it('states why the subscriptions could not be read, with a retry, in place of the rows', async () => {
     signedInWith(['*']);
     server.use(
       http.get('*/api/v1/clusters/c1/dead-letters', () =>
         HttpResponse.json({ title: 'Cluster unreachable', detail: 'No node answered.' }, { status: 502 }),
       ),
     );
-    renderWithProviders(<DlqView />);
+    renderWithProviders(<DeadLettersView />);
 
     const alert = await screen.findByRole('alert');
     expect(within(alert).getByText('Rahdar failed to complete the request')).toBeInTheDocument();

@@ -22,11 +22,17 @@ export function BodyPreview({ message: m }: Readonly<{ message: MessageSummaryVi
   );
 }
 
-/** A dead-letter queue's name, shortened in the middle so its distinguishing end stays in view, as a link to its messages. */
-export function QueueLink({ clusterId, queueName }: Readonly<{ clusterId: string; queueName: string }>) {
+/** A dead-letter subscription's name, shortened in the middle so its distinguishing end stays in view, as a link to its messages. */
+export function SubscriptionLink({
+  clusterId,
+  subscriptionName,
+}: Readonly<{ clusterId: string; subscriptionName: string }>) {
   return (
-    <Link to={`/clusters/${clusterId}/queues/${encodeURIComponent(queueName)}/messages`} className={linkClasses.link}>
-      <MiddleTruncate text={queueName} />
+    <Link
+      to={`/clusters/${clusterId}/subscriptions/${encodeURIComponent(subscriptionName)}/messages`}
+      className={linkClasses.link}
+    >
+      <MiddleTruncate text={subscriptionName} />
     </Link>
   );
 }

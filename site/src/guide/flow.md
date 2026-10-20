@@ -37,7 +37,7 @@ named in words: *no consumer*, *stalled*, *not connected*, *on 1 of 2 nodes*.
 Hover or focus any node and the full upstream and downstream path through it stays
 bright while the rest fades. Select it to open its details: its figures, the flow into
 and out of it with each rate's source and age, and buttons to focus the view on it or
-open it in Queues (the queue itself), Addresses, Consumers, Producers or Connections.
+open it in Subscriptions (the subscription itself), Destinations, Consumers, Producers or Connections.
 The selection is part of the address, so a reload or a shared link opens the same
 details. Flow itself never changes the broker.
 
@@ -135,8 +135,7 @@ Routing is drawn in layers you switch on and off in the toolbar:
 
 | Layer | Draws | Default |
 |---|---|---|
-| Diverts | An address rerouting (exclusive) or copying to another. An exclusive divert without a filter marks its address's own queues *bypassed* | on |
-| Bridges | A queue forwarded to an address here or on another broker; *not connected* when it is down | on |
+| Routes | A destination rerouting (an exclusive forward) or copying to another, and a subscription linked to a destination here or on another broker; a link is *not connected* when it is down. An exclusive forward without a filter marks its destination's own subscriptions *bypassed* | on |
 | Cluster hops | Messages a node moves to another node through its store-and-forward queue | on |
 | Dead letter & expiry | Where a failed or expired message from each shown queue goes | off |
 | Temporary queues | One node per client for all its short-lived reply queues | off |

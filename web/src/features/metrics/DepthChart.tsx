@@ -14,9 +14,9 @@ import {
 import type { MetricRange } from './ranges.ts';
 
 /**
- * Average queue depth for each bucket, with the bucket's peak as an envelope
+ * Average subscription depth for each bucket, with the bucket's peak as an envelope
  * above it. With `total`, the cluster's depth at each bucket's end instead: the sum
- * of every queue's latest sample, which has no bucket peak (ADR-0127).
+ * of every subscription's latest sample, which has no bucket peak (ADR-0127).
  *
  * The two marks share one hue on purpose. Peak is not a second identity — it is
  * the same measurement's upper bound — so this is an envelope, not a categorical

@@ -3,7 +3,7 @@ import type { ConsumerHealthView } from './api.ts';
 import { isUnmeasured, verdictCopy, verdictText } from './verdict.ts';
 
 /**
- * One queue's verdict, as a word.
+ * One subscription's verdict, as a word.
  *
  * Colour never carries the verdict alone: the same text is present in every scheme and at every
  * contrast, and a healthy or unmeasured row carries no colour at all (it must not read as a fault,

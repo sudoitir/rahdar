@@ -1,9 +1,9 @@
+import type { ResourceRef } from '../../kernel/api/resourceId.ts';
 import { useMemo } from 'react';
 import { Button, Group, Stack, Text } from '@mantine/core';
 import { useNavigate } from '@tanstack/react-router';
 
 import { useMetrics } from './api.ts';
-import { useRoleIds } from '../clusters/index.ts';
 import { serverNow } from '../../kernel/time/time.ts';
 import { DepthChart } from './DepthChart.tsx';
 import { rangeSpec } from './ranges.ts';
@@ -12,16 +12,17 @@ import { ThroughputChart } from './ThroughputChart.tsx';
 /** The drawer always shows the last hour; a longer view is the metrics page's job. */
 const DRAWER_RANGE = '1h' as const;
 
-/** A queue's last hour of depth and throughput in its detail drawer (`queue.detail.panels`). */
-export function QueueHistoryPanels({
+/** A subscription's last hour of depth and throughput in its detail drawer (`subscription.detail.panels`). */
+export function SubscriptionHistoryPanels({
   clusterId,
-  queueName,
+  subscription,
   onClose,
 }: Readonly<{
   clusterId: string;
-  queueName: string;
+  subscription: ResourceRef;
   onClose: () => void;
 }>) {
+  const subscriptionName = subscription.name;
   const navigate = useNavigate();
   // The drawer's own window is a fixed hour, quantized to the same bucket the
   // metrics view uses so the two agree about where a bucket starts (ADR-0055).
@@ -36,20 +37,18 @@ export function QueueHistoryPanels({
       toMs: end,
     };
   }, [spec.stepMs, spec.windowMs]);
-  const ids = useRoleIds(clusterId);
   const metrics = useMetrics(
     clusterId,
     {
       metrics: ['openbroker.backlog', 'openbroker.enqueued', 'openbroker.acknowledged'],
-      resource: ids.loaded ? ids.subscription(queueName) : undefined,
+      resource: subscription.id,
       from,
       to,
     },
     false,
-    ids.loaded,
   );
   const byName = (name: string) => metrics.data?.series.find((s) => s.metric === name);
-  const syncId = `queue-drawer-${queueName}`;
+  const syncId = `subscription-drawer-${subscriptionName}`;
 
   return (
     <>
@@ -63,7 +62,7 @@ export function QueueHistoryPanels({
             onClose();
             void navigate({
               to: `/clusters/${clusterId}/metrics`,
-              search: { subject: queueName } as never,
+              search: { subject: subscriptionName } as never,
             });
           }}
         >

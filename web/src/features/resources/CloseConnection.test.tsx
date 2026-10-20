@@ -7,7 +7,7 @@ import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from '../../test/render.tsx';
 import { server } from '../../test/setup.ts';
 import type { CapabilityView, ConnectionCloseView } from './api.ts';
-import { CloseAddressConsumersAction, CloseConnectionAction } from './CloseConnection.tsx';
+import { CloseDestinationConsumersAction, CloseConnectionAction } from './CloseConnection.tsx';
 import { ARTEMIS_KINDS } from '../../test/wire.ts';
 
 const AVAILABLE: CapabilityView = { status: 'AVAILABLE', reason: 'ok', brokerXmlSnippet: null };
@@ -125,7 +125,7 @@ describe('closing a connection from a row', () => {
     expect(dialog).not.toHaveTextContent('a3f1c9de');
   });
 
-  it('states how many in-flight messages return to their queue before it can be armed', async () => {
+  it('states how many in-flight messages return to their subscription before it can be armed', async () => {
     server.use(meHandler(), clusterHandler(), closeHandler(live));
     const user = userEvent.setup();
     renderWithProviders(<Harness />);
@@ -133,10 +133,10 @@ describe('closing a connection from a row', () => {
     await user.click(await screen.findByRole('button', { name: /close the connection for/i }));
 
     const dialog = await screen.findByRole('dialog');
-    await within(dialog).findByText(/41 in-flight messages will return to their queue/i);
+    await within(dialog).findByText(/41 in-flight messages will return to their subscription/i);
     await within(dialog).findByText(/increased delivery count/i);
     // The scale of the disconnect, not just the one connection.
-    expect(within(dialog).getByText('Sessions closed with it')).toBeInTheDocument();
+    expect(within(dialog).getByText('Channels closed with it')).toBeInTheDocument();
     expect(within(dialog).getByText('Consumers closed with it')).toBeInTheDocument();
   });
 
@@ -255,8 +255,8 @@ describe('a target that could not be read', () => {
   });
 });
 
-describe('closing every consumer on an address', () => {
-  function addressHandler(replyFor: (dryRun: boolean) => object) {
+describe('closing every consumer on an destination', () => {
+  function destinationHandler(replyFor: (dryRun: boolean) => object) {
     return http.post('*/api/v1/clusters/c1/resources/artemis.address/orders:close', ({ request }) =>
       HttpResponse.json(replyFor(new URL(request.url).searchParams.get('dryRun') === 'true')),
     );
@@ -279,10 +279,10 @@ describe('closing every consumer on an address', () => {
     },
   });
 
-  it('arms on the address, then reads a partial result per node in a dialog of its own', async () => {
-    server.use(meHandler(), clusterHandler(), addressHandler(reply));
+  it('arms on the destination, then reads a partial result per node in a dialog of its own', async () => {
+    server.use(meHandler(), clusterHandler(), destinationHandler(reply));
     const user = userEvent.setup();
-    renderWithProviders(<CloseAddressConsumersAction clusterId="c1" address="orders" />);
+    renderWithProviders(<CloseDestinationConsumersAction clusterId="c1" destination="orders" />);
 
     await user.click(await screen.findByRole('button', { name: 'Close consumers on orders' }));
     const confirmation = await screen.findByRole('dialog', { name: 'Close every consumer on orders' });

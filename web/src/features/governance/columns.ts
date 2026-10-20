@@ -36,9 +36,9 @@ export function ruleColumns({ controls }: RuleRows): Column<RuleView>[] {
       priority: 'essential',
     },
     {
-      id: 'addresses',
-      header: 'Addresses',
-      accessor: (r) => r.destinationPattern ?? 'All addresses',
+      id: 'destinations',
+      header: 'Destinations',
+      accessor: (r) => r.destinationPattern ?? 'All destinations',
       kind: 'text',
       wrap: true,
       priority: 'high',
@@ -81,8 +81,8 @@ export function findingColumns({ zone, controls }: FindingRows): Column<FindingV
   return [
     { id: 'field', header: 'Field', accessor: fieldOf, kind: 'identifier', priority: 'essential' },
     {
-      id: 'address',
-      header: 'Address',
+      id: 'destination',
+      header: 'Destination',
       accessor: (f) => f.destination,
       kind: 'identifier',
       priority: 'essential',

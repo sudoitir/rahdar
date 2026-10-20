@@ -22,7 +22,7 @@ export function RangePicker() {
       size="xs"
       value={current}
       // Merged into the existing search rather than replacing it: choosing a range
-      // must not silently drop a queue scope, and picking a relative range is how
+      // must not silently drop a subscription scope, and picking a relative range is how
       // an operator leaves an absolute one.
       onChange={(value) =>
         navigate({

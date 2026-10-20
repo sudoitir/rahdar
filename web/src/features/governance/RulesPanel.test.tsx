@@ -111,7 +111,7 @@ describe('RulesPanel', () => {
     expect(await screen.findByText(/Enter the name the rule matches/)).toBeInTheDocument();
 
     await user.type(name, 'customerName');
-    await user.type(screen.getByRole('textbox', { name: /Addresses/ }), 'orders.#');
+    await user.type(screen.getByRole('textbox', { name: /Destinations/ }), 'orders.#');
     await user.click(screen.getByRole('button', { name: 'Save rule' }));
 
     await waitFor(() => expect(posted).not.toBeNull());

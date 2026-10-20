@@ -217,7 +217,7 @@ function RoleEditor({
         {edited?.builtin ? null : (
           <Switch
             label="Team role"
-            description="Lets the role be given to a team's members or in a share. A team role holds only permissions that act on a queue or address, and team:admin."
+            description="Lets the role be given to a team's members or in a share. A team role holds only permissions that act on a subscription or destination, and team:admin."
             {...form.getInputProps('teamAssignable', { type: 'checkbox' })}
           />
         )}

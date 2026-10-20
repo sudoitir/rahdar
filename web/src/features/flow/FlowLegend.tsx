@@ -82,8 +82,8 @@ export function FlowLegend({ motion }: Readonly<{ motion: 'running' | 'paused' |
     <div className={classes.legend} role="group" aria-label="Legend">
       <LegendGroup title="Nodes">
         <LegendItem mark={node('pill')}>client</LegendItem>
-        <LegendItem mark={node('tag')}>address</LegendItem>
-        <LegendItem mark={node('box')}>queue, bar = backlog</LegendItem>
+        <LegendItem mark={node('tag')}>destination</LegendItem>
+        <LegendItem mark={node('box')}>subscription, bar = backlog</LegendItem>
         <LegendItem mark={node('hex')}>other node or broker</LegendItem>
       </LegendGroup>
       <LegendGroup title="Throughput">
@@ -102,9 +102,9 @@ export function FlowLegend({ motion }: Readonly<{ motion: 'running' | 'paused' |
         </LegendItem>
       </LegendGroup>
       <LegendGroup title="Line kinds">
-        <LegendItem mark={line({ 'data-kind': 'FORWARD' })}>divert (not counted by the broker)</LegendItem>
+        <LegendItem mark={line({ 'data-kind': 'FORWARD' })}>forward (not counted by the broker)</LegendItem>
         <LegendItem mark={line({ 'data-kind': 'WILDCARD' })}>wildcard</LegendItem>
-        <LegendItem mark={line({ 'data-kind': 'LINK' })}>bridge</LegendItem>
+        <LegendItem mark={line({ 'data-kind': 'LINK' })}>link</LegendItem>
         <LegendItem mark={line({ 'data-kind': 'CLUSTER_HOP' })}>cluster redistribution</LegendItem>
         <LegendItem mark={line({ 'data-kind': 'DEAD_LETTER' })}>dead letter or expiry</LegendItem>
       </LegendGroup>

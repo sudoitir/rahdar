@@ -32,7 +32,7 @@ export function MetricChart({
   subject,
   title,
   range = '1h',
-  emptyLabel = 'No samples yet. Metrics are sampled on every queue scrape, about every 15 seconds.',
+  emptyLabel = 'No samples yet. Metrics are sampled on every subscription scrape, about every 15 seconds.',
 }: Readonly<{
   clusterId: string;
   metric: string;

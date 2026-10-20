@@ -27,7 +27,7 @@ vi.mock('@tanstack/react-router', async (importOriginal) => ({
   ),
 }));
 
-const { QueueDetailDrawer } = await import('./QueueDetailDrawer.tsx');
+const { SubscriptionDetailDrawer } = await import('./SubscriptionDetailDrawer.tsx');
 
 function cell(nodeId: string, nodeName: string, messageCount: number, stale = false) {
   return {
@@ -80,10 +80,10 @@ function serve() {
   );
 }
 
-describe('QueueDetailDrawer', () => {
+describe('SubscriptionDetailDrawer', () => {
   it('lists each node in a table of its own, with stale figures named in words', async () => {
     serve();
-    renderWithProviders(<QueueDetailDrawer queue={QUEUE} onClose={() => {}} />);
+    renderWithProviders(<SubscriptionDetailDrawer subscription={QUEUE} onClose={() => {}} />);
 
     const table = await screen.findByRole('table', { name: 'orders.in per node' });
     const rows = within(table).getAllByRole('row');
@@ -95,9 +95,9 @@ describe('QueueDetailDrawer', () => {
     expect(within(rows[1]!).queryByText('stale')).not.toBeInTheDocument();
   });
 
-  it('heads the breakdown as a section under the drawer title, and states the queue as words', async () => {
+  it('heads the breakdown as a section under the drawer title, and states the subscription as words', async () => {
     serve();
-    renderWithProviders(<QueueDetailDrawer queue={QUEUE} onClose={() => {}} />);
+    renderWithProviders(<SubscriptionDetailDrawer subscription={QUEUE} onClose={() => {}} />);
 
     expect(await screen.findByRole('heading', { level: 3, name: 'Per node' })).toBeInTheDocument();
     expect(screen.getByText('anycast')).toBeInTheDocument();
@@ -106,10 +106,13 @@ describe('QueueDetailDrawer', () => {
     expect(screen.queryByRole('heading', { level: 1 })).not.toBeInTheDocument();
   });
 
-  it('names the team that owns the queue, as a link to it', async () => {
+  it('names the team that owns the subscription, as a link to it', async () => {
     serve();
     renderWithProviders(
-      <QueueDetailDrawer queue={{ ...QUEUE, ownerTeam: { id: 't1', name: 'Orders' } }} onClose={() => {}} />,
+      <SubscriptionDetailDrawer
+        subscription={{ ...QUEUE, ownerTeam: { id: 't1', name: 'Orders' } }}
+        onClose={() => {}}
+      />,
     );
 
     expect(await screen.findByRole('link', { name: 'Owner: team Orders' })).toHaveAttribute(
@@ -118,11 +121,11 @@ describe('QueueDetailDrawer', () => {
     );
   });
 
-  it('says the queue is not found, instead of closing silently, when it can no longer be seen', async () => {
+  it('says the subscription is not found, instead of closing silently, when it can no longer be seen', async () => {
     serve();
-    renderWithProviders(<QueueDetailDrawer queue={null} missing="orders.in" onClose={() => {}} />);
+    renderWithProviders(<SubscriptionDetailDrawer subscription={null} missing="orders.in" onClose={() => {}} />);
 
-    expect(await screen.findByText('Queue not found')).toBeInTheDocument();
+    expect(await screen.findByText('Subscription not found')).toBeInTheDocument();
     expect(screen.getByText(/your access to it may have been removed/)).toBeInTheDocument();
   });
 });

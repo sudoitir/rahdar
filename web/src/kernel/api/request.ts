@@ -38,7 +38,7 @@ export class ApiError extends Error {
 /** What the server says about an operation it held for approval instead of running. */
 export interface HeldOperation {
   id: string;
-  /** What the operation would do, in words, such as `Purge queue "orders" on prod`. */
+  /** What the operation would do, in words, such as `Purge subscription "orders" on prod`. */
   summary: string;
   /** When the request lapses unless someone decides it, as an ISO instant. */
   expiresAt: string;

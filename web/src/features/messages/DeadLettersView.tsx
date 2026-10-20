@@ -11,15 +11,15 @@ import { ErrorState } from '../../ui/ErrorState.tsx';
 import { Page } from '../../ui/Page.tsx';
 import { PageHeader } from '../../ui/PageHeader.tsx';
 import { DataTable } from '../../ui/table/index.ts';
-import { useDlq, type DeadLetterSubscription } from './api.ts';
+import { useDeadLetters, type DeadLetterSubscription } from './api.ts';
 import { BulkActionPreview } from './BulkActionPreview.tsx';
-import { dlqColumns, type DlqRow } from './columns.ts';
+import { deadLetterColumns, type DeadLetterRow } from './columns.ts';
 import { useActionGate } from './gates.ts';
 import { messageCount } from './outcomes.ts';
 
-const rowKey = (r: DlqRow) => `${r.address}/${r.queue.name}`;
+const rowKey = (r: DeadLetterRow) => `${r.destination}/${r.subscription.name}`;
 
-/** "Replay all…" on a queue's row: every message back to the queue it came from, through the shared preview. */
+/** "Replay all…" on a subscription's row: every message back to the subscription it came from, through the shared preview. */
 function ReplayItem({ clusterId, onReplay }: Readonly<{ clusterId: string; onReplay: () => void }>) {
   const host = useActionHost();
   const gate = useActionGate(clusterId, 'retry');
@@ -28,14 +28,14 @@ function ReplayItem({ clusterId, onReplay }: Readonly<{ clusterId: string; onRep
       label="Replay all…"
       icon={<IconArrowBackUp size="1rem" aria-hidden />}
       verdict={gate}
-      onExplain={(verdict) => host.explain(verdict, 'replaying this queue')}
+      onExplain={(verdict) => host.explain(verdict, 'replaying this subscription')}
       onSelect={onReplay}
     />
   );
 }
 
 /** Why the grid has no rows: the broker's settings could not be read, or nothing is dead-lettered. */
-function DlqEmpty({ addresses, available }: Readonly<{ addresses: string[]; available: boolean }>) {
+function DeadLettersEmpty({ destinations, available }: Readonly<{ destinations: string[]; available: boolean }>) {
   if (!available) {
     return (
       <EmptyState
@@ -43,9 +43,9 @@ function DlqEmpty({ addresses, available }: Readonly<{ addresses: string[]; avai
         title="Dead-letter configuration unavailable"
         description={
           <>
-            Rahdar could not read this broker's address settings, so it will not guess which queues are dead-letter
-            queues from their names. Grant the connection management-read access, or check{' '}
-            <code>getAddressSettingsAsJSON</code> is permitted, then reload.
+            Rahdar could not read this broker's destination settings, so it will not guess which subscriptions are
+            dead-letter subscriptions from their names. Grant the connection management-read access, or check{' '}
+            <code>getDestinationSettingsAsJSON</code> is permitted, then reload.
           </>
         }
       />
@@ -57,8 +57,8 @@ function DlqEmpty({ addresses, available }: Readonly<{ addresses: string[]; avai
       title="No dead-lettered messages"
       description={
         <>
-          The broker's dead-letter address is <code>{addresses.join(', ') || '—'}</code>, but no queue on it currently
-          holds messages. A message lands there when a consumer keeps rejecting it or it expires.
+          The broker's dead-letter destination is <code>{destinations.join(', ') || '—'}</code>, but no subscription on
+          it currently holds messages. A message lands there when a consumer keeps rejecting it or it expires.
         </>
       }
     />
@@ -66,58 +66,63 @@ function DlqEmpty({ addresses, available }: Readonly<{ addresses: string[]; avai
 }
 
 /**
- * Dead-letter / expiry management (ADR-0021, D8). Addresses come from the broker's own settings —
+ * Dead-letter / expiry management (ADR-0021, D8). Destinations come from the broker's own settings —
  * when that read fails the view says exactly that and infers nothing. "Replay all" runs a by-selector
  * RETRY through the shared preview + cap gate. The grid is virtualised, so a cluster with hundreds
- * of dead-lettered queues needs no paging.
+ * of dead-lettered subscriptions needs no paging.
  */
-export function DlqView() {
+export function DeadLettersView() {
   const { clusterId } = useParams({ strict: false }) as { clusterId: string };
-  const dlq = useDlq(clusterId);
+  const dlq = useDeadLetters(clusterId);
   const [replay, setReplay] = useState<DeadLetterSubscription | null>(null);
   const [breakdown, setBreakdown] = useState<DeadLetterSubscription | null>(null);
-  const columns = useMemo(() => dlqColumns(clusterId), [clusterId]);
+  const columns = useMemo(() => deadLetterColumns(clusterId), [clusterId]);
 
-  const addresses = dlq.data?.destinations;
-  // Flattened so each row is a queue rather than an address: one address can hold hundreds.
-  const rows = useMemo<DlqRow[]>(
+  const destinations = dlq.data?.destinations;
+  // Flattened so each row is a subscription rather than a destination: one destination can hold hundreds.
+  const rows = useMemo<DeadLetterRow[]>(
     () =>
-      (addresses ?? []).flatMap((a) => a.subscriptions.map((queue) => ({ address: a.name, kind: a.purpose, queue }))),
-    [addresses],
+      (destinations ?? []).flatMap((a) =>
+        a.subscriptions.map((subscription) => ({ destination: a.name, kind: a.purpose, subscription })),
+      ),
+    [destinations],
   );
 
   return (
     <Page fill>
       <PageHeader
-        title="Dead-letter queues"
-        description="Queues on the broker's dead-letter and expiry addresses that hold messages, with how many on each node."
+        title="Dead-letter subscriptions"
+        description="Subscriptions on the broker's dead-letter and expiry destinations that hold messages, with how many on each node."
       />
 
       <DataTable
-        label="Dead-letter queues"
-        storageKey="dlq"
+        label="Dead-letter subscriptions"
+        storageKey="dead-letters"
         height="fill"
         columns={columns}
         data={rows}
         rowKey={rowKey}
         loading={dlq.isPending}
         error={dlq.isError ? <ErrorState error={dlq.error} onRetry={() => void dlq.refetch()} /> : undefined}
-        onRowClick={(r) => setBreakdown(r.queue)}
+        onRowClick={(r) => setBreakdown(r.subscription)}
         rowMenu={{
-          label: (r) => `dead-letter queue ${r.queue.name}`,
+          label: (r) => `dead-letter subscription ${r.subscription.name}`,
           render: (r) => (
             <>
               <ActionMenuItem
                 label="Per-node breakdown"
                 icon={<IconListDetails size="1rem" aria-hidden />}
-                onSelect={() => setBreakdown(r.queue)}
+                onSelect={() => setBreakdown(r.subscription)}
               />
-              <ReplayItem clusterId={clusterId} onReplay={() => setReplay(r.queue)} />
+              <ReplayItem clusterId={clusterId} onReplay={() => setReplay(r.subscription)} />
             </>
           ),
         }}
         empty={
-          <DlqEmpty addresses={(addresses ?? []).map((a) => a.name)} available={dlq.data?.settingsAvailable ?? true} />
+          <DeadLettersEmpty
+            destinations={(destinations ?? []).map((a) => a.name)}
+            available={dlq.data?.settingsAvailable ?? true}
+          />
         }
       />
 
@@ -137,7 +142,7 @@ export function DlqView() {
       {replay ? (
         <BulkActionPreview
           clusterId={clusterId}
-          queueName={replay.name}
+          subscriptionName={replay.name}
           action="retry"
           opened={replay !== null}
           onClose={() => setReplay(null)}
