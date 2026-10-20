@@ -6,6 +6,7 @@ import static io.github.sudoitir.rahdar.support.ArtemisIntegrationTest.BROKER_US
 import io.github.sudoitir.rahdar.platform.broker.BrokerMBeans;
 import io.github.sudoitir.rahdar.platform.broker.JolokiaBrokerClient;
 import io.github.sudoitir.rahdar.platform.broker.JolokiaRequest;
+import io.github.sudoitir.rahdar.support.wire.WireRecorder;
 import jakarta.jms.BytesMessage;
 import jakarta.jms.Connection;
 import jakarta.jms.JMSException;
@@ -54,13 +55,18 @@ public final class ArtemisBrokers {
             return "tcp://%s:%d".formatted(container.getHost(), container.getMappedPort(61616));
         }
 
+        /** The URL to hand to Rahdar: through the {@link WireRecorder}'s proxy when recording. */
         public String jolokiaUrl() {
+            return WireRecorder.proxied(directJolokiaUrl());
+        }
+
+        private String directJolokiaUrl() {
             return "http://%s:%d/console/jolokia".formatted(container.getHost(), container.getMappedPort(8161));
         }
 
-        /** A Jolokia client of the test's own, outside Rahdar's rate limiter. */
+        /** A Jolokia client of the test's own, outside Rahdar's rate limiter and the recording. */
         public JolokiaBrokerClient jolokia() {
-            return ArtemisIntegrationTest.jolokiaClient(jolokiaUrl());
+            return ArtemisIntegrationTest.jolokiaClient(directJolokiaUrl());
         }
 
         /** An anycast queue on its own address, with an optional filter; kept if it exists. */

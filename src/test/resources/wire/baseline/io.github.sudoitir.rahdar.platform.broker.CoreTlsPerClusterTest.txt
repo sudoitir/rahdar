@@ -1,0 +1,2 @@
+CORE consumer | {"browseOnly":false,"queueName":"notif.<uuid>.ActiveMQServerImpl_name=cluster-node-1"}
+CORE consumer | {"browseOnly":false,"queueName":"notif.<uuid>.ActiveMQServerImpl_name=cluster-node-2"}

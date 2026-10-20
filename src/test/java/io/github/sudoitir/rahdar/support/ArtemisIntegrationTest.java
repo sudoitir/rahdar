@@ -3,6 +3,7 @@ package io.github.sudoitir.rahdar.support;
 import io.github.sudoitir.rahdar.platform.broker.BrokerClientFactory;
 import io.github.sudoitir.rahdar.platform.broker.BrokerVersion;
 import io.github.sudoitir.rahdar.platform.broker.JolokiaBrokerClient;
+import io.github.sudoitir.rahdar.support.wire.WireRecorder;
 import java.time.Duration;
 import org.springframework.web.client.RestClient;
 import org.testcontainers.containers.GenericContainer;
@@ -71,7 +72,8 @@ public abstract class ArtemisIntegrationTest {
      * class and therefore starts the shared container, which is the point.
      */
     public static String jolokiaUrl() {
-        return "http://%s:%d/console/jolokia".formatted(ARTEMIS.getHost(), ARTEMIS.getMappedPort(8161));
+        return WireRecorder.proxied(
+                "http://%s:%d/console/jolokia".formatted(ARTEMIS.getHost(), ARTEMIS.getMappedPort(8161)));
     }
 
     /** A Jolokia client of the test's own for the shared broker, outside Rahdar's rate limiter. */

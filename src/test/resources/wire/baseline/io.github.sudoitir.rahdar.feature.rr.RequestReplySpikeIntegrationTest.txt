@@ -1,0 +1,5 @@
+CORE consumer | {"browseOnly":false,"filter":"JMSCorrelationID = 'corr-shared-1'","queueName":"rr.spike.shared.rep.<hex>"}
+CORE consumer | {"browseOnly":false,"queueName":"<uuid>"}
+CORE consumer | {"browseOnly":false,"queueName":"rr.spike.shared.req.<hex>"}
+CORE consumer | {"browseOnly":false,"queueName":"rr.spike.stuck.<hex>"}
+CORE consumer | {"browseOnly":false,"queueName":"rr.spike.temp.<hex>"}
