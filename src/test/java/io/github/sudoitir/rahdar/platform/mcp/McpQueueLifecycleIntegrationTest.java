@@ -23,7 +23,6 @@ import io.github.sudoitir.rahdar.kernel.security.internal.persistence.RolePermis
 import io.github.sudoitir.rahdar.kernel.security.internal.persistence.RoleRepository;
 import io.github.sudoitir.rahdar.kernel.security.internal.persistence.UserRoleRepository;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaBrokerClient;
 import io.github.sudoitir.rahdar.platform.broker.QueueRow;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNodeEntity;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNodeEntity.HaObservation;
@@ -33,6 +32,8 @@ import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterR
 import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshotUpsert;
 import io.github.sudoitir.rahdar.support.McpFixture;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNodes;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -91,6 +92,9 @@ class McpQueueLifecycleIntegrationTest extends PostgresIntegrationTest {
     BrokerConnections connections;
 
     @MockitoBean
+    ArtemisNodes artemisNodes;
+
+    @MockitoBean
     QueueLifecycleOperations ops;
 
     private MockMvc mvc;
@@ -111,9 +115,9 @@ class McpQueueLifecycleIntegrationTest extends PostgresIntegrationTest {
         upsert.upsertBatch(
                 List.of(new QueueRow(clusterId, nodeId, QUEUE, QUEUE, "ANYCAST", true, 9, 0, 0, 0, 0, 0, 0, false)));
 
-        JolokiaBrokerClient client = mock(JolokiaBrokerClient.class);
+        ArtemisNode client = mock(ArtemisNode.class);
         when(client.resolveBrokerObjectName()).thenReturn("org.apache.activemq.artemis:broker=\"b\"");
-        when(connections.forCluster(eq(clusterId), anyString())).thenReturn(client);
+        when(artemisNodes.on(eq(clusterId), any(UUID.class))).thenReturn(client);
         when(ops.messageCount(any(), anyString())).thenReturn(9L);
         when(ops.deleteState(any(), anyString(), anyString(), anyString(), anyString()))
                 .thenReturn(new QueueLifecycleOperations.DeleteState(true, 0L, List.of(QUEUE)));

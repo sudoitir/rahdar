@@ -21,7 +21,6 @@ import io.github.sudoitir.rahdar.kernel.security.ActorResolver;
 import io.github.sudoitir.rahdar.kernel.security.ClusterAccessGuard;
 import io.github.sudoitir.rahdar.kernel.security.Permissions;
 import io.github.sudoitir.rahdar.kernel.settings.SettingsService;
-import io.github.sudoitir.rahdar.platform.broker.BrokerConnectors;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterLock;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
@@ -30,6 +29,8 @@ import io.github.sudoitir.rahdar.platform.clusters.RegisteredCluster;
 import io.github.sudoitir.rahdar.platform.clusters.RegistrationAdoption;
 import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshot;
 import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshots;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNodes;
+import io.github.sudoitir.rahdar.system.artemis.BrokerConnectors;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -87,6 +88,7 @@ public class BrokerConfigService {
     private final AuditService audit;
     private final ActorResolver actorResolver;
     private final ObjectMapper mapper;
+    private final ArtemisNodes artemisNodes;
 
     /** What the API returns for a cluster's declaration. */
     public record Declaration(
@@ -491,7 +493,7 @@ public class BrokerConfigService {
         List<ObservedNodeConfig> observed = new ArrayList<>();
         for (RegistrationAdoption.LiveNode node : nodes) {
             try {
-                observed.add(ops.readForAdoption(node.client(), new UUID(0, 0), node.name()));
+                observed.add(ops.readForAdoption(artemisNodes.on(node.target()), new UUID(0, 0), node.name()));
             } catch (RuntimeException e) {
                 notes.add(node.name() + " could not be read and contributed nothing: " + e.getMessage());
             }

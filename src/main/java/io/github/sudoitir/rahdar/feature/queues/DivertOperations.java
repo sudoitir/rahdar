@@ -1,12 +1,12 @@
 package io.github.sudoitir.rahdar.feature.queues;
 
-import io.github.sudoitir.rahdar.platform.broker.BrokerListOps;
-import io.github.sudoitir.rahdar.platform.broker.BrokerMBeans;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaBrokerClient;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaRequest;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaResponse;
+import io.github.sudoitir.openbroker.artemis.ArtemisLists;
+import io.github.sudoitir.openbroker.artemis.ArtemisMBeans;
+import io.github.sudoitir.openbroker.artemis.JolokiaRequest;
+import io.github.sudoitir.openbroker.artemis.JolokiaResponse;
 import io.github.sudoitir.rahdar.platform.broker.ManagementRefusal;
 import io.github.sudoitir.rahdar.platform.clusters.LifecycleOutcome.NodeStatus;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -78,22 +78,24 @@ public class DivertOperations {
     // ---- reads -----------------------------------------------------------
 
     /** Every divert deployed on this node. An empty list is a real answer, not a failure. */
-    public List<DivertRow> listDiverts(JolokiaBrokerClient client, UUID nodeId, String nodeName) {
+    public List<DivertRow> listDiverts(ArtemisNode client, UUID nodeId, String nodeName) {
         String broker = client.resolveBrokerObjectName();
-        return BrokerListOps.readAll(
-                client, client.search(BrokerMBeans.divertsPattern(broker)), a -> DivertRow.parse(a, nodeId, nodeName));
+        return ArtemisLists.readAll(
+                client.jolokia(),
+                client.search(ArtemisMBeans.divertsPattern(broker)),
+                a -> DivertRow.parse(a, nodeId, nodeName));
     }
 
     /** One divert by name on this node, or empty when it is not deployed there. */
-    public Optional<DivertRow> find(JolokiaBrokerClient client, String name) {
+    public Optional<DivertRow> find(ArtemisNode client, String name) {
         return listDiverts(client, null, null).stream()
                 .filter(d -> name.equals(d.uniqueName()))
                 .findFirst();
     }
 
     /** Whether the address exists on this node, or would be created the first time something is sent to it. */
-    public boolean addressAvailable(JolokiaBrokerClient client, String brokerMbean, String address) {
-        if (!client.search(BrokerMBeans.address(brokerMbean, address)).isEmpty()) {
+    public boolean addressAvailable(ArtemisNode client, String brokerMbean, String address) {
+        if (!client.search(ArtemisMBeans.address(brokerMbean, address)).isEmpty()) {
             return true;
         }
         JsonNode settings = client.execOnBrokerParsed("getAddressSettingsAsJSON(java.lang.String)", address);
@@ -107,7 +109,7 @@ public class DivertOperations {
      * already exists raises {@link ManagementRefusal.Kind#ALREADY}, which the caller
      * reports as "already in the requested state" rather than as a failure.
      */
-    public void createDivert(JolokiaBrokerClient client, String brokerMbean, Map<String, Object> config) {
+    public void createDivert(ArtemisNode client, String brokerMbean, Map<String, Object> config) {
         JolokiaResponse res = client.single(
                 JolokiaRequest.exec(brokerMbean, "createDivert(java.lang.String)", mapper.writeValueAsString(config)));
         if (lacksJsonCreate(res)) {
@@ -167,7 +169,7 @@ public class DivertOperations {
      *     it is now deployed as asked
      * @throws ManagementRefusal naming the differing fields, or saying it was not deployed
      */
-    public NodeStatus createVerified(JolokiaBrokerClient client, String brokerMbean, Map<String, Object> config) {
+    public NodeStatus createVerified(ArtemisNode client, String brokerMbean, Map<String, Object> config) {
         String name = String.valueOf(config.get("name"));
         Optional<DivertRow> before = find(client, name);
         if (before.isPresent()) {
@@ -264,7 +266,7 @@ public class DivertOperations {
     }
 
     /** Destroy a divert. One that is already gone raises {@link ManagementRefusal.Kind#ALREADY}. */
-    public void destroyDivert(JolokiaBrokerClient client, String brokerMbean, String name) {
+    public void destroyDivert(ArtemisNode client, String brokerMbean, String name) {
         require(
                 client.single(JolokiaRequest.exec(brokerMbean, "destroyDivert(java.lang.String)", name)),
                 "destroyDivert");
@@ -300,6 +302,6 @@ public class DivertOperations {
     }
 
     private static void require(JolokiaResponse res, String operation) {
-        ManagementRefusal.require(res, operation);
+        ArtemisNode.require(res, operation);
     }
 }

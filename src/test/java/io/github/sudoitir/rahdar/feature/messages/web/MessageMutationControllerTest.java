@@ -18,7 +18,6 @@ import io.github.sudoitir.rahdar.kernel.audit.internal.persistence.AuditEventRep
 import io.github.sudoitir.rahdar.kernel.settings.SettingsService;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
 import io.github.sudoitir.rahdar.platform.broker.BrokerSettings;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaBrokerClient;
 import io.github.sudoitir.rahdar.platform.broker.QueueRow;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNodeEntity;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNodeRepository;
@@ -26,7 +25,10 @@ import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterE
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterRepository;
 import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshotUpsert;
 import io.github.sudoitir.rahdar.support.AdminAuthenticationExtension;
+import io.github.sudoitir.rahdar.support.FixtureJolokia;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNodes;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -41,9 +43,7 @@ import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.web.client.RestClient;
 import org.springframework.web.context.WebApplicationContext;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -83,6 +83,9 @@ class MessageMutationControllerTest extends PostgresIntegrationTest {
     @MockitoBean
     BrokerConnections connections;
 
+    @MockitoBean
+    ArtemisNodes artemisNodes;
+
     private UUID clusterId;
     private UUID nodeId;
 
@@ -107,20 +110,18 @@ class MessageMutationControllerTest extends PostgresIntegrationTest {
     }
 
     /** A client that answers the given raw JSON bodies in order (search first when the op needs the MBean name). */
-    private JolokiaBrokerClient client(String... bodies) {
-        RestClient.Builder builder = RestClient.builder();
-        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+    private ArtemisNode client(String... bodies) {
+        FixtureJolokia server = new FixtureJolokia();
         for (String body : bodies) {
             server.expect(requestTo(URL)).andRespond(withSuccess(body, MediaType.APPLICATION_JSON));
         }
-        return new JolokiaBrokerClient(builder.build(), URL, mapper);
+        return server.node();
     }
 
-    private JolokiaBrokerClient unauthorized() {
-        RestClient.Builder builder = RestClient.builder();
-        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+    private ArtemisNode unauthorized() {
+        FixtureJolokia server = new FixtureJolokia();
         server.expect(requestTo(URL)).andRespond(withStatus(HttpStatus.UNAUTHORIZED));
-        return new JolokiaBrokerClient(builder.build(), URL, mapper);
+        return server.node();
     }
 
     private static String fixture(String name) {
@@ -163,7 +164,7 @@ class MessageMutationControllerTest extends PostgresIntegrationTest {
 
     @Test
     void sendRealWritesASuccessRowWithCountOne() throws Exception {
-        when(connections.forCluster(clusterId, URL)).thenReturn(client(SEARCH, fixture("send-message.json")));
+        when(artemisNodes.on(eq(clusterId), any(UUID.class))).thenReturn(client(SEARCH, fixture("send-message.json")));
 
         mvc.perform(post("/api/v1/clusters/{c}/queues/{q}/messages", clusterId, Q)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -215,7 +216,7 @@ class MessageMutationControllerTest extends PostgresIntegrationTest {
     @Test
     void deleteByIdsRealCountsTheBrokerBooleans() throws Exception {
         // Both ids go to the broker in one batch request (ADR-0076), answered positionally.
-        when(connections.forCluster(clusterId, URL))
+        when(artemisNodes.on(eq(clusterId), any(UUID.class)))
                 .thenReturn(client(SEARCH, "[" + BOOL_TRUE + "," + BOOL_TRUE + "]"));
 
         mvc.perform(post("/api/v1/clusters/{c}/queues/{q}/messages/actions/delete", clusterId, Q)
@@ -239,7 +240,8 @@ class MessageMutationControllerTest extends PostgresIntegrationTest {
 
     @Test
     void deleteByFilterDryRunIssuesOnlyCountMessages() throws Exception {
-        when(connections.forCluster(clusterId, URL)).thenReturn(client(SEARCH, fixture("count-messages.json")));
+        when(artemisNodes.on(eq(clusterId), any(UUID.class)))
+                .thenReturn(client(SEARCH, fixture("count-messages.json")));
 
         mvc.perform(post("/api/v1/clusters/{c}/queues/{q}/messages/actions/delete", clusterId, Q)
                         .param("dryRun", "true")
@@ -255,7 +257,7 @@ class MessageMutationControllerTest extends PostgresIntegrationTest {
     @Test
     void deleteByFilterOverCapIsA422WithAffectedCountAndCap() throws Exception {
         settings.put(BrokerSettings.BULK_CAP, "2");
-        when(connections.forCluster(clusterId, URL)).thenReturn(client(SEARCH, COUNT_3));
+        when(artemisNodes.on(eq(clusterId), any(UUID.class))).thenReturn(client(SEARCH, COUNT_3));
 
         mvc.perform(post("/api/v1/clusters/{c}/queues/{q}/messages/actions/delete", clusterId, Q)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -271,7 +273,7 @@ class MessageMutationControllerTest extends PostgresIntegrationTest {
     @Test
     void deleteByFilterExactlyAtTheCapIsAllowed() throws Exception {
         settings.put(BrokerSettings.BULK_CAP, "3");
-        when(connections.forCluster(clusterId, URL))
+        when(artemisNodes.on(eq(clusterId), any(UUID.class)))
                 .thenReturn(client(SEARCH, COUNT_3, fixture("remove-messages.json")));
 
         mvc.perform(post("/api/v1/clusters/{c}/queues/{q}/messages/actions/delete", clusterId, Q)
@@ -285,7 +287,7 @@ class MessageMutationControllerTest extends PostgresIntegrationTest {
     @Test
     void deleteByFilterOverCapProceedsWithOverride() throws Exception {
         settings.put(BrokerSettings.BULK_CAP, "2");
-        when(connections.forCluster(clusterId, URL))
+        when(artemisNodes.on(eq(clusterId), any(UUID.class)))
                 .thenReturn(client(SEARCH, COUNT_3, fixture("remove-messages.json")));
 
         mvc.perform(post("/api/v1/clusters/{c}/queues/{q}/messages/actions/delete", clusterId, Q)
@@ -302,7 +304,7 @@ class MessageMutationControllerTest extends PostgresIntegrationTest {
 
     @Test
     void purgeDryRunReadsMessageCountAndDoesNotRemove() throws Exception {
-        when(connections.forCluster(clusterId, URL)).thenReturn(client(SEARCH, COUNT_3));
+        when(artemisNodes.on(eq(clusterId), any(UUID.class))).thenReturn(client(SEARCH, COUNT_3));
 
         mvc.perform(delete("/api/v1/clusters/{c}/queues/{q}/messages", clusterId, Q)
                         .param("dryRun", "true"))
@@ -316,7 +318,7 @@ class MessageMutationControllerTest extends PostgresIntegrationTest {
 
     @Test
     void purgeRealAuditsTheRemovedCount() throws Exception {
-        when(connections.forCluster(clusterId, URL))
+        when(artemisNodes.on(eq(clusterId), any(UUID.class)))
                 .thenReturn(client(SEARCH, COUNT_3, fixture("remove-all-messages.json")));
 
         mvc.perform(delete("/api/v1/clusters/{c}/queues/{q}/messages", clusterId, Q))
@@ -330,7 +332,7 @@ class MessageMutationControllerTest extends PostgresIntegrationTest {
 
     @Test
     void aBrokerFailureLeavesAFailureRowAndReturnsAClassifiedProblem() throws Exception {
-        when(connections.forCluster(eq(clusterId), any())).thenReturn(unauthorized());
+        when(artemisNodes.on(eq(clusterId), any(UUID.class))).thenReturn(unauthorized());
 
         mvc.perform(post("/api/v1/clusters/{c}/queues/{q}/messages", clusterId, Q)
                         .contentType(MediaType.APPLICATION_JSON)

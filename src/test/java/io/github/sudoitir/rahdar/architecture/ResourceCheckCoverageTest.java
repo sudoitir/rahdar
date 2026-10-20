@@ -16,7 +16,7 @@ import io.github.sudoitir.rahdar.kernel.security.OperatorHandoff;
 import io.github.sudoitir.rahdar.kernel.security.PermissionResolver;
 import io.github.sudoitir.rahdar.kernel.security.ResourceFilter;
 import io.github.sudoitir.rahdar.kernel.security.ResourceRef;
-import io.github.sudoitir.rahdar.platform.clusters.BrokerCommands;
+import io.github.sudoitir.rahdar.system.artemis.BrokerCommands;
 import java.lang.reflect.Parameter;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.RecordComponent;
@@ -103,15 +103,14 @@ class ResourceCheckCoverageTest {
                     "feature.resources.ConnectionOperations",
                     "broker primitives; connection control is a cluster-level permission checked by its callers"),
             Map.entry(
-                    "platform.broker.MessageOperations",
+                    "system.artemis.MessageOperations",
                     "broker primitives; MessageService, DlqService and the transfer and bulk runners check before"
                             + " they call them"),
-            Map.entry("platform.broker.StagingQueues", "a transfer's own staging queues, made and removed by its run"),
+            Map.entry("system.artemis.StagingQueues", "a transfer's own staging queues, made and removed by its run"),
             Map.entry(
-                    "platform.broker.AcceptanceProbe",
-                    "reads a target's facts for a transfer that was already checked"),
+                    "system.artemis.AcceptanceProbe", "reads a target's facts for a transfer that was already checked"),
             Map.entry(
-                    "platform.scrape.QueueLocator",
+                    "system.artemis.QueueLocator",
                     "finds where a name is on the scraped snapshot; its callers have checked the name"),
             Map.entry(
                     "platform.scrape.QueueSnapshotUpsert",

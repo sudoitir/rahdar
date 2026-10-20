@@ -1,8 +1,12 @@
 package io.github.sudoitir.rahdar.feature.flow;
 
-import static io.github.sudoitir.rahdar.platform.broker.BrokerListOps.num;
-import static io.github.sudoitir.rahdar.platform.broker.BrokerListOps.str;
+import static io.github.sudoitir.openbroker.artemis.ArtemisLists.num;
+import static io.github.sudoitir.openbroker.artemis.ArtemisLists.str;
 
+import io.github.sudoitir.openbroker.artemis.ArtemisLists;
+import io.github.sudoitir.openbroker.artemis.ArtemisMBeans;
+import io.github.sudoitir.openbroker.artemis.JolokiaRequest;
+import io.github.sudoitir.openbroker.artemis.JolokiaResponse;
 import io.github.sudoitir.rahdar.feature.flow.ClientEdges.Edge;
 import io.github.sudoitir.rahdar.feature.flow.ClientEdges.Kind;
 import io.github.sudoitir.rahdar.feature.flow.ClientEdges.Member;
@@ -17,15 +21,12 @@ import io.github.sudoitir.rahdar.kernel.settings.SettingsService;
 import io.github.sudoitir.rahdar.kernel.stream.SseHub;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
-import io.github.sudoitir.rahdar.platform.broker.BrokerListOps;
-import io.github.sudoitir.rahdar.platform.broker.BrokerMBeans;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaBrokerClient;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaRequest;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaResponse;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterLock;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterOwnership;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNodes;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import java.time.Clock;
@@ -92,6 +93,7 @@ public class ClientSampler {
     private final SseHub hub;
     private final MeterRegistry meters;
     private final Clock clock;
+    private final ArtemisNodes artemisNodes;
 
     /** Per cluster, per node and kind: the previous sweep's counters. Held only while this instance samples. */
     private final Map<UUID, Map<String, MemberDeltas>> deltas = new ConcurrentHashMap<>();
@@ -200,13 +202,13 @@ public class ClientSampler {
     NodeResult sampleNode(UUID clusterId, ClusterNode node, int cap) {
         Instant at = clock.instant();
         try {
-            JolokiaBrokerClient client = connections.forCluster(clusterId, node.getJolokiaUrl());
+            ArtemisNode client = artemisNodes.on(clusterId, node.getId());
             String mbean = client.resolveBrokerObjectName();
             List<JolokiaResponse> entries = client.batch(List.of(
-                    JolokiaRequest.exec(mbean, LIST_PRODUCERS, BrokerListOps.ALL, 1, cap),
-                    JolokiaRequest.exec(mbean, LIST_CONSUMERS, BrokerListOps.ALL, 1, cap),
-                    JolokiaRequest.readAll(BrokerMBeans.divertsPattern(mbean)),
-                    JolokiaRequest.readAll(BrokerMBeans.bridgesPattern(mbean)),
+                    JolokiaRequest.exec(mbean, LIST_PRODUCERS, ArtemisLists.ALL, 1, cap),
+                    JolokiaRequest.exec(mbean, LIST_CONSUMERS, ArtemisLists.ALL, 1, cap),
+                    JolokiaRequest.readAll(ArtemisMBeans.divertsPattern(mbean)),
+                    JolokiaRequest.readAll(ArtemisMBeans.bridgesPattern(mbean)),
                     JolokiaRequest.exec(mbean, LIST_QUEUES, STORE_AND_FORWARD_QUEUES, 1, cap),
                     JolokiaRequest.exec(mbean, LIST_QUEUES, TEMPORARY_QUEUES, 1, cap),
                     JolokiaRequest.exec(mbean, LIST_QUEUES, FILTERED_QUEUES, 1, cap),
@@ -220,7 +222,7 @@ public class ClientSampler {
                 // ponytail: the cap now counts every queue, so a node with more queues than the cap can
                 // miss filtered ones; page through them if a broker that old runs that many.
                 entries = new ArrayList<>(entries);
-                entries.set(6, client.single(JolokiaRequest.exec(mbean, LIST_QUEUES, BrokerListOps.ALL, 1, cap)));
+                entries.set(6, client.single(JolokiaRequest.exec(mbean, LIST_QUEUES, ArtemisLists.ALL, 1, cap)));
             }
 
             Listing producers = listing(client, entries.get(0));
@@ -305,7 +307,7 @@ public class ClientSampler {
 
     /** The routing entries of a node's POST, each read on its own: one failing entry loses only itself. */
     private static List<Route> routes(
-            JolokiaBrokerClient client, ClusterNode node, List<JolokiaResponse> entries, List<String> errors) {
+            ArtemisNode client, ClusterNode node, List<JolokiaResponse> entries, List<String> errors) {
         List<Route> routes = new ArrayList<>();
         for (JsonNode attrs : patternRead(entries.get(2), errors)) {
             DivertRow d = DivertRow.parse(attrs, node.getId(), node.getName());
@@ -422,7 +424,7 @@ public class ClientSampler {
         return out;
     }
 
-    private static List<JsonNode> queueRows(JolokiaBrokerClient client, JolokiaResponse entry, List<String> errors) {
+    private static List<JsonNode> queueRows(ArtemisNode client, JolokiaResponse entry, List<String> errors) {
         Listing listing = listing(client, entry);
         if (listing.error() != null) {
             errors.add(listing.error());
@@ -519,7 +521,7 @@ public class ClientSampler {
         return str(row, "id") + "@" + str(row, "session");
     }
 
-    private static Listing listing(JolokiaBrokerClient client, JolokiaResponse entry) {
+    private static Listing listing(ArtemisNode client, JolokiaResponse entry) {
         if (!entry.ok()) {
             String error = entryError(entry);
             String lower = error.toLowerCase(Locale.ROOT);

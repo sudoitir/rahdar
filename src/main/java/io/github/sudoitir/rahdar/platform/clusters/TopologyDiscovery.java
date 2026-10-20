@@ -1,18 +1,18 @@
 package io.github.sudoitir.rahdar.platform.clusters;
 
-import static io.github.sudoitir.rahdar.platform.broker.JolokiaJson.bool;
-import static io.github.sudoitir.rahdar.platform.broker.JolokiaJson.boxedBool;
-import static io.github.sudoitir.rahdar.platform.broker.JolokiaJson.text;
-
+import io.github.sudoitir.openbroker.model.Attributes;
+import io.github.sudoitir.openbroker.model.ClusterMember;
+import io.github.sudoitir.openbroker.model.NodeDescription;
 import io.github.sudoitir.rahdar.platform.broker.AccountResult;
-import io.github.sudoitir.rahdar.platform.broker.BrokerClientFactory;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionSettings;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaBrokerClient;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaResponse;
+import io.github.sudoitir.rahdar.platform.broker.BrokerFailures;
+import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
+import io.github.sudoitir.rahdar.platform.broker.BrokerTarget;
 import io.github.sudoitir.rahdar.platform.broker.ManagementUrlProblem;
 import io.github.sudoitir.rahdar.platform.broker.ManagementUrlSource;
 import io.github.sudoitir.rahdar.platform.broker.NodeEndpoint;
+import io.github.sudoitir.rahdar.platform.broker.ProbeSession;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNodeEntity;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNodeEntity.HaObservation;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNodeRepository;
@@ -36,7 +36,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
-import tools.jackson.databind.JsonNode;
 
 /**
  * Turns one or more reachable seed connections into persisted {@code broker_node}
@@ -59,15 +58,11 @@ public class TopologyDiscovery {
     private static final String PRIMARY = "PRIMARY";
     private static final String BACKUP = "BACKUP";
 
-    private static final String[] HA_ATTRS = {
-        "Active", "Started", "Backup", "ReplicaSync", "NodeID", "Clustered", "Version"
-    };
-
     private final BrokerNodeRepository nodes;
     private final HaStateEvaluator evaluator;
     private final BrokerNodeMapper nodeMapper;
     private final ClusterIdentityClaims identityClaims;
-    private final BrokerClientFactory clientFactory;
+    private final BrokerGateway gateway;
     private final TransactionTemplate transactions;
 
     /**
@@ -75,10 +70,10 @@ public class TopologyDiscovery {
      * it reports and its URL is never given to a node: a TLS seed's addresses are read to learn the
      * NodeIDs behind its host name, which stays the seed.
      */
-    public record ProbedSeed(String jolokiaUrl, JolokiaBrokerClient client, boolean attachable) {
+    public record ProbedSeed(String jolokiaUrl, BrokerTarget target, boolean attachable) {
 
-        public ProbedSeed(String jolokiaUrl, JolokiaBrokerClient client) {
-            this(jolokiaUrl, client, true);
+        public ProbedSeed(String jolokiaUrl, BrokerTarget target) {
+            this(jolokiaUrl, target, true);
         }
     }
 
@@ -605,8 +600,8 @@ public class TopologyDiscovery {
 
     /** Asks one address, with an account, which broker answers there and whether it is the one expected. */
     UrlProof probe(BrokerConnectionSettings settings, String url, String expectedNodeId) {
-        try {
-            SeedReading reading = readHa(url, true, clientFactory.forNode(settings, url));
+        try (ProbeSession session = gateway.probe(settings)) {
+            SeedReading reading = readHa(url, true, session.node(url));
             if (expectedNodeId != null && !expectedNodeId.equals(reading.nodeId())) {
                 return new UrlProof(url, reading, ManagementUrlProblem.OTHER_BROKER, false);
             }
@@ -647,38 +642,49 @@ public class TopologyDiscovery {
     }
 
     private static SeedReading read(ProbedSeed seed) {
-        SeedReading ha = readHa(seed.jolokiaUrl(), seed.attachable(), seed.client());
-        JsonNode topology = seed.client().execOnBrokerParsed("listNetworkTopology()");
-
+        SeedReading ha = readHa(seed.jolokiaUrl(), seed.attachable(), seed.target());
         List<TopologyEntry> entries = new ArrayList<>();
-        if (topology != null && topology.isArray()) {
-            for (JsonNode e : topology) {
-                entries.add(
-                        new TopologyEntry(text(e, "nodeID"), text(e, "live"), text(e, "primary"), text(e, "backup")));
-            }
+        for (ClusterMember m : seed.target().members()) {
+            entries.add(new TopologyEntry(
+                    m.nativeId().isEmpty() ? null : m.nativeId(),
+                    connector(m, "artemis.live_connector"),
+                    connector(m, "artemis.primary_connector"),
+                    connector(m, "artemis.backup_connector")));
         }
         return ha.withEntries(entries);
     }
 
+    private static String connector(ClusterMember member, String attribute) {
+        return member.attributes().raw(attribute).map(Object::toString).orElse(null);
+    }
+
     /** One batched read of the HA attributes, with no topology: all a node's URL has to prove. */
-    private static SeedReading readHa(String jolokiaUrl, boolean attachable, JolokiaBrokerClient client) {
-        JolokiaResponse response = client.readBrokerAttributes(HA_ATTRS);
-        if (!response.ok()) {
-            throw new BrokerConnectionException(
-                    BrokerConnectionException.Kind.BAD_RESPONSE, "HA read failed: " + response.failure());
+    private static SeedReading readHa(String jolokiaUrl, boolean attachable, BrokerTarget target) {
+        NodeDescription ha;
+        try {
+            ha = target.describe();
+        } catch (BrokerConnectionException e) {
+            throw BrokerFailures.answeredError(e)
+                    .map(error -> new BrokerConnectionException(
+                            BrokerConnectionException.Kind.BAD_RESPONSE, "HA read failed: " + error))
+                    .orElse(e);
         }
-        JsonNode ha = response.value();
+        Attributes a = ha.attributes();
         return new SeedReading(
                 jolokiaUrl,
                 attachable,
-                text(ha, "NodeID"),
-                bool(ha, "Backup"),
-                boxedBool(ha, "Started"),
-                bool(ha, "Active"),
-                boxedBool(ha, "ReplicaSync"),
-                text(ha, "Version"),
-                boxedBool(ha, "Clustered"),
+                ha.nativeId().isEmpty() ? null : ha.nativeId(),
+                flag(a, "artemis.backup").orElse(false),
+                flag(a, "artemis.started").orElse(null),
+                flag(a, "artemis.active").orElse(false),
+                flag(a, "artemis.replica_sync").orElse(null),
+                ha.version().orElse(null),
+                flag(a, "artemis.clustered").orElse(null),
                 List.of());
+    }
+
+    private static Optional<Boolean> flag(Attributes attributes, String name) {
+        return attributes.raw(name).map(v -> (Boolean) v);
     }
 
     private static String seedHost(String jolokiaUrl) {

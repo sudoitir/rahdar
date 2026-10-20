@@ -8,7 +8,7 @@ import io.github.sudoitir.rahdar.feature.transfer.web.TransferViews.OrphanReturn
 import io.github.sudoitir.rahdar.feature.transfer.web.TransferViews.OrphanReturnView;
 import io.github.sudoitir.rahdar.feature.transfer.web.TransferViews.OrphanView;
 import io.github.sudoitir.rahdar.feature.transfer.web.TransferViews.TransferRunView;
-import io.github.sudoitir.rahdar.platform.broker.StagingQueues;
+import io.github.sudoitir.rahdar.system.artemis.StagingQueues;
 import java.util.UUID;
 import java.util.stream.IntStream;
 import org.junit.jupiter.api.Test;

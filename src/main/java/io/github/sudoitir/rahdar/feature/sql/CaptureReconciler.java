@@ -9,7 +9,6 @@ import io.github.sudoitir.rahdar.kernel.audit.AuditService;
 import io.github.sudoitir.rahdar.kernel.security.Actor;
 import io.github.sudoitir.rahdar.kernel.settings.RahdarInstance;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaBrokerClient;
 import io.github.sudoitir.rahdar.platform.broker.ManagementRefusal;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDutyReleased;
@@ -17,6 +16,8 @@ import io.github.sudoitir.rahdar.platform.clusters.ClusterLock;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterOwnership;
 import io.github.sudoitir.rahdar.platform.clusters.ServingNodes;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNodes;
 import jakarta.jms.JMSException;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -72,6 +73,7 @@ public class CaptureReconciler {
     private final CaptureAddresses addresses;
     private final AuditService audit;
     private final CaptureLoss loss;
+    private final ArtemisNodes artemisNodes;
 
     /**
      * Clusters this instance has installed a tap on. In memory, because it exists only
@@ -153,7 +155,7 @@ public class CaptureReconciler {
             refused.keySet().removeIf(key -> key.endsWith("." + subscriptionId));
             for (ClusterNode node : servingNodes(clusterId)) {
                 try {
-                    JolokiaBrokerClient client = client(clusterId, node);
+                    ArtemisNode client = client(clusterId, node);
                     for (String name : tap.installedNames(client, instance.id())) {
                         if (subscriptionId.equals(CaptureNames.subscriptionOf(name))) {
                             consumers.stop(node.getId(), name);
@@ -302,7 +304,7 @@ public class CaptureReconciler {
 
     /** Whether this node has nothing wanted and nothing of this instance's left on it. */
     private boolean reconcileNode(UUID clusterId, ClusterNode node, List<Desired> wanted) {
-        JolokiaBrokerClient client = client(clusterId, node);
+        ArtemisNode client = client(clusterId, node);
         Set<String> actual = new LinkedHashSet<>(tap.installedNames(client, instance.id()));
         log.debug("Capture pass on {}: {} tap(s) already installed", node.getName(), actual.size());
         Set<String> wantedNames = new LinkedHashSet<>();
@@ -435,7 +437,7 @@ public class CaptureReconciler {
     }
 
     /** Whether the tap is gone from the node. A failure is audited and retried on the next pass. */
-    private boolean removeOrphan(UUID clusterId, ClusterNode node, JolokiaBrokerClient client, String name) {
+    private boolean removeOrphan(UUID clusterId, ClusterNode node, ArtemisNode client, String name) {
         AuditEvent event = audit.begin(
                 Actor.system(), "REMOVE_CAPTURE", "CAPTURE", name, clusterId, node.getId(), Map.of(), false);
         try {
@@ -509,8 +511,8 @@ public class CaptureReconciler {
     }
 
     /** The client waits for the node's ceiling before each of an install's requests (ADR-0076). */
-    private JolokiaBrokerClient client(UUID clusterId, ClusterNode node) {
-        return connections.forCluster(clusterId, node.getJolokiaUrl());
+    private ArtemisNode client(UUID clusterId, ClusterNode node) {
+        return artemisNodes.on(clusterId, node.getId());
     }
 
     private static String reason(Exception e) {

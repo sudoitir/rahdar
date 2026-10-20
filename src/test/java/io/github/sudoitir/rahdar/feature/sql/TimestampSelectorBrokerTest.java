@@ -2,10 +2,10 @@ package io.github.sudoitir.rahdar.feature.sql;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import io.github.sudoitir.rahdar.platform.broker.BrokerMBeans;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaBrokerClient;
-import io.github.sudoitir.rahdar.platform.broker.MessageBrowser;
+import io.github.sudoitir.openbroker.artemis.ArtemisMBeans;
 import io.github.sudoitir.rahdar.support.ArtemisIntegrationTest;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
+import io.github.sudoitir.rahdar.system.artemis.MessageBrowser;
 import jakarta.jms.Connection;
 import jakarta.jms.Session;
 import org.apache.activemq.artemis.jms.client.ActiveMQConnectionFactory;
@@ -20,7 +20,7 @@ import org.junit.jupiter.api.Test;
 class TimestampSelectorBrokerTest extends ArtemisIntegrationTest {
 
     private final MessageBrowser browser = new MessageBrowser();
-    private JolokiaBrokerClient client;
+    private ArtemisNode client;
     private String queue;
 
     @BeforeEach
@@ -39,7 +39,7 @@ class TimestampSelectorBrokerTest extends ArtemisIntegrationTest {
     }
 
     private long browseCount(String selector) {
-        String mbean = BrokerMBeans.queue(client.resolveBrokerObjectName(), queue, queue, "ANYCAST");
+        String mbean = ArtemisMBeans.queue(client.resolveBrokerObjectName(), queue, queue, "ANYCAST");
         return browser.browse(client, mbean, 1, 50, selector).messages().size();
     }
 

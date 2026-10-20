@@ -6,10 +6,10 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import io.github.sudoitir.openbroker.artemis.JolokiaResponse;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaBrokerClient;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaResponse;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -24,7 +24,7 @@ class SetupReaderTest {
     private static final ObjectMapper MAPPER = JsonMapper.builder().build();
     private static final UUID NODE_ID = UUID.randomUUID();
 
-    private final JolokiaBrokerClient client = mock(JolokiaBrokerClient.class);
+    private final ArtemisNode client = mock(ArtemisNode.class);
     private final SetupReader reader = new SetupReader(MAPPER);
 
     @BeforeEach

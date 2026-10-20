@@ -6,10 +6,10 @@ import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import io.github.sudoitir.openbroker.artemis.JolokiaRequest;
+import io.github.sudoitir.openbroker.artemis.JolokiaResponse;
 import io.github.sudoitir.rahdar.feature.brokerconfig.ConfigReader.NodeConfig;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaBrokerClient;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaRequest;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaResponse;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.IntStream;
@@ -34,7 +34,7 @@ class ConfigReaderTest {
         List<String> matches = new ArrayList<>(
                 IntStream.range(0, 40).mapToObj(i -> "addr-" + i).toList());
         matches.add("#");
-        JolokiaBrokerClient client = mock(JolokiaBrokerClient.class);
+        ArtemisNode client = mock(ArtemisNode.class);
         when(client.resolveBrokerObjectName()).thenReturn("m");
         List<List<JolokiaRequest>> batches = new ArrayList<>();
         when(client.batch(anyList())).thenAnswer(call -> {

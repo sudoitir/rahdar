@@ -10,7 +10,6 @@ import io.github.sudoitir.rahdar.feature.sql.QueryResult.Row;
 import io.github.sudoitir.rahdar.kernel.settings.RahdarInstance;
 import io.github.sudoitir.rahdar.platform.broker.Attempt;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaBrokerClient;
 import io.github.sudoitir.rahdar.platform.broker.QueueRow;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
@@ -23,6 +22,7 @@ import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshotUpsert;
 import io.github.sudoitir.rahdar.support.AdminAuthenticationExtension;
 import io.github.sudoitir.rahdar.support.ArtemisIntegrationTest;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
 import jakarta.jms.Connection;
 import jakarta.jms.MessageConsumer;
 import jakarta.jms.Session;
@@ -101,7 +101,7 @@ class CaptureTailRealBrokerTest extends PostgresIntegrationTest {
 
     private UUID clusterId;
     private UUID subscriptionId;
-    private JolokiaBrokerClient client;
+    private ArtemisNode client;
     private String broker;
     private ActiveMQConnectionFactory factory;
     private SqlTailPoller.Tail tail;
@@ -126,7 +126,7 @@ class CaptureTailRealBrokerTest extends PostgresIntegrationTest {
         ClusterNode node = directory.nodes(clusterId).getFirst();
         clusterService.overrideNodeUrl(
                 clusterId, node.getId(), new NodeOverrideRequest(null, ArtemisIntegrationTest.coreUrl()));
-        client = connections.forCluster(clusterId, ArtemisIntegrationTest.jolokiaUrl());
+        client = ArtemisIntegrationTest.jolokiaClient(ArtemisIntegrationTest.jolokiaUrl());
         broker = client.resolveBrokerObjectName();
         factory = new ActiveMQConnectionFactory(
                 ArtemisIntegrationTest.coreUrl(),

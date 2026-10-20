@@ -7,10 +7,10 @@ import io.github.sudoitir.rahdar.feature.brokerconfig.BrokerConfigRecommendation
 import io.github.sudoitir.rahdar.feature.brokerconfig.BrokerConfigRecommendations.Recommendations;
 import io.github.sudoitir.rahdar.feature.brokerconfig.BrokerConfigRecommendations.RolesSourceKind;
 import io.github.sudoitir.rahdar.feature.brokerconfig.BrokerConfigRecommendations.Section;
-import io.github.sudoitir.rahdar.platform.broker.BrokerAccountRoles;
 import io.github.sudoitir.rahdar.platform.broker.BrokerCapabilities;
 import io.github.sudoitir.rahdar.platform.broker.BrokerCapabilities.CapabilityAssessment;
-import io.github.sudoitir.rahdar.platform.broker.CapabilityProbe;
+import io.github.sudoitir.rahdar.platform.broker.BrokerCapabilityProbe;
+import io.github.sudoitir.rahdar.system.artemis.BrokerAccountRoles;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -43,7 +43,7 @@ class BrokerConfigRecommendationsTest {
                 CapabilityAssessment.available("read ok"),
                 CapabilityAssessment.available("write ok"),
                 gap,
-                CapabilityAssessment.available("Available. The broker " + CapabilityProbe.TRUNCATING + "."),
+                CapabilityAssessment.available("Available. The broker " + BrokerCapabilityProbe.TRUNCATING + "."),
                 gap);
     }
 

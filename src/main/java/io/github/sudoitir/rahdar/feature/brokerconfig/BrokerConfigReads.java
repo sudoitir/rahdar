@@ -3,10 +3,11 @@ package io.github.sudoitir.rahdar.feature.brokerconfig;
 import io.github.sudoitir.rahdar.feature.brokerconfig.BrokerConfigOperations.ReadScope;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaBrokerClient;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
 import io.github.sudoitir.rahdar.platform.clusters.ServingNodes;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNodes;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -26,6 +27,7 @@ public class BrokerConfigReads {
     private final ClusterDirectory brokerNodes;
     private final BrokerConnections connections;
     private final BrokerConfigOperations ops;
+    private final ArtemisNodes artemisNodes;
 
     /** The cluster's logical nodes, live member first where one exists. */
     public List<ClusterNode> targets(UUID clusterId) {
@@ -57,7 +59,7 @@ public class BrokerConfigReads {
      * A client for one node; a write path uses this too. The client waits for the node's ceiling
      * before every request it sends (ADR-0076), so a fifty-step apply is charged fifty permits.
      */
-    public JolokiaBrokerClient client(UUID clusterId, ClusterNode node) {
-        return connections.forCluster(clusterId, node.getJolokiaUrl());
+    public ArtemisNode client(UUID clusterId, ClusterNode node) {
+        return artemisNodes.on(clusterId, node.getId());
     }
 }

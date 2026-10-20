@@ -8,12 +8,12 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import io.github.sudoitir.openbroker.artemis.JolokiaRequest;
+import io.github.sudoitir.openbroker.artemis.JolokiaResponse;
 import io.github.sudoitir.rahdar.feature.queues.DivertOperations;
 import io.github.sudoitir.rahdar.feature.queues.DivertRow;
 import io.github.sudoitir.rahdar.feature.queues.QueueLifecycleOperations;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaBrokerClient;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaRequest;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaResponse;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -36,7 +36,7 @@ class CaptureTapTest {
 
     private DivertOperations diverts;
     private QueueLifecycleOperations queues;
-    private JolokiaBrokerClient client;
+    private ArtemisNode client;
     private CaptureTap tap;
 
     private final CaptureTap.Spec spec = new CaptureTap.Spec(UUID.randomUUID(), "ORDER.IN", 10_000L, null);
@@ -45,7 +45,7 @@ class CaptureTapTest {
     void setUp() {
         diverts = mock(DivertOperations.class);
         queues = mock(QueueLifecycleOperations.class);
-        client = mock(JolokiaBrokerClient.class);
+        client = mock(ArtemisNode.class);
         deployed.clear();
         when(diverts.listDiverts(any(), any(), any())).thenAnswer(invocation -> List.copyOf(deployed));
         when(client.resolveBrokerObjectName()).thenReturn(BROKER);

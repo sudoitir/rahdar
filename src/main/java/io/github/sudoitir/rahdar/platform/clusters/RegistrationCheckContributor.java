@@ -1,7 +1,7 @@
 package io.github.sudoitir.rahdar.platform.clusters;
 
 import io.github.sudoitir.rahdar.platform.broker.BrokerCapabilities;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaBrokerClient;
+import io.github.sudoitir.rahdar.platform.broker.BrokerTarget;
 
 /**
  * What an enabled feature adds to a registration check (ADR-0070), read from the first node the
@@ -20,5 +20,5 @@ public interface RegistrationCheckContributor {
      * @param coreUsername the account the cluster will connect to Core with, from the request;
      *     null when it connects anonymously
      */
-    Object contribute(BrokerCapabilities capabilities, JolokiaBrokerClient seed, String coreUsername);
+    Object contribute(BrokerCapabilities capabilities, BrokerTarget seed, String coreUsername);
 }

@@ -18,11 +18,12 @@ import io.github.sudoitir.rahdar.kernel.audit.AuditService;
 import io.github.sudoitir.rahdar.kernel.audit.internal.persistence.AuditEventEntity;
 import io.github.sudoitir.rahdar.kernel.settings.RahdarInstance;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaBrokerClient;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterLock;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterOwnership;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNodeEntity;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNodes;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -61,6 +62,8 @@ class CaptureReconcilerTest {
     private BrokerConnections connections;
     private ClusterOwnership ownership;
 
+    private final ArtemisNodes artemisNodes = mock(ArtemisNodes.class);
+
     @BeforeEach
     void setUp() {
         subscriptions = mock(MessageIndexSubscriptionRepository.class);
@@ -81,7 +84,7 @@ class CaptureReconcilerTest {
         when(instance.id()).thenReturn(INSTANCE);
         nodeEntity = node();
         when(nodes.nodes(CLUSTER)).thenReturn(List.of(nodeEntity));
-        when(connections.forCluster(any(), any())).thenReturn(mock(JolokiaBrokerClient.class));
+        when(artemisNodes.on(any(UUID.class), any(UUID.class))).thenReturn(mock(ArtemisNode.class));
         MessageIndexSubscriptionEntity subscription = subscription();
         when(subscriptions.findByEnabledTrue()).thenReturn(List.of(subscription));
         QueryPlan plan = plan();
@@ -111,7 +114,8 @@ class CaptureReconcilerTest {
                 instance,
                 addresses,
                 audit,
-                mock(CaptureLoss.class));
+                mock(CaptureLoss.class),
+                artemisNodes);
     }
 
     @Test
@@ -200,7 +204,7 @@ class CaptureReconcilerTest {
 
     @Test
     void anOrphanThatCouldNotBeRemovedKeepsItsClusterVisitedWhenAnotherNodeIsClean() {
-        JolokiaBrokerClient failing = twoNodesWhereOnlyTheFirstHasAnOrphan();
+        ArtemisNode failing = twoNodesWhereOnlyTheFirstHasAnOrphan();
         doAnswer(invocation -> {
                     throw new IllegalStateException("broker did not answer");
                 })
@@ -217,7 +221,7 @@ class CaptureReconcilerTest {
 
     @Test
     void aNodeThatDidNotAnswerKeepsItsClusterVisitedWhenAnotherNodeIsClean() {
-        JolokiaBrokerClient unanswering = twoNodesWhereOnlyTheFirstHasAnOrphan();
+        ArtemisNode unanswering = twoNodesWhereOnlyTheFirstHasAnOrphan();
         when(tap.installedNames(unanswering, INSTANCE))
                 .thenThrow(new IllegalStateException("broker did not answer"))
                 .thenReturn(List.of(WANTED));
@@ -229,7 +233,7 @@ class CaptureReconcilerTest {
     }
 
     /** The first node's client, which reports {@link #WANTED} as an orphan; the second reports nothing. */
-    private JolokiaBrokerClient twoNodesWhereOnlyTheFirstHasAnOrphan() {
+    private ArtemisNode twoNodesWhereOnlyTheFirstHasAnOrphan() {
         BrokerNodeEntity second = mock(BrokerNodeEntity.class);
         when(second.getId()).thenReturn(UUID.randomUUID());
         when(second.getName()).thenReturn("second");
@@ -241,10 +245,12 @@ class CaptureReconcilerTest {
         when(nodes.nodes(CLUSTER)).thenReturn(List.of(nodeEntity, second));
         when(nodes.allNodes()).thenReturn(List.of(nodeEntity, second));
         when(subscriptions.findByEnabledTrue()).thenReturn(List.of());
-        JolokiaBrokerClient first = mock(JolokiaBrokerClient.class);
-        JolokiaBrokerClient clean = mock(JolokiaBrokerClient.class);
-        when(connections.forCluster(CLUSTER, nodeEntity.getJolokiaUrl())).thenReturn(first);
-        when(connections.forCluster(CLUSTER, second.getJolokiaUrl())).thenReturn(clean);
+        ArtemisNode first = mock(ArtemisNode.class);
+        ArtemisNode clean = mock(ArtemisNode.class);
+        UUID firstId = nodeEntity.getId();
+        UUID secondId = second.getId();
+        when(artemisNodes.on(CLUSTER, firstId)).thenReturn(first);
+        when(artemisNodes.on(CLUSTER, secondId)).thenReturn(clean);
         when(tap.installedNames(first, INSTANCE)).thenReturn(List.of(WANTED));
         when(tap.installedNames(clean, INSTANCE)).thenReturn(List.of());
         return first;

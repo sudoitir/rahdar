@@ -1,7 +1,5 @@
 package io.github.sudoitir.rahdar.feature.resources.web;
 
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
@@ -12,7 +10,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.setup.MockMvcBuilders.webAppContextSetup;
 
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaBrokerClient;
 import io.github.sudoitir.rahdar.platform.broker.QueueRow;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNodeEntity;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNodeRepository;
@@ -20,7 +17,10 @@ import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterE
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterRepository;
 import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshotUpsert;
 import io.github.sudoitir.rahdar.support.AdminAuthenticationExtension;
+import io.github.sudoitir.rahdar.support.FixtureJolokia;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNodes;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -35,9 +35,7 @@ import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.web.client.RestClient;
 import org.springframework.web.context.WebApplicationContext;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -67,6 +65,9 @@ class ClusterResourceControllerTest extends PostgresIntegrationTest {
     @MockitoBean
     BrokerConnections connections;
 
+    @MockitoBean
+    ArtemisNodes artemisNodes;
+
     private UUID clusterId;
     private UUID nodeAId;
     private UUID nodeBId;
@@ -91,20 +92,18 @@ class ClusterResourceControllerTest extends PostgresIntegrationTest {
         clusters.deleteById(clusterId);
     }
 
-    private JolokiaBrokerClient client(String url, String... fixtures) {
-        RestClient.Builder builder = RestClient.builder();
-        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+    private ArtemisNode client(String url, String... fixtures) {
+        FixtureJolokia server = new FixtureJolokia();
         for (String fixture : fixtures) {
             server.expect(requestTo(url)).andRespond(withSuccess(body(fixture), MediaType.APPLICATION_JSON));
         }
-        return new JolokiaBrokerClient(builder.build(), url, mapper);
+        return server.node();
     }
 
-    private JolokiaBrokerClient unauthorized(String url) {
-        RestClient.Builder builder = RestClient.builder();
-        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+    private ArtemisNode unauthorized(String url) {
+        FixtureJolokia server = new FixtureJolokia();
         server.expect(requestTo(url)).andRespond(withStatus(HttpStatus.UNAUTHORIZED));
-        return new JolokiaBrokerClient(builder.build(), url, mapper);
+        return server.node();
     }
 
     private static String body(String fixture) {
@@ -134,9 +133,9 @@ class ClusterResourceControllerTest extends PostgresIntegrationTest {
 
     @Test
     void consumersFansOutLiveAndTagsEachRowWithItsNode() throws Exception {
-        when(connections.forCluster(clusterId, URL_A))
+        when(artemisNodes.on(clusterId, nodeAId))
                 .thenReturn(client(URL_A, "search-broker.json", "list-consumers.json"));
-        when(connections.forCluster(clusterId, URL_B))
+        when(artemisNodes.on(clusterId, nodeBId))
                 .thenReturn(client(URL_B, "search-broker.json", "list-consumers.json"));
 
         mvc.perform(get("/api/v1/clusters/{id}/consumers", clusterId))
@@ -148,9 +147,8 @@ class ClusterResourceControllerTest extends PostgresIntegrationTest {
 
     @Test
     void aClusterWithNoReadableNodeSurfacesAClassifiedProblem() throws Exception {
-        when(connections.forCluster(eq(clusterId), any()))
-                .thenReturn(unauthorized(URL_A))
-                .thenReturn(unauthorized(URL_B));
+        when(artemisNodes.on(clusterId, nodeAId)).thenReturn(unauthorized(URL_A));
+        when(artemisNodes.on(clusterId, nodeBId)).thenReturn(unauthorized(URL_B));
 
         mvc.perform(get("/api/v1/clusters/{id}/sessions", clusterId))
                 .andExpect(status().is4xxClientError())

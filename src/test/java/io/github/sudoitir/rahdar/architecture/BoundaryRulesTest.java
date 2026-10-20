@@ -84,10 +84,10 @@ class BoundaryRulesTest {
     }
 
     @Test
-    void brokerClientTypesStayInsideThePlatformBroker() {
+    void brokerClientTypesStayInsideTheBrokerLayer() {
         noClasses()
                 .that()
-                .resideOutsideOfPackage(ROOT + ".platform.broker..")
+                .resideOutsideOfPackages(ROOT + ".platform.broker..", ROOT + ".system.artemis..")
                 .should()
                 .dependOnClassesThat()
                 .resideInAnyPackage("org.jolokia..", "org.apache.activemq.artemis.api.core.client..")

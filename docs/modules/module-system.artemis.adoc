@@ -1,0 +1,31 @@
+[%autowidth.stretch, cols="h,a"]
+|===
+|Base package
+|`io.github.sudoitir.rahdar.system.artemis`
+|Spring components
+|* `i.g.s.r.s.a.AcceptanceProbe`
+* `i.g.s.r.s.a.ArtemisNodes`
+* `i.g.s.r.s.a.BrokerAccountRoles`
+* `i.g.s.r.s.a.BrokerCommands`
+* `i.g.s.r.s.a.BrokerConnectors`
+* `i.g.s.r.s.a.CapabilityProbe`
+* `i.g.s.r.s.a.CoreMessageTransport`
+* `i.g.s.r.s.a.JolokiaMessageTransport`
+* `i.g.s.r.s.a.MessageBrowser`
+* `i.g.s.r.s.a.MessageOperations`
+* `i.g.s.r.s.a.QueueLocator`
+* `i.g.s.r.s.a.StagingQueues`
+|Bean references
+|* `i.g.s.r.p.b.BrokerGateway` (in Broker connectivity)
+* `i.g.s.r.p.c.ClusterDirectory` (in Clusters)
+* `i.g.s.r.p.b.BrokerConnections` (in Broker connectivity)
+* `i.g.s.r.k.a.AuditService` (in Audit log)
+* `i.g.s.r.k.s.ActorResolver` (in Security)
+* `i.g.s.r.k.s.SettingsService` (in Settings)
+* `i.g.s.r.k.s.ClusterAccessGuard` (in Security)
+* `i.g.s.r.p.c.CapabilityLedger` (in Clusters)
+* `i.g.s.r.p.b.CorePool` (in Broker connectivity)
+* `i.g.s.r.p.b.NodeCallLimiter` (in Broker connectivity)
+* `i.g.s.r.p.b.CoreObservations` (in Broker connectivity)
+* `i.g.s.r.p.s.QueueSnapshots` (in Scraping)
+|===

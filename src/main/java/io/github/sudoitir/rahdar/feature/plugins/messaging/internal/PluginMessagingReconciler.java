@@ -12,13 +12,14 @@ import io.github.sudoitir.rahdar.kernel.audit.AuditService;
 import io.github.sudoitir.rahdar.kernel.security.Actor;
 import io.github.sudoitir.rahdar.kernel.settings.RahdarInstance;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaBrokerClient;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDutyReleased;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterLock;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterOwnership;
 import io.github.sudoitir.rahdar.platform.clusters.ServingNodes;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNodes;
 import java.time.Clock;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
@@ -65,6 +66,7 @@ public class PluginMessagingReconciler {
     private final AuditService audit;
     private final PluginMessagingProperties properties;
     private final Clock clock;
+    private final ArtemisNodes artemisNodes;
 
     /** Clusters this instance may hold taps on; kept so a cluster is swept after its last registration goes. */
     private final Set<UUID> installedOn = ConcurrentHashMap.newKeySet();
@@ -179,7 +181,7 @@ public class PluginMessagingReconciler {
             List<RegistrationEntity> regs,
             Map<UUID, Verdict> verdicts,
             Map<UUID, NodeResult> results) {
-        JolokiaBrokerClient client = connections.forCluster(clusterId, node.getJolokiaUrl());
+        ArtemisNode client = artemisNodes.on(clusterId, node.getId());
         Set<String> actualTaps = new LinkedHashSet<>(tap.installedNames(client, instance.id()));
         Set<String> wantedTaps = new LinkedHashSet<>();
 
@@ -218,7 +220,7 @@ public class PluginMessagingReconciler {
     private NodeResult assertTap(
             UUID clusterId,
             ClusterNode node,
-            JolokiaBrokerClient client,
+            ArtemisNode client,
             RegistrationEntity reg,
             String name,
             boolean installed) {
@@ -275,7 +277,7 @@ public class PluginMessagingReconciler {
         }
     }
 
-    private NodeResult assertConsumer(ClusterNode node, JolokiaBrokerClient client, RegistrationEntity reg) {
+    private NodeResult assertConsumer(ClusterNode node, ArtemisNode client, RegistrationEntity reg) {
         int runningWith = drains.concurrency(reg.getId(), node.getId());
         if (runningWith == reg.getConcurrency()) {
             return new NodeResult(RegistrationState.ACTIVE, null, null);
@@ -321,7 +323,7 @@ public class PluginMessagingReconciler {
                 source);
     }
 
-    private void removeTap(UUID clusterId, ClusterNode node, JolokiaBrokerClient client, String name) {
+    private void removeTap(UUID clusterId, ClusterNode node, ArtemisNode client, String name) {
         AuditEvent event = audit.begin(
                 Actor.system(), "REMOVE_PLUGIN_TAP", "PLUGIN_TAP", name, clusterId, node.getId(), Map.of(), false);
         try {

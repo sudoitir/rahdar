@@ -5,6 +5,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.InstanceOfAssertFactories.STRING;
 import static org.awaitility.Awaitility.await;
 
+import io.github.sudoitir.openbroker.artemis.ArtemisMBeans;
+import io.github.sudoitir.openbroker.artemis.JolokiaRequest;
 import io.github.sudoitir.rahdar.feature.plugins.messaging.internal.PluginMessagingReconciler;
 import io.github.sudoitir.rahdar.feature.queues.DivertOperations;
 import io.github.sudoitir.rahdar.feature.queues.QueueLifecycleOperations;
@@ -31,9 +33,6 @@ import io.github.sudoitir.rahdar.kernel.security.internal.persistence.UserRoleEn
 import io.github.sudoitir.rahdar.kernel.security.internal.persistence.UserRoleRepository;
 import io.github.sudoitir.rahdar.platform.broker.Attempt;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
-import io.github.sudoitir.rahdar.platform.broker.BrokerMBeans;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaBrokerClient;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaRequest;
 import io.github.sudoitir.rahdar.platform.broker.QueueRow;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
@@ -46,6 +45,7 @@ import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshotUpsert;
 import io.github.sudoitir.rahdar.support.AdminAuthenticationExtension;
 import io.github.sudoitir.rahdar.support.ArtemisIntegrationTest;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
 import jakarta.jms.Connection;
 import jakarta.jms.DeliveryMode;
 import jakarta.jms.Message;
@@ -168,7 +168,7 @@ class PluginMessagingRealBrokerTest extends PostgresIntegrationTest {
     private final List<String> queues = new ArrayList<>();
 
     private UUID clusterId;
-    private JolokiaBrokerClient client;
+    private ArtemisNode client;
     private String broker;
     private UUID operator;
     private Connection jms;
@@ -193,7 +193,7 @@ class PluginMessagingRealBrokerTest extends PostgresIntegrationTest {
         ClusterNode node = directory.nodes(clusterId).getFirst();
         clusterService.overrideNodeUrl(
                 clusterId, node.getId(), new NodeOverrideRequest(null, ArtemisIntegrationTest.coreUrl()));
-        client = connections.forCluster(clusterId, ArtemisIntegrationTest.jolokiaUrl());
+        client = ArtemisIntegrationTest.jolokiaClient(ArtemisIntegrationTest.jolokiaUrl());
         broker = client.resolveBrokerObjectName();
         operator = user(Set.of("message:read", "message:send", "queue:purge"));
 
@@ -813,7 +813,7 @@ class PluginMessagingRealBrokerTest extends PostgresIntegrationTest {
 
     private long queueAttribute(String queue, String attribute) {
         JsonNode value = client.single(
-                        JolokiaRequest.read(BrokerMBeans.queue(broker, queue, queue, "anycast"), attribute))
+                        JolokiaRequest.read(ArtemisMBeans.queue(broker, queue, queue, "anycast"), attribute))
                 .attribute(attribute);
         return value == null ? -1 : value.asLong();
     }

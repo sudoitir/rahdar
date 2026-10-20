@@ -8,8 +8,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
  * Refuses a broker call made while a database transaction is active: the call would hold a database
  * connection for the whole network round trip (and for as long as the per-node rate limiter makes it wait).
  *
- * <p>Checked where a Jolokia request is sent ({@code JolokiaBrokerClient}, which {@code BrokerClientFactory} gives
- * this bean) and where a Core connection is built ({@code CoreConnectionFactory}). A pooled Core connection that is reused does not pass the second.
+ * <p>Checked where a management request is admitted ({@link RahdarCallInterceptor}) and where a Core connection is built ({@code CoreConnectionFactory}). A pooled Core connection that is reused does not pass the second.
  * Switched on by {@code rahdar.broker.forbid-calls-in-transaction}: on in the tests, so a violation
  * fails the test that exercises it, and off in production, where a call inside a transaction is slow, not wrong.
  */

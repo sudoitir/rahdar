@@ -4,6 +4,7 @@ import io.github.sudoitir.openbroker.BrokerException;
 import io.github.sudoitir.openbroker.ErrorReasons;
 import io.github.sudoitir.openbroker.Plane;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * The SDK's failures in Rahdar's terms: each standard reason maps to exactly one {@link
@@ -64,6 +65,13 @@ public final class BrokerFailures {
                         : connection(BrokerConnectionException.Kind.UNREACHABLE, e);
             default -> connection(BrokerConnectionException.Kind.BAD_RESPONSE, e);
         };
+    }
+
+    /** The broker's own error text, when a translated failure is an answer that carried an error. */
+    public static Optional<String> answeredError(Throwable translated) {
+        return translated.getCause() instanceof BrokerException b
+                ? Optional.ofNullable(b.info().metadata().get(NATIVE_ERROR))
+                : Optional.empty();
     }
 
     private static BrokerConnectionException connection(BrokerConnectionException.Kind kind, BrokerException e) {

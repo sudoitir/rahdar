@@ -21,7 +21,6 @@ import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
 import io.github.sudoitir.rahdar.platform.broker.BrokerSettings;
 import io.github.sudoitir.rahdar.platform.broker.BulkCapExceededException;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaBrokerClient;
 import io.github.sudoitir.rahdar.platform.clusters.LifecycleOutcome.NodeOutcome;
 import io.github.sudoitir.rahdar.platform.clusters.LifecycleOutcome.NodeStatus;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNodeEntity;
@@ -31,6 +30,8 @@ import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterE
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterRepository;
 import io.github.sudoitir.rahdar.support.AdminAuthenticationExtension;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNodes;
 import java.time.Instant;
 import java.util.Comparator;
 import java.util.UUID;
@@ -76,12 +77,15 @@ class ConnectionControlServiceTest extends PostgresIntegrationTest {
     BrokerConnections connections;
 
     @MockitoBean
+    ArtemisNodes artemisNodes;
+
+    @MockitoBean
     ConnectionOperations ops;
 
     private UUID clusterId;
     private UUID liveId;
     private UUID deadId;
-    private JolokiaBrokerClient client;
+    private ArtemisNode client;
 
     @BeforeEach
     void setUp() {
@@ -90,9 +94,9 @@ class ConnectionControlServiceTest extends PostgresIntegrationTest {
         liveId = node("live", LIVE_URL, true);
         deadId = node("dead", DEAD_URL, false);
 
-        client = mock(JolokiaBrokerClient.class);
+        client = mock(ArtemisNode.class);
         when(client.resolveBrokerObjectName()).thenReturn(BROKER_MBEAN);
-        when(connections.forCluster(eq(clusterId), anyString())).thenReturn(client);
+        when(artemisNodes.on(eq(clusterId), any(UUID.class))).thenReturn(client);
     }
 
     private UUID node(String name, String url, boolean active) {
@@ -129,7 +133,7 @@ class ConnectionControlServiceTest extends PostgresIntegrationTest {
         });
         assertThat(result.target().clientId()).isEqualTo("orders-worker-7");
         // A close by id is not a fan-out: the other node is never asked.
-        verify(connections, never()).forCluster(clusterId, DEAD_URL);
+        verify(artemisNodes, never()).on(clusterId, deadId);
     }
 
     @Test
@@ -306,9 +310,9 @@ class ConnectionControlServiceTest extends PostgresIntegrationTest {
      */
     @Test
     void anEstimateNoNodeCouldCompleteStillDemandsTheOverride() {
-        JolokiaBrokerClient mute = mock(JolokiaBrokerClient.class);
+        ArtemisNode mute = mock(ArtemisNode.class);
         when(mute.resolveBrokerObjectName()).thenReturn(BROKER_MBEAN);
-        when(connections.forCluster(clusterId, LIVE_URL)).thenReturn(mute);
+        when(artemisNodes.on(eq(clusterId), any(UUID.class))).thenReturn(mute);
         when(ops.countConsumersForAddress(mute, "orders"))
                 .thenThrow(new BrokerConnectionException(
                         BrokerConnectionException.Kind.UNREACHABLE, "node did not answer"));

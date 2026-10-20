@@ -1,23 +1,23 @@
 package io.github.sudoitir.rahdar.feature.bulk;
 
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
-import io.github.sudoitir.rahdar.platform.broker.BrokerListOps;
-import io.github.sudoitir.rahdar.platform.broker.CoreMessageTransport;
 import io.github.sudoitir.rahdar.platform.broker.CoreSubscriptionManager;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaMessageTransport;
-import io.github.sudoitir.rahdar.platform.broker.MessageOperations;
-import io.github.sudoitir.rahdar.platform.clusters.BrokerCommands;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterEnvironmentIndex;
 import io.github.sudoitir.rahdar.platform.clusters.NodeStateRecorder;
 import io.github.sudoitir.rahdar.platform.governance.ClearViewAudit;
 import io.github.sudoitir.rahdar.platform.governance.ContentPolicy;
 import io.github.sudoitir.rahdar.platform.mcp.McpProperties;
-import io.github.sudoitir.rahdar.platform.scrape.QueueLocator;
 import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshotUpsert;
 import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshots;
 import io.github.sudoitir.rahdar.platform.scrape.ScrapeProperties;
 import io.github.sudoitir.rahdar.support.ModuleIntegrationTest;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNodes;
+import io.github.sudoitir.rahdar.system.artemis.BrokerCommands;
+import io.github.sudoitir.rahdar.system.artemis.CoreMessageTransport;
+import io.github.sudoitir.rahdar.system.artemis.JolokiaMessageTransport;
+import io.github.sudoitir.rahdar.system.artemis.MessageOperations;
+import io.github.sudoitir.rahdar.system.artemis.QueueLocator;
 import org.springframework.modulith.test.ApplicationModuleTest;
 import org.springframework.modulith.test.ApplicationModuleTest.BootstrapMode;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -56,8 +56,6 @@ class BulkModuleTest extends ModuleIntegrationTest {
     BrokerCommands brokerCommands;
 
     /** The resources module's connection control reads Jolokia list pages through the broker module. */
-    @MockitoBean
-    BrokerListOps brokerListOps;
 
     /** Messages purges through the single message-operation entry point in the broker module. */
     @MockitoBean
@@ -103,4 +101,7 @@ class BulkModuleTest extends ModuleIntegrationTest {
     /** A masked field revealed by a governance override is itself audited. */
     @MockitoBean
     ClearViewAudit clearViewAudit;
+
+    @MockitoBean
+    ArtemisNodes artemisNodes;
 }

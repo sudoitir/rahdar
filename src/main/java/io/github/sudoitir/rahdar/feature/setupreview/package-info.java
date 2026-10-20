@@ -16,7 +16,8 @@
             "kernel.stream",
             "platform.broker",
             "platform.clusters",
-            "platform.mcp"
+            "platform.mcp",
+            "system.artemis"
         })
 package io.github.sudoitir.rahdar.feature.setupreview;
 

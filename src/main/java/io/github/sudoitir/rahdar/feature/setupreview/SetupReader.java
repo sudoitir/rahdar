@@ -1,10 +1,10 @@
 package io.github.sudoitir.rahdar.feature.setupreview;
 
+import io.github.sudoitir.openbroker.artemis.JolokiaRequest;
+import io.github.sudoitir.openbroker.artemis.JolokiaResponse;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaBrokerClient;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaRequest;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaResponse;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -34,7 +34,7 @@ public class SetupReader {
 
     private final ObjectMapper mapper;
 
-    public NodeRead read(JolokiaBrokerClient client, ClusterNode node) {
+    public NodeRead read(ArtemisNode client, ClusterNode node) {
         boolean live = Boolean.TRUE.equals(node.getActive());
         try {
             String broker = client.resolveBrokerObjectName();
@@ -86,7 +86,7 @@ public class SetupReader {
         return NodeRead.unreadable(node.getId(), node.getName(), node.getArtemisNodeId(), live, true, reason);
     }
 
-    private static Part<JsonNode> defaultSettings(JolokiaBrokerClient client, JolokiaResponse response) {
+    private static Part<JsonNode> defaultSettings(ArtemisNode client, JolokiaResponse response) {
         JsonNode parsed = response.ok() ? client.parsed(response) : null;
         if (parsed != null && parsed.isObject()) {
             return new Part<>(parsed, null);

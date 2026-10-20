@@ -2,13 +2,13 @@ package io.github.sudoitir.rahdar.feature.sql;
 
 import io.github.sudoitir.rahdar.feature.sql.QueryAst.Source;
 import io.github.sudoitir.rahdar.feature.sql.QueryResult.Row;
+import io.github.sudoitir.rahdar.platform.broker.BodyEncoding;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
-import io.github.sudoitir.rahdar.platform.broker.CoreMessageTransport;
+import io.github.sudoitir.rahdar.platform.broker.BrowsedMessage;
 import io.github.sudoitir.rahdar.platform.broker.CorePool;
 import io.github.sudoitir.rahdar.platform.broker.CorePool.PooledSession;
 import io.github.sudoitir.rahdar.platform.broker.CoreUrl;
-import io.github.sudoitir.rahdar.platform.broker.MessageBrowser.BodyEncoding;
-import io.github.sudoitir.rahdar.platform.broker.MessageBrowser.BrowsedMessage;
+import io.github.sudoitir.rahdar.system.artemis.CoreMessageTransport;
 import jakarta.jms.JMSException;
 import jakarta.jms.Message;
 import jakarta.jms.MessageConsumer;

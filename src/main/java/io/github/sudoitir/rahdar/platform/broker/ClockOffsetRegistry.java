@@ -11,11 +11,9 @@ import org.springframework.stereotype.Component;
  * How far each broker's clock is from Rahdar's, measured for free from the
  * timestamp Jolokia already puts on every response (ADR-0053).
  *
- * <p>Keyed by Jolokia URL and shared across every client {@link BrokerClientFactory}
- * builds, mirroring the shape of the broker-MBean-name cache in
- * {@link JolokiaBrokerClient}: clients are rebuilt per call, so per-instance state
- * would be discarded before it could accumulate. No call site changes and no extra
- * broker request is made — non-negotiable #1 is untouched.
+ * <p>Keyed by management URL and fed by {@link RahdarCallInterceptor} from the server time each
+ * completed call reports, so every connection to a node teaches one estimate. No call site changes
+ * and no extra broker request is made — non-negotiable #1 is untouched.
  *
  * <p>The estimator is the standard NTP one, cut down to what one field per
  * response supports. A reading is

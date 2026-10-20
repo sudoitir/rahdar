@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -24,13 +25,15 @@ import io.github.sudoitir.rahdar.kernel.core.ConflictException;
 import io.github.sudoitir.rahdar.kernel.security.Grant;
 import io.github.sudoitir.rahdar.kernel.security.RahdarPrincipal;
 import io.github.sudoitir.rahdar.platform.broker.AccountResult;
-import io.github.sudoitir.rahdar.platform.broker.BrokerClientFactory;
+import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionSettings;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
+import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
+import io.github.sudoitir.rahdar.platform.broker.BrokerTarget;
 import io.github.sudoitir.rahdar.platform.broker.BrokerVersion;
 import io.github.sudoitir.rahdar.platform.broker.CoreAccountCheck;
 import io.github.sudoitir.rahdar.platform.broker.CoreSubscriptionCheck;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaBrokerClient;
 import io.github.sudoitir.rahdar.platform.broker.ManagementUrlSource;
+import io.github.sudoitir.rahdar.platform.broker.ProbeSession;
 import io.github.sudoitir.rahdar.platform.broker.SubscriptionVerdict;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterPermissions;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterService;
@@ -39,6 +42,7 @@ import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerCr
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNodeRepository;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterRepository;
 import io.github.sudoitir.rahdar.support.AdminAuthenticationExtension;
+import io.github.sudoitir.rahdar.support.FixtureJolokia;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -59,9 +63,7 @@ import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.web.client.RestClient;
 import org.springframework.web.context.WebApplicationContext;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -96,7 +98,13 @@ class ClusterControllerTest extends PostgresIntegrationTest {
     AuditEventRepository audits;
 
     @MockitoBean
-    BrokerClientFactory clientFactory;
+    BrokerGateway gateway;
+
+    /** Every probe with the request's or the stored account goes through this session. */
+    private final ProbeSession session = mock(ProbeSession.class);
+
+    /** Probes with the new password under test go through this one. */
+    private final ProbeSession newSecretSession = mock(ProbeSession.class);
 
     @MockitoBean
     BrokerConnections connections;
@@ -112,31 +120,34 @@ class ClusterControllerTest extends PostgresIntegrationTest {
 
     @BeforeEach
     void setUp() {
+        when(gateway.probe(any(BrokerConnectionSettings.class))).thenAnswer(inv -> {
+            BrokerConnectionSettings s = inv.getArgument(0);
+            return s != null && "\u0000".equals(s.password()) ? newSecretSession : session;
+        });
+        when(gateway.probe(any(UUID.class))).thenReturn(session);
         mvc = webAppContextSetup(webContext).build();
         audits.deleteAll();
         clusters.deleteAll();
         // The backup answers where the seed's pattern puts it, as its own NodeID's broker.
-        when(clientFactory.forNode(any(), eq(BACKUP_URL)))
+        when(session.node(BACKUP_URL))
                 .thenAnswer(inv -> client(BACKUP_URL, "search-broker.json", "ha-read-backup.json"));
         when(coreAccountCheck.check(any(), any())).thenReturn(AccountResult.ACCEPTED);
         when(coreSubscriptionCheck.probe(any(), any())).thenReturn(new SubscriptionVerdict.NotAttempted());
     }
 
     /** A client whose mock server answers the given fixtures at {@link #SEED}, in order. */
-    private JolokiaBrokerClient client(String url, String... fixtures) {
-        RestClient.Builder builder = RestClient.builder();
-        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+    private BrokerTarget client(String url, String... fixtures) {
+        FixtureJolokia server = new FixtureJolokia();
         for (String fixture : fixtures) {
             server.expect(requestTo(url)).andRespond(withSuccess(body(fixture), MediaType.APPLICATION_JSON));
         }
-        return new JolokiaBrokerClient(builder.build(), url, mapper);
+        return server.target();
     }
 
-    private JolokiaBrokerClient unauthorizedClient(String url) {
-        RestClient.Builder builder = RestClient.builder();
-        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+    private BrokerTarget unauthorizedClient(String url) {
+        FixtureJolokia server = new FixtureJolokia();
         server.expect(requestTo(url)).andRespond(withStatus(HttpStatus.UNAUTHORIZED));
-        return new JolokiaBrokerClient(builder.build(), url, mapper);
+        return server.target();
     }
 
     private static String body(String fixture) {
@@ -152,7 +163,7 @@ class ClusterControllerTest extends PostgresIntegrationTest {
     private static String[] registerSequence() {
         return new String[] {
             "search-broker.json", // connectAll -> resolveBrokerObjectName
-            "capability-version-read.json", // connectAll -> Version, for the range check (ADR-0142)
+            "ha-read-primary.json", // connectAll -> the HA read, whose Version is the range check (ADR-0142)
             "ha-read-primary.json", // discover -> readBrokerAttributes
             "topology.json", // discover -> listNetworkTopology
             "capability-version-read.json", // probe -> MANAGEMENT_READ
@@ -173,7 +184,7 @@ class ClusterControllerTest extends PostgresIntegrationTest {
 
     @Test
     void registerPersistsClusterNodesAndAudit() throws Exception {
-        when(clientFactory.forNode(any(), eq(SEED))).thenReturn(client(SEED, registerSequence()));
+        when(session.node(SEED)).thenReturn(client(SEED, registerSequence()));
 
         mvc.perform(post("/api/v1/clusters")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -203,7 +214,7 @@ class ClusterControllerTest extends PostgresIntegrationTest {
         // checkConnection order: connect, then the in-memory preview (which the Core
         // subscription pre-check needs for a Core URL), then the capability probe
         // (which is handed that check's verdict).
-        when(clientFactory.forNode(any(), eq(SEED))).thenReturn(client(SEED, registerSequence()));
+        when(session.node(SEED)).thenReturn(client(SEED, registerSequence()));
 
         mvc.perform(post("/api/v1/clusters")
                         .param("dryRun", "true")
@@ -227,7 +238,7 @@ class ClusterControllerTest extends PostgresIntegrationTest {
 
     @Test
     void theCheckListsEveryNodeWithItsUrlAndWhereItCameFrom() throws Exception {
-        when(clientFactory.forNode(any(), eq(SEED))).thenReturn(client(SEED, registerSequence()));
+        when(session.node(SEED)).thenReturn(client(SEED, registerSequence()));
 
         mvc.perform(post("/api/v1/clusters")
                         .param("dryRun", "true")
@@ -247,7 +258,7 @@ class ClusterControllerTest extends PostgresIntegrationTest {
 
     @Test
     void aCoreAccountTheBrokerRefusesDoesNotHideTheManagementAccountItAccepted() throws Exception {
-        when(clientFactory.forNode(any(), eq(SEED))).thenReturn(client(SEED, registerSequence()));
+        when(session.node(SEED)).thenReturn(client(SEED, registerSequence()));
         when(coreAccountCheck.check(eq("artemis-primary:61616"), any())).thenReturn(AccountResult.REJECTED);
 
         mvc.perform(post("/api/v1/clusters")
@@ -264,8 +275,8 @@ class ClusterControllerTest extends PostgresIntegrationTest {
 
     @Test
     void aManagementAccountTheBrokerRefusesDoesNotHideTheCoreAccountItAccepted() throws Exception {
-        when(clientFactory.forNode(any(), eq(SEED))).thenReturn(client(SEED, registerSequence()));
-        when(clientFactory.forNode(any(), eq(BACKUP_URL))).thenReturn(unauthorizedClient(BACKUP_URL));
+        when(session.node(SEED)).thenReturn(client(SEED, registerSequence()));
+        when(session.node(BACKUP_URL)).thenReturn(unauthorizedClient(BACKUP_URL));
 
         mvc.perform(post("/api/v1/clusters")
                         .param("dryRun", "true")
@@ -280,7 +291,7 @@ class ClusterControllerTest extends PostgresIntegrationTest {
 
     @Test
     void thePreviewCarriesWhatAdoptingWouldDeclareWhenTheNodesAgree() throws Exception {
-        when(clientFactory.forNode(any(), eq(SEED))).thenReturn(client(SEED, registerSequence()));
+        when(session.node(SEED)).thenReturn(client(SEED, registerSequence()));
         when(adoption.preview(any()))
                 .thenReturn(Optional.of(new RegistrationAdoption.Preview(
                         new RegistrationAdoption.Counts(3, 2, 1, 0), List.of(), List.of("note"))));
@@ -298,7 +309,7 @@ class ClusterControllerTest extends PostgresIntegrationTest {
 
     @Test
     void thePreviewListsWhereTheNodesDisagree() throws Exception {
-        when(clientFactory.forNode(any(), eq(SEED))).thenReturn(client(SEED, registerSequence()));
+        when(session.node(SEED)).thenReturn(client(SEED, registerSequence()));
         String disagreement = "Address settings for orders differ between a and b; a's were kept.";
         when(adoption.preview(any()))
                 .thenReturn(Optional.of(new RegistrationAdoption.Preview(
@@ -314,7 +325,7 @@ class ClusterControllerTest extends PostgresIntegrationTest {
 
     @Test
     void thePreviewOffersNoAdoptionToACallerWhoMayNotDeclare() throws Exception {
-        when(clientFactory.forNode(any(), eq(SEED))).thenReturn(client(SEED, registerSequence()));
+        when(session.node(SEED)).thenReturn(client(SEED, registerSequence()));
 
         mvc.perform(post("/api/v1/clusters")
                         .param("dryRun", "true")
@@ -333,7 +344,7 @@ class ClusterControllerTest extends PostgresIntegrationTest {
 
     @Test
     void registeringWithTheAdoptionOnAdoptsInTheRegistrationsTransaction() throws Exception {
-        when(clientFactory.forNode(any(), eq(SEED))).thenReturn(client(SEED, registerSequence()));
+        when(session.node(SEED)).thenReturn(client(SEED, registerSequence()));
         RegistrationAdoption.Reading reading = new RegistrationAdoption.Reading() {};
         when(adoption.read(any())).thenReturn(Optional.of(reading));
 
@@ -355,7 +366,7 @@ class ClusterControllerTest extends PostgresIntegrationTest {
 
     @Test
     void registeringWithTheAdoptionOffSavesNoRevision() throws Exception {
-        when(clientFactory.forNode(any(), eq(SEED))).thenReturn(client(SEED, registerSequence()));
+        when(session.node(SEED)).thenReturn(client(SEED, registerSequence()));
 
         mvc.perform(post("/api/v1/clusters")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -367,7 +378,7 @@ class ClusterControllerTest extends PostgresIntegrationTest {
 
     @Test
     void anAdoptionWithNoReadableNodeIsRefusedBeforeAnythingIsSaved() throws Exception {
-        when(clientFactory.forNode(any(), eq(SEED))).thenReturn(client(SEED, registerSequence()));
+        when(session.node(SEED)).thenReturn(client(SEED, registerSequence()));
         when(adoption.read(any())).thenReturn(Optional.empty());
 
         mvc.perform(post("/api/v1/clusters")
@@ -380,7 +391,7 @@ class ClusterControllerTest extends PostgresIntegrationTest {
 
     @Test
     void anAdoptionThatFailsLeavesNoClusterBehind() throws Exception {
-        when(clientFactory.forNode(any(), eq(SEED))).thenReturn(client(SEED, registerSequence()));
+        when(session.node(SEED)).thenReturn(client(SEED, registerSequence()));
         when(adoption.read(any())).thenReturn(Optional.of(new RegistrationAdoption.Reading() {}));
         doThrow(new ConflictException("adoption-failed", "The first revision could not be saved."))
                 .when(adoption)
@@ -399,8 +410,7 @@ class ClusterControllerTest extends PostgresIntegrationTest {
     @ParameterizedTest
     @ValueSource(booleans = {true, false})
     void aBrokerOlderThanTheMinimumIsRefusedAndNothingIsStored(boolean dryRun) throws Exception {
-        when(clientFactory.forNode(any(), eq(SEED)))
-                .thenReturn(client(SEED, "search-broker.json", "version-read-too-old.json"));
+        when(session.node(SEED)).thenReturn(client(SEED, "search-broker.json", "ha-read-too-old.json"));
 
         mvc.perform(post("/api/v1/clusters")
                         .param("dryRun", String.valueOf(dryRun))
@@ -420,7 +430,7 @@ class ClusterControllerTest extends PostgresIntegrationTest {
 
     @Test
     void badSeedYieldsClassifiedProblemDetailAndPersistsNothing() throws Exception {
-        when(clientFactory.forNode(any(), eq(SEED))).thenReturn(unauthorizedClient(SEED));
+        when(session.node(SEED)).thenReturn(unauthorizedClient(SEED));
 
         mvc.perform(post("/api/v1/clusters")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -439,7 +449,7 @@ class ClusterControllerTest extends PostgresIntegrationTest {
 
     @Test
     void discoveryKeepsAnOverriddenNode() throws Exception {
-        when(clientFactory.forNode(any(), eq(SEED))).thenReturn(client(SEED, registerSequence()));
+        when(session.node(SEED)).thenReturn(client(SEED, registerSequence()));
         mvc.perform(post("/api/v1/clusters")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(registerBody()))
@@ -449,7 +459,7 @@ class ClusterControllerTest extends PostgresIntegrationTest {
                 nodes.findByClusterIdAndName(clusterId, "artemis-backup:61616").orElseThrow();
 
         // PATCH the backup with a reachable management URL.
-        when(connections.forCluster(clusterId, OVERRIDE_URL)).thenReturn(client(OVERRIDE_URL, "search-broker.json"));
+        when(session.node(OVERRIDE_URL)).thenReturn(client(OVERRIDE_URL, "search-broker.json", "ha-read-primary.json"));
         mvc.perform(patch("/api/v1/clusters/{c}/nodes/{n}", clusterId, backup.getId())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"jolokiaUrl\":\"" + OVERRIDE_URL + "\"}"))
@@ -457,9 +467,9 @@ class ClusterControllerTest extends PostgresIntegrationTest {
                 .andExpect(jsonPath("$.urlSource").value("MANUAL"));
 
         // A discovery tick: every manageable node answers search + HA read + topology.
-        when(connections.forCluster(eq(clusterId), any()))
+        when(session.node(any()))
                 .thenAnswer(inv ->
-                        client(inv.getArgument(1), "search-broker.json", "ha-read-primary.json", "topology.json"));
+                        client(inv.getArgument(0), "search-broker.json", "ha-read-primary.json", "topology.json"));
 
         clusterService.rediscover(clusterId);
 
@@ -471,7 +481,7 @@ class ClusterControllerTest extends PostgresIntegrationTest {
 
     @Test
     void deleteRemovesClusterAndCredentialsButKeepsAudit() throws Exception {
-        when(clientFactory.forNode(any(), eq(SEED))).thenReturn(client(SEED, registerSequence()));
+        when(session.node(SEED)).thenReturn(client(SEED, registerSequence()));
         mvc.perform(post("/api/v1/clusters")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(registerBody()))
@@ -498,9 +508,7 @@ class ClusterControllerTest extends PostgresIntegrationTest {
 
     /** The reads before the identity check: connect, the version, then the one HA and topology read. */
     private static String[] untilIdentityKnown() {
-        return new String[] {
-            "search-broker.json", "capability-version-read.json", "ha-read-primary.json", "topology.json"
-        };
+        return new String[] {"search-broker.json", "ha-read-primary.json", "ha-read-primary.json", "topology.json"};
     }
 
     /**
@@ -511,8 +519,8 @@ class ClusterControllerTest extends PostgresIntegrationTest {
     @ValueSource(booleans = {true, false})
     void theSameBrokersAreRegisteredOnlyOnce(boolean dryRun) throws Exception {
         String alias = "http://BROKER-1.example:8161/console/jolokia/";
-        when(clientFactory.forNode(any(), eq(SEED))).thenReturn(client(SEED, registerSequence()));
-        when(clientFactory.forNode(any(), eq(alias))).thenReturn(client(alias, untilIdentityKnown()));
+        when(session.node(SEED)).thenReturn(client(SEED, registerSequence()));
+        when(session.node(alias)).thenReturn(client(alias, untilIdentityKnown()));
         mvc.perform(post("/api/v1/clusters")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(registerBody()))
@@ -547,8 +555,7 @@ class ClusterControllerTest extends PostgresIntegrationTest {
     /** A caller who cannot read the cluster holding the brokers is refused without being told which it is. */
     @Test
     void aClusterTheCallerCannotSeeIsNotNamed() throws Exception {
-        when(clientFactory.forNode(any(), eq(SEED)))
-                .thenReturn(client(SEED, registerSequence()), client(SEED, untilIdentityKnown()));
+        when(session.node(SEED)).thenReturn(client(SEED, registerSequence()), client(SEED, untilIdentityKnown()));
         mvc.perform(post("/api/v1/clusters")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(registerBody()))

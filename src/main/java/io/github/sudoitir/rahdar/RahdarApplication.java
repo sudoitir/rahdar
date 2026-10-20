@@ -21,7 +21,8 @@ import org.springframework.scheduling.annotation.EnableScheduling;
         scanBasePackages = {
             "io.github.sudoitir.rahdar.app",
             "io.github.sudoitir.rahdar.kernel",
-            "io.github.sudoitir.rahdar.platform"
+            "io.github.sudoitir.rahdar.platform",
+            "io.github.sudoitir.rahdar.system"
         })
 // The kernel is what every module stands on, so each module's own test bootstraps it (ADR-0069).
 @Modulithic(

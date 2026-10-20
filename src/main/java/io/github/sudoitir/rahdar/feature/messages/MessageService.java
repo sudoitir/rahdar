@@ -1,5 +1,6 @@
 package io.github.sudoitir.rahdar.feature.messages;
 
+import io.github.sudoitir.openbroker.artemis.ArtemisMBeans;
 import io.github.sudoitir.rahdar.feature.messages.MessageActionParams.MessageDeleteParams;
 import io.github.sudoitir.rahdar.feature.messages.MessageActionParams.MessageExpireParams;
 import io.github.sudoitir.rahdar.feature.messages.MessageActionParams.MessageMoveParams;
@@ -25,19 +26,14 @@ import io.github.sudoitir.rahdar.kernel.security.ResourceRef;
 import io.github.sudoitir.rahdar.kernel.settings.SettingsService;
 import io.github.sudoitir.rahdar.kernel.stream.SseHub;
 import io.github.sudoitir.rahdar.platform.broker.Attempt;
+import io.github.sudoitir.rahdar.platform.broker.BodyEncoding;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
-import io.github.sudoitir.rahdar.platform.broker.BrokerMBeans;
 import io.github.sudoitir.rahdar.platform.broker.BrokerSettings;
+import io.github.sudoitir.rahdar.platform.broker.BrowsedMessage;
 import io.github.sudoitir.rahdar.platform.broker.BulkCapExceededException;
-import io.github.sudoitir.rahdar.platform.broker.CoreMessageTransport;
 import io.github.sudoitir.rahdar.platform.broker.CoreSubscriptionManager;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaBrokerClient;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaMessageTransport;
-import io.github.sudoitir.rahdar.platform.broker.MessageBrowser;
-import io.github.sudoitir.rahdar.platform.broker.MessageBrowser.BrowsedMessage;
 import io.github.sudoitir.rahdar.platform.broker.MessageKind;
-import io.github.sudoitir.rahdar.platform.broker.MessageOperations;
 import io.github.sudoitir.rahdar.platform.broker.MessageTransport;
 import io.github.sudoitir.rahdar.platform.broker.MessageTransport.BrowseResult;
 import io.github.sudoitir.rahdar.platform.broker.MessageTransport.SendSpec;
@@ -51,8 +47,13 @@ import io.github.sudoitir.rahdar.platform.governance.GovernContext;
 import io.github.sudoitir.rahdar.platform.governance.GovernanceViews;
 import io.github.sudoitir.rahdar.platform.governance.GovernedMessage;
 import io.github.sudoitir.rahdar.platform.governance.MessageContent;
-import io.github.sudoitir.rahdar.platform.scrape.QueueLocator;
-import io.github.sudoitir.rahdar.platform.scrape.QueueLocator.QueueLocation;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNodes;
+import io.github.sudoitir.rahdar.system.artemis.CoreMessageTransport;
+import io.github.sudoitir.rahdar.system.artemis.JolokiaMessageTransport;
+import io.github.sudoitir.rahdar.system.artemis.MessageOperations;
+import io.github.sudoitir.rahdar.system.artemis.QueueLocator;
+import io.github.sudoitir.rahdar.system.artemis.QueueLocator.QueueLocation;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Comparator;
@@ -106,6 +107,7 @@ public class MessageService {
     private final ContentPolicy contentPolicy;
     private final ClearViewAudit clearViews;
     private final OperationGate gate;
+    private final ArtemisNodes artemisNodes;
 
     /** Resolved (node, address, routingType) for a queue name on a cluster. */
     record ResolvedQueue(ClusterNode node, String address, String routingType) {}
@@ -292,7 +294,7 @@ public class MessageService {
         if (!req.byFilter() && !req.ids().isEmpty()) {
             return new Reach(req.ids().size(), identityOf(resolved));
         }
-        JolokiaBrokerClient client = clientFor(clusterId, resolved);
+        ArtemisNode client = clientFor(clusterId, resolved);
         return new Reach(estimate(client, queueMbean(client, resolved, queueName), action, req), identityOf(resolved));
     }
 
@@ -300,7 +302,7 @@ public class MessageService {
     public Reach reachOfPurge(UUID clusterId, String queueName, UUID nodeId) {
         clusterAccess.requireResource(clusterId, ResourceRef.queue(queueName), MessagePermissions.QUEUE_PURGE);
         ResolvedQueue resolved = resolve(clusterId, queueName, nodeId);
-        JolokiaBrokerClient client = clientFor(clusterId, resolved);
+        ArtemisNode client = clientFor(clusterId, resolved);
         return new Reach(
                 messageOps.messageCount(client, queueMbean(client, resolved, queueName)), identityOf(resolved));
     }
@@ -347,7 +349,7 @@ public class MessageService {
         }
 
         try {
-            JolokiaBrokerClient client = clientFor(clusterId, resolved);
+            ArtemisNode client = clientFor(clusterId, resolved);
             String mbean = queueMbean(client, resolved, queueName);
             long estimate = estimate(client, mbean, action, req);
             boolean over = estimate > cap;
@@ -437,7 +439,7 @@ public class MessageService {
         UUID node = resolved.node().getId();
         AuditEvent event = begin("PURGE_QUEUE", queueName, clusterId, node, Map.of(), dryRun);
         try {
-            JolokiaBrokerClient client = clientFor(clusterId, resolved);
+            ArtemisNode client = clientFor(clusterId, resolved);
             String mbean = queueMbean(client, resolved, queueName);
             long cap = settings.intValue(BrokerSettings.BULK_CAP);
 
@@ -504,7 +506,7 @@ public class MessageService {
         if (clusterAccess.holds(clusterId, MessagePermissions.MESSAGE_SEND)) {
             return RetryScope.UNRESTRICTED;
         }
-        JolokiaBrokerClient client = clientFor(clusterId, resolved);
+        ArtemisNode client = clientFor(clusterId, resolved);
         Set<String> origins = messageOps.originalAddresses(client, queueMbean(client, resolved, queueName));
         clusterAccess.requireAll(
                 clusterId,
@@ -523,7 +525,7 @@ public class MessageService {
 
     // ---- estimate / perform dispatch --------------------------------
 
-    private long estimate(JolokiaBrokerClient client, String mbean, MessageAction action, MessageActionRequest req) {
+    private long estimate(ArtemisNode client, String mbean, MessageAction action, MessageActionRequest req) {
         if (action == MessageAction.RETRY && req.ids().isEmpty()) {
             return messageOps.messageCount(client, mbean);
         }
@@ -535,7 +537,7 @@ public class MessageService {
 
     /** A retry-all or a by-filter operation: one broker call, which returns its own count. */
     private long perform(QueueAction call) {
-        JolokiaBrokerClient client = call.client();
+        ArtemisNode client = call.client();
         String mbean = call.mbean();
         MessageActionRequest req = call.req();
         if (call.action() == MessageAction.RETRY && req.ids().isEmpty()) {
@@ -557,7 +559,7 @@ public class MessageService {
      * retry are fixed now, by the checked addresses, and retried by id: a message that came from another
      * address in the meantime is not among them.
      */
-    private long retryFromCheckedOrigins(JolokiaBrokerClient client, String mbean, Set<String> checkedOrigins) {
+    private long retryFromCheckedOrigins(ArtemisNode client, String mbean, Set<String> checkedOrigins) {
         List<Long> ids = new ArrayList<>();
         for (String origin : checkedOrigins) {
             ids.addAll(messageOps.listIds(client, mbean, messageOps.originalAddressFilter(origin)));
@@ -566,7 +568,7 @@ public class MessageService {
     }
 
     private MessageOperations.BulkResult performByIds(QueueAction call) {
-        JolokiaBrokerClient client = call.client();
+        ArtemisNode client = call.client();
         String mbean = call.mbean();
         MessageActionRequest req = call.req();
         List<Long> ids = req.ids();
@@ -594,11 +596,7 @@ public class MessageService {
 
     /** One message action, ready to run against a resolved queue. */
     private record QueueAction(
-            JolokiaBrokerClient client,
-            String mbean,
-            MessageAction action,
-            MessageActionRequest req,
-            RetryScope scope) {}
+            ArtemisNode client, String mbean, MessageAction action, MessageActionRequest req, RetryScope scope) {}
 
     // ---- resolution + plumbing ------------------------------------
 
@@ -624,12 +622,12 @@ public class MessageService {
                 node.getCoreUrl());
     }
 
-    private JolokiaBrokerClient clientFor(UUID clusterId, ResolvedQueue resolved) {
-        return connections.forCluster(clusterId, resolved.node().getJolokiaUrl());
+    private ArtemisNode clientFor(UUID clusterId, ResolvedQueue resolved) {
+        return artemisNodes.on(clusterId, resolved.node().getId());
     }
 
-    private static String queueMbean(JolokiaBrokerClient client, ResolvedQueue resolved, String queueName) {
-        return BrokerMBeans.queue(
+    private static String queueMbean(ArtemisNode client, ResolvedQueue resolved, String queueName) {
+        return ArtemisMBeans.queue(
                 client.resolveBrokerObjectName(), resolved.address(), queueName, resolved.routingType());
     }
 
@@ -707,7 +705,7 @@ public class MessageService {
         properties.putAll(m.doubleProperties());
         properties.putAll(m.booleanProperties());
         return new MessageContent(
-                headers, properties, m.body(), m.bodyEncoding() == MessageBrowser.BodyEncoding.BASE64, m.contentType());
+                headers, properties, m.body(), m.bodyEncoding() == BodyEncoding.BASE64, m.contentType());
     }
 
     private static MessageSummaryView toSummary(BrowsedMessage m, GovernedMessage g) {

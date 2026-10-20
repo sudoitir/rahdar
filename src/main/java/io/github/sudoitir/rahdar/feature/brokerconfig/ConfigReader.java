@@ -1,9 +1,9 @@
 package io.github.sudoitir.rahdar.feature.brokerconfig;
 
+import io.github.sudoitir.openbroker.artemis.JolokiaRequest;
+import io.github.sudoitir.openbroker.artemis.JolokiaResponse;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaBrokerClient;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaRequest;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaResponse;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashSet;
@@ -82,7 +82,7 @@ public class ConfigReader {
      * @throws BrokerConnectionException if the node cannot be read at all — the caller
      *     marks that side unavailable rather than rendering half a diff
      */
-    public NodeConfig read(JolokiaBrokerClient client, List<String> matches) {
+    public NodeConfig read(ArtemisNode client, List<String> matches) {
         String mbean = client.resolveBrokerObjectName();
 
         List<String> compared = cap(matches);

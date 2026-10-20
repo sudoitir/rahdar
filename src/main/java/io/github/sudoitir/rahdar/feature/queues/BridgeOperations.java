@@ -1,12 +1,12 @@
 package io.github.sudoitir.rahdar.feature.queues;
 
-import io.github.sudoitir.rahdar.platform.broker.BrokerListOps;
-import io.github.sudoitir.rahdar.platform.broker.BrokerMBeans;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaBrokerClient;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaRequest;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaResponse;
+import io.github.sudoitir.openbroker.artemis.ArtemisLists;
+import io.github.sudoitir.openbroker.artemis.ArtemisMBeans;
+import io.github.sudoitir.openbroker.artemis.JolokiaRequest;
+import io.github.sudoitir.openbroker.artemis.JolokiaResponse;
 import io.github.sudoitir.rahdar.platform.broker.ManagementRefusal;
 import io.github.sudoitir.rahdar.platform.clusters.LifecycleOutcome.NodeStatus;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -47,10 +47,12 @@ public class BridgeOperations {
     // ---- reads -----------------------------------------------------------
 
     /** Every bridge deployed on this node, with its started and connected state. */
-    public List<BridgeRow> listBridges(JolokiaBrokerClient client, UUID nodeId, String nodeName) {
+    public List<BridgeRow> listBridges(ArtemisNode client, UUID nodeId, String nodeName) {
         String broker = client.resolveBrokerObjectName();
-        return BrokerListOps.readAll(
-                client, client.search(BrokerMBeans.bridgesPattern(broker)), a -> BridgeRow.parse(a, nodeId, nodeName));
+        return ArtemisLists.readAll(
+                client.jolokia(),
+                client.search(ArtemisMBeans.bridgesPattern(broker)),
+                a -> BridgeRow.parse(a, nodeId, nodeName));
     }
 
     /**
@@ -78,7 +80,7 @@ public class BridgeOperations {
     }
 
     /** The deployed instances of one declared bridge, keyed by MBean name; absent names are simply missing. */
-    public Map<String, BridgeRow> instancesOf(JolokiaBrokerClient client, List<String> names) {
+    public Map<String, BridgeRow> instancesOf(ArtemisNode client, List<String> names) {
         Map<String, BridgeRow> out = new LinkedHashMap<>();
         for (BridgeRow row : listBridges(client, null, null)) {
             if (names.contains(row.name())) {
@@ -91,7 +93,7 @@ public class BridgeOperations {
     // ---- mutations -------------------------------------------------------
 
     /** Create a bridge from a hyphenated {@code BridgeConfiguration} document. */
-    public void createBridge(JolokiaBrokerClient client, String brokerMbean, Map<String, Object> config) {
+    public void createBridge(ArtemisNode client, String brokerMbean, Map<String, Object> config) {
         JolokiaResponse res = client.single(
                 JolokiaRequest.exec(brokerMbean, "createBridge(java.lang.String)", mapper.writeValueAsString(config)));
         require(res, "createBridge");
@@ -102,7 +104,7 @@ public class BridgeOperations {
      * concurrency above one deployed. A bridge that is already gone answers 200 and
      * does nothing.
      */
-    public void destroyBridge(JolokiaBrokerClient client, String brokerMbean, String name) {
+    public void destroyBridge(ArtemisNode client, String brokerMbean, String name) {
         require(
                 client.single(JolokiaRequest.exec(brokerMbean, "destroyBridge(java.lang.String)", name)),
                 "destroyBridge");
@@ -117,7 +119,7 @@ public class BridgeOperations {
      *     deployed — and naming the transformer class when one was declared, because a
      *     class the node cannot load is the usual cause
      */
-    public NodeStatus createVerified(JolokiaBrokerClient client, String brokerMbean, Map<String, Object> config) {
+    public NodeStatus createVerified(ArtemisNode client, String brokerMbean, Map<String, Object> config) {
         String name = String.valueOf(config.get("name"));
         List<String> expected = instanceNames(config);
         Map<String, BridgeRow> before = instancesOf(client, expected);
@@ -254,6 +256,6 @@ public class BridgeOperations {
     }
 
     private static void require(JolokiaResponse res, String operation) {
-        ManagementRefusal.require(res, operation);
+        ArtemisNode.require(res, operation);
     }
 }

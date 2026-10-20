@@ -6,7 +6,7 @@ import io.github.sudoitir.rahdar.feature.transfer.TargetAcceptance.BatchVerdict;
 import io.github.sudoitir.rahdar.feature.transfer.TargetAcceptance.Input;
 import io.github.sudoitir.rahdar.feature.transfer.web.TransferViews.Finding;
 import io.github.sudoitir.rahdar.feature.transfer.web.TransferViews.FindingKind;
-import io.github.sudoitir.rahdar.platform.broker.AcceptanceProbe.Facts;
+import io.github.sudoitir.rahdar.system.artemis.AcceptanceProbe.Facts;
 import java.util.List;
 import java.util.function.Consumer;
 import java.util.stream.Stream;

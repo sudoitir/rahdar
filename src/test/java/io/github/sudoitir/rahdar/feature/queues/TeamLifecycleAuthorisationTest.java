@@ -18,7 +18,6 @@ import io.github.sudoitir.rahdar.kernel.security.internal.TeamService;
 import io.github.sudoitir.rahdar.kernel.security.internal.persistence.AppUserRepository;
 import io.github.sudoitir.rahdar.kernel.security.internal.persistence.RoleRepository;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaBrokerClient;
 import io.github.sudoitir.rahdar.platform.broker.ManagementRefusal;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNodeEntity;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNodeEntity.HaObservation;
@@ -28,6 +27,8 @@ import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterR
 import io.github.sudoitir.rahdar.support.AdminAuthenticationExtension;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
 import io.github.sudoitir.rahdar.support.TeamAccessFixture;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNodes;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -78,14 +79,17 @@ class TeamLifecycleAuthorisationTest extends PostgresIntegrationTest {
     BrokerConnections connections;
 
     @MockitoBean
+    ArtemisNodes artemisNodes;
+
+    @MockitoBean
     DivertOperations divertOps;
 
     @MockitoBean
     QueueLifecycleOperations ops;
 
     final JsonMapper json = new JsonMapper();
-    final JolokiaBrokerClient clientOne = mock(JolokiaBrokerClient.class);
-    final JolokiaBrokerClient clientTwo = mock(JolokiaBrokerClient.class);
+    final ArtemisNode clientOne = mock(ArtemisNode.class);
+    final ArtemisNode clientTwo = mock(ArtemisNode.class);
 
     MockMvc mvc;
     UUID cluster;
@@ -99,8 +103,8 @@ class TeamLifecycleAuthorisationTest extends PostgresIntegrationTest {
                 .getId();
         node("one", ONE);
         node("two", TWO);
-        when(connections.forCluster(cluster, ONE)).thenReturn(clientOne);
-        when(connections.forCluster(cluster, TWO)).thenReturn(clientTwo);
+        when(artemisNodes.on(eq(cluster), any(UUID.class))).thenReturn(clientOne);
+        when(artemisNodes.on(eq(cluster), any(UUID.class))).thenReturn(clientTwo);
         when(clientOne.resolveBrokerObjectName()).thenReturn("org.apache.activemq.artemis:broker=\"one\"");
         when(clientTwo.resolveBrokerObjectName()).thenReturn("org.apache.activemq.artemis:broker=\"two\"");
         UUID orders = fixture.team("orders", cluster, "orders.#");

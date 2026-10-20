@@ -4,6 +4,7 @@ import io.github.sudoitir.rahdar.platform.clusters.ClusterEnvironmentIndex;
 import io.github.sudoitir.rahdar.platform.governance.ClearViewAudit;
 import io.github.sudoitir.rahdar.platform.governance.ContentPolicy;
 import io.github.sudoitir.rahdar.platform.mcp.McpProperties;
+import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshots;
 import io.github.sudoitir.rahdar.support.ModuleIntegrationTest;
 import org.springframework.modulith.test.ApplicationModuleTest;
 import org.springframework.modulith.test.ApplicationModuleTest.BootstrapMode;
@@ -35,4 +36,7 @@ class TransferModuleTest extends ModuleIntegrationTest {
      */
     @MockitoBean
     ClusterEnvironmentIndex clusterEnvironmentIndex;
+
+    @MockitoBean
+    QueueSnapshots queueSnapshots;
 }

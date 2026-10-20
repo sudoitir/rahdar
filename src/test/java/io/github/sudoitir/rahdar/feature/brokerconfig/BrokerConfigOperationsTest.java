@@ -9,6 +9,9 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import io.github.sudoitir.openbroker.artemis.ArtemisMBeans;
+import io.github.sudoitir.openbroker.artemis.JolokiaRequest;
+import io.github.sudoitir.openbroker.artemis.JolokiaResponse;
 import io.github.sudoitir.rahdar.feature.brokerconfig.BrokerConfigDocument.AddressDecl;
 import io.github.sudoitir.rahdar.feature.brokerconfig.BrokerConfigDocument.AddressSettingDecl;
 import io.github.sudoitir.rahdar.feature.brokerconfig.BrokerConfigDocument.BridgeDecl;
@@ -22,11 +25,8 @@ import io.github.sudoitir.rahdar.feature.queues.BridgeRow;
 import io.github.sudoitir.rahdar.feature.queues.DivertOperations;
 import io.github.sudoitir.rahdar.feature.queues.QueueLifecycleOperations;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
-import io.github.sudoitir.rahdar.platform.broker.BrokerMBeans;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaBrokerClient;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaRequest;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaResponse;
 import io.github.sudoitir.rahdar.platform.broker.ManagementRefusal;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -55,7 +55,7 @@ class BrokerConfigOperationsTest {
     private final QueueLifecycleOperations queueOps = mock(QueueLifecycleOperations.class);
     private final DivertOperations divertOps = mock(DivertOperations.class);
     private final BridgeOperations bridgeOps = mock(BridgeOperations.class);
-    private final JolokiaBrokerClient client = mock(JolokiaBrokerClient.class);
+    private final ArtemisNode client = mock(ArtemisNode.class);
     private final BrokerConfigOperations ops = new BrokerConfigOperations(mapper, queueOps, divertOps, bridgeOps);
 
     /** Requests the scripted broker was sent, one list per batched POST. */
@@ -254,7 +254,7 @@ class BrokerConfigOperationsTest {
                 .updateQueue(
                         eq(client),
                         eq(BROKER),
-                        eq(BrokerMBeans.queue(BROKER, "orders", "orders.q", "ANYCAST")),
+                        eq(ArtemisMBeans.queue(BROKER, "orders", "orders.q", "ANYCAST")),
                         patch.capture());
         assertThat(patch.getValue())
                 .containsEntry("max-consumers", 3)
@@ -326,8 +326,8 @@ class BrokerConfigOperationsTest {
 
     @Test
     void readsANodeInTwoBatchedPostsAndBuildsItsConfiguration() {
-        String orders = BrokerMBeans.address(BROKER, "orders");
-        String ordersQueue = BrokerMBeans.queue(BROKER, "orders", "orders.q", "ANYCAST");
+        String orders = ArtemisMBeans.address(BROKER, "orders");
+        String ordersQueue = ArtemisMBeans.queue(BROKER, "orders", "orders.q", "ANYCAST");
         String divertMbean = BROKER + ",component=addresses,address=\"orders\",subcomponent=diverts,divert=\"d1\"";
         String bridgeA = BROKER + ",component=bridges,name=\"to-dc2-0\"";
         String bridgeB = BROKER + ",component=bridges,name=\"to-dc2-1\"";
@@ -349,8 +349,8 @@ class BrokerConfigOperationsTest {
                 json("\"[{\\\"name\\\":\\\"admins\\\",\\\"send\\\":true,"
                         + "\\\"consume\\\":true},{\\\"name\\\":\\\"\\\",\\\"send\\\":true},{\\\"name\\\":\\\"guests\\\","
                         + "\\\"browse\\\":true}]\""));
-        on(search(BrokerMBeans.divertsPattern(BROKER)), names(divertMbean));
-        on(search(BrokerMBeans.bridgesPattern(BROKER)), names(bridgeA, bridgeB, stray));
+        on(search(ArtemisMBeans.divertsPattern(BROKER)), names(divertMbean));
+        on(search(ArtemisMBeans.bridgesPattern(BROKER)), names(bridgeA, bridgeB, stray));
         on(
                 readOf(divertMbean),
                 json("{\"UniqueName\":\"d1\",\"Address\":\"orders\",\"ForwardingAddress\":\"audit\","
@@ -362,7 +362,7 @@ class BrokerConfigOperationsTest {
         on(readOf(bridgeB), json("{\"Name\":\"to-dc2-1\",\"QueueName\":\"q\",\"Started\":true,\"Connected\":false}"));
         on(readOf(stray), json("{\"Name\":\"stray\",\"Started\":false}"));
         on(readOf(orders), json("{\"RoutingTypes\":[\"ANYCAST\"],\"AddressSize\":42,\"MessageCount\":7}"));
-        on(readOf(BrokerMBeans.address(BROKER, "orders.eu")), json("{\"RoutingTypes\":[\"MULTICAST\"]}"));
+        on(readOf(ArtemisMBeans.address(BROKER, "orders.eu")), json("{\"RoutingTypes\":[\"MULTICAST\"]}"));
         on(readOf(ordersQueue), json("{\"Name\":\"orders.q\"}"));
         on(
                 search(orders + ",subcomponent=queues,*"),
@@ -470,8 +470,8 @@ class BrokerConfigOperationsTest {
                         && r.attribute().contains("Active"),
                 json("{\"Active\":true,\"AddressNames\":[\"orders.eu\",\"orders.us\",\"activemq.x\",\"billing\"]}"));
         on(r -> "search".equals(r.type()), json("[]"));
-        on(readOf(BrokerMBeans.address(BROKER, "orders.eu")), json("{\"RoutingTypes\":[\"ANYCAST\"]}"));
-        on(readOf(BrokerMBeans.address(BROKER, "orders.us")), failure("gone"));
+        on(readOf(ArtemisMBeans.address(BROKER, "orders.eu")), json("{\"RoutingTypes\":[\"ANYCAST\"]}"));
+        on(readOf(ArtemisMBeans.address(BROKER, "orders.us")), failure("gone"));
 
         ObservedNodeConfig observed =
                 ops.read(client, NODE, "node-a", scope(Set.of("orders.#"), Set.of(), Map.of(), Set.of(), List.of()));
@@ -479,7 +479,8 @@ class BrokerConfigOperationsTest {
         List<String> readAddresses =
                 batches.get(1).stream().map(JolokiaRequest::mbean).toList();
         assertThat(readAddresses)
-                .containsExactly(BrokerMBeans.address(BROKER, "orders.eu"), BrokerMBeans.address(BROKER, "orders.us"));
+                .containsExactly(
+                        ArtemisMBeans.address(BROKER, "orders.eu"), ArtemisMBeans.address(BROKER, "orders.us"));
         assertThat(observed.addresses().get("orders.eu")).containsExactly("ANYCAST");
         // An address whose MBean would not answer is still known by name.
         assertThat(observed.addresses().get("orders.us")).isEmpty();
@@ -498,11 +499,11 @@ class BrokerConfigOperationsTest {
                 json("{\"Active\":true,\"AddressNames\":[\"a\",\"b\",\"$sys.x\",\"activemq.notifications\"]}"));
         on(exec(BrokerConfigOperations.GET_ADDRESS_SETTINGS, "#"), json("\"{\\\"a\\\":1}\""));
         on(exec(BrokerConfigOperations.GET_ROLES, "#"), json("\"[{\\\"name\\\":\\\"r\\\",\\\"send\\\":true}]\""));
-        on(search(BrokerMBeans.divertsPattern(BROKER)), names(divertMbean));
-        on(readOf(BrokerMBeans.address(BROKER, "a")), json("{\"RoutingTypes\":[\"MULTICAST\"]}"));
+        on(search(ArtemisMBeans.divertsPattern(BROKER)), names(divertMbean));
+        on(readOf(ArtemisMBeans.address(BROKER, "a")), json("{\"RoutingTypes\":[\"MULTICAST\"]}"));
         on(exec(BrokerConfigOperations.GET_ADDRESS_SETTINGS, "a"), json("\"{\\\"b\\\":2}\""));
         on(exec(BrokerConfigOperations.GET_ROLES, "a"), json("\"[]\""));
-        on(readOf(BrokerMBeans.address(BROKER, "b")), failure("gone"));
+        on(readOf(ArtemisMBeans.address(BROKER, "b")), failure("gone"));
         on(exec(BrokerConfigOperations.GET_ADDRESS_SETTINGS, "b"), failure("gone"));
         on(exec(BrokerConfigOperations.GET_ROLES, "b"), failure("gone"));
         on(readOf(divertMbean), json("{\"UniqueName\":\"d\",\"Address\":\"a\"}"));
@@ -531,7 +532,7 @@ class BrokerConfigOperationsTest {
         on(exec(BrokerConfigOperations.GET_ADDRESS_SETTINGS, "#"), failure("no"));
         on(exec(BrokerConfigOperations.GET_ROLES, "#"), failure("no"));
         on(r -> "search".equals(r.type()), json("[]"));
-        on(readOf(BrokerMBeans.address(BROKER, "a")), json("{\"RoutingTypes\":[\"ANYCAST\"]}"));
+        on(readOf(ArtemisMBeans.address(BROKER, "a")), json("{\"RoutingTypes\":[\"ANYCAST\"]}"));
         on(exec(BrokerConfigOperations.GET_ADDRESS_SETTINGS, "a"), json("\"[]\""));
         on(exec(BrokerConfigOperations.GET_ROLES, "a"), json("\"[]\""));
 

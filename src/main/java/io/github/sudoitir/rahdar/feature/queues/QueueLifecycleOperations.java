@@ -1,11 +1,11 @@
 package io.github.sudoitir.rahdar.feature.queues;
 
+import io.github.sudoitir.openbroker.artemis.ArtemisMBeans;
+import io.github.sudoitir.openbroker.artemis.JolokiaRequest;
+import io.github.sudoitir.openbroker.artemis.JolokiaResponse;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
-import io.github.sudoitir.rahdar.platform.broker.BrokerMBeans;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaBrokerClient;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaRequest;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaResponse;
 import io.github.sudoitir.rahdar.platform.broker.ManagementRefusal;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -93,7 +93,7 @@ public class QueueLifecycleOperations {
      * asked for. That costs a second call only on the path where one is genuinely
      * needed.
      */
-    public JsonNode createQueue(JolokiaBrokerClient client, String brokerMbean, Map<String, Object> config) {
+    public JsonNode createQueue(ArtemisNode client, String brokerMbean, Map<String, Object> config) {
         JolokiaResponse res = client.single(JolokiaRequest.exec(
                 brokerMbean, "createQueue(java.lang.String,boolean)", mapper.writeValueAsString(config), false));
         require(res, "createQueue");
@@ -114,8 +114,7 @@ public class QueueLifecycleOperations {
      * <p>The read is not a dry run — it is part of performing the update — so this
      * does not violate the never-preview-and-act-in-one-POST rule.
      */
-    public JsonNode updateQueue(
-            JolokiaBrokerClient client, String brokerMbean, String queueMbean, Map<String, Object> patch) {
+    public JsonNode updateQueue(ArtemisNode client, String brokerMbean, String queueMbean, Map<String, Object> patch) {
         Map<String, Object> merged = readQueueConfig(client, queueMbean);
         merged.putAll(patch);
         JolokiaResponse res = client.single(
@@ -129,7 +128,7 @@ public class QueueLifecycleOperations {
      * read from its MBean attributes in one call. Also the read half of the
      * create-time comparison that distinguishes {@code ALREADY} from a mismatch.
      */
-    public Map<String, Object> readQueueConfig(JolokiaBrokerClient client, String queueMbean) {
+    public Map<String, Object> readQueueConfig(ArtemisNode client, String queueMbean) {
         JolokiaResponse res = client.single(JolokiaRequest.readAll(queueMbean));
         require(res, "read queue configuration");
         return toQueueConfig(res.value());
@@ -162,8 +161,7 @@ public class QueueLifecycleOperations {
      * {@link ManagementRefusal.Kind#HAS_CONSUMERS}. A queue that is already gone raises
      * {@link ManagementRefusal.Kind#ALREADY}.
      */
-    public void destroyQueue(
-            JolokiaBrokerClient client, String brokerMbean, String queueName, boolean removeConsumers) {
+    public void destroyQueue(ArtemisNode client, String brokerMbean, String queueName, boolean removeConsumers) {
         JolokiaResponse res = client.single(JolokiaRequest.exec(
                 brokerMbean, "destroyQueue(java.lang.String,boolean,boolean)", queueName, removeConsumers, false));
         require(res, "destroyQueue");
@@ -179,10 +177,11 @@ public class QueueLifecycleOperations {
     public record DeleteState(boolean present, long consumerCount, List<String> addressQueues) {}
 
     public DeleteState deleteState(
-            JolokiaBrokerClient client, String brokerMbean, String address, String queueName, String routingType) {
+            ArtemisNode client, String brokerMbean, String address, String queueName, String routingType) {
         List<JolokiaResponse> res = client.batch(List.of(
-                JolokiaRequest.read(BrokerMBeans.address(brokerMbean, address), QUEUE_NAMES),
-                JolokiaRequest.read(BrokerMBeans.queue(brokerMbean, address, queueName, routingType), CONSUMER_COUNT)));
+                JolokiaRequest.read(ArtemisMBeans.address(brokerMbean, address), QUEUE_NAMES),
+                JolokiaRequest.read(
+                        ArtemisMBeans.queue(brokerMbean, address, queueName, routingType), CONSUMER_COUNT)));
         // An address that is not there is a fact: the queue is gone. Any other failed read is
         // not, and throwing makes the node "could not be checked" rather than assumed fine.
         if (absent(res.get(0))) {
@@ -206,7 +205,7 @@ public class QueueLifecycleOperations {
     }
 
     /** {@code MessageCount} on the queue MBean — the delete estimate the bulk cap is checked against (D6). */
-    public long messageCount(JolokiaBrokerClient client, String queueMbean) {
+    public long messageCount(ArtemisNode client, String queueMbean) {
         JolokiaResponse res = client.single(JolokiaRequest.read(queueMbean, MESSAGE_COUNT));
         require(res, MESSAGE_COUNT);
         JsonNode count = res.attribute(MESSAGE_COUNT);
@@ -214,7 +213,7 @@ public class QueueLifecycleOperations {
     }
 
     /** Whether the queue is currently paused — the {@code ALREADY} test for pause / resume. */
-    public boolean isPaused(JolokiaBrokerClient client, String queueMbean) {
+    public boolean isPaused(ArtemisNode client, String queueMbean) {
         JolokiaResponse res = client.single(JolokiaRequest.read(queueMbean, PAUSED));
         require(res, PAUSED);
         JsonNode paused = res.attribute(PAUSED);
@@ -222,22 +221,22 @@ public class QueueLifecycleOperations {
     }
 
     /** Pause delivery, persistently so it survives a broker restart. */
-    public void pause(JolokiaBrokerClient client, String queueMbean) {
+    public void pause(ArtemisNode client, String queueMbean) {
         require(client.single(JolokiaRequest.exec(queueMbean, "pause(boolean)", true)), "pause");
     }
 
-    public void resume(JolokiaBrokerClient client, String queueMbean) {
+    public void resume(ArtemisNode client, String queueMbean) {
         require(client.single(JolokiaRequest.exec(queueMbean, "resume()")), "resume");
     }
 
-    public void resetMessageCounter(JolokiaBrokerClient client, String queueMbean) {
+    public void resetMessageCounter(ArtemisNode client, String queueMbean) {
         require(client.single(JolokiaRequest.exec(queueMbean, "resetMessageCounter()")), "resetMessageCounter");
     }
 
     // ---- addresses ------------------------------------------------------
 
     /** Create an address. One that already exists raises {@link ManagementRefusal.Kind#ALREADY}. */
-    public void createAddress(JolokiaBrokerClient client, String brokerMbean, String address, String routingTypes) {
+    public void createAddress(ArtemisNode client, String brokerMbean, String address, String routingTypes) {
         JolokiaResponse res = client.single(JolokiaRequest.exec(
                 brokerMbean, "createAddress(java.lang.String,java.lang.String)", address, routingTypes));
         require(res, "createAddress");
@@ -248,7 +247,7 @@ public class QueueLifecycleOperations {
      * to drop a routing type while a queue of that type is bound ({@code AMQ229209},
      * broker-management-notes §15 M8), so this never unbinds a queue.
      */
-    public void updateAddress(JolokiaBrokerClient client, String brokerMbean, String address, String routingTypes) {
+    public void updateAddress(ArtemisNode client, String brokerMbean, String address, String routingTypes) {
         JolokiaResponse res = client.single(JolokiaRequest.exec(
                 brokerMbean, "updateAddress(java.lang.String,java.lang.String)", address, routingTypes));
         require(res, "updateAddress");
@@ -260,14 +259,14 @@ public class QueueLifecycleOperations {
      * {@link ManagementRefusal.Kind#BOUND_QUEUES}; the caller names the queues,
      * because the broker's own message does not.
      */
-    public void deleteAddress(JolokiaBrokerClient client, String brokerMbean, String address) {
+    public void deleteAddress(ArtemisNode client, String brokerMbean, String address) {
         JolokiaResponse res =
                 client.single(JolokiaRequest.exec(brokerMbean, "deleteAddress(java.lang.String)", address));
         require(res, "deleteAddress");
     }
 
     /** The queues bound to an address — what a {@link ManagementRefusal.Kind#BOUND_QUEUES} refusal names. */
-    public List<String> boundQueues(JolokiaBrokerClient client, String addressMbean) {
+    public List<String> boundQueues(ArtemisNode client, String addressMbean) {
         JolokiaResponse res = client.single(JolokiaRequest.read(addressMbean, QUEUE_NAMES));
         if (!res.ok()) {
             return List.of();
@@ -282,6 +281,6 @@ public class QueueLifecycleOperations {
     // ---- helpers --------------------------------------------------------
 
     private static void require(JolokiaResponse res, String operation) {
-        ManagementRefusal.require(res, operation);
+        ArtemisNode.require(res, operation);
     }
 }

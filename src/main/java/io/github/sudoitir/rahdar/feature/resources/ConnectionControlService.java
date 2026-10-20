@@ -10,15 +10,16 @@ import io.github.sudoitir.rahdar.kernel.stream.SseHub;
 import io.github.sudoitir.rahdar.platform.broker.Attempt;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaBrokerClient;
-import io.github.sudoitir.rahdar.platform.clusters.BrokerCommands;
-import io.github.sudoitir.rahdar.platform.clusters.BrokerCommands.Command;
-import io.github.sudoitir.rahdar.platform.clusters.BrokerCommands.Estimate;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
 import io.github.sudoitir.rahdar.platform.clusters.LifecycleOutcome;
 import io.github.sudoitir.rahdar.platform.clusters.LifecycleOutcome.NodeOutcome;
 import io.github.sudoitir.rahdar.platform.clusters.LifecycleOutcome.NodeStatus;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNodes;
+import io.github.sudoitir.rahdar.system.artemis.BrokerCommands;
+import io.github.sudoitir.rahdar.system.artemis.BrokerCommands.Command;
+import io.github.sudoitir.rahdar.system.artemis.BrokerCommands.Estimate;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -68,6 +69,7 @@ public class ConnectionControlService {
     private final SseHub sseHub;
     private final ClusterAccessGuard clusterAccess;
     private final BrokerCommands commands;
+    private final ArtemisNodes artemisNodes;
 
     /**
      * One close's result: what was found immediately before it, and what each node
@@ -126,7 +128,7 @@ public class ConnectionControlService {
                 dryRun);
 
         try {
-            JolokiaBrokerClient client = clientFor(clusterId, node);
+            ArtemisNode client = clientFor(clusterId, node);
             Resolved resolved = resolve(client, kind, subject);
 
             // Already gone. The requested state holds, so this is a success on every
@@ -171,7 +173,7 @@ public class ConnectionControlService {
     /** What a close by id ends up acting on, once the broker's own rows have been walked. */
     private record Resolved(String connectionId, String sessionId, ConnectionSnapshot target) {}
 
-    private Resolved resolve(JolokiaBrokerClient client, ConnectionCloseKind kind, String id) {
+    private Resolved resolve(ArtemisNode client, ConnectionCloseKind kind, String id) {
         switch (kind) {
             case CONNECTION -> {
                 ConnectionSnapshot target = ops.readConnection(client, id);
@@ -269,8 +271,8 @@ public class ConnectionControlService {
                 .orElseThrow(() -> new NotFoundException("node", nodeId));
     }
 
-    private JolokiaBrokerClient clientFor(UUID clusterId, ClusterNode node) {
-        return connections.forCluster(clusterId, node.getJolokiaUrl());
+    private ArtemisNode clientFor(UUID clusterId, ClusterNode node) {
+        return artemisNodes.on(clusterId, node.getId());
     }
 
     private void publishTopics(UUID clusterId) {

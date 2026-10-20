@@ -3,7 +3,7 @@ package io.github.sudoitir.rahdar.platform.broker;
 import java.util.UUID;
 
 /**
- * Everything {@link BrokerClientFactory} needs to build a client for a cluster:
+ * Everything {@link BrokerGateway} needs to connect to a cluster:
  * the (already decrypted) HTTP Basic credentials and the optional TLS bundle.
  * Credentials are per cluster ({@code broker_credential} is keyed by
  * {@code (cluster_id, kind)}), so one of these serves every node in a cluster.

@@ -1,14 +1,14 @@
 package io.github.sudoitir.rahdar.feature.queues;
 
-import io.github.sudoitir.rahdar.platform.broker.BrokerClientFactory;
+import io.github.sudoitir.rahdar.platform.broker.BrokerCapabilityProbe;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
 import io.github.sudoitir.rahdar.platform.broker.BrokerSessions;
-import io.github.sudoitir.rahdar.platform.broker.CapabilityProbe;
 import io.github.sudoitir.rahdar.platform.broker.CoreAccountCheck;
 import io.github.sudoitir.rahdar.platform.broker.CoreSubscriptionCheck;
 import io.github.sudoitir.rahdar.platform.broker.CoreSubscriptionManager;
 import io.github.sudoitir.rahdar.platform.broker.NodeCallLimiter;
 import io.github.sudoitir.rahdar.support.ModuleIntegrationTest;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNodes;
 import org.springframework.modulith.test.ApplicationModuleTest;
 import org.springframework.modulith.test.ApplicationModuleTest.BootstrapMode;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -21,7 +21,7 @@ class QueuesModuleTest extends ModuleIntegrationTest {
     // the broker module, which queues itself does not use.
 
     @MockitoBean
-    BrokerClientFactory clientFactory;
+    ArtemisNodes clientFactory;
 
     @MockitoBean
     BrokerConnections connections;
@@ -30,7 +30,7 @@ class QueuesModuleTest extends ModuleIntegrationTest {
     BrokerSessions sessions;
 
     @MockitoBean
-    CapabilityProbe capabilityProbe;
+    BrokerCapabilityProbe capabilityProbe;
 
     @MockitoBean
     CoreAccountCheck coreAccountCheck;

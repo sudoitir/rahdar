@@ -11,9 +11,9 @@ import io.github.sudoitir.rahdar.platform.broker.ClockOffsetRegistry.ClockOffset
 import io.github.sudoitir.rahdar.platform.broker.ClockOffsetService;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
-import io.github.sudoitir.rahdar.platform.scrape.QueueLocator;
-import io.github.sudoitir.rahdar.platform.scrape.QueueLocator.QueueLocation;
 import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshots;
+import io.github.sudoitir.rahdar.system.artemis.QueueLocator;
+import io.github.sudoitir.rahdar.system.artemis.QueueLocator.QueueLocation;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;

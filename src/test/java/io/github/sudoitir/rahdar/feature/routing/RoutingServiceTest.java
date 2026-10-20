@@ -16,7 +16,6 @@ import io.github.sudoitir.rahdar.feature.routing.web.RoutingViews.NodeRef;
 import io.github.sudoitir.rahdar.kernel.core.PagedView;
 import io.github.sudoitir.rahdar.kernel.core.ResourceQuery;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaBrokerClient;
 import io.github.sudoitir.rahdar.platform.clusters.LifecycleOutcome;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNodeEntity;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNodeEntity.HaObservation;
@@ -25,6 +24,8 @@ import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterE
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterRepository;
 import io.github.sudoitir.rahdar.support.AdminAuthenticationExtension;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNodes;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -65,6 +66,9 @@ class RoutingServiceTest extends PostgresIntegrationTest {
     BrokerConnections connections;
 
     @MockitoBean
+    ArtemisNodes artemisNodes;
+
+    @MockitoBean
     DivertOperations divertOps;
 
     private UUID clusterId;
@@ -78,9 +82,9 @@ class RoutingServiceTest extends PostgresIntegrationTest {
         nodeA = node("node-a", NODE_A_URL);
         nodeB = node("node-b", NODE_B_URL);
 
-        JolokiaBrokerClient client = mock(JolokiaBrokerClient.class);
+        ArtemisNode client = mock(ArtemisNode.class);
         when(client.resolveBrokerObjectName()).thenReturn("org.apache.activemq.artemis:broker=\"b\"");
-        when(connections.forCluster(eq(clusterId), anyString())).thenReturn(client);
+        when(artemisNodes.on(eq(clusterId), any(UUID.class))).thenReturn(client);
         when(divertOps.addressAvailable(any(), any(), any())).thenReturn(true);
         when(divertOps.createVerified(any(), any(), any())).thenReturn(LifecycleOutcome.NodeStatus.APPLIED);
     }

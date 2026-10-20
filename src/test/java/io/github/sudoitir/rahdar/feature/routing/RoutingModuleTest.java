@@ -1,8 +1,8 @@
 package io.github.sudoitir.rahdar.feature.routing;
 
-import io.github.sudoitir.rahdar.platform.scrape.QueueLocator;
 import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshotUpsert;
 import io.github.sudoitir.rahdar.support.ModuleIntegrationTest;
+import io.github.sudoitir.rahdar.system.artemis.QueueLocator;
 import org.springframework.modulith.test.ApplicationModuleTest;
 import org.springframework.modulith.test.ApplicationModuleTest.BootstrapMode;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;

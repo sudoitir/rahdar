@@ -1,17 +1,18 @@
 package io.github.sudoitir.rahdar.feature.queues;
 
+import io.github.sudoitir.openbroker.artemis.ArtemisMBeans;
 import io.github.sudoitir.rahdar.kernel.core.NotFoundException;
 import io.github.sudoitir.rahdar.kernel.security.ClusterAccessGuard;
 import io.github.sudoitir.rahdar.kernel.security.Permissions;
 import io.github.sudoitir.rahdar.kernel.security.ResourceRef;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
-import io.github.sudoitir.rahdar.platform.broker.BrokerMBeans;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaBrokerClient;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
-import io.github.sudoitir.rahdar.platform.scrape.QueueLocator;
-import io.github.sudoitir.rahdar.platform.scrape.QueueLocator.QueueLocation;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNodes;
+import io.github.sudoitir.rahdar.system.artemis.QueueLocator;
+import io.github.sudoitir.rahdar.system.artemis.QueueLocator.QueueLocation;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -45,6 +46,7 @@ public class QueueConfigurationReader {
     private final BrokerConnections connections;
     private final QueueLifecycleOperations ops;
     private final ClusterAccessGuard access;
+    private final ArtemisNodes artemisNodes;
 
     /** One node's copy of the queue: its configuration, or why it could not be read. */
     public record NodeConfiguration(
@@ -71,8 +73,8 @@ public class QueueConfigurationReader {
                 continue;
             }
             try {
-                JolokiaBrokerClient client = connections.forCluster(clusterId, node.getJolokiaUrl());
-                String mbean = BrokerMBeans.queue(
+                ArtemisNode client = artemisNodes.on(clusterId, node.getId());
+                String mbean = ArtemisMBeans.queue(
                         client.resolveBrokerObjectName(),
                         location.address(),
                         location.queueName(),

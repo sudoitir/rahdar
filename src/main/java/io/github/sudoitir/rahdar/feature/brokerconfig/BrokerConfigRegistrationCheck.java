@@ -1,10 +1,12 @@
 package io.github.sudoitir.rahdar.feature.brokerconfig;
 
 import io.github.sudoitir.rahdar.feature.brokerconfig.web.BrokerConfigViews.RecommendationsView;
-import io.github.sudoitir.rahdar.platform.broker.BrokerAccountRoles;
 import io.github.sudoitir.rahdar.platform.broker.BrokerCapabilities;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaBrokerClient;
+import io.github.sudoitir.rahdar.platform.broker.BrokerTarget;
 import io.github.sudoitir.rahdar.platform.clusters.RegistrationCheckContributor;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNodes;
+import io.github.sudoitir.rahdar.system.artemis.BrokerAccountRoles;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -23,6 +25,7 @@ class BrokerConfigRegistrationCheck implements RegistrationCheckContributor {
 
     private final BrokerConfigOperations operations;
     private final BrokerAccountRoles accountRoles;
+    private final ArtemisNodes artemisNodes;
 
     @Override
     public String featureId() {
@@ -30,8 +33,8 @@ class BrokerConfigRegistrationCheck implements RegistrationCheckContributor {
     }
 
     @Override
-    public RecommendationsView contribute(
-            BrokerCapabilities capabilities, JolokiaBrokerClient seed, String coreUsername) {
+    public RecommendationsView contribute(BrokerCapabilities capabilities, BrokerTarget target, String coreUsername) {
+        ArtemisNode seed = artemisNodes.on(target);
         return RecommendationsView.of(
                 BrokerConfigRecommendations.from(capabilities, observe(seed), accountRoles.read(seed, coreUsername)));
     }
@@ -40,7 +43,7 @@ class BrokerConfigRegistrationCheck implements RegistrationCheckContributor {
      * A read that fails costs the seed and nothing else: the panel then says it could not read the
      * node rather than showing a replace nobody can check.
      */
-    private ObservedNodeConfig observe(JolokiaBrokerClient seed) {
+    private ObservedNodeConfig observe(ArtemisNode seed) {
         try {
             return operations.read(
                     seed,

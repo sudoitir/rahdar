@@ -84,26 +84,22 @@ public class BrokerGateway implements DisposableBean {
         return held.connection();
     }
 
-    /**
-     * A connection to addresses that are not registered nodes, with a cluster's credentials and TLS.
-     * Each node's id is its management URL. Close it when done.
-     */
-    public ClusterConnection probe(UUID clusterId, List<String> managementUrls) {
-        List<NodeSpec> nodes = managementUrls.stream()
-                .map(url -> new NodeSpec(NodeId.of(url), List.of(new Endpoint(Plane.MANAGEMENT, JOLOKIA, url))))
-                .toList();
-        return drivers.connect(request(clusterId, ClusterSpec.ofNodes(nodes)));
+    /** Addresses that are not registered nodes, reached with a registered cluster's credentials and TLS. */
+    public ProbeSession probe(UUID clusterId) {
+        return new ProbeSession(spec -> drivers.connect(request(clusterId, spec)));
     }
 
-    /** As {@link #probe(UUID, List)}, with credentials and TLS given before the cluster exists. */
-    public ClusterConnection probe(BrokerConnectionSettings with, List<String> managementUrls) {
-        List<NodeSpec> nodes = managementUrls.stream()
-                .map(url -> new NodeSpec(NodeId.of(url), List.of(new Endpoint(Plane.MANAGEMENT, JOLOKIA, url))))
-                .toList();
+    /** Addresses reached with credentials and TLS given before the cluster exists. */
+    public ProbeSession probe(BrokerConnectionSettings with) {
         CredentialSource credentials =
                 plane -> with.hasCredentials() ? Credentials.of(with.username(), with.password()) : Credentials.none();
-        return drivers.connect(
-                new ConnectRequest(SYSTEM, ClusterSpec.ofNodes(nodes), credentials, options(tls.forCluster(with))));
+        return new ProbeSession(
+                spec -> drivers.connect(new ConnectRequest(SYSTEM, spec, credentials, options(tls.forCluster(with)))));
+    }
+
+    /** A registered node, through its cluster's connection. */
+    public BrokerTarget node(UUID clusterId, UUID nodeId) {
+        return new BrokerTarget(cluster(clusterId), idOf(nodeId));
     }
 
     /** Closes a cluster's connection: it was removed, or this replica no longer owns it. */

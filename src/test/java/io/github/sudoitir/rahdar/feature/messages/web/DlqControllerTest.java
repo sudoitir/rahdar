@@ -12,7 +12,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.setup.MockMvcBuilders.webAppContextSetup;
 
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaBrokerClient;
 import io.github.sudoitir.rahdar.platform.broker.QueueRow;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNodeEntity;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNodeRepository;
@@ -20,7 +19,10 @@ import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterE
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterRepository;
 import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshotUpsert;
 import io.github.sudoitir.rahdar.support.AdminAuthenticationExtension;
+import io.github.sudoitir.rahdar.support.FixtureJolokia;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNodes;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -35,9 +37,7 @@ import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.web.client.RestClient;
 import org.springframework.web.context.WebApplicationContext;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -66,6 +66,9 @@ class DlqControllerTest extends PostgresIntegrationTest {
     @MockitoBean
     BrokerConnections connections;
 
+    @MockitoBean
+    ArtemisNodes artemisNodes;
+
     private UUID clusterId;
     private UUID nodeId;
 
@@ -88,20 +91,18 @@ class DlqControllerTest extends PostgresIntegrationTest {
         clusters.deleteById(clusterId);
     }
 
-    private JolokiaBrokerClient client(String... bodies) {
-        RestClient.Builder builder = RestClient.builder();
-        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+    private ArtemisNode client(String... bodies) {
+        FixtureJolokia server = new FixtureJolokia();
         for (String b : bodies) {
             server.expect(requestTo(URL)).andRespond(withSuccess(b, MediaType.APPLICATION_JSON));
         }
-        return new JolokiaBrokerClient(builder.build(), URL, mapper);
+        return server.node();
     }
 
-    private JolokiaBrokerClient unauthorized() {
-        RestClient.Builder builder = RestClient.builder();
-        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+    private ArtemisNode unauthorized() {
+        FixtureJolokia server = new FixtureJolokia();
         server.expect(requestTo(URL)).andRespond(withStatus(HttpStatus.UNAUTHORIZED));
-        return new JolokiaBrokerClient(builder.build(), URL, mapper);
+        return server.node();
     }
 
     private static final String SEARCH =
@@ -117,7 +118,8 @@ class DlqControllerTest extends PostgresIntegrationTest {
 
     @Test
     void listsTheDlaFromSettingsWithItsQueuesAndPerNodeDepth() throws Exception {
-        when(connections.forCluster(clusterId, URL)).thenReturn(client(SEARCH, fixture("address-settings.json")));
+        when(artemisNodes.on(eq(clusterId), any(UUID.class)))
+                .thenReturn(client(SEARCH, fixture("address-settings.json")));
 
         mvc.perform(get("/api/v1/clusters/{c}/dlq", clusterId))
                 .andExpect(status().isOk())
@@ -130,7 +132,7 @@ class DlqControllerTest extends PostgresIntegrationTest {
 
     @Test
     void whenTheSettingsReadFailsItSaysSoAndInfersNothing() throws Exception {
-        when(connections.forCluster(eq(clusterId), any())).thenReturn(unauthorized());
+        when(artemisNodes.on(eq(clusterId), any(UUID.class))).thenReturn(unauthorized());
 
         mvc.perform(get("/api/v1/clusters/{c}/dlq", clusterId))
                 .andExpect(status().isOk())

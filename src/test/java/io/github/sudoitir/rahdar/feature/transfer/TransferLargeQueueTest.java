@@ -6,7 +6,7 @@ import io.github.sudoitir.rahdar.feature.transfer.internal.persistence.TransferR
 import io.github.sudoitir.rahdar.feature.transfer.web.TransferViews.TransferRunView;
 import io.github.sudoitir.rahdar.platform.broker.NodeAddress;
 import io.github.sudoitir.rahdar.platform.broker.NodeCallLimiter;
-import io.github.sudoitir.rahdar.platform.broker.StagingQueues;
+import io.github.sudoitir.rahdar.system.artemis.StagingQueues;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Duration;
 import java.util.concurrent.atomic.AtomicBoolean;

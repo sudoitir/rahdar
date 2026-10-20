@@ -3,6 +3,9 @@ package io.github.sudoitir.rahdar.feature.brokerconfig;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 
+import io.github.sudoitir.openbroker.artemis.ArtemisMBeans;
+import io.github.sudoitir.openbroker.artemis.JolokiaRequest;
+import io.github.sudoitir.openbroker.artemis.JolokiaResponse;
 import io.github.sudoitir.rahdar.feature.brokerconfig.BrokerConfigDocument.AddressDecl;
 import io.github.sudoitir.rahdar.feature.brokerconfig.BrokerConfigDocument.AddressSettingDecl;
 import io.github.sudoitir.rahdar.feature.brokerconfig.BrokerConfigDocument.DivertDecl;
@@ -13,10 +16,6 @@ import io.github.sudoitir.rahdar.feature.queues.QueueLifecycleOperations;
 import io.github.sudoitir.rahdar.kernel.audit.internal.persistence.AuditEventRepository;
 import io.github.sudoitir.rahdar.platform.broker.Attempt;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
-import io.github.sudoitir.rahdar.platform.broker.BrokerMBeans;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaBrokerClient;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaRequest;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaResponse;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterService;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterRepository;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterRequests.RegisterClusterRequest;
@@ -24,6 +23,7 @@ import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.ClusterDetai
 import io.github.sudoitir.rahdar.support.AdminAuthenticationExtension;
 import io.github.sudoitir.rahdar.support.ArtemisIntegrationTest;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -98,7 +98,7 @@ class BrokerConfigApplyRealBrokerTest extends PostgresIntegrationTest {
 
     private MockMvc mvc;
     private UUID clusterId;
-    private JolokiaBrokerClient client;
+    private ArtemisNode client;
     private String broker;
 
     @BeforeEach
@@ -119,7 +119,7 @@ class BrokerConfigApplyRealBrokerTest extends PostgresIntegrationTest {
             throw new IllegalStateException("could not register the container broker: " + attempt);
         }
         clusterId = ok.value().id();
-        client = connections.forCluster(clusterId, ArtemisIntegrationTest.jolokiaUrl());
+        client = ArtemisIntegrationTest.jolokiaClient(ArtemisIntegrationTest.jolokiaUrl());
         broker = client.resolveBrokerObjectName();
     }
 
@@ -240,7 +240,7 @@ class BrokerConfigApplyRealBrokerTest extends PostgresIntegrationTest {
         assertThat(routingTypes(events)).containsExactlyInAnyOrder("ANYCAST", "MULTICAST");
         assertThat(routingTypes(fanout)).containsExactly("MULTICAST");
         JsonNode queue = client.single(JolokiaRequest.read(
-                        BrokerMBeans.queue(broker, events, events, "ANYCAST"), "MaxConsumers", "Filter", "Exclusive"))
+                        ArtemisMBeans.queue(broker, events, events, "ANYCAST"), "MaxConsumers", "Filter", "Exclusive"))
                 .value();
         assertThat(queue.path("MaxConsumers").asInt()).isEqualTo(5);
         assertThat(queue.path("Filter").asString()).isEqualTo("region = 'eu'");
@@ -303,7 +303,7 @@ class BrokerConfigApplyRealBrokerTest extends PostgresIntegrationTest {
     }
 
     private Set<String> routingTypes(String address) {
-        JsonNode value = client.single(JolokiaRequest.read(BrokerMBeans.address(broker, address), "RoutingTypes"))
+        JsonNode value = client.single(JolokiaRequest.read(ArtemisMBeans.address(broker, address), "RoutingTypes"))
                 .attribute("RoutingTypes");
         return Set.copyOf(value.valueStream().map(JsonNode::asString).toList());
     }

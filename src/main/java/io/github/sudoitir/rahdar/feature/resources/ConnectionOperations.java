@@ -1,11 +1,11 @@
 package io.github.sudoitir.rahdar.feature.resources;
 
+import io.github.sudoitir.openbroker.artemis.ArtemisLists;
+import io.github.sudoitir.openbroker.artemis.JolokiaRequest;
+import io.github.sudoitir.openbroker.artemis.JolokiaResponse;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
-import io.github.sudoitir.rahdar.platform.broker.BrokerListOps;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaBrokerClient;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaRequest;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaResponse;
 import io.github.sudoitir.rahdar.platform.broker.ManagementRefusal;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -84,11 +84,9 @@ public class ConnectionOperations {
     }
 
     private final ObjectMapper mapper;
-    private final BrokerListOps listOps;
 
-    public ConnectionOperations(ObjectMapper mapper, BrokerListOps listOps) {
+    public ConnectionOperations(ObjectMapper mapper) {
         this.mapper = mapper;
-        this.listOps = listOps;
     }
 
     // ---- reads -----------------------------------------------------------
@@ -101,7 +99,7 @@ public class ConnectionOperations {
      * {@code listConsumers} per session in a single bulk request. The second is
      * skipped entirely when the connection carries no sessions.
      */
-    public ConnectionSnapshot readConnection(JolokiaBrokerClient client, String connectionId) {
+    public ConnectionSnapshot readConnection(ArtemisNode client, String connectionId) {
         List<JolokiaResponse> head = client.batch(List.of(
                 listRequest(client, "listConnections", filter(CONNECTION_ID, connectionId)),
                 listRequest(client, LIST_SESSIONS, filter(CONNECTION_ID, connectionId))));
@@ -114,8 +112,8 @@ public class ConnectionOperations {
         long consumers = 0;
         List<String> sessionIds = new ArrayList<>();
         for (JsonNode session : sessions) {
-            consumers += BrokerListOps.num(session, "consumerCount");
-            String id = BrokerListOps.str(session, "id");
+            consumers += ArtemisLists.num(session, "consumerCount");
+            String id = ArtemisLists.str(session, "id");
             if (id != null && !id.isBlank()) {
                 sessionIds.add(id);
             }
@@ -123,28 +121,28 @@ public class ConnectionOperations {
 
         return new ConnectionSnapshot(
                 connectionId,
-                BrokerListOps.str(connection, CLIENT_ID),
-                BrokerListOps.str(connection, "remoteAddress"),
-                BrokerListOps.str(connection, "users"),
-                BrokerListOps.str(connection, "protocol"),
+                ArtemisLists.str(connection, CLIENT_ID),
+                ArtemisLists.str(connection, "remoteAddress"),
+                ArtemisLists.str(connection, "users"),
+                ArtemisLists.str(connection, "protocol"),
                 // The connection's own sessionCount can disagree with the rows the
                 // session list returned; the rows are what the close will actually
                 // take with it, so they are what the operator is shown.
-                sessions.isEmpty() ? BrokerListOps.num(connection, "sessionCount") : sessions.size(),
+                sessions.isEmpty() ? ArtemisLists.num(connection, "sessionCount") : sessions.size(),
                 consumers,
                 inTransit(client, sessionIds));
     }
 
     /** The connection a session belongs to, or {@code null} when the session is gone. */
-    public String connectionIdOfSession(JolokiaBrokerClient client, String sessionId) {
+    public String connectionIdOfSession(ArtemisNode client, String sessionId) {
         JsonNode row = firstRow(client, listRequest(client, LIST_SESSIONS, filter("id", sessionId)));
-        return row == null ? null : BrokerListOps.str(row, CONNECTION_ID);
+        return row == null ? null : ArtemisLists.str(row, CONNECTION_ID);
     }
 
     /** The session a consumer belongs to, or {@code null} when the consumer is gone. */
-    public String sessionIdOfConsumer(JolokiaBrokerClient client, String consumerId) {
+    public String sessionIdOfConsumer(ArtemisNode client, String consumerId) {
         JsonNode row = firstRow(client, listRequest(client, LIST_CONSUMERS, filter("id", consumerId)));
-        return row == null ? null : BrokerListOps.str(row, "session");
+        return row == null ? null : ArtemisLists.str(row, "session");
     }
 
     /**
@@ -158,28 +156,28 @@ public class ConnectionOperations {
      * opaque connection id as its confirmation token, which is precisely what
      * ADR-0057 D3 forbids.
      */
-    public ConnectionSnapshot readSession(JolokiaBrokerClient client, String sessionId) {
+    public ConnectionSnapshot readSession(ArtemisNode client, String sessionId) {
         JsonNode row = firstRow(client, listRequest(client, LIST_SESSIONS, filter("id", sessionId)));
         if (row == null) {
             return null;
         }
-        String connectionId = BrokerListOps.str(row, CONNECTION_ID);
+        String connectionId = ArtemisLists.str(row, CONNECTION_ID);
         JsonNode connection = connectionId == null
                 ? null
                 : firstRow(client, listRequest(client, "listConnections", filter(CONNECTION_ID, connectionId)));
         return new ConnectionSnapshot(
                 connectionId,
-                firstNonBlank(BrokerListOps.str(row, CLIENT_ID), str(connection, CLIENT_ID)),
+                firstNonBlank(ArtemisLists.str(row, CLIENT_ID), str(connection, CLIENT_ID)),
                 str(connection, "remoteAddress"),
-                firstNonBlank(BrokerListOps.str(row, "user"), str(connection, "users")),
+                firstNonBlank(ArtemisLists.str(row, "user"), str(connection, "users")),
                 str(connection, "protocol"),
                 1,
-                BrokerListOps.num(row, "consumerCount"),
+                ArtemisLists.num(row, "consumerCount"),
                 inTransit(client, List.of(sessionId)));
     }
 
     private static String str(JsonNode row, String field) {
-        return row == null ? null : BrokerListOps.str(row, field);
+        return row == null ? null : ArtemisLists.str(row, field);
     }
 
     private static String firstNonBlank(String a, String b) {
@@ -190,27 +188,27 @@ public class ConnectionOperations {
      * How many consumers are bound to an address on this node — the address-scoped
      * close's per-node estimate, which the bulk cap is checked against (D6).
      */
-    public long countConsumersForAddress(JolokiaBrokerClient client, String address) {
-        return listOps.fetch(client, LIST_CONSUMERS, filter("address", address), -1, -1)
+    public long countConsumersForAddress(ArtemisNode client, String address) {
+        return ArtemisLists.fetch(client.jolokia(), LIST_CONSUMERS, filter("address", address), -1, -1)
                 .count();
     }
 
     // ---- closes (one exec each) -------------------------------------------
 
     /** @return true when a connection was closed; false when the node had none with that id. */
-    public boolean closeConnection(JolokiaBrokerClient client, String brokerMbean, String connectionId) {
+    public boolean closeConnection(ArtemisNode client, String brokerMbean, String connectionId) {
         return closed(client.single(
                 JolokiaRequest.exec(brokerMbean, "closeConnectionWithID(java.lang.String)", connectionId)));
     }
 
     /** @return true when a session was closed; false when it was already gone. */
-    public boolean closeSession(JolokiaBrokerClient client, String brokerMbean, String connectionId, String sessionId) {
+    public boolean closeSession(ArtemisNode client, String brokerMbean, String connectionId, String sessionId) {
         return closed(client.single(JolokiaRequest.exec(
                 brokerMbean, "closeSessionWithID(java.lang.String,java.lang.String)", connectionId, sessionId)));
     }
 
     /** @return true when at least one consumer connection was closed on this node. */
-    public boolean closeConsumerConnectionsForAddress(JolokiaBrokerClient client, String brokerMbean, String address) {
+    public boolean closeConsumerConnectionsForAddress(ArtemisNode client, String brokerMbean, String address) {
         return closed(client.single(
                 JolokiaRequest.exec(brokerMbean, "closeConsumerConnectionsForAddress(java.lang.String)", address)));
     }
@@ -221,7 +219,7 @@ public class ConnectionOperations {
      * In-flight messages held across a set of sessions, or {@code null} when there
      * is nothing to ask about. One bulk POST holds every session's consumer list.
      */
-    private Long inTransit(JolokiaBrokerClient client, List<String> sessionIds) {
+    private Long inTransit(ArtemisNode client, List<String> sessionIds) {
         if (sessionIds.isEmpty()) {
             return null;
         }
@@ -231,7 +229,7 @@ public class ConnectionOperations {
         long total = 0;
         for (JolokiaResponse entry : client.batch(requests)) {
             for (JsonNode consumer : rows(client, entry)) {
-                total += BrokerListOps.num(consumer, "messagesInTransit");
+                total += ArtemisLists.num(consumer, "messagesInTransit");
             }
         }
         return total;
@@ -246,21 +244,21 @@ public class ConnectionOperations {
         return mapper.writeValueAsString(f);
     }
 
-    private JolokiaRequest listRequest(JolokiaBrokerClient client, String op, String options) {
+    private JolokiaRequest listRequest(ArtemisNode client, String op, String options) {
         return JolokiaRequest.exec(
                 client.resolveBrokerObjectName(), op + "(java.lang.String,int,int)", options, -1, -1);
     }
 
-    private JsonNode firstRow(JolokiaBrokerClient client, JolokiaRequest request) {
+    private JsonNode firstRow(ArtemisNode client, JolokiaRequest request) {
         return firstRow(client, client.single(request));
     }
 
-    private JsonNode firstRow(JolokiaBrokerClient client, JolokiaResponse entry) {
+    private JsonNode firstRow(ArtemisNode client, JolokiaResponse entry) {
         List<JsonNode> rows = rows(client, entry);
         return rows.isEmpty() ? null : rows.get(0);
     }
 
-    private List<JsonNode> rows(JolokiaBrokerClient client, JolokiaResponse entry) {
+    private List<JsonNode> rows(ArtemisNode client, JolokiaResponse entry) {
         JsonNode data = client.parsed(entry).get("data");
         if (data == null || !data.isArray()) {
             return List.of();

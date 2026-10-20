@@ -6,9 +6,9 @@ import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import io.github.sudoitir.openbroker.artemis.JolokiaResponse;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaBrokerClient;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaResponse;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -20,7 +20,7 @@ class QueueLifecycleOperationsTest {
     private static final String BROKER = "org.apache.activemq.artemis:broker=\"b\"";
     private final ObjectMapper mapper = new ObjectMapper();
     private final QueueLifecycleOperations ops = new QueueLifecycleOperations(mapper);
-    private final JolokiaBrokerClient client = mock(JolokiaBrokerClient.class);
+    private final ArtemisNode client = mock(ArtemisNode.class);
 
     private JolokiaResponse ok(String attribute, Object value) {
         return new JolokiaResponse(200, mapper.valueToTree(Map.of(attribute, value)), null, null, null);

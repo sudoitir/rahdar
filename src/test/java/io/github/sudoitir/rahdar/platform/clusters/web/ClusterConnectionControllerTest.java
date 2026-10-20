@@ -2,11 +2,10 @@ package io.github.sudoitir.rahdar.platform.clusters.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.argThat;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -23,11 +22,12 @@ import io.github.sudoitir.rahdar.kernel.audit.internal.persistence.AuditEventRep
 import io.github.sudoitir.rahdar.kernel.security.RahdarPrincipal;
 import io.github.sudoitir.rahdar.kernel.security.SecretVault;
 import io.github.sudoitir.rahdar.platform.broker.AccountResult;
-import io.github.sudoitir.rahdar.platform.broker.BrokerClientFactory;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionSettings;
+import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
+import io.github.sudoitir.rahdar.platform.broker.BrokerTarget;
 import io.github.sudoitir.rahdar.platform.broker.CoreAccountCheck;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaBrokerClient;
 import io.github.sudoitir.rahdar.platform.broker.ManagementUrlProblem;
+import io.github.sudoitir.rahdar.platform.broker.ProbeSession;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerCredentialEntity;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerCredentialRepository;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNodeEntity;
@@ -35,6 +35,7 @@ import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNo
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterEntity;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterRepository;
 import io.github.sudoitir.rahdar.support.AdminAuthenticationExtension;
+import io.github.sudoitir.rahdar.support.FixtureJolokia;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -53,11 +54,9 @@ import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
-import org.springframework.web.client.RestClient;
 import org.springframework.web.context.WebApplicationContext;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -103,7 +102,13 @@ class ClusterConnectionControllerTest extends PostgresIntegrationTest {
     SecretVault vault;
 
     @MockitoBean
-    BrokerClientFactory clientFactory;
+    BrokerGateway gateway;
+
+    /** Every probe with the request's or the stored account goes through this session. */
+    private final ProbeSession session = mock(ProbeSession.class);
+
+    /** Probes with the new password under test go through this one. */
+    private final ProbeSession newSecretSession = mock(ProbeSession.class);
 
     @MockitoBean
     CoreAccountCheck coreAccountCheck;
@@ -112,6 +117,11 @@ class ClusterConnectionControllerTest extends PostgresIntegrationTest {
 
     @BeforeEach
     void setUp() {
+        when(gateway.probe(any(BrokerConnectionSettings.class))).thenAnswer(inv -> {
+            BrokerConnectionSettings s = inv.getArgument(0);
+            return s != null && NEW_SECRET.equals(s.password()) ? newSecretSession : session;
+        });
+        when(gateway.probe(any(UUID.class))).thenReturn(session);
         mvc = webAppContextSetup(webContext).build();
         audits.deleteAll();
         clusters.deleteAll();
@@ -132,8 +142,8 @@ class ClusterConnectionControllerTest extends PostgresIntegrationTest {
 
         when(coreAccountCheck.check(any(), any())).thenReturn(AccountResult.ACCEPTED);
         // Every discovery tick: each manageable node answers search, HA read and topology.
-        when(clientFactory.forNode(any(), any())).thenAnswer(inv -> {
-            String url = inv.getArgument(1);
+        when(session.node(any())).thenAnswer(inv -> {
+            String url = inv.getArgument(0);
             return client(
                     url, url.contains("backup") ? "ha-read-backup.json" : "ha-read-primary.json", "topology.json");
         });
@@ -144,23 +154,19 @@ class ClusterConnectionControllerTest extends PostgresIntegrationTest {
                 clusterId, kind, username, vault.seal(SecretVault.aad(clusterId, kind), password)));
     }
 
-    private JolokiaBrokerClient client(String url, String... fixtures) {
-        RestClient.Builder builder = RestClient.builder();
-        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+    private BrokerTarget client(String url, String... fixtures) {
+        FixtureJolokia server = new FixtureJolokia();
         server.expect(requestTo(url)).andRespond(withSuccess(body("search-broker.json"), MediaType.APPLICATION_JSON));
         for (String fixture : fixtures) {
             server.expect(requestTo(url)).andRespond(withSuccess(body(fixture), MediaType.APPLICATION_JSON));
         }
-        return new JolokiaBrokerClient(builder.build(), url, mapper);
+        return server.target();
     }
 
-    private JolokiaBrokerClient refusing(String url) {
-        RestClient.Builder builder = RestClient.builder();
-        MockRestServiceServer.bindTo(builder)
-                .build()
-                .expect(requestTo(url))
-                .andRespond(withStatus(HttpStatus.UNAUTHORIZED));
-        return new JolokiaBrokerClient(builder.build(), url, mapper);
+    private BrokerTarget refusing(String url) {
+        FixtureJolokia server = new FixtureJolokia();
+        server.expect(requestTo(url)).andRespond(withStatus(HttpStatus.UNAUTHORIZED));
+        return server.target();
     }
 
     private static String body(String fixture) {
@@ -187,12 +193,10 @@ class ClusterConnectionControllerTest extends PostgresIntegrationTest {
 
     @Test
     void aNewPasswordIsCheckedOnEveryNodeAndNothingIsStored() throws Exception {
-        doReturn(refusing(PRIMARY_URL))
-                .when(clientFactory)
-                .forNode(argThat((BrokerConnectionSettings s) -> NEW_SECRET.equals(s.password())), eq(PRIMARY_URL));
+        doReturn(refusing(PRIMARY_URL)).when(newSecretSession).node(PRIMARY_URL);
         doReturn(client(BACKUP_URL, "ha-read-backup.json"))
-                .when(clientFactory)
-                .forNode(argThat((BrokerConnectionSettings s) -> NEW_SECRET.equals(s.password())), eq(BACKUP_URL));
+                .when(newSecretSession)
+                .node(BACKUP_URL);
 
         edit("{\"management\":{\"username\":\"old-user\",\"password\":\"" + NEW_SECRET + "\"}}", true)
                 .andExpect(status().isOk())
@@ -294,7 +298,7 @@ class ClusterConnectionControllerTest extends PostgresIntegrationTest {
     @Test
     void aChangedPatternRederivesTheDerivedUrlOnTheSpotAndLeavesTheSeedAlone() throws Exception {
         String moved = "http://artemis-backup:9161/jolokia";
-        doReturn(client(moved, "ha-read-backup.json")).when(clientFactory).forNode(any(), eq(moved));
+        doReturn(client(moved, "ha-read-backup.json")).when(session).node(moved);
 
         edit("{\"managementUrlPattern\":\"http://{host}:9161/jolokia\"," + BOTH_ACCOUNTS + "}", false)
                 .andExpect(status().isOk());
@@ -317,7 +321,7 @@ class ClusterConnectionControllerTest extends PostgresIntegrationTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.detail").value("Enter the management password again to check new hosts."));
 
-        verify(clientFactory, never()).forNode(any(), eq(attacker));
+        verify(session, never()).node(attacker);
     }
 
     @Test
@@ -334,7 +338,7 @@ class ClusterConnectionControllerTest extends PostgresIntegrationTest {
     @Test
     void aSeedOnANewHostIsCheckedOnceThePasswordIsEnteredAgain() throws Exception {
         String other = "http://other.example:8161/console/jolokia";
-        doReturn(client(other, "ha-read-primary.json")).when(clientFactory).forNode(any(), eq(other));
+        doReturn(client(other, "ha-read-primary.json")).when(session).node(other);
 
         edit("{\"seedUrls\":[\"" + other + "\"]," + BOTH_ACCOUNTS + "}", true).andExpect(status().isOk());
     }
@@ -395,7 +399,7 @@ class ClusterConnectionControllerTest extends PostgresIntegrationTest {
         lost.recordUrlProblem(ManagementUrlProblem.CREDENTIALS_REJECTED, Instant.now());
         nodes.save(lost);
         String moved = "http://artemis-backup:9161/jolokia";
-        doReturn(client(moved, "ha-read-backup.json")).when(clientFactory).forNode(any(), eq(moved));
+        doReturn(client(moved, "ha-read-backup.json")).when(session).node(moved);
 
         edit("{\"managementUrlPattern\":\"http://{host}:9161/jolokia\"," + BOTH_ACCOUNTS + "}", false)
                 .andExpect(status().isOk());
@@ -413,14 +417,14 @@ class ClusterConnectionControllerTest extends PostgresIntegrationTest {
                     if (TransactionSynchronizationManager.isActualTransactionActive()) {
                         inTransaction.set(true);
                     }
-                    String url = inv.getArgument(1);
+                    String url = inv.getArgument(0);
                     return client(
                             url,
                             url.contains("backup") ? "ha-read-backup.json" : "ha-read-primary.json",
                             "topology.json");
                 })
-                .when(clientFactory)
-                .forNode(any(), any());
+                .when(session)
+                .node(any());
         return inTransaction;
     }
 
@@ -431,7 +435,7 @@ class ClusterConnectionControllerTest extends PostgresIntegrationTest {
         edit("{\"name\":\"renamed\"}", true).andExpect(status().isOk());
 
         assertThat(inTransaction).isFalse();
-        verify(clientFactory, atLeastOnce()).forNode(any(), any());
+        verify(session, atLeastOnce()).node(any());
     }
 
     @Test
@@ -442,7 +446,7 @@ class ClusterConnectionControllerTest extends PostgresIntegrationTest {
                 .andExpect(status().isOk());
 
         assertThat(inTransaction).isFalse();
-        verify(clientFactory, atLeastOnce()).forNode(any(), any());
+        verify(session, atLeastOnce()).node(any());
     }
 
     @Test

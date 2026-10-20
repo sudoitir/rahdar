@@ -60,8 +60,8 @@ public class NodeCallLimiter {
         this.replicasReadAtNanos = System.nanoTime() - REPLICAS_REFRESH.toNanos();
     }
 
-    /** A limiter for one replica, which keeps the whole configured rate. */
-    NodeCallLimiter(RateLimitProperties properties, MeterRegistry meters) {
+    /** A limiter for one replica, which keeps the whole configured rate: a test's, or a tool's. */
+    public NodeCallLimiter(RateLimitProperties properties, MeterRegistry meters) {
         this(properties, meters, () -> 1);
     }
 

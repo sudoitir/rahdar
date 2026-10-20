@@ -5,7 +5,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doCallRealMethod;
 
 import io.github.sudoitir.rahdar.feature.transfer.web.TransferViews.TransferRunView;
-import io.github.sudoitir.rahdar.platform.broker.StagingQueues;
+import io.github.sudoitir.rahdar.system.artemis.StagingQueues;
 import jakarta.jms.Message;
 import java.util.List;
 import java.util.stream.IntStream;

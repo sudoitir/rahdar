@@ -10,6 +10,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import io.github.sudoitir.openbroker.artemis.JolokiaResponse;
 import io.github.sudoitir.rahdar.feature.queues.QueueLifecycleService.AddressDeleteParams;
 import io.github.sudoitir.rahdar.feature.queues.QueueLifecycleService.QueueDeleteParams;
 import io.github.sudoitir.rahdar.feature.queues.QueueLifecycleService.Reach;
@@ -21,8 +22,6 @@ import io.github.sudoitir.rahdar.kernel.gate.OperationGate;
 import io.github.sudoitir.rahdar.kernel.gate.OperationHeldException;
 import io.github.sudoitir.rahdar.kernel.gate.Trait;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaBrokerClient;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaResponse;
 import io.github.sudoitir.rahdar.platform.broker.ManagementRefusal;
 import io.github.sudoitir.rahdar.platform.broker.QueueRow;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNodeEntity;
@@ -33,6 +32,8 @@ import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterR
 import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshotUpsert;
 import io.github.sudoitir.rahdar.support.AdminAuthenticationExtension;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNodes;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -88,6 +89,9 @@ class QueueGateTest extends PostgresIntegrationTest {
     BrokerConnections connections;
 
     @MockitoBean
+    ArtemisNodes artemisNodes;
+
+    @MockitoBean
     QueueLifecycleOperations ops;
 
     @MockitoBean
@@ -111,9 +115,9 @@ class QueueGateTest extends PostgresIntegrationTest {
         node.attachSeedUrl("http://live:8161/console/jolokia");
         node.applyHaState(new HaObservation(true, "STARTED", "PRIMARY", null, "2.44.0", null), 1L, Instant.now());
         nodeId = nodes.save(node).getId();
-        JolokiaBrokerClient client = Mockito.mock(JolokiaBrokerClient.class);
+        ArtemisNode client = Mockito.mock(ArtemisNode.class);
         when(client.resolveBrokerObjectName()).thenReturn("org.apache.activemq.artemis:broker=\"b\"");
-        when(connections.forCluster(eq(clusterId), anyString())).thenReturn(client);
+        when(artemisNodes.on(eq(clusterId), any(UUID.class))).thenReturn(client);
         // No node has a queue the scrape does not show.
         when(client.single(any())).thenReturn(new JolokiaResponse(404, null, "no such queue", null, null));
         when(ops.deleteState(any(), anyString(), anyString(), anyString(), anyString()))

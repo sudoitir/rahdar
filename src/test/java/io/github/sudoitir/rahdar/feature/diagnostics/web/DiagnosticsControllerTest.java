@@ -2,6 +2,8 @@ package io.github.sudoitir.rahdar.feature.diagnostics.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
@@ -21,7 +23,6 @@ import io.github.sudoitir.rahdar.kernel.security.Grant;
 import io.github.sudoitir.rahdar.kernel.security.Permissions;
 import io.github.sudoitir.rahdar.kernel.security.RahdarPrincipal;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaBrokerClient;
 import io.github.sudoitir.rahdar.platform.broker.QueueRow;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterSecrets;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNodeEntity;
@@ -30,7 +31,10 @@ import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterE
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterRepository;
 import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshotUpsert;
 import io.github.sudoitir.rahdar.support.AdminAuthenticationExtension;
+import io.github.sudoitir.rahdar.support.FixtureJolokia;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNodes;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -55,10 +59,8 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
-import org.springframework.web.client.RestClient;
 import org.springframework.web.context.WebApplicationContext;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
@@ -103,6 +105,9 @@ class DiagnosticsControllerTest extends PostgresIntegrationTest {
     @MockitoBean
     BrokerConnections connections;
 
+    @MockitoBean
+    ArtemisNodes artemisNodes;
+
     private UUID clusterId;
 
     @BeforeEach
@@ -131,7 +136,7 @@ class DiagnosticsControllerTest extends PostgresIntegrationTest {
         LoggerFactory.getLogger(DiagnosticsControllerTest.class)
                 .warn("broker login failed password={} for tcp://bob:{}@broker:61616", loggedPassword, loggedPassword);
         secrets.store(clusterId, "diag", "bob", storedPassword);
-        when(connections.forCluster(clusterId, URL)).thenReturn(client(SEARCH, fixture("send-message.json")));
+        when(artemisNodes.on(eq(clusterId), any(UUID.class))).thenReturn(client(SEARCH, fixture("send-message.json")));
         mvc.perform(post("/api/v1/clusters/{c}/queues/{q}/messages", clusterId, Q)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"kind\":\"TEXT\",\"durable\":true,\"body\":\"%s\",\"properties\":{\"k\":\"%s\"}}"
@@ -263,13 +268,12 @@ class DiagnosticsControllerTest extends PostgresIntegrationTest {
                         UsernamePasswordAuthenticationToken.authenticated(principal, null, principal.getAuthorities()));
     }
 
-    private JolokiaBrokerClient client(String... bodies) {
-        RestClient.Builder builder = RestClient.builder();
-        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+    private ArtemisNode client(String... bodies) {
+        FixtureJolokia server = new FixtureJolokia();
         for (String b : bodies) {
             server.expect(requestTo(URL)).andRespond(withSuccess(b, MediaType.APPLICATION_JSON));
         }
-        return new JolokiaBrokerClient(builder.build(), URL, json);
+        return server.node();
     }
 
     private static String fixture(String name) throws IOException {

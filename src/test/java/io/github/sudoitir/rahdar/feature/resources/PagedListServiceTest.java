@@ -3,6 +3,7 @@ package io.github.sudoitir.rahdar.feature.resources;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
@@ -21,10 +22,11 @@ import io.github.sudoitir.rahdar.kernel.security.TeamIndex;
 import io.github.sudoitir.rahdar.kernel.security.TeamRef;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
-import io.github.sudoitir.rahdar.platform.broker.BrokerListOps;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaBrokerClient;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNodeEntity;
+import io.github.sudoitir.rahdar.support.FixtureJolokia;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNodes;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -46,9 +48,7 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.MediaType;
-import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.test.web.client.ResponseCreator;
-import org.springframework.web.client.RestClient;
 import tools.jackson.databind.json.JsonMapper;
 
 @ExtendWith(MockitoExtension.class)
@@ -65,6 +65,9 @@ class PagedListServiceTest {
 
     @Mock
     BrokerConnections connections;
+
+    @Mock
+    ArtemisNodes artemisNodes;
 
     /** Permissive by default: an unstubbed void call is a no-op, i.e. access granted.
      * The guard's real behaviour is covered by {@code ClusterScopeAuthorizationTest}. */
@@ -89,16 +92,15 @@ class PagedListServiceTest {
         when(everything.readable(any())).thenReturn(true);
         when(everything.allowedActions(any())).thenReturn(List.of());
         service = new PagedListService(
-                nodes, connections, new BrokerListOps(), new ResourceViewMapper(), clusterAccess, permissions, teams);
+                nodes, connections, new ResourceViewMapper(), clusterAccess, permissions, teams, artemisNodes);
     }
 
-    private JolokiaBrokerClient client(String url, String... fixtures) {
-        RestClient.Builder builder = RestClient.builder();
-        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+    private ArtemisNode client(String url, String... fixtures) {
+        FixtureJolokia server = new FixtureJolokia();
         for (String fixture : fixtures) {
             server.expect(requestTo(url)).andRespond(body(fixture));
         }
-        return new JolokiaBrokerClient(builder.build(), url, mapper);
+        return server.node();
     }
 
     private static ResponseCreator body(String fixture) {
@@ -145,9 +147,9 @@ class PagedListServiceTest {
         BrokerNodeEntity a = node(clusterId, "node-a", URL_A);
         BrokerNodeEntity b = node(clusterId, "node-b", URL_B);
         when(nodes.nodes(clusterId)).thenReturn(List.of(a, b));
-        when(connections.forCluster(clusterId, URL_A))
+        when(artemisNodes.on(eq(clusterId), any(UUID.class)))
                 .thenThrow(BrokerConnectionException.of(BrokerConnectionException.Kind.UNREACHABLE));
-        when(connections.forCluster(clusterId, URL_B))
+        when(artemisNodes.on(eq(clusterId), eq(b.getId())))
                 .thenReturn(client(URL_B, "search-broker.json", "list-consumers.json"));
 
         PagedView<ConsumerView> page = service.consumers(clusterId, ResourceQuery.of(null, 1, 50, null));
@@ -162,7 +164,7 @@ class PagedListServiceTest {
         UUID clusterId = UUID.randomUUID();
         BrokerNodeEntity b = node(clusterId, "node-b", URL_B);
         when(nodes.nodes(clusterId)).thenReturn(List.of(b));
-        when(connections.forCluster(clusterId, URL_B))
+        when(artemisNodes.on(eq(clusterId), eq(b.getId())))
                 .thenReturn(client(URL_B, "search-broker.json", "list-consumers.json"));
 
         // A session row links to its consumers by session id, which is not the field the listing
@@ -182,7 +184,7 @@ class PagedListServiceTest {
         UUID clusterId = UUID.randomUUID();
         BrokerNodeEntity a = node(clusterId, "node-a", URL_A);
         when(nodes.nodes(clusterId)).thenReturn(List.of(a));
-        when(connections.forCluster(clusterId, URL_A))
+        when(artemisNodes.on(eq(clusterId), any(UUID.class)))
                 .thenThrow(BrokerConnectionException.of(BrokerConnectionException.Kind.CREDENTIALS_REJECTED));
 
         ResourceQuery firstPage = ResourceQuery.of(null, 1, 50, null);
@@ -198,7 +200,7 @@ class PagedListServiceTest {
         UUID clusterId = UUID.randomUUID();
         BrokerNodeEntity a = node(clusterId, "node-a", URL_A);
         when(nodes.nodes(clusterId)).thenReturn(List.of(a));
-        when(connections.forCluster(clusterId, URL_A))
+        when(artemisNodes.on(eq(clusterId), eq(a.getId())))
                 .thenReturn(client(URL_A, "search-broker.json", "list-consumers.json"));
 
         ExecutorService pool = Executors.newFixedThreadPool(10);
@@ -219,7 +221,7 @@ class PagedListServiceTest {
             pool.shutdownNow();
         }
 
-        Mockito.verify(connections, Mockito.times(1)).forCluster(clusterId, URL_A);
+        Mockito.verify(artemisNodes, Mockito.times(1)).on(clusterId, a.getId());
     }
 
     @Test
@@ -256,8 +258,9 @@ class PagedListServiceTest {
 
     private UUID oneNodeServing(String... fixtures) {
         UUID clusterId = UUID.randomUUID();
-        when(nodes.nodes(clusterId)).thenReturn(List.of(node(clusterId, "node-b", URL_B)));
-        when(connections.forCluster(clusterId, URL_B)).thenReturn(client(URL_B, fixtures));
+        BrokerNodeEntity b = node(clusterId, "node-b", URL_B);
+        when(nodes.nodes(clusterId)).thenReturn(List.of(b));
+        when(artemisNodes.on(eq(clusterId), eq(b.getId()))).thenReturn(client(URL_B, fixtures));
         return clusterId;
     }
 

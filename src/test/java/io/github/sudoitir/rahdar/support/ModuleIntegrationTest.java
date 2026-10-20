@@ -12,6 +12,7 @@ import io.github.sudoitir.rahdar.kernel.lifecycle.partition.PartitionDrops;
 import io.github.sudoitir.rahdar.kernel.plugin.FeatureDescriptor;
 import io.github.sudoitir.rahdar.kernel.plugin.InstalledFeatures;
 import io.github.sudoitir.rahdar.kernel.security.ResourceNames;
+import io.github.sudoitir.rahdar.platform.broker.BrokerCapabilityProbe;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterOwnership;
 import io.github.sudoitir.rahdar.platform.scrape.ScrapeScheduler;
 import java.util.ArrayDeque;
@@ -63,6 +64,10 @@ public abstract class ModuleIntegrationTest {
     private static final String FEATURES = ROOT + ".feature.";
 
     /** Team administration previews what a pattern covers from the names the scrape module knows. */
+    /** Implemented by the system module, which a module test boots only when it depends on it. */
+    @MockitoBean
+    BrokerCapabilityProbe capabilityProbe;
+
     @MockitoBean
     ResourceNames resourceNames;
 

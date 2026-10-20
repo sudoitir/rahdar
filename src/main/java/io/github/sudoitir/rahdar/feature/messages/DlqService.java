@@ -10,11 +10,12 @@ import io.github.sudoitir.rahdar.kernel.security.PermissionResolver;
 import io.github.sudoitir.rahdar.kernel.security.ResourceFilter;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaBrokerClient;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
 import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshot;
 import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshots;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNodes;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -42,6 +43,7 @@ public class DlqService {
     private final BrokerConnections connections;
     private final ClusterAccessGuard clusterAccess;
     private final PermissionResolver permissions;
+    private final ArtemisNodes artemisNodes;
 
     public DlqView view(UUID clusterId) {
         clusterAccess.requireVisible(clusterId);
@@ -77,7 +79,7 @@ public class DlqService {
     /** The dead-letter and expiry addresses by kind, or empty when the broker's settings cannot be read. */
     private Optional<Map<String, String>> deadLetterKinds(UUID clusterId, ClusterNode manageable) {
         try {
-            JolokiaBrokerClient client = connections.forCluster(clusterId, manageable.getJolokiaUrl());
+            ArtemisNode client = artemisNodes.on(clusterId, manageable.getId());
             JsonNode settings = client.execOnBrokerParsed("getAddressSettingsAsJSON(java.lang.String)", "#");
             String dla = text(settings, "deadLetterAddress");
             String ea = text(settings, "expiryAddress");

@@ -839,6 +839,15 @@ React, Mantine and the SDK's components work as they are. A library of your own 
 (a rich-text editor, a Markdown renderer) is what to check: it stops working here. Pick one that renders
 through React, or show the text as text.
 
+### Moving a plugin from contract 15 to 16
+
+Contract 16 moves Rahdar onto a broker-neutral SDK. Rahdar refuses a plugin built for contract 15, so
+rebuild it and set `<rahdar.contract>16</rahdar.contract>` in its `pom.xml`:
+
+- **No broker client.** `BrokerClientFactory` and `BrokerCommands` are no longer part of the plugin API.
+  A plugin reaches brokers through the messaging contributions and the services marked `@PluginApi`; it
+  never sends management requests of its own.
+
 ### Moving a plugin from contract 14 to 15
 
 Contract 15 renames the product to Rahdar. Nothing about how a plugin works changes, but every name it

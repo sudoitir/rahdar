@@ -15,6 +15,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import io.github.sudoitir.openbroker.artemis.JolokiaResponse;
 import io.github.sudoitir.rahdar.feature.queues.LifecycleRequests.CreateQueueRequest;
 import io.github.sudoitir.rahdar.kernel.audit.internal.persistence.AuditEventEntity;
 import io.github.sudoitir.rahdar.kernel.audit.internal.persistence.AuditEventRepository;
@@ -23,8 +24,6 @@ import io.github.sudoitir.rahdar.platform.broker.Attempt;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
 import io.github.sudoitir.rahdar.platform.broker.BulkCapExceededException;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaBrokerClient;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaResponse;
 import io.github.sudoitir.rahdar.platform.broker.ManagementRefusal;
 import io.github.sudoitir.rahdar.platform.broker.QueueRow;
 import io.github.sudoitir.rahdar.platform.clusters.LifecycleOutcome;
@@ -39,6 +38,8 @@ import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshotUpsert;
 import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshots;
 import io.github.sudoitir.rahdar.support.AdminAuthenticationExtension;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNodes;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
@@ -94,6 +95,9 @@ class QueueLifecycleServiceTest extends PostgresIntegrationTest {
     BrokerConnections connections;
 
     @MockitoBean
+    ArtemisNodes artemisNodes;
+
+    @MockitoBean
     QueueLifecycleOperations ops;
 
     @MockitoBean
@@ -105,7 +109,7 @@ class QueueLifecycleServiceTest extends PostgresIntegrationTest {
     @MockitoBean
     CaptureTaps captureTaps;
 
-    private JolokiaBrokerClient client;
+    private ArtemisNode client;
 
     private UUID clusterId;
     private UUID liveId;
@@ -118,9 +122,9 @@ class QueueLifecycleServiceTest extends PostgresIntegrationTest {
         liveId = node("live", LIVE_URL, true);
         deadId = node("dead", DEAD_URL, false);
 
-        client = mock(JolokiaBrokerClient.class);
+        client = mock(ArtemisNode.class);
         when(client.resolveBrokerObjectName()).thenReturn("org.apache.activemq.artemis:broker=\"b\"");
-        when(connections.forCluster(eq(clusterId), anyString())).thenReturn(client);
+        when(artemisNodes.on(eq(clusterId), any(UUID.class))).thenReturn(client);
     }
 
     /** Each node is its own logical node, so both are considered as targets. */
@@ -162,7 +166,7 @@ class QueueLifecycleServiceTest extends PostgresIntegrationTest {
         assertThat(outcome.anyFailed()).isFalse();
 
         // The node that was not live must not have been called at all.
-        verify(connections, never()).forCluster(clusterId, DEAD_URL);
+        verify(artemisNodes, never()).on(clusterId, deadId);
     }
 
     @Test

@@ -6,11 +6,11 @@ import io.github.sudoitir.rahdar.feature.brokerconfig.BrokerConfigRecommendation
 import io.github.sudoitir.rahdar.kernel.core.ConflictException;
 import io.github.sudoitir.rahdar.kernel.security.ClusterAccessGuard;
 import io.github.sudoitir.rahdar.kernel.security.Permissions;
-import io.github.sudoitir.rahdar.platform.broker.BrokerAccountRoles;
 import io.github.sudoitir.rahdar.platform.broker.BrokerCapabilities;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterService;
+import io.github.sudoitir.rahdar.system.artemis.BrokerAccountRoles;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;

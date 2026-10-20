@@ -6,11 +6,10 @@ import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import io.github.sudoitir.openbroker.artemis.JolokiaRequest;
+import io.github.sudoitir.openbroker.artemis.JolokiaResponse;
 import io.github.sudoitir.rahdar.feature.resources.ConnectionOperations.ConnectionSnapshot;
-import io.github.sudoitir.rahdar.platform.broker.BrokerListOps;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaBrokerClient;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaRequest;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaResponse;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -34,7 +33,7 @@ import tools.jackson.databind.json.JsonMapper;
 class ConnectionOperationsTest {
 
     private final ObjectMapper mapper = new JsonMapper();
-    private final ConnectionOperations ops = new ConnectionOperations(mapper, new BrokerListOps());
+    private final ConnectionOperations ops = new ConnectionOperations(mapper);
 
     /** One {@code listX} envelope, in the double-encoded shape Artemis actually answers with. */
     private JolokiaResponse page(String rowsJson) {
@@ -57,8 +56,8 @@ class ConnectionOperationsTest {
             "messagesInTransit":"7","messagesDelivered":"0","status":"OK"}]""";
 
     /** A client whose single/batch calls answer in the order the operation asks. */
-    private JolokiaBrokerClient clientAnswering(String... pages) {
-        JolokiaBrokerClient client = mock(JolokiaBrokerClient.class);
+    private ArtemisNode clientAnswering(String... pages) {
+        ArtemisNode client = mock(ArtemisNode.class);
         when(client.resolveBrokerObjectName()).thenReturn("org.apache.activemq.artemis:broker=\"b\"");
         List<JolokiaResponse> queue =
                 new ArrayList<>(List.of(pages).stream().map(this::page).toList());
@@ -81,7 +80,7 @@ class ConnectionOperationsTest {
     @Test
     void aSessionWithNoClientIdIsIdentifiedByItsConnectionsRemoteAddress() {
         // listSessions(id) → listConnections(connectionID) → listConsumers(session).
-        JolokiaBrokerClient client = clientAnswering(SESSION_ROW, CONNECTION_ROW, CONSUMER_ROW);
+        ArtemisNode client = clientAnswering(SESSION_ROW, CONNECTION_ROW, CONSUMER_ROW);
 
         ConnectionSnapshot snapshot = ops.readSession(client, "sess-1");
 
@@ -96,7 +95,7 @@ class ConnectionOperationsTest {
     @Test
     void aConnectionSnapshotCarriesTheIdentityAndTheInFlightCount() {
         // listConnections + listSessions batched, then listConsumers per session.
-        JolokiaBrokerClient client = clientAnswering(CONNECTION_ROW, SESSION_ROW, CONSUMER_ROW);
+        ArtemisNode client = clientAnswering(CONNECTION_ROW, SESSION_ROW, CONSUMER_ROW);
 
         ConnectionSnapshot snapshot = ops.readConnection(client, "7762766a");
 
@@ -109,7 +108,7 @@ class ConnectionOperationsTest {
     /** The broker answers {@code false} rather than raising, and that is the already-gone verdict. */
     @Test
     void aCloseTheBrokerAnsweredFalseToIsReportedAsNotClosed() {
-        JolokiaBrokerClient client = mock(JolokiaBrokerClient.class);
+        ArtemisNode client = mock(ArtemisNode.class);
         when(client.single(any())).thenReturn(new JolokiaResponse(200, mapper.valueToTree(false), null, null, null));
 
         assertThat(ops.closeConnection(client, "mbean", "gone")).isFalse();
@@ -117,7 +116,7 @@ class ConnectionOperationsTest {
 
     @Test
     void anEmptyPageMeansTheTargetIsGone() {
-        JolokiaBrokerClient client = clientAnswering("[]");
+        ArtemisNode client = clientAnswering("[]");
 
         assertThat(ops.readSession(client, "sess-1")).isNull();
     }
@@ -125,7 +124,7 @@ class ConnectionOperationsTest {
     /** Reads are filtered broker-side, so one row comes back rather than a full dump. */
     @Test
     void readsAskTheBrokerToFilterRatherThanFetchingEveryRow() {
-        JolokiaBrokerClient client = clientAnswering(SESSION_ROW);
+        ArtemisNode client = clientAnswering(SESSION_ROW);
         ops.connectionIdOfSession(client, "sess-1");
 
         ArgumentCaptor<JolokiaRequest> captured = ArgumentCaptor.forClass(JolokiaRequest.class);

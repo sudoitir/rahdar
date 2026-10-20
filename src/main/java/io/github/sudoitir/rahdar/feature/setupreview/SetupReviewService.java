@@ -29,6 +29,7 @@ import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterLock;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
 import io.github.sudoitir.rahdar.platform.clusters.RegisteredCluster;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNodes;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -75,6 +76,7 @@ public class SetupReviewService {
     private final AuditService audit;
     private final ActorResolver actorResolver;
     private final ObjectMapper mapper;
+    private final ArtemisNodes artemisNodes;
 
     /** The latest review of a cluster, never running one. */
     @Transactional(readOnly = true)
@@ -140,7 +142,7 @@ public class SetupReviewService {
                         "Rahdar has no management URL for this node."));
                 continue;
             }
-            reads.add(reader.read(connections.forCluster(clusterId, node.getJolokiaUrl()), node));
+            reads.add(reader.read(artemisNodes.on(clusterId, node.getId()), node));
         }
         SetupRules.Result result = SetupRules.evaluate(reads, mapper);
         long millis = Duration.ofNanos(System.nanoTime() - started).toMillis();

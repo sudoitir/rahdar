@@ -11,6 +11,9 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import io.github.sudoitir.openbroker.artemis.ArtemisLists;
+import io.github.sudoitir.openbroker.artemis.JolokiaRequest;
+import io.github.sudoitir.openbroker.artemis.JolokiaResponse;
 import io.github.sudoitir.rahdar.feature.flow.ClientEdges.Edge;
 import io.github.sudoitir.rahdar.feature.flow.ClientEdges.Kind;
 import io.github.sudoitir.rahdar.feature.flow.ClientSampler.NodeResult;
@@ -21,14 +24,12 @@ import io.github.sudoitir.rahdar.kernel.settings.SettingsService;
 import io.github.sudoitir.rahdar.kernel.stream.SseHub;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
-import io.github.sudoitir.rahdar.platform.broker.BrokerListOps;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaBrokerClient;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaRequest;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaResponse;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterLock;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterOwnership;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNodes;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Clock;
 import java.time.Duration;
@@ -58,6 +59,7 @@ class ClientSamplerTest {
     private final FlowStore store = mock(FlowStore.class);
     private final ClusterDirectory directory = mock(ClusterDirectory.class);
     private final BrokerConnections connections = mock(BrokerConnections.class);
+    ArtemisNodes artemisNodes = mock(ArtemisNodes.class);
     private final ClusterLock lock = mock(ClusterLock.class);
     private final ClusterOwnership ownership = mock(ClusterOwnership.class);
     private final SettingsService settings = mock(SettingsService.class);
@@ -78,7 +80,8 @@ class ClientSamplerTest {
                     return true;
                 });
         when(ownership.owns(clusterId)).thenReturn(true);
-        sampler = new ClientSampler(store, directory, connections, lock, ownership, settings, hub, meters, clock);
+        sampler = new ClientSampler(
+                store, directory, connections, lock, ownership, settings, hub, meters, clock, artemisNodes);
     }
 
     // ---- fixtures ------------------------------------------------------
@@ -168,8 +171,8 @@ class ClientSamplerTest {
         }
     }
 
-    private JolokiaBrokerClient client(List<JolokiaResponse> entries) {
-        JolokiaBrokerClient client = mock(JolokiaBrokerClient.class);
+    private ArtemisNode client(List<JolokiaResponse> entries) {
+        ArtemisNode client = mock(ArtemisNode.class);
         when(client.resolveBrokerObjectName()).thenReturn("org.apache.activemq.artemis:broker=\"b\"");
         when(client.batch(anyList())).thenReturn(entries);
         when(client.parsed(any())).thenAnswer(inv -> ((JolokiaResponse) inv.getArgument(0)).value());
@@ -191,8 +194,8 @@ class ClientSamplerTest {
         when(directory.nodes(clusterId)).thenReturn(list);
     }
 
-    private void answers(JolokiaBrokerClient client) {
-        when(connections.forCluster(eq(clusterId), any())).thenReturn(client);
+    private void answers(ArtemisNode client) {
+        when(artemisNodes.on(eq(clusterId), any(UUID.class))).thenReturn(client);
     }
 
     private NodeResult sample(Batch batch) {
@@ -443,7 +446,7 @@ class ClientSamplerTest {
         Batch batch = new Batch();
         batch.producers = ok("null");
         ClusterNode node = node(UUID.randomUUID(), "n1", "http://n1/jolokia", "N1", true);
-        JolokiaBrokerClient client = client(batch.entries());
+        ArtemisNode client = client(batch.entries());
         when(client.parsed(batch.producers)).thenReturn(null);
         answers(client);
 
@@ -457,14 +460,14 @@ class ClientSamplerTest {
     void aConnectionFailureNamesItsKindAndARuntimeFailureIsABadResponse() {
         ClusterNode node = node(UUID.randomUUID(), "n1", "http://n1/jolokia", "N1", true);
         doThrow(BrokerConnectionException.of(BrokerConnectionException.Kind.UNREACHABLE))
-                .when(connections)
-                .forCluster(any(), any());
+                .when(artemisNodes)
+                .on(any(UUID.class), any(UUID.class));
         NodeResult unreachable = sampler.sampleNode(clusterId, node, 100);
         assertThat(unreachable.sample().errorKind()).isEqualTo("UNREACHABLE");
         assertThat(unreachable.sample().error()).isEqualTo(BrokerConnectionException.Kind.UNREACHABLE.defaultMessage());
         assertThat(unreachable.partial()).isFalse();
 
-        doThrow(new IllegalStateException("garbled")).when(connections).forCluster(any(), any());
+        doThrow(new IllegalStateException("garbled")).when(artemisNodes).on(any(UUID.class), any(UUID.class));
         NodeResult garbled = sampler.sampleNode(clusterId, node, 100);
         assertThat(garbled.sample().errorKind()).isEqualTo("BAD_RESPONSE");
         assertThat(garbled.sample().error()).isEqualTo("garbled");
@@ -479,7 +482,7 @@ class ClientSamplerTest {
 
     // ---- sweep ---------------------------------------------------------
 
-    private JolokiaBrokerClient stableClient() {
+    private ArtemisNode stableClient() {
         Batch batch = new Batch();
         batch.producers = listing(1, producer(1, 100));
         batch.consumers = listing(1, consumer(2, 50));
@@ -498,7 +501,7 @@ class ClientSamplerTest {
                 node(active, "active", "http://active/jolokia", "SHARED", true),
                 node(solo, "solo", "http://solo/jolokia", null, null),
                 node(unmanaged, "unmanaged", null, "OTHER", true));
-        when(connections.forCluster(eq(clusterId), any())).thenAnswer(inv -> stableClient());
+        when(artemisNodes.on(eq(clusterId), any(UUID.class))).thenAnswer(inv -> stableClient());
 
         sampler.sweep(clusterId);
         clock.advance(Duration.ofSeconds(10));
@@ -539,7 +542,7 @@ class ClientSamplerTest {
     @Test
     void aSweepSignalsOnlyWhenWhatWasPersistedChanged() {
         serving(node(UUID.randomUUID(), "n", "http://n/j", "N", true));
-        when(connections.forCluster(eq(clusterId), any())).thenAnswer(inv -> stableClient());
+        when(artemisNodes.on(eq(clusterId), any(UUID.class))).thenAnswer(inv -> stableClient());
 
         sampler.sweep(clusterId); // first: signals
         clock.advance(Duration.ofSeconds(10));
@@ -555,8 +558,8 @@ class ClientSamplerTest {
         UUID id = UUID.randomUUID();
         serving(node(id, "n", "http://n/j", "N", true));
         doThrow(BrokerConnectionException.of(BrokerConnectionException.Kind.CREDENTIALS_REJECTED))
-                .when(connections)
-                .forCluster(any(), any());
+                .when(artemisNodes)
+                .on(any(UUID.class), any(UUID.class));
 
         sampler.sweep(clusterId);
 
@@ -581,7 +584,7 @@ class ClientSamplerTest {
     void theRowCapIsAtLeastOne() {
         when(settings.intValue(FlowSettings.MAX_ROWS_PER_NODE)).thenReturn(0);
         serving(node(UUID.randomUUID(), "n", "http://n/j", "N", true));
-        JolokiaBrokerClient client = client(new Batch().entries());
+        ArtemisNode client = client(new Batch().entries());
         answers(client);
 
         sampler.sweep(clusterId);
@@ -589,7 +592,7 @@ class ClientSamplerTest {
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<JolokiaRequest>> requests = ArgumentCaptor.forClass(List.class);
         verify(client).batch(requests.capture());
-        assertThat(requests.getValue().get(0).arguments()).containsExactly(BrokerListOps.ALL, 1, 1);
+        assertThat(requests.getValue().get(0).arguments()).containsExactly(ArtemisLists.ALL, 1, 1);
     }
 
     // ---- sweepObserved -------------------------------------------------

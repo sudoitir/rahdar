@@ -1,7 +1,7 @@
 package io.github.sudoitir.rahdar.feature.resources;
 
-import static io.github.sudoitir.rahdar.platform.broker.BrokerListOps.num;
-import static io.github.sudoitir.rahdar.platform.broker.BrokerListOps.str;
+import static io.github.sudoitir.openbroker.artemis.ArtemisLists.num;
+import static io.github.sudoitir.openbroker.artemis.ArtemisLists.str;
 
 import io.github.sudoitir.rahdar.feature.resources.web.ResourceViews.AddressView;
 import io.github.sudoitir.rahdar.feature.resources.web.ResourceViews.ConnectionView;

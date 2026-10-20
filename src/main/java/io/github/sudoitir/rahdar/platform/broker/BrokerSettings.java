@@ -25,7 +25,6 @@ public class BrokerSettings implements SettingsContribution {
     private final BrokerProperties broker;
     private final SafetyProperties safety;
     private final NodeCallLimiter limiter;
-    private final BrokerClientFactory brokerClients;
     private final BrokerTimeouts timeouts;
 
     @Override
@@ -79,7 +78,6 @@ public class BrokerSettings implements SettingsContribution {
     }
 
     private void applyTimeouts(SettingsService s) {
-        brokerClients.setTimeouts(s.duration(CONNECT_TIMEOUT), s.duration(READ_TIMEOUT));
         timeouts.set(s.duration(CONNECT_TIMEOUT), s.duration(READ_TIMEOUT));
     }
 }

@@ -8,7 +8,7 @@ import com.tngtech.archunit.core.domain.JavaModifier;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.core.importer.ImportOption;
 import io.github.sudoitir.rahdar.kernel.audit.AuditService;
-import io.github.sudoitir.rahdar.platform.clusters.BrokerCommands;
+import io.github.sudoitir.rahdar.system.artemis.BrokerCommands;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;

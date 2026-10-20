@@ -1,14 +1,15 @@
 package io.github.sudoitir.rahdar.feature.diagnostics;
 
-import io.github.sudoitir.rahdar.platform.broker.BrokerClientFactory;
+import io.github.sudoitir.rahdar.platform.broker.BrokerCapabilityProbe;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
+import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
 import io.github.sudoitir.rahdar.platform.broker.BrokerSessions;
-import io.github.sudoitir.rahdar.platform.broker.CapabilityProbe;
 import io.github.sudoitir.rahdar.platform.broker.CoreAccountCheck;
 import io.github.sudoitir.rahdar.platform.broker.CoreSubscriptionCheck;
 import io.github.sudoitir.rahdar.platform.broker.CoreSubscriptionManager;
 import io.github.sudoitir.rahdar.platform.broker.NodeCallLimiter;
 import io.github.sudoitir.rahdar.support.ModuleIntegrationTest;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNodes;
 import org.springframework.modulith.test.ApplicationModuleTest;
 import org.springframework.modulith.test.ApplicationModuleTest.BootstrapMode;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -24,13 +25,13 @@ class DiagnosticsModuleTest extends ModuleIntegrationTest {
     BrokerConnections brokerConnections;
 
     @MockitoBean
-    BrokerClientFactory clientFactory;
+    ArtemisNodes clientFactory;
 
     @MockitoBean
     BrokerSessions sessions;
 
     @MockitoBean
-    CapabilityProbe capabilityProbe;
+    BrokerCapabilityProbe capabilityProbe;
 
     @MockitoBean
     CoreAccountCheck coreAccountCheck;
@@ -43,4 +44,7 @@ class DiagnosticsModuleTest extends ModuleIntegrationTest {
 
     @MockitoBean
     NodeCallLimiter limiter;
+
+    @MockitoBean
+    BrokerGateway gateway;
 }

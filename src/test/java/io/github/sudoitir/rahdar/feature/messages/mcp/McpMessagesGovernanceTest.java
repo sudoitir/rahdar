@@ -16,15 +16,17 @@ import io.github.sudoitir.rahdar.kernel.security.internal.persistence.RolePermis
 import io.github.sudoitir.rahdar.kernel.security.internal.persistence.RoleRepository;
 import io.github.sudoitir.rahdar.kernel.security.internal.persistence.UserRoleRepository;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaBrokerClient;
 import io.github.sudoitir.rahdar.platform.broker.QueueRow;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNodeEntity;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNodeRepository;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterEntity;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterRepository;
 import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshotUpsert;
+import io.github.sudoitir.rahdar.support.FixtureJolokia;
 import io.github.sudoitir.rahdar.support.McpFixture;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNodes;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -38,10 +40,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
-import org.springframework.web.client.RestClient;
 import org.springframework.web.context.WebApplicationContext;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
@@ -83,6 +83,9 @@ class McpMessagesGovernanceTest extends PostgresIntegrationTest {
     @MockitoBean
     BrokerConnections connections;
 
+    @MockitoBean
+    ArtemisNodes artemisNodes;
+
     private MockMvc mvc;
     private UUID clusterId;
 
@@ -106,16 +109,15 @@ class McpMessagesGovernanceTest extends PostgresIntegrationTest {
         clusters.deleteById(clusterId);
     }
 
-    private JolokiaBrokerClient client() {
-        RestClient.Builder builder = RestClient.builder();
-        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+    private ArtemisNode client() {
+        FixtureJolokia server = new FixtureJolokia();
         server.expect(requestTo(URL_A))
                 .andRespond(withSuccess(fixture("search-broker.json"), MediaType.APPLICATION_JSON));
         server.expect(requestTo(URL_A))
                 .andRespond(withSuccess(
                         "[" + fixture("browse-sensitive.json") + ",{\"value\":1,\"status\":200}]",
                         MediaType.APPLICATION_JSON));
-        return new JolokiaBrokerClient(builder.build(), URL_A, mapper);
+        return server.node();
     }
 
     private static String fixture(String name) {
@@ -128,7 +130,7 @@ class McpMessagesGovernanceTest extends PostgresIntegrationTest {
 
     @Test
     void anAssistantNeverReceivesTheCredentialOrTheCardNumber() throws Exception {
-        when(connections.forCluster(eq(clusterId), any())).thenReturn(client());
+        when(artemisNodes.on(eq(clusterId), any(UUID.class))).thenReturn(client());
         McpFixture.Key key = McpFixture.mintKey(
                 users,
                 roles,

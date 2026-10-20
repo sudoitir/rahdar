@@ -4,7 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -15,19 +15,20 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 import io.github.sudoitir.rahdar.platform.broker.AccountResult;
-import io.github.sudoitir.rahdar.platform.broker.BrokerClientFactory;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionSettings;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaBrokerClient;
+import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
 import io.github.sudoitir.rahdar.platform.broker.ManagementUrlProblem;
 import io.github.sudoitir.rahdar.platform.broker.ManagementUrlSource;
 import io.github.sudoitir.rahdar.platform.broker.NodeEndpoint;
+import io.github.sudoitir.rahdar.platform.broker.ProbeSession;
 import io.github.sudoitir.rahdar.platform.clusters.TopologyDiscovery.ProbedSeed;
 import io.github.sudoitir.rahdar.platform.clusters.TopologyDiscovery.UrlDerivation;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNodeEntity;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNodeRepository;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterEntity;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterRepository;
+import io.github.sudoitir.rahdar.support.FixtureJolokia;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
 import java.io.IOException;
 import java.net.ConnectException;
@@ -37,6 +38,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -44,9 +46,7 @@ import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.test.web.client.ResponseCreator;
-import org.springframework.web.client.RestClient;
 import tools.jackson.databind.json.JsonMapper;
 
 class TopologyDiscoveryTest extends PostgresIntegrationTest {
@@ -67,7 +67,15 @@ class TopologyDiscoveryTest extends PostgresIntegrationTest {
     BrokerNodeRepository nodes;
 
     @MockitoBean
-    BrokerClientFactory clientFactory;
+    BrokerGateway gateway;
+
+    /** Every probe of a derived address goes through this session; each address answers from its own fixture. */
+    private final ProbeSession session = mock(ProbeSession.class);
+
+    @BeforeEach
+    void probesGoThroughTheSession() {
+        when(gateway.probe(any(BrokerConnectionSettings.class))).thenReturn(session);
+    }
 
     /** Not a rolled-back test transaction: discovery calls brokers, and a broker call inside one is refused. */
     @AfterEach
@@ -95,31 +103,28 @@ class TopologyDiscoveryTest extends PostgresIntegrationTest {
     }
 
     private ProbedSeed seed(String url, String haFixture, String topologyFixture) {
-        RestClient.Builder builder = RestClient.builder();
-        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        FixtureJolokia server = new FixtureJolokia();
         server.expect(requestTo(url)).andRespond(json("search-broker.json"));
         server.expect(requestTo(url)).andRespond(json(haFixture));
         server.expect(requestTo(url)).andRespond(json(topologyFixture));
-        return new ProbedSeed(url, new JolokiaBrokerClient(builder.build(), url, mapper));
+        return new ProbedSeed(url, server.target());
     }
 
     /** A seed whose broker is down: the first call, resolving the broker's MBean, gets no answer. */
     private ProbedSeed deadSeed(String url) {
-        RestClient.Builder builder = RestClient.builder();
-        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        FixtureJolokia server = new FixtureJolokia();
         server.expect(requestTo(url)).andRespond(withException(new ConnectException("Connection refused")));
-        return new ProbedSeed(url, new JolokiaBrokerClient(builder.build(), url, mapper));
+        return new ProbedSeed(url, server.target());
     }
 
     /** The client the factory hands out for a derived URL: search broker, then HA read, answered as given. */
     private void derivedAnswers(String url, ResponseCreator search, ResponseCreator ha) {
-        RestClient.Builder builder = RestClient.builder();
-        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        FixtureJolokia server = new FixtureJolokia();
         server.expect(requestTo(url)).andRespond(search);
         if (ha != null) {
             server.expect(requestTo(url)).andRespond(ha);
         }
-        when(clientFactory.forNode(any(), eq(url))).thenReturn(new JolokiaBrokerClient(builder.build(), url, mapper));
+        when(session.node(url)).thenReturn(server.target());
     }
 
     private void backupAnswersWithItsOwnNodeId() {
@@ -221,7 +226,7 @@ class TopologyDiscoveryTest extends PostgresIntegrationTest {
 
         discovery.discover(clusterId, List.of(seed("topology.json")), derivation(PATTERN));
 
-        verify(clientFactory, times(1)).forNode(any(), eq(BACKUP_URL));
+        verify(session, times(1)).node(BACKUP_URL);
         assertThat(backup(clusterId).getUrlProblem()).isEqualTo(ManagementUrlProblem.UNREACHABLE);
     }
 
@@ -239,7 +244,7 @@ class TopologyDiscoveryTest extends PostgresIntegrationTest {
 
         discovery.discover(clusterId, List.of(seed("topology.json")), derivation(PATTERN));
 
-        verify(clientFactory, times(2)).forNode(any(), eq(BACKUP_URL));
+        verify(session, times(2)).node(BACKUP_URL);
         BrokerNodeEntity after = backup(clusterId);
         assertThat(after.getJolokiaUrl()).isEqualTo(BACKUP_URL);
         assertThat(after.getUrlProblem()).isNull();
@@ -265,7 +270,7 @@ class TopologyDiscoveryTest extends PostgresIntegrationTest {
         nodes.saveAndFlush(refused);
         discovery.discover(clusterId, List.of(seed("topology.json")), derivation(PATTERN));
 
-        verify(clientFactory, times(1)).forNode(any(), eq(BACKUP_URL));
+        verify(session, times(1)).node(BACKUP_URL);
     }
 
     @Test
@@ -290,7 +295,7 @@ class TopologyDiscoveryTest extends PostgresIntegrationTest {
         discovery.discover(clusterId, List.of(seed("topology.json")), derivation(null));
 
         assertThat(backup(clusterId).getUrlProblem()).isEqualTo(ManagementUrlProblem.NO_PATTERN);
-        verify(clientFactory, never()).forNode(any(), any());
+        verify(session, never()).node(any());
     }
 
     @Test
@@ -307,7 +312,7 @@ class TopologyDiscoveryTest extends PostgresIntegrationTest {
         BrokerNodeEntity after = backup(clusterId);
         assertThat(after.getJolokiaUrl()).isEqualTo("http://localhost:8261/console/jolokia");
         assertThat(after.getUrlSource()).isEqualTo(ManagementUrlSource.MANUAL);
-        verify(clientFactory, never()).forNode(any(), any());
+        verify(session, never()).node(any());
     }
 
     @Test
@@ -333,7 +338,7 @@ class TopologyDiscoveryTest extends PostgresIntegrationTest {
 
         discovery.discover(clusterId, List.of(seed("topology.json")), derivation(PATTERN));
 
-        verify(clientFactory, Mockito.times(1)).forNode(any(), any());
+        verify(session, Mockito.times(1)).node(any());
         assertThat(backup(clusterId).getJolokiaUrl()).isEqualTo(BACKUP_URL);
     }
 
@@ -376,7 +381,7 @@ class TopologyDiscoveryTest extends PostgresIntegrationTest {
         ProbedSeed read = seed("topology.json");
 
         discovery.discover(
-                clusterId, List.of(new ProbedSeed(read.jolokiaUrl(), read.client(), false)), derivation(null));
+                clusterId, List.of(new ProbedSeed(read.jolokiaUrl(), read.target(), false)), derivation(null));
 
         assertThat(nodes.findByClusterIdOrderByNameAsc(clusterId))
                 .extracting(BrokerNodeEntity::getName, BrokerNodeEntity::getJolokiaUrl)

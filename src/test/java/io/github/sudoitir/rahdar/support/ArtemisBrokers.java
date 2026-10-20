@@ -3,10 +3,10 @@ package io.github.sudoitir.rahdar.support;
 import static io.github.sudoitir.rahdar.support.ArtemisIntegrationTest.BROKER_PASSWORD;
 import static io.github.sudoitir.rahdar.support.ArtemisIntegrationTest.BROKER_USER;
 
-import io.github.sudoitir.rahdar.platform.broker.BrokerMBeans;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaBrokerClient;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaRequest;
+import io.github.sudoitir.openbroker.artemis.ArtemisMBeans;
+import io.github.sudoitir.openbroker.artemis.JolokiaRequest;
 import io.github.sudoitir.rahdar.support.wire.WireRecorder;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
 import jakarta.jms.BytesMessage;
 import jakarta.jms.Connection;
 import jakarta.jms.JMSException;
@@ -65,7 +65,7 @@ public final class ArtemisBrokers {
         }
 
         /** A Jolokia client of the test's own, outside Rahdar's rate limiter and the recording. */
-        public JolokiaBrokerClient jolokia() {
+        public ArtemisNode jolokia() {
             return ArtemisIntegrationTest.jolokiaClient(directJolokiaUrl());
         }
 
@@ -87,7 +87,7 @@ public final class ArtemisBrokers {
 
         /** Drop the queue and its messages, and its address. Quiet when either is gone. */
         public void destroyQueue(String queue) {
-            JolokiaBrokerClient client = jolokia();
+            ArtemisNode client = jolokia();
             try {
                 client.execOnBroker("destroyQueue(java.lang.String,boolean)", queue, true);
             } catch (RuntimeException _) {
@@ -117,19 +117,19 @@ public final class ArtemisBrokers {
             }
         }
 
-        private String queueMbean(JolokiaBrokerClient client, String queue) {
-            return BrokerMBeans.queue(client.resolveBrokerObjectName(), queue, queue, "ANYCAST");
+        private String queueMbean(ArtemisNode client, String queue) {
+            return ArtemisMBeans.queue(client.resolveBrokerObjectName(), queue, queue, "ANYCAST");
         }
 
         public boolean queueExists(String queue) {
-            JolokiaBrokerClient client = jolokia();
-            return !client.search(BrokerMBeans.queuePattern(client.resolveBrokerObjectName(), queue))
+            ArtemisNode client = jolokia();
+            return !client.search(ArtemisMBeans.queuePattern(client.resolveBrokerObjectName(), queue))
                     .isEmpty();
         }
 
         /** Messages on the queue, including any in delivery. */
         public long depth(String queue) {
-            JolokiaBrokerClient client = jolokia();
+            ArtemisNode client = jolokia();
             JsonNode value =
                     client.parsed(client.single(JolokiaRequest.read(queueMbean(client, queue), "MessageCount")));
             return value.isObject() ? value.path("MessageCount").asLong() : value.asLong();
@@ -137,7 +137,7 @@ public final class ArtemisBrokers {
 
         /** The messages on the queue as the broker lists them, in queue order, without consuming any. */
         public List<JsonNode> list(String queue) {
-            JolokiaBrokerClient client = jolokia();
+            ArtemisNode client = jolokia();
             JsonNode listed = client.parsed(client.single(
                     JolokiaRequest.exec(queueMbean(client, queue), "listMessages(java.lang.String)", "")));
             List<JsonNode> messages = new ArrayList<>();

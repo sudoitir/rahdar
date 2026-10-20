@@ -5,12 +5,11 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import io.github.sudoitir.openbroker.artemis.ArtemisMBeans;
 import io.github.sudoitir.rahdar.kernel.audit.internal.persistence.AuditEventEntity;
 import io.github.sudoitir.rahdar.kernel.audit.internal.persistence.AuditEventRepository;
 import io.github.sudoitir.rahdar.platform.broker.Attempt;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
-import io.github.sudoitir.rahdar.platform.broker.BrokerMBeans;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaBrokerClient;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterService;
 import io.github.sudoitir.rahdar.platform.clusters.LifecycleOutcome;
 import io.github.sudoitir.rahdar.platform.clusters.LifecycleOutcome.NodeOutcome;
@@ -21,6 +20,7 @@ import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.ClusterDetai
 import io.github.sudoitir.rahdar.support.AdminAuthenticationExtension;
 import io.github.sudoitir.rahdar.support.ArtemisIntegrationTest;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
 import jakarta.jms.Connection;
 import jakarta.jms.Session;
 import java.util.LinkedHashMap;
@@ -81,7 +81,7 @@ class QueueDeleteRealBrokerTest extends PostgresIntegrationTest {
     private final String feed = "feed-" + run;
     private final String fanOut = "fan-out-" + run;
     private UUID clusterId;
-    private JolokiaBrokerClient client;
+    private ArtemisNode client;
     private String broker;
     private ActiveMQConnectionFactory factory;
 
@@ -102,7 +102,7 @@ class QueueDeleteRealBrokerTest extends PostgresIntegrationTest {
             throw new IllegalStateException("could not register the container broker: " + attempt);
         }
         clusterId = ok.value().id();
-        client = connections.forCluster(clusterId, ArtemisIntegrationTest.jolokiaUrl());
+        client = ArtemisIntegrationTest.jolokiaClient(ArtemisIntegrationTest.jolokiaUrl());
         broker = client.resolveBrokerObjectName();
         factory = new ActiveMQConnectionFactory(
                 ArtemisIntegrationTest.coreUrl() + "?useTopologyForLoadBalancing=false",
@@ -159,7 +159,7 @@ class QueueDeleteRealBrokerTest extends PostgresIntegrationTest {
     }
 
     private boolean dstQueueExists() {
-        return queueOps.boundQueues(client, BrokerMBeans.address(broker, dst)).contains(dst);
+        return queueOps.boundQueues(client, ArtemisMBeans.address(broker, dst)).contains(dst);
     }
 
     @Test
@@ -199,7 +199,7 @@ class QueueDeleteRealBrokerTest extends PostgresIntegrationTest {
             Session session = producerConnection.createSession(false, Session.AUTO_ACKNOWLEDGE);
             session.createProducer(session.createTopic(src)).send(session.createTextMessage("after"));
         }
-        assertThat(queueOps.messageCount(client, BrokerMBeans.queue(broker, src, src + ".copy", "MULTICAST")))
+        assertThat(queueOps.messageCount(client, ArtemisMBeans.queue(broker, src, src + ".copy", "MULTICAST")))
                 .isEqualTo(1L);
         assertThat(dstQueueExists()).isFalse();
 
@@ -233,7 +233,7 @@ class QueueDeleteRealBrokerTest extends PostgresIntegrationTest {
             Session session = producerConnection.createSession(false, Session.AUTO_ACKNOWLEDGE);
             session.createProducer(session.createTopic(src)).send(session.createTextMessage("through"));
         }
-        assertThat(queueOps.messageCount(client, BrokerMBeans.queue(broker, other, other, "ANYCAST")))
+        assertThat(queueOps.messageCount(client, ArtemisMBeans.queue(broker, other, other, "ANYCAST")))
                 .isEqualTo(1L);
     }
 }

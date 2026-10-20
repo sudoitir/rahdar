@@ -10,7 +10,8 @@
             "kernel.plugin",
             "kernel.security",
             "platform.broker",
-            "platform.clusters"
+            "platform.clusters",
+            "system.artemis"
         })
 package io.github.sudoitir.rahdar.feature.routing;
 

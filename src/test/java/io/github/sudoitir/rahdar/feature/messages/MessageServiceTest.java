@@ -16,6 +16,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import io.github.sudoitir.openbroker.artemis.ArtemisMBeans;
 import io.github.sudoitir.rahdar.feature.messages.MessageActionParams.MessageDeleteParams;
 import io.github.sudoitir.rahdar.feature.messages.MessageActionParams.MessageExpireParams;
 import io.github.sudoitir.rahdar.feature.messages.MessageActionParams.MessageMoveParams;
@@ -42,20 +43,15 @@ import io.github.sudoitir.rahdar.kernel.settings.SettingsService;
 import io.github.sudoitir.rahdar.kernel.stream.SseHub;
 import io.github.sudoitir.rahdar.platform.broker.Attempt;
 import io.github.sudoitir.rahdar.platform.broker.BodyDecoder.Compression;
+import io.github.sudoitir.rahdar.platform.broker.BodyEncoding;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
-import io.github.sudoitir.rahdar.platform.broker.BrokerMBeans;
 import io.github.sudoitir.rahdar.platform.broker.BrokerSettings;
+import io.github.sudoitir.rahdar.platform.broker.BrowsePage;
+import io.github.sudoitir.rahdar.platform.broker.BrowsedMessage;
 import io.github.sudoitir.rahdar.platform.broker.BulkCapExceededException;
-import io.github.sudoitir.rahdar.platform.broker.CoreMessageTransport;
 import io.github.sudoitir.rahdar.platform.broker.CoreSubscriptionManager;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaBrokerClient;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaMessageTransport;
-import io.github.sudoitir.rahdar.platform.broker.MessageBrowser.BodyEncoding;
-import io.github.sudoitir.rahdar.platform.broker.MessageBrowser.BrowsePage;
-import io.github.sudoitir.rahdar.platform.broker.MessageBrowser.BrowsedMessage;
 import io.github.sudoitir.rahdar.platform.broker.MessageKind;
-import io.github.sudoitir.rahdar.platform.broker.MessageOperations;
 import io.github.sudoitir.rahdar.platform.broker.MessageTransport;
 import io.github.sudoitir.rahdar.platform.broker.MessageTransport.BrowseResult;
 import io.github.sudoitir.rahdar.platform.broker.MessageTransport.Channel;
@@ -69,8 +65,13 @@ import io.github.sudoitir.rahdar.platform.governance.ContentPolicy;
 import io.github.sudoitir.rahdar.platform.governance.GovernContext;
 import io.github.sudoitir.rahdar.platform.governance.GovernedMessage;
 import io.github.sudoitir.rahdar.platform.governance.MessageContent;
-import io.github.sudoitir.rahdar.platform.scrape.QueueLocator;
-import io.github.sudoitir.rahdar.platform.scrape.QueueLocator.QueueLocation;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNodes;
+import io.github.sudoitir.rahdar.system.artemis.CoreMessageTransport;
+import io.github.sudoitir.rahdar.system.artemis.JolokiaMessageTransport;
+import io.github.sudoitir.rahdar.system.artemis.MessageOperations;
+import io.github.sudoitir.rahdar.system.artemis.QueueLocator;
+import io.github.sudoitir.rahdar.system.artemis.QueueLocator.QueueLocation;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -102,6 +103,7 @@ class MessageServiceTest {
     private final QueueLocator locator = mock(QueueLocator.class);
     private final ClusterDirectory directory = mock(ClusterDirectory.class);
     private final BrokerConnections connections = mock(BrokerConnections.class);
+    ArtemisNodes artemisNodes = mock(ArtemisNodes.class);
     private final MessageOperations messageOps = mock(MessageOperations.class);
     private final JolokiaMessageTransport jolokia = mock(JolokiaMessageTransport.class);
     private final CoreMessageTransport core = mock(CoreMessageTransport.class);
@@ -114,7 +116,7 @@ class MessageServiceTest {
     private final ContentPolicy policy = mock(ContentPolicy.class);
     private final ClearViewAudit clearViews = mock(ClearViewAudit.class);
     private final OperationGate gate = mock(OperationGate.class);
-    private final JolokiaBrokerClient client = mock(JolokiaBrokerClient.class);
+    private final ArtemisNode client = mock(ArtemisNode.class);
     private final AuditEvent event = mock(AuditEvent.class);
     private final ClusterNode nodeA = node(NODE_A, "node-a", "http://a/jolokia", "tcp://a", true);
     private final ClusterNode nodeB = node(NODE_B, "node-b", "http://b/jolokia", "tcp://b", true);
@@ -141,7 +143,8 @@ class MessageServiceTest {
                 access,
                 policy,
                 clearViews,
-                gate);
+                gate,
+                artemisNodes);
         when(locator.locate(CLUSTER, "target"))
                 .thenReturn(List.of(new QueueLocation(NODE_A, "target", "target", "ANYCAST", 1)));
         when(locator.locate(CLUSTER, "t")).thenReturn(List.of(new QueueLocation(NODE_A, "t", "t", "ANYCAST", 1)));
@@ -155,7 +158,7 @@ class MessageServiceTest {
         when(audit.begin(any(), anyString(), anyString(), anyString(), any(), any(), any(), any(Boolean.class)))
                 .thenReturn(event);
         when(settings.intValue(BrokerSettings.BULK_CAP)).thenReturn(100);
-        when(connections.forCluster(eq(CLUSTER), anyString())).thenReturn(client);
+        when(artemisNodes.on(eq(CLUSTER), any(UUID.class))).thenReturn(client);
         when(client.resolveBrokerObjectName()).thenReturn(BROKER);
         when(policy.context(eq(CLUSTER), anyString(), anyString()))
                 .thenReturn(GovernContext.masked(CLUSTER, "orders.addr"));
@@ -529,7 +532,7 @@ class MessageServiceTest {
     }
 
     private String queueMbean() {
-        return BrokerMBeans.queue(BROKER, "orders.addr", "orders", "ANYCAST");
+        return ArtemisMBeans.queue(BROKER, "orders.addr", "orders", "ANYCAST");
     }
 
     @Test
@@ -561,7 +564,7 @@ class MessageServiceTest {
                         Attempt.Ok.class,
                         ok -> assertThat(ok.value()).isEqualTo(new Outcome.DryRun(3, 100, false, NODE_B)));
         verify(audit).succeed(event, 3);
-        verify(connections, never()).forCluster(any(), anyString());
+        verify(artemisNodes, never()).on(any(UUID.class), any(UUID.class));
     }
 
     @Test

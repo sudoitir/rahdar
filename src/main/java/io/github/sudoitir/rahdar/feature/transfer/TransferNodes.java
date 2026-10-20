@@ -4,9 +4,10 @@ import io.github.sudoitir.rahdar.kernel.core.NotFoundException;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
 import io.github.sudoitir.rahdar.platform.broker.CoreRelay;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaBrokerClient;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNodes;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -22,6 +23,7 @@ class TransferNodes {
 
     private final ClusterDirectory directory;
     private final BrokerConnections connections;
+    private final ArtemisNodes artemisNodes;
 
     /** A node of this cluster by Rahdar's id; 404 when it is not one. */
     ClusterNode node(UUID clusterId, UUID nodeId) {
@@ -50,8 +52,8 @@ class TransferNodes {
                         "Node " + name + " has no live, manageable endpoint now."));
     }
 
-    JolokiaBrokerClient client(ClusterNode node) {
-        return connections.forCluster(node.getClusterId(), node.getJolokiaUrl());
+    ArtemisNode client(ClusterNode node) {
+        return artemisNodes.on(node.getClusterId(), node.getId());
     }
 
     CoreRelay.Endpoint core(ClusterNode node) {

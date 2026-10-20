@@ -1,12 +1,11 @@
 package io.github.sudoitir.rahdar.platform.broker;
 
-import io.github.sudoitir.rahdar.platform.broker.MessageBrowser.BrowsePage;
 import java.util.Map;
 import java.util.UUID;
 
 /**
  * The message read/write surface, extracted from two real implementations
- * (ADR-0002, ADR-0029): {@link JolokiaMessageTransport} over the management
+ * (ADR-0002, ADR-0029): {@code JolokiaMessageTransport} over the management
  * channel, {@link CoreMessageTransport} over the Core protocol client. Only
  * browse and send get a Core path — those are where body/property fidelity
  * lives; by-id / by-filter mutations carry no payload and stay on Jolokia

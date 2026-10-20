@@ -3,6 +3,7 @@ package io.github.sudoitir.rahdar.feature.resources;
 import static io.github.sudoitir.rahdar.kernel.plugin.ResourceKind.ADDRESS;
 import static io.github.sudoitir.rahdar.kernel.plugin.ResourceKind.QUEUE;
 
+import io.github.sudoitir.openbroker.artemis.ArtemisLists;
 import io.github.sudoitir.rahdar.feature.resources.ResourceViewMapper.NodeRef;
 import io.github.sudoitir.rahdar.feature.resources.web.ResourceViews.AddressView;
 import io.github.sudoitir.rahdar.feature.resources.web.ResourceViews.ConnectionView;
@@ -18,11 +19,10 @@ import io.github.sudoitir.rahdar.kernel.security.ResourceRef;
 import io.github.sudoitir.rahdar.kernel.security.TeamIndex;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
-import io.github.sudoitir.rahdar.platform.broker.BrokerListOps;
-import io.github.sudoitir.rahdar.platform.broker.BrokerListOps.ListPage;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaBrokerClient;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNodes;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -62,11 +62,11 @@ public class PagedListService {
 
     private final ClusterDirectory nodes;
     private final BrokerConnections connections;
-    private final BrokerListOps listOps;
     private final ResourceViewMapper mapper;
     private final ClusterAccessGuard clusterAccess;
     private final PermissionResolver permissions;
     private final TeamIndex teams;
+    private final ArtemisNodes artemisNodes;
 
     public PagedView<AddressView> addresses(UUID clusterId, ResourceQuery query) {
         clusterAccess.requireVisible(clusterId);
@@ -217,7 +217,7 @@ public class PagedListService {
         BrokerConnectionException firstError = null;
         for (ClusterNode node : servingNodes) {
             try {
-                ListPage page = fetch(clusterId, node, kind);
+                ArtemisLists.Page page = fetch(clusterId, node, kind);
                 if (page.data() != null && page.data().isArray()) {
                     NodeRef ref = new NodeRef(node.getId(), node.getName());
                     page.data().forEach(row -> merged.add(rowMapper.apply(row, ref)));
@@ -242,10 +242,10 @@ public class PagedListService {
      * one broker call rather than each making their own. A failed read is not kept, so the
      * next request tries again.
      */
-    private ListPage fetch(UUID clusterId, ClusterNode node, ResourceKind kind) {
+    private ArtemisLists.Page fetch(UUID clusterId, ClusterNode node, ResourceKind kind) {
         ListKey key = new ListKey(clusterId, node.getId(), kind);
         long now = System.nanoTime();
-        CompletableFuture<ListPage> mine = new CompletableFuture<>();
+        CompletableFuture<ArtemisLists.Page> mine = new CompletableFuture<>();
         RecentList winner = recent.compute(
                 key,
                 (k, current) -> current != null && current.freshUntil() > now
@@ -253,8 +253,8 @@ public class PagedListService {
                         : new RecentList(mine, now + FRESH.toNanos()));
         if (winner.page() == mine) {
             try {
-                JolokiaBrokerClient client = connections.forCluster(clusterId, node.getJolokiaUrl());
-                mine.complete(listOps.fetch(client, kind.op(), BrokerListOps.ALL, -1, -1));
+                ArtemisNode client = artemisNodes.on(clusterId, node.getId());
+                mine.complete(ArtemisLists.fetch(client.jolokia(), kind.op(), ArtemisLists.ALL, -1, -1));
             } catch (RuntimeException e) {
                 recent.remove(key, winner);
                 mine.completeExceptionally(e);
@@ -272,7 +272,7 @@ public class PagedListService {
 
     private record ListKey(UUID clusterId, UUID nodeId, ResourceKind kind) {}
 
-    private record RecentList(CompletableFuture<ListPage> page, long freshUntil) {}
+    private record RecentList(CompletableFuture<ArtemisLists.Page> page, long freshUntil) {}
 
     /** At most one entry per (cluster, node, kind), so bounded by the estate, not by traffic. */
     private final Map<ListKey, RecentList> recent = new ConcurrentHashMap<>();

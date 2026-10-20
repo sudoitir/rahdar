@@ -42,6 +42,6 @@ _Others_
 * `i.g.s.r.p.g.ContentPolicy` (in Data governance)
 * `i.g.s.r.p.g.ContentSealer` (in Data governance)
 * `i.g.s.r.p.c.ClusterOwnership` (in Clusters)
-* `i.g.s.r.p.b.CoreMessageTransport` (in Broker connectivity)
+* `i.g.s.r.s.a.CoreMessageTransport` (in Artemis)
 * `i.g.s.r.p.m.McpProperties` (in MCP server)
 |===

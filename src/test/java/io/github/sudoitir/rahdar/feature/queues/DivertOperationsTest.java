@@ -2,8 +2,8 @@ package io.github.sudoitir.rahdar.feature.queues;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import io.github.sudoitir.rahdar.platform.broker.JolokiaRequest;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaResponse;
+import io.github.sudoitir.openbroker.artemis.JolokiaRequest;
+import io.github.sudoitir.openbroker.artemis.JolokiaResponse;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;

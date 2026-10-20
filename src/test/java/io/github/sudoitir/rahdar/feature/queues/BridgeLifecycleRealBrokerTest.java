@@ -5,7 +5,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import io.github.sudoitir.rahdar.platform.broker.Attempt;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaBrokerClient;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterService;
 import io.github.sudoitir.rahdar.platform.clusters.LifecycleOutcome.NodeStatus;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterRepository;
@@ -14,6 +13,7 @@ import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.ClusterDetai
 import io.github.sudoitir.rahdar.support.AdminAuthenticationExtension;
 import io.github.sudoitir.rahdar.support.ArtemisIntegrationTest;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -64,7 +64,7 @@ class BridgeLifecycleRealBrokerTest extends PostgresIntegrationTest {
     private final String bridge = "bridge-real-" + run;
 
     private UUID clusterId;
-    private JolokiaBrokerClient client;
+    private ArtemisNode client;
     private String broker;
 
     @BeforeEach
@@ -84,7 +84,7 @@ class BridgeLifecycleRealBrokerTest extends PostgresIntegrationTest {
             throw new IllegalStateException("could not register the container broker: " + attempt);
         }
         clusterId = ok.value().id();
-        client = connections.forCluster(clusterId, ArtemisIntegrationTest.jolokiaUrl());
+        client = ArtemisIntegrationTest.jolokiaClient(ArtemisIntegrationTest.jolokiaUrl());
         broker = client.resolveBrokerObjectName();
         queueOps.createQueue(client, broker, Map.of("name", source, "address", source, "routing-type", "ANYCAST"));
     }

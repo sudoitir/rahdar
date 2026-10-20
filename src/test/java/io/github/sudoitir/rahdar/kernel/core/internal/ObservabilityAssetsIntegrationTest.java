@@ -9,12 +9,13 @@ import static org.springframework.test.web.servlet.setup.MockMvcBuilders.webAppC
 
 import io.github.sudoitir.rahdar.kernel.jobs.JobRunner;
 import io.github.sudoitir.rahdar.kernel.jobs.ScheduledJob;
-import io.github.sudoitir.rahdar.platform.broker.BrokerClientFactory;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionSettings;
+import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
 import io.github.sudoitir.rahdar.platform.broker.CoreConnectionSettings;
 import io.github.sudoitir.rahdar.platform.broker.CorePool;
 import io.github.sudoitir.rahdar.platform.broker.NodeCallLimiter;
+import io.github.sudoitir.rahdar.platform.broker.ProbeSession;
 import io.github.sudoitir.rahdar.support.ArtemisIntegrationTest;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -62,7 +63,7 @@ class ObservabilityAssetsIntegrationTest extends PostgresIntegrationTest {
     WebApplicationContext webContext;
 
     @Autowired
-    BrokerClientFactory clients;
+    BrokerGateway clients;
 
     @Autowired
     CorePool corePool;
@@ -105,11 +106,10 @@ class ObservabilityAssetsIntegrationTest extends PostgresIntegrationTest {
 
     private void exerciseTheMeters() throws Exception {
         UUID cluster = UUID.randomUUID();
-        clients.forNode(
-                        BrokerConnectionSettings.basicAuth(
-                                cluster, ArtemisIntegrationTest.BROKER_USER, ArtemisIntegrationTest.BROKER_PASSWORD),
-                        ArtemisIntegrationTest.jolokiaUrl())
-                .readBrokerAttributes("Version");
+        try (ProbeSession session = clients.probe(BrokerConnectionSettings.basicAuth(
+                cluster, ArtemisIntegrationTest.BROKER_USER, ArtemisIntegrationTest.BROKER_PASSWORD))) {
+            session.node(ArtemisIntegrationTest.jolokiaUrl()).describe();
+        }
         corePool.borrow(
                         cluster,
                         ArtemisIntegrationTest.coreUrl(),
