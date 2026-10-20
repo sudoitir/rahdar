@@ -12,14 +12,13 @@ import io.github.sudoitir.rahdar.kernel.audit.AuditService;
 import io.github.sudoitir.rahdar.kernel.security.Actor;
 import io.github.sudoitir.rahdar.kernel.settings.RahdarInstance;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
+import io.github.sudoitir.rahdar.platform.broker.MessageTaps.TapSource;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDutyReleased;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterLock;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterOwnership;
 import io.github.sudoitir.rahdar.platform.clusters.ServingNodes;
-import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
-import io.github.sudoitir.rahdar.system.artemis.ArtemisNodes;
 import java.time.Clock;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
@@ -66,7 +65,6 @@ public class PluginMessagingReconciler {
     private final AuditService audit;
     private final PluginMessagingProperties properties;
     private final Clock clock;
-    private final ArtemisNodes artemisNodes;
 
     /** Clusters this instance may hold taps on; kept so a cluster is swept after its last registration goes. */
     private final Set<UUID> installedOn = ConcurrentHashMap.newKeySet();
@@ -181,8 +179,7 @@ public class PluginMessagingReconciler {
             List<RegistrationEntity> regs,
             Map<UUID, Verdict> verdicts,
             Map<UUID, NodeResult> results) {
-        ArtemisNode client = artemisNodes.on(clusterId, node.getId());
-        Set<String> actualTaps = new LinkedHashSet<>(tap.installedNames(client, instance.id()));
+        Set<String> actualTaps = new LinkedHashSet<>(tap.installedNames(clusterId, node.getId(), instance.id()));
         Set<String> wantedTaps = new LinkedHashSet<>();
 
         for (RegistrationEntity reg : regs) {
@@ -195,9 +192,9 @@ public class PluginMessagingReconciler {
             if (reg.getMode() == RegistrationMode.TAP) {
                 String name = TapNames.of(instance.id(), reg.getId());
                 wantedTaps.add(name);
-                results.put(reg.getId(), assertTap(clusterId, node, client, reg, name, actualTaps.contains(name)));
+                results.put(reg.getId(), assertTap(clusterId, node, reg, name, actualTaps.contains(name)));
             } else {
-                results.put(reg.getId(), assertConsumer(node, client, reg));
+                results.put(reg.getId(), assertConsumer(clusterId, node, reg));
             }
         }
 
@@ -205,7 +202,7 @@ public class PluginMessagingReconciler {
         // suspended user, or a crash between a deletion and its sweep.
         for (String orphan : actualTaps) {
             if (!wantedTaps.contains(orphan)) {
-                removeTap(clusterId, node, client, orphan);
+                removeTap(clusterId, node, orphan);
             }
         }
         // Drains here for registrations that are gone altogether.
@@ -214,18 +211,14 @@ public class PluginMessagingReconciler {
                 .filter(id -> !known.contains(id))
                 .forEach(id -> drains.stop(id, node.getId()));
 
-        return wantedTaps.isEmpty() && tap.installedNames(client, instance.id()).isEmpty();
+        return wantedTaps.isEmpty()
+                && tap.installedNames(clusterId, node.getId(), instance.id()).isEmpty();
     }
 
     private NodeResult assertTap(
-            UUID clusterId,
-            ClusterNode node,
-            ArtemisNode client,
-            RegistrationEntity reg,
-            String name,
-            boolean installed) {
+            UUID clusterId, ClusterNode node, RegistrationEntity reg, String name, boolean installed) {
         if (installed && drains.isRunning(reg.getId(), node.getId())) {
-            return new NodeResult(RegistrationState.ACTIVE, null, tap.dropped(client, name));
+            return new NodeResult(RegistrationState.ACTIVE, null, tap.dropped(clusterId, node.getId(), name));
         }
         String refusalKey = node.getId() + "|" + name;
         String fingerprint = reg.getQueue() + "|" + node.getDataUrl() + "|" + node.getManagementUrl();
@@ -240,7 +233,7 @@ public class PluginMessagingReconciler {
                             + " cluster's connection.",
                     null);
         }
-        PluginTap.Source source = tap.source(client, reg.getQueue());
+        TapSource source = tap.source(clusterId, node.getId(), reg.getQueue()).orElse(null);
         if (source == null) {
             return new NodeResult(
                     RegistrationState.PENDING, "The queue " + reg.getQueue() + " does not exist on this node.", null);
@@ -255,11 +248,11 @@ public class PluginMessagingReconciler {
                 Map.of("plugin", reg.getPluginId(), "registration", reg.getKey(), "queue", reg.getQueue()),
                 false);
         try {
-            tap.install(client, instance.id(), reg.getId(), source, properties.tapRingSize());
+            tap.install(clusterId, node.getId(), instance.id(), reg.getId(), source, properties.tapRingSize());
             drains.start(spec(reg, node, TapNames.queueOf(name)));
             refused.remove(refusalKey);
             audit.succeed(event, 1);
-            return new NodeResult(RegistrationState.ACTIVE, null, tap.dropped(client, name));
+            return new NodeResult(RegistrationState.ACTIVE, null, tap.dropped(clusterId, node.getId(), name));
         } catch (TapRefusedException e) {
             refused.put(refusalKey, fingerprint);
             audit.fail(event, e.getMessage());
@@ -277,7 +270,7 @@ public class PluginMessagingReconciler {
         }
     }
 
-    private NodeResult assertConsumer(ClusterNode node, ArtemisNode client, RegistrationEntity reg) {
+    private NodeResult assertConsumer(UUID clusterId, ClusterNode node, RegistrationEntity reg) {
         int runningWith = drains.concurrency(reg.getId(), node.getId());
         if (runningWith == reg.getConcurrency()) {
             return new NodeResult(RegistrationState.ACTIVE, null, null);
@@ -294,7 +287,7 @@ public class PluginMessagingReconciler {
                             + " cluster's connection.",
                     null);
         }
-        PluginTap.Source source = tap.source(client, reg.getQueue());
+        TapSource source = tap.source(clusterId, node.getId(), reg.getQueue()).orElse(null);
         if (source == null) {
             return new NodeResult(
                     RegistrationState.PENDING, "The queue " + reg.getQueue() + " does not exist on this node.", null);
@@ -321,7 +314,7 @@ public class PluginMessagingReconciler {
                 source);
     }
 
-    private void removeTap(UUID clusterId, ClusterNode node, ArtemisNode client, String name) {
+    private void removeTap(UUID clusterId, ClusterNode node, String name) {
         AuditEvent event = audit.begin(
                 Actor.system(), "REMOVE_PLUGIN_TAP", "PLUGIN_TAP", name, clusterId, node.getId(), Map.of(), false);
         try {
@@ -329,7 +322,7 @@ public class PluginMessagingReconciler {
             if (registrationId != null) {
                 drains.stop(registrationId, node.getId());
             }
-            tap.remove(client, instance.id(), name);
+            tap.remove(clusterId, node.getId(), instance.id(), name);
             refused.remove(node.getId() + "|" + name);
             audit.succeed(event, 1);
         } catch (RuntimeException e) {

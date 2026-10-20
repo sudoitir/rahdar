@@ -1,6 +1,6 @@
 package io.github.sudoitir.rahdar.feature.sql;
 
-import io.github.sudoitir.rahdar.system.artemis.DivertOperations;
+import io.github.sudoitir.rahdar.platform.broker.RahdarNames;
 import java.util.UUID;
 
 /**
@@ -29,7 +29,7 @@ public final class CaptureNames {
      * The match earlier versions put their settings on, shared by every Rahdar instance. Only
      * ever removed now, once no capture object of any instance is left (ADR-0079).
      */
-    public static final String LEGACY_MATCH = DivertOperations.CAPTURE_PREFIX + "#";
+    public static final String LEGACY_MATCH = RahdarNames.CAPTURE_PREFIX + "#";
 
     private CaptureNames() {}
 
@@ -39,7 +39,7 @@ public final class CaptureNames {
      * another's capture queues (ADR-0079).
      */
     public static String matchFor(String instanceId) {
-        return DivertOperations.CAPTURE_PREFIX + instanceId + ".#";
+        return RahdarNames.CAPTURE_PREFIX + instanceId + ".#";
     }
 
     /**
@@ -47,7 +47,7 @@ public final class CaptureNames {
      * {@link #queueOf}.
      */
     public static String of(String instanceId, String address, UUID subscriptionId) {
-        return DivertOperations.CAPTURE_PREFIX + instanceId + '.' + address + '.' + subscriptionId;
+        return RahdarNames.CAPTURE_PREFIX + instanceId + '.' + address + '.' + subscriptionId;
     }
 
     /**
@@ -67,7 +67,7 @@ public final class CaptureNames {
 
     /** Whether this name is a capture object belonging to this instance. */
     public static boolean ownedBy(String name, String instanceId) {
-        return name != null && name.startsWith(DivertOperations.CAPTURE_PREFIX + instanceId + '.');
+        return name != null && name.startsWith(RahdarNames.CAPTURE_PREFIX + instanceId + '.');
     }
 
     /** The subscription a capture object serves, or null when the name does not parse. */
@@ -88,7 +88,7 @@ public final class CaptureNames {
         if (!ownedBy(name, instanceId) || subscriptionOf(name) == null) {
             return null;
         }
-        int start = DivertOperations.CAPTURE_PREFIX.length() + instanceId.length() + 1;
+        int start = RahdarNames.CAPTURE_PREFIX.length() + instanceId.length() + 1;
         int end = name.lastIndexOf('.');
         return end <= start ? null : name.substring(start, end);
     }

@@ -31,7 +31,7 @@ _Others_
 * `i.g.s.r.p.c.ClusterLock` (in Clusters)
 * `i.g.s.r.p.c.ClusterOwnership` (in Clusters)
 * `i.g.s.r.k.s.RahdarInstance` (in Settings)
-* `i.g.s.r.s.a.ArtemisNodes` (in Artemis)
+* `i.g.s.r.p.b.SystemExtensions` (in Broker connectivity)
 * `i.g.s.r.k.a.AuditQueryService` (in Audit log)
 * `i.g.s.r.k.s.OperatorHandoff` (in Security)
 |Events listened to

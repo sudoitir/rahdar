@@ -1,71 +1,35 @@
 package io.github.sudoitir.rahdar.feature.plugins.messaging.internal;
 
 import io.github.sudoitir.rahdar.feature.sql.CaptureProperties;
-import io.github.sudoitir.rahdar.platform.broker.ManagementRefusal;
-import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
-import io.github.sudoitir.rahdar.system.artemis.DivertOperations;
-import io.github.sudoitir.rahdar.system.artemis.DivertRow;
-import io.github.sudoitir.rahdar.system.artemis.MBeanNames;
-import io.github.sudoitir.rahdar.system.artemis.ManagementRequest;
-import io.github.sudoitir.rahdar.system.artemis.ManagementResponse;
-import io.github.sudoitir.rahdar.system.artemis.QueueLifecycleOperations;
-import java.util.LinkedHashMap;
+import io.github.sudoitir.rahdar.platform.broker.MessageTaps;
+import io.github.sudoitir.rahdar.platform.broker.MessageTaps.TapRefusal;
+import io.github.sudoitir.rahdar.platform.broker.MessageTaps.TapSource;
+import io.github.sudoitir.rahdar.platform.broker.MessageTaps.TapSpec;
+import io.github.sudoitir.rahdar.platform.broker.RahdarNames;
+import io.github.sudoitir.rahdar.platform.broker.SystemExtensions;
 import java.util.List;
-import java.util.Map;
+import java.util.Optional;
+import java.util.OptionalLong;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Component;
-import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.ObjectMapper;
 
 /**
  * Installs and removes one plugin tap on one node (ADR-0111): capture's tap (ADR-0062, ADR-0079)
- * under its own prefix.
+ * under its own prefix, installed by the broker system's {@link MessageTaps}.
  *
- * <p>The same four objects in the same order, for the same reasons — address settings that make the
- * tap queue drop rather than page or block and expire what nobody reads; security settings that
- * restrict it to Rahdar's broker role; a non-durable, ring- and byte-bounded queue; and a
- * non-exclusive divert, so production routing is untouched. Rahdar's broker role, the expiry and the
- * byte bound are capture's settings, so an estate configures one role for both.
+ * <p>The tap is bounded and restricted to Rahdar's broker role like capture's. Rahdar's broker role, the
+ * expiry and the byte bound are capture's settings, so an estate configures one role for both.
  *
- * <p>The divert carries the tapped queue's own filter, so the copy is what that queue receives, and
- * the tap queue takes {@code max-consumers = 1}: a second instance of the same Rahdar drains the
- * same tap only after the first lets it go.
+ * <p>The tap carries the tapped queue's own filter, so the copy is what that queue receives.
  */
 @Component
 @RequiredArgsConstructor
 class PluginTap {
 
-    private static final String ANYCAST = "ANYCAST";
-    private static final String FILTER = "Filter";
-    private static final String ADD_ADDRESS_SETTINGS = "addAddressSettings(java.lang.String,java.lang.String)";
-
-    /** The 13-string arm the broker accepts; its order is documented and measured in capture's {@code CaptureTap}. */
-    private static final String ADD_SECURITY_SETTINGS = "addSecuritySettings(java.lang.String,java.lang.String,"
-            + "java.lang.String,java.lang.String,java.lang.String,java.lang.String,java.lang.String,java.lang.String,"
-            + "java.lang.String,java.lang.String,java.lang.String,java.lang.String,java.lang.String)";
-
-    /** Absent while the queues feature is disabled; taps are then refused with that reason. */
-    private final ObjectProvider<DivertOperations> divertOperations;
-
-    private final ObjectProvider<QueueLifecycleOperations> queueOperations;
+    private final SystemExtensions extensions;
     private final ObjectProvider<CaptureProperties> captureProperties;
-    private final ObjectMapper mapper;
-
-    private DivertOperations divertOps() {
-        DivertOperations ops = divertOperations.getIfAvailable();
-        if (ops == null) {
-            throw new TapRefusedException("Taps are installed through the queues feature, which is disabled"
-                    + " (rahdar.features.queues.enabled=false). Enable it, or register in consume mode.");
-        }
-        return ops;
-    }
-
-    private QueueLifecycleOperations queueOps() {
-        divertOps();
-        return queueOperations.getObject();
-    }
 
     private CaptureProperties capture() {
         CaptureProperties props = captureProperties.getIfAvailable();
@@ -76,34 +40,16 @@ class PluginTap {
         return props;
     }
 
-    /** The queue a tap copies, as the broker reports it on this node. */
-    record Source(String queue, String address, String routingType, String filter) {}
-
-    /** The tapped queue on this node, or {@code null} when the node does not have it. */
-    Source source(ArtemisNode client, String queue) {
-        ManagementResponse read = client.single(ManagementRequest.read(
-                MBeanNames.queuePattern(client.resolveBrokerObjectName(), queue), "Address", "RoutingType", FILTER));
-        if (!read.ok() || read.value() == null || !read.value().isObject()) {
-            return null;
-        }
-        var entries = read.value().properties().iterator();
-        if (!entries.hasNext()) {
-            return null;
-        }
-        JsonNode attrs = entries.next().getValue();
-        String filter = attrs.path(FILTER).isNull() ? null : attrs.path(FILTER).asString(null);
-        return new Source(
-                queue,
-                attrs.path("Address").asString(queue),
-                attrs.path("RoutingType").asString(ANYCAST),
-                filter == null || filter.isBlank() ? null : filter);
+    /** The tapped queue on this node, or empty when the node does not have it. */
+    Optional<TapSource> source(UUID clusterId, UUID nodeId, String queue) {
+        return extensions.require(clusterId, MessageTaps.class).source(clusterId, nodeId, queue);
     }
 
     /** Refuse, or install (idempotently) and verify. Returns the tap's name. */
-    String install(ArtemisNode client, String instanceId, UUID registrationId, Source source, long ringSize) {
-        String broker = client.resolveBrokerObjectName();
-        refuseIfShadowed(client, source.address());
-        String role = capture().brokerRole();
+    String install(
+            UUID clusterId, UUID nodeId, String instanceId, UUID registrationId, TapSource source, long ringSize) {
+        CaptureProperties capture = capture();
+        String role = capture.brokerRole();
         if (role == null || role.isBlank()) {
             throw new TapRefusedException(
                     "Taps restrict their queues to the broker role Rahdar's own user holds, and none is configured."
@@ -111,167 +57,52 @@ class PluginTap {
                             + " role, then the tap is installed on the next pass.");
         }
         String name = TapNames.of(instanceId, registrationId);
-        applyAddressSettings(client, broker, instanceId, ringSize);
-        applySecuritySettings(client, broker, instanceId, role);
-        String queue = TapNames.queueOf(name);
-        tolerateAlready(() -> queueOps().createAddress(client, broker, queue, ANYCAST));
-        tolerateAlready(() -> queueOps().createQueue(client, broker, queueConfig(queue, ringSize)));
-        tolerateAlready(() -> divertOps()
-                .createDivert(
-                        client,
-                        broker,
-                        DivertOperations.divertConfig(
-                                name,
-                                TapNames.routingOf(name),
-                                source.address(),
-                                queue,
-                                false,
-                                source.filter(),
-                                ANYCAST)));
-        // Artemis answers 200 and only logs when it declines to deploy a divert (see CaptureTap).
-        if (!installedNames(client, instanceId).contains(name)) {
-            throw new TapRefusedException("The broker accepted the tap but did not deploy its divert on "
-                    + source.address() + ". The broker's own log says why. Nothing is tapped on this node.");
+        try {
+            extensions
+                    .require(clusterId, MessageTaps.class)
+                    .install(
+                            clusterId,
+                            nodeId,
+                            new TapSpec(
+                                    name,
+                                    TapNames.queueOf(name),
+                                    TapNames.matchFor(instanceId),
+                                    source.destination(),
+                                    source.filter(),
+                                    ringSize,
+                                    capture.maxRingBytes().toBytes(),
+                                    capture.expiry(),
+                                    role));
+        } catch (TapRefusal e) {
+            throw new TapRefusedException(e.getMessage());
         }
         return name;
     }
 
     /** Remove a tap, and this instance's settings once it has no tap left on the node. Idempotent. */
-    void remove(ArtemisNode client, String instanceId, String name) {
-        String broker = client.resolveBrokerObjectName();
-        String queue = TapNames.queueOf(name);
-        tolerateAlready(() -> divertOps().destroyDivert(client, broker, name));
-        tolerateAlready(() -> queueOps().destroyQueue(client, broker, queue, true));
-        tolerateAlready(() -> queueOps().deleteAddress(client, broker, queue));
-        if (installedNames(client, instanceId).isEmpty()) {
-            client.single(ManagementRequest.exec(
-                    broker, "removeAddressSettings(java.lang.String)", TapNames.matchFor(instanceId)));
-            client.single(ManagementRequest.exec(
-                    broker, "removeSecuritySettings(java.lang.String)", TapNames.matchFor(instanceId)));
+    void remove(UUID clusterId, UUID nodeId, String instanceId, String name) {
+        MessageTaps taps = extensions.require(clusterId, MessageTaps.class);
+        taps.remove(clusterId, nodeId, name, TapNames.queueOf(name), true);
+        if (installedNames(clusterId, nodeId, instanceId).isEmpty()) {
+            taps.removeSettings(clusterId, nodeId, TapNames.matchFor(instanceId));
         }
     }
 
     /** This instance's tap diverts on the node: the reconciler's view of what exists. */
-    List<String> installedNames(ArtemisNode client, String instanceId) {
-        if (divertOperations.getIfAvailable() == null) {
-            return List.of();
-        }
-        return divertOps().listDiverts(client, null, null).stream()
-                .map(DivertRow::uniqueName)
-                .filter(n -> TapNames.ownedBy(n, instanceId))
-                .toList();
+    List<String> installedNames(UUID clusterId, UUID nodeId, String instanceId) {
+        return extensions
+                .forCluster(clusterId, MessageTaps.class)
+                .map(taps -> taps.installed(clusterId, nodeId, RahdarNames.PLUGIN_TAP_PREFIX + instanceId + '.'))
+                .orElse(List.of());
     }
 
     /**
-     * Copies the broker dropped because the tap queue was full or they expired unread: its
-     * {@code MessagesKilled} and {@code MessagesExpired} plus ring removals, which Artemis counts in
-     * {@code MessagesAdded} minus what is still there and what was acknowledged. {@code null} when
+     * Copies the broker dropped because the tap queue was full or they expired unread. {@code null} when
      * the node did not answer.
      */
-    Long dropped(ArtemisNode client, String name) {
-        String queue = TapNames.queueOf(name);
-        ManagementResponse read = client.single(ManagementRequest.read(
-                MBeanNames.queuePattern(client.resolveBrokerObjectName(), queue),
-                "MessagesAdded",
-                "MessagesAcknowledged",
-                "MessageCount",
-                "DeliveringCount"));
-        if (!read.ok() || read.value() == null || !read.value().isObject()) {
-            return null;
-        }
-        var entries = read.value().properties().iterator();
-        if (!entries.hasNext()) {
-            return null;
-        }
-        JsonNode a = entries.next().getValue();
-        long added = a.path("MessagesAdded").asLong(0);
-        long acked = a.path("MessagesAcknowledged").asLong(0);
-        long held = a.path("MessageCount").asLong(0);
-        // Everything added that was neither acknowledged by the drain nor is still waiting was
-        // dropped: ring overflow, the DROP policy at the byte bound, or expiry.
-        return Math.max(0, added - acked - held);
-    }
-
-    /** An exclusive divert runs before every other one, so a tap behind it would copy nothing. */
-    private void refuseIfShadowed(ArtemisNode client, String address) {
-        divertOps().listDiverts(client, null, null).stream()
-                .filter(DivertRow::exclusive)
-                .filter(d -> address.equals(d.address()))
-                .findFirst()
-                .ifPresent(d -> {
-                    throw new TapRefusedException("The divert '" + d.uniqueName() + "' on " + address
-                            + " is exclusive, and Artemis applies exclusive diverts before every other one, so a tap"
-                            + " here would never see a message. Register on " + d.forwardingAddress()
-                            + " instead, which is where this address's traffic goes.");
-                });
-    }
-
-    private void applyAddressSettings(ArtemisNode client, String broker, String instanceId, long ringSize) {
-        Map<String, Object> settings = new LinkedHashMap<>();
-        settings.put("addressFullMessagePolicy", "DROP");
-        settings.put("defaultRingSize", ringSize);
-        settings.put("expiryDelay", capture().expiry().toMillis());
-        settings.put("autoCreateExpiryResources", false);
-        settings.put("maxDeliveryAttempts", -1);
-        settings.put("maxSizeBytes", capture().maxRingBytes().toBytes());
-        // As capture's: a promoted backup may hold the divert before the non-durable queue exists,
-        // and the address must then exist or the producer's send is rejected (see CaptureTap).
-        settings.put("autoCreateAddresses", true);
-        settings.put("autoDeleteAddresses", true);
-        settings.put("autoCreateQueues", false);
-        settings.put("autoDeleteQueues", false);
-        ManagementResponse res = client.single(ManagementRequest.exec(
-                broker, ADD_ADDRESS_SETTINGS, TapNames.matchFor(instanceId), mapper.writeValueAsString(settings)));
-        if (!res.ok()) {
-            throw new TapRefusedException(
-                    "This broker would not accept the address settings that bound a tap queue: " + res.error()
-                            + ". Without them a tap could page production payload to disk, so it is not installed.");
-        }
-    }
-
-    private static void applySecuritySettings(ArtemisNode client, String broker, String instanceId, String role) {
-        ManagementResponse res = client.single(ManagementRequest.exec(
-                broker,
-                ADD_SECURITY_SETTINGS,
-                TapNames.matchFor(instanceId),
-                "", // send
-                role, // consume
-                "", // createDurableQueue
-                "", // deleteDurableQueue
-                role, // createNonDurableQueue
-                role, // deleteNonDurableQueue
-                "", // manage
-                role, // browse
-                "", // createAddress
-                "", // deleteAddress
-                "", // view
-                "")); // edit
-        if (!res.ok()) {
-            throw new TapRefusedException("This broker would not let Rahdar restrict a tap queue: " + res.error()
-                    + ". A tap queue is a full copy of the queue's payload, so it is not created unrestricted.");
-        }
-    }
-
-    private static Map<String, Object> queueConfig(String name, long ringSize) {
-        Map<String, Object> config = new LinkedHashMap<>();
-        config.put("name", name);
-        config.put("address", name);
-        config.put("routing-type", ANYCAST);
-        config.put("durable", false);
-        config.put("ring-size", ringSize);
-        config.put("max-consumers", 1);
-        config.put("purge-on-no-consumers", false);
-        config.put("auto-delete", false);
-        return config;
-    }
-
-    private static void tolerateAlready(Runnable operation) {
-        try {
-            operation.run();
-        } catch (ManagementRefusal e) {
-            if (e.kind() != ManagementRefusal.Kind.ALREADY) {
-                throw e;
-            }
-        }
+    Long dropped(UUID clusterId, UUID nodeId, String name) {
+        OptionalLong dropped =
+                extensions.require(clusterId, MessageTaps.class).dropped(clusterId, nodeId, TapNames.queueOf(name));
+        return dropped.isPresent() ? dropped.getAsLong() : null;
     }
 }

@@ -1,7 +1,9 @@
-package io.github.sudoitir.rahdar.feature.transfer;
+package io.github.sudoitir.rahdar.system.artemis;
 
-import io.github.sudoitir.rahdar.feature.transfer.web.TransferViews.Finding;
-import io.github.sudoitir.rahdar.feature.transfer.web.TransferViews.FindingKind;
+import io.github.sudoitir.rahdar.platform.broker.TransferAcceptance.AcceptanceFinding;
+import io.github.sudoitir.rahdar.platform.broker.TransferAcceptance.AcceptanceInput;
+import io.github.sudoitir.rahdar.platform.broker.TransferAcceptance.BatchVerdict;
+import io.github.sudoitir.rahdar.platform.broker.TransferAcceptance.FindingKind;
 import io.github.sudoitir.rahdar.system.artemis.AcceptanceProbe.Facts;
 import java.util.ArrayList;
 import java.util.List;
@@ -17,41 +19,16 @@ import tools.jackson.databind.JsonNode;
  * <p>The same rules run in the preview, over the whole selection, and before every batch of a run
  * ({@link #batch}), where a target near full makes the run wait instead of fail.
  */
-public final class TargetAcceptance {
+final class TargetAcceptance {
 
     private TargetAcceptance() {}
 
-    /**
-     * What the verdict is over.
-     *
-     * @param target what the target node said about the queue, its address and itself
-     * @param count messages selected; null when unknown
-     * @param bytes their projected size; null when unknown
-     * @param sameQueueSameNode the target is the source queue on the source node
-     * @param sameCluster source and target are in one cluster, so the broker may redistribute
-     * @param targetLive the target node is live now
-     * @param targetBackup the target node is a backup
-     * @param splitBrain the target node's pair is in split-brain
-     * @param thresholdPercent how full the target may get before a run waits
-     */
-    public record Input(
-            Facts target,
-            Long count,
-            Long bytes,
-            boolean sameQueueSameNode,
-            boolean sameCluster,
-            boolean targetLive,
-            boolean targetBackup,
-            boolean splitBrain,
-            int thresholdPercent) {}
-
-    public static List<Finding> evaluate(Input in, String address, String queue) {
-        List<Finding> out = refusals(in);
+    static List<AcceptanceFinding> evaluate(Facts f, AcceptanceInput in, String address, String queue) {
+        List<AcceptanceFinding> out = refusals(in);
         if (!out.isEmpty()) {
             return out;
         }
 
-        Facts f = in.target();
         JsonNode settings = f.addressSettings();
         queue(in, f, settings, address, queue, out);
         policy(in, f, settings, address, out);
@@ -74,8 +51,8 @@ public final class TargetAcceptance {
     }
 
     /** What rules the target out before its queue is even looked at. */
-    private static List<Finding> refusals(Input in) {
-        List<Finding> out = new ArrayList<>();
+    private static List<AcceptanceFinding> refusals(AcceptanceInput in) {
+        List<AcceptanceFinding> out = new ArrayList<>();
         if (in.sameQueueSameNode()) {
             out.add(refuse(
                     "same-queue", "The target is the source queue on the source node, so there is nowhere to go."));
@@ -97,7 +74,7 @@ public final class TargetAcceptance {
         return out;
     }
 
-    private static void duplicateDetection(Facts f, List<Finding> out) {
+    private static void duplicateDetection(Facts f, List<AcceptanceFinding> out) {
         if (f.idCacheSize() == null || f.persistIdCache() == null) {
             out.add(unknown(
                     "duplicate-detection",
@@ -116,7 +93,8 @@ public final class TargetAcceptance {
         }
     }
 
-    private static void queue(Input in, Facts f, JsonNode settings, String address, String queue, List<Finding> out) {
+    private static void queue(
+            AcceptanceInput in, Facts f, JsonNode settings, String address, String queue, List<AcceptanceFinding> out) {
         if (f.queueExists() == null) {
             out.add(unknown(
                     "queue-unknown", "Whether queue %s exists on the target node could not be read.".formatted(queue)));
@@ -147,7 +125,7 @@ public final class TargetAcceptance {
         }
     }
 
-    private static void queueMissing(JsonNode settings, String address, String queue, List<Finding> out) {
+    private static void queueMissing(JsonNode settings, String address, String queue, List<AcceptanceFinding> out) {
         JsonNode auto = settings == null ? null : settings.get("autoCreateQueues");
         if (auto == null || auto.isNull()) {
             out.add(unknown(
@@ -167,7 +145,7 @@ public final class TargetAcceptance {
         }
     }
 
-    private static void ring(Input in, Facts f, String queue, List<Finding> out) {
+    private static void ring(AcceptanceInput in, Facts f, String queue, List<AcceptanceFinding> out) {
         long ring = f.ringSize();
         if (in.count() == null) {
             out.add(unknown(
@@ -188,7 +166,8 @@ public final class TargetAcceptance {
         }
     }
 
-    private static void policy(Input in, Facts f, JsonNode settings, String address, List<Finding> out) {
+    private static void policy(
+            AcceptanceInput in, Facts f, JsonNode settings, String address, List<AcceptanceFinding> out) {
         if (settings == null) {
             out.add(unknown(
                     "address-settings",
@@ -225,7 +204,12 @@ public final class TargetAcceptance {
 
     /** An address that fails or blocks when full: does the selection fit, and is the target getting tight. */
     private static void boundedCapacity(
-            Input in, Facts f, JsonNode settings, String policy, String address, List<Finding> out) {
+            AcceptanceInput in,
+            Facts f,
+            JsonNode settings,
+            String policy,
+            String address,
+            List<AcceptanceFinding> out) {
         long maxBytes = settings.path("maxSizeBytes").asLong(-1);
         if (maxBytes > 0) {
             byteCapacity(in, f, maxBytes, policy, address, out);
@@ -252,7 +236,7 @@ public final class TargetAcceptance {
     }
 
     private static void byteCapacity(
-            Input in, Facts f, long maxBytes, String policy, String address, List<Finding> out) {
+            AcceptanceInput in, Facts f, long maxBytes, String policy, String address, List<AcceptanceFinding> out) {
         if (f.addressSize() == null || in.bytes() == null) {
             out.add(unknown(
                     "capacity-unknown",
@@ -284,7 +268,7 @@ public final class TargetAcceptance {
         }
     }
 
-    private static void disk(Input in, Facts f, List<Finding> out) {
+    private static void disk(AcceptanceInput in, Facts f, List<AcceptanceFinding> out) {
         if (f.diskStoreUsage() == null || f.maxDiskUsage() == null) {
             out.add(unknown("disk-unknown", "How full the target broker's disk is could not be read."));
             return;
@@ -310,17 +294,8 @@ public final class TargetAcceptance {
     /**
      * Before a batch: a refusal that would lose messages fails the run, a target near full makes it
      * wait. What cannot be read now is not held against the run: the preview already stated it.
-     *
-     * @param refusal set when the run must not continue
-     * @param waitReason why the run must wait, when it must
      */
-    public record BatchVerdict(Finding refusal, String waitReason) {
-        public boolean proceed() {
-            return refusal == null && waitReason == null;
-        }
-    }
-
-    public static BatchVerdict batch(Facts f, long batchBytes, int thresholdPercent, String address, String queue) {
+    static BatchVerdict batch(Facts f, long batchBytes, int thresholdPercent, String address, String queue) {
         if (f.filter() != null && !f.filter().isBlank()) {
             return new BatchVerdict(
                     refuse(
@@ -411,19 +386,19 @@ public final class TargetAcceptance {
         return String.format(Locale.ROOT, "%.1f MB", bytes / 1_000_000.0);
     }
 
-    private static Finding refuse(String code, String words) {
-        return new Finding(FindingKind.REFUSE, code, words, null);
+    private static AcceptanceFinding refuse(String code, String words) {
+        return new AcceptanceFinding(FindingKind.REFUSE, code, words, null);
     }
 
-    private static Finding refuse(String code, String words, String snippet) {
-        return new Finding(FindingKind.REFUSE, code, words, snippet);
+    private static AcceptanceFinding refuse(String code, String words, String snippet) {
+        return new AcceptanceFinding(FindingKind.REFUSE, code, words, snippet);
     }
 
-    private static Finding warn(String code, String words, String snippet) {
-        return new Finding(FindingKind.WARN, code, words, snippet);
+    private static AcceptanceFinding warn(String code, String words, String snippet) {
+        return new AcceptanceFinding(FindingKind.WARN, code, words, snippet);
     }
 
-    private static Finding unknown(String code, String words) {
-        return new Finding(FindingKind.UNKNOWN, code, words, null);
+    private static AcceptanceFinding unknown(String code, String words) {
+        return new AcceptanceFinding(FindingKind.UNKNOWN, code, words, null);
     }
 }

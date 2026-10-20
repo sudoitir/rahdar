@@ -21,10 +21,13 @@ import io.github.sudoitir.rahdar.kernel.settings.SettingsService;
 import io.github.sudoitir.rahdar.kernel.stream.SseHub;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
+import io.github.sudoitir.rahdar.platform.broker.FlowSampler;
+import io.github.sudoitir.rahdar.platform.broker.SystemExtensions;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterLock;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterOwnership;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisFlowSampler;
 import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
 import io.github.sudoitir.rahdar.system.artemis.ArtemisNodes;
 import io.github.sudoitir.rahdar.system.artemis.ListRows;
@@ -60,6 +63,7 @@ class ClientSamplerTest {
     private final ClusterDirectory directory = mock(ClusterDirectory.class);
     private final BrokerConnections connections = mock(BrokerConnections.class);
     ArtemisNodes artemisNodes = mock(ArtemisNodes.class);
+    SystemExtensions extensions = mock(SystemExtensions.class);
     private final ClusterLock lock = mock(ClusterLock.class);
     private final ClusterOwnership ownership = mock(ClusterOwnership.class);
     private final SettingsService settings = mock(SettingsService.class);
@@ -80,8 +84,9 @@ class ClientSamplerTest {
                     return true;
                 });
         when(ownership.owns(clusterId)).thenReturn(true);
+        when(extensions.require(any(), eq(FlowSampler.class))).thenReturn(new ArtemisFlowSampler(artemisNodes));
         sampler = new ClientSampler(
-                store, directory, connections, lock, ownership, settings, hub, meters, clock, artemisNodes);
+                store, directory, connections, lock, ownership, settings, hub, meters, clock, extensions);
     }
 
     // ---- fixtures ------------------------------------------------------
@@ -471,13 +476,6 @@ class ClientSamplerTest {
         NodeResult garbled = sampler.sampleNode(clusterId, node, 100);
         assertThat(garbled.sample().errorKind()).isEqualTo("BAD_RESPONSE");
         assertThat(garbled.sample().error()).isEqualTo("garbled");
-    }
-
-    @Test
-    void theReceivingNodeIsTheLastSegmentOfAStoreAndForwardQueue() {
-        assertThat(ClientSampler.receivingNodeId("$.artemis.internal.sf.my-cluster.abc-123"))
-                .isEqualTo("abc-123");
-        assertThat(ClientSampler.receivingNodeId("nodots")).isEqualTo("nodots");
     }
 
     // ---- sweep ---------------------------------------------------------

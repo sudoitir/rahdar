@@ -138,10 +138,6 @@ class BoundaryRulesTest {
         ROOT + ".feature.setupreview..",
         ROOT + ".feature.routing..",
         ROOT + ".feature.queues..",
-        ROOT + ".feature.sql..",
-        ROOT + ".feature.plugins..",
-        ROOT + ".feature.transfer..",
-        ROOT + ".feature.flow..",
     };
 
     @Test

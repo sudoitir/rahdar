@@ -21,16 +21,15 @@ import io.github.sudoitir.rahdar.platform.broker.BrokerRelay;
 import io.github.sudoitir.rahdar.platform.broker.BrokerXmlSnippets;
 import io.github.sudoitir.rahdar.platform.broker.BulkResult;
 import io.github.sudoitir.rahdar.platform.broker.NodeCallLimiter;
+import io.github.sudoitir.rahdar.platform.broker.RahdarNames;
 import io.github.sudoitir.rahdar.platform.broker.RelayLink;
 import io.github.sudoitir.rahdar.platform.broker.RelayedMessages.Provenance;
+import io.github.sudoitir.rahdar.platform.broker.TransferAcceptance;
+import io.github.sudoitir.rahdar.platform.broker.TransferAcceptance.AcceptanceFacts;
+import io.github.sudoitir.rahdar.platform.broker.TransferAcceptance.BatchVerdict;
+import io.github.sudoitir.rahdar.platform.broker.TransferStaging;
+import io.github.sudoitir.rahdar.platform.broker.TransferStaging.TransferSource;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
-import io.github.sudoitir.rahdar.system.artemis.AcceptanceProbe;
-import io.github.sudoitir.rahdar.system.artemis.AcceptanceProbe.Facts;
-import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
-import io.github.sudoitir.rahdar.system.artemis.ArtemisSelectors;
-import io.github.sudoitir.rahdar.system.artemis.MBeanNames;
-import io.github.sudoitir.rahdar.system.artemis.MessageOperations;
-import io.github.sudoitir.rahdar.system.artemis.StagingQueues;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
@@ -89,9 +88,6 @@ class TransferRunner {
     private final TransferNodes nodes;
     private final TransferFaults faults;
     private final BrokerRelay relay;
-    private final MessageOperations messages;
-    private final StagingQueues staging;
-    private final AcceptanceProbe probe;
     private final NodeCallLimiter limiter;
     private final OperatorHandoff handoff;
     private final AuditService audit;
@@ -152,21 +148,8 @@ class TransferRunner {
             return run.getId();
         }
 
-        String frozenFilter() {
-            return ArtemisSelectors.frozen(selection.filter(), run.getT0());
-        }
-
-        String sourceMbean(ArtemisNode client) {
-            return MBeanNames.queue(
-                    client.resolveBrokerObjectName(),
-                    run.getSourceAddress(),
-                    run.getSourceQueue(),
-                    run.getSourceRoutingType());
-        }
-
-        String stagingMbean(ArtemisNode client) {
-            String queue = StagingQueues.queueName(id());
-            return MBeanNames.queue(client.resolveBrokerObjectName(), queue, queue, "ANYCAST");
+        TransferSource sourceQueue() {
+            return new TransferSource(run.getSourceAddress(), run.getSourceQueue(), run.getSourceRoutingType());
         }
 
         void resolve() {
@@ -219,13 +202,13 @@ class TransferRunner {
     // ---- move between two nodes -------------------------------------------------
 
     private End moveStaged(Segment s) throws IOException {
-        String stagingQueue = StagingQueues.queueName(s.id());
+        String stagingQueue = RahdarNames.stagingQueue(s.id());
         End g = guard(s);
         if (g != null) {
             return g;
         }
         try {
-            staging.create(nodes.client(s.source), s.id());
+            nodes.staging(s.source).create(s.source.getClusterId(), s.source.getId(), s.id());
         } catch (BrokerConnectionException e) {
             return new End(
                     TransferState.FAILED,
@@ -246,12 +229,12 @@ class TransferRunner {
                     return g;
                 }
                 int batch = settings.intValue(TransferSettings.BATCH_SIZE);
-                ArtemisNode source = nodes.client(s.source);
+                ClusterNode source = s.source;
                 // The larger of what the broker counts in staging and what the run has put there and not
                 // yet delivered: the bound holds even when either is off for a moment. The bound is on
                 // held(): it never exceeds twice the batch. The broker's count can read higher for an
                 // instant, because it double-counts messages moving to the relay's consumer (issue #75).
-                long depth = Math.max(messages.messageCount(source, s.stagingMbean(source)), held(s.run));
+                long depth = Math.max(stagedCount(source, stagingQueue), held(s.run));
                 if (!progress.exhausted && depth < 2L * batch) {
                     progress.exhausted = refill(s, source, (int) (2L * batch - depth), stagingQueue);
                 }
@@ -267,6 +250,10 @@ class TransferRunner {
         }
     }
 
+    private long stagedCount(ClusterNode node, String stagingQueue) {
+        return nodes.staging(node).stagedCount(node.getClusterId(), node.getId(), stagingQueue);
+    }
+
     /** What a staged move has seen so far: whether the source is drained, and how many empty batches ran. */
     private static final class Staged {
         boolean exhausted;
@@ -279,7 +266,7 @@ class TransferRunner {
             RelayLink.Batch b,
             InDoubt inDoubt,
             Staged progress,
-            ArtemisNode source,
+            ClusterNode source,
             String stagingQueue,
             long started) {
         switch (b.outcome()) {
@@ -288,7 +275,7 @@ class TransferRunner {
                 return waitForCapacity(s, "The target refused a batch because its address is full.");
             }
             case EMPTY -> {
-                long left = messages.messageCount(source, s.stagingMbean(source));
+                long left = stagedCount(source, stagingQueue);
                 if (progress.exhausted && left == 0) {
                     return finishStaged(s, source, stagingQueue);
                 }
@@ -348,8 +335,8 @@ class TransferRunner {
      * Take up to {@code want} more selected messages off the source into staging. True when the source
      * has no more to give: every id tried, or fewer matched than asked for.
      */
-    private boolean refill(Segment s, ArtemisNode source, int want, String stagingQueue) {
-        String mbean = s.sourceMbean(source);
+    private boolean refill(Segment s, ClusterNode source, int want, String stagingQueue) {
+        TransferStaging broker = nodes.staging(source);
         if (s.selection.kind() == SelectionKind.IDS) {
             List<Long> ids = s.selection.ids();
             int from = s.run.getIdCursor();
@@ -357,7 +344,8 @@ class TransferRunner {
                 return true;
             }
             List<Long> chunk = ids.subList(from, Math.min(ids.size(), from + want));
-            BulkResult result = messages.moveByIds(source, mbean, chunk, stagingQueue);
+            BulkResult result =
+                    broker.moveIds(source.getClusterId(), source.getId(), s.sourceQueue(), chunk, stagingQueue);
             int taken = chunk.size() - result.notDone().size();
             s.run.staged(result.affected(), taken);
             s.run.notTransferred(taken - result.affected());
@@ -369,19 +357,32 @@ class TransferRunner {
             }
             return s.run.getIdCursor() >= ids.size();
         }
-        long moved = messages.moveMessages(source, mbean, want, s.frozenFilter(), stagingQueue, false, want);
+        long moved = broker.moveSelected(
+                source.getClusterId(),
+                source.getId(),
+                s.sourceQueue(),
+                s.selection.filter(),
+                s.run.getT0(),
+                want,
+                stagingQueue);
         s.run.staged(moved, 0);
         save(s);
         return moved < want;
     }
 
     /** Staging is empty and the source has no more: count what could not be taken, and remove staging. */
-    private End finishStaged(Segment s, ArtemisNode source, String stagingQueue) {
+    private End finishStaged(Segment s, ClusterNode source, String stagingQueue) {
         s.run.expired(Math.max(0, s.run.getStaged() - s.run.getDelivered() - s.run.getReturned()));
         if (s.selection.kind() != SelectionKind.IDS) {
-            s.run.notTransferred(messages.countMessages(source, s.sourceMbean(source), s.frozenFilter()));
+            s.run.notTransferred(nodes.staging(source)
+                    .countSelected(
+                            source.getClusterId(),
+                            source.getId(),
+                            s.sourceQueue(),
+                            s.selection.filter(),
+                            s.run.getT0()));
         }
-        if (!staging.destroyIfEmpty(source, stagingQueue)) {
+        if (!nodes.staging(source).destroyIfEmpty(source.getClusterId(), source.getId(), stagingQueue)) {
             return End.stopped("Staging queue %s received messages again after it emptied; resume to relay them."
                     .formatted(stagingQueue));
         }
@@ -398,24 +399,36 @@ class TransferRunner {
                 return g;
             }
             int batch = settings.intValue(TransferSettings.BATCH_SIZE);
-            ArtemisNode source = nodes.client(s.source);
-            String mbean = s.sourceMbean(source);
+            ClusterNode source = s.source;
             long started = System.nanoTime();
             boolean byIds = s.selection.kind() == SelectionKind.IDS;
             if (byIds && s.run.getIdCursor() >= s.selection.ids().size()) {
                 return completed(s);
             }
             long moved = byIds
-                    ? moveIdChunk(s, source, mbean, batch)
-                    : messages.moveMessages(
-                            source, mbean, batch, s.frozenFilter(), s.run.getTargetQueue(), false, batch);
+                    ? moveIdChunk(s, source, batch)
+                    : nodes.staging(source)
+                            .moveSelected(
+                                    source.getClusterId(),
+                                    source.getId(),
+                                    s.sourceQueue(),
+                                    s.selection.filter(),
+                                    s.run.getT0(),
+                                    batch,
+                                    s.run.getTargetQueue());
             boolean done = byIds ? s.run.getIdCursor() >= s.selection.ids().size() : moved < batch;
             s.run.delivered(moved, 0, Instant.now());
             save(s);
             publish(s);
             if (done) {
                 if (!byIds) {
-                    s.run.notTransferred(messages.countMessages(source, mbean, s.frozenFilter()));
+                    s.run.notTransferred(nodes.staging(source)
+                            .countSelected(
+                                    source.getClusterId(),
+                                    source.getId(),
+                                    s.sourceQueue(),
+                                    s.selection.filter(),
+                                    s.run.getT0()));
                 }
                 return completed(s);
             }
@@ -424,11 +437,12 @@ class TransferRunner {
     }
 
     /** Moves the next {@code batch} selected ids straight to the target queue; how many moved. */
-    private long moveIdChunk(Segment s, ArtemisNode source, String mbean, int batch) {
+    private long moveIdChunk(Segment s, ClusterNode source, int batch) {
         List<Long> ids = s.selection.ids();
         int from = s.run.getIdCursor();
         List<Long> chunk = ids.subList(from, Math.min(ids.size(), from + batch));
-        BulkResult result = messages.moveByIds(source, mbean, chunk, s.run.getTargetQueue());
+        BulkResult result = nodes.staging(source)
+                .moveIds(source.getClusterId(), source.getId(), s.sourceQueue(), chunk, s.run.getTargetQueue());
         int taken = chunk.size() - result.notDone().size();
         long moved = result.affected();
         s.run.staged(0, taken);
@@ -523,8 +537,13 @@ class TransferRunner {
         } else {
             // ponytail: countMessages looks at no more than management-browse-page-size messages, so on
             // a deep queue this under-counts; only reached when the preview could not size the selection.
-            ArtemisNode source = nodes.client(s.source);
-            long matching = messages.countMessages(source, s.sourceMbean(source), s.frozenFilter());
+            long matching = nodes.staging(s.source)
+                    .countSelected(
+                            s.source.getClusterId(),
+                            s.source.getId(),
+                            s.sourceQueue(),
+                            s.selection.filter(),
+                            s.run.getT0());
             s.run.notTransferred(Math.max(0, matching - copied));
         }
     }
@@ -538,17 +557,17 @@ class TransferRunner {
      * does not answer, is kept in staging rather than risk a message on both brokers.
      */
     private End giveBack(Segment s) throws IOException {
-        String stagingQueue = StagingQueues.queueName(s.id());
+        String stagingQueue = RahdarNames.stagingQueue(s.id());
         ClusterNode node =
                 nodes.serving(s.run.getSourceClusterId(), s.run.getSourceNativeNodeId(), s.run.getSourceNodeName());
-        ArtemisNode source = nodes.client(node);
-        String mbean = s.stagingMbean(source);
+        TransferStaging broker = nodes.staging(node);
         Set<Long> unsettled = settle(s, node, ledger.all(s.id()));
         if (!unsettled.isEmpty()) {
-            List<Long> safe = messages.listIds(source, mbean).stream()
+            List<Long> safe = broker.stagedIds(node.getClusterId(), node.getId(), stagingQueue).stream()
                     .filter(id -> !unsettled.contains(id))
                     .toList();
-            BulkResult result = messages.moveByIds(source, mbean, safe, s.run.getSourceQueue());
+            BulkResult result =
+                    broker.moveStagedIds(node.getClusterId(), node.getId(), stagingQueue, safe, s.run.getSourceQueue());
             s.run.returned(result.affected());
             save(s);
             publish(s);
@@ -564,16 +583,16 @@ class TransferRunner {
         int batch = settings.intValue(TransferSettings.BATCH_SIZE);
         long moved;
         do {
-            moved = messages.moveMessages(source, mbean, batch, "", s.run.getSourceQueue(), false, batch);
+            moved = broker.moveStaged(node.getClusterId(), node.getId(), stagingQueue, batch, s.run.getSourceQueue());
             s.run.returned(moved);
             save(s);
             publish(s);
         } while (moved >= batch);
-        if (!staging.destroyIfEmpty(source, stagingQueue)) {
+        if (!broker.destroyIfEmpty(node.getClusterId(), node.getId(), stagingQueue)) {
             return new End(
                     TransferState.FAILED,
                     "%d messages are still in staging queue %s (in delivery or scheduled), so it was kept. Return"
-                                    .formatted(messages.messageCount(source, mbean), stagingQueue)
+                                    .formatted(stagedCount(node, stagingQueue), stagingQueue)
                             + " again later.",
                     null);
         }
@@ -591,7 +610,7 @@ class TransferRunner {
         }
         Set<Long> left = new HashSet<>(inDoubt);
         RelayLink.Route route = new RelayLink.Route(
-                StagingQueues.queueName(s.id()),
+                RahdarNames.stagingQueue(s.id()),
                 true,
                 null,
                 Optional.empty(),
@@ -666,7 +685,7 @@ class TransferRunner {
                     .formatted(MessagePermissions.MESSAGE_SEND));
         }
         s.resolve();
-        TargetAcceptance.BatchVerdict verdict = check(s);
+        BatchVerdict verdict = check(s);
         if (verdict.refusal() != null) {
             return new End(
                     TransferState.FAILED,
@@ -682,14 +701,17 @@ class TransferRunner {
         return null;
     }
 
-    private TargetAcceptance.BatchVerdict check(Segment s) {
-        Facts facts = probe.read(
-                nodes.client(s.target), s.run.getTargetAddress(), s.run.getTargetQueue(), s.run.getTargetRoutingType());
+    private BatchVerdict check(Segment s) {
+        TransferAcceptance acceptance = nodes.acceptance(s.target);
+        AcceptanceFacts facts = acceptance.read(
+                s.target.getClusterId(),
+                s.target.getId(),
+                new TransferSource(s.run.getTargetAddress(), s.run.getTargetQueue(), s.run.getTargetRoutingType()));
         int batch = settings.intValue(TransferSettings.BATCH_SIZE);
         long batchBytes = s.run.getEstimateBytes() == null || s.run.getEstimate() == null || s.run.getEstimate() == 0
                 ? 0
                 : s.run.getEstimateBytes() / s.run.getEstimate() * batch;
-        return TargetAcceptance.batch(
+        return acceptance.batch(
                 facts,
                 batchBytes,
                 settings.intValue(TransferSettings.CAPACITY_THRESHOLD_PERCENT),
@@ -712,12 +734,12 @@ class TransferRunner {
             if (!sleep(s.id(), delay)) {
                 return End.stopped("Stopped by the operator while waiting for the target to have room.");
             }
-            TargetAcceptance.BatchVerdict verdict;
+            BatchVerdict verdict;
             try {
                 s.resolve();
                 verdict = check(s);
             } catch (BrokerConnectionException _) {
-                verdict = new TargetAcceptance.BatchVerdict(null, reason);
+                verdict = new BatchVerdict(null, reason);
             }
             if (verdict.refusal() != null) {
                 return new End(

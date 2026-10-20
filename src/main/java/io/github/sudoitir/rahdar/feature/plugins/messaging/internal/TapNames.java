@@ -1,6 +1,6 @@
 package io.github.sudoitir.rahdar.feature.plugins.messaging.internal;
 
-import io.github.sudoitir.rahdar.system.artemis.DivertOperations;
+import io.github.sudoitir.rahdar.platform.broker.RahdarNames;
 import java.util.UUID;
 
 /**
@@ -17,7 +17,7 @@ final class TapNames {
     private TapNames() {}
 
     static String of(String instanceId, UUID registrationId) {
-        return DivertOperations.PLUGIN_TAP_PREFIX + instanceId + '.' + registrationId;
+        return RahdarNames.PLUGIN_TAP_PREFIX + instanceId + '.' + registrationId;
     }
 
     static String queueOf(String name) {
@@ -30,11 +30,11 @@ final class TapNames {
 
     /** Every object of this instance's taps, and nothing of another instance's or of capture's. */
     static String matchFor(String instanceId) {
-        return DivertOperations.PLUGIN_TAP_PREFIX + instanceId + ".#";
+        return RahdarNames.PLUGIN_TAP_PREFIX + instanceId + ".#";
     }
 
     static boolean ownedBy(String name, String instanceId) {
-        return name != null && name.startsWith(DivertOperations.PLUGIN_TAP_PREFIX + instanceId + '.');
+        return name != null && name.startsWith(RahdarNames.PLUGIN_TAP_PREFIX + instanceId + '.');
     }
 
     /** The registration a tap serves, or {@code null} when the name does not parse. */

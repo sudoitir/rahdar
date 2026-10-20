@@ -20,6 +20,7 @@ import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
 import io.github.sudoitir.rahdar.platform.broker.BrokerMessages;
 import io.github.sudoitir.rahdar.platform.broker.ManagementRefusal;
 import io.github.sudoitir.rahdar.platform.broker.QueueCounters;
+import io.github.sudoitir.rahdar.platform.broker.RahdarNames;
 import io.github.sudoitir.rahdar.platform.clusters.BrokerCommands;
 import io.github.sudoitir.rahdar.platform.clusters.BrokerCommands.Check;
 import io.github.sudoitir.rahdar.platform.clusters.BrokerCommands.Command;
@@ -289,7 +290,7 @@ public class QueueLifecycleService {
             List<DivertRow> tapsGone,
             List<DivertRow> tapsKept) {
         String address = queue.address();
-        boolean capture = d.uniqueName() != null && d.uniqueName().startsWith(DivertOperations.CAPTURE_PREFIX);
+        boolean capture = d.uniqueName() != null && d.uniqueName().startsWith(RahdarNames.CAPTURE_PREFIX);
         if (capture) {
             if (address.equals(d.address())) {
                 boolean stays = captureTaps
@@ -556,7 +557,7 @@ public class QueueLifecycleService {
         }
         boolean captured = existing.stream()
                 .anyMatch(d -> d.uniqueName() != null
-                        && d.uniqueName().startsWith(DivertOperations.CAPTURE_PREFIX)
+                        && d.uniqueName().startsWith(RahdarNames.CAPTURE_PREFIX)
                         && req.address().equals(d.address()));
         if (Boolean.TRUE.equals(req.exclusive()) && captured) {
             String effect = "'" + req.address() + "' is being captured, and Artemis applies exclusive diverts before"
@@ -581,13 +582,13 @@ public class QueueLifecycleService {
 
     /** Capture's diverts are managed by their subscription (ADR-0079), whichever API is asked. */
     private static void refuseCaptureName(String name) {
-        if (name != null && name.startsWith(DivertOperations.CAPTURE_PREFIX)) {
+        if (name != null && name.startsWith(RahdarNames.CAPTURE_PREFIX)) {
             throw new IllegalArgumentException("'" + name + "' is in the namespace reserved for message capture ("
-                    + DivertOperations.CAPTURE_PREFIX + "). Manage it from its capture subscription instead.");
+                    + RahdarNames.CAPTURE_PREFIX + "). Manage it from its capture subscription instead.");
         }
-        if (name != null && name.startsWith(DivertOperations.PLUGIN_TAP_PREFIX)) {
+        if (name != null && name.startsWith(RahdarNames.PLUGIN_TAP_PREFIX)) {
             throw new IllegalArgumentException("'" + name + "' is in the namespace reserved for plugins' message taps ("
-                    + DivertOperations.PLUGIN_TAP_PREFIX
+                    + RahdarNames.PLUGIN_TAP_PREFIX
                     + "). It is removed with the plugin registration that owns it.");
         }
     }

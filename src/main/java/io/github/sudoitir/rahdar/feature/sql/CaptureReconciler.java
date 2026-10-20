@@ -16,8 +16,6 @@ import io.github.sudoitir.rahdar.platform.clusters.ClusterLock;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterOwnership;
 import io.github.sudoitir.rahdar.platform.clusters.ServingNodes;
-import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
-import io.github.sudoitir.rahdar.system.artemis.ArtemisNodes;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -72,7 +70,6 @@ public class CaptureReconciler {
     private final CaptureAddresses addresses;
     private final AuditService audit;
     private final CaptureLoss loss;
-    private final ArtemisNodes artemisNodes;
 
     /**
      * Clusters this instance has installed a tap on. In memory, because it exists only
@@ -154,11 +151,10 @@ public class CaptureReconciler {
             refused.keySet().removeIf(key -> key.endsWith("." + subscriptionId));
             for (ClusterNode node : servingNodes(clusterId)) {
                 try {
-                    ArtemisNode client = client(clusterId, node);
-                    for (String name : tap.installedNames(client, instance.id())) {
+                    for (String name : tap.installedNames(clusterId, node.getId(), instance.id())) {
                         if (subscriptionId.equals(CaptureNames.subscriptionOf(name))) {
                             consumers.stop(node.getId(), name);
-                            tap.remove(client, instance.id(), name);
+                            tap.remove(clusterId, node.getId(), instance.id(), name);
                         }
                     }
                 } catch (RuntimeException e) {
@@ -303,8 +299,7 @@ public class CaptureReconciler {
 
     /** Whether this node has nothing wanted and nothing of this instance's left on it. */
     private boolean reconcileNode(UUID clusterId, ClusterNode node, List<Desired> wanted) {
-        ArtemisNode client = client(clusterId, node);
-        Set<String> actual = new LinkedHashSet<>(tap.installedNames(client, instance.id()));
+        Set<String> actual = new LinkedHashSet<>(tap.installedNames(clusterId, node.getId(), instance.id()));
         log.debug("Capture pass on {}: {} tap(s) already installed", node.getName(), actual.size());
         Set<String> wantedNames = new LinkedHashSet<>();
         wanted.forEach(d -> wantedNames.add(d.name()));
@@ -322,7 +317,7 @@ public class CaptureReconciler {
 
         // What was removed is no longer installed, so the checks below read what is left: an
         // orphan removed here must not keep its cluster visited, one that failed must.
-        actual.removeIf(orphan -> !wantedNames.contains(orphan) && removeOrphan(clusterId, node, client, orphan));
+        actual.removeIf(orphan -> !wantedNames.contains(orphan) && removeOrphan(clusterId, node, orphan));
 
         // A drain for a tap this node no longer has is stopped whatever the reason it
         // went away — including a broker that was rebuilt underneath us.
@@ -372,7 +367,8 @@ public class CaptureReconciler {
                         null);
             }
             tap.install(
-                    client(clusterId, node),
+                    clusterId,
+                    node.getId(),
                     instance.id(),
                     new CaptureTap.Spec(
                             desired.subscription().getId(),
@@ -435,12 +431,12 @@ public class CaptureReconciler {
     }
 
     /** Whether the tap is gone from the node. A failure is audited and retried on the next pass. */
-    private boolean removeOrphan(UUID clusterId, ClusterNode node, ArtemisNode client, String name) {
+    private boolean removeOrphan(UUID clusterId, ClusterNode node, String name) {
         AuditEvent event = audit.begin(
                 Actor.system(), "REMOVE_CAPTURE", "CAPTURE", name, clusterId, node.getId(), Map.of(), false);
         try {
             consumers.stop(node.getId(), name);
-            tap.remove(client, instance.id(), name);
+            tap.remove(clusterId, node.getId(), instance.id(), name);
             UUID subscriptionId = CaptureNames.subscriptionOf(name);
             if (subscriptionId != null) {
                 captureNodes.deleteBySubscriptionIdAndNodeId(subscriptionId, node.getId());
@@ -506,11 +502,6 @@ public class CaptureReconciler {
         // If nothing answered, fall back rather than reporting an empty desired state —
         // an empty desired state would look like "remove every tap".
         return ServingNodes.from(answering.isEmpty() ? all : answering);
-    }
-
-    /** The client waits for the node's ceiling before each of an install's requests (ADR-0076). */
-    private ArtemisNode client(UUID clusterId, ClusterNode node) {
-        return artemisNodes.on(clusterId, node.getId());
     }
 
     private static String reason(Exception e) {

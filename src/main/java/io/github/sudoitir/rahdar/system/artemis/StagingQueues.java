@@ -1,6 +1,7 @@
 package io.github.sudoitir.rahdar.system.artemis;
 
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
+import io.github.sudoitir.rahdar.platform.broker.RahdarNames;
 import java.util.List;
 import java.util.UUID;
 import javax.management.MalformedObjectNameException;
@@ -21,7 +22,7 @@ import org.springframework.stereotype.Component;
 public class StagingQueues {
 
     /** Every staging queue's name starts with this; nothing else Rahdar touches here does. */
-    public static final String PREFIX = "rahdar.transfer.";
+    public static final String PREFIX = RahdarNames.TRANSFER_PREFIX;
 
     static final String SETTINGS = "{\"maxDeliveryAttempts\":-1,\"redistributionDelay\":-1}";
 
@@ -30,7 +31,7 @@ public class StagingQueues {
 
     /** The staging queue (and address) name of a run. */
     public static String queueName(UUID runId) {
-        return PREFIX + runId;
+        return RahdarNames.stagingQueue(runId);
     }
 
     /** Create the staging queue and its address settings, or leave them as they are when they exist. */

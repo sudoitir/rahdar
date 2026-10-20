@@ -1,11 +1,11 @@
-package io.github.sudoitir.rahdar.feature.transfer;
+package io.github.sudoitir.rahdar.system.artemis;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import io.github.sudoitir.rahdar.feature.transfer.TargetAcceptance.BatchVerdict;
-import io.github.sudoitir.rahdar.feature.transfer.TargetAcceptance.Input;
-import io.github.sudoitir.rahdar.feature.transfer.web.TransferViews.Finding;
-import io.github.sudoitir.rahdar.feature.transfer.web.TransferViews.FindingKind;
+import io.github.sudoitir.rahdar.platform.broker.TransferAcceptance.AcceptanceFinding;
+import io.github.sudoitir.rahdar.platform.broker.TransferAcceptance.AcceptanceInput;
+import io.github.sudoitir.rahdar.platform.broker.TransferAcceptance.BatchVerdict;
+import io.github.sudoitir.rahdar.platform.broker.TransferAcceptance.FindingKind;
 import io.github.sudoitir.rahdar.system.artemis.AcceptanceProbe.Facts;
 import java.util.List;
 import java.util.function.Consumer;
@@ -223,7 +223,7 @@ class TargetAcceptanceTest {
     @ParameterizedTest(name = "{0}")
     @MethodSource("rows")
     void findsWhatTheTableSays(String name, Consumer<F> facts, Consumer<In> in, FindingKind kind, String code) {
-        List<Finding> findings = evaluate(facts, in);
+        List<AcceptanceFinding> findings = evaluate(facts, in);
 
         assertThat(findings).anySatisfy(f -> {
             assertThat(f.code()).isEqualTo(code);
@@ -250,13 +250,13 @@ class TargetAcceptanceTest {
                             f.settings = "{\"redistributionDelay\":0}";
                         },
                         i -> {}))
-                .extracting(Finding::code)
+                .extracting(AcceptanceFinding::code)
                 .doesNotContain("may-redistribute");
     }
 
     @Test
     void notEnoughRoomStatesBothFigures() {
-        List<Finding> findings = evaluate(
+        List<AcceptanceFinding> findings = evaluate(
                 f -> {
                     f.settings = "{\"addressFullMessagePolicy\":\"FAIL\",\"maxSizeBytes\":%d}".formatted(100 * MB);
                     f.addressSize = 90 * MB;
@@ -280,10 +280,10 @@ class TargetAcceptanceTest {
     @Test
     void aTargetThatIsNotLiveIsNotReadFurther() {
         // The facts of a node that is not live are not read at all, so none of their checks is reported.
-        List<Finding> findings = TargetAcceptance.evaluate(
-                new Input(null, 100L, MB, false, false, false, false, false, 90), "orders", "orders");
+        List<AcceptanceFinding> findings = TargetAcceptance.evaluate(
+                null, new AcceptanceInput(100L, MB, false, false, false, false, false, 90), "orders", "orders");
 
-        assertThat(findings).extracting(Finding::code).containsExactly("target-not-live");
+        assertThat(findings).extracting(AcceptanceFinding::code).containsExactly("target-not-live");
     }
 
     // ---- before each batch ---------------------------------------------------------
@@ -341,14 +341,14 @@ class TargetAcceptanceTest {
                 .isTrue();
     }
 
-    private static List<Finding> evaluate(Consumer<F> tweakFacts, Consumer<In> tweakInput) {
+    private static List<AcceptanceFinding> evaluate(Consumer<F> tweakFacts, Consumer<In> tweakInput) {
         F f = new F();
         tweakFacts.accept(f);
         In in = new In();
         tweakInput.accept(in);
         return TargetAcceptance.evaluate(
-                new Input(
-                        f.facts(),
+                f.facts(),
+                new AcceptanceInput(
                         in.count,
                         in.bytes,
                         in.sameQueueSameNode,
