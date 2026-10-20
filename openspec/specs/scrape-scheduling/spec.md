@@ -102,6 +102,9 @@ node, whatever the origin:
 - a multi-step command;
 - capture installation or removal.
 
+The ceiling SHALL be applied through the broker SDK's call interceptor, which the driver
+asks for a permit before every request, so no request reaches a node without one.
+
 A single request that carries many operations SHALL count against the ceiling in proportion
 to the operations it carries, so batching can never be used to exceed it. The default
 ceiling SHALL be conservative so that Rahdar is never the reason a broker is overloaded.
@@ -186,13 +189,15 @@ SHALL only cost a re-scrape, never correctness.
 
 ### Requirement: Metric samples are written and retained for a bounded window
 
-The system SHALL append queue counter samples to the metric history on the
-medium and slow tiers, and SHALL delete history older than a configurable
-retention window. The default retention SHALL be seven days. History SHALL be
-retained in daily partitions with UTC bounds and no default partition, so that
-trimming expired history is a partition drop rather than a row-by-row delete.
-A sample for a queue, node and time that is already stored SHALL be ignored,
-not stored twice, so that a repeated scrape does not duplicate it.
+The system SHALL append subscription counter samples to the metric history on the
+medium and slow tiers, under the broker SDK's standard metric keys
+(`openbroker.backlog`, `openbroker.consumer.count`, `openbroker.in_flight`,
+`openbroker.enqueued`, `openbroker.acknowledged`, `openbroker.expired`), and SHALL
+delete history older than a configurable retention window. The default retention
+SHALL be seven days. History SHALL be retained in daily partitions with UTC bounds and
+no default partition, so that trimming expired history is a partition drop rather than
+a row-by-row delete. A sample for a subscription, node and time that is already stored
+SHALL be ignored, not stored twice, so that a repeated scrape does not duplicate it.
 
 #### Scenario: Old samples are trimmed
 
@@ -216,6 +221,11 @@ not stored twice, so that a repeated scrape does not duplicate it.
   retention window
 - **THEN** they remain until the whole partition is older than the window, and
   are then dropped with it
+
+#### Scenario: Samples use the standard keys
+
+- **WHEN** a subscription's message count is sampled
+- **THEN** it is stored and served by the metrics API under `openbroker.backlog`
 
 ### Requirement: A node failure is isolated and recorded
 

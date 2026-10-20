@@ -108,11 +108,15 @@ Every `POST`, `PUT`, `PATCH` and `DELETE` under `/api/v1`, except plugin-gateway
 - **THEN** the key is refused as reused, never answered with the preview's result
 
 ### Requirement: TypeScript and Java clients are generated and published
-Each release SHALL publish a TypeScript client (`@rahdar/client` on npm) and a Java client (`io.github.sudoitir:rahdar-client` on Maven Central), both generated from that release's API document, versioned with the release, and published with provenance.
+Each release SHALL publish a TypeScript client (`@rahdar/client` on npm) generated from that release's API document, versioned with the release, and published with provenance. A Java client (`io.github.sudoitir:rahdar-client`) generated from a release's API document SHALL be published to Maven Central with provenance when a maintainer publishes that release there, versioned with the release. Every release SHALL attach its API document.
 
 #### Scenario: Client release
 - **WHEN** a release is published
-- **THEN** both clients of that version are available
+- **THEN** the TypeScript client of that version is available on npm and the release carries its API document
+
+#### Scenario: Java client on Central
+- **WHEN** a maintainer publishes a release to Maven Central
+- **THEN** the Java client of that version is available there, with the plugin API when the backend changed since the newest version on Central
 
 ### Requirement: Contract tests keep implementation and document aligned
 The build SHALL validate every JSON response produced in the API tests against the document's schema for that operation and status, and SHALL treat an undocumented property as a failure.

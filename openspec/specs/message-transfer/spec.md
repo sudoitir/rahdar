@@ -55,10 +55,11 @@ again, the preview SHALL say so.
 
 A filter or whole-queue selection SHALL cover only messages whose timestamp is not
 later than the run's start, so that messages produced during the run are not
-transferred and a run against a live queue terminates. An id selection SHALL cover
-exactly the listed ids. Selected messages that cannot be taken — being delivered to
-a consumer, or scheduled for later delivery — SHALL be counted and reported, never
-silently left.
+transferred and a run against a live queue terminates. A filter SHALL be parsed before
+the run and SHALL be refused unless it is one complete expression, so it cannot escape
+the time bound it is combined with. An id selection SHALL cover exactly the listed ids.
+Selected messages that cannot be taken — being delivered to a consumer, or scheduled
+for later delivery — SHALL be counted and reported, never silently left.
 
 #### Scenario: A producer sending during the run
 
@@ -69,6 +70,11 @@ silently left.
 
 - **WHEN** some selected messages are being delivered to a consumer when the run reaches them
 - **THEN** the run finishes as partial and states how many messages were not transferred and why
+
+#### Scenario: A filter that would escape the bound is refused
+
+- **WHEN** a transfer is requested with the filter `a=1) OR (1=1`
+- **THEN** it is refused as an invalid filter before any message moves
 
 ### Requirement: Transfers work on queues of any size
 

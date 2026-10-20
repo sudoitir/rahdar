@@ -141,8 +141,7 @@ class ClusterConnectionControllerTest extends PostgresIntegrationTest {
         // Every discovery tick: each manageable node answers search, HA read and topology.
         when(session.node(any())).thenAnswer(inv -> {
             String url = inv.getArgument(0);
-            return client(
-                    url, url.contains("backup") ? "ha-read-backup.json" : "ha-read-primary.json", "topology.json");
+            return client(url.contains("backup") ? "ha-read-backup.json" : "ha-read-primary.json", "topology.json");
         });
     }
 
@@ -151,7 +150,7 @@ class ClusterConnectionControllerTest extends PostgresIntegrationTest {
                 clusterId, kind, username, vault.seal(SecretVault.aad(clusterId, kind), password)));
     }
 
-    private BrokerTarget client(String url, String... fixtures) {
+    private BrokerTarget client(String... fixtures) {
         FixtureJolokia server = new FixtureJolokia();
         server.expect().andRespond(withSuccess(body("search-broker.json"), MediaType.APPLICATION_JSON));
         for (String fixture : fixtures) {
@@ -160,7 +159,7 @@ class ClusterConnectionControllerTest extends PostgresIntegrationTest {
         return server.target();
     }
 
-    private BrokerTarget refusing(String url) {
+    private BrokerTarget refusing() {
         FixtureJolokia server = new FixtureJolokia();
         server.expect().andRespond(withStatus(HttpStatus.UNAUTHORIZED));
         return server.target();
@@ -190,10 +189,8 @@ class ClusterConnectionControllerTest extends PostgresIntegrationTest {
 
     @Test
     void aNewPasswordIsCheckedOnEveryNodeAndNothingIsStored() throws Exception {
-        doReturn(refusing(PRIMARY_URL)).when(newSecretSession).node(PRIMARY_URL);
-        doReturn(client(BACKUP_URL, "ha-read-backup.json"))
-                .when(newSecretSession)
-                .node(BACKUP_URL);
+        doReturn(refusing()).when(newSecretSession).node(PRIMARY_URL);
+        doReturn(client("ha-read-backup.json")).when(newSecretSession).node(BACKUP_URL);
 
         edit("{\"management\":{\"username\":\"old-user\",\"password\":\"" + NEW_SECRET + "\"}}", true)
                 .andExpect(status().isOk())
@@ -295,7 +292,7 @@ class ClusterConnectionControllerTest extends PostgresIntegrationTest {
     @Test
     void aChangedPatternRederivesTheDerivedUrlOnTheSpotAndLeavesTheSeedAlone() throws Exception {
         String moved = "http://artemis-backup:9161/jolokia";
-        doReturn(client(moved, "ha-read-backup.json")).when(session).node(moved);
+        doReturn(client("ha-read-backup.json")).when(session).node(moved);
 
         edit("{\"managementUrlPattern\":\"http://{host}:9161/jolokia\"," + BOTH_ACCOUNTS + "}", false)
                 .andExpect(status().isOk());
@@ -335,7 +332,7 @@ class ClusterConnectionControllerTest extends PostgresIntegrationTest {
     @Test
     void aSeedOnANewHostIsCheckedOnceThePasswordIsEnteredAgain() throws Exception {
         String other = "http://other.example:8161/console/jolokia";
-        doReturn(client(other, "ha-read-primary.json")).when(session).node(other);
+        doReturn(client("ha-read-primary.json")).when(session).node(other);
 
         edit("{\"seedUrls\":[\"" + other + "\"]," + BOTH_ACCOUNTS + "}", true).andExpect(status().isOk());
     }
@@ -396,7 +393,7 @@ class ClusterConnectionControllerTest extends PostgresIntegrationTest {
         lost.recordUrlProblem(ManagementUrlProblem.CREDENTIALS_REJECTED, Instant.now());
         nodes.save(lost);
         String moved = "http://artemis-backup:9161/jolokia";
-        doReturn(client(moved, "ha-read-backup.json")).when(session).node(moved);
+        doReturn(client("ha-read-backup.json")).when(session).node(moved);
 
         edit("{\"managementUrlPattern\":\"http://{host}:9161/jolokia\"," + BOTH_ACCOUNTS + "}", false)
                 .andExpect(status().isOk());
@@ -416,9 +413,7 @@ class ClusterConnectionControllerTest extends PostgresIntegrationTest {
                     }
                     String url = inv.getArgument(0);
                     return client(
-                            url,
-                            url.contains("backup") ? "ha-read-backup.json" : "ha-read-primary.json",
-                            "topology.json");
+                            url.contains("backup") ? "ha-read-backup.json" : "ha-read-primary.json", "topology.json");
                 })
                 .when(session)
                 .node(any());
