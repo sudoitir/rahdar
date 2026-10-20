@@ -77,13 +77,12 @@ describe('TransferDialog', () => {
     await waitFor(() => expect(bodies).toHaveLength(1));
     expect(bodies[0]).toEqual({
       mode: 'MOVE',
-      sourceQueue: 'orders',
+      source: 'artemis.queue/orders',
       sourceNodeId: 'n1',
       selection: { kind: 'ALL', ids: null, filter: null },
       targetClusterId: 'c1',
       targetNodeId: 'n2',
-      targetQueue: 'orders',
-      targetAddress: null,
+      target: 'artemis.queue/orders',
     });
   });
 
@@ -213,7 +212,7 @@ describe('TransferDialog', () => {
       planHash: 'h1',
       override: false,
       acknowledged: ['id-cache-off'],
-      confirmQueue: 'orders',
+      confirmSubscription: 'orders',
     });
     await waitFor(() => expect(navigate).toHaveBeenCalledWith({ to: '/clusters/c1/transfers/r1' }));
   });
@@ -476,7 +475,7 @@ describe('TransfersView', () => {
     await holdButton(within(dialog).getByRole('button', { name: 'Return the messages' }));
 
     await waitFor(() => expect(bodies).toHaveLength(1));
-    expect(bodies[0]).toEqual({ nodeId: 'n1', stagingQueue: 'rahdar.transfer.r9', targetQueue: 'orders' });
+    expect(bodies[0]).toEqual({ nodeId: 'n1', stagingQueue: 'rahdar.transfer.r9', target: 'artemis.queue/orders' });
     expect(await screen.findByText(/42 messages returned from rahdar\.transfer\.r9\./)).toBeInTheDocument();
   });
 });

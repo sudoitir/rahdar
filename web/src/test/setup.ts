@@ -6,6 +6,9 @@ import { setupServer } from 'msw/node';
 
 import { accessHandler } from './access.ts';
 import { manifestHandler } from './manifest.ts';
+import { ARTEMIS_KINDS } from './wire.ts';
+
+const AVAILABLE = { status: 'AVAILABLE', reason: 'ok', brokerXmlSnippet: null };
 
 /**
  * Shared MSW network mock (ADR-0024). Tests add per-case handlers with
@@ -13,7 +16,7 @@ import { manifestHandler } from './manifest.ts';
  * mock fails loudly instead of hanging on a real fetch. The defaults are the
  * manifest, with every feature enabled, since the shell reads it on every screen, and
  * `/me/access`, worked out from whatever a test mocks for `/auth/me`, an empty inbox for the header's bell, an
- * approval gate with break-glass off for the shell's banner, and no approval requests for the Account page;
+ * approval gate with break-glass off for the shell's banner, a cluster view that offers the Artemis kinds, and no approval requests for the Account page;
  * a test disables features with `server.use(manifestHandler([...]))`.
  */
 export const server = setupServer(
@@ -22,6 +25,31 @@ export const server = setupServer(
   http.get('*/api/v1/inbox/count', () => HttpResponse.json({ unread: 0, capped: false })),
   http.get('*/api/v1/gate/status', () =>
     HttpResponse.json({ armed: false, providerId: null, attached: false, breakGlass: false }),
+  ),
+  // The cluster view, for the kinds a screen that holds only a name builds its ids from; a test that needs more of it
+  // serves its own.
+  http.get('*/api/v1/clusters/:id', ({ params }) =>
+    HttpResponse.json({
+      id: params.id,
+      name: String(params.id),
+      topology: { clusterId: params.id, nodes: [] },
+      capabilities: {
+        managementRead: AVAILABLE,
+        managementWrite: AVAILABLE,
+        notifications: AVAILABLE,
+        messageIo: AVAILABLE,
+      },
+      health: {
+        clusterId: params.id,
+        level: 'OK',
+        liveEndpointNames: [],
+        splitBrain: 'NONE',
+        replicationBehind: false,
+        notes: [],
+      },
+      system: { id: 'artemis', name: 'Artemis' },
+      kinds: ARTEMIS_KINDS,
+    }),
   ),
   http.get('*/api/v1/held-operations', () => HttpResponse.json({ items: [], next: null })),
 );

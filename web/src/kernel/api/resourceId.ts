@@ -39,12 +39,25 @@ export function resourcePath(id: string): string {
   return `/resources/${id.slice(0, slash)}/${encodeURIComponent(id.slice(slash + 1))}`;
 }
 
-/** The kind the Artemis driver gives a queue; a screen that has only a name composes its id from it. */
-export const QUEUE_KIND = 'artemis.queue';
+/** The kinds a cluster's system offers, as the cluster view lists them. */
+export type ClusterKinds = ReadonlyArray<{ id: string; resourceClass: string }>;
 
-/** The kind the Artemis driver gives an address. */
-export const ADDRESS_KIND = 'artemis.address';
+/** The roles a screen that holds only a name needs an id for. */
+export type Role = 'SUBSCRIPTION' | 'DESTINATION';
 
-export const queueId = (name: string): string => resourceId(QUEUE_KIND, name);
+/** The kind that plays this role in the cluster's system. */
+export function kindOfRole(kinds: ClusterKinds | undefined, role: Role): string {
+  const kind = kinds?.find((k) => k.resourceClass === role);
+  if (!kind) {
+    throw new Error(`The cluster offers no ${role.toLowerCase()} kind`);
+  }
+  return kind.id;
+}
 
-export const addressId = (name: string): string => resourceId(ADDRESS_KIND, name);
+/** The id of the subscription of this name; for a screen that holds a name and no row (a URL param, a picker). */
+export const subscriptionId = (kinds: ClusterKinds | undefined, name: string): string =>
+  resourceId(kindOfRole(kinds, 'SUBSCRIPTION'), name);
+
+/** The id of the destination of this name, built as {@link subscriptionId} builds a subscription's. */
+export const destinationId = (kinds: ClusterKinds | undefined, name: string): string =>
+  resourceId(kindOfRole(kinds, 'DESTINATION'), name);

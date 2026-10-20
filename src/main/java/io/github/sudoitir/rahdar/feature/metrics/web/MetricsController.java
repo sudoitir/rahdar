@@ -1,8 +1,10 @@
 package io.github.sudoitir.rahdar.feature.metrics.web;
 
+import io.github.sudoitir.openbroker.model.ResourceId;
 import io.github.sudoitir.rahdar.feature.metrics.MetricQuery;
 import io.github.sudoitir.rahdar.feature.metrics.MetricQueryService;
 import io.github.sudoitir.rahdar.feature.metrics.web.MetricViews.MetricSeriesResponse;
+import io.github.sudoitir.rahdar.kernel.security.ResourceRef;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -27,8 +29,7 @@ public class MetricsController {
     public MetricSeriesResponse metrics(
             @PathVariable UUID clusterId,
             @RequestParam List<String> metric,
-            @RequestParam(defaultValue = "CLUSTER") String subjectType,
-            @RequestParam(required = false) String subject,
+            @RequestParam(required = false) String resource,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant to,
             @RequestParam(required = false) String step,
@@ -38,7 +39,14 @@ public class MetricsController {
         Duration requestedStep = step != null ? Duration.parse(step) : null;
         return metricQuery.query(
                 clusterId,
-                new MetricQuery(metric, subjectType, subject, effectiveFrom, effectiveTo, requestedStep, splitBy));
+                new MetricQuery(metric, subscriptionOf(resource), effectiveFrom, effectiveTo, requestedStep, splitBy));
+    }
+
+    /** The subscription a resource id names; null for none, which asks for the cluster's totals. */
+    private static ResourceRef subscriptionOf(String resource) {
+        return resource == null || resource.isBlank()
+                ? null
+                : ResourceRef.subscription(ResourceId.parse(resource).name());
     }
 
     /** A plugin metric's series for one subject (ADR-0113). */

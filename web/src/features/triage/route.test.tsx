@@ -56,8 +56,8 @@ describe('the consumer health address', () => {
         HttpResponse.json({
           data: [
             {
-              address: 'orders',
-              queueName: 'orders',
+              destination: 'artemis.address/orders',
+              subscription: 'artemis.queue/orders',
               verdict: 'NO_CONSUMERS',
               severity: 4,
               cause: 'No consumers are attached.',

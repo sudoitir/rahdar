@@ -21,7 +21,7 @@ import org.hibernate.type.SqlTypes;
  * an operator has declared for request-reply tracing, and how (proposal.md,
  * request-reply-tracing spec).
  *
- * <p>{@code replyAddresses} is a set of literal addresses or globs, never null. An
+ * <p>{@code replyDestinations} is a set of literal addresses or globs, never null. An
  * empty list is meaningful and is not the same as unset: it says replies arrive on
  * a temporary queue named by the request's {@code replyTo} (design.md, D3).
  */
@@ -43,7 +43,7 @@ public class RrExpectationEntity {
     private UUID clusterId;
 
     @Column(name = "request_destination", nullable = false)
-    private String requestAddress;
+    private String requestDestination;
 
     /**
      * Literal addresses or {@code *} globs. Mapped as the Postgres {@code TEXT[]}
@@ -53,7 +53,7 @@ public class RrExpectationEntity {
      */
     @Column(name = "reply_destinations", nullable = false, columnDefinition = "text[]")
     @JdbcTypeCode(SqlTypes.ARRAY)
-    private List<String> replyAddresses = new ArrayList<>();
+    private List<String> replyDestinations = new ArrayList<>();
 
     @Column(name = "correlation_property")
     private String correlationProperty;
@@ -71,21 +71,21 @@ public class RrExpectationEntity {
     private boolean enabled = true;
 
     /** Never stores null — the column is {@code NOT NULL} and an empty list is the meaningful "temp queue" value. */
-    public void setReplyAddresses(List<String> replyAddresses) {
-        this.replyAddresses = replyAddresses == null ? new ArrayList<>() : new ArrayList<>(replyAddresses);
+    public void setReplyDestinations(List<String> replyDestinations) {
+        this.replyDestinations = replyDestinations == null ? new ArrayList<>() : new ArrayList<>(replyDestinations);
     }
 
     public RrExpectationEntity(
             UUID clusterId,
-            String requestAddress,
-            List<String> replyAddresses,
+            String requestDestination,
+            List<String> replyDestinations,
             String correlationProperty,
             Integer deadlineMs,
             int samplePerMin,
             boolean capturePayload) {
         this.clusterId = clusterId;
-        this.requestAddress = requestAddress;
-        setReplyAddresses(replyAddresses);
+        this.requestDestination = requestDestination;
+        setReplyDestinations(replyDestinations);
         this.correlationProperty = correlationProperty;
         this.deadlineMs = deadlineMs;
         this.samplePerMin = samplePerMin;

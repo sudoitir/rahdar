@@ -5,6 +5,11 @@ import { paged } from '../../kernel/api/paging.ts';
 
 /** Test fixtures for the transfer screens. Placeholder names only. */
 
+const KINDS = [
+  { id: 'artemis.queue', resourceClass: 'SUBSCRIPTION', label: 'Queue', verbs: [] },
+  { id: 'artemis.address', resourceClass: 'DESTINATION', label: 'Address', verbs: [] },
+];
+
 export const AVAILABLE = { status: 'AVAILABLE', reason: 'ok', brokerXmlSnippet: null };
 
 export function endpoint(id: string, name: string, over: Record<string, unknown> = {}) {
@@ -56,6 +61,7 @@ export function clusterHandlers(
     name,
     description: null,
     topology: topologyOf(id),
+    kinds: KINDS,
     capabilities: {
       managementRead: AVAILABLE,
       managementWrite: AVAILABLE,
@@ -98,8 +104,8 @@ export const END = (clusterId: string, nodeId: string, nodeName: string, queue: 
   clusterId,
   nodeId,
   nodeName,
-  queue,
-  address: queue,
+  subscription: `artemis.queue/${queue}`,
+  destination: `artemis.address/${queue}`,
 });
 
 export function run(over: Partial<TransferRunView> = {}): TransferRunView {

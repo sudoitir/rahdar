@@ -46,18 +46,18 @@ public class SqlGovernance {
      * Whether the current caller holds {@code message:clear} on every queue the pattern can match. Only
      * meaningful on a request thread.
      */
-    public boolean clearAccess(UUID clusterId, String queuePattern) {
-        return policy.mayClear(clusterId, queuePattern);
+    public boolean clearAccess(UUID clusterId, String subscriptionPattern) {
+        return policy.mayClear(clusterId, subscriptionPattern);
     }
 
     /** A result row as the caller may see it. */
     public GovernedMessage govern(UUID clusterId, boolean clearAccess, Row row) {
-        return policy.govern(new GovernContext(clusterId, row.address(), clearAccess), content(row));
+        return policy.govern(new GovernContext(clusterId, row.destination(), clearAccess), content(row));
     }
 
     /** A row as Rahdar may store it: masked for everyone, with sealable originals collected. */
     public GovernedMessage forStorage(UUID clusterId, Row row) {
-        return forStorage(clusterId, row.address(), content(row));
+        return forStorage(clusterId, row.destination(), content(row));
     }
 
     public GovernedMessage forStorage(UUID clusterId, String address, MessageContent content) {
@@ -69,8 +69,8 @@ public class SqlGovernance {
         return new Row(
                 row.nodeId(),
                 row.nodeName(),
-                row.queueName(),
-                row.address(),
+                row.subscription(),
+                row.destination(),
                 row.messageId(),
                 row.messageType(),
                 row.durable(),
@@ -158,7 +158,7 @@ public class SqlGovernance {
      */
     public void guardPredicates(UUID clusterId, QueryAst ast) {
         String field = maskedField(ast);
-        if (field != null && !clearAccess(clusterId, ast.queuePattern())) {
+        if (field != null && !clearAccess(clusterId, ast.subscriptionPattern())) {
             throw new GovernanceRefusedException(field);
         }
     }

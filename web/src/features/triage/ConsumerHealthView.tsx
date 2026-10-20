@@ -14,11 +14,12 @@ import { PageHeader } from '../../ui/PageHeader.tsx';
 import { Pager } from '../../ui/Pager.tsx';
 import { Toolbar } from '../../ui/Toolbar.tsx';
 import { ResourceActions } from '../../kernel/actions/ResourceActions.tsx';
+import { nameOf } from '../../kernel/api/resourceId.ts';
 import { useFilterShortcut } from '../../kernel/keyboard/filterShortcut.ts';
 
 const PAGE_SIZE = 200;
 
-const rowKey = (r: HealthRow) => `${r.address}::${r.queueName}`;
+const rowKey = (r: HealthRow) => `${r.destination}::${r.subscription}`;
 
 /**
  * How many rows on this page need attention, in words. There is always a sentence, so the line it
@@ -175,12 +176,12 @@ export function ConsumerHealthView() {
           end: <Pager page={page} pageSize={PAGE_SIZE} total={total} onChange={setPage} label="queues" />,
         }}
         rowMenu={{
-          label: (r) => r.queueName,
+          label: (r) => nameOf(r.subscription),
           render: (r, menu) => (
             <ResourceActions
               kind="queue"
               clusterId={clusterId}
-              target={{ queueName: r.queueName, address: r.address }}
+              target={{ queueName: nameOf(r.subscription), address: nameOf(r.destination) }}
               restoreFocus={menu.restoreFocus}
             />
           ),

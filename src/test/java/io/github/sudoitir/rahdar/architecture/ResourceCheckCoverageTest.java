@@ -51,16 +51,16 @@ class ResourceCheckCoverageTest {
 
     private static final String BASE = "io.github.sudoitir.rahdar.";
 
-    /** A parameter that names a queue or an address. */
-    private static final Pattern NAMES_A_RESOURCE =
-            Pattern.compile("(?i)(.*queue(name|pattern)?|.*address(name|pattern)?|source|target)");
+    /** A parameter that names a queue or an address, or a subscription or a destination. */
+    private static final Pattern NAMES_A_RESOURCE = Pattern.compile(
+            "(?i)(.*queue(name|pattern)?|.*address(name|pattern)?|.*subscription(name|pattern)?|.*destination(name|pattern)?|source|target)");
 
     /** What a request body is called. */
     private static final Pattern REQUEST_BODY = Pattern.compile(".*(Request|Spec|Query)");
 
     /** A list parameter that names several of them. */
-    private static final Pattern NAMES_SOME_RESOURCES =
-            Pattern.compile("(?i)(names|.*queues|.*queuenames|.*addresses|.*addressnames)");
+    private static final Pattern NAMES_SOME_RESOURCES = Pattern.compile(
+            "(?i)(names|.*queues|.*queuenames|.*addresses|.*addressnames|.*subscriptions|.*destinations)");
 
     private static final Set<String> STEREOTYPES = Set.of(
             "org.springframework.stereotype.Service",
@@ -148,7 +148,7 @@ class ResourceCheckCoverageTest {
             Map.entry(
                     "feature.rr.QueueTargetResolver",
                     "the request-reply sampler's own lookup; no caller names a queue"),
-            Map.entry("feature.rr.ReplyAddressResolver", "matches a declared reply pattern for the sampler"),
+            Map.entry("feature.rr.ReplyDestinationResolver", "matches a declared reply pattern for the sampler"),
             Map.entry("feature.rr.RrMetrics.recordCompletion", "records a latency the sampler observed"),
             Map.entry("feature.rr.RrSamplerHealth", "the sampler's own health record"),
             Map.entry(

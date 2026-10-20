@@ -24,8 +24,8 @@ public class ManagementRefusal extends RuntimeException {
          * change on a live queue. The operator's input is wrong, the connection is fine.
          */
         ARGUMENT,
-        /** An address still has queues bound to it (D8). The refusal names them. */
-        BOUND_QUEUES,
+        /** A destination still has subscriptions bound to it (D8). The refusal names them. */
+        BOUND_SUBSCRIPTIONS,
         /**
          * A queue has consumers attached, so the broker will not destroy it without being told
          * to disconnect them (ADR-0084 D6).

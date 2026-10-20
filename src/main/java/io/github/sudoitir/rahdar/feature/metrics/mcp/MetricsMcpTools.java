@@ -3,6 +3,7 @@ package io.github.sudoitir.rahdar.feature.metrics.mcp;
 import io.github.sudoitir.rahdar.feature.metrics.MetricQuery;
 import io.github.sudoitir.rahdar.feature.metrics.MetricQueryService;
 import io.github.sudoitir.rahdar.feature.metrics.web.MetricViews;
+import io.github.sudoitir.rahdar.kernel.security.ResourceRef;
 import io.github.sudoitir.rahdar.platform.mcp.McpArgs;
 import io.github.sudoitir.rahdar.platform.mcp.McpErrors;
 import io.github.sudoitir.rahdar.platform.mcp.McpViews;
@@ -55,8 +56,7 @@ public class MetricsMcpTools {
                 clusterId,
                 new MetricQuery(
                         List.of(metric),
-                        perQueue ? "QUEUE" : "CLUSTER",
-                        perQueue ? queue : null,
+                        perQueue ? ResourceRef.subscription(queue) : null,
                         to.minus(window),
                         to,
                         null,

@@ -63,7 +63,7 @@ execute.
 ### Requirement: A bulk run is capped by queue count and by estimated messages
 
 A bulk run SHALL NOT contain more queues than the configured queue cap
-(`safety.bulk-queue-cap`, default 200). A preview that would exceed it SHALL be refused,
+(`safety.bulk-subscription-cap`, default 200). A preview that would exceed it SHALL be refused,
 and the refusal SHALL state the cap and how many queues matched. There is no override
 for this cap.
 

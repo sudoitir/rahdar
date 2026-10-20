@@ -180,7 +180,7 @@ public class AlertRuleService {
                 || clusterAccess.mayOnAll(
                         clusterId,
                         ResourceType.SUBSCRIPTION,
-                        AlertScope.parse(rule.getScope(), json).queueNames(),
+                        AlertScope.parse(rule.getScope(), json).subscriptionNames(),
                         Permissions.SUBSCRIPTION_READ);
     }
 
@@ -190,7 +190,7 @@ public class AlertRuleService {
             clusterAccess.requireOnAll(
                     clusterId,
                     ResourceType.SUBSCRIPTION,
-                    AlertScope.parse(rule.getScope(), json).queueNames(),
+                    AlertScope.parse(rule.getScope(), json).subscriptionNames(),
                     Permissions.SUBSCRIPTION_READ);
         }
     }

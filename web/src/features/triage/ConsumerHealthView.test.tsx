@@ -21,8 +21,8 @@ const { ConsumerHealthView } = await import('./ConsumerHealthView.tsx');
 
 function row(over: Record<string, unknown> = {}) {
   return {
-    address: 'orders',
-    queueName: 'orders',
+    destination: 'artemis.address/orders',
+    subscription: 'artemis.queue/orders',
     verdict: 'HEALTHY',
     severity: 0,
     cause: 'Keeping up with what arrives.',
@@ -64,8 +64,14 @@ describe('ConsumerHealthView', () => {
       http.get('*/api/v1/clusters/c1/consumer-health', () =>
         HttpResponse.json(
           page([
-            row({ queueName: 'broken', verdict: 'NO_CONSUMERS', severity: 4, consumers: 0, depth: 9000 }),
-            row({ queueName: 'stuck', verdict: 'STALLED', severity: 4, delivering: 30, depth: 5000 }),
+            row({
+              subscription: 'artemis.queue/broken',
+              verdict: 'NO_CONSUMERS',
+              severity: 4,
+              consumers: 0,
+              depth: 9000,
+            }),
+            row({ subscription: 'artemis.queue/stuck', verdict: 'STALLED', severity: 4, delivering: 30, depth: 5000 }),
           ]),
         ),
       ),
@@ -81,7 +87,9 @@ describe('ConsumerHealthView', () => {
     currentSearch = {};
     withCluster();
     server.use(
-      http.get('*/api/v1/clusters/c1/consumer-health', () => HttpResponse.json(page([row({ queueName: 'quiet' })]))),
+      http.get('*/api/v1/clusters/c1/consumer-health', () =>
+        HttpResponse.json(page([row({ subscription: 'artemis.queue/quiet' })])),
+      ),
     );
 
     renderWithProviders(<ConsumerHealthView />);
@@ -99,7 +107,13 @@ describe('ConsumerHealthView', () => {
       http.get('*/api/v1/clusters/c1/consumer-health', () =>
         HttpResponse.json(
           page([
-            row({ queueName: 'new-queue', verdict: 'INSUFFICIENT_DATA', severity: 0, ackRate: null, addRate: null }),
+            row({
+              subscription: 'artemis.queue/new-queue',
+              verdict: 'INSUFFICIENT_DATA',
+              severity: 0,
+              ackRate: null,
+              addRate: null,
+            }),
           ]),
         ),
       ),
@@ -117,7 +131,9 @@ describe('ConsumerHealthView', () => {
     withCluster();
     server.use(
       http.get('*/api/v1/clusters/c1/consumer-health', () =>
-        HttpResponse.json(page([row({ queueName: 'quiet', ackRate: null, depthSlopePerSecond: null })])),
+        HttpResponse.json(
+          page([row({ subscription: 'artemis.queue/quiet', ackRate: null, depthSlopePerSecond: null })]),
+        ),
       ),
     );
 

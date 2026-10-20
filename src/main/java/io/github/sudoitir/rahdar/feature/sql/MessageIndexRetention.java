@@ -102,7 +102,7 @@ public class MessageIndexRetention {
                 .map(QueueSnapshot::queueName)
                 .distinct()
                 .forEach(queue -> ofCluster.stream()
-                        .filter(s -> QueueNamePattern.matches(s.getQueuePattern(), queue))
+                        .filter(s -> QueueNamePattern.matches(s.getSubscriptionPattern(), queue))
                         .mapToInt(MessageIndexSubscriptionEntity::getRetentionDays)
                         .max()
                         .ifPresent(retention -> longest.merge(queue, retention, Math::max)));

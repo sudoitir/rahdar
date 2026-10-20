@@ -1,5 +1,4 @@
-import { addressId } from '../../kernel/api/resourceId.ts';
-import { destinationIdentity, subscriptionIdentity } from '../../test/wire.ts';
+import { addressId, destinationIdentity, subscriptionIdentity } from '../../test/wire.ts';
 import { describe, expect, it } from 'vitest';
 import { http, HttpResponse } from 'msw';
 import { screen, waitFor } from '@testing-library/react';

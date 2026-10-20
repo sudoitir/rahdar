@@ -93,17 +93,17 @@ function toRows(graph: FlowGraphView): PathRow[] {
 function subjectOf(row: PathRow): FlowNodeView | undefined {
   switch (row.edge.kind) {
     case 'PRODUCE':
-    case 'BRIDGE':
+    case 'LINK':
     case 'CLUSTER_HOP':
       return row.from;
     case 'CONSUME':
     case 'ROUTE':
       return row.to;
-    case 'DIVERT':
+    case 'FORWARD':
     case 'WILDCARD':
     case 'DEAD_LETTER':
     case 'EXPIRY':
-      return row.to?.kind === 'ADDRESS' ? row.to : undefined;
+      return row.to?.kind === 'DESTINATION' ? row.to : undefined;
     default:
       return undefined;
   }

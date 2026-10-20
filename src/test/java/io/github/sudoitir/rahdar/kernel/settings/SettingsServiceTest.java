@@ -217,28 +217,29 @@ class SettingsServiceTest extends PostgresIntegrationTest {
         settings.put(BrokerSettings.BULK_CAP, "3");
 
         settings.apply(List.of(
-                SettingChange.reset(BrokerSettings.BULK_CAP), SettingChange.set(BrokerSettings.BULK_QUEUE_CAP, "2")));
+                SettingChange.reset(BrokerSettings.BULK_CAP),
+                SettingChange.set(BrokerSettings.BULK_SUBSCRIPTION_CAP, "2")));
 
         assertThat(settings.effective().get(BrokerSettings.BULK_CAP).overridden())
                 .isFalse();
-        assertThat(settings.intValue(BrokerSettings.BULK_QUEUE_CAP)).isEqualTo(2);
+        assertThat(settings.intValue(BrokerSettings.BULK_SUBSCRIPTION_CAP)).isEqualTo(2);
         assertThat(auditEvents.findAll())
                 .extracting(AuditEventEntity::getAction, AuditEventEntity::getTargetName)
                 .contains(
                         tuple("RESET_SETTING", BrokerSettings.BULK_CAP),
-                        tuple("UPDATE_SETTING", BrokerSettings.BULK_QUEUE_CAP));
+                        tuple("UPDATE_SETTING", BrokerSettings.BULK_SUBSCRIPTION_CAP));
     }
 
     @Test
     void aChangeSetWithOneInvalidValueChangesNothingAndNamesTheInvalidSetting() {
         assertThatThrownBy(() -> settings.apply(List.of(
                         SettingChange.set(BrokerSettings.BULK_CAP, "3"),
-                        SettingChange.set(BrokerSettings.BULK_QUEUE_CAP, "0"),
+                        SettingChange.set(BrokerSettings.BULK_SUBSCRIPTION_CAP, "0"),
                         SettingChange.set(ScrapeSettings.TIER_A, "soon"))))
                 .isInstanceOfSatisfying(
                         SettingsInvalidException.class,
                         e -> assertThat(e.fieldErrors())
-                                .containsOnlyKeys(BrokerSettings.BULK_QUEUE_CAP, ScrapeSettings.TIER_A));
+                                .containsOnlyKeys(BrokerSettings.BULK_SUBSCRIPTION_CAP, ScrapeSettings.TIER_A));
 
         assertThat(settings.effective().get(BrokerSettings.BULK_CAP).overridden())
                 .isFalse();

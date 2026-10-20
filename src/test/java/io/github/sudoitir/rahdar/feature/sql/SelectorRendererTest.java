@@ -212,7 +212,7 @@ class SelectorRendererTest {
         Predicate onBody = new Predicate.IsNull(new Term.JsonTerm("$.a"), false);
         Predicate folded = new Predicate.IsNull(new Term.CaseFold(TENANT, false), false);
         Predicate rank = new Predicate.IsNull(new Term.MatchRank(), false);
-        Predicate noSelector = new Predicate.IsNull(new Term.ColumnTerm(Column.QUEUE), false);
+        Predicate noSelector = new Predicate.IsNull(new Term.ColumnTerm(Column.SUBSCRIPTION), false);
         Predicate ordering =
                 new Predicate.Compare(new Term.ColumnTerm(Column.DURABLE), Operator.GT, new Literal.Bool(true));
 
@@ -221,7 +221,7 @@ class SelectorRendererTest {
         assertThatThrownBy(() -> render(onBody)).hasMessageContaining("read the body");
         assertThatThrownBy(() -> render(folded)).hasMessageContaining("fold case");
         assertThatThrownBy(() -> render(rank)).hasMessageContaining("match_rank");
-        assertThatThrownBy(() -> render(noSelector)).hasMessageContaining("no selector identifier for queue");
+        assertThatThrownBy(() -> render(noSelector)).hasMessageContaining("no selector identifier for subscription");
         assertThatThrownBy(() -> render(ordering)).hasMessageContaining("= or <>");
         assertThat(List.of(ilike, match, onBody, folded, rank, noSelector, ordering))
                 .noneMatch(renderer::isRenderable);

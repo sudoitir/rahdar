@@ -1,4 +1,4 @@
-import { destinationIdentity, subscriptionIdentity } from '../../test/wire.ts';
+import { ARTEMIS_KINDS, destinationIdentity, subscriptionIdentity } from '../../test/wire.ts';
 import { describe, expect, it, vi } from 'vitest';
 import { http, HttpResponse } from 'msw';
 import { screen, waitFor, within } from '@testing-library/react';
@@ -34,6 +34,7 @@ function signedInWith(permissions: string[]) {
         name: 'prod',
         description: null,
         topology: { clusterId: 'c1', nodes: [] },
+        kinds: ARTEMIS_KINDS,
         capabilities: {
           managementRead: AVAILABLE,
           managementWrite: AVAILABLE,

@@ -5,7 +5,7 @@ import { useForm } from '@mantine/form';
 import { useActionHost } from '../../kernel/actions/hostContext.ts';
 import { ActionMenuItem } from '../../ui/ActionMenuItem.tsx';
 import { CapabilityGate } from '../../ui/CapabilityGate.tsx';
-import { queueId } from '../../kernel/api/resourceId.ts';
+import { useRoleIds } from '../clusters/index.ts';
 import { ConfirmDialog } from '../../ui/ConfirmDialog.tsx';
 import { focusFirstInvalid } from '../../ui/formErrors.ts';
 import { Toolbar } from '../../ui/Toolbar.tsx';
@@ -87,6 +87,7 @@ export function MessageActions({
   onCleared: () => void;
 }>) {
   const run = useMessageAction(clusterId, queueName);
+  const roleIds = useRoleIds(clusterId);
   // The action stays set while the dialog closes, so its text does not change during the exit.
   const [action, setAction] = useState<MessageActionKind>('move');
   const [opened, setOpened] = useState(false);
@@ -112,7 +113,7 @@ export function MessageActions({
     run.mutate(
       {
         action,
-        body: { positions: ids, target: action === 'move' ? queueId(target) : undefined },
+        body: { positions: ids, target: action === 'move' ? roleIds.subscription(target) : undefined },
         node,
       },
       {

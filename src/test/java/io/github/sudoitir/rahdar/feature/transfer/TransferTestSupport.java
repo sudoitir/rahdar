@@ -10,6 +10,7 @@ import io.github.sudoitir.rahdar.feature.transfer.web.TransferViews.TransferSele
 import io.github.sudoitir.rahdar.kernel.jobs.BackgroundRuns;
 import io.github.sudoitir.rahdar.kernel.security.AccessChanges;
 import io.github.sudoitir.rahdar.kernel.security.GrantLoader;
+import io.github.sudoitir.rahdar.kernel.security.ResourceIdTexts;
 import io.github.sudoitir.rahdar.kernel.security.internal.persistence.AppUserRepository;
 import io.github.sudoitir.rahdar.kernel.security.internal.persistence.RolePermissionRepository;
 import io.github.sudoitir.rahdar.kernel.security.internal.persistence.RoleRepository;
@@ -70,6 +71,9 @@ abstract class TransferTestSupport extends PostgresIntegrationTest {
 
     @Autowired
     TransferService transfers;
+
+    @Autowired
+    ResourceIdTexts ids;
 
     @Autowired
     TransferRecovery recovery;
@@ -252,7 +256,14 @@ abstract class TransferTestSupport extends PostgresIntegrationTest {
             String targetQueue) {
         return transfers.preview(
                 from.id(),
-                new TransferPreviewRequest(mode, sourceQueue, fromNode, selection, to.id(), toNode, targetQueue, null));
+                new TransferPreviewRequest(
+                        mode,
+                        ids.subscription(from.id(), sourceQueue),
+                        fromNode,
+                        selection,
+                        to.id(),
+                        toNode,
+                        ids.subscription(to.id(), targetQueue)));
     }
 
     /** From P's queue to D's queue. */
@@ -270,7 +281,10 @@ abstract class TransferTestSupport extends PostgresIntegrationTest {
                 preview.source().clusterId(),
                 preview.id(),
                 new TransferExecuteRequest(
-                        preview.planHash(), override, warnings, preview.source().queue()));
+                        preview.planHash(),
+                        override,
+                        warnings,
+                        ResourceIdTexts.name(preview.source().subscription())));
         started.add(run.id());
         return run;
     }

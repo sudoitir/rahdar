@@ -223,7 +223,7 @@ class SqlGovernanceTest {
         assertThat(replaced.body()).isEqualTo("masked");
         assertThat(replaced.properties()).containsEntry("p", 1L);
         assertThat(replaced.messageId()).isEqualTo(original.messageId());
-        assertThat(replaced.queueName()).isEqualTo("orders");
+        assertThat(replaced.subscription()).isEqualTo("orders");
         assertThat(replaced.bodyTruncated()).isTrue();
         assertThat(replaced.origin()).isEqualTo("CAPTURED");
         assertThat(replaced.sourceMessageId()).isEqualTo(99L);
@@ -276,7 +276,7 @@ class SqlGovernanceTest {
         assertThat(governance.maskedField(where(eqStr(new Term.ColumnTerm(Column.GROUP_ID), "x"), List.of())))
                 .as("a header column the policy does not classify")
                 .isNull();
-        assertThat(governance.maskedField(where(eqStr(new Term.ColumnTerm(Column.QUEUE), "x"), List.of())))
+        assertThat(governance.maskedField(where(eqStr(new Term.ColumnTerm(Column.SUBSCRIPTION), "x"), List.of())))
                 .as("a column that is not a header at all")
                 .isNull();
         assertThat(governance.maskedField(

@@ -18,10 +18,10 @@ vi.mock('@tanstack/react-router', async (importOriginal) => ({
 function expectation(over: Record<string, unknown> = {}) {
   return {
     id: 'e1',
-    requestAddress: 'orders.request',
-    replyAddresses: ['orders.reply'],
-    resolvedReplyAddresses: ['orders.reply'],
-    replyAddressesCapped: false,
+    requestDestination: 'orders.request',
+    replyDestinations: ['orders.reply'],
+    resolvedReplyDestinations: ['orders.reply'],
+    replyDestinationsCapped: false,
     correlationProperty: null,
     deadlineMs: 30_000,
     samplePerMin: 10,
@@ -85,7 +85,7 @@ describe('ExpectationsView', () => {
   });
 
   it('sends every reply address pattern the operator entered', async () => {
-    const sent: { replyAddresses?: string[] }[] = [];
+    const sent: { replyDestinations?: string[] }[] = [];
     let created = false;
     server.use(
       writer,
@@ -94,7 +94,7 @@ describe('ExpectationsView', () => {
       ),
       http.get('*/api/v1/clusters/c1/rr/expectations', () => HttpResponse.json(paged(created ? [expectation()] : []))),
       http.post('*/api/v1/clusters/c1/rr/expectations', async ({ request }) => {
-        sent.push((await request.json()) as { replyAddresses?: string[] });
+        sent.push((await request.json()) as { replyDestinations?: string[] });
         created = true;
         return HttpResponse.json(expectation(), { status: 201 });
       }),
@@ -115,7 +115,7 @@ describe('ExpectationsView', () => {
     await user.click(screen.getByRole('button', { name: 'Add' }));
 
     await screen.findByRole('rowheader', { name: 'orders.request' });
-    expect(sent[0]?.replyAddresses).toEqual(['orders.reply.a', 'orders.reply.*']);
+    expect(sent[0]?.replyDestinations).toEqual(['orders.reply.a', 'orders.reply.*']);
   });
 
   it('explains what leaving the reply addresses empty means', async () => {
@@ -145,7 +145,9 @@ describe('ExpectationsView', () => {
   it('says when a declared pattern matches nothing on the cluster yet', async () => {
     server.use(
       http.get('*/api/v1/clusters/c1/rr/expectations', () =>
-        HttpResponse.json(paged([expectation({ replyAddresses: ['orders.reply.*'], resolvedReplyAddresses: [] })])),
+        HttpResponse.json(
+          paged([expectation({ replyDestinations: ['orders.reply.*'], resolvedReplyDestinations: [] })]),
+        ),
       ),
     );
     renderWithProviders(<ExpectationsView clusterId="c1" />);
@@ -159,9 +161,9 @@ describe('ExpectationsView', () => {
         HttpResponse.json(
           paged([
             expectation({
-              replyAddresses: ['*'],
-              resolvedReplyAddresses: Array.from({ length: 32 }, (_, i) => `a.${i}`),
-              replyAddressesCapped: true,
+              replyDestinations: ['*'],
+              resolvedReplyDestinations: Array.from({ length: 32 }, (_, i) => `a.${i}`),
+              replyDestinationsCapped: true,
             }),
           ]),
         ),
@@ -180,8 +182,8 @@ describe('ExpectationsView', () => {
         HttpResponse.json(
           paged(
             captured
-              ? [{ id: 's1', queuePattern: 'orders.#', mode: 'CAPTURE', enabled: true, nodes: [] }]
-              : [{ id: 's1', queuePattern: 'orders.request', mode: 'SAMPLE', enabled: true, nodes: [] }],
+              ? [{ id: 's1', subscriptionPattern: 'orders.#', mode: 'CAPTURE', enabled: true, nodes: [] }]
+              : [{ id: 's1', subscriptionPattern: 'orders.request', mode: 'SAMPLE', enabled: true, nodes: [] }],
           ),
         ),
       ),
@@ -202,7 +204,7 @@ describe('ExpectationsView', () => {
     server.use(
       writer,
       http.get('*/api/v1/clusters/c1/rr/expectations', () =>
-        HttpResponse.json(paged([expectation(), expectation({ id: 'e2', requestAddress: 'billing.request' })])),
+        HttpResponse.json(paged([expectation(), expectation({ id: 'e2', requestDestination: 'billing.request' })])),
       ),
     );
     renderWithProviders(<ExpectationsView clusterId="c1" />);

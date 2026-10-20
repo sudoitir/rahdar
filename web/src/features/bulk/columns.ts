@@ -1,5 +1,6 @@
 import { createElement } from 'react';
 
+import { nameOf } from '../../kernel/api/resourceId.ts';
 import { absoluteLabel } from '../../kernel/time/time.ts';
 import { AUTO, localZone } from '../../kernel/time/timezone.ts';
 import type { Column } from '../../ui/table/index.ts';
@@ -67,12 +68,12 @@ export function runColumns({ clusterId, zone }: RunColumnDeps): Column<BulkRunVi
  * for a destroy, how many messages it held go next, and the reason is the first to be hidden when the
  * table is narrow. Building them again is needed only when the operation or the handler changes.
  */
-export function itemColumns(destructive: boolean, onOpen: (queueName: string) => void): Column<BulkItemView>[] {
+export function itemColumns(destructive: boolean, onOpen: (subscription: string) => void): Column<BulkItemView>[] {
   return [
     {
       id: 'queue',
       header: 'Queue',
-      accessor: (i) => i.queueName,
+      accessor: (i) => nameOf(i.subscription),
       cell: (i) => createElement(QueueButton, { item: i, onOpen }),
       kind: 'identifier',
       priority: 'essential',
@@ -98,7 +99,13 @@ export function itemColumns(destructive: boolean, onOpen: (queueName: string) =>
  */
 export function previewColumns(destructive: boolean): Column<BulkItemView>[] {
   return [
-    { id: 'queue', header: 'Queue', accessor: (i) => i.queueName, kind: 'identifier', priority: 'essential' },
+    {
+      id: 'queue',
+      header: 'Queue',
+      accessor: (i) => nameOf(i.subscription),
+      kind: 'identifier',
+      priority: 'essential',
+    },
     ...(destructive ? [messagesColumn('messages')] : []),
     { id: 'nodes', header: 'Nodes', accessor: (i) => i.nodes.length, kind: 'number', priority: 'low' },
     {

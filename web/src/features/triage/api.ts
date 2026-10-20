@@ -2,6 +2,7 @@ import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 
 import { type PagedView, type ResourceParams, resourceSearch } from '../../kernel/api/paging.ts';
 import { ApiError, clusterKey, request } from '../../kernel/api/request.ts';
+import { useRoleIds } from '../clusters/index.ts';
 import type { components } from '../../kernel/api/schema.d.ts';
 
 type Schemas = components['schemas'];
@@ -40,12 +41,13 @@ export function useQueueHealth(
   queueName: string,
   enabled = true,
 ): UseQueryResult<ConsumerHealthView | null, ApiError> {
+  const ids = useRoleIds(clusterId);
   return useQuery({
     queryKey: keys.queue(clusterId, queueName),
-    enabled: enabled && clusterId !== '' && queueName !== '',
+    enabled: enabled && ids.loaded && queueName !== '',
     queryFn: async () => {
       const page = await request<PagedView<ConsumerHealthView>>(
-        `/clusters/${clusterId}/consumer-health?queue=${encodeURIComponent(queueName)}`,
+        `/clusters/${clusterId}/consumer-health?subscription=${encodeURIComponent(ids.subscription(queueName))}`,
       );
       return page.data[0] ?? null;
     },

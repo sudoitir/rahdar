@@ -25,7 +25,8 @@ import type { ConsumerHealthView } from '../features/triage/api.ts';
 import type { FlowEdgeView, FlowNodeView } from '../features/flow/api.ts';
 import type { MessageSummaryView } from '../features/messages/api.ts';
 import type { PluginUpdateView, PluginView } from '../features/plugins/api.ts';
-import { ADDRESS_KIND, addressId, QUEUE_KIND, queueId, resourceId } from '../kernel/api/resourceId.ts';
+import { resourceId } from '../kernel/api/resourceId.ts';
+import { ADDRESS_KIND, addressId, QUEUE_KIND, queueId } from './wire.ts';
 import type { SubscriptionView } from '../features/queues/api.ts';
 import type {
   DestinationView,
@@ -368,7 +369,7 @@ const brokerEvent = (f: Fixture, i: number): BrokerEventView => ({
     'openbroker.resource.deleted',
     'openbroker.message.expired',
   ][i],
-  address: address(f, i),
+  destination: address(f, i),
   routingName: name(f, 'orders', i),
   consumerName: name(f, 'consumer', i),
   sessionName: null,
@@ -406,15 +407,15 @@ const transfer = (f: Fixture, i: number): TransferRunView => ({
     clusterId: CLUSTER,
     nodeId: 'node-1',
     nodeName: f === 'normal' ? 'broker-1' : name(f, 'broker', i),
-    queue: name(f, 'orders', i),
-    address: address(f, i),
+    subscription: resourceId('artemis.queue', name(f, 'orders', i)),
+    destination: resourceId('artemis.address', address(f, i)),
   },
   target: {
     clusterId: i === 3 ? 'cluster-2' : CLUSTER,
     nodeId: 'node-2',
     nodeName: f === 'normal' ? 'broker-2' : name(f, 'broker', i + 1),
-    queue: name(f, 'archive', i),
-    address: address(f, i + 1),
+    subscription: resourceId('artemis.queue', name(f, 'archive', i)),
+    destination: resourceId('artemis.address', address(f, i + 1)),
   },
   sameNode: false,
   selection: { kind: 'ALL' },
@@ -451,8 +452,8 @@ const transfer = (f: Fixture, i: number): TransferRunView => ({
 });
 
 const health = (f: Fixture, i: number): ConsumerHealthView => ({
-  address: address(f, i),
-  queueName: name(f, 'orders', i),
+  destination: resourceId('artemis.address', address(f, i)),
+  subscription: resourceId('artemis.queue', name(f, 'orders', i)),
   verdict: ['NO_CONSUMERS', 'STALLED', 'FALLING_BEHIND', 'DRAINING', 'HEALTHY', 'INSUFFICIENT_DATA'][i],
   severity: 6 - i,
   cause: 'cause',
@@ -479,8 +480,8 @@ const health = (f: Fixture, i: number): ConsumerHealthView => ({
 const sqlRow = (f: Fixture, i: number): SqlRowView => ({
   nodeId: `node-${(i % 2) + 1}`,
   nodeName: f === 'normal' ? `broker-${(i % 2) + 1}` : name(f, 'broker', i % 2),
-  queueName: name(f, 'orders', i),
-  address: address(f, i),
+  subscription: resourceId('artemis.queue', name(f, 'orders', i)),
+  destination: resourceId('artemis.address', address(f, i)),
   messageId: num(f, 5_000_000 + i),
   messageType: 4,
   durable: true,
@@ -523,7 +524,7 @@ const runRow = (f: Fixture, i: number): BulkRunView => ({
 
 const bulkItem = (f: Fixture, i: number): BulkItemView => ({
   ordinal: i,
-  queueName: name(f, 'orders', i),
+  subscription: resourceId('artemis.queue', name(f, 'orders', i)),
   status: (['SUCCEEDED', 'FAILED', 'REFUSED', 'PENDING', 'RUNNING', 'SKIPPED'] as const)[i],
   error:
     i === 1 || i === 2
@@ -641,16 +642,16 @@ const updates: ReadonlyMap<string, PluginUpdateView> = new Map(
   }),
 );
 
-const flowNode = (f: Fixture, kind: 'QUEUE' | 'ADDRESS' | 'PRODUCER', i: number): FlowNodeView => ({
+const flowNode = (f: Fixture, kind: 'SUBSCRIPTION' | 'DESTINATION' | 'PRODUCER', i: number): FlowNodeView => ({
   id: `${kind}:${i}`,
   kind,
-  label: kind === 'ADDRESS' ? address(f, i) : name(f, 'orders', i),
+  label: kind === 'DESTINATION' ? address(f, i) : name(f, 'orders', i),
   members: kind === 'PRODUCER' ? 3 : null,
 });
 
 const flowEdge = (i: number): FlowEdgeView => ({
   id: `edge-${i}`,
-  kind: (['PRODUCE', 'ROUTE', 'CONSUME', 'DIVERT', 'BRIDGE', 'DEAD_LETTER'] as const)[i],
+  kind: (['PRODUCE', 'ROUTE', 'CONSUME', 'FORWARD', 'LINK', 'DEAD_LETTER'] as const)[i],
   source: 'a',
   target: 'b',
   rate: 12.5 * (i + 1),
@@ -675,7 +676,7 @@ const pathRow = (f: Fixture, i: number): PathRow => ({
   id: `path-${i}`,
   edge: flowEdge(i),
   from: flowNode(f, 'PRODUCER', i),
-  to: flowNode(f, 'QUEUE', i),
+  to: flowNode(f, 'SUBSCRIPTION', i),
   faults: i === 2 ? ['NO_CONSUMER'] : [],
 });
 
@@ -840,9 +841,9 @@ export const VIEWS: TableView_[] = [
     label: 'Consumer health',
     columns: consumerHealthColumns(),
     rows: (f) => ROWS.map((i) => health(f, i)),
-    rowKey: (r) => r.queueName,
-    identifiers: ['queueName', 'address'],
-    visible1280: ['verdict', 'queueName', 'address', 'depth', 'consumers', 'delivering', 'ackRate', 'trend'],
+    rowKey: (r) => r.subscription,
+    identifiers: ['subscription', 'destination'],
+    visible1280: ['verdict', 'subscription', 'destination', 'depth', 'consumers', 'delivering', 'ackRate', 'trend'],
   }),
   view({
     name: 'sql results',
@@ -867,7 +868,7 @@ export const VIEWS: TableView_[] = [
     label: 'Queues in this run',
     columns: itemColumns(true, () => {}),
     rows: (f) => ROWS.map((i) => bulkItem(f, i)),
-    rowKey: (r) => r.queueName,
+    rowKey: (r) => r.subscription,
     height: { maxRows: 12 },
     identifiers: [],
     visible1280: ['queue', 'status', 'affected', 'note'],
@@ -877,7 +878,7 @@ export const VIEWS: TableView_[] = [
     label: 'Queues in this plan',
     columns: previewColumns(true),
     rows: (f) => ROWS.map((i) => bulkItem(f, i)),
-    rowKey: (r) => r.queueName,
+    rowKey: (r) => r.subscription,
     height: { maxRows: 8 },
     identifiers: ['queue'],
     visible1280: ['queue', 'messages', 'nodes', 'plan', 'note'],

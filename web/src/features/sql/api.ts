@@ -59,7 +59,7 @@ export function useVerifyOnBroker(clusterId: string) {
         method: 'POST',
         body: JSON.stringify({
           nodeId: row.nodeId,
-          queueName: row.queueName,
+          subscription: row.subscription,
           // A captured row's own messageId belongs to the diverted copy, which never
           // existed on the source queue. The id to ask the broker about is the source
           // one the divert copied across (ADR-0062 D2).

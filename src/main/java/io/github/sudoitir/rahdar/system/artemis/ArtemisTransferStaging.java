@@ -16,7 +16,7 @@ import org.springframework.stereotype.Component;
  */
 @Component
 @RequiredArgsConstructor
-public class ArtemisTransferStaging implements TransferStaging {
+class ArtemisTransferStaging implements TransferStaging {
 
     private static final String ANYCAST = "ANYCAST";
 

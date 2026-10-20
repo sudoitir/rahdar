@@ -80,7 +80,7 @@ const nodeB = { nodeId: 'n2', nodeName: 'node-b', paused: false };
 function item(over: Partial<BulkItemView> = {}): BulkItemView {
   return {
     ordinal: 0,
-    queueName: 'orders.a',
+    subscription: 'artemis.queue/orders.a',
     status: 'PENDING',
     error: null,
     warning: null,
@@ -104,14 +104,14 @@ function deletePreview(): BulkRunDetailView {
       item(),
       item({
         ordinal: 1,
-        queueName: 'orders.b',
+        subscription: 'artemis.queue/orders.b',
         affected: null,
         warning: 'node-b has not answered recently, so its message count is unknown',
         nodes: [{ ...nodeB, messageCount: null, consumerCount: null }],
       }),
       item({
         ordinal: 2,
-        queueName: 'orders.c',
+        subscription: 'artemis.queue/orders.c',
         status: 'REFUSED',
         error: 'It has consumers attached',
         affected: 5,
@@ -264,9 +264,9 @@ describe('BulkPreviewDialog', () => {
       http.post('*/api/v1/clusters/c1/bulk/preview', () =>
         problem(
           422,
-          'bulk-queue-cap-exceeded',
+          'bulk-subscription-cap-exceeded',
           'Bulk run refused',
-          '140 queues matched; a bulk run is capped at 100 queues (safety.bulk-queue-cap). Narrow the selection.',
+          '140 subscriptions matched; a bulk run is capped at 100 subscriptions (safety.bulk-subscription-cap). Narrow the selection.',
         ),
       ),
     );
@@ -276,7 +276,7 @@ describe('BulkPreviewDialog', () => {
     const dialog = await openPreview(user);
     const alert = await within(dialog).findByRole('alert');
     expect(alert).toHaveTextContent('Bulk run refused');
-    expect(alert).toHaveTextContent('140 queues matched; a bulk run is capped at 100 queues');
+    expect(alert).toHaveTextContent('140 subscriptions matched; a bulk run is capped at 100 subscriptions');
     expect(alert).toHaveTextContent('Narrow the selection.');
     expect(within(dialog).getByRole('button', { name: 'Preview again' })).toBeInTheDocument();
   });
@@ -388,7 +388,10 @@ const RUNNING = () =>
   http.get('*/api/v1/clusters/c1/bulk/runs/r1', () =>
     HttpResponse.json({
       run: run({ status: 'RUNNING', total: 3, succeeded: 1, startedAt: '2026-09-21T10:01:00Z' }),
-      items: [item({ status: 'SUCCEEDED' }), item({ ordinal: 1, queueName: 'orders.b', status: 'RUNNING' })],
+      items: [
+        item({ status: 'SUCCEEDED' }),
+        item({ ordinal: 1, subscription: 'artemis.queue/orders.b', status: 'RUNNING' }),
+      ],
     }),
   );
 
@@ -513,7 +516,12 @@ describe('BulkRunView', () => {
           run: run({ status: 'PARTIAL', total: 10, succeeded: 8, failed: 2, finishedAt: '2026-09-21T10:02:00Z' }),
           items: [
             item({ status: 'SUCCEEDED' }),
-            item({ ordinal: 1, queueName: 'orders.b', status: 'FAILED', error: 'node-b refused the delete' }),
+            item({
+              ordinal: 1,
+              subscription: 'artemis.queue/orders.b',
+              status: 'FAILED',
+              error: 'node-b refused the delete',
+            }),
           ],
         }),
       ),

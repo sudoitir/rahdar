@@ -45,8 +45,9 @@ final class PolicyEngine {
         if (!seal) {
             return governed;
         }
-        GovernedMessage clearCopy =
-                new Run(new GovernContext(context.clusterId(), context.address(), true), false, true).message(content);
+        GovernedMessage clearCopy = new Run(
+                        new GovernContext(context.clusterId(), context.destination(), true), false, true)
+                .message(content);
         Map<String, String> sealable = new LinkedHashMap<>();
         for (Redaction r : governed.redactions()) {
             if (r.clear() || !r.dataClass().sealable()) {
@@ -135,12 +136,12 @@ final class PolicyEngine {
         }
 
         String field(Location location, String name, String value) {
-            Rule rule = policy.rule(context.address(), location, name);
+            Rule rule = policy.rule(context.destination(), location, name);
             if (rule != null) {
                 return whole(location, name, value, rule.dataClass(), rule.effectiveAction());
             }
             List<Detectors.Hit> hits = Detectors.scan(value).stream()
-                    .filter(h -> !policy.exempt(context.address(), location, name, h.dataClass()))
+                    .filter(h -> !policy.exempt(context.destination(), location, name, h.dataClass()))
                     .toList();
             if (hits.isEmpty()) {
                 return value;
@@ -149,7 +150,7 @@ final class PolicyEngine {
                 hits.stream()
                         .map(Detectors.Hit::dataClass)
                         .distinct()
-                        .forEach(c -> findings.recordFinding(context.address(), location, name, c));
+                        .forEach(c -> findings.recordFinding(context.destination(), location, name, c));
             }
             return spans(location, name, value, hits);
         }

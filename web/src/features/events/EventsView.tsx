@@ -63,7 +63,7 @@ function CopyEventLink({ clusterId, seq }: Readonly<{ clusterId: string; seq: nu
 
 type EventsSearch = {
   type?: string;
-  address?: string;
+  destination?: string;
   event?: number;
   page?: number;
 };
@@ -169,7 +169,7 @@ function EventDetail({
         columns={2}
         items={[
           { term: 'Time', value: occurredAt(selected) },
-          { term: 'Address', value: selected.address ?? 'no address' },
+          { term: 'Address', value: selected.destination ?? 'no address' },
           { term: 'Subject', value: subjectOf(selected) },
           { term: 'Remote address', value: selected.remoteAddress ?? '—' },
         ]}
@@ -212,7 +212,7 @@ export function EventsView() {
   const cluster = useCluster(clusterId);
   const notifications = cluster.data?.capabilities.notifications;
 
-  const [address, setAddress] = useState(search.address ?? '');
+  const [address, setAddress] = useState(search.destination ?? '');
   const [debouncedAddress] = useDebouncedValue(address, 250);
   const page = search.page ?? 1;
 
@@ -227,7 +227,7 @@ export function EventsView() {
 
   const query = useEvents(clusterId, {
     type: search.type,
-    address: debouncedAddress || undefined,
+    destination: debouncedAddress || undefined,
     page,
     size: PAGE_SIZE,
   });
@@ -269,7 +269,7 @@ export function EventsView() {
   const filtered = Boolean(search.type || debouncedAddress);
   const clearFilters = () => {
     setAddress('');
-    void setParam({ type: undefined, address: undefined });
+    void setParam({ type: undefined, destination: undefined });
   };
 
   const onPage = rows.find((e) => e.seq === search.event);
@@ -311,7 +311,7 @@ export function EventsView() {
               placeholder="Filter by address"
               value={address}
               onChange={(e) => setAddress(e.currentTarget.value)}
-              onBlur={() => setParam({ address: debouncedAddress || undefined })}
+              onBlur={() => setParam({ destination: debouncedAddress || undefined })}
               size="xs"
               w="13.75rem"
             />

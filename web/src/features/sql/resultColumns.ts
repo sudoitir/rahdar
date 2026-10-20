@@ -8,7 +8,7 @@ import type { SqlRowView } from './api.ts';
 export const COLUMN_LABELS: Record<string, string> = {
   source: 'Source',
   node: 'Node',
-  queue: 'Queue',
+  subscription: 'Queue',
   messageId: 'Message ID',
   timestamp: 'Enqueued',
   priority: 'Prio',

@@ -222,7 +222,7 @@ class BrokerQueryExecutorTest {
         assertThat(result.rows()).hasSize(5);
         assertThat(result.rows()).allSatisfy(row -> {
             assertThat(row.nodeName()).isEqualTo("broker-1");
-            assertThat(row.queueName()).isEqualTo("ORDER.IN");
+            assertThat(row.subscription()).isEqualTo("ORDER.IN");
             assertThat(row.source()).isEqualTo(QueryAst.Source.BROKER);
         });
         assertThat(result.isPartial()).isFalse();
@@ -583,7 +583,7 @@ class BrokerQueryExecutorTest {
                 sink);
 
         assertThat(sink.first()).isPresent();
-        assertThat(sink.first().orElseThrow().queueName()).isEqualTo("ORDER.IN");
+        assertThat(sink.first().orElseThrow().subscription()).isEqualTo("ORDER.IN");
         sink.cancel();
         assertThat(sink.isCancelled()).isTrue();
     }

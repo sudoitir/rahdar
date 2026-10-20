@@ -39,7 +39,7 @@ function LegendGroup({ title, children }: Readonly<{ title: string; children: Re
 
 /** A node's shape at the proportions of the real one, drawn as the canvas draws it. */
 function node(shape: 'pill' | 'tag' | 'box' | 'hex') {
-  const { width, height } = NODE_SIZE[shape === 'tag' ? 'ADDRESS' : 'REMOTE'];
+  const { width, height } = NODE_SIZE[shape === 'tag' ? 'DESTINATION' : 'REMOTE'];
   return (
     <svg
       className={classes.legendNode}
@@ -66,7 +66,7 @@ function node(shape: 'pill' | 'tag' | 'box' | 'hex') {
 
 /** A short run of edge, with the edge's own class and attributes, so its dash and colour are the canvas's. */
 function line(attributes: Record<string, string>, width = MIN_WIDTH) {
-  const double = attributes['data-kind'] === 'BRIDGE' || attributes['data-kind'] === 'CLUSTER_HOP';
+  const double = attributes['data-kind'] === 'LINK' || attributes['data-kind'] === 'CLUSTER_HOP';
   const style = { '--edge-width': `${double ? width + 2 : width}px` } as CSSProperties;
   return (
     <svg className={classes.legendLine} viewBox="0 0 28 12" aria-hidden="true" focusable="false">
@@ -102,9 +102,9 @@ export function FlowLegend({ motion }: Readonly<{ motion: 'running' | 'paused' |
         </LegendItem>
       </LegendGroup>
       <LegendGroup title="Line kinds">
-        <LegendItem mark={line({ 'data-kind': 'DIVERT' })}>divert (not counted by the broker)</LegendItem>
+        <LegendItem mark={line({ 'data-kind': 'FORWARD' })}>divert (not counted by the broker)</LegendItem>
         <LegendItem mark={line({ 'data-kind': 'WILDCARD' })}>wildcard</LegendItem>
-        <LegendItem mark={line({ 'data-kind': 'BRIDGE' })}>bridge</LegendItem>
+        <LegendItem mark={line({ 'data-kind': 'LINK' })}>bridge</LegendItem>
         <LegendItem mark={line({ 'data-kind': 'CLUSTER_HOP' })}>cluster redistribution</LegendItem>
         <LegendItem mark={line({ 'data-kind': 'DEAD_LETTER' })}>dead letter or expiry</LegendItem>
       </LegendGroup>

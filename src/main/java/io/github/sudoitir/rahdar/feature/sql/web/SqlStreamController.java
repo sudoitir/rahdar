@@ -15,6 +15,7 @@ import io.github.sudoitir.rahdar.kernel.core.SecretRedactor;
 import io.github.sudoitir.rahdar.kernel.security.Actor;
 import io.github.sudoitir.rahdar.kernel.security.ActorResolver;
 import io.github.sudoitir.rahdar.kernel.security.ClusterAccessGuard;
+import io.github.sudoitir.rahdar.kernel.security.ResourceIdTexts;
 import io.github.sudoitir.rahdar.kernel.stream.SseHub;
 import io.github.sudoitir.rahdar.kernel.stream.Subscriber;
 import io.github.sudoitir.rahdar.kernel.stream.web.StreamController;
@@ -82,6 +83,7 @@ public class SqlStreamController {
     private final SqlConsoleService console;
     private final SqlTailPoller tailPoller;
     private final SqlViewMapper mapper;
+    private final ResourceIdTexts idTexts;
     private final ClusterAccessGuard clusterAccess;
     private final SseHub hub;
     private final SqlProblemAdvice problems;
@@ -176,7 +178,7 @@ public class SqlStreamController {
             session.complete();
             return;
         }
-        session.send("done", mapper.toView(executed.result(), executed.plan()));
+        session.send("done", mapper.toView(session.ids, executed.result(), executed.plan()));
         session.tailing = true;
         if (!tail || session.cancelled) {
             session.complete();
@@ -233,6 +235,7 @@ public class SqlStreamController {
 
         private final SseEmitter emitter;
         private final UUID clusterId;
+        private final ResourceIdTexts.Of ids;
         /** Set before the query runs, from what the query reads: rows and tail rows are shown clear only where it holds. */
         private volatile boolean clearAccess;
 
@@ -250,6 +253,7 @@ public class SqlStreamController {
         private Session(SseEmitter emitter, UUID clusterId, Actor actor) {
             this.emitter = emitter;
             this.clusterId = clusterId;
+            this.ids = idTexts.of(clusterId);
             this.actor = actor;
         }
 
@@ -264,7 +268,7 @@ public class SqlStreamController {
                     tailClearRows.incrementAndGet();
                 }
             }
-            send("row", mapper.toView(row, governed));
+            send("row", mapper.toView(ids, row, governed));
         }
 
         @Override
@@ -290,7 +294,7 @@ public class SqlStreamController {
 
         @Override
         public void nodeFinished(QueryResult.NodeOutcome outcome) {
-            send("node", mapper.toView(outcome));
+            send("node", mapper.toView(ids, outcome));
         }
 
         @Override

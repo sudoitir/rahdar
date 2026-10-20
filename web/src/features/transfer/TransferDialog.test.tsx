@@ -119,7 +119,9 @@ describe('TransferDialog destination', () => {
       meHandler(),
       ...clusterHandlers(),
       previewHandler(
-        run({ target: { ...run().target, clusterId: 'c2', nodeName: 'node-a', queue: 'orders-dr' } }),
+        run({
+          target: { ...run().target, clusterId: 'c2', nodeName: 'node-a', subscription: 'artemis.queue/orders-dr' },
+        }),
         bodies,
       ),
     );
@@ -140,7 +142,7 @@ describe('TransferDialog destination', () => {
     await user.click(previewButton(dialog));
 
     await waitFor(() => expect(bodies).toHaveLength(1));
-    expect(bodies[0]).toMatchObject({ targetClusterId: 'c2', targetNodeId: 'n1', targetQueue: 'orders-dr' });
+    expect(bodies[0]).toMatchObject({ targetClusterId: 'c2', targetNodeId: 'n1', target: 'artemis.queue/orders-dr' });
     expect(
       await within(dialog).findByText(/to orders-dr on node-a \(dr-site\)\. They leave the source queue\./),
     ).toBeInTheDocument();
@@ -208,13 +210,12 @@ describe('TransferDialog redistribution', () => {
     await waitFor(() => expect(bodies).toHaveLength(1));
     expect(bodies[0]).toEqual({
       mode: 'MOVE',
-      sourceQueue: 'orders',
+      source: 'artemis.queue/orders',
       sourceNodeId: 'n1',
       selection: { kind: 'ALL', ids: null, filter: null },
       targetClusterId: 'c1',
       targetNodeId: 'n2',
-      targetQueue: 'orders',
-      targetAddress: null,
+      target: 'artemis.queue/orders',
     });
   });
 
@@ -394,7 +395,7 @@ describe('TransferDialog preview', () => {
     await holdButton(confirm);
 
     await waitFor(() =>
-      expect(executed).toEqual([{ planHash: 'h1', override: true, acknowledged: [], confirmQueue: 'orders' }]),
+      expect(executed).toEqual([{ planHash: 'h1', override: true, acknowledged: [], confirmSubscription: 'orders' }]),
     );
     await waitFor(() => expect(navigate).toHaveBeenCalledWith({ to: '/clusters/c1/transfers/r1' }));
     expect(onClose).toHaveBeenCalled();

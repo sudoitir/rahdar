@@ -9,7 +9,7 @@ import java.util.UUID;
  *
  * @param type the notification type
  * @param nodeId the node it came from
- * @param address the address it concerns
+ * @param destination the destination it concerns
  * @param from earliest timestamp, inclusive
  * @param to latest timestamp, inclusive
  * @param page 1-based page number
@@ -17,4 +17,4 @@ import java.util.UUID;
  * @param after where the previous page ended, or null to page by number
  */
 public record BrokerEventQuery(
-        String type, UUID nodeId, String address, Instant from, Instant to, int page, int size, Cursor after) {}
+        String type, UUID nodeId, String destination, Instant from, Instant to, int page, int size, Cursor after) {}

@@ -172,6 +172,15 @@ class ResourceEnforcementIntegrationTest extends PostgresIntegrationTest {
                 .toList();
     }
 
+    /** The names of the subscriptions a list holds by id. */
+    private List<String> subscriptionNames(MockHttpServletResponse response) throws Exception {
+        return body(response)
+                .get("data")
+                .valueStream()
+                .map(r -> ResourceIdTexts.name(r.get("subscription").asString()))
+                .toList();
+    }
+
     // ---- lists and counts ---------------------------------------------------------------------
 
     @Test
@@ -456,7 +465,7 @@ class ResourceEnforcementIntegrationTest extends PostgresIntegrationTest {
     // ---- capture and queries -------------------------------------------------------------------------
 
     private static String capture(String pattern) {
-        return "{\"queuePattern\":\"%s\",\"mode\":\"CAPTURE\"}".formatted(pattern);
+        return "{\"subscriptionPattern\":\"%s\",\"mode\":\"CAPTURE\"}".formatted(pattern);
     }
 
     /** A member of Orders in a team role that may also capture. */
@@ -514,7 +523,7 @@ class ResourceEnforcementIntegrationTest extends PostgresIntegrationTest {
     // ---- request-reply ---------------------------------------------------------------------------------
 
     private static String expectation(String address) {
-        return "{\"requestAddress\":\"%s\",\"samplePerMin\":10,\"capturePayload\":false}".formatted(address);
+        return "{\"requestDestination\":\"%s\",\"samplePerMin\":10,\"capturePayload\":false}".formatted(address);
     }
 
     @Test
@@ -537,7 +546,7 @@ class ResourceEnforcementIntegrationTest extends PostgresIntegrationTest {
 
         assertThat(listed.get("data")
                         .valueStream()
-                        .map(e -> e.get("requestAddress").asString()))
+                        .map(e -> e.get("requestDestination").asString()))
                 .containsExactly("orders.in");
     }
 
@@ -553,9 +562,9 @@ class ResourceEnforcementIntegrationTest extends PostgresIntegrationTest {
 
     @Test
     void consumerHealthRanksOnlyTheCallersQueues() throws Exception {
-        assertThat(field(call(get(base() + "/consumer-health"), ordersViewer), "queueName"))
+        assertThat(subscriptionNames(call(get(base() + "/consumer-health"), ordersViewer)))
                 .containsExactlyInAnyOrder("orders.in", "orders.out");
-        assertThat(call(get(base() + "/consumer-health?queue=billing.in"), ordersViewer)
+        assertThat(call(get(base() + "/consumer-health?subscription=artemis.queue/billing.in"), ordersViewer)
                         .getStatus())
                 .isEqualTo(404);
     }
@@ -568,7 +577,7 @@ class ResourceEnforcementIntegrationTest extends PostgresIntegrationTest {
 
         JsonNode page = body(call(get(base() + "/events"), ordersViewer));
 
-        assertThat(page.get("data").valueStream().map(e -> e.get("address").asString()))
+        assertThat(page.get("data").valueStream().map(e -> e.get("destination").asString()))
                 .containsExactly("orders.in");
         assertThat(page.get("count").asLong()).isEqualTo(1);
         assertThat(body(call(get(base() + "/events"), platformOperator))
@@ -580,12 +589,12 @@ class ResourceEnforcementIntegrationTest extends PostgresIntegrationTest {
     @Test
     void aSeriesIsReadPerQueueAndTheClusterTotalNeedsEveryQueue() throws Exception {
         assertThat(call(
-                                get(base() + "/metrics?metric=openbroker.backlog&subjectType=QUEUE&subject=orders.in"),
+                                get(base() + "/metrics?metric=openbroker.backlog&resource=artemis.queue/orders.in"),
                                 ordersViewer)
                         .getStatus())
                 .isEqualTo(200);
         assertThat(call(
-                                get(base() + "/metrics?metric=openbroker.backlog&subjectType=QUEUE&subject=billing.in"),
+                                get(base() + "/metrics?metric=openbroker.backlog&resource=artemis.queue/billing.in"),
                                 ordersViewer)
                         .getStatus())
                 .isEqualTo(404);
@@ -679,9 +688,9 @@ class ResourceEnforcementIntegrationTest extends PostgresIntegrationTest {
         return fixture.session(user);
     }
 
-    private static String rule(String name, String queuePattern) {
-        return "{\"name\":\"%s\",\"kind\":\"METRIC_THRESHOLD\",\"metric\":\"openbroker.backlog\",\"comparator\":\"GT\",\"threshold\":10,\"forSeconds\":0,\"severity\":\"WARNING\",\"scope\":\"{\\\"queuePattern\\\":\\\"%s\\\"}\",\"enabled\":true}"
-                .formatted(name, queuePattern);
+    private static String rule(String name, String subscriptionPattern) {
+        return "{\"name\":\"%s\",\"kind\":\"METRIC_THRESHOLD\",\"metric\":\"openbroker.backlog\",\"comparator\":\"GT\",\"threshold\":10,\"forSeconds\":0,\"severity\":\"WARNING\",\"scope\":\"{\\\"subscriptionPattern\\\":\\\"%s\\\"}\",\"enabled\":true}"
+                .formatted(name, subscriptionPattern);
     }
 
     @Test

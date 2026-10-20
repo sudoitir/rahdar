@@ -1,4 +1,4 @@
-import { subscriptionIdentity } from '../../test/wire.ts';
+import { ARTEMIS_KINDS, subscriptionIdentity } from '../../test/wire.ts';
 import { describe, expect, it, vi } from 'vitest';
 import { http, HttpResponse } from 'msw';
 import { screen, waitFor, within } from '@testing-library/react';
@@ -31,6 +31,7 @@ function clusterHandler(managementWrite: CapabilityView) {
       name: 'c1',
       description: null,
       topology: { nodes: [] },
+      kinds: ARTEMIS_KINDS,
       capabilities: capabilities(managementWrite),
       health: { level: 'OK', reasons: [] },
       environmentId: null,

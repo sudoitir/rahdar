@@ -88,7 +88,7 @@ class GovernanceRuleControllerTest extends PostgresIntegrationTest {
         mvc.perform(post("/api/v1/governance/rules")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"addressPattern":"orders.#","target":"PROPERTY","selector":"customerName",
+                                {"destinationPattern":"orders.#","target":"PROPERTY","selector":"customerName",
                                  "dataClass":"PERSONAL","action":null,"enabled":true}
                                 """))
                 .andExpect(status().isCreated())

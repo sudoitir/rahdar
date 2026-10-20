@@ -7,6 +7,7 @@ import { Notifications, notifications } from '@mantine/notifications';
 import { renderWithProviders } from '../../test/render.tsx';
 import { server } from '../../test/setup.ts';
 import { holdButton } from '../../test/hold.ts';
+import { ARTEMIS_KINDS } from '../../test/wire.ts';
 
 // The address is state here, as it is in the app: the open message lives in it (`?message=`).
 let searchState: Record<string, unknown> = {};
@@ -89,6 +90,7 @@ function mockCluster(endpoints: ReturnType<typeof endpoint>[]) {
           clusterId: 'c1',
           nodes: [{ artemisNodeId: 'NID', splitBrain: 'NONE', replicationBehind: false, endpoints }],
         },
+        kinds: ARTEMIS_KINDS,
         capabilities: {
           managementRead: AVAILABLE,
           managementWrite: AVAILABLE,
@@ -155,6 +157,7 @@ describe('MessagesView', () => {
           name: 'prod',
           description: null,
           topology: { clusterId: 'c1', nodes: [] },
+          kinds: ARTEMIS_KINDS,
           capabilities: {
             managementRead: AVAILABLE,
             managementWrite: AVAILABLE,

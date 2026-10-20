@@ -12,22 +12,22 @@ export const FLOW_LIMITS = [20, 40, 100, 200] as const;
 export const DEFAULT_LIMIT = 40;
 
 /** Routing drawn around the paths; the server's default is diverts, bridges and cluster hops. */
-export const FLOW_LAYERS = ['DIVERTS', 'BRIDGES', 'CLUSTER', 'DEAD_LETTER', 'TEMPORARY', 'CAPTURE'] as const;
+export const FLOW_LAYERS = ['ROUTES', 'CLUSTER', 'DEAD_LETTER', 'TEMPORARY', 'CAPTURE'] as const;
 
 export type FlowRank = (typeof FLOW_RANKS)[number];
 export type FlowGroupBy = (typeof FLOW_GROUPINGS)[number];
 export type FlowLayer = (typeof FLOW_LAYERS)[number];
 
-export const DEFAULT_LAYERS: readonly FlowLayer[] = ['BRIDGES', 'CLUSTER', 'DIVERTS'];
+export const DEFAULT_LAYERS: readonly FlowLayer[] = ['CLUSTER', 'ROUTES'];
 
 export interface FlowSearch {
   /** The graph is the default view; the table is its accessible twin; split adds the monitoring pane. */
   tab?: 'table' | 'split';
-  /** The selected node's id (`queue:<name>`, `client:<name>`…): what the inspector or the pane shows. */
+  /** The selected node's id (`subscription:<name>`, `client:<name>`…): what the inspector or the pane shows. */
   node?: string;
   /** The window of the split pane's trends; absent for an hour. */
   range?: MetricRange;
-  /** `client:<name>`, `address:<name>` or `queue:<name>`. */
+  /** `client:<name>`, `destination:<name>` or `subscription:<name>`. */
   focus?: string;
   hops?: number;
   rank?: FlowRank;
@@ -39,7 +39,7 @@ export interface FlowSearch {
   sort?: string;
 }
 
-const FOCUS = /^(client|address|queue):.+$/;
+const FOCUS = /^(client|destination|subscription):.+$/;
 
 export function validateFlowSearch(raw: Record<string, unknown>): FlowSearch {
   return { ...validateView(raw), ...validateBounds(raw) };
@@ -98,20 +98,22 @@ export function layersParam(layers: readonly FlowLayer[]): string | undefined {
   return sorted.length === 0 ? 'NONE' : sorted.join(',');
 }
 
-/** `queue:orders` → `{ kind: 'queue', name: 'orders' }`; anything else → null. */
-export function parseFocus(focus: string | undefined): { kind: 'client' | 'address' | 'queue'; name: string } | null {
+/** `subscription:orders` → `{ kind: 'subscription', name: 'orders' }`; anything else → null. */
+export function parseFocus(
+  focus: string | undefined,
+): { kind: 'client' | 'destination' | 'subscription'; name: string } | null {
   if (!focus || !FOCUS.test(focus)) return null;
   const colon = focus.indexOf(':');
-  return { kind: focus.slice(0, colon) as 'client' | 'address' | 'queue', name: focus.slice(colon + 1) };
+  return { kind: focus.slice(0, colon) as 'client' | 'destination' | 'subscription', name: focus.slice(colon + 1) };
 }
 
 /** The URL focus for a node, or null for one the server cannot focus on (a remote node). */
 export function focusOf(node: FlowNodeView): string | null {
   switch (node.kind) {
-    case 'QUEUE':
-      return `queue:${node.label}`;
-    case 'ADDRESS':
-      return `address:${node.label}`;
+    case 'SUBSCRIPTION':
+      return `subscription:${node.label}`;
+    case 'DESTINATION':
+      return `destination:${node.label}`;
     case 'PRODUCER':
     case 'CONSUMER':
       return `client:${node.label}`;
@@ -126,7 +128,7 @@ const NO_MENU_ROLES = new Set(['TEMPORARY', 'ANONYMOUS']);
 /** Whether a flow node is one resource a menu can be about. */
 export function hasActions(node: FlowNodeView): boolean {
   return (
-    ['QUEUE', 'ADDRESS', 'PRODUCER', 'CONSUMER'].includes(node.kind ?? '') &&
+    ['SUBSCRIPTION', 'DESTINATION', 'PRODUCER', 'CONSUMER'].includes(node.kind ?? '') &&
     !NO_MENU_ROLES.has(node.role ?? '') &&
     Boolean(node.label)
   );

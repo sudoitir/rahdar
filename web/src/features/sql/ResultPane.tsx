@@ -1,6 +1,7 @@
 import { ActionIcon, Button, Group, Stack, Text, Tooltip } from '@mantine/core';
 import { IconArrowsMaximize, IconArrowsMinimize } from '@tabler/icons-react';
 
+import { nameOf } from '../../kernel/api/resourceId.ts';
 import type { ApiError } from '../../kernel/api/request.ts';
 import { download } from '../../ui/download.ts';
 import { EmptyState } from '../../ui/EmptyState.tsx';
@@ -30,8 +31,8 @@ function outcomeRows(nodes: SqlResultView['nodes']): OutcomeRow[] {
   return (nodes ?? []).map((node, i) => {
     const status = nodeStatusWords(node);
     return {
-      key: `${node.nodeId}/${node.queueName}/${i}`,
-      name: `${node.nodeName} · ${node.queueName}`,
+      key: `${node.nodeId}/${node.subscription}/${i}`,
+      name: `${node.nodeName} · ${nameOf(node.subscription)}`,
       count: (node.matched ?? 0).toLocaleString(),
       status,
       tone: NODE_TONE[node.status ?? ''],
@@ -198,7 +199,7 @@ function EmptyResult({ result, tailing }: Readonly<{ result: SqlResultView; tail
         kind="unreachable"
         title="Nothing to show, and not because there was nothing"
         description={`${unread.length} of ${nodes.length} targets did not answer, so this is not an empty result — it is an unknown one.`}
-        nodes={unread.map((n) => `${n.nodeName} · ${n.queueName}`)}
+        nodes={unread.map((n) => `${n.nodeName} · ${nameOf(n.subscription)}`)}
       />
     );
   }

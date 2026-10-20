@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
 import { ApiError, clusterKey, request } from '../../kernel/api/request.ts';
-import { queueId, resourcePath } from '../../kernel/api/resourceId.ts';
+import { resourcePath } from '../../kernel/api/resourceId.ts';
+import { useRoleIds } from '../clusters/index.ts';
 import type { components } from '../../kernel/api/schema.d.ts';
 
 type Schemas = components['schemas'];
@@ -48,13 +49,16 @@ export function useMessages(
   queueName: string,
   params: MessageBrowseParams = {},
 ): UseQueryResult<MessagePageView, ApiError> {
+  const ids = useRoleIds(clusterId);
   return useQuery({
     queryKey: keys.messages(clusterId, queueName, params),
-    queryFn: () => request<MessagePageView>(`${messagesBase(clusterId, queueName)}${messageSearch(params)}`),
+    queryFn: () =>
+      request<MessagePageView>(`${messagesBase(clusterId, ids.subscription(queueName))}${messageSearch(params)}`),
     // A queue is not a document: messages arrive and are consumed while the
     // screen is open, and a browse that never refreshes shows an arrangement of
     // the queue that stopped being true the moment it was drawn. One bounded
     // page read per interval, pausable with every other poll (ADR-0052).
+    enabled: ids.loaded,
     refetchInterval: 10_000,
     placeholderData: (prev) => prev,
   });
@@ -67,6 +71,7 @@ export function useMessageDetail(
   node?: string,
   filter?: string,
 ): UseQueryResult<MessageDetailView, ApiError> {
+  const ids = useRoleIds(clusterId);
   return useQuery({
     queryKey: keys.message(clusterId, queueName, messageId ?? 'none', node, filter),
     queryFn: () => {
@@ -76,10 +81,10 @@ export function useMessageDetail(
       const qs = sp.toString();
       const query = qs ? `?${qs}` : '';
       return request<MessageDetailView>(
-        `${messagesBase(clusterId, queueName)}/${encodeURIComponent(messageId ?? '')}${query}`,
+        `${messagesBase(clusterId, ids.subscription(queueName))}/${encodeURIComponent(messageId ?? '')}${query}`,
       );
     },
-    enabled: messageId !== null,
+    enabled: messageId !== null && ids.loaded,
   });
 }
 
@@ -89,12 +94,12 @@ export interface BulkCapProblem {
   cap: number;
 }
 
-function resourceBase(clusterId: string, queueName: string) {
-  return `/clusters/${clusterId}${resourcePath(queueId(queueName))}`;
+function resourceBase(clusterId: string, subscription: string) {
+  return `/clusters/${clusterId}${resourcePath(subscription)}`;
 }
 
-function messagesBase(clusterId: string, queueName: string) {
-  return `${resourceBase(clusterId, queueName)}/messages`;
+function messagesBase(clusterId: string, subscription: string) {
+  return `${resourceBase(clusterId, subscription)}/messages`;
 }
 
 function mutationQuery(node?: string, dryRun?: boolean, override?: boolean): string {
@@ -113,10 +118,11 @@ export interface SendVars {
 }
 
 export function useSendMessage(clusterId: string, queueName: string) {
+  const ids = useRoleIds(clusterId);
   const qc = useQueryClient();
   return useMutation<AffectedView | DryRunView, ApiError, SendVars>({
     mutationFn: ({ body, node, dryRun }) =>
-      request(`${messagesBase(clusterId, queueName)}${mutationQuery(node, dryRun)}`, {
+      request(`${messagesBase(clusterId, ids.subscription(queueName))}${mutationQuery(node, dryRun)}`, {
         method: 'POST',
         body: JSON.stringify(body),
       }),
@@ -138,13 +144,17 @@ export interface ActionVars {
 }
 
 export function useMessageAction(clusterId: string, queueName: string) {
+  const ids = useRoleIds(clusterId);
   const qc = useQueryClient();
   return useMutation<AffectedView | DryRunView | PartialView, ApiError, ActionVars>({
     mutationFn: ({ action, body, node, dryRun, override }) =>
-      request(`${resourceBase(clusterId, queueName)}/messages:${action}${mutationQuery(node, dryRun, override)}`, {
-        method: 'POST',
-        body: JSON.stringify(body),
-      }),
+      request(
+        `${resourceBase(clusterId, ids.subscription(queueName))}/messages:${action}${mutationQuery(node, dryRun, override)}`,
+        {
+          method: 'POST',
+          body: JSON.stringify(body),
+        },
+      ),
     onSuccess: (result) => {
       // DryRunView carries `cap`; AffectedView does not. Only a real run changes state.
       if ('cap' in result) return;
@@ -161,10 +171,11 @@ export interface PurgeVars {
 }
 
 export function usePurgeQueue(clusterId: string, queueName: string) {
+  const ids = useRoleIds(clusterId);
   const qc = useQueryClient();
   return useMutation<AffectedView | DryRunView, ApiError, PurgeVars>({
     mutationFn: ({ node, dryRun, override }) =>
-      request(`${resourceBase(clusterId, queueName)}:purge${mutationQuery(node, dryRun, override)}`, {
+      request(`${resourceBase(clusterId, ids.subscription(queueName))}:purge${mutationQuery(node, dryRun, override)}`, {
         method: 'POST',
       }),
     onSuccess: (result) => {

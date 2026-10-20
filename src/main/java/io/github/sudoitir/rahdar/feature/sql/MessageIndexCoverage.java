@@ -56,7 +56,7 @@ public class MessageIndexCoverage {
                 .toList();
         return targets.stream()
                 .allMatch(target -> capturing.stream()
-                        .filter(s -> QueueNamePattern.matches(s.getQueuePattern(), target.queueName()))
+                        .filter(s -> QueueNamePattern.matches(s.getSubscriptionPattern(), target.subscription()))
                         .anyMatch(s -> captureNodes
                                 .findBySubscriptionIdAndNodeId(s.getId(), target.nodeId())
                                 .map(MessageCaptureNodeEntity::getCaptureState)
@@ -73,9 +73,10 @@ public class MessageIndexCoverage {
         List<Notice> notices = new ArrayList<>();
 
         List<String> uncovered = targets.stream()
-                .map(Target::queueName)
+                .map(Target::subscription)
                 .distinct()
-                .filter(queue -> enabled.stream().noneMatch(s -> QueueNamePattern.matches(s.getQueuePattern(), queue)))
+                .filter(queue ->
+                        enabled.stream().noneMatch(s -> QueueNamePattern.matches(s.getSubscriptionPattern(), queue)))
                 .toList();
         if (!uncovered.isEmpty()) {
             notices.add(new Notice(
@@ -140,7 +141,7 @@ public class MessageIndexCoverage {
         List<String> uncoveredNodes = new ArrayList<>();
         for (Target target : targets) {
             boolean covered = capturing.stream()
-                    .filter(s -> QueueNamePattern.matches(s.getQueuePattern(), target.queueName()))
+                    .filter(s -> QueueNamePattern.matches(s.getSubscriptionPattern(), target.subscription()))
                     .anyMatch(s -> captureNodes
                             .findBySubscriptionIdAndNodeId(s.getId(), target.nodeId())
                             .map(MessageCaptureNodeEntity::getCaptureState)
@@ -158,13 +159,13 @@ public class MessageIndexCoverage {
         }
 
         List<String> fannedOut = targets.stream()
-                .map(Target::address)
+                .map(Target::destination)
                 .distinct()
                 .filter(address -> address != null && boundQueueCount(clusterId, address) > 1)
                 .toList();
         if (!fannedOut.isEmpty()) {
             notices.add(new Notice(
-                    Notice.Kind.ADDRESS_SCOPED_CAPTURE,
+                    Notice.Kind.DESTINATION_SCOPED_CAPTURE,
                     String.join(", ", fannedOut) + (fannedOut.size() == 1 ? " has" : " have")
                             + " more than one queue bound."));
         }

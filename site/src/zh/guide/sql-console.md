@@ -65,9 +65,9 @@ Schema 限定符在查询文本自身中选择后端，因此一条被粘贴进�
 
 可用作 selector（免费）：`priority`、`durable`、`timestamp`、`expiration`、`size`、`jmsType`、`correlationId`、`groupId`、`userId`，以及以 `props.<名称>` 形式访问的任意应用属性。
 
-Target（免费）：`queue`、`address`、`node`。
+Target（免费）：`subscription`、`destination`、`node`。
 
-Scan：`body`、`messageId`、`messageType`、`replyTo`，以及仅索引可用的 `observedAt`、`lastSeenAt`、`origin`、`origAddress` 与 `sourceMessageId`。
+Scan：`body`、`messageId`、`messageType`、`replyTo`，以及仅索引可用的 `observedAt`、`lastSeenAt`、`origin`、`orig_destination` 与 `sourceMessageId`。
 
 在索引上，`MATCH (body) AGAINST ('terms')` 是对已存储消息体的全文检索，走 GIN 索引而非扫描；`ORDER BY match_rank` 按匹配程度排序。引号短语、`-排除` 和 `or` 的行为与搜索框一致。二进制消息体不建全文索引；消息体为文本的字节消息与其他消息一样可被检索。
 

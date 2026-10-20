@@ -6,9 +6,9 @@ import java.util.regex.Pattern;
  * An Artemis wildcard address pattern: {@code .} separates words, {@code *} is one word, {@code #}
  * is zero or more words. {@code orders.#} matches {@code orders} and {@code orders.eu.north}.
  */
-final class AddressPattern {
+final class DestinationPattern {
 
-    private AddressPattern() {}
+    private DestinationPattern() {}
 
     static Pattern compile(String pattern) {
         String[] words = pattern.split("\\.", -1);

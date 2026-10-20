@@ -13,7 +13,7 @@ function matches(pattern: string[], address: string[]): boolean {
 /** The addresses no enabled capture-everything subscription covers, in the order given. */
 export function uncapturedAddresses(subscriptions: SqlIndexSubscriptionView[], addresses: string[]): string[] {
   const patterns = subscriptions
-    .filter((s) => s.mode === 'CAPTURE' && s.enabled && s.queuePattern)
-    .map((s) => (s.queuePattern as string).split('.'));
+    .filter((s) => s.mode === 'CAPTURE' && s.enabled && s.subscriptionPattern)
+    .map((s) => (s.subscriptionPattern as string).split('.'));
   return [...new Set(addresses)].filter((a) => !patterns.some((p) => matches(p, a.split('.'))));
 }

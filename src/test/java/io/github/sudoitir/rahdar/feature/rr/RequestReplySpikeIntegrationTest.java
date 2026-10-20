@@ -43,7 +43,7 @@ class RequestReplySpikeIntegrationTest extends ArtemisIntegrationTest {
 
     @Test
     void temporaryQueuePattern() throws Exception {
-        String requestAddress = "rr.spike.temp." + System.nanoTime();
+        String requestDestination = "rr.spike.temp." + System.nanoTime();
         ActiveMQConnectionFactory factory = factory();
 
         List<Message> notifications = new ArrayList<>();
@@ -55,7 +55,7 @@ class RequestReplySpikeIntegrationTest extends ArtemisIntegrationTest {
             requesterConn.start();
 
             Session responderSession = responderConn.createSession(false, Session.AUTO_ACKNOWLEDGE);
-            Queue requestQueue = responderSession.createQueue(requestAddress);
+            Queue requestQueue = responderSession.createQueue(requestDestination);
             MessageConsumer responder = responderSession.createConsumer(requestQueue);
 
             Session requesterSession = requesterConn.createSession(false, Session.AUTO_ACKNOWLEDGE);
@@ -106,8 +106,8 @@ class RequestReplySpikeIntegrationTest extends ArtemisIntegrationTest {
 
     @Test
     void sharedReplyQueuePattern() throws Exception {
-        String requestAddress = "rr.spike.shared.req." + System.nanoTime();
-        String replyAddress = "rr.spike.shared.rep." + System.nanoTime();
+        String requestDestination = "rr.spike.shared.req." + System.nanoTime();
+        String replyDestination = "rr.spike.shared.rep." + System.nanoTime();
         ActiveMQConnectionFactory factory = factory();
 
         try (Connection responderConn = factory.createConnection(BROKER_USER, BROKER_PASSWORD);
@@ -116,15 +116,15 @@ class RequestReplySpikeIntegrationTest extends ArtemisIntegrationTest {
             requesterConn.start();
 
             Session responderSession = responderConn.createSession(false, Session.AUTO_ACKNOWLEDGE);
-            Queue requestQueue = responderSession.createQueue(requestAddress);
-            Queue replyQueue = responderSession.createQueue(replyAddress);
+            Queue requestQueue = responderSession.createQueue(requestDestination);
+            Queue replyQueue = responderSession.createQueue(replyDestination);
             MessageConsumer responder = responderSession.createConsumer(requestQueue);
             MessageProducer replyProducer = responderSession.createProducer(replyQueue);
 
             Session requesterSession = requesterConn.createSession(false, Session.AUTO_ACKNOWLEDGE);
             MessageProducer requestProducer = requesterSession.createProducer(requestQueue);
             MessageConsumer replyConsumer = requesterSession.createConsumer(
-                    requesterSession.createQueue(replyAddress), "JMSCorrelationID = 'corr-shared-1'");
+                    requesterSession.createQueue(replyDestination), "JMSCorrelationID = 'corr-shared-1'");
 
             TextMessage request = requesterSession.createTextMessage("ping");
             request.setJMSCorrelationID("corr-shared-1");
@@ -134,7 +134,7 @@ class RequestReplySpikeIntegrationTest extends ArtemisIntegrationTest {
             // exercise the same non-destructive browser the sampler will use.
             AtomicReference<QueueBrowser> browserRef = new AtomicReference<>();
             Session browseSession = requesterConn.createSession(false, Session.AUTO_ACKNOWLEDGE);
-            QueueBrowser browser = browseSession.createBrowser(browseSession.createQueue(requestAddress));
+            QueueBrowser browser = browseSession.createBrowser(browseSession.createQueue(requestDestination));
             browserRef.set(browser);
             Enumeration<?> enumeration = browser.getEnumeration();
             while (enumeration.hasMoreElements()) {
@@ -181,7 +181,7 @@ class RequestReplySpikeIntegrationTest extends ArtemisIntegrationTest {
 
     @Test
     void stuckRequestExpires() throws Exception {
-        String requestAddress = "rr.spike.stuck." + System.nanoTime();
+        String requestDestination = "rr.spike.stuck." + System.nanoTime();
         ActiveMQConnectionFactory factory = factory();
 
         List<Message> notifications = new ArrayList<>();
@@ -190,7 +190,7 @@ class RequestReplySpikeIntegrationTest extends ArtemisIntegrationTest {
         try (Connection requesterConn = factory.createConnection(BROKER_USER, BROKER_PASSWORD)) {
             requesterConn.start();
             Session session = requesterConn.createSession(false, Session.AUTO_ACKNOWLEDGE);
-            Queue requestQueue = session.createQueue(requestAddress);
+            Queue requestQueue = session.createQueue(requestDestination);
             MessageProducer producer = session.createProducer(requestQueue);
             producer.setTimeToLive(1_000);
             producer.setDeliveryMode(DeliveryMode.NON_PERSISTENT);
@@ -214,7 +214,7 @@ class RequestReplySpikeIntegrationTest extends ArtemisIntegrationTest {
         try (Connection consumerConn = factory.createConnection(BROKER_USER, BROKER_PASSWORD)) {
             consumerConn.start();
             Session session = consumerConn.createSession(false, Session.AUTO_ACKNOWLEDGE);
-            MessageConsumer consumer = session.createConsumer(session.createQueue(requestAddress));
+            MessageConsumer consumer = session.createConsumer(session.createQueue(requestDestination));
             assertThat(consumer.receive(1_000))
                     .as("the request expired instead of waiting")
                     .isNull();

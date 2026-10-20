@@ -5,6 +5,7 @@ import { AUTO, localZone } from '../../kernel/time/timezone.ts';
 import type { Column } from '../../ui/table/index.ts';
 import type { SqlRowView } from './api.ts';
 import { BodyCell, SourceBadge, VerifyCell } from './cells.tsx';
+import { nameOf } from '../../kernel/api/resourceId.ts';
 import { COLUMN_LABELS, sourceOf } from './resultColumns.ts';
 
 /**
@@ -24,9 +25,9 @@ export function resultColumns(clusterId: string, zone: string): Column<SqlRowVie
       priority: 'essential',
     },
     {
-      id: 'queue',
-      header: COLUMN_LABELS.queue,
-      accessor: (r) => r.queueName ?? '',
+      id: 'subscription',
+      header: COLUMN_LABELS.subscription,
+      accessor: (r) => nameOf(r.subscription),
       kind: 'identifier',
       priority: 'essential',
     },

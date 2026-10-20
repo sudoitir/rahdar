@@ -18,8 +18,8 @@ import tools.jackson.databind.ObjectMapper;
  * Reads the latest per-{@code (node,queue)} gauge value from {@code subscription_snapshot}
  * (design.md decision 2) — one query per cluster per tick regardless of rule
  * count. A queue present on several nodes without a specific {@code scope.node}
- * is aggregated by summing, keyed {@code queue:<name>}; a node-scoped rule keys
- * {@code node:<nativeNodeId>/queue:<name>} on that node's own value.
+ * is aggregated by summing, keyed {@code subscription:<name>}; a node-scoped rule keys
+ * {@code node:<nativeNodeId>/subscription:<name>} on that node's own value.
  */
 @Component
 @Order(30)
@@ -52,12 +52,14 @@ public class GaugeCondition implements AlertCondition {
         Set<String> universe = new HashSet<>();
         Map<String, Double> subjectValues = new HashMap<>();
         for (QueueSnapshot row : snapshots.forCluster(clusterId)) {
-            if (!scope.matchesAddress(row.address())
-                    || !scope.matchesQueue(row.queueName())
+            if (!scope.matchesDestination(row.address())
+                    || !scope.matchesSubscription(row.queueName())
                     || (nodeScoped && !scope.node().equals(row.nodeId().toString()))) {
                 continue;
             }
-            String key = nodeScoped ? "node:" + row.nodeId() + "/queue:" + row.queueName() : "queue:" + row.queueName();
+            String key = nodeScoped
+                    ? "node:" + row.nodeId() + "/subscription:" + row.queueName()
+                    : "subscription:" + row.queueName();
             universe.add(key);
             subjectValues.merge(key, (double) value.applyAsLong(row), Double::sum);
         }

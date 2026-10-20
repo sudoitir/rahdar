@@ -6,6 +6,7 @@ import { useMetrics, type MetricSeries } from './api.ts';
 import dayjs from 'dayjs';
 import duration from 'dayjs/plugin/duration';
 
+import { useRoleIds } from '../clusters/index.ts';
 import { elapsedLabel, useServerNow } from '../../kernel/time/time.ts';
 import { rangeSpec, type MetricRange } from './ranges.ts';
 import { RangePicker } from './RangePicker.tsx';
@@ -132,18 +133,19 @@ export function MetricsView() {
     };
   }, [live, tick, spec.stepMs, spec.windowMs, search.from, search.to]);
 
+  const ids = useRoleIds(clusterId);
   const metrics = useMetrics(
     clusterId,
     {
       metrics: METRICS,
-      subjectType: subject ? 'QUEUE' : 'CLUSTER',
-      subject,
+      resource: subject && ids.loaded ? ids.subscription(subject) : undefined,
       from,
       to,
       step: live ? spec.step : undefined,
       splitBy: split ? 'NODE' : undefined,
     },
     live ? Math.max(15_000, spec.stepMs) : false,
+    ids.loaded,
   );
 
   const byName = (name: string): MetricSeries | undefined => metrics.data?.series.find((s) => s.metric === name);

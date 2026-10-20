@@ -25,12 +25,14 @@ _Others_
 * `i.g.s.r.p.c.BrokerCommands`
 * `i.g.s.r.p.c.BrokerNodeMapper` (via `i.g.s.r.p.c.BrokerNodeMapperImpl`)
 * `i.g.s.r.p.c.ClusterDirectory`
+* `i.g.s.r.p.c.ClusterKinds`
 * `i.g.s.r.p.c.ClusterLock`
 * `i.g.s.r.p.c.ClusterSecrets`
 * `i.g.s.r.p.c.ClusterViewMapper` (via `i.g.s.r.p.c.ClusterViewMapperImpl`)
 * `i.g.s.r.p.c.HaStateEvaluator`
 * `i.g.s.r.p.c.NodeStateRecorder`
 * `i.g.s.r.p.c.RahdarInfo`
+* `i.g.s.r.p.c.ResourceTargets`
 * `i.g.s.r.p.c.SeedExpander`
 * `i.g.s.r.p.c.TopologyDiscovery`
 |Bean references
@@ -45,6 +47,8 @@ _Others_
 * `i.g.s.r.p.b.BrokerNotifications` (in Broker connectivity)
 * `i.g.s.r.k.r.RahdarBus` (in Replicas)
 * `i.g.s.r.k.s.SecretVault` (in Security)
+* `i.g.s.r.p.b.BrokerSystems` (in Broker connectivity)
+* `i.g.s.r.p.b.SystemExtensions` (in Broker connectivity)
 * `i.g.s.r.k.r.ReplicaRegistry` (in Replicas)
 * `i.g.s.r.k.r.HaProperties` (in Replicas)
 * `i.g.s.r.p.b.DataPlaneCheck` (in Broker connectivity)

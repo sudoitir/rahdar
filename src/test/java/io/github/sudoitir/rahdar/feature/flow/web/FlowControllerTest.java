@@ -95,7 +95,7 @@ class FlowControllerTest extends PostgresIntegrationTest {
                 .andExpect(jsonPath("$.totals.paths").value(1))
                 .andExpect(jsonPath("$.totals.limit").value(40))
                 .andExpect(jsonPath("$.measuring").value(true))
-                .andExpect(jsonPath("$.nodes[?(@.id == 'queue:orders.dead')].faults[0]")
+                .andExpect(jsonPath("$.nodes[?(@.id == 'subscription:orders.dead')].faults[0]")
                         .value("NO_CONSUMER"))
                 .andExpect(jsonPath("$.kpis.backlog").value(12));
     }

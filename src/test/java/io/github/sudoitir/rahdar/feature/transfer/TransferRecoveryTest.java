@@ -77,8 +77,8 @@ class TransferRecoveryTest extends TransferTestSupport {
         assertThat(transfers.orphans(clusterP.id()))
                 .contains(new OrphanView(clusterP.node(), orphanNodeName(), orphan, 5L));
 
-        OrphanReturnView returned =
-                transfers.returnOrphan(clusterP.id(), new OrphanReturnRequest(clusterP.node(), orphan, back));
+        OrphanReturnView returned = transfers.returnOrphan(
+                clusterP.id(), new OrphanReturnRequest(clusterP.node(), orphan, ids.subscription(clusterP.id(), back)));
 
         assertThat(returned).isEqualTo(new OrphanReturnView(orphan, 5, 0, true));
         assertThat(p.depth(back)).isEqualTo(5);

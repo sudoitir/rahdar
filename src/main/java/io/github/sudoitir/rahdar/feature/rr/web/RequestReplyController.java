@@ -77,7 +77,7 @@ public class RequestReplyController {
     public PagedView<FlowView> flows(
             @PathVariable UUID clusterId,
             @RequestParam(required = false) String state,
-            @RequestParam(required = false) String address,
+            @RequestParam(required = false) String destination,
             @RequestParam(required = false) String correlationId,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant to,
@@ -85,7 +85,7 @@ public class RequestReplyController {
             @RequestParam(required = false) Integer size) {
         ResourceQuery paging = ResourceQuery.ofPage(page, size);
         return requestReply.flowPage(
-                clusterId, new FlowQuery(state, address, correlationId, from, to, paging.page(), paging.size()));
+                clusterId, new FlowQuery(state, destination, correlationId, from, to, paging.page(), paging.size()));
     }
 
     @GetMapping("/flows/{flowId}")

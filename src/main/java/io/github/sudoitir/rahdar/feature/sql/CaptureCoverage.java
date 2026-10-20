@@ -29,7 +29,7 @@ public class CaptureCoverage {
         return subscriptions.findByClusterId(clusterId).stream()
                 .filter(MessageIndexSubscriptionEntity::isEnabled)
                 .filter(s -> s.getMode() == CaptureMode.CAPTURE)
-                .filter(s -> QueueNamePattern.matches(s.getQueuePattern(), address))
+                .filter(s -> QueueNamePattern.matches(s.getSubscriptionPattern(), address))
                 .anyMatch(s -> captureNodes
                         .findBySubscriptionIdAndNodeId(s.getId(), nodeId)
                         .map(MessageCaptureNodeEntity::getCaptureState)

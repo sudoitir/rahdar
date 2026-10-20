@@ -42,7 +42,7 @@ public class RrCorrelator implements RrObservationSink {
     private final RrEventRepository events;
     private final RrExpectationRepository expectations;
     private final RrMetrics metrics;
-    private final ReplyAddressResolver replyAddresses;
+    private final ReplyDestinationResolver replyDestinations;
     private final ClockOffsetService clocks;
     private final SseHub sseHub;
     private final ObjectMapper mapper;
@@ -70,7 +70,7 @@ public class RrCorrelator implements RrObservationSink {
             RrEventRepository events,
             RrExpectationRepository expectations,
             RrMetrics metrics,
-            ReplyAddressResolver replyAddresses,
+            ReplyDestinationResolver replyDestinations,
             ClockOffsetService clocks,
             SseHub sseHub,
             ObjectMapper mapper,
@@ -84,7 +84,7 @@ public class RrCorrelator implements RrObservationSink {
         this.events = events;
         this.expectations = expectations;
         this.metrics = metrics;
-        this.replyAddresses = replyAddresses;
+        this.replyDestinations = replyDestinations;
         this.clocks = clocks;
         this.sseHub = sseHub;
         this.mapper = mapper;
@@ -136,18 +136,18 @@ public class RrCorrelator implements RrObservationSink {
     }
 
     private void onRequestSeen(Observation.RequestSeen r) {
-        String dedupeKey = r.clusterId() + "|" + r.requestAddress() + "|" + r.messageId();
+        String dedupeKey = r.clusterId() + "|" + r.requestDestination() + "|" + r.messageId();
         if (recentRequestFlow.getIfPresent(dedupeKey) != null) {
             return;
         }
-        Optional<RrFlowEntity> existing = flows.findByClusterIdAndRequestAddressAndRequestMessageId(
-                r.clusterId(), r.requestAddress(), r.messageId());
+        Optional<RrFlowEntity> existing = flows.findByClusterIdAndRequestDestinationAndRequestMessageId(
+                r.clusterId(), r.requestDestination(), r.messageId());
         if (existing.isPresent()) {
             recentRequestFlow.put(dedupeKey, existing.get().getId());
             return;
         }
 
-        RrExpectationEntity expectation = expectationFor(r.clusterId(), r.requestAddress());
+        RrExpectationEntity expectation = expectationFor(r.clusterId(), r.requestDestination());
         String replyKind = r.replyTo() != null ? "TEMPORARY" : "SHARED";
         // A shared-queue flow is stamped with its reply destination only when it is
         // knowable in advance — one resolved literal. Under a pattern the stamp would
@@ -157,7 +157,7 @@ public class RrCorrelator implements RrObservationSink {
         // shared-queue flow on correlation identity alone.
         String destination = r.replyTo();
         if (destination == null && expectation != null) {
-            ReplyAddressResolver.Resolution resolved = replyAddresses.resolve(r.clusterId(), expectation);
+            ReplyDestinationResolver.Resolution resolved = replyDestinations.resolve(r.clusterId(), expectation);
             destination = resolved.singleLiteral() ? resolved.addresses().getFirst() : null;
         }
         Instant deadline = deadlineAt(r, expectation);
@@ -165,14 +165,14 @@ public class RrCorrelator implements RrObservationSink {
         RrFlowEntity flow = new RrFlowEntity(new RrFlowEntity.Awaiting(
                 r.clusterId(),
                 r.nodeId(),
-                r.requestAddress(),
+                r.requestDestination(),
                 destination,
                 replyKind,
                 r.correlationId(),
                 r.messageId(),
                 r.at(),
                 deadline));
-        flow.setResponderConsumer(currentResponder.get(r.clusterId() + "|" + r.requestAddress()));
+        flow.setResponderConsumer(currentResponder.get(r.clusterId() + "|" + r.requestDestination()));
         flow.setRequestEnqueuedAt(r.enqueuedAt());
         Long skew = forwardSkew(r.enqueuedAt(), r.at());
         flow.setRequestSkewMs(skew);
@@ -190,13 +190,13 @@ public class RrCorrelator implements RrObservationSink {
                 capturePayload
                         ? payload(
                                 r.clusterId(),
-                                r.requestAddress(),
+                                r.requestDestination(),
                                 flow.getId(),
                                 "REQUEST_SEEN",
                                 r.at(),
                                 r.bodyPreview())
                         : null);
-        sseHub.publishAboutAddress(r.clusterId(), "rr", r.requestAddress());
+        sseHub.publishAboutAddress(r.clusterId(), "rr", r.requestDestination());
     }
 
     private void onReplySeen(Observation.ReplySeen r) {
@@ -249,10 +249,11 @@ public class RrCorrelator implements RrObservationSink {
         }
 
         if (t.latencyMs() != null) {
-            metrics.recordCompletion(flow.getClusterId(), flow.getRequestAddress(), t.latencyMs());
+            metrics.recordCompletion(flow.getClusterId(), flow.getRequestDestination(), t.latencyMs());
         }
-        RrExpectationEntity expectation =
-                flow.getRequestAddress() == null ? null : expectationFor(flow.getClusterId(), flow.getRequestAddress());
+        RrExpectationEntity expectation = flow.getRequestDestination() == null
+                ? null
+                : expectationFor(flow.getClusterId(), flow.getRequestDestination());
         boolean capturePayload = expectation != null && expectation.isCapturePayload();
         recordEvent(
                 flow.getId(),
@@ -267,18 +268,18 @@ public class RrCorrelator implements RrObservationSink {
                                 r.at(),
                                 r.bodyPreview())
                         : null);
-        sseHub.publishAboutAddress(r.clusterId(), "rr", flow.getRequestAddress());
+        sseHub.publishAboutAddress(r.clusterId(), "rr", flow.getRequestDestination());
     }
 
     private void onResponderUp(Observation.ResponderUp r) {
-        currentResponder.put(r.clusterId() + "|" + r.requestAddress(), r.consumerName());
+        currentResponder.put(r.clusterId() + "|" + r.requestDestination(), r.consumerName());
         // Backfill: a request observed before any responder existed created its flow with
         // responderConsumer null. If a responder now attaches while that flow is still
         // awaiting reply, the eventual timeout must be TIMED_OUT, not ORPHANED — "no
         // responder was ever observed" covers the flow's whole lifetime, not just the
         // instant it was created.
-        for (RrFlowEntity flow : flows.findByClusterIdAndRequestAddressAndState(
-                r.clusterId(), r.requestAddress(), RrState.AWAITING_REPLY.name())) {
+        for (RrFlowEntity flow : flows.findByClusterIdAndRequestDestinationAndState(
+                r.clusterId(), r.requestDestination(), RrState.AWAITING_REPLY.name())) {
             if (flow.getResponderConsumer() == null) {
                 flow.setResponderConsumer(r.consumerName());
                 flows.save(flow);
@@ -287,12 +288,12 @@ public class RrCorrelator implements RrObservationSink {
     }
 
     private void onResponderDown(Observation.ResponderDown r) {
-        String key = r.clusterId() + "|" + r.requestAddress();
+        String key = r.clusterId() + "|" + r.requestDestination();
         if (r.remainingConsumers() == 0) {
             currentResponder.remove(key);
         }
-        for (RrFlowEntity flow : flows.findByClusterIdAndRequestAddressAndState(
-                r.clusterId(), r.requestAddress(), RrState.AWAITING_REPLY.name())) {
+        for (RrFlowEntity flow : flows.findByClusterIdAndRequestDestinationAndState(
+                r.clusterId(), r.requestDestination(), RrState.AWAITING_REPLY.name())) {
             FlowContext ctx = new FlowContext(
                     RrState.AWAITING_REPLY,
                     flow.getRequestedAt(),
@@ -315,8 +316,8 @@ public class RrCorrelator implements RrObservationSink {
     }
 
     private void onMessageExpired(Observation.MessageExpired r) {
-        Optional<RrFlowEntity> flow =
-                flows.findByClusterIdAndRequestAddressAndRequestMessageId(r.clusterId(), r.address(), r.messageId());
+        Optional<RrFlowEntity> flow = flows.findByClusterIdAndRequestDestinationAndRequestMessageId(
+                r.clusterId(), r.address(), r.messageId());
         flow.filter(f -> RrState.AWAITING_REPLY.name().equals(f.getState())).ifPresent(f -> {
             FlowContext ctx = new FlowContext(
                     RrState.AWAITING_REPLY, f.getRequestedAt(), f.getRequestMessageId(), f.getReplyDestination());
@@ -329,7 +330,7 @@ public class RrCorrelator implements RrObservationSink {
         flow.setObservedAt(at);
         flows.save(flow);
         recordEvent(flow.getId(), flow.getNodeId(), t.eventKind(), null);
-        sseHub.publishAboutAddress(flow.getClusterId(), "rr", flow.getRequestAddress());
+        sseHub.publishAboutAddress(flow.getClusterId(), "rr", flow.getRequestDestination());
     }
 
     /**
@@ -380,9 +381,9 @@ public class RrCorrelator implements RrObservationSink {
      * tracking responder state, or matching a delivery as a reply, for addresses
      * nobody asked Rahdar to trace.
      */
-    boolean isTracedRequestAddress(UUID clusterId, String address) {
-        return expectations.findByClusterIdOrderByRequestAddress(clusterId).stream()
-                .anyMatch(e -> e.isEnabled() && e.getRequestAddress().equals(address));
+    boolean isTracedRequestDestination(UUID clusterId, String address) {
+        return expectations.findByClusterIdOrderByRequestDestination(clusterId).stream()
+                .anyMatch(e -> e.isEnabled() && e.getRequestDestination().equals(address));
     }
 
     /** Whether some flow is still awaiting a reply on this exact temp-queue destination. */
@@ -405,14 +406,14 @@ public class RrCorrelator implements RrObservationSink {
      * identity, and otherwise records an orphaned reply. Coverage, not a replacement
      * for browsing.
      */
-    boolean isTracedReplyAddress(UUID clusterId, String address) {
-        return expectations.findByClusterIdOrderByRequestAddress(clusterId).stream()
-                .anyMatch(e -> e.isEnabled() && replyAddresses.matches(e, address));
+    boolean isTracedReplyDestination(UUID clusterId, String address) {
+        return expectations.findByClusterIdOrderByRequestDestination(clusterId).stream()
+                .anyMatch(e -> e.isEnabled() && replyDestinations.matches(e, address));
     }
 
-    private RrExpectationEntity expectationFor(UUID clusterId, String requestAddress) {
-        return expectations.findByClusterIdOrderByRequestAddress(clusterId).stream()
-                .filter(e -> e.getRequestAddress().equals(requestAddress))
+    private RrExpectationEntity expectationFor(UUID clusterId, String requestDestination) {
+        return expectations.findByClusterIdOrderByRequestDestination(clusterId).stream()
+                .filter(e -> e.getRequestDestination().equals(requestDestination))
                 .findFirst()
                 .orElse(null);
     }

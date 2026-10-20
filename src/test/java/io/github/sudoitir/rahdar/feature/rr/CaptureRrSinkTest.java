@@ -27,7 +27,7 @@ class CaptureRrSinkTest {
 
     private final CaptureBus bus = mock(CaptureBus.class);
     private final RrExpectationRepository expectations = mock(RrExpectationRepository.class);
-    private final ReplyAddressResolver replyAddresses = mock(ReplyAddressResolver.class);
+    private final ReplyDestinationResolver replyDestinations = mock(ReplyDestinationResolver.class);
 
     @SuppressWarnings("unchecked")
     private final ObjectProvider<RrObservationSink> provider = mock(ObjectProvider.class);
@@ -38,7 +38,7 @@ class CaptureRrSinkTest {
     @BeforeEach
     void setUp() {
         when(provider.getIfAvailable()).thenReturn(observed::add);
-        sink = new CaptureRrSink(bus, expectations, replyAddresses, provider);
+        sink = new CaptureRrSink(bus, expectations, replyDestinations, provider);
     }
 
     private static Row row(
@@ -73,7 +73,7 @@ class CaptureRrSinkTest {
     }
 
     private static CaptureBus.Captured captured(UUID cluster, Row row) {
-        return new CaptureBus.Captured(cluster, UUID.randomUUID(), row, row.address(), null, Instant.now());
+        return new CaptureBus.Captured(cluster, UUID.randomUUID(), row, row.destination(), null, Instant.now());
     }
 
     private static RrExpectationEntity expectation(UUID cluster, String request) {
@@ -97,7 +97,7 @@ class CaptureRrSinkTest {
     }
 
     @Test
-    void aMessageOnTheRequestAddressIsARequest() {
+    void aMessageOnTheRequestDestinationIsARequest() {
         RrExpectationEntity e = expectation(CLUSTER, "rr.request");
         when(expectations.findByEnabledTrue()).thenReturn(List.of(e));
 
@@ -106,7 +106,7 @@ class CaptureRrSinkTest {
         assertThat(observed).singleElement().isInstanceOfSatisfying(Observation.RequestSeen.class, seen -> {
             assertThat(seen.clusterId()).isEqualTo(CLUSTER);
             assertThat(seen.nodeId()).isEqualTo(NODE);
-            assertThat(seen.requestAddress()).isEqualTo("rr.request");
+            assertThat(seen.requestDestination()).isEqualTo("rr.request");
             assertThat(seen.messageId()).isEqualTo("42");
             assertThat(seen.correlationId()).isEqualTo("corr-1");
             assertThat(seen.replyTo()).isEqualTo("reply-1");
@@ -129,10 +129,10 @@ class CaptureRrSinkTest {
     }
 
     @Test
-    void aMessageOnAReplyAddressIsAReply() {
+    void aMessageOnAReplyDestinationIsAReply() {
         RrExpectationEntity e = expectation(CLUSTER, "rr.request");
         when(expectations.findByEnabledTrue()).thenReturn(List.of(e));
-        when(replyAddresses.matches(e, "rr.reply")).thenReturn(true);
+        when(replyDestinations.matches(e, "rr.reply")).thenReturn(true);
 
         sink.captured(captured(CLUSTER, row("rr.reply", "corr-1", null, 1_000L, null)));
 
@@ -147,7 +147,7 @@ class CaptureRrSinkTest {
     void anUnrelatedAddressProducesNothing() {
         RrExpectationEntity e = expectation(CLUSTER, "rr.request");
         when(expectations.findByEnabledTrue()).thenReturn(List.of(e));
-        when(replyAddresses.matches(e, "other")).thenReturn(false);
+        when(replyDestinations.matches(e, "other")).thenReturn(false);
 
         sink.captured(captured(CLUSTER, row("other", "c", null, 0, null)));
 

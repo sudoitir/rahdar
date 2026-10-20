@@ -8,7 +8,8 @@ import {
   request,
 } from '../../kernel/api/request.ts';
 import { type PagedView, type ResourceParams, resourceSearch } from '../../kernel/api/paging.ts';
-import { addressId, nameOf, queueId, resourcePath } from '../../kernel/api/resourceId.ts';
+import { nameOf, resourcePath } from '../../kernel/api/resourceId.ts';
+import { useRoleIds } from '../clusters/index.ts';
 import type { components } from '../../kernel/api/schema.d.ts';
 
 type Schemas = components['schemas'];
@@ -109,10 +110,12 @@ export function useQueueConfiguration(
   queueName: string,
   enabled = true,
 ): UseQueryResult<SubscriptionConfiguration, ApiError> {
+  const ids = useRoleIds(clusterId);
   return useQuery({
     queryKey: keys.configuration(clusterId, queueName),
-    queryFn: () => request<SubscriptionConfiguration>(`/clusters/${clusterId}${resourcePath(queueId(queueName))}`),
-    enabled: enabled && clusterId !== '' && queueName !== '',
+    queryFn: () =>
+      request<SubscriptionConfiguration>(`/clusters/${clusterId}${resourcePath(ids.subscription(queueName))}`),
+    enabled: enabled && ids.loaded && queueName !== '',
   });
 }
 
@@ -148,8 +151,9 @@ export function useCreateQueue(clusterId: string) {
 }
 
 export function useUpdateQueue(clusterId: string, queueName: string) {
+  const ids = useRoleIds(clusterId);
   return useLifecycleMutation<LifecycleVars & { body: UpdateResourceRequest }>(clusterId, ({ body, dryRun }) =>
-    request(`${lifecycleBase(clusterId)}${resourcePath(queueId(queueName))}${lifecycleQuery(dryRun)}`, {
+    request(`${lifecycleBase(clusterId)}${resourcePath(ids.subscription(queueName))}${lifecycleQuery(dryRun)}`, {
       method: 'PATCH',
       body: JSON.stringify(body),
     }),
@@ -161,13 +165,14 @@ export function useUpdateQueue(clusterId: string, queueName: string) {
  * without it such a node refuses (ADR-0084).
  */
 export function useDeleteQueue(clusterId: string, queueName: string) {
+  const ids = useRoleIds(clusterId);
   return useLifecycleMutation<LifecycleVars & { disconnectConsumers?: boolean }>(
     clusterId,
     ({ dryRun, override, disconnectConsumers }) => {
       const query = lifecycleQuery(dryRun, override);
       const separator = query ? '&' : '?';
       const flag = disconnectConsumers ? `${separator}disconnectConsumers=true` : '';
-      return request(`${lifecycleBase(clusterId)}${resourcePath(queueId(queueName))}${query}${flag}`, {
+      return request(`${lifecycleBase(clusterId)}${resourcePath(ids.subscription(queueName))}${query}${flag}`, {
         method: 'DELETE',
       });
     },
@@ -176,19 +181,24 @@ export function useDeleteQueue(clusterId: string, queueName: string) {
 
 /** Pause and resume are one hook: the same permission, and the UI toggles between them. */
 export function useSetQueuePaused(clusterId: string, queueName: string) {
+  const ids = useRoleIds(clusterId);
   return useLifecycleMutation<LifecycleVars & { paused: boolean }>(clusterId, ({ paused, dryRun }) =>
     request(
-      `${lifecycleBase(clusterId)}${resourcePath(queueId(queueName))}:${paused ? 'pause' : 'resume'}${lifecycleQuery(dryRun)}`,
+      `${lifecycleBase(clusterId)}${resourcePath(ids.subscription(queueName))}:${paused ? 'pause' : 'resume'}${lifecycleQuery(dryRun)}`,
       { method: 'POST' },
     ),
   );
 }
 
 export function useResetQueueCounter(clusterId: string, queueName: string) {
+  const ids = useRoleIds(clusterId);
   return useLifecycleMutation<LifecycleVars>(clusterId, ({ dryRun }) =>
-    request(`${lifecycleBase(clusterId)}${resourcePath(queueId(queueName))}:reset-counters${lifecycleQuery(dryRun)}`, {
-      method: 'POST',
-    }),
+    request(
+      `${lifecycleBase(clusterId)}${resourcePath(ids.subscription(queueName))}:reset-counters${lifecycleQuery(dryRun)}`,
+      {
+        method: 'POST',
+      },
+    ),
   );
 }
 
@@ -202,8 +212,9 @@ export function useCreateAddress(clusterId: string) {
 }
 
 export function useDeleteAddress(clusterId: string, address: string) {
+  const ids = useRoleIds(clusterId);
   return useLifecycleMutation<LifecycleVars>(clusterId, ({ dryRun }) =>
-    request(`${lifecycleBase(clusterId)}${resourcePath(addressId(address))}${lifecycleQuery(dryRun)}`, {
+    request(`${lifecycleBase(clusterId)}${resourcePath(ids.destination(address))}${lifecycleQuery(dryRun)}`, {
       method: 'DELETE',
     }),
   );

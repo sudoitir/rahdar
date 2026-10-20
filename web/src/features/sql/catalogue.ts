@@ -29,16 +29,16 @@ export const COLUMNS: CatalogueColumn[] = [
     description: 'The broker-assigned message id. Node-local.',
   },
   {
-    name: 'queue',
+    name: 'subscription',
     type: 'string',
     evaluation: 'TARGET',
-    description: 'The queue the message is on.',
+    description: 'The subscription the message is on.',
   },
   {
-    name: 'address',
+    name: 'destination',
     type: 'string',
     evaluation: 'TARGET',
-    description: 'The address the queue is bound to.',
+    description: 'The destination the subscription is bound to.',
   },
   {
     name: 'node',
@@ -141,11 +141,11 @@ export const COLUMNS: CatalogueColumn[] = [
       'SAMPLED or CAPTURED. A sampled row says a poll saw the message; a captured one says the address routed it.',
   },
   {
-    name: 'origAddress',
+    name: 'orig_destination',
     type: 'string',
     evaluation: 'SCAN',
     indexOnly: true,
-    description: 'The address the broker said a captured copy came from, when it said so.',
+    description: 'The destination the broker said a captured copy came from, when it said so.',
   },
   {
     name: 'sourceMessageId',

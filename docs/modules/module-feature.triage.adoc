@@ -31,4 +31,5 @@ _Others_
 * `i.g.s.r.k.a.AuditQueryService` (in Audit log)
 * `i.g.s.r.p.c.ClusterDirectory` (in Clusters)
 * `i.g.s.r.p.b.ClockOffsetService` (in Broker connectivity)
+* `i.g.s.r.k.s.ResourceIdTexts` (in Security)
 |===

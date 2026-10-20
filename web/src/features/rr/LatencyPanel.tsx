@@ -21,7 +21,7 @@ const CHART_HEIGHT = '17.5rem';
 export function LatencyPanel({ clusterId }: Readonly<{ clusterId: string }>) {
   const stats = useRrStats(clusterId);
   const [allCoverage, setAllCoverage] = useState(false);
-  const addresses = stats.data?.addresses ?? [];
+  const addresses = stats.data?.destinations ?? [];
 
   if (stats.isError) {
     return (
@@ -50,7 +50,7 @@ export function LatencyPanel({ clusterId }: Readonly<{ clusterId: string }>) {
   // number reads as "instant", which is the most dangerous reading of a latency
   // chart there is.
   const data = addresses.map((a) => ({
-    address: a.address,
+    address: a.destination,
     p50: a.p50Ms ?? undefined,
     p95: a.p95Ms ?? undefined,
     p99: a.p99Ms ?? undefined,
@@ -67,8 +67,8 @@ export function LatencyPanel({ clusterId }: Readonly<{ clusterId: string }>) {
       >
         <List size="xs" spacing={2} aria-label="Coverage per address">
           {listed.map((a) => (
-            <List.Item key={a.address}>
-              {a.address}:{' '}
+            <List.Item key={a.destination}>
+              {a.destination}:{' '}
               {a.coverageRatio == null
                 ? 'coverage unknown'
                 : `~${Math.round(a.coverageRatio * 100)}% of requests observed`}

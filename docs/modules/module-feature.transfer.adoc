@@ -33,6 +33,7 @@ _Others_
 * `i.g.s.r.k.s.ClusterAccessGuard` (in Security)
 * `i.g.s.r.k.s.PermissionResolver` (in Security)
 * `i.g.s.r.k.g.OperationGate` (in Approval gate contract)
+* `i.g.s.r.k.s.ResourceIdTexts` (in Security)
 * `i.g.s.r.k.c.HeavyRequests` (in Core)
 * `i.g.s.r.k.s.ActorResolver` (in Security)
 |Events listened to

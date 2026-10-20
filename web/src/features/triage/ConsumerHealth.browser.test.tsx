@@ -21,8 +21,8 @@ import { QueueHealthPanel } from './QueueHealthPanel.tsx';
  * arrives after a delay, as it does from the server.
  */
 const row = (queueName: string, verdict: string, severity: number, over: Record<string, unknown> = {}) => ({
-  address: queueName,
-  queueName,
+  destination: `artemis.address/${queueName}`,
+  subscription: `artemis.queue/${queueName}`,
   verdict,
   severity,
   cause: 'The consumer is blocked, or a message it cannot process is being redelivered.',
@@ -66,7 +66,7 @@ const CLUSTER = { id: 'c1', name: 'prod', topology: { nodes: [] }, capabilities:
 function bodyFor(path: string, query: string): unknown {
   if (path.endsWith('/auth/me')) return ME;
   if (path.endsWith('/consumer-health')) {
-    let rows = query.includes('queue=') ? ROWS.slice(0, 1) : ROWS;
+    let rows = query.includes('subscription=') ? ROWS.slice(0, 1) : ROWS;
     if (query.includes('q=nope')) rows = [];
     return { data: rows, count: rows.length, page: 1, pageSize: 200 };
   }

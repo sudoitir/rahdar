@@ -22,7 +22,7 @@ export function subscriptionColumns({
     {
       id: 'queues',
       header: 'Queues',
-      accessor: (s) => s.queuePattern ?? '',
+      accessor: (s) => s.subscriptionPattern ?? '',
       cell: (s) => createElement(QueuesCell, { subscription: s }),
       kind: 'text',
       priority: 'essential',

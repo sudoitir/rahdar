@@ -11,7 +11,7 @@ const edge = (source: string, target: string, kind: string, rate?: number) => ({
   source,
   target,
   rate,
-  rateSource: kind === 'ROUTE' ? 'QUEUE_METRIC' : 'SAMPLER',
+  rateSource: kind === 'ROUTE' ? 'SUBSCRIPTION_METRIC' : 'SAMPLER',
   stale: false,
   faults: [],
   bypassed: false,
@@ -22,20 +22,20 @@ function graph(rate = 10): FlowGraphView {
   return {
     nodes: [
       node('consumer:billing', 'CONSUMER', 'billing'),
-      node('queue:ORDERS', 'QUEUE', 'ORDERS', { messageCount: 50 }),
-      node('queue:AUDIT', 'QUEUE', 'AUDIT', { messageCount: 200 }),
-      node('address:ORDERS', 'ADDRESS', 'ORDERS'),
+      node('subscription:ORDERS', 'SUBSCRIPTION', 'ORDERS', { messageCount: 50 }),
+      node('subscription:AUDIT', 'SUBSCRIPTION', 'AUDIT', { messageCount: 200 }),
+      node('destination:ORDERS', 'DESTINATION', 'ORDERS'),
       node('producer:order-svc', 'PRODUCER', 'order-svc'),
       node('producer:web', 'PRODUCER', 'web'),
       node('consumer:auditor', 'CONSUMER', 'auditor'),
     ],
     edges: [
-      edge('producer:order-svc', 'address:ORDERS', 'PRODUCE', rate),
-      edge('producer:web', 'address:ORDERS', 'PRODUCE', 1),
-      edge('address:ORDERS', 'queue:ORDERS', 'ROUTE', rate),
-      edge('address:ORDERS', 'queue:AUDIT', 'ROUTE', rate),
-      edge('queue:ORDERS', 'consumer:billing', 'CONSUME', rate),
-      edge('queue:AUDIT', 'consumer:auditor', 'CONSUME'),
+      edge('producer:order-svc', 'destination:ORDERS', 'PRODUCE', rate),
+      edge('producer:web', 'destination:ORDERS', 'PRODUCE', 1),
+      edge('destination:ORDERS', 'subscription:ORDERS', 'ROUTE', rate),
+      edge('destination:ORDERS', 'subscription:AUDIT', 'ROUTE', rate),
+      edge('subscription:ORDERS', 'consumer:billing', 'CONSUME', rate),
+      edge('subscription:AUDIT', 'consumer:auditor', 'CONSUME'),
     ],
     measuring: false,
     sampleIntervalSeconds: 15,
@@ -56,8 +56,10 @@ describe('flow layout', () => {
   it('puts other nodes and remote brokers in a column after the consumers', async () => {
     const g = graph();
     g.nodes!.push(node('remote:node:abc', 'REMOTE', 'node-b', { role: 'CLUSTER_NODE' }) as never);
-    g.nodes!.push(node('queue:$.artemis.internal.sf.demo.abc', 'QUEUE', 'sf', { role: 'STORE_AND_FORWARD' }) as never);
-    g.edges!.push(edge('queue:$.artemis.internal.sf.demo.abc', 'remote:node:abc', 'CLUSTER_HOP', 7) as never);
+    g.nodes!.push(
+      node('subscription:$.artemis.internal.sf.demo.abc', 'SUBSCRIPTION', 'sf', { role: 'STORE_AND_FORWARD' }) as never,
+    );
+    g.edges!.push(edge('subscription:$.artemis.internal.sf.demo.abc', 'remote:node:abc', 'CLUSTER_HOP', 7) as never);
     const positions = await runLayout(toElkGraph(g));
 
     const consumers = g.nodes!.filter((n) => n.kind === 'CONSUMER').map((n) => positions[n.id!].x);
@@ -69,39 +71,43 @@ describe('flow layout', () => {
   it('keeps the same layout signature when only rates change', () => {
     expect(layoutSignature(graph(10))).toBe(layoutSignature(graph(9_000)));
     const grown = graph();
-    grown.nodes!.push(node('queue:NEW', 'QUEUE', 'NEW') as never);
+    grown.nodes!.push(node('subscription:NEW', 'SUBSCRIPTION', 'NEW') as never);
     expect(layoutSignature(grown)).not.toBe(layoutSignature(graph()));
   });
 
   it('emphasises the whole path through a node and dims the rest', async () => {
     const g = graph();
     const positions = await runLayout(toElkGraph(g));
-    const path = pathThrough(g, 'queue:ORDERS');
+    const path = pathThrough(g, 'subscription:ORDERS');
 
     expect([...path].sort()).toEqual(
-      ['address:ORDERS', 'consumer:billing', 'producer:order-svc', 'producer:web', 'queue:ORDERS'].sort(),
+      ['destination:ORDERS', 'consumer:billing', 'producer:order-svc', 'producer:web', 'subscription:ORDERS'].sort(),
     );
     const model = toReactFlow(g, positions, new Map(), path);
-    expect(model.nodes.find((n) => n.id === 'queue:AUDIT')?.data.dimmed).toBe(true);
-    expect(model.nodes.find((n) => n.id === 'queue:ORDERS')?.data.dimmed).toBe(false);
-    expect(model.edges.find((e) => e.target === 'queue:AUDIT')?.data?.dimmed).toBe(true);
+    expect(model.nodes.find((n) => n.id === 'subscription:AUDIT')?.data.dimmed).toBe(true);
+    expect(model.nodes.find((n) => n.id === 'subscription:ORDERS')?.data.dimmed).toBe(false);
+    expect(model.edges.find((e) => e.target === 'subscription:AUDIT')?.data?.dimmed).toBe(true);
   });
 
   it('hands back the elements an emphasis leaves alone, so only the changed ones render again', async () => {
     const g = graph();
     const positions = await runLayout(toElkGraph(g));
     const plain = toReactFlow(g, positions, new Map(), null);
-    const emphasised = toReactFlow(g, positions, new Map(), pathThrough(g, 'queue:ORDERS'));
+    const emphasised = toReactFlow(g, positions, new Map(), pathThrough(g, 'subscription:ORDERS'));
 
     const nodes = reuseUnchanged(plain.nodes, emphasised.nodes);
     const edges = reuseUnchanged(plain.edges, emphasised.edges);
     const kept = (id: string) => nodes.find((n) => n.id === id) === plain.nodes.find((n) => n.id === id);
-    expect(kept('queue:ORDERS')).toBe(true);
-    expect(kept('lane:QUEUE')).toBe(true);
-    expect(kept('queue:AUDIT')).toBe(false);
-    expect(nodes.find((n) => n.id === 'queue:AUDIT')?.data.dimmed).toBe(true);
-    expect(edges.find((e) => e.target === 'queue:AUDIT')).not.toBe(plain.edges.find((e) => e.target === 'queue:AUDIT'));
-    expect(edges.find((e) => e.target === 'queue:ORDERS')).toBe(plain.edges.find((e) => e.target === 'queue:ORDERS'));
+    expect(kept('subscription:ORDERS')).toBe(true);
+    expect(kept('lane:SUBSCRIPTION')).toBe(true);
+    expect(kept('subscription:AUDIT')).toBe(false);
+    expect(nodes.find((n) => n.id === 'subscription:AUDIT')?.data.dimmed).toBe(true);
+    expect(edges.find((e) => e.target === 'subscription:AUDIT')).not.toBe(
+      plain.edges.find((e) => e.target === 'subscription:AUDIT'),
+    );
+    expect(edges.find((e) => e.target === 'subscription:ORDERS')).toBe(
+      plain.edges.find((e) => e.target === 'subscription:ORDERS'),
+    );
   });
 
   it('labels each column once, and scales queue depth against the deepest shown queue', async () => {
@@ -114,15 +120,15 @@ describe('flow layout', () => {
       'Queues',
       'Consumers',
     ]);
-    expect(model.nodes.find((n) => n.id === 'queue:AUDIT')?.data.depth).toBe(1);
-    expect(model.nodes.find((n) => n.id === 'queue:ORDERS')?.data.depth).toBe(0.25);
+    expect(model.nodes.find((n) => n.id === 'subscription:AUDIT')?.data.depth).toBe(1);
+    expect(model.nodes.find((n) => n.id === 'subscription:ORDERS')?.data.depth).toBe(0.25);
   });
 
   it('leaves out a node that has no position yet, with its edges', () => {
     const g = graph();
     const model = toReactFlow(
       g,
-      { 'producer:web': { x: 0, y: 0 }, 'address:ORDERS': { x: 300, y: 0 } },
+      { 'producer:web': { x: 0, y: 0 }, 'destination:ORDERS': { x: 300, y: 0 } },
       new Map(),
       null,
     );
@@ -132,7 +138,7 @@ describe('flow layout', () => {
         .filter((n) => n.type !== 'lane')
         .map((n) => n.id)
         .sort(),
-    ).toEqual(['address:ORDERS', 'producer:web']);
-    expect(model.edges.map((e) => e.id)).toEqual(['PRODUCE:producer:web->address:ORDERS']);
+    ).toEqual(['destination:ORDERS', 'producer:web']);
+    expect(model.edges.map((e) => e.id)).toEqual(['PRODUCE:producer:web->destination:ORDERS']);
   });
 });

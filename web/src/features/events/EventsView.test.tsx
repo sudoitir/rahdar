@@ -52,7 +52,7 @@ function event(over: Record<string, unknown> = {}) {
     occurredAt: '2026-09-04T10:00:00.000Z',
     receivedAt: '2026-09-04T10:00:00.000Z',
     type: 'openbroker.consumer.attached',
-    address: 'orders',
+    destination: 'orders',
     routingName: 'orders',
     consumerName: 'c-42',
     sessionName: 's-1',
@@ -244,7 +244,7 @@ describe('EventsView', () => {
     const update = navigate.mock.calls.at(-1)![0].search as (prev: object) => object;
     expect(update({ type: 'openbroker.channel.closed' })).toEqual({
       type: undefined,
-      address: undefined,
+      destination: undefined,
       page: undefined,
     });
   });

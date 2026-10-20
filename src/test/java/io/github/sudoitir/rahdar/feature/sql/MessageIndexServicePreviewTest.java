@@ -108,7 +108,7 @@ class MessageIndexServicePreviewTest {
 
         MessageIndexService.Preview preview = service("rahdar").preview(CLUSTER, spec("ORDER.IN", 50_000L));
 
-        assertThat(preview.addresses()).containsExactly("ORDER.IN");
+        assertThat(preview.destinations()).containsExactly("ORDER.IN");
         assertThat(preview.nodes()).containsExactly("primary");
         assertThat(preview.ringMessages()).isEqualTo(50_000L);
         assertThat(preview.ringBytes()).isEqualTo(DataSize.ofMegabytes(64).toBytes());
@@ -135,7 +135,7 @@ class MessageIndexServicePreviewTest {
 
         MessageIndexService.Preview preview = service("rahdar").preview(CLUSTER, spec("NOTHING.*", null));
 
-        assertThat(preview.addresses()).isEmpty();
+        assertThat(preview.destinations()).isEmpty();
         assertThat(preview.refusal()).contains("matches no address");
     }
 
@@ -168,7 +168,7 @@ class MessageIndexServicePreviewTest {
         UUID id = UUID.randomUUID();
         entity.setId(id);
         entity.setClusterId(CLUSTER);
-        entity.setQueuePattern("ORDER.IN");
+        entity.setSubscriptionPattern("ORDER.IN");
         entity.setMode(CaptureMode.CAPTURE);
         entity.setRetentionDays(7);
         when(subscriptions.findById(id)).thenReturn(Optional.of(entity));
@@ -222,7 +222,7 @@ class MessageIndexServicePreviewTest {
         UUID id = UUID.randomUUID();
         entity.setId(id);
         entity.setClusterId(CLUSTER);
-        entity.setQueuePattern("ORDER.IN");
+        entity.setSubscriptionPattern("ORDER.IN");
         entity.setMode(CaptureMode.CAPTURE);
         entity.setEnabled(true);
         entity.setRetentionDays(7);

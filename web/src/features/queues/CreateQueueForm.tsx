@@ -3,7 +3,8 @@ import { Button, Collapse, Group, Modal, NumberInput, Radio, Stack, Switch, Text
 import { useForm } from '@mantine/form';
 
 import { useCreateRule } from '../../kernel/auth/useCreateRule.ts';
-import { addressId, QUEUE_KIND } from '../../kernel/api/resourceId.ts';
+import { kindOfRole } from '../../kernel/api/resourceId.ts';
+import { useCluster, useRoleIds } from '../clusters/index.ts';
 import { useCreateQueue, type CreateSubscriptionRequest, type LifecycleOutcomeView } from './api.ts';
 import { ErrorState } from '../../ui/ErrorState.tsx';
 import { focusFirstInvalid, serverFieldErrors } from '../../ui/formErrors.ts';
@@ -61,6 +62,8 @@ export function CreateQueueForm({
   const [advanced, setAdvanced] = useState(false);
 
   const create = useCreateQueue(clusterId);
+  const kinds = useCluster(clusterId).data?.kinds;
+  const ids = useRoleIds(clusterId);
   const queueRule = useCreateRule(clusterId, 'subscription');
   const addressRule = useCreateRule(clusterId, 'destination');
   const form = useForm<FormState>({
@@ -82,9 +85,9 @@ export function CreateQueueForm({
   const hasErrors = Object.keys(form.errors).length > 0;
 
   const body = (values: FormState): CreateSubscriptionRequest => ({
-    kind: QUEUE_KIND,
+    kind: kindOfRole(kinds, 'SUBSCRIPTION'),
     name: values.name.trim(),
-    destination: addressId(values.address.trim()),
+    destination: ids.destination(values.address.trim()),
     attributes: {
       routingType: values.routingType,
       durable: values.durable,

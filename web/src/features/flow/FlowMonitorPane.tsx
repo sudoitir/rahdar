@@ -16,8 +16,8 @@ import classes from './FlowView.module.css';
 const KIND_WORD: Record<string, string> = {
   PRODUCER: 'Producing client',
   CONSUMER: 'Consuming client',
-  ADDRESS: 'Address',
-  QUEUE: 'Queue',
+  DESTINATION: 'Address',
+  SUBSCRIPTION: 'Queue',
   REMOTE: 'Remote',
 };
 
@@ -162,7 +162,7 @@ function History({
       </Text>
     );
   }
-  if (node.kind !== 'QUEUE' || panels.length === 0) return null;
+  if (node.kind !== 'SUBSCRIPTION' || panels.length === 0) return null;
   return (
     <Section
       headingLevel={3}

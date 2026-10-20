@@ -14,6 +14,7 @@ import io.github.sudoitir.rahdar.kernel.plugin.support.PluginJarBuilder;
 import io.github.sudoitir.rahdar.kernel.security.AccessChanges;
 import io.github.sudoitir.rahdar.kernel.security.GrantLoader;
 import io.github.sudoitir.rahdar.kernel.security.Permissions;
+import io.github.sudoitir.rahdar.kernel.security.ResourceRef;
 import io.github.sudoitir.rahdar.kernel.security.internal.persistence.AppUserRepository;
 import io.github.sudoitir.rahdar.kernel.security.internal.persistence.RolePermissionRepository;
 import io.github.sudoitir.rahdar.kernel.security.internal.persistence.RoleRepository;
@@ -216,7 +217,8 @@ class MetricHistoryIntegrationTest extends PostgresIntegrationTest {
     }
 
     private MetricQuery depthQuery(Instant from) {
-        return new MetricQuery(List.of("openbroker.backlog"), "QUEUE", "orders", from, now, null, null);
+        return new MetricQuery(
+                List.of("openbroker.backlog"), ResourceRef.subscription("orders"), from, now, null, null);
     }
 
     /** A user holding {@code permissions} on this cluster only; nobody is left signed in. */

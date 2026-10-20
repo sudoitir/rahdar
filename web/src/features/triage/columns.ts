@@ -1,5 +1,6 @@
 import { createElement } from 'react';
 
+import { nameOf } from '../../kernel/api/resourceId.ts';
 import type { Column } from '../../ui/table/index.ts';
 import type { ConsumerHealthView } from './api.ts';
 import { QueueLink } from './cells.tsx';
@@ -27,21 +28,21 @@ export function consumerHealthColumns(): Column<ConsumerHealthView>[] {
       sortKey: 'severity',
     },
     {
-      id: 'queueName',
+      id: 'subscription',
       header: 'Queue',
-      accessor: (r) => r.queueName,
+      accessor: (r) => nameOf(r.subscription),
       cell: (r) => createElement(QueueLink, { row: r }),
       kind: 'identifier',
       priority: 'essential',
-      sortKey: 'queueName',
+      sortKey: 'subscription',
     },
     {
-      id: 'address',
+      id: 'destination',
       header: 'Address',
-      accessor: (r) => r.address,
+      accessor: (r) => nameOf(r.destination),
       kind: 'identifier',
       priority: 'low',
-      sortKey: 'address',
+      sortKey: 'destination',
     },
     { id: 'depth', header: 'Depth', accessor: (r) => r.depth, kind: 'number', priority: 'high', sortKey: 'depth' },
     {

@@ -12,7 +12,7 @@ record PolicySnapshot(int version, List<Rule.Compiled> rules) {
                 rules.stream()
                         .filter(Rule::enabled)
                         // An address-scoped rule is more specific than a global one, so it is consulted first.
-                        .sorted(Comparator.comparing(r -> r.addressPattern() == null))
+                        .sorted(Comparator.comparing(r -> r.destinationPattern() == null))
                         .map(Rule.Compiled::of)
                         .toList());
     }

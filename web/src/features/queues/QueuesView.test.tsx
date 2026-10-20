@@ -1,5 +1,4 @@
-import { addressId } from '../../kernel/api/resourceId.ts';
-import { subscriptionIdentity } from '../../test/wire.ts';
+import { ARTEMIS_KINDS, addressId, subscriptionIdentity } from '../../test/wire.ts';
 import { beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 import { delay, http, HttpResponse } from 'msw';
 import { act, screen, waitFor, within } from '@testing-library/react';
@@ -100,7 +99,7 @@ describe('QueuesView selection', () => {
         }),
       ),
       http.get('*/api/v1/clusters/c1', () =>
-        HttpResponse.json({ id: 'c1', name: 'c1', topology: { nodes: [] }, capabilities: {} }),
+        HttpResponse.json({ id: 'c1', name: 'c1', topology: { nodes: [] }, kinds: ARTEMIS_KINDS, capabilities: {} }),
       ),
       // 140 match, one page of two is shown.
       http.get('*/api/v1/clusters/c1/subscriptions', () =>
@@ -146,7 +145,13 @@ function serve({
       }),
     ),
     http.get('*/api/v1/clusters/c1', () =>
-      HttpResponse.json({ id: 'c1', name: 'c1', topology: { nodes }, capabilities: { managementWrite } }),
+      HttpResponse.json({
+        id: 'c1',
+        name: 'c1',
+        topology: { nodes },
+        kinds: ARTEMIS_KINDS,
+        capabilities: { managementWrite },
+      }),
     ),
     http.get('*/api/v1/clusters/c1/subscriptions', () =>
       HttpResponse.json({ data: queues, count: count ?? queues.length, page: 1, pageSize: 200 }),
@@ -281,7 +286,7 @@ describe('QueuesView the open queue', () => {
         HttpResponse.json({ id: 'u1', username: 'admin', mustChangePassword: false, grants: [] }),
       ),
       http.get('*/api/v1/clusters/c1', () =>
-        HttpResponse.json({ id: 'c1', name: 'c1', topology: { nodes: [] }, capabilities: {} }),
+        HttpResponse.json({ id: 'c1', name: 'c1', topology: { nodes: [] }, kinds: ARTEMIS_KINDS, capabilities: {} }),
       ),
       http.get('*/api/v1/clusters/c1/subscriptions', ({ request }) => {
         const asked = new URL(request.url).searchParams.get('q');

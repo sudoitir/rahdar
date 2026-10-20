@@ -8,7 +8,8 @@ import {
   request,
 } from '../../kernel/api/request.ts';
 import { type ResourceParams, useResource } from '../../kernel/api/paging.ts';
-import { addressId, resourcePath } from '../../kernel/api/resourceId.ts';
+import { resourcePath } from '../../kernel/api/resourceId.ts';
+import { useRoleIds } from '../clusters/index.ts';
 import type { components } from '../../kernel/api/schema.d.ts';
 
 type Schemas = components['schemas'];
@@ -80,9 +81,13 @@ export function useCloseNodeTarget(clusterId: string, nodeId: string, targetId: 
 
 /** Every consumer connection bound to a destination, on every live node. Capped. */
 export function useCloseAddressConsumers(clusterId: string, address: string) {
+  const ids = useRoleIds(clusterId);
   return useCloseMutation<LifecycleVars>(clusterId, ({ dryRun, override }) =>
-    request(`${lifecycleBase(clusterId)}${resourcePath(addressId(address))}:close${lifecycleQuery(dryRun, override)}`, {
-      method: 'POST',
-    }),
+    request(
+      `${lifecycleBase(clusterId)}${resourcePath(ids.destination(address))}:close${lifecycleQuery(dryRun, override)}`,
+      {
+        method: 'POST',
+      },
+    ),
   );
 }

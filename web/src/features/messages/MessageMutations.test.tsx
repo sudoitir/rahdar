@@ -7,6 +7,7 @@ import { Notifications, notifications } from '@mantine/notifications';
 import { renderWithProviders } from '../../test/render.tsx';
 import { server } from '../../test/setup.ts';
 import { holdButton } from '../../test/hold.ts';
+import { ARTEMIS_KINDS } from '../../test/wire.ts';
 
 vi.mock('@tanstack/react-router', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@tanstack/react-router')>()),
@@ -40,6 +41,7 @@ function signedInWith(permissions: string[]) {
         name: 'prod',
         description: null,
         topology: { clusterId: 'c1', nodes: [] },
+        kinds: ARTEMIS_KINDS,
         capabilities: {
           managementRead: AVAILABLE,
           managementWrite: AVAILABLE,

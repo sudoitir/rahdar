@@ -63,7 +63,7 @@ public final class BrokerFailures {
                                 : ManagementRefusal.Kind.ALREADY,
                         e.getMessage());
             case ErrorReasons.HAS_CHILDREN ->
-                new ManagementRefusal(ManagementRefusal.Kind.BOUND_QUEUES, e.getMessage());
+                new ManagementRefusal(ManagementRefusal.Kind.BOUND_SUBSCRIPTIONS, e.getMessage());
             case ErrorReasons.HAS_CONSUMERS ->
                 new ManagementRefusal(
                         ManagementRefusal.Kind.HAS_CONSUMERS,

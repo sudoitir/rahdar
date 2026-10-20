@@ -1,3 +1,4 @@
+import { nameOf } from '../../kernel/api/resourceId.ts';
 import type { SqlRowView } from './api.ts';
 
 /**
@@ -16,8 +17,8 @@ const FIELDS: { key: string; of: (row: SqlRowView) => unknown }[] = [
   { key: 'source', of: (r) => r.source },
   { key: 'origin', of: (r) => r.origin },
   { key: 'node', of: (r) => r.nodeName },
-  { key: 'queue', of: (r) => r.queueName },
-  { key: 'address', of: (r) => r.address },
+  { key: 'subscription', of: (r) => nameOf(r.subscription) },
+  { key: 'destination', of: (r) => nameOf(r.destination) },
   { key: 'messageId', of: (r) => r.messageId },
   { key: 'sourceMessageId', of: (r) => r.sourceMessageId },
   {

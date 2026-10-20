@@ -30,7 +30,7 @@ class FindingsRecorder {
                    hit_count = classification_finding.hit_count + EXCLUDED.hit_count
             """;
 
-    record Key(String address, Location location, String path, DataClass dataClass) {}
+    record Key(String destination, Location location, String path, DataClass dataClass) {}
 
     record Tally(Instant firstSeen, Instant lastSeen, long hits) {}
 
@@ -68,7 +68,7 @@ class FindingsRecorder {
                     Timestamp.from(tally.firstSeen()),
                     Timestamp.from(tally.lastSeen()),
                     tally.hits(),
-                    key.address(),
+                    key.destination(),
                     key.location().name(),
                     key.path(),
                     key.dataClass().name()

@@ -7,7 +7,7 @@ const row = (edge: Partial<FlowEdgeView> = {}): PathRow => ({
   id: 'e1',
   edge: { id: 'e1', kind: 'PRODUCE', stale: false, ...edge } as FlowEdgeView,
   from: { id: 'p1', kind: 'PRODUCER', label: 'app-1', members: 3 },
-  to: { id: 'q1', kind: 'QUEUE', label: 'orders' },
+  to: { id: 'q1', kind: 'SUBSCRIPTION', label: 'orders' },
   faults: ['no consumer'],
 });
 

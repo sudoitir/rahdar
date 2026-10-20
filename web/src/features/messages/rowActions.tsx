@@ -15,7 +15,7 @@ import { useResourceGate } from '../../kernel/auth/useResourceGate.ts';
 import type { ActionProps, HostedDialogProps, MessageTarget, QueueTarget } from '../../kernel/actions/types.ts';
 import { absoluteHref, clusterHref } from '../../kernel/routing/href.ts';
 import { ActionMenuItem } from '../../ui/ActionMenuItem.tsx';
-import { queueId } from '../../kernel/api/resourceId.ts';
+import { useRoleIds } from '../clusters/index.ts';
 import { ConfirmDialog } from '../../ui/ConfirmDialog.tsx';
 import { focusFirstInvalid } from '../../ui/formErrors.ts';
 import { notify } from '../../ui/notify.ts';
@@ -133,6 +133,7 @@ function OneMessageDialog({
   action,
 }: HostedDialogProps & { clusterId: string; target: MessageTarget; action: OneAction }) {
   const run = useMessageAction(clusterId, target.queueName);
+  const ids = useRoleIds(clusterId);
   const form = useForm({
     initialValues: { destination: '' },
     validateInputOnBlur: true,
@@ -149,7 +150,7 @@ function OneMessageDialog({
     run.mutate(
       {
         action,
-        body: { positions: [target.position], target: action === 'move' ? queueId(destination) : undefined },
+        body: { positions: [target.position], target: action === 'move' ? ids.subscription(destination) : undefined },
         node: target.node,
       },
       {

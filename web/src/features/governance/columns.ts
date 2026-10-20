@@ -38,7 +38,7 @@ export function ruleColumns({ controls }: RuleRows): Column<RuleView>[] {
     {
       id: 'addresses',
       header: 'Addresses',
-      accessor: (r) => r.addressPattern ?? 'All addresses',
+      accessor: (r) => r.destinationPattern ?? 'All addresses',
       kind: 'text',
       wrap: true,
       priority: 'high',
@@ -83,7 +83,7 @@ export function findingColumns({ zone, controls }: FindingRows): Column<FindingV
     {
       id: 'address',
       header: 'Address',
-      accessor: (f) => f.address,
+      accessor: (f) => f.destination,
       kind: 'identifier',
       priority: 'essential',
     },

@@ -55,7 +55,8 @@ final class TargetAcceptance {
         List<AcceptanceFinding> out = new ArrayList<>();
         if (in.sameQueueSameNode()) {
             out.add(refuse(
-                    "same-queue", "The target is the source queue on the source node, so there is nowhere to go."));
+                    "same-subscription",
+                    "The target is the source queue on the source node, so there is nowhere to go."));
             return out;
         }
         if (in.splitBrain()) {
@@ -97,7 +98,8 @@ final class TargetAcceptance {
             AcceptanceInput in, Facts f, JsonNode settings, String address, String queue, List<AcceptanceFinding> out) {
         if (f.queueExists() == null) {
             out.add(unknown(
-                    "queue-unknown", "Whether queue %s exists on the target node could not be read.".formatted(queue)));
+                    "subscription-unknown",
+                    "Whether queue %s exists on the target node could not be read.".formatted(queue)));
             return;
         }
         if (Boolean.FALSE.equals(f.queueExists())) {
@@ -129,12 +131,12 @@ final class TargetAcceptance {
         JsonNode auto = settings == null ? null : settings.get("autoCreateQueues");
         if (auto == null || auto.isNull()) {
             out.add(unknown(
-                    "queue-missing",
+                    "subscription-missing",
                     "Queue %s does not exist on the target node, and whether the broker would create it could not be read."
                             .formatted(queue)));
         } else if (!auto.asBoolean()) {
             out.add(refuse(
-                    "queue-missing",
+                    "subscription-missing",
                     "Queue %s does not exist on the target node, and address %s does not create queues automatically."
                             .formatted(queue, address),
                     """

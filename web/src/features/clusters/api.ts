@@ -1,7 +1,9 @@
+import { useMemo } from 'react';
 import { useMutation, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
 import { requestAll } from '../../kernel/api/paging.ts';
 import { useCan } from '../../kernel/auth/useCan.ts';
 import { ApiError, clusterKey, request } from '../../kernel/api/request.ts';
+import { destinationId, subscriptionId } from '../../kernel/api/resourceId.ts';
 import type { components } from '../../kernel/api/schema.d.ts';
 
 type Schemas = components['schemas'];
@@ -194,4 +196,20 @@ export function useAssignClusterEnvironment(clusterId: string) {
       }),
     onSuccess: () => qc.invalidateQueries({ queryKey: keys.all }),
   });
+}
+
+/**
+ * Builders for the ids of a subscription or a destination named only by its name (a URL param, a picker),
+ * with the kind the cluster's system gives each role. They throw until the cluster has loaded.
+ */
+export function useRoleIds(clusterId: string) {
+  const kinds = useCluster(clusterId === '' ? null : clusterId).data?.kinds;
+  return useMemo(
+    () => ({
+      subscription: (name: string) => subscriptionId(kinds, name),
+      destination: (name: string) => destinationId(kinds, name),
+      loaded: kinds !== undefined,
+    }),
+    [kinds],
+  );
 }

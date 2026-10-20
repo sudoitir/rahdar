@@ -26,7 +26,7 @@ const flow = (id: string, state: string, over: Record<string, unknown> = {}) => 
   id,
   clusterId: 'c1',
   nodeId: null,
-  requestAddress: 'orders.request',
+  requestDestination: 'orders.request',
   replyDestination: null,
   replyKind: 'SHARED',
   state,
@@ -46,10 +46,10 @@ const FLOWS = [
 
 const EXPECTATION = {
   id: 'e1',
-  requestAddress: 'orders.request',
-  replyAddresses: ['orders.reply.*'],
-  resolvedReplyAddresses: [],
-  replyAddressesCapped: false,
+  requestDestination: 'orders.request',
+  replyDestinations: ['orders.reply.*'],
+  resolvedReplyDestinations: [],
+  replyDestinationsCapped: false,
   correlationProperty: null,
   deadlineMs: 30_000,
   samplePerMin: 10,
@@ -74,7 +74,7 @@ const DIAGNOSTICS = {
   expectations: [
     {
       expectationId: 'e1',
-      requestAddress: 'orders.request',
+      requestDestination: 'orders.request',
       enabled: true,
       lastAttemptAt: '2026-09-06T12:00:00Z',
       lastSuccessAt: '2026-09-06T12:00:00Z',
@@ -126,7 +126,7 @@ function seeded(flows: readonly unknown[]): QueryClient {
   client.setQueryData(['clusters', 'c1', 'rr', 'expectations'], [EXPECTATION]);
   client.setQueryData(['clusters', 'c1', 'rr', 'diagnostics'], DIAGNOSTICS);
   client.setQueryData(['clusters', 'c1', 'rr', 'stats', 'PT15M'], {
-    addresses: [{ address: 'orders.request', p50Ms: 20, p95Ms: 80, p99Ms: 120, coverageRatio: 0.5 }],
+    destinations: [{ destination: 'orders.request', p50Ms: 20, p95Ms: 80, p99Ms: 120, coverageRatio: 0.5 }],
   });
   return client;
 }

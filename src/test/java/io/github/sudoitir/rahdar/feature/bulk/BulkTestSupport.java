@@ -4,6 +4,7 @@ import io.github.sudoitir.rahdar.feature.bulk.web.BulkViews.BulkPreviewRequest;
 import io.github.sudoitir.rahdar.feature.bulk.web.BulkViews.BulkRunDetailView;
 import io.github.sudoitir.rahdar.kernel.security.AccessChanges;
 import io.github.sudoitir.rahdar.kernel.security.GrantLoader;
+import io.github.sudoitir.rahdar.kernel.security.ResourceIdTexts;
 import io.github.sudoitir.rahdar.kernel.security.internal.persistence.AppUserRepository;
 import io.github.sudoitir.rahdar.kernel.security.internal.persistence.RolePermissionRepository;
 import io.github.sudoitir.rahdar.kernel.security.internal.persistence.RoleRepository;
@@ -17,6 +18,7 @@ import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNo
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterEntity;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterRepository;
 import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshotUpsert;
+import io.github.sudoitir.rahdar.support.ArtemisIds;
 import io.github.sudoitir.rahdar.support.OperatorFixture;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
 import java.time.Instant;
@@ -27,12 +29,17 @@ import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /** A cluster of two live nodes, a signed-in operator with a real account, and queues seeded into the snapshot. */
 abstract class BulkTestSupport extends PostgresIntegrationTest {
 
     @Autowired
     BulkService bulk;
+
+    /** No broker is reachable here, so the id a subscription has is stated. */
+    @MockitoBean
+    ResourceIdTexts ids;
 
     @Autowired
     ClusterRepository clusters;
@@ -79,11 +86,12 @@ abstract class BulkTestSupport extends PostgresIntegrationTest {
         nodeA = node("a");
         nodeB = node("b");
         userId = OperatorFixture.signIn(users, roles, rolePermissions, userRoles, grants);
+        ArtemisIds.stub(ids);
     }
 
     @AfterEach
     void cleanUp() {
-        settings.reset(BrokerSettings.BULK_QUEUE_CAP);
+        settings.reset(BrokerSettings.BULK_SUBSCRIPTION_CAP);
         settings.reset(BrokerSettings.BULK_CAP);
         clusters.deleteById(clusterId);
         SecurityContextHolder.clearContext();

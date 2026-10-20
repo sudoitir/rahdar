@@ -37,7 +37,7 @@ public class RrSamplerHealth {
     public record ExpectationHealth(
             UUID expectationId,
             UUID clusterId,
-            String requestAddress,
+            String requestDestination,
             Instant lastAttemptAt,
             Instant lastSuccessAt,
             int nodesSampled,
@@ -55,8 +55,8 @@ public class RrSamplerHealth {
     }
 
     /** Accumulates one expectation's tick, then publishes it in one go. */
-    public Tick begin(UUID expectationId, UUID clusterId, String requestAddress) {
-        return new Tick(expectationId, clusterId, requestAddress, clock.instant());
+    public Tick begin(UUID expectationId, UUID clusterId, String requestDestination) {
+        return new Tick(expectationId, clusterId, requestDestination, clock.instant());
     }
 
     public Optional<ExpectationHealth> forExpectation(UUID expectationId) {
@@ -66,7 +66,7 @@ public class RrSamplerHealth {
     public List<ExpectationHealth> forCluster(UUID clusterId) {
         return byExpectation.values().stream()
                 .filter(h -> h.clusterId().equals(clusterId))
-                .sorted((a, b) -> a.requestAddress().compareTo(b.requestAddress()))
+                .sorted((a, b) -> a.requestDestination().compareTo(b.requestDestination()))
                 .toList();
     }
 
@@ -80,7 +80,7 @@ public class RrSamplerHealth {
 
         private final UUID expectationId;
         private final UUID clusterId;
-        private final String requestAddress;
+        private final String requestDestination;
         private final Instant startedAt;
         private final List<NodeOutcome> skipped = new ArrayList<>();
 
@@ -89,10 +89,10 @@ public class RrSamplerHealth {
         private int observations;
         private String lastError;
 
-        private Tick(UUID expectationId, UUID clusterId, String requestAddress, Instant startedAt) {
+        private Tick(UUID expectationId, UUID clusterId, String requestDestination, Instant startedAt) {
             this.expectationId = expectationId;
             this.clusterId = clusterId;
-            this.requestAddress = requestAddress;
+            this.requestDestination = requestDestination;
             this.startedAt = startedAt;
         }
 
@@ -125,7 +125,7 @@ public class RrSamplerHealth {
                     new ExpectationHealth(
                             expectationId,
                             clusterId,
-                            requestAddress,
+                            requestDestination,
                             startedAt,
                             lastSuccessAt,
                             nodesSampled,

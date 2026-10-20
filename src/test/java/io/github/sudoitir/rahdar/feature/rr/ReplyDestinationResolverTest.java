@@ -17,25 +17,25 @@ import org.junit.jupiter.api.Test;
  * the only collaborator is the snapshot repository, stubbed, because the point of
  * resolving from {@code subscription_snapshot} is that no broker is involved.
  */
-class ReplyAddressResolverTest {
+class ReplyDestinationResolverTest {
 
     private static final UUID CLUSTER = UUID.randomUUID();
 
-    private static RrExpectationEntity expecting(String... replyAddresses) {
-        return new RrExpectationEntity(CLUSTER, "rr.request", List.of(replyAddresses), null, null, 10, false);
+    private static RrExpectationEntity expecting(String... replyDestinations) {
+        return new RrExpectationEntity(CLUSTER, "rr.request", List.of(replyDestinations), null, null, 10, false);
     }
 
-    private static ReplyAddressResolver resolverOver(String... knownAddresses) {
+    private static ReplyDestinationResolver resolverOver(String... knownAddresses) {
         QueueSnapshots snapshots = mock(QueueSnapshots.class);
         when(snapshots.addresses(any())).thenReturn(List.of(knownAddresses));
-        return new ReplyAddressResolver(snapshots);
+        return new ReplyDestinationResolver(snapshots);
     }
 
     @Test
     void aLiteralResolvesToItselfEvenWhenTheScrapeHasNotSeenIt() {
         // A literal is browsable whether or not the last scrape happened to see it;
         // requiring a snapshot would break an expectation on a freshly-registered cluster.
-        ReplyAddressResolver resolver = resolverOver();
+        ReplyDestinationResolver resolver = resolverOver();
 
         assertThat(resolver.resolve(CLUSTER, expecting("orders.reply")).addresses())
                 .containsExactly("orders.reply");
@@ -43,7 +43,7 @@ class ReplyAddressResolverTest {
 
     @Test
     void aGlobResolvesToEveryMatchingKnownAddress() {
-        ReplyAddressResolver resolver =
+        ReplyDestinationResolver resolver =
                 resolverOver("orders.reply.host-1", "orders.reply.host-2", "orders.request", "billing.reply.host-1");
 
         assertThat(resolver.resolve(CLUSTER, expecting("orders.reply.*")).addresses())
@@ -54,19 +54,19 @@ class ReplyAddressResolverTest {
     void matchingIsAnchoredAtBothEnds() {
         RrExpectationEntity e = expecting("orders.reply.*");
 
-        assertThat(new ReplyAddressResolver(mock(QueueSnapshots.class)).matches(e, "orders.reply.x"))
+        assertThat(new ReplyDestinationResolver(mock(QueueSnapshots.class)).matches(e, "orders.reply.x"))
                 .isTrue();
         // The whole address must match, not a substring of it.
-        assertThat(new ReplyAddressResolver(mock(QueueSnapshots.class)).matches(e, "legacy.orders.reply.x"))
+        assertThat(new ReplyDestinationResolver(mock(QueueSnapshots.class)).matches(e, "legacy.orders.reply.x"))
                 .isFalse();
-        assertThat(new ReplyAddressResolver(mock(QueueSnapshots.class)).matches(e, "orders.reply"))
+        assertThat(new ReplyDestinationResolver(mock(QueueSnapshots.class)).matches(e, "orders.reply"))
                 .isFalse();
     }
 
     @Test
     void regexMetacharactersInAPatternAreLiteral() {
         // A glob is not a regular expression: '.' is a dot, '+' is a plus (design.md D1).
-        ReplyAddressResolver resolver = resolverOver("ordersXreply.a", "orders.reply.a");
+        ReplyDestinationResolver resolver = resolverOver("ordersXreply.a", "orders.reply.a");
 
         assertThat(resolver.resolve(CLUSTER, expecting("orders.reply.*")).addresses())
                 .containsExactly("orders.reply.a");
@@ -79,7 +79,7 @@ class ReplyAddressResolverTest {
     @Test
     void anEmptySetResolvesToNothingAndMatchesNothing() {
         // The temporary-reply-queue pattern (D3): no shared queue to browse at all.
-        ReplyAddressResolver resolver = resolverOver("orders.reply.a");
+        ReplyDestinationResolver resolver = resolverOver("orders.reply.a");
         RrExpectationEntity e = expecting();
 
         assertThat(resolver.resolve(CLUSTER, e).isEmpty()).isTrue();
@@ -88,23 +88,23 @@ class ReplyAddressResolverTest {
 
     @Test
     void anOverBroadPatternIsCappedAndSaysSo() {
-        String[] many = IntStream.range(0, ReplyAddressResolver.MAX_RESOLVED + 10)
+        String[] many = IntStream.range(0, ReplyDestinationResolver.MAX_RESOLVED + 10)
                 .mapToObj(i -> "orders.reply." + i)
                 .toArray(String[]::new);
-        ReplyAddressResolver resolver = resolverOver(many);
+        ReplyDestinationResolver resolver = resolverOver(many);
 
-        ReplyAddressResolver.Resolution resolution = resolver.resolve(CLUSTER, expecting("*"));
+        ReplyDestinationResolver.Resolution resolution = resolver.resolve(CLUSTER, expecting("*"));
 
-        assertThat(resolution.addresses()).hasSize(ReplyAddressResolver.MAX_RESOLVED);
+        assertThat(resolution.addresses()).hasSize(ReplyDestinationResolver.MAX_RESOLVED);
         assertThat(resolution.capped()).isTrue();
     }
 
     @Test
     void aPatternThatMatchesNothingYetIsNotAnError() {
         // The reply queue simply has not been created; tracing starts when it appears.
-        ReplyAddressResolver resolver = resolverOver("orders.request");
+        ReplyDestinationResolver resolver = resolverOver("orders.request");
 
-        ReplyAddressResolver.Resolution resolution = resolver.resolve(CLUSTER, expecting("orders.reply.*"));
+        ReplyDestinationResolver.Resolution resolution = resolver.resolve(CLUSTER, expecting("orders.reply.*"));
 
         assertThat(resolution.isEmpty()).isTrue();
         assertThat(resolution.capped()).isFalse();
@@ -112,7 +112,7 @@ class ReplyAddressResolverTest {
 
     @Test
     void onlyASingleLiteralIsKnownInAdvance() {
-        ReplyAddressResolver resolver = resolverOver("orders.reply.a", "orders.reply.b");
+        ReplyDestinationResolver resolver = resolverOver("orders.reply.a", "orders.reply.b");
 
         assertThat(resolver.resolve(CLUSTER, expecting("orders.reply")).singleLiteral())
                 .isTrue();
@@ -126,9 +126,9 @@ class ReplyAddressResolverTest {
         // The address it resolves to today is a fact about this scrape, not about the
         // expectation: a second responder tomorrow makes the stamp wrong. The flow
         // takes its destination from the joining reply instead (design.md D5).
-        ReplyAddressResolver resolver = resolverOver("orders.reply.only-host");
+        ReplyDestinationResolver resolver = resolverOver("orders.reply.only-host");
 
-        ReplyAddressResolver.Resolution resolution = resolver.resolve(CLUSTER, expecting("orders.reply.*"));
+        ReplyDestinationResolver.Resolution resolution = resolver.resolve(CLUSTER, expecting("orders.reply.*"));
 
         assertThat(resolution.addresses()).containsExactly("orders.reply.only-host");
         assertThat(resolution.singleLiteral()).isFalse();

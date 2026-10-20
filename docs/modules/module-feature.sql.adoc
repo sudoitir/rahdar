@@ -61,6 +61,7 @@ _Others_
 * `i.g.s.r.p.b.ClockOffsetService` (in Broker connectivity)
 * `i.g.s.r.k.c.HeavyRequests` (in Core)
 * `i.g.s.r.p.g.ContentPolicy` (in Data governance)
+* `i.g.s.r.k.s.ResourceIdTexts` (in Security)
 * `i.g.s.r.k.s.SseHub` (in Event stream)
 * `i.g.s.r.p.g.ClearViewAudit` (in Data governance)
 |Events listened to

@@ -9,9 +9,7 @@ import static org.mockito.Mockito.verify;
 
 import io.github.sudoitir.rahdar.feature.messages.MessagePermissions;
 import io.github.sudoitir.rahdar.feature.resources.ResourcePermissions;
-import io.github.sudoitir.rahdar.feature.transfer.web.TransferViews.SelectionKind;
-import io.github.sudoitir.rahdar.feature.transfer.web.TransferViews.TransferPreviewRequest;
-import io.github.sudoitir.rahdar.feature.transfer.web.TransferViews.TransferSelection;
+import io.github.sudoitir.rahdar.feature.transfer.TransferService.Target;
 import io.github.sudoitir.rahdar.kernel.core.NotFoundException;
 import io.github.sudoitir.rahdar.kernel.security.ClusterAccessGuard;
 import io.github.sudoitir.rahdar.kernel.security.ClusterAccessGuard.Requirement;
@@ -28,8 +26,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
- * Messages are sent into the target queue, so the target address the caller is checked against is the one the
- * queue is bound to, whatever address the request names (team-access spec).
+ * Messages are sent into the target subscription, so the destination the caller is checked against is the one the
+ * subscription is bound to, whatever destination the request names (team-access spec).
  */
 @ExtendWith(MockitoExtension.class)
 class TransferTargetAuthorisationTest {
@@ -42,16 +40,8 @@ class TransferTargetAuthorisationTest {
     @InjectMocks
     TransferService service;
 
-    private static TransferPreviewRequest request(String targetQueue, String targetAddress) {
-        return new TransferPreviewRequest(
-                TransferMode.MOVE,
-                "orders.in",
-                UUID.randomUUID(),
-                new TransferSelection(SelectionKind.ALL, null, null),
-                CLUSTER,
-                UUID.randomUUID(),
-                targetQueue,
-                targetAddress);
+    private static Target target(String subscription, String destination) {
+        return new Target(subscription, destination);
     }
 
     private static Optional<QueueLocation> boundTo(String queue, String address) {
@@ -60,8 +50,8 @@ class TransferTargetAuthorisationTest {
 
     @Test
     void anExistingTargetIsCheckedAgainstTheAddressItIsBoundToNotTheOneTheRequestNames() {
-        String address =
-                service.authorisedTargetAddress(request("billing.in", null), boundTo("billing.in", "billing.addr"));
+        String address = service.authorisedTargetAddress(
+                CLUSTER, target("billing.in", null), boundTo("billing.in", "billing.addr"));
 
         assertThat(address).isEqualTo("billing.addr");
         verify(access)
@@ -80,10 +70,10 @@ class TransferTargetAuthorisationTest {
                 .when(access)
                 .requireAll(eq(CLUSTER), any());
 
-        var request = request("billing.in", "orders.out");
+        var target = target("billing.in", "orders.out");
         var bound = boundTo("billing.in", "billing.addr");
 
-        assertThatThrownBy(() -> service.authorisedTargetAddress(request, bound))
+        assertThatThrownBy(() -> service.authorisedTargetAddress(CLUSTER, target, bound))
                 .isInstanceOf(NotFoundException.class)
                 .hasMessageNotContaining("billing");
     }
@@ -91,16 +81,17 @@ class TransferTargetAuthorisationTest {
     @Test
     void anAddressThatIsNotTheQueuesOwnIsRefusedOnceTheCallerMayReachTheQueue() {
         assertThatThrownBy(() -> service.authorisedTargetAddress(
-                        request("orders.out", "orders.other"), boundTo("orders.out", "orders.out")))
+                        CLUSTER, target("orders.out", "orders.other"), boundTo("orders.out", "orders.out")))
                 .isInstanceOfSatisfying(TransferRefusedException.class, e -> {
-                    assertThat(e.slug()).isEqualTo("transfer-target-address");
+                    assertThat(e.slug()).isEqualTo("transfer-target-destination");
                     assertThat(e.getMessage()).contains("orders.out");
                 });
     }
 
     @Test
     void aTargetQueueTheBrokerWouldCreateIsCheckedAsACreationUnderItsAddress() {
-        String address = service.authorisedTargetAddress(request("orders.new", "orders.addr"), Optional.empty());
+        String address =
+                service.authorisedTargetAddress(CLUSTER, target("orders.new", "orders.addr"), Optional.empty());
 
         assertThat(address).isEqualTo("orders.addr");
         verify(access)
@@ -115,7 +106,7 @@ class TransferTargetAuthorisationTest {
 
     @Test
     void aQueueToBeCreatedWithNoAddressNamedIsBoundToAnAddressOfItsOwnName() {
-        assertThat(service.authorisedTargetAddress(request("orders.new", null), Optional.empty()))
+        assertThat(service.authorisedTargetAddress(CLUSTER, target("orders.new", null), Optional.empty()))
                 .isEqualTo("orders.new");
     }
 }

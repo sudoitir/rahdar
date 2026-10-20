@@ -118,7 +118,7 @@ class SqlControllerTest extends PostgresIntegrationTest {
         plan("SELECT * FROM \"ORDER.*\" LIMIT 10")
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.targets.length()").value(2))
-                .andExpect(jsonPath("$.targets[*].queueName", Matchers.hasItem("ORDER.IN")));
+                .andExpect(jsonPath("$.targets[*].subscription", Matchers.hasItem(Matchers.endsWith("/ORDER.IN"))));
     }
 
     @Test
@@ -147,7 +147,7 @@ class SqlControllerTest extends PostgresIntegrationTest {
         plan("SELECT * FROM \"NOTHING.HERE\"")
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.targets.length()").value(0))
-                .andExpect(jsonPath("$.notices[*].kind", Matchers.hasItem("NO_QUEUE_MATCHED")));
+                .andExpect(jsonPath("$.notices[*].kind", Matchers.hasItem("NO_SUBSCRIPTION_MATCHED")));
     }
 
     @Test

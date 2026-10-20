@@ -14,7 +14,7 @@ public final class BrokerModule {
             .settingKey(BrokerSettings.CONNECT_TIMEOUT)
             .settingKey(BrokerSettings.READ_TIMEOUT)
             .settingKey(BrokerSettings.BULK_CAP)
-            .settingKey(BrokerSettings.BULK_QUEUE_CAP)
+            .settingKey(BrokerSettings.BULK_SUBSCRIPTION_CAP)
             .build();
 
     private BrokerModule() {}

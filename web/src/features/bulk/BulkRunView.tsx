@@ -3,6 +3,7 @@ import { Button, Group, Progress, Stack, Text } from '@mantine/core';
 import { Link, useParams } from '@tanstack/react-router';
 
 import { useCan } from '../../kernel/auth/useCan.ts';
+import { nameOf } from '../../kernel/api/resourceId.ts';
 import { absoluteLabel } from '../../kernel/time/time.ts';
 import { useDisplayZone } from '../../kernel/time/timezone.ts';
 import { CapabilityGate } from '../../ui/CapabilityGate.tsx';
@@ -65,7 +66,7 @@ const TONE_COLOR = { danger: 'var(--as-danger)', warning: 'var(--as-warning)' } 
 
 const TERMINAL = new Set<Run['status']>(['SUCCEEDED', 'PARTIAL', 'FAILED', 'STOPPED', 'INTERRUPTED']);
 
-const rowKey = (i: BulkItemView) => i.queueName;
+const rowKey = (i: BulkItemView) => i.subscription;
 
 /** One queue's per-node result, or why it has none. */
 function QueueDetail({
@@ -81,7 +82,7 @@ function QueueDetail({
 }>) {
   return (
     <Section
-      title={item.queueName}
+      title={nameOf(item.subscription)}
       headingLevel={3}
       actions={
         <Button size="xs" variant="subtle" onClick={onHide}>
@@ -135,7 +136,7 @@ export function BulkRunView() {
   const op = OPERATIONS[run.operation];
   const status = runStatus(run.status);
   const done = run.succeeded + run.failed + run.skipped;
-  const opened = items.find((i) => i.queueName === open) ?? null;
+  const opened = items.find((i) => i.subscription === open) ?? null;
   const openedOutcome = opened ? outcomeOf(opened, run) : null;
   // The server re-checks; this only explains. Offered while grants load.
   const stopGate = gateFor(can(op.permission, clusterId), op.permissionLabel, undefined, loading);

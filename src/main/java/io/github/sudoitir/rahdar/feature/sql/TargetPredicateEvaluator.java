@@ -74,11 +74,11 @@ final class TargetPredicateEvaluator {
         if (!(term instanceof Term.ColumnTerm(var c))) {
             return null;
         }
-        if (c == Column.QUEUE) {
-            return target.queueName();
+        if (c == Column.SUBSCRIPTION) {
+            return target.subscription();
         }
-        if (c == Column.ADDRESS) {
-            return target.address();
+        if (c == Column.DESTINATION) {
+            return target.destination();
         }
         if (c == Column.NODE) {
             return target.nodeName();

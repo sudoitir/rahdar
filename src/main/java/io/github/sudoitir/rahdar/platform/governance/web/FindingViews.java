@@ -19,7 +19,7 @@ public final class FindingViews {
      */
     public record FindingView(
             @Schema(requiredMode = REQUIRED) UUID id,
-            @Schema(requiredMode = REQUIRED) String address,
+            @Schema(requiredMode = REQUIRED) String destination,
             @Schema(requiredMode = REQUIRED) String location,
             @Schema(requiredMode = REQUIRED) String fieldPath,
             @Schema(requiredMode = REQUIRED) String dataClass,

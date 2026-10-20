@@ -6,6 +6,7 @@ import { Link, useParams } from '@tanstack/react-router';
 import { useClusters } from '../clusters/index.ts';
 import { AddressPicker } from '../queues/index.ts';
 import { useCan } from '../../kernel/auth/useCan.ts';
+import { useRoleIds } from '../clusters/index.ts';
 import { useDisplayZone } from '../../kernel/time/timezone.ts';
 import { CapabilityGate } from '../../ui/CapabilityGate.tsx';
 import { gateFor } from '../../ui/capabilityGate.ts';
@@ -31,6 +32,7 @@ import { plural } from './words.ts';
 function Orphans({ clusterId }: Readonly<{ clusterId: string }>) {
   const query = useOrphans(clusterId);
   const returnOrphan = useReturnOrphan(clusterId);
+  const ids = useRoleIds(clusterId);
   const { canAnywhere, loading } = useCan();
   const [chosen, setChosen] = useState<OrphanView | null>(null);
   const form = useForm({
@@ -43,7 +45,7 @@ function Orphans({ clusterId }: Readonly<{ clusterId: string }>) {
   const returnMessages = form.onSubmit(({ queue }) => {
     if (!chosen) return;
     returnOrphan.mutate(
-      { nodeId: chosen.nodeId, stagingQueue: chosen.stagingQueue, targetQueue: queue.trim() },
+      { nodeId: chosen.nodeId, stagingQueue: chosen.stagingQueue, target: ids.subscription(queue.trim()) },
       { onSuccess: () => setChosen(null) },
     );
   }, focusFirstInvalid(form.getInputNode));

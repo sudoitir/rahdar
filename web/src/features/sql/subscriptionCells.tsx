@@ -82,7 +82,7 @@ export function QueuesCell({ subscription }: Readonly<{ subscription: SqlIndexSu
   return (
     <Stack gap={2}>
       <Text size="sm" fw={600}>
-        {subscription.queuePattern}
+        {subscription.subscriptionPattern}
       </Text>
       <Text size="xs" c="dimmed">
         {subscription.mode === 'CAPTURE' ? 'capturing' : 'sampling'} since {when(subscription.captureFrom)}
@@ -136,7 +136,7 @@ export function StateCell({
             onError: (error) =>
               notify.settle(error, {
                 action: UPDATE,
-                subject: `index subscription ${subscription.queuePattern}`,
+                subject: `index subscription ${subscription.subscriptionPattern}`,
                 cause: error.message,
                 next: 'Try the switch again.',
               }),
@@ -160,7 +160,7 @@ export function DeleteCell({
 }: Readonly<{ clusterId: string; subscription: SqlIndexSubscriptionView; canWrite: boolean }>) {
   const remove = useDeleteIndexSubscription(clusterId);
   const [confirming, setConfirming] = useState(false);
-  const pattern = subscription.queuePattern ?? '';
+  const pattern = subscription.subscriptionPattern ?? '';
   const held = subscription.messagesHeld ?? 0;
 
   return (

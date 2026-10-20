@@ -214,7 +214,7 @@ class ConsumerHealthServiceTest extends PostgresIntegrationTest {
         sample("unsampled", "openbroker.acknowledged", 5, Instant.now().minusSeconds(5));
 
         var page = service.page(clusterId, ResourceQuery.of(null, 1, 50, null));
-        var order = page.data().stream().map(ConsumerHealth::queueName).toList();
+        var order = page.data().stream().map(ConsumerHealth::subscription).toList();
 
         assertThat(order).containsExactly("broken", "unsampled", "healthy");
     }
@@ -222,7 +222,7 @@ class ConsumerHealthServiceTest extends PostgresIntegrationTest {
     // ---- helpers ----------------------------------------------------------
 
     private ConsumerHealth verdictFor(String queue) {
-        return service.forQueue(clusterId, queue).orElseThrow();
+        return service.forSubscription(clusterId, queue).orElseThrow();
     }
 
     private void queue(String name, long consumers, long messages, long delivering, boolean paused) {

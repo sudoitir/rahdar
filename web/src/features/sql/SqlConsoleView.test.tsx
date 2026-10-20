@@ -25,8 +25,8 @@ function target(nodeId: string, nodeName: string) {
   return {
     nodeId,
     nodeName,
-    queueName: 'ORDER.IN',
-    address: 'ORDER.IN',
+    subscription: 'artemis.queue/ORDER.IN',
+    destination: 'artemis.address/ORDER.IN',
     messageCount: 1200,
   };
 }
@@ -50,7 +50,7 @@ function answered(overrides: Record<string, unknown> = {}) {
   return {
     nodeId: 'n1',
     nodeName: 'primary',
-    queueName: 'ORDER.IN',
+    subscription: 'artemis.queue/ORDER.IN',
     status: 'ANSWERED',
     examined: 500,
     matched: 0,
@@ -241,8 +241,8 @@ describe('SqlConsoleView', () => {
     const row = (nodeId: string, nodeName: string, messageId: number, body: string) => ({
       nodeId,
       nodeName,
-      queueName: 'ORDER.IN',
-      address: 'ORDER.IN',
+      subscription: 'artemis.queue/ORDER.IN',
+      destination: 'artemis.address/ORDER.IN',
       messageId,
       messageType: 3,
       durable: true,
@@ -430,8 +430,8 @@ describe('SqlConsoleView', () => {
     emit('row', {
       nodeId: 'n1',
       nodeName: 'primary',
-      queueName: 'ORDER.IN',
-      address: 'ORDER.IN',
+      subscription: 'artemis.queue/ORDER.IN',
+      destination: 'artemis.address/ORDER.IN',
       messageId: 42,
       messageType: 3,
       durable: true,
@@ -505,8 +505,8 @@ describe('SqlConsoleView', () => {
 const messageRow = (messageId: number, body = `order ${messageId}`) => ({
   nodeId: 'n1',
   nodeName: 'primary',
-  queueName: 'ORDER.IN',
-  address: 'ORDER.IN',
+  subscription: 'artemis.queue/ORDER.IN',
+  destination: 'artemis.address/ORDER.IN',
   messageId,
   messageType: 3,
   durable: true,
@@ -875,7 +875,7 @@ describe('SqlConsoleView result columns and export', () => {
     expect(JSON.parse(window.localStorage.getItem('as.table.sql.results')!).order.slice(0, 3)).toEqual([
       'messageId',
       'node',
-      'queue',
+      'subscription',
     ]);
     // The message identifies the row and stays first.
     expect(screen.getByRole('button', { name: 'Move Message ID later' })).toBeDisabled();
@@ -917,11 +917,11 @@ describe('SqlConsoleView result columns and export', () => {
 
     expect(files.map((f) => f.name)).toEqual(['sql-console.csv', 'sql-console.json']);
     const csv = await files[0].blob.text();
-    expect(csv.split('\r\n')[0]).toContain('queue,address,messageId');
+    expect(csv.split('\r\n')[0]).toContain('subscription,destination,messageId');
     expect(csv).toContain('"order, ""4471"""');
     const json = JSON.parse(await files[1].blob.text());
     expect(json).toHaveLength(1);
-    expect(json[0]).toMatchObject({ queue: 'ORDER.IN', messageId: 11, body: 'order, "4471"' });
+    expect(json[0]).toMatchObject({ subscription: 'ORDER.IN', messageId: 11, body: 'order, "4471"' });
     vi.restoreAllMocks();
   });
 });

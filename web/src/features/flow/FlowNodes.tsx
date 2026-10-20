@@ -11,8 +11,8 @@ import classes from './FlowCanvas.module.css';
 const KIND_WORD: Record<string, string> = {
   PRODUCER: 'Producing client',
   CONSUMER: 'Consuming client',
-  ADDRESS: 'Address',
-  QUEUE: 'Queue',
+  DESTINATION: 'Address',
+  SUBSCRIPTION: 'Queue',
   REMOTE: 'Remote',
 };
 
@@ -23,7 +23,7 @@ function faultWords(view: FlowNodeView): string[] {
 /** The sentence a screen reader hears for a node: what it is, its figures, and what is wrong. */
 function nodeSentence(view: FlowNodeView): string {
   const parts = [`${KIND_WORD[view.kind ?? ''] ?? 'Node'} ${view.label}`];
-  if (view.kind === 'QUEUE') {
+  if (view.kind === 'SUBSCRIPTION') {
     parts.push(
       view.messageCount === null || view.messageCount === undefined
         ? 'not swept yet'

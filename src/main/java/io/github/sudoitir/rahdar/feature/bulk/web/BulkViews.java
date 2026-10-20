@@ -80,13 +80,16 @@ public final class BulkViews {
             @Schema(nullable = true) String error) {}
 
     /**
-     * @param error why the queue was refused or did not succeed
+     * @param error why the subscription was refused or did not succeed
      * @param warning what the preview noted without refusing, such as an unknown figure
      * @param outcome each node's result once acted on, in the single-queue command's shape
      */
     public record BulkItemView(
             @Schema(requiredMode = REQUIRED) int ordinal,
-            @Schema(requiredMode = REQUIRED) String queueName,
+
+            @Schema(requiredMode = REQUIRED, description = "The subscription's id.")
+            String subscription,
+
             @Schema(requiredMode = REQUIRED) BulkItemStatus status,
             @Schema(nullable = true) String error,
             @Schema(nullable = true) String warning,

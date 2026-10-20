@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import io.github.sudoitir.rahdar.feature.bulk.web.BulkViews.BulkItemView;
 import io.github.sudoitir.rahdar.feature.bulk.web.BulkViews.BulkPreviewRequest;
 import io.github.sudoitir.rahdar.feature.bulk.web.BulkViews.BulkRunDetailView;
+import io.github.sudoitir.rahdar.kernel.security.ResourceIdTexts;
 import io.github.sudoitir.rahdar.platform.broker.BrokerSettings;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -54,7 +55,7 @@ class BulkPreviewTest extends BulkTestSupport {
         BulkRunDetailView preview = preview(BulkOperation.DELETE, "orders");
 
         assertThat(preview.items())
-                .filteredOn(i -> i.queueName().equals("orders.busy"))
+                .filteredOn(i -> ResourceIdTexts.name(i.subscription()).equals("orders.busy"))
                 .singleElement()
                 .satisfies(i -> {
                     assertThat(i.status()).isEqualTo(BulkItemStatus.REFUSED);
@@ -69,20 +70,22 @@ class BulkPreviewTest extends BulkTestSupport {
 
         BulkRunDetailView preview = preview(BulkOperation.PAUSE, List.of("orders.a", "gone"));
 
-        assertThat(preview.items()).extracting(BulkItemView::queueName).containsExactly("orders.a", "gone");
+        assertThat(preview.items())
+                .extracting(i -> ResourceIdTexts.name(i.subscription()))
+                .containsExactly("orders.a", "gone");
         assertThat(preview.items().get(1).status()).isEqualTo(BulkItemStatus.REFUSED);
     }
 
     @Test
     void moreQueuesThanTheQueueCapIsRefusedWithTheNumbers() {
-        settings.put(BrokerSettings.BULK_QUEUE_CAP, "2");
+        settings.put(BrokerSettings.BULK_SUBSCRIPTION_CAP, "2");
         queue(nodeA, "orders.a", 0, 0, false);
         queue(nodeA, "orders.b", 0, 0, false);
         queue(nodeA, "orders.c", 0, 0, false);
 
         assertThatThrownBy(() -> preview(BulkOperation.PAUSE, "orders"))
                 .isInstanceOf(BulkRefusedException.class)
-                .hasMessageContaining("3 queues matched")
+                .hasMessageContaining("3 subscriptions matched")
                 .hasMessageContaining("capped at 2");
     }
 
@@ -105,6 +108,8 @@ class BulkPreviewTest extends BulkTestSupport {
     }
 
     private static List<String> names(BulkRunDetailView run) {
-        return run.items().stream().map(BulkItemView::queueName).toList();
+        return run.items().stream()
+                .map(i -> ResourceIdTexts.name(i.subscription()))
+                .toList();
     }
 }

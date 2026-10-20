@@ -49,7 +49,7 @@ function flow(over: Record<string, unknown> = {}) {
     id: 'f1',
     clusterId: 'c1',
     nodeId: null,
-    requestAddress: 'orders.request',
+    requestDestination: 'orders.request',
     replyDestination: null,
     replyKind: 'SHARED',
     state: 'AWAITING_REPLY',

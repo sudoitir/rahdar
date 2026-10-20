@@ -109,10 +109,10 @@ class CaptureConsumerTest extends ArtemisIntegrationTest {
         doAnswer(invocation -> {
                     List<MessageIndexWriter.Captured> batch = List.copyOf(invocation.getArgument(0));
                     batchAddresses.add(batch.stream()
-                            .map(c -> c.row().address())
+                            .map(c -> c.row().destination())
                             .distinct()
                             .toList());
-                    if (batch.getFirst().row().address().equals("SLOW")) {
+                    if (batch.getFirst().row().destination().equals("SLOW")) {
                         release.await(30, TimeUnit.SECONDS);
                     }
                     stored.addAll(batch);
@@ -272,7 +272,9 @@ class CaptureConsumerTest extends ArtemisIntegrationTest {
     }
 
     private long count(String address) {
-        return stored.stream().filter(c -> c.row().address().equals(address)).count();
+        return stored.stream()
+                .filter(c -> c.row().destination().equals(address))
+                .count();
     }
 
     private CaptureConsumer.Spec spec(String queue, String sourceAddress) {

@@ -76,7 +76,7 @@ public class RrMcpTools {
         List<McpViews.FlowRow> rows = page.data().stream()
                 .map(f -> new McpViews.FlowRow(
                         f.correlationId(),
-                        f.requestAddress(),
+                        f.requestDestination(),
                         f.replyDestination(),
                         f.requestedAt(),
                         f.latencyMs(),

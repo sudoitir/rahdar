@@ -21,7 +21,7 @@ import tools.jackson.databind.JsonNode;
  */
 @Component
 @RequiredArgsConstructor
-public class ArtemisFlowSampler implements FlowSampler {
+class ArtemisFlowSampler implements FlowSampler {
 
     static final String LIST_PRODUCERS = "listProducers(java.lang.String,int,int)";
     static final String LIST_CONSUMERS = "listConsumers(java.lang.String,int,int)";

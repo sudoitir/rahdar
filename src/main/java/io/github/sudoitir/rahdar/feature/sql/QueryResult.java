@@ -15,7 +15,7 @@ public record QueryResult(
         List<Row> rows, List<NodeOutcome> nodes, List<Bound> boundsReached, List<QueryPlan.Notice> notices) {
 
     /**
-     * One message. Identity is {@code (node, queue, messageId)} — a message id is
+     * One message. Identity is {@code (node, subscription, messageId)} — a message id is
      * issued by, and meaningful only on, the node holding it (cf. ADR-0057), so the
      * id alone is never a cluster-wide handle.
      *
@@ -28,8 +28,8 @@ public record QueryResult(
     public record Row(
             UUID nodeId,
             String nodeName,
-            String queueName,
-            String address,
+            String subscription,
+            String destination,
             long messageId,
             int messageType,
             boolean durable,
@@ -71,7 +71,13 @@ public record QueryResult(
      * being left out of the result — an absent node is not an absence of messages.
      */
     public record NodeOutcome(
-            UUID nodeId, String nodeName, String queueName, Status status, long examined, long matched, String detail) {
+            UUID nodeId,
+            String nodeName,
+            String subscription,
+            Status status,
+            long examined,
+            long matched,
+            String detail) {
 
         public enum Status {
             ANSWERED,

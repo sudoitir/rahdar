@@ -11,7 +11,7 @@ function isPattern(entry: string): boolean {
 }
 
 /**
- * Mirrors the backend's `ReplyAddressResolver.compile`: `*` matches any run of
+ * Mirrors the backend's `ReplyDestinationResolver.compile`: `*` matches any run of
  * characters, every other character is literal, anchored at both ends. Kept in step
  * with it deliberately — an operator shown one set of matches whose broker is then
  * browsed for another has been told a lie about what is traced.
@@ -37,7 +37,7 @@ function resolveAgainst(entries: string[], known: string[]): string[] {
   return [...out];
 }
 
-export interface ReplyAddressResolution {
+export interface ReplyDestinationResolution {
   resolved: string[];
   unmatched: string[];
   isError: boolean;
@@ -49,11 +49,11 @@ export interface ReplyAddressResolution {
  * What the entered literals and globs expand to against the addresses this cluster
  * currently has.
  *
- * Its own module rather than a second export from `ReplyAddressesInput`: the control
+ * Its own module rather than a second export from `ReplyDestinationsInput`: the control
  * and its help text render in different rows of the form grid and have to agree about
  * what is traced, and a hook exported alongside a component costs fast refresh.
  */
-export function useReplyAddressResolution(clusterId: string, value: string[]): ReplyAddressResolution {
+export function useReplyDestinationResolution(clusterId: string, value: string[]): ReplyDestinationResolution {
   // The address list is a background fact, not a per-keystroke query: matches are
   // computed here, so typing costs nothing over the wire.
   const queues = useQueues(clusterId, { size: SUGGESTION_LIMIT });

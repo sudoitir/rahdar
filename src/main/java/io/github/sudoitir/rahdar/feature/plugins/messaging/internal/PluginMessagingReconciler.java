@@ -163,7 +163,7 @@ public class PluginMessagingReconciler {
                             + " so nothing is delivered.");
         }
         Optional<String> denied = access.denial(
-                reg.getActingUserId(), reg.getClusterId(), AccessCheck.needsOf(reg.getMode(), reg.getQueue()));
+                reg.getActingUserId(), reg.getClusterId(), AccessCheck.needsOf(reg.getMode(), reg.getSubscription()));
         return denied.map(why -> new Verdict(
                         RegistrationState.SUSPENDED,
                         "Suspended: " + why + " It resumes" + " by itself once the permission is granted again."))
@@ -221,7 +221,7 @@ public class PluginMessagingReconciler {
             return new NodeResult(RegistrationState.ACTIVE, null, tap.dropped(clusterId, node.getId(), name));
         }
         String refusalKey = node.getId() + "|" + name;
-        String fingerprint = reg.getQueue() + "|" + node.getDataUrl() + "|" + node.getManagementUrl();
+        String fingerprint = reg.getSubscription() + "|" + node.getDataUrl() + "|" + node.getManagementUrl();
         if (installed && fingerprint.equals(refused.get(refusalKey))) {
             return new NodeResult(RegistrationState.FAILED, "Refused earlier on this node; see the audit log.", null);
         }
@@ -233,10 +233,13 @@ public class PluginMessagingReconciler {
                             + " cluster's connection.",
                     null);
         }
-        TapSource source = tap.source(clusterId, node.getId(), reg.getQueue()).orElse(null);
+        TapSource source =
+                tap.source(clusterId, node.getId(), reg.getSubscription()).orElse(null);
         if (source == null) {
             return new NodeResult(
-                    RegistrationState.PENDING, "The queue " + reg.getQueue() + " does not exist on this node.", null);
+                    RegistrationState.PENDING,
+                    "The subscription " + reg.getSubscription() + " does not exist on this node.",
+                    null);
         }
         AuditEvent event = audit.begin(
                 Actor.system(),
@@ -245,7 +248,13 @@ public class PluginMessagingReconciler {
                 name,
                 clusterId,
                 node.getId(),
-                Map.of("plugin", reg.getPluginId(), "registration", reg.getKey(), "queue", reg.getQueue()),
+                Map.of(
+                        "plugin",
+                        reg.getPluginId(),
+                        "registration",
+                        reg.getKey(),
+                        "subscription",
+                        reg.getSubscription()),
                 false);
         try {
             tap.install(clusterId, node.getId(), instance.id(), reg.getId(), source, properties.tapRingSize());
@@ -287,10 +296,13 @@ public class PluginMessagingReconciler {
                             + " cluster's connection.",
                     null);
         }
-        TapSource source = tap.source(clusterId, node.getId(), reg.getQueue()).orElse(null);
+        TapSource source =
+                tap.source(clusterId, node.getId(), reg.getSubscription()).orElse(null);
         if (source == null) {
             return new NodeResult(
-                    RegistrationState.PENDING, "The queue " + reg.getQueue() + " does not exist on this node.", null);
+                    RegistrationState.PENDING,
+                    "The subscription " + reg.getSubscription() + " does not exist on this node.",
+                    null);
         }
         try {
             drains.start(spec(reg, node, source.queue()));
@@ -310,7 +322,7 @@ public class PluginMessagingReconciler {
                 reg.getClusterId(),
                 node.getId(),
                 node.getName(),
-                reg.getQueue(),
+                reg.getSubscription(),
                 source);
     }
 

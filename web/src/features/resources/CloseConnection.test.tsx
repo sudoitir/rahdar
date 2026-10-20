@@ -8,6 +8,7 @@ import { renderWithProviders } from '../../test/render.tsx';
 import { server } from '../../test/setup.ts';
 import type { CapabilityView, ConnectionCloseView } from './api.ts';
 import { CloseAddressConsumersAction, CloseConnectionAction } from './CloseConnection.tsx';
+import { ARTEMIS_KINDS } from '../../test/wire.ts';
 
 const AVAILABLE: CapabilityView = { status: 'AVAILABLE', reason: 'ok', brokerXmlSnippet: null };
 
@@ -18,6 +19,7 @@ function clusterHandler() {
       name: 'c1',
       description: null,
       topology: { nodes: [] },
+      kinds: ARTEMIS_KINDS,
       capabilities: {
         managementRead: AVAILABLE,
         managementWrite: AVAILABLE,

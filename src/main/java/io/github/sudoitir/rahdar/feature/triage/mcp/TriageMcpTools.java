@@ -151,13 +151,14 @@ public class TriageMcpTools {
                 assessment.at());
     }
 
-    private McpViews.QueueDiagnosis diagnose(UUID clusterId, String queue) {
+    private McpViews.SubscriptionDiagnosis diagnose(UUID clusterId, String queue) {
         // The shared verdict (ADR-0089) — the same evaluation the console and the alert
         // condition read. This method used to derive its own trend from two points and its
         // own slow-consumer guess from a ratio, which is how an agent and a screen came to
         // describe one queue differently.
-        ConsumerHealth health =
-                consumerHealth.forQueue(clusterId, queue).orElseThrow(() -> new NotFoundException("queue", queue));
+        ConsumerHealth health = consumerHealth
+                .forSubscription(clusterId, queue)
+                .orElseThrow(() -> new NotFoundException("queue", queue));
 
         List<String> findings = new ArrayList<>();
         if (health.nodesPresent() < health.nodesTotal()) {
@@ -180,16 +181,16 @@ public class TriageMcpTools {
                 : null;
 
         List<McpViews.ActivityRow> recent = brokerEvents
-                .page(clusterId, new BrokerEventQuery(null, null, health.address(), null, null, 1, 10, null))
+                .page(clusterId, new BrokerEventQuery(null, null, health.destination(), null, null, 1, 10, null))
                 .data()
                 .stream()
                 .map(TriageMcpTools::toActivity)
                 .toList();
 
-        return new McpViews.QueueDiagnosis(
+        return new McpViews.SubscriptionDiagnosis(
                 clusterId,
                 queue,
-                health.address(),
+                health.destination(),
                 health.verdict().name(),
                 health.verdict().severity(),
                 health.cause(),
@@ -271,7 +272,7 @@ public class TriageMcpTools {
                 e.occurredAt(),
                 e.type(),
                 e.username(),
-                e.address() != null ? e.address() : e.routingName(),
+                e.destination() != null ? e.destination() : e.routingName(),
                 "observed",
                 e.consumerName() != null ? "consumer=" + e.consumerName() : null);
     }

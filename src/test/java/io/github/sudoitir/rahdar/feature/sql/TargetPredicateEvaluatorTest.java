@@ -48,13 +48,13 @@ class TargetPredicateEvaluatorTest {
         "GTE,ZZZ,false"
     })
     void everyOperatorComparesTheQueueName(Operator op, String literal, boolean expected) {
-        assertThat(matches(new Predicate.Compare(col(Column.QUEUE), op, new Literal.Str(literal))))
+        assertThat(matches(new Predicate.Compare(col(Column.SUBSCRIPTION), op, new Literal.Str(literal))))
                 .isEqualTo(expected);
     }
 
     @Test
     void addressAndNodeColumnsReadTheTarget() {
-        assertThat(matches(new Predicate.Compare(col(Column.ADDRESS), Operator.EQ, new Literal.Str("orders.addr"))))
+        assertThat(matches(new Predicate.Compare(col(Column.DESTINATION), Operator.EQ, new Literal.Str("orders.addr"))))
                 .isTrue();
         assertThat(matches(new Predicate.Compare(col(Column.NODE), Operator.EQ, new Literal.Str("node-b"))))
                 .isFalse();
@@ -69,7 +69,7 @@ class TargetPredicateEvaluatorTest {
         assertThat(matches(new Predicate.Compare(new Term.PropertyTerm("p"), Operator.EQ, new Literal.Str("x"))))
                 .isTrue();
         // not a string literal
-        assertThat(matches(new Predicate.Compare(col(Column.QUEUE), Operator.EQ, new Literal.Num(1, true))))
+        assertThat(matches(new Predicate.Compare(col(Column.SUBSCRIPTION), Operator.EQ, new Literal.Num(1, true))))
                 .isTrue();
     }
 
@@ -77,9 +77,11 @@ class TargetPredicateEvaluatorTest {
     void inMatchesStringMembersAndNegates() {
         var values = List.<Literal>of(new Literal.Num(1, true), new Literal.Str("ORDERS"));
 
-        assertThat(matches(new Predicate.In(col(Column.QUEUE), values, false))).isTrue();
-        assertThat(matches(new Predicate.In(col(Column.QUEUE), values, true))).isFalse();
-        assertThat(matches(new Predicate.In(col(Column.QUEUE), List.of(new Literal.Str("X")), false)))
+        assertThat(matches(new Predicate.In(col(Column.SUBSCRIPTION), values, false)))
+                .isTrue();
+        assertThat(matches(new Predicate.In(col(Column.SUBSCRIPTION), values, true)))
+                .isFalse();
+        assertThat(matches(new Predicate.In(col(Column.SUBSCRIPTION), List.of(new Literal.Str("X")), false)))
                 .isFalse();
         assertThat(matches(new Predicate.In(col(Column.PRIORITY), values, false)))
                 .isTrue();
@@ -87,20 +89,22 @@ class TargetPredicateEvaluatorTest {
 
     @Test
     void isNullOnATargetColumnIsNeverTrueAndOnOtherTermsAlwaysIs() {
-        assertThat(matches(new Predicate.IsNull(col(Column.QUEUE), false))).isFalse();
-        assertThat(matches(new Predicate.IsNull(col(Column.QUEUE), true))).isTrue();
+        assertThat(matches(new Predicate.IsNull(col(Column.SUBSCRIPTION), false)))
+                .isFalse();
+        assertThat(matches(new Predicate.IsNull(col(Column.SUBSCRIPTION), true)))
+                .isTrue();
         assertThat(matches(new Predicate.IsNull(col(Column.BODY), false))).isTrue();
     }
 
     @Test
     void likeMatchesWithCaseAndNegation() {
-        assertThat(matches(new Predicate.Like(col(Column.QUEUE), "ORD%", null, false, false)))
+        assertThat(matches(new Predicate.Like(col(Column.SUBSCRIPTION), "ORD%", null, false, false)))
                 .isTrue();
-        assertThat(matches(new Predicate.Like(col(Column.QUEUE), "ord%", null, false, false)))
+        assertThat(matches(new Predicate.Like(col(Column.SUBSCRIPTION), "ord%", null, false, false)))
                 .isFalse();
-        assertThat(matches(new Predicate.Like(col(Column.QUEUE), "ord%", null, false, true)))
+        assertThat(matches(new Predicate.Like(col(Column.SUBSCRIPTION), "ord%", null, false, true)))
                 .isTrue();
-        assertThat(matches(new Predicate.Like(col(Column.QUEUE), "ORD%", null, true, false)))
+        assertThat(matches(new Predicate.Like(col(Column.SUBSCRIPTION), "ORD%", null, true, false)))
                 .isFalse();
         assertThat(matches(new Predicate.Like(col(Column.BODY), "x", null, false, false)))
                 .isTrue();
@@ -108,15 +112,16 @@ class TargetPredicateEvaluatorTest {
 
     @Test
     void booleanCombinatorsAndNonTargetPredicates() {
-        var yes = new Predicate.Compare(col(Column.QUEUE), Operator.EQ, new Literal.Str("ORDERS"));
-        var no = new Predicate.Compare(col(Column.QUEUE), Operator.EQ, new Literal.Str("X"));
+        var yes = new Predicate.Compare(col(Column.SUBSCRIPTION), Operator.EQ, new Literal.Str("ORDERS"));
+        var no = new Predicate.Compare(col(Column.SUBSCRIPTION), Operator.EQ, new Literal.Str("X"));
 
         assertThat(matches(new Predicate.And(List.of(yes, no)))).isFalse();
         assertThat(matches(new Predicate.And(List.of(yes, yes)))).isTrue();
         assertThat(matches(new Predicate.Or(List.of(no, yes)))).isTrue();
         assertThat(matches(new Predicate.Or(List.of(no, no)))).isFalse();
         assertThat(matches(new Predicate.Not(no))).isTrue();
-        assertThat(matches(new Predicate.Between(col(Column.QUEUE), new Literal.Str("a"), new Literal.Str("b"), false)))
+        assertThat(matches(new Predicate.Between(
+                        col(Column.SUBSCRIPTION), new Literal.Str("a"), new Literal.Str("b"), false)))
                 .isTrue();
         assertThat(matches(new Predicate.Match("foo"))).isTrue();
     }

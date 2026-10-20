@@ -50,13 +50,13 @@ class RequestReplyControllerTest extends PostgresIntegrationTest {
     @Test
     void createListUpdateAndDeleteAnExpectation() throws Exception {
         String body = """
-                {"requestAddress":"rr.request","replyAddresses":["rr.reply"],"samplePerMin":10,"capturePayload":false}""";
+                {"requestDestination":"rr.request","replyDestinations":["rr.reply"],"samplePerMin":10,"capturePayload":false}""";
 
         String created = mvc.perform(post("/api/v1/clusters/{id}/rr/expectations", clusterId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.requestAddress").value("rr.request"))
+                .andExpect(jsonPath("$.requestDestination").value("rr.request"))
                 .andExpect(jsonPath("$.enabled").value(true))
                 .andReturn()
                 .getResponse()
@@ -65,7 +65,7 @@ class RequestReplyControllerTest extends PostgresIntegrationTest {
 
         mvc.perform(get("/api/v1/clusters/{id}/rr/expectations", clusterId))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data[0].requestAddress").value("rr.request"));
+                .andExpect(jsonPath("$.data[0].requestDestination").value("rr.request"));
 
         mvc.perform(delete("/api/v1/clusters/{id}/rr/expectations/{eid}", clusterId, id))
                 .andExpect(status().isNoContent());
@@ -87,6 +87,6 @@ class RequestReplyControllerTest extends PostgresIntegrationTest {
     void statsResponseHasNoAddressesForAClusterWithNoFlows() throws Exception {
         mvc.perform(get("/api/v1/clusters/{id}/rr/stats", clusterId))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.addresses").isEmpty());
+                .andExpect(jsonPath("$.destinations").isEmpty());
     }
 }

@@ -8,11 +8,11 @@ import { server } from '../../test/setup.ts';
 import { LatencyPanel } from './LatencyPanel.tsx';
 
 function address(name: string, over: Record<string, unknown> = {}) {
-  return { address: name, p50Ms: 20, p95Ms: 80, p99Ms: 120, coverageRatio: 0.5, ...over };
+  return { destination: name, p50Ms: 20, p95Ms: 80, p99Ms: 120, coverageRatio: 0.5, ...over };
 }
 
 function serve(addresses: unknown[]) {
-  server.use(http.get('*/api/v1/clusters/c1/rr/stats', () => HttpResponse.json({ addresses })));
+  server.use(http.get('*/api/v1/clusters/c1/rr/stats', () => HttpResponse.json({ destinations: addresses })));
 }
 
 describe('LatencyPanel', () => {

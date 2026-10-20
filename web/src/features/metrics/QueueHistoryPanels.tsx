@@ -3,6 +3,7 @@ import { Button, Group, Stack, Text } from '@mantine/core';
 import { useNavigate } from '@tanstack/react-router';
 
 import { useMetrics } from './api.ts';
+import { useRoleIds } from '../clusters/index.ts';
 import { serverNow } from '../../kernel/time/time.ts';
 import { DepthChart } from './DepthChart.tsx';
 import { rangeSpec } from './ranges.ts';
@@ -35,17 +36,17 @@ export function QueueHistoryPanels({
       toMs: end,
     };
   }, [spec.stepMs, spec.windowMs]);
+  const ids = useRoleIds(clusterId);
   const metrics = useMetrics(
     clusterId,
     {
       metrics: ['openbroker.backlog', 'openbroker.enqueued', 'openbroker.acknowledged'],
-      subjectType: 'QUEUE',
-      subject: queueName,
+      resource: ids.loaded ? ids.subscription(queueName) : undefined,
       from,
       to,
     },
     false,
-    true,
+    ids.loaded,
   );
   const byName = (name: string) => metrics.data?.series.find((s) => s.metric === name);
   const syncId = `queue-drawer-${queueName}`;

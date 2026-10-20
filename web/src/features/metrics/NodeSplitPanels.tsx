@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { Stack, Text } from '@mantine/core';
 import { CompositeChart } from '@mantine/charts';
 
+import { useRoleIds } from '../clusters/index.ts';
 import { useServerNow } from '../../kernel/time/time.ts';
 import { ErrorState } from '../../ui/ErrorState.tsx';
 import { LoadingState } from '../../ui/LoadingState.tsx';
@@ -161,18 +162,19 @@ export function NodeSplitPanels({
     const end = Math.floor(tick / spec.stepMs) * spec.stepMs;
     return { from: end - spec.windowMs, to: end };
   }, [tick, spec.stepMs, spec.windowMs]);
+  const ids = useRoleIds(clusterId);
   const metrics = useMetrics(
     clusterId,
     {
       metrics: METRICS,
-      subjectType: 'QUEUE',
-      subject: queueName,
+      resource: ids.loaded ? ids.subscription(queueName) : undefined,
       from: new Date(from).toISOString(),
       to: new Date(to).toISOString(),
       step: spec.step,
       splitBy: 'NODE',
     },
     Math.max(15_000, spec.stepMs),
+    ids.loaded,
   );
 
   if (metrics.isError) {

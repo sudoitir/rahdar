@@ -133,9 +133,9 @@ class SlowConsumerConditionTest extends PostgresIntegrationTest {
 
         Evaluation result = condition.evaluate(clusterId, rule(1.0, null));
 
-        assertThat(result.universe()).containsExactly("queue:orders");
-        assertThat(result.active()).containsKey("queue:orders");
-        assertThat(result.active().get("queue:orders")).isZero();
+        assertThat(result.universe()).containsExactly("subscription:orders");
+        assertThat(result.active()).containsKey("subscription:orders");
+        assertThat(result.active().get("subscription:orders")).isZero();
     }
 
     @Test
@@ -146,7 +146,7 @@ class SlowConsumerConditionTest extends PostgresIntegrationTest {
 
         Evaluation result = condition.evaluate(clusterId, rule(1.0, null));
 
-        assertThat(result.universe()).containsExactly("queue:orders");
+        assertThat(result.universe()).containsExactly("subscription:orders");
         assertThat(result.active()).isEmpty();
     }
 
@@ -185,7 +185,7 @@ class SlowConsumerConditionTest extends PostgresIntegrationTest {
 
         // ADR-0033's GREATEST(..., 0) clamp is reused, not reimplemented, so the rate
         // is never negative and a threshold of "< -1" can never match.
-        assertThat(result.universe()).containsExactly("queue:orders");
+        assertThat(result.universe()).containsExactly("subscription:orders");
         assertThat(result.active()).isEmpty();
     }
 
@@ -197,7 +197,7 @@ class SlowConsumerConditionTest extends PostgresIntegrationTest {
 
         Evaluation result = condition.evaluate(clusterId, rule(1.0, "{\"node\":\"" + nodeId + "\"}"));
 
-        assertThat(result.universe()).containsExactly("node:" + nodeId + "/queue:orders");
+        assertThat(result.universe()).containsExactly("node:" + nodeId + "/subscription:orders");
     }
 
     @Test

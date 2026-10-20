@@ -16,8 +16,8 @@ import java.time.Instant;
  * whole feature exists to prevent.
  */
 public record ConsumerHealth(
-        String address,
-        String queueName,
+        String destination,
+        String subscription,
         Verdict verdict,
         /** The likely cause and what to do about it, in words. Never null. */
         String cause,

@@ -143,7 +143,7 @@ class QueryPlannerTest {
 
         QueryPlan plan = plan("SELECT * FROM \"ORDER.*\"");
 
-        assertThat(plan.targets()).extracting(Target::queueName).containsExactly("ORDER.IN", "ORDER.OUT");
+        assertThat(plan.targets()).extracting(Target::subscription).containsExactly("ORDER.IN", "ORDER.OUT");
     }
 
     @Test
@@ -154,7 +154,7 @@ class QueryPlannerTest {
         assertThat(plan("SELECT * FROM \"ORDER.#\"").targets()).hasSize(2);
         // '*' is one level, so it does not reach ORDER.EU.IN.
         assertThat(plan("SELECT * FROM \"ORDER.*\"").targets())
-                .extracting(Target::queueName)
+                .extracting(Target::subscription)
                 .containsExactly("ORDER.IN");
     }
 
@@ -177,7 +177,7 @@ class QueryPlannerTest {
         QueryPlan plan = plan("SELECT * FROM \"NOTHING.*\"");
 
         assertThat(plan.targets()).isEmpty();
-        assertThat(plan.notices()).extracting(Notice::kind).contains(Notice.Kind.NO_QUEUE_MATCHED);
+        assertThat(plan.notices()).extracting(Notice::kind).contains(Notice.Kind.NO_SUBSCRIPTION_MATCHED);
     }
 
     /**
@@ -194,11 +194,11 @@ class QueryPlannerTest {
         QueryPlan plan = plan("SELECT * FROM \"FRESH\"");
 
         assertThat(plan.targets()).singleElement().satisfies(t -> {
-            assertThat(t.queueName()).isEqualTo("FRESH");
+            assertThat(t.subscription()).isEqualTo("FRESH");
             assertThat(t.nodeId()).isEqualTo(a.getId());
             assertThat(t.messageCount()).isEqualTo(3);
         });
-        assertThat(plan.notices()).extracting(Notice::kind).doesNotContain(Notice.Kind.NO_QUEUE_MATCHED);
+        assertThat(plan.notices()).extracting(Notice::kind).doesNotContain(Notice.Kind.NO_SUBSCRIPTION_MATCHED);
     }
 
     @Test
@@ -397,7 +397,7 @@ class QueryPlannerTest {
 
         assertThatThrownBy(() -> planner.enforceCostCeiling(plan))
                 .isInstanceOf(CostRefusedException.class)
-                .hasMessageContaining("Name one queue instead of a wildcard");
+                .hasMessageContaining("Name one subscription instead of a wildcard");
     }
 
     @Test
@@ -460,7 +460,8 @@ class QueryPlannerTest {
                 new QueryAst.Predicate.Like(observed, "x%", null, false, false),
                 new QueryAst.Predicate.Between(observed, text, text, false),
                 new QueryAst.Predicate.Not(compare(observed, text)),
-                new QueryAst.Predicate.And(List.of(compare(column(Column.QUEUE), text), compare(observed, text))),
+                new QueryAst.Predicate.And(
+                        List.of(compare(column(Column.SUBSCRIPTION), text), compare(observed, text))),
                 new QueryAst.Predicate.Or(List.of(compare(observed, text))),
                 compare(new QueryAst.Term.CaseFold(observed, true), text));
 
@@ -507,7 +508,7 @@ class QueryPlannerTest {
                 CLUSTER,
                 astOf(
                         Source.BROKER,
-                        List.of(Column.QUEUE),
+                        List.of(Column.SUBSCRIPTION),
                         new QueryAst.Predicate.And(List.of(
                                 compare(new QueryAst.Term.PropertyTerm("region"), text),
                                 compare(new QueryAst.Term.JsonTerm("a.b"), text),
@@ -545,7 +546,7 @@ class QueryPlannerTest {
 
         List<QueryAst.Predicate> none = List.of(
                 new QueryAst.Predicate.IsNull(timestamp, false),
-                new QueryAst.Predicate.Like(column(Column.QUEUE), "a%", null, false, false),
+                new QueryAst.Predicate.Like(column(Column.SUBSCRIPTION), "a%", null, false, false),
                 compare(timestamp, new QueryAst.Literal.Num(1, true)),
                 new QueryAst.Predicate.In(timestamp, List.of(text), false),
                 new QueryAst.Predicate.Between(timestamp, text, text, false));
@@ -590,7 +591,7 @@ class QueryPlannerTest {
 
         QueryPlan plan = plan("SELECT * FROM \"Q.#\"");
 
-        assertThat(plan.targets()).extracting(Target::queueName).containsExactly("Q.0", "Q.1");
+        assertThat(plan.targets()).extracting(Target::subscription).containsExactly("Q.0", "Q.1");
         assertThat(plan.notices()).singleElement().satisfies(n -> {
             assertThat(n.kind()).isEqualTo(Notice.Kind.TARGET_CAPPED);
             assertThat(n.detail()).contains("5 targets").contains("first 2");

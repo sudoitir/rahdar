@@ -25,6 +25,7 @@ import io.github.sudoitir.rahdar.kernel.gate.Gated;
 import io.github.sudoitir.rahdar.kernel.gate.Operation;
 import io.github.sudoitir.rahdar.kernel.gate.OperationGate;
 import io.github.sudoitir.rahdar.kernel.gate.OperationHeldException;
+import io.github.sudoitir.rahdar.kernel.plugin.ResourceType;
 import io.github.sudoitir.rahdar.kernel.replica.ReplicaRegistry;
 import io.github.sudoitir.rahdar.kernel.security.ClusterAccessGuard;
 import io.github.sudoitir.rahdar.kernel.security.ClusterAccessGuard.Requirement;
@@ -32,6 +33,7 @@ import io.github.sudoitir.rahdar.kernel.security.OperatorHandoff;
 import io.github.sudoitir.rahdar.kernel.security.OperatorHandoff.Operator;
 import io.github.sudoitir.rahdar.kernel.security.PermissionResolver;
 import io.github.sudoitir.rahdar.kernel.security.Permissions;
+import io.github.sudoitir.rahdar.kernel.security.ResourceIdTexts;
 import io.github.sudoitir.rahdar.kernel.security.ResourceRef;
 import io.github.sudoitir.rahdar.kernel.settings.SettingsService;
 import io.github.sudoitir.rahdar.platform.broker.BrokerCapabilities;
@@ -107,6 +109,7 @@ public class TransferService {
     private final ObjectMapper json;
     private final ReplicaRegistry replicas;
     private final OperationGate gate;
+    private final ResourceIdTexts ids;
 
     /**
      * What the gate holds of a transfer: the run, the plan it was previewed with (its hash, mode and ends, so an
@@ -122,7 +125,7 @@ public class TransferService {
             String targetQueue,
             boolean override,
             List<String> acknowledged,
-            String confirmQueue) {}
+            String confirmSubscription) {}
 
     // ---- preview -----------------------------------------------------------
 
@@ -132,8 +135,11 @@ public class TransferService {
      */
     public TransferRunView preview(UUID clusterId, TransferPreviewRequest request) {
         TransferMode mode = request.mode();
-        access.requireResource(clusterId, ResourceRef.subscription(request.sourceQueue()), mode.sourcePermission());
+        String sourceName = ResourceIdTexts.name(request.source());
+        access.requireResource(clusterId, ResourceRef.subscription(sourceName), mode.sourcePermission());
         access.requireVisible(request.targetClusterId());
+        requireSubscription(clusterId, request.source());
+        Target named = targetOf(request);
         TransferSelection selection = normalise(request.selection(), nodes.staging(clusterId));
 
         ClusterNode source = nodes.node(clusterId, request.sourceNodeId());
@@ -147,10 +153,10 @@ public class TransferService {
                                 .formatted(node.getName()));
             }
         }
-        QueueLocation from = locate(clusterId, request.sourceQueue(), source)
-                .orElseThrow(() -> new NotFoundException("queue", request.sourceQueue()));
-        Optional<QueueLocation> to = locate(request.targetClusterId(), request.targetQueue(), target);
-        String targetAddress = authorisedTargetAddress(request, to);
+        QueueLocation from = locate(clusterId, sourceName, source)
+                .orElseThrow(() -> new NotFoundException("subscription", request.source()));
+        Optional<QueueLocation> to = locate(request.targetClusterId(), named.name(), target);
+        String targetAddress = authorisedTargetAddress(request.targetClusterId(), named, to);
         String targetRoutingType = to.map(QueueLocation::routingType).orElse(ANYCAST);
         boolean sameCluster = clusterId.equals(request.targetClusterId());
         boolean sameNode = sameCluster && source.getNativeNodeId().equals(target.getNativeNodeId());
@@ -168,7 +174,7 @@ public class TransferService {
                         .read(
                                 target.getClusterId(),
                                 target.getId(),
-                                new TransferSource(targetAddress, request.targetQueue(), targetRoutingType))
+                                new TransferSource(targetAddress, named.name(), targetRoutingType))
                 : null;
         int threshold = settings.intValue(TransferSettings.CAPACITY_THRESHOLD_PERCENT);
         List<Finding> findings = new ArrayList<>(nodes
@@ -178,14 +184,14 @@ public class TransferService {
                         new AcceptanceInput(
                                 count,
                                 bytes,
-                                sameNode && from.queueName().equals(request.targetQueue()),
+                                sameNode && from.queueName().equals(named.name()),
                                 sameCluster,
                                 targetLive,
                                 TransferNodes.backup(target),
                                 target.getSplitBrain() == SplitBrainStatus.CRITICAL,
                                 threshold),
                         targetAddress,
-                        request.targetQueue())
+                        named.name())
                 .stream()
                 .map(TransferService::finding)
                 .toList());
@@ -215,22 +221,14 @@ public class TransferService {
                 .targetNodeId(target.getId())
                 .targetNodeName(target.getName())
                 .targetNativeNodeId(target.getNativeNodeId())
-                .targetQueue(request.targetQueue())
+                .targetQueue(named.name())
                 .targetAddress(targetAddress)
                 .targetRoutingType(targetRoutingType)
                 .sameNode(sameNode)
                 .selection(json.writeValueAsString(selection))
                 .findings(json.writeValueAsString(findings))
                 .t0(t0)
-                .planHash(new Plan(
-                                mode,
-                                source,
-                                target,
-                                from.queueName(),
-                                request.targetQueue(),
-                                targetAddress,
-                                selection,
-                                t0)
+                .planHash(new Plan(mode, source, target, from.queueName(), named.name(), targetAddress, selection, t0)
                         .hash())
                 .estimate(count)
                 .estimateBytes(bytes)
@@ -287,42 +285,68 @@ public class TransferService {
                         .findFirst());
     }
 
+    /** A transfer's target: the subscription that takes the messages, and the destination the operator named, if any. */
+    record Target(String name, String destination) {}
+
+    /** The target a request names: a subscription is taken as it is; a destination is the one its subscription of that name sits at. */
+    Target targetOf(TransferPreviewRequest request) {
+        ResourceType type = ids.typeOf(request.targetClusterId(), request.target())
+                .orElseThrow(() -> new TransferRefusedException(
+                        HttpStatus.UNPROCESSABLE_ENTITY,
+                        "transfer-target-unknown",
+                        "%s is not a subscription or a destination of the target cluster."
+                                .formatted(request.target())));
+        String name = ResourceIdTexts.name(request.target());
+        return switch (type) {
+            case SUBSCRIPTION -> new Target(name, null);
+            case DESTINATION -> new Target(name, name);
+        };
+    }
+
+    /** Refuses an id that does not name a subscription of the cluster. */
+    private void requireSubscription(UUID clusterId, String id) {
+        if (ids.typeOf(clusterId, id)
+                .filter(t -> t == ResourceType.SUBSCRIPTION)
+                .isEmpty()) {
+            throw new TransferRefusedException(
+                    HttpStatus.UNPROCESSABLE_ENTITY,
+                    "transfer-not-a-subscription",
+                    "%s is not a subscription of this cluster.".formatted(id));
+        }
+    }
+
     /**
-     * The address a transfer sends to, and whether the caller may send there. Messages go to the target
-     * queue, so the address is the one that queue is bound to, never one the caller names: a queue
-     * that exists is read and sent to through its own address, and naming another address is refused.
-     * A queue the broker would create is checked as a creation, under the address named (default: the
-     * queue's own name). The not-found of a target the caller cannot read names neither the queue nor the address.
+     * The destination a transfer sends to, and whether the caller may send there. Messages go to the target
+     * subscription, so the destination is the one that subscription is bound to, never one the caller names: a
+     * subscription that exists is read and sent to through its own destination, and naming another destination is
+     * refused. A subscription the broker would create is checked as a creation, under the destination named
+     * (default: the subscription's own name). The not-found of a target the caller cannot read names neither the
+     * subscription nor the destination.
      */
-    String authorisedTargetAddress(TransferPreviewRequest request, Optional<QueueLocation> to) {
-        UUID cluster = request.targetClusterId();
-        String supplied =
-                request.targetAddress() == null || request.targetAddress().isBlank()
-                        ? null
-                        : request.targetAddress().strip();
+    String authorisedTargetAddress(UUID cluster, Target target, Optional<QueueLocation> to) {
+        String supplied = target.destination();
         if (to.isPresent()) {
             String bound = to.get().address();
             access.requireAll(
                     cluster,
                     List.of(
-                            new Requirement(
-                                    ResourceRef.subscription(request.targetQueue()), Permissions.SUBSCRIPTION_READ),
+                            new Requirement(ResourceRef.subscription(target.name()), Permissions.SUBSCRIPTION_READ),
                             new Requirement(ResourceRef.destination(bound), MessagePermissions.MESSAGE_SEND)));
             if (supplied != null && !supplied.equals(bound)) {
                 throw new TransferRefusedException(
                         HttpStatus.UNPROCESSABLE_ENTITY,
-                        "transfer-target-address",
-                        "Queue %s is bound to address %s, not %s. Leave the address out to send to the queue's own."
-                                .formatted(request.targetQueue(), bound, supplied));
+                        "transfer-target-destination",
+                        "Subscription %s is bound to destination %s, not %s. Name the subscription to send to its own."
+                                .formatted(target.name(), bound, supplied));
             }
             return bound;
         }
-        String address = supplied != null ? supplied : request.targetQueue();
-        access.requireCreate(
-                cluster, ResourceRef.subscription(request.targetQueue()), ResourcePermissions.SUBSCRIPTION_CREATE);
+        String destination = supplied != null ? supplied : target.name();
+        access.requireCreate(cluster, ResourceRef.subscription(target.name()), ResourcePermissions.SUBSCRIPTION_CREATE);
         access.requireAll(
-                cluster, List.of(new Requirement(ResourceRef.destination(address), MessagePermissions.MESSAGE_SEND)));
-        return address;
+                cluster,
+                List.of(new Requirement(ResourceRef.destination(destination), MessagePermissions.MESSAGE_SEND)));
+        return destination;
     }
 
     /**
@@ -510,11 +534,11 @@ public class TransferService {
                     "Acknowledge every warning the preview raised before running it: " + String.join(", ", missing)
                             + ".");
         }
-        if (run.getMode() == TransferMode.MOVE && !run.getSourceQueue().equals(request.confirmQueue())) {
+        if (run.getMode() == TransferMode.MOVE && !run.getSourceQueue().equals(request.confirmSubscription())) {
             throw new TransferRefusedException(
                     HttpStatus.UNPROCESSABLE_ENTITY,
                     "transfer-confirmation-mismatch",
-                    "Send the source queue's name, %s, as confirmQueue to confirm the move."
+                    "Send the source subscription's name, %s, as confirmSubscription to confirm the move."
                             .formatted(run.getSourceQueue()));
         }
         long cap = settings.intValue(BrokerSettings.BULK_CAP);
@@ -540,7 +564,7 @@ public class TransferService {
                         run.getTargetQueue(),
                         request.override(),
                         request.acknowledged() == null ? List.of() : List.copyOf(request.acknowledged()),
-                        request.confirmQueue()),
+                        request.confirmSubscription()),
                 run,
                 request);
     }
@@ -828,7 +852,9 @@ public class TransferService {
         // A staging queue is named by no team's pattern, so only a grant that reaches the cluster passes; the queue the
         // messages go back into is read and sent to through its own address, as in a transfer.
         access.requireVisible(clusterId);
-        String returnAddress = locator.locate(clusterId, request.targetQueue()).stream()
+        String target = ResourceIdTexts.name(request.target());
+        requireSubscription(clusterId, request.target());
+        String returnAddress = locator.locate(clusterId, target).stream()
                 .findFirst()
                 .map(QueueLocation::address)
                 .orElseThrow(() -> access.unreadableAmongSeveral(clusterId));
@@ -837,7 +863,7 @@ public class TransferService {
                 List.of(
                         new Requirement(
                                 ResourceRef.subscription(request.stagingQueue()), MessagePermissions.MESSAGE_MOVE),
-                        new Requirement(ResourceRef.subscription(request.targetQueue()), Permissions.SUBSCRIPTION_READ),
+                        new Requirement(ResourceRef.subscription(target), Permissions.SUBSCRIPTION_READ),
                         new Requirement(ResourceRef.destination(returnAddress), MessagePermissions.MESSAGE_SEND)));
         ClusterNode node = nodes.node(clusterId, request.nodeId());
         String queue = request.stagingQueue();
@@ -859,7 +885,7 @@ public class TransferService {
                 queue,
                 clusterId,
                 node.getId(),
-                Map.of("stagingQueue", queue, "target", request.targetQueue()),
+                Map.of("stagingQueue", queue, "target", target),
                 false);
         long returned = 0;
         try {
@@ -867,7 +893,7 @@ public class TransferService {
             int chunk = settings.intValue(TransferSettings.BATCH_SIZE);
             long moved;
             do {
-                moved = broker.moveStaged(clusterId, node.getId(), queue, chunk, request.targetQueue());
+                moved = broker.moveStaged(clusterId, node.getId(), queue, chunk, target);
                 returned += moved;
             } while (moved >= chunk);
             boolean removed = broker.destroyIfEmpty(clusterId, node.getId(), queue);
@@ -1006,14 +1032,14 @@ public class TransferService {
                         run.getSourceClusterId(),
                         run.getSourceNodeId(),
                         run.getSourceNodeName(),
-                        run.getSourceQueue(),
-                        run.getSourceAddress()),
+                        ids.subscription(run.getSourceClusterId(), run.getSourceQueue()),
+                        ids.destination(run.getSourceClusterId(), run.getSourceAddress())),
                 new TransferEnd(
                         run.getTargetClusterId(),
                         run.getTargetNodeId(),
                         run.getTargetNodeName(),
-                        run.getTargetQueue(),
-                        run.getTargetAddress()),
+                        ids.subscription(run.getTargetClusterId(), run.getTargetQueue()),
+                        ids.destination(run.getTargetClusterId(), run.getTargetAddress())),
                 selection,
                 findings(run),
                 new Derived(

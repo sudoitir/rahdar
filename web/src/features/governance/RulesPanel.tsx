@@ -76,7 +76,7 @@ const ACTIONS = [
 const WRITE_REASON = 'Changing masking rules needs the governance:write permission.';
 
 const EMPTY: RuleRequest = {
-  addressPattern: null,
+  destinationPattern: null,
   target: 'PROPERTY',
   selector: '',
   dataClass: 'PERSONAL',
@@ -91,8 +91,8 @@ function selectorProblem(selector: string, target: string): string | null {
     : 'Enter the name the rule matches. Use * for any run of characters.';
 }
 
-function addressProblem(addressPattern: string | null | undefined): string | null {
-  return addressPattern && /\s/.test(addressPattern)
+function addressProblem(destinationPattern: string | null | undefined): string | null {
+  return destinationPattern && /\s/.test(destinationPattern)
     ? 'An address pattern has no spaces. Use a pattern such as orders.# or orders.*.'
     : null;
 }
@@ -113,7 +113,7 @@ export function RulesPanel() {
     validateInputOnBlur: true,
     validate: {
       selector: (v, values) => selectorProblem(v, values.target),
-      addressPattern: addressProblem,
+      destinationPattern: addressProblem,
     },
   });
   const [saveError, setSaveError] = useState<ApiError | null>(null);
@@ -139,7 +139,7 @@ export function RulesPanel() {
     const body: RuleRequest = {
       ...values,
       selector: values.selector.trim(),
-      addressPattern: values.addressPattern?.trim() ? values.addressPattern.trim() : null,
+      destinationPattern: values.destinationPattern?.trim() ? values.destinationPattern.trim() : null,
     };
     const handlers = {
       onSuccess: (rule: RuleView) => {
@@ -269,8 +269,8 @@ export function RulesPanel() {
             <TextInput
               label="Addresses"
               description="Optional. An address pattern such as orders.#; empty means every address."
-              {...form.getInputProps('addressPattern')}
-              value={form.values.addressPattern ?? ''}
+              {...form.getInputProps('destinationPattern')}
+              value={form.values.destinationPattern ?? ''}
             />
             <Select label="Data class" data={CLASSES} {...form.getInputProps('dataClass')} allowDeselect={false} />
             <Select
@@ -309,8 +309,8 @@ export function RulesPanel() {
           deleting ? (
             <>
               Values this rule masks become visible to every user who can read messages on{' '}
-              {deleting.addressPattern ? <code>{deleting.addressPattern}</code> : 'every address'}, unless a detector
-              still recognises them. Stored messages are re-masked under the new policy.
+              {deleting.destinationPattern ? <code>{deleting.destinationPattern}</code> : 'every address'}, unless a
+              detector still recognises them. Stored messages are re-masked under the new policy.
             </>
           ) : null
         }

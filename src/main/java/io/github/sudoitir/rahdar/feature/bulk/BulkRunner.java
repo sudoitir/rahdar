@@ -179,7 +179,7 @@ class BulkRunner {
         String[] failure = new String[1];
         String permission = run.getOperation().permission();
         if (!handoff.stillHolds(
-                operator, run.getClusterId(), ResourceRef.subscription(item.getQueueName()), permission)) {
+                operator, run.getClusterId(), ResourceRef.subscription(item.getSubscription()), permission)) {
             failure[0] =
                     "The permission %s on this queue is no longer held, so it was not acted on.".formatted(permission);
         } else {
@@ -211,7 +211,7 @@ class BulkRunner {
     /** The single-queue command for this operation, with the run's override and options. */
     private LifecycleOutcome command(BulkRunEntity run, BulkRunItemEntity item) {
         UUID clusterId = run.getClusterId();
-        String queue = item.getQueueName();
+        String queue = item.getSubscription();
         return switch (run.getOperation()) {
             case PAUSE -> unwrap(queues.setPaused(clusterId, queue, true, false));
             case RESUME -> unwrap(queues.setPaused(clusterId, queue, false, false));
@@ -234,7 +234,7 @@ class BulkRunner {
             NodeOutcome outcome;
             try {
                 outcome = switch (messages.purge(
-                        run.getClusterId(), item.getQueueName(), node.nodeId(), false, run.isOverrideCap())) {
+                        run.getClusterId(), item.getSubscription(), node.nodeId(), false, run.isOverrideCap())) {
                     case Attempt.Ok<MessageService.Outcome>(MessageService.Outcome.Affected affected) ->
                         new NodeOutcome(node.nodeId(), node.nodeName(), NodeStatus.APPLIED, affected.count(), null);
                     case Attempt.Ok<MessageService.Outcome>(var other) ->
@@ -294,7 +294,7 @@ class BulkRunner {
                 run.getClusterId(),
                 TOPIC,
                 new BulkProgress(run.getId(), status, succeeded, failed, skipped, run.getTotalItems()),
-                rows.stream().map(BulkRunItemEntity::getQueueName).toList(),
+                rows.stream().map(BulkRunItemEntity::getSubscription).toList(),
                 List.of());
     }
 
