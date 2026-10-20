@@ -7046,7 +7046,7 @@ export interface components {
             nodeId: string;
             nodeName: string;
             producerId?: string | null;
-            name?: string | null;
+            clientId?: string | null;
             sessionId?: string | null;
             address?: string | null;
             protocol?: string | null;
@@ -7386,7 +7386,11 @@ export interface components {
             messagesDelivered: number;
             /** Format: int64 */
             messagesAcknowledged: number;
-            status?: string | null;
+            /**
+             * Format: int64
+             * @description Messages delivered to this consumer and not yet acknowledged.
+             */
+            messagesInFlight: number;
             /** @description The actions of the catalogue that apply to this row and that the caller holds on it, such as queue:purge. The console gates its controls from this. */
             allowedActions: string[];
         };
@@ -7913,7 +7917,8 @@ export interface components {
             nodeId: string;
             nodeName: string;
             name: string;
-            routingTypes?: string | null;
+            /** @description How the address delivers: to one consumer, to every subscription, or both. */
+            delivery: ("POINT_TO_POINT" | "PUBLISH_SUBSCRIBE")[];
             /** Format: int64 */
             queueCount: number;
             /** Format: int64 */

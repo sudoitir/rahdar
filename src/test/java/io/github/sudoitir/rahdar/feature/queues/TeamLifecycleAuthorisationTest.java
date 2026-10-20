@@ -18,6 +18,8 @@ import io.github.sudoitir.rahdar.kernel.security.internal.TeamService;
 import io.github.sudoitir.rahdar.kernel.security.internal.persistence.AppUserRepository;
 import io.github.sudoitir.rahdar.kernel.security.internal.persistence.RoleRepository;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
+import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
+import io.github.sudoitir.rahdar.platform.broker.BrokerTarget;
 import io.github.sudoitir.rahdar.platform.broker.ManagementRefusal;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNodeEntity;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNodeEntity.HaObservation;
@@ -26,9 +28,13 @@ import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterE
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterRepository;
 import io.github.sudoitir.rahdar.support.AdminAuthenticationExtension;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
+import io.github.sudoitir.rahdar.support.Targets;
 import io.github.sudoitir.rahdar.support.TeamAccessFixture;
 import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
 import io.github.sudoitir.rahdar.system.artemis.ArtemisNodes;
+import io.github.sudoitir.rahdar.system.artemis.DivertOperations;
+import io.github.sudoitir.rahdar.system.artemis.DivertRow;
+import io.github.sudoitir.rahdar.system.artemis.QueueLifecycleOperations;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -82,6 +88,9 @@ class TeamLifecycleAuthorisationTest extends PostgresIntegrationTest {
     ArtemisNodes artemisNodes;
 
     @MockitoBean
+    BrokerGateway gateway;
+
+    @MockitoBean
     DivertOperations divertOps;
 
     @MockitoBean
@@ -101,10 +110,16 @@ class TeamLifecycleAuthorisationTest extends PostgresIntegrationTest {
         TeamAccessFixture fixture = new TeamAccessFixture(teamService, roles, users);
         cluster = clusters.save(new ClusterEntity("divert-" + UUID.randomUUID(), null, null))
                 .getId();
-        node("one", ONE);
-        node("two", TWO);
-        when(artemisNodes.on(eq(cluster), any(UUID.class))).thenReturn(clientOne);
-        when(artemisNodes.on(eq(cluster), any(UUID.class))).thenReturn(clientTwo);
+        UUID one = node("one", ONE);
+        UUID two = node("two", TWO);
+        BrokerTarget targetOne = Targets.target();
+        BrokerTarget targetTwo = Targets.target();
+        when(gateway.node(cluster, one)).thenReturn(targetOne);
+        when(gateway.node(cluster, two)).thenReturn(targetTwo);
+        when(artemisNodes.on(cluster, one)).thenReturn(clientOne);
+        when(artemisNodes.on(cluster, two)).thenReturn(clientTwo);
+        when(artemisNodes.on(targetOne)).thenReturn(clientOne);
+        when(artemisNodes.on(targetTwo)).thenReturn(clientTwo);
         when(clientOne.resolveBrokerObjectName()).thenReturn("org.apache.activemq.artemis:broker=\"one\"");
         when(clientTwo.resolveBrokerObjectName()).thenReturn("org.apache.activemq.artemis:broker=\"two\"");
         UUID orders = fixture.team("orders", cluster, "orders.#");
@@ -117,12 +132,12 @@ class TeamLifecycleAuthorisationTest extends PostgresIntegrationTest {
         clusters.deleteById(cluster);
     }
 
-    private void node(String name, String url) {
+    private UUID node(String name, String url) {
         BrokerNodeEntity n = BrokerNodeEntity.fromSeed(
                 cluster, name, "PRIMARY", UUID.randomUUID().toString());
         n.attachSeedUrl(url);
         n.applyHaState(new HaObservation(true, "STARTED", "PRIMARY", null, "2.44.0", null), 1L, Instant.now());
-        brokerNodes.save(n);
+        return brokerNodes.save(n).getId();
     }
 
     private static DivertRow divert(String from, String to) {

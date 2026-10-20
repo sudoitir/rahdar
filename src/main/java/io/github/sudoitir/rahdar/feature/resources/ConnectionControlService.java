@@ -1,5 +1,8 @@
 package io.github.sudoitir.rahdar.feature.resources;
 
+import io.github.sudoitir.openbroker.ClusterConnection;
+import io.github.sudoitir.openbroker.model.ResourceClass;
+import io.github.sudoitir.openbroker.model.ResourceId;
 import io.github.sudoitir.rahdar.feature.resources.ConnectionOperations.ConnectionSnapshot;
 import io.github.sudoitir.rahdar.kernel.audit.AuditEvent;
 import io.github.sudoitir.rahdar.kernel.audit.AuditService;
@@ -9,17 +12,17 @@ import io.github.sudoitir.rahdar.kernel.security.ClusterAccessGuard;
 import io.github.sudoitir.rahdar.kernel.stream.SseHub;
 import io.github.sudoitir.rahdar.platform.broker.Attempt;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
-import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
+import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
+import io.github.sudoitir.rahdar.platform.broker.BrokerTarget;
+import io.github.sudoitir.rahdar.platform.broker.ResourceIds;
+import io.github.sudoitir.rahdar.platform.clusters.BrokerCommands;
+import io.github.sudoitir.rahdar.platform.clusters.BrokerCommands.Command;
+import io.github.sudoitir.rahdar.platform.clusters.BrokerCommands.Estimate;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
 import io.github.sudoitir.rahdar.platform.clusters.LifecycleOutcome;
 import io.github.sudoitir.rahdar.platform.clusters.LifecycleOutcome.NodeOutcome;
 import io.github.sudoitir.rahdar.platform.clusters.LifecycleOutcome.NodeStatus;
-import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
-import io.github.sudoitir.rahdar.system.artemis.ArtemisNodes;
-import io.github.sudoitir.rahdar.system.artemis.BrokerCommands;
-import io.github.sudoitir.rahdar.system.artemis.BrokerCommands.Command;
-import io.github.sudoitir.rahdar.system.artemis.BrokerCommands.Estimate;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -62,14 +65,13 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 public class ConnectionControlService {
 
     private final ClusterDirectory brokerNodes;
-    private final BrokerConnections connections;
     private final ConnectionOperations ops;
     private final AuditService audit;
     private final ActorResolver actorResolver;
     private final SseHub sseHub;
     private final ClusterAccessGuard clusterAccess;
     private final BrokerCommands commands;
-    private final ArtemisNodes artemisNodes;
+    private final BrokerGateway gateway;
 
     /**
      * One close's result: what was found immediately before it, and what each node
@@ -128,8 +130,8 @@ public class ConnectionControlService {
                 dryRun);
 
         try {
-            ArtemisNode client = clientFor(clusterId, node);
-            Resolved resolved = resolve(client, kind, subject);
+            BrokerTarget broker = gateway.node(clusterId, node.getId());
+            Resolved resolved = resolve(broker, kind, subject);
 
             // Already gone. The requested state holds, so this is a success on every
             // path — including the audit row, which records what was asked for and
@@ -151,10 +153,7 @@ public class ConnectionControlService {
                 return new Attempt.Ok<>(new CloseResult(kind, subject, target, outcome));
             }
 
-            boolean closed = kind == ConnectionCloseKind.SESSION
-                    ? ops.closeSession(
-                            client, client.resolveBrokerObjectName(), resolved.connectionId(), resolved.sessionId())
-                    : ops.closeConnection(client, client.resolveBrokerObjectName(), resolved.connectionId());
+            boolean closed = ops.close(broker, resolved.closes());
 
             LifecycleOutcome outcome = single(
                     node,
@@ -171,36 +170,36 @@ public class ConnectionControlService {
     }
 
     /** What a close by id ends up acting on, once the broker's own rows have been walked. */
-    private record Resolved(String connectionId, String sessionId, ConnectionSnapshot target) {}
+    private record Resolved(ResourceId closes, ConnectionSnapshot target) {}
 
-    private Resolved resolve(ArtemisNode client, ConnectionCloseKind kind, String id) {
+    private Resolved resolve(BrokerTarget node, ConnectionCloseKind kind, String id) {
+        ClusterConnection c = node.connection();
         switch (kind) {
             case CONNECTION -> {
-                ConnectionSnapshot target = ops.readConnection(client, id);
-                return target == null ? null : new Resolved(id, null, target);
+                ConnectionSnapshot target = ops.readConnection(node, id);
+                return target == null ? null : new Resolved(ResourceIds.of(c, ResourceClass.CONNECTION, id), target);
             }
             case SESSION -> {
-                ConnectionSnapshot target = ops.readSession(client, id);
+                ConnectionSnapshot target = ops.readSession(node, id);
                 if (target == null || target.connectionId() == null) {
                     return null;
                 }
-                return new Resolved(target.connectionId(), id, target);
+                return new Resolved(ResourceIds.of(c, ResourceClass.CHANNEL, id), target);
             }
             case CONSUMER -> {
-                // A consumer row names its session but not its connection, so the
-                // connection is found through the session rather than guessed from the
-                // remote address. Closing a consumer closes the connection behind it —
-                // which is the intervention the slow-consumer finding implies.
-                String sessionId = ops.sessionIdOfConsumer(client, id);
-                if (sessionId == null) {
-                    return null;
-                }
-                String connectionId = ops.connectionIdOfSession(client, sessionId);
+                // A consumer names its session, and the session its connection, so the connection
+                // is found through them rather than guessed from the remote address. Closing a
+                // consumer closes the connection behind it: the intervention the slow-consumer
+                // finding implies.
+                String sessionId = ops.sessionOfConsumer(node, id);
+                String connectionId = sessionId == null ? null : ops.connectionOfSession(node, sessionId);
                 if (connectionId == null) {
                     return null;
                 }
-                ConnectionSnapshot target = ops.readConnection(client, connectionId);
-                return target == null ? null : new Resolved(connectionId, sessionId, target);
+                ConnectionSnapshot target = ops.readConnection(node, connectionId);
+                return target == null
+                        ? null
+                        : new Resolved(ResourceIds.of(c, ResourceClass.CONNECTION, connectionId), target);
             }
             default -> throw new IllegalStateException("not a by-id close: " + kind);
         }
@@ -231,12 +230,12 @@ public class ConnectionControlService {
                 .params(Map.of("address", subject))
                 .dryRun(dryRun)
                 .override(override)
-                .action((client, broker) -> ops.closeConsumerConnectionsForAddress(client, broker, subject)
+                .action(node -> ops.close(node, ResourceIds.of(node.connection(), ResourceClass.DESTINATION, subject))
                         ? NodeStatus.APPLIED
                         : NodeStatus.ALREADY)
                 // Each consumer it closes returns its in-flight messages to a queue, and a
                 // node that could not be counted leaves the blast radius unknown.
-                .estimate(new Estimate("consumer count", true, client -> ops.countConsumersForAddress(client, subject)))
+                .estimate(new Estimate("consumer count", true, node -> ops.countConsumersForAddress(node, subject)))
                 .auditDetail(nodes -> new CloseDetail(null, nodes))
                 .signal(() -> publishTopics(clusterId))
                 .build());
@@ -269,10 +268,6 @@ public class ConnectionControlService {
                 .filter(n -> n.getId().equals(nodeId) && n.getJolokiaUrl() != null)
                 .findFirst()
                 .orElseThrow(() -> new NotFoundException("node", nodeId));
-    }
-
-    private ArtemisNode clientFor(UUID clusterId, ClusterNode node) {
-        return artemisNodes.on(clusterId, node.getId());
     }
 
     private void publishTopics(UUID clusterId) {

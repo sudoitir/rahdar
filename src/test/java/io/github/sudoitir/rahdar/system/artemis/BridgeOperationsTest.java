@@ -1,4 +1,4 @@
-package io.github.sudoitir.rahdar.feature.queues;
+package io.github.sudoitir.rahdar.system.artemis;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.setup.MockMvcBuilders.webAppContextSetup;
 
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
+import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
 import io.github.sudoitir.rahdar.platform.broker.QueueRow;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNodeEntity;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNodeRepository;
@@ -19,11 +20,11 @@ import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshotUpsert;
 import io.github.sudoitir.rahdar.support.AdminAuthenticationExtension;
 import io.github.sudoitir.rahdar.support.FixtureJolokia;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
-import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
-import io.github.sudoitir.rahdar.system.artemis.ArtemisNodes;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.hamcrest.Matchers;
 import org.junit.jupiter.api.AfterEach;
@@ -66,7 +67,7 @@ class ClusterResourceControllerTest extends PostgresIntegrationTest {
     BrokerConnections connections;
 
     @MockitoBean
-    ArtemisNodes artemisNodes;
+    BrokerGateway gateway;
 
     private UUID clusterId;
     private UUID nodeAId;
@@ -92,18 +93,26 @@ class ClusterResourceControllerTest extends PostgresIntegrationTest {
         clusters.deleteById(clusterId);
     }
 
-    private ArtemisNode client(String url, String... fixtures) {
+    private static FixtureJolokia client(String url, String... fixtures) {
         FixtureJolokia server = new FixtureJolokia();
         for (String fixture : fixtures) {
             server.expect(requestTo(url)).andRespond(withSuccess(body(fixture), MediaType.APPLICATION_JSON));
         }
-        return server.node();
+        return server;
     }
 
-    private ArtemisNode unauthorized(String url) {
+    private static FixtureJolokia unauthorized(String url) {
         FixtureJolokia server = new FixtureJolokia();
         server.expect(requestTo(url)).andRespond(withStatus(HttpStatus.UNAUTHORIZED));
-        return server.node();
+        return server;
+    }
+
+    /** The cluster as the gateway gives it: node A answered by one agent, node B by the other. */
+    private void serving(FixtureJolokia a, FixtureJolokia b) {
+        Map<UUID, FixtureJolokia> agents = new LinkedHashMap<>();
+        agents.put(nodeAId, a);
+        agents.put(nodeBId, b);
+        when(gateway.cluster(clusterId)).thenReturn(FixtureJolokia.cluster(agents));
     }
 
     private static String body(String fixture) {
@@ -133,10 +142,9 @@ class ClusterResourceControllerTest extends PostgresIntegrationTest {
 
     @Test
     void consumersFansOutLiveAndTagsEachRowWithItsNode() throws Exception {
-        when(artemisNodes.on(clusterId, nodeAId))
-                .thenReturn(client(URL_A, "search-broker.json", "list-consumers.json"));
-        when(artemisNodes.on(clusterId, nodeBId))
-                .thenReturn(client(URL_B, "search-broker.json", "list-consumers.json"));
+        serving(
+                client(URL_A, "search-broker.json", "list-consumers.json"),
+                client(URL_B, "search-broker.json", "list-consumers.json"));
 
         mvc.perform(get("/api/v1/clusters/{id}/consumers", clusterId))
                 .andExpect(status().isOk())
@@ -147,8 +155,7 @@ class ClusterResourceControllerTest extends PostgresIntegrationTest {
 
     @Test
     void aClusterWithNoReadableNodeSurfacesAClassifiedProblem() throws Exception {
-        when(artemisNodes.on(clusterId, nodeAId)).thenReturn(unauthorized(URL_A));
-        when(artemisNodes.on(clusterId, nodeBId)).thenReturn(unauthorized(URL_B));
+        serving(unauthorized(URL_A), unauthorized(URL_B));
 
         mvc.perform(get("/api/v1/clusters/{id}/sessions", clusterId))
                 .andExpect(status().is4xxClientError())

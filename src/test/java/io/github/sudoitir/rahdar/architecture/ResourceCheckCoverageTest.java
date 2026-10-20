@@ -16,7 +16,7 @@ import io.github.sudoitir.rahdar.kernel.security.OperatorHandoff;
 import io.github.sudoitir.rahdar.kernel.security.PermissionResolver;
 import io.github.sudoitir.rahdar.kernel.security.ResourceFilter;
 import io.github.sudoitir.rahdar.kernel.security.ResourceRef;
-import io.github.sudoitir.rahdar.system.artemis.BrokerCommands;
+import io.github.sudoitir.rahdar.platform.clusters.BrokerCommands;
 import java.lang.reflect.Parameter;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.RecordComponent;

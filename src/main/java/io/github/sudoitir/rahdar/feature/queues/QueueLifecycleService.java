@@ -19,6 +19,12 @@ import io.github.sudoitir.rahdar.platform.broker.Attempt;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
 import io.github.sudoitir.rahdar.platform.broker.ManagementRefusal;
+import io.github.sudoitir.rahdar.platform.clusters.BrokerCommands;
+import io.github.sudoitir.rahdar.platform.clusters.BrokerCommands.Check;
+import io.github.sudoitir.rahdar.platform.clusters.BrokerCommands.Command;
+import io.github.sudoitir.rahdar.platform.clusters.BrokerCommands.Estimate;
+import io.github.sudoitir.rahdar.platform.clusters.BrokerCommands.NodeAction;
+import io.github.sudoitir.rahdar.platform.clusters.BrokerCommands.NodePreflight;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
 import io.github.sudoitir.rahdar.platform.clusters.LifecycleOutcome;
@@ -26,11 +32,9 @@ import io.github.sudoitir.rahdar.platform.clusters.LifecycleOutcome.NodeStatus;
 import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshotUpsert;
 import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
 import io.github.sudoitir.rahdar.system.artemis.ArtemisNodes;
-import io.github.sudoitir.rahdar.system.artemis.BrokerCommands;
-import io.github.sudoitir.rahdar.system.artemis.BrokerCommands.Check;
-import io.github.sudoitir.rahdar.system.artemis.BrokerCommands.Command;
-import io.github.sudoitir.rahdar.system.artemis.BrokerCommands.Estimate;
-import io.github.sudoitir.rahdar.system.artemis.BrokerCommands.NodeAction;
+import io.github.sudoitir.rahdar.system.artemis.DivertOperations;
+import io.github.sudoitir.rahdar.system.artemis.DivertRow;
+import io.github.sudoitir.rahdar.system.artemis.QueueLifecycleOperations;
 import io.github.sudoitir.rahdar.system.artemis.QueueLocator;
 import io.github.sudoitir.rahdar.system.artemis.QueueLocator.QueueLocation;
 import jakarta.validation.Validator;
@@ -207,12 +211,14 @@ public class QueueLifecycleService {
                 .params(Map.of("disconnectConsumers", disconnectConsumers))
                 .dryRun(dryRun)
                 .override(override)
-                .preflight((client, broker) -> deletePreflight(
-                        deletePlan(clusterId, client, broker, queue), queue, disconnectConsumers, declared))
-                .action((client, broker) -> deleteWithDiverts(
-                        client, broker, deletePlan(clusterId, client, broker, queue), disconnectConsumers))
-                .estimate(new Estimate(
-                        "message count", false, client -> ops.messageCount(client, queueMbean(client, queue))))
+                .preflight(artemisPreflight((client, broker) -> deletePreflight(
+                        deletePlan(clusterId, client, broker, queue), queue, disconnectConsumers, declared)))
+                .action(artemis((client, broker) -> deleteWithDiverts(
+                        client, broker, deletePlan(clusterId, client, broker, queue), disconnectConsumers)))
+                .estimate(new Estimate("message count", false, node -> {
+                    ArtemisNode client = artemisNodes.on(node);
+                    return ops.messageCount(client, queueMbean(client, queue));
+                }))
                 .signal(() -> {
                     // The queue is gone from the brokers; the snapshot is a cache of
                     // what they run. Left alone it keeps the row until the next sweep,
@@ -525,8 +531,8 @@ public class QueueLifecycleService {
                 .targetName(req.name())
                 .params(audited)
                 .dryRun(dryRun)
-                .preflight((client, broker) -> divertPreflight(client, broker, req))
-                .action((client, broker) -> divertOps.createVerified(client, broker, config))
+                .preflight(artemisPreflight((client, broker) -> divertPreflight(client, broker, req)))
+                .action(artemis((client, broker) -> divertOps.createVerified(client, broker, config)))
                 .signal(() -> sseHub.publishAbout(
                         clusterId, QUEUES_TOPIC, List.of(), List.of(req.address(), req.forwardingAddress())))
                 .build()));
@@ -604,14 +610,14 @@ public class QueueLifecycleService {
                 .dryRun(dryRun)
                 // Each node's own divert is what is destroyed there: one that runs between addresses nobody
                 // checked is left alone, so a name that means something else on another node costs nothing.
-                .preflight((client, broker) -> wholeCluster
+                .preflight(artemisPreflight((client, broker) -> wholeCluster
                                 || endsOn(client, name).stream().allMatch(ends::contains)
                         ? Check.OK
-                        : Check.refuse("The divert on this node is not one you may delete, so it was left alone."))
-                .action((client, broker) -> {
+                        : Check.refuse("The divert on this node is not one you may delete, so it was left alone.")))
+                .action(artemis((client, broker) -> {
                     divertOps.destroyDivert(client, broker, name);
                     return NodeStatus.APPLIED;
-                })
+                }))
                 .signal(() -> sseHub.publishAbout(clusterId, QUEUES_TOPIC, ends))
                 .build()));
     }
@@ -667,7 +673,7 @@ public class QueueLifecycleService {
             Map<String, ?> params,
             boolean dryRun,
             boolean override,
-            NodeAction action) {
+            ArtemisAction action) {
         return new Attempt.Ok<>(commands.run(Command.builder()
                 .clusterId(clusterId)
                 .permission(kind.permission())
@@ -678,12 +684,38 @@ public class QueueLifecycleService {
                 .params(params)
                 .dryRun(dryRun)
                 .override(override)
-                .action(action)
+                .action(artemis(action))
                 .signal(() -> sseHub.publishAbout(
                         clusterId,
                         QUEUES_TOPIC,
                         kind.resource(targetName).stream().toList()))
                 .build()));
+    }
+
+    /** What a command does on one node's Artemis agent. */
+    @FunctionalInterface
+    interface ArtemisAction {
+        NodeStatus apply(ArtemisNode client, String brokerMbean);
+    }
+
+    /** A check on one node's Artemis agent. */
+    @FunctionalInterface
+    interface ArtemisPreflight {
+        Check apply(ArtemisNode client, String brokerMbean);
+    }
+
+    private NodeAction artemis(ArtemisAction action) {
+        return node -> {
+            ArtemisNode client = artemisNodes.on(node);
+            return action.apply(client, client.resolveBrokerObjectName());
+        };
+    }
+
+    private NodePreflight artemisPreflight(ArtemisPreflight check) {
+        return node -> {
+            ArtemisNode client = artemisNodes.on(node);
+            return check.apply(client, client.resolveBrokerObjectName());
+        };
     }
 
     // ---- queue resolution ------------------------------------------------

@@ -1,15 +1,15 @@
 package io.github.sudoitir.rahdar.feature.resources;
 
+import static io.github.sudoitir.rahdar.support.Targets.id;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import io.github.sudoitir.openbroker.model.ResourceId;
 import io.github.sudoitir.rahdar.feature.resources.ConnectionControlService.CloseResult;
 import io.github.sudoitir.rahdar.feature.resources.ConnectionOperations.ConnectionSnapshot;
 import io.github.sudoitir.rahdar.kernel.audit.internal.persistence.AuditEventEntity;
@@ -19,7 +19,9 @@ import io.github.sudoitir.rahdar.kernel.settings.SettingsService;
 import io.github.sudoitir.rahdar.platform.broker.Attempt;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
+import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
 import io.github.sudoitir.rahdar.platform.broker.BrokerSettings;
+import io.github.sudoitir.rahdar.platform.broker.BrokerTarget;
 import io.github.sudoitir.rahdar.platform.broker.BulkCapExceededException;
 import io.github.sudoitir.rahdar.platform.clusters.LifecycleOutcome.NodeOutcome;
 import io.github.sudoitir.rahdar.platform.clusters.LifecycleOutcome.NodeStatus;
@@ -30,8 +32,7 @@ import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterE
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterRepository;
 import io.github.sudoitir.rahdar.support.AdminAuthenticationExtension;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
-import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
-import io.github.sudoitir.rahdar.system.artemis.ArtemisNodes;
+import io.github.sudoitir.rahdar.support.Targets;
 import java.time.Instant;
 import java.util.Comparator;
 import java.util.UUID;
@@ -56,7 +57,6 @@ class ConnectionControlServiceTest extends PostgresIntegrationTest {
     private static final String LIVE_URL = "http://live:8161/console/jolokia";
     private static final String DEAD_URL = "http://dead:8161/console/jolokia";
     private static final String CONNECTION = "a3f1c9de";
-    private static final String BROKER_MBEAN = "org.apache.activemq.artemis:broker=\"b\"";
 
     @Autowired
     ConnectionControlService control;
@@ -77,7 +77,7 @@ class ConnectionControlServiceTest extends PostgresIntegrationTest {
     BrokerConnections connections;
 
     @MockitoBean
-    ArtemisNodes artemisNodes;
+    BrokerGateway gateway;
 
     @MockitoBean
     ConnectionOperations ops;
@@ -85,7 +85,7 @@ class ConnectionControlServiceTest extends PostgresIntegrationTest {
     private UUID clusterId;
     private UUID liveId;
     private UUID deadId;
-    private ArtemisNode client;
+    private BrokerTarget client;
 
     @BeforeEach
     void setUp() {
@@ -94,9 +94,8 @@ class ConnectionControlServiceTest extends PostgresIntegrationTest {
         liveId = node("live", LIVE_URL, true);
         deadId = node("dead", DEAD_URL, false);
 
-        client = mock(ArtemisNode.class);
-        when(client.resolveBrokerObjectName()).thenReturn(BROKER_MBEAN);
-        when(artemisNodes.on(eq(clusterId), any(UUID.class))).thenReturn(client);
+        client = Targets.target();
+        when(gateway.node(eq(clusterId), any(UUID.class))).thenReturn(client);
     }
 
     private UUID node(String name, String url, boolean active) {
@@ -114,6 +113,8 @@ class ConnectionControlServiceTest extends PostgresIntegrationTest {
         }
     }
 
+    private static final ResourceId CONNECTION_ID = id("artemis.connection", CONNECTION);
+
     private static ConnectionSnapshot snapshot() {
         return new ConnectionSnapshot(CONNECTION, "orders-worker-7", "10.4.2.9:53160", "apps", "CORE", 2, 3, 41L);
     }
@@ -123,7 +124,7 @@ class ConnectionControlServiceTest extends PostgresIntegrationTest {
     @Test
     void closesTheConnectionOnTheNamedNodeAndReportsItApplied() {
         when(ops.readConnection(client, CONNECTION)).thenReturn(snapshot());
-        when(ops.closeConnection(client, BROKER_MBEAN, CONNECTION)).thenReturn(true);
+        when(ops.close(client, CONNECTION_ID)).thenReturn(true);
 
         CloseResult result = ok(control.closeConnection(clusterId, liveId, CONNECTION, false));
 
@@ -133,7 +134,7 @@ class ConnectionControlServiceTest extends PostgresIntegrationTest {
         });
         assertThat(result.target().clientId()).isEqualTo("orders-worker-7");
         // A close by id is not a fan-out: the other node is never asked.
-        verify(artemisNodes, never()).on(clusterId, deadId);
+        verify(gateway, never()).node(clusterId, deadId);
     }
 
     @Test
@@ -145,7 +146,7 @@ class ConnectionControlServiceTest extends PostgresIntegrationTest {
         assertThat(result.outcome().dryRun()).isTrue();
         assertThat(result.outcome().nodes().get(0).status()).isEqualTo(NodeStatus.WOULD_APPLY);
         assertThat(result.target().messagesInTransit()).isEqualTo(41L);
-        verify(ops, never()).closeConnection(any(), anyString(), anyString());
+        verify(ops, never()).close(any(), any());
     }
 
     /** D2: the requested state — that connection is not open — holds. Not an error. */
@@ -159,7 +160,7 @@ class ConnectionControlServiceTest extends PostgresIntegrationTest {
         assertThat(result.outcome().anyFailed()).isFalse();
         assertThat(result.target()).isNull();
         assertThat(latestAudit().getOutcome()).isEqualTo("SUCCESS");
-        verify(ops, never()).closeConnection(any(), anyString(), anyString());
+        verify(ops, never()).close(any(), any());
     }
 
     /**
@@ -170,7 +171,7 @@ class ConnectionControlServiceTest extends PostgresIntegrationTest {
     @Test
     void aConnectionThatVanishesBetweenTheReadAndTheCloseIsAlreadyGone() {
         when(ops.readConnection(client, CONNECTION)).thenReturn(snapshot());
-        when(ops.closeConnection(client, BROKER_MBEAN, CONNECTION)).thenReturn(false);
+        when(ops.close(client, CONNECTION_ID)).thenReturn(false);
 
         CloseResult result = ok(control.closeConnection(clusterId, liveId, CONNECTION, false));
 
@@ -182,7 +183,7 @@ class ConnectionControlServiceTest extends PostgresIntegrationTest {
     @Test
     void theAuditRowCarriesTheIdentityReadImmediatelyBeforeTheClose() {
         when(ops.readConnection(client, CONNECTION)).thenReturn(snapshot());
-        when(ops.closeConnection(client, BROKER_MBEAN, CONNECTION)).thenReturn(true);
+        when(ops.close(client, CONNECTION_ID)).thenReturn(true);
 
         control.closeConnection(clusterId, liveId, CONNECTION, false);
 
@@ -200,26 +201,26 @@ class ConnectionControlServiceTest extends PostgresIntegrationTest {
     void closingASessionUsesTheConnectionTheBrokerReportsForIt() {
         when(ops.readSession(client, "sess-1"))
                 .thenReturn(new ConnectionSnapshot(CONNECTION, "orders-worker-7", null, "apps", null, 1, 2, 7L));
-        when(ops.closeSession(client, BROKER_MBEAN, CONNECTION, "sess-1")).thenReturn(true);
+        when(ops.close(client, id("artemis.session", "sess-1"))).thenReturn(true);
 
         CloseResult result = ok(control.closeSession(clusterId, liveId, "sess-1", false));
 
         assertThat(result.outcome().nodes().get(0).status()).isEqualTo(NodeStatus.APPLIED);
-        verify(ops).closeSession(client, BROKER_MBEAN, CONNECTION, "sess-1");
+        verify(ops).close(client, id("artemis.session", "sess-1"));
     }
 
     /** A consumer row names its session, so the connection is walked to, not guessed. */
     @Test
     void closingAConsumerWalksToItsConnectionAndClosesThat() {
-        when(ops.sessionIdOfConsumer(client, "1849")).thenReturn("sess-1");
-        when(ops.connectionIdOfSession(client, "sess-1")).thenReturn(CONNECTION);
+        when(ops.sessionOfConsumer(client, "1849")).thenReturn("sess-1");
+        when(ops.connectionOfSession(client, "sess-1")).thenReturn(CONNECTION);
         when(ops.readConnection(client, CONNECTION)).thenReturn(snapshot());
-        when(ops.closeConnection(client, BROKER_MBEAN, CONNECTION)).thenReturn(true);
+        when(ops.close(client, CONNECTION_ID)).thenReturn(true);
 
         CloseResult result = ok(control.closeConsumerConnection(clusterId, liveId, "1849", false));
 
         assertThat(result.outcome().nodes().get(0).status()).isEqualTo(NodeStatus.APPLIED);
-        verify(ops).closeConnection(client, BROKER_MBEAN, CONNECTION);
+        verify(ops).close(client, CONNECTION_ID);
     }
 
     /**
@@ -273,7 +274,7 @@ class ConnectionControlServiceTest extends PostgresIntegrationTest {
         assertThat(statusOf(result, liveId)).isEqualTo(NodeStatus.WOULD_APPLY);
         // The node that is not live never received the command, so it is skipped.
         assertThat(statusOf(result, deadId)).isEqualTo(NodeStatus.SKIPPED_NOT_LIVE);
-        verify(ops, never()).closeConsumerConnectionsForAddress(any(), anyString(), anyString());
+        verify(ops, never()).close(any(), any());
     }
 
     @Test
@@ -283,10 +284,9 @@ class ConnectionControlServiceTest extends PostgresIntegrationTest {
 
         assertThatThrownBy(() -> control.closeAddressConsumers(clusterId, "orders", false, false))
                 .isInstanceOf(BulkCapExceededException.class);
-        verify(ops, never()).closeConsumerConnectionsForAddress(any(), anyString(), anyString());
+        verify(ops, never()).close(any(), any());
 
-        when(ops.closeConsumerConnectionsForAddress(client, BROKER_MBEAN, "orders"))
-                .thenReturn(true);
+        when(ops.close(client, id("artemis.address", "orders"))).thenReturn(true);
         CloseResult result = ok(control.closeAddressConsumers(clusterId, "orders", false, true));
         assertThat(statusOf(result, liveId)).isEqualTo(NodeStatus.APPLIED);
     }
@@ -294,8 +294,7 @@ class ConnectionControlServiceTest extends PostgresIntegrationTest {
     @Test
     void anAddressWithNoConsumersOnANodeReportsThatNodeAsAlready() {
         when(ops.countConsumersForAddress(client, "orders")).thenReturn(0L);
-        when(ops.closeConsumerConnectionsForAddress(client, BROKER_MBEAN, "orders"))
-                .thenReturn(false);
+        when(ops.close(client, id("artemis.address", "orders"))).thenReturn(false);
 
         CloseResult result = ok(control.closeAddressConsumers(clusterId, "orders", false, false));
 
@@ -310,9 +309,8 @@ class ConnectionControlServiceTest extends PostgresIntegrationTest {
      */
     @Test
     void anEstimateNoNodeCouldCompleteStillDemandsTheOverride() {
-        ArtemisNode mute = mock(ArtemisNode.class);
-        when(mute.resolveBrokerObjectName()).thenReturn(BROKER_MBEAN);
-        when(artemisNodes.on(eq(clusterId), any(UUID.class))).thenReturn(mute);
+        BrokerTarget mute = Targets.target();
+        when(gateway.node(eq(clusterId), any(UUID.class))).thenReturn(mute);
         when(ops.countConsumersForAddress(mute, "orders"))
                 .thenThrow(new BrokerConnectionException(
                         BrokerConnectionException.Kind.UNREACHABLE, "node did not answer"));
@@ -325,7 +323,7 @@ class ConnectionControlServiceTest extends PostgresIntegrationTest {
 
         assertThatThrownBy(() -> control.closeAddressConsumers(clusterId, "orders", false, false))
                 .isInstanceOf(BulkCapExceededException.class);
-        verify(ops, never()).closeConsumerConnectionsForAddress(any(), anyString(), anyString());
+        verify(ops, never()).close(any(), any());
     }
 
     // ---- helpers ---------------------------------------------------------

@@ -20,13 +20,13 @@ import io.github.sudoitir.rahdar.feature.brokerconfig.BrokerConfigDocument.Queue
 import io.github.sudoitir.rahdar.feature.brokerconfig.BrokerConfigDocument.SecuritySettingDecl;
 import io.github.sudoitir.rahdar.feature.brokerconfig.BrokerConfigOperations.ReadScope;
 import io.github.sudoitir.rahdar.feature.brokerconfig.ObservedNodeConfig.ObservedBridge;
-import io.github.sudoitir.rahdar.feature.queues.BridgeOperations;
-import io.github.sudoitir.rahdar.feature.queues.BridgeRow;
-import io.github.sudoitir.rahdar.feature.queues.DivertOperations;
-import io.github.sudoitir.rahdar.feature.queues.QueueLifecycleOperations;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
 import io.github.sudoitir.rahdar.platform.broker.ManagementRefusal;
 import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
+import io.github.sudoitir.rahdar.system.artemis.BridgeOperations;
+import io.github.sudoitir.rahdar.system.artemis.BridgeRow;
+import io.github.sudoitir.rahdar.system.artemis.DivertOperations;
+import io.github.sudoitir.rahdar.system.artemis.QueueLifecycleOperations;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;

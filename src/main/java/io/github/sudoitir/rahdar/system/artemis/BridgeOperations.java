@@ -1,4 +1,4 @@
-package io.github.sudoitir.rahdar.feature.queues;
+package io.github.sudoitir.rahdar.system.artemis;
 
 import io.github.sudoitir.openbroker.artemis.ArtemisLists;
 import io.github.sudoitir.openbroker.artemis.ArtemisMBeans;
@@ -6,7 +6,6 @@ import io.github.sudoitir.openbroker.artemis.JolokiaRequest;
 import io.github.sudoitir.openbroker.artemis.JolokiaResponse;
 import io.github.sudoitir.rahdar.platform.broker.ManagementRefusal;
 import io.github.sudoitir.rahdar.platform.clusters.LifecycleOutcome.NodeStatus;
-import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;

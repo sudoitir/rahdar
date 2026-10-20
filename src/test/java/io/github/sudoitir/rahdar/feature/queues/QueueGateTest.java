@@ -22,6 +22,8 @@ import io.github.sudoitir.rahdar.kernel.gate.OperationGate;
 import io.github.sudoitir.rahdar.kernel.gate.OperationHeldException;
 import io.github.sudoitir.rahdar.kernel.gate.Trait;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
+import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
+import io.github.sudoitir.rahdar.platform.broker.BrokerTarget;
 import io.github.sudoitir.rahdar.platform.broker.ManagementRefusal;
 import io.github.sudoitir.rahdar.platform.broker.QueueRow;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNodeEntity;
@@ -32,8 +34,11 @@ import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterR
 import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshotUpsert;
 import io.github.sudoitir.rahdar.support.AdminAuthenticationExtension;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
+import io.github.sudoitir.rahdar.support.Targets;
 import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
 import io.github.sudoitir.rahdar.system.artemis.ArtemisNodes;
+import io.github.sudoitir.rahdar.system.artemis.DivertOperations;
+import io.github.sudoitir.rahdar.system.artemis.QueueLifecycleOperations;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -92,6 +97,9 @@ class QueueGateTest extends PostgresIntegrationTest {
     ArtemisNodes artemisNodes;
 
     @MockitoBean
+    BrokerGateway gateway;
+
+    @MockitoBean
     QueueLifecycleOperations ops;
 
     @MockitoBean
@@ -118,6 +126,9 @@ class QueueGateTest extends PostgresIntegrationTest {
         ArtemisNode client = Mockito.mock(ArtemisNode.class);
         when(client.resolveBrokerObjectName()).thenReturn("org.apache.activemq.artemis:broker=\"b\"");
         when(artemisNodes.on(eq(clusterId), any(UUID.class))).thenReturn(client);
+        when(artemisNodes.on(any(BrokerTarget.class))).thenReturn(client);
+        BrokerTarget anyNode = Targets.target();
+        when(gateway.node(any(UUID.class), any(UUID.class))).thenReturn(anyNode);
         // No node has a queue the scrape does not show.
         when(client.single(any())).thenReturn(new JolokiaResponse(404, null, "no such queue", null, null));
         when(ops.deleteState(any(), anyString(), anyString(), anyString(), anyString()))

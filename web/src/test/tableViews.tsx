@@ -217,7 +217,7 @@ const queue = (f: Fixture, i: number): QueueView => ({
 const address_ = (f: Fixture, i: number): AddressView => ({
   ...NODE(f, i),
   name: address(f, i),
-  routingTypes: 'ANYCAST, MULTICAST',
+  delivery: ['POINT_TO_POINT', 'PUBLISH_SUBSCRIBE'],
   queueCount: num(f, 3 + i),
   messageCount: num(f, 9_200 + i),
   allowedActions: [],
@@ -232,7 +232,7 @@ const consumer = (f: Fixture, i: number): ConsumerView => ({
   protocol: 'AMQP',
   messagesDelivered: num(f, 8_431 + i),
   messagesAcknowledged: num(f, 8_400 + i),
-  status: i === 1 ? 'slow' : 'ok',
+  messagesInFlight: num(f, 12 + i),
   allowedActions: [],
 });
 
@@ -261,7 +261,7 @@ const connection = (f: Fixture, i: number): ConnectionView => ({
 const producer = (f: Fixture, i: number): ProducerView => ({
   ...NODE(f, i),
   producerId: ident(f, 'producer', i),
-  name: f === 'normal' ? 'order-writer' : name(f, 'writer', i),
+  clientId: f === 'normal' ? 'order-writer' : name(f, 'writer', i),
   sessionId: ident(f, 'session', i),
   address: address(f, i),
   protocol: 'CORE',

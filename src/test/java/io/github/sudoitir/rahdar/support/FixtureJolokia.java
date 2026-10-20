@@ -11,6 +11,7 @@ import io.github.sudoitir.openbroker.Endpoint;
 import io.github.sudoitir.openbroker.NodeId;
 import io.github.sudoitir.openbroker.NodeSpec;
 import io.github.sudoitir.openbroker.Plane;
+import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
 import io.github.sudoitir.rahdar.platform.broker.BrokerTarget;
 import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
 import io.github.sudoitir.rahdar.system.artemis.ArtemisNodes;
@@ -21,7 +22,9 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Queue;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CopyOnWriteArrayList;
 import org.jspecify.annotations.Nullable;
@@ -109,6 +112,27 @@ public final class FixtureJolokia implements AutoCloseable {
         opened.add(connection);
         opened.add(drivers);
         return new BrokerTarget(connection, NodeId.of(url()));
+    }
+
+    /**
+     * One cluster connection whose nodes are these agents, each named as the gateway names the node
+     * of that id, for code that reads a cluster through {@code BrokerGateway.cluster}. It closes with
+     * the first agent.
+     */
+    public static ClusterConnection cluster(Map<UUID, FixtureJolokia> nodes) {
+        BrokerDrivers drivers = BrokerDrivers.load();
+        List<NodeSpec> specs = nodes.entrySet().stream()
+                .map(e -> new NodeSpec(
+                        BrokerGateway.idOf(e.getKey()),
+                        List.of(new Endpoint(
+                                Plane.MANAGEMENT, "jolokia", e.getValue().url()))))
+                .toList();
+        ClusterConnection connection = drivers.connect(new ConnectRequest(
+                "artemis", ClusterSpec.ofNodes(specs), CredentialSource.none(), ConnectOptions.defaults()));
+        FixtureJolokia first = nodes.values().iterator().next();
+        first.opened.add(connection);
+        first.opened.add(drivers);
+        return connection;
     }
 
     /** The request bodies the agent received, in order. */

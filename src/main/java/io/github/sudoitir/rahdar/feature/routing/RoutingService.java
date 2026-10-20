@@ -1,9 +1,5 @@
 package io.github.sudoitir.rahdar.feature.routing;
 
-import io.github.sudoitir.rahdar.feature.queues.BridgeOperations;
-import io.github.sudoitir.rahdar.feature.queues.BridgeRow;
-import io.github.sudoitir.rahdar.feature.queues.DivertOperations;
-import io.github.sudoitir.rahdar.feature.queues.DivertRow;
 import io.github.sudoitir.rahdar.feature.queues.LifecycleKind;
 import io.github.sudoitir.rahdar.feature.routing.web.RoutingViews.BridgeNodeCell;
 import io.github.sudoitir.rahdar.feature.routing.web.RoutingViews.BridgeView;
@@ -23,6 +19,10 @@ import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
 import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
 import io.github.sudoitir.rahdar.system.artemis.ArtemisNodes;
+import io.github.sudoitir.rahdar.system.artemis.BridgeOperations;
+import io.github.sudoitir.rahdar.system.artemis.BridgeRow;
+import io.github.sudoitir.rahdar.system.artemis.DivertOperations;
+import io.github.sudoitir.rahdar.system.artemis.DivertRow;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;

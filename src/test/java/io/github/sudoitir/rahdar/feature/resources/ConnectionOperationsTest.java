@@ -1,45 +1,30 @@
 package io.github.sudoitir.rahdar.feature.resources;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyList;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.anything;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
-import io.github.sudoitir.openbroker.artemis.JolokiaRequest;
-import io.github.sudoitir.openbroker.artemis.JolokiaResponse;
 import io.github.sudoitir.rahdar.feature.resources.ConnectionOperations.ConnectionSnapshot;
-import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
-import java.util.ArrayList;
+import io.github.sudoitir.rahdar.support.FixtureJolokia;
 import java.util.List;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
-import org.mockito.Mockito;
-import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.ObjectMapper;
+import org.springframework.http.MediaType;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * The pre-close read, against the row shapes a real broker returns
- * (`src/test/resources/jolokia/list-*.json`).
+ * The pre-close read, through the driver, against the row shapes a real broker returns.
  *
- * <p>The one that matters is the confirmation token. ADR-0057 D3 says an operator
- * confirms against something they can recognise, and a session row carries no
- * remote address and — for a CORE client, which is the ordinary case in this
- * project's own captured fixture — a blank {@code clientID}. If the snapshot does
- * not reach for the connection's identity, the token silently degrades to the
- * opaque connection id, which is exactly what the ADR forbids.
+ * <p>The one that matters is the confirmation token. ADR-0057 D3 says an operator confirms against
+ * something they can recognise, and a session row carries no remote address and, for a CORE client,
+ * a blank client id. If the snapshot does not reach for the connection's identity, the token silently
+ * degrades to the opaque connection id, which is exactly what the ADR forbids.
  */
 class ConnectionOperationsTest {
 
-    private final ObjectMapper mapper = new JsonMapper();
-    private final ConnectionOperations ops = new ConnectionOperations(mapper);
-
-    /** One {@code listX} envelope, in the double-encoded shape Artemis actually answers with. */
-    private JolokiaResponse page(String rowsJson) {
-        String envelope = "{\"data\":" + rowsJson + ",\"count\":1}";
-        return new JolokiaResponse(200, mapper.valueToTree(envelope), null, null, null);
-    }
+    private static final JsonMapper JSON = JsonMapper.builder().build();
+    private static final String SEARCH =
+            "{\"status\":200,\"value\":[\"org.apache.activemq.artemis:broker=\\\"b\\\"\"]}";
 
     private static final String SESSION_ROW = """
             [{"id":"sess-1","user":"artemis","validatedUser":"artemis","creationTime":"Thu Sep 03 13:10:38 UTC 2026",\
@@ -55,37 +40,34 @@ class ConnectionOperationsTest {
             "queue":"SPIKE.A.q000","address":"SPIKE.A","remoteAddress":"127.0.0.1:35926",\
             "messagesInTransit":"7","messagesDelivered":"0","status":"OK"}]""";
 
-    /** A client whose single/batch calls answer in the order the operation asks. */
-    private ArtemisNode clientAnswering(String... pages) {
-        ArtemisNode client = mock(ArtemisNode.class);
-        when(client.resolveBrokerObjectName()).thenReturn("org.apache.activemq.artemis:broker=\"b\"");
-        List<JolokiaResponse> queue =
-                new ArrayList<>(List.of(pages).stream().map(this::page).toList());
-        when(client.single(any())).thenAnswer(i -> queue.remove(0));
-        when(client.batch(anyList())).thenAnswer(i -> {
-            List<?> requests = i.getArgument(0);
-            List<JolokiaResponse> out = new ArrayList<>();
-            for (int n = 0; n < requests.size(); n++) {
-                out.add(queue.remove(0));
-            }
-            return out;
-        });
-        when(client.parsed(any())).thenAnswer(i -> {
-            JolokiaResponse entry = i.getArgument(0);
-            return entry.valueParsed(mapper);
-        });
-        return client;
+    private final FixtureJolokia server = new FixtureJolokia();
+    private final ConnectionOperations ops = new ConnectionOperations();
+
+    @AfterEach
+    void stop() {
+        server.close();
+    }
+
+    /** One list operation's answer: its rows in the double-encoded envelope Artemis answers with. */
+    private static String list(String rows) {
+        return "{\"status\":200,\"value\":" + JSON.writeValueAsString("{\"data\":" + rows + ",\"count\":1}") + "}";
+    }
+
+    private void answer(String... bodies) {
+        for (String body : bodies) {
+            server.expect(anything()).andRespond(withSuccess(body, MediaType.APPLICATION_JSON));
+        }
     }
 
     @Test
     void aSessionWithNoClientIdIsIdentifiedByItsConnectionsRemoteAddress() {
-        // listSessions(id) → listConnections(connectionID) → listConsumers(session).
-        ArtemisNode client = clientAnswering(SESSION_ROW, CONNECTION_ROW, CONSUMER_ROW);
+        // The session, then its connection and its consumers together.
+        answer(SEARCH, list(SESSION_ROW), "[" + list(CONNECTION_ROW) + "," + list(CONSUMER_ROW) + "]");
 
-        ConnectionSnapshot snapshot = ops.readSession(client, "sess-1");
+        ConnectionSnapshot snapshot = ops.readSession(server.target(), "sess-1");
 
         assertThat(snapshot.remoteAddress()).isEqualTo("172.21.0.5:53156");
-        // The token a human types — never the opaque id.
+        // The token a human types: never the opaque id.
         assertThat(snapshot.label()).isEqualTo("172.21.0.5:53156").isNotEqualTo("7762766a");
         assertThat(snapshot.user()).isEqualTo("artemis");
         assertThat(snapshot.consumerCount()).isEqualTo(2);
@@ -94,46 +76,35 @@ class ConnectionOperationsTest {
 
     @Test
     void aConnectionSnapshotCarriesTheIdentityAndTheInFlightCount() {
-        // listConnections + listSessions batched, then listConsumers per session.
-        ArtemisNode client = clientAnswering(CONNECTION_ROW, SESSION_ROW, CONSUMER_ROW);
+        // The connection and its sessions together, then the one session's consumers.
+        answer(SEARCH, "[" + list(CONNECTION_ROW) + "," + list(SESSION_ROW) + "]", list(CONSUMER_ROW));
 
-        ConnectionSnapshot snapshot = ops.readConnection(client, "7762766a");
+        ConnectionSnapshot snapshot = ops.readConnection(server.target(), "7762766a");
 
         assertThat(snapshot.remoteAddress()).isEqualTo("172.21.0.5:53156");
+        assertThat(snapshot.user()).isEqualTo("artemis");
         assertThat(snapshot.sessionCount()).isEqualTo(1);
         assertThat(snapshot.consumerCount()).isEqualTo(2);
         assertThat(snapshot.messagesInTransit()).isEqualTo(7L);
     }
 
-    /** The broker answers {@code false} rather than raising, and that is the already-gone verdict. */
     @Test
-    void aCloseTheBrokerAnsweredFalseToIsReportedAsNotClosed() {
-        ArtemisNode client = mock(ArtemisNode.class);
-        when(client.single(any())).thenReturn(new JolokiaResponse(200, mapper.valueToTree(false), null, null, null));
+    void anEmptyListMeansTheTargetIsGone() {
+        answer(SEARCH, list("[]"));
 
-        assertThat(ops.closeConnection(client, "mbean", "gone")).isFalse();
+        assertThat(ops.readSession(server.target(), "sess-1")).isNull();
     }
 
-    @Test
-    void anEmptyPageMeansTheTargetIsGone() {
-        ArtemisNode client = clientAnswering("[]");
-
-        assertThat(ops.readSession(client, "sess-1")).isNull();
-    }
-
-    /** Reads are filtered broker-side, so one row comes back rather than a full dump. */
+    /** Reads are filtered on the broker, so one row comes back rather than a full dump. */
     @Test
     void readsAskTheBrokerToFilterRatherThanFetchingEveryRow() {
-        ArtemisNode client = clientAnswering(SESSION_ROW);
-        ops.connectionIdOfSession(client, "sess-1");
+        answer(SEARCH, list("[]"));
 
-        ArgumentCaptor<JolokiaRequest> captured = ArgumentCaptor.forClass(JolokiaRequest.class);
-        Mockito.verify(client).single(captured.capture());
+        ops.readSession(server.target(), "sess-1");
 
-        JsonNode filter =
-                mapper.readTree((String) captured.getValue().arguments().get(0));
-        assertThat(filter.get("field").asString()).isEqualTo("id");
-        assertThat(filter.get("operation").asString()).isEqualTo("EQUALS");
-        assertThat(filter.get("value").asString()).isEqualTo("sess-1");
+        List<String> sent = server.requests();
+        assertThat(sent.get(1))
+                .contains("listSessions(java.lang.String,int,int)")
+                .contains("{\\\"field\\\":\\\"id\\\",\\\"operation\\\":\\\"EQUALS\\\",\\\"value\\\":\\\"sess-1\\\"}");
     }
 }

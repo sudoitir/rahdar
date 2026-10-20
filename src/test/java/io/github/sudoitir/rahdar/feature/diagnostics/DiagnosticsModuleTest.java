@@ -1,6 +1,5 @@
 package io.github.sudoitir.rahdar.feature.diagnostics;
 
-import io.github.sudoitir.rahdar.platform.broker.BrokerCapabilityProbe;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
 import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
 import io.github.sudoitir.rahdar.platform.broker.BrokerSessions;
@@ -29,9 +28,6 @@ class DiagnosticsModuleTest extends ModuleIntegrationTest {
 
     @MockitoBean
     BrokerSessions sessions;
-
-    @MockitoBean
-    BrokerCapabilityProbe capabilityProbe;
 
     @MockitoBean
     CoreAccountCheck coreAccountCheck;

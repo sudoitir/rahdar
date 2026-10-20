@@ -1,6 +1,6 @@
 package io.github.sudoitir.rahdar.feature.plugins.messaging.internal;
 
-import io.github.sudoitir.rahdar.feature.queues.DivertOperations;
+import io.github.sudoitir.rahdar.system.artemis.DivertOperations;
 import java.util.UUID;
 
 /**

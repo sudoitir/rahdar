@@ -1,6 +1,5 @@
 package io.github.sudoitir.rahdar.feature.queues;
 
-import io.github.sudoitir.rahdar.platform.broker.BrokerCapabilityProbe;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
 import io.github.sudoitir.rahdar.platform.broker.BrokerSessions;
 import io.github.sudoitir.rahdar.platform.broker.CoreAccountCheck;
@@ -28,9 +27,6 @@ class QueuesModuleTest extends ModuleIntegrationTest {
 
     @MockitoBean
     BrokerSessions sessions;
-
-    @MockitoBean
-    BrokerCapabilityProbe capabilityProbe;
 
     @MockitoBean
     CoreAccountCheck coreAccountCheck;

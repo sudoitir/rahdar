@@ -23,6 +23,8 @@ import io.github.sudoitir.rahdar.kernel.core.NotFoundException;
 import io.github.sudoitir.rahdar.platform.broker.Attempt;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
+import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
+import io.github.sudoitir.rahdar.platform.broker.BrokerTarget;
 import io.github.sudoitir.rahdar.platform.broker.BulkCapExceededException;
 import io.github.sudoitir.rahdar.platform.broker.ManagementRefusal;
 import io.github.sudoitir.rahdar.platform.broker.QueueRow;
@@ -38,8 +40,12 @@ import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshotUpsert;
 import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshots;
 import io.github.sudoitir.rahdar.support.AdminAuthenticationExtension;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
+import io.github.sudoitir.rahdar.support.Targets;
 import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
 import io.github.sudoitir.rahdar.system.artemis.ArtemisNodes;
+import io.github.sudoitir.rahdar.system.artemis.DivertOperations;
+import io.github.sudoitir.rahdar.system.artemis.DivertRow;
+import io.github.sudoitir.rahdar.system.artemis.QueueLifecycleOperations;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
@@ -98,6 +104,9 @@ class QueueLifecycleServiceTest extends PostgresIntegrationTest {
     ArtemisNodes artemisNodes;
 
     @MockitoBean
+    BrokerGateway gateway;
+
+    @MockitoBean
     QueueLifecycleOperations ops;
 
     @MockitoBean
@@ -125,6 +134,9 @@ class QueueLifecycleServiceTest extends PostgresIntegrationTest {
         client = mock(ArtemisNode.class);
         when(client.resolveBrokerObjectName()).thenReturn("org.apache.activemq.artemis:broker=\"b\"");
         when(artemisNodes.on(eq(clusterId), any(UUID.class))).thenReturn(client);
+        when(artemisNodes.on(any(BrokerTarget.class))).thenReturn(client);
+        BrokerTarget anyNode = Targets.target();
+        when(gateway.node(any(UUID.class), any(UUID.class))).thenReturn(anyNode);
     }
 
     /** Each node is its own logical node, so both are considered as targets. */

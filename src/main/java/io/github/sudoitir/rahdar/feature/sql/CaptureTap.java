@@ -2,11 +2,11 @@ package io.github.sudoitir.rahdar.feature.sql;
 
 import io.github.sudoitir.openbroker.artemis.JolokiaRequest;
 import io.github.sudoitir.openbroker.artemis.JolokiaResponse;
-import io.github.sudoitir.rahdar.feature.queues.DivertOperations;
-import io.github.sudoitir.rahdar.feature.queues.DivertRow;
-import io.github.sudoitir.rahdar.feature.queues.QueueLifecycleOperations;
 import io.github.sudoitir.rahdar.platform.broker.ManagementRefusal;
 import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
+import io.github.sudoitir.rahdar.system.artemis.DivertOperations;
+import io.github.sudoitir.rahdar.system.artemis.DivertRow;
+import io.github.sudoitir.rahdar.system.artemis.QueueLifecycleOperations;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;

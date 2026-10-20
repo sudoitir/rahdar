@@ -3,9 +3,10 @@ package io.github.sudoitir.rahdar.feature.resources;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
-import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.anything;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withException;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 import io.github.sudoitir.rahdar.feature.resources.web.ResourceViews.AddressView;
@@ -14,6 +15,7 @@ import io.github.sudoitir.rahdar.feature.resources.web.ResourceViews.ConsumerVie
 import io.github.sudoitir.rahdar.feature.resources.web.ResourceViews.SessionView;
 import io.github.sudoitir.rahdar.kernel.core.PagedView;
 import io.github.sudoitir.rahdar.kernel.core.ResourceQuery;
+import io.github.sudoitir.rahdar.kernel.plugin.ResourceKind;
 import io.github.sudoitir.rahdar.kernel.security.ClusterAccessGuard;
 import io.github.sudoitir.rahdar.kernel.security.PermissionResolver;
 import io.github.sudoitir.rahdar.kernel.security.ResourceFilter;
@@ -21,16 +23,17 @@ import io.github.sudoitir.rahdar.kernel.security.ResourceRef;
 import io.github.sudoitir.rahdar.kernel.security.TeamIndex;
 import io.github.sudoitir.rahdar.kernel.security.TeamRef;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
-import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
+import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNodeEntity;
 import io.github.sudoitir.rahdar.support.FixtureJolokia;
-import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
-import io.github.sudoitir.rahdar.system.artemis.ArtemisNodes;
 import java.io.IOException;
+import java.net.ConnectException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
@@ -47,9 +50,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.ResponseCreator;
-import tools.jackson.databind.json.JsonMapper;
 
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -58,16 +61,11 @@ class PagedListServiceTest {
     private static final String URL_A = "http://a:8161/console/jolokia";
     private static final String URL_B = "http://b:8161/console/jolokia";
 
-    private final JsonMapper mapper = new JsonMapper();
-
     @Mock
     ClusterDirectory nodes;
 
     @Mock
-    BrokerConnections connections;
-
-    @Mock
-    ArtemisNodes artemisNodes;
+    BrokerGateway gateway;
 
     /** Permissive by default: an unstubbed void call is a no-op, i.e. access granted.
      * The guard's real behaviour is covered by {@code ClusterScopeAuthorizationTest}. */
@@ -91,16 +89,28 @@ class PagedListServiceTest {
         when(permissions.filter(any(), any())).thenReturn(everything);
         when(everything.readable(any())).thenReturn(true);
         when(everything.allowedActions(any())).thenReturn(List.of());
-        service = new PagedListService(
-                nodes, connections, new ResourceViewMapper(), clusterAccess, permissions, teams, artemisNodes);
+        service = new PagedListService(nodes, new ResourceViewMapper(), clusterAccess, permissions, teams, gateway);
     }
 
-    private ArtemisNode client(String url, String... fixtures) {
+    /** An agent that answers with these fixtures, in order. */
+    private static FixtureJolokia agent(String... fixtures) {
         FixtureJolokia server = new FixtureJolokia();
         for (String fixture : fixtures) {
-            server.expect(requestTo(url)).andRespond(body(fixture));
+            server.expect(anything()).andRespond(body(fixture));
         }
-        return server.node();
+        return server;
+    }
+
+    /** An agent that answers nothing: the connection closes before any response. */
+    private static FixtureJolokia unreachable() {
+        FixtureJolokia server = new FixtureJolokia();
+        server.expect(anything()).andRespond(withException(new ConnectException("Connection refused")));
+        return server;
+    }
+
+    /** The cluster as the gateway gives it: these agents, one per node. */
+    private void serving(UUID clusterId, Map<UUID, FixtureJolokia> agents) {
+        when(gateway.cluster(clusterId)).thenReturn(FixtureJolokia.cluster(agents));
     }
 
     private static ResponseCreator body(String fixture) {
@@ -147,10 +157,9 @@ class PagedListServiceTest {
         BrokerNodeEntity a = node(clusterId, "node-a", URL_A);
         BrokerNodeEntity b = node(clusterId, "node-b", URL_B);
         when(nodes.nodes(clusterId)).thenReturn(List.of(a, b));
-        when(artemisNodes.on(eq(clusterId), any(UUID.class)))
-                .thenThrow(BrokerConnectionException.of(BrokerConnectionException.Kind.UNREACHABLE));
-        when(artemisNodes.on(eq(clusterId), eq(b.getId())))
-                .thenReturn(client(URL_B, "search-broker.json", "list-consumers.json"));
+        serving(
+                clusterId,
+                orderedMap(a.getId(), unreachable(), b.getId(), agent("search-broker.json", "list-consumers.json")));
 
         PagedView<ConsumerView> page = service.consumers(clusterId, ResourceQuery.of(null, 1, 50, null));
 
@@ -164,8 +173,7 @@ class PagedListServiceTest {
         UUID clusterId = UUID.randomUUID();
         BrokerNodeEntity b = node(clusterId, "node-b", URL_B);
         when(nodes.nodes(clusterId)).thenReturn(List.of(b));
-        when(artemisNodes.on(eq(clusterId), eq(b.getId())))
-                .thenReturn(client(URL_B, "search-broker.json", "list-consumers.json"));
+        serving(clusterId, Map.of(b.getId(), agent("search-broker.json", "list-consumers.json")));
 
         // A session row links to its consumers by session id, which is not the field the listing
         // used to filter on (the queue name).
@@ -184,8 +192,9 @@ class PagedListServiceTest {
         UUID clusterId = UUID.randomUUID();
         BrokerNodeEntity a = node(clusterId, "node-a", URL_A);
         when(nodes.nodes(clusterId)).thenReturn(List.of(a));
-        when(artemisNodes.on(eq(clusterId), any(UUID.class)))
-                .thenThrow(BrokerConnectionException.of(BrokerConnectionException.Kind.CREDENTIALS_REJECTED));
+        FixtureJolokia refusing = new FixtureJolokia();
+        refusing.expect(anything()).andRespond(withStatus(HttpStatus.UNAUTHORIZED));
+        serving(clusterId, Map.of(a.getId(), refusing));
 
         ResourceQuery firstPage = ResourceQuery.of(null, 1, 50, null);
 
@@ -200,8 +209,8 @@ class PagedListServiceTest {
         UUID clusterId = UUID.randomUUID();
         BrokerNodeEntity a = node(clusterId, "node-a", URL_A);
         when(nodes.nodes(clusterId)).thenReturn(List.of(a));
-        when(artemisNodes.on(eq(clusterId), eq(a.getId())))
-                .thenReturn(client(URL_A, "search-broker.json", "list-consumers.json"));
+        FixtureJolokia only = agent("search-broker.json", "list-consumers.json");
+        serving(clusterId, Map.of(a.getId(), only));
 
         ExecutorService pool = Executors.newFixedThreadPool(10);
         try {
@@ -221,7 +230,8 @@ class PagedListServiceTest {
             pool.shutdownNow();
         }
 
-        Mockito.verify(artemisNodes, Mockito.times(1)).on(clusterId, a.getId());
+        // The broker name, then the one list every read shared.
+        assertThat(only.requests()).hasSize(2);
     }
 
     @Test
@@ -238,14 +248,19 @@ class PagedListServiceTest {
 
     private static final String QUEUE = "SPIKE.A.q000";
 
+    private static <K, V> Map<K, V> orderedMap(K k1, V v1, K k2, V v2) {
+        Map<K, V> map = new LinkedHashMap<>();
+        map.put(k1, v1);
+        map.put(k2, v2);
+        return map;
+    }
+
     /** A filter that lets the named resources through and nothing else. */
     private void readable(UUID clusterId, String[] queues, String[] addresses) {
         ResourceFilter readableQueues = reading(queues);
         ResourceFilter readableAddresses = reading(addresses);
-        when(permissions.filter(clusterId, io.github.sudoitir.rahdar.kernel.plugin.ResourceKind.QUEUE))
-                .thenReturn(readableQueues);
-        when(permissions.filter(clusterId, io.github.sudoitir.rahdar.kernel.plugin.ResourceKind.ADDRESS))
-                .thenReturn(readableAddresses);
+        when(permissions.filter(clusterId, ResourceKind.QUEUE)).thenReturn(readableQueues);
+        when(permissions.filter(clusterId, ResourceKind.ADDRESS)).thenReturn(readableAddresses);
     }
 
     private static ResourceFilter reading(String... names) {
@@ -260,7 +275,7 @@ class PagedListServiceTest {
         UUID clusterId = UUID.randomUUID();
         BrokerNodeEntity b = node(clusterId, "node-b", URL_B);
         when(nodes.nodes(clusterId)).thenReturn(List.of(b));
-        when(artemisNodes.on(eq(clusterId), eq(b.getId()))).thenReturn(client(URL_B, fixtures));
+        serving(clusterId, Map.of(b.getId(), agent(fixtures)));
         return clusterId;
     }
 

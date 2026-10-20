@@ -1,4 +1,4 @@
-package io.github.sudoitir.rahdar.feature.queues;
+package io.github.sudoitir.rahdar.system.artemis;
 
 import io.github.sudoitir.openbroker.artemis.ArtemisMBeans;
 import io.github.sudoitir.rahdar.kernel.core.NotFoundException;
@@ -9,9 +9,6 @@ import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
-import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
-import io.github.sudoitir.rahdar.system.artemis.ArtemisNodes;
-import io.github.sudoitir.rahdar.system.artemis.QueueLocator;
 import io.github.sudoitir.rahdar.system.artemis.QueueLocator.QueueLocation;
 import java.util.ArrayList;
 import java.util.List;

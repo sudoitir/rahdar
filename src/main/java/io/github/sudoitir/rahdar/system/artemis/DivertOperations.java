@@ -1,4 +1,4 @@
-package io.github.sudoitir.rahdar.feature.queues;
+package io.github.sudoitir.rahdar.system.artemis;
 
 import io.github.sudoitir.openbroker.artemis.ArtemisLists;
 import io.github.sudoitir.openbroker.artemis.ArtemisMBeans;
@@ -6,7 +6,6 @@ import io.github.sudoitir.openbroker.artemis.JolokiaRequest;
 import io.github.sudoitir.openbroker.artemis.JolokiaResponse;
 import io.github.sudoitir.rahdar.platform.broker.ManagementRefusal;
 import io.github.sudoitir.rahdar.platform.clusters.LifecycleOutcome.NodeStatus;
-import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -231,7 +230,7 @@ public class DivertOperations {
      * The cycle a new divert would close, as {@code A → B → A}, or null. Built from the
      * diverts already on the node, excluding any with the new divert's name.
      */
-    static String cycle(List<DivertRow> existing, String name, String address, String forwardingAddress) {
+    public static String cycle(List<DivertRow> existing, String name, String address, String forwardingAddress) {
         Map<String, List<String>> edges = new HashMap<>();
         for (DivertRow d : existing) {
             if (d.address() != null && d.forwardingAddress() != null && !Objects.equals(d.uniqueName(), name)) {

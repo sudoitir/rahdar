@@ -7,8 +7,6 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import io.github.sudoitir.rahdar.feature.queues.DivertOperations;
-import io.github.sudoitir.rahdar.feature.queues.DivertRow;
 import io.github.sudoitir.rahdar.feature.queues.LifecycleRequests.CreateDivertRequest;
 import io.github.sudoitir.rahdar.feature.queues.QueueLifecycleService;
 import io.github.sudoitir.rahdar.feature.routing.web.RoutingViews.DivertView;
@@ -16,6 +14,8 @@ import io.github.sudoitir.rahdar.feature.routing.web.RoutingViews.NodeRef;
 import io.github.sudoitir.rahdar.kernel.core.PagedView;
 import io.github.sudoitir.rahdar.kernel.core.ResourceQuery;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
+import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
+import io.github.sudoitir.rahdar.platform.broker.BrokerTarget;
 import io.github.sudoitir.rahdar.platform.clusters.LifecycleOutcome;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNodeEntity;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNodeEntity.HaObservation;
@@ -24,8 +24,11 @@ import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterE
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterRepository;
 import io.github.sudoitir.rahdar.support.AdminAuthenticationExtension;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
+import io.github.sudoitir.rahdar.support.Targets;
 import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
 import io.github.sudoitir.rahdar.system.artemis.ArtemisNodes;
+import io.github.sudoitir.rahdar.system.artemis.DivertOperations;
+import io.github.sudoitir.rahdar.system.artemis.DivertRow;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -69,6 +72,9 @@ class RoutingServiceTest extends PostgresIntegrationTest {
     ArtemisNodes artemisNodes;
 
     @MockitoBean
+    BrokerGateway gateway;
+
+    @MockitoBean
     DivertOperations divertOps;
 
     private UUID clusterId;
@@ -85,6 +91,9 @@ class RoutingServiceTest extends PostgresIntegrationTest {
         ArtemisNode client = mock(ArtemisNode.class);
         when(client.resolveBrokerObjectName()).thenReturn("org.apache.activemq.artemis:broker=\"b\"");
         when(artemisNodes.on(eq(clusterId), any(UUID.class))).thenReturn(client);
+        when(artemisNodes.on(any(BrokerTarget.class))).thenReturn(client);
+        BrokerTarget anyNode = Targets.target();
+        when(gateway.node(any(UUID.class), any(UUID.class))).thenReturn(anyNode);
         when(divertOps.addressAvailable(any(), any(), any())).thenReturn(true);
         when(divertOps.createVerified(any(), any(), any())).thenReturn(LifecycleOutcome.NodeStatus.APPLIED);
     }
