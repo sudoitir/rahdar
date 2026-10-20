@@ -144,7 +144,7 @@ public class MessageService {
         for (int i = 0; i < browsed.size(); i++) {
             rows.add(toSummary(browsed.get(i), governed.get(i)));
         }
-        clearViews.recordClear(context, "QUEUE", queueName, governed);
+        clearViews.recordClear(context, "SUBSCRIPTION", queueName, governed);
         Long total = result.total();
         // ponytail: with no broker count, a full page is taken to have a successor; the last page can be a false yes
         boolean hasNext = total != null ? (long) page * size < total : rows.size() == size;
@@ -156,6 +156,16 @@ public class MessageService {
                 hasNext,
                 result.totalUnavailable(),
                 resolved.node().getId());
+    }
+
+    /** An action request that moves into the queue of this name, for a caller that holds names rather than ids. */
+    public MessageActionRequest actionRequest(UUID clusterId, List<Long> ids, String filter, String targetQueue) {
+        return new MessageActionRequest(
+                ids.stream().map(String::valueOf).toList(),
+                filter,
+                targetQueue == null
+                        ? null
+                        : messages.queueId(clusterId, targetQueue).format());
     }
 
     public MessageDetailView detail(UUID clusterId, String queueName, long messageId, UUID nodeId, String filter) {
@@ -204,10 +214,10 @@ public class MessageService {
                     resolved.node().getId()));
         }
         try {
-            messages.send(
+            messages.sendTo(
                     clusterId,
                     resolved.node().getId(),
-                    resolved.address(),
+                    ResourceRef.destination(resolved.address()),
                     SentMessages.of(req.kind(), req.durable(), req.body(), req.headers(), req.properties()));
             audit.succeed(event, 1);
             publishQueuesAfterCommit(clusterId, queueName);
@@ -642,7 +652,7 @@ public class MessageService {
     private AuditEvent begin(
             String action, String queueName, UUID clusterId, UUID node, Map<String, ?> params, boolean dryRun) {
         Actor actor = actorResolver.resolve();
-        return audit.begin(actor, action, "QUEUE", queueName, clusterId, node, params, dryRun);
+        return audit.begin(actor, action, "SUBSCRIPTION", queueName, clusterId, node, params, dryRun);
     }
 
     /** Tells the subscribers who read the queue that it changed, once the transaction commits. */
@@ -719,7 +729,7 @@ public class MessageService {
     private static MessageSummaryView toSummary(BrowsedMessage m, GovernedMessage g) {
         String body = g.body();
         return new MessageSummaryView(
-                m.messageId(),
+                String.valueOf(m.messageId()),
                 m.type(),
                 m.durable(),
                 m.priority(),
@@ -758,7 +768,7 @@ public class MessageService {
             }
         });
         return new MessageDetailView(
-                m.messageId(),
+                String.valueOf(m.messageId()),
                 m.type(),
                 m.durable(),
                 m.priority(),

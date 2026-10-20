@@ -1,3 +1,4 @@
+import { subscriptionIdentity } from '../../test/wire.ts';
 import { describe, expect, it, vi } from 'vitest';
 import { http, HttpResponse } from 'msw';
 import { screen, waitFor, within } from '@testing-library/react';
@@ -5,7 +6,7 @@ import userEvent from '@testing-library/user-event';
 
 import { renderWithProviders } from '../../test/render.tsx';
 import { server } from '../../test/setup.ts';
-import type { CapabilityView, QueueView } from './api.ts';
+import type { CapabilityView, SubscriptionView } from './api.ts';
 import { QueueLifecycleActions } from './QueueLifecycleActions.tsx';
 import { holdButton, holdByKeyboard } from '../../test/hold.ts';
 
@@ -49,10 +50,9 @@ function meHandler(permissions: string[] = ['*']) {
   );
 }
 
-function queue(over: Partial<QueueView> = {}): QueueView {
+function queue(over: Partial<SubscriptionView> = {}): SubscriptionView {
   return {
-    address: 'orders.addr',
-    queueName: 'orders',
+    ...subscriptionIdentity('orders', 'orders.addr'),
     allowedActions: [
       'subscription:read',
       'subscription:pause',
@@ -62,7 +62,6 @@ function queue(over: Partial<QueueView> = {}): QueueView {
       'message:read',
       'message:move',
     ],
-    routingType: 'ANYCAST',
     durable: true,
     totalMessageCount: 12,
     totalConsumerCount: 0,
@@ -85,7 +84,7 @@ function queue(over: Partial<QueueView> = {}): QueueView {
       },
     ],
     ...over,
-  } as QueueView;
+  } as SubscriptionView;
 }
 
 function Harness() {
@@ -137,7 +136,10 @@ describe('QueueLifecycleActions capability gating', () => {
 
   it('hides an action the caller cannot take anywhere on the cluster', async () => {
     // Every lifecycle permission except delete, held on the cluster itself: delete is not theirs to be offered.
-    server.use(meHandler(['subscription:create', 'subscription:update', 'subscription:pause', 'cluster:read']), clusterHandler(AVAILABLE));
+    server.use(
+      meHandler(['subscription:create', 'subscription:update', 'subscription:pause', 'cluster:read']),
+      clusterHandler(AVAILABLE),
+    );
     renderWithProviders(<Harness />);
 
     await waitFor(() => expect(screen.queryByRole('button', { name: 'Delete queue' })).not.toBeInTheDocument());
@@ -210,7 +212,11 @@ describe('QueueLifecycleActions capability gating', () => {
       server.use(teamAccess(), clusterHandler(AVAILABLE));
       const user = userEvent.setup();
       renderWithProviders(
-        <QueueLifecycleActions clusterId="c1" queue={queue({ allowedActions: ['subscription:read'] })} onClose={() => {}} />,
+        <QueueLifecycleActions
+          clusterId="c1"
+          queue={queue({ allowedActions: ['subscription:read'] })}
+          onClose={() => {}}
+        />,
       );
 
       await user.click(await screen.findByRole('button', { name: 'Why deleting this queue is unavailable' }));
@@ -224,7 +230,7 @@ describe('the destructive flow is keyboard-complete', () => {
     server.use(
       meHandler(),
       clusterHandler(AVAILABLE),
-      http.delete('*/api/v1/clusters/c1/queues/orders', () =>
+      http.delete('*/api/v1/clusters/c1/resources/artemis.queue/orders', () =>
         HttpResponse.json({
           dryRun: true,
           cap: 1000,
@@ -259,7 +265,7 @@ describe('the destructive flow is keyboard-complete', () => {
     server.use(
       meHandler(),
       clusterHandler(AVAILABLE),
-      http.delete('*/api/v1/clusters/c1/queues/orders', ({ request }) => {
+      http.delete('*/api/v1/clusters/c1/resources/artemis.queue/orders', ({ request }) => {
         const url = new URL(request.url);
         urls.push(url.search);
         const dryRun = url.searchParams.get('dryRun') === 'true';
@@ -339,7 +345,7 @@ describe('the destructive flow is keyboard-complete', () => {
     server.use(
       meHandler(),
       clusterHandler(AVAILABLE),
-      http.delete('*/api/v1/clusters/c1/queues/orders', async ({ request }) => {
+      http.delete('*/api/v1/clusters/c1/resources/artemis.queue/orders', async ({ request }) => {
         const dryRun = new URL(request.url).searchParams.get('dryRun') === 'true';
         if (!dryRun) await gate;
         return HttpResponse.json({
@@ -386,7 +392,7 @@ describe('a delete that failed everywhere', () => {
     server.use(
       meHandler(),
       clusterHandler(AVAILABLE),
-      http.delete('*/api/v1/clusters/c1/queues/orders', ({ request }) => {
+      http.delete('*/api/v1/clusters/c1/resources/artemis.queue/orders', ({ request }) => {
         const dryRun = new URL(request.url).searchParams.get('dryRun') === 'true';
         return HttpResponse.json({
           dryRun,
@@ -432,7 +438,7 @@ describe('a delete no node was live for', () => {
     server.use(
       meHandler(),
       clusterHandler(AVAILABLE),
-      http.delete('*/api/v1/clusters/c1/queues/orders', ({ request }) => {
+      http.delete('*/api/v1/clusters/c1/resources/artemis.queue/orders', ({ request }) => {
         const dryRun = new URL(request.url).searchParams.get('dryRun') === 'true';
         return HttpResponse.json({
           dryRun,
@@ -480,18 +486,17 @@ describe('the edit form', () => {
     return [
       clusterHandler(AVAILABLE),
       meHandler(),
-      http.get('*/api/v1/clusters/c1/queues/orders/configuration', () =>
+      http.get('*/api/v1/clusters/c1/resources/artemis.queue/orders', () =>
         HttpResponse.json({
-          queueName: 'orders',
-          address: 'orders.addr',
-          routingType: 'ANYCAST',
+          ...subscriptionIdentity('orders', 'orders.addr'),
           nodes: [{ nodeId: 'n1', nodeName: 'node-a', values: current, unavailableReason: null }],
         }),
       ),
-      http.patch('*/api/v1/clusters/c1/queues/orders', async ({ request }) => {
-        const body = (await request.json()) as Record<string, unknown>;
+      http.patch('*/api/v1/clusters/c1/resources/artemis.queue/orders', async ({ request }) => {
+        const body = (await request.json()) as { attributes?: Record<string, unknown> };
         onPatch?.(body);
-        if (body.maxConsumers !== undefined) current = { ...current, 'max-consumers': body.maxConsumers };
+        if (body.attributes?.maxConsumers !== undefined)
+          current = { ...current, 'max-consumers': body.attributes.maxConsumers };
         return HttpResponse.json({
           dryRun: false,
           cap: 1000,
@@ -527,8 +532,8 @@ describe('the edit form', () => {
     await waitFor(() => expect(consumers).toHaveValue('4'));
     // Only the field the operator changed is sent; the rest is left to the merge.
     expect(patched).toHaveBeenCalledTimes(1);
-    expect(patched.mock.calls[0][0]).toMatchObject({ maxConsumers: 4 });
-    expect((patched.mock.calls[0][0] as Record<string, unknown>).ringSize).toBeUndefined();
+    expect(patched.mock.calls[0][0]).toMatchObject({ attributes: { maxConsumers: 4 } });
+    expect((patched.mock.calls[0][0] as { attributes: Record<string, unknown> }).attributes.ringSize).toBeUndefined();
   });
 });
 
@@ -537,7 +542,7 @@ describe('a pause the broker refused', () => {
     server.use(
       meHandler(),
       clusterHandler(AVAILABLE),
-      http.post('*/api/v1/clusters/c1/queues/orders/pause', () =>
+      http.post('*/api/v1/clusters/c1/resources/artemis.queue/orders:pause', () =>
         HttpResponse.json({ title: 'Pause failed', detail: 'node-a did not answer.' }, { status: 502 }),
       ),
     );
@@ -560,7 +565,7 @@ describe('the delete result', () => {
     server.use(
       meHandler(),
       clusterHandler(AVAILABLE),
-      http.delete('*/api/v1/clusters/c1/queues/orders', ({ request }) => {
+      http.delete('*/api/v1/clusters/c1/resources/artemis.queue/orders', ({ request }) => {
         const dryRun = new URL(request.url).searchParams.get('dryRun') === 'true';
         return HttpResponse.json({
           dryRun,

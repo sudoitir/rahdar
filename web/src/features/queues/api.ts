@@ -8,18 +8,25 @@ import {
   request,
 } from '../../kernel/api/request.ts';
 import { type PagedView, type ResourceParams, resourceSearch } from '../../kernel/api/paging.ts';
+import { addressId, nameOf, queueId, resourcePath } from '../../kernel/api/resourceId.ts';
 import type { components } from '../../kernel/api/schema.d.ts';
 
 type Schemas = components['schemas'];
 
-export type AddressView = Schemas['AddressView'];
+export type DestinationView = Schemas['DestinationView'];
 export type CapabilityView = Schemas['CapabilityView'];
-export type CreateAddressRequest = Schemas['CreateAddressRequest'];
-export type CreateQueueRequest = Schemas['CreateQueueRequest'];
+export type CreateDestinationRequest = Schemas['CreateDestinationRequest'];
+export type CreateSubscriptionRequest = Schemas['CreateSubscriptionRequest'];
 export type LifecycleOutcomeView = Schemas['LifecycleOutcomeView'];
-export type QueueConfiguration = Schemas['QueueConfiguration'];
-export type QueueView = Schemas['QueueView'];
-export type UpdateQueueRequest = Schemas['UpdateQueueRequest'];
+export type SubscriptionConfiguration = Schemas['SubscriptionConfiguration'];
+export type SubscriptionView = Schemas['SubscriptionView'];
+export type UpdateResourceRequest = Schemas['UpdateResourceRequest'];
+
+/** The name of the destination a subscription is bound to. */
+export const addressOf = (q: SubscriptionView): string => nameOf(q.destination);
+
+/** The routing type the system reports for a subscription, in the case it reports it. */
+export const routingTypeOf = (q: SubscriptionView): string => q.nativeAttributes.routingType ?? '';
 
 export const keys = {
   resource: (id: string, kind: string, params: ResourceParams = {}) => clusterKey(id, kind, params),
@@ -32,13 +39,13 @@ export function useQueues(
   params: ResourceParams = {},
   /** `enabled: false` holds the read; `live: false` reads once instead of polling. */
   options: { enabled?: boolean; live?: boolean } = {},
-): UseQueryResult<PagedView<QueueView>, ApiError> {
+): UseQueryResult<PagedView<SubscriptionView>, ApiError> {
   return useQuery({
     queryKey: keys.resource(id, 'queues', params),
-    queryFn: () => request<PagedView<QueueView>>(`/clusters/${id}/queues${resourceSearch(params)}`),
+    queryFn: () => request<PagedView<SubscriptionView>>(`/clusters/${id}/subscriptions${resourceSearch(params)}`),
     // The command palette mounts on every route, including the ones outside a
     // cluster, where it has no id to give. Without this it requested
-    // `/clusters//queues`, which is a 400 — and an errored observed query puts
+    // `/clusters//subscriptions`, which is a 400 — and an errored observed query puts
     // the whole shell into its offline state, so every cluster-less screen
     // claimed Rahdar had lost the brokers.
     enabled: id !== '' && (options.enabled ?? true),
@@ -55,10 +62,10 @@ export function useAddresses(
   id: string,
   params: ResourceParams,
   enabled: boolean,
-): UseQueryResult<PagedView<AddressView>, ApiError> {
+): UseQueryResult<PagedView<DestinationView>, ApiError> {
   return useQuery({
     queryKey: keys.resource(id, 'addresses', params),
-    queryFn: () => request<PagedView<AddressView>>(`/clusters/${id}/addresses${resourceSearch(params)}`),
+    queryFn: () => request<PagedView<DestinationView>>(`/clusters/${id}/destinations${resourceSearch(params)}`),
     enabled: id !== '' && enabled,
     placeholderData: (prev) => prev,
   });
@@ -72,18 +79,20 @@ export function useAddresses(
 export function useQueue(
   clusterId: string,
   queueName: string | undefined,
-  snapshot?: QueueView,
-): { queue: QueueView | undefined; isPending: boolean; isError: boolean; error: Error | null } {
+  snapshot?: SubscriptionView,
+): { queue: SubscriptionView | undefined; isPending: boolean; isError: boolean; error: Error | null } {
   const lookup = useQuery({
     queryKey: keys.resource(clusterId, 'queues', { q: queueName, size: 50 }),
     queryFn: () =>
-      request<PagedView<QueueView>>(`/clusters/${clusterId}/queues${resourceSearch({ q: queueName, size: 50 })}`),
+      request<PagedView<SubscriptionView>>(
+        `/clusters/${clusterId}/subscriptions${resourceSearch({ q: queueName, size: 50 })}`,
+      ),
     enabled: !snapshot && clusterId !== '' && Boolean(queueName),
     refetchInterval: 5_000,
   });
   if (snapshot) return { queue: snapshot, isPending: false, isError: false, error: null };
   return {
-    queue: lookup.data?.data.find((q) => q.queueName === queueName),
+    queue: lookup.data?.data.find((q) => q.name === queueName),
     isPending: Boolean(queueName) && lookup.isPending,
     isError: lookup.isError,
     error: lookup.error,
@@ -99,11 +108,10 @@ export function useQueueConfiguration(
   clusterId: string,
   queueName: string,
   enabled = true,
-): UseQueryResult<QueueConfiguration, ApiError> {
+): UseQueryResult<SubscriptionConfiguration, ApiError> {
   return useQuery({
     queryKey: keys.configuration(clusterId, queueName),
-    queryFn: () =>
-      request<QueueConfiguration>(`/clusters/${clusterId}/queues/${encodeURIComponent(queueName)}/configuration`),
+    queryFn: () => request<SubscriptionConfiguration>(`/clusters/${clusterId}${resourcePath(queueId(queueName))}`),
     enabled: enabled && clusterId !== '' && queueName !== '',
   });
 }
@@ -131,8 +139,8 @@ function useLifecycleMutation<V extends LifecycleVars>(
 }
 
 export function useCreateQueue(clusterId: string) {
-  return useLifecycleMutation<LifecycleVars & { body: CreateQueueRequest }>(clusterId, ({ body, dryRun }) =>
-    request(`${lifecycleBase(clusterId)}/queues${lifecycleQuery(dryRun)}`, {
+  return useLifecycleMutation<LifecycleVars & { body: CreateSubscriptionRequest }>(clusterId, ({ body, dryRun }) =>
+    request(`${lifecycleBase(clusterId)}/subscriptions${lifecycleQuery(dryRun)}`, {
       method: 'POST',
       body: JSON.stringify(body),
     }),
@@ -140,8 +148,8 @@ export function useCreateQueue(clusterId: string) {
 }
 
 export function useUpdateQueue(clusterId: string, queueName: string) {
-  return useLifecycleMutation<LifecycleVars & { body: UpdateQueueRequest }>(clusterId, ({ body, dryRun }) =>
-    request(`${lifecycleBase(clusterId)}/queues/${encodeURIComponent(queueName)}${lifecycleQuery(dryRun)}`, {
+  return useLifecycleMutation<LifecycleVars & { body: UpdateResourceRequest }>(clusterId, ({ body, dryRun }) =>
+    request(`${lifecycleBase(clusterId)}${resourcePath(queueId(queueName))}${lifecycleQuery(dryRun)}`, {
       method: 'PATCH',
       body: JSON.stringify(body),
     }),
@@ -159,7 +167,7 @@ export function useDeleteQueue(clusterId: string, queueName: string) {
       const query = lifecycleQuery(dryRun, override);
       const separator = query ? '&' : '?';
       const flag = disconnectConsumers ? `${separator}disconnectConsumers=true` : '';
-      return request(`${lifecycleBase(clusterId)}/queues/${encodeURIComponent(queueName)}${query}${flag}`, {
+      return request(`${lifecycleBase(clusterId)}${resourcePath(queueId(queueName))}${query}${flag}`, {
         method: 'DELETE',
       });
     },
@@ -170,7 +178,7 @@ export function useDeleteQueue(clusterId: string, queueName: string) {
 export function useSetQueuePaused(clusterId: string, queueName: string) {
   return useLifecycleMutation<LifecycleVars & { paused: boolean }>(clusterId, ({ paused, dryRun }) =>
     request(
-      `${lifecycleBase(clusterId)}/queues/${encodeURIComponent(queueName)}/${paused ? 'pause' : 'resume'}${lifecycleQuery(dryRun)}`,
+      `${lifecycleBase(clusterId)}${resourcePath(queueId(queueName))}:${paused ? 'pause' : 'resume'}${lifecycleQuery(dryRun)}`,
       { method: 'POST' },
     ),
   );
@@ -178,16 +186,15 @@ export function useSetQueuePaused(clusterId: string, queueName: string) {
 
 export function useResetQueueCounter(clusterId: string, queueName: string) {
   return useLifecycleMutation<LifecycleVars>(clusterId, ({ dryRun }) =>
-    request(
-      `${lifecycleBase(clusterId)}/queues/${encodeURIComponent(queueName)}/reset-counter${lifecycleQuery(dryRun)}`,
-      { method: 'POST' },
-    ),
+    request(`${lifecycleBase(clusterId)}${resourcePath(queueId(queueName))}:reset-counters${lifecycleQuery(dryRun)}`, {
+      method: 'POST',
+    }),
   );
 }
 
 export function useCreateAddress(clusterId: string) {
-  return useLifecycleMutation<LifecycleVars & { body: CreateAddressRequest }>(clusterId, ({ body, dryRun }) =>
-    request(`${lifecycleBase(clusterId)}/addresses${lifecycleQuery(dryRun)}`, {
+  return useLifecycleMutation<LifecycleVars & { body: CreateDestinationRequest }>(clusterId, ({ body, dryRun }) =>
+    request(`${lifecycleBase(clusterId)}/destinations${lifecycleQuery(dryRun)}`, {
       method: 'POST',
       body: JSON.stringify(body),
     }),
@@ -196,7 +203,7 @@ export function useCreateAddress(clusterId: string) {
 
 export function useDeleteAddress(clusterId: string, address: string) {
   return useLifecycleMutation<LifecycleVars>(clusterId, ({ dryRun }) =>
-    request(`${lifecycleBase(clusterId)}/addresses/${encodeURIComponent(address)}${lifecycleQuery(dryRun)}`, {
+    request(`${lifecycleBase(clusterId)}${resourcePath(addressId(address))}${lifecycleQuery(dryRun)}`, {
       method: 'DELETE',
     }),
   );

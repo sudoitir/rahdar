@@ -1,8 +1,7 @@
 package io.github.sudoitir.rahdar.feature.routing.web;
 
 import io.github.sudoitir.rahdar.feature.routing.RoutingService;
-import io.github.sudoitir.rahdar.feature.routing.web.RoutingViews.BridgeView;
-import io.github.sudoitir.rahdar.feature.routing.web.RoutingViews.DivertView;
+import io.github.sudoitir.rahdar.feature.routing.web.RoutingViews.RouteView;
 import io.github.sudoitir.rahdar.kernel.core.PagedView;
 import io.github.sudoitir.rahdar.kernel.core.ResourceQuery;
 import java.util.UUID;
@@ -15,10 +14,11 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * A cluster's routing: its diverts and its bridges.
+ * A cluster's routes: what carries messages from one place to another, whatever the system calls it
+ * (an Artemis divert or bridge).
  *
- * <p>Reading either needs only {@code cluster:read}. Creating and deleting a divert
- * are {@link DivertController}'s, under the Artemis namespace.
+ * <p>Reading them needs only {@code cluster:read}. Creating and deleting a divert are
+ * {@link DivertController}'s, under the Artemis namespace.
  *
  * <p>Bridges are read-only, permanently. Creating or changing one alters how a
  * cluster is wired to other brokers and is invisible to whatever manages that
@@ -31,14 +31,9 @@ public class RoutingController {
 
     private final RoutingService routing;
 
-    @GetMapping("/diverts")
-    public PagedView<DivertView> diverts(@PathVariable UUID clusterId, ResourceQuery query) {
-        return routing.diverts(clusterId, query);
-    }
-
-    @GetMapping("/bridges")
-    public PagedView<BridgeView> bridges(@PathVariable UUID clusterId, ResourceQuery query) {
-        return routing.bridges(clusterId, query);
+    @GetMapping("/routes")
+    public PagedView<RouteView> routes(@PathVariable UUID clusterId, ResourceQuery query) {
+        return routing.routes(clusterId, query);
     }
 
     /** Binds {@code ?q=&page=&size=&sort=} to the shared query envelope. */

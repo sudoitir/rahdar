@@ -1,12 +1,13 @@
 import { useMutation, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
 import { ApiError, clusterKey, request } from '../../kernel/api/request.ts';
+import { queueId, resourcePath } from '../../kernel/api/resourceId.ts';
 import type { components } from '../../kernel/api/schema.d.ts';
 
 type Schemas = components['schemas'];
 
 export type AffectedView = Schemas['AffectedView'];
-export type DlqQueue = Schemas['DlqQueue'];
-export type DlqView = Schemas['DlqView'];
+export type DeadLetterSubscription = Schemas['DeadLetterSubscription'];
+export type DeadLetterView = Schemas['DeadLetterView'];
 export type DryRunView = Schemas['DryRunView'];
 export type MessageActionRequest = Schemas['MessageActionRequest'];
 export type MessageDetailView = Schemas['MessageDetailView'];
@@ -49,10 +50,7 @@ export function useMessages(
 ): UseQueryResult<MessagePageView, ApiError> {
   return useQuery({
     queryKey: keys.messages(clusterId, queueName, params),
-    queryFn: () =>
-      request<MessagePageView>(
-        `/clusters/${clusterId}/queues/${encodeURIComponent(queueName)}/messages${messageSearch(params)}`,
-      ),
+    queryFn: () => request<MessagePageView>(`${messagesBase(clusterId, queueName)}${messageSearch(params)}`),
     // A queue is not a document: messages arrive and are consumed while the
     // screen is open, and a browse that never refreshes shows an arrangement of
     // the queue that stopped being true the moment it was drawn. One bounded
@@ -78,7 +76,7 @@ export function useMessageDetail(
       const qs = sp.toString();
       const query = qs ? `?${qs}` : '';
       return request<MessageDetailView>(
-        `/clusters/${clusterId}/queues/${encodeURIComponent(queueName)}/messages/${messageId}${query}`,
+        `${messagesBase(clusterId, queueName)}/${encodeURIComponent(messageId ?? '')}${query}`,
       );
     },
     enabled: messageId !== null,
@@ -91,8 +89,12 @@ export interface BulkCapProblem {
   cap: number;
 }
 
+function resourceBase(clusterId: string, queueName: string) {
+  return `/clusters/${clusterId}${resourcePath(queueId(queueName))}`;
+}
+
 function messagesBase(clusterId: string, queueName: string) {
-  return `/clusters/${clusterId}/queues/${encodeURIComponent(queueName)}/messages`;
+  return `${resourceBase(clusterId, queueName)}/messages`;
 }
 
 function mutationQuery(node?: string, dryRun?: boolean, override?: boolean): string {
@@ -139,7 +141,7 @@ export function useMessageAction(clusterId: string, queueName: string) {
   const qc = useQueryClient();
   return useMutation<AffectedView | DryRunView | PartialView, ApiError, ActionVars>({
     mutationFn: ({ action, body, node, dryRun, override }) =>
-      request(`${messagesBase(clusterId, queueName)}/actions/${action}${mutationQuery(node, dryRun, override)}`, {
+      request(`${resourceBase(clusterId, queueName)}/messages:${action}${mutationQuery(node, dryRun, override)}`, {
         method: 'POST',
         body: JSON.stringify(body),
       }),
@@ -162,8 +164,8 @@ export function usePurgeQueue(clusterId: string, queueName: string) {
   const qc = useQueryClient();
   return useMutation<AffectedView | DryRunView, ApiError, PurgeVars>({
     mutationFn: ({ node, dryRun, override }) =>
-      request(`${messagesBase(clusterId, queueName)}${mutationQuery(node, dryRun, override)}`, {
-        method: 'DELETE',
+      request(`${resourceBase(clusterId, queueName)}:purge${mutationQuery(node, dryRun, override)}`, {
+        method: 'POST',
       }),
     onSuccess: (result) => {
       // DryRunView carries `cap`; AffectedView does not. Only a real run changes state.
@@ -174,10 +176,10 @@ export function usePurgeQueue(clusterId: string, queueName: string) {
   });
 }
 
-export function useDlq(clusterId: string): UseQueryResult<DlqView, ApiError> {
+export function useDlq(clusterId: string): UseQueryResult<DeadLetterView, ApiError> {
   return useQuery({
     queryKey: ['clusters', clusterId, 'dlq'],
-    queryFn: () => request<DlqView>(`/clusters/${clusterId}/dlq`),
+    queryFn: () => request<DeadLetterView>(`/clusters/${clusterId}/dead-letters`),
     refetchInterval: 10_000,
   });
 }

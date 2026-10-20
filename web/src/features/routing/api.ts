@@ -7,25 +7,43 @@ import {
   type LifecycleVars,
   request,
 } from '../../kernel/api/request.ts';
-import { type ResourceParams, useResource } from '../../kernel/api/paging.ts';
+import { type PagedView, type ResourceParams, useResource } from '../../kernel/api/paging.ts';
+import { bridgeRow, divertRow, type BridgeRow, type DivertRow, type RouteView } from '../../kernel/api/routes.ts';
 import type { components } from '../../kernel/api/schema.d.ts';
 
 type Schemas = components['schemas'];
 
-export type BridgeView = Schemas['BridgeView'];
 export type CapabilityView = Schemas['CapabilityView'];
+export type { BridgeRow, DivertRow, RouteView };
 export type CreateDivertRequest = Schemas['CreateDivertRequest'];
 export type DivertMutationView = Schemas['DivertMutationView'];
-export type DivertView = Schemas['DivertView'];
 export type LifecycleOutcomeView = Schemas['LifecycleOutcomeView'];
 
 export const keys = {
   resource: (id: string, kind: string, params: ResourceParams = {}) => clusterKey(id, kind, params),
 };
 
-export const useDiverts = (id: string, p: ResourceParams = {}) => useResource<DivertView>(id, 'diverts', p);
+function ofClass<T>(
+  query: ReturnType<typeof useResource<RouteView>>,
+  routeClass: string,
+  row: (r: RouteView) => T,
+): Omit<typeof query, 'data'> & { data: PagedView<T> | undefined } {
+  const { data, ...rest } = query;
+  const rows = data?.data.filter((r) => r.routeClass === routeClass).map(row);
+  return {
+    ...rest,
+    data:
+      data && rows
+        ? { ...data, data: rows, count: rows.length === data.data.length ? data.count : rows.length }
+        : undefined,
+  };
+}
 
-export const useBridges = (id: string, p: ResourceParams = {}) => useResource<BridgeView>(id, 'bridges', p);
+export const useDiverts = (id: string, p: ResourceParams = {}) =>
+  ofClass(useResource<RouteView>(id, 'routes', p), 'FORWARD', divertRow);
+
+export const useBridges = (id: string, p: ResourceParams = {}) =>
+  ofClass(useResource<RouteView>(id, 'routes', p), 'LINK', bridgeRow);
 
 /**
  * Create a divert across the cluster. The response carries the `broker.xml` that
@@ -43,7 +61,7 @@ export function useCreateDivert(clusterId: string) {
       }),
     onSuccess: (result) => {
       if (result.outcome.dryRun) return;
-      void qc.invalidateQueries({ queryKey: keys.resource(clusterId, 'diverts') });
+      void qc.invalidateQueries({ queryKey: keys.resource(clusterId, 'routes') });
     },
   });
 }
@@ -61,7 +79,7 @@ export function useDeleteDivert(clusterId: string, name: string) {
       }),
     onSuccess: (result) => {
       if (result.dryRun) return;
-      void qc.invalidateQueries({ queryKey: keys.resource(clusterId, 'diverts') });
+      void qc.invalidateQueries({ queryKey: keys.resource(clusterId, 'routes') });
     },
   });
 }

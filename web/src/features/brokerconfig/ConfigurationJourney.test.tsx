@@ -27,8 +27,12 @@ function shell() {
     ),
     http.get('*/api/v1/environments', () => HttpResponse.json(paged([]))),
     http.get('*/api/v1/alerts/firing', () => HttpResponse.json(paged([]))),
-    http.get('*/api/v1/clusters/c1/queues', () => HttpResponse.json({ data: [], count: 0, page: 1, pageSize: 50 })),
-    http.get('*/api/v1/clusters/c1/dlq', () => HttpResponse.json({ settingsAvailable: true, addresses: [] })),
+    http.get('*/api/v1/clusters/c1/subscriptions', () =>
+      HttpResponse.json({ data: [], count: 0, page: 1, pageSize: 50 }),
+    ),
+    http.get('*/api/v1/clusters/c1/dead-letters', () =>
+      HttpResponse.json({ settingsAvailable: true, destinations: [] }),
+    ),
     http.get('*/api/v1/clusters/c1', () =>
       HttpResponse.json({
         id: 'c1',
@@ -70,7 +74,7 @@ const drifted = declaration({
 });
 
 function applyHandler(onReal: () => ConfigApplyOutcomeView, seen?: (body: unknown, dryRun: string | null) => void) {
-  return http.post('*/api/v1/clusters/c1/config/apply', async ({ request }) => {
+  return http.post('*/api/v1/clusters/c1/artemis/config/apply', async ({ request }) => {
     const url = new URL(request.url);
     const body = await request.json();
     seen?.(body, url.searchParams.get('dryRun'));
@@ -144,7 +148,7 @@ describe('the configuration screen', () => {
     server.use(
       ...shell(),
       ...baseHandlers(drifted),
-      http.post('*/api/v1/clusters/c1/config/apply', () => HttpResponse.json(withAlready())),
+      http.post('*/api/v1/clusters/c1/artemis/config/apply', () => HttpResponse.json(withAlready())),
     );
     const user = userEvent.setup();
     await open();
@@ -257,7 +261,7 @@ describe('the configuration screen', () => {
     server.use(
       ...shell(),
       // Ahead of the base handlers: the first match wins, and this one moves.
-      http.get('*/api/v1/clusters/c1/config', () =>
+      http.get('*/api/v1/clusters/c1/artemis/config', () =>
         HttpResponse.json(
           revision === 3
             ? drifted
@@ -270,7 +274,7 @@ describe('the configuration screen', () => {
               }),
         ),
       ),
-      http.put('*/api/v1/clusters/c1/config', () => {
+      http.put('*/api/v1/clusters/c1/artemis/config', () => {
         revision = 4;
         return HttpResponse.json(declaration({ revision: 4 }), { status: 201 });
       }),

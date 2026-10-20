@@ -1,10 +1,11 @@
+import { subscriptionIdentity } from '../../test/wire.ts';
 import { describe, expect, it, vi } from 'vitest';
 import { http, HttpResponse } from 'msw';
 import { screen, within } from '@testing-library/react';
 
 import { renderWithProviders } from '../../test/render.tsx';
 import { server } from '../../test/setup.ts';
-import type { QueueView } from './api.ts';
+import type { SubscriptionView } from './api.ts';
 
 vi.mock('@tanstack/react-router', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@tanstack/react-router')>()),
@@ -42,8 +43,7 @@ function cell(nodeId: string, nodeName: string, messageCount: number, stale = fa
 }
 
 const QUEUE = {
-  address: 'orders',
-  queueName: 'orders.in',
+  ...subscriptionIdentity('orders.in', 'orders'),
   allowedActions: [
     'subscription:read',
     'subscription:pause',
@@ -53,7 +53,6 @@ const QUEUE = {
     'message:read',
     'message:move',
   ],
-  routingType: 'ANYCAST',
   durable: true,
   totalMessageCount: 42,
   totalConsumerCount: 4,
@@ -63,7 +62,7 @@ const QUEUE = {
   nodesTotal: 3,
   paused: false,
   perNode: [cell('a', 'node-a', 40), cell('b', 'node-b', 2, true)],
-} as unknown as QueueView;
+} as unknown as SubscriptionView;
 
 function serve() {
   server.use(

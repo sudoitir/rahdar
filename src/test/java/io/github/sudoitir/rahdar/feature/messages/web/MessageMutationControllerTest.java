@@ -1,9 +1,9 @@
 package io.github.sudoitir.rahdar.feature.messages.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -83,6 +83,8 @@ class MessageMutationControllerTest extends PostgresIntegrationTest {
     @BeforeEach
     void setUp() {
         mvc = webAppContextSetup(webContext).build();
+        when(gateway.cluster(any()))
+                .thenReturn(FixtureJolokia.cluster(Map.of(UUID.randomUUID(), new FixtureJolokia())));
         clusterId = clusters.save(new ClusterEntity("c-" + UUID.randomUUID(), null, null))
                 .getId();
         BrokerNodeEntity a = BrokerNodeEntity.fromSeed(
@@ -125,7 +127,7 @@ class MessageMutationControllerTest extends PostgresIntegrationTest {
     @Test
     void sendDryRunWritesAPendingToSuccessRowAndIssuesNoBrokerCall() throws Exception {
         // No client stub → any broker POST would fail the test.
-        mvc.perform(post("/api/v1/clusters/{c}/queues/{q}/messages", clusterId, Q)
+        mvc.perform(post("/api/v1/clusters/{c}/resources/artemis.queue/{q}/messages", clusterId, Q)
                         .param("dryRun", "true")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"kind\":\"TEXT\",\"durable\":true,\"body\":\"hi\"}"))
@@ -143,7 +145,7 @@ class MessageMutationControllerTest extends PostgresIntegrationTest {
     void sendRealWritesASuccessRowWithCountOne() throws Exception {
         FakeArtemis broker = serving().operation("sendMessage", "ID:1");
 
-        mvc.perform(post("/api/v1/clusters/{c}/queues/{q}/messages", clusterId, Q)
+        mvc.perform(post("/api/v1/clusters/{c}/resources/artemis.queue/{q}/messages", clusterId, Q)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"kind\":\"TEXT\",\"durable\":true,\"body\":\"hi\",\"properties\":{\"k\":\"v\"}}"))
                 .andExpect(status().isOk())
@@ -158,7 +160,7 @@ class MessageMutationControllerTest extends PostgresIntegrationTest {
 
     @Test
     void sendValidationFailureIsA400WithNoAuditRow() throws Exception {
-        mvc.perform(post("/api/v1/clusters/{c}/queues/{q}/messages", clusterId, Q)
+        mvc.perform(post("/api/v1/clusters/{c}/resources/artemis.queue/{q}/messages", clusterId, Q)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"durable\":true}"))
                 .andExpect(status().isBadRequest());
@@ -167,7 +169,7 @@ class MessageMutationControllerTest extends PostgresIntegrationTest {
 
     @Test
     void sendOfABytesBodyThatIsNotBase64IsA400WithNoAuditRow() throws Exception {
-        mvc.perform(post("/api/v1/clusters/{c}/queues/{q}/messages", clusterId, Q)
+        mvc.perform(post("/api/v1/clusters/{c}/resources/artemis.queue/{q}/messages", clusterId, Q)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"kind\":\"BYTES\",\"durable\":true,\"body\":\"not base64!\"}"))
                 .andExpect(status().isBadRequest());
@@ -178,10 +180,10 @@ class MessageMutationControllerTest extends PostgresIntegrationTest {
 
     @Test
     void deleteByIdsDryRunNeedsNoBrokerAndAuditsTheIdCount() throws Exception {
-        mvc.perform(post("/api/v1/clusters/{c}/queues/{q}/messages/actions/delete", clusterId, Q)
+        mvc.perform(post("/api/v1/clusters/{c}/resources/artemis.queue/{q}/messages:delete", clusterId, Q)
                         .param("dryRun", "true")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"messageIds\":[1,2,3]}"))
+                        .content("{\"positions\":[\"1\",\"2\",\"3\"]}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.affectedCount").value(3));
 
@@ -195,9 +197,9 @@ class MessageMutationControllerTest extends PostgresIntegrationTest {
     void deleteByIdsRealCountsTheBrokerBooleans() throws Exception {
         FakeArtemis broker = serving().operation("removeMessage", true);
 
-        mvc.perform(post("/api/v1/clusters/{c}/queues/{q}/messages/actions/delete", clusterId, Q)
+        mvc.perform(post("/api/v1/clusters/{c}/resources/artemis.queue/{q}/messages:delete", clusterId, Q)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"messageIds\":[10,11]}"))
+                        .content("{\"positions\":[\"10\",\"11\"]}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.affectedCount").value(2));
 
@@ -207,9 +209,9 @@ class MessageMutationControllerTest extends PostgresIntegrationTest {
 
     @Test
     void moveByIdsWithoutTargetIsA400() throws Exception {
-        mvc.perform(post("/api/v1/clusters/{c}/queues/{q}/messages/actions/move", clusterId, Q)
+        mvc.perform(post("/api/v1/clusters/{c}/resources/artemis.queue/{q}/messages:move", clusterId, Q)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"messageIds\":[1]}"))
+                        .content("{\"positions\":[\"1\"]}"))
                 .andExpect(status().isBadRequest());
     }
 
@@ -219,7 +221,7 @@ class MessageMutationControllerTest extends PostgresIntegrationTest {
     void deleteByFilterDryRunIssuesOnlyCountMessages() throws Exception {
         FakeArtemis broker = serving().operation("countMessages", 3);
 
-        mvc.perform(post("/api/v1/clusters/{c}/queues/{q}/messages/actions/delete", clusterId, Q)
+        mvc.perform(post("/api/v1/clusters/{c}/resources/artemis.queue/{q}/messages:delete", clusterId, Q)
                         .param("dryRun", "true")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"filter\":\"region = 'eu'\"}"))
@@ -236,7 +238,7 @@ class MessageMutationControllerTest extends PostgresIntegrationTest {
         settings.put(BrokerSettings.BULK_CAP, "2");
         serving().operation("countMessages", 3);
 
-        mvc.perform(post("/api/v1/clusters/{c}/queues/{q}/messages/actions/delete", clusterId, Q)
+        mvc.perform(post("/api/v1/clusters/{c}/resources/artemis.queue/{q}/messages:delete", clusterId, Q)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"filter\":\"region = 'eu'\"}"))
                 .andExpect(status().isUnprocessableEntity())
@@ -252,7 +254,7 @@ class MessageMutationControllerTest extends PostgresIntegrationTest {
         settings.put(BrokerSettings.BULK_CAP, "3");
         serving().operation("countMessages", 3).operation("removeMessages", 3);
 
-        mvc.perform(post("/api/v1/clusters/{c}/queues/{q}/messages/actions/delete", clusterId, Q)
+        mvc.perform(post("/api/v1/clusters/{c}/resources/artemis.queue/{q}/messages:delete", clusterId, Q)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"filter\":\"region = 'eu'\"}"))
                 .andExpect(status().isOk());
@@ -265,7 +267,7 @@ class MessageMutationControllerTest extends PostgresIntegrationTest {
         settings.put(BrokerSettings.BULK_CAP, "2");
         serving().operation("countMessages", 3).operation("removeMessages", 1);
 
-        mvc.perform(post("/api/v1/clusters/{c}/queues/{q}/messages/actions/delete", clusterId, Q)
+        mvc.perform(post("/api/v1/clusters/{c}/resources/artemis.queue/{q}/messages:delete", clusterId, Q)
                         .param("override", "true")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"filter\":\"region = 'eu'\"}"))
@@ -281,7 +283,7 @@ class MessageMutationControllerTest extends PostgresIntegrationTest {
     void purgeDryRunReadsMessageCountAndDoesNotRemove() throws Exception {
         FakeArtemis broker = serving();
 
-        mvc.perform(delete("/api/v1/clusters/{c}/queues/{q}/messages", clusterId, Q)
+        mvc.perform(post("/api/v1/clusters/{c}/resources/artemis.queue/{q}:purge", clusterId, Q)
                         .param("dryRun", "true"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.affectedCount").value(3));
@@ -296,7 +298,7 @@ class MessageMutationControllerTest extends PostgresIntegrationTest {
     void purgeRealAuditsTheRemovedCount() throws Exception {
         FakeArtemis broker = serving().operation("removeAllMessages", 3);
 
-        mvc.perform(delete("/api/v1/clusters/{c}/queues/{q}/messages", clusterId, Q))
+        mvc.perform(post("/api/v1/clusters/{c}/resources/artemis.queue/{q}:purge", clusterId, Q))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.affectedCount").value(3));
 
@@ -310,7 +312,7 @@ class MessageMutationControllerTest extends PostgresIntegrationTest {
     void aBrokerFailureLeavesAFailureRowAndReturnsAClassifiedProblem() throws Exception {
         unauthorized();
 
-        mvc.perform(post("/api/v1/clusters/{c}/queues/{q}/messages", clusterId, Q)
+        mvc.perform(post("/api/v1/clusters/{c}/resources/artemis.queue/{q}/messages", clusterId, Q)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"kind\":\"TEXT\",\"durable\":true,\"body\":\"hi\"}"))
                 .andExpect(status().is4xxClientError())

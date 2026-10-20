@@ -1,9 +1,9 @@
 package io.github.sudoitir.rahdar.feature.resources;
 
 import io.github.sudoitir.openbroker.model.Attributes;
-import io.github.sudoitir.rahdar.feature.resources.LifecycleRequests.CreateAddressRequest;
-import io.github.sudoitir.rahdar.feature.resources.LifecycleRequests.CreateQueueRequest;
-import io.github.sudoitir.rahdar.feature.resources.LifecycleRequests.UpdateQueueRequest;
+import io.github.sudoitir.rahdar.feature.resources.LifecycleRequests.CreateDestinationRequest;
+import io.github.sudoitir.rahdar.feature.resources.LifecycleRequests.CreateSubscriptionRequest;
+import io.github.sudoitir.rahdar.feature.resources.LifecycleRequests.UpdateResourceRequest;
 import io.github.sudoitir.rahdar.feature.resources.QueueCalls.NodeQueues;
 import io.github.sudoitir.rahdar.kernel.core.NotFoundException;
 import io.github.sudoitir.rahdar.kernel.gate.Gated;
@@ -93,20 +93,22 @@ public class QueueLifecycleService {
 
     // ---- entry points ----------------------------------------------------
 
-    public Attempt<LifecycleOutcome> createQueue(UUID clusterId, CreateQueueRequest req, boolean dryRun) {
+    public Attempt<LifecycleOutcome> createQueue(UUID clusterId, CreateSubscriptionRequest req, boolean dryRun) {
         // The queue is created as a name the caller's patterns cover, on an address they may also create:
         // a queue bound to someone else's address would receive what is sent to it.
         access.requireCreate(clusterId, ResourceRef.subscription(req.name()), ResourcePermissions.SUBSCRIPTION_CREATE);
-        access.requireCreate(clusterId, ResourceRef.destination(req.address()), ResourcePermissions.DESTINATION_CREATE);
-        return run(clusterId, LifecycleKind.CREATE_QUEUE, req.name(), params(req), dryRun, false, node -> {
+        access.requireCreate(
+                clusterId, ResourceRef.destination(req.destinationName()), ResourcePermissions.DESTINATION_CREATE);
+        return run(clusterId, LifecycleKind.CREATE_SUBSCRIPTION, req.name(), params(req), dryRun, false, node -> {
             // A queue that exists as asked is ALREADY; one that exists differently is refused, naming how.
             return QueueCalls.createQueue(node, req);
         });
     }
 
     public Attempt<LifecycleOutcome> updateQueue(
-            UUID clusterId, String queueName, UpdateQueueRequest req, boolean dryRun) {
-        access.requireResource(clusterId, ResourceRef.subscription(queueName), LifecycleKind.UPDATE_QUEUE.permission());
+            UUID clusterId, String queueName, UpdateResourceRequest req, boolean dryRun) {
+        access.requireResource(
+                clusterId, ResourceRef.subscription(queueName), LifecycleKind.UPDATE_RESOURCE.permission());
         Attributes patch = QueueCalls.patch(req);
         if (patch.isEmpty()) {
             throw new IllegalArgumentException("An update must change at least one field.");
@@ -114,7 +116,7 @@ public class QueueLifecycleService {
         resolveQueue(clusterId, queueName);
         return run(
                 clusterId,
-                LifecycleKind.UPDATE_QUEUE,
+                LifecycleKind.UPDATE_RESOURCE,
                 queueName,
                 patch.asMap(),
                 dryRun,
@@ -131,7 +133,8 @@ public class QueueLifecycleService {
      */
     public Attempt<LifecycleOutcome> deleteQueue(
             UUID clusterId, String queueName, boolean dryRun, boolean override, boolean disconnectConsumers) {
-        access.requireResource(clusterId, ResourceRef.subscription(queueName), LifecycleKind.DELETE_QUEUE.permission());
+        access.requireResource(
+                clusterId, ResourceRef.subscription(queueName), LifecycleKind.DELETE_SUBSCRIPTION.permission());
         if (dryRun) {
             return runDeleteQueue(clusterId, queueName, true, override, disconnectConsumers);
         }
@@ -150,7 +153,8 @@ public class QueueLifecycleService {
      * nodes, and the queue's identity across the cluster for the gate's state key, which the broker reports.
      */
     public Reach reachOfQueueDelete(UUID clusterId, String queueName) {
-        access.requireResource(clusterId, ResourceRef.subscription(queueName), LifecycleKind.DELETE_QUEUE.permission());
+        access.requireResource(
+                clusterId, ResourceRef.subscription(queueName), LifecycleKind.DELETE_SUBSCRIPTION.permission());
         List<QueueLocation> found = queueLocator.locate(clusterId, queueName);
         if (found.isEmpty()) {
             throw new NotFoundException("queue", queueName);
@@ -163,7 +167,7 @@ public class QueueLifecycleService {
             UUID clusterId, String queueName, boolean dryRun, boolean override, boolean disconnectConsumers) {
         ResolvedQueue queue = resolveQueue(clusterId, queueName);
         Set<String> declared = declaredDiverts.map(d -> d.names(clusterId)).orElse(Set.of());
-        LifecycleKind kind = LifecycleKind.DELETE_QUEUE;
+        LifecycleKind kind = LifecycleKind.DELETE_SUBSCRIPTION;
         return new Attempt.Ok<>(commands.run(Command.builder()
                 .clusterId(clusterId)
                 .permission(kind.permission())
@@ -370,7 +374,7 @@ public class QueueLifecycleService {
     }
 
     public Attempt<LifecycleOutcome> setPaused(UUID clusterId, String queueName, boolean paused, boolean dryRun) {
-        LifecycleKind kind = paused ? LifecycleKind.PAUSE_QUEUE : LifecycleKind.RESUME_QUEUE;
+        LifecycleKind kind = paused ? LifecycleKind.PAUSE_SUBSCRIPTION : LifecycleKind.RESUME_SUBSCRIPTION;
         access.requireResource(clusterId, ResourceRef.subscription(queueName), kind.permission());
         resolveQueue(clusterId, queueName);
         return run(
@@ -385,20 +389,21 @@ public class QueueLifecycleService {
 
     public Attempt<LifecycleOutcome> resetCounter(UUID clusterId, String queueName, boolean dryRun) {
         access.requireResource(
-                clusterId, ResourceRef.subscription(queueName), LifecycleKind.RESET_QUEUE_COUNTER.permission());
+                clusterId, ResourceRef.subscription(queueName), LifecycleKind.RESET_COUNTERS.permission());
         // Resolved first, so a queue no node has is not found rather than reset nowhere.
         resolveQueue(clusterId, queueName);
-        return run(clusterId, LifecycleKind.RESET_QUEUE_COUNTER, queueName, Map.of(), dryRun, false, node -> {
+        return run(clusterId, LifecycleKind.RESET_COUNTERS, queueName, Map.of(), dryRun, false, node -> {
             counters.reset(node, queueName);
             return NodeStatus.APPLIED;
         });
     }
 
-    public Attempt<LifecycleOutcome> createAddress(UUID clusterId, CreateAddressRequest req, boolean dryRun) {
-        access.requireCreate(clusterId, ResourceRef.destination(req.name()), LifecycleKind.CREATE_ADDRESS.permission());
+    public Attempt<LifecycleOutcome> createAddress(UUID clusterId, CreateDestinationRequest req, boolean dryRun) {
+        access.requireCreate(
+                clusterId, ResourceRef.destination(req.name()), LifecycleKind.CREATE_DESTINATION.permission());
         return run(
                 clusterId,
-                LifecycleKind.CREATE_ADDRESS,
+                LifecycleKind.CREATE_DESTINATION,
                 req.name(),
                 Map.of("routingTypes", req.routingTypes()),
                 dryRun,
@@ -414,7 +419,8 @@ public class QueueLifecycleService {
      * a safe default, and the safe path costs one extra step.
      */
     public Attempt<LifecycleOutcome> deleteAddress(UUID clusterId, String address, boolean dryRun) {
-        access.requireResource(clusterId, ResourceRef.destination(address), LifecycleKind.DELETE_ADDRESS.permission());
+        access.requireResource(
+                clusterId, ResourceRef.destination(address), LifecycleKind.DELETE_DESTINATION.permission());
         if (dryRun) {
             return runDeleteAddress(clusterId, address, true);
         }
@@ -429,7 +435,7 @@ public class QueueLifecycleService {
     private Attempt<LifecycleOutcome> runDeleteAddress(UUID clusterId, String address, boolean dryRun) {
         // Taken here, on the caller's thread: the nodes' actions carry no security context.
         ResourceFilter readable = permissions.filter(clusterId, ResourceType.SUBSCRIPTION);
-        return run(clusterId, LifecycleKind.DELETE_ADDRESS, address, Map.of(), dryRun, false, node -> {
+        return run(clusterId, LifecycleKind.DELETE_DESTINATION, address, Map.of(), dryRun, false, node -> {
             try {
                 return QueueCalls.deleteAddress(node, address);
             } catch (ManagementRefusal e) {
@@ -511,9 +517,9 @@ public class QueueLifecycleService {
 
     // ---- audit -----------------------------------------------------------
 
-    private static Map<String, Object> params(CreateQueueRequest req) {
+    private static Map<String, Object> params(CreateSubscriptionRequest req) {
         Map<String, Object> params = new LinkedHashMap<>();
-        params.put(ADDRESS, req.address());
+        params.put(ADDRESS, req.destinationName());
         params.put("routingType", req.routingType());
         params.put(DURABLE, req.durable());
         if (req.filter() != null && !req.filter().isBlank()) {

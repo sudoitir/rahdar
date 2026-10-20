@@ -8,7 +8,7 @@ import { server } from '../../test/setup.ts';
 import { CreateQueueForm } from './CreateQueueForm.tsx';
 
 function emptyQueues() {
-  return http.get('*/api/v1/clusters/c1/queues', () =>
+  return http.get('*/api/v1/clusters/c1/subscriptions', () =>
     HttpResponse.json({ data: [], count: 0, page: 1, pageSize: 300 }),
   );
 }
@@ -96,7 +96,7 @@ describe('CreateQueueForm', () => {
     server.use(
       admin(),
       emptyQueues(),
-      http.post('*/api/v1/clusters/c1/queues', ({ request }) => {
+      http.post('*/api/v1/clusters/c1/subscriptions', ({ request }) => {
         const url = new URL(request.url);
         expect(url.searchParams.get('dryRun')).toBe('true');
         return HttpResponse.json({

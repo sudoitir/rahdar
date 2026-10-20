@@ -1,3 +1,4 @@
+import { destinationIdentity } from '../../test/wire.ts';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { http, HttpResponse } from 'msw';
 import { screen, waitFor, within } from '@testing-library/react';
@@ -241,7 +242,7 @@ describe('ConfigurationView', () => {
   it('lists what an import cannot carry instead of dropping it', async () => {
     server.use(
       ...baseHandlers(),
-      http.post('*/api/v1/clusters/c1/config/import-xml', () =>
+      http.post('*/api/v1/clusters/c1/artemis/config/import-xml', () =>
         HttpResponse.json({
           document: {
             version: 1,
@@ -275,7 +276,7 @@ describe('ConfigurationView', () => {
     let posted = '';
     server.use(
       ...baseHandlers(),
-      http.post('*/api/v1/clusters/c1/config/import-xml', async ({ request }) => {
+      http.post('*/api/v1/clusters/c1/artemis/config/import-xml', async ({ request }) => {
         posted = await request.text();
         return HttpResponse.json({
           document: {
@@ -312,7 +313,7 @@ describe('ConfigurationView', () => {
     const declared = vi.fn();
     server.use(
       ...baseHandlers(),
-      http.get('*/api/v1/clusters/c1/config/recommendations', () =>
+      http.get('*/api/v1/clusters/c1/artemis/config/recommendations', () =>
         HttpResponse.json({
           seededFrom: 'broker-1',
           recommendations: [
@@ -343,7 +344,7 @@ describe('ConfigurationView', () => {
           ],
         }),
       ),
-      http.post('*/api/v1/clusters/c1/config/recommendations/declare', async ({ request }) => {
+      http.post('*/api/v1/clusters/c1/artemis/config/recommendations/declare', async ({ request }) => {
         declared((await request.json()) as unknown);
         return HttpResponse.json(declaration(), { status: 201 });
       }),
@@ -371,7 +372,7 @@ describe('ConfigurationView', () => {
   it('will not declare a security setting that would grant nobody anything', async () => {
     server.use(
       ...baseHandlers(),
-      http.get('*/api/v1/clusters/c1/config/recommendations', () =>
+      http.get('*/api/v1/clusters/c1/artemis/config/recommendations', () =>
         HttpResponse.json({
           seededFrom: null,
           recommendations: [
@@ -429,7 +430,7 @@ describe('ConfigurationView', () => {
   it('makes an adoption that closes drift name what it erases and type the cluster to confirm', async () => {
     server.use(
       ...baseHandlers(),
-      http.post('*/api/v1/clusters/c1/config/adopt', () =>
+      http.post('*/api/v1/clusters/c1/artemis/config/adopt', () =>
         HttpResponse.json({
           document: {
             version: 1,
@@ -476,12 +477,12 @@ describe('ConfigurationView', () => {
   it("offers address-setting templates built from the cluster's own DLQ, and saves nothing until asked", async () => {
     server.use(
       ...baseHandlers(),
-      http.get('*/api/v1/clusters/c1/dlq', () =>
+      http.get('*/api/v1/clusters/c1/dead-letters', () =>
         HttpResponse.json({
           settingsAvailable: true,
-          addresses: [
-            { address: 'ORDERS.DLQ', kind: 'dead-letter', queues: [] },
-            { address: 'ORDERS.EXPIRY', kind: 'expiry', queues: [] },
+          destinations: [
+            { ...destinationIdentity('ORDERS.DLQ'), purpose: 'dead-letter', subscriptions: [] },
+            { ...destinationIdentity('ORDERS.EXPIRY'), purpose: 'expiry', subscriptions: [] },
           ],
         }),
       ),
@@ -514,7 +515,7 @@ describe('ConfigurationView', () => {
           document: { version: 1, addresses: [], addressSettings: [], securitySettings: [], diverts: [], bridges: [] },
         }),
       ),
-      http.post('*/api/v1/clusters/c1/config/adopt', () =>
+      http.post('*/api/v1/clusters/c1/artemis/config/adopt', () =>
         HttpResponse.json({
           document: {
             version: 1,
@@ -528,7 +529,7 @@ describe('ConfigurationView', () => {
           closes: [],
         }),
       ),
-      http.put('*/api/v1/clusters/c1/config', async ({ request }) => {
+      http.put('*/api/v1/clusters/c1/artemis/config', async ({ request }) => {
         saved(await request.json());
         return HttpResponse.json(declaration(), { status: 201 });
       }),
@@ -576,7 +577,7 @@ describe('ConfigurationView', () => {
 
   it('holds the page and says what is loading while the declaration loads', async () => {
     server.use(
-      http.get('*/api/v1/clusters/c1/config', async () => {
+      http.get('*/api/v1/clusters/c1/artemis/config', async () => {
         await new Promise((r) => setTimeout(r, 200));
         return HttpResponse.json(declaration());
       }),
@@ -592,7 +593,7 @@ describe('ConfigurationView', () => {
   it('states why the declaration could not be read and reads it again on retry', async () => {
     let attempts = 0;
     server.use(
-      http.get('*/api/v1/clusters/c1/config', () => {
+      http.get('*/api/v1/clusters/c1/artemis/config', () => {
         attempts += 1;
         return attempts === 1
           ? HttpResponse.json({ title: 'Down', detail: 'The configuration store is not answering.' }, { status: 503 })
@@ -637,7 +638,7 @@ describe('ConfigurationView', () => {
     let calls = 0;
     server.use(
       ...baseHandlers(),
-      http.post('*/api/v1/clusters/c1/config/drift/evaluate', () => {
+      http.post('*/api/v1/clusters/c1/artemis/config/drift/evaluate', () => {
         calls += 1;
         return calls === 1
           ? HttpResponse.json({ title: 'Down', detail: 'No node answered the evaluation.' }, { status: 503 })
@@ -666,7 +667,7 @@ describe('ConfigurationView', () => {
   it('says why the recommendations could not be assessed, and that this is not the same as nothing to recommend', async () => {
     server.use(
       ...baseHandlers(),
-      http.get('*/api/v1/clusters/c1/config/recommendations', () =>
+      http.get('*/api/v1/clusters/c1/artemis/config/recommendations', () =>
         HttpResponse.json({ title: 'Down', detail: 'No node could be read.' }, { status: 503 }),
       ),
     );

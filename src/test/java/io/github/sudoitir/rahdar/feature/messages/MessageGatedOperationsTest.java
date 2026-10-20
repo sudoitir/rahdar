@@ -99,7 +99,7 @@ class MessageGatedOperationsTest {
     void aSelectedActionSaysWhatItMovesAndWhere() {
         GatedOperation<MessageMoveParams> move = operations.messageMoveOperation(messages, clusters);
         MessageMoveParams params = new MessageMoveParams(
-                CLUSTER, "orders.dlq", null, new MessageActionRequest(List.of(1L, 2L), null, "orders"), false);
+                CLUSTER, "orders.dlq", null, MessageRequestFixtures.of(List.of(1L, 2L), null, "orders"), false);
 
         assertThat(move.type()).isEqualTo("message.move");
         assertThat(move.summary(params)).isEqualTo("Move 2 messages on queue orders.dlq on prod-eu");
@@ -110,7 +110,7 @@ class MessageGatedOperationsTest {
 
     @Test
     void aFilteredActionEstimatesTheMatchesAndPinsTheFilterWithTheQueue() {
-        MessageActionRequest request = new MessageActionRequest(null, "priority > 3", null);
+        MessageActionRequest request = MessageRequestFixtures.of(null, "priority > 3", null);
         when(messages.reach(CLUSTER, "orders", null, MessageAction.DELETE, request))
                 .thenReturn(new Reach(40, "orders.addr|ANYCAST"));
 
@@ -123,7 +123,7 @@ class MessageGatedOperationsTest {
 
     @Test
     void aSelectionByIdsPinsTheQueueAloneBecauseTheIdsAreInTheParameters() {
-        MessageActionRequest request = new MessageActionRequest(List.of(1L, 2L, 3L), null, null);
+        MessageActionRequest request = MessageRequestFixtures.of(List.of(1L, 2L, 3L), null, null);
         when(messages.reach(CLUSTER, "orders", null, MessageAction.EXPIRE, request))
                 .thenReturn(new Reach(3, "orders.addr|ANYCAST"));
 
@@ -137,7 +137,7 @@ class MessageGatedOperationsTest {
 
     @Test
     void eachActionReplaysAsItself() {
-        MessageActionRequest request = new MessageActionRequest(List.of(5L), null, null);
+        MessageActionRequest request = MessageRequestFixtures.of(List.of(5L), null, null);
         when(messages.execute(CLUSTER, "orders", null, MessageAction.RETRY, request, false, false))
                 .thenReturn(new Attempt.Ok<>(new Outcome.Affected(1, NODE)));
 
@@ -150,7 +150,7 @@ class MessageGatedOperationsTest {
 
     @Test
     void everyParameterRecordRoundTripsThroughCanonicalJson() {
-        MessageActionRequest request = new MessageActionRequest(List.of(1L, 2L), "a = 'b'", "orders");
+        MessageActionRequest request = MessageRequestFixtures.of(List.of(1L, 2L), "a = 'b'", "orders");
         List<Record> all = List.of(
                 new QueuePurgeParams(CLUSTER, "orders", null, true),
                 new MessageMoveParams(CLUSTER, "orders", NODE, request, true),

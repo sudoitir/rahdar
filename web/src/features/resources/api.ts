@@ -8,17 +8,18 @@ import {
   request,
 } from '../../kernel/api/request.ts';
 import { type ResourceParams, useResource } from '../../kernel/api/paging.ts';
+import { addressId, resourcePath } from '../../kernel/api/resourceId.ts';
 import type { components } from '../../kernel/api/schema.d.ts';
 
 type Schemas = components['schemas'];
 
-export type AddressView = Schemas['AddressView'];
+export type DestinationView = Schemas['DestinationView'];
 export type CapabilityView = Schemas['CapabilityView'];
 export type ConnectionCloseView = Schemas['ConnectionCloseView'];
 export type ConnectionView = Schemas['ConnectionView'];
 export type ConsumerView = Schemas['ConsumerView'];
 export type ProducerView = Schemas['ProducerView'];
-export type SessionView = Schemas['SessionView'];
+export type ChannelView = Schemas['ChannelView'];
 
 /** The four closes `connection-control` exposes; the first three are node-scoped. */
 export type ConnectionCloseKind = 'connection' | 'session' | 'consumer' | 'address-consumers';
@@ -27,11 +28,13 @@ export const keys = {
   topic: (id: string, topic: string) => clusterKey(id, topic),
 };
 
-export const useAddresses = (id: string, p: ResourceParams = {}) => useResource<AddressView>(id, 'addresses', p);
+export const useAddresses = (id: string, p: ResourceParams = {}) =>
+  useResource<DestinationView>(id, 'addresses', p, 'destinations');
 
 export const useConsumers = (id: string, p: ResourceParams = {}) => useResource<ConsumerView>(id, 'consumers', p);
 
-export const useSessions = (id: string, p: ResourceParams = {}) => useResource<SessionView>(id, 'sessions', p);
+export const useSessions = (id: string, p: ResourceParams = {}) =>
+  useResource<ChannelView>(id, 'sessions', p, 'channels');
 
 export const useConnections = (id: string, p: ResourceParams = {}) => useResource<ConnectionView>(id, 'connections', p);
 
@@ -63,27 +66,23 @@ function useCloseMutation<V extends LifecycleVars>(clusterId: string, send: (var
   });
 }
 
-/** `connection` | `session` | `consumer`, all node-scoped by the id's issuing node. */
-export function useCloseNodeTarget(
-  clusterId: string,
-  kind: Exclude<ConnectionCloseKind, 'address-consumers'>,
-  nodeId: string,
-  targetId: string,
-) {
+/**
+ * A connection, a channel or a consumer, named by its id and closed on the node that issued it
+ * (`:close?node=`).
+ */
+export function useCloseNodeTarget(clusterId: string, nodeId: string, targetId: string) {
   return useCloseMutation<LifecycleVars>(clusterId, ({ dryRun }) =>
-    request(
-      `${lifecycleBase(clusterId)}/nodes/${nodeId}/${kind}s/${encodeURIComponent(targetId)}/close${lifecycleQuery(dryRun)}`,
-      { method: 'POST' },
-    ),
+    request(`${lifecycleBase(clusterId)}${resourcePath(targetId)}:close${lifecycleQuery(dryRun, undefined, nodeId)}`, {
+      method: 'POST',
+    }),
   );
 }
 
-/** Every consumer connection bound to an address, on every live node. Capped. */
+/** Every consumer connection bound to a destination, on every live node. Capped. */
 export function useCloseAddressConsumers(clusterId: string, address: string) {
   return useCloseMutation<LifecycleVars>(clusterId, ({ dryRun, override }) =>
-    request(
-      `${lifecycleBase(clusterId)}/addresses/${encodeURIComponent(address)}/consumers/close${lifecycleQuery(dryRun, override)}`,
-      { method: 'POST' },
-    ),
+    request(`${lifecycleBase(clusterId)}${resourcePath(addressId(address))}:close${lifecycleQuery(dryRun, override)}`, {
+      method: 'POST',
+    }),
   );
 }

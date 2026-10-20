@@ -89,7 +89,9 @@ describe('ExpectationsView', () => {
     let created = false;
     server.use(
       writer,
-      http.get('*/api/v1/clusters/c1/queues', () => HttpResponse.json({ data: [], page: 1, size: 300, total: 0 })),
+      http.get('*/api/v1/clusters/c1/subscriptions', () =>
+        HttpResponse.json({ data: [], page: 1, size: 300, total: 0 }),
+      ),
       http.get('*/api/v1/clusters/c1/rr/expectations', () => HttpResponse.json(paged(created ? [expectation()] : []))),
       http.post('*/api/v1/clusters/c1/rr/expectations', async ({ request }) => {
         sent.push((await request.json()) as { replyAddresses?: string[] });

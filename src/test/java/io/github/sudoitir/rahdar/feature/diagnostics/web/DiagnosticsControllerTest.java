@@ -131,7 +131,7 @@ class DiagnosticsControllerTest extends PostgresIntegrationTest {
         secrets.store(clusterId, "diag", "bob", storedPassword);
         FakeArtemis broker = new FakeArtemis().queue(Q).operation("sendMessage", "ID:1");
         when(gateway.cluster(clusterId)).thenReturn(FixtureJolokia.cluster(Map.of(nodeId, broker.agent())));
-        mvc.perform(post("/api/v1/clusters/{c}/queues/{q}/messages", clusterId, Q)
+        mvc.perform(post("/api/v1/clusters/{c}/resources/artemis.queue/{q}/messages", clusterId, Q)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"kind\":\"TEXT\",\"durable\":true,\"body\":\"%s\",\"properties\":{\"k\":\"%s\"}}"
                                 .formatted(body, property)))

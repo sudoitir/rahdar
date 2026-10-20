@@ -3,7 +3,7 @@ import { createElement } from 'react';
 import { absoluteLabel } from '../../kernel/time/time.ts';
 import { AUTO, localZone } from '../../kernel/time/timezone.ts';
 import type { Column } from '../../ui/table/index.ts';
-import type { DlqQueue, MessageSummaryView } from './api.ts';
+import type { DeadLetterSubscription, MessageSummaryView } from './api.ts';
 import { BodyPreview, QueueLink } from './cells.tsx';
 
 /**
@@ -13,9 +13,9 @@ import { BodyPreview, QueueLink } from './cells.tsx';
 export function messageColumns(zone: string): Column<MessageSummaryView>[] {
   return [
     {
-      id: 'messageId',
+      id: 'position',
       header: 'Message ID',
-      accessor: (m) => m.messageId,
+      accessor: (m) => m.position,
       kind: 'identifier',
       priority: 'essential',
     },
@@ -52,7 +52,7 @@ export function messageColumns(zone: string): Column<MessageSummaryView>[] {
 export interface DlqRow {
   address: string;
   kind: string;
-  queue: DlqQueue;
+  queue: DeadLetterSubscription;
 }
 
 /** The dead-letter grid's columns. The queue identifies a row and is never hidden. */
@@ -61,8 +61,8 @@ export function dlqColumns(clusterId: string): Column<DlqRow>[] {
     {
       id: 'queue',
       header: 'Queue',
-      accessor: (r) => r.queue.queueName,
-      cell: (r) => createElement(QueueLink, { clusterId, queueName: r.queue.queueName }),
+      accessor: (r) => r.queue.name,
+      cell: (r) => createElement(QueueLink, { clusterId, queueName: r.queue.name }),
       kind: 'identifier',
       priority: 'essential',
     },

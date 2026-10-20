@@ -3,12 +3,14 @@ import { Button, Group, Modal, NumberInput, Stack, Switch, Text, TextInput } fro
 import { useForm } from '@mantine/form';
 
 import {
+  addressOf,
+  routingTypeOf,
   useQueueConfiguration,
   useUpdateQueue,
   type LifecycleOutcomeView,
-  type QueueConfiguration,
-  type QueueView,
-  type UpdateQueueRequest,
+  type SubscriptionConfiguration,
+  type SubscriptionView,
+  type UpdateResourceRequest,
 } from './api.ts';
 import { DescriptionList } from '../../ui/DescriptionList.tsx';
 import { ErrorState } from '../../ui/ErrorState.tsx';
@@ -22,7 +24,7 @@ import { NodeOutcomeSummary } from '../../ui/NodeOutcomeSummary.tsx';
  * the form says so above the fields, because seeding from one node silently is
  * how an operator applies one node's value to all of them without knowing.
  */
-function currentValues(config: QueueConfiguration | undefined): Record<string, unknown> | undefined {
+function currentValues(config: SubscriptionConfiguration | undefined): Record<string, unknown> | undefined {
   return config?.nodes?.find((n) => !n.unavailableReason)?.values;
 }
 
@@ -76,7 +78,7 @@ export function EditQueueForm({
   onClose,
 }: Readonly<{
   clusterId: string;
-  queue: QueueView;
+  queue: SubscriptionView;
   opened: boolean;
   onClose: () => void;
 }>) {
@@ -93,11 +95,11 @@ export function EditQueueForm({
   });
   const { setValues, resetDirty } = form;
 
-  const update = useUpdateQueue(clusterId, queue.queueName);
+  const update = useUpdateQueue(clusterId, queue.name);
   // What the queue runs right now, per node. The form is seeded from it, so the
   // operator edits the real configuration rather than guessing at blank inputs —
   // and after an update the reopened form shows what was written.
-  const configuration = useQueueConfiguration(clusterId, queue.queueName, opened);
+  const configuration = useQueueConfiguration(clusterId, queue.name, opened);
   const current = currentValues(configuration.data);
   const seeded = configuration.data?.nodes?.find((n) => !n.unavailableReason);
   const seededFrom = seeded?.nodeName ?? '';
@@ -125,7 +127,7 @@ export function EditQueueForm({
   // Only what the operator actually changed is sent. The server reads the queue's
   // current configuration and merges this over it, because the broker's update
   // replaces rather than merges and would otherwise clear every omitted field.
-  const body = ({ filter, maxConsumers, purgeOnNoConsumers, exclusive, ringSize }: FormState): UpdateQueueRequest => ({
+  const changes = ({ filter, maxConsumers, purgeOnNoConsumers, exclusive, ringSize }: FormState) => ({
     filter: current && str(current['filter-string']) === filter.trim() ? undefined : filter.trim(),
     maxConsumers:
       maxConsumers === '' || (current && num(current['max-consumers']) === maxConsumers)
@@ -137,8 +139,9 @@ export function EditQueueForm({
     nonDestructive: undefined,
     ringSize: ringSize === '' || (current && num(current['ring-size']) === ringSize) ? undefined : Number(ringSize),
   });
+  const body = (values: FormState): UpdateResourceRequest => ({ attributes: changes(values) });
 
-  const changed = Object.values(body(form.values)).some((v) => v !== undefined);
+  const changed = Object.values(changes(form.values)).some((v) => v !== undefined);
 
   const close = () => {
     form.reset();
@@ -162,7 +165,7 @@ export function EditQueueForm({
     );
 
   return (
-    <Modal opened={opened} onClose={close} title={`Edit ${queue.queueName}`} size="lg">
+    <Modal opened={opened} onClose={close} title={`Edit ${queue.name}`} size="lg">
       <form noValidate onSubmit={submit(false)}>
         <Stack gap="md">
           {/* Immutable, not disabled — stated as facts about the queue rather than
@@ -170,8 +173,8 @@ export function EditQueueForm({
           <DescriptionList
             label="Fixed for the life of the queue"
             items={[
-              { term: 'Address', value: queue.address },
-              { term: 'Routing type', value: queue.routingType },
+              { term: 'Address', value: addressOf(queue) },
+              { term: 'Routing type', value: routingTypeOf(queue) },
               { term: 'Durable', value: queue.durable ? 'yes' : 'no' },
             ]}
           />

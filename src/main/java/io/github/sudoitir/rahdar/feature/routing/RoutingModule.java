@@ -12,8 +12,7 @@ public final class RoutingModule {
             .title("Routing")
             .kind(FeatureDescriptor.Kind.FEATURE)
             .require("resources")
-            .apiPrefix("/api/v1/clusters/{clusterId}/diverts")
-            .apiPrefix("/api/v1/clusters/{clusterId}/bridges")
+            .apiPrefix("/api/v1/clusters/{clusterId}/routes")
             .apiPrefix("/api/v1/clusters/{clusterId}/artemis/diverts")
             .mcpTool(new McpToolDef(
                     "divert_lifecycle",

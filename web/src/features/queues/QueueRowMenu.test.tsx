@@ -1,3 +1,4 @@
+import { subscriptionIdentity } from '../../test/wire.ts';
 import { describe, expect, it, vi } from 'vitest';
 import { http, HttpResponse } from 'msw';
 import { screen, waitFor, within } from '@testing-library/react';
@@ -36,8 +37,7 @@ const AVAILABLE = { status: 'AVAILABLE', reason: 'ok', brokerXmlSnippet: null };
 
 function queue(name: string, over: Record<string, unknown> = {}) {
   return {
-    address: name,
-    queueName: name,
+    ...subscriptionIdentity(name, name),
     allowedActions: [
       'subscription:read',
       'subscription:pause',
@@ -47,7 +47,6 @@ function queue(name: string, over: Record<string, unknown> = {}) {
       'message:read',
       'message:move',
     ],
-    routingType: 'ANYCAST',
     durable: true,
     totalMessageCount: 12,
     totalConsumerCount: 0,
@@ -98,9 +97,9 @@ function handlers(permissions: string[], rows = [queue('orders'), queue('payment
         },
       }),
     ),
-    http.get('*/api/v1/clusters/c1/queues', ({ request }) => {
+    http.get('*/api/v1/clusters/c1/subscriptions', ({ request }) => {
       const q = new URL(request.url).searchParams.get('q');
-      const data = q ? rows.filter((r) => r.queueName.includes(q)) : rows;
+      const data = q ? rows.filter((r) => r.name.includes(q)) : rows;
       return HttpResponse.json({ data, count: data.length, page: 1, pageSize: 200 });
     }),
   ];
@@ -112,7 +111,7 @@ describe('the queue row menu (ADR-0107)', () => {
     const urls: string[] = [];
     server.use(
       ...handlers(['*']),
-      http.delete('*/api/v1/clusters/c1/queues/orders', ({ request }) => {
+      http.delete('*/api/v1/clusters/c1/resources/artemis.queue/orders', ({ request }) => {
         const url = new URL(request.url);
         urls.push(url.search);
         const dryRun = url.searchParams.get('dryRun') === 'true';
@@ -216,7 +215,7 @@ describe('the queue row menu (ADR-0107)', () => {
     server.use(...handlers(['*'], [queue('orders'), queue('archive.2019')]));
     // The listing's first page does not hold it; the lookup by name does.
     server.use(
-      http.get('*/api/v1/clusters/c1/queues', ({ request }) => {
+      http.get('*/api/v1/clusters/c1/subscriptions', ({ request }) => {
         const q = new URL(request.url).searchParams.get('q');
         const data = q === 'archive.2019' ? [queue('archive.2019')] : [queue('orders')];
         return HttpResponse.json({ data, count: q ? 1 : 2, page: 1, pageSize: 200 });

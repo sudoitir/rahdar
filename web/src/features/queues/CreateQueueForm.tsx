@@ -3,7 +3,8 @@ import { Button, Collapse, Group, Modal, NumberInput, Radio, Stack, Switch, Text
 import { useForm } from '@mantine/form';
 
 import { useCreateRule } from '../../kernel/auth/useCreateRule.ts';
-import { useCreateQueue, type CreateQueueRequest, type LifecycleOutcomeView } from './api.ts';
+import { addressId, QUEUE_KIND } from '../../kernel/api/resourceId.ts';
+import { useCreateQueue, type CreateSubscriptionRequest, type LifecycleOutcomeView } from './api.ts';
 import { ErrorState } from '../../ui/ErrorState.tsx';
 import { focusFirstInvalid, serverFieldErrors } from '../../ui/formErrors.ts';
 import { NodeOutcomeSummary } from '../../ui/NodeOutcomeSummary.tsx';
@@ -80,18 +81,20 @@ export function CreateQueueForm({
   });
   const hasErrors = Object.keys(form.errors).length > 0;
 
-  const body = (values: FormState): CreateQueueRequest => ({
-    address: values.address.trim(),
+  const body = (values: FormState): CreateSubscriptionRequest => ({
+    kind: QUEUE_KIND,
     name: values.name.trim(),
-    routingType: values.routingType,
-    durable: values.durable,
-    filter: values.filter.trim() || undefined,
-    maxConsumers: values.maxConsumers === '' ? undefined : Number(values.maxConsumers),
-    purgeOnNoConsumers: values.purgeOnNoConsumers,
-    exclusive: values.exclusive,
-    nonDestructive: undefined,
-    ringSize: values.ringSize === '' ? undefined : Number(values.ringSize),
-    autoCreateAddress: true,
+    destination: addressId(values.address.trim()),
+    attributes: {
+      routingType: values.routingType,
+      durable: values.durable,
+      filter: values.filter.trim() || undefined,
+      maxConsumers: values.maxConsumers === '' ? undefined : Number(values.maxConsumers),
+      purgeOnNoConsumers: values.purgeOnNoConsumers,
+      exclusive: values.exclusive,
+      ringSize: values.ringSize === '' ? undefined : Number(values.ringSize),
+      autoCreateAddress: true,
+    },
   });
 
   const submit = (dryRun: boolean) =>

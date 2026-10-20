@@ -4,6 +4,7 @@ import io.github.sudoitir.rahdar.feature.resources.CrossNodeAggregator;
 import io.github.sudoitir.rahdar.feature.resources.PagedListService;
 import io.github.sudoitir.rahdar.feature.resources.web.ResourceViews;
 import io.github.sudoitir.rahdar.kernel.core.ResourceQuery;
+import io.github.sudoitir.rahdar.platform.broker.ResourceIds;
 import io.github.sudoitir.rahdar.platform.mcp.McpArgs;
 import io.github.sudoitir.rahdar.platform.mcp.McpErrors;
 import io.github.sudoitir.rahdar.platform.mcp.McpProperties;
@@ -75,24 +76,25 @@ public class ResourcesMcpReadTools {
         String orderedBy;
         switch (kind) {
             case QUEUES -> {
-                orderedBy = "queueName";
+                orderedBy = "name";
                 // Queues keep their own snapshot-backed path — they are aggregated from
                 // subscription_snapshot, not fanned out live, and that is the cheap read.
-                for (ResourceViews.QueueView q : queues.queues(clusterId, query).data()) {
+                for (ResourceViews.SubscriptionView q :
+                        queues.subscriptions(clusterId, query).data()) {
                     rows.add(new McpViews.ResourceRow(
                             "queue",
-                            q.queueName(),
+                            q.name(),
                             q.nodesPresent() + "/" + q.nodesTotal() + " nodes",
-                            "address=" + q.address() + " consumers=" + q.totalConsumerCount(),
+                            "address=" + q.destinationName() + " consumers=" + q.totalConsumerCount(),
                             q.totalMessageCount()));
                 }
             }
             case ADDRESSES -> {
                 orderedBy = "name";
-                for (ResourceViews.AddressView a :
-                        lists.addresses(clusterId, query).data()) {
+                for (ResourceViews.DestinationView a :
+                        lists.destinations(clusterId, query).data()) {
                     rows.add(new McpViews.ResourceRow(
-                            "address", a.name(), a.nodeName(), "queues=" + a.queueCount(), a.messageCount()));
+                            "address", a.name(), a.nodeName(), "queues=" + a.subscriptionCount(), a.messageCount()));
                 }
             }
             case CONSUMERS -> {
@@ -101,7 +103,7 @@ public class ResourcesMcpReadTools {
                         lists.consumers(clusterId, query).data()) {
                     rows.add(new McpViews.ResourceRow(
                             "consumer",
-                            c.queueName(),
+                            c.subscriptionName(),
                             c.nodeName(),
                             PROTOCOL_LABEL + c.protocol() + " acked=" + c.messagesAcknowledged(),
                             c.messagesDelivered()));
@@ -109,11 +111,11 @@ public class ResourcesMcpReadTools {
             }
             case SESSIONS -> {
                 orderedBy = "sessionId";
-                for (ResourceViews.SessionView x :
-                        lists.sessions(clusterId, query).data()) {
+                for (ResourceViews.ChannelView x :
+                        lists.channels(clusterId, query).data()) {
                     rows.add(new McpViews.ResourceRow(
                             "session",
-                            x.sessionId(),
+                            ResourceIds.nameOf(x.id()),
                             x.nodeName(),
                             "user=" + x.user() + " producers=" + x.producerCount(),
                             x.consumerCount()));
@@ -128,7 +130,7 @@ public class ResourcesMcpReadTools {
                             x.remoteAddress(),
                             x.nodeName(),
                             PROTOCOL_LABEL + x.protocol() + " client=" + x.clientId(),
-                            x.sessionCount()));
+                            x.channelCount()));
                 }
             }
             case PRODUCERS -> {
@@ -136,7 +138,11 @@ public class ResourcesMcpReadTools {
                 for (ResourceViews.ProducerView x :
                         lists.producers(clusterId, query).data()) {
                     rows.add(new McpViews.ResourceRow(
-                            "producer", x.address(), x.nodeName(), PROTOCOL_LABEL + x.protocol(), x.messagesSent()));
+                            "producer",
+                            x.destinationName(),
+                            x.nodeName(),
+                            PROTOCOL_LABEL + x.protocol(),
+                            x.messagesSent()));
                 }
             }
             default -> throw McpErrors.invalidParams("unsupported kind");

@@ -7,38 +7,35 @@ import io.github.sudoitir.rahdar.kernel.security.ResourceRef;
  * API and the single MCP {@code queue_lifecycle} tool, so a kind cannot be
  * reachable through one and not the other.
  *
- * <p>Holding a message-level permission implies none of these. Purging a queue and
+ * <p>Holding a message-level permission implies none of these. Purging a subscription and
  * destroying one are different authorities: one empties a resource the operator
  * keeps, the other removes the resource itself.
  */
 public enum LifecycleKind {
-    CREATE_QUEUE("CREATE_QUEUE", LifecycleKind.QUEUE_TARGET, ResourcePermissions.SUBSCRIPTION_CREATE, false),
-    UPDATE_QUEUE("UPDATE_QUEUE", LifecycleKind.QUEUE_TARGET, ResourcePermissions.SUBSCRIPTION_UPDATE, false),
-    DELETE_QUEUE("DELETE_QUEUE", LifecycleKind.QUEUE_TARGET, ResourcePermissions.SUBSCRIPTION_DELETE, true),
-    PAUSE_QUEUE("PAUSE_QUEUE", LifecycleKind.QUEUE_TARGET, ResourcePermissions.SUBSCRIPTION_PAUSE, false),
-    RESUME_QUEUE("RESUME_QUEUE", LifecycleKind.QUEUE_TARGET, ResourcePermissions.SUBSCRIPTION_PAUSE, false),
-    RESET_QUEUE_COUNTER(
-            "RESET_QUEUE_COUNTER", LifecycleKind.QUEUE_TARGET, ResourcePermissions.SUBSCRIPTION_UPDATE, false),
-    CREATE_ADDRESS("CREATE_ADDRESS", LifecycleKind.ADDRESS_TARGET, ResourcePermissions.DESTINATION_CREATE, false),
-    DELETE_ADDRESS("DELETE_ADDRESS", LifecycleKind.ADDRESS_TARGET, ResourcePermissions.DESTINATION_DELETE, true);
+    CREATE_SUBSCRIPTION(LifecycleKind.SUBSCRIPTION_TARGET, ResourcePermissions.SUBSCRIPTION_CREATE, false),
+    UPDATE_RESOURCE(LifecycleKind.SUBSCRIPTION_TARGET, ResourcePermissions.SUBSCRIPTION_UPDATE, false),
+    DELETE_SUBSCRIPTION(LifecycleKind.SUBSCRIPTION_TARGET, ResourcePermissions.SUBSCRIPTION_DELETE, true),
+    PAUSE_SUBSCRIPTION(LifecycleKind.SUBSCRIPTION_TARGET, ResourcePermissions.SUBSCRIPTION_PAUSE, false),
+    RESUME_SUBSCRIPTION(LifecycleKind.SUBSCRIPTION_TARGET, ResourcePermissions.SUBSCRIPTION_PAUSE, false),
+    RESET_COUNTERS(LifecycleKind.SUBSCRIPTION_TARGET, ResourcePermissions.SUBSCRIPTION_UPDATE, false),
+    CREATE_DESTINATION(LifecycleKind.DESTINATION_TARGET, ResourcePermissions.DESTINATION_CREATE, false),
+    DELETE_DESTINATION(LifecycleKind.DESTINATION_TARGET, ResourcePermissions.DESTINATION_DELETE, true);
 
-    private static final String QUEUE_TARGET = "QUEUE";
-    private static final String ADDRESS_TARGET = "ADDRESS";
+    private static final String SUBSCRIPTION_TARGET = "SUBSCRIPTION";
+    private static final String DESTINATION_TARGET = "DESTINATION";
 
-    private final String auditName;
     private final String targetType;
     private final String permission;
     private final boolean destructive;
 
-    LifecycleKind(String auditName, String targetType, String permission, boolean destructive) {
-        this.auditName = auditName;
+    LifecycleKind(String targetType, String permission, boolean destructive) {
         this.targetType = targetType;
         this.permission = permission;
         this.destructive = destructive;
     }
 
     public String auditName() {
-        return auditName;
+        return name();
     }
 
     public String targetType() {
@@ -52,7 +49,7 @@ public enum LifecycleKind {
     /**
      * Whether this kind destroys something that cannot be restored. Destructive
      * kinds require a typed confirmation in the UI and a matching {@code confirm}
-     * argument over MCP, and a queue delete additionally goes through the bulk cap.
+     * argument over MCP, and a subscription delete additionally goes through the bulk cap.
      */
     public boolean destructive() {
         return destructive;
@@ -60,7 +57,7 @@ public enum LifecycleKind {
 
     /** Whether re-running this kind leaves the cluster in the same state. */
     public boolean idempotent() {
-        return this != RESET_QUEUE_COUNTER;
+        return this != RESET_COUNTERS;
     }
 
     /** The subscription or destination this kind acts on when it is given {@code name}, which its permission is checked against. */
@@ -69,10 +66,10 @@ public enum LifecycleKind {
     }
 
     public boolean isAddressKind() {
-        return this == CREATE_ADDRESS || this == DELETE_ADDRESS;
+        return this == CREATE_DESTINATION || this == DELETE_DESTINATION;
     }
 
-    /** Parse a path segment such as {@code create-queue}. */
+    /** Parse a name such as {@code create-subscription}. */
     public static LifecycleKind fromPath(String path) {
         String needle = path == null ? "" : path.replace('-', '_').toUpperCase();
         for (LifecycleKind kind : values()) {

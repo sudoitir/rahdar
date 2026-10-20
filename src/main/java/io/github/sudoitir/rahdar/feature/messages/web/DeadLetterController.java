@@ -1,7 +1,7 @@
 package io.github.sudoitir.rahdar.feature.messages.web;
 
 import io.github.sudoitir.rahdar.feature.messages.DlqService;
-import io.github.sudoitir.rahdar.feature.messages.web.MessageViews.DlqView;
+import io.github.sudoitir.rahdar.feature.messages.web.MessageViews.DeadLetterView;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -15,14 +15,14 @@ import org.springframework.web.bind.annotation.RestController;
  * ({@code settingsAvailable = false}) rather than guessing from names.
  */
 @RestController
-@RequestMapping("/clusters/{clusterId}/dlq")
+@RequestMapping("/clusters/{clusterId}/dead-letters")
 @RequiredArgsConstructor
-public class DlqController {
+public class DeadLetterController {
 
     private final DlqService dlq;
 
     @GetMapping
-    public DlqView view(@PathVariable UUID clusterId) {
+    public DeadLetterView view(@PathVariable UUID clusterId) {
         return dlq.view(clusterId);
     }
 }

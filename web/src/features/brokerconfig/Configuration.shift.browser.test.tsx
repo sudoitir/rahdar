@@ -104,7 +104,7 @@ function bodyFor(path: string): unknown {
     [/\/config\/applies/, paged([])],
     [/\/config$/, drifted],
     [/\/config-diff/, DIFF],
-    [/\/dlq$/, { settingsAvailable: true, addresses: [] }],
+    [/\/dead-letters$/, { settingsAvailable: true, destinations: [] }],
     [
       /\/config\/recommendations$/,
       {

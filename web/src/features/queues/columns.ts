@@ -1,14 +1,14 @@
 import { createElement } from 'react';
 
 import type { Column } from '../../ui/table/index.ts';
-import type { QueueView } from './api.ts';
+import { addressOf, routingTypeOf, type SubscriptionView } from './api.ts';
 import { OwnerChip } from '../../kernel/auth/OwnerChip.tsx';
 import { StaleBadge } from './cells.tsx';
 
-type NodeCell = QueueView['perNode'][number];
+type NodeCell = SubscriptionView['perNode'][number];
 
 /** The state cell: blank while running, so a healthy grid stays quiet. */
-export function pausedLabel(r: QueueView): string {
+export function pausedLabel(r: SubscriptionView): string {
   if (!r.paused) return '';
   return r.perNode.every((n) => n.paused) ? 'paused' : 'paused on some nodes';
 }
@@ -22,23 +22,23 @@ export function pausedLabel(r: QueueView): string {
  * compact rather than hidden: a count is as wide as its figures, its header a short label with the full
  * name on hover, and a routing type is in lower case, the way the address picker writes it.
  */
-export function queueColumns(): Column<QueueView>[] {
+export function queueColumns(): Column<SubscriptionView>[] {
   return [
     {
       id: 'address',
       header: 'Address',
-      accessor: (r) => r.address,
+      accessor: (r) => addressOf(r),
       kind: 'identifier',
       priority: 'essential',
-      sortKey: 'address',
+      sortKey: 'destination',
     },
     {
       id: 'queueName',
       header: 'Queue',
-      accessor: (r) => r.queueName,
+      accessor: (r) => r.name,
       kind: 'identifier',
       priority: 'essential',
-      sortKey: 'queueName',
+      sortKey: 'name',
     },
     {
       id: 'owner',
@@ -55,7 +55,7 @@ export function queueColumns(): Column<QueueView>[] {
     {
       id: 'routingType',
       header: 'Type',
-      accessor: (r) => r.routingType.toLowerCase(),
+      accessor: (r) => routingTypeOf(r).toLowerCase(),
       kind: 'status',
       priority: 'low',
       description: 'Routing type: anycast delivers each message to one consumer, multicast to all of them',

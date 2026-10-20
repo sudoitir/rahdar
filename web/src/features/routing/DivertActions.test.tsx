@@ -6,7 +6,7 @@ import userEvent from '@testing-library/user-event';
 
 import { renderWithProviders } from '../../test/render.tsx';
 import { server } from '../../test/setup.ts';
-import type { CapabilityView, DivertView } from './api.ts';
+import type { CapabilityView, DivertRow } from './api.ts';
 import { CreateDivertAction, DeleteDivertAction } from './DivertActions.tsx';
 
 const AVAILABLE: CapabilityView = { status: 'AVAILABLE', reason: 'ok', brokerXmlSnippet: null };
@@ -64,7 +64,7 @@ function outcome(dryRun: boolean) {
 
 const BROKER_XML = '<diverts>\n  <divert name="audit-copy">\n  </divert>\n</diverts>\n';
 
-const DIVERT: DivertView = {
+const DIVERT: DivertRow = {
   name: 'audit-copy',
   routingName: 'audit-copy',
   address: 'ORDER.IN',

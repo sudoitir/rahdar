@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { useNavigate } from '@tanstack/react-router';
 
 import type { PaletteSource } from '../../kernel/feature.ts';
-import { useQueues } from './api.ts';
+import { addressOf, useQueues } from './api.ts';
 
 const SHOWN = 8;
 
@@ -28,14 +28,14 @@ export const QueuePalette: PaletteSource = ({ clusterId, query, opened, report }
         group: 'Queues',
         actions: [
           ...data.map((q) => {
-            const where = q.address === q.queueName ? '' : `on ${q.address} · `;
+            const where = addressOf(q) === q.name ? '' : `on ${addressOf(q)} · `;
             return {
-              id: `queue-${q.address}-${q.queueName}`,
-              label: q.queueName,
+              id: `queue-${addressOf(q)}-${q.name}`,
+              label: q.name,
               description: `${where}depth ${q.totalMessageCount.toLocaleString()} · ${q.nodesPresent}/${q.nodesTotal} nodes`,
               // The query itself, so the palette's own filter keeps what the server already matched.
-              keywords: [query, q.address],
-              onClick: () => navigate({ to: `/clusters/${clusterId}/queues`, search: { queue: q.queueName } }),
+              keywords: [query, addressOf(q)],
+              onClick: () => navigate({ to: `/clusters/${clusterId}/queues`, search: { queue: q.name } }),
             };
           }),
           ...(hasNext

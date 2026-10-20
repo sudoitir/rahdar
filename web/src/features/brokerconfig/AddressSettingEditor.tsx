@@ -145,8 +145,8 @@ export function AddressSettingEditor({
   // never from invented names: a prefilled DLQ that does not exist declares a
   // policy that silently routes nowhere.
   const dlq = useDlq(declaration.clusterId);
-  const deadLetter = dlq.data?.addresses.find((a) => a.kind === 'dead-letter')?.address;
-  const expiry = dlq.data?.addresses.find((a) => a.kind === 'expiry')?.address;
+  const deadLetter = dlq.data?.destinations.find((a) => a.purpose === 'dead-letter')?.name;
+  const expiry = dlq.data?.destinations.find((a) => a.purpose === 'expiry')?.name;
   const templates = [
     deadLetter
       ? {

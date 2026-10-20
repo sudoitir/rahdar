@@ -26,10 +26,14 @@ function shell() {
     ),
     http.get('*/api/v1/environments', () => HttpResponse.json(paged([]))),
     http.get('*/api/v1/alerts/firing', () => HttpResponse.json(paged([]))),
-    http.get('*/api/v1/clusters/c1/queues', () => HttpResponse.json({ data: [], count: 0, page: 1, pageSize: 50 })),
-    http.get('*/api/v1/clusters/c1/dlq', () => HttpResponse.json({ settingsAvailable: true, addresses: [] })),
-    http.get('*/api/v1/clusters/c1/diverts', () => HttpResponse.json({ data: [], count: 0, page: 1, pageSize: 200 })),
-    http.get('*/api/v1/clusters/c1/bridges', () => HttpResponse.json({ data: [], count: 0, page: 1, pageSize: 200 })),
+    http.get('*/api/v1/clusters/c1/subscriptions', () =>
+      HttpResponse.json({ data: [], count: 0, page: 1, pageSize: 50 }),
+    ),
+    http.get('*/api/v1/clusters/c1/dead-letters', () =>
+      HttpResponse.json({ settingsAvailable: true, destinations: [] }),
+    ),
+    http.get('*/api/v1/clusters/c1/routes', () => HttpResponse.json({ data: [], count: 0, page: 1, pageSize: 200 })),
+    http.get('*/api/v1/clusters/c1/routes', () => HttpResponse.json({ data: [], count: 0, page: 1, pageSize: 200 })),
     http.get('*/api/v1/clusters/c1', () =>
       HttpResponse.json({
         id: 'c1',
@@ -112,8 +116,8 @@ describe('the Routing screen’s Builder tab', () => {
     let saved: { document: ConfigDocumentView; expectedRevision: number; note: string } | null = null;
     // The first matching handler wins, so the stateful declaration goes ahead of the fixtures'.
     server.use(
-      http.get('*/api/v1/clusters/c1/config', () => HttpResponse.json(current)),
-      http.put('*/api/v1/clusters/c1/config', async ({ request }) => {
+      http.get('*/api/v1/clusters/c1/artemis/config', () => HttpResponse.json(current)),
+      http.put('*/api/v1/clusters/c1/artemis/config', async ({ request }) => {
         saved = (await request.json()) as typeof saved;
         current = { ...current, revision: current.revision + 1, document: saved!.document };
         return HttpResponse.json(current);
@@ -195,7 +199,7 @@ describe('the Routing screen’s Builder tab', () => {
   it('states why the declaration could not be read, says what the builder needs, and reads it again on retry', async () => {
     let attempts = 0;
     server.use(
-      http.get('*/api/v1/clusters/c1/config', () => {
+      http.get('*/api/v1/clusters/c1/artemis/config', () => {
         attempts += 1;
         return attempts === 1
           ? HttpResponse.json({ title: 'Down', detail: 'The configuration store is not answering.' }, { status: 503 })

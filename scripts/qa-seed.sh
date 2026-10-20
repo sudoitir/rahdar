@@ -111,15 +111,15 @@ fi
 
 say "creating 60 queues"
 queue() { # address name routing-type
-  post "queue $2" "/clusters/$cluster/queues" \
-    "{\"address\":\"$1\",\"name\":\"$2\",\"routingType\":\"$3\",\"durable\":true,\"autoCreateAddress\":true}"
+  post "queue $2" "/clusters/$cluster/subscriptions" \
+    "{\"kind\":\"artemis.queue\",\"name\":\"$2\",\"destination\":\"artemis.address/$1\",\"attributes\":{\"routingType\":\"$3\",\"durable\":true,\"autoCreateAddress\":true}}"
 }
 # 1 on a 200-character address, 3 with names past 120 characters.
 queue "$LONG_ADDRESS" "$LONG_ADDRESS" ANYCAST
 for name in "${LONG_QUEUES[@]}"; do queue "$name" "$name" ANYCAST; done
 # 18 multicast subscribers: six fan-out addresses with three queues each.
 for n in 1 2 3 4 5 6; do
-  post "address qa.fanout.$n" "/clusters/$cluster/addresses" "{\"name\":\"qa.fanout.$n\",\"routingTypes\":\"MULTICAST\"}"
+  post "address qa.fanout.$n" "/clusters/$cluster/destinations" "{\"kind\":\"artemis.address\",\"name\":\"qa.fanout.$n\",\"attributes\":{\"routingTypes\":\"MULTICAST\"}}"
   for sub in a b c; do queue "qa.fanout.$n" "qa.fanout.$n.sub-$sub" MULTICAST; done
 done
 # The DLQ family and the expiry family: DLQ and ExpiryQueue come with the brokers' configuration.
@@ -137,7 +137,7 @@ done
 say "sending long messages to the dead-letter and expiry queues"
 # 12 dead-lettered and 6 expired, each with a body of about 16 KB, headers and properties of hundreds of characters.
 long_message() { # queue n
-  python3 - "$1" "$2" <<'PY' | api POST "/clusters/$cluster/queues/$1/messages" --data-binary @- -o /dev/null -w '%{http_code}' | grep -q '^2' \
+  python3 - "$1" "$2" <<'PY' | api POST "/clusters/$cluster/resources/artemis.queue/$1/messages" --data-binary @- -o /dev/null -w '%{http_code}' | grep -q '^2' \
     || { echo "  message $2 to $1 was refused" >&2; failed=$((failed + 1)); }
 import json, sys
 queue, n = sys.argv[1], int(sys.argv[2])
@@ -160,7 +160,7 @@ for n in $(seq 1 6); do long_message ExpiryQueue "$n"; done
 
 say "sending 250 small messages to one queue, for a query with many rows"
 for n in $(seq 1 250); do
-  code=$(api POST "/clusters/$cluster/queues/qa.orders.eu-central.001/messages" -o /dev/null -w '%{http_code}' \
+  code=$(api POST "/clusters/$cluster/resources/artemis.queue/qa.orders.eu-central.001/messages" -o /dev/null -w '%{http_code}' \
     -d "{\"kind\":\"TEXT\",\"durable\":true,\"body\":\"{\\\"orderId\\\":\\\"ORD-$n\\\",\\\"amount\\\":$((n * 7 % 500))}\",\"properties\":{\"seq\":$n}}") || code=000
   case $code in 2??) ;; *) failed=$((failed + 1)) ;; esac
 done

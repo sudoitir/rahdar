@@ -1,5 +1,7 @@
 package io.github.sudoitir.rahdar.feature.resources;
 
+import io.github.sudoitir.openbroker.model.ResourceClass;
+import io.github.sudoitir.openbroker.model.ResourceId;
 import io.github.sudoitir.rahdar.kernel.core.NotFoundException;
 import io.github.sudoitir.rahdar.kernel.security.ClusterAccessGuard;
 import io.github.sudoitir.rahdar.kernel.security.Permissions;
@@ -8,6 +10,7 @@ import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
 import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
 import io.github.sudoitir.rahdar.platform.broker.BrokerTarget;
 import io.github.sudoitir.rahdar.platform.broker.QueueSettings;
+import io.github.sudoitir.rahdar.platform.broker.ResourceIds;
 import io.github.sudoitir.rahdar.platform.broker.SystemExtensions;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
@@ -38,7 +41,7 @@ import org.springframework.stereotype.Component;
  */
 @Component
 @RequiredArgsConstructor
-public class QueueConfigurationReader {
+public class SubscriptionConfigurationReader {
 
     private final QueueLocator queueLocator;
     private final ClusterDirectory clusters;
@@ -50,11 +53,18 @@ public class QueueConfigurationReader {
     public record NodeConfiguration(
             UUID nodeId, String nodeName, Map<String, Object> values, String unavailableReason) {}
 
-    /** Every node's copy, with the address and routing type the queue is bound as. */
-    public record QueueConfiguration(
-            String queueName, String address, String routingType, List<NodeConfiguration> nodes) {}
+    /** Every node's copy, with the destination and the system's own properties the subscription is bound as. */
+    public record SubscriptionConfiguration(
+            String id,
+            String kind,
+            String kindLabel,
+            String name,
+            String destination,
+            Map<String, String> nativeAttributes,
+            List<NodeConfiguration> nodes) {}
 
-    public QueueConfiguration read(UUID clusterId, String queueName) {
+    public SubscriptionConfiguration read(UUID clusterId, ResourceId id) {
+        String queueName = id.name();
         access.requireResource(clusterId, ResourceRef.subscription(queueName), Permissions.SUBSCRIPTION_READ);
         List<QueueLocation> locations = queueLocator.locate(clusterId, queueName);
         if (locations.isEmpty()) {
@@ -81,6 +91,14 @@ public class QueueConfigurationReader {
             }
         }
         QueueLocation first = locations.getFirst();
-        return new QueueConfiguration(queueName, first.address(), first.routingType(), read);
+        return new SubscriptionConfiguration(
+                id.format(),
+                id.kind().value(),
+                ResourceIds.label(id.kind()),
+                queueName,
+                ResourceIds.of(gateway.cluster(clusterId), ResourceClass.DESTINATION, first.address())
+                        .format(),
+                Map.of("routingType", first.routingType()),
+                read);
     }
 }

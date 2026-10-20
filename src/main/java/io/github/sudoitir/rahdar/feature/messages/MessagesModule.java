@@ -40,8 +40,7 @@ public final class MessagesModule {
                     "Purge subscriptions",
                     ResourceType.SUBSCRIPTION,
                     Permissions.SUBSCRIPTION_READ))
-            .apiPrefix("/api/v1/clusters/{clusterId}/queues/{queueName}/messages")
-            .apiPrefix("/api/v1/clusters/{clusterId}/dlq")
+            .apiPrefix("/api/v1/clusters/{clusterId}/dead-letters")
             .mcpTool(new McpToolDef(
                     "browse_messages",
                     McpToolDef.Posture.READ,

@@ -11,13 +11,13 @@ import { ErrorState } from '../../ui/ErrorState.tsx';
 import { Page } from '../../ui/Page.tsx';
 import { PageHeader } from '../../ui/PageHeader.tsx';
 import { DataTable } from '../../ui/table/index.ts';
-import { useDlq, type DlqQueue } from './api.ts';
+import { useDlq, type DeadLetterSubscription } from './api.ts';
 import { BulkActionPreview } from './BulkActionPreview.tsx';
 import { dlqColumns, type DlqRow } from './columns.ts';
 import { useActionGate } from './gates.ts';
 import { messageCount } from './outcomes.ts';
 
-const rowKey = (r: DlqRow) => `${r.address}/${r.queue.queueName}`;
+const rowKey = (r: DlqRow) => `${r.address}/${r.queue.name}`;
 
 /** "Replay all…" on a queue's row: every message back to the queue it came from, through the shared preview. */
 function ReplayItem({ clusterId, onReplay }: Readonly<{ clusterId: string; onReplay: () => void }>) {
@@ -74,14 +74,15 @@ function DlqEmpty({ addresses, available }: Readonly<{ addresses: string[]; avai
 export function DlqView() {
   const { clusterId } = useParams({ strict: false }) as { clusterId: string };
   const dlq = useDlq(clusterId);
-  const [replay, setReplay] = useState<DlqQueue | null>(null);
-  const [breakdown, setBreakdown] = useState<DlqQueue | null>(null);
+  const [replay, setReplay] = useState<DeadLetterSubscription | null>(null);
+  const [breakdown, setBreakdown] = useState<DeadLetterSubscription | null>(null);
   const columns = useMemo(() => dlqColumns(clusterId), [clusterId]);
 
-  const addresses = dlq.data?.addresses;
+  const addresses = dlq.data?.destinations;
   // Flattened so each row is a queue rather than an address: one address can hold hundreds.
   const rows = useMemo<DlqRow[]>(
-    () => (addresses ?? []).flatMap((a) => a.queues.map((queue) => ({ address: a.address, kind: a.kind, queue }))),
+    () =>
+      (addresses ?? []).flatMap((a) => a.subscriptions.map((queue) => ({ address: a.name, kind: a.purpose, queue }))),
     [addresses],
   );
 
@@ -103,7 +104,7 @@ export function DlqView() {
         error={dlq.isError ? <ErrorState error={dlq.error} onRetry={() => void dlq.refetch()} /> : undefined}
         onRowClick={(r) => setBreakdown(r.queue)}
         rowMenu={{
-          label: (r) => `dead-letter queue ${r.queue.queueName}`,
+          label: (r) => `dead-letter queue ${r.queue.name}`,
           render: (r) => (
             <>
               <ActionMenuItem
@@ -116,17 +117,14 @@ export function DlqView() {
           ),
         }}
         empty={
-          <DlqEmpty
-            addresses={(addresses ?? []).map((a) => a.address)}
-            available={dlq.data?.settingsAvailable ?? true}
-          />
+          <DlqEmpty addresses={(addresses ?? []).map((a) => a.name)} available={dlq.data?.settingsAvailable ?? true} />
         }
       />
 
       <Modal
         opened={breakdown !== null}
         onClose={() => setBreakdown(null)}
-        title={breakdown ? `${breakdown.queueName} by node` : ''}
+        title={breakdown ? `${breakdown.name} by node` : ''}
       >
         {breakdown ? (
           <DescriptionList
@@ -139,7 +137,7 @@ export function DlqView() {
       {replay ? (
         <BulkActionPreview
           clusterId={clusterId}
-          queueName={replay.queueName}
+          queueName={replay.name}
           action="retry"
           opened={replay !== null}
           onClose={() => setReplay(null)}

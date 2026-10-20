@@ -24,7 +24,7 @@ import io.github.sudoitir.openbroker.model.StandardAttributes;
 import io.github.sudoitir.openbroker.operation.Direction;
 import io.github.sudoitir.openbroker.operation.Operation;
 import io.github.sudoitir.openbroker.operation.Operations;
-import io.github.sudoitir.rahdar.feature.resources.LifecycleRequests.CreateQueueRequest;
+import io.github.sudoitir.rahdar.feature.resources.LifecycleRequests.CreateSubscriptionRequest;
 import io.github.sudoitir.rahdar.kernel.audit.internal.persistence.AuditEventEntity;
 import io.github.sudoitir.rahdar.kernel.audit.internal.persistence.AuditEventRepository;
 import io.github.sudoitir.rahdar.kernel.core.NotFoundException;
@@ -197,8 +197,9 @@ class QueueLifecycleServiceTest extends PostgresIntegrationTest {
         }
     }
 
-    private CreateQueueRequest createRequest() {
-        return new CreateQueueRequest("orders.addr", QUEUE, "ANYCAST", true, null, null, null, null, null, null, null);
+    private CreateSubscriptionRequest createRequest() {
+        return LifecycleFixtures.createQueue(
+                "orders.addr", QUEUE, "ANYCAST", true, null, null, null, null, null, null, null);
     }
 
     // ---- what the node holds ------------------------------------------------
@@ -381,7 +382,7 @@ class QueueLifecycleServiceTest extends PostgresIntegrationTest {
         assertThat(status(outcome, secondLive)).isEqualTo(NodeStatus.FAILED);
 
         // One row for the whole command, recorded as failed, carrying every node.
-        List<AuditEventEntity> events = auditFor("CREATE_QUEUE");
+        List<AuditEventEntity> events = auditFor("CREATE_SUBSCRIPTION");
         assertThat(events).hasSize(1);
         assertThat(events.get(0).getOutcome()).isEqualTo("FAILURE");
         assertThat(events.get(0).getOutcomeDetail()).contains("FAILED").contains("SKIPPED_NOT_LIVE");
@@ -391,7 +392,7 @@ class QueueLifecycleServiceTest extends PostgresIntegrationTest {
     void aSuccessfulFanOutIsOneAuditRowCarryingEveryNode() {
         ok(lifecycle.createQueue(clusterId, createRequest(), false));
 
-        List<AuditEventEntity> events = auditFor("CREATE_QUEUE");
+        List<AuditEventEntity> events = auditFor("CREATE_SUBSCRIPTION");
         assertThat(events).hasSize(1);
         assertThat(events.get(0).getOutcome()).isEqualTo("SUCCESS");
         assertThat(events.get(0).getOutcomeDetail()).contains("APPLIED").contains("SKIPPED_NOT_LIVE");
@@ -432,7 +433,7 @@ class QueueLifecycleServiceTest extends PostgresIntegrationTest {
         NodeOutcome real = live(ok(lifecycle.deleteQueue(clusterId, QUEUE, false, false, true)));
         assertThat(real.status()).isEqualTo(NodeStatus.APPLIED);
         verify(ops).execute(eq(QUEUE_ID), eq(deleteQueue(true)), any(Scope.class));
-        assertThat(realAudit("DELETE_QUEUE").getParams()).contains("disconnectConsumers");
+        assertThat(realAudit("DELETE_SUBSCRIPTION").getParams()).contains("disconnectConsumers");
     }
 
     @Test
@@ -456,7 +457,7 @@ class QueueLifecycleServiceTest extends PostgresIntegrationTest {
         order.verify(ops).execute(eq(divertId("feed")), eq(Operation.delete()), any(Scope.class));
         order.verify(ops).execute(eq(QUEUE_ID), eq(deleteQueue(false)), any(Scope.class));
         // Enough in the audit row to recreate the divert exactly.
-        assertThat(realAudit("DELETE_QUEUE").getOutcomeDetail())
+        assertThat(realAudit("DELETE_SUBSCRIPTION").getOutcomeDetail())
                 .contains("feed")
                 .contains("incoming")
                 .contains("STRIP");
@@ -609,8 +610,9 @@ class QueueLifecycleServiceTest extends PostgresIntegrationTest {
 
     // ---- create queue ------------------------------------------------------
 
-    private CreateQueueRequest fullRequest() {
-        return new CreateQueueRequest(ADDRESS, QUEUE, "anycast", true, "color='red'", 5, true, false, true, 100L, null);
+    private CreateSubscriptionRequest fullRequest() {
+        return LifecycleFixtures.createQueue(
+                ADDRESS, QUEUE, "anycast", true, "color='red'", 5, true, false, true, 100L, null);
     }
 
     @Test
@@ -652,8 +654,8 @@ class QueueLifecycleServiceTest extends PostgresIntegrationTest {
 
     @Test
     void aBlankFilterIsNotSent() {
-        CreateQueueRequest blankFilter =
-                new CreateQueueRequest(ADDRESS, QUEUE, "ANYCAST", true, "  ", null, null, null, null, null, null);
+        CreateSubscriptionRequest blankFilter = LifecycleFixtures.createQueue(
+                ADDRESS, QUEUE, "ANYCAST", true, "  ", null, null, null, null, null, null);
 
         lifecycle.createQueue(clusterId, blankFilter, false);
 
@@ -669,7 +671,7 @@ class QueueLifecycleServiceTest extends PostgresIntegrationTest {
         seedQueue();
 
         LifecycleOutcome outcome = ok(lifecycle.updateQueue(
-                clusterId, QUEUE, new LifecycleRequests.UpdateQueueRequest("", 3, false, true, false, 50L), false));
+                clusterId, QUEUE, LifecycleFixtures.updateQueue("", 3, false, true, false, 50L), false));
 
         assertThat(status(outcome, liveId)).isEqualTo(NodeStatus.APPLIED);
         ArgumentCaptor<Operation> sent = ArgumentCaptor.forClass(Operation.class);
@@ -687,7 +689,7 @@ class QueueLifecycleServiceTest extends PostgresIntegrationTest {
     void anUpdateThatChangesNothingIsRejectedBeforeTouchingAnyNode() {
         seedQueue();
 
-        var request = new LifecycleRequests.UpdateQueueRequest(null, null, null, null, null, null);
+        var request = LifecycleFixtures.updateQueue(null, null, null, null, null, null);
 
         assertThatThrownBy(() -> lifecycle.updateQueue(clusterId, QUEUE, request, false))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -697,7 +699,7 @@ class QueueLifecycleServiceTest extends PostgresIntegrationTest {
 
     @Test
     void anUpdateOfAQueueNoNodeHasIsNotFound() {
-        var update = new LifecycleRequests.UpdateQueueRequest(null, 1, null, null, null, null);
+        var update = LifecycleFixtures.updateQueue(null, 1, null, null, null, null);
 
         assertThatThrownBy(() -> lifecycle.updateQueue(clusterId, "ghost", update, false))
                 .isInstanceOf(NotFoundException.class);
@@ -729,7 +731,7 @@ class QueueLifecycleServiceTest extends PostgresIntegrationTest {
         when(ops.execute(eq(QUEUE_ID), eq(resume), any(Scope.class))).thenReturn(Targets.already());
         assertThat(status(ok(lifecycle.setPaused(clusterId, QUEUE, false, false)), liveId))
                 .isEqualTo(NodeStatus.ALREADY);
-        assertThat(auditFor("RESUME_QUEUE")).isNotEmpty();
+        assertThat(auditFor("RESUME_SUBSCRIPTION")).isNotEmpty();
     }
 
     @Test
@@ -746,8 +748,8 @@ class QueueLifecycleServiceTest extends PostgresIntegrationTest {
 
     @Test
     void anAddressIsCreatedWithItsRoutingTypesUpperCased() {
-        LifecycleOutcome outcome = ok(lifecycle.createAddress(
-                clusterId, new LifecycleRequests.CreateAddressRequest("a.b", "anycast,multicast"), false));
+        LifecycleOutcome outcome = ok(
+                lifecycle.createAddress(clusterId, LifecycleFixtures.createAddress("a.b", "anycast,multicast"), false));
 
         assertThat(status(outcome, liveId)).isEqualTo(NodeStatus.APPLIED);
         ArgumentCaptor<Operation> sent = ArgumentCaptor.forClass(Operation.class);

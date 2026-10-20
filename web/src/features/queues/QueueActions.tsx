@@ -30,7 +30,7 @@ import { ErrorState } from '../../ui/ErrorState.tsx';
 import { Notice } from '../../ui/Notice.tsx';
 import { LoadingState } from '../../ui/LoadingState.tsx';
 import { NodeOutcomeSummary } from '../../ui/NodeOutcomeSummary.tsx';
-import { useQueue, useSetQueuePaused, type LifecycleOutcomeView, type QueueView } from './api.ts';
+import { useQueue, useSetQueuePaused, type LifecycleOutcomeView, type SubscriptionView } from './api.ts';
 import { EditQueueForm } from './EditQueueForm.tsx';
 import { DeleteQueueDialog } from './QueueLifecycleActions.tsx';
 import linkClasses from '../../ui/InlineLink.module.css';
@@ -67,7 +67,7 @@ function WithQueue({
 }: HostedDialogProps & {
   clusterId: string;
   target: QueueTarget;
-  render: (queue: QueueView, dialog: HostedDialogProps) => ReactNode;
+  render: (queue: SubscriptionView, dialog: HostedDialogProps) => ReactNode;
 }) {
   const { queue, isPending, isError, error } = useQueue(clusterId, target.queueName, target.snapshot);
   const [ready, setReady] = useState(false);
@@ -126,8 +126,8 @@ function PauseQueueDialog({
   onClose,
   clusterId,
   queue,
-}: HostedDialogProps & { clusterId: string; queue: QueueView }) {
-  const setPaused = useSetQueuePaused(clusterId, queue.queueName);
+}: HostedDialogProps & { clusterId: string; queue: SubscriptionView }) {
+  const setPaused = useSetQueuePaused(clusterId, queue.name);
   const [outcome, setOutcome] = useState<LifecycleOutcomeView | null>(null);
   const paused = queue.perNode.some((n) => n.paused);
   const verb = paused ? 'Resume' : 'Pause';
@@ -136,7 +136,7 @@ function PauseQueueDialog({
     <ConfirmDialog
       opened={opened}
       onClose={onClose}
-      title={`${verb} ${queue.queueName}`}
+      title={`${verb} ${queue.name}`}
       confirmLabel={`${verb} queue`}
       pending={setPaused.isPending}
       onConfirm={() => setPaused.mutate({ paused: !paused }, { onSuccess: setOutcome })}
@@ -220,7 +220,12 @@ export function PauseResumeQueue({ clusterId, target, host }: Readonly<ActionPro
 }
 
 export function EditQueue({ clusterId, target, host }: Readonly<ActionProps<QueueTarget>>) {
-  const { hidden, verdict: gate } = useWriteGate(clusterId, target, 'subscription:update', "Change a queue's configuration");
+  const { hidden, verdict: gate } = useWriteGate(
+    clusterId,
+    target,
+    'subscription:update',
+    "Change a queue's configuration",
+  );
   if (hidden) return null;
   return (
     <ActionMenuItem
@@ -240,7 +245,12 @@ export function EditQueue({ clusterId, target, host }: Readonly<ActionProps<Queu
 }
 
 export function DeleteQueue({ clusterId, target, host }: Readonly<ActionProps<QueueTarget>>) {
-  const { hidden, verdict: gate } = useWriteGate(clusterId, target, 'subscription:delete', 'Destroy queues and addresses');
+  const { hidden, verdict: gate } = useWriteGate(
+    clusterId,
+    target,
+    'subscription:delete',
+    'Destroy queues and addresses',
+  );
   if (hidden) return null;
   return (
     <ActionMenuItem

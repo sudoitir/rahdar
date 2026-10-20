@@ -20,7 +20,17 @@ const ENVIRONMENTS: EnvironmentView[] = [
 ];
 
 function cluster(id: string, name: string, over: Partial<ClusterSummary> = {}): ClusterSummary {
-  return { id, name, health: 'OK', nodeCount: 2, updatedAt: '2026-01-01T00:00:00Z', environmentId: null, ...over };
+  return {
+    id,
+    name,
+    health: 'OK',
+    nodeCount: 2,
+    updatedAt: '2026-01-01T00:00:00Z',
+    environmentId: null,
+    system: { id: 'artemis', name: 'Apache ActiveMQ Artemis' },
+    kinds: [],
+    ...over,
+  };
 }
 
 /** A cheap view of a cluster, at the path of the real Queues view, so what is under test is the switcher and not a screen. */

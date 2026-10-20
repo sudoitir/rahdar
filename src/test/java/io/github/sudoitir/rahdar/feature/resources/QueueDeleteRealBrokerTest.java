@@ -181,7 +181,7 @@ class QueueDeleteRealBrokerTest extends PostgresIntegrationTest {
 
             // The same preview over REST, with the flag: the blast radius names the divert.
             MockMvc mvc = MockMvcBuilders.webAppContextSetup(webContext).build();
-            mvc.perform(delete("/api/v1/clusters/" + clusterId + "/queues/" + dst)
+            mvc.perform(delete("/api/v1/clusters/" + clusterId + "/resources/artemis.queue/" + dst)
                             .param("dryRun", "true")
                             .param("disconnectConsumers", "true"))
                     .andExpect(status().isOk())
@@ -206,7 +206,7 @@ class QueueDeleteRealBrokerTest extends PostgresIntegrationTest {
         assertThat(dstQueueExists()).isFalse();
 
         AuditEventEntity row = auditEvents.findAll().stream()
-                .filter(e -> "DELETE_QUEUE".equals(e.getAction())
+                .filter(e -> "DELETE_SUBSCRIPTION".equals(e.getAction())
                         && clusterId.equals(e.getClusterId())
                         && !e.isDryRun()
                         && "SUCCESS".equals(e.getOutcome()))

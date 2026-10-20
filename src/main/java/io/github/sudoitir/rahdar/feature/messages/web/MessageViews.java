@@ -27,7 +27,9 @@ public final class MessageViews {
 
     /** One row in the message grid. */
     public record MessageSummaryView(
-            @Schema(requiredMode = REQUIRED) long messageId,
+            @Schema(requiredMode = REQUIRED, description = "The message's position on its node, opaque.")
+            String position,
+
             @Schema(requiredMode = REQUIRED) int type,
             @Schema(requiredMode = REQUIRED) boolean durable,
             @Schema(requiredMode = REQUIRED) int priority,
@@ -43,7 +45,9 @@ public final class MessageViews {
 
     /** One message, expanded: the full header set, the typed property maps, and the body. */
     public record MessageDetailView(
-            @Schema(requiredMode = REQUIRED) long messageId,
+            @Schema(requiredMode = REQUIRED, description = "The message's position on its node, opaque.")
+            String position,
+
             @Schema(requiredMode = REQUIRED) int type,
             @Schema(requiredMode = REQUIRED) boolean durable,
             @Schema(requiredMode = REQUIRED) int priority,
@@ -112,7 +116,7 @@ public final class MessageViews {
      */
     public record PartialView(
             @Schema(requiredMode = REQUIRED) long affectedCount,
-            @Schema(requiredMode = REQUIRED) List<Long> notDone,
+            @Schema(requiredMode = REQUIRED) List<String> notDone,
             @Schema(requiredMode = REQUIRED) String error,
             @Schema(requiredMode = REQUIRED) boolean partial,
             @Schema(requiredMode = REQUIRED) UUID node) {}
@@ -130,25 +134,49 @@ public final class MessageViews {
             @Schema(requiredMode = REQUIRED) boolean overCap,
             @Schema(requiredMode = REQUIRED) UUID node) {}
 
-    // ---- DLQ (Slice 9) --------------------------------------------------
+    // ---- dead letters (Slice 9) -----------------------------------------
 
-    public record DlqQueueDepth(
+    public record DeadLetterDepth(
             @Schema(requiredMode = REQUIRED) UUID nodeId,
             @Schema(requiredMode = REQUIRED) String nodeName,
             @Schema(requiredMode = REQUIRED) long depth) {}
 
-    public record DlqQueue(
-            @Schema(requiredMode = REQUIRED) String queueName,
-            @Schema(requiredMode = REQUIRED) String address,
+    public record DeadLetterSubscription(
+            @Schema(requiredMode = REQUIRED, description = "The subscription's canonical id.")
+            String id,
+
+            @Schema(requiredMode = REQUIRED, description = "The id of its kind, such as artemis.queue.")
+            String kind,
+
+            @Schema(requiredMode = REQUIRED, description = "The kind's name for people, such as Queue.")
+            String kindLabel,
+
+            @Schema(requiredMode = REQUIRED) String name,
+
+            @Schema(requiredMode = REQUIRED, description = "The id of the destination it is bound to.")
+            String destination,
+
             @Schema(requiredMode = REQUIRED) long totalDepth,
-            @Schema(requiredMode = REQUIRED) List<DlqQueueDepth> perNode) {}
+            @Schema(requiredMode = REQUIRED) List<DeadLetterDepth> perNode) {}
 
-    public record DlqAddress(
-            @Schema(requiredMode = REQUIRED) String address,
-            @Schema(requiredMode = REQUIRED) String kind,
-            @Schema(requiredMode = REQUIRED) List<DlqQueue> queues) {}
+    public record DeadLetterDestination(
+            @Schema(requiredMode = REQUIRED, description = "The destination's canonical id.")
+            String id,
 
-    public record DlqView(
-            @Schema(requiredMode = REQUIRED) List<DlqAddress> addresses,
+            @Schema(requiredMode = REQUIRED, description = "The id of its kind, such as artemis.address.")
+            String kind,
+
+            @Schema(requiredMode = REQUIRED, description = "The kind's name for people, such as Address.")
+            String kindLabel,
+
+            @Schema(requiredMode = REQUIRED) String name,
+
+            @Schema(requiredMode = REQUIRED, description = "dead-letter or expiry.")
+            String purpose,
+
+            @Schema(requiredMode = REQUIRED) List<DeadLetterSubscription> subscriptions) {}
+
+    public record DeadLetterView(
+            @Schema(requiredMode = REQUIRED) List<DeadLetterDestination> destinations,
             @Schema(requiredMode = REQUIRED) boolean settingsAvailable) {}
 }

@@ -216,8 +216,8 @@ class AuditExportControllerTest extends PostgresIntegrationTest {
                         "exporter-" + UUID.randomUUID(), List.of(AuditPermissions.EXPORT), false, false))
                 .id();
         userService.addGrant(user, new GrantRequest(role, "CLUSTER", clusterId));
-        event("alice", "MINE", "QUEUE", "orders.in", Map.of("target", "billing.in"));
-        event("alice", "THEIRS", "QUEUE", "billing.in", Map.of());
+        event("alice", "MINE", "SUBSCRIPTION", "orders.in", Map.of("target", "billing.in"));
+        event("alice", "THEIRS", "SUBSCRIPTION", "billing.in", Map.of());
         event("alice", "CLUSTERWIDE", "CLUSTER", "prod", Map.of());
 
         String body = export("format=ndjson", fixture.session(user)).getContentAsString();

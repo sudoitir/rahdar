@@ -205,10 +205,11 @@ export interface LifecycleVars {
   override?: boolean;
 }
 
-export function lifecycleQuery(dryRun?: boolean, override?: boolean): string {
+export function lifecycleQuery(dryRun?: boolean, override?: boolean, node?: string): string {
   const params = new URLSearchParams();
   if (dryRun !== undefined) params.set('dryRun', String(dryRun));
   if (override) params.set('override', 'true');
+  if (node) params.set('node', node);
   const q = params.toString();
   return q ? `?${q}` : '';
 }

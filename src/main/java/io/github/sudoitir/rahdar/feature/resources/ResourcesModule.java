@@ -65,16 +65,14 @@ public final class ResourcesModule {
                     "Create and delete routes",
                     ResourceType.DESTINATION,
                     Permissions.DESTINATION_READ))
-            .apiPrefix("/api/v1/clusters/{clusterId}/queues")
-            .apiPrefix("/api/v1/clusters/{clusterId}/addresses")
+            .apiPrefix("/api/v1/clusters/{clusterId}/subscriptions")
+            .apiPrefix("/api/v1/clusters/{clusterId}/destinations")
             .apiPrefix("/api/v1/clusters/{clusterId}/consumers")
-            .apiPrefix("/api/v1/clusters/{clusterId}/sessions")
+            .apiPrefix("/api/v1/clusters/{clusterId}/channels")
             .apiPrefix("/api/v1/clusters/{clusterId}/connections")
             .apiPrefix("/api/v1/clusters/{clusterId}/producers")
-            .apiPrefix("/api/v1/clusters/{clusterId}/nodes/{nodeId}/connections")
-            .apiPrefix("/api/v1/clusters/{clusterId}/nodes/{nodeId}/sessions")
-            .apiPrefix("/api/v1/clusters/{clusterId}/nodes/{nodeId}/consumers")
-            .apiPrefix("/api/v1/clusters/{clusterId}/addresses/{address}/consumers")
+            .apiPrefix("/api/v1/clusters/{clusterId}/resources")
+            .apiPrefix("/api/v1/subscriptions")
             .streamTopic(TopicDef.signal("consumers", ResourcePermissions.CONNECTION_READ))
             .streamTopic(TopicDef.signal("sessions", ResourcePermissions.CONNECTION_READ))
             .streamTopic(TopicDef.signal("connections", ResourcePermissions.CONNECTION_READ))
@@ -117,9 +115,9 @@ public final class ResourcesModule {
                                     "config",
                                     "{ address, routingType (ANYCAST|MULTICAST), durable, filter, maxConsumers, "
                                             + "purgeOnNoConsumers, exclusive, nonDestructive, ringSize }",
-                                    "create_queue needs at least address and routingType. On update_queue only "
+                                    "create_subscription needs at least address and routingType. On update_resource only "
                                             + "the fields you send change; address, routingType, name and durable "
-                                            + "cannot change on a live queue. create_address reads routingType only."),
+                                            + "cannot change on a live queue. create_destination reads routingType only."),
                             McpToolDef.Param.note(
                                     "kind.fanout",
                                     "A command targets the cluster and fans out to every live node. The result "
@@ -129,7 +127,7 @@ public final class ResourcesModule {
                                             + "than a failure. Re-running after a partial application converges."),
                             McpToolDef.Param.note(
                                     "disconnectConsumers",
-                                    "delete_queue only, default false. A node where the queue has consumers "
+                                    "delete_subscription only, default false. A node where the queue has consumers "
                                             + "refuses the delete without it; with it they are closed. A divert "
                                             + "that forwards into the queue's address, where it is the last queue, "
                                             + "is removed with it, and the preview names it per node."),

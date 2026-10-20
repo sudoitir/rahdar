@@ -13,11 +13,11 @@ public enum ConnectionCloseKind {
     /** Close one connection, and with it every session and consumer it carries. */
     CONNECTION("CLOSE_CONNECTION", "CONNECTION"),
     /** Close one session within a connection. */
-    SESSION("CLOSE_SESSION", "SESSION"),
+    SESSION("CLOSE_SESSION", "CHANNEL"),
     /** Close the connection behind one consumer, found from the consumer's own id. */
     CONSUMER("CLOSE_CONSUMER_CONNECTION", "CONSUMER"),
     /** Close every consumer connection bound to an address, on every live node. */
-    ADDRESS_CONSUMERS("CLOSE_ADDRESS_CONSUMERS", "ADDRESS");
+    ADDRESS_CONSUMERS("CLOSE_ADDRESS_CONSUMERS", "DESTINATION");
 
     private final String auditName;
     private final String targetType;

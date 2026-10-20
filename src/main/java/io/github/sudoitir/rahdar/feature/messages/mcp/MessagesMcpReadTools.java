@@ -69,7 +69,7 @@ public class MessagesMcpReadTools {
         MessageViews.MessagePageView page = messages.browse(clusterId, queue, null, filter, 1, limit + 1);
         List<McpViews.MessageHeader> rows = page.data().stream()
                 .map(m -> new McpViews.MessageHeader(
-                        String.valueOf(m.messageId()),
+                        m.position(),
                         queue,
                         page.node().toString(),
                         m.timestamp() > 0 ? Instant.ofEpochMilli(m.timestamp()) : null,

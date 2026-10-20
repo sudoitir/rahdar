@@ -2,9 +2,7 @@ package io.github.sudoitir.rahdar.feature.resources;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import io.github.sudoitir.rahdar.feature.resources.LifecycleRequests.CreateAddressRequest;
-import io.github.sudoitir.rahdar.feature.resources.LifecycleRequests.CreateQueueRequest;
-import io.github.sudoitir.rahdar.feature.resources.LifecycleRequests.UpdateQueueRequest;
+import io.github.sudoitir.rahdar.feature.resources.LifecycleRequests.CreateSubscriptionRequest;
 import io.github.sudoitir.rahdar.kernel.audit.internal.persistence.AuditEventRepository;
 import io.github.sudoitir.rahdar.platform.broker.Attempt;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterService;
@@ -93,16 +91,19 @@ class QueueLifecycleRealBrokerTest extends PostgresIntegrationTest {
 
     @Test
     void aQueueIsCreatedUpdatedPausedResumedAndDeleted() {
-        assertThat(only(lifecycle.createAddress(clusterId, new CreateAddressRequest(address, "anycast"), false)))
+        assertThat(only(lifecycle.createAddress(clusterId, LifecycleFixtures.createAddress(address, "anycast"), false)))
                 .isEqualTo(NodeStatus.APPLIED);
-        CreateQueueRequest request =
-                new CreateQueueRequest(address, queue, "anycast", true, "color='red'", 5, null, null, null, null, null);
+        CreateSubscriptionRequest request = LifecycleFixtures.createQueue(
+                address, queue, "anycast", true, "color='red'", 5, null, null, null, null, null);
 
         assertThat(only(lifecycle.createQueue(clusterId, request, false))).isEqualTo(NodeStatus.APPLIED);
         assertThat(only(lifecycle.createQueue(clusterId, request, false))).isEqualTo(NodeStatus.ALREADY);
 
         assertThat(only(lifecycle.updateQueue(
-                        clusterId, queue, new UpdateQueueRequest("color='blue'", 7, null, null, null, null), false)))
+                        clusterId,
+                        queue,
+                        LifecycleFixtures.updateQueue("color='blue'", 7, null, null, null, null),
+                        false)))
                 .isEqualTo(NodeStatus.APPLIED);
 
         assertThat(only(lifecycle.setPaused(clusterId, queue, true, false))).isEqualTo(NodeStatus.APPLIED);
@@ -116,11 +117,11 @@ class QueueLifecycleRealBrokerTest extends PostgresIntegrationTest {
 
     @Test
     void aQueueThatExistsDifferentlyFailsNamingTheDifference() {
-        CreateQueueRequest request =
-                new CreateQueueRequest(address, queue, "anycast", true, null, null, null, null, null, null, null);
+        CreateSubscriptionRequest request = LifecycleFixtures.createQueue(
+                address, queue, "anycast", true, null, null, null, null, null, null, null);
         assertThat(only(lifecycle.createQueue(clusterId, request, false))).isEqualTo(NodeStatus.APPLIED);
 
-        CreateQueueRequest other = new CreateQueueRequest(
+        CreateSubscriptionRequest other = LifecycleFixtures.createQueue(
                 address, queue, "anycast", true, "color='red'", null, null, null, null, null, null);
         LifecycleOutcome outcome =
                 ((Attempt.Ok<LifecycleOutcome>) lifecycle.createQueue(clusterId, other, false)).value();

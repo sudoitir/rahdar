@@ -152,7 +152,7 @@ class DivertLifecycleServiceTest extends PostgresIntegrationTest {
                 .containsEntry("artemis.routing_name", "feed")
                 .containsEntry("artemis.exclusive", false)
                 .containsKeys("openbroker.route.source", "openbroker.route.target");
-        AuditEventEntity audit = realAudit("CREATE_DIVERT");
+        AuditEventEntity audit = realAudit("CREATE_ROUTE");
         assertThat(audit.getParams()).contains("acknowledgeCaptureShadowing").contains("routing-name");
     }
 

@@ -1,3 +1,5 @@
+import { addressId } from '../../kernel/api/resourceId.ts';
+import { subscriptionIdentity } from '../../test/wire.ts';
 import { beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 import { delay, http, HttpResponse } from 'msw';
 import { act, screen, waitFor, within } from '@testing-library/react';
@@ -37,13 +39,13 @@ vi.mock('./QueueDetailDrawer.tsx', () => ({
     missing,
     onClose,
   }: {
-    queue: { queueName: string } | null;
+    queue: { name: string } | null;
     missing?: string;
     onClose: () => void;
   }) =>
     queue ? (
       <div role="dialog" aria-label="Queue detail">
-        {queue.queueName}
+        {queue.name}
         <button onClick={onClose}>Close detail</button>
       </div>
     ) : missing ? (
@@ -64,8 +66,7 @@ const { QueuesView } = await import('./QueuesView.tsx');
 
 function queue(name: string) {
   return {
-    address: name,
-    queueName: name,
+    ...subscriptionIdentity(name, name),
     allowedActions: [
       'subscription:read',
       'subscription:pause',
@@ -75,7 +76,6 @@ function queue(name: string) {
       'message:read',
       'message:move',
     ],
-    routingType: 'ANYCAST',
     durable: true,
     totalMessageCount: 1,
     totalConsumerCount: 0,
@@ -103,7 +103,7 @@ describe('QueuesView selection', () => {
         HttpResponse.json({ id: 'c1', name: 'c1', topology: { nodes: [] }, capabilities: {} }),
       ),
       // 140 match, one page of two is shown.
-      http.get('*/api/v1/clusters/c1/queues', () =>
+      http.get('*/api/v1/clusters/c1/subscriptions', () =>
         HttpResponse.json({ data: [queue('orders.a'), queue('orders.b')], count: 140, page: 1, pageSize: 200 }),
       ),
     );
@@ -148,7 +148,7 @@ function serve({
     http.get('*/api/v1/clusters/c1', () =>
       HttpResponse.json({ id: 'c1', name: 'c1', topology: { nodes }, capabilities: { managementWrite } }),
     ),
-    http.get('*/api/v1/clusters/c1/queues', () =>
+    http.get('*/api/v1/clusters/c1/subscriptions', () =>
       HttpResponse.json({ data: queues, count: count ?? queues.length, page: 1, pageSize: 200 }),
     ),
   );
@@ -240,7 +240,7 @@ describe('QueuesView rows', () => {
   it('states why the queues could not be listed instead of showing an empty grid', async () => {
     search = {};
     server.use(
-      http.get('*/api/v1/clusters/c1/queues', () =>
+      http.get('*/api/v1/clusters/c1/subscriptions', () =>
         HttpResponse.json({ title: 'Listing failed', detail: 'No node answered.' }, { status: 502 }),
       ),
     );
@@ -258,7 +258,7 @@ describe('QueuesView rows', () => {
 describe('QueuesView the open queue', () => {
   it('puts the clicked queue in the address, and opens the one the address names', async () => {
     search = {};
-    serve({ queues: [{ ...queue('orders.a'), address: 'orders' }] });
+    serve({ queues: [{ ...queue('orders.a'), destination: addressId('orders') }] });
     const user = userEvent.setup();
     const { unmount } = renderWithProviders(<QueuesView />);
 
@@ -283,7 +283,7 @@ describe('QueuesView the open queue', () => {
       http.get('*/api/v1/clusters/c1', () =>
         HttpResponse.json({ id: 'c1', name: 'c1', topology: { nodes: [] }, capabilities: {} }),
       ),
-      http.get('*/api/v1/clusters/c1/queues', ({ request }) => {
+      http.get('*/api/v1/clusters/c1/subscriptions', ({ request }) => {
         const asked = new URL(request.url).searchParams.get('q');
         return HttpResponse.json({
           data: asked === 'elsewhere' ? [queue('elsewhere')] : [queue('orders.a')],
@@ -508,7 +508,10 @@ describe('QueuesView creating a queue', () => {
     search = {};
     serve({ queues: [queue('a')], permissions: [] });
     server.use(
-      teamAccess({ anywhere: ['subscription:read'], createPatterns: { subscription: ['orders.#'], destination: ['orders.#'] } }),
+      teamAccess({
+        anywhere: ['subscription:read'],
+        createPatterns: { subscription: ['orders.#'], destination: ['orders.#'] },
+      }),
     );
     renderWithProviders(<QueuesView />);
 
@@ -550,7 +553,7 @@ describe('QueuesView page structure', () => {
   it('does not say there are no queues while the first page is still loading', async () => {
     search = {};
     serve();
-    server.use(http.get('*/api/v1/clusters/c1/queues', async () => delay('infinite')));
+    server.use(http.get('*/api/v1/clusters/c1/subscriptions', async () => delay('infinite')));
     renderWithProviders(<QueuesView />);
 
     await screen.findByRole('grid', { name: 'Queues' });

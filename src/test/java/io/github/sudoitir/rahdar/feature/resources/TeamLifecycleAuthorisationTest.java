@@ -102,6 +102,7 @@ class TeamLifecycleAuthorisationTest extends PostgresIntegrationTest {
         UUID two = node("two", TWO);
         targetOne = Targets.target();
         targetTwo = Targets.target();
+        when(gateway.cluster(cluster)).thenReturn(targetOne.connection());
         when(gateway.node(cluster, one)).thenReturn(targetOne);
         when(gateway.node(cluster, two)).thenReturn(targetTwo);
         UUID orders = fixture.team("orders", cluster, "orders.#");
@@ -181,9 +182,10 @@ class TeamLifecycleAuthorisationTest extends PostgresIntegrationTest {
                     Targets.queue("billing.y", "orders.in", 0, 0));
         }
 
-        MockHttpServletResponse response = mvc.perform(delete("/api/v1/clusters/" + cluster + "/addresses/orders.in")
-                        .with(authentication(ordersOperator))
-                        .with(csrf()))
+        MockHttpServletResponse response = mvc.perform(
+                        delete("/api/v1/clusters/" + cluster + "/resources/artemis.address/orders.in")
+                                .with(authentication(ordersOperator))
+                                .with(csrf()))
                 .andReturn()
                 .getResponse();
 

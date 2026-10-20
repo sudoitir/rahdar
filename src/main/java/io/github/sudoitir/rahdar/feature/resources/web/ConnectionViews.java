@@ -34,7 +34,11 @@ public final class ConnectionViews {
      *     which a client must state rather than render as zero.
      */
     public record ConnectionTargetView(
-            @Schema(requiredMode = REQUIRED) String connectionId,
+            @Schema(
+                    requiredMode = REQUIRED,
+                    description = "The connection's name on its node, as the broker reports it.")
+            String connection,
+
             @Schema(nullable = true) String clientId,
             @Schema(nullable = true) String remoteAddress,
             @Schema(nullable = true) String user,
@@ -70,10 +74,12 @@ public final class ConnectionViews {
     public record ConnectionCloseView(
             @Schema(
                     requiredMode = REQUIRED,
-                    allowableValues = {"CONNECTION", "SESSION", "CONSUMER", "ADDRESS_CONSUMERS"})
+                    allowableValues = {"CONNECTION", "SESSION", "CONSUMER", "ADDRESS_CONSUMERS"},
+                    description = "What was closed: a connection, one channel of it (SESSION), the connection"
+                            + " behind a consumer, or every consumer connection of a destination.")
             String kind,
 
-            @Schema(requiredMode = REQUIRED, description = "The id or address the close was aimed at.")
+            @Schema(requiredMode = REQUIRED, description = "The name or destination the close was aimed at.")
             String subject,
 
             @Schema(requiredMode = REQUIRED) boolean alreadyGone,

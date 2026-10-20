@@ -16,7 +16,7 @@ public enum DivertKind {
     DELETE_DIVERT(true);
 
     /** What the audit trail files a divert under. */
-    public static final String TARGET_TYPE = "DIVERT";
+    public static final String TARGET_TYPE = "ROUTE";
 
     private final boolean destructive;
 
@@ -25,7 +25,7 @@ public enum DivertKind {
     }
 
     public String auditName() {
-        return name();
+        return this == CREATE_DIVERT ? "CREATE_ROUTE" : "DELETE_ROUTE";
     }
 
     public String permission() {

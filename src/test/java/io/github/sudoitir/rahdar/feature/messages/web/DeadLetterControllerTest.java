@@ -39,9 +39,9 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.context.WebApplicationContext;
 
-/** {@code GET .../dlq} — addresses from broker settings, per-node depth from the cache, honest unavailable path. */
+/** {@code GET .../dead-letters} — addresses from broker settings, per-node depth from the cache, honest unavailable path. */
 @ExtendWith(AdminAuthenticationExtension.class)
-class DlqControllerTest extends PostgresIntegrationTest {
+class DeadLetterControllerTest extends PostgresIntegrationTest {
 
     private static final String URL = "http://a:8161/console/jolokia";
 
@@ -117,12 +117,12 @@ class DlqControllerTest extends PostgresIntegrationTest {
         when(artemisNodes.on(eq(clusterId), any(UUID.class)))
                 .thenReturn(client(SEARCH, fixture("address-settings.json")));
 
-        mvc.perform(get("/api/v1/clusters/{c}/dlq", clusterId))
+        mvc.perform(get("/api/v1/clusters/{c}/dead-letters", clusterId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.settingsAvailable").value(true))
-                .andExpect(jsonPath("$.addresses[?(@.address == 'DLQ')].kind").value(Matchers.hasItem("dead-letter")))
-                .andExpect(jsonPath("$.addresses[?(@.address == 'DLQ')].queues[0].queues", Matchers.anything()))
-                .andExpect(jsonPath("$..queues[?(@.queueName == 'DLQ')].totalDepth")
+                .andExpect(
+                        jsonPath("$.destinations[?(@.name == 'DLQ')].purpose").value(Matchers.hasItem("dead-letter")))
+                .andExpect(jsonPath("$..subscriptions[?(@.name == 'DLQ')].totalDepth")
                         .value(Matchers.hasItem(7)));
     }
 
@@ -130,9 +130,9 @@ class DlqControllerTest extends PostgresIntegrationTest {
     void whenTheSettingsReadFailsItSaysSoAndInfersNothing() throws Exception {
         when(artemisNodes.on(eq(clusterId), any(UUID.class))).thenReturn(unauthorized());
 
-        mvc.perform(get("/api/v1/clusters/{c}/dlq", clusterId))
+        mvc.perform(get("/api/v1/clusters/{c}/dead-letters", clusterId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.settingsAvailable").value(false))
-                .andExpect(jsonPath("$.addresses.length()").value(0));
+                .andExpect(jsonPath("$.destinations.length()").value(0));
     }
 }

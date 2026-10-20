@@ -5,7 +5,7 @@ import { useDebouncedValue } from '@mantine/hooks';
 
 import styles from './AddressPicker.module.css';
 
-import { useAddresses, useQueues, type QueueView } from './api.ts';
+import { addressOf, routingTypeOf, useAddresses, useQueues, type SubscriptionView } from './api.ts';
 import { LoadingState } from '../../ui/LoadingState.tsx';
 
 const SUGGESTION_LIMIT = 300;
@@ -104,20 +104,20 @@ export function AddressPicker({
   }, [addresses.data, permission]);
 
   const options = useMemo(() => {
-    const rows = (queues.data?.data ?? []).filter((q) => !barred.has(q.address));
+    const rows = (queues.data?.data ?? []).filter((q) => !barred.has(addressOf(q)));
     const wanted = types.length === 0 ? null : new Set<string>(types);
     // One row per address: the same address on several nodes is one thing to
     // whoever is picking it, so keep the busiest and count the rest as coverage.
-    const byAddress = new Map<string, QueueView>();
+    const byAddress = new Map<string, SubscriptionView>();
     for (const row of rows) {
-      if (wanted && !wanted.has(row.routingType)) continue;
-      const seen = byAddress.get(row.address);
-      if (!seen || row.totalMessageCount > seen.totalMessageCount) byAddress.set(row.address, row);
+      if (wanted && !wanted.has(routingTypeOf(row))) continue;
+      const seen = byAddress.get(addressOf(row));
+      if (!seen || row.totalMessageCount > seen.totalMessageCount) byAddress.set(addressOf(row), row);
     }
-    return [...byAddress.values()].sort((a, b) => a.address.localeCompare(b.address));
+    return [...byAddress.values()].sort((a, b) => addressOf(a).localeCompare(addressOf(b)));
   }, [queues.data, types, barred]);
 
-  const matchesKnownAddress = options.some((o) => o.address === value);
+  const matchesKnownAddress = options.some((o) => addressOf(o) === value);
   const unknown = Boolean(unknownHint) && value.trim() !== '' && !queues.isFetching && !matchesKnownAddress;
   const notAllowed =
     permission && barred.has(value) ? `You do not hold ${permission} on the address ${value}.` : undefined;
@@ -190,19 +190,19 @@ export function AddressPicker({
               {pickerNotice(queues, options.length, types.length) ??
                 options.map((o) => (
                   <Combobox.Option
-                    value={o.address}
-                    key={o.address}
+                    value={addressOf(o)}
+                    key={addressOf(o)}
                     // Built explicitly: the visual row separates these with flex
                     // gaps, which a screen reader reads as one run-on word.
-                    aria-label={`${o.address}, ${o.routingType.toLowerCase()}, ${o.totalMessageCount.toLocaleString()} messages, on ${o.nodesPresent} of ${o.nodesTotal} nodes`}
+                    aria-label={`${addressOf(o)}, ${routingTypeOf(o).toLowerCase()}, ${o.totalMessageCount.toLocaleString()} messages, on ${o.nodesPresent} of ${o.nodesTotal} nodes`}
                   >
                     <div className={styles.option}>
-                      <span className={styles.name} title={o.address}>
-                        {o.address}
+                      <span className={styles.name} title={addressOf(o)}>
+                        {addressOf(o)}
                       </span>
                       <span className={styles.meta}>
                         <Text size="xs" span>
-                          {o.routingType.toLowerCase()}
+                          {routingTypeOf(o).toLowerCase()}
                         </Text>
                         <Text size="xs" span>
                           {o.totalMessageCount.toLocaleString()} msg

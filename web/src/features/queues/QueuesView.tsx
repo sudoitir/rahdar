@@ -4,7 +4,7 @@ import { useNavigate, useParams, useSearch } from '@tanstack/react-router';
 import { useDebouncedCallback } from '@mantine/hooks';
 
 import { useCluster } from '../clusters/index.ts';
-import { useQueue, useQueues, type QueueView } from './api.ts';
+import { addressOf, routingTypeOf, useQueue, useQueues, type SubscriptionView } from './api.ts';
 import { DataTable } from '../../ui/table/index.ts';
 import { EmptyState } from '../../ui/EmptyState.tsx';
 import { ErrorState } from '../../ui/ErrorState.tsx';
@@ -25,7 +25,7 @@ import { queueColumns } from './columns.ts';
 
 const PAGE_SIZE = 200;
 
-const rowKey = (r: QueueView) => `${r.address}::${r.queueName}::${r.routingType}`;
+const rowKey = (r: SubscriptionView) => `${addressOf(r)}::${r.name}::${routingTypeOf(r)}`;
 
 /** What the selection says, in words. */
 function selectionWords(count: number, total: number, matching: string, allMatching: boolean): string {
@@ -155,7 +155,7 @@ function QueuesEmpty({
  * queues, and carrying picks across it would act on queues the operator can no longer see.
  * Picks are keyed by row, holding the queue name the bulk actions need.
  */
-function useQueueSelection(rows: QueueView[], total: number, q: string | undefined) {
+function useQueueSelection(rows: SubscriptionView[], total: number, q: string | undefined) {
   const [picked, setPicked] = useState<Map<string, string>>(new Map());
   const [allMatching, setAllMatching] = useState(false);
   const clearSelection = () => {
@@ -168,19 +168,19 @@ function useQueueSelection(rows: QueueView[], total: number, q: string | undefin
   }, [q]);
   // "All matching" is a filter, not a list of names: the queues on the other pages were never loaded.
   // Changing any one row turns it back into names, starting from this page.
-  const pageNames = () => new Map(rows.map((r) => [rowKey(r), r.queueName]));
+  const pageNames = () => new Map(rows.map((r) => [rowKey(r), r.name]));
   const toggleRow = (key: string) => {
     const next = allMatching ? pageNames() : new Map(picked);
     setAllMatching(false);
     if (next.has(key)) next.delete(key);
-    else next.set(key, rows.find((r) => rowKey(r) === key)?.queueName ?? key);
+    else next.set(key, rows.find((r) => rowKey(r) === key)?.name ?? key);
     setPicked(next);
   };
   const toggleAll = (keys: string[], allSelected: boolean) => {
     const next = allMatching ? pageNames() : new Map(picked);
     setAllMatching(false);
     if (allSelected) keys.forEach((k) => next.delete(k));
-    else rows.forEach((r) => next.set(rowKey(r), r.queueName));
+    else rows.forEach((r) => next.set(rowKey(r), r.name));
     setPicked(next);
   };
   const selectedKeys: ReadonlySet<string> = allMatching ? new Set(rows.map(rowKey)) : new Set(picked.keys());
@@ -258,18 +258,19 @@ export function QueuesView() {
   //
   // A shared or palette link can name a queue that is not on the loaded page; it is looked up by
   // name then, rather than the link silently opening nothing.
-  const onPage = (query.data?.data ?? []).find((q) => q.queueName === search.queue);
+  const onPage = (query.data?.data ?? []).find((q) => q.name === search.queue);
   const offPage = useQueue(clusterId, onPage ? undefined : search.queue);
   const selected = onPage ?? offPage.queue ?? null;
   // Neither the page nor an exact lookup has it: gone, or no longer visible to the caller. Not while still asking.
   const missing = !selected && search.queue && !offPage.isPending && !offPage.isError ? search.queue : undefined;
-  useTitlePart('resource', selected?.queueName);
-  const setSelected = (queue: QueueView | null) =>
-    navigate({ to: '.', search: (prev: Record<string, unknown>) => ({ ...prev, queue: queue?.queueName }) });
+  useTitlePart('resource', selected?.name);
+  const setSelected = (queue: SubscriptionView | null) =>
+    navigate({ to: '.', search: (prev: Record<string, unknown>) => ({ ...prev, queue: queue?.name }) });
   const [createOpen, setCreateOpen] = useState(false);
   const { can, reach, createPatterns, loading: grantsLoading } = useCan();
   // Through a team or a share the caller may create under their patterns; only with neither is the control not theirs.
-  const mayCreate = can('subscription:create', clusterId) || (createPatterns(clusterId, 'subscription')?.length ?? 0) > 0;
+  const mayCreate =
+    can('subscription:create', clusterId) || (createPatterns(clusterId, 'subscription')?.length ?? 0) > 0;
 
   // An empty grid has three quite different causes, and presenting an absence as
   // a fact is the one that misleads: a node Rahdar could not reach contributes no
@@ -380,12 +381,12 @@ export function QueuesView() {
           ) : undefined,
         }}
         rowMenu={{
-          label: (r) => r.queueName,
+          label: (r) => r.name,
           render: (r, menu) => (
             <ResourceActions
               kind="queue"
               clusterId={clusterId}
-              target={{ queueName: r.queueName, address: r.address, snapshot: r }}
+              target={{ queueName: r.name, address: addressOf(r), snapshot: r }}
               restoreFocus={menu.restoreFocus}
             />
           ),

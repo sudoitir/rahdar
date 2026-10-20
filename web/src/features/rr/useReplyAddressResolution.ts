@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { useDebouncedValue } from '@mantine/hooks';
 
-import { useQueues } from '../queues/index.ts';
+import { addressOf, useQueues } from '../queues/index.ts';
 
 const SUGGESTION_LIMIT = 300;
 
@@ -61,7 +61,7 @@ export function useReplyAddressResolution(clusterId: string, value: string[]): R
 
   const known = useMemo(() => {
     const addresses = new Set<string>();
-    for (const row of queues.data?.data ?? []) addresses.add(row.address);
+    for (const row of queues.data?.data ?? []) addresses.add(addressOf(row));
     return [...addresses].sort((a, b) => a.localeCompare(b));
   }, [queues.data]);
 

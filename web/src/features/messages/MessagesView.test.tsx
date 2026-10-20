@@ -105,7 +105,7 @@ function mockCluster(endpoints: ReturnType<typeof endpoint>[]) {
         },
       }),
     ),
-    http.get('*/api/v1/clusters/c1/queues/PHASE3.SRC/messages', () =>
+    http.get('*/api/v1/clusters/c1/resources/artemis.queue/PHASE3.SRC/messages', () =>
       HttpResponse.json({ data: [], count: 0, page: 1, pageSize: 200, node: endpoints[0].id }),
     ),
   );
@@ -120,7 +120,7 @@ describe('MessagesView', () => {
     try {
       mockCluster([endpoint('n1', 'primary')]);
       server.use(
-        http.get('*/api/v1/clusters/c1/queues/PHASE3.SRC/messages', () => {
+        http.get('*/api/v1/clusters/c1/resources/artemis.queue/PHASE3.SRC/messages', () => {
           browses += 1;
           return HttpResponse.json({ data: [], count: 0, page: 1, pageSize: 200, node: 'n1' });
         }),
@@ -201,7 +201,7 @@ describe('MessagesView', () => {
   it('states an unavailable total instead of showing zero', async () => {
     mockCluster([endpoint('n1', 'primary')]);
     server.use(
-      http.get('*/api/v1/clusters/c1/queues/PHASE3.SRC/messages', () =>
+      http.get('*/api/v1/clusters/c1/resources/artemis.queue/PHASE3.SRC/messages', () =>
         HttpResponse.json({
           data: [],
           count: null,
@@ -250,7 +250,7 @@ describe('MessagesView', () => {
   it('states why the page could not be read, with a retry, in place of the rows', async () => {
     mockCluster([endpoint('n1', 'primary')]);
     server.use(
-      http.get('*/api/v1/clusters/c1/queues/PHASE3.SRC/messages', () =>
+      http.get('*/api/v1/clusters/c1/resources/artemis.queue/PHASE3.SRC/messages', () =>
         HttpResponse.json({ title: 'Cluster unreachable', detail: 'No node answered.' }, { status: 502 }),
       ),
     );
@@ -281,7 +281,7 @@ describe('MessagesView', () => {
 
   it('renders every message of a populated page and opens the one clicked', async () => {
     const summary = (messageId: number, body: string, truncated = false) => ({
-      messageId,
+      position: String(messageId),
       type: 3,
       durable: true,
       priority: 4,
@@ -297,7 +297,7 @@ describe('MessagesView', () => {
     });
     mockCluster([endpoint('n1', 'primary'), endpoint('n2', 'secondary')]);
     server.use(
-      http.get('*/api/v1/clusters/c1/queues/PHASE3.SRC/messages', () =>
+      http.get('*/api/v1/clusters/c1/resources/artemis.queue/PHASE3.SRC/messages', () =>
         HttpResponse.json({
           data: [summary(101, 'order A-1'), summary(102, 'order A-2', true), summary(103, 'order A-3')],
           count: 3,
@@ -307,7 +307,7 @@ describe('MessagesView', () => {
           node: 'n2',
         }),
       ),
-      http.get('*/api/v1/clusters/c1/queues/PHASE3.SRC/messages/102', () =>
+      http.get('*/api/v1/clusters/c1/resources/artemis.queue/PHASE3.SRC/messages/102', () =>
         HttpResponse.json({
           ...summary(102, 'order A-2', true),
           userId: null,
@@ -350,7 +350,7 @@ describe('the purge estimate', () => {
   it('states an estimate that could not be taken, and still lets the purge be armed', async () => {
     mockCluster([endpoint('n1', 'primary')]);
     server.use(
-      http.delete('*/api/v1/clusters/c1/queues/PHASE3.SRC/messages', () =>
+      http.post('*/api/v1/clusters/c1/resources/artemis.queue/PHASE3.SRC:purge', () =>
         HttpResponse.json(
           { title: 'The broker did not answer', detail: 'The node timed out after 5s.' },
           { status: 504 },
@@ -377,7 +377,7 @@ describe('the purge and the bulk safety cap', () => {
     mockCluster([endpoint('n1', 'primary')]);
     const urls: string[] = [];
     server.use(
-      http.delete('*/api/v1/clusters/c1/queues/PHASE3.SRC/messages', ({ request }) => {
+      http.post('*/api/v1/clusters/c1/resources/artemis.queue/PHASE3.SRC:purge', ({ request }) => {
         const url = new URL(request.url);
         urls.push(url.search);
         if (url.searchParams.get('dryRun') === 'true') {
@@ -407,7 +407,7 @@ describe('the purge and the bulk safety cap', () => {
     mockCluster([endpoint('n1', 'primary')]);
     const urls: string[] = [];
     server.use(
-      http.delete('*/api/v1/clusters/c1/queues/PHASE3.SRC/messages', ({ request }) => {
+      http.post('*/api/v1/clusters/c1/resources/artemis.queue/PHASE3.SRC:purge', ({ request }) => {
         const url = new URL(request.url);
         urls.push(url.search);
         if (url.searchParams.get('dryRun') === 'true') {
@@ -433,7 +433,7 @@ describe('the purge and the bulk safety cap', () => {
 describe('one message, from its row (ADR-0107)', () => {
   it('deletes a single message only once its id is typed, and states the outcome', async () => {
     const summary = {
-      messageId: 205,
+      position: '205',
       type: 3,
       durable: true,
       priority: 4,
@@ -458,7 +458,7 @@ describe('one message, from its row (ADR-0107)', () => {
           grants: [{ scopeType: 'GLOBAL', scopeId: null, permissions: ['*'] }],
         }),
       ),
-      http.get('*/api/v1/clusters/c1/queues/PHASE3.SRC/messages', () =>
+      http.get('*/api/v1/clusters/c1/resources/artemis.queue/PHASE3.SRC/messages', () =>
         HttpResponse.json({
           data: [summary],
           count: 1,
@@ -468,7 +468,7 @@ describe('one message, from its row (ADR-0107)', () => {
           node: 'n1',
         }),
       ),
-      http.post('*/api/v1/clusters/c1/queues/PHASE3.SRC/messages/actions/delete', async ({ request }) => {
+      http.post('*/api/v1/clusters/c1/resources/artemis.queue/PHASE3.SRC/messages:delete', async ({ request }) => {
         bodies.push(await request.json());
         return HttpResponse.json({ affectedCount: 1 });
       }),
@@ -492,12 +492,12 @@ describe('one message, from its row (ADR-0107)', () => {
     // The outcome is announced, politely, and the dialog is out of the way.
     expect(await screen.findByText('Deleted message 205 in queue "PHASE3.SRC"')).toBeInTheDocument();
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Delete message 205' })).not.toBeInTheDocument());
-    expect(bodies).toEqual([{ messageIds: [205] }]);
+    expect(bodies).toEqual([{ positions: ['205'] }]);
   });
 
   it('asks for the target queue on the field when a single message is moved without one', async () => {
     const summary = {
-      messageId: 206,
+      position: '206',
       type: 3,
       durable: true,
       priority: 4,
@@ -514,10 +514,10 @@ describe('one message, from its row (ADR-0107)', () => {
     const posts: unknown[] = [];
     mockCluster([endpoint('n1', 'primary')]);
     server.use(
-      http.get('*/api/v1/clusters/c1/queues/PHASE3.SRC/messages', () =>
+      http.get('*/api/v1/clusters/c1/resources/artemis.queue/PHASE3.SRC/messages', () =>
         HttpResponse.json({ data: [summary], count: 1, countUnavailable: null, page: 1, pageSize: 200, node: 'n1' }),
       ),
-      http.post('*/api/v1/clusters/c1/queues/PHASE3.SRC/messages/actions/move', async ({ request }) => {
+      http.post('*/api/v1/clusters/c1/resources/artemis.queue/PHASE3.SRC/messages:move', async ({ request }) => {
         posts.push(await request.json());
         return HttpResponse.json({ affectedCount: 1 });
       }),
@@ -545,6 +545,6 @@ describe('one message, from its row (ADR-0107)', () => {
     await user.type(target, 'ARCHIVE');
     await user.click(within(dialog).getByRole('button', { name: 'Move message' }));
     expect(await screen.findByText('Moved message 206 in queue "PHASE3.SRC"')).toBeInTheDocument();
-    expect(posts).toEqual([{ messageIds: [206], targetQueue: 'ARCHIVE' }]);
+    expect(posts).toEqual([{ positions: ['206'], target: 'artemis.queue/ARCHIVE' }]);
   });
 });

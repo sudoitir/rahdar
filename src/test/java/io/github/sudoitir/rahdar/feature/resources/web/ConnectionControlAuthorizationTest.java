@@ -90,7 +90,7 @@ class ConnectionControlAuthorizationTest extends PostgresIntegrationTest {
     @Test
     void theQueueLifecyclePermissionsDoNotGrantACloseEither() throws Exception {
         assertThat(status(
-                        "/api/v1/clusters/" + clusterId + "/addresses/orders/consumers/close?dryRun=true",
+                        "/api/v1/clusters/" + clusterId + "/resources/artemis.address/orders:close?dryRun=true",
                         Permissions.CLUSTER_READ,
                         ResourcePermissions.SUBSCRIPTION_CREATE,
                         ResourcePermissions.SUBSCRIPTION_DELETE,
@@ -107,7 +107,7 @@ class ConnectionControlAuthorizationTest extends PostgresIntegrationTest {
      */
     @Test
     void theGrantIsWhatMakesTheDifference() throws Exception {
-        String path = "/api/v1/clusters/" + clusterId + "/addresses/orders/consumers/close?dryRun=true";
+        String path = "/api/v1/clusters/" + clusterId + "/resources/artemis.address/orders:close?dryRun=true";
 
         assertThat(status(path, Permissions.CLUSTER_READ)).isEqualTo(404);
         assertThat(status(path, Permissions.CLUSTER_READ, ResourcePermissions.CONNECTION_CLOSE))

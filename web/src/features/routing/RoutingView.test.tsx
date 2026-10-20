@@ -6,7 +6,7 @@ import type { ComponentType } from 'react';
 
 import { renderWithProviders } from '../../test/render.tsx';
 import { server } from '../../test/setup.ts';
-import type { BridgeView, CapabilityView, DivertView } from './api.ts';
+import type { BridgeRow, CapabilityView, DivertRow } from './api.ts';
 
 let search: Record<string, unknown> = {};
 const navigate = vi.fn();
@@ -28,7 +28,7 @@ const { RoutingView } = await import('./RoutingView.tsx');
 
 const AVAILABLE: CapabilityView = { status: 'AVAILABLE', reason: 'ok', brokerXmlSnippet: null };
 
-function divert(over: Partial<DivertView> = {}): DivertView {
+function divert(over: Partial<DivertRow> = {}): DivertRow {
   return {
     name: 'copy-orders',
     address: 'orders',
@@ -42,7 +42,7 @@ function divert(over: Partial<DivertView> = {}): DivertView {
   };
 }
 
-function bridge(over: Partial<BridgeView> = {}): BridgeView {
+function bridge(over: Partial<BridgeRow> = {}): BridgeRow {
   return {
     name: 'to-dr',
     queueName: 'orders.out',
@@ -65,7 +65,7 @@ function serve({
   diverts = [],
   bridges = [],
   count,
-}: { diverts?: DivertView[]; bridges?: BridgeView[]; count?: number } = {}) {
+}: { diverts?: DivertRow[]; bridges?: BridgeRow[]; count?: number } = {}) {
   server.use(
     http.get('*/api/v1/auth/me', () =>
       HttpResponse.json({
@@ -93,13 +93,62 @@ function serve({
         environmentId: null,
       }),
     ),
-    http.get('*/api/v1/clusters/c1/diverts', () =>
-      HttpResponse.json({ data: diverts, count: count ?? diverts.length, page: 1, pageSize: 200 }),
-    ),
-    http.get('*/api/v1/clusters/c1/bridges', () =>
-      HttpResponse.json({ data: bridges, count: count ?? bridges.length, page: 1, pageSize: 200 }),
-    ),
+    http.get('*/api/v1/clusters/c1/routes', () => {
+      const routes = [...diverts.map(divertRoute), ...bridges.map(bridgeRoute)];
+      return HttpResponse.json({ data: routes, count: count ?? routes.length, page: 1, pageSize: 200 });
+    }),
   );
+}
+
+/** A divert as the API lists a route. */
+function divertRoute(d: DivertRow) {
+  return {
+    id: `artemis.divert/${d.name}`,
+    kind: 'artemis.divert',
+    kindLabel: 'Divert',
+    name: d.name,
+    routeClass: 'FORWARD',
+    source: `artemis.address/${d.address}`,
+    target: `artemis.address/${d.forwardingAddress}`,
+    nativeAttributes: {
+      ...(d.filter ? { filter: d.filter } : {}),
+      ...(d.routingType ? { routingType: d.routingType } : {}),
+      exclusive: String(d.exclusive),
+      retroactiveResource: String(d.retroactiveResource),
+      ...(d.captureSubscriptionId ? { captureSubscriptionId: d.captureSubscriptionId } : {}),
+    },
+    nodesPresent: d.nodesPresent,
+    nodesTotal: d.nodesTotal,
+    perNode: d.perNode,
+    owner: d.owner ?? null,
+    drift: d.brokerXml ?? null,
+  };
+}
+
+/** A bridge as the API lists a route. */
+function bridgeRoute(b: BridgeRow) {
+  return {
+    id: `artemis.bridge/${b.name}`,
+    kind: 'artemis.bridge',
+    kindLabel: 'Bridge',
+    name: b.name,
+    routeClass: 'LINK',
+    source: b.queueName ? `artemis.queue/${b.queueName}` : null,
+    target: null,
+    nativeAttributes: {
+      ...(b.forwardingAddress ? { forwardingAddress: b.forwardingAddress } : {}),
+      staticConnectors: b.staticConnectors.join(','),
+      started: String(b.started),
+      connected: String(b.connected),
+      messagesAcknowledged: String(b.messagesAcknowledged),
+      messagesPendingAcknowledgement: String(b.messagesPendingAcknowledgement),
+    },
+    nodesPresent: b.nodesPresent,
+    nodesTotal: b.nodesTotal,
+    perNode: b.perNode,
+    owner: null,
+    drift: null,
+  };
 }
 
 /** What a navigate() call would do to the address it starts from. */
@@ -218,7 +267,7 @@ describe('RoutingView diverts', () => {
   it('states why the diverts could not be read instead of listing none, and retries', async () => {
     let calls = 0;
     server.use(
-      http.get('*/api/v1/clusters/c1/diverts', () => {
+      http.get('*/api/v1/clusters/c1/routes', () => {
         calls += 1;
         return HttpResponse.json({ title: 'Cluster unreachable', detail: 'No node answered.' }, { status: 502 });
       }),
@@ -401,7 +450,7 @@ describe('RoutingView page structure', () => {
 
   it('does not say there are no diverts while the first page is still loading', async () => {
     serve();
-    server.use(http.get('*/api/v1/clusters/c1/diverts', async () => delay('infinite')));
+    server.use(http.get('*/api/v1/clusters/c1/routes', async () => delay('infinite')));
     renderWithProviders(<RoutingView />);
 
     await screen.findByRole('grid', { name: 'Diverts' });

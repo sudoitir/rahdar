@@ -6,6 +6,7 @@ import io.github.sudoitir.rahdar.platform.clusters.LifecycleViews;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.media.Schema.RequiredMode;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 /** The cross-node routing views: diverts and bridges. */
@@ -14,38 +15,57 @@ public final class RoutingViews {
     private RoutingViews() {}
 
     /**
-     * One divert, merged across the nodes it was found on.
+     * One route, merged across the nodes it was found on: a divert ({@code FORWARD}, an address copied or
+     * moved into another) or a bridge ({@code LINK}, a queue forwarded to another broker).
      *
-     * <p>There is no field saying where the divert came from. Artemis records nothing
-     * on a divert distinguishing one declared in {@code broker.xml} from one created
-     * over management, and offers no way to read configured-but-undeployed diverts,
-     * so the system does not claim an origin it cannot establish (ADR-0065 D2).
+     * <p>There is no field saying where a divert came from. Artemis records nothing on a divert
+     * distinguishing one declared in {@code broker.xml} from one created over management, and offers no way
+     * to read configured-but-undeployed diverts, so the system does not claim an origin it cannot establish
+     * (ADR-0065 D2). {@code owner} is the one attribution that is honest, because it comes from Rahdar's own
+     * records rather than from the broker.
      *
-     * <p>{@code owner} is the one attribution that is honest, because it comes from
-     * Rahdar's own records rather than from the broker.
+     * <p>Bridges are read-only, permanently: creating or changing one alters how a cluster is wired to other
+     * brokers and is invisible to whatever manages that cluster's configuration.
      */
-    public record DivertView(
+    public record RouteView(
+            @Schema(requiredMode = REQUIRED, description = "The route's canonical id, such as artemis.divert/orders.")
+            String id,
+
+            @Schema(requiredMode = REQUIRED, description = "The id of the route's kind, such as artemis.divert.")
+            String kind,
+
+            @Schema(requiredMode = REQUIRED, description = "The kind's name for people, such as Divert.")
+            String kindLabel,
+
             @Schema(requiredMode = REQUIRED) String name,
-            @Schema(nullable = true) String routingName,
-            @Schema(requiredMode = REQUIRED) String address,
-            @Schema(requiredMode = REQUIRED) String forwardingAddress,
-            @Schema(nullable = true) String filter,
-            @Schema(nullable = true) String routingType,
-            @Schema(nullable = true) String transformerClassName,
 
             @Schema(
                     requiredMode = REQUIRED,
-                    description = "Exclusive diverts take the message rather than copying it, and Artemis"
-                            + " evaluates them before non-exclusive ones. The difference between traffic"
-                            + " being duplicated and traffic being taken away.")
-            boolean exclusive,
+                    allowableValues = {"BINDING", "FORWARD", "LINK"},
+                    description = "BINDING attaches a subscription to a destination, FORWARD copies or moves"
+                            + " what reaches one destination into another, LINK carries it to another broker.")
+            String routeClass,
 
-            @Schema(requiredMode = REQUIRED) boolean retroactiveResource,
+            @Schema(nullable = true, description = "The id of the destination or subscription the route reads from.")
+            String source,
+
+            @Schema(nullable = true, description = "The id of the destination the route writes to, when it is one.")
+            String target,
+
+            @Schema(
+                    requiredMode = REQUIRED,
+                    description = "What the system calls the route's own properties: its filter, whether it is"
+                            + " exclusive, its transformer, whether it is started, and so on.")
+            Map<String, String> nativeAttributes,
+
+            @Schema(requiredMode = REQUIRED) int nodesPresent,
+            @Schema(requiredMode = REQUIRED) int nodesTotal,
+            @Schema(requiredMode = REQUIRED) List<RouteNodeCell> perNode,
 
             @Schema(
                     requiredMode = RequiredMode.NOT_REQUIRED,
                     nullable = true,
-                    description = "What in Rahdar owns this divert, when Rahdar's own records say it does:"
+                    description = "What in Rahdar owns this route, when Rahdar's own records say it does:"
                             + " MESSAGE_CAPTURE for a capture tap, OPERATOR for one created through the"
                             + " routing screen. Null means Rahdar has no record of it, which is not a claim"
                             + " that it came from broker configuration.")
@@ -54,57 +74,10 @@ public final class RoutingViews {
             @Schema(
                     requiredMode = RequiredMode.NOT_REQUIRED,
                     nullable = true,
-                    description = "The capture subscription this divert serves, when owner is MESSAGE_CAPTURE."
-                            + " Such a divert is not deletable from the routing view: reconciliation would"
-                            + " reinstate it, so the deletion would appear to succeed and then undo itself.")
-            UUID captureSubscriptionId,
-
-            @Schema(
-                    requiredMode = RequiredMode.NOT_REQUIRED,
-                    nullable = true,
-                    description = "The <divert> element that would make broker configuration carry this divert,"
-                            + " when owner is OPERATOR: Rahdar created it, so the deployed broker.xml does not.")
-            String brokerXml,
-
-            @Schema(requiredMode = REQUIRED) int nodesPresent,
-            @Schema(requiredMode = REQUIRED) int nodesTotal,
-            @Schema(requiredMode = REQUIRED) List<NodeRef> perNode) {}
-
-    /**
-     * One bridge, merged across the nodes it was found on. Read-only, permanently:
-     * creating or changing a bridge alters how a cluster is wired to other brokers
-     * and is invisible to whatever manages that cluster's configuration.
-     */
-    public record BridgeView(
-            @Schema(requiredMode = REQUIRED) String name,
-            @Schema(nullable = true) String queueName,
-            @Schema(nullable = true) String forwardingAddress,
-            @Schema(nullable = true) String filterString,
-            @Schema(nullable = true) String discoveryGroupName,
-            @Schema(nullable = true) String transformerClassName,
-            @Schema(requiredMode = REQUIRED) List<String> staticConnectors,
-            @Schema(requiredMode = REQUIRED) long messagesAcknowledged,
-            @Schema(requiredMode = REQUIRED) long messagesPendingAcknowledgement,
-
-            @Schema(
-                    requiredMode = REQUIRED,
-                    description = "Started on at least one node. A bridge started on some nodes and not"
-                            + " others is a divergence the operator needs to see, so this is 'any', not"
-                            + " 'all' — perNode says which.")
-            boolean started,
-
-            @Schema(
-                    requiredMode = REQUIRED,
-                    description = "Connected to its target on at least one node. Started and connected are"
-                            + " different facts: a started bridge that cannot reach its target is the state"
-                            + " 'is this bridge actually running' is really asking about.")
-            boolean connected,
-
-            @Schema(requiredMode = REQUIRED) boolean useDuplicateDetection,
-            @Schema(requiredMode = REQUIRED) boolean highlyAvailable,
-            @Schema(requiredMode = REQUIRED) int nodesPresent,
-            @Schema(requiredMode = REQUIRED) int nodesTotal,
-            @Schema(requiredMode = REQUIRED) List<BridgeNodeCell> perNode) {}
+                    description = "The broker.xml element that would make broker configuration carry this"
+                            + " route, when owner is OPERATOR: Rahdar created it, so the deployed broker.xml"
+                            + " does not.")
+            String drift) {}
 
     /**
      * The result of creating a divert, with the {@code broker.xml} that would make
@@ -124,17 +97,17 @@ public final class RoutingViews {
                             + " absent from configuration, and this is what closes that gap.")
             String brokerXml) {}
 
-    /** A node a merged routing row was found on. */
-    public record NodeRef(
-            @Schema(requiredMode = REQUIRED) UUID nodeId,
-            @Schema(requiredMode = REQUIRED) String nodeName) {}
-
-    /** One node's contribution to a bridge row — its running state there. */
-    public record BridgeNodeCell(
+    /** One node's contribution to a route row. */
+    public record RouteNodeCell(
             @Schema(requiredMode = REQUIRED) UUID nodeId,
             @Schema(requiredMode = REQUIRED) String nodeName,
-            @Schema(requiredMode = REQUIRED) boolean started,
-            @Schema(requiredMode = REQUIRED) boolean connected,
-            @Schema(requiredMode = REQUIRED) long messagesAcknowledged,
-            @Schema(requiredMode = REQUIRED) long messagesPendingAcknowledgement) {}
+
+            @Schema(nullable = true, description = "Whether the route is started there; null for a kind with no state.")
+            Boolean started,
+
+            @Schema(nullable = true, description = "Whether the route is connected to its target there.")
+            Boolean connected,
+
+            @Schema(nullable = true) Long messagesAcknowledged,
+            @Schema(nullable = true) Long messagesPendingAcknowledgement) {}
 }

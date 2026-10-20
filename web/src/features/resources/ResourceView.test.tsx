@@ -1,3 +1,4 @@
+import { destinationIdentity } from '../../test/wire.ts';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { delay, http, HttpResponse } from 'msw';
 import { screen, within } from '@testing-library/react';
@@ -43,10 +44,12 @@ function consumer(id: string) {
   return {
     nodeId: 'n1',
     nodeName: 'node-a',
-    consumerId: id,
-    queueName: 'orders',
-    address: 'orders',
-    sessionId: 's1',
+    id: `artemis.consumer/s1/${id}`,
+    kind: 'artemis.consumer',
+    kindLabel: 'Consumer',
+    channel: 'artemis.session/s1',
+    subscription: 'artemis.queue/orders',
+    destination: 'artemis.address/orders',
     protocol: 'CORE',
     messagesDelivered: 7,
     messagesAcknowledged: 5,
@@ -161,9 +164,9 @@ describe('ResourceView addresses of teams', () => {
     return {
       nodeId: 'n1',
       nodeName: 'node-a',
-      name,
+      ...destinationIdentity(name),
       delivery: ['POINT_TO_POINT'],
-      queueCount: 1,
+      subscriptionCount: 1,
       messageCount: 3,
       allowedActions: ['destination:read'],
       ...(ownerTeam ? { ownerTeam } : {}),
@@ -173,7 +176,7 @@ describe('ResourceView addresses of teams', () => {
   function serveAddresses(rows: object[], access: { permissions: string[]; anywhere: string[] }) {
     serve();
     server.use(
-      http.get('*/api/v1/clusters/c1/addresses', () =>
+      http.get('*/api/v1/clusters/c1/destinations', () =>
         HttpResponse.json({ data: rows, count: rows.length, page: 1, pageSize: 200, hasNext: false }),
       ),
       http.get('*/api/v1/me/access', ({ request }) => {

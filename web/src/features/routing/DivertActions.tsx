@@ -7,7 +7,7 @@ import {
   useCreateDivert,
   useDeleteDivert,
   type DivertMutationView,
-  type DivertView,
+  type DivertRow,
   type LifecycleOutcomeView,
 } from './api.ts';
 import { useCan } from '../../kernel/auth/useCan.ts';
@@ -339,7 +339,7 @@ export function CreateDivertAction({ clusterId }: Readonly<{ clusterId: string }
  * its next pass, so the deletion would appear to succeed and then silently undo
  * itself; the operator is sent to the capture subscription that owns it instead.
  */
-export function DeleteDivertAction({ clusterId, divert }: Readonly<{ clusterId: string; divert: DivertView }>) {
+export function DeleteDivertAction({ clusterId, divert }: Readonly<{ clusterId: string; divert: DivertRow }>) {
   const gate = useDivertWriteGate(clusterId);
   const host = useActionHost();
 
@@ -380,7 +380,7 @@ export function DeleteDivertDialog({
   divert,
   opened,
   onClose,
-}: HostedDialogProps & { clusterId: string; divert: DivertView }) {
+}: HostedDialogProps & { clusterId: string; divert: DivertRow }) {
   const [preview, setPreview] = useState<LifecycleOutcomeView | null>(null);
   const [result, setResult] = useState<LifecycleOutcomeView | null>(null);
   const [previewFailed, setPreviewFailed] = useState<Error | null>(null);

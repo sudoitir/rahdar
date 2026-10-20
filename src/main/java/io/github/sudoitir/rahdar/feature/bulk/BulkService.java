@@ -14,8 +14,8 @@ import io.github.sudoitir.rahdar.feature.bulk.web.BulkViews.BulkRunView;
 import io.github.sudoitir.rahdar.feature.bulk.web.BulkViews.BulkSelection;
 import io.github.sudoitir.rahdar.feature.bulk.web.BulkViews.NodeFigure;
 import io.github.sudoitir.rahdar.feature.resources.CrossNodeAggregator;
-import io.github.sudoitir.rahdar.feature.resources.web.ResourceViews.QueueNodeCell;
-import io.github.sudoitir.rahdar.feature.resources.web.ResourceViews.QueueView;
+import io.github.sudoitir.rahdar.feature.resources.web.ResourceViews.SubscriptionNodeCell;
+import io.github.sudoitir.rahdar.feature.resources.web.ResourceViews.SubscriptionView;
 import io.github.sudoitir.rahdar.kernel.audit.AuditEvent;
 import io.github.sudoitir.rahdar.kernel.audit.AuditService;
 import io.github.sudoitir.rahdar.kernel.core.ConflictException;
@@ -105,8 +105,8 @@ public class BulkService {
     public BulkRunDetailView preview(UUID clusterId, BulkPreviewRequest request) {
         BulkOperation operation = Objects.requireNonNull(request.operation(), "operation");
         clusterAccess.requireVisible(clusterId);
-        Map<String, QueueView> byName = new LinkedHashMap<>();
-        queues.allQueues(clusterId).forEach(q -> byName.putIfAbsent(q.queueName(), q));
+        Map<String, SubscriptionView> byName = new LinkedHashMap<>();
+        queues.allQueues(clusterId).forEach(q -> byName.putIfAbsent(q.name(), q));
 
         List<String> names = resolve(request, byName);
         // Every queue of the plan, before anything is stored: one the caller may not read is not found,
@@ -171,20 +171,21 @@ public class BulkService {
 
     private record Planned(String name, String refusal, ItemEstimate figures) {}
 
-    private static List<String> resolve(BulkPreviewRequest request, Map<String, QueueView> byName) {
+    private static List<String> resolve(BulkPreviewRequest request, Map<String, SubscriptionView> byName) {
         if (request.names() != null) {
             return List.copyOf(new LinkedHashSet<>(request.names()));
         }
         ResourceQuery query = ResourceQuery.of(request.q(), 1, 1, null);
         return byName.values().stream()
-                .filter(q -> query.matches(q.queueName()) || query.matches(q.address()))
-                .map(QueueView::queueName)
+                .filter(q -> query.matches(q.name()) || query.matches(q.destinationName()))
+                .map(SubscriptionView::name)
                 .sorted(String.CASE_INSENSITIVE_ORDER)
                 .toList();
     }
 
     /** One queue's figures, refusal and warning, by the rules the single-queue preflight applies. */
-    private static Planned plan(BulkOperation operation, boolean disconnectConsumers, String name, QueueView queue) {
+    private static Planned plan(
+            BulkOperation operation, boolean disconnectConsumers, String name, SubscriptionView queue) {
         if (queue == null) {
             return new Planned(
                     name, "No queue with this name exists on the cluster.", new ItemEstimate(List.of(), null));
@@ -235,7 +236,7 @@ public class BulkService {
     }
 
     /** A node that has not answered within the freshness window has unknown figures, never zero. */
-    private static NodeFigure figure(QueueNodeCell cell) {
+    private static NodeFigure figure(SubscriptionNodeCell cell) {
         return new NodeFigure(
                 cell.nodeId(),
                 cell.nodeName(),
@@ -360,8 +361,8 @@ public class BulkService {
         AuditEvent event = audit.begin(
                 operator.actor(),
                 operation.auditAction(),
-                "QUEUE",
-                run.getTotalItems() + " queues",
+                "SUBSCRIPTION",
+                run.getTotalItems() + " subscriptions",
                 clusterId,
                 null,
                 auditParams(run),

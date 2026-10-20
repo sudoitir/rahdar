@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Button, Modal, Stack, Text } from '@mantine/core';
 
 import { StatusBadge } from '../../ui/StatusBadge.tsx';
-import type { BridgeView, DivertView } from './api.ts';
+import type { BridgeRow, DivertRow } from './api.ts';
 import { BrokerXmlRemedy, DRIFT_SENTENCE } from './DivertActions.tsx';
 import classes from './RoutingView.module.css';
 import { MiddleTruncate } from '../../ui/table/MiddleTruncate.tsx';
@@ -11,7 +11,7 @@ import { MiddleTruncate } from '../../ui/table/MiddleTruncate.tsx';
  * A Rahdar-created divert's ownership, as a control rather than a hover title: it opens the
  * broker.xml that would make the deployed configuration carry it, reachable from the keyboard.
  */
-function RahdarOwned({ divert }: Readonly<{ divert: DivertView }>) {
+function RahdarOwned({ divert }: Readonly<{ divert: DivertRow }>) {
   const [open, setOpen] = useState(false);
   return (
     <>
@@ -53,7 +53,7 @@ function Direction({ from, to }: Readonly<{ from: string; to: string }>) {
 }
 
 /** Who created the divert: message capture, an operator through Rahdar, or nobody Rahdar knows of. */
-export function OwnerCell({ divert: r }: Readonly<{ divert: DivertView }>) {
+export function OwnerCell({ divert: r }: Readonly<{ divert: DivertRow }>) {
   if (r.owner === 'MESSAGE_CAPTURE') {
     return (
       <span title="Serves a message capture subscription">
@@ -74,18 +74,18 @@ export function OwnerCell({ divert: r }: Readonly<{ divert: DivertView }>) {
 }
 
 /** A divert's route: where traffic on its address goes. */
-export function DivertRoute({ divert: r }: Readonly<{ divert: DivertView }>) {
+export function DivertRoute({ divert: r }: Readonly<{ divert: DivertRow }>) {
   return <Direction from={r.address} to={r.forwardingAddress} />;
 }
 
 /** A bridge's route: the queue it drains and the address it forwards to, named when unrecorded. */
-export function BridgeRoute({ bridge: r }: Readonly<{ bridge: BridgeView }>) {
+export function BridgeRoute({ bridge: r }: Readonly<{ bridge: BridgeRow }>) {
   return <Direction from={r.queueName ?? '(unnamed queue)'} to={r.forwardingAddress ?? '(the target broker)'} />;
 }
 
 // In words, never by colour alone: the difference between traffic being duplicated and traffic being
 // taken away is the most consequential fact in the diverts table.
-export function DivertEffect({ divert: r }: Readonly<{ divert: DivertView }>) {
+export function DivertEffect({ divert: r }: Readonly<{ divert: DivertRow }>) {
   return (
     <Text size="xs" title={r.exclusive ? 'Exclusive divert' : 'Non-exclusive divert'}>
       {r.exclusive ? 'takes the message' : 'copies the message'}
@@ -100,7 +100,7 @@ export function BridgeStateBadge({ words, halfUp }: Readonly<{ words: string; ha
 }
 
 /** How many nodes carry the divert or bridge, naming them on hover. */
-export function NodesPresent({ row: r }: Readonly<{ row: DivertView | BridgeView }>) {
+export function NodesPresent({ row: r }: Readonly<{ row: DivertRow | BridgeRow }>) {
   return (
     <Text size="xs" title={r.perNode.map((n) => n.nodeName).join(', ')}>
       {r.nodesPresent}/{r.nodesTotal}

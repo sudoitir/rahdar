@@ -41,6 +41,8 @@ function clusters(count: number): ClusterSummary[] {
     nodeCount: 2,
     updatedAt: '2026-01-01T00:00:00Z',
     environmentId: i % 3 === 2 ? null : ENVIRONMENTS[i % 3].id,
+    system: { id: 'artemis', name: 'Apache ActiveMQ Artemis' },
+    kinds: [],
   }));
 }
 

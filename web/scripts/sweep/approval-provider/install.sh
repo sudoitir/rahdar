@@ -83,15 +83,15 @@ REQUESTER_PASSWORD=$REQUESTER_PASSWORD node --experimental-strip-types "$REPO/we
 say "leaving requests in every state"
 cluster=$(find_id /clusters name demo)
 for queue in held-1 held-2 held-3 held-4 held-5 held-6 held-toast; do
-  api POST "/clusters/$cluster/queues" -o /dev/null \
-    -d "{\"address\":\"qa.reconciliation.$queue\",\"name\":\"qa.reconciliation.$queue\",\"routingType\":\"ANYCAST\",\"durable\":true,\"autoCreateAddress\":true}" || true
+  api POST "/clusters/$cluster/subscriptions" -o /dev/null \
+    -d "{\"kind\":\"artemis.queue\",\"name\":\"qa.reconciliation.$queue\",\"destination\":\"artemis.address/qa.reconciliation.$queue\",\"attributes\":{\"routingType\":\"ANYCAST\",\"durable\":true,\"autoCreateAddress\":true}}" || true
 done
 ADMIN_COOKIES=$COOKIES
 COOKIES=$BUILD/requester.cookies
 (ADMIN_USER=qa-requester ADMIN_PASSWORD=$REQUESTER_PASSWORD ADMIN_TOTP_SECRET= rahdar_sign_in "") || exit 1
 # purge QUEUE → the held request's id
 purge() {
-  api DELETE "/clusters/$cluster/queues/qa.reconciliation.$1/messages" \
+  api POST "/clusters/$cluster/resources/artemis.queue/qa.reconciliation.$1:purge" \
     | python3 -c 'import json,sys; print(json.load(sys.stdin)["heldOperation"]["id"])'
 }
 purge held-1 >/dev/null
@@ -112,6 +112,6 @@ decide() {
 }
 decide "$approved" APPROVE "Checked with the batch owner"
 decide "$rejected" REJECT "The queue still has unprocessed settlements; drain it first"
-api DELETE "/clusters/$cluster/queues/qa.reconciliation.held-6" -f -o /dev/null
+api DELETE "/clusters/$cluster/resources/artemis.queue/qa.reconciliation.held-6" -f -o /dev/null
 decide "$refused" APPROVE ""
 echo "the expiring request expires within a few minutes"

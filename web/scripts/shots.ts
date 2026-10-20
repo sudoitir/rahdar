@@ -200,7 +200,7 @@ async function main() {
       // Each node's drift is on the declared tab once the nodes are evaluated.
       before: async () => {
         await page.request
-          .post(`${BASE}/api/v1/clusters/${clusterId}/config/drift/evaluate`, {
+          .post(`${BASE}/api/v1/clusters/${clusterId}/artemis/config/drift/evaluate`, {
             headers: { 'X-XSRF-TOKEN': await xsrf(page) },
           })
           .catch(() => undefined);

@@ -15,6 +15,7 @@ import { useResourceGate } from '../../kernel/auth/useResourceGate.ts';
 import type { ActionProps, HostedDialogProps, MessageTarget, QueueTarget } from '../../kernel/actions/types.ts';
 import { absoluteHref, clusterHref } from '../../kernel/routing/href.ts';
 import { ActionMenuItem } from '../../ui/ActionMenuItem.tsx';
+import { queueId } from '../../kernel/api/resourceId.ts';
 import { ConfirmDialog } from '../../ui/ConfirmDialog.tsx';
 import { focusFirstInvalid } from '../../ui/formErrors.ts';
 import { notify } from '../../ui/notify.ts';
@@ -52,7 +53,7 @@ function messagePath(target: MessageTarget) {
 }
 
 function messageSearch(target: MessageTarget) {
-  return { message: String(target.messageId), node: target.node };
+  return { message: target.position, node: target.node };
 }
 
 export function OpenMessage({ clusterId, target }: Readonly<ActionProps<MessageTarget>>) {
@@ -78,7 +79,7 @@ export function CopyMessage({ clusterId, target, host }: Readonly<ActionProps<Me
       <ActionMenuItem
         label="Copy message id"
         icon={<IconClipboard size="1rem" aria-hidden />}
-        onSelect={() => host.copy(String(target.messageId), 'message id')}
+        onSelect={() => host.copy(target.position, 'message id')}
       />
       <ActionMenuItem
         label="Copy link to this message"
@@ -142,13 +143,13 @@ function OneMessageDialog({
     },
   });
   const one = ONE[action];
-  const subject = `message ${target.messageId} in queue "${target.queueName}"`;
+  const subject = `message ${target.position} in queue "${target.queueName}"`;
 
   const submit = form.onSubmit(({ destination }) => {
     run.mutate(
       {
         action,
-        body: { messageIds: [target.messageId], targetQueue: action === 'move' ? destination : undefined },
+        body: { positions: [target.position], target: action === 'move' ? queueId(destination) : undefined },
         node: target.node,
       },
       {
@@ -175,7 +176,7 @@ function OneMessageDialog({
     <ConfirmDialog
       opened={opened}
       onClose={onClose}
-      title={`${VERBS[action].verb} message ${target.messageId}`}
+      title={`${VERBS[action].verb} message ${target.position}`}
       consequence={
         <Stack gap="sm">
           <Text size="sm">{one.intro(target.queueName)}</Text>

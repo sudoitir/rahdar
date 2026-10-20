@@ -149,7 +149,7 @@ class McpQueueLifecycleIntegrationTest extends PostgresIntegrationTest {
                 mvc,
                 key,
                 "queue_lifecycle",
-                Map.of("clusterId", clusterId.toString(), "kind", "delete_queue", "name", QUEUE));
+                Map.of("clusterId", clusterId.toString(), "kind", "delete_subscription", "name", QUEUE));
 
         JsonNode outcome = response.path("result").path("structuredContent");
         assertThat(response.path("result").path("isError").asBoolean(false))
@@ -173,7 +173,7 @@ class McpQueueLifecycleIntegrationTest extends PostgresIntegrationTest {
                         "clusterId",
                         clusterId.toString(),
                         "kind",
-                        "delete_queue",
+                        "delete_subscription",
                         "name",
                         QUEUE,
                         "dryRun",
@@ -196,7 +196,7 @@ class McpQueueLifecycleIntegrationTest extends PostgresIntegrationTest {
                 mvc,
                 key,
                 "queue_lifecycle",
-                Map.of("clusterId", clusterId.toString(), "kind", "delete_queue", "name", QUEUE));
+                Map.of("clusterId", clusterId.toString(), "kind", "delete_subscription", "name", QUEUE));
 
         // Refused on the same basis as the HTTP request: a not-found that reveals
         // nothing about whether the cluster exists.
@@ -222,7 +222,15 @@ class McpQueueLifecycleIntegrationTest extends PostgresIntegrationTest {
                 mvc,
                 key,
                 "queue_lifecycle",
-                Map.of("clusterId", clusterId.toString(), "kind", "pause_queue", "name", QUEUE, "dryRun", false));
+                Map.of(
+                        "clusterId",
+                        clusterId.toString(),
+                        "kind",
+                        "pause_subscription",
+                        "name",
+                        QUEUE,
+                        "dryRun",
+                        false));
 
         JsonNode nodesOut = response.path("result").path("structuredContent").path("nodes");
         assertThat(nodesOut).describedAs("%s", response).hasSize(2);
@@ -240,7 +248,7 @@ class McpQueueLifecycleIntegrationTest extends PostgresIntegrationTest {
                 mvc,
                 key,
                 "queue_lifecycle",
-                Map.of("clusterId", clusterId.toString(), "kind", "delete_queue", "name", QUEUE));
+                Map.of("clusterId", clusterId.toString(), "kind", "delete_subscription", "name", QUEUE));
         assertThat(refused.path("result")
                         .path("structuredContent")
                         .path("nodes")
@@ -258,7 +266,7 @@ class McpQueueLifecycleIntegrationTest extends PostgresIntegrationTest {
                         "clusterId",
                         clusterId.toString(),
                         "kind",
-                        "delete_queue",
+                        "delete_subscription",
                         "name",
                         QUEUE,
                         "dryRun",

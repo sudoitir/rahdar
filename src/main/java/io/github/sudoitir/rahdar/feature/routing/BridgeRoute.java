@@ -5,6 +5,7 @@ import io.github.sudoitir.openbroker.model.ConditionTypes;
 import io.github.sudoitir.openbroker.model.KindId;
 import io.github.sudoitir.openbroker.model.MetricKeys;
 import io.github.sudoitir.openbroker.model.Resource;
+import io.github.sudoitir.openbroker.model.ResourceId;
 import io.github.sudoitir.openbroker.model.ResourceQuery;
 import io.github.sudoitir.openbroker.model.RouteEndpoint;
 import io.github.sudoitir.openbroker.model.StandardAttributes;
@@ -36,6 +37,11 @@ record BridgeRoute(
     private static final String STATIC_CONNECTORS = "artemis.static_connectors";
     private static final String DUPLICATE_DETECTION = "artemis.duplicate_detection";
     private static final String HA = "artemis.ha";
+
+    /** The id of the bridge of this name. */
+    static ResourceId id(String name) {
+        return ResourceId.of(KIND.value(), name);
+    }
 
     /** Every bridge on the node. */
     static List<BridgeRoute> list(BrokerTarget node) {

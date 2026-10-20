@@ -3,7 +3,7 @@ import { Tabs, TextInput } from '@mantine/core';
 import { useNavigate, useParams, useSearch } from '@tanstack/react-router';
 import { useDebouncedValue } from '@mantine/hooks';
 
-import { useBridges, useDiverts, type BridgeView, type DivertView } from './api.ts';
+import { useBridges, useDiverts, type BridgeRow, type DivertRow } from './api.ts';
 import type { RoutingSearch } from './feature.ts';
 import { useSlot } from '../../kernel/slots.ts';
 import { DataTable } from '../../ui/table/index.ts';
@@ -23,8 +23,8 @@ const PAGE_SIZE = 200;
 
 const NO_ROWS: never[] = [];
 
-const divertKey = (r: DivertView) => `${r.name}:${r.address}:${r.forwardingAddress}`;
-const bridgeKey = (r: BridgeView) => r.name;
+const divertKey = (r: DivertRow) => `${r.name}:${r.address}:${r.forwardingAddress}`;
+const bridgeKey = (r: BridgeRow) => r.name;
 
 type Tab = 'diverts' | 'bridges';
 
@@ -94,7 +94,7 @@ function DivertsTable({
   pager,
   onSort,
   onClearFilters,
-}: Readonly<ListingProps<DivertView>>) {
+}: Readonly<ListingProps<DivertRow>>) {
   const columns = useMemo(() => divertColumns(clusterId), [clusterId]);
   return (
     <DataTable
@@ -144,7 +144,7 @@ function BridgesTable({
   onSort,
   onClearFilters,
   hasBuilder,
-}: Readonly<Omit<ListingProps<BridgeView>, 'clusterId'> & { hasBuilder: boolean }>) {
+}: Readonly<Omit<ListingProps<BridgeRow>, 'clusterId'> & { hasBuilder: boolean }>) {
   const columns = useMemo(() => bridgeColumns(), []);
   return (
     <DataTable

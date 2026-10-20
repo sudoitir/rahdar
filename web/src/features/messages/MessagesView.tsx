@@ -31,7 +31,7 @@ const PAGE_SIZE = 200;
 
 const NO_ROWS: MessageSummaryView[] = [];
 
-const messageKey = (m: MessageSummaryView) => String(m.messageId);
+const messageKey = (m: MessageSummaryView) => m.position;
 
 /** "12 messages", or why the total is not known. */
 function countLabel(page: { count?: number | null; countUnavailable?: string | null }): string {
@@ -316,18 +316,18 @@ export function MessagesView() {
         error={
           messages.isError ? <ErrorState error={messages.error} onRetry={() => void messages.refetch()} /> : undefined
         }
-        onRowClick={(m) => setOpenId(String(m.messageId))}
+        onRowClick={(m) => setOpenId(m.position)}
         selectable
         selected={selected}
         onToggleRow={toggleRow}
         onToggleAll={toggleAll}
         rowMenu={{
-          label: (m) => `message ${m.messageId}`,
+          label: (m) => `message ${m.position}`,
           render: (m, menu) => (
             <ResourceActions
               kind="message"
               clusterId={clusterId}
-              target={{ queueName, messageId: m.messageId, node: search.node }}
+              target={{ queueName, position: m.position, node: search.node }}
               restoreFocus={menu.restoreFocus}
             />
           ),

@@ -5,6 +5,7 @@ import { useForm } from '@mantine/form';
 import { useActionHost } from '../../kernel/actions/hostContext.ts';
 import { ActionMenuItem } from '../../ui/ActionMenuItem.tsx';
 import { CapabilityGate } from '../../ui/CapabilityGate.tsx';
+import { queueId } from '../../kernel/api/resourceId.ts';
 import { ConfirmDialog } from '../../ui/ConfirmDialog.tsx';
 import { focusFirstInvalid } from '../../ui/formErrors.ts';
 import { Toolbar } from '../../ui/Toolbar.tsx';
@@ -99,7 +100,7 @@ export function MessageActions({
   });
   const [bulk, setBulk] = useState<MessageActionKind | null>(null);
 
-  const ids = [...selected].map(Number).filter((n) => Number.isFinite(n));
+  const ids = [...selected];
 
   const open = (next: MessageActionKind) => {
     setAction(next);
@@ -111,7 +112,7 @@ export function MessageActions({
     run.mutate(
       {
         action,
-        body: { messageIds: ids, targetQueue: action === 'move' ? target : undefined },
+        body: { positions: ids, target: action === 'move' ? queueId(target) : undefined },
         node,
       },
       {

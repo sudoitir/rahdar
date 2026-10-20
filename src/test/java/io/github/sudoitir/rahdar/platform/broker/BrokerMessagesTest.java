@@ -8,6 +8,7 @@ import static org.mockito.Mockito.when;
 
 import io.github.sudoitir.openbroker.ClusterConnection;
 import io.github.sudoitir.openbroker.messaging.MessageAction.Delete;
+import io.github.sudoitir.rahdar.kernel.security.ResourceRef;
 import io.github.sudoitir.rahdar.support.ArtemisIntegrationTest;
 import jakarta.jms.BytesMessage;
 import jakarta.jms.Connection;
@@ -147,10 +148,10 @@ class BrokerMessagesTest extends ArtemisIntegrationTest {
 
     @Test
     void aSendLandsWithTheOperatorsHeadersUnderTheBrokersOwnNames() throws Exception {
-        messages.send(
+        messages.sendTo(
                 clusterId,
                 nodeId,
-                queue,
+                ResourceRef.destination(queue),
                 SentMessages.of(
                         MessageKind.TEXT,
                         true,
@@ -178,10 +179,10 @@ class BrokerMessagesTest extends ArtemisIntegrationTest {
 
     @Test
     void aBytesSendLandsAsABytesMessage() throws Exception {
-        messages.send(
+        messages.sendTo(
                 clusterId,
                 nodeId,
-                queue,
+                ResourceRef.destination(queue),
                 SentMessages.of(
                         MessageKind.BYTES,
                         true,

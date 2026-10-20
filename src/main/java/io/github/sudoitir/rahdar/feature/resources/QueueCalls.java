@@ -12,9 +12,9 @@ import io.github.sudoitir.openbroker.model.StandardAttributes;
 import io.github.sudoitir.openbroker.operation.Direction;
 import io.github.sudoitir.openbroker.operation.Operation;
 import io.github.sudoitir.openbroker.operation.OperationResult;
-import io.github.sudoitir.rahdar.feature.resources.LifecycleRequests.CreateAddressRequest;
-import io.github.sudoitir.rahdar.feature.resources.LifecycleRequests.CreateQueueRequest;
-import io.github.sudoitir.rahdar.feature.resources.LifecycleRequests.UpdateQueueRequest;
+import io.github.sudoitir.rahdar.feature.resources.LifecycleRequests.CreateDestinationRequest;
+import io.github.sudoitir.rahdar.feature.resources.LifecycleRequests.CreateSubscriptionRequest;
+import io.github.sudoitir.rahdar.feature.resources.LifecycleRequests.UpdateResourceRequest;
 import io.github.sudoitir.rahdar.platform.broker.BrokerFailures;
 import io.github.sudoitir.rahdar.platform.broker.BrokerTarget;
 import io.github.sudoitir.rahdar.platform.broker.DivertRoute;
@@ -49,10 +49,12 @@ final class QueueCalls {
 
     // ---- queues ----------------------------------------------------------
 
-    static NodeStatus createQueue(BrokerTarget node, CreateQueueRequest req) {
+    static NodeStatus createQueue(BrokerTarget node, CreateSubscriptionRequest req) {
         ClusterConnection c = node.connection();
         Attributes.Builder attributes = Attributes.builder()
-                .put(StandardAttributes.DESTINATION, ResourceIds.of(c, ResourceClass.DESTINATION, req.address()))
+                .put(
+                        StandardAttributes.DESTINATION,
+                        ResourceIds.of(c, ResourceClass.DESTINATION, req.destinationName()))
                 .putRaw(ROUTING_TYPE, req.routingType().toUpperCase(Locale.ROOT))
                 .put(StandardAttributes.DURABLE, req.durable())
                 .putRaw(AUTO_CREATE_ADDRESS, req.autoCreateAddress());
@@ -70,7 +72,7 @@ final class QueueCalls {
     }
 
     /** The attributes an update changes, empty when the request names none. A filter of "" clears it. */
-    static Attributes patch(UpdateQueueRequest req) {
+    static Attributes patch(UpdateResourceRequest req) {
         Attributes.Builder patch = Attributes.builder();
         if (req.filter() != null) {
             patch.put(StandardAttributes.FILTER, req.filter());
@@ -134,7 +136,7 @@ final class QueueCalls {
 
     // ---- addresses -------------------------------------------------------
 
-    static NodeStatus createAddress(BrokerTarget node, CreateAddressRequest req) {
+    static NodeStatus createAddress(BrokerTarget node, CreateDestinationRequest req) {
         Attributes attributes = Attributes.builder()
                 .putRaw(ROUTING_TYPES, req.routingTypes().toUpperCase(Locale.ROOT))
                 .build();

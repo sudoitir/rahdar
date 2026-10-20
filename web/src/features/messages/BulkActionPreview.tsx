@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Button, Modal, Stack, Text, TextInput } from '@mantine/core';
 import { useForm } from '@mantine/form';
 
+import { queueId } from '../../kernel/api/resourceId.ts';
 import { ConfirmDialog } from '../../ui/ConfirmDialog.tsx';
 import { focusFirstInvalid } from '../../ui/formErrors.ts';
 import { useMessageAction, type DryRunView, type MessageActionKind } from './api.ts';
@@ -46,7 +47,7 @@ export function BulkActionPreview({
 
   const body = () => ({
     filter: form.values.filter,
-    targetQueue: action === 'move' ? form.values.target : undefined,
+    target: action === 'move' ? queueId(form.values.target) : undefined,
   });
 
   const doPreview = form.onSubmit(

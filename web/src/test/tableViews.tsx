@@ -25,15 +25,16 @@ import type { ConsumerHealthView } from '../features/triage/api.ts';
 import type { FlowEdgeView, FlowNodeView } from '../features/flow/api.ts';
 import type { MessageSummaryView } from '../features/messages/api.ts';
 import type { PluginUpdateView, PluginView } from '../features/plugins/api.ts';
-import type { QueueView } from '../features/queues/api.ts';
+import { ADDRESS_KIND, addressId, QUEUE_KIND, queueId, resourceId } from '../kernel/api/resourceId.ts';
+import type { SubscriptionView } from '../features/queues/api.ts';
 import type {
-  AddressView,
+  DestinationView,
   ConnectionView,
   ConsumerView,
   ProducerView,
-  SessionView,
+  ChannelView,
 } from '../features/resources/api.ts';
-import type { BridgeView, DivertView } from '../features/routing/api.ts';
+import type { BridgeRow, DivertRow } from '../features/routing/api.ts';
 import type { SqlRowView } from '../features/sql/api.ts';
 import type { StoreView, TableView } from '../features/lifecycle/api.ts';
 import type { TransferRunView } from '../features/transfer/api.ts';
@@ -198,10 +199,18 @@ function view<T>(spec: Spec<T>): TableView_ {
 
 // ── Fixtures, by row type ──────────────────────────────────────────────────────────────────────
 
-const queue = (f: Fixture, i: number): QueueView => ({
-  address: address(f, i),
-  queueName: name(f, 'orders', i),
-  routingType: i % 2 ? 'ANYCAST' : 'MULTICAST',
+/** The identity fields of a queue's subscription row. */
+const subscriptionIdentity = (name: string) => ({
+  id: queueId(name),
+  kind: QUEUE_KIND,
+  kindLabel: 'Queue',
+  name,
+});
+
+const queue = (f: Fixture, i: number): SubscriptionView => ({
+  ...subscriptionIdentity(name(f, 'orders', i)),
+  destination: addressId(address(f, i)),
+  nativeAttributes: { routingType: i % 2 ? 'ANYCAST' : 'MULTICAST' },
   durable: i % 3 !== 0,
   totalMessageCount: num(f, 12_840 + i),
   totalConsumerCount: num(f, 4 + i),
@@ -214,21 +223,26 @@ const queue = (f: Fixture, i: number): QueueView => ({
   allowedActions: [],
 });
 
-const address_ = (f: Fixture, i: number): AddressView => ({
+const address_ = (f: Fixture, i: number): DestinationView => ({
   ...NODE(f, i),
+  id: addressId(address(f, i)),
+  kind: ADDRESS_KIND,
+  kindLabel: 'Address',
   name: address(f, i),
   delivery: ['POINT_TO_POINT', 'PUBLISH_SUBSCRIBE'],
-  queueCount: num(f, 3 + i),
+  subscriptionCount: num(f, 3 + i),
   messageCount: num(f, 9_200 + i),
   allowedActions: [],
 });
 
 const consumer = (f: Fixture, i: number): ConsumerView => ({
   ...NODE(f, i),
-  consumerId: ident(f, 'consumer', i),
-  sessionId: ident(f, 'session', i),
-  queueName: name(f, 'orders', i),
-  address: address(f, i),
+  id: resourceId('artemis.consumer', ident(f, 'session', i), ident(f, 'consumer', i)),
+  kind: 'artemis.consumer',
+  kindLabel: 'Consumer',
+  channel: resourceId('artemis.session', ident(f, 'session', i)),
+  subscription: queueId(name(f, 'orders', i)),
+  destination: addressId(address(f, i)),
   protocol: 'AMQP',
   messagesDelivered: num(f, 8_431 + i),
   messagesAcknowledged: num(f, 8_400 + i),
@@ -236,11 +250,13 @@ const consumer = (f: Fixture, i: number): ConsumerView => ({
   allowedActions: [],
 });
 
-const session = (f: Fixture, i: number): SessionView => ({
+const session = (f: Fixture, i: number): ChannelView => ({
   ...NODE(f, i),
-  sessionId: ident(f, 'session', i),
+  id: resourceId('artemis.session', ident(f, 'session', i)),
+  kind: 'artemis.session',
+  kindLabel: 'Session',
   user: f === 'normal' ? 'svc-orders' : name(f, 'svc', i),
-  connectionId: ident(f, 'connection', i),
+  connection: resourceId('artemis.connection', ident(f, 'connection', i)),
   consumerCount: num(f, 2 + i),
   producerCount: num(f, 1 + i),
   creationTime: at(i),
@@ -249,27 +265,31 @@ const session = (f: Fixture, i: number): SessionView => ({
 
 const connection = (f: Fixture, i: number): ConnectionView => ({
   ...NODE(f, i),
-  connectionId: ident(f, 'connection', i),
+  id: resourceId('artemis.connection', ident(f, 'connection', i)),
+  kind: 'artemis.connection',
+  kindLabel: 'Connection',
   remoteAddress: f === 'normal' ? `10.4.${i}.17:5672` : address(f, i),
   protocol: 'AMQP',
   clientId: ident(f, 'client', i),
-  sessionCount: num(f, 3 + i),
+  channelCount: num(f, 3 + i),
   creationTime: at(i),
   allowedActions: [],
 });
 
 const producer = (f: Fixture, i: number): ProducerView => ({
   ...NODE(f, i),
-  producerId: ident(f, 'producer', i),
+  id: resourceId('artemis.producer', ident(f, 'session', i), ident(f, 'producer', i)),
+  kind: 'artemis.producer',
+  kindLabel: 'Producer',
   clientId: f === 'normal' ? 'order-writer' : name(f, 'writer', i),
-  sessionId: ident(f, 'session', i),
-  address: address(f, i),
+  channel: resourceId('artemis.session', ident(f, 'session', i)),
+  destination: addressId(address(f, i)),
   protocol: 'CORE',
   messagesSent: num(f, 55_120 + i),
   allowedActions: [],
 });
 
-const divert = (f: Fixture, i: number): DivertView => ({
+const divert = (f: Fixture, i: number): DivertRow => ({
   name: name(f, 'divert', i),
   routingName: name(f, 'divert', i),
   address: address(f, i),
@@ -287,7 +307,7 @@ const divert = (f: Fixture, i: number): DivertView => ({
   perNode: [],
 });
 
-const bridge = (f: Fixture, i: number): BridgeView => ({
+const bridge = (f: Fixture, i: number): BridgeRow => ({
   name: name(f, 'bridge', i),
   queueName: name(f, 'orders', i),
   forwardingAddress: address(f, i),
@@ -307,7 +327,7 @@ const bridge = (f: Fixture, i: number): BridgeView => ({
 });
 
 const message = (f: Fixture, i: number): MessageSummaryView => ({
-  messageId: num(f, 5_000_000 + i),
+  position: String(num(f, 5_000_000 + i)),
   type: 4,
   durable: i % 2 === 0,
   priority: 4,
@@ -326,8 +346,8 @@ const dlqRow = (f: Fixture, i: number): DlqRow => ({
   address: f === 'normal' ? ['DLQ', 'ExpiryQueue'][i % 2] : address(f, i),
   kind: i % 2 ? 'expiry' : 'dead-letter',
   queue: {
-    queueName: name(f, 'DLQ.orders', i),
-    address: f === 'normal' ? ['DLQ', 'ExpiryQueue'][i % 2] : address(f, i),
+    ...subscriptionIdentity(name(f, 'DLQ.orders', i)),
+    destination: addressId(f === 'normal' ? ['DLQ', 'ExpiryQueue'][i % 2] : address(f, i)),
     totalDepth: num(f, 1_204 + i),
     perNode: [
       { nodeId: 'node-1', nodeName: 'broker-1', depth: num(f, 600 + i) },
@@ -680,7 +700,7 @@ export const VIEWS: TableView_[] = [
     label: 'Queues',
     columns: queueColumns(),
     rows: (f) => ROWS.map((i) => queue(f, i)),
-    rowKey: (r) => r.queueName,
+    rowKey: (r) => r.name,
     selectable: true,
     menu: true,
     identifiers: ['address', 'queueName'],
@@ -713,7 +733,7 @@ export const VIEWS: TableView_[] = [
     label: 'Consumers',
     columns: resourceColumns.consumers(deps),
     rows: (f) => ROWS.map((i) => consumer(f, i)),
-    rowKey: (r) => `${r.nodeId}/${r.consumerId}`,
+    rowKey: (r) => `${r.nodeId}/${r.id}`,
     menu: true,
     identifiers: ['queue', 'address'],
     visible1280: ['queue', 'address', 'protocol', 'delivered', 'acked', 'inFlight', 'node', 'action'],
@@ -723,7 +743,7 @@ export const VIEWS: TableView_[] = [
     label: 'Sessions',
     columns: resourceColumns.sessions(deps),
     rows: (f) => ROWS.map((i) => session(f, i)),
-    rowKey: (r) => `${r.nodeId}/${r.sessionId}`,
+    rowKey: (r) => `${r.nodeId}/${r.id}`,
     menu: true,
     identifiers: ['session', 'conn'],
     visible1280: ['session', 'user', 'conn', 'consumers', 'producers', 'node', 'action'],
@@ -733,7 +753,7 @@ export const VIEWS: TableView_[] = [
     label: 'Connections',
     columns: resourceColumns.connections(deps),
     rows: (f) => ROWS.map((i) => connection(f, i)),
-    rowKey: (r) => `${r.nodeId}/${r.connectionId}`,
+    rowKey: (r) => `${r.nodeId}/${r.id}`,
     menu: true,
     identifiers: ['remote'],
     visible1280: ['remote', 'protocol', 'client', 'sessions', 'node', 'action'],
@@ -743,7 +763,7 @@ export const VIEWS: TableView_[] = [
     label: 'Producers',
     columns: resourceColumns.producers(),
     rows: (f) => ROWS.map((i) => producer(f, i)),
-    rowKey: (r) => `${r.nodeId}/${r.producerId}`,
+    rowKey: (r) => `${r.nodeId}/${r.id}`,
     menu: true,
     identifiers: ['address'],
     visible1280: ['address', 'client', 'protocol', 'sent', 'node'],
@@ -772,18 +792,18 @@ export const VIEWS: TableView_[] = [
     label: 'Messages',
     columns: messageColumns(AUTO),
     rows: (f) => ROWS.map((i) => message(f, i)),
-    rowKey: (r) => String(r.messageId),
+    rowKey: (r) => r.position,
     selectable: true,
     menu: true,
     identifiers: [],
-    visible1280: ['messageId', 'timestamp', 'priority', 'durable', 'size', 'props', 'body'],
+    visible1280: ['position', 'timestamp', 'priority', 'durable', 'size', 'props', 'body'],
   }),
   view({
     name: 'dead-letter queues',
     label: 'Dead-letter queues',
     columns: dlqColumns(CLUSTER),
     rows: (f) => ROWS.map((i) => dlqRow(f, i)),
-    rowKey: (r) => r.queue.queueName,
+    rowKey: (r) => r.queue.name,
     menu: true,
     identifiers: ['queue', 'address'],
     visible1280: ['queue', 'address', 'kind', 'depth', 'nodes'],

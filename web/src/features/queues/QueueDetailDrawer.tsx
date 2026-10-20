@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { Button, Drawer, Group, Stack } from '@mantine/core';
 import { Link, useParams } from '@tanstack/react-router';
 
-import { type QueueView } from './api.ts';
+import { addressOf, routingTypeOf, type SubscriptionView } from './api.ts';
 import { OwnerChip } from '../../kernel/auth/OwnerChip.tsx';
 import { useSlot } from '../../kernel/slots.ts';
 import { EmptyState } from '../../ui/EmptyState.tsx';
@@ -12,7 +12,7 @@ import { DataTable } from '../../ui/table/index.ts';
 import { queueNodeColumns } from './columns.ts';
 import { QueueLifecycleActions } from './QueueLifecycleActions.tsx';
 
-type NodeCell = QueueView['perNode'][number];
+type NodeCell = SubscriptionView['perNode'][number];
 
 const nodeKey = (cell: NodeCell) => cell.nodeId;
 
@@ -25,7 +25,7 @@ export function QueueDetailDrawer({
   missing,
   onClose,
 }: Readonly<{
-  queue: QueueView | null;
+  queue: SubscriptionView | null;
   /** The name of the open queue when it can no longer be found, to say so in place of its detail. */
   missing?: string;
   onClose: () => void;
@@ -40,7 +40,7 @@ export function QueueDetailDrawer({
       onClose={onClose}
       position="right"
       size="lg"
-      title={queue ? `${queue.address} / ${queue.queueName}` : (missing ?? '')}
+      title={queue ? `${addressOf(queue)} / ${queue.name}` : (missing ?? '')}
     >
       {!queue && missing ? (
         // Access lost while the queue was open looks the same as a queue that is gone: the listing no longer has it.
@@ -59,7 +59,7 @@ export function QueueDetailDrawer({
         <Stack gap="md">
           <Group gap="xs" justify="space-between">
             <Group gap="xs">
-              <StatusBadge>{queue.routingType.toLowerCase()}</StatusBadge>
+              <StatusBadge>{routingTypeOf(queue).toLowerCase()}</StatusBadge>
               <StatusBadge>{queue.durable ? 'durable' : 'non-durable'}</StatusBadge>
               <StatusBadge>{`${queue.nodesPresent}/${queue.nodesTotal} nodes`}</StatusBadge>
               <OwnerChip team={queue.ownerTeam} />
@@ -68,7 +68,7 @@ export function QueueDetailDrawer({
               size="xs"
               variant="default"
               component={Link}
-              to={`/clusters/${clusterId}/queues/${encodeURIComponent(queue.queueName)}/messages`}
+              to={`/clusters/${clusterId}/queues/${encodeURIComponent(queue.name)}/messages`}
               onClick={onClose}
             >
               Browse messages
@@ -80,7 +80,7 @@ export function QueueDetailDrawer({
           <Section title="Per node" headingLevel={3}>
             <DataTable
               variant="static"
-              label={`${queue.queueName} per node`}
+              label={`${queue.name} per node`}
               columns={nodeColumns}
               data={queue.perNode}
               rowKey={nodeKey}
@@ -96,7 +96,7 @@ export function QueueDetailDrawer({
           </Section>
 
           {panels.map(({ id, Component }) => (
-            <Component key={id} clusterId={clusterId} queueName={queue.queueName} onClose={onClose} />
+            <Component key={id} clusterId={clusterId} queueName={queue.name} onClose={onClose} />
           ))}
         </Stack>
       ) : null}

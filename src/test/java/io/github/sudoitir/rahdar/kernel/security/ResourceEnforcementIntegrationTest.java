@@ -161,10 +161,14 @@ class ResourceEnforcementIntegrationTest extends PostgresIntegrationTest {
     }
 
     private List<String> names(MockHttpServletResponse response) throws Exception {
+        return field(response, "name");
+    }
+
+    private List<String> field(MockHttpServletResponse response, String field) throws Exception {
         return body(response)
                 .get("data")
                 .valueStream()
-                .map(r -> r.get("queueName").asString())
+                .map(r -> r.get(field).asString())
                 .toList();
     }
 
@@ -172,7 +176,7 @@ class ResourceEnforcementIntegrationTest extends PostgresIntegrationTest {
 
     @Test
     void aTeamOnlyUserListsOnlyTheirQueuesAndTheTotalsCountOnlyThose() throws Exception {
-        MockHttpServletResponse response = call(get(base() + "/queues"), ordersViewer);
+        MockHttpServletResponse response = call(get(base() + "/subscriptions"), ordersViewer);
 
         assertThat(response.getStatus()).isEqualTo(200);
         assertThat(names(response)).containsExactlyInAnyOrder("orders.in", "orders.out");
@@ -181,7 +185,7 @@ class ResourceEnforcementIntegrationTest extends PostgresIntegrationTest {
 
     @Test
     void aSearchNeverCountsWhatTheCallerCannotRead() throws Exception {
-        MockHttpServletResponse response = call(get(base() + "/queues?q=billing"), ordersViewer);
+        MockHttpServletResponse response = call(get(base() + "/subscriptions?q=billing"), ordersViewer);
 
         assertThat(names(response)).isEmpty();
         assertThat(body(response).get("count").asLong()).isZero();
@@ -189,10 +193,10 @@ class ResourceEnforcementIntegrationTest extends PostgresIntegrationTest {
 
     @Test
     void rowsCarryTheActionsTheCallerHoldsOnThem() throws Exception {
-        JsonNode viewerRow = body(call(get(base() + "/queues?q=orders.in"), ordersViewer))
+        JsonNode viewerRow = body(call(get(base() + "/subscriptions?q=orders.in"), ordersViewer))
                 .get("data")
                 .get(0);
-        JsonNode operatorRow = body(call(get(base() + "/queues?q=orders.in"), ordersOperator))
+        JsonNode operatorRow = body(call(get(base() + "/subscriptions?q=orders.in"), ordersOperator))
                 .get("data")
                 .get(0);
 
@@ -205,7 +209,7 @@ class ResourceEnforcementIntegrationTest extends PostgresIntegrationTest {
 
     @Test
     void aClusterWidePlatformGrantSeesEveryQueueAndEveryAction() throws Exception {
-        MockHttpServletResponse response = call(get(base() + "/queues"), platformOperator);
+        MockHttpServletResponse response = call(get(base() + "/subscriptions"), platformOperator);
 
         assertThat(names(response))
                 .containsExactlyInAnyOrder("orders.in", "orders.out", "billing.in", "billing.payments", "misc.audit");
@@ -228,16 +232,16 @@ class ResourceEnforcementIntegrationTest extends PostgresIntegrationTest {
                         "x.#"),
                 "TEAM_VIEWER"));
 
-        assertThat(call(get(base() + "/queues"), stranger).getStatus()).isEqualTo(404);
-        assertThat(call(get(base() + "/addresses"), stranger).getStatus()).isEqualTo(404);
+        assertThat(call(get(base() + "/subscriptions"), stranger).getStatus()).isEqualTo(404);
+        assertThat(call(get(base() + "/destinations"), stranger).getStatus()).isEqualTo(404);
     }
 
     // ---- a refused resource looks like a missing one ------------------------------------------
 
     @Test
     void aQueueTheCallerCannotReadIsNotFoundExactlyLikeOneThatDoesNotExist() throws Exception {
-        MockHttpServletResponse foreign = call(get(base() + "/queues/billing.payments/configuration"), ordersViewer);
-        MockHttpServletResponse missing = call(get(base() + "/queues/nowhere.at.all/configuration"), ordersViewer);
+        MockHttpServletResponse foreign = call(get(base() + "/resources/artemis.queue/billing.payments"), ordersViewer);
+        MockHttpServletResponse missing = call(get(base() + "/resources/artemis.queue/nowhere.at.all"), ordersViewer);
 
         assertThat(foreign.getStatus()).isEqualTo(404);
         assertThat(missing.getStatus()).isEqualTo(404);
@@ -248,7 +252,7 @@ class ResourceEnforcementIntegrationTest extends PostgresIntegrationTest {
 
     @Test
     void aQueueTheCallerMayReadHasItsConfigurationRead() throws Exception {
-        assertThat(call(get(base() + "/queues/orders.in/configuration"), ordersViewer)
+        assertThat(call(get(base() + "/resources/artemis.queue/orders.in"), ordersViewer)
                         .getStatus())
                 .isEqualTo(200);
     }
@@ -256,7 +260,7 @@ class ResourceEnforcementIntegrationTest extends PostgresIntegrationTest {
     @Test
     void aTeamViewerPurgingAReadableQueueIsToldWhichPermissionIsMissing() throws Exception {
         MockHttpServletResponse response =
-                call(delete(base() + "/queues/orders.in/messages?dryRun=true"), ordersViewer);
+                call(post(base() + "/resources/artemis.queue/orders.in:purge?dryRun=true"), ordersViewer);
 
         assertThat(response.getStatus()).isEqualTo(403);
         JsonNode problem = body(response);
@@ -267,19 +271,21 @@ class ResourceEnforcementIntegrationTest extends PostgresIntegrationTest {
 
     @Test
     void aTeamViewerBrowsingAForeignQueueDoesNotLearnItExists() throws Exception {
-        assertThat(call(get(base() + "/queues/billing.in/messages"), ordersViewer)
+        assertThat(call(get(base() + "/resources/artemis.queue/billing.in/messages"), ordersViewer)
                         .getStatus())
                 .isEqualTo(404);
     }
 
     // ---- operations touching several resources ----------------------------------------------
 
-    private static final String MOVE_TO_BILLING = "{\"messageIds\":[1],\"targetQueue\":\"billing.in\"}";
+    private static final String MOVE_TO_BILLING = "{\"positions\":[\"1\"],\"target\":\"artemis.queue/billing.in\"}";
 
     @Test
     void movingToAnotherTeamsQueueIsRefusedBeforeAnythingIsMoved() throws Exception {
         MockHttpServletResponse response = postJson(
-                base() + "/queues/orders.in/messages/actions/move?dryRun=true", MOVE_TO_BILLING, ordersOperator);
+                base() + "/resources/artemis.queue/orders.in/messages:move?dryRun=true",
+                MOVE_TO_BILLING,
+                ordersOperator);
 
         assertThat(response.getStatus()).isEqualTo(404);
         assertThat(response.getContentAsString()).doesNotContain("billing.in");
@@ -290,7 +296,9 @@ class ResourceEnforcementIntegrationTest extends PostgresIntegrationTest {
         fixture.share(billing, orders, cluster, "billing.in", "TEAM_OPERATOR");
 
         MockHttpServletResponse response = postJson(
-                base() + "/queues/orders.in/messages/actions/move?dryRun=true", MOVE_TO_BILLING, ordersOperator);
+                base() + "/resources/artemis.queue/orders.in/messages:move?dryRun=true",
+                MOVE_TO_BILLING,
+                ordersOperator);
 
         assertThat(response.getStatus()).isEqualTo(200);
     }
@@ -300,7 +308,9 @@ class ResourceEnforcementIntegrationTest extends PostgresIntegrationTest {
         fixture.share(billing, orders, cluster, "billing.in", "TEAM_VIEWER");
 
         MockHttpServletResponse response = postJson(
-                base() + "/queues/orders.in/messages/actions/move?dryRun=true", MOVE_TO_BILLING, ordersOperator);
+                base() + "/resources/artemis.queue/orders.in/messages:move?dryRun=true",
+                MOVE_TO_BILLING,
+                ordersOperator);
 
         assertThat(response.getStatus()).isEqualTo(403);
         assertThat(body(response).get("permission").asString()).isEqualTo("message:send");
@@ -342,12 +352,13 @@ class ResourceEnforcementIntegrationTest extends PostgresIntegrationTest {
     // ---- creating names ------------------------------------------------------------------------
 
     private static String createQueue(String name) {
-        return "{\"address\":\"" + name + "\",\"name\":\"" + name + "\",\"routingType\":\"ANYCAST\"}";
+        return "{\"kind\":\"artemis.queue\",\"name\":\"" + name + "\",\"destination\":\"artemis.address/" + name
+                + "\",\"attributes\":{\"routingType\":\"ANYCAST\"}}";
     }
 
     @Test
     void aTeamOperatorMayCreateAQueueInsideTheTeamsPattern() throws Exception {
-        assertThat(postJson(base() + "/queues?dryRun=true", createQueue("orders.retry"), ordersOperator)
+        assertThat(postJson(base() + "/subscriptions?dryRun=true", createQueue("orders.retry"), ordersOperator)
                         .getStatus())
                 .isEqualTo(200);
     }
@@ -355,7 +366,7 @@ class ResourceEnforcementIntegrationTest extends PostgresIntegrationTest {
     @Test
     void creatingOutsideTheTeamsPatternIsRefusedNamingWhereTheUserMayCreate() throws Exception {
         MockHttpServletResponse response =
-                postJson(base() + "/queues?dryRun=true", createQueue("misc.temp"), ordersOperator);
+                postJson(base() + "/subscriptions?dryRun=true", createQueue("misc.temp"), ordersOperator);
 
         assertThat(response.getStatus()).isEqualTo(403);
         assertThat(body(response).get("detail").asString()).contains("subscription:create", "misc.temp", "orders.#");
@@ -363,7 +374,7 @@ class ResourceEnforcementIntegrationTest extends PostgresIntegrationTest {
 
     @Test
     void aTeamViewerMayNotCreateInsideTheirOwnPatternEither() throws Exception {
-        assertThat(postJson(base() + "/queues?dryRun=true", createQueue("orders.retry"), ordersViewer)
+        assertThat(postJson(base() + "/subscriptions?dryRun=true", createQueue("orders.retry"), ordersViewer)
                         .getStatus())
                 .isEqualTo(403);
     }
@@ -371,8 +382,8 @@ class ResourceEnforcementIntegrationTest extends PostgresIntegrationTest {
     @Test
     void aQueueCannotBeBoundToAnAddressOfAnotherTeam() throws Exception {
         MockHttpServletResponse response = postJson(
-                base() + "/queues?dryRun=true",
-                "{\"address\":\"billing.in\",\"name\":\"orders.spy\",\"routingType\":\"ANYCAST\"}",
+                base() + "/subscriptions?dryRun=true",
+                "{\"kind\":\"artemis.queue\",\"name\":\"orders.spy\",\"destination\":\"artemis.address/billing.in\",\"attributes\":{\"routingType\":\"ANYCAST\"}}",
                 ordersOperator);
 
         assertThat(response.getStatus()).isEqualTo(403);
@@ -381,30 +392,30 @@ class ResourceEnforcementIntegrationTest extends PostgresIntegrationTest {
 
     @Test
     void aPlatformOperatorMayCreateAnywhere() throws Exception {
-        assertThat(postJson(base() + "/queues?dryRun=true", createQueue("misc.temp"), platformOperator)
+        assertThat(postJson(base() + "/subscriptions?dryRun=true", createQueue("misc.temp"), platformOperator)
                         .getStatus())
                 .isEqualTo(200);
     }
 
     @Test
     void anotherTeamsQueueCannotBeChangedOrDeleted() throws Exception {
-        assertThat(call(delete(base() + "/queues/billing.in?dryRun=true"), ordersOperator)
+        assertThat(call(delete(base() + "/resources/artemis.queue/billing.in?dryRun=true"), ordersOperator)
                         .getStatus())
                 .isEqualTo(404);
-        assertThat(postJson(base() + "/queues/billing.in/pause?dryRun=true", "", ordersOperator)
+        assertThat(postJson(base() + "/resources/artemis.queue/billing.in:pause?dryRun=true", "", ordersOperator)
                         .getStatus())
                 .isEqualTo(404);
     }
 
     @Test
     void anAddressIsDestroyedOnlyWithAddressDelete() throws Exception {
-        assertThat(call(delete(base() + "/addresses/orders.in?dryRun=true"), ordersViewer)
+        assertThat(call(delete(base() + "/resources/artemis.address/orders.in?dryRun=true"), ordersViewer)
                         .getStatus())
                 .isEqualTo(403);
-        assertThat(call(delete(base() + "/addresses/orders.in?dryRun=true"), ordersOperator)
+        assertThat(call(delete(base() + "/resources/artemis.address/orders.in?dryRun=true"), ordersOperator)
                         .getStatus())
                 .isEqualTo(200);
-        assertThat(call(delete(base() + "/addresses/billing.in?dryRun=true"), ordersOperator)
+        assertThat(call(delete(base() + "/resources/artemis.address/billing.in?dryRun=true"), ordersOperator)
                         .getStatus())
                 .isEqualTo(404);
     }
@@ -418,17 +429,17 @@ class ResourceEnforcementIntegrationTest extends PostgresIntegrationTest {
 
     @Test
     void aDivertBetweenTheTeamsOwnAddressesIsAllowed() throws Exception {
-        assertThat(postJson(base() + "/diverts?dryRun=true", divert("orders.in", "orders.out"), ordersOperator)
+        assertThat(postJson(base() + "/artemis/diverts?dryRun=true", divert("orders.in", "orders.out"), ordersOperator)
                         .getStatus())
                 .isEqualTo(200);
     }
 
     @Test
     void aDivertIntoAnotherTeamsAddressIsNotFoundAndNothingIsDiverted() throws Exception {
-        assertThat(postJson(base() + "/diverts?dryRun=true", divert("orders.in", "billing.in"), ordersOperator)
+        assertThat(postJson(base() + "/artemis/diverts?dryRun=true", divert("orders.in", "billing.in"), ordersOperator)
                         .getStatus())
                 .isEqualTo(404);
-        assertThat(postJson(base() + "/diverts?dryRun=true", divert("billing.in", "orders.out"), ordersOperator)
+        assertThat(postJson(base() + "/artemis/diverts?dryRun=true", divert("billing.in", "orders.out"), ordersOperator)
                         .getStatus())
                 .isEqualTo(404);
     }
@@ -436,7 +447,7 @@ class ResourceEnforcementIntegrationTest extends PostgresIntegrationTest {
     @Test
     void aTeamViewerMayNotWriteADivertOnTheirOwnAddresses() throws Exception {
         MockHttpServletResponse response =
-                postJson(base() + "/diverts?dryRun=true", divert("orders.in", "orders.out"), ordersViewer);
+                postJson(base() + "/artemis/diverts?dryRun=true", divert("orders.in", "orders.out"), ordersViewer);
 
         assertThat(response.getStatus()).isEqualTo(403);
         assertThat(body(response).get("permission").asString()).isEqualTo("route:write");
@@ -542,7 +553,7 @@ class ResourceEnforcementIntegrationTest extends PostgresIntegrationTest {
 
     @Test
     void consumerHealthRanksOnlyTheCallersQueues() throws Exception {
-        assertThat(names(call(get(base() + "/consumer-health"), ordersViewer)))
+        assertThat(field(call(get(base() + "/consumer-health"), ordersViewer), "queueName"))
                 .containsExactlyInAnyOrder("orders.in", "orders.out");
         assertThat(call(get(base() + "/consumer-health?queue=billing.in"), ordersViewer)
                         .getStatus())
@@ -588,9 +599,9 @@ class ResourceEnforcementIntegrationTest extends PostgresIntegrationTest {
 
     @Test
     void theAuditTrailShowsOnlyEventsAboutWhatTheCallerMayRead() throws Exception {
-        audited("QUEUE", "orders.in");
-        audited("QUEUE", "billing.in");
-        audited("ADDRESS", "billing.in");
+        audited("SUBSCRIPTION", "orders.in");
+        audited("SUBSCRIPTION", "billing.in");
+        audited("DESTINATION", "billing.in");
         audited("CLUSTER", "prod");
 
         JsonNode mine = body(call(get(base() + "/audit"), ordersViewer));
@@ -622,8 +633,8 @@ class ResourceEnforcementIntegrationTest extends PostgresIntegrationTest {
 
     @Test
     void anAuditEventDoesNotNameAQueueTheReaderMayNotReadInItsParameters() throws Exception {
-        audited("QUEUE", "orders.in", Map.of("target", "billing.in"));
-        audited("QUEUE", "orders.out", Map.of("target", "orders.in"));
+        audited("SUBSCRIPTION", "orders.in", Map.of("target", "billing.in"));
+        audited("SUBSCRIPTION", "orders.out", Map.of("target", "orders.in"));
 
         String trail = call(get(base() + "/audit"), ordersViewer).getContentAsString();
 
@@ -717,7 +728,7 @@ class ResourceEnforcementIntegrationTest extends PostgresIntegrationTest {
 
     @Test
     void aRefusedPurgeIsAnAuditEventNamingThePermissionAndTheQueue() throws Exception {
-        assertThat(call(delete(base() + "/queues/orders.in/messages?dryRun=true"), ordersViewer)
+        assertThat(call(post(base() + "/resources/artemis.queue/orders.in:purge?dryRun=true"), ordersViewer)
                         .getStatus())
                 .isEqualTo(403);
 
@@ -726,7 +737,7 @@ class ResourceEnforcementIntegrationTest extends PostgresIntegrationTest {
         assertThat(events).hasSize(1);
         JsonNode refused = events.get(0);
         assertThat(refused.get("action").asString()).isEqualTo("ACCESS_REFUSED");
-        assertThat(refused.get("targetType").asString()).isEqualTo("QUEUE");
+        assertThat(refused.get("targetType").asString()).isEqualTo("SUBSCRIPTION");
         assertThat(refused.get("targetName").asString()).isEqualTo("orders.in");
         assertThat(refused.get("username").asString()).isEqualTo(ordersViewerName());
         assertThat(json.readTree(refused.get("params").asString())
@@ -741,7 +752,7 @@ class ResourceEnforcementIntegrationTest extends PostgresIntegrationTest {
 
     @Test
     void aQueueHiddenFromTheCallerIsRecordedAsHidden() throws Exception {
-        assertThat(call(delete(base() + "/queues/billing.in/messages?dryRun=true"), ordersViewer)
+        assertThat(call(post(base() + "/resources/artemis.queue/billing.in:purge?dryRun=true"), ordersViewer)
                         .getStatus())
                 .isEqualTo(404);
 
@@ -758,7 +769,7 @@ class ResourceEnforcementIntegrationTest extends PostgresIntegrationTest {
     @Test
     void theSameRefusalRepeatedIsOneEventWithACount() throws Exception {
         for (int i = 0; i < 50; i++) {
-            call(delete(base() + "/queues/orders.in/messages?dryRun=true"), ordersViewer);
+            call(post(base() + "/resources/artemis.queue/orders.in:purge?dryRun=true"), ordersViewer);
         }
 
         List<JsonNode> events = refusals(platformOperator);
@@ -769,7 +780,7 @@ class ResourceEnforcementIntegrationTest extends PostgresIntegrationTest {
 
     @Test
     void aRefusedBrokerChangeLeavesOneRefusedEventNamingThePermission() throws Exception {
-        assertThat(postJson(base() + "/queues/orders.in/pause?dryRun=true", "", ordersViewer)
+        assertThat(postJson(base() + "/resources/artemis.queue/orders.in:pause?dryRun=true", "", ordersViewer)
                         .getStatus())
                 .isEqualTo(403);
 
@@ -786,8 +797,8 @@ class ResourceEnforcementIntegrationTest extends PostgresIntegrationTest {
 
     @Test
     void aTeamMemberSeesTheRefusalsAboutTheirOwnQueuesOnly() throws Exception {
-        call(delete(base() + "/queues/orders.in/messages?dryRun=true"), ordersViewer);
-        call(delete(base() + "/queues/billing.in/messages?dryRun=true"), ordersViewer);
+        call(post(base() + "/resources/artemis.queue/orders.in:purge?dryRun=true"), ordersViewer);
+        call(post(base() + "/resources/artemis.queue/billing.in:purge?dryRun=true"), ordersViewer);
 
         assertThat(refusals(ordersViewer))
                 .extracting(e -> e.get("targetName").asString())

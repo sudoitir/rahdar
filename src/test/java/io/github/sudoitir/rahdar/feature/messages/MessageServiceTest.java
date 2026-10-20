@@ -217,13 +217,13 @@ class MessageServiceTest {
         assertThat(page.page()).isEqualTo(2);
         assertThat(page.pageSize()).isEqualTo(MessageService.BROKER_PAGE_CAP);
         assertThat(page.data()).singleElement().satisfies(row -> {
-            assertThat(row.messageId()).isEqualTo(1);
+            assertThat(row.position()).isEqualTo("1");
             assertThat(row.groupId()).isEqualTo("group-1");
             assertThat(row.correlationId()).isEqualTo("corr-1");
             assertThat(row.bodyPreview()).isEqualTo("hello");
             assertThat(row.propertyCount()).isEqualTo(5);
         });
-        verify(clearViews).recordClear(any(), eq("QUEUE"), eq("orders"), anyList());
+        verify(clearViews).recordClear(any(), eq("SUBSCRIPTION"), eq("orders"), anyList());
     }
 
     @Test
@@ -265,7 +265,7 @@ class MessageServiceTest {
 
         MessageDetailView detail = service.detail(CLUSTER, "orders", 2, null, null);
 
-        assertThat(detail.messageId()).isEqualTo(2);
+        assertThat(detail.position()).isEqualTo("2");
         assertThat(detail.bodyEncoding()).isEqualTo("BASE64");
         assertThat(detail.bodyCompression()).isNull();
         assertThat(detail.body()).isEqualTo("b");
@@ -415,7 +415,7 @@ class MessageServiceTest {
                         Attempt.Ok.class,
                         ok -> assertThat(ok.value()).isEqualTo(new Outcome.DryRun(1, 100, false, NODE_B)));
         verify(audit).succeed(event, 1);
-        verify(messages, never()).send(any(), any(), any(), any());
+        verify(messages, never()).sendTo(any(), any(), any(), any());
         verify(hub, never()).publishAbout(any(UUID.class), anyString(), anyCollection(), anyCollection());
     }
 
@@ -429,7 +429,7 @@ class MessageServiceTest {
                 .hasMessageContaining("'x-long-name'");
         verify(audit, never())
                 .begin(any(), anyString(), anyString(), anyString(), any(), any(), any(), any(Boolean.class));
-        verify(messages, never()).send(any(), any(), any(), any());
+        verify(messages, never()).sendTo(any(), any(), any(), any());
     }
 
     @Test
@@ -441,7 +441,7 @@ class MessageServiceTest {
                 .hasMessageContaining("base64");
         verify(audit, never())
                 .begin(any(), anyString(), anyString(), anyString(), any(), any(), any(), any(Boolean.class));
-        verify(messages, never()).send(any(), any(), any(), any());
+        verify(messages, never()).sendTo(any(), any(), any(), any());
     }
 
     @Test
@@ -463,7 +463,7 @@ class MessageServiceTest {
                 .isInstanceOfSatisfying(
                         Attempt.Ok.class, ok -> assertThat(ok.value()).isEqualTo(new Outcome.Affected(1, NODE_A)));
         ArgumentCaptor<OutboundMessage> sent = ArgumentCaptor.forClass(OutboundMessage.class);
-        verify(messages).send(eq(CLUSTER), eq(NODE_A), eq("orders.addr"), sent.capture());
+        verify(messages).sendTo(eq(CLUSTER), eq(NODE_A), eq(ResourceRef.destination("orders.addr")), sent.capture());
         assertThat(sent.getValue().headers().durable()).contains(true);
         assertThat(sent.getValue().headers().correlationId()).contains("c-1");
         assertThat(sent.getValue().body().bytes().orElseThrow().toByteArray()).isEqualTo("{}".getBytes());
@@ -475,7 +475,7 @@ class MessageServiceTest {
     void aSendThatTheBrokerRefusesIsReportedAndAuditedAsFailed() {
         doThrow(new BrokerConnectionException(BrokerConnectionException.Kind.CREDENTIALS_REJECTED, "denied"))
                 .when(messages)
-                .send(any(), any(), any(), any());
+                .sendTo(any(), any(), any(), any());
 
         Attempt<Outcome> result = service.send(CLUSTER, "orders", null, sendRequest(), false);
 
@@ -499,11 +499,11 @@ class MessageServiceTest {
     // ---- move, retry, delete, expire ----------------------------------------------------------
 
     private static MessageActionRequest ids(Long... ids) {
-        return new MessageActionRequest(List.of(ids), null, null);
+        return MessageRequestFixtures.of(List.of(ids), null, null);
     }
 
     private static MessageActionRequest filter(String filter, String target) {
-        return new MessageActionRequest(null, filter, target);
+        return MessageRequestFixtures.of(null, filter, target);
     }
 
     private void counts(String filter, long count) {
@@ -523,7 +523,7 @@ class MessageServiceTest {
 
     @Test
     void aMoveWithABlankTargetIsRefusedToo() {
-        var request = new MessageActionRequest(List.of(1L), null, " ");
+        var request = MessageRequestFixtures.of(List.of(1L), null, " ");
 
         assertThatThrownBy(() -> service.execute(CLUSTER, "orders", null, MessageAction.MOVE, request, false, false))
                 .isInstanceOf(IllegalArgumentException.class);
@@ -579,7 +579,7 @@ class MessageServiceTest {
                 "orders",
                 null,
                 MessageAction.RETRY,
-                new MessageActionRequest(null, "ignored", null),
+                MessageRequestFixtures.of(null, "ignored", null),
                 true,
                 false);
 
@@ -597,7 +597,13 @@ class MessageServiceTest {
                 .thenReturn(done(12));
 
         Attempt<Outcome> result = service.execute(
-                CLUSTER, "orders", null, MessageAction.RETRY, new MessageActionRequest(null, null, null), false, false);
+                CLUSTER,
+                "orders",
+                null,
+                MessageAction.RETRY,
+                MessageRequestFixtures.of(null, null, null),
+                false,
+                false);
 
         assertThat(result)
                 .isInstanceOfSatisfying(
@@ -658,7 +664,7 @@ class MessageServiceTest {
         when(expiry.byIds(CLUSTER, NODE_B, "orders", List.of(1L, 2L))).thenReturn(new BulkResult(2, List.of(), null));
 
         for (MessageAction action : MessageAction.values()) {
-            MessageActionRequest request = new MessageActionRequest(List.of(1L, 2L), null, "target");
+            MessageActionRequest request = MessageRequestFixtures.of(List.of(1L, 2L), null, "target");
             assertThat(service.execute(CLUSTER, "orders", null, action, request, false, false))
                     .as(action.name())
                     .isInstanceOfSatisfying(
@@ -726,7 +732,7 @@ class MessageServiceTest {
                 "orders",
                 null,
                 MessageAction.MOVE,
-                new MessageActionRequest(List.of(1L, 2L), null, "t"),
+                MessageRequestFixtures.of(List.of(1L, 2L), null, "t"),
                 false,
                 false);
 
@@ -736,7 +742,7 @@ class MessageServiceTest {
                 .begin(
                         any(),
                         eq("MOVE_MESSAGES"),
-                        eq("QUEUE"),
+                        eq("SUBSCRIPTION"),
                         eq("orders"),
                         eq(CLUSTER),
                         eq(NODE_B),
@@ -890,7 +896,7 @@ class MessageServiceTest {
         counts(null, 3L);
 
         service.execute(
-                CLUSTER, "orders", null, MessageAction.RETRY, new MessageActionRequest(null, null, null), true, false);
+                CLUSTER, "orders", null, MessageAction.RETRY, MessageRequestFixtures.of(null, null, null), true, false);
 
         verify(access)
                 .requireAll(
@@ -906,7 +912,7 @@ class MessageServiceTest {
         counts(null, 3L);
 
         service.execute(
-                CLUSTER, "orders", null, MessageAction.RETRY, new MessageActionRequest(null, null, null), true, false);
+                CLUSTER, "orders", null, MessageAction.RETRY, MessageRequestFixtures.of(null, null, null), true, false);
 
         verify(messages, never()).countBy(any(), any(), any(), any());
     }
@@ -921,7 +927,13 @@ class MessageServiceTest {
                 .thenReturn(done(1));
 
         Attempt<Outcome> result = service.execute(
-                CLUSTER, "orders", null, MessageAction.RETRY, new MessageActionRequest(null, null, null), false, false);
+                CLUSTER,
+                "orders",
+                null,
+                MessageAction.RETRY,
+                MessageRequestFixtures.of(null, null, null),
+                false,
+                false);
 
         assertThat(result).isEqualTo(new Attempt.Ok<Outcome>(new Outcome.Affected(3, NODE_B)));
         verify(messages, never()).byFilter(any(), any(), any(), any(String.class), any(), any());
@@ -939,7 +951,7 @@ class MessageServiceTest {
                 "orders",
                 null,
                 MessageAction.RETRY,
-                new MessageActionRequest(List.of(1L, 99L), null, null),
+                MessageRequestFixtures.of(List.of(1L, 99L), null, null),
                 false,
                 false);
 
@@ -953,7 +965,13 @@ class MessageServiceTest {
                 .thenThrow(new BrokerConnectionException(BrokerConnectionException.Kind.UNREACHABLE, "down"));
 
         Attempt<Outcome> result = service.execute(
-                CLUSTER, "orders", null, MessageAction.RETRY, new MessageActionRequest(null, null, null), false, false);
+                CLUSTER,
+                "orders",
+                null,
+                MessageAction.RETRY,
+                MessageRequestFixtures.of(null, null, null),
+                false,
+                false);
 
         assertThat(result).isEqualTo(new Attempt.Failed<Outcome>(BrokerConnectionException.Kind.UNREACHABLE, "down"));
         verify(messages, never()).byFilter(any(), any(), any(), any(String.class), any(), any());
@@ -1000,7 +1018,7 @@ class MessageServiceTest {
                 "orders",
                 null,
                 MessageAction.DELETE,
-                new MessageActionRequest(List.of(1L, 2L), null, null),
+                MessageRequestFixtures.of(List.of(1L, 2L), null, null),
                 true,
                 false);
 
@@ -1009,7 +1027,7 @@ class MessageServiceTest {
 
     @Test
     void eachRealActionPassesTheGateAsItsOwnTypeWithTheRequestAsItsParameters() {
-        MessageActionRequest request = new MessageActionRequest(List.of(1L, 2L), null, "target");
+        MessageActionRequest request = MessageRequestFixtures.of(List.of(1L, 2L), null, "target");
         when(access.holds(CLUSTER, MessagePermissions.MESSAGE_SEND)).thenReturn(true);
         when(messages.byIds(any(), any(), anyString(), anyList(), any())).thenReturn(done(2));
         when(expiry.byIds(any(), any(), anyString(), anyList())).thenReturn(new BulkResult(2, List.of(), null));
@@ -1046,7 +1064,7 @@ class MessageServiceTest {
                 .when(gate)
                 .run(any(), any());
 
-        MessageActionRequest request = new MessageActionRequest(List.of(1L), null, null);
+        MessageActionRequest request = MessageRequestFixtures.of(List.of(1L), null, null);
 
         assertThatThrownBy(() -> service.purge(CLUSTER, "orders", null, false, false))
                 .isInstanceOf(OperationHeldException.class);
@@ -1063,7 +1081,7 @@ class MessageServiceTest {
     void aGatedActionStillAuthorizesFirst() {
         doThrow(new AccessDeniedException("no")).when(access).requireAll(eq(CLUSTER), anyList());
 
-        MessageActionRequest request = new MessageActionRequest(List.of(1L), null, null);
+        MessageActionRequest request = MessageRequestFixtures.of(List.of(1L), null, null);
 
         assertThatThrownBy(() -> service.execute(CLUSTER, "orders", null, MessageAction.DELETE, request, false, false))
                 .isInstanceOf(AccessDeniedException.class);
@@ -1080,14 +1098,14 @@ class MessageServiceTest {
                         "orders",
                         null,
                         MessageAction.DELETE,
-                        new MessageActionRequest(null, "priority > 3", null)))
+                        MessageRequestFixtures.of(null, "priority > 3", null)))
                 .isEqualTo(new MessageService.Reach(7, ETAG));
         assertThat(service.reach(
                         CLUSTER,
                         "orders",
                         null,
                         MessageAction.DELETE,
-                        new MessageActionRequest(List.of(1L, 2L, 3L), null, null)))
+                        MessageRequestFixtures.of(List.of(1L, 2L, 3L), null, null)))
                 .isEqualTo(new MessageService.Reach(3, ETAG));
         verify(audit, never())
                 .begin(any(), anyString(), anyString(), anyString(), any(), any(), any(), any(Boolean.class));

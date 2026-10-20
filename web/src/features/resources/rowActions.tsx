@@ -116,7 +116,7 @@ export function ConnectionClose({ clusterId, target, host }: Readonly<ActionProp
           kind: 'connection',
           nodeId: target.nodeId,
           nodeName: target.nodeName,
-          targetId: target.connectionId,
+          targetId: target.id,
           fetchedAt: null,
         })
       }
@@ -172,7 +172,7 @@ export function SessionClose({ clusterId, target, host }: Readonly<ActionProps<S
           kind: 'session',
           nodeId: target.nodeId,
           nodeName: target.nodeName,
-          targetId: target.sessionId,
+          targetId: target.id,
           fetchedAt: null,
         })
       }
@@ -215,7 +215,7 @@ export function ConsumerClose({ clusterId, target, host }: Readonly<ActionProps<
           kind: 'consumer',
           nodeId: target.nodeId,
           nodeName: target.nodeName,
-          targetId: target.consumerId,
+          targetId: target.id,
           fetchedAt: null,
         })
       }

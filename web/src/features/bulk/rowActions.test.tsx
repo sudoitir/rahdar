@@ -9,12 +9,16 @@ import { server } from '../../test/setup.ts';
 import type { components } from '../../kernel/api/schema.d.ts';
 import { PurgeQueue } from './rowActions.tsx';
 
-type QueueView = components['schemas']['QueueView'];
+type SubscriptionView = components['schemas']['SubscriptionView'];
 
 const HOST: ActionHost = { open: () => {}, explain: vi.fn(), copy: () => {} };
 
-function purge(snapshot: Partial<QueueView>) {
-  const target = { queueName: 'orders.in', address: 'orders.in', snapshot: snapshot as QueueView } as QueueTarget;
+function purge(snapshot: Partial<SubscriptionView>) {
+  const target = {
+    queueName: 'orders.in',
+    address: 'orders.in',
+    snapshot: snapshot as SubscriptionView,
+  } as QueueTarget;
   return renderWithProviders(
     <Menu opened>
       <Menu.Dropdown>

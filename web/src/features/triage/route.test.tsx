@@ -24,8 +24,12 @@ function shell() {
       }),
     ),
     http.get('*/api/v1/alerts/firing', () => HttpResponse.json(paged([]))),
-    http.get('*/api/v1/clusters/c1/queues', () => HttpResponse.json({ data: [], count: 0, page: 1, pageSize: 50 })),
-    http.get('*/api/v1/clusters/c1/dlq', () => HttpResponse.json({ settingsAvailable: true, addresses: [] })),
+    http.get('*/api/v1/clusters/c1/subscriptions', () =>
+      HttpResponse.json({ data: [], count: 0, page: 1, pageSize: 50 }),
+    ),
+    http.get('*/api/v1/clusters/c1/dead-letters', () =>
+      HttpResponse.json({ settingsAvailable: true, destinations: [] }),
+    ),
     http.get('*/api/v1/clusters/c1', () =>
       HttpResponse.json({
         id: 'c1',

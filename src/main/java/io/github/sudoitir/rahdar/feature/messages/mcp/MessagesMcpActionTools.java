@@ -3,7 +3,6 @@ package io.github.sudoitir.rahdar.feature.messages.mcp;
 import io.github.sudoitir.rahdar.feature.messages.MessageAction;
 import io.github.sudoitir.rahdar.feature.messages.MessageService;
 import io.github.sudoitir.rahdar.feature.messages.MessageService.Outcome;
-import io.github.sudoitir.rahdar.feature.messages.web.MessageRequests.MessageActionRequest;
 import io.github.sudoitir.rahdar.feature.messages.web.MessageRequests.SendMessageRequest;
 import io.github.sudoitir.rahdar.platform.broker.Attempt;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
@@ -89,7 +88,7 @@ public class MessagesMcpActionTools {
                             q,
                             null,
                             MessageAction.valueOf(kind.name()),
-                            new MessageActionRequest(parseIds(messageIds), filter, targetQueue),
+                            messages.actionRequest(id, parseIds(messageIds), filter, targetQueue),
                             dry,
                             over);
             return outcome(kind.name().toLowerCase(Locale.ROOT), q, attempt);

@@ -63,7 +63,7 @@ function live(dryRun: boolean): ConnectionCloseView {
     subject: 'a3f1c9de',
     alreadyGone: false,
     target: {
-      connectionId: 'a3f1c9de',
+      connection: 'a3f1c9de',
       clientId: 'orders-worker-7',
       remoteAddress: '10.4.2.9:53160',
       user: 'apps',
@@ -89,7 +89,7 @@ function gone(dryRun: boolean): ConnectionCloseView {
 }
 
 function closeHandler(reply: (dryRun: boolean) => ConnectionCloseView) {
-  return http.post('*/api/v1/clusters/c1/nodes/n1/connections/a3f1c9de/close', ({ request }) =>
+  return http.post('*/api/v1/clusters/c1/resources/artemis.connection/a3f1c9de:close', ({ request }) =>
     HttpResponse.json(reply(new URL(request.url).searchParams.get('dryRun') === 'true')),
   );
 }
@@ -101,7 +101,7 @@ function Harness() {
       kind="connection"
       nodeId="n1"
       nodeName="node-a"
-      targetId="a3f1c9de"
+      targetId="artemis.connection/a3f1c9de"
       rowLabel="orders-worker-7"
       fetchedAt={Date.now() - 4_000}
     />
@@ -174,7 +174,7 @@ describe('closing a connection from a row', () => {
     server.use(
       meHandler(),
       clusterHandler(),
-      http.post('*/api/v1/clusters/c1/nodes/n1/connections/a3f1c9de/close', ({ request }) => {
+      http.post('*/api/v1/clusters/c1/resources/artemis.connection/a3f1c9de:close', ({ request }) => {
         const dryRun = new URL(request.url).searchParams.get('dryRun') === 'true';
         if (!dryRun) closes();
         return HttpResponse.json(live(dryRun));
@@ -218,7 +218,7 @@ describe('a target that could not be read', () => {
     server.use(
       meHandler(),
       clusterHandler(),
-      http.post('*/api/v1/clusters/c1/nodes/n1/connections/a3f1c9de/close', () =>
+      http.post('*/api/v1/clusters/c1/resources/artemis.connection/a3f1c9de:close', () =>
         HttpResponse.json({ title: 'Read failed', detail: 'node-a did not answer.' }, { status: 502 }),
       ),
     );
@@ -255,7 +255,7 @@ describe('a target that could not be read', () => {
 
 describe('closing every consumer on an address', () => {
   function addressHandler(replyFor: (dryRun: boolean) => object) {
-    return http.post('*/api/v1/clusters/c1/addresses/orders/consumers/close', ({ request }) =>
+    return http.post('*/api/v1/clusters/c1/resources/artemis.address/orders:close', ({ request }) =>
       HttpResponse.json(replyFor(new URL(request.url).searchParams.get('dryRun') === 'true')),
     );
   }

@@ -1,5 +1,6 @@
 import type { ComponentType, ReactNode } from 'react';
 
+import type { DivertRow } from '../api/routes.ts';
 import type { components } from '../api/schema.d.ts';
 import type { GateVerdict } from '../../ui/capabilityGate.ts';
 
@@ -32,12 +33,12 @@ export type ActionMode = 'act' | 'navigate';
 export interface QueueTarget {
   queueName: string;
   address?: string | null;
-  snapshot?: Schemas['QueueView'];
+  snapshot?: Schemas['SubscriptionView'];
 }
 
 export interface AddressTarget {
   address: string;
-  snapshot?: Schemas['AddressView'];
+  snapshot?: Schemas['DestinationView'];
 }
 
 /** Connections, sessions, consumers and producers are per node; a close needs to know which. */
@@ -47,17 +48,24 @@ interface NodeScoped {
 }
 
 export interface ConnectionTarget extends NodeScoped {
+  /** The connection's canonical id, which a close names. */
+  id: string;
+  /** Its name on the node, which a filter and a copy use. */
   connectionId: string;
   snapshot?: Schemas['ConnectionView'];
 }
 
 export interface SessionTarget extends NodeScoped {
+  /** The channel's canonical id, which a close names. */
+  id: string;
   sessionId: string;
   connectionId?: string | null;
-  snapshot?: Schemas['SessionView'];
+  snapshot?: Schemas['ChannelView'];
 }
 
 export interface ConsumerTarget extends NodeScoped {
+  /** The consumer's canonical id, which a close names. */
+  id: string;
   consumerId: string;
   queueName?: string | null;
   sessionId?: string | null;
@@ -73,14 +81,14 @@ export interface ProducerTarget extends NodeScoped {
 
 export interface MessageTarget {
   queueName: string;
-  messageId: number;
+  position: string;
   /** The node the message was browsed on; absent for the live node. */
   node?: string;
 }
 
 export interface DivertTarget {
   name: string;
-  snapshot?: Schemas['DivertView'];
+  snapshot?: DivertRow;
 }
 
 /** A client of the flow view: an identity that may stand for many connections. */

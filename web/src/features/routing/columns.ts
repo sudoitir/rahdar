@@ -1,12 +1,12 @@
 import { createElement } from 'react';
 
 import type { Column } from '../../ui/table/index.ts';
-import type { BridgeView, DivertView } from './api.ts';
+import type { BridgeRow, DivertRow } from './api.ts';
 import { BridgeRoute, BridgeStateBadge, DivertEffect, DivertRoute, NodesPresent, OwnerCell } from './cells.tsx';
 import { DeleteDivertAction } from './DivertActions.tsx';
 
 /** A bridge's state in words, which is also what its column's cells copy. */
-function bridgeWords(r: BridgeView): string {
+function bridgeWords(r: BridgeRow): string {
   if (r.connected) return 'running and connected';
   if (r.started) return 'started, not connected to its target';
   return 'not started';
@@ -20,7 +20,7 @@ function bridgeWords(r: BridgeView): string {
  * configured-but-undeployed diverts, so the product does not guess (ADR-0065).
  * What it can say honestly is which diverts are its own, and it says that.
  */
-export function divertColumns(clusterId: string): Column<DivertView>[] {
+export function divertColumns(clusterId: string): Column<DivertRow>[] {
   return [
     { id: 'name', header: 'Name', accessor: (r) => r.name, kind: 'identifier', priority: 'essential', sortKey: 'name' },
     {
@@ -74,7 +74,7 @@ export function divertColumns(clusterId: string): Column<DivertView>[] {
  * the declaration's job (ADR-0091), reached on the Builder tab — this
  * table reads every serving node and has no write of its own.
  */
-export function bridgeColumns(): Column<BridgeView>[] {
+export function bridgeColumns(): Column<BridgeRow>[] {
   return [
     { id: 'name', header: 'Name', accessor: (r) => r.name, kind: 'identifier', priority: 'essential', sortKey: 'name' },
     {

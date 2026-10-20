@@ -1,14 +1,20 @@
 package io.github.sudoitir.rahdar.feature.resources.mcp;
 
+import io.github.sudoitir.openbroker.ClusterConnection;
+import io.github.sudoitir.openbroker.model.ResourceClass;
 import io.github.sudoitir.rahdar.feature.resources.LifecycleKind;
-import io.github.sudoitir.rahdar.feature.resources.LifecycleRequests.CreateAddressRequest;
-import io.github.sudoitir.rahdar.feature.resources.LifecycleRequests.CreateQueueRequest;
-import io.github.sudoitir.rahdar.feature.resources.LifecycleRequests.UpdateQueueRequest;
+import io.github.sudoitir.rahdar.feature.resources.LifecycleRequests.CreateDestinationRequest;
+import io.github.sudoitir.rahdar.feature.resources.LifecycleRequests.CreateSubscriptionRequest;
+import io.github.sudoitir.rahdar.feature.resources.LifecycleRequests.UpdateResourceRequest;
 import io.github.sudoitir.rahdar.feature.resources.QueueLifecycleService;
+import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
+import io.github.sudoitir.rahdar.platform.broker.ResourceIds;
 import io.github.sudoitir.rahdar.platform.mcp.McpArgs;
 import io.github.sudoitir.rahdar.platform.mcp.McpErrors;
 import io.github.sudoitir.rahdar.platform.mcp.McpLifecycle;
 import io.modelcontextprotocol.spec.McpSchema;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.ai.mcp.annotation.McpTool;
@@ -29,6 +35,7 @@ import org.springframework.stereotype.Component;
 public class QueuesMcpTools {
 
     private final QueueLifecycleService lifecycle;
+    private final BrokerGateway gateway;
 
     /** The queue configuration a create or update carries. Every field optional; checked per kind. */
     public record QueueConfigBody(
@@ -91,14 +98,14 @@ public class QueuesMcpTools {
                 op.destructive(),
                 dry,
                 switch (op) {
-                    case CREATE_QUEUE -> lifecycle.createQueue(id, createRequest(subject, body), dry);
-                    case UPDATE_QUEUE -> lifecycle.updateQueue(id, subject, updateRequest(body), dry);
-                    case DELETE_QUEUE -> lifecycle.deleteQueue(id, subject, dry, over, disconnect);
-                    case PAUSE_QUEUE -> lifecycle.setPaused(id, subject, true, dry);
-                    case RESUME_QUEUE -> lifecycle.setPaused(id, subject, false, dry);
-                    case RESET_QUEUE_COUNTER -> lifecycle.resetCounter(id, subject, dry);
-                    case CREATE_ADDRESS -> lifecycle.createAddress(id, addressRequest(subject, body), dry);
-                    case DELETE_ADDRESS -> lifecycle.deleteAddress(id, subject, dry);
+                    case CREATE_SUBSCRIPTION -> lifecycle.createQueue(id, createRequest(id, subject, body), dry);
+                    case UPDATE_RESOURCE -> lifecycle.updateQueue(id, subject, updateRequest(body), dry);
+                    case DELETE_SUBSCRIPTION -> lifecycle.deleteQueue(id, subject, dry, over, disconnect);
+                    case PAUSE_SUBSCRIPTION -> lifecycle.setPaused(id, subject, true, dry);
+                    case RESUME_SUBSCRIPTION -> lifecycle.setPaused(id, subject, false, dry);
+                    case RESET_COUNTERS -> lifecycle.resetCounter(id, subject, dry);
+                    case CREATE_DESTINATION -> lifecycle.createAddress(id, addressRequest(id, subject, body), dry);
+                    case DELETE_DESTINATION -> lifecycle.deleteAddress(id, subject, dry);
                 }));
     }
 
@@ -109,35 +116,49 @@ public class QueuesMcpTools {
         return McpErrors.parse("config", raw, QueueConfigBody.class);
     }
 
-    private static CreateQueueRequest createRequest(String name, QueueConfigBody body) {
+    private CreateSubscriptionRequest createRequest(UUID clusterId, String name, QueueConfigBody body) {
         if (body.address() == null || body.routingType() == null) {
-            throw McpErrors.invalidParams("create_queue needs config with at least address and routingType.");
+            throw McpErrors.invalidParams("create_subscription needs config with at least address and routingType.");
         }
-        return new CreateQueueRequest(
-                body.address(),
+        ClusterConnection connection = gateway.cluster(clusterId);
+        Map<String, Object> attributes = attributes(body);
+        attributes.put("routingType", body.routingType());
+        attributes.put("durable", body.durable());
+        return new CreateSubscriptionRequest(
+                ResourceIds.kind(connection, ResourceClass.SUBSCRIPTION).value(),
                 name,
-                body.routingType(),
-                body.durable(),
-                body.filter(),
-                body.maxConsumers(),
-                body.purgeOnNoConsumers(),
-                body.exclusive(),
-                body.nonDestructive(),
-                body.ringSize(),
-                null);
+                ResourceIds.of(connection, ResourceClass.DESTINATION, body.address())
+                        .format(),
+                attributes);
     }
 
-    private static UpdateQueueRequest updateRequest(QueueConfigBody body) {
-        return new UpdateQueueRequest(
-                body.filter(),
-                body.maxConsumers(),
-                body.purgeOnNoConsumers(),
-                body.exclusive(),
-                body.nonDestructive(),
-                body.ringSize());
+    private static UpdateResourceRequest updateRequest(QueueConfigBody body) {
+        return new UpdateResourceRequest(attributes(body));
     }
 
-    private static CreateAddressRequest addressRequest(String name, QueueConfigBody body) {
-        return new CreateAddressRequest(name, body.routingType() == null ? "ANYCAST" : body.routingType());
+    private CreateDestinationRequest addressRequest(UUID clusterId, String name, QueueConfigBody body) {
+        return new CreateDestinationRequest(
+                ResourceIds.kind(gateway.cluster(clusterId), ResourceClass.DESTINATION)
+                        .value(),
+                name,
+                Map.of("routingTypes", body.routingType() == null ? "ANYCAST" : body.routingType()));
+    }
+
+    /** The body's tuning fields that were sent. */
+    private static Map<String, Object> attributes(QueueConfigBody body) {
+        Map<String, Object> attributes = new LinkedHashMap<>();
+        putIfSet(attributes, "filter", body.filter());
+        putIfSet(attributes, "maxConsumers", body.maxConsumers());
+        putIfSet(attributes, "purgeOnNoConsumers", body.purgeOnNoConsumers());
+        putIfSet(attributes, "exclusive", body.exclusive());
+        putIfSet(attributes, "nonDestructive", body.nonDestructive());
+        putIfSet(attributes, "ringSize", body.ringSize());
+        return attributes;
+    }
+
+    private static void putIfSet(Map<String, Object> attributes, String key, Object value) {
+        if (value != null) {
+            attributes.put(key, value);
+        }
     }
 }

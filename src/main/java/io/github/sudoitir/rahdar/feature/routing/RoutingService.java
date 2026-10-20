@@ -1,9 +1,10 @@
 package io.github.sudoitir.rahdar.feature.routing;
 
-import io.github.sudoitir.rahdar.feature.routing.web.RoutingViews.BridgeNodeCell;
-import io.github.sudoitir.rahdar.feature.routing.web.RoutingViews.BridgeView;
-import io.github.sudoitir.rahdar.feature.routing.web.RoutingViews.DivertView;
-import io.github.sudoitir.rahdar.feature.routing.web.RoutingViews.NodeRef;
+import io.github.sudoitir.openbroker.ClusterConnection;
+import io.github.sudoitir.openbroker.model.ResourceClass;
+import io.github.sudoitir.openbroker.model.ResourceId;
+import io.github.sudoitir.rahdar.feature.routing.web.RoutingViews.RouteNodeCell;
+import io.github.sudoitir.rahdar.feature.routing.web.RoutingViews.RouteView;
 import io.github.sudoitir.rahdar.kernel.audit.AuditService;
 import io.github.sudoitir.rahdar.kernel.core.PagedView;
 import io.github.sudoitir.rahdar.kernel.core.ResourceQuery;
@@ -18,6 +19,7 @@ import io.github.sudoitir.rahdar.platform.broker.BrokerXmlSnippets;
 import io.github.sudoitir.rahdar.platform.broker.DivertRoute;
 import io.github.sudoitir.rahdar.platform.broker.DivertSettings;
 import io.github.sudoitir.rahdar.platform.broker.RahdarNames;
+import io.github.sudoitir.rahdar.platform.broker.ResourceIds;
 import io.github.sudoitir.rahdar.platform.broker.SystemExtensions;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
@@ -27,6 +29,7 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -62,6 +65,9 @@ public class RoutingService {
 
     private static final String OWNER_OPERATOR = "OPERATOR";
 
+    private static final String ROUTE_FORWARD = "FORWARD";
+    private static final String ROUTE_LINK = "LINK";
+
     private final ClusterDirectory nodes;
     private final BrokerGateway gateway;
     private final SystemExtensions extensions;
@@ -75,11 +81,26 @@ public class RoutingService {
     /** A bridge and the node it was read from. */
     private record NodeBridge(UUID nodeId, String nodeName, BridgeRoute route) {}
 
-    public PagedView<DivertView> diverts(UUID clusterId, ResourceQuery query) {
+    /** Every route the caller may see: the diverts and the bridges, in one list. */
+    public PagedView<RouteView> routes(UUID clusterId, ResourceQuery query) {
         clusterAccess.requireVisible(clusterId);
-        ResourceFilter addresses = permissions.filter(clusterId, ResourceType.DESTINATION);
-        DivertSettings settings = extensions.require(clusterId, DivertSettings.class);
         List<ClusterNode> serving = servingManageableNodes(clusterId);
+        List<RouteView> views = new ArrayList<>(extensions
+                .forCluster(clusterId, DivertSettings.class)
+                .map(settings -> diverts(clusterId, serving, settings))
+                .orElse(List.of()));
+        views.addAll(bridges(clusterId, serving));
+
+        // Filtering is the question "what touches this", so the filter covers both ends of a route as well as
+        // its name.
+        List<RouteView> filtered = views.stream()
+                .filter(v -> query.matches(v.name()) || query.matches(v.source()) || query.matches(v.target()))
+                .toList();
+        return query.paginate(filtered, Comparator.comparing(RouteView::source, nullSafe()));
+    }
+
+    private List<RouteView> diverts(UUID clusterId, List<ClusterNode> serving, DivertSettings settings) {
+        ResourceFilter destinations = permissions.filter(clusterId, ResourceType.DESTINATION);
         int nodesTotal = serving.size();
         Set<String> ownedByOperator = operatorOwnedDivertNames(clusterId);
 
@@ -97,25 +118,14 @@ public class RoutingService {
         for (NodeDivert row : rows) {
             merged.computeIfAbsent(divertKey(row), k -> new ArrayList<>()).add(row);
         }
-
-        List<DivertView> views = merged.values().stream()
-                .map(group -> toDivertView(group, nodesTotal, ownedByOperator))
-                .filter(v -> seen(v, addresses))
+        return merged.values().stream()
+                .filter(group -> seen(group.get(0).route(), destinations))
+                .map(group -> toDivertView(clusterId, group, nodesTotal, ownedByOperator))
                 .toList();
-
-        // Filtering by address is the question "what touches this address", so the
-        // filter covers both ends of the divert as well as its name.
-        List<DivertView> filtered = views.stream()
-                .filter(v ->
-                        query.matches(v.name()) || query.matches(v.address()) || query.matches(v.forwardingAddress()))
-                .toList();
-        return query.paginate(filtered, Comparator.comparing(DivertView::address, nullSafe()));
     }
 
-    public PagedView<BridgeView> bridges(UUID clusterId, ResourceQuery query) {
-        clusterAccess.requireVisible(clusterId);
-        ResourceFilter queues = permissions.filter(clusterId, ResourceType.SUBSCRIPTION);
-        List<ClusterNode> serving = servingManageableNodes(clusterId);
+    private List<RouteView> bridges(UUID clusterId, List<ClusterNode> serving) {
+        ResourceFilter subscriptions = permissions.filter(clusterId, ResourceType.SUBSCRIPTION);
         int nodesTotal = serving.size();
 
         List<NodeBridge> rows = fanOut(
@@ -130,24 +140,21 @@ public class RoutingService {
             merged.computeIfAbsent(String.valueOf(row.route().name()), k -> new ArrayList<>())
                     .add(row);
         }
-        List<BridgeView> views = merged.values().stream()
-                .map(group -> toBridgeView(group, nodesTotal))
-                .filter(v -> queues.readable(v.queueName()))
-                .filter(v ->
-                        query.matches(v.name()) || query.matches(v.queueName()) || query.matches(v.forwardingAddress()))
+        return merged.values().stream()
+                .filter(group -> subscriptions.readable(group.get(0).route().queueName()))
+                .map(group -> toBridgeView(clusterId, group, nodesTotal))
                 .toList();
-        return query.paginate(views, Comparator.comparing(BridgeView::name, nullSafe()));
     }
 
     /**
      * A divert is seen by a caller who may read both addresses it runs between, since showing it names the
      * other one. A capture's or a plugin's tap forwards into an address Rahdar made, so only its source counts.
      */
-    private static boolean seen(DivertView divert, ResourceFilter addresses) {
+    private static boolean seen(DivertRoute divert, ResourceFilter destinations) {
         String name = divert.name();
         boolean tap = name != null
                 && (name.startsWith(RahdarNames.CAPTURE_PREFIX) || name.startsWith(RahdarNames.PLUGIN_TAP_PREFIX));
-        return addresses.readable(divert.address()) && (tap || addresses.readable(divert.forwardingAddress()));
+        return destinations.readable(divert.address()) && (tap || destinations.readable(divert.forwardingAddress()));
     }
 
     // ---- fan-out ---------------------------------------------------------
@@ -200,23 +207,46 @@ public class RoutingService {
         return ownedByOperator.contains(name) ? OWNER_OPERATOR : null;
     }
 
-    private DivertView toDivertView(List<NodeDivert> group, int nodesTotal, Set<String> ownedByOperator) {
+    private RouteView toDivertView(
+            UUID clusterId, List<NodeDivert> group, int nodesTotal, Set<String> ownedByOperator) {
         DivertRoute first = group.get(0).route();
         String name = first.name();
         boolean capture = name != null && name.startsWith(RahdarNames.CAPTURE_PREFIX);
         String owner = capture ? OWNER_CAPTURE : operatorOwner(name, ownedByOperator);
-        return new DivertView(
+        ClusterConnection connection = gateway.cluster(clusterId);
+        Map<String, String> attributes = new LinkedHashMap<>();
+        putIfPresent(attributes, "routingName", first.routingName());
+        putIfPresent(attributes, "filter", first.filter());
+        putIfPresent(attributes, "routingType", first.routingType());
+        putIfPresent(attributes, "transformerClassName", first.transformerClassName());
+        attributes.put("exclusive", String.valueOf(first.exclusive()));
+        attributes.put("retroactiveResource", String.valueOf(group.get(0).retroactive()));
+        if (capture) {
+            putIfPresent(
+                    attributes,
+                    "captureSubscriptionId",
+                    Optional.ofNullable(captureSubscriptionId(name))
+                            .map(UUID::toString)
+                            .orElse(null));
+        }
+        ResourceId id = DivertRoute.id(name);
+        return new RouteView(
+                id.format(),
+                id.kind().value(),
+                ResourceIds.label(id.kind()),
                 name,
-                first.routingName(),
-                first.address(),
-                first.forwardingAddress(),
-                first.filter(),
-                first.routingType(),
-                first.transformerClassName(),
-                first.exclusive(),
-                group.get(0).retroactive(),
+                ROUTE_FORWARD,
+                ResourceIds.of(connection, ResourceClass.DESTINATION, first.address())
+                        .format(),
+                ResourceIds.of(connection, ResourceClass.DESTINATION, first.forwardingAddress())
+                        .format(),
+                attributes,
+                group.size(),
+                nodesTotal,
+                group.stream()
+                        .map(r -> new RouteNodeCell(r.nodeId(), r.nodeName(), null, null, null, null))
+                        .toList(),
                 owner,
-                capture ? captureSubscriptionId(name) : null,
                 OWNER_OPERATOR.equals(owner)
                         ? BrokerXmlSnippets.forDivert(
                                 name,
@@ -226,41 +256,67 @@ public class RoutingService {
                                 first.exclusive(),
                                 first.filter(),
                                 first.routingType())
-                        : null,
-                group.size(),
-                nodesTotal,
-                group.stream().map(r -> new NodeRef(r.nodeId(), r.nodeName())).toList());
+                        : null);
     }
 
-    private static BridgeView toBridgeView(List<NodeBridge> group, int nodesTotal) {
+    private RouteView toBridgeView(UUID clusterId, List<NodeBridge> group, int nodesTotal) {
         BridgeRoute first = group.get(0).route();
-        return new BridgeView(
-                first.name(),
-                first.queueName(),
-                first.forwardingAddress(),
-                first.filterString(),
-                first.discoveryGroupName(),
-                first.transformerClassName(),
-                first.staticConnectors(),
-                group.stream().mapToLong(r -> r.route().messagesAcknowledged()).sum(),
-                group.stream()
+        ClusterConnection connection = gateway.cluster(clusterId);
+        Map<String, String> attributes = new LinkedHashMap<>();
+        putIfPresent(attributes, "forwardingAddress", first.forwardingAddress());
+        putIfPresent(attributes, "filter", first.filterString());
+        putIfPresent(attributes, "discoveryGroupName", first.discoveryGroupName());
+        putIfPresent(attributes, "transformerClassName", first.transformerClassName());
+        attributes.put("staticConnectors", String.join(",", first.staticConnectors()));
+        attributes.put("useDuplicateDetection", String.valueOf(first.useDuplicateDetection()));
+        attributes.put("highlyAvailable", String.valueOf(first.highlyAvailable()));
+        attributes.put(
+                "started", String.valueOf(group.stream().anyMatch(r -> r.route().started())));
+        attributes.put(
+                "connected",
+                String.valueOf(group.stream().anyMatch(r -> r.route().connected())));
+        attributes.put(
+                "messagesAcknowledged",
+                String.valueOf(group.stream()
+                        .mapToLong(r -> r.route().messagesAcknowledged())
+                        .sum()));
+        attributes.put(
+                "messagesPendingAcknowledgement",
+                String.valueOf(group.stream()
                         .mapToLong(r -> r.route().messagesPendingAcknowledgement())
-                        .sum(),
-                group.stream().anyMatch(r -> r.route().started()),
-                group.stream().anyMatch(r -> r.route().connected()),
-                first.useDuplicateDetection(),
-                first.highlyAvailable(),
+                        .sum()));
+        ResourceId id = BridgeRoute.id(first.name());
+        return new RouteView(
+                id.format(),
+                id.kind().value(),
+                ResourceIds.label(id.kind()),
+                first.name(),
+                ROUTE_LINK,
+                first.queueName() == null
+                        ? null
+                        : ResourceIds.of(connection, ResourceClass.SUBSCRIPTION, first.queueName())
+                                .format(),
+                null,
+                attributes,
                 group.size(),
                 nodesTotal,
                 group.stream()
-                        .map(r -> new BridgeNodeCell(
+                        .map(r -> new RouteNodeCell(
                                 r.nodeId(),
                                 r.nodeName(),
                                 r.route().started(),
                                 r.route().connected(),
                                 r.route().messagesAcknowledged(),
                                 r.route().messagesPendingAcknowledgement()))
-                        .toList());
+                        .toList(),
+                null,
+                null);
+    }
+
+    private static void putIfPresent(Map<String, String> attributes, String key, String value) {
+        if (value != null && !value.isBlank()) {
+            attributes.put(key, value);
+        }
     }
 
     /**

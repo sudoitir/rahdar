@@ -1,3 +1,4 @@
+import { destinationIdentity, subscriptionIdentity } from '../../test/wire.ts';
 import { describe, expect, it, vi } from 'vitest';
 import { http, HttpResponse } from 'msw';
 import { screen, waitFor, within } from '@testing-library/react';
@@ -53,12 +54,11 @@ function signedInWith(permissions: string[]) {
 }
 
 function dlq(body: Record<string, unknown>) {
-  server.use(http.get('*/api/v1/clusters/c1/dlq', () => HttpResponse.json(body)));
+  server.use(http.get('*/api/v1/clusters/c1/dead-letters', () => HttpResponse.json(body)));
 }
 
 const QUEUE = {
-  queueName: 'DLQ.orders',
-  address: 'DLQ',
+  ...subscriptionIdentity('DLQ.orders', 'DLQ'),
   totalDepth: 7,
   perNode: [
     { nodeId: 'n1', nodeName: 'primary', depth: 4 },
@@ -69,7 +69,10 @@ const QUEUE = {
 describe('DlqView', () => {
   it('is one page named Dead-letter queues, listing each queue with its depth as a link to its messages', async () => {
     signedInWith(['*']);
-    dlq({ settingsAvailable: true, addresses: [{ address: 'DLQ', kind: 'dead-letter', queues: [QUEUE] }] });
+    dlq({
+      settingsAvailable: true,
+      destinations: [{ ...destinationIdentity('DLQ'), purpose: 'dead-letter', subscriptions: [QUEUE] }],
+    });
     renderWithProviders(<DlqView />);
 
     expect(await screen.findByRole('heading', { level: 1, name: 'Dead-letter queues' })).toBeInTheDocument();
@@ -84,7 +87,10 @@ describe('DlqView', () => {
 
   it('opens the per-node depth as terms and values from the row menu', async () => {
     signedInWith(['*']);
-    dlq({ settingsAvailable: true, addresses: [{ address: 'DLQ', kind: 'dead-letter', queues: [QUEUE] }] });
+    dlq({
+      settingsAvailable: true,
+      destinations: [{ ...destinationIdentity('DLQ'), purpose: 'dead-letter', subscriptions: [QUEUE] }],
+    });
     const user = userEvent.setup();
     renderWithProviders(<DlqView />);
 
@@ -100,7 +106,10 @@ describe('DlqView', () => {
 
   it('offers Replay all through the shared preview, and explains why not to an operator who may not move messages', async () => {
     signedInWith(['message:read']);
-    dlq({ settingsAvailable: true, addresses: [{ address: 'DLQ', kind: 'dead-letter', queues: [QUEUE] }] });
+    dlq({
+      settingsAvailable: true,
+      destinations: [{ ...destinationIdentity('DLQ'), purpose: 'dead-letter', subscriptions: [QUEUE] }],
+    });
     const user = userEvent.setup();
     renderWithProviders(<DlqView />);
 
@@ -116,9 +125,12 @@ describe('DlqView', () => {
 
   it('previews a replay of the queue chosen from its row', async () => {
     signedInWith(['*']);
-    dlq({ settingsAvailable: true, addresses: [{ address: 'DLQ', kind: 'dead-letter', queues: [QUEUE] }] });
+    dlq({
+      settingsAvailable: true,
+      destinations: [{ ...destinationIdentity('DLQ'), purpose: 'dead-letter', subscriptions: [QUEUE] }],
+    });
     server.use(
-      http.post('*/api/v1/clusters/c1/queues/DLQ.orders/messages/actions/retry', () =>
+      http.post('*/api/v1/clusters/c1/resources/artemis.queue/DLQ.orders/messages:retry', () =>
         HttpResponse.json({ affectedCount: 7, cap: 100, overCap: false, node: 'n1' }),
       ),
     );
@@ -134,7 +146,7 @@ describe('DlqView', () => {
 
   it('says the dead-letter settings could not be read, and infers no queue from its name', async () => {
     signedInWith(['*']);
-    dlq({ settingsAvailable: false, addresses: [] });
+    dlq({ settingsAvailable: false, destinations: [] });
     renderWithProviders(<DlqView />);
 
     expect(await screen.findByText('Dead-letter configuration unavailable')).toBeInTheDocument();
@@ -143,7 +155,10 @@ describe('DlqView', () => {
 
   it('teaches what is empty when nothing is dead-lettered, naming the dead-letter address', async () => {
     signedInWith(['*']);
-    dlq({ settingsAvailable: true, addresses: [{ address: 'DLQ', kind: 'dead-letter', queues: [] }] });
+    dlq({
+      settingsAvailable: true,
+      destinations: [{ ...destinationIdentity('DLQ'), purpose: 'dead-letter', subscriptions: [] }],
+    });
     renderWithProviders(<DlqView />);
 
     expect(await screen.findByText('No dead-lettered messages')).toBeInTheDocument();
@@ -153,7 +168,7 @@ describe('DlqView', () => {
   it('states why the queues could not be read, with a retry, in place of the rows', async () => {
     signedInWith(['*']);
     server.use(
-      http.get('*/api/v1/clusters/c1/dlq', () =>
+      http.get('*/api/v1/clusters/c1/dead-letters', () =>
         HttpResponse.json({ title: 'Cluster unreachable', detail: 'No node answered.' }, { status: 502 }),
       ),
     );

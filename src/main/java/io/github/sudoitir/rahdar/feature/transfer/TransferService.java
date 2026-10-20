@@ -87,7 +87,7 @@ public class TransferService {
 
     static final Duration PREVIEW_LIFETIME = Duration.ofMinutes(10);
     static final String AUDIT_ACTION = "message.transfer";
-    private static final String AUDIT_QUEUE = "QUEUE";
+    private static final String AUDIT_QUEUE = "SUBSCRIPTION";
     private static final String RUN_ID = "runId";
     private static final String ANYCAST = "ANYCAST";
     private static final int HISTORY = 100;

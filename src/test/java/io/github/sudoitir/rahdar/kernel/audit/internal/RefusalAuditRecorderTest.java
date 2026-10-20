@@ -66,7 +66,7 @@ class RefusalAuditRecorderTest {
                 .refused(
                         eq(ada),
                         eq("ACCESS_REFUSED"),
-                        eq("QUEUE"),
+                        eq("SUBSCRIPTION"),
                         eq("orders.in"),
                         eq(cluster),
                         params.capture(),
@@ -81,7 +81,7 @@ class RefusalAuditRecorderTest {
         refused(ResourceRef.subscription("billing.in"), "subscription:read", true);
 
         ArgumentCaptor<Map<String, Object>> params = ArgumentCaptor.captor();
-        verify(audit).refused(any(), any(), eq("QUEUE"), eq("billing.in"), eq(cluster), params.capture(), any());
+        verify(audit).refused(any(), any(), eq("SUBSCRIPTION"), eq("billing.in"), eq(cluster), params.capture(), any());
         assertThat(params.getValue()).containsEntry("visibility", "hidden");
     }
 

@@ -21,7 +21,7 @@ describe('useQueues without a cluster', () => {
   it('requests nothing, and reports no error', async () => {
     const seen: string[] = [];
     server.use(
-      http.get('*/api/v1/clusters/*/queues', ({ request }) => {
+      http.get('*/api/v1/clusters/*/subscriptions', ({ request }) => {
         seen.push(new URL(request.url).pathname);
         return HttpResponse.json({ data: [], page: 1, size: 50, count: 0, truncated: false });
       }),
@@ -36,7 +36,7 @@ describe('useQueues without a cluster', () => {
   it('requests once it has one', async () => {
     const seen: string[] = [];
     server.use(
-      http.get('*/api/v1/clusters/*/queues', ({ request }) => {
+      http.get('*/api/v1/clusters/*/subscriptions', ({ request }) => {
         seen.push(new URL(request.url).pathname);
         return HttpResponse.json({ data: [], page: 1, size: 50, count: 0, truncated: false });
       }),
@@ -44,6 +44,6 @@ describe('useQueues without a cluster', () => {
 
     renderWithProviders(<Probe clusterId="c1" />);
 
-    await waitFor(() => expect(seen).toEqual(['/api/v1/clusters/c1/queues']));
+    await waitFor(() => expect(seen).toEqual(['/api/v1/clusters/c1/subscriptions']));
   });
 });

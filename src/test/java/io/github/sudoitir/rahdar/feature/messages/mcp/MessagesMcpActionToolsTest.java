@@ -13,6 +13,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import io.github.sudoitir.rahdar.feature.messages.MessageAction;
+import io.github.sudoitir.rahdar.feature.messages.MessageRequestFixtures;
 import io.github.sudoitir.rahdar.feature.messages.MessageService;
 import io.github.sudoitir.rahdar.feature.messages.MessageService.Outcome;
 import io.github.sudoitir.rahdar.feature.messages.web.MessageRequests.MessageActionRequest;
@@ -25,6 +26,7 @@ import io.modelcontextprotocol.spec.McpError;
 import io.modelcontextprotocol.spec.McpSchema.CallToolResult;
 import java.util.List;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
@@ -35,6 +37,13 @@ class MessagesMcpActionToolsTest {
     private final MessagesMcpActionTools tools = new MessagesMcpActionTools(messages);
     private final UUID cluster = UUID.randomUUID();
     private final UUID node = UUID.randomUUID();
+
+    @BeforeEach
+    void namesBecomeIds() {
+        when(messages.actionRequest(any(), any(), any(), any()))
+                .thenAnswer(call ->
+                        MessageRequestFixtures.of(call.getArgument(1), call.getArgument(2), call.getArgument(3)));
+    }
 
     private static MutationOutcome structured(CallToolResult result) {
         return (MutationOutcome) result.structuredContent();
@@ -73,7 +82,7 @@ class MessagesMcpActionToolsTest {
                         request.capture(),
                         eq(true),
                         eq(false));
-        assertThat(request.getValue().messageIds()).containsExactly(1L, 2L, 3L);
+        assertThat(request.getValue().ids()).containsExactly(1L, 2L, 3L);
         assertThat(request.getValue().filter()).isEqualTo("color='red'");
         assertThat(request.getValue().targetQueue()).isEqualTo("dlq");
     }
@@ -183,7 +192,7 @@ class MessagesMcpActionToolsTest {
 
         ArgumentCaptor<MessageActionRequest> request = ArgumentCaptor.forClass(MessageActionRequest.class);
         verify(messages).execute(any(), any(), any(), any(), request.capture(), anyBoolean(), anyBoolean());
-        assertThat(request.getValue().messageIds()).isEmpty();
+        assertThat(request.getValue().ids()).isEmpty();
     }
 
     @Test

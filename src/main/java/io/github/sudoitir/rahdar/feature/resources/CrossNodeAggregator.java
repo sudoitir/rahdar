@@ -1,7 +1,10 @@
 package io.github.sudoitir.rahdar.feature.resources;
 
-import io.github.sudoitir.rahdar.feature.resources.QueueViewMapper.QueueKey;
-import io.github.sudoitir.rahdar.feature.resources.web.ResourceViews.QueueView;
+import io.github.sudoitir.openbroker.ClusterConnection;
+import io.github.sudoitir.openbroker.model.KindId;
+import io.github.sudoitir.openbroker.model.ResourceClass;
+import io.github.sudoitir.rahdar.feature.resources.ResourceViewMapper.SubscriptionKey;
+import io.github.sudoitir.rahdar.feature.resources.web.ResourceViews.SubscriptionView;
 import io.github.sudoitir.rahdar.kernel.core.PagedView;
 import io.github.sudoitir.rahdar.kernel.core.ResourceQuery;
 import io.github.sudoitir.rahdar.kernel.plugin.ResourceType;
@@ -10,6 +13,8 @@ import io.github.sudoitir.rahdar.kernel.security.PermissionResolver;
 import io.github.sudoitir.rahdar.kernel.security.ResourceFilter;
 import io.github.sudoitir.rahdar.kernel.security.ResourceRef;
 import io.github.sudoitir.rahdar.kernel.security.TeamIndex;
+import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
+import io.github.sudoitir.rahdar.platform.broker.ResourceIds;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
 import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshot;
@@ -39,22 +44,23 @@ public class CrossNodeAggregator {
 
     private final QueueSnapshots snapshots;
     private final ClusterDirectory nodes;
-    private final QueueViewMapper mapper;
+    private final ResourceViewMapper mapper;
     private final ScrapeProperties properties;
     private final ClusterAccessGuard clusterAccess;
     private final PermissionResolver permissions;
     private final TeamIndex teams;
+    private final BrokerGateway gateway;
 
     @Transactional(readOnly = true)
-    public PagedView<QueueView> queues(UUID clusterId, ResourceQuery query) {
+    public PagedView<SubscriptionView> subscriptions(UUID clusterId, ResourceQuery query) {
         ResourceFilter readable = permissions.filter(clusterId, ResourceType.SUBSCRIPTION);
-        List<QueueView> rows = accessibleQueues(clusterId, readable).stream()
-                .filter(v -> query.matches(v.queueName()) || query.matches(v.address()))
+        List<SubscriptionView> rows = accessibleQueues(clusterId, readable).stream()
+                .filter(v -> query.matches(v.name()) || query.matches(v.destinationName()))
                 .toList();
         return query.paginate(rows, comparatorFor(query.sortField()))
                 .map(v -> v.withAccess(
-                        readable.allowedActions(v.queueName()),
-                        teams.ownerTeamOf(clusterId, ResourceRef.subscription(v.queueName()))
+                        readable.allowedActions(v.name()),
+                        teams.ownerTeamOf(clusterId, ResourceRef.subscription(v.name()))
                                 .orElse(null)));
     }
 
@@ -68,15 +74,15 @@ public class CrossNodeAggregator {
      * one in the cluster and still look complete (ADR-0089).
      */
     @Transactional(readOnly = true)
-    public List<QueueView> allQueues(UUID clusterId) {
+    public List<SubscriptionView> allQueues(UUID clusterId) {
         return accessibleQueues(clusterId, permissions.filter(clusterId, ResourceType.SUBSCRIPTION));
     }
 
     /** The cluster's queues that the caller may read, so a total never counts a hidden one. */
-    private List<QueueView> accessibleQueues(UUID clusterId, ResourceFilter readable) {
+    private List<SubscriptionView> accessibleQueues(UUID clusterId, ResourceFilter readable) {
         clusterAccess.requireVisible(clusterId);
         return rolledUp(clusterId).stream()
-                .filter(v -> readable.readable(v.queueName()))
+                .filter(v -> readable.readable(v.name()))
                 .toList();
     }
 
@@ -93,11 +99,11 @@ public class CrossNodeAggregator {
      * <p><b>Never call this from a request path.</b> {@link #allQueues} is that entry point.
      */
     @Transactional(readOnly = true)
-    public List<QueueView> rollUp(UUID clusterId) {
+    public List<SubscriptionView> rollUp(UUID clusterId) {
         return rolledUp(clusterId);
     }
 
-    private List<QueueView> rolledUp(UUID clusterId) {
+    private List<SubscriptionView> rolledUp(UUID clusterId) {
         List<ClusterNode> nodeRows = nodes.nodes(clusterId);
         Map<UUID, String> nodeNames =
                 nodeRows.stream().collect(Collectors.toMap(ClusterNode::getId, ClusterNode::getName));
@@ -107,14 +113,24 @@ public class CrossNodeAggregator {
                 .count();
         Instant staleBefore = Instant.now().minus(properties.tierCInterval().multipliedBy(2));
 
-        Map<QueueKey, List<QueueSnapshot>> byKey = snapshots.forCluster(clusterId).stream()
+        ClusterConnection connection = gateway.cluster(clusterId);
+        KindId subscriptionKind = ResourceIds.kind(connection, ResourceClass.SUBSCRIPTION);
+        KindId destinationKind = ResourceIds.kind(connection, ResourceClass.DESTINATION);
+        Map<SubscriptionKey, List<QueueSnapshot>> byKey = snapshots.forCluster(clusterId).stream()
                 .collect(Collectors.groupingBy(
-                        s -> new QueueKey(s.address(), s.queueName(), s.routingType()),
+                        s -> new SubscriptionKey(s.address(), s.queueName(), s.routingType()),
                         LinkedHashMap::new,
                         Collectors.toList()));
 
         return byKey.entrySet().stream()
-                .map(e -> mapper.toView(e.getKey(), e.getValue(), nodeNames, nodesTotal, staleBefore))
+                .map(e -> mapper.subscription(
+                        e.getKey(),
+                        subscriptionKind,
+                        destinationKind,
+                        e.getValue(),
+                        nodeNames,
+                        nodesTotal,
+                        staleBefore))
                 .toList();
     }
 
@@ -122,17 +138,18 @@ public class CrossNodeAggregator {
         return n.getNativeNodeId() != null ? n.getNativeNodeId() : "id:" + n.getId();
     }
 
-    private static Comparator<QueueView> comparatorFor(String field) {
+    private static Comparator<SubscriptionView> comparatorFor(String field) {
         if (field == null) {
             return null;
         }
         return switch (field) {
-            case "queueName", "name" -> Comparator.comparing(QueueView::queueName, String.CASE_INSENSITIVE_ORDER);
-            case "address" -> Comparator.comparing(QueueView::address, String.CASE_INSENSITIVE_ORDER);
-            case "depth", "messageCount" -> Comparator.comparingLong(QueueView::totalMessageCount);
-            case "consumers", "consumerCount" -> Comparator.comparingLong(QueueView::totalConsumerCount);
-            case "delivering" -> Comparator.comparingLong(QueueView::totalDeliveringCount);
-            case "scheduled" -> Comparator.comparingLong(QueueView::totalScheduledCount);
+            case "name" -> Comparator.comparing(SubscriptionView::name, String.CASE_INSENSITIVE_ORDER);
+            case "destination", "address" ->
+                Comparator.comparing(SubscriptionView::destinationName, String.CASE_INSENSITIVE_ORDER);
+            case "depth", "messageCount" -> Comparator.comparingLong(SubscriptionView::totalMessageCount);
+            case "consumers", "consumerCount" -> Comparator.comparingLong(SubscriptionView::totalConsumerCount);
+            case "delivering" -> Comparator.comparingLong(SubscriptionView::totalDeliveringCount);
+            case "scheduled" -> Comparator.comparingLong(SubscriptionView::totalScheduledCount);
             default -> null;
         };
     }

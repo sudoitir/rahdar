@@ -1,10 +1,13 @@
 package io.github.sudoitir.rahdar.feature.resources.web;
 
+import io.github.sudoitir.openbroker.model.ResourceClass;
 import io.github.sudoitir.rahdar.feature.resources.ConnectionControlService;
 import io.github.sudoitir.rahdar.feature.resources.ConnectionControlService.CloseResult;
 import io.github.sudoitir.rahdar.feature.resources.web.ConnectionViews.ConnectionCloseView;
 import io.github.sudoitir.rahdar.platform.broker.Attempt;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
+import io.github.sudoitir.rahdar.platform.clusters.ResourceTargets;
+import io.github.sudoitir.rahdar.platform.clusters.ResourceTargets.Target;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -40,46 +43,46 @@ import org.springframework.web.bind.annotation.RestController;
 public class ConnectionControlController {
 
     private final ConnectionControlService control;
-
-    @PostMapping("/nodes/{nodeId}/connections/{connectionId}/close")
-    public ConnectionCloseView closeConnection(
-            @PathVariable UUID clusterId,
-            @PathVariable UUID nodeId,
-            @PathVariable String connectionId,
-            @RequestParam(defaultValue = "false") boolean dryRun) {
-        return respond(control.closeConnection(clusterId, nodeId, connectionId, dryRun));
-    }
-
-    @PostMapping("/nodes/{nodeId}/sessions/{sessionId}/close")
-    public ConnectionCloseView closeSession(
-            @PathVariable UUID clusterId,
-            @PathVariable UUID nodeId,
-            @PathVariable String sessionId,
-            @RequestParam(defaultValue = "false") boolean dryRun) {
-        return respond(control.closeSession(clusterId, nodeId, sessionId, dryRun));
-    }
+    private final ResourceTargets targets;
 
     /**
-     * Close the connection behind one consumer. A consumer row names its session
-     * but not its connection, so the link is walked server-side — the client never
-     * supplies the connection id it did not read.
+     * Close a connection, a channel of one, the connection behind a consumer, or every consumer connection of
+     * a destination. The first three name a {@code node}: a connection id is issued by one node and means
+     * nothing on another. A consumer row names its channel but not its connection, so the link is walked
+     * server-side: the client never supplies the connection id it did not read.
      */
-    @PostMapping("/nodes/{nodeId}/consumers/{consumerId}/close")
-    public ConnectionCloseView closeConsumerConnection(
+    @PostMapping("/resources/{kind}/{path}:close")
+    public ConnectionCloseView close(
             @PathVariable UUID clusterId,
-            @PathVariable UUID nodeId,
-            @PathVariable String consumerId,
-            @RequestParam(defaultValue = "false") boolean dryRun) {
-        return respond(control.closeConsumerConnection(clusterId, nodeId, consumerId, dryRun));
-    }
-
-    @PostMapping("/addresses/{address}/consumers/close")
-    public ConnectionCloseView closeAddressConsumers(
-            @PathVariable UUID clusterId,
-            @PathVariable String address,
+            @PathVariable String kind,
+            @PathVariable String path,
+            @RequestParam(required = false) UUID node,
             @RequestParam(defaultValue = "false") boolean dryRun,
             @RequestParam(defaultValue = "false") boolean override) {
-        return respond(control.closeAddressConsumers(clusterId, address, dryRun, override));
+        Target target = targets.require(
+                clusterId,
+                kind,
+                path,
+                ResourceClass.CONNECTION,
+                ResourceClass.CHANNEL,
+                ResourceClass.CONSUMER,
+                ResourceClass.DESTINATION);
+        String name = target.name();
+        return respond(
+                switch (target.resourceClass()) {
+                    case CONNECTION -> control.closeConnection(clusterId, requireNode(node), name, dryRun);
+                    case CHANNEL -> control.closeSession(clusterId, requireNode(node), name, dryRun);
+                    case CONSUMER -> control.closeConsumerConnection(clusterId, requireNode(node), name, dryRun);
+                    default -> control.closeAddressConsumers(clusterId, name, dryRun, override);
+                });
+    }
+
+    private static UUID requireNode(UUID node) {
+        if (node == null) {
+            throw new IllegalArgumentException(
+                    "A connection, channel or consumer is closed on one node: say which with ?node.");
+        }
+        return node;
     }
 
     private static ConnectionCloseView respond(Attempt<CloseResult> attempt) {

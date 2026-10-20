@@ -2,19 +2,27 @@ package io.github.sudoitir.rahdar.feature.resources;
 
 import static io.github.sudoitir.rahdar.platform.broker.ResourceIds.count;
 import static io.github.sudoitir.rahdar.platform.broker.ResourceIds.createdAt;
-import static io.github.sudoitir.rahdar.platform.broker.ResourceIds.name;
+import static io.github.sudoitir.rahdar.platform.broker.ResourceIds.idText;
+import static io.github.sudoitir.rahdar.platform.broker.ResourceIds.label;
 import static io.github.sudoitir.rahdar.platform.broker.ResourceIds.text;
 
+import io.github.sudoitir.openbroker.model.KindId;
 import io.github.sudoitir.openbroker.model.MetricKeys;
 import io.github.sudoitir.openbroker.model.Resource;
+import io.github.sudoitir.openbroker.model.ResourceId;
 import io.github.sudoitir.openbroker.model.StandardAttributes;
-import io.github.sudoitir.rahdar.feature.resources.web.ResourceViews.AddressView;
+import io.github.sudoitir.rahdar.feature.resources.web.ResourceViews.ChannelView;
 import io.github.sudoitir.rahdar.feature.resources.web.ResourceViews.ConnectionView;
 import io.github.sudoitir.rahdar.feature.resources.web.ResourceViews.ConsumerView;
 import io.github.sudoitir.rahdar.feature.resources.web.ResourceViews.Delivery;
+import io.github.sudoitir.rahdar.feature.resources.web.ResourceViews.DestinationView;
 import io.github.sudoitir.rahdar.feature.resources.web.ResourceViews.ProducerView;
-import io.github.sudoitir.rahdar.feature.resources.web.ResourceViews.SessionView;
+import io.github.sudoitir.rahdar.feature.resources.web.ResourceViews.SubscriptionNodeCell;
+import io.github.sudoitir.rahdar.feature.resources.web.ResourceViews.SubscriptionView;
+import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshot;
+import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.springframework.stereotype.Component;
 
@@ -25,10 +33,64 @@ public class ResourceViewMapper {
     /** The logical node a fanned-out row belongs to. */
     public record NodeRef(UUID id, String name) {}
 
-    public AddressView address(Resource r, NodeRef node) {
-        return new AddressView(
+    /** The aggregation key of a subscription across the cluster's nodes. */
+    public record SubscriptionKey(String destination, String name, String routingType) {}
+
+    /**
+     * {@code subscription_snapshot} rows sharing a {@link SubscriptionKey} → one {@link SubscriptionView}: a
+     * per-node cell for each row, cluster totals, and node presence (ADR-0017).
+     */
+    public SubscriptionView subscription(
+            SubscriptionKey key,
+            KindId subscriptionKind,
+            KindId destinationKind,
+            List<QueueSnapshot> rows,
+            Map<UUID, String> nodeNames,
+            int nodesTotal,
+            Instant staleBefore) {
+        List<SubscriptionNodeCell> cells = rows.stream()
+                .map(r -> new SubscriptionNodeCell(
+                        r.nodeId(),
+                        nodeNames.getOrDefault(r.nodeId(), r.nodeId().toString()),
+                        r.ts() != null && r.ts().isBefore(staleBefore),
+                        r.ts(),
+                        r.messageCount(),
+                        r.consumerCount(),
+                        r.deliveringCount(),
+                        r.scheduledCount(),
+                        r.paused()))
+                .sorted((a, b) -> a.nodeName().compareToIgnoreCase(b.nodeName()))
+                .toList();
+        return new SubscriptionView(
+                ResourceId.of(subscriptionKind.value(), key.name()).format(),
+                subscriptionKind.value(),
+                label(subscriptionKind),
+                key.name(),
+                ResourceId.of(destinationKind.value(), key.destination()).format(),
+                Map.of("routingType", key.routingType()),
+                rows.stream().anyMatch(QueueSnapshot::durable),
+                cells.stream().mapToLong(SubscriptionNodeCell::messageCount).sum(),
+                cells.stream().mapToLong(SubscriptionNodeCell::consumerCount).sum(),
+                cells.stream().mapToLong(SubscriptionNodeCell::deliveringCount).sum(),
+                cells.stream().mapToLong(SubscriptionNodeCell::scheduledCount).sum(),
+                (int) cells.stream()
+                        .map(SubscriptionNodeCell::nodeId)
+                        .distinct()
+                        .count(),
+                nodesTotal,
+                cells.stream().anyMatch(SubscriptionNodeCell::paused),
+                cells,
+                List.of(),
+                null);
+    }
+
+    public DestinationView destination(Resource r, NodeRef node) {
+        return new DestinationView(
                 node.id(),
                 node.name(),
+                r.id().format(),
+                r.id().kind().value(),
+                label(r.id().kind()),
                 r.id().name(),
                 delivery(r),
                 count(r, MetricKeys.SUBSCRIPTION_COUNT),
@@ -41,10 +103,12 @@ public class ResourceViewMapper {
         return new ConsumerView(
                 node.id(),
                 node.name(),
-                r.id().name(),
-                name(r, StandardAttributes.PARENT),
-                name(r, StandardAttributes.SUBSCRIPTION),
-                name(r, StandardAttributes.DESTINATION),
+                r.id().format(),
+                r.id().kind().value(),
+                label(r.id().kind()),
+                idText(r, StandardAttributes.PARENT),
+                idText(r, StandardAttributes.SUBSCRIPTION),
+                idText(r, StandardAttributes.DESTINATION),
                 text(r, StandardAttributes.PROTOCOL),
                 count(r, MetricKeys.DELIVERED),
                 count(r, MetricKeys.ACKNOWLEDGED),
@@ -52,13 +116,15 @@ public class ResourceViewMapper {
                 List.of());
     }
 
-    public SessionView session(Resource r, NodeRef node) {
-        return new SessionView(
+    public ChannelView channel(Resource r, NodeRef node) {
+        return new ChannelView(
                 node.id(),
                 node.name(),
-                r.id().name(),
+                r.id().format(),
+                r.id().kind().value(),
+                label(r.id().kind()),
+                idText(r, StandardAttributes.PARENT),
                 text(r, StandardAttributes.PRINCIPAL),
-                name(r, StandardAttributes.PARENT),
                 count(r, MetricKeys.CONSUMER_COUNT),
                 count(r, MetricKeys.PRODUCER_COUNT),
                 createdAt(r),
@@ -69,7 +135,9 @@ public class ResourceViewMapper {
         return new ConnectionView(
                 node.id(),
                 node.name(),
-                r.id().name(),
+                r.id().format(),
+                r.id().kind().value(),
+                label(r.id().kind()),
                 text(r, StandardAttributes.REMOTE_ADDRESS),
                 text(r, StandardAttributes.PROTOCOL),
                 text(r, StandardAttributes.CLIENT_ID),
@@ -82,16 +150,18 @@ public class ResourceViewMapper {
         return new ProducerView(
                 node.id(),
                 node.name(),
-                r.id().name(),
+                r.id().format(),
+                r.id().kind().value(),
+                label(r.id().kind()),
                 text(r, StandardAttributes.CLIENT_ID),
-                name(r, StandardAttributes.PARENT),
-                name(r, StandardAttributes.DESTINATION),
+                idText(r, StandardAttributes.PARENT),
+                idText(r, StandardAttributes.DESTINATION),
                 text(r, StandardAttributes.PROTOCOL),
                 count(r, MetricKeys.SENT),
                 List.of());
     }
 
-    /** How the address delivers, in a stable order. */
+    /** How the destination delivers, in a stable order. */
     private static List<Delivery> delivery(Resource r) {
         return r.attributes()
                 .get(StandardAttributes.DELIVERY)

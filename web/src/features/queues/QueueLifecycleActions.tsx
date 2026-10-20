@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Button, Checkbox, Group, Stack, Text } from '@mantine/core';
 
 import { useCluster } from '../clusters/index.ts';
-import { useDeleteQueue, useSetQueuePaused, type LifecycleOutcomeView, type QueueView } from './api.ts';
+import { useDeleteQueue, useSetQueuePaused, type LifecycleOutcomeView, type SubscriptionView } from './api.ts';
 import { useResourceGate } from '../../kernel/auth/useResourceGate.ts';
 import { CapabilityGate } from '../../ui/CapabilityGate.tsx';
 import { ConfirmDialog } from '../../ui/ConfirmDialog.tsx';
@@ -26,7 +26,7 @@ export function QueueLifecycleActions({
   onClose,
 }: Readonly<{
   clusterId: string;
-  queue: QueueView;
+  queue: SubscriptionView;
   onClose: () => void;
 }>) {
   const cluster = useCluster(clusterId);
@@ -36,11 +36,15 @@ export function QueueLifecycleActions({
   const [editOpen, setEditOpen] = useState(false);
   const [pauseOutcome, setPauseOutcome] = useState<LifecycleOutcomeView | null>(null);
 
-  const setPaused = useSetQueuePaused(clusterId, queue.queueName);
+  const setPaused = useSetQueuePaused(clusterId, queue.name);
 
   const base = { clusterId, noun: 'queue', resource: queue, capability: write, pending: cluster.isPending } as const;
   const pause = useResourceGate({ ...base, permission: 'subscription:pause', label: 'Pause and resume queues' });
-  const update = useResourceGate({ ...base, permission: 'subscription:update', label: "Change a queue's configuration" });
+  const update = useResourceGate({
+    ...base,
+    permission: 'subscription:update',
+    label: "Change a queue's configuration",
+  });
   const remove = useResourceGate({ ...base, permission: 'subscription:delete', label: 'Destroy queues and addresses' });
   const pauseGate = pause.verdict;
   const updateGate = update.verdict;
@@ -151,12 +155,12 @@ export function DeleteQueueDialog({
   onDeleted,
 }: Readonly<{
   clusterId: string;
-  queue: QueueView;
+  queue: SubscriptionView;
   opened: boolean;
   onClose: () => void;
   onDeleted: () => void;
 }>) {
-  const remove = useDeleteQueue(clusterId, queue.queueName);
+  const remove = useDeleteQueue(clusterId, queue.name);
   const [preview, setPreview] = useState<LifecycleOutcomeView | null>(null);
   const [result, setResult] = useState<LifecycleOutcomeView | null>(null);
   const [previewFailed, setPreviewFailed] = useState<Error | null>(null);
@@ -203,7 +207,7 @@ export function DeleteQueueDialog({
     <ConfirmDialog
       opened={opened}
       onClose={dismiss}
-      title={result ? `Result of deleting ${queue.queueName}` : `Delete ${queue.queueName}`}
+      title={result ? `Result of deleting ${queue.name}` : `Delete ${queue.name}`}
       tone="danger"
       confirmLabel={overCap ? 'Delete anyway, over the cap' : 'Delete this queue'}
       // Also locked while the preview is being taken, so the typed name cannot arm a delete that

@@ -1,3 +1,4 @@
+import { subscriptionIdentity } from '../../test/wire.ts';
 import { describe, expect, it, vi } from 'vitest';
 import { http, HttpResponse } from 'msw';
 import { screen } from '@testing-library/react';
@@ -48,14 +49,12 @@ function mockApi(permissions: string[] = ['*']) {
         ]),
       ),
     ),
-    http.get('*/api/v1/clusters/c1/queues', ({ request }) => {
+    http.get('*/api/v1/clusters/c1/subscriptions', ({ request }) => {
       queueRequests.push(new URL(request.url).search);
       return HttpResponse.json({
         data: [
           {
-            address: 'ORDERS',
-            queueName: 'ORDERS',
-            routingType: 'ANYCAST',
+            ...subscriptionIdentity('ORDERS', 'ORDERS'),
             durable: true,
             totalMessageCount: 7,
             totalConsumerCount: 1,

@@ -89,7 +89,7 @@ function mockCluster(over: { permissions?: string[]; messageIo?: object; queues?
         },
       }),
     ),
-    http.get('*/api/v1/clusters/c1/queues', () =>
+    http.get('*/api/v1/clusters/c1/subscriptions', () =>
       HttpResponse.json({ data: over.queues ?? [], count: (over.queues ?? []).length, page: 1, pageSize: 500 }),
     ),
     http.get('*/api/v1/auth/me', () =>
@@ -1015,7 +1015,7 @@ describe('SqlConsoleView other panels', () => {
     mockCluster();
     mockPlan();
     server.use(
-      http.get('*/api/v1/clusters/c1/queues/ORDER.IN/messages/11', () =>
+      http.get('*/api/v1/clusters/c1/resources/artemis.queue/ORDER.IN/messages/11', () =>
         HttpResponse.json({ title: 'Message gone', detail: 'It was consumed.' }, { status: 404 }),
       ),
     );

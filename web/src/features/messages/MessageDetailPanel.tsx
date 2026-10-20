@@ -78,7 +78,7 @@ function MessageBody({
   contentType?: string | null;
   bodyTruncated: boolean;
   stringProperties: Record<string, string>;
-  messageId: number;
+  messageId: string;
   redactions: Redactions;
   withheld: MessageDetailView['withheld'];
 }>) {
@@ -175,7 +175,7 @@ function parsedJson(detected: ReturnType<typeof detectPayload>): unknown {
 }
 
 /** A binary body is handed over as its bytes, not as the base64 that carried it. */
-function downloadMessageBody(messageId: number, bodyEncoding: string, raw: string, format: string): void {
+function downloadMessageBody(messageId: string, bodyEncoding: string, raw: string, format: string): void {
   if (bodyEncoding === 'BASE64') {
     download(`message-${messageId}.bin`, new Blob([base64Bytes(raw)]));
   } else {
@@ -274,7 +274,7 @@ function MessageDetailContent({ m }: Readonly<{ m: MessageDetailView }>) {
         contentType={m.contentType}
         bodyTruncated={m.bodyTruncated}
         stringProperties={m.stringProperties}
-        messageId={m.messageId}
+        messageId={m.position}
         redactions={m.redactions}
         withheld={m.withheld}
       />

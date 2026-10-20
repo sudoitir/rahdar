@@ -1,3 +1,5 @@
+import { addressId } from '../../kernel/api/resourceId.ts';
+import { destinationIdentity, subscriptionIdentity } from '../../test/wire.ts';
 import { describe, expect, it } from 'vitest';
 import { http, HttpResponse } from 'msw';
 import { screen, waitFor } from '@testing-library/react';
@@ -9,9 +11,7 @@ import { AddressPicker } from './AddressPicker.tsx';
 
 function queue(over: Record<string, unknown> = {}) {
   return {
-    address: 'orders.request',
-    queueName: 'orders.request',
-    routingType: 'ANYCAST',
+    ...subscriptionIdentity('orders.request', 'orders.request'),
     durable: true,
     totalMessageCount: 12,
     totalConsumerCount: 1,
@@ -35,8 +35,13 @@ function Harness({ initial = '' }: { initial?: string }) {
 describe('AddressPicker', () => {
   it('suggests the broker’s addresses with their type and depth', async () => {
     server.use(
-      http.get('*/api/v1/clusters/c1/queues', () =>
-        HttpResponse.json(page([queue(), queue({ address: 'orders.events', routingType: 'MULTICAST' })])),
+      http.get('*/api/v1/clusters/c1/subscriptions', () =>
+        HttpResponse.json(
+          page([
+            queue(),
+            queue({ destination: addressId('orders.events'), nativeAttributes: { routingType: 'MULTICAST' } }),
+          ]),
+        ),
       ),
     );
     const user = userEvent.setup();
@@ -57,7 +62,11 @@ describe('AddressPicker', () => {
     // 240px dropdown, so `flex: none` meta won and every long address rendered as
     // an ellipsis — useless for exactly the names this picker exists to tell apart.
     const long = 'orders.reply.responder-with-a-rather-long-node-name.v1';
-    server.use(http.get('*/api/v1/clusters/c1/queues', () => HttpResponse.json(page([queue({ address: long })]))));
+    server.use(
+      http.get('*/api/v1/clusters/c1/subscriptions', () =>
+        HttpResponse.json(page([queue({ destination: addressId(long) })])),
+      ),
+    );
     const user = userEvent.setup();
     renderWithProviders(<Harness />);
 
@@ -71,8 +80,13 @@ describe('AddressPicker', () => {
 
   it('filters the suggestions by routing type', async () => {
     server.use(
-      http.get('*/api/v1/clusters/c1/queues', () =>
-        HttpResponse.json(page([queue(), queue({ address: 'orders.events', routingType: 'MULTICAST' })])),
+      http.get('*/api/v1/clusters/c1/subscriptions', () =>
+        HttpResponse.json(
+          page([
+            queue(),
+            queue({ destination: addressId('orders.events'), nativeAttributes: { routingType: 'MULTICAST' } }),
+          ]),
+        ),
       ),
     );
     const user = userEvent.setup();
@@ -88,7 +102,7 @@ describe('AddressPicker', () => {
   });
 
   it('says so when the typed name matches nothing, without blocking it', async () => {
-    server.use(http.get('*/api/v1/clusters/c1/queues', () => HttpResponse.json(page([]))));
+    server.use(http.get('*/api/v1/clusters/c1/subscriptions', () => HttpResponse.json(page([]))));
     renderWithProviders(
       <AddressPicker
         clusterId="c1"
@@ -105,7 +119,7 @@ describe('AddressPicker', () => {
 
   it('stays usable when the queue list cannot be read', async () => {
     server.use(
-      http.get('*/api/v1/clusters/c1/queues', () =>
+      http.get('*/api/v1/clusters/c1/subscriptions', () =>
         HttpResponse.json(
           { title: 'Unexpected broker response', detail: 'The broker is unreachable.' },
           { status: 502 },
@@ -125,9 +139,9 @@ describe('AddressPicker', () => {
       return {
         nodeId: 'n1',
         nodeName: 'node-a',
-        name,
+        ...destinationIdentity(name),
         routingTypes: 'ANYCAST',
-        queueCount: 1,
+        subscriptionCount: 1,
         messageCount: 0,
         allowedActions,
       };
@@ -135,10 +149,12 @@ describe('AddressPicker', () => {
 
     function serveAddresses() {
       server.use(
-        http.get('*/api/v1/clusters/c1/queues', () =>
-          HttpResponse.json(page([queue({ address: 'orders.in' }), queue({ address: 'billing.in' })])),
+        http.get('*/api/v1/clusters/c1/subscriptions', () =>
+          HttpResponse.json(
+            page([queue({ destination: addressId('orders.in') }), queue({ destination: addressId('billing.in') })]),
+          ),
         ),
-        http.get('*/api/v1/clusters/c1/addresses', () =>
+        http.get('*/api/v1/clusters/c1/destinations', () =>
           HttpResponse.json({
             data: [address('orders.in', ['message:send']), address('billing.in', ['destination:read'])],
             count: 2,

@@ -5,8 +5,8 @@ import io.github.sudoitir.openbroker.notification.EventTypes;
 import io.github.sudoitir.rahdar.feature.events.BrokerEventService;
 import io.github.sudoitir.rahdar.feature.events.web.EventViews.BrokerEventView;
 import io.github.sudoitir.rahdar.feature.resources.CrossNodeAggregator;
-import io.github.sudoitir.rahdar.feature.resources.web.ResourceViews.QueueNodeCell;
-import io.github.sudoitir.rahdar.feature.resources.web.ResourceViews.QueueView;
+import io.github.sudoitir.rahdar.feature.resources.web.ResourceViews.SubscriptionNodeCell;
+import io.github.sudoitir.rahdar.feature.resources.web.ResourceViews.SubscriptionView;
 import io.github.sudoitir.rahdar.feature.triage.ConsumerHealth.Source;
 import io.github.sudoitir.rahdar.feature.triage.ConsumerHealth.Verdict;
 import io.github.sudoitir.rahdar.kernel.core.PagedView;
@@ -117,7 +117,7 @@ public class ConsumerHealthService {
         // The guard belongs at the request boundary — page() and forQueue() apply it —
         // which is the same split the other alert conditions make by reading
         // subscription_snapshot directly.
-        List<QueueView> rows = queues.rollUp(clusterId);
+        List<SubscriptionView> rows = queues.rollUp(clusterId);
 
         Instant to = Instant.now();
         Instant from = to.minus(scrape.tierBInterval().multipliedBy(2));
@@ -133,19 +133,18 @@ public class ConsumerHealthService {
     }
 
     private ConsumerHealth classify(
-            QueueView row,
+            SubscriptionView row,
             Map<String, SubjectRate> addRates,
             Map<String, SubjectRate> ackRates,
             Map<String, Double> slopes,
             Map<String, BrokerEventView> brokerSlow) {
 
-        Builder b = new Builder(
-                row, addRates.get(row.queueName()), ackRates.get(row.queueName()), slopes.get(row.queueName()));
+        Builder b = new Builder(row, addRates.get(row.name()), ackRates.get(row.name()), slopes.get(row.name()));
 
         boolean backlog = row.totalMessageCount() >= properties.minBacklog();
         boolean acking = b.ackRate != null && b.ackRate > properties.idleAckRate();
 
-        ConsumerHealth verdict = unmeasuredOrUnattended(b, backlog, brokerSlow.get(row.address()));
+        ConsumerHealth verdict = unmeasuredOrUnattended(b, backlog, brokerSlow.get(row.destinationName()));
         if (verdict == null) {
             verdict = notAcknowledging(b, backlog, acking);
         }
@@ -154,7 +153,7 @@ public class ConsumerHealthService {
 
     /** Rungs 1-4 of the ladder: no rate to reason from, paused, nobody attached, or the broker's own word. */
     private static ConsumerHealth unmeasuredOrUnattended(Builder b, boolean backlog, BrokerEventView slow) {
-        QueueView row = b.row;
+        SubscriptionView row = b.row;
         // 1. No computable rate. Checked first: every verdict below reasons about rates,
         //    and guessing from a depth alone is how "looks healthy" happens.
         if (b.ackRate == null && b.addRate == null) {
@@ -168,7 +167,7 @@ public class ConsumerHealthService {
         //    no acknowledgements by design, which is indistinguishable from a stall by
         //    signal alone and entirely different in what the operator should do.
         if (row.paused()) {
-            boolean everywhere = row.perNode().stream().allMatch(QueueNodeCell::paused);
+            boolean everywhere = row.perNode().stream().allMatch(SubscriptionNodeCell::paused);
             return b.verdict(
                     Verdict.PAUSED,
                     everywhere
@@ -203,7 +202,7 @@ public class ConsumerHealthService {
      * to opposite investigations.
      */
     private static ConsumerHealth notAcknowledging(Builder b, boolean backlog, boolean acking) {
-        QueueView row = b.row;
+        SubscriptionView row = b.row;
         if (row.totalConsumerCount() > 0 && backlog && !acking) {
             if (row.totalDeliveringCount() > 0) {
                 return b.verdict(
@@ -320,7 +319,7 @@ public class ConsumerHealthService {
      * arguments, and the ladder — the part worth reading — disappears into them.
      */
     private static final class Builder {
-        private final QueueView row;
+        private final SubscriptionView row;
         private final Double addRate;
         private final Double ackRate;
         private final Double netRate;
@@ -332,7 +331,7 @@ public class ConsumerHealthService {
         private String brokerConsumerName;
         private Duration eta;
 
-        private Builder(QueueView row, SubjectRate add, SubjectRate ack, Double slope) {
+        private Builder(SubscriptionView row, SubjectRate add, SubjectRate ack, Double slope) {
             this.row = row;
             this.addRate = add == null ? null : add.rate();
             this.ackRate = ack == null ? null : ack.rate();
@@ -344,7 +343,7 @@ public class ConsumerHealthService {
             // freshest thing the verdict rests on, not of an arbitrary one of the two.
             this.asOf = newest(add, ack);
             this.span = longestSpan(add, ack);
-            this.stale = row.perNode().stream().anyMatch(QueueNodeCell::stale);
+            this.stale = row.perNode().stream().anyMatch(SubscriptionNodeCell::stale);
         }
 
         private static Instant newest(SubjectRate a, SubjectRate b) {
@@ -379,8 +378,8 @@ public class ConsumerHealthService {
 
         private ConsumerHealth verdict(Verdict verdict, String cause) {
             return new ConsumerHealth(
-                    row.address(),
-                    row.queueName(),
+                    row.destinationName(),
+                    row.name(),
                     verdict,
                     cause,
                     verdict == Verdict.BROKER_SLOW ? Source.BROKER : Source.DERIVED,

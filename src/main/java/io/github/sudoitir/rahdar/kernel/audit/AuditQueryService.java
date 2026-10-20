@@ -156,8 +156,8 @@ public class AuditQueryService {
         params.put("from", Timestamp.from(f.from()));
         params.put("to", Timestamp.from(f.to()));
         if (!f.everything()) {
-            sql.append(" AND ((target_type = 'QUEUE' AND target_name IN (:queues))")
-                    .append(" OR (target_type = 'ADDRESS' AND target_name IN (:addresses)))");
+            sql.append(" AND ((target_type = 'SUBSCRIPTION' AND target_name IN (:queues))")
+                    .append(" OR (target_type = 'DESTINATION' AND target_name IN (:addresses)))");
             params.put("queues", f.queues());
             params.put("addresses", f.addresses());
         }
@@ -385,8 +385,8 @@ public class AuditQueryService {
         boolean everything = clusterAccess.holds(clusterId, Permissions.CLUSTER_READ);
         return new Scope(
                 everything,
-                everything ? List.of("") : readable(clusterId, "QUEUE", ResourceType.SUBSCRIPTION),
-                everything ? List.of("") : readable(clusterId, "ADDRESS", ResourceType.DESTINATION),
+                everything ? List.of("") : readable(clusterId, "SUBSCRIPTION", ResourceType.SUBSCRIPTION),
+                everything ? List.of("") : readable(clusterId, "DESTINATION", ResourceType.DESTINATION),
                 everything ? null : redaction(clusterId));
     }
 
@@ -420,8 +420,8 @@ public class AuditQueryService {
         ResourceFilter addresses = permissions.filter(clusterId, ResourceType.DESTINATION);
         return events.findByIdAndClusterId(id, clusterId)
                 .filter(e -> everything
-                        || ("QUEUE".equals(e.getTargetType()) && queues.readable(e.getTargetName()))
-                        || ("ADDRESS".equals(e.getTargetType()) && addresses.readable(e.getTargetName())))
+                        || ("SUBSCRIPTION".equals(e.getTargetType()) && queues.readable(e.getTargetName()))
+                        || ("DESTINATION".equals(e.getTargetType()) && addresses.readable(e.getTargetName())))
                 .map(e -> toView(e, everything ? null : redaction(clusterId)))
                 .orElseThrow(() -> new NotFoundException("audit event", id));
     }

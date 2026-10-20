@@ -1,9 +1,10 @@
+import { nameOf } from '../../kernel/api/resourceId.ts';
 import type { ReactNode } from 'react';
 
 import { OwnerChip } from '../../kernel/auth/OwnerChip.tsx';
 import { ResourceLink } from '../../kernel/actions/ResourceLink.tsx';
 import { MiddleTruncate, type Column } from '../../ui/table/index.ts';
-import type { AddressView, ConnectionView, ConsumerView, ProducerView, SessionView } from './api.ts';
+import type { DestinationView, ConnectionView, ConsumerView, ProducerView, ChannelView } from './api.ts';
 import { CloseAddressConsumersAction, CloseConnectionAction } from './CloseConnection.tsx';
 
 /** What a row action needs that the row itself does not carry. */
@@ -59,14 +60,14 @@ function nodeColumn<T extends { nodeName: string }>(): Column<T> {
 }
 
 /** How an address delivers, as an operator reads it. */
-const DELIVERY: Record<AddressView['delivery'][number], string> = {
+const DELIVERY: Record<DestinationView['delivery'][number], string> = {
   POINT_TO_POINT: 'Point to point',
   PUBLISH_SUBSCRIBE: 'Publish-subscribe',
 };
 
 /** Each resource's columns. The first column identifies a row; the node column is never hidden. */
 export const resourceColumns = {
-  addresses: ({ clusterId }: ColumnDeps): Column<AddressView>[] => [
+  addresses: ({ clusterId }: ColumnDeps): Column<DestinationView>[] => [
     {
       id: 'name',
       header: 'Address',
@@ -95,10 +96,10 @@ export const resourceColumns = {
       kind: 'status',
       priority: 'low',
     },
-    { id: 'queues', header: 'Queues', accessor: (r) => r.queueCount, kind: 'number', priority: 'high' },
+    { id: 'queues', header: 'Queues', accessor: (r) => r.subscriptionCount, kind: 'number', priority: 'high' },
     { id: 'depth', header: 'Messages', accessor: (r) => r.messageCount, kind: 'number', priority: 'high' },
-    nodeColumn<AddressView>(),
-    actionColumn<AddressView>('Close consumers', (row) => (
+    nodeColumn<DestinationView>(),
+    actionColumn<DestinationView>('Close consumers', (row) => (
       <CloseAddressConsumersAction clusterId={clusterId} address={row.name} />
     )),
   ],
@@ -106,8 +107,8 @@ export const resourceColumns = {
     {
       id: 'queue',
       header: 'Queue',
-      accessor: (r) => r.queueName ?? '',
-      cell: (r) => linked('queue', r.queueName),
+      accessor: (r) => nameOf(r.subscription),
+      cell: (r) => linked('queue', nameOf(r.subscription)),
       kind: 'identifier',
       priority: 'essential',
       sortKey: 'queue',
@@ -115,8 +116,8 @@ export const resourceColumns = {
     {
       id: 'address',
       header: 'Address',
-      accessor: (r) => r.address ?? '',
-      cell: (r) => linked('address', r.address),
+      accessor: (r) => nameOf(r.destination),
+      cell: (r) => linked('address', nameOf(r.destination)),
       kind: 'identifier',
       priority: 'high',
     },
@@ -138,17 +139,17 @@ export const resourceColumns = {
         kind="consumer"
         nodeId={row.nodeId}
         nodeName={row.nodeName}
-        targetId={row.consumerId ?? ''}
-        rowLabel={row.queueName ?? row.consumerId ?? ''}
+        targetId={row.id}
+        rowLabel={nameOf(row.subscription) || nameOf(row.id)}
         fetchedAt={fetchedAt}
       />
     )),
   ],
-  sessions: ({ clusterId, fetchedAt }: ColumnDeps): Column<SessionView>[] => [
+  sessions: ({ clusterId, fetchedAt }: ColumnDeps): Column<ChannelView>[] => [
     {
       id: 'session',
       header: 'Session',
-      accessor: (r) => r.sessionId ?? '',
+      accessor: (r) => nameOf(r.id),
       kind: 'identifier',
       priority: 'essential',
       sortKey: 'session',
@@ -157,22 +158,22 @@ export const resourceColumns = {
     {
       id: 'conn',
       header: 'Connection',
-      accessor: (r) => r.connectionId ?? '',
-      cell: (r) => linked('connection', r.connectionId),
+      accessor: (r) => nameOf(r.connection),
+      cell: (r) => linked('connection', nameOf(r.connection)),
       kind: 'identifier',
       priority: 'low',
     },
     { id: 'consumers', header: 'Consumers', accessor: (r) => r.consumerCount, kind: 'number', priority: 'high' },
     { id: 'producers', header: 'Producers', accessor: (r) => r.producerCount, kind: 'number', priority: 'high' },
-    nodeColumn<SessionView>(),
-    actionColumn<SessionView>('Close', (row) => (
+    nodeColumn<ChannelView>(),
+    actionColumn<ChannelView>('Close', (row) => (
       <CloseConnectionAction
         clusterId={clusterId}
         kind="session"
         nodeId={row.nodeId}
         nodeName={row.nodeName}
-        targetId={row.sessionId ?? ''}
-        rowLabel={row.user ?? row.sessionId ?? ''}
+        targetId={row.id}
+        rowLabel={row.user ?? nameOf(row.id)}
         fetchedAt={fetchedAt}
       />
     )),
@@ -188,7 +189,7 @@ export const resourceColumns = {
     },
     { id: 'protocol', header: 'Protocol', accessor: (r) => r.protocol ?? '', kind: 'status', priority: 'low' },
     { id: 'client', header: 'Client id', accessor: (r) => r.clientId ?? '', kind: 'identifier', priority: 'high' },
-    { id: 'sessions', header: 'Sessions', accessor: (r) => r.sessionCount, kind: 'number', priority: 'high' },
+    { id: 'sessions', header: 'Sessions', accessor: (r) => r.channelCount, kind: 'number', priority: 'high' },
     nodeColumn<ConnectionView>(),
     actionColumn<ConnectionView>('Close', (row) => (
       <CloseConnectionAction
@@ -196,8 +197,8 @@ export const resourceColumns = {
         kind="connection"
         nodeId={row.nodeId}
         nodeName={row.nodeName}
-        targetId={row.connectionId ?? ''}
-        rowLabel={row.clientId || row.remoteAddress || row.connectionId || ''}
+        targetId={row.id}
+        rowLabel={row.clientId || row.remoteAddress || nameOf(row.id)}
         fetchedAt={fetchedAt}
       />
     )),
@@ -206,8 +207,8 @@ export const resourceColumns = {
     {
       id: 'address',
       header: 'Address',
-      accessor: (r) => r.address ?? '',
-      cell: (r) => linked('address', r.address),
+      accessor: (r) => nameOf(r.destination),
+      cell: (r) => linked('address', nameOf(r.destination)),
       kind: 'identifier',
       priority: 'essential',
       sortKey: 'address',

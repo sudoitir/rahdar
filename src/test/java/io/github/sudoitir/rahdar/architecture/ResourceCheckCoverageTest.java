@@ -90,6 +90,9 @@ class ResourceCheckCoverageTest {
      */
     private static final Map<String, String> EXEMPT = Map.ofEntries(
             Map.entry(
+                    "feature.messages.MessageService.actionRequest",
+                    "writes a request body from names for the MCP tool; execute checks the queues it names"),
+            Map.entry(
                     "system.artemis.QueueLifecycleOperations",
                     "broker primitives; QueueLifecycleService checks before it calls them"),
             Map.entry(
@@ -128,7 +131,7 @@ class ResourceCheckCoverageTest {
                     "broker primitive behind DivertSettings; the divert and routing services check before they call it"),
             Map.entry(
                     "system.artemis.ArtemisQueueSettings",
-                    "broker primitive behind QueueSettings; QueueConfigurationReader checks before it calls it"),
+                    "broker primitive behind QueueSettings; SubscriptionConfigurationReader checks before it calls it"),
             Map.entry(
                     "system.artemis.ArtemisTaps",
                     "broker primitive behind MessageTaps; the capture and plugin messaging services check before they"

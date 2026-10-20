@@ -89,12 +89,12 @@ const stateless = (area: string, id: string, path: string, extra: Partial<RouteS
   ...extra,
 });
 
-/** A cluster's resource listing: one paged call, filtered by `q`. */
-const listing = (area: string, id: string, resource: string): RouteSpec => ({
+/** A cluster's resource listing: one paged call, filtered by `q`. `api` is the endpoint when it is not the screen's own word. */
+const listing = (area: string, id: string, resource: string, api: string = resource): RouteSpec => ({
   area,
   id,
   path: cluster(resource),
-  data: [paged(cluster(resource))],
+  data: [paged(cluster(api))],
   filter: `?q=${NO_MATCH}`,
 });
 
@@ -177,14 +177,14 @@ export const ROUTES: RouteSpec[] = [
     path: cluster('topology'),
     data: [{ path: cluster('topology'), empty: { clusterId: ':cluster', nodes: [] } }, { path: cluster('health') }],
   },
-  listing('queues', 'queues', 'queues'),
+  listing('queues', 'queues', 'queues', 'subscriptions'),
   {
     area: 'messages',
     id: 'messages-dlq-queue',
     path: cluster('queues/DLQ/messages'),
     data: [
       {
-        path: cluster('queues/*/messages'),
+        path: cluster('resources/artemis.queue/*/messages'),
         empty: { ...page, node: 'primary', transport: 'jolokia' },
       },
     ],
@@ -193,13 +193,13 @@ export const ROUTES: RouteSpec[] = [
     area: 'messages',
     id: 'messages-long-name',
     path: cluster(`queues/${LONG_ADDRESS}/messages`),
-    data: [{ path: cluster('queues/*/messages'), empty: { ...page, node: 'primary', transport: 'jolokia' } }],
+    data: [{ path: cluster('resources/artemis.queue/*/messages'), empty: { ...page, node: 'primary', transport: 'jolokia' } }],
   },
   {
     area: 'messages',
     id: 'dlq',
     path: cluster('dlq'),
-    data: [{ path: cluster('dlq'), empty: { addresses: [], settingsAvailable: true } }],
+    data: [{ path: cluster('dead-letters'), empty: { destinations: [], settingsAvailable: true } }],
   },
   {
     area: 'metrics',
@@ -265,22 +265,22 @@ export const ROUTES: RouteSpec[] = [
     expectedStatus: [404],
   },
   { area: 'sql', id: 'sql', path: cluster('sql'), data: [paged(cluster('sql/index'))] },
-  listing('resources', 'addresses', 'addresses'),
+  listing('resources', 'addresses', 'addresses', 'destinations'),
   listing('resources', 'consumers', 'consumers'),
-  listing('resources', 'sessions', 'sessions'),
+  listing('resources', 'sessions', 'sessions', 'channels'),
   listing('resources', 'connections', 'connections'),
   listing('resources', 'producers', 'producers'),
   {
     area: 'routing',
     id: 'routing',
     path: cluster('routing'),
-    data: [paged(cluster('diverts')), paged(cluster('bridges')), { path: cluster('config') }],
+    data: [paged(cluster('routes')), { path: cluster('artemis/config') }],
   },
   {
     area: 'setupreview',
     id: 'setup-review',
     path: cluster('setup-review'),
-    data: [{ path: cluster('setup-review') }],
+    data: [{ path: cluster('artemis/setup-review') }],
   },
   ...(
     [
@@ -297,13 +297,13 @@ export const ROUTES: RouteSpec[] = [
     area: 'brokerconfig',
     id: `configuration-${tab}`,
     path: cluster(`configuration?tab=${tab}`),
-    data: [{ path: cluster('config') }, paged(cluster('config/revisions'))],
+    data: [{ path: cluster('artemis/config') }, paged(cluster('artemis/config/revisions'))],
   })),
   {
     area: 'brokerconfig',
     id: 'config-diff',
     path: cluster('config-diff'),
-    data: [{ path: cluster('config-diff') }],
+    data: [{ path: cluster('artemis/config-diff') }],
   },
   ...SETTINGS_TABS.map((tab): RouteSpec => ({
     area: 'settings',

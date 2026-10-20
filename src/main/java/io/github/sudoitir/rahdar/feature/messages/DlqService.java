@@ -1,16 +1,21 @@
 package io.github.sudoitir.rahdar.feature.messages;
 
-import io.github.sudoitir.rahdar.feature.messages.web.MessageViews.DlqAddress;
-import io.github.sudoitir.rahdar.feature.messages.web.MessageViews.DlqQueue;
-import io.github.sudoitir.rahdar.feature.messages.web.MessageViews.DlqQueueDepth;
-import io.github.sudoitir.rahdar.feature.messages.web.MessageViews.DlqView;
+import io.github.sudoitir.openbroker.ClusterConnection;
+import io.github.sudoitir.openbroker.model.ResourceClass;
+import io.github.sudoitir.openbroker.model.ResourceId;
+import io.github.sudoitir.rahdar.feature.messages.web.MessageViews.DeadLetterDepth;
+import io.github.sudoitir.rahdar.feature.messages.web.MessageViews.DeadLetterDestination;
+import io.github.sudoitir.rahdar.feature.messages.web.MessageViews.DeadLetterSubscription;
+import io.github.sudoitir.rahdar.feature.messages.web.MessageViews.DeadLetterView;
 import io.github.sudoitir.rahdar.kernel.plugin.ResourceType;
 import io.github.sudoitir.rahdar.kernel.security.ClusterAccessGuard;
 import io.github.sudoitir.rahdar.kernel.security.PermissionResolver;
 import io.github.sudoitir.rahdar.kernel.security.ResourceFilter;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
+import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
 import io.github.sudoitir.rahdar.platform.broker.DeadLetterDestinations;
+import io.github.sudoitir.rahdar.platform.broker.ResourceIds;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
 import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshot;
@@ -42,8 +47,9 @@ public class DlqService {
     private final ClusterAccessGuard clusterAccess;
     private final PermissionResolver permissions;
     private final DeadLetterDestinations deadLetters;
+    private final BrokerGateway gateway;
 
-    public DlqView view(UUID clusterId) {
+    public DeadLetterView view(UUID clusterId) {
         clusterAccess.requireVisible(clusterId);
         ResourceFilter readableQueues = permissions.filter(clusterId, ResourceType.SUBSCRIPTION);
         ResourceFilter readableAddresses = permissions.filter(clusterId, ResourceType.DESTINATION);
@@ -56,43 +62,64 @@ public class DlqService {
 
         Optional<Map<String, String>> kinds = deadLetters.defaults(clusterId, manageable.getId());
         if (kinds.isEmpty()) {
-            return new DlqView(List.of(), false);
+            return new DeadLetterView(List.of(), false);
         }
 
         Map<UUID, String> nodeNames = new LinkedHashMap<>();
         brokerNodes.nodes(clusterId).forEach(n -> nodeNames.put(n.getId(), n.getName()));
         List<QueueSnapshot> all = queueSnapshots.forCluster(clusterId);
+        ClusterConnection connection = gateway.cluster(clusterId);
 
-        List<DlqAddress> addresses = new ArrayList<>();
+        List<DeadLetterDestination> destinations = new ArrayList<>();
         for (Map.Entry<String, String> entry : kinds.get().entrySet()) {
             String address = entry.getKey();
-            List<DlqQueue> queues = readableQueuesOn(address, all, nodeNames, readableQueues);
+            List<DeadLetterSubscription> queues = readableQueuesOn(connection, address, all, nodeNames, readableQueues);
             if (!queues.isEmpty() || readableAddresses.readable(address)) {
-                addresses.add(new DlqAddress(address, entry.getValue(), queues));
+                ResourceId id = ResourceIds.of(connection, ResourceClass.DESTINATION, address);
+                destinations.add(new DeadLetterDestination(
+                        id.format(),
+                        id.kind().value(),
+                        ResourceIds.label(id.kind()),
+                        address,
+                        entry.getValue(),
+                        queues));
             }
         }
-        return new DlqView(addresses, true);
+        return new DeadLetterView(destinations, true);
     }
 
-    private static List<DlqQueue> readableQueuesOn(
-            String address, List<QueueSnapshot> all, Map<UUID, String> nodeNames, ResourceFilter readableQueues) {
+    private static List<DeadLetterSubscription> readableQueuesOn(
+            ClusterConnection connection,
+            String address,
+            List<QueueSnapshot> all,
+            Map<UUID, String> nodeNames,
+            ResourceFilter readableQueues) {
         Map<String, List<QueueSnapshot>> byQueue = new LinkedHashMap<>();
         for (QueueSnapshot s : all) {
             if (address.equals(s.address())) {
                 byQueue.computeIfAbsent(s.queueName(), k -> new ArrayList<>()).add(s);
             }
         }
-        List<DlqQueue> queues = new ArrayList<>();
+        List<DeadLetterSubscription> queues = new ArrayList<>();
         byQueue.forEach((queueName, rows) -> {
             if (!readableQueues.readable(queueName)) {
                 return;
             }
-            List<DlqQueueDepth> perNode = rows.stream()
-                    .map(r -> new DlqQueueDepth(
+            List<DeadLetterDepth> perNode = rows.stream()
+                    .map(r -> new DeadLetterDepth(
                             r.nodeId(), nodeNames.getOrDefault(r.nodeId(), "unknown"), r.messageCount()))
                     .toList();
-            long totalDepth = perNode.stream().mapToLong(DlqQueueDepth::depth).sum();
-            queues.add(new DlqQueue(queueName, address, totalDepth, perNode));
+            long totalDepth = perNode.stream().mapToLong(DeadLetterDepth::depth).sum();
+            ResourceId id = ResourceIds.of(connection, ResourceClass.SUBSCRIPTION, queueName);
+            queues.add(new DeadLetterSubscription(
+                    id.format(),
+                    id.kind().value(),
+                    ResourceIds.label(id.kind()),
+                    queueName,
+                    ResourceIds.of(connection, ResourceClass.DESTINATION, address)
+                            .format(),
+                    totalDepth,
+                    perNode));
         });
         return queues;
     }

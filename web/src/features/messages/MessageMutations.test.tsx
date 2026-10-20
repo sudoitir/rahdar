@@ -84,7 +84,7 @@ describe('BulkActionPreview', () => {
 
   it('gates "Run anyway" behind the typed queue name when over cap', async () => {
     server.use(
-      http.post('*/api/v1/clusters/c1/queues/ORDERS/messages/actions/delete', () =>
+      http.post('*/api/v1/clusters/c1/resources/artemis.queue/ORDERS/messages:delete', () =>
         HttpResponse.json({ affectedCount: 50, cap: 10, overCap: true, node: 'n1' }),
       ),
     );
@@ -103,7 +103,7 @@ describe('BulkActionPreview', () => {
   it('says what is missing beside the field, and takes no preview, when Preview is pressed on an empty form', async () => {
     const requests: string[] = [];
     server.use(
-      http.post('*/api/v1/clusters/c1/queues/ORDERS/messages/actions/move', ({ request }) => {
+      http.post('*/api/v1/clusters/c1/resources/artemis.queue/ORDERS/messages:move', ({ request }) => {
         requests.push(request.url);
         return HttpResponse.json({ affectedCount: 1, cap: 10, overCap: false, node: 'n1' });
       }),
@@ -128,7 +128,7 @@ describe('BulkActionPreview', () => {
   it('arms a delete under the cap only once the queue name is typed, and announces what it deleted', async () => {
     const bodies: string[] = [];
     server.use(
-      http.post('*/api/v1/clusters/c1/queues/ORDERS/messages/actions/delete', ({ request }) => {
+      http.post('*/api/v1/clusters/c1/resources/artemis.queue/ORDERS/messages:delete', ({ request }) => {
         const dry = new URL(request.url).searchParams.get('dryRun') === 'true';
         bodies.push(dry ? 'preview' : 'run');
         return HttpResponse.json(
@@ -161,7 +161,7 @@ describe('BulkActionPreview', () => {
 
   it('replays without typing a name, because a retry destroys nothing', async () => {
     server.use(
-      http.post('*/api/v1/clusters/c1/queues/ORDERS/messages/actions/retry', () =>
+      http.post('*/api/v1/clusters/c1/resources/artemis.queue/ORDERS/messages:retry', () =>
         HttpResponse.json({ affectedCount: 5, cap: 10, overCap: false, node: 'n1' }),
       ),
     );
@@ -183,7 +183,7 @@ describe('MessageActions', () => {
   it('reports a by-id operation that stopped part-way, naming the ids left undone', async () => {
     signedInWith(['*']);
     server.use(
-      http.post('*/api/v1/clusters/c1/queues/ORDERS/messages/actions/delete', () =>
+      http.post('*/api/v1/clusters/c1/resources/artemis.queue/ORDERS/messages:delete', () =>
         HttpResponse.json({
           affectedCount: 1,
           notDone: [2],
@@ -209,7 +209,7 @@ describe('MessageActions', () => {
   it('keeps the dialog open and states the cause and the next step when the operation fails', async () => {
     signedInWith(['*']);
     server.use(
-      http.post('*/api/v1/clusters/c1/queues/ORDERS/messages/actions/expire', () =>
+      http.post('*/api/v1/clusters/c1/resources/artemis.queue/ORDERS/messages:expire', () =>
         HttpResponse.json({ title: 'Broker refused', detail: 'The node is read-only.' }, { status: 409 }),
       ),
     );
@@ -230,7 +230,7 @@ describe('MessageActions', () => {
     signedInWith(['*']);
     const requests: string[] = [];
     server.use(
-      http.post('*/api/v1/clusters/c1/queues/ORDERS/messages/actions/move', ({ request }) => {
+      http.post('*/api/v1/clusters/c1/resources/artemis.queue/ORDERS/messages:move', ({ request }) => {
         requests.push(request.url);
         return HttpResponse.json({ affectedCount: 2, node: 'n1' });
       }),
@@ -283,7 +283,7 @@ describe('PurgeQueue', () => {
   it('states the estimate, arms on the typed name, and announces what it purged', async () => {
     signedInWith(['*']);
     server.use(
-      http.delete('*/api/v1/clusters/c1/queues/ORDERS/messages', ({ request }) =>
+      http.post('*/api/v1/clusters/c1/resources/artemis.queue/ORDERS:purge', ({ request }) =>
         new URL(request.url).searchParams.get('dryRun') === 'true'
           ? dry(4)
           : HttpResponse.json({ affectedCount: 4, node: 'n1' }),
@@ -305,7 +305,7 @@ describe('PurgeQueue', () => {
   it('keeps the dialog open and states the cause when the purge itself fails', async () => {
     signedInWith(['*']);
     server.use(
-      http.delete('*/api/v1/clusters/c1/queues/ORDERS/messages', ({ request }) =>
+      http.post('*/api/v1/clusters/c1/resources/artemis.queue/ORDERS:purge', ({ request }) =>
         new URL(request.url).searchParams.get('dryRun') === 'true'
           ? dry(4)
           : HttpResponse.json({ title: 'Broker refused', detail: 'The queue is being deleted.' }, { status: 409 }),
@@ -332,7 +332,7 @@ describe('SendMessage', () => {
   it('names a property that has no key, on the field, and sends nothing', async () => {
     const posts: unknown[] = [];
     server.use(
-      http.post('*/api/v1/clusters/c1/queues/ORDERS/messages', async ({ request }) => {
+      http.post('*/api/v1/clusters/c1/resources/artemis.queue/ORDERS/messages', async ({ request }) => {
         posts.push(await request.json());
         return HttpResponse.json({ affectedCount: 1, node: 'n1' });
       }),
@@ -368,7 +368,7 @@ describe('SendMessage', () => {
   it('sends the message with its trimmed property names and announces it', async () => {
     const posts: unknown[] = [];
     server.use(
-      http.post('*/api/v1/clusters/c1/queues/ORDERS/messages', async ({ request }) => {
+      http.post('*/api/v1/clusters/c1/resources/artemis.queue/ORDERS/messages', async ({ request }) => {
         posts.push(await request.json());
         return HttpResponse.json({ affectedCount: 1, node: 'n1' });
       }),
@@ -389,7 +389,7 @@ describe('SendMessage', () => {
   it('sends the bytes kind with a base64 body', async () => {
     const posts: unknown[] = [];
     server.use(
-      http.post('*/api/v1/clusters/c1/queues/ORDERS/messages', async ({ request }) => {
+      http.post('*/api/v1/clusters/c1/resources/artemis.queue/ORDERS/messages', async ({ request }) => {
         posts.push(await request.json());
         return HttpResponse.json({ affectedCount: 1, node: 'n1' });
       }),
@@ -408,7 +408,7 @@ describe('SendMessage', () => {
   it('refuses a bytes body that is not base64, on the field, and sends nothing', async () => {
     const posts: unknown[] = [];
     server.use(
-      http.post('*/api/v1/clusters/c1/queues/ORDERS/messages', async ({ request }) => {
+      http.post('*/api/v1/clusters/c1/resources/artemis.queue/ORDERS/messages', async ({ request }) => {
         posts.push(await request.json());
         return HttpResponse.json({ affectedCount: 1, node: 'n1' });
       }),
@@ -427,7 +427,7 @@ describe('SendMessage', () => {
 
   it('states the cause and the next step when the broker refuses the message, and keeps what was typed', async () => {
     server.use(
-      http.post('*/api/v1/clusters/c1/queues/ORDERS/messages', () =>
+      http.post('*/api/v1/clusters/c1/resources/artemis.queue/ORDERS/messages', () =>
         HttpResponse.json({ title: 'Broker refused', detail: 'The address is full.' }, { status: 409 }),
       ),
     );

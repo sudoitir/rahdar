@@ -107,11 +107,6 @@ public class BrokerMessages {
         });
     }
 
-    /** Sends one message to a destination through a node; returns its id, when the system gives one. */
-    public Optional<String> send(UUID clusterId, UUID nodeId, String address, OutboundMessage message) {
-        return sendTo(clusterId, nodeId, ResourceRef.destination(address), message);
-    }
-
     /**
      * Sends one message through a node to a destination, which routes it, or straight to a subscription;
      * returns its id, when the system gives one.

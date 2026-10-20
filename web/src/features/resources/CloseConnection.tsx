@@ -146,7 +146,7 @@ export function CloseDialog({
   opened: boolean;
   onClose: () => void;
 }>) {
-  const close = useCloseNodeTarget(clusterId, kind, nodeId, targetId);
+  const close = useCloseNodeTarget(clusterId, nodeId, targetId);
   const now = useServerNow();
 
   const { preview, result, setResult, previewFailed, dismiss } = useClosePreview(close, opened, onClose);

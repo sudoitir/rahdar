@@ -1,3 +1,4 @@
+import { nameOf } from '../../kernel/api/resourceId.ts';
 import { useEffect, useMemo, useState, useRef } from 'react';
 import { plural } from './plural.ts';
 import { TextInput } from '@mantine/core';
@@ -10,11 +11,11 @@ import {
   useConsumers,
   useProducers,
   useSessions,
-  type AddressView,
+  type DestinationView,
   type ConnectionView,
   type ConsumerView,
   type ProducerView,
-  type SessionView,
+  type ChannelView,
 } from './api.ts';
 import { type PagedView, type ResourceParams } from '../../kernel/api/paging.ts';
 import { DataTable, type Column } from '../../ui/table/index.ts';
@@ -59,9 +60,9 @@ interface RowMenuConfig<T> {
 }
 
 const CONFIG: {
-  addresses: KindConfig<AddressView>;
+  addresses: KindConfig<DestinationView>;
   consumers: KindConfig<ConsumerView>;
-  sessions: KindConfig<SessionView>;
+  sessions: KindConfig<ChannelView>;
   connections: KindConfig<ConnectionView>;
   producers: KindConfig<ProducerView>;
 } = {
@@ -83,7 +84,7 @@ const CONFIG: {
   consumers: {
     hook: useConsumers,
     columns: resourceColumns.consumers,
-    rowKey: (r) => `${r.nodeId}:${r.consumerId}`,
+    rowKey: (r) => `${r.nodeId}:${r.id}`,
     filter: 'Queue name or session id',
     noun: 'consumer',
     summary: 'Every consumer attached to a queue, read live from each node.',
@@ -94,18 +95,19 @@ const CONFIG: {
       target: (r) => ({
         nodeId: r.nodeId,
         nodeName: r.nodeName,
-        consumerId: r.consumerId ?? '',
-        queueName: r.queueName,
-        sessionId: r.sessionId,
+        id: r.id,
+        consumerId: nameOf(r.id),
+        queueName: nameOf(r.subscription),
+        sessionId: nameOf(r.channel),
         snapshot: r,
       }),
-      label: (r) => `${r.queueName ?? 'consumer'} (${r.consumerId ?? 'no id'})`,
+      label: (r) => `${nameOf(r.subscription) || 'consumer'} (${nameOf(r.id) || 'no id'})`,
     },
   },
   sessions: {
     hook: useSessions,
     columns: resourceColumns.sessions,
-    rowKey: (r) => `${r.nodeId}:${r.sessionId}`,
+    rowKey: (r) => `${r.nodeId}:${r.id}`,
     filter: 'Session id, connection id or user',
     noun: 'session',
     summary: 'Every client session, read live from each node.',
@@ -116,17 +118,18 @@ const CONFIG: {
       target: (r) => ({
         nodeId: r.nodeId,
         nodeName: r.nodeName,
-        sessionId: r.sessionId ?? '',
-        connectionId: r.connectionId,
+        id: r.id,
+        sessionId: nameOf(r.id),
+        connectionId: nameOf(r.connection),
         snapshot: r,
       }),
-      label: (r) => r.sessionId ?? 'session',
+      label: (r) => nameOf(r.id) || 'session',
     },
   },
   connections: {
     hook: useConnections,
     columns: resourceColumns.connections,
-    rowKey: (r) => `${r.nodeId}:${r.connectionId}`,
+    rowKey: (r) => `${r.nodeId}:${r.id}`,
     filter: 'Remote address, client id or connection id',
     noun: 'connection',
     summary: 'Every client connection, read live from each node.',
@@ -134,14 +137,20 @@ const CONFIG: {
       "A connection is a client's network link to a broker node. There are none while no client is connected; one appears when a client connects to a node's acceptor.",
     menu: {
       kind: 'connection',
-      target: (r) => ({ nodeId: r.nodeId, nodeName: r.nodeName, connectionId: r.connectionId ?? '', snapshot: r }),
-      label: (r) => r.clientId || r.remoteAddress || r.connectionId || 'connection',
+      target: (r) => ({
+        nodeId: r.nodeId,
+        nodeName: r.nodeName,
+        id: r.id,
+        connectionId: nameOf(r.id),
+        snapshot: r,
+      }),
+      label: (r) => r.clientId || r.remoteAddress || nameOf(r.id) || 'connection',
     },
   },
   producers: {
     hook: useProducers,
     columns: resourceColumns.producers,
-    rowKey: (r) => `${r.nodeId}:${r.producerId}`,
+    rowKey: (r) => `${r.nodeId}:${r.id}`,
     filter: 'Address, producer name or session id',
     noun: 'producer',
     summary: 'Every producer sending to an address, read live from each node.',
@@ -152,12 +161,12 @@ const CONFIG: {
       target: (r) => ({
         nodeId: r.nodeId,
         nodeName: r.nodeName,
-        producerId: r.producerId ?? '',
-        address: r.address,
-        sessionId: r.sessionId,
+        producerId: nameOf(r.id),
+        address: nameOf(r.destination),
+        sessionId: nameOf(r.channel),
         snapshot: r,
       }),
-      label: (r) => r.clientId || r.address || r.producerId || 'producer',
+      label: (r) => r.clientId || nameOf(r.destination) || nameOf(r.id) || 'producer',
     },
   },
 };

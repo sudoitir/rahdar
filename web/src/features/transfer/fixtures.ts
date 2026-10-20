@@ -79,7 +79,7 @@ export function clusterHandlers(
         ]),
       ),
     ),
-    http.get('*/api/v1/clusters/:id/queues', () => HttpResponse.json({ items: [], total: 0 })),
+    http.get('*/api/v1/clusters/:id/subscriptions', () => HttpResponse.json({ items: [], total: 0 })),
   ];
 }
 

@@ -68,14 +68,14 @@ class QueueLifecycleAuthorizationTest extends PostgresIntegrationTest {
     }
 
     private static final String CREATE_BODY = """
-            {"address":"a","name":"q","routingType":"ANYCAST"}""";
+            {"kind":"artemis.queue","name":"q","destination":"artemis.address/a","attributes":{"routingType":"ANYCAST"}}""";
 
     // ---- each route demands its own permission ---------------------------
 
     @Test
     void createNeedsTheCreatePermission() throws Exception {
         // Reading the cluster is not enough: the refusal is a 403 that names the permission.
-        mvc.perform(MockMvcRequestBuilders.post("/api/v1/clusters/" + clusterId + "/queues")
+        mvc.perform(MockMvcRequestBuilders.post("/api/v1/clusters/" + clusterId + "/subscriptions")
                         .with(csrf())
                         .with(authentication(callerWith(Permissions.CLUSTER_READ)))
                         .contentType(MediaType.APPLICATION_JSON)
@@ -90,7 +90,8 @@ class QueueLifecycleAuthorizationTest extends PostgresIntegrationTest {
     @Test
     void purgeDoesNotImplyDestroy() throws Exception {
         // Emptying a queue and removing it are different authorities.
-        mvc.perform(MockMvcRequestBuilders.delete("/api/v1/clusters/" + clusterId + "/queues/q?dryRun=true")
+        mvc.perform(MockMvcRequestBuilders.delete(
+                                "/api/v1/clusters/" + clusterId + "/resources/artemis.queue/q?dryRun=true")
                         .with(csrf())
                         .with(authentication(callerWith(
                                 Permissions.CLUSTER_READ,
@@ -105,7 +106,8 @@ class QueueLifecycleAuthorizationTest extends PostgresIntegrationTest {
 
     @Test
     void updateDoesNotImplyPause() throws Exception {
-        mvc.perform(MockMvcRequestBuilders.post("/api/v1/clusters/" + clusterId + "/queues/q/pause?dryRun=true")
+        mvc.perform(MockMvcRequestBuilders.post(
+                                "/api/v1/clusters/" + clusterId + "/resources/artemis.queue/q:pause?dryRun=true")
                         .with(csrf())
                         .with(authentication(callerWith(
                                 Permissions.CLUSTER_READ,
@@ -120,7 +122,8 @@ class QueueLifecycleAuthorizationTest extends PostgresIntegrationTest {
 
     @Test
     void createDoesNotImplyDelete() throws Exception {
-        mvc.perform(MockMvcRequestBuilders.delete("/api/v1/clusters/" + clusterId + "/addresses/a?dryRun=true")
+        mvc.perform(MockMvcRequestBuilders.delete(
+                                "/api/v1/clusters/" + clusterId + "/resources/artemis.address/a?dryRun=true")
                         .with(csrf())
                         .with(authentication(callerWith(
                                 Permissions.CLUSTER_READ,
@@ -136,7 +139,8 @@ class QueueLifecycleAuthorizationTest extends PostgresIntegrationTest {
 
     @Test
     void aQueueTheCallerMayNotReadIsNotFoundWhateverElseTheyHold() throws Exception {
-        mvc.perform(MockMvcRequestBuilders.delete("/api/v1/clusters/" + clusterId + "/queues/q?dryRun=true")
+        mvc.perform(MockMvcRequestBuilders.delete(
+                                "/api/v1/clusters/" + clusterId + "/resources/artemis.queue/q?dryRun=true")
                         .with(csrf())
                         .with(authentication(
                                 callerWith(Permissions.CLUSTER_READ, ResourcePermissions.SUBSCRIPTION_DELETE))))
@@ -160,7 +164,7 @@ class QueueLifecycleAuthorizationTest extends PostgresIntegrationTest {
                 false);
         var caller = UsernamePasswordAuthenticationToken.authenticated(principal, null, principal.getAuthorities());
 
-        int real = mvc.perform(MockMvcRequestBuilders.post("/api/v1/clusters/" + clusterId + "/queues")
+        int real = mvc.perform(MockMvcRequestBuilders.post("/api/v1/clusters/" + clusterId + "/subscriptions")
                         .with(csrf())
                         .with(authentication(caller))
                         .contentType(MediaType.APPLICATION_JSON)
@@ -169,7 +173,7 @@ class QueueLifecycleAuthorizationTest extends PostgresIntegrationTest {
                 .getResponse()
                 .getStatus();
 
-        int fake = mvc.perform(MockMvcRequestBuilders.post("/api/v1/clusters/" + invented + "/queues")
+        int fake = mvc.perform(MockMvcRequestBuilders.post("/api/v1/clusters/" + invented + "/subscriptions")
                         .with(csrf())
                         .with(authentication(caller))
                         .contentType(MediaType.APPLICATION_JSON)
@@ -186,16 +190,17 @@ class QueueLifecycleAuthorizationTest extends PostgresIntegrationTest {
     void theRightPermissionGetsPastTheGuard() throws Exception {
         // The control: with the grants, the request is no longer a 404 or a 403 — proving the
         // refusals above come from the guard and not from the route being absent.
-        int status = mvc.perform(MockMvcRequestBuilders.post("/api/v1/clusters/" + clusterId + "/queues?dryRun=true")
-                        .with(csrf())
-                        .with(authentication(callerWith(
-                                Permissions.CLUSTER_READ,
-                                Permissions.SUBSCRIPTION_READ,
-                                Permissions.DESTINATION_READ,
-                                ResourcePermissions.SUBSCRIPTION_CREATE,
-                                ResourcePermissions.DESTINATION_CREATE)))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(CREATE_BODY))
+        int status = mvc.perform(
+                        MockMvcRequestBuilders.post("/api/v1/clusters/" + clusterId + "/subscriptions?dryRun=true")
+                                .with(csrf())
+                                .with(authentication(callerWith(
+                                        Permissions.CLUSTER_READ,
+                                        Permissions.SUBSCRIPTION_READ,
+                                        Permissions.DESTINATION_READ,
+                                        ResourcePermissions.SUBSCRIPTION_CREATE,
+                                        ResourcePermissions.DESTINATION_CREATE)))
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(CREATE_BODY))
                 .andReturn()
                 .getResponse()
                 .getStatus();
