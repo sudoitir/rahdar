@@ -57,7 +57,7 @@ function movement(flat: boolean, delta: number) {
 
 /**
  * Movement across the window. The direction is a word and an arrow, never the
- * colour alone — and it carries no colour at all, because a rising queue depth is
+ * colour alone — and it carries no colour at all, because a rising subscription depth is
  * not by itself something wrong. `undefined` is "still loading": the line is held, empty.
  */
 function Delta({ delta, format }: Readonly<{ delta: number | null | undefined; format: (value: number) => string }>) {

@@ -52,7 +52,7 @@ export function stateWords(state: TransferState): { text: string; tone: Tone } {
 
 export const ACTIVE = new Set<TransferState>(['RUNNING', 'WAITING_FOR_CAPACITY', 'RETURNING']);
 
-/** Whether this run parks messages in a staging queue: a move between two nodes. */
+/** Whether this run parks messages in a staging subscription: a move between two nodes. */
 export const stages = (run: TransferRunView) => run.mode === 'MOVE' && !run.sameNode;
 
 const TONE_COLOR = { danger: 'var(--as-danger)', warning: 'var(--as-warning)' } as const;

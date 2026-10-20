@@ -13,7 +13,7 @@ vi.mock('@tanstack/react-router', async (importOriginal) => ({
   useParams: () => ({ clusterId: 'c1' }),
   useSearch: () => currentSearch,
   useNavigate: () => navigateSpy,
-  // Queue names are links (ADR-0107); this view is rendered without a router here.
+  // Subscription names are links (ADR-0107); this view is rendered without a router here.
   Link: ({ children, ...rest }: { children: React.ReactNode }) => <a {...(rest as object)}>{children}</a>,
 }));
 
@@ -96,11 +96,11 @@ describe('ConsumerHealthView', () => {
 
     expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
     expect(screen.getByRole('heading', { level: 1, name: 'Consumer health' })).toBeInTheDocument();
-    expect(screen.getByText('Reading queue health…')).toBeInTheDocument();
+    expect(screen.getByText('Reading subscription health…')).toBeInTheDocument();
     expect(await screen.findByText('Nothing on this page needs attention')).toBeInTheDocument();
   });
 
-  it('distinguishes an unmeasured queue from a healthy one', async () => {
+  it('distinguishes an unmeasured subscription from a healthy one', async () => {
     currentSearch = {};
     withCluster();
     server.use(
@@ -108,7 +108,7 @@ describe('ConsumerHealthView', () => {
         HttpResponse.json(
           page([
             row({
-              subscription: 'artemis.queue/new-queue',
+              subscription: 'artemis.queue/new-subscription',
               verdict: 'INSUFFICIENT_DATA',
               severity: 0,
               ackRate: null,
@@ -176,7 +176,7 @@ describe('ConsumerHealthView', () => {
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent('Rahdar failed to complete the request');
     expect(within(alert).getByRole('button', { name: 'Retry' })).toBeInTheDocument();
-    expect(screen.queryByText('No queues to report on yet')).not.toBeInTheDocument();
+    expect(screen.queryByText('No subscriptions to report on yet')).not.toBeInTheDocument();
   });
 
   it('offers to clear a filter that matched nothing', async () => {
@@ -186,6 +186,6 @@ describe('ConsumerHealthView', () => {
 
     renderWithProviders(<ConsumerHealthView />);
 
-    expect(await screen.findByText(/No queue matches "nope"/)).toBeInTheDocument();
+    expect(await screen.findByText(/No subscription matches "nope"/)).toBeInTheDocument();
   });
 });

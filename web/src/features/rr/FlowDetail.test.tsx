@@ -45,7 +45,7 @@ describe('FlowDetail', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
-  it('names the request address in the title and states the flow, its reply queue and its facts', async () => {
+  it('names the request destination in the title and states the flow, its reply subscription and its facts', async () => {
     serve(
       flow({
         state: 'COMPLETED',
@@ -60,7 +60,7 @@ describe('FlowDetail', () => {
 
     const dialog = await screen.findByRole('dialog', { name: 'Flow on orders.request' });
     expect(within(dialog).getByText('completed')).toBeInTheDocument();
-    expect(within(dialog).getByText('temp reply queue')).toBeInTheDocument();
+    expect(within(dialog).getByText('temp reply subscription')).toBeInTheDocument();
     for (const label of ['Requested at', 'Replied at', 'Deadline', 'Correlation id', 'Reply destination']) {
       expect(within(dialog).getByText(label)).toBeInTheDocument();
     }
@@ -70,13 +70,13 @@ describe('FlowDetail', () => {
     expect(within(dialog).queryByText('Clock skew')).not.toBeInTheDocument();
   });
 
-  it('omits the optional facts a still-open flow does not have, and names a shared reply queue', async () => {
+  it('omits the optional facts a still-open flow does not have, and names a shared reply subscription', async () => {
     serve(flow());
     open();
 
     const dialog = await screen.findByRole('dialog', { name: 'Flow on orders.request' });
     expect(within(dialog).getByText('awaiting reply')).toBeInTheDocument();
-    expect(within(dialog).getByText('shared reply queue')).toBeInTheDocument();
+    expect(within(dialog).getByText('shared reply subscription')).toBeInTheDocument();
     expect(within(dialog).getByText('Requested at')).toBeInTheDocument();
     for (const label of ['Replied at', 'Deadline', 'Correlation id', 'Reply destination']) {
       expect(within(dialog).queryByText(label)).not.toBeInTheDocument();
@@ -134,12 +134,12 @@ describe('FlowDetail', () => {
 
   describe('timeline', () => {
     it('lists each event with its kind, and shows a detail without a payload as JSON', async () => {
-      serve(flow({ events: [event(1, 'REQUEST_SEEN', null), event(2, 'REPLY_SEEN', { queue: 'reply.q' })] }));
+      serve(flow({ events: [event(1, 'REQUEST_SEEN', null), event(2, 'REPLY_SEEN', { subscription: 'reply.q' })] }));
       open();
 
       expect(await screen.findByText('REQUEST_SEEN')).toBeInTheDocument();
       expect(screen.getByText('REPLY_SEEN')).toBeInTheDocument();
-      expect(screen.getByText(/"queue": "reply\.q"/)).toBeInTheDocument();
+      expect(screen.getByText(/"subscription": "reply\.q"/)).toBeInTheDocument();
     });
 
     it('gives the reason a payload was omitted', async () => {

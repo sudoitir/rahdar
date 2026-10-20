@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { ARTEMIS_KINDS, ARTEMIS_SYSTEM } from '../../test/wire.ts';
 import { http, HttpResponse } from 'msw';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -35,6 +36,8 @@ function shell() {
     ),
     http.get('*/api/v1/clusters/c1', () =>
       HttpResponse.json({
+        system: ARTEMIS_SYSTEM,
+        kinds: ARTEMIS_KINDS,
         id: 'c1',
         name: 'prod',
         description: null,
@@ -83,7 +86,7 @@ function applyHandler(onReal: () => ConfigApplyOutcomeView, seen?: (body: unknow
   });
 }
 
-async function open(path = '/clusters/c1/configuration') {
+async function open(path = '/clusters/c1/artemis/configuration') {
   const view = renderAppAt(path);
   await screen.findByText(/Revision 3/);
   return view;
@@ -96,7 +99,7 @@ describe('the configuration screen', () => {
       ...baseHandlers(drifted),
       applyHandler(() => plan()),
     );
-    await open('/clusters/c1/configuration?tab=addressSettings');
+    await open('/clusters/c1/artemis/configuration?tab=addressSettings');
 
     // The sentence a save produces: a revision exists, and a broker has not been written.
     expect(await screen.findByText('Revision 3 — applied to 1 of 2 live nodes')).toBeInTheDocument();
@@ -174,7 +177,7 @@ describe('the configuration screen', () => {
       applyHandler(() => plan({ dryRun: false, outcome: 'APPLIED' }), seen),
     );
     const user = userEvent.setup();
-    await open('/clusters/c1/configuration?tab=addressSettings');
+    await open('/clusters/c1/artemis/configuration?tab=addressSettings');
 
     await user.click(await screen.findByRole('button', { name: 'Apply this address setting orders.#' }));
     const drawer = await screen.findByRole('dialog', { name: /Review & apply address setting orders.#/ });
@@ -282,7 +285,7 @@ describe('the configuration screen', () => {
       applyHandler(() => plan()),
     );
     const user = userEvent.setup();
-    await open('/clusters/c1/configuration?tab=addressSettings');
+    await open('/clusters/c1/artemis/configuration?tab=addressSettings');
 
     await user.click(await screen.findByRole('button', { name: 'Edit address setting orders.#' }));
     const editor = await screen.findByRole('dialog', { name: /Address setting orders/ });
@@ -291,5 +294,35 @@ describe('the configuration screen', () => {
     // The screen the editor returns to is the one that says no broker has it yet.
     expect(await screen.findByText('Revision 4 — applied to 0 of 2 live nodes')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Review & apply' })).toBeEnabled();
+  });
+});
+
+describe('the Artemis-only screens on a cluster of another system', () => {
+  it.each(['configuration', 'config-diff'])('answers /artemis/%s with the page-not-found page', async (screenName) => {
+    server.use(...shell(), ...baseHandlers(drifted));
+    server.use(
+      http.get('*/api/v1/clusters/c1', () =>
+        HttpResponse.json({
+          id: 'c1',
+          name: 'prod',
+          description: null,
+          topology: { clusterId: 'c1', nodes: [], unmanaged: [] },
+          health: { clusterId: 'c1', level: 'OK', splitBrain: 'NONE', replicationBehind: false, notes: [] },
+          capabilities: {
+            managementRead: capability,
+            managementWrite: capability,
+            messageIo: capability,
+            notifications: capability,
+          },
+          system: { id: 'kafka', name: 'Kafka' },
+          kinds: [],
+        }),
+      ),
+    );
+    renderAppAt(`/clusters/c1/artemis/${screenName}`);
+
+    expect(await screen.findByRole('heading', { level: 1, name: 'Page not found' })).toBeInTheDocument();
+    // The sidebar does not offer them either.
+    expect(screen.queryByRole('link', { name: 'Configuration' })).not.toBeInTheDocument();
   });
 });

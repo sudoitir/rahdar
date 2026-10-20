@@ -22,11 +22,11 @@ import classes from './QueryEditor.module.css';
 
 /**
  * The completion source. Written by hand rather than handed to `lang-sql`'s
- * `schema` option because a queue name is not a SQL identifier: `ORDER.IN` is a
+ * `schema` option because a subscription name is not a SQL identifier: `ORDER.IN` is a
  * reserved word and a dot, so it is always double-quoted, and the schema
  * completer has no way to produce that.
  */
-function completions(queues: string[]) {
+function completions(subscriptions: string[]) {
   const columnOptions = COLUMNS.map((c) => ({
     label: c.name,
     type: 'property',
@@ -44,7 +44,7 @@ function completions(queues: string[]) {
   ];
 
   return (context: CompletionContext): CompletionResult | null => {
-    // After FROM, the only useful completion is a queue name — quoted, because
+    // After FROM, the only useful completion is a subscription name — quoted, because
     // that is the only spelling the parser accepts.
     const from = context.matchBefore(/from\s+(?:broker\.|index\.)?"?[\w.*#$-]*/i);
     if (from) {
@@ -54,10 +54,10 @@ function completions(queues: string[]) {
         from: start,
         options: [
           ...(openQuote >= 0 ? [] : sourceOptions),
-          ...queues.map((q) => ({
+          ...subscriptions.map((q) => ({
             label: `"${q}"`,
             type: 'class',
-            detail: 'queue',
+            detail: 'subscription',
           })),
         ],
         validFor: /^["\w.*#$-]*$/,
@@ -110,7 +110,7 @@ export interface QueryError {
 
 /**
  * The console's query editor: CodeMirror 6 with the SQL grammar, completion over
- * the column catalogue and the cluster's live queue names, ⌘/Ctrl-Enter to run and
+ * the column catalogue and the cluster's live subscription names, ⌘/Ctrl-Enter to run and
  * ⌘/Ctrl-. to cancel. A rejected query is marked on its offending token as a lint
  * diagnostic, which F8 steps to.
  *
@@ -124,7 +124,7 @@ export function QueryEditor({
   onCancel,
   onMaximise,
   onEscape,
-  queues,
+  subscriptions,
   label = 'Query',
   describedBy,
   error = null,
@@ -138,8 +138,8 @@ export function QueryEditor({
   onMaximise: () => void;
   /** Escape with nothing left to close or collapse: the caller moves focus out of the editor. */
   onEscape: () => void;
-  /** Queue names for completion, from the cluster's current snapshot. */
-  queues: string[];
+  /** Subscription names for completion, from the cluster's current snapshot. */
+  subscriptions: string[];
   label?: string;
   /** The element that describes the query, such as its cost verdict. */
   describedBy?: string;
@@ -153,8 +153,8 @@ export function QueryEditor({
   // The extensions are built once, so the keymap and completion source close over
   // the first render's callbacks. These refs keep them current without tearing
   // the editor down and losing the cursor on every parent render.
-  const latest = useRef({ value, onChange, onRun, onCancel, onMaximise, onEscape, queues });
-  latest.current = { value, onChange, onRun, onCancel, onMaximise, onEscape, queues };
+  const latest = useRef({ value, onChange, onRun, onCancel, onMaximise, onEscape, subscriptions });
+  latest.current = { value, onChange, onRun, onCancel, onMaximise, onEscape, subscriptions };
 
   useEffect(() => {
     if (!host.current) return;
@@ -225,7 +225,7 @@ export function QueryEditor({
       sql({ upperCaseKeywords: true }),
       syntaxHighlighting(highlight),
       autocompletion({
-        override: [(c) => completions(latest.current.queues)(c)],
+        override: [(c) => completions(latest.current.subscriptions)(c)],
       }),
       placeholder('SELECT * FROM "ORDER.IN" WHERE priority > 4 LIMIT 100'),
       EditorView.lineWrapping,

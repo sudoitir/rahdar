@@ -5,15 +5,15 @@ import { CONTRACT, defineFeature } from '../../kernel/feature.ts';
 import { clusterRoute } from '../../kernel/routing/roots.ts';
 import { lazyFeatureView, lazySlot } from '../../kernel/routing/lazy.tsx';
 import { METRIC_RANGES, type MetricRange } from './ranges.ts';
-import { OpenQueueHistory } from './rowActions.tsx';
+import { OpenSubscriptionHistory } from './rowActions.tsx';
 
 export interface MetricsSearch {
   range?: MetricRange;
   from?: string;
   to?: string;
-  /** Queue name to scope the series to; absent means cluster-wide. */
+  /** Subscription name to scope the series to; absent means cluster-wide. */
   subject?: string;
-  /** `node`: a queue's series also broken down per broker node. Ignored without a queue. */
+  /** `node`: a subscription's series also broken down per broker node. Ignored without a subscription. */
   split?: 'node';
 }
 
@@ -41,7 +41,7 @@ const metricsRoute = createRoute({
   validateSearch: validateMetricsSearch,
 });
 
-/** Time series of depth, throughput and consumers, cluster-wide and per queue. */
+/** Time series of depth, throughput and consumers, cluster-wide and per subscription. */
 export const metricsFeature = defineFeature({
   contract: CONTRACT,
   id: 'metrics',
@@ -58,12 +58,12 @@ export const metricsFeature = defineFeature({
     },
   ],
   slots: {
-    'queue.actions': [{ id: 'metrics.history', order: 30, section: 'open', Component: OpenQueueHistory }],
-    'queue.detail.panels': [
+    'subscription.actions': [{ id: 'metrics.history', order: 30, section: 'open', Component: OpenSubscriptionHistory }],
+    'subscription.detail.panels': [
       {
-        id: 'metrics-queue-history',
+        id: 'metrics-subscription-history',
         order: 10,
-        Component: lazySlot(() => import('./QueueHistoryPanels.tsx'), 'QueueHistoryPanels'),
+        Component: lazySlot(() => import('./SubscriptionHistoryPanels.tsx'), 'SubscriptionHistoryPanels'),
       },
     ],
     'flow.selection.panels': [

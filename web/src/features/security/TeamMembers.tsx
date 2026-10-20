@@ -71,7 +71,7 @@ export function TeamMembers({ team }: Readonly<{ team: TeamView }>) {
       <Section
         title="Members"
         headingLevel={3}
-        description="Each member holds one team role, which applies to the queues and addresses this team owns."
+        description="Each member holds one team role, which applies to the subscriptions and destinations this team owns."
       >
         {userAdmin || !team.members.some((m) => m.principalType === 'GROUP') ? null : (
           <Text size="sm" className={classes.reason}>

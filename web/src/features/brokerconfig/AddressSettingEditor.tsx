@@ -3,7 +3,7 @@ import { Button, Chip, Collapse, Group, NumberInput, Select, Stack, Text, TextIn
 import { useForm } from '@mantine/form';
 
 import { focusFirstInvalid } from '../../ui/formErrors.ts';
-import { useDlq } from '../messages/index.ts';
+import { useDeadLetters } from '../messages/index.ts';
 import type {
   ConfigAddressSettingKeyView,
   ConfigAddressSettingView,
@@ -144,7 +144,7 @@ export function AddressSettingEditor({
   // Templates are built from this cluster's own dead-letter and expiry addresses,
   // never from invented names: a prefilled DLQ that does not exist declares a
   // policy that silently routes nowhere.
-  const dlq = useDlq(declaration.clusterId);
+  const dlq = useDeadLetters(declaration.clusterId);
   const deadLetter = dlq.data?.destinations.find((a) => a.purpose === 'dead-letter')?.name;
   const expiry = dlq.data?.destinations.find((a) => a.purpose === 'expiry')?.name;
   const templates = [

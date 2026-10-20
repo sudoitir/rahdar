@@ -12,7 +12,7 @@ keyboard button in the header, to list the shortcuts. The list is built from the
 
 | Keys | Does |
 |---|---|
-| **⌘ K** / **Ctrl K** | Open search: views, clusters, recent pages, queues as you type, and searches of connections, consumers and the rest |
+| **⌘ K** / **Ctrl K** | Open search: views, clusters, recent pages, subscriptions as you type, and searches of connections, consumers and the rest |
 | **⌘ B** / **Ctrl B** | Collapse or expand the sidebar |
 | **?** | List the shortcuts |
 | **/** | Focus the current view's filter |
@@ -22,16 +22,16 @@ The **g** letters:
 
 | Letter | View | Letter | View |
 |---|---|---|---|
-| t | Topology | a | Addresses |
+| t | Topology | a | Destinations |
 | f | Flow | c | Consumers |
 | h | Consumer health | n | Connections |
 | m | Metrics | p | Producers |
-| l | Alerts | o | Routing |
-| r | Requests | k | Configuration |
-| q | Queues | e | Events |
-| d | DLQ | b | Bulk runs |
+| l | Alerts | o | Routes |
+| r | Requests | k | Configuration (Artemis) |
+| q | Subscriptions | e | Events |
+| d | Dead letters | b | Bulk runs |
 | x | Transfers | u | Audit |
-| s | SQL Console | i | Sessions |
+| s | SQL Console | i | Channels |
 
 A view whose feature is off has no letter. Plugins cannot claim letters.
 
@@ -101,7 +101,7 @@ shortcuts stay on, and the list can still be opened from the header's keyboard b
 
 Shortcuts never fire while you type in a field, inside a dialog or an open menu, or while
 an input method is composing. On a non-Latin keyboard layout, the letters follow the
-physical keys, so **g** then **q** still reaches Queues.
+physical keys, so **g** then **q** still reaches Subscriptions.
 
 The design is recorded in
 [ADR-0108](/reference/adr/0108-the-data-grid-is-one-tab-stop-with-roving-cell-focus) and

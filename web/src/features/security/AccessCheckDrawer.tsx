@@ -41,7 +41,7 @@ export function AccessCheckDrawer({
   onClose,
 }: Readonly<{
   user: { id: string; username: string } | null;
-  /** Where to check to begin with, such as the queue the drawer was opened from; none starts at Rahdar itself. */
+  /** Where to check to begin with, such as the subscription the drawer was opened from; none starts at Rahdar itself. */
   place?: { clusterId: string; kind: 'SUBSCRIPTION' | 'DESTINATION'; name: string };
   onClose: () => void;
 }>) {
@@ -86,7 +86,7 @@ function AccessCheck({ userId, place }: Readonly<{ userId: string; place?: Where
     <Section
       title="Access check"
       headingLevel={3}
-      description="Choose a cluster, and a queue or address on it, to see who gives this user each permission there."
+      description="Choose a cluster, and a subscription or destination on it, to see who gives this user each permission there."
     >
       <form
         noValidate

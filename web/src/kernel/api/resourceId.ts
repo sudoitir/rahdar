@@ -33,6 +33,21 @@ export function nameOf(id: string | null | undefined): string {
   }
 }
 
+/** What identifies a resource wherever a screen or a plugin is handed one: its canonical id, kind and name. */
+export interface ResourceRef {
+  /** The resource's canonical id, which an API call names. */
+  id: string;
+  /** The id of its kind, such as `artemis.queue`. */
+  kind: string;
+  /** Its name, which a filter and a copy use. */
+  name: string;
+}
+
+/** The reference of a canonical id. */
+export function refOf(id: string): ResourceRef {
+  return { id, kind: kindOf(id), name: nameOf(id) };
+}
+
 /** `/resources/{kind}/{path}` of a canonical id, ready to follow with `:pause`, `/messages` and the like. */
 export function resourcePath(id: string): string {
   const slash = id.indexOf('/');

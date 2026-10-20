@@ -9,8 +9,8 @@ type Capability = 'messageIo' | 'managementWrite';
 /**
  * Whether the caller may take a message operation here, and why not when they may not. Offered while
  * grants and the cluster load, and blocked only on a known refusal (non-negotiable #5). The permission is held on
- * the queue or address the screen is about, which the server checks; here it counts if it is held anywhere on the
- * cluster, so a team member is not locked out of their own queue.
+ * the subscription or destination the screen is about, which the server checks; here it counts if it is held anywhere on the
+ * cluster, so a team member is not locked out of their own subscription.
  */
 export function useMessageGate(
   clusterId: string,

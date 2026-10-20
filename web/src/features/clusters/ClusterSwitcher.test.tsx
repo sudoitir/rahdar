@@ -33,13 +33,17 @@ function cluster(id: string, name: string, over: Partial<ClusterSummary> = {}): 
   };
 }
 
-/** A cheap view of a cluster, at the path of the real Queues view, so what is under test is the switcher and not a screen. */
+/** A cheap view of a cluster, at the path of the real Subscriptions view, so what is under test is the switcher and not a screen. */
 const QUEUES = defineFeature({
   contract: CONTRACT,
   id: 'resources',
   routes: {
     cluster: [
-      createRoute({ getParentRoute: () => clusterRoute, path: 'queues', component: () => <p>A cluster's queues</p> }),
+      createRoute({
+        getParentRoute: () => clusterRoute,
+        path: 'subscriptions',
+        component: () => <p>A cluster's subscriptions</p>,
+      }),
     ],
   },
 });
@@ -89,7 +93,7 @@ describe('ClusterSwitcher', () => {
 
   it('shows the open cluster with its environment, its health in words and its node count', async () => {
     mockApi();
-    renderAppAt('/clusters/c1/queues', [QUEUES]);
+    renderAppAt('/clusters/c1/subscriptions', [QUEUES]);
 
     // The clusters and the environments are two requests, answered in either order: the trigger shows the cluster
     // as soon as the clusters arrive, and its environment once the environments do.
@@ -101,7 +105,7 @@ describe('ClusterSwitcher', () => {
 
   it('holds the place of the cluster at its final size while the clusters load', async () => {
     mockApi(SMALL, { latency: 150 });
-    renderAppAt('/clusters/c1/queues', [QUEUES]);
+    renderAppAt('/clusters/c1/subscriptions', [QUEUES]);
 
     const placeholder = (await screen.findByText('Loading clusters')).closest('output');
     const faceClass = placeholder?.className;
@@ -115,7 +119,7 @@ describe('ClusterSwitcher', () => {
   it('lists every cluster grouped by environment, each with its environment and health, and registration last', async () => {
     mockApi();
     const user = userEvent.setup();
-    renderAppAt('/clusters/c1/queues', [QUEUES]);
+    renderAppAt('/clusters/c1/subscriptions', [QUEUES]);
     await user.click(await screen.findByRole('button', { name: /prod-emea/ }));
 
     const list = await screen.findByRole('listbox', { name: 'Clusters' });
@@ -137,13 +141,13 @@ describe('ClusterSwitcher', () => {
     mockApi();
     const error = vi.spyOn(console, 'error');
     const user = userEvent.setup();
-    const { router } = renderAppAt('/clusters/c1/queues', [QUEUES]);
+    const { router } = renderAppAt('/clusters/c1/subscriptions', [QUEUES]);
     await user.click(await screen.findByRole('button', { name: /prod-emea/ }));
 
     await user.click(await option(/stage-eu/));
 
     await screen.findByRole('button', { name: /stage-eu/ });
-    expect(router.state.location.pathname).toBe('/clusters/c3/queues');
+    expect(router.state.location.pathname).toBe('/clusters/c3/subscriptions');
     // Opening a cluster builds its queries while the shell is on screen: that must not update the shell mid-render.
     expect(error.mock.calls.map((call) => String(call[0]))).not.toContainEqual(
       expect.stringContaining('Cannot update a component'),
@@ -153,7 +157,7 @@ describe('ClusterSwitcher', () => {
   it('is operated by keyboard alone: arrows open it, the search takes focus, Enter chooses, Escape returns focus', async () => {
     mockApi();
     const user = userEvent.setup();
-    const { router } = renderAppAt('/clusters/c1/queues', [QUEUES]);
+    const { router } = renderAppAt('/clusters/c1/subscriptions', [QUEUES]);
     const trigger = await screen.findByRole('button', { name: /prod-emea/ });
 
     trigger.focus();
@@ -166,7 +170,7 @@ describe('ClusterSwitcher', () => {
     await user.keyboard('{Enter}');
 
     await screen.findByRole('button', { name: /prod-apac/ });
-    expect(router.state.location.pathname).toBe('/clusters/c2/queues');
+    expect(router.state.location.pathname).toBe('/clusters/c2/subscriptions');
 
     await user.keyboard('{ArrowDown}{Escape}');
     await waitFor(() => expect(screen.getByRole('button', { name: /prod-apac/ })).toHaveFocus());
@@ -176,7 +180,7 @@ describe('ClusterSwitcher', () => {
   it('says so when no cluster matches the search', async () => {
     mockApi();
     const user = userEvent.setup();
-    renderAppAt('/clusters/c1/queues', [QUEUES]);
+    renderAppAt('/clusters/c1/subscriptions', [QUEUES]);
     await user.click(await screen.findByRole('button', { name: /prod-emea/ }));
 
     fireEvent.change(await screen.findByRole('textbox', { name: 'Search clusters' }), {
@@ -192,7 +196,7 @@ describe('ClusterSwitcher', () => {
     );
     mockApi(many);
     const user = userEvent.setup();
-    renderAppAt('/clusters/m0/queues', [QUEUES]);
+    renderAppAt('/clusters/m0/subscriptions', [QUEUES]);
     await user.click(await screen.findByRole('button', { name: /cluster-00/ }));
 
     const list = await screen.findByRole('listbox', { name: 'Clusters' });
@@ -207,7 +211,7 @@ describe('ClusterSwitcher', () => {
   it('opens registration from the end of the list', async () => {
     mockApi();
     const user = userEvent.setup();
-    renderAppAt('/clusters/c1/queues', [QUEUES]);
+    renderAppAt('/clusters/c1/subscriptions', [QUEUES]);
     await user.click(await screen.findByRole('button', { name: /prod-emea/ }));
 
     await user.click(await option('Register cluster'));
@@ -221,7 +225,7 @@ describe('ClusterSwitcher', () => {
   it('in the collapsed rail is the cluster monogram, named by the cluster and its environment', async () => {
     window.localStorage.setItem('as:nav:collapsed', 'true');
     mockApi();
-    renderAppAt('/clusters/c1/queues', [QUEUES]);
+    renderAppAt('/clusters/c1/subscriptions', [QUEUES]);
 
     const trigger = await screen.findByRole('button', {
       name: 'PR, Switch cluster, now prod-emea, Production, Degraded',

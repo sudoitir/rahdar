@@ -5,13 +5,13 @@ import { useSlot, type SlotName } from '../slots.ts';
 import type { ActionTargets } from './types.ts';
 
 /** The kinds another view can link to, each through the owning feature's `<kind>.link` slot. */
-export type LinkKind = 'queue' | 'address' | 'connection' | 'session';
+export type LinkKind = 'subscription' | 'destination' | 'connection' | 'channel';
 
 type LinkSlot<K extends LinkKind> = `${K}.link` & SlotName;
 
 /**
  * A resource's name, as a link to the resource itself (ADR-0107): the owning feature renders the
- * link, so a view naming a queue never needs to know where queues live. When that feature is
+ * link, so a view naming a subscription never needs to know where subscriptions live. When that feature is
  * disabled the name is plain text — never a link that leads to a page explaining it is off.
  */
 export function ResourceLink<K extends LinkKind>({

@@ -6,7 +6,7 @@ import { clusterRoute } from '../../kernel/routing/roots.ts';
 import { lazyFeatureView } from '../../kernel/routing/lazy.tsx';
 import { validateResourceSearch } from '../../kernel/routing/search.ts';
 import { keys } from './api.ts';
-import { QueueHealthPanel } from './QueueHealthPanel.tsx';
+import { SubscriptionHealthPanel } from './SubscriptionHealthPanel.tsx';
 
 const consumerHealthRoute = createRoute({
   getParentRoute: () => clusterRoute,
@@ -16,8 +16,8 @@ const consumerHealthRoute = createRoute({
 });
 
 /**
- * Consumer health: every queue ranked by whether its consumers are keeping up, and
- * the same verdict in a queue's detail drawer (ADR-0089).
+ * Consumer health: every subscription ranked by whether its consumers are keeping up, and
+ * the same verdict in a subscription's detail drawer (ADR-0089).
  *
  * Its id is `triage`, the backend module that owns the verdict — the nav label is
  * what an operator calls the screen, the id is what the manifest enables.
@@ -41,7 +41,7 @@ export const triageFeature = defineFeature({
   ],
   slots: {
     // Above the metrics history panel (order 10): the verdict first, its charts after.
-    'queue.detail.panels': [{ id: 'triage-queue-health', order: 5, Component: QueueHealthPanel }],
+    'subscription.detail.panels': [{ id: 'triage-subscription-health', order: 5, Component: SubscriptionHealthPanel }],
   },
   streamTopics: {
     // A verdict is derived from the sweep, so it changes when the sweep lands.

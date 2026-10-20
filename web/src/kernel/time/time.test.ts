@@ -89,7 +89,7 @@ describe('server time', () => {
     await syncServerTime();
     const learned = serverNow() - Date.now();
 
-    // A queued response claiming a wildly different time must not move the answer.
+    // A subscriptiond response claiming a wildly different time must not move the answer.
     serverAheadBy(600_000);
     await syncServerTime();
 

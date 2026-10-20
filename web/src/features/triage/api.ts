@@ -2,7 +2,7 @@ import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 
 import { type PagedView, type ResourceParams, resourceSearch } from '../../kernel/api/paging.ts';
 import { ApiError, clusterKey, request } from '../../kernel/api/request.ts';
-import { useRoleIds } from '../clusters/index.ts';
+import type { ResourceRef } from '../../kernel/api/resourceId.ts';
 import type { components } from '../../kernel/api/schema.d.ts';
 
 type Schemas = components['schemas'];
@@ -11,12 +11,13 @@ export type ConsumerHealthView = Schemas['ConsumerHealthView'];
 
 export const keys = {
   health: (id: string, params: ResourceParams = {}) => clusterKey(id, 'consumer-health', params),
-  queue: (id: string, queueName: string) => clusterKey(id, 'consumer-health', 'queue', queueName),
-  /** The stream topic the queue sweep publishes; a verdict changes when a sweep lands. */
+  subscription: (id: string, subscriptionName: string) =>
+    clusterKey(id, 'consumer-health', 'subscription', subscriptionName),
+  /** The stream topic the subscription sweep publishes; a verdict changes when a sweep lands. */
   topic: (id: string) => clusterKey(id, 'consumer-health'),
 };
 
-/** The cluster's queues with their verdicts, worst first unless `sort` says otherwise. */
+/** The cluster's subscriptions with their verdicts, worst first unless `sort` says otherwise. */
 export function useConsumerHealth(
   clusterId: string,
   params: ResourceParams = {},
@@ -33,21 +34,20 @@ export function useConsumerHealth(
 }
 
 /**
- * One queue's verdict, for the detail drawer. A separate key from the listing so
+ * One subscription's verdict, for the detail drawer. A separate key from the listing so
  * opening a drawer does not evict the ranked page behind it.
  */
-export function useQueueHealth(
+export function useSubscriptionHealth(
   clusterId: string,
-  queueName: string,
+  subscription: ResourceRef,
   enabled = true,
 ): UseQueryResult<ConsumerHealthView | null, ApiError> {
-  const ids = useRoleIds(clusterId);
   return useQuery({
-    queryKey: keys.queue(clusterId, queueName),
-    enabled: enabled && ids.loaded && queueName !== '',
+    queryKey: keys.subscription(clusterId, subscription.name),
+    enabled: enabled && subscription.id !== '',
     queryFn: async () => {
       const page = await request<PagedView<ConsumerHealthView>>(
-        `/clusters/${clusterId}/consumer-health?subscription=${encodeURIComponent(ids.subscription(queueName))}`,
+        `/clusters/${clusterId}/consumer-health?subscription=${encodeURIComponent(subscription.id)}`,
       );
       return page.data[0] ?? null;
     },

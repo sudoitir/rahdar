@@ -34,9 +34,9 @@ import { OPERATIONS, plural, runStatus } from './words.ts';
 const STOP = { verb: 'Stop', past: 'Stopped', progressive: 'Stopping' } as const;
 
 /** What the page says before the run has loaded, so the header holds its two lines when it arrives. */
-const ABOUT = "One bulk run: its status, how far it has got and each queue's outcome.";
+const ABOUT = "One bulk run: its status, how far it has got and each subscription's outcome.";
 
-/** An acted-on queue's per-node result, in the single-queue command's shape. */
+/** An acted-on subscription's per-node result, in the single-subscription command's shape. */
 function outcomeOf(item: BulkItemView, run: Run): LifecycleOutcomeView | null {
   if (!item.outcome) return null;
   const landed = item.outcome.some((n) => n.status === 'APPLIED' || n.status === 'ALREADY');
@@ -59,7 +59,7 @@ function outcomeOf(item: BulkItemView, run: Run): LifecycleOutcomeView | null {
 /** The counts in words, so the outcome does not depend on reading a bar. */
 function counts(run: Run): string {
   const done = run.succeeded + run.failed + run.skipped;
-  return `${run.succeeded.toLocaleString()} succeeded, ${run.failed.toLocaleString()} failed, ${run.skipped.toLocaleString()} skipped, ${done.toLocaleString()} of ${plural(run.total, 'queue')} settled`;
+  return `${run.succeeded.toLocaleString()} succeeded, ${run.failed.toLocaleString()} failed, ${run.skipped.toLocaleString()} skipped, ${done.toLocaleString()} of ${plural(run.total, 'subscription')} settled`;
 }
 
 const TONE_COLOR = { danger: 'var(--as-danger)', warning: 'var(--as-warning)' } as const;
@@ -68,8 +68,8 @@ const TERMINAL = new Set<Run['status']>(['SUCCEEDED', 'PARTIAL', 'FAILED', 'STOP
 
 const rowKey = (i: BulkItemView) => i.subscription;
 
-/** One queue's per-node result, or why it has none. */
-function QueueDetail({
+/** One subscription's per-node result, or why it has none. */
+function SubscriptionDetail({
   item,
   outcome,
   destructive,
@@ -96,7 +96,7 @@ function QueueDetail({
         <Text size="sm">
           {item.status === 'REFUSED'
             ? `Refused at preview: ${item.error ?? 'no reason recorded'}. Nothing was sent to the broker.`
-            : 'This queue has not been acted on, so there is no per-node result.'}
+            : 'This subscription has not been acted on, so there is no per-node result.'}
         </Text>
       )}
     </Section>
@@ -104,7 +104,7 @@ function QueueDetail({
 }
 
 /**
- * One bulk run at its own address: its status in words, its progress, and each queue's outcome,
+ * One bulk run at its own address: its status in words, its progress, and each subscription's outcome,
  * expandable to the per-node detail. Kept live by the `bulk` stream topic, so a reload picks the run
  * up where it is.
  */
@@ -160,7 +160,7 @@ export function BulkRunView() {
   return (
     <Page>
       <PageHeader
-        title={`${op.verb} ${plural(run.total, 'queue')}`}
+        title={`${op.verb} ${plural(run.total, 'subscription')}`}
         description={
           <>
             Started by {run.username}
@@ -174,7 +174,7 @@ export function BulkRunView() {
             {run.auditEventId != null ? (
               <Link
                 to={`/clusters/${clusterId}/audit`}
-                // The untyped router cannot type another feature's search; `QueueHistoryPanels` does the same.
+                // The untyped router cannot type another feature's search; `SubscriptionHistoryPanels` does the same.
                 search={{ parentId: run.auditEventId } as never}
                 className={linkClasses.link}
               >
@@ -212,15 +212,15 @@ export function BulkRunView() {
 
         {/* The bar fills on the theme's motion token, which reduced motion zeroes, so it jumps instead. */}
         <Progress
-          aria-label="Queues settled"
+          aria-label="Subscriptions settled"
           value={run.total === 0 ? 0 : (done / run.total) * 100}
           color={status.tone ? TONE_COLOR[status.tone] : undefined}
         />
       </Section>
 
-      <Section title="Queues">
+      <Section title="Subscriptions">
         <DataTable
-          label="Queues in this run"
+          label="Subscriptions in this run"
           storageKey="bulk.run"
           height={{ maxRows: 12 }}
           columns={columns}
@@ -229,14 +229,14 @@ export function BulkRunView() {
           empty={
             <EmptyState
               kind="empty"
-              title="No queues in this run"
-              description="A run acts on the queues frozen at its preview. This one froze none, so nothing was or will be acted on. Start a new run from the Queues screen with a selection."
+              title="No subscriptions in this run"
+              description="A run acts on the subscriptions frozen at its preview. This one froze none, so nothing was or will be acted on. Start a new run from the Subscriptions screen with a selection."
             />
           }
         />
 
         {opened ? (
-          <QueueDetail
+          <SubscriptionDetail
             item={opened}
             outcome={openedOutcome}
             destructive={op.destructive}
@@ -249,7 +249,7 @@ export function BulkRunView() {
         opened={stopOpen}
         onClose={() => setStopOpen(false)}
         title="Stop this run?"
-        consequence="The queue being acted on now finishes; every queue after it is cancelled and left as it is. What has already been done is not undone."
+        consequence="The subscription being acted on now finishes; every subscription after it is cancelled and left as it is. What has already been done is not undone."
         confirmLabel="Stop run"
         pending={stop.isPending}
         onConfirm={stopRun}

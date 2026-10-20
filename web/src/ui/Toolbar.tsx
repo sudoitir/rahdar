@@ -23,7 +23,7 @@ export function Toolbar({
   end,
   arrowNavigation = false,
 }: Readonly<{
-  /** Names the toolbar for assistive technology, such as "Queue filters". */
+  /** Names the toolbar for assistive technology, such as "Subscription filters". */
   label: string;
   /** Controls that act on the view, on the start side. */
   start?: ReactNode;

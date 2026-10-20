@@ -59,15 +59,15 @@ export function metricLabel(metric: string): string {
 
 /**
  * What a derived metric actually watches, stated in the form. `ackRatePerConsumer`
- * only evaluates queues that have consumers attached AND a backlog AND are not
- * paused — the triple that stops it paging on every quiet queue at 3am — and it
- * cannot name the individual consumer, only the queue on a node.
+ * only evaluates subscriptions that have consumers attached AND a backlog AND are not
+ * paused — the triple that stops it paging on every quiet subscription at 3am — and it
+ * cannot name the individual consumer, only the subscription on a node.
  */
 export const METRIC_NOTES: Record<string, string> = {
   consumerHealth:
-    'Fires on the same verdict the Consumer health screen shows, so an alert and the screen can never disagree. A queue whose verdict cannot be computed yet — too few samples — is excluded entirely, so it neither fires nor resolves a firing that is still true. A paused queue ranks below every threshold offered here and never pages.',
+    'Fires on the same verdict the Consumer health screen shows, so an alert and the screen can never disagree. A subscription whose verdict cannot be computed yet — too few samples — is excluded entirely, so it neither fires nor resolves a firing that is still true. A paused subscription ranks below every threshold offered here and never pages.',
   ackRatePerConsumer:
-    "Only queues with consumers attached, a non-zero backlog, and not paused are evaluated — an idle or paused queue is not a slow consumer. Rahdar resolves this to a queue on a node; naming the individual consumer needs the broker's own slow-consumer detection.",
+    "Only subscriptions with consumers attached, a non-zero backlog, and not paused are evaluated — an idle or paused subscription is not a slow consumer. Rahdar resolves this to a subscription on a node; naming the individual consumer needs the broker's own slow-consumer detection.",
 };
 
 /**

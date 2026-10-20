@@ -130,7 +130,7 @@ describe.each(SCHEMES)('Index subscriptions in the %s scheme at 1280 px', (schem
 
     const dialog = await screen.findByRole('dialog', { name: 'Delete index subscription PAYMENT.#' });
     await settle(() => getComputedStyle(dialog).opacity);
-    expect(screen.getByText(/It also removes the divert, the capture queue/)).toBeVisible();
+    expect(screen.getByText(/It also removes the divert, the capture subscription/)).toBeVisible();
     expect(await axeViolations(dialog)).toEqual([]);
   });
 });

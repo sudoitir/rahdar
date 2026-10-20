@@ -14,8 +14,8 @@ export interface SetupReviewSearch {
 
 const setupReviewRoute = createRoute({
   getParentRoute: () => clusterRoute,
-  path: 'setup-review',
-  component: lazyFeatureView('setupreview', () => import('./SetupReviewView.tsx'), 'SetupReviewView'),
+  path: 'artemis/setup-review',
+  component: lazyFeatureView('setupreview', () => import('./SetupReviewView.tsx'), 'SetupReviewView', 'artemis'),
   validateSearch: (raw: Record<string, unknown>): SetupReviewSearch => ({
     severity: (SEVERITY_FILTERS as readonly string[]).includes(String(raw.severity))
       ? (raw.severity as SeverityFilter)
@@ -39,7 +39,8 @@ export const setupreviewFeature = defineFeature({
       order: 5,
       label: 'Setup review',
       icon: IconStethoscope,
-      path: 'setup-review',
+      system: 'artemis',
+      path: 'artemis/setup-review',
       permission: 'cluster:read',
     },
   ],

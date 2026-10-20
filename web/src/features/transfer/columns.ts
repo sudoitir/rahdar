@@ -18,7 +18,7 @@ export interface TransferColumnDeps {
 
 /**
  * The transfers grid's columns. The start time, which opens the run, and the two ends, which name the
- * queues and nodes, identify a row and are never hidden; the outcome and the count go next, and who
+ * subscriptions and nodes, identify a row and are never hidden; the outcome and the count go next, and who
  * ran it and the mode are the first to be hidden when the table is narrow. A view builds the columns
  * again when the zone or the cluster names change.
  */

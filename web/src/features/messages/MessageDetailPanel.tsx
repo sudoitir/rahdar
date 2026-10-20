@@ -286,20 +286,20 @@ function MessageDetailContent({ m }: Readonly<{ m: MessageDetailView }>) {
 
 export function MessageDetailPanel({
   clusterId,
-  queueName,
+  subscriptionName,
   messageId,
   node,
   filter,
   onClose,
 }: Readonly<{
   clusterId: string;
-  queueName: string;
+  subscriptionName: string;
   messageId: string | null;
   node?: string;
   filter?: string;
   onClose: () => void;
 }>) {
-  const detail = useMessageDetail(clusterId, queueName, messageId, node, filter);
+  const detail = useMessageDetail(clusterId, subscriptionName, messageId, node, filter);
   const m = detail.data;
   // Absolute timestamps here read the display zone from module state, so this
   // subscribes the view to a zone change (`app/timezone.ts`).

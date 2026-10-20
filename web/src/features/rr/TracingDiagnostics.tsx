@@ -82,7 +82,7 @@ export function TracingDiagnostics({ clusterId }: Readonly<{ clusterId: string }
       {d.expectations.length > 0 ? (
         <DataTable
           variant="static"
-          label="What the sampler did for each traced address"
+          label="What the sampler did for each traced destination"
           storageKey="rr.diagnostics"
           columns={columns}
           data={d.expectations}

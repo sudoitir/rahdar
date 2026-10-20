@@ -37,7 +37,7 @@ export function NodeOutcomeSummary({
    */
   alreadyLabel?: string;
   /**
-   * What the counts are counting, and the verb for them. Defaults to the queue
+   * What the counts are counting, and the verb for them. Defaults to the subscription
    * delete's wording; a connection close affects consumers, not messages, and
    * saying "destroyed" there would overstate what happened.
    */

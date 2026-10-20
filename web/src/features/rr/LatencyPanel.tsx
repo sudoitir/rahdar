@@ -8,20 +8,20 @@ import { LoadingState } from '../../ui/LoadingState.tsx';
 import { Section } from '../../ui/Section.tsx';
 import { useRrStats } from './api.ts';
 
-/** Coverage lines shown before the list is folded away — one per traced address. */
+/** Coverage lines shown before the list is folded away — one per traced destination. */
 const COVERAGE_VISIBLE = 6;
 
 const CHART_HEIGHT = '17.5rem';
 
 /**
- * p50/p95/p99 per traced address. The sampling caveat and coverage estimate
+ * p50/p95/p99 per traced destination. The sampling caveat and coverage estimate
  * sit next to the chart, not in a tooltip (request-reply-tracing spec —
  * latency is never shown without its coverage).
  */
 export function LatencyPanel({ clusterId }: Readonly<{ clusterId: string }>) {
   const stats = useRrStats(clusterId);
   const [allCoverage, setAllCoverage] = useState(false);
-  const addresses = stats.data?.destinations ?? [];
+  const destinations = stats.data?.destinations ?? [];
 
   if (stats.isError) {
     return (
@@ -36,7 +36,7 @@ export function LatencyPanel({ clusterId }: Readonly<{ clusterId: string }>) {
     return <LoadingState label="Loading latency" blockSize={CHART_HEIGHT} />;
   }
 
-  if (addresses.length === 0) {
+  if (destinations.length === 0) {
     return (
       <EmptyState
         kind="empty"
@@ -49,13 +49,13 @@ export function LatencyPanel({ clusterId }: Readonly<{ clusterId: string }>) {
   // A percentile with no value is omitted, never coerced to zero: an absent
   // number reads as "instant", which is the most dangerous reading of a latency
   // chart there is.
-  const data = addresses.map((a) => ({
-    address: a.destination,
+  const data = destinations.map((a) => ({
+    destination: a.destination,
     p50: a.p50Ms ?? undefined,
     p95: a.p95Ms ?? undefined,
     p99: a.p99Ms ?? undefined,
   }));
-  const listed = allCoverage ? addresses : addresses.slice(0, COVERAGE_VISIBLE);
+  const listed = allCoverage ? destinations : destinations.slice(0, COVERAGE_VISIBLE);
 
   return (
     <Stack gap="md">
@@ -65,7 +65,7 @@ export function LatencyPanel({ clusterId }: Readonly<{ clusterId: string }>) {
         title="Sampled, not exhaustive"
         description="Latency is measured only on requests Rahdar happened to observe — a request that completes faster than the sample interval is never seen, which biases these numbers toward slower flows."
       >
-        <List size="xs" spacing={2} aria-label="Coverage per address">
+        <List size="xs" spacing={2} aria-label="Coverage per destination">
           {listed.map((a) => (
             <List.Item key={a.destination}>
               {a.destination}:{' '}
@@ -75,7 +75,7 @@ export function LatencyPanel({ clusterId }: Readonly<{ clusterId: string }>) {
             </List.Item>
           ))}
         </List>
-        {addresses.length > COVERAGE_VISIBLE ? (
+        {destinations.length > COVERAGE_VISIBLE ? (
           <Button
             variant="subtle"
             size="xs"
@@ -83,14 +83,14 @@ export function LatencyPanel({ clusterId }: Readonly<{ clusterId: string }>) {
             aria-expanded={allCoverage}
             onClick={() => setAllCoverage((on) => !on)}
           >
-            {allCoverage ? 'Show fewer' : `Show coverage for all ${addresses.length} addresses`}
+            {allCoverage ? 'Show fewer' : `Show coverage for all ${destinations.length} destinations`}
           </Button>
         ) : null}
       </Section>
       <BarChart
         h={CHART_HEIGHT}
         data={data}
-        dataKey="address"
+        dataKey="destination"
         // One hue, light to dark: p50/p95/p99 is an ordered magnitude, not three
         // identities, and the status colours it used to borrow said a slow tail
         // was an error before anyone had decided that it was.

@@ -53,29 +53,29 @@ function failed(error: ApiError): CostVerdict {
 /** What a plan costs, worked out from the plan alone. */
 function planned(plan: SqlPlanView): CostVerdict {
   const targets = plan.targets ?? [];
-  const queues = new Set(targets.map((t) => t.subscription)).size;
+  const subscriptions = new Set(targets.map((t) => t.subscription)).size;
   const nodes = new Set(targets.map((t) => t.nodeId)).size;
   if (targets.length === 0) {
-    return { badge: 'No cost', tone: 'neutral', sentence: 'Reads nothing: no queue matches the FROM pattern.' };
+    return { badge: 'No cost', tone: 'neutral', sentence: 'Reads nothing: no subscription matches the FROM pattern.' };
   }
   if (plan.source === 'INDEX') {
     return {
       badge: 'Index',
       tone: 'neutral',
-      sentence: `Reads Rahdar's index, up to ${quantity(plan.effectiveLimit, 'row')} from ${count(queues, 'queue')}. No broker is read.`,
+      sentence: `Reads Rahdar's index, up to ${quantity(plan.effectiveLimit, 'row')} from ${count(subscriptions, 'subscription')}. No broker is read.`,
     };
   }
   if (plan.requiresScan) {
     return {
       badge: 'Scan',
       tone: 'warning',
-      sentence: `Rahdar reads and examines about ${quantity(plan.estimatedMessagesExamined, 'message')} on ${count(queues, 'queue')} across ${count(nodes, 'node')}.`,
+      sentence: `Rahdar reads and examines about ${quantity(plan.estimatedMessagesExamined, 'message')} on ${count(subscriptions, 'subscription')} across ${count(nodes, 'node')}.`,
     };
   }
   return {
     badge: 'Broker-filtered',
     tone: 'neutral',
-    sentence: `The brokers filter; Rahdar examines at most ${quantity(plan.effectiveLimit, 'message')} from ${count(queues, 'queue')}.`,
+    sentence: `The brokers filter; Rahdar examines at most ${quantity(plan.effectiveLimit, 'message')} from ${count(subscriptions, 'subscription')}.`,
   };
 }
 

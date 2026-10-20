@@ -44,7 +44,7 @@ function mockDetail(body: Record<string, unknown>) {
 describe('MessageDetailPanel', () => {
   const base = {
     clusterId: 'c1',
-    queueName: 'PHASE3.SRC',
+    subscriptionName: 'PHASE3.SRC',
     onClose: () => {},
   };
 

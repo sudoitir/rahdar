@@ -7,12 +7,12 @@ import { renderWithProviders } from '../../test/render.tsx';
 import { server } from '../../test/setup.ts';
 import { LatencyPanel } from './LatencyPanel.tsx';
 
-function address(name: string, over: Record<string, unknown> = {}) {
+function destination(name: string, over: Record<string, unknown> = {}) {
   return { destination: name, p50Ms: 20, p95Ms: 80, p99Ms: 120, coverageRatio: 0.5, ...over };
 }
 
-function serve(addresses: unknown[]) {
-  server.use(http.get('*/api/v1/clusters/c1/rr/stats', () => HttpResponse.json({ destinations: addresses })));
+function serve(destinations: unknown[]) {
+  server.use(http.get('*/api/v1/clusters/c1/rr/stats', () => HttpResponse.json({ destinations: destinations })));
 }
 
 describe('LatencyPanel', () => {
@@ -41,8 +41,8 @@ describe('LatencyPanel', () => {
     expect(within(alert).getByRole('button', { name: 'Retry' })).toBeInTheDocument();
   });
 
-  it('states the sampling caveat and each address’s coverage beside the chart', async () => {
-    serve([address('orders.request'), address('billing.request', { coverageRatio: null })]);
+  it('states the sampling caveat and each destination’s coverage beside the chart', async () => {
+    serve([destination('orders.request'), destination('billing.request', { coverageRatio: null })]);
     renderWithProviders(<LatencyPanel clusterId="c1" />);
 
     expect(await screen.findByRole('heading', { level: 3, name: 'Sampled, not exhaustive' })).toBeInTheDocument();
@@ -51,14 +51,14 @@ describe('LatencyPanel', () => {
   });
 
   it('folds a long coverage list and unfolds it on request', async () => {
-    serve(Array.from({ length: 8 }, (_, i) => address(`a.${i}`)));
+    serve(Array.from({ length: 8 }, (_, i) => destination(`a.${i}`)));
     const user = userEvent.setup();
     renderWithProviders(<LatencyPanel clusterId="c1" />);
 
-    const list = await screen.findByRole('list', { name: 'Coverage per address' });
+    const list = await screen.findByRole('list', { name: 'Coverage per destination' });
     expect(within(list).getAllByRole('listitem')).toHaveLength(6);
 
-    await user.click(screen.getByRole('button', { name: 'Show coverage for all 8 addresses' }));
+    await user.click(screen.getByRole('button', { name: 'Show coverage for all 8 destinations' }));
     expect(within(list).getAllByRole('listitem')).toHaveLength(8);
     expect(screen.getByRole('button', { name: 'Show fewer' })).toHaveAttribute('aria-expanded', 'true');
   });

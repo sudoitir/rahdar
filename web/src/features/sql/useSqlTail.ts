@@ -19,7 +19,7 @@ const FRESH_MS = 4_000;
  */
 const MAX_TAIL_ROWS = 2_000;
 
-/** A row's identity is `(node, queue, messageId)` — ids are node-local. */
+/** A row's identity is `(node, subscription, messageId)` — ids are node-local. */
 export function rowKey(row: SqlRowView): string {
   return `${row.nodeId}/${row.subscription}/${row.messageId}`;
 }

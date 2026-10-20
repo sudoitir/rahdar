@@ -13,8 +13,8 @@ export type Column = (typeof COLUMNS)[number];
 
 export const COLUMN_TITLES: Record<Column, string> = {
   PRODUCER: 'Producers',
-  DESTINATION: 'Addresses',
-  SUBSCRIPTION: 'Queues',
+  DESTINATION: 'Destinations',
+  SUBSCRIPTION: 'Subscriptions',
   CONSUMER: 'Consumers',
   REMOTE: 'Other nodes and brokers',
 };
@@ -63,7 +63,7 @@ export type Positions = Record<string, { x: number; y: number }>;
 
 export interface FlowNodeData extends Record<string, unknown> {
   view: FlowNodeView;
-  /** 0–1: this queue's backlog against the deepest shown queue; 0 for other kinds. */
+  /** 0–1: this subscription's backlog against the deepest shown subscription; 0 for other kinds. */
   depth: number;
   dimmed: boolean;
 }
@@ -95,7 +95,7 @@ export function layoutSignature(graph: FlowGraphView): string {
 
 export function toElkGraph(graph: FlowGraphView): ElkNode {
   // Model order puts the busiest paths first, so a view that opens at the top opens on traffic, and an
-  // idle dead-letter or redistribution queue sinks to the bottom of its column.
+  // idle dead-letter or redistribution subscription sinks to the bottom of its column.
   const busiest = new Map<string, number>();
   for (const e of graph.edges ?? []) {
     for (const id of [e.source!, e.target!]) busiest.set(id, Math.max(busiest.get(id) ?? 0, e.rate ?? 0));
@@ -179,9 +179,13 @@ export function toReactFlow(
   const deepest = Math.max(1, ...placed.map((n) => n.messageCount ?? 0));
   const nodes: Node[] = placed.map((n) => ({
     id: n.id!,
-    type: { SUBSCRIPTION: 'queue', DESTINATION: 'address', REMOTE: 'remote', PRODUCER: 'client', CONSUMER: 'client' }[
-      column(n)
-    ],
+    type: {
+      SUBSCRIPTION: 'subscription',
+      DESTINATION: 'destination',
+      REMOTE: 'remote',
+      PRODUCER: 'client',
+      CONSUMER: 'client',
+    }[column(n)],
     position: positions[n.id!],
     ...NODE_SIZE[column(n)],
     draggable: false,

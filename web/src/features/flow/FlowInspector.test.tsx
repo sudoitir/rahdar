@@ -52,7 +52,7 @@ const graph = {
 } as FlowGraphView;
 
 describe('FlowInspector', () => {
-  it('explains a queue: figures, faults in words, and the flow into it', () => {
+  it('explains a subscription: figures, faults in words, and the flow into it', () => {
     renderWithProviders(
       <FlowInspector
         graph={graph}
@@ -63,7 +63,7 @@ describe('FlowInspector', () => {
       />,
     );
 
-    const details = screen.getByRole('complementary', { name: 'Details of Queue ORDERS.inbound' });
+    const details = screen.getByRole('complementary', { name: 'Details of Subscription ORDERS.inbound' });
     expect(details).toHaveTextContent('1,200 waiting');
     expect(details).toHaveTextContent('no consumer');
     expect(details).toHaveTextContent('shared · 42 msg/s');
@@ -87,7 +87,7 @@ describe('FlowInspector', () => {
     expect(onClose).toHaveBeenCalled();
   });
 
-  it('focuses the view and opens the exact queue without mutating anything', async () => {
+  it('focuses the view and opens the exact subscription without mutating anything', async () => {
     const onFocus = vi.fn();
     renderWithProviders(
       <FlowInspector
@@ -102,11 +102,11 @@ describe('FlowInspector', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Focus the view on this' }));
     expect(onFocus).toHaveBeenCalledWith('subscription:ORDERS.inbound');
 
-    await userEvent.click(screen.getByRole('button', { name: 'Open in Queues' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Open in Subscriptions' }));
     expect(navigate).toHaveBeenCalledWith({
-      to: '/clusters/$clusterId/queues',
+      to: '/clusters/$clusterId/subscriptions',
       params: { clusterId: 'c1' },
-      search: { queue: 'ORDERS.inbound' },
+      search: { subscription: 'ORDERS.inbound' },
     });
   });
 });
@@ -142,24 +142,24 @@ describe('FlowInspector other resources', () => {
     expect(screen.queryByRole('button', { name: 'Close details' })).toBeNull();
   });
 
-  it('says a queue that has not been swept yet has no figures yet, rather than zero', () => {
+  it('says a subscription that has not been swept yet has no figures yet, rather than zero', () => {
     inspect({ id: 'subscription:q', kind: 'SUBSCRIPTION', label: 'q' });
 
-    const details = screen.getByRole('complementary', { name: 'Details of Queue q' });
+    const details = screen.getByRole('complementary', { name: 'Details of Subscription q' });
     expect(details).toHaveTextContent('Backlognot swept yet');
     expect(details).toHaveTextContent('Consumersnot swept yet');
     expect(details).not.toHaveTextContent('0 waiting');
   });
 
-  it('states a queue with consumers and a backlog of nothing', () => {
+  it('states a subscription with consumers and a backlog of nothing', () => {
     inspect({ id: 'subscription:q', kind: 'SUBSCRIPTION', label: 'q', messageCount: 0, consumerCount: 3 });
 
-    const details = screen.getByRole('complementary', { name: 'Details of Queue q' });
+    const details = screen.getByRole('complementary', { name: 'Details of Subscription q' });
     expect(details).toHaveTextContent('Backlog0 waiting');
     expect(details).toHaveTextContent('Consumers3');
   });
 
-  it('explains an address by its routing and opens the addresses screen filtered to it', async () => {
+  it('explains a destination by its routing and opens the destinations screen filtered to it', async () => {
     navigate.mockClear();
     const { onFocus } = inspect({
       id: 'destination:a',
@@ -168,18 +168,18 @@ describe('FlowInspector other resources', () => {
       routingTypes: ['ANYCAST', 'MULTICAST'],
     });
 
-    expect(screen.getByRole('complementary', { name: 'Details of Address a' })).toHaveTextContent(
+    expect(screen.getByRole('complementary', { name: 'Details of Destination a' })).toHaveTextContent(
       'Routinganycast, multicast',
     );
-    await userEvent.click(screen.getByRole('button', { name: 'Open in Addresses' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Open in Destinations' }));
     expect(navigate).toHaveBeenCalledWith({
-      to: '/clusters/$clusterId/addresses',
+      to: '/clusters/$clusterId/destinations',
       params: { clusterId: 'c1' },
       search: { q: 'a' },
     });
     await userEvent.click(screen.getByRole('button', { name: 'Focus the view on this' }));
     expect(onFocus).toHaveBeenCalledWith('destination:a');
-    expect(screen.queryByRole('button', { name: 'Open in Queues' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Open in Subscriptions' })).toBeNull();
   });
 
   it('explains a producing client by its connections, and offers its producers and connections', async () => {
@@ -236,18 +236,24 @@ describe('FlowInspector other resources', () => {
     inspect({ id: 'remote:r', kind: 'REMOTE', label: 'dr-site', role: 'LINK_TARGET' });
 
     expect(screen.getByRole('complementary', { name: 'Details of Remote dr-site' })).toHaveTextContent(
-      'What it isA bridge target outside this cluster',
+      'What it isA link target outside this cluster',
     );
     // A remote broker is not something this cluster can focus on or open.
     expect(screen.queryByRole('button', { name: 'Focus the view on this' })).toBeNull();
     expect(screen.getByText(/Flow never changes the broker/)).toBeInTheDocument();
   });
 
-  it('keeps a queue with a role from opening the Queues screen, since it is not one queue', () => {
-    inspect({ id: 'subscription:t', kind: 'SUBSCRIPTION', label: 'temporary queues', role: 'TEMPORARY', members: 12 });
+  it('keeps a subscription with a role from opening the Subscriptions screen, since it is not one subscription', () => {
+    inspect({
+      id: 'subscription:t',
+      kind: 'SUBSCRIPTION',
+      label: 'temporary subscriptions',
+      role: 'TEMPORARY',
+      members: 12,
+    });
 
-    expect(screen.getByRole('complementary')).toHaveTextContent('What it isTemporary queues, collapsed');
-    expect(screen.queryByRole('button', { name: 'Open in Queues' })).toBeNull();
+    expect(screen.getByRole('complementary')).toHaveTextContent('What it isTemporary subscriptions, collapsed');
+    expect(screen.queryByRole('button', { name: 'Open in Subscriptions' })).toBeNull();
     expect(screen.getByRole('button', { name: 'Focus the view on this' })).toBeInTheDocument();
   });
 
@@ -263,7 +269,7 @@ describe('FlowInspector other resources', () => {
     const details = screen.getByRole('complementary');
     expect(details).toHaveTextContent('What it isnew_role');
     expect(details).toHaveTextContent('stalled, brand_new');
-    expect(screen.queryByRole('button', { name: 'Open in Addresses' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Open in Destinations' })).toBeNull();
   });
 
   it('describes a node of no known kind without a kind word', () => {
@@ -310,7 +316,7 @@ describe('FlowInspector other resources', () => {
     expect(within(details).getByText(/sampled clients · .+ ago/)).toBeInTheDocument();
     // An edge whose far end is not in the graph shows a dash, not a blank; stale and faults are worded.
     expect(within(details).getByText('—')).toBeInTheDocument();
-    expect(within(details).getByText(/queue metrics, ~5 min average/)).toBeInTheDocument();
+    expect(within(details).getByText(/subscription metrics, ~5 min average/)).toBeInTheDocument();
     expect(within(details).getByText(/stalled/)).toBeInTheDocument();
     expect(within(details).getByText(/stale/)).toBeInTheDocument();
   });
@@ -339,7 +345,7 @@ describe('FlowInspector other resources', () => {
     view.rerender(
       <FlowInspector graph={g} nodeId="subscription:b" clusterId="c1" onClose={onClose} onFocus={() => {}} />,
     );
-    expect(screen.getByRole('complementary', { name: 'Details of Queue b' })).toBeInTheDocument();
+    expect(screen.getByRole('complementary', { name: 'Details of Subscription b' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Close details' })).toHaveFocus();
 
     await userEvent.click(screen.getByRole('button', { name: 'Close details' }));
@@ -357,7 +363,7 @@ describe('FlowInspector other resources', () => {
       />,
     );
 
-    const details = screen.getByRole('complementary', { name: 'Details of Queue ORDERS.inbound' });
+    const details = screen.getByRole('complementary', { name: 'Details of Subscription ORDERS.inbound' });
     expect(within(details).getByRole('heading', { level: 3, name: 'ORDERS.inbound' })).toBeInTheDocument();
     const facts = within(details).getByRole('group', { name: 'Facts' });
     expect(within(facts).getByText('Backlog')).toBeInTheDocument();

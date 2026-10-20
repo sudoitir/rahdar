@@ -445,7 +445,7 @@ export function useRemoveShare(teamId: string) {
 
 export const UNOWNED_PAGE_SIZE = 100;
 
-/** The queue or address names of a cluster that no team's pattern covers, one page at a time. */
+/** The subscription or destination names of a cluster that no team's pattern covers, one page at a time. */
 export function useUnowned(
   clusterId: string | null,
   kind: 'SUBSCRIPTION' | 'DESTINATION',

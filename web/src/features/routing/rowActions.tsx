@@ -1,27 +1,30 @@
 import { IconClipboard, IconTrash } from '@tabler/icons-react';
 
-import type { ActionProps, DivertTarget } from '../../kernel/actions/types.ts';
+import type { ActionProps, RouteTarget } from '../../kernel/actions/types.ts';
 import { ActionMenuItem } from '../../ui/ActionMenuItem.tsx';
 import { DeleteDivertDialog } from './DivertActions.tsx';
+import { DIVERT_KIND } from './columns.ts';
 import { useDivertWriteGate } from './divertGate.ts';
 
-export function CopyDivertName({ target, host }: Readonly<ActionProps<DivertTarget>>) {
+export function CopyRouteName({ target, host }: Readonly<ActionProps<RouteTarget>>) {
   return (
     <ActionMenuItem
-      label="Copy divert name"
+      label="Copy route name"
       icon={<IconClipboard size={16} aria-hidden />}
-      onSelect={() => host.copy(target.name, 'divert name')}
+      onSelect={() => host.copy(target.name, 'route name')}
     />
   );
 }
 
 /**
- * "Delete divert…" on a divert's row. A capture divert is Rahdar's own and reconciliation would put
- * it back, so it is not deletable here, and the item says where it is managed instead.
+ * "Delete divert…" on a divert's row, Artemis-only: no other kind of route offers it. A capture divert is
+ * Rahdar's own and reconciliation would put it back, so it is not deletable here, and the item says where
+ * it is managed instead.
  */
-export function DeleteDivert({ clusterId, target, host }: Readonly<ActionProps<DivertTarget>>) {
+export function DeleteDivert({ clusterId, target, host }: Readonly<ActionProps<RouteTarget>>) {
   const gate = useDivertWriteGate(clusterId);
   const divert = target.snapshot;
+  if (target.kind !== DIVERT_KIND) return null;
   const verdict =
     divert?.owner === 'MESSAGE_CAPTURE'
       ? ({

@@ -87,7 +87,7 @@ function serve(body: Record<string, unknown>, seen: string[] = []) {
   );
 }
 
-/** The queue's node shares: a stranded backlog on artemis-b, and artemis-c silent. */
+/** The subscription's node shares: a stranded backlog on artemis-b, and artemis-c silent. */
 function splitGraph() {
   const base = graph({ measuring: false, sampledAt: '2026-09-14T10:00:00Z' });
   const nodes = (base.nodes as Array<Record<string, unknown>>).map((n) =>
@@ -165,7 +165,7 @@ describe('FlowView', () => {
     expect(totals).toHaveTextContent('2 faults');
     expect(screen.getByText('Showing 2 of 5 paths, ranked by messages in.')).toBeInTheDocument();
     expect(
-      screen.getByText('Raise the limit, or focus a client, address or queue to reach the rest.'),
+      screen.getByText('Raise the limit, or focus a client, destination or subscription to reach the rest.'),
     ).toBeInTheDocument();
     expect(screen.getByText(/Measuring client rates/)).toBeInTheDocument();
   });
@@ -282,13 +282,13 @@ describe('FlowView', () => {
         nodes: [],
         edges: [],
         totals: { paths: 5, shown: 0, limit: 40, clamped: false },
-        focus: { kind: 'queue', name: 'ARCHIVE.gone', hops: 1, matched: false },
+        focus: { kind: 'subscription', name: 'ARCHIVE.gone', hops: 1, matched: false },
         brokerNodes: [],
       }),
     );
     renderWithProviders(<FlowView />);
 
-    expect(await screen.findByText('Nothing matches the focus queue ARCHIVE.gone')).toBeInTheDocument();
+    expect(await screen.findByText('Nothing matches the focus subscription ARCHIVE.gone')).toBeInTheDocument();
     await userEvent.click(screen.getAllByRole('button', { name: 'Clear focus' })[0]);
 
     const call = routerState.navigate.mock.calls.at(-1)?.[0] as { search: (prev: object) => Record<string, unknown> };
@@ -382,7 +382,7 @@ describe('FlowView', () => {
     serveHistory();
     renderWithProviders(<FlowView />);
 
-    const pane = await screen.findByRole('region', { name: 'Queue orders' });
+    const pane = await screen.findByRole('region', { name: 'Subscription orders' });
     expect(seen.at(-1)).toContain('byNode=true');
     expect(pane).toHaveTextContent(
       'artemis-b holds 9,000 messages and has no consumer; the consumers are on artemis-a.',
@@ -419,7 +419,7 @@ describe('FlowView', () => {
     serve(graph());
     renderWithProviders(<FlowView />);
 
-    expect(await screen.findByRole('complementary', { name: 'Details of Queue orders' })).toBeInTheDocument();
+    expect(await screen.findByRole('complementary', { name: 'Details of Subscription orders' })).toBeInTheDocument();
   });
 
   it('resizes the monitoring pane from the keyboard', async () => {
@@ -508,7 +508,7 @@ describe('FlowView controls', () => {
 
   it('states the focus, widens its reach by hops, and steps back to the neighbours', async () => {
     routerState.search = { focus: 'subscription:orders', hops: 2 };
-    serve(graph({ focus: { kind: 'queue', name: 'orders', hops: 2, matched: true } }));
+    serve(graph({ focus: { kind: 'subscription', name: 'orders', hops: 2, matched: true } }));
     const user = userEvent.setup();
     renderWithProviders(<FlowView />);
 
@@ -594,7 +594,7 @@ describe('FlowView controls', () => {
     expect(screen.queryByRole('button', { name: /motion/ })).not.toBeInTheDocument();
   });
 
-  it('focuses the view on a client, address or queue chosen from the find box', async () => {
+  it('focuses the view on a client, destination or subscription chosen from the find box', async () => {
     serve(graph());
     const user = userEvent.setup();
     renderWithProviders(<FlowView />);
@@ -634,7 +634,7 @@ describe('FlowView controls', () => {
     const user = userEvent.setup();
     renderWithProviders(<FlowView />);
 
-    const inspector = await screen.findByRole('complementary', { name: 'Details of Queue orders' });
+    const inspector = await screen.findByRole('complementary', { name: 'Details of Subscription orders' });
     await user.click(within(inspector).getByRole('button', { name: /^Focus/ }));
     expect(nextSearch({ node: 'subscription:ORDERS.inbound' })).toEqual({
       focus: 'subscription:orders',
@@ -653,7 +653,7 @@ describe('FlowView controls', () => {
     const user = userEvent.setup();
     renderWithProviders(<FlowView />);
 
-    const pane = await screen.findByRole('region', { name: 'Queue orders' });
+    const pane = await screen.findByRole('region', { name: 'Subscription orders' });
     await user.click(await within(pane).findByRole('radio', { name: '6h' }));
     expect(nextSearch({ tab: 'split' })).toEqual({ tab: 'split', range: '6h' });
   });
@@ -665,7 +665,7 @@ describe('FlowView controls', () => {
     const user = userEvent.setup();
     renderWithProviders(<FlowView />);
 
-    const pane = await screen.findByRole('region', { name: 'Queue orders' });
+    const pane = await screen.findByRole('region', { name: 'Subscription orders' });
     await user.click(await within(pane).findByRole('radio', { name: '1h' }));
     expect(nextSearch({ range: '6h' })).toEqual({ range: undefined });
   });

@@ -172,7 +172,7 @@ function QueryFailure({ error, onRunAgain }: Readonly<{ error: ApiError; onRunAg
 
 /**
  * Why there is nothing here. An empty grid means at least four different things, and three of them are
- * not "the queue is empty": presenting an absence as a fact is the failure this whole screen exists to avoid.
+ * not "the subscription is empty": presenting an absence as a fact is the failure this whole screen exists to avoid.
  */
 function EmptyResult({ result, tailing }: Readonly<{ result: SqlResultView; tailing: boolean }>) {
   const nodes = result.nodes ?? [];
@@ -182,12 +182,12 @@ function EmptyResult({ result, tailing }: Readonly<{ result: SqlResultView; tail
     return (
       <EmptyState
         kind="empty"
-        title="No queue matched"
+        title="No subscription matched"
         description={
           <>
-            The FROM pattern matched no queue on any node in this cluster. This is an empty target list, not an empty
-            queue — check the name, and remember that <code>*</code> matches one dot-delimited level and <code>#</code>{' '}
-            matches many.
+            The FROM pattern matched no subscription on any node in this cluster. This is an empty target list, not an
+            empty subscription — check the name, and remember that <code>*</code> matches one dot-delimited level and{' '}
+            <code>#</code> matches many.
           </>
         }
       />
@@ -208,7 +208,7 @@ function EmptyResult({ result, tailing }: Readonly<{ result: SqlResultView; tail
       <EmptyState
         kind="empty"
         title="Nothing matched yet"
-        description="Every target answered and none of them held a matching message when the tail started. Anything that arrives from now on appears here — but only if it is still on the queue when Rahdar next reads it."
+        description="Every target answered and none of them held a matching message when the tail started. Anything that arrives from now on appears here — but only if it is still on the subscription when Rahdar next reads it."
       />
     );
   }

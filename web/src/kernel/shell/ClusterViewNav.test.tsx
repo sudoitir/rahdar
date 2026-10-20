@@ -57,7 +57,7 @@ describe('ClusterViewNav', () => {
       within(messaging)
         .getAllByRole('link')
         .map((link) => link.textContent),
-    ).toEqual(['Queues', 'DLQ', 'Transfers', 'SQL Console']);
+    ).toEqual(['Subscriptions', 'Dead letters', 'Transfers', 'SQL Console']);
   });
 
   it("leaves out a disabled feature's views, and a group left with none", async () => {
@@ -66,7 +66,7 @@ describe('ClusterViewNav', () => {
 
     await waitFor(() => expect(screen.queryByRole('group', { name: 'Activity' })).not.toBeInTheDocument());
     expect(screen.queryByRole('link', { name: 'SQL Console' })).not.toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Queues' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Subscriptions' })).toBeInTheDocument();
   });
 
   it('keeps a view the operator cannot read listed and disabled, with the reason', async () => {
@@ -77,7 +77,7 @@ describe('ClusterViewNav', () => {
     expect(alerts).toHaveAttribute('aria-disabled', 'true');
     // Focusable, so the reason is reachable by keyboard.
     expect(alerts).toHaveAttribute('tabindex', '0');
-    expect(screen.getByRole('link', { name: 'Queues' })).not.toHaveAttribute('aria-disabled');
+    expect(screen.getByRole('link', { name: 'Subscriptions' })).not.toHaveAttribute('aria-disabled');
   });
 
   it('keeps each group and view named when the nav is collapsed', async () => {
@@ -106,5 +106,30 @@ describe('ClusterViewNav', () => {
 
     await screen.findByRole('link', { name: 'Alerts' });
     expect(screen.queryByText('1')).not.toBeInTheDocument();
+  });
+
+  it("lists a system-only view for a cluster of that system and leaves it out for another system's", async () => {
+    mockApi();
+    const { unmount } = renderWithProviders(<ClusterViewNav clusterId="c1" collapsed={false} />);
+    expect(await screen.findByRole('link', { name: 'Configuration' })).toHaveAttribute(
+      'href',
+      '/clusters/c1/artemis/configuration',
+    );
+    expect(screen.getByRole('link', { name: 'Setup review' })).toBeInTheDocument();
+    unmount();
+
+    server.use(
+      http.get('*/api/v1/clusters/c1', () =>
+        HttpResponse.json({ id: 'c1', name: 'c1', system: { id: 'kafka', name: 'Kafka' }, kinds: [] }),
+      ),
+    );
+    renderWithProviders(<ClusterViewNav clusterId="c1" collapsed={false} />);
+
+    await screen.findByRole('link', { name: 'Topology' });
+    await waitFor(() => expect(screen.queryByRole('link', { name: 'Configuration' })).not.toBeInTheDocument());
+    expect(screen.queryByRole('link', { name: 'Setup review' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Config diff' })).not.toBeInTheDocument();
+    // Everything that is not tied to a system stays.
+    expect(screen.getByRole('link', { name: 'Subscriptions' })).toBeInTheDocument();
   });
 });

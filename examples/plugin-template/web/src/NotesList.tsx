@@ -2,16 +2,16 @@ import { useMemo, useState } from 'react';
 import { Button, Stack, Textarea } from '@mantine/core';
 import { DataTable, EmptyState, ErrorState, Section, useCan, type Column } from '@rahdar/plugin-sdk';
 
-import { ID, useAddNote, useDeleteNote, useQueueNotes, type Note } from './api.ts';
+import { ID, useAddNote, useDeleteNote, useSubscriptionNotes, type Note } from './api.ts';
 
-/** The notes on one queue, and — for someone allowed to — a way to add one. */
-export function NotesList({ clusterId, queue }: { clusterId: string; queue: string }) {
-  const notes = useQueueNotes(clusterId, queue);
-  const add = useAddNote(clusterId, queue);
+/** The notes on one subscription, and — for someone allowed to — a way to add one. */
+export function NotesList({ clusterId, subscription }: { clusterId: string; subscription: string }) {
+  const notes = useSubscriptionNotes(clusterId, subscription);
+  const add = useAddNote(clusterId, subscription);
   const remove = useDeleteNote(clusterId);
   const { can } = useCan();
   const [body, setBody] = useState('');
-  const canWrite = can(`${ID}:write`, { clusterId, kind: 'queue', name: queue });
+  const canWrite = can(`${ID}:write`, { clusterId, type: 'subscription', name: subscription });
 
   const columns = useMemo<Column<Note>[]>(() => {
     const cols: Column<Note>[] = [
@@ -52,7 +52,7 @@ export function NotesList({ clusterId, queue }: { clusterId: string; queue: stri
     <Stack gap="md">
       <DataTable
         variant="static"
-        label={`Notes on ${queue}`}
+        label={`Notes on ${subscription}`}
         columns={columns}
         data={notes.data ?? []}
         rowKey={(n) => n.id}
@@ -61,8 +61,8 @@ export function NotesList({ clusterId, queue }: { clusterId: string; queue: stri
         empty={
           <EmptyState
             kind="empty"
-            title={`No notes on ${queue}`}
-            description="A note is for the next operator: why this queue is odd, who owns it."
+            title={`No notes on ${subscription}`}
+            description="A note is for the next operator: why this subscription is odd, who owns it."
           />
         }
         error={notes.isError ? <ErrorState error={notes.error} onRetry={() => void notes.refetch()} /> : undefined}

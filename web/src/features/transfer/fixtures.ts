@@ -5,8 +5,10 @@ import { paged } from '../../kernel/api/paging.ts';
 
 /** Test fixtures for the transfer screens. Placeholder names only. */
 
+const SYSTEM = { id: 'artemis', name: 'Artemis' };
+
 const KINDS = [
-  { id: 'artemis.queue', resourceClass: 'SUBSCRIPTION', label: 'Queue', verbs: [] },
+  { id: 'artemis.queue', resourceClass: 'SUBSCRIPTION', label: 'Queue', verbs: ['move-messages', 'retry-messages'] },
   { id: 'artemis.address', resourceClass: 'DESTINATION', label: 'Address', verbs: [] },
 ];
 
@@ -61,6 +63,7 @@ export function clusterHandlers(
     name,
     description: null,
     topology: topologyOf(id),
+    system: SYSTEM,
     kinds: KINDS,
     capabilities: {
       managementRead: AVAILABLE,
@@ -100,12 +103,12 @@ export function meHandler(permissions: string[] = ['*']) {
   );
 }
 
-export const END = (clusterId: string, nodeId: string, nodeName: string, queue: string) => ({
+export const END = (clusterId: string, nodeId: string, nodeName: string, subscription: string) => ({
   clusterId,
   nodeId,
   nodeName,
-  subscription: `artemis.queue/${queue}`,
-  destination: `artemis.address/${queue}`,
+  subscription: `artemis.queue/${subscription}`,
+  destination: `artemis.address/${subscription}`,
 });
 
 export function run(over: Partial<TransferRunView> = {}): TransferRunView {

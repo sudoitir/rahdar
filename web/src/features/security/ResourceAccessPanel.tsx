@@ -1,3 +1,4 @@
+import type { ResourceRef } from '../../kernel/api/resourceId.ts';
 import { useMemo, useState } from 'react';
 import { Drawer, Group, Select, Stack, Text } from '@mantine/core';
 
@@ -15,7 +16,7 @@ import { resourceGrantColumns } from './columns.ts';
 const rowKey = (g: ResourceTeamGrant) => `${g.source}:${g.teamId}:${g.roleName}:${g.pattern ?? ''}`;
 
 /**
- * Who may act on one queue or address (team-access spec): the team that owns it and every team a share gives a role
+ * Who may act on one subscription or destination (team-access spec): the team that owns it and every team a share gives a role
  * on it, with how many people hold each. For a user administrator or the administrator of a team, who are the people
  * that can act on a request for access. A user administrator can also check what one user holds on it, with the
  * source of each permission.
@@ -86,21 +87,24 @@ export function ResourceAccessPanel({
   );
 }
 
-/** A queue's panel in its detail drawer. */
-export function QueueAccessPanel({ clusterId, queueName }: Readonly<{ clusterId: string; queueName: string }>) {
-  return <ResourceAccessPanel clusterId={clusterId} kind="SUBSCRIPTION" name={queueName} />;
+/** A subscription's panel in its detail drawer. */
+export function SubscriptionAccessPanel({
+  clusterId,
+  subscription,
+}: Readonly<{ clusterId: string; subscription: ResourceRef }>) {
+  return <ResourceAccessPanel clusterId={clusterId} kind="SUBSCRIPTION" name={subscription.name} />;
 }
 
-/** An address's access, opened from its row, since an address has no detail page of its own. */
-export function AddressAccessDrawer({
+/** A destination's access, opened from its row, since a destination has no detail page of its own. */
+export function DestinationAccessDrawer({
   opened,
   onClose,
   clusterId,
-  address,
-}: Readonly<{ opened: boolean; onClose: () => void; clusterId: string; address: string }>) {
+  destination,
+}: Readonly<{ opened: boolean; onClose: () => void; clusterId: string; destination: string }>) {
   return (
-    <Drawer opened={opened} onClose={onClose} position="right" size="lg" title={`Access to ${address}`}>
-      <ResourceAccessPanel clusterId={clusterId} kind="DESTINATION" name={address} />
+    <Drawer opened={opened} onClose={onClose} position="right" size="lg" title={`Access to ${destination}`}>
+      <ResourceAccessPanel clusterId={clusterId} kind="DESTINATION" name={destination} />
     </Drawer>
   );
 }

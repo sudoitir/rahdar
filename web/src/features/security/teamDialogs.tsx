@@ -14,7 +14,7 @@ const CREATE: ActionVerb = { verb: 'Create', past: 'Created', progressive: 'Crea
 const RENAME: ActionVerb = { verb: 'Rename', past: 'Renamed', progressive: 'Renaming' };
 const DELETE: ActionVerb = { verb: 'Delete', past: 'Deleted', progressive: 'Deleting' };
 
-const NAME_ERROR = 'Name the team after the group of people who own these queues.';
+const NAME_ERROR = 'Name the team after the group of people who own these subscriptions.';
 
 /** The team a name dialog is about: a new one, or one to rename. */
 export type Naming = 'new' | Pick<TeamSummary, 'id' | 'name'>;
@@ -92,7 +92,7 @@ function TeamNameForm({
       <Stack gap="sm">
         <TextInput
           label="Name"
-          description="The group of people who own these queues, such as Payments."
+          description="The group of people who own these subscriptions, such as Payments."
           data-autofocus
           {...form.getInputProps('name')}
           required
@@ -116,7 +116,7 @@ function deletedWith(team: TeamSummary | TeamView): string {
     'memberCount' in team
       ? [team.memberCount, team.sharesOut + team.sharesIn]
       : [team.members.length, team.sharesOut.length + team.sharesIn.length];
-  return `This removes the team's ${countOf(team.patterns.length, 'pattern')}, ${countOf(members, 'member')} and ${countOf(shares, 'share')}. Its members lose the access the team gave them on their next request. The queues and addresses themselves are not touched.`;
+  return `This removes the team's ${countOf(team.patterns.length, 'pattern')}, ${countOf(members, 'member')} and ${countOf(shares, 'share')}. Its members lose the access the team gave them on their next request. The subscriptions and destinations themselves are not touched.`;
 }
 
 /** States what deleting a team ends, from its own counts, before it can be armed, then asks for its name. */

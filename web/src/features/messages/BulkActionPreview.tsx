@@ -7,18 +7,18 @@ import { ConfirmDialog } from '../../ui/ConfirmDialog.tsx';
 import { focusFirstInvalid } from '../../ui/formErrors.ts';
 import { useMessageAction, type DryRunView, type MessageActionKind } from './api.ts';
 import { announceFailure, announceResult, destroys, messageCount, VERBS } from './outcomes.ts';
-import { AddressPicker } from '../queues/index.ts';
+import { DestinationPicker } from '../resources/index.ts';
 
 /**
  * By-selector action with a mandatory preview (ADR-0022). "Preview" runs `dryRun=true` and takes the
  * broker's point-in-time estimate; the confirmation then states it and the cap. Deleting or expiring,
- * or going over the cap, is armed by typing the queue's name, and an over-cap run resends with
+ * or going over the cap, is armed by typing the subscription's name, and an over-cap run resends with
  * `override=true`. The selector and the target are checked on activation, with the reason beside the
  * field.
  */
 export function BulkActionPreview({
   clusterId,
-  queueName,
+  subscriptionName,
   action,
   node,
   opened,
@@ -26,14 +26,14 @@ export function BulkActionPreview({
   onDone,
 }: Readonly<{
   clusterId: string;
-  queueName: string;
+  subscriptionName: string;
   action: MessageActionKind;
   node?: string;
   opened: boolean;
   onClose: () => void;
   onDone: () => void;
 }>) {
-  const run = useMessageAction(clusterId, queueName);
+  const run = useMessageAction(clusterId, subscriptionName);
   const ids = useRoleIds(clusterId);
   const [preview, setPreview] = useState<DryRunView | null>(null);
   const form = useForm({
@@ -41,7 +41,7 @@ export function BulkActionPreview({
     validateInputOnBlur: true,
     validate: {
       filter: (value) => (action !== 'retry' && !value.trim() ? 'Enter the selector the messages must match.' : null),
-      target: (value) => (action === 'move' && !value.trim() ? 'Name the queue to move the messages to.' : null),
+      target: (value) => (action === 'move' && !value.trim() ? 'Name the subscription to move the messages to.' : null),
     },
   });
   const verb = VERBS[action].verb;
@@ -57,7 +57,8 @@ export function BulkActionPreview({
         { action, body: body(), node, dryRun: true },
         {
           onSuccess: (r) => setPreview('cap' in r ? r : null),
-          onError: (e) => announceFailure(action, `the preview of the selector on queue "${queueName}"`, e),
+          onError: (e) =>
+            announceFailure(action, `the preview of the selector on subscription "${subscriptionName}"`, e),
         },
       ),
     focusFirstInvalid(form.getInputNode),
@@ -78,15 +79,20 @@ export function BulkActionPreview({
       { action, body: body(), node, override: preview?.overCap ?? false },
       {
         onSuccess: (r) => {
-          announceResult(action, queueName, r, preview?.affectedCount ?? 0);
+          announceResult(action, subscriptionName, r, preview?.affectedCount ?? 0);
           reset();
           onDone();
         },
         onError: (e) =>
-          announceFailure(action, `${messageCount(preview?.affectedCount ?? 0)} in queue "${queueName}"`, e, () => {
-            reset();
-            onDone();
-          }),
+          announceFailure(
+            action,
+            `${messageCount(preview?.affectedCount ?? 0)} in subscription "${subscriptionName}"`,
+            e,
+            () => {
+              reset();
+              onDone();
+            },
+          ),
       },
     );
 
@@ -99,8 +105,8 @@ export function BulkActionPreview({
           <Stack gap="sm">
             {action === 'retry' ? (
               <Text size="sm" c="dimmed">
-                Artemis has no by-selector retry — this replays <strong>every</strong> message on the queue. Preview to
-                see how many.
+                Artemis has no by-selector retry — this replays <strong>every</strong> message on the subscription.
+                Preview to see how many.
               </Text>
             ) : (
               <TextInput
@@ -112,9 +118,9 @@ export function BulkActionPreview({
               />
             )}
             {action === 'move' ? (
-              <AddressPicker
+              <DestinationPicker
                 clusterId={clusterId}
-                label="Target queue"
+                label="Target subscription"
                 permission="message:send"
                 {...form.getInputProps('target')}
                 value={form.values.target}

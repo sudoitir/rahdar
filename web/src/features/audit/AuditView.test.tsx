@@ -368,7 +368,7 @@ describe('AuditView filters', () => {
 
     // In words on screen; the recorded value in the address.
     const action = await screen.findByPlaceholderText('Any action');
-    expect(action).toHaveValue('Purge queue');
+    expect(action).toHaveValue('Purge subscription');
     await user.click(action);
     await user.click(await screen.findByRole('option', { name: 'Move messages' }));
     expect(nextSearch()).toEqual({ action: 'MOVE_MESSAGES', page: undefined });
@@ -446,16 +446,16 @@ describe('AuditView event detail', () => {
     expect(within(dialog).queryByText('Error')).not.toBeInTheDocument();
     expect(within(dialog).queryByRole('region', { name: 'Audit event parameters' })).not.toBeInTheDocument();
     expect(within(dialog).queryByText(/Show the operation this belongs to/)).not.toBeInTheDocument();
-    expect(within(dialog).queryByText(/Show the event for each queue/)).not.toBeInTheDocument();
+    expect(within(dialog).queryByText(/Show the event for each subscription/)).not.toBeInTheDocument();
   });
 
-  it('offers the events of each queue for a bulk run, and closing the drawer drops the event from the address', async () => {
+  it('offers the events of each subscription for a bulk run, and closing the drawer drops the event from the address', async () => {
     search = { event: 7 };
     server.use(grants([]), page([row({ id: 7, action: 'bulk.delete', targetName: 'cluster' })]));
     const user = userEvent.setup();
     renderWithProviders(<AuditView />);
 
-    await user.click(await screen.findByRole('button', { name: 'Show the event for each queue in this run' }));
+    await user.click(await screen.findByRole('button', { name: 'Show the event for each subscription in this run' }));
     expect(nextSearch({ event: 7 })).toEqual({ parentId: 7, event: undefined, page: undefined });
 
     await user.keyboard('{Escape}');

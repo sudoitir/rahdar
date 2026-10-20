@@ -13,10 +13,10 @@ import { OPERATIONS } from './words.ts';
 const ORDER: BulkOperation[] = ['PAUSE', 'RESUME', 'PURGE', 'DELETE'];
 
 /**
- * The bulk actions over the queues screen's selection (`queues.selection`). Each is gated on the
- * permission of the single-queue command it applies, and opens its preview; nothing acts from here.
+ * The bulk actions over the subscriptions screen's selection (`subscriptions.selection`). Each is gated on the
+ * permission of the single-subscription command it applies, and opens its preview; nothing acts from here.
  */
-export function BulkActionBar({ clusterId, selection, count, clear }: Readonly<SlotProps['queues.selection']>) {
+export function BulkActionBar({ clusterId, selection, count, clear }: Readonly<SlotProps['subscriptions.selection']>) {
   const { canAnywhere, loading } = useCan();
   const cluster = useCluster(clusterId);
   const write = cluster.data?.capabilities.managementWrite;
@@ -40,11 +40,12 @@ export function BulkActionBar({ clusterId, selection, count, clear }: Readonly<S
           permitted.kind === 'allowed' && count === 0
             ? {
                 kind: 'blocked',
-                reason: 'No queues are selected. Select queues in the grid, or select all matching the filter.',
+                reason:
+                  'No subscriptions are selected. Select subscriptions in the grid, or select all matching the filter.',
               }
             : permitted;
         return (
-          <CapabilityGate key={each} verdict={gate} what={`${op.gerund} these queues`}>
+          <CapabilityGate key={each} verdict={gate} what={`${op.gerund} these subscriptions`}>
             <Button
               size="xs"
               variant="default"

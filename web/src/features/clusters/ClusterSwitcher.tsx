@@ -155,7 +155,7 @@ function Face({
  * The way between clusters (`shell.navbar`): one row of constant height showing the cluster the address
  * is under, opening a searchable list of every cluster, grouped by environment, with registration at its
  * end. Outside a cluster it says "Choose a cluster". Choosing one keeps the view (ADR-0109): comparing
- * Queues on two clusters is a choice and a click.
+ * Subscriptions on two clusters is a choice and a click.
  *
  * Collapsed to the rail it is the cluster's monogram, bordered in its environment's colour.
  */

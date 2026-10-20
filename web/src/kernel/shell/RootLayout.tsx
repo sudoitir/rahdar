@@ -73,7 +73,7 @@ export function RootLayout() {
   }, [isPublicRoute, me.isError, me.error, me.data, location.pathname, navigate]);
 
   // Every tab says what it holds (ADR-0109): an operator with six Rahdar tabs open finds the one
-  // on prod's Queues without opening each.
+  // on prod's Subscriptions without opening each.
   const view = useCurrentView();
   const titleParts = useTitleParts();
   useDocumentTitle(
@@ -84,7 +84,7 @@ export function RootLayout() {
 
   // Every place visited feeds the palette's Recent group: a view, or the resource open in it.
   const recentLabel = view?.item ? titleParts.resource || view.item.label : undefined;
-  // The search is part of the place (the open queue), but a filter typed into it is not a new place:
+  // The search is part of the place (the open subscription), but a filter typed into it is not a new place:
   // the effect event reads it without making it a trigger.
   const record = useEffectEvent(() => {
     if (!view?.item || !recentLabel) return;

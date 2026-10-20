@@ -10,7 +10,7 @@ import { ExplainStrip } from './ExplainStrip.tsx';
 import { QueryEditor, type QueryError } from './QueryEditor.tsx';
 import classes from './SqlConsoleView.module.css';
 
-/** How many queue names the editor's completion is offered. Enough to cover a cluster. */
+/** How many subscription names the editor's completion is offered. Enough to cover a cluster. */
 export const QUEUE_COMPLETION_LIMIT = 500;
 
 /**
@@ -104,7 +104,7 @@ export function QueryPane({
   onCancel,
   onMaximise,
   onEscape,
-  queueNames,
+  subscriptionNames,
   completionCapped,
   costId,
   verdict,
@@ -117,7 +117,7 @@ export function QueryPane({
   onCancel: () => void;
   onMaximise: () => void;
   onEscape: () => void;
-  queueNames: string[];
+  subscriptionNames: string[];
   completionCapped: boolean;
   /** The id of the cost line, which describes the editor and Run. */
   costId: string;
@@ -134,7 +134,7 @@ export function QueryPane({
         onCancel={onCancel}
         onMaximise={onMaximise}
         onEscape={onEscape}
-        queues={queueNames}
+        subscriptions={subscriptionNames}
         describedBy={costId}
         error={queryError}
       />
@@ -142,7 +142,7 @@ export function QueryPane({
       <Text size="xs" c="dimmed" className={classes.fixed}>
         ⌘/Ctrl-Enter runs · ⌘/Ctrl-. cancels · Ctrl-Space completes · Escape leaves the editor
         {completionCapped
-          ? ` · completion lists the first ${QUEUE_COMPLETION_LIMIT.toLocaleString()} queues on this cluster, not all of them`
+          ? ` · completion lists the first ${QUEUE_COMPLETION_LIMIT.toLocaleString()} subscriptions on this cluster, not all of them`
           : ''}
       </Text>
 

@@ -33,7 +33,7 @@ const HINTS: Record<Hint, string> = {
  * finger or a pen, or with Space or Enter on the keyboard; the hint under the button says so, and the
  * outcome is announced.
  *
- * <p>`label` is the action ("Delete 37 queues") and names the blast radius the button is for; the button
+ * <p>`label` is the action ("Delete 37 subscriptions") and names the blast radius the button is for; the button
  * reads exactly that, and the hint under it says to hold it. While `loading` it is busy and cannot be held again. Mouse and touch
  * presses are Mantine's `useLongPress`; it has no keyboard, which is handled here.
  */
@@ -45,7 +45,7 @@ export function HoldToConfirm({
   describedBy,
   tone = 'danger',
 }: Readonly<{
-  /** The exact action, such as "Delete queue ORDERS" or "Apply to 2 nodes". */
+  /** The exact action, such as "Delete subscription ORDERS" or "Apply to 2 nodes". */
   label: string;
   onConfirm: () => void;
   loading?: boolean;

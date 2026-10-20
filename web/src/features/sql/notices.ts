@@ -13,15 +13,15 @@ export type Tone = 'warning' | 'danger' | undefined;
 
 const NOTICE_WORDS: Record<string, { text: string; tone: Tone }> = {
   NO_QUEUE_MATCHED: {
-    text: 'No queue matched. This is an empty target list, not an empty queue.',
+    text: 'No subscription matched. This is an empty target list, not an empty subscription.',
     tone: 'warning',
   },
   TARGET_CAPPED: {
-    text: 'The FROM pattern matched more queues than one query may read, so only some of them were read.',
+    text: 'The FROM pattern matched more subscriptions than one query may read, so only some of them were read.',
     tone: 'warning',
   },
   EXCLUDED_BY_PERMISSION: {
-    text: 'A queue this query names was excluded — you do not have access to it.',
+    text: 'A subscription this query names was excluded — you do not have access to it.',
     tone: 'warning',
   },
   CLOCK_OFFSET_UNKNOWN: {
@@ -45,12 +45,12 @@ const NOTICE_WORDS: Record<string, { text: string; tone: Tone }> = {
     tone: 'warning',
   },
   ADDRESS_SCOPED_CAPTURE: {
-    // Not a warning: the rows are complete for what the address routed. It is the
+    // Not a warning: the rows are complete for what the destination routed. It is the
     // question "which subscription got it" that cannot be answered, and saying so
     // is the whole point.
     text:
-      'These rows are what the address routed. Capture copies before fan-out, so which of the ' +
-      'queues bound to this address received a message is not recorded.',
+      'These rows are what the destination routed. Capture copies before fan-out, so which of the ' +
+      'subscriptions bound to this destination received a message is not recorded.',
     tone: undefined,
   },
   CAPTURE_NODE_GAP: {
@@ -86,7 +86,7 @@ export function boundWords(bound: SqlBoundView): string {
     case 'TIMEOUT':
       return `Stopped after ${value} ms — the query timeout. There may be more matches.`;
     case 'TARGET_CAP':
-      return `Only the first ${value} queues were read — the target cap. Narrow the FROM pattern.`;
+      return `Only the first ${value} subscriptions were read — the target cap. Narrow the FROM pattern.`;
     default:
       return `Stopped at ${value} (${bound.kind}).`;
   }

@@ -1,5 +1,5 @@
-/* A queue's name is broker-supplied and can be one long unbroken string, so it breaks anywhere
+/* A subscription's name is broker-supplied and can be one long unbroken string, so it breaks anywhere
    rather than widening the page. */
-.queue {
+.subscription {
   overflow-wrap: anywhere;
 }

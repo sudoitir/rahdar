@@ -63,8 +63,8 @@ function SubscriptionNotes({ subscription }: Readonly<{ subscription: SqlIndexSu
       ) : null}
       {subscription.backlogInProgress ? (
         <Text size="xs" c="dimmed">
-          Still indexing the messages that were already on these queues, a few pages per poll; until that finishes the
-          index is not up to date.
+          Still indexing the messages that were already on these subscriptions, a few pages per poll; until that
+          finishes the index is not up to date.
         </Text>
       ) : null}
       {subscription.mode !== 'CAPTURE' ? (
@@ -77,8 +77,8 @@ function SubscriptionNotes({ subscription }: Readonly<{ subscription: SqlIndexSu
   );
 }
 
-/** The queues a subscription covers, since when, by whom, and what each node is doing about it. */
-export function QueuesCell({ subscription }: Readonly<{ subscription: SqlIndexSubscriptionView }>) {
+/** The subscriptions a subscription covers, since when, by whom, and what each node is doing about it. */
+export function SubscriptionsCell({ subscription }: Readonly<{ subscription: SqlIndexSubscriptionView }>) {
   return (
     <Stack gap={2}>
       <Text size="sm" fw={600}>
@@ -181,7 +181,7 @@ export function DeleteCell({
               This deletes the subscription and the {held.toLocaleString()} captured message{held === 1 ? '' : 's'} it
               holds. They cannot be recovered — a consumed message cannot be observed a second time.
               {subscription.mode === 'CAPTURE'
-                ? ' It also removes the divert, the capture queue, the address setting and the security setting from every node that answers now; a node that is unreachable is cleaned on its next reconcile pass. Nothing else removes them.'
+                ? ' It also removes the divert, the capture subscription, the address setting and the security setting from every node that answers now; a node that is unreachable is cleaned on its next reconcile pass. Nothing else removes them.'
                 : ''}
             </Text>
             {remove.isError ? <ErrorState variant="inline" error={remove.error} /> : null}

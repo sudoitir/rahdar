@@ -30,7 +30,14 @@ const ALL: MessageSelection = { kind: 'all' };
 
 function Actions({ selection = ALL, total = 1200 }: { selection?: MessageSelection; total?: number | null }) {
   return (
-    <TransferActions clusterId="c1" queueName="orders" node="n1" selection={selection} total={total} clear={() => {}} />
+    <TransferActions
+      clusterId="c1"
+      subscription={{ id: 'artemis.queue/orders', kind: 'artemis.queue', name: 'orders' }}
+      node="n1"
+      selection={selection}
+      total={total}
+      clear={() => {}}
+    />
   );
 }
 
@@ -51,7 +58,7 @@ describe('TransferActions', () => {
     expect(await screen.findByText(/Browse messages/)).toBeInTheDocument();
   });
 
-  it('says an empty queue is why there is nothing to transfer', async () => {
+  it('says an empty subscription is why there is nothing to transfer', async () => {
     server.use(meHandler(), ...clusterHandlers());
     renderWithProviders(<Actions total={0} />);
 
@@ -63,7 +70,7 @@ describe('TransferActions', () => {
 });
 
 describe('TransferDialog', () => {
-  it('previews the whole queue with every field the server requires', async () => {
+  it('previews the whole subscription with every field the server requires', async () => {
     const bodies: unknown[] = [];
     server.use(meHandler(), ...clusterHandlers(), previewHandler(run(), bodies));
     const user = userEvent.setup();
@@ -148,7 +155,7 @@ describe('TransferDialog', () => {
             finding(
               'REFUSE',
               'address-full-policy-drop',
-              'orders on node-b drops messages when its address is full, so a transfer could lose them silently.',
+              'orders on node-b drops messages when its destination is full, so a transfer could lose them silently.',
               '<address-setting match="orders"><address-full-policy>PAGE</address-full-policy></address-setting>',
             ),
           ],
@@ -165,7 +172,7 @@ describe('TransferDialog', () => {
 
     expect(await within(dialog).findByText(/Move 1,200 messages \(84 MB\)/)).toBeInTheDocument();
     expect(within(dialog).getByText(/The target cannot accept this transfer/)).toBeInTheDocument();
-    expect(within(dialog).getByText(/drops messages when its address is full/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/drops messages when its destination is full/)).toBeInTheDocument();
     expect(within(dialog).getByText(/<address-full-policy>PAGE<\/address-full-policy>/)).toBeInTheDocument();
     // Nothing to arm: a refused transfer offers no confirmation at all.
     expect(within(dialog).queryByRole('button', { name: /^Move 1,200 messages$/ })).not.toBeInTheDocument();
@@ -321,17 +328,17 @@ describe('TransferRunView', () => {
       delivered: 300,
       resumable: true,
       returnable: true,
-      lastError: 'node-b refused the batch: its address is full.',
+      lastError: 'node-b refused the batch: its destination is full.',
     });
 
     const status = await screen.findByRole('status', { name: 'Transfer state' });
     expect(status).toHaveTextContent('Nothing held is lost');
-    expect(screen.getAllByText('node-b refused the batch: its address is full.').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('node-b refused the batch: its destination is full.').length).toBeGreaterThan(0);
     expect(screen.getByRole('button', { name: 'Resume' })).toBeEnabled();
     expect(screen.getByRole('button', { name: 'Return to source…' })).toBeEnabled();
   });
 
-  it('returns the held messages only after the source queue name is typed', async () => {
+  it('returns the held messages only after the source subscription name is typed', async () => {
     let returned = 0;
     server.use(
       meHandler(),
@@ -376,7 +383,12 @@ describe('TransferRunView', () => {
 
 describe('TransfersView', () => {
   it('is one page with a single h1 and the stranded-staging section below it', async () => {
-    const orphan: OrphanView = { nodeId: 'n1', nodeName: 'node-a', stagingQueue: 'rahdar.transfer.r9', depth: null };
+    const orphan: OrphanView = {
+      nodeId: 'n1',
+      nodeName: 'node-a',
+      stagingQueue: 'rahdar.transfer.r9',
+      depth: null,
+    };
     server.use(
       meHandler(),
       ...clusterHandlers(),
@@ -386,7 +398,9 @@ describe('TransfersView', () => {
     renderWithProviders(<TransfersView />);
 
     expect(screen.getByRole('heading', { level: 1, name: 'Message transfers' })).toBeInTheDocument();
-    expect(await screen.findByRole('heading', { level: 2, name: 'Staging queues with no run' })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { level: 2, name: 'Staging subscriptions with no run' }),
+    ).toBeInTheDocument();
     expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
     // An unknown depth is stated, never shown as zero.
     expect(screen.getByText(/rahdar\.transfer\.r9 on node-a — depth unknown/)).toBeInTheDocument();
@@ -406,15 +420,22 @@ describe('TransfersView', () => {
     const user = userEvent.setup();
     renderWithProviders(<TransfersView />);
 
-    const section = (await screen.findByRole('heading', { name: 'Staging queues with no run' })).closest('section');
+    const section = (await screen.findByRole('heading', { name: 'Staging subscriptions with no run' })).closest(
+      'section',
+    );
     expect(section).toHaveTextContent('If a transfer was interrupted, its messages may still be held on a broker.');
     const before = calls;
     await user.click(await within(section as HTMLElement).findByRole('button', { name: 'Retry' }));
     await waitFor(() => expect(calls).toBeGreaterThan(before));
   });
 
-  it('asks for the queue to return to, beside its field, instead of leaving the button dead', async () => {
-    const orphan: OrphanView = { nodeId: 'n1', nodeName: 'node-a', stagingQueue: 'rahdar.transfer.r9', depth: 42 };
+  it('asks for the subscription to return to, beside its field, instead of leaving the button dead', async () => {
+    const orphan: OrphanView = {
+      nodeId: 'n1',
+      nodeName: 'node-a',
+      stagingQueue: 'rahdar.transfer.r9',
+      depth: 42,
+    };
     const bodies: unknown[] = [];
     server.use(
       meHandler(),
@@ -423,7 +444,12 @@ describe('TransfersView', () => {
       http.get('*/api/v1/clusters/c1/transfers/orphans', () => HttpResponse.json(paged([orphan]))),
       http.post('*/api/v1/clusters/c1/transfers/orphans/return', async ({ request }) => {
         bodies.push(await request.json());
-        return HttpResponse.json({ stagingQueue: 'rahdar.transfer.r9', returned: 42, remaining: 0, removed: true });
+        return HttpResponse.json({
+          stagingQueue: 'rahdar.transfer.r9',
+          returned: 42,
+          remaining: 0,
+          removed: true,
+        });
       }),
     );
     const user = userEvent.setup();
@@ -433,7 +459,7 @@ describe('TransfersView', () => {
     const dialog = await screen.findByRole('dialog');
     await holdButton(within(dialog).getByRole('button', { name: 'Return the messages' }));
 
-    expect(await within(dialog).findByText('Name the queue the messages go back to.')).toBeInTheDocument();
+    expect(await within(dialog).findByText('Name the subscription the messages go back to.')).toBeInTheDocument();
     expect(within(dialog).getByRole('textbox', { name: /Return them to/ })).toHaveFocus();
     expect(bodies).toHaveLength(0);
   });
@@ -451,8 +477,13 @@ describe('TransfersView', () => {
     expect(screen.getByText(/checks the target can accept them/)).toBeInTheDocument();
   });
 
-  it('lists staging with no run, and returns it to a named queue', async () => {
-    const orphan: OrphanView = { nodeId: 'n1', nodeName: 'node-a', stagingQueue: 'rahdar.transfer.r9', depth: 42 };
+  it('lists staging with no run, and returns it to a named subscription', async () => {
+    const orphan: OrphanView = {
+      nodeId: 'n1',
+      nodeName: 'node-a',
+      stagingQueue: 'rahdar.transfer.r9',
+      depth: 42,
+    };
     const bodies: unknown[] = [];
     server.use(
       meHandler(),
@@ -461,7 +492,12 @@ describe('TransfersView', () => {
       http.get('*/api/v1/clusters/c1/transfers/orphans', () => HttpResponse.json(paged([orphan]))),
       http.post('*/api/v1/clusters/c1/transfers/orphans/return', async ({ request }) => {
         bodies.push(await request.json());
-        return HttpResponse.json({ stagingQueue: 'rahdar.transfer.r9', returned: 42, remaining: 0, removed: true });
+        return HttpResponse.json({
+          stagingQueue: 'rahdar.transfer.r9',
+          returned: 42,
+          remaining: 0,
+          removed: true,
+        });
       }),
     );
     const user = userEvent.setup();
@@ -475,7 +511,11 @@ describe('TransfersView', () => {
     await holdButton(within(dialog).getByRole('button', { name: 'Return the messages' }));
 
     await waitFor(() => expect(bodies).toHaveLength(1));
-    expect(bodies[0]).toEqual({ nodeId: 'n1', stagingQueue: 'rahdar.transfer.r9', target: 'artemis.queue/orders' });
+    expect(bodies[0]).toEqual({
+      nodeId: 'n1',
+      stagingQueue: 'rahdar.transfer.r9',
+      target: 'artemis.queue/orders',
+    });
     expect(await screen.findByText(/42 messages returned from rahdar\.transfer\.r9\./)).toBeInTheDocument();
   });
 });

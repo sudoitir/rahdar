@@ -192,7 +192,7 @@ describe('useCan', () => {
     });
   });
 
-  it('asks the server about one queue, and follows what a team gives there', async () => {
+  it('asks the server about one subscription, and follows what a team gives there', async () => {
     serveAccess({ permissions: [] });
     const asked: string[] = [];
     server.use(
@@ -235,7 +235,7 @@ describe('useCan', () => {
     expect(screen.getByText('acme:write on b: no')).toBeInTheDocument();
   });
 
-  it('offers a page for a resource permission held on some queue of a cluster, through a team', async () => {
+  it('offers a page for a resource permission held on some subscription of a cluster, through a team', async () => {
     serveAccess({ permissions: [] }, { c1: { permissions: [], anywhere: ['acme:read'] }, c2: { permissions: [] } });
     renderWithProviders(
       <>

@@ -16,8 +16,8 @@ function IndexProvenance({ captured }: Readonly<{ captured: boolean }>) {
   return (
     <Notice title={captured ? 'Captured rows' : 'Sampled rows'}>
       {captured
-        ? 'These rows were captured: a divert copied every message the address routed into a queue Rahdar drains, so a message that was consumed immediately is still here. A message may have been consumed since it was captured — "verify on broker", on any row, asks a broker whether it is still there.'
-        : 'These rows are what Rahdar observed while sampling these queues. A message may have been consumed since it was seen, and one that arrived and left between two samples was never indexed at all.'}
+        ? 'These rows were captured: a divert copied every message the destination routed into a subscription Rahdar drains, so a message that was consumed immediately is still here. A message may have been consumed since it was captured — "verify on broker", on any row, asks a broker whether it is still there.'
+        : 'These rows are what Rahdar observed while sampling these subscriptions. A message may have been consumed since it was seen, and one that arrived and left between two samples was never indexed at all.'}
     </Notice>
   );
 }

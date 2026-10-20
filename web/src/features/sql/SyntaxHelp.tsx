@@ -33,9 +33,9 @@ export function SyntaxHelp({
             their own dry run and audit record.
           </Text>
           <Text size="sm">
-            A queue name is not a SQL identifier — <Code>ORDER.IN</Code> is a reserved word and a dot — so it is always
-            double-quoted. Wildcards are Artemis&apos;, not SQL&apos;s: <Code>*</Code> matches one dot-delimited level
-            and <Code>#</Code> matches many.
+            A subscription name is not a SQL identifier — <Code>ORDER.IN</Code> is a reserved word and a dot — so it is
+            always double-quoted. Wildcards are Artemis&apos;, not SQL&apos;s: <Code>*</Code> matches one dot-delimited
+            level and <Code>#</Code> matches many.
           </Text>
         </Stack>
 
@@ -43,9 +43,9 @@ export function SyntaxHelp({
           <Text size="sm">
             The schema qualifier picks the backend. <Code>FROM broker.&quot;Q&quot;</Code> reads the live brokers —
             current truth. <Code>FROM index.&quot;Q&quot;</Code> reads the historical index, which still holds messages
-            that have since been consumed, and only covers queues with a subscription. <Code>FROM &quot;Q&quot;</Code>{' '}
-            reads the index when every queue it names is captured, and the live brokers otherwise — a queue that is only
-            sampled is read live. The plan says which it picked.
+            that have since been consumed, and only covers subscriptions with a subscription.{' '}
+            <Code>FROM &quot;Q&quot;</Code> reads the index when every subscription it names is captured, and the live
+            brokers otherwise — a subscription that is only sampled is read live. The plan says which it picked.
           </Text>
         </Section>
 
@@ -73,8 +73,8 @@ export function SyntaxHelp({
             }))}
           />
           <Text size="sm">
-            Application properties are addressed by name as <Code>props.tenant</Code>, and a JSON field inside the body
-            as <Code>body-&gt;&gt;&apos;orderId&apos;</Code>. The only functions the dialect accepts are{' '}
+            Application properties are destinationed by name as <Code>props.tenant</Code>, and a JSON field inside the
+            body as <Code>body-&gt;&gt;&apos;orderId&apos;</Code>. The only functions the dialect accepts are{' '}
             {FUNCTIONS.map((f) => (
               <Code key={f}>{f}()</Code>
             ))}

@@ -1,7 +1,7 @@
 import type { FlowNodeShare } from './api.ts';
 import { formatCount } from './flowFormat.ts';
 
-/** One statement about how a queue or address is spread over the broker nodes (design D11). */
+/** One statement about how a subscription or destination is spread over the broker nodes (design D11). */
 export interface Statement {
   kind: 'concentration' | 'stranded' | 'skew' | 'balanced' | 'unknown';
   text: string;

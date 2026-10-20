@@ -27,7 +27,7 @@ const perm = (over: Partial<EffectivePermissionView>): EffectivePermissionView =
 });
 
 const PERMISSIONS: EffectivePermissionView[] = [
-  perm({ action: 'subscription:read', description: 'See queues' }),
+  perm({ action: 'subscription:read', description: 'See subscriptions' }),
   perm({ action: 'subscription:write', via: 'subscription:*' }),
   perm({
     action: 'cluster:manage',
@@ -87,7 +87,7 @@ describe('RoleGrants', () => {
     expect(screen.getByText('Environment')).toBeInTheDocument();
 
     const read = screen.getByRole('row', { name: /subscription:read/ });
-    expect(read).toHaveTextContent('See queues');
+    expect(read).toHaveTextContent('See subscriptions');
     expect(read).toHaveTextContent('operator');
     expect(read).toHaveTextContent('Granted');
     expect(read).not.toHaveTextContent('through');

@@ -14,7 +14,7 @@ const USER = { id: 'u-1', username: 'alice' };
 
 const check = (over: Partial<AccessCheckView>): AccessCheckView => ({
   action: 'subscription:read',
-  description: 'See queues',
+  description: 'See subscriptions',
   scope: 'RESOURCE',
   allowed: false,
   sources: [],
@@ -84,7 +84,7 @@ describe('AccessCheckDrawer', () => {
     expect(screen.getByText(/1 of 2 permissions are allowed on Rahdar itself/)).toBeInTheDocument();
   });
 
-  it('asks about a queue on a cluster and names the team and the share that allow it', async () => {
+  it('asks about a subscription on a cluster and names the team and the share that allow it', async () => {
     serveLookups();
     const asked = serve((params) => (params.get('name') ? TEAM_RESULT : GLOBAL_RESULT));
     const person = userEvent.setup();

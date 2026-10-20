@@ -58,3 +58,24 @@ export const KIND_PRESETS: Record<ColumnKind, KindPreset> = {
   time: { grow: false, truncate: 'none', mono: false },
   status: { grow: false, truncate: 'none', mono: false },
 };
+
+/**
+ * The Kind column of a list of one role: what the row's system calls its kind ("Queue", "Divert"). It is
+ * `low` so a narrow table drops it first; the name still identifies the row.
+ */
+export function kindColumn<T extends { kindLabel: string }>(): Column<T>;
+/** The same column for rows that hold the label deeper, such as a dead-letter row's subscription. */
+export function kindColumn<T>(label: (row: T) => string): Column<T>;
+export function kindColumn<T>(label?: (row: T) => string): Column<T> {
+  return {
+    id: 'kind',
+    header: 'Kind',
+    accessor: label ?? ((r) => (r as { kindLabel: string }).kindLabel),
+    kind: 'text',
+    priority: 'low',
+    // A kind's label is a word or two, so the column holds no more than that and leaves the width to the names.
+    min: 8,
+    max: 16,
+    grow: false,
+  };
+}

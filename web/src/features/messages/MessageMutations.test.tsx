@@ -11,13 +11,13 @@ import { ARTEMIS_KINDS } from '../../test/wire.ts';
 
 vi.mock('@tanstack/react-router', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@tanstack/react-router')>()),
-  useParams: () => ({ clusterId: 'c1', queueName: 'ORDERS' }),
+  useParams: () => ({ clusterId: 'c1', subscriptionName: 'ORDERS' }),
   useNavigate: () => () => {},
 }));
 
 const { BulkActionPreview } = await import('./BulkActionPreview.tsx');
 const { MessageActions } = await import('./MessageActions.tsx');
-const { PurgeQueue } = await import('./PurgeQueue.tsx');
+const { PurgeSubscription } = await import('./PurgeSubscription.tsx');
 const { SendMessage } = await import('./SendMessage.tsx');
 
 afterEach(() => act(() => notifications.clean()));
@@ -76,7 +76,7 @@ describe('BulkActionPreview', () => {
     renderWithProviders(
       <BulkActionPreview
         clusterId="c1"
-        queueName="ORDERS"
+        subscriptionName="ORDERS"
         action={action}
         opened
         onClose={() => {}}
@@ -84,7 +84,7 @@ describe('BulkActionPreview', () => {
       />,
     );
 
-  it('gates "Run anyway" behind the typed queue name when over cap', async () => {
+  it('gates "Run anyway" behind the typed subscription name when over cap', async () => {
     server.use(
       http.post('*/api/v1/clusters/c1/resources/artemis.queue/ORDERS/messages:delete', () =>
         HttpResponse.json({ affectedCount: 50, cap: 10, overCap: true, node: 'n1' }),
@@ -122,12 +122,12 @@ describe('BulkActionPreview', () => {
 
     await user.type(selector, 'a = 1');
     await user.click(screen.getByRole('button', { name: 'Preview' }));
-    expect(screen.getByLabelText('Target queue')).toBeInvalid();
-    expect(screen.getByLabelText('Target queue')).toHaveFocus();
+    expect(screen.getByLabelText('Target subscription')).toBeInvalid();
+    expect(screen.getByLabelText('Target subscription')).toHaveFocus();
     expect(requests).toHaveLength(0);
   });
 
-  it('arms a delete under the cap only once the queue name is typed, and announces what it deleted', async () => {
+  it('arms a delete under the cap only once the subscription name is typed, and announces what it deleted', async () => {
     const bodies: string[] = [];
     server.use(
       http.post('*/api/v1/clusters/c1/resources/artemis.queue/ORDERS/messages:delete', ({ request }) => {
@@ -143,7 +143,7 @@ describe('BulkActionPreview', () => {
       withToasts(
         <BulkActionPreview
           clusterId="c1"
-          queueName="ORDERS"
+          subscriptionName="ORDERS"
           action="delete"
           opened
           onClose={() => {}}
@@ -157,7 +157,7 @@ describe('BulkActionPreview', () => {
     const confirm = await screen.findByRole('button', { name: 'Delete 3 messages' });
     await holdButton(confirm);
 
-    expect(await screen.findByText('Deleted 3 messages in queue "ORDERS"')).toBeInTheDocument();
+    expect(await screen.findByText('Deleted 3 messages in subscription "ORDERS"')).toBeInTheDocument();
     expect(bodies).toEqual(['preview', 'run']);
   });
 
@@ -179,7 +179,7 @@ describe('BulkActionPreview', () => {
 
 describe('MessageActions', () => {
   const selectTwo = () => (
-    <MessageActions clusterId="c1" queueName="ORDERS" selected={new Set(['1', '2'])} onCleared={() => {}} />
+    <MessageActions clusterId="c1" subscriptionName="ORDERS" selected={new Set(['1', '2'])} onCleared={() => {}} />
   );
 
   it('reports a by-id operation that stopped part-way, naming the ids left undone', async () => {
@@ -203,7 +203,7 @@ describe('MessageActions', () => {
 
     // Partial is announced assertively and stays until dismissed, with the ids still where they were.
     const alert = await screen.findByRole('alert');
-    expect(alert).toHaveTextContent('Deleted 1 of 2 messages on queue "ORDERS"');
+    expect(alert).toHaveTextContent('Deleted 1 of 2 messages on subscription "ORDERS"');
     expect(alert).toHaveTextContent(/The broker stopped answering\. Not deleted: 2\./);
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
   });
@@ -223,12 +223,12 @@ describe('MessageActions', () => {
     await holdButton(within(dialog).getByRole('button', { name: 'Expire 2 messages' }));
 
     const alert = await screen.findByRole('alert');
-    expect(alert).toHaveTextContent('Could not expire 2 messages in queue "ORDERS"');
+    expect(alert).toHaveTextContent('Could not expire 2 messages in subscription "ORDERS"');
     expect(alert).toHaveTextContent('The node is read-only. Check the audit log for what ran, then try again.');
     expect(screen.getByRole('dialog', { name: 'Expire 2 messages' })).toBeInTheDocument();
   });
 
-  it('asks for the target queue on the field when a move is confirmed without one', async () => {
+  it('asks for the target subscription on the field when a move is confirmed without one', async () => {
     signedInWith(['*']);
     const requests: string[] = [];
     server.use(
@@ -246,15 +246,15 @@ describe('MessageActions', () => {
     expect(within(dialog).queryByLabelText(/Type "ORDERS" to confirm/)).not.toBeInTheDocument();
     await user.click(within(dialog).getByRole('button', { name: 'Move 2 messages' }));
 
-    const target = within(dialog).getByLabelText('Target queue');
+    const target = within(dialog).getByLabelText('Target subscription');
     expect(target).toBeInvalid();
-    expect(within(dialog).getByText('Name the queue to move the messages to.')).toBeInTheDocument();
+    expect(within(dialog).getByText('Name the subscription to move the messages to.')).toBeInTheDocument();
     expect(target).toHaveFocus();
     expect(requests).toHaveLength(0);
 
     await user.type(target, 'ARCHIVE');
     await user.click(within(dialog).getByRole('button', { name: 'Move 2 messages' }));
-    expect(await screen.findByText('Moved 2 messages in queue "ORDERS"')).toBeInTheDocument();
+    expect(await screen.findByText('Moved 2 messages in subscription "ORDERS"')).toBeInTheDocument();
   });
 
   it('keeps every action visible but disabled, with the reason, for an operator who may only read', async () => {
@@ -279,7 +279,7 @@ describe('MessageActions', () => {
   });
 });
 
-describe('PurgeQueue', () => {
+describe('PurgeSubscription', () => {
   const dry = (affectedCount: number) => HttpResponse.json({ affectedCount, cap: 10, overCap: false, node: 'n1' });
 
   it('states the estimate, arms on the typed name, and announces what it purged', async () => {
@@ -292,16 +292,18 @@ describe('PurgeQueue', () => {
       ),
     );
     const user = userEvent.setup();
-    renderWithProviders(withToasts(<PurgeQueue clusterId="c1" queueName="ORDERS" />));
+    renderWithProviders(withToasts(<PurgeSubscription clusterId="c1" subscriptionName="ORDERS" />));
 
-    await user.click(await screen.findByRole('button', { name: 'Purge queue' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Purge queue ORDERS' });
+    await user.click(await screen.findByRole('button', { name: 'Purge subscription' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Purge subscription ORDERS' });
     expect(dialog).toHaveTextContent('approximately 4 messages');
-    const confirm = within(dialog).getByRole('button', { name: 'Purge queue' });
+    const confirm = within(dialog).getByRole('button', { name: 'Purge subscription' });
     await holdButton(confirm);
 
-    expect(await screen.findByText('Purged 4 messages in queue "ORDERS"')).toBeInTheDocument();
-    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Purge queue ORDERS' })).not.toBeInTheDocument());
+    expect(await screen.findByText('Purged 4 messages in subscription "ORDERS"')).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog', { name: 'Purge subscription ORDERS' })).not.toBeInTheDocument(),
+    );
   });
 
   it('keeps the dialog open and states the cause when the purge itself fails', async () => {
@@ -310,26 +312,29 @@ describe('PurgeQueue', () => {
       http.post('*/api/v1/clusters/c1/resources/artemis.queue/ORDERS:purge', ({ request }) =>
         new URL(request.url).searchParams.get('dryRun') === 'true'
           ? dry(4)
-          : HttpResponse.json({ title: 'Broker refused', detail: 'The queue is being deleted.' }, { status: 409 }),
+          : HttpResponse.json(
+              { title: 'Broker refused', detail: 'The subscription is being deleted.' },
+              { status: 409 },
+            ),
       ),
     );
     const user = userEvent.setup();
-    renderWithProviders(withToasts(<PurgeQueue clusterId="c1" queueName="ORDERS" />));
+    renderWithProviders(withToasts(<PurgeSubscription clusterId="c1" subscriptionName="ORDERS" />));
 
-    await user.click(await screen.findByRole('button', { name: 'Purge queue' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Purge queue ORDERS' });
-    await holdButton(within(dialog).getByRole('button', { name: 'Purge queue' }));
+    await user.click(await screen.findByRole('button', { name: 'Purge subscription' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Purge subscription ORDERS' });
+    await holdButton(within(dialog).getByRole('button', { name: 'Purge subscription' }));
 
     const alert = await screen.findByRole('alert');
-    expect(alert).toHaveTextContent('Could not purge queue "ORDERS"');
-    expect(alert).toHaveTextContent('The queue is being deleted.');
-    expect(screen.getByRole('dialog', { name: 'Purge queue ORDERS' })).toBeInTheDocument();
+    expect(alert).toHaveTextContent('Could not purge subscription "ORDERS"');
+    expect(alert).toHaveTextContent('The subscription is being deleted.');
+    expect(screen.getByRole('dialog', { name: 'Purge subscription ORDERS' })).toBeInTheDocument();
   });
 });
 
 describe('SendMessage', () => {
   const open = () =>
-    renderWithProviders(withToasts(<SendMessage clusterId="c1" queueName="ORDERS" opened onClose={vi.fn()} />));
+    renderWithProviders(withToasts(<SendMessage clusterId="c1" subscriptionName="ORDERS" opened onClose={vi.fn()} />));
 
   it('names a property that has no key, on the field, and sends nothing', async () => {
     const posts: unknown[] = [];
@@ -384,7 +389,7 @@ describe('SendMessage', () => {
     await user.type(screen.getByLabelText('Value'), 'eu');
     await user.click(screen.getByRole('button', { name: 'Send' }));
 
-    expect(await screen.findByText('Sent a message to queue "ORDERS"')).toBeInTheDocument();
+    expect(await screen.findByText('Sent a message to subscription "ORDERS"')).toBeInTheDocument();
     expect(posts).toEqual([{ kind: 'TEXT', durable: true, body: 'hello', headers: {}, properties: { region: 'eu' } }]);
   });
 
@@ -403,7 +408,7 @@ describe('SendMessage', () => {
     await user.type(screen.getByLabelText(/^Content/), 'CQgH');
     await user.click(screen.getByRole('button', { name: 'Send' }));
 
-    expect(await screen.findByText('Sent a message to queue "ORDERS"')).toBeInTheDocument();
+    expect(await screen.findByText('Sent a message to subscription "ORDERS"')).toBeInTheDocument();
     expect(posts).toEqual([{ kind: 'BYTES', durable: true, body: 'CQgH', headers: {}, properties: {} }]);
   });
 
@@ -430,7 +435,7 @@ describe('SendMessage', () => {
   it('states the cause and the next step when the broker refuses the message, and keeps what was typed', async () => {
     server.use(
       http.post('*/api/v1/clusters/c1/resources/artemis.queue/ORDERS/messages', () =>
-        HttpResponse.json({ title: 'Broker refused', detail: 'The address is full.' }, { status: 409 }),
+        HttpResponse.json({ title: 'Broker refused', detail: 'The destination is full.' }, { status: 409 }),
       ),
     );
     const user = userEvent.setup();
@@ -440,8 +445,8 @@ describe('SendMessage', () => {
     await user.click(screen.getByRole('button', { name: 'Send' }));
 
     const alert = await screen.findByRole('alert');
-    expect(alert).toHaveTextContent('Could not send a message to queue "ORDERS"');
-    expect(alert).toHaveTextContent('The address is full. Check the audit log for what ran, then try again.');
+    expect(alert).toHaveTextContent('Could not send a message to subscription "ORDERS"');
+    expect(alert).toHaveTextContent('The destination is full. Check the audit log for what ran, then try again.');
     expect(screen.getByLabelText(/^Content/)).toHaveValue('hello');
   });
 });

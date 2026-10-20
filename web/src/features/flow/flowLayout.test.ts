@@ -43,7 +43,7 @@ function graph(rate = 10): FlowGraphView {
 }
 
 describe('flow layout', () => {
-  it('places producers, addresses, queues and consumers in strictly ordered columns', async () => {
+  it('places producers, destinations, subscriptions and consumers in strictly ordered columns', async () => {
     const g = graph();
     const positions = await runLayout(toElkGraph(g));
     const x = (kind: string) => g.nodes!.filter((n) => n.kind === kind).map((n) => positions[n.id!].x);
@@ -110,14 +110,14 @@ describe('flow layout', () => {
     );
   });
 
-  it('labels each column once, and scales queue depth against the deepest shown queue', async () => {
+  it('labels each column once, and scales subscription depth against the deepest shown subscription', async () => {
     const g = graph();
     const model = toReactFlow(g, await runLayout(toElkGraph(g)), new Map(), null);
 
     expect(model.nodes.filter((n) => n.type === 'lane').map((n) => n.data.title)).toEqual([
       'Producers',
-      'Addresses',
-      'Queues',
+      'Destinations',
+      'Subscriptions',
       'Consumers',
     ]);
     expect(model.nodes.find((n) => n.id === 'subscription:AUDIT')?.data.depth).toBe(1);

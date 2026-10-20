@@ -1,11 +1,11 @@
 import { useMemo } from 'react';
 import { useDebouncedValue } from '@mantine/hooks';
 
-import { addressOf, useQueues } from '../queues/index.ts';
+import { destinationOf, useSubscriptions } from '../resources/index.ts';
 
 const SUGGESTION_LIMIT = 300;
 
-/** A pattern is anything containing `*`; everything else is a literal address. */
+/** A pattern is anything containing `*`; everything else is a literal destination. */
 function isPattern(entry: string): boolean {
   return entry.includes('*');
 }
@@ -21,7 +21,7 @@ function globToRegExp(glob: string): RegExp {
   return new RegExp(`^${parts.join('.*')}$`, 's');
 }
 
-/** What a set of literals and globs currently expands to, given the addresses we know. */
+/** What a set of literals and globs currently expands to, given the destinations we know. */
 function resolveAgainst(entries: string[], known: string[]): string[] {
   const out = new Set<string>();
   for (const entry of entries) {
@@ -30,8 +30,8 @@ function resolveAgainst(entries: string[], known: string[]): string[] {
       continue;
     }
     const re = globToRegExp(entry);
-    for (const address of known) {
-      if (re.test(address)) out.add(address);
+    for (const destination of known) {
+      if (re.test(destination)) out.add(destination);
     }
   }
   return [...out];
@@ -46,7 +46,7 @@ export interface ReplyDestinationResolution {
 }
 
 /**
- * What the entered literals and globs expand to against the addresses this cluster
+ * What the entered literals and globs expand to against the destinations this cluster
  * currently has.
  *
  * Its own module rather than a second export from `ReplyDestinationsInput`: the control
@@ -54,16 +54,16 @@ export interface ReplyDestinationResolution {
  * what is traced, and a hook exported alongside a component costs fast refresh.
  */
 export function useReplyDestinationResolution(clusterId: string, value: string[]): ReplyDestinationResolution {
-  // The address list is a background fact, not a per-keystroke query: matches are
+  // The destination list is a background fact, not a per-keystroke query: matches are
   // computed here, so typing costs nothing over the wire.
-  const queues = useQueues(clusterId, { size: SUGGESTION_LIMIT });
+  const subscriptions = useSubscriptions(clusterId, { size: SUGGESTION_LIMIT });
   const [entries] = useDebouncedValue(value, 200);
 
   const known = useMemo(() => {
-    const addresses = new Set<string>();
-    for (const row of queues.data?.data ?? []) addresses.add(addressOf(row));
-    return [...addresses].sort((a, b) => a.localeCompare(b));
-  }, [queues.data]);
+    const destinations = new Set<string>();
+    for (const row of subscriptions.data?.data ?? []) destinations.add(destinationOf(row));
+    return [...destinations].sort((a, b) => a.localeCompare(b));
+  }, [subscriptions.data]);
 
   const resolved = useMemo(() => resolveAgainst(entries, known), [entries, known]);
   const unmatched = useMemo(
@@ -71,7 +71,7 @@ export function useReplyDestinationResolution(clusterId: string, value: string[]
       entries.filter((entry) => {
         if (!isPattern(entry)) return false;
         const re = globToRegExp(entry);
-        return !known.some((address) => re.test(address));
+        return !known.some((destination) => re.test(destination));
       }),
     [entries, known],
   );
@@ -79,8 +79,8 @@ export function useReplyDestinationResolution(clusterId: string, value: string[]
   return {
     resolved,
     unmatched,
-    isError: queues.isError,
-    retry: () => void queues.refetch(),
+    isError: subscriptions.isError,
+    retry: () => void subscriptions.refetch(),
     known,
   };
 }

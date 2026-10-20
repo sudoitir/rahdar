@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { ARTEMIS_KINDS, ARTEMIS_SYSTEM } from '../../test/wire.ts';
 import { http, HttpResponse } from 'msw';
 import { Notifications, notifications } from '@mantine/notifications';
 import { act, screen, waitFor, within } from '@testing-library/react';
@@ -89,6 +90,8 @@ function shell(reviewBody: () => Record<string, unknown>) {
     http.get(`*/api/v1/clusters/${CLUSTER}/artemis/setup-review`, () => HttpResponse.json(reviewBody())),
     http.get(`*/api/v1/clusters/${CLUSTER}`, () =>
       HttpResponse.json({
+        system: ARTEMIS_SYSTEM,
+        kinds: ARTEMIS_KINDS,
         id: CLUSTER,
         name: 'prod',
         description: null,
@@ -108,7 +111,7 @@ function shell(reviewBody: () => Record<string, unknown>) {
 /** The application at the view, with the toast host the real application mounts above the router. */
 function renderView(search = '') {
   renderWithProviders(<Notifications />);
-  return renderAppAt(`/clusters/${CLUSTER}/setup-review${search}`);
+  return renderAppAt(`/clusters/${CLUSTER}/artemis/setup-review${search}`);
 }
 
 describe('Setup review', () => {
@@ -140,7 +143,7 @@ describe('Setup review', () => {
     const info = screen.getByRole('article', { name: /No expiry address/ });
     expect(within(info).getByRole('link', { name: 'Apply it in Broker configuration' })).toHaveAttribute(
       'href',
-      `/clusters/${CLUSTER}/configuration`,
+      `/clusters/${CLUSTER}/artemis/configuration`,
     );
   });
 

@@ -9,13 +9,13 @@ const PRESENCE: Record<string, { words: string; tone?: string }> = {
 };
 
 /**
- * "Is this indexed message still on its queue?" — asked of the broker, which is
+ * "Is this indexed message still on its subscription?" — asked of the broker, which is
  * the only thing that can answer it.
  *
  * <p>Three outcomes, never two. An unknown verdict is rendered as unknown rather
  * than folded into "gone": the index already says what was seen, and a false
  * "gone" during an incident sends an operator looking for a message that is
- * sitting on the queue in front of them.
+ * sitting on the subscription in front of them.
  *
  * <p>A captured row can only be verified through the id its source message had,
  * which the broker copies onto the diverted copy as `_AMQ_ORIG_MESSAGE_ID`. Where
@@ -53,7 +53,7 @@ export function VerifyOnBroker({ clusterId, row }: Readonly<{ clusterId: string;
       <Tooltip
         label={
           'This broker did not record which message this copy came from, so there is nothing ' +
-          'to look up on the queue. Artemis copies _AMQ_ORIG_MESSAGE_ID onto a diverted message.'
+          'to look up on the subscription. Artemis copies _AMQ_ORIG_MESSAGE_ID onto a diverted message.'
         }
         multiline
         w={300}

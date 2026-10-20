@@ -1,5 +1,5 @@
 /**
- * Whether `name` matches a queue or address pattern in the broker's wildcard syntax: words separated by `.`, `*`
+ * Whether `name` matches a subscription or destination pattern in the broker's wildcard syntax: words separated by `.`, `*`
  * for exactly one word and `#` for zero or more. The server decides (`ResourcePattern`); this only lets a form say
  * so while a name is typed.
  */

@@ -306,7 +306,7 @@
   stroke: var(--as-flow-fault);
 }
 
-.edge[data-kind='DIVERT'] {
+.edge[data-kind='FORWARD'] {
   stroke-dasharray: 2 4;
   stroke-linecap: round;
 }

@@ -22,7 +22,7 @@ function time(iso?: string): string {
  */
 function gapWords(tail: SqlTailStatusView | null): string {
   if (!tail || (tail.enqueued ?? 0) === 0) {
-    return 'No message has been enqueued on these queues since the tail started.';
+    return 'No message has been enqueued on these subscriptions since the tail started.';
   }
   const enqueued = (tail.enqueued ?? 0).toLocaleString();
   const shown = (tail.shown ?? 0).toLocaleString();
@@ -32,7 +32,7 @@ function gapWords(tail: SqlTailStatusView | null): string {
       ? `${enqueued} enqueued, ${shown} shown — nothing has passed through unobserved yet.`
       : `${enqueued} enqueued, ${shown} shown: about ${missed.toLocaleString()} passed through between reads and were never seen.`;
   }
-  return `${enqueued} enqueued on these queues while tailing, ${shown} shown here. The difference holds both messages that did not match this query and messages consumed between reads, and the two cannot be told apart.`;
+  return `${enqueued} enqueued on these subscriptions while tailing, ${shown} shown here. The difference holds both messages that did not match this query and messages consumed between reads, and the two cannot be told apart.`;
 }
 
 /**
@@ -99,8 +99,8 @@ export function LiveTailBanner({
         <Stack gap={6}>
           <Text size="sm">
             {captured
-              ? 'A divert copies every message these addresses route into a queue Rahdar drains, so a message that is consumed the instant it arrives still appears here. It is address-scoped: for an address with several bound queues, which queue received a message is not recorded.'
-              : 'Rahdar re-reads these queues every few seconds. A message that arrives and is consumed between two reads is never seen, so an empty tail is not evidence that nothing was sent.'}
+              ? 'A divert copies every message these destinations route into a subscription Rahdar drains, so a message that is consumed the instant it arrives still appears here. It is destination-scoped: for a destination with several bound subscriptions, which subscription received a message is not recorded.'
+              : 'Rahdar re-reads these subscriptions every few seconds. A message that arrives and is consumed between two reads is never seen, so an empty tail is not evidence that nothing was sent.'}
           </Text>
           {paused ? (
             <Text size="sm">

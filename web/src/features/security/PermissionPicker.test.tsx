@@ -10,18 +10,18 @@ import { PermissionPicker } from './PermissionPicker.tsx';
 const CATALOGUE: PermissionView[] = [
   {
     action: 'subscription:create',
-    label: 'Create queues',
-    featureId: 'queues',
-    featureTitle: 'Queues',
+    label: 'Create subscriptions',
+    featureId: 'subscriptions',
+    featureTitle: 'Subscriptions',
     scope: 'CLUSTER',
     resourceTypes: [],
     requires: [],
   },
   {
     action: 'subscription:delete',
-    label: 'Destroy queues',
-    featureId: 'queues',
-    featureTitle: 'Queues',
+    label: 'Destroy subscriptions',
+    featureId: 'subscriptions',
+    featureTitle: 'Subscriptions',
     scope: 'CLUSTER',
     resourceTypes: [],
     requires: [],
@@ -49,27 +49,27 @@ const CATALOGUE: PermissionView[] = [
 const RESOURCE_CATALOGUE: PermissionView[] = [
   {
     action: 'subscription:read',
-    label: 'Read queues',
-    featureId: 'queues',
-    featureTitle: 'Queues',
+    label: 'Read subscriptions',
+    featureId: 'subscriptions',
+    featureTitle: 'Subscriptions',
     scope: 'RESOURCE',
     resourceTypes: ['SUBSCRIPTION'],
     requires: [],
   },
   {
     action: 'subscription:purge',
-    label: 'Purge queues',
-    featureId: 'queues',
-    featureTitle: 'Queues',
+    label: 'Purge subscriptions',
+    featureId: 'subscriptions',
+    featureTitle: 'Subscriptions',
     scope: 'RESOURCE',
     resourceTypes: ['SUBSCRIPTION'],
     requires: ['subscription:read'],
   },
   {
     action: 'subscription:delete',
-    label: 'Delete queues',
-    featureId: 'queues',
-    featureTitle: 'Queues',
+    label: 'Delete subscriptions',
+    featureId: 'subscriptions',
+    featureTitle: 'Subscriptions',
     scope: 'RESOURCE',
     resourceTypes: ['SUBSCRIPTION'],
     requires: ['subscription:purge'],
@@ -131,21 +131,21 @@ describe('PermissionPicker', () => {
     expect(screen.getByText(/No permission matches/)).toBeInTheDocument();
     await user.click(screen.getAllByRole('button', { name: 'Clear search' })[0]);
 
-    expect(screen.getByRole('button', { name: /Queues, 0 of 2 selected/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Subscriptions, 0 of 2 selected/ })).toBeInTheDocument();
   });
 
   it('selects and clears a whole group from the keyboard and announces the count', async () => {
     const user = userEvent.setup();
     renderWithProviders(<Harness />);
 
-    screen.getByRole('checkbox', { name: 'Select all in Queues' }).focus();
+    screen.getByRole('checkbox', { name: 'Select all in Subscriptions' }).focus();
     await user.keyboard(' ');
     expect(selected()).toBe('subscription:create,subscription:delete');
-    expect(screen.getByRole('status')).toHaveTextContent('2 of 2 permissions selected in Queues');
+    expect(screen.getByRole('status')).toHaveTextContent('2 of 2 permissions selected in Subscriptions');
 
     await user.keyboard(' ');
     expect(selected()).toBe('');
-    expect(screen.getByRole('status')).toHaveTextContent('0 of 2 permissions selected in Queues');
+    expect(screen.getByRole('status')).toHaveTextContent('0 of 2 permissions selected in Subscriptions');
   });
 
   it('marks where each permission takes effect', async () => {
@@ -159,7 +159,7 @@ describe('PermissionPicker', () => {
     await user.click(screen.getByRole('button', { name: /Acme notes/ }));
     expect(screen.getAllByText('Cluster').length).toBeGreaterThan(0);
 
-    await user.click(screen.getByRole('button', { name: /Queues, 0 of 3 selected/ }));
+    await user.click(screen.getByRole('button', { name: /Subscriptions, 0 of 3 selected/ }));
     expect(screen.getAllByText('Resource: subscription').length).toBeGreaterThan(0);
   });
 
@@ -167,7 +167,7 @@ describe('PermissionPicker', () => {
     const user = userEvent.setup();
     renderWithProviders(<Harness catalogue={RESOURCE_CATALOGUE} />);
 
-    await user.click(screen.getByRole('button', { name: /Queues, 0 of 3 selected/ }));
+    await user.click(screen.getByRole('button', { name: /Subscriptions, 0 of 3 selected/ }));
     await user.click(await screen.findByRole('checkbox', { name: /subscription:delete/ }));
 
     expect(selected()).toBe('subscription:delete,subscription:purge,subscription:read');
@@ -179,12 +179,15 @@ describe('PermissionPicker', () => {
   it('shows what a wildcard grants as granted through it, counted as held, with the group open', async () => {
     renderWithProviders(<Harness catalogue={RESOURCE_CATALOGUE} initial={['subscription:*']} />);
 
-    expect(screen.getByRole('button', { name: /Queues, 3 of 3 selected/ })).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('button', { name: /Subscriptions, 3 of 3 selected/ })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    );
     const purge = screen.getByRole('checkbox', { name: /subscription:purge/ });
     expect(purge).toBeChecked();
     expect(purge).toBeDisabled();
     expect(purge).toHaveAccessibleDescription(/Granted through subscription:\*\./);
-    expect(screen.getByRole('checkbox', { name: 'Select all in Queues' })).toBeDisabled();
+    expect(screen.getByRole('checkbox', { name: 'Select all in Subscriptions' })).toBeDisabled();
     expect(screen.getByRole('button', { name: /Brokers, 0 of 1 selected/ })).toHaveAttribute('aria-expanded', 'false');
   });
 
@@ -227,7 +230,7 @@ describe('PermissionPicker', () => {
     renderWithProviders(<Harness catalogue={RESOURCE_CATALOGUE} teamRole />);
 
     expect(screen.queryByRole('button', { name: /Brokers/ })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Queues, 0 of 3 selected/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Subscriptions, 0 of 3 selected/ })).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: /Security, 0 of 1 selected/ }));
     expect(await screen.findByRole('checkbox', { name: /team:admin/ })).toBeInTheDocument();
     expect(screen.getByText('Team')).toBeInTheDocument();

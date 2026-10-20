@@ -38,8 +38,8 @@ export function rateSourceLabel(edge: Pick<FlowEdgeView, 'rateSource' | 'average
       return 'sampled clients';
     case 'SUBSCRIPTION_METRIC':
       return edge.averagedOverSeconds
-        ? `queue metrics, ~${Math.round(edge.averagedOverSeconds / 60)} min average`
-        : 'queue metrics';
+        ? `subscription metrics, ~${Math.round(edge.averagedOverSeconds / 60)} min average`
+        : 'subscription metrics';
     default:
       return 'broker keeps no count';
   }
@@ -57,8 +57,8 @@ export const RELATION: Record<string, string> = {
   PRODUCE: 'produces to',
   ROUTE: 'routes to',
   CONSUME: 'consumed by',
-  FORWARD: 'diverts to',
-  LINK: 'bridges to',
+  FORWARD: 'forwards to',
+  LINK: 'links to',
   CLUSTER_HOP: 'redistributes to',
   WILDCARD: 'also reaches',
   DEAD_LETTER: 'dead-letters to',
@@ -99,12 +99,12 @@ function routeParts(view: FlowEdgeView): string[] {
   const parts: string[] = [];
   if (view.delivery) parts.push(view.delivery === 'COPY' ? 'copy' : 'shared');
   if (view.filter) parts.push('filtered');
-  if (view.bypassed) parts.push('bypassed by an exclusive divert');
+  if (view.bypassed) parts.push('bypassed by an exclusive forward');
   parts.push(rateLabel(view));
   return parts;
 }
 
-function divertParts(view: FlowEdgeView): string[] {
+function forwardParts(view: FlowEdgeView): string[] {
   const parts = [view.exclusive ? 'reroutes' : 'copies'];
   if (view.filter) parts.push('filtered');
   if (view.transformer) parts.push('transformed');
@@ -120,10 +120,10 @@ function kindParts(view: FlowEdgeView): string[] {
       parts.push(...routeParts(view));
       break;
     case 'FORWARD':
-      parts.push(...divertParts(view));
+      parts.push(...forwardParts(view));
       break;
     case 'LINK':
-      parts.push('bridge', rateLabel(view));
+      parts.push('link', rateLabel(view));
       break;
     case 'CLUSTER_HOP':
       parts.push('redistributes', rateLabel(view));

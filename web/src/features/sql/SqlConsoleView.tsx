@@ -4,7 +4,7 @@ import { useDebouncedValue, useElementSize, useHotkeys, type UseSplitterReturnVa
 import { useNavigate, useParams, useSearch } from '@tanstack/react-router';
 
 import { CapabilityLedger, useCluster } from '../clusters/index.ts';
-import { useQueues } from '../queues/index.ts';
+import { useSubscriptions } from '../resources/index.ts';
 import { MessageDetailPanel } from '../messages/index.ts';
 import { nameOf } from '../../kernel/api/resourceId.ts';
 import { useCan } from '../../kernel/auth/useCan.ts';
@@ -89,7 +89,7 @@ function queryErrorOf(error: ApiError | null | undefined): QueryError | null {
 }
 
 /**
- * The SQL Console (ADR-0058): one query language over messages, across many queues, with the cost stated
+ * The SQL Console (ADR-0058): one query language over messages, across many subscriptions, with the cost stated
  * before the query runs and the provenance of every row stated after.
  *
  * <p>It is one workspace: the editor above and the results below, divided by a split the operator
@@ -124,18 +124,18 @@ export function SqlConsoleView() {
   const [maximised, setMaximised] = useState(false);
 
   const cluster = useCluster(clusterId);
-  const queues = useQueues(clusterId, { size: QUEUE_COMPLETION_LIMIT });
+  const subscriptions = useSubscriptions(clusterId, { size: QUEUE_COMPLETION_LIMIT });
   const { can, loading: grantsLoading } = useCan();
   const run = useSqlTail(clusterId);
   const [history, setHistory] = useQueryHistory(run);
 
-  const queueNames = useMemo(
-    () => Array.from(new Set((queues.data?.data ?? []).map((q) => q.name))).sort((a, b) => a.localeCompare(b)),
-    [queues.data],
+  const subscriptionNames = useMemo(
+    () => Array.from(new Set((subscriptions.data?.data ?? []).map((q) => q.name))).sort((a, b) => a.localeCompare(b)),
+    [subscriptions.data],
   );
-  // An absent completion entry reads as "there is no such queue". Say when the list is short because it was
+  // An absent completion entry reads as "there is no such subscription". Say when the list is short because it was
   // capped rather than because the cluster is small.
-  const completionCapped = (queues.data?.data ?? []).length >= QUEUE_COMPLETION_LIMIT;
+  const completionCapped = (subscriptions.data?.data ?? []).length >= QUEUE_COMPLETION_LIMIT;
 
   const gate = gateFor(
     can('message:read', clusterId),
@@ -176,7 +176,7 @@ export function SqlConsoleView() {
   const cancellable = running || run.status === 'tailing';
   const cancel = () => {
     if (!cancellable) return;
-    // Stopping a tail also takes it out of the address, so a link to the console does not reopen it tailing.
+    // Stopping a tail also takes it out of the destination, so a link to the console does not reopen it tailing.
     if (run.status === 'tailing') {
       setLive(false);
       void navigate({ to: '.', search: () => ({ q: text }) });
@@ -217,7 +217,7 @@ export function SqlConsoleView() {
 
   return (
     <Page fill>
-      <PageHeader title="SQL Console" description="Search messages across this cluster's queues. Read-only." />
+      <PageHeader title="SQL Console" description="Search messages across this cluster's subscriptions. Read-only." />
 
       {gate.kind === 'blocked' ? (
         <>
@@ -236,12 +236,12 @@ export function SqlConsoleView() {
 
       <SyntaxHelp opened={helpOpen} onClose={() => setHelpOpen(false)} onLoadExample={setText} />
 
-      {/* Identity is (node, queue, messageId), so the detail request carries all three. An indexed row may
+      {/* Identity is (node, subscription, messageId), so the detail request carries all three. An indexed row may
           already be gone from the broker — the panel reports that as the read failure it is, rather than as
           an empty message. */}
       <MessageDetailPanel
         clusterId={clusterId}
-        queueName={openRow ? nameOf(openRow.subscription) : ''}
+        subscriptionName={openRow ? nameOf(openRow.subscription) : ''}
         messageId={openRow ? String(openRow.messageId) : null}
         node={openRow?.nodeId}
         onClose={() => setOpenRow(null)}
@@ -308,7 +308,7 @@ export function SqlConsoleView() {
               onEscape={() =>
                 toolbar.current?.querySelector<HTMLElement>('button:not(:disabled), input:not(:disabled)')?.focus()
               }
-              queueNames={queueNames}
+              subscriptionNames={subscriptionNames}
               completionCapped={completionCapped}
               costId={costId}
               verdict={verdict}

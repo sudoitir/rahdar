@@ -3,13 +3,13 @@ import { createElement } from 'react';
 import { nameOf } from '../../kernel/api/resourceId.ts';
 import type { Column } from '../../ui/table/index.ts';
 import type { ConsumerHealthView } from './api.ts';
-import { QueueLink } from './cells.tsx';
+import { SubscriptionLink } from './cells.tsx';
 import { HealthVerdict } from './HealthVerdict.tsx';
 import { formatRate, trendPhrase, verdictText } from './verdict.ts';
 
 /**
- * The consumer-health grid's columns. The verdict and the queue identify a row and are never
- * hidden; the figures that explain the verdict go next, and the address and the in-flight count are
+ * The consumer-health grid's columns. The verdict and the subscription identify a row and are never
+ * hidden; the figures that explain the verdict go next, and the destination and the in-flight count are
  * the first to be hidden when the table is narrow.
  *
  * An unmeasured rate or trend reads "not measured", never 0: on this screen the two mean opposite
@@ -29,16 +29,16 @@ export function consumerHealthColumns(): Column<ConsumerHealthView>[] {
     },
     {
       id: 'subscription',
-      header: 'Queue',
+      header: 'Subscription',
       accessor: (r) => nameOf(r.subscription),
-      cell: (r) => createElement(QueueLink, { row: r }),
+      cell: (r) => createElement(SubscriptionLink, { row: r }),
       kind: 'identifier',
       priority: 'essential',
       sortKey: 'subscription',
     },
     {
       id: 'destination',
-      header: 'Address',
+      header: 'Destination',
       accessor: (r) => nameOf(r.destination),
       kind: 'identifier',
       priority: 'low',

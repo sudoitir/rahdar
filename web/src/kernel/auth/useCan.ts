@@ -17,7 +17,7 @@ export interface ResourceWhere {
 /** The actions the server says the caller holds on one row, as a list carries them. */
 export type AllowedActions = readonly string[];
 
-/** One thing the hook has asked the server about: a cluster as a whole, or one queue or address of it. */
+/** One thing the hook has asked the server about: a cluster as a whole, or one subscription or destination of it. */
 type Ask = { id: string; clusterId: string; resource?: { type: 'SUBSCRIPTION' | 'DESTINATION'; name: string } };
 
 const askFor = (where: string | ResourceWhere): Ask =>
@@ -40,12 +40,12 @@ const askFor = (where: string | ResourceWhere): Ask =>
  * Each is fetched the first time it is asked. Until it arrives the control is offered, as it is while grants load:
  * blocking on an answer not yet known would lock out someone the server lets in. For a resource permission the
  * cluster answer counts grants only; what a team or share gives on some subscription or address is in the summary's
- * `anywhere`, and on one named queue or address in its own answer, or in the row's `allowedActions`.
+ * `anywhere`, and on one named subscription or destination in its own answer, or in the row's `allowedActions`.
  *
  * <p>`canAnywhere` is the page-level right: held on the cluster by a grant, or on some subscription or address through a team
  * or a share. A control is hidden only when it is false. `canOn` is the right on one row the server sent, from the
  * row's `allowedActions`: false there is a control shown disabled, with its reason. `createPatterns` are the name
- * patterns a team or share lets the caller create queues and addresses under.
+ * patterns a team or share lets the caller create subscriptions and destinations under.
  */
 export function useCan() {
   const installation = useQuery(accessQuery());
