@@ -143,7 +143,6 @@ public class IndexQueryExecutor {
                     NodeOutcome.Status.ANSWERED,
                     matched,
                     matched,
-                    null,
                     null);
             outcomes.add(outcome);
             sink.nodeFinished(outcome);

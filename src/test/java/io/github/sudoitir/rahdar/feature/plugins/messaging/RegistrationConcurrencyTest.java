@@ -11,8 +11,8 @@ import io.github.sudoitir.rahdar.feature.plugins.messaging.internal.PluginDrains
 import io.github.sudoitir.rahdar.feature.plugins.messaging.internal.PluginMessagingReconciler;
 import io.github.sudoitir.rahdar.kernel.audit.AuditService;
 import io.github.sudoitir.rahdar.kernel.security.ActorResolver;
+import io.github.sudoitir.rahdar.platform.broker.BrokerMessages;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
-import io.github.sudoitir.rahdar.system.artemis.CoreMessageTransport;
 import java.time.Clock;
 import java.util.UUID;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -31,7 +31,7 @@ class RegistrationConcurrencyTest {
             mock(PluginMessagingReconciler.class),
             mock(PluginDrains.class),
             mock(ClusterDirectory.class),
-            mock(CoreMessageTransport.class),
+            mock(BrokerMessages.class),
             audit,
             mock(ActorResolver.class),
             mock(TransactionTemplate.class),

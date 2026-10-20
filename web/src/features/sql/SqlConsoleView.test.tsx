@@ -54,7 +54,6 @@ function answered(overrides: Record<string, unknown> = {}) {
     status: 'ANSWERED',
     examined: 500,
     matched: 0,
-    servedBy: 'JOLOKIA',
     detail: null,
     ...overrides,
   };
@@ -206,7 +205,6 @@ describe('SqlConsoleView', () => {
           nodeName: 'backup',
           status: 'FAILED',
           examined: 0,
-          servedBy: null,
           detail: 'connection refused',
         }),
       ],

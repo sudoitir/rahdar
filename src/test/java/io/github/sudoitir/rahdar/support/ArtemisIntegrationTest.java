@@ -11,6 +11,7 @@ import io.github.sudoitir.openbroker.Endpoint;
 import io.github.sudoitir.openbroker.NodeId;
 import io.github.sudoitir.openbroker.NodeSpec;
 import io.github.sudoitir.openbroker.Plane;
+import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
 import io.github.sudoitir.rahdar.platform.broker.BrokerTarget;
 import io.github.sudoitir.rahdar.platform.broker.BrokerVersion;
 import io.github.sudoitir.rahdar.support.wire.WireRecorder;
@@ -18,6 +19,7 @@ import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
 import io.github.sudoitir.rahdar.system.artemis.ArtemisNodes;
 import java.time.Duration;
 import java.util.List;
+import java.util.UUID;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.utility.MountableFile;
@@ -106,6 +108,22 @@ public abstract class ArtemisIntegrationTest {
                 CredentialSource.of(Credentials.of(BROKER_USER, BROKER_PASSWORD)),
                 ConnectOptions.defaults()));
         return new BrokerTarget(connection, NodeId.of(url));
+    }
+
+    /**
+     * The shared broker as a one-node SDK cluster over Jolokia and Core, the node known by Rahdar's id
+     * for it, for code that reaches a cluster through the gateway.
+     */
+    public static ClusterConnection cluster(UUID nodeId) {
+        return DRIVERS.connect(new ConnectRequest(
+                BrokerGateway.SYSTEM,
+                ClusterSpec.ofNodes(List.of(new NodeSpec(
+                        BrokerGateway.idOf(nodeId),
+                        List.of(
+                                new Endpoint(Plane.MANAGEMENT, BrokerGateway.JOLOKIA, jolokiaUrl()),
+                                new Endpoint(Plane.DATA, BrokerGateway.CORE, coreUrl()))))),
+                CredentialSource.of(Credentials.of(BROKER_USER, BROKER_PASSWORD)),
+                ConnectOptions.defaults()));
     }
 
     /** One driver registry for the test JVM, as an application keeps one. */

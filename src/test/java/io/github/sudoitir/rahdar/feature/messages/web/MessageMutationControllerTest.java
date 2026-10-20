@@ -1,12 +1,9 @@
 package io.github.sudoitir.rahdar.feature.messages.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
-import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -17,6 +14,7 @@ import io.github.sudoitir.rahdar.kernel.audit.internal.persistence.AuditEventEnt
 import io.github.sudoitir.rahdar.kernel.audit.internal.persistence.AuditEventRepository;
 import io.github.sudoitir.rahdar.kernel.settings.SettingsService;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
+import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
 import io.github.sudoitir.rahdar.platform.broker.BrokerSettings;
 import io.github.sudoitir.rahdar.platform.broker.QueueRow;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNodeEntity;
@@ -25,13 +23,11 @@ import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterE
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterRepository;
 import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshotUpsert;
 import io.github.sudoitir.rahdar.support.AdminAuthenticationExtension;
+import io.github.sudoitir.rahdar.support.FakeArtemis;
 import io.github.sudoitir.rahdar.support.FixtureJolokia;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
-import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
-import io.github.sudoitir.rahdar.system.artemis.ArtemisNodes;
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.hamcrest.Matchers;
 import org.junit.jupiter.api.AfterEach;
@@ -39,7 +35,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -84,7 +79,7 @@ class MessageMutationControllerTest extends PostgresIntegrationTest {
     BrokerConnections connections;
 
     @MockitoBean
-    ArtemisNodes artemisNodes;
+    BrokerGateway gateway;
 
     private UUID clusterId;
     private UUID nodeId;
@@ -109,33 +104,18 @@ class MessageMutationControllerTest extends PostgresIntegrationTest {
         settings.reset(BrokerSettings.BULK_CAP);
     }
 
-    /** A client that answers the given raw JSON bodies in order (search first when the op needs the MBean name). */
-    private ArtemisNode client(String... bodies) {
-        FixtureJolokia server = new FixtureJolokia();
-        for (String body : bodies) {
-            server.expect(requestTo(URL)).andRespond(withSuccess(body, MediaType.APPLICATION_JSON));
-        }
-        return server.node();
+    /** The node, answered as a broker holding the queue with three messages. */
+    private FakeArtemis serving() {
+        FakeArtemis broker = new FakeArtemis().queue(Q).attribute("MessageCount", 3);
+        when(gateway.cluster(clusterId)).thenReturn(FixtureJolokia.cluster(Map.of(nodeId, broker.agent())));
+        return broker;
     }
 
-    private ArtemisNode unauthorized() {
+    private void unauthorized() {
         FixtureJolokia server = new FixtureJolokia();
         server.expect(requestTo(URL)).andRespond(withStatus(HttpStatus.UNAUTHORIZED));
-        return server.node();
+        when(gateway.cluster(clusterId)).thenReturn(FixtureJolokia.cluster(Map.of(nodeId, server)));
     }
-
-    private static String fixture(String name) {
-        try {
-            return new String(new ClassPathResource("jolokia/" + name).getContentAsByteArray(), StandardCharsets.UTF_8);
-        } catch (IOException e) {
-            throw new IllegalStateException(e);
-        }
-    }
-
-    private static final String SEARCH =
-            "{\"value\":[\"org.apache.activemq.artemis:broker=\\\"primary\\\"\"],\"status\":200}";
-    private static final String BOOL_TRUE = "{\"value\":true,\"status\":200}";
-    private static final String COUNT_3 = "{\"value\":3,\"status\":200}";
 
     private AuditEventEntity onlyAudit() {
         List<AuditEventEntity> all = audit.findByClusterIdOrderByTsDesc(clusterId);
@@ -164,7 +144,7 @@ class MessageMutationControllerTest extends PostgresIntegrationTest {
 
     @Test
     void sendRealWritesASuccessRowWithCountOne() throws Exception {
-        when(artemisNodes.on(eq(clusterId), any(UUID.class))).thenReturn(client(SEARCH, fixture("send-message.json")));
+        FakeArtemis broker = serving().operation("sendMessage", "ID:1");
 
         mvc.perform(post("/api/v1/clusters/{c}/queues/{q}/messages", clusterId, Q)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -176,6 +156,7 @@ class MessageMutationControllerTest extends PostgresIntegrationTest {
         assertThat(row.getOutcome()).isEqualTo("SUCCESS");
         assertThat(row.getAffectedCount()).isEqualTo(1);
         assertThat(row.isDryRun()).isFalse();
+        assertThat(broker.operations()).containsExactly("sendMessage");
     }
 
     @Test
@@ -215,9 +196,7 @@ class MessageMutationControllerTest extends PostgresIntegrationTest {
 
     @Test
     void deleteByIdsRealCountsTheBrokerBooleans() throws Exception {
-        // Both ids go to the broker in one batch request (ADR-0076), answered positionally.
-        when(artemisNodes.on(eq(clusterId), any(UUID.class)))
-                .thenReturn(client(SEARCH, "[" + BOOL_TRUE + "," + BOOL_TRUE + "]"));
+        FakeArtemis broker = serving().operation("removeMessage", true);
 
         mvc.perform(post("/api/v1/clusters/{c}/queues/{q}/messages/actions/delete", clusterId, Q)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -226,6 +205,7 @@ class MessageMutationControllerTest extends PostgresIntegrationTest {
                 .andExpect(jsonPath("$.affectedCount").value(2));
 
         assertThat(onlyAudit().getAffectedCount()).isEqualTo(2);
+        assertThat(broker.operations()).containsExactly("removeMessage", "removeMessage");
     }
 
     @Test
@@ -240,8 +220,7 @@ class MessageMutationControllerTest extends PostgresIntegrationTest {
 
     @Test
     void deleteByFilterDryRunIssuesOnlyCountMessages() throws Exception {
-        when(artemisNodes.on(eq(clusterId), any(UUID.class)))
-                .thenReturn(client(SEARCH, fixture("count-messages.json")));
+        FakeArtemis broker = serving().operation("countMessages", 3);
 
         mvc.perform(post("/api/v1/clusters/{c}/queues/{q}/messages/actions/delete", clusterId, Q)
                         .param("dryRun", "true")
@@ -252,12 +231,13 @@ class MessageMutationControllerTest extends PostgresIntegrationTest {
                 .andExpect(jsonPath("$.overCap").value(false));
 
         assertThat(onlyAudit().isDryRun()).isTrue();
+        assertThat(broker.operations()).containsExactly("countMessages");
     }
 
     @Test
     void deleteByFilterOverCapIsA422WithAffectedCountAndCap() throws Exception {
         settings.put(BrokerSettings.BULK_CAP, "2");
-        when(artemisNodes.on(eq(clusterId), any(UUID.class))).thenReturn(client(SEARCH, COUNT_3));
+        serving().operation("countMessages", 3);
 
         mvc.perform(post("/api/v1/clusters/{c}/queues/{q}/messages/actions/delete", clusterId, Q)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -273,8 +253,7 @@ class MessageMutationControllerTest extends PostgresIntegrationTest {
     @Test
     void deleteByFilterExactlyAtTheCapIsAllowed() throws Exception {
         settings.put(BrokerSettings.BULK_CAP, "3");
-        when(artemisNodes.on(eq(clusterId), any(UUID.class)))
-                .thenReturn(client(SEARCH, COUNT_3, fixture("remove-messages.json")));
+        serving().operation("countMessages", 3).operation("removeMessages", 3);
 
         mvc.perform(post("/api/v1/clusters/{c}/queues/{q}/messages/actions/delete", clusterId, Q)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -287,8 +266,7 @@ class MessageMutationControllerTest extends PostgresIntegrationTest {
     @Test
     void deleteByFilterOverCapProceedsWithOverride() throws Exception {
         settings.put(BrokerSettings.BULK_CAP, "2");
-        when(artemisNodes.on(eq(clusterId), any(UUID.class)))
-                .thenReturn(client(SEARCH, COUNT_3, fixture("remove-messages.json")));
+        serving().operation("countMessages", 3).operation("removeMessages", 1);
 
         mvc.perform(post("/api/v1/clusters/{c}/queues/{q}/messages/actions/delete", clusterId, Q)
                         .param("override", "true")
@@ -304,7 +282,7 @@ class MessageMutationControllerTest extends PostgresIntegrationTest {
 
     @Test
     void purgeDryRunReadsMessageCountAndDoesNotRemove() throws Exception {
-        when(artemisNodes.on(eq(clusterId), any(UUID.class))).thenReturn(client(SEARCH, COUNT_3));
+        FakeArtemis broker = serving();
 
         mvc.perform(delete("/api/v1/clusters/{c}/queues/{q}/messages", clusterId, Q)
                         .param("dryRun", "true"))
@@ -314,25 +292,26 @@ class MessageMutationControllerTest extends PostgresIntegrationTest {
         AuditEventEntity row = onlyAudit();
         assertThat(row.getAction()).isEqualTo("PURGE_QUEUE");
         assertThat(row.isDryRun()).isTrue();
+        assertThat(broker.operations()).isEmpty();
     }
 
     @Test
     void purgeRealAuditsTheRemovedCount() throws Exception {
-        when(artemisNodes.on(eq(clusterId), any(UUID.class)))
-                .thenReturn(client(SEARCH, COUNT_3, fixture("remove-all-messages.json")));
+        FakeArtemis broker = serving().operation("removeAllMessages", 3);
 
         mvc.perform(delete("/api/v1/clusters/{c}/queues/{q}/messages", clusterId, Q))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.affectedCount").value(3));
 
         assertThat(onlyAudit().getAffectedCount()).isEqualTo(3);
+        assertThat(broker.operations()).containsExactly("removeAllMessages");
     }
 
     // ---- broker failure ---------------------------------------
 
     @Test
     void aBrokerFailureLeavesAFailureRowAndReturnsAClassifiedProblem() throws Exception {
-        when(artemisNodes.on(eq(clusterId), any(UUID.class))).thenReturn(unauthorized());
+        unauthorized();
 
         mvc.perform(post("/api/v1/clusters/{c}/queues/{q}/messages", clusterId, Q)
                         .contentType(MediaType.APPLICATION_JSON)

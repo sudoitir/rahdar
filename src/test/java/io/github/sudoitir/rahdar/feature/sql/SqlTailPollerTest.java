@@ -2,6 +2,7 @@ package io.github.sudoitir.rahdar.feature.sql;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -10,11 +11,11 @@ import io.github.sudoitir.rahdar.feature.sql.QueryResult.NodeOutcome;
 import io.github.sudoitir.rahdar.feature.sql.QueryResult.Row;
 import io.github.sudoitir.rahdar.platform.broker.BodyDecoder.Compression;
 import io.github.sudoitir.rahdar.platform.broker.BodyEncoding;
+import io.github.sudoitir.rahdar.platform.broker.BrokerMessages;
 import io.github.sudoitir.rahdar.platform.broker.BrowsePage;
 import io.github.sudoitir.rahdar.platform.broker.BrowsedMessage;
 import io.github.sudoitir.rahdar.platform.broker.ClockOffsetRegistry.ClockOffset;
 import io.github.sudoitir.rahdar.platform.broker.ClockOffsetService;
-import io.github.sudoitir.rahdar.platform.broker.MessageTransport;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNodeEntity;
 import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshot;
@@ -64,6 +65,9 @@ class SqlTailPollerTest {
     private BrokerNodeEntity node;
     private final AtomicLong messagesAdded = new AtomicLong(100);
 
+    /** What the broker serves to the tail under test. */
+    private volatile Browsing transport = new RecordingTransport(0);
+
     @BeforeEach
     void setUp() {
         snapshots = mock(QueueSnapshots.class);
@@ -88,7 +92,7 @@ class SqlTailPollerTest {
         RecordingTransport transport = new RecordingTransport(3);
         CollectingListener listener = new CollectingListener();
         SqlTailPoller poller = poller();
-        poller.start(CLUSTER, plan("SELECT * FROM \"ORDER.IN\""), transport, listener);
+        start(poller, plan("SELECT * FROM \"ORDER.IN\""), transport, listener);
 
         poller.tick();
         await(() -> !listener.statuses.isEmpty());
@@ -102,7 +106,7 @@ class SqlTailPollerTest {
         RecordingTransport transport = new RecordingTransport(3);
         CollectingListener listener = new CollectingListener();
         SqlTailPoller poller = poller();
-        poller.start(CLUSTER, plan("SELECT * FROM \"ORDER.IN\""), transport, listener);
+        start(poller, plan("SELECT * FROM \"ORDER.IN\""), transport, listener);
 
         poller.tick();
         await(() -> listener.statuses.size() == 1);
@@ -130,7 +134,7 @@ class SqlTailPollerTest {
         SqlTailPoller poller = poller();
         QueryPlan plan = plan("SELECT * FROM \"ORDER.IN\"");
         assertThat(plan.resolvedSource()).isEqualTo(QueryAst.Source.INDEX);
-        poller.start(CLUSTER, plan, transport, listener);
+        start(poller, plan, transport, listener);
 
         poller.tick();
         await(() -> !listener.statuses.isEmpty());
@@ -165,7 +169,7 @@ class SqlTailPollerTest {
 
         CollectingListener listener = new CollectingListener();
         SqlTailPoller poller = poller();
-        poller.start(CLUSTER, plan, new RecordingTransport(0), listener);
+        start(poller, plan, new RecordingTransport(0), listener);
 
         poller.tick();
         await(() -> listener.statuses.size() == 1);
@@ -225,7 +229,7 @@ class SqlTailPollerTest {
         RecordingTransport transport = new RecordingTransport(3);
         CollectingListener listener = new CollectingListener();
         SqlTailPoller poller = poller();
-        poller.start(CLUSTER, plan("SELECT * FROM \"ORDER.IN\""), transport, listener);
+        start(poller, plan("SELECT * FROM \"ORDER.IN\""), transport, listener);
 
         listener.cancelled = true;
         poller.tick();
@@ -239,7 +243,7 @@ class SqlTailPollerTest {
         RecordingTransport transport = new RecordingTransport(3);
         CollectingListener listener = new CollectingListener();
         SqlTailPoller poller = poller();
-        SqlTailPoller.Tail tail = poller.start(CLUSTER, plan("SELECT * FROM \"ORDER.IN\""), transport, listener);
+        SqlTailPoller.Tail tail = start(poller, plan("SELECT * FROM \"ORDER.IN\""), transport, listener);
 
         tail.stop();
         poller.tick();
@@ -253,7 +257,7 @@ class SqlTailPollerTest {
         RecordingTransport transport = new RecordingTransport(3);
         CollectingListener listener = new CollectingListener();
         SqlTailPoller poller = poller();
-        poller.start(CLUSTER, plan("SELECT * FROM \"ORDER.IN\""), transport, listener);
+        start(poller, plan("SELECT * FROM \"ORDER.IN\""), transport, listener);
 
         // Thirty arrived; the poll saw three of them still on the queue. The rest
         // were consumed between reads and are exactly what a sample cannot show.
@@ -272,8 +276,7 @@ class SqlTailPollerTest {
     void aQueryWithAPredicateSaysItsGapFigureCannotBeSeparatedFromNonMatches() {
         CollectingListener listener = new CollectingListener();
         SqlTailPoller poller = poller();
-        poller.start(
-                CLUSTER, plan("SELECT * FROM \"ORDER.IN\" WHERE priority > 4"), new RecordingTransport(0), listener);
+        start(poller, plan("SELECT * FROM \"ORDER.IN\" WHERE priority > 4"), new RecordingTransport(0), listener);
 
         poller.tick();
         await(() -> !listener.statuses.isEmpty());
@@ -286,7 +289,7 @@ class SqlTailPollerTest {
         DeepTransport transport = new DeepTransport();
         CollectingListener listener = new CollectingListener();
         SqlTailPoller poller = poller();
-        poller.start(CLUSTER, plan("SELECT * FROM \"ORDER.IN\""), transport, listener, Duration.ZERO, true);
+        start(poller, plan("SELECT * FROM \"ORDER.IN\""), transport, listener, Duration.ZERO, true);
 
         poller.tick();
         await(() -> !listener.statuses.isEmpty());
@@ -299,8 +302,7 @@ class SqlTailPollerTest {
     void aShallowBacklogIsFinishedInOneTick() {
         CollectingListener listener = new CollectingListener();
         SqlTailPoller poller = poller();
-        poller.start(
-                CLUSTER, plan("SELECT * FROM \"ORDER.IN\""), new RecordingTransport(3), listener, Duration.ZERO, true);
+        start(poller, plan("SELECT * FROM \"ORDER.IN\""), new RecordingTransport(3), listener, Duration.ZERO, true);
 
         poller.tick();
         await(() -> !listener.statuses.isEmpty());
@@ -310,28 +312,41 @@ class SqlTailPollerTest {
 
     // ---- harness --------------------------------------------------------
 
+    /** One browse of a queue, as the broker serves it to the tail. */
+    @FunctionalInterface
+    private interface Browsing {
+        BrowsePage browse(String queue, int page, int size, String filter);
+    }
+
+    private SqlTailPoller.Tail start(
+            SqlTailPoller poller, QueryPlan plan, Browsing served, SqlTailPoller.Listener listener) {
+        transport = served;
+        return poller.start(CLUSTER, plan, listener);
+    }
+
+    private SqlTailPoller.Tail start(
+            SqlTailPoller poller,
+            QueryPlan plan,
+            Browsing served,
+            SqlTailPoller.Listener listener,
+            Duration minInterval,
+            boolean fromBeginning) {
+        transport = served;
+        return poller.start(CLUSTER, plan, listener, minInterval, fromBeginning);
+    }
+
     /** A queue deeper than any tick may read: every page is full, and every message is distinct. */
-    private static final class DeepTransport implements MessageTransport {
+    private static final class DeepTransport implements Browsing {
         final AtomicInteger pagesRead = new AtomicInteger();
 
         @Override
-        public Channel channel() {
-            return Channel.JOLOKIA;
-        }
-
-        @Override
-        public BrowseResult browse(TransportTarget target, int page, int size, String filter) {
+        public BrowsePage browse(String queue, int page, int size, String filter) {
             pagesRead.incrementAndGet();
             List<BrowsedMessage> messages = new ArrayList<>(size);
             for (int i = 0; i < size; i++) {
                 messages.add(message((page - 1) * size + i));
             }
-            return new BrowseResult(new BrowsePage(messages, 1_000_000L), Channel.JOLOKIA);
-        }
-
-        @Override
-        public void send(TransportTarget target, SendSpec spec) {
-            throw new UnsupportedOperationException();
+            return new BrowsePage(messages, 1_000_000L);
         }
     }
 
@@ -355,9 +370,13 @@ class SqlTailPollerTest {
                 properties,
                 coverage,
                 Clock.fixed(NOW, ZoneOffset.UTC));
+        BrokerMessages messages = mock(BrokerMessages.class);
+        when(messages.browse(any(), any(), any(), anyInt(), anyInt(), any()))
+                .thenAnswer(
+                        i -> transport.browse(i.getArgument(2), i.getArgument(3), i.getArgument(4), i.getArgument(5)));
         return new SqlTailPoller(
                 new BrokerQueryExecutor(
-                        nodes, residuals, planner, properties, BrokerQueryExecutorTest.clearGovernance()),
+                        nodes, residuals, planner, properties, BrokerQueryExecutorTest.clearGovernance(), messages),
                 indexExecutor,
                 snapshots);
     }
@@ -421,7 +440,7 @@ class SqlTailPollerTest {
     }
 
     /** Serves a fixed set of messages and records the selector it was asked to apply. */
-    private static final class RecordingTransport implements MessageTransport {
+    private static final class RecordingTransport implements Browsing {
         private final int depth;
         final List<String> filters = Collections.synchronizedList(new ArrayList<>());
 
@@ -430,12 +449,7 @@ class SqlTailPollerTest {
         }
 
         @Override
-        public Channel channel() {
-            return Channel.JOLOKIA;
-        }
-
-        @Override
-        public BrowseResult browse(TransportTarget target, int page, int size, String filter) {
+        public BrowsePage browse(String queue, int page, int size, String filter) {
             filters.add(filter == null ? "" : filter);
             List<BrowsedMessage> messages = new ArrayList<>();
             if (page == 1) {
@@ -443,12 +457,7 @@ class SqlTailPollerTest {
                     messages.add(message(i));
                 }
             }
-            return new BrowseResult(new BrowsePage(messages, depth), Channel.JOLOKIA);
-        }
-
-        @Override
-        public void send(TransportTarget target, SendSpec spec) {
-            throw new UnsupportedOperationException();
+            return new BrowsePage(messages, (long) depth);
         }
     }
 

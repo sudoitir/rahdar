@@ -28,7 +28,7 @@ class MessageIndexCaptureTest {
         MessageIndexSubscriptionRepository subscriptions = mock(MessageIndexSubscriptionRepository.class);
         when(subscriptions.findByEnabledTrue()).thenThrow(new IllegalStateException("the context is closed"));
         MessageIndexCapture capture =
-                new MessageIndexCapture(subscriptions, null, null, null, null, null, mock(ClusterOwnership.class));
+                new MessageIndexCapture(subscriptions, null, null, null, null, mock(ClusterOwnership.class));
 
         List<Throwable> uncaught = new CopyOnWriteArrayList<>();
         Thread.UncaughtExceptionHandler before = Thread.getDefaultUncaughtExceptionHandler();

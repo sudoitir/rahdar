@@ -50,7 +50,6 @@ public class MessageIndexCapture {
     private final SqlQueryParser parser;
     private final QueryPlanner planner;
     private final SqlTailPoller poller;
-    private final SqlConsoleService console;
     private final MessageIndexWriter writer;
     private final ClusterOwnership ownership;
 
@@ -185,7 +184,6 @@ public class MessageIndexCapture {
         SqlTailPoller.Tail tail = poller.start(
                 clusterId,
                 plan,
-                console.transportFor(clusterId),
                 new IndexSink(clusterId, subscription.getId()),
                 Duration.ofMillis(subscription.getIntervalMs()),
                 true);

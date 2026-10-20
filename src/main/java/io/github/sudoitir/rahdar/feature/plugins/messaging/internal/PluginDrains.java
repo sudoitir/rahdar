@@ -1,17 +1,15 @@
 package io.github.sudoitir.rahdar.feature.plugins.messaging.internal;
 
+import io.github.sudoitir.openbroker.BrokerException;
+import io.github.sudoitir.openbroker.ErrorReasons;
+import io.github.sudoitir.openbroker.messaging.Message;
+import io.github.sudoitir.openbroker.messaging.ReceiveOptions;
+import io.github.sudoitir.openbroker.messaging.Receiver;
 import io.github.sudoitir.rahdar.feature.plugins.messaging.Disposition;
 import io.github.sudoitir.rahdar.feature.plugins.messaging.PluginMessage;
-import io.github.sudoitir.rahdar.feature.plugins.messaging.PluginMessagingProperties;
 import io.github.sudoitir.rahdar.feature.plugins.messaging.RegistrationMode;
-import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
-import io.github.sudoitir.rahdar.platform.broker.CorePool;
-import io.github.sudoitir.rahdar.platform.broker.CorePool.PooledSession;
-import io.github.sudoitir.rahdar.platform.broker.CoreUrl;
-import jakarta.jms.JMSException;
-import jakarta.jms.Message;
-import jakarta.jms.MessageConsumer;
-import jakarta.jms.MessageListener;
+import io.github.sudoitir.rahdar.platform.broker.BrokerMessages;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -22,34 +20,37 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.activemq.artemis.api.core.ActiveMQQueueMaxConsumerLimitReached;
 import org.springframework.stereotype.Component;
 
 /**
- * The Core consumers that deliver registrations' messages to plugins: one drain per registration
- * and node, with one slot per unit of the registration's concurrency, on Rahdar's plugin session
- * pools (ADR-0111, ADR-0112).
+ * The receivers that deliver registrations' messages to plugins: one drain per registration and
+ * node, with one slot per unit of the registration's concurrency (ADR-0111, ADR-0112).
  *
- * <p>Every slot is its own {@code CLIENT_ACKNOWLEDGE} session carrying one consumer, so an
- * acknowledge settles exactly the message just handled, and the slots of a drain handle messages
- * in parallel. A consumer's slots have no prefetch window, so each holds at most the one message
- * it is handling; the broker's message grouping keeps a group on one slot, in order. A tap's copy is acknowledged whatever the handler
- * said — the original never left its queue. A consumed message is acknowledged only on
- * {@link Disposition#ACCEPT}; a rejection or an exception recovers the session, and the broker
- * redelivers it within its own {@code max-delivery-attempts}. A drain that stops, or a Rahdar that
- * dies, acknowledges nothing it had not already settled, so what it held is redelivered.
+ * <p>Every slot is its own receiver, read on its own virtual thread, so settling one message
+ * settles exactly the message just handled, the slots of a drain handle messages in parallel, and a
+ * plugin that blocks holds only its own slot's thread. A slot has no prefetch, so it holds at most
+ * the one message it is handling; the broker's message grouping keeps a group on one slot, in
+ * order. A tap's copy is accepted whatever the handler said — the original never left its queue. A
+ * consumed message is accepted only on {@link Disposition#ACCEPT}; a release hands it back
+ * uncounted, and a rejection or an exception hands it back counted, so the broker redelivers it
+ * within its own {@code max-delivery-attempts}. A drain that stops, or a Rahdar that dies, accepts
+ * nothing it had not already settled, so what it held is redelivered.
  */
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class PluginDrains {
 
-    private final CorePool corePool;
-    private final BrokerConnections connections;
-    private final PluginHandlers handlers;
-    private final PluginMessagingProperties properties;
+    /** How long one receive waits; also how soon a slot sees its drain stop. */
+    private static final Duration POLL = Duration.ofMillis(500);
 
-    /** One drain's identity and what it reads. {@code source} is the queue name the consumer opens. */
+    /** How long stopping a drain waits for a handler still running. */
+    private static final Duration STOP_WAIT = Duration.ofSeconds(30);
+
+    private final BrokerMessages messages;
+    private final PluginHandlers handlers;
+
+    /** One drain's identity and what it reads. {@code source} is the queue the receivers open. */
     record Spec(
             UUID registrationId,
             String pluginId,
@@ -59,7 +60,6 @@ public class PluginDrains {
             UUID clusterId,
             UUID nodeId,
             String nodeName,
-            String coreUrl,
             String queue,
             String source) {}
 
@@ -118,7 +118,15 @@ public class PluginDrains {
             drain.close();
             throw e;
         }
-        running.put(key(spec.registrationId(), spec.nodeId()), drain);
+        drain.slots.forEach(slot -> slot.thread = Thread.ofVirtual()
+                .name("plugin-" + spec.pluginId() + "-" + spec.key())
+                .start(slot::run));
+        String key = key(spec.registrationId(), spec.nodeId());
+        running.put(key, drain);
+        if (drain.closed) {
+            // A slot failed as it started; the next pass tries again.
+            running.remove(key, drain);
+        }
         log.info(
                 "Delivering {} of {} on {} to plugin {} ({}, {} at once)",
                 spec.mode() == RegistrationMode.TAP ? "a copy" : "messages",
@@ -131,29 +139,16 @@ public class PluginDrains {
 
     private Slot openSlot(Drain drain) throws StartFailure {
         Spec spec = drain.spec;
-        PooledSession jms;
         try {
-            jms = corePool.borrowForPlugins(
-                    spec.clusterId(),
-                    CoreUrl.dialable(spec.coreUrl()),
-                    connections.coreSettingsFor(spec.clusterId()),
-                    spec.mode() == RegistrationMode.CONSUME,
-                    properties.maxThreads());
-        } catch (JMSException | RuntimeException e) {
-            throw new StartFailure(
-                    "Rahdar could not open a Core session to " + spec.nodeName() + ": " + reason(e), false, e);
-        }
-        try {
-            MessageConsumer consumer =
-                    jms.session().createConsumer(jms.session().createQueue(spec.source()));
-            Slot slot = new Slot(drain, jms, consumer);
-            consumer.setMessageListener(slot);
-            jms.connection()
-                    .setExceptionListener(failure -> connectionFailed(spec.clusterId(), spec.nodeId(), failure));
-            return slot;
-        } catch (JMSException e) {
-            jms.close();
-            boolean elsewhere = causedByMaxConsumers(e);
+            return new Slot(
+                    drain,
+                    messages.receiver(
+                            spec.clusterId(),
+                            spec.nodeId(),
+                            spec.source(),
+                            ReceiveOptions.consume().withPrefetch(0)));
+        } catch (BrokerException e) {
+            boolean elsewhere = ErrorReasons.MAX_CONSUMERS_REACHED.equals(e.reason());
             throw new StartFailure(
                     elsewhere
                             ? "Another Rahdar instance sharing this database is delivering this on " + spec.nodeName()
@@ -161,6 +156,9 @@ public class PluginDrains {
                                     + reason(e),
                     elsewhere,
                     e);
+        } catch (RuntimeException e) {
+            throw new StartFailure(
+                    "Rahdar could not open a receiver on " + spec.nodeName() + ": " + reason(e), false, e);
         }
     }
 
@@ -204,33 +202,16 @@ public class PluginDrains {
         });
     }
 
-    /** A dead connection ends every drain on its node; the next pass starts them again. */
-    void connectionFailed(UUID clusterId, UUID nodeId, JMSException failure) {
-        running.entrySet().removeIf(e -> {
-            Spec spec = e.getValue().spec;
-            if (!spec.clusterId().equals(clusterId) || !spec.nodeId().equals(nodeId)) {
-                return false;
-            }
-            e.getValue().abandon();
+    /** A slot lost its receiver: the drain ends, and the next pass starts it again. */
+    private void failed(Drain drain, RuntimeException failure) {
+        if (running.remove(key(drain.spec.registrationId(), drain.spec.nodeId()), drain)) {
             log.warn(
                     "Plugin delivery of {} on {} lost its broker connection and restarts on the next pass: {}",
-                    spec.queue(),
-                    spec.nodeName(),
+                    drain.spec.queue(),
+                    drain.spec.nodeName(),
                     failure.getMessage());
-            return true;
-        });
-    }
-
-    private static boolean causedByMaxConsumers(Throwable e) {
-        for (Throwable t = e; t != null; t = t.getCause() == t ? null : t.getCause()) {
-            if (t instanceof ActiveMQQueueMaxConsumerLimitReached) {
-                return true;
-            }
-            if (t instanceof JMSException j && j.getLinkedException() instanceof ActiveMQQueueMaxConsumerLimitReached) {
-                return true;
-            }
         }
-        return false;
+        drain.closed = true;
     }
 
     private static String reason(Exception e) {
@@ -248,37 +229,47 @@ public class PluginDrains {
             this.spec = spec;
         }
 
-        /** Stop taking messages on every slot first, then close each; see {@link Slot#close()}. */
+        /**
+         * Stop taking messages on every slot, then wait for each to finish the message it is handling
+         * and close its receiver, which hands back whatever it holds unsettled.
+         */
         void close() {
             closed = true;
-            slots.forEach(Slot::close);
-        }
-
-        /** The connection is already dead; release what is left without waiting on it. */
-        void abandon() {
-            closed = true;
-            slots.forEach(slot -> slot.jms.close());
+            for (Slot slot : slots) {
+                slot.awaitStopped();
+            }
         }
     }
 
-    /** One session and its consumer: a message at a time. */
-    private final class Slot implements MessageListener {
+    /** One receiver, read on its own thread: a message at a time. */
+    private final class Slot {
 
         private final Drain drain;
-        private final PooledSession jms;
-        private final MessageConsumer consumer;
+        private final Receiver receiver;
+        private volatile Thread thread;
 
-        Slot(Drain drain, PooledSession jms, MessageConsumer consumer) {
+        Slot(Drain drain, Receiver receiver) {
             this.drain = drain;
-            this.jms = jms;
-            this.consumer = consumer;
+            this.receiver = receiver;
         }
 
-        @Override
-        public void onMessage(Message message) {
-            if (drain.closed) {
-                return;
+        void run() {
+            try {
+                while (!drain.closed) {
+                    for (Message message : receiver.receive(1, POLL)) {
+                        deliver(message);
+                    }
+                }
+            } catch (RuntimeException e) {
+                if (!drain.closed) {
+                    failed(drain, e);
+                }
+            } finally {
+                receiver.close();
             }
+        }
+
+        private void deliver(Message message) {
             Spec spec = drain.spec;
             Optional<Disposition> outcome;
             try {
@@ -300,41 +291,36 @@ public class PluginDrains {
                 // closing this drain returns it to the broker.
                 return;
             }
-            try {
-                if (spec.mode() == RegistrationMode.TAP || outcome.get() == Disposition.ACCEPT) {
-                    message.acknowledge();
-                } else if (outcome.get() == Disposition.RELEASE) {
-                    jms.release();
-                } else {
-                    jms.session().recover();
-                }
-            } catch (JMSException e) {
-                log.warn("Could not settle a message from {} on {}: {}", spec.queue(), spec.nodeName(), e.getMessage());
-            }
+            receiver.settle(message, settlement(spec.mode(), outcome.get()));
         }
 
-        /**
-         * Close the consumer (which waits for a delivery in progress), hand back to the broker
-         * whatever it received and did not settle, then return the session.
-         *
-         * <p>The recover is not optional. Closing a pooled session returns it to the pool rather than
-         * ending it, and a {@code CLIENT_ACKNOWLEDGE} session keeps what it was delivered and never
-         * acknowledged — so without this, those messages would stay held by an idle pooled session
-         * instead of being redelivered to the next consumer.
-         */
-        void close() {
-            String node = drain.spec.nodeName();
-            try {
-                consumer.close();
-            } catch (JMSException e) {
-                log.debug("Closing a plugin drain on {}: {}", node, e.getMessage());
+        /** Wait for the slot's thread to leave its handler and close its receiver. */
+        void awaitStopped() {
+            Thread running = thread;
+            if (running == null) {
+                receiver.close();
+                return;
+            }
+            if (running == Thread.currentThread()) {
+                return;
             }
             try {
-                jms.session().recover();
-            } catch (JMSException e) {
-                log.debug("Returning unsettled messages from a plugin drain on {}: {}", node, e.getMessage());
+                if (!running.join(STOP_WAIT)) {
+                    log.warn("A plugin drain on {} did not stop within {}", drain.spec.nodeName(), STOP_WAIT);
+                }
+            } catch (InterruptedException _) {
+                Thread.currentThread().interrupt();
             }
-            jms.close();
         }
+    }
+
+    /** A tap's copy is always accepted; a consumed message is settled as the plugin said. */
+    static io.github.sudoitir.openbroker.messaging.Disposition settlement(RegistrationMode mode, Disposition outcome) {
+        if (mode == RegistrationMode.TAP || outcome == Disposition.ACCEPT) {
+            return io.github.sudoitir.openbroker.messaging.Disposition.accept();
+        }
+        return outcome == Disposition.RELEASE
+                ? new io.github.sudoitir.openbroker.messaging.Disposition.Release(Optional.empty(), false)
+                : new io.github.sudoitir.openbroker.messaging.Disposition.Reject(Optional.empty());
     }
 }

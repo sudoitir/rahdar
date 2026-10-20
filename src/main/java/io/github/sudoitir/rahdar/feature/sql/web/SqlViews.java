@@ -134,9 +134,6 @@ public final class SqlViews {
             long examined,
             long matched,
 
-            @Schema(description = "JOLOKIA or CORE — the channel that served this node.")
-            String servedBy,
-
             String detail) {}
 
     @Schema(description = "A limit the query ran into, which is why it stopped.")

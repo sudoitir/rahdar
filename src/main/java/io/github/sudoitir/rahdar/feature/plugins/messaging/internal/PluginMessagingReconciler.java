@@ -300,8 +300,7 @@ public class PluginMessagingReconciler {
                     RegistrationState.PENDING, "The queue " + reg.getQueue() + " does not exist on this node.", null);
         }
         try {
-            // The fully qualified name reaches this queue even when its address has others.
-            drains.start(spec(reg, node, source.address() + "::" + source.queue()));
+            drains.start(spec(reg, node, source.queue()));
             return new NodeResult(RegistrationState.ACTIVE, null, null);
         } catch (PluginDrains.StartFailure e) {
             return new NodeResult(RegistrationState.PENDING, e.getMessage(), null);
@@ -318,7 +317,6 @@ public class PluginMessagingReconciler {
                 reg.getClusterId(),
                 node.getId(),
                 node.getName(),
-                node.getCoreUrl(),
                 reg.getQueue(),
                 source);
     }

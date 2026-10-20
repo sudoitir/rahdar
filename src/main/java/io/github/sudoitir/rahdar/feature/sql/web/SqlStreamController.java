@@ -182,8 +182,7 @@ public class SqlStreamController {
             session.complete();
             return;
         }
-        SqlTailPoller.Tail running =
-                tailPoller.start(clusterId, executed.plan(), console.transportFor(clusterId), session);
+        SqlTailPoller.Tail running = tailPoller.start(clusterId, executed.plan(), session);
         // The static rows are already on the client. Advancing the mark past them is
         // what stops the first poll from sending every one of them again.
         executed.result().rows().forEach(running::seen);

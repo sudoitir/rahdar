@@ -2,6 +2,7 @@ package io.github.sudoitir.rahdar.feature.sql;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -12,14 +13,11 @@ import io.github.sudoitir.rahdar.feature.sql.QueryResult.Row;
 import io.github.sudoitir.rahdar.platform.broker.BodyDecoder.Compression;
 import io.github.sudoitir.rahdar.platform.broker.BodyEncoding;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
+import io.github.sudoitir.rahdar.platform.broker.BrokerMessages;
 import io.github.sudoitir.rahdar.platform.broker.BrowsePage;
 import io.github.sudoitir.rahdar.platform.broker.BrowsedMessage;
 import io.github.sudoitir.rahdar.platform.broker.ClockOffsetRegistry.ClockOffset;
 import io.github.sudoitir.rahdar.platform.broker.ClockOffsetService;
-import io.github.sudoitir.rahdar.platform.broker.MessageTransport;
-import io.github.sudoitir.rahdar.platform.broker.MessageTransport.BrowseResult;
-import io.github.sudoitir.rahdar.platform.broker.MessageTransport.Channel;
-import io.github.sudoitir.rahdar.platform.broker.MessageTransport.TransportTarget;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNodeEntity;
 import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshot;
@@ -99,17 +97,17 @@ class BrokerQueryExecutorTest {
                 Clock.fixed(NOW, ZoneOffset.UTC));
     }
 
-    private QueryResult run(String sql, MessageTransport transport, SqlProperties properties) {
+    private QueryResult run(String sql, BrokerMessages transport, SqlProperties properties) {
         return run(sql, transport, properties, new CountingSink());
     }
 
     private QueryResult run(
-            String sql, MessageTransport transport, SqlProperties properties, BrokerQueryExecutor.Sink sink) {
+            String sql, BrokerMessages transport, SqlProperties properties, BrokerQueryExecutor.Sink sink) {
         QueryPlanner planner = planner(properties);
         BrokerQueryExecutor executor =
-                new BrokerQueryExecutor(nodes, residuals, planner, properties, clearGovernance());
+                new BrokerQueryExecutor(nodes, residuals, planner, properties, clearGovernance(), transport);
         QueryPlan plan = planner.plan(CLUSTER, parser.parse(sql));
-        return executor.execute(CLUSTER, plan, transport, sink);
+        return executor.execute(CLUSTER, plan, sink);
     }
 
     static class CountingSink implements BrokerQueryExecutor.Sink {
@@ -133,32 +131,16 @@ class BrokerQueryExecutorTest {
         }
     }
 
-    /** A transport that serves a fixed queue depth, counting the browses it is asked for. */
-    private MessageTransport transportServing(int totalMessages, boolean truncated) {
-        return new MessageTransport() {
-            final AtomicInteger calls = new AtomicInteger();
-
-            @Override
-            public Channel channel() {
-                return Channel.JOLOKIA;
+    /** Messages that serve a fixed queue depth. */
+    private static BrokerMessages transportServing(int totalMessages, boolean truncated) {
+        return transport((queue, page, size, filter) -> {
+            int from = (page - 1) * size;
+            List<BrowsedMessage> messages = new ArrayList<>();
+            for (int i = from; i < Math.min(from + size, totalMessages); i++) {
+                messages.add(message(i, truncated));
             }
-
-            @Override
-            public BrowseResult browse(TransportTarget target, int page, int size, String filter) {
-                calls.incrementAndGet();
-                int from = (page - 1) * size;
-                List<BrowsedMessage> messages = new ArrayList<>();
-                for (int i = from; i < Math.min(from + size, totalMessages); i++) {
-                    messages.add(message(i, truncated));
-                }
-                return new BrowseResult(new BrowsePage(messages, totalMessages), Channel.JOLOKIA);
-            }
-
-            @Override
-            public void send(TransportTarget target, SendSpec spec) {
-                throw new UnsupportedOperationException();
-            }
-        };
+            return new BrowsePage(messages, (long) totalMessages);
+        });
     }
 
     private static BrowsedMessage message(int i, boolean truncated) {
@@ -279,12 +261,12 @@ class BrokerQueryExecutorTest {
         });
         SqlProperties properties = props(50_000, 2_000, Duration.ofSeconds(30));
         QueryPlanner planner = planner(properties);
-        BrokerQueryExecutor executor = new BrokerQueryExecutor(nodes, residuals, planner, properties, masked);
+        BrokerQueryExecutor executor =
+                new BrokerQueryExecutor(nodes, residuals, planner, properties, masked, transportServing(5, false));
 
         QueryResult result = executor.execute(
                 CLUSTER,
                 planner.plan(CLUSTER, parser.parse("SELECT * FROM \"ORDER.IN\" WHERE body LIKE '%needle%'")),
-                transportServing(5, false),
                 new CountingSink());
 
         // Every raw body contains the needle; none of the bodies the caller may see does.
@@ -347,30 +329,16 @@ class BrokerQueryExecutorTest {
         BrokerNodeEntity broken = node("broker-2", "node-b");
         given(List.of(healthy, broken), List.of(snapshot(healthy, "ORDER.IN", 3), snapshot(broken, "ORDER.OUT", 3)));
 
-        MessageTransport flaky = new MessageTransport() {
-            @Override
-            public Channel channel() {
-                return Channel.JOLOKIA;
+        BrokerMessages flaky = transport((queue, page, size, filter) -> {
+            if ("ORDER.OUT".equals(queue)) {
+                throw new BrokerConnectionException(BrokerConnectionException.Kind.UNREACHABLE, "connection refused");
             }
-
-            @Override
-            public BrowseResult browse(TransportTarget target, int page, int size, String filter) {
-                if ("ORDER.OUT".equals(target.queueName())) {
-                    throw new BrokerConnectionException(
-                            BrokerConnectionException.Kind.UNREACHABLE, "connection refused");
-                }
-                List<BrowsedMessage> messages = new ArrayList<>();
-                for (int i = 0; i < 3; i++) {
-                    messages.add(message(i, false));
-                }
-                return new BrowseResult(new BrowsePage(messages, 3), Channel.JOLOKIA);
+            List<BrowsedMessage> messages = new ArrayList<>();
+            for (int i = 0; i < 3; i++) {
+                messages.add(message(i, false));
             }
-
-            @Override
-            public void send(TransportTarget target, SendSpec spec) {
-                throw new UnsupportedOperationException();
-            }
-        };
+            return new BrowsePage(messages, 3L);
+        });
 
         QueryResult result = run("SELECT * FROM \"ORDER.#\"", flaky, props(50_000, 2_000, Duration.ofSeconds(30)));
 
@@ -388,27 +356,14 @@ class BrokerQueryExecutorTest {
     void abandoningTheQueryStopsFurtherBrokerReads() {
         given(List.of(node), List.of(snapshot(node, "ORDER.IN", 1_000)));
         AtomicInteger browses = new AtomicInteger();
-        MessageTransport counting = new MessageTransport() {
-            @Override
-            public Channel channel() {
-                return Channel.JOLOKIA;
+        BrokerMessages counting = transport((queue, page, size, filter) -> {
+            browses.incrementAndGet();
+            List<BrowsedMessage> messages = new ArrayList<>();
+            for (int i = 0; i < size; i++) {
+                messages.add(message(i, false));
             }
-
-            @Override
-            public BrowseResult browse(TransportTarget target, int page, int size, String filter) {
-                browses.incrementAndGet();
-                List<BrowsedMessage> messages = new ArrayList<>();
-                for (int i = 0; i < size; i++) {
-                    messages.add(message(i, false));
-                }
-                return new BrowseResult(new BrowsePage(messages, 1_000), Channel.JOLOKIA);
-            }
-
-            @Override
-            public void send(TransportTarget target, SendSpec spec) {
-                throw new UnsupportedOperationException();
-            }
-        };
+            return new BrowsePage(messages, 1_000L);
+        });
         CountingSink sink = new CountingSink();
         sink.cancelled = true;
 
@@ -449,34 +404,22 @@ class BrokerQueryExecutorTest {
     /** What a browse does, so an edge case can be written as one lambda. */
     @FunctionalInterface
     private interface Browse {
-        BrowseResult apply(TransportTarget target, int page, int size, String filter);
+        BrowsePage apply(String queue, int page, int size, String filter);
     }
 
-    private MessageTransport transport(Browse browse) {
-        return new MessageTransport() {
-            @Override
-            public Channel channel() {
-                return Channel.JOLOKIA;
-            }
-
-            @Override
-            public BrowseResult browse(TransportTarget target, int page, int size, String filter) {
-                return browse.apply(target, page, size, filter);
-            }
-
-            @Override
-            public void send(TransportTarget target, SendSpec spec) {
-                throw new UnsupportedOperationException();
-            }
-        };
+    private static BrokerMessages transport(Browse browse) {
+        BrokerMessages messages = mock(BrokerMessages.class);
+        when(messages.browse(any(), any(), any(), anyInt(), anyInt(), any()))
+                .thenAnswer(i -> browse.apply(i.getArgument(2), i.getArgument(3), i.getArgument(4), i.getArgument(5)));
+        return messages;
     }
 
-    private static BrowseResult fullPage(int size, Channel channel) {
+    private static BrowsePage fullPage(int size) {
         List<BrowsedMessage> messages = new ArrayList<>();
         for (int i = 0; i < size; i++) {
             messages.add(message(i, false));
         }
-        return new BrowseResult(new BrowsePage(messages, 100_000), channel);
+        return new BrowsePage(messages, 100_000L);
     }
 
     @Test
@@ -486,13 +429,13 @@ class BrokerQueryExecutorTest {
 
         QueryResult withMessage = run(
                 "SELECT * FROM \"ORDER.IN\"",
-                transport((t, page, size, filter) -> {
+                transport((queue, page, size, filter) -> {
                     throw new IllegalStateException("boom");
                 }),
                 properties);
         QueryResult withoutMessage = run(
                 "SELECT * FROM \"ORDER.IN\"",
-                transport((t, page, size, filter) -> {
+                transport((queue, page, size, filter) -> {
                     throw new IllegalStateException();
                 }),
                 properties);
@@ -510,10 +453,10 @@ class BrokerQueryExecutorTest {
 
         QueryResult result = run(
                 "SELECT * FROM \"ORDER.IN\"",
-                transport((t, page, size, filter) -> {
+                transport((queue, page, size, filter) -> {
                     browses.incrementAndGet();
                     sink.cancelled = true;
-                    return fullPage(size, Channel.JOLOKIA);
+                    return fullPage(size);
                 }),
                 props(50_000, 2_000, Duration.ofSeconds(30)),
                 sink);
@@ -525,49 +468,31 @@ class BrokerQueryExecutorTest {
     }
 
     @Test
-    void theChannelThatServedTheLastPageIsWhatTheOutcomeReports() {
-        given(List.of(node), List.of(snapshot(node, "ORDER.IN", 100_000)));
-        AtomicInteger calls = new AtomicInteger();
-
-        QueryResult result = run(
-                "SELECT * FROM \"ORDER.IN\" LIMIT 1000",
-                transport((t, page, size, filter) ->
-                        fullPage(size, calls.getAndIncrement() == 0 ? Channel.JOLOKIA : Channel.CORE)),
-                props(50_000, 2_000, Duration.ofSeconds(30)));
-
-        assertThat(calls.get()).isGreaterThan(1);
-        assertThat(result.nodes().getFirst().servedBy()).isEqualTo(Channel.CORE);
-    }
-
-    @Test
     void aTailsExtraSelectorIsAndedIntoThePushedDownOneOrStandsAlone() {
         given(List.of(node), List.of(snapshot(node, "ORDER.IN", 3)));
         SqlProperties properties = props(50_000, 2_000, Duration.ofSeconds(30));
         QueryPlanner planner = planner(properties);
-        BrokerQueryExecutor executor =
-                new BrokerQueryExecutor(nodes, residuals, planner, properties, clearGovernance());
         List<String> filters = new ArrayList<>();
-        MessageTransport capturing = transport((t, page, size, filter) -> {
+        BrokerMessages capturing = transport((queue, page, size, filter) -> {
             filters.add(filter);
-            return fullPage(1, Channel.JOLOKIA);
+            return fullPage(1);
         });
+        BrokerQueryExecutor executor =
+                new BrokerQueryExecutor(nodes, residuals, planner, properties, clearGovernance(), capturing);
 
         executor.execute(
                 CLUSTER,
                 planner.plan(CLUSTER, parser.parse("SELECT * FROM \"ORDER.IN\" WHERE priority = 4")),
-                capturing,
                 new CountingSink(),
                 target -> "AMQTimestamp > 5");
         executor.execute(
                 CLUSTER,
                 planner.plan(CLUSTER, parser.parse("SELECT * FROM \"ORDER.IN\"")),
-                capturing,
                 new CountingSink(),
                 target -> "AMQTimestamp > 5");
         executor.execute(
                 CLUSTER,
                 planner.plan(CLUSTER, parser.parse("SELECT * FROM \"ORDER.IN\" WHERE priority = 4")),
-                capturing,
                 new CountingSink(),
                 target -> " ");
 
@@ -584,17 +509,16 @@ class BrokerQueryExecutorTest {
         given(List.of(node), List.of(snapshot(node, "ORDER.IN", 100_000)));
         SqlProperties properties = props(500_000, 2_000, Duration.ofSeconds(30));
         QueryPlanner planner = planner(properties);
-        BrokerQueryExecutor executor =
-                new BrokerQueryExecutor(nodes, residuals, planner, properties, clearGovernance());
         AtomicInteger browses = new AtomicInteger();
+        BrokerQueryExecutor executor = new BrokerQueryExecutor(
+                nodes, residuals, planner, properties, clearGovernance(), transport((queue, page, size, filter) -> {
+                    browses.incrementAndGet();
+                    return fullPage(size);
+                }));
 
         QueryResult result = executor.execute(
                 CLUSTER,
                 planner.plan(CLUSTER, parser.parse("SELECT * FROM \"ORDER.IN\" WHERE body LIKE '%haystack%'")),
-                transport((t, page, size, filter) -> {
-                    browses.incrementAndGet();
-                    return fullPage(size, Channel.JOLOKIA);
-                }),
                 new CountingSink(),
                 target -> null,
                 2);
@@ -669,11 +593,11 @@ class BrokerQueryExecutorTest {
         given(List.of(node), List.of(snapshot(node, "ORDER.IN", 2)));
         SqlProperties properties = props(50_000, 2_000, Duration.ofSeconds(30));
         QueryPlanner planner = planner(properties);
-        BrokerQueryExecutor executor =
-                new BrokerQueryExecutor(nodes, residuals, planner, properties, clearGovernance());
+        BrokerQueryExecutor executor = new BrokerQueryExecutor(
+                nodes, residuals, planner, properties, clearGovernance(), transportServing(2, false));
         QueryPlan plan = planner.plan(CLUSTER, parser.parse("SELECT * FROM \"ORDER.IN\""));
 
-        QueryResult result = executor.execute(CLUSTER, plan, transportServing(2, false), new CountingSink(), t -> null);
+        QueryResult result = executor.execute(CLUSTER, plan, new CountingSink(), t -> null);
 
         assertThat(result.rows()).hasSize(2);
     }

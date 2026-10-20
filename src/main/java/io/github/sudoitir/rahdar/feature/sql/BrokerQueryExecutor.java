@@ -10,15 +10,12 @@ import io.github.sudoitir.rahdar.feature.sql.QueryResult.NodeOutcome;
 import io.github.sudoitir.rahdar.feature.sql.QueryResult.Row;
 import io.github.sudoitir.rahdar.platform.broker.BodyEncoding;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
+import io.github.sudoitir.rahdar.platform.broker.BrokerMessages;
+import io.github.sudoitir.rahdar.platform.broker.BrowsePage;
 import io.github.sudoitir.rahdar.platform.broker.BrowsedMessage;
-import io.github.sudoitir.rahdar.platform.broker.MessageTransport;
-import io.github.sudoitir.rahdar.platform.broker.MessageTransport.BrowseResult;
-import io.github.sudoitir.rahdar.platform.broker.MessageTransport.Channel;
-import io.github.sudoitir.rahdar.platform.broker.MessageTransport.TransportTarget;
 import io.github.sudoitir.rahdar.platform.broker.NodeCallLimiter;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
-import io.github.sudoitir.rahdar.system.artemis.MessageBrowser;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -43,7 +40,7 @@ import org.springframework.stereotype.Component;
  * Runs a {@link QueryPlan} against the live brokers (ADR-0058).
  *
  * <p>Nothing here is a new way to read a broker: it is the existing
- * {@link MessageTransport#browse} loop, one virtual thread per node, behind the same
+ * {@link BrokerMessages#browse} loop, one virtual thread per node, behind the same
  * {@link NodeCallLimiter} permit every other management call takes. That is what
  * makes non-negotiable #1 hold by construction — a runaway query throttles itself
  * against the broker rather than the other way round.
@@ -58,13 +55,14 @@ import org.springframework.stereotype.Component;
 public class BrokerQueryExecutor {
 
     /** The broker will not return more than this per browse, whatever we ask for. */
-    static final int PAGE_SIZE = MessageBrowser.BROKER_PAGE_CAP;
+    static final int PAGE_SIZE = BrokerMessages.PAGE_CAP;
 
     private final ClusterDirectory nodes;
     private final MessagePredicate residuals;
     private final QueryPlanner planner;
     private final SqlProperties properties;
     private final SqlGovernance governance;
+    private final BrokerMessages messages;
 
     /** Where a caller receives rows and per-node outcomes as they happen. */
     public interface Sink {
@@ -81,21 +79,16 @@ public class BrokerQueryExecutor {
         }
     }
 
-    public QueryResult execute(UUID clusterId, QueryPlan plan, MessageTransport transport, Sink sink) {
-        return execute(clusterId, plan, transport, sink, target -> null);
+    public QueryResult execute(UUID clusterId, QueryPlan plan, Sink sink) {
+        return execute(clusterId, plan, sink, target -> null);
     }
 
-    public QueryResult execute(
-            UUID clusterId,
-            QueryPlan plan,
-            MessageTransport transport,
-            Sink sink,
-            Function<Target, String> extraSelector) {
-        return execute(clusterId, plan, transport, sink, extraSelector, Integer.MAX_VALUE);
+    public QueryResult execute(UUID clusterId, QueryPlan plan, Sink sink, Function<Target, String> extraSelector) {
+        return execute(clusterId, plan, sink, extraSelector, Integer.MAX_VALUE);
     }
 
     /**
-     * As {@link #execute(UUID, QueryPlan, MessageTransport, Sink)}, with one extra
+     * As {@link #execute(UUID, QueryPlan, Sink)}, with one extra
      * selector clause per target — the tail's high-water mark (ADR-0058 D7).
      *
      * <p>It is ANDed into the pushed-down selector rather than filtered in Rahdar, so
@@ -107,13 +100,8 @@ public class BrokerQueryExecutor {
      * indexing a deep backlog walks it over several ticks rather than in one (message-index spec).
      */
     public QueryResult execute(
-            UUID clusterId,
-            QueryPlan plan,
-            MessageTransport transport,
-            Sink sink,
-            Function<Target, String> extraSelector,
-            int maxPagesPerTarget) {
-        return new Run(clusterId, plan, transport, sink, extraSelector, maxPagesPerTarget).execute();
+            UUID clusterId, QueryPlan plan, Sink sink, Function<Target, String> extraSelector, int maxPagesPerTarget) {
+        return new Run(clusterId, plan, sink, extraSelector, maxPagesPerTarget).execute();
     }
 
     /**
@@ -124,7 +112,6 @@ public class BrokerQueryExecutor {
 
         private final UUID clusterId;
         private final QueryPlan plan;
-        private final MessageTransport transport;
         private final Sink sink;
         private final Function<Target, String> extraSelector;
         private final int maxPagesPerTarget;
@@ -143,16 +130,9 @@ public class BrokerQueryExecutor {
         private final AtomicBoolean truncationSeen = new AtomicBoolean();
         private final long deadline;
 
-        Run(
-                UUID clusterId,
-                QueryPlan plan,
-                MessageTransport transport,
-                Sink sink,
-                Function<Target, String> extraSelector,
-                int maxPagesPerTarget) {
+        Run(UUID clusterId, QueryPlan plan, Sink sink, Function<Target, String> extraSelector, int maxPagesPerTarget) {
             this.clusterId = clusterId;
             this.plan = plan;
-            this.transport = transport;
             this.sink = sink;
             this.extraSelector = extraSelector;
             this.maxPagesPerTarget = maxPagesPerTarget;
@@ -234,7 +214,6 @@ public class BrokerQueryExecutor {
                             NodeOutcome.Status.NOT_READ,
                             0,
                             0,
-                            null,
                             "Stopped before this queue was read: " + describe(stop) + "."));
                 } else if (nodesById.containsKey(target.nodeId())) {
                     finished(readTarget(nodesById.get(target.nodeId()), target));
@@ -257,14 +236,6 @@ public class BrokerQueryExecutor {
             TargetRead read = new TargetRead(
                     node,
                     target,
-                    new TransportTarget(
-                            clusterId,
-                            node.getId(),
-                            target.queueName(),
-                            target.address(),
-                            target.routingType(),
-                            node.getJolokiaUrl(),
-                            node.getCoreUrl()),
                     selector,
                     residuals.compile(
                             split.scan(),
@@ -285,14 +256,7 @@ public class BrokerQueryExecutor {
                     if (fetched.failure() != null) {
                         return fetched.failure();
                     }
-                    BrowseResult result = fetched.result();
-                    if (read.servedBy != null && read.servedBy != result.servedBy()) {
-                        // Core has no server-side offset, so a deep page silently changes
-                        // fidelity. The result says so rather than mixing two truths.
-                        log.debug("SQL console channel changed mid-query on {}", target.queueName());
-                    }
-                    read.servedBy = result.servedBy();
-                    List<BrowsedMessage> messages = result.page().messages();
+                    List<BrowsedMessage> messages = fetched.page().messages();
                     scan(read, messages);
                     more = messages.size() >= PAGE_SIZE
                             && rows.size() < plan.effectiveLimit()
@@ -304,12 +268,15 @@ public class BrokerQueryExecutor {
         }
 
         /** A page of one target, or the outcome that ends the target because it could not be read. */
-        private record Fetched(BrowseResult result, NodeOutcome failure) {}
+        private record Fetched(BrowsePage page, NodeOutcome failure) {}
 
         private Fetched fetch(TargetRead read, int page) {
             try {
-                // Either transport waits for the node's ceiling before it reads (ADR-0076).
-                return new Fetched(transport.browse(read.transportTarget, page, PAGE_SIZE, read.selector), null);
+                // Every read waits for the node's ceiling first (ADR-0076).
+                return new Fetched(
+                        messages.browse(
+                                clusterId, read.node.getId(), read.target.queueName(), page, PAGE_SIZE, read.selector),
+                        null);
             } catch (BrokerConnectionException e) {
                 return new Fetched(null, read.outcome(NodeOutcome.Status.FAILED, e.getMessage()));
             } catch (RuntimeException e) {
@@ -430,36 +397,21 @@ public class BrokerQueryExecutor {
     private static final class TargetRead {
         private final ClusterNode node;
         private final Target target;
-        private final TransportTarget transportTarget;
         private final String selector;
         private final Predicate<BrowsedMessage> residual;
         private long matched;
         private long examinedHere;
-        private Channel servedBy;
 
-        TargetRead(
-                ClusterNode node,
-                Target target,
-                TransportTarget transportTarget,
-                String selector,
-                Predicate<BrowsedMessage> residual) {
+        TargetRead(ClusterNode node, Target target, String selector, Predicate<BrowsedMessage> residual) {
             this.node = node;
             this.target = target;
-            this.transportTarget = transportTarget;
             this.selector = selector;
             this.residual = residual;
         }
 
         NodeOutcome outcome(NodeOutcome.Status status, String detail) {
             return new NodeOutcome(
-                    node.getId(),
-                    target.nodeName(),
-                    target.queueName(),
-                    status,
-                    examinedHere,
-                    matched,
-                    servedBy,
-                    detail);
+                    node.getId(), target.nodeName(), target.queueName(), status, examinedHere, matched, detail);
         }
     }
 

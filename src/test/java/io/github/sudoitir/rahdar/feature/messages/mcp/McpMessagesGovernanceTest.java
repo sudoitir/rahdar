@@ -1,8 +1,6 @@
 package io.github.sudoitir.rahdar.feature.messages.mcp;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
@@ -16,6 +14,7 @@ import io.github.sudoitir.rahdar.kernel.security.internal.persistence.RolePermis
 import io.github.sudoitir.rahdar.kernel.security.internal.persistence.RoleRepository;
 import io.github.sudoitir.rahdar.kernel.security.internal.persistence.UserRoleRepository;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
+import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
 import io.github.sudoitir.rahdar.platform.broker.QueueRow;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNodeEntity;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNodeRepository;
@@ -25,8 +24,6 @@ import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshotUpsert;
 import io.github.sudoitir.rahdar.support.FixtureJolokia;
 import io.github.sudoitir.rahdar.support.McpFixture;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
-import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
-import io.github.sudoitir.rahdar.system.artemis.ArtemisNodes;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -84,10 +81,11 @@ class McpMessagesGovernanceTest extends PostgresIntegrationTest {
     BrokerConnections connections;
 
     @MockitoBean
-    ArtemisNodes artemisNodes;
+    BrokerGateway gateway;
 
     private MockMvc mvc;
     private UUID clusterId;
+    private UUID nodeId;
 
     @BeforeEach
     void setUp() {
@@ -99,7 +97,7 @@ class McpMessagesGovernanceTest extends PostgresIntegrationTest {
         BrokerNodeEntity a = BrokerNodeEntity.fromSeed(
                 clusterId, "node-a", "PRIMARY", UUID.randomUUID().toString());
         a.attachSeedUrl(URL_A);
-        UUID nodeId = nodes.save(a).getId();
+        nodeId = nodes.save(a).getId();
         upsert.upsertBatch(List.of(new QueueRow(
                 clusterId, nodeId, "PHASE3.SRC", "PHASE3.SRC", "ANYCAST", true, 1, 0, 0, 0, 0, 0, 0, false)));
     }
@@ -109,15 +107,22 @@ class McpMessagesGovernanceTest extends PostgresIntegrationTest {
         clusters.deleteById(clusterId);
     }
 
-    private ArtemisNode client() {
+    /** The node as the broker SDK reads it: the broker and queue searches, then one batched browse. */
+    private void serving() {
         FixtureJolokia server = new FixtureJolokia();
         server.expect(requestTo(URL_A))
                 .andRespond(withSuccess(fixture("search-broker.json"), MediaType.APPLICATION_JSON));
         server.expect(requestTo(URL_A))
                 .andRespond(withSuccess(
+                        "{\"status\":200,\"value\":[\"org.apache.activemq.artemis:address=\\\"PHASE3.SRC\\\","
+                                + "broker=\\\"primary\\\",component=addresses,queue=\\\"PHASE3.SRC\\\","
+                                + "routing-type=\\\"anycast\\\",subcomponent=queues\"]}",
+                        MediaType.APPLICATION_JSON));
+        server.expect(requestTo(URL_A))
+                .andRespond(withSuccess(
                         "[" + fixture("browse-sensitive.json") + ",{\"value\":1,\"status\":200}]",
                         MediaType.APPLICATION_JSON));
-        return server.node();
+        when(gateway.cluster(clusterId)).thenReturn(FixtureJolokia.cluster(Map.of(nodeId, server)));
     }
 
     private static String fixture(String name) {
@@ -130,7 +135,7 @@ class McpMessagesGovernanceTest extends PostgresIntegrationTest {
 
     @Test
     void anAssistantNeverReceivesTheCredentialOrTheCardNumber() throws Exception {
-        when(artemisNodes.on(eq(clusterId), any(UUID.class))).thenReturn(client());
+        serving();
         McpFixture.Key key = McpFixture.mintKey(
                 users,
                 roles,

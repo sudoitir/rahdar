@@ -4,14 +4,13 @@ import io.github.sudoitir.rahdar.feature.rr.QueueTargetResolver.QueueTarget;
 import io.github.sudoitir.rahdar.feature.rr.internal.persistence.RrExpectationEntity;
 import io.github.sudoitir.rahdar.feature.rr.internal.persistence.RrExpectationRepository;
 import io.github.sudoitir.rahdar.feature.sql.CaptureCoverage;
+import io.github.sudoitir.rahdar.platform.broker.BrokerMessages;
 import io.github.sudoitir.rahdar.platform.broker.BrowsedMessage;
 import io.github.sudoitir.rahdar.platform.broker.ClockOffsetService;
 import io.github.sudoitir.rahdar.platform.broker.CoreDestinationName;
-import io.github.sudoitir.rahdar.platform.broker.MessageTransport.TransportTarget;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterOwnership;
-import io.github.sudoitir.rahdar.system.artemis.CoreMessageTransport;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -50,7 +49,7 @@ public class RrSampler {
     private final RrExpectationRepository expectations;
     private final ClusterDirectory nodes;
     private final ClusterOwnership ownership;
-    private final CoreMessageTransport coreTransport;
+    private final BrokerMessages messages;
     private final ObjectProvider<RrObservationSink> sink;
     private final ReplyAddressResolver replyAddresses;
     private final ClockOffsetService clocks;
@@ -269,15 +268,8 @@ public class RrSampler {
             tick.skipped(node.getName(), "no queue for address '" + address + "' in the last scrape");
             return List.of();
         }
-        TransportTarget target = new TransportTarget(
-                clusterId,
-                node.getId(),
-                address,
-                queue.queueName(),
-                queue.routingType(),
-                node.getJolokiaUrl(),
-                node.getCoreUrl());
-        return coreTransport.sample(target, SAMPLE_PAGE_SIZE);
+        return messages.browse(clusterId, node.getId(), queue.queueName(), 1, SAMPLE_PAGE_SIZE, null)
+                .messages();
     }
 
     /** Log once per interval for a key, sharing the failure throttle's budget. */

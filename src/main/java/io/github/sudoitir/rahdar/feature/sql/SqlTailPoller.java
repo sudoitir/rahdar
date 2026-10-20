@@ -3,7 +3,6 @@ package io.github.sudoitir.rahdar.feature.sql;
 import io.github.sudoitir.rahdar.feature.sql.QueryPlan.Target;
 import io.github.sudoitir.rahdar.feature.sql.QueryResult.NodeOutcome;
 import io.github.sudoitir.rahdar.feature.sql.QueryResult.Row;
-import io.github.sudoitir.rahdar.platform.broker.MessageTransport;
 import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshot;
 import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshots;
 import java.time.Duration;
@@ -157,7 +156,6 @@ public class SqlTailPoller {
     public final class Tail {
         private final UUID clusterId;
         private final QueryPlan plan;
-        private final MessageTransport transport;
         private final Listener listener;
         private final boolean everyMessageMatches;
 
@@ -194,16 +192,9 @@ public class SqlTailPoller {
          */
         private volatile Instant indexSince = Instant.now().minus(INDEX_TAIL_OVERLAP);
 
-        private Tail(
-                UUID clusterId,
-                QueryPlan plan,
-                MessageTransport transport,
-                Listener listener,
-                Duration minInterval,
-                boolean fromBeginning) {
+        private Tail(UUID clusterId, QueryPlan plan, Listener listener, Duration minInterval, boolean fromBeginning) {
             this.clusterId = clusterId;
             this.plan = plan;
-            this.transport = transport;
             this.listener = listener;
             this.minInterval = minInterval;
             this.maxPagesPerTarget = fromBeginning ? BACKLOG_PAGES_PER_TICK : Integer.MAX_VALUE;
@@ -302,8 +293,8 @@ public class SqlTailPoller {
      * run once. The returned handle is the only way to stop it, and the caller must
      * stop it when its client disconnects.
      */
-    public Tail start(UUID clusterId, QueryPlan plan, MessageTransport transport, Listener listener) {
-        return start(clusterId, plan, transport, listener, Duration.ZERO, false);
+    public Tail start(UUID clusterId, QueryPlan plan, Listener listener) {
+        return start(clusterId, plan, listener, Duration.ZERO, false);
     }
 
     /**
@@ -311,14 +302,8 @@ public class SqlTailPoller {
      * starting from the beginning of each queue rather than from now. The tick still
      * runs at the console's cadence; a tail that is not due is skipped.
      */
-    public Tail start(
-            UUID clusterId,
-            QueryPlan plan,
-            MessageTransport transport,
-            Listener listener,
-            Duration minInterval,
-            boolean fromBeginning) {
-        Tail tail = new Tail(clusterId, plan, transport, listener, minInterval, fromBeginning);
+    public Tail start(UUID clusterId, QueryPlan plan, Listener listener, Duration minInterval, boolean fromBeginning) {
+        Tail tail = new Tail(clusterId, plan, listener, minInterval, fromBeginning);
         tails.add(tail);
         return tail;
     }
@@ -365,12 +350,7 @@ public class SqlTailPoller {
         QueryResult result = fromIndex
                 ? indexExecutor.execute(tail.clusterId, tail.plan, new TailSink(tail), tail.indexSince)
                 : executor.execute(
-                        tail.clusterId,
-                        tail.plan,
-                        tail.transport,
-                        new TailSink(tail),
-                        tail::selectorFor,
-                        tail.maxPagesPerTarget);
+                        tail.clusterId, tail.plan, new TailSink(tail), tail::selectorFor, tail.maxPagesPerTarget);
         tail.pollCount.incrementAndGet();
         if (fromIndex) {
             advanceIndexWindow(tail, result);

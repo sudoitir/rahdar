@@ -34252,10 +34252,6 @@
             "type" : "integer",
             "format" : "int64"
           },
-          "servedBy" : {
-            "type" : "string",
-            "description" : "JOLOKIA or CORE — the channel that served this node."
-          },
           "detail" : {
             "type" : "string"
           }
@@ -35054,12 +35050,9 @@
           "node" : {
             "type" : "string",
             "format" : "uuid"
-          },
-          "transport" : {
-            "type" : "string"
           }
         },
-        "required" : [ "data", "hasNext", "node", "page", "pageSize", "transport" ]
+        "required" : [ "data", "hasNext", "node", "page", "pageSize" ]
       },
       "MessageSummaryView" : {
         "type" : "object",
@@ -35175,9 +35168,6 @@
             "type" : [ "integer", "null" ],
             "format" : "int32"
           },
-          "transport" : {
-            "type" : "string"
-          },
           "node" : {
             "type" : "string",
             "format" : "uuid"
@@ -35228,7 +35218,7 @@
             }
           }
         },
-        "required" : [ "bodyEncoding", "bodyTruncated", "booleanProperties", "doubleProperties", "durable", "expiration", "intProperties", "longProperties", "messageId", "node", "priority", "redactions", "size", "stringProperties", "timestamp", "transport", "type", "withheld" ]
+        "required" : [ "bodyEncoding", "bodyTruncated", "booleanProperties", "doubleProperties", "durable", "expiration", "intProperties", "longProperties", "messageId", "node", "priority", "redactions", "size", "stringProperties", "timestamp", "type", "withheld" ]
       },
       "NodeConfiguration" : {
         "type" : "object",

@@ -282,11 +282,11 @@ subscription verdict (`AVAILABLE` on ≥1 subscribed node; `UNAVAILABLE` with th
 exact `broker.xml` security-setting or acceptor snippet when refused or
 unreachable; `UNKNOWN` only until the first scrape). It opens no connection.
 
-Message browse and send are served over the Core client when a subscription is
-live (`MessageTransport`, ADR-0029): a `QueueBrowser` returns real byte bodies
-(base64 with an encoding indicator), real typed properties, and does not
-truncate. By-id / by-filter mutations stay on Jolokia. A page past the broker
-page size falls back to Jolokia and every response says which channel served it.
+Message browse and send go through the broker SDK (`BrokerMessages`, ADR-0203), and
+the driver picks the channel. The Artemis driver reads the first window of a queue
+over the Core client (ADR-0029), which returns whole bodies and typed properties
+without truncating, and a deeper page, or a node without Core, over Jolokia. By-id
+and by-filter mutations go over management.
 
 ### Realtime to the browser
 

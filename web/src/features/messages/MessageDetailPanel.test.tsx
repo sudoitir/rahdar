@@ -25,7 +25,6 @@ function detail(over: Record<string, unknown> = {}) {
     contentType: null,
     bodyTruncated: false,
     observedLimitBytes: null,
-    transport: 'JOLOKIA',
     node: '11111111-1111-1111-1111-111111111111',
     stringProperties: { orderId: 'BIG-1' },
     intProperties: {},
@@ -81,19 +80,18 @@ describe('MessageDetailPanel', () => {
     expect(screen.getByText(/connect the Core client/)).toBeInTheDocument();
   });
 
-  it('states the transport and dumps a binary body as bytes, never as text', async () => {
-    mockDetail(detail({ transport: 'CORE', bodyEncoding: 'BASE64', body: 'AQIDBA==' }));
+  it('dumps a binary body as bytes, never as text', async () => {
+    mockDetail(detail({ bodyEncoding: 'BASE64', body: 'AQIDBA==' }));
     renderWithProviders(<MessageDetailPanel {...base} messageId="146" />);
 
-    expect(await screen.findByText('Core protocol client')).toBeInTheDocument();
-    expect(screen.getByText('binary')).toBeInTheDocument();
+    expect(await screen.findByText('binary')).toBeInTheDocument();
     // A hex + ASCII dump of the four bytes, not a TextDecoder'd rendering of them.
     expect(screen.getByText(/00000000 01 02 03 04/)).toBeInTheDocument();
   });
 
   it('names a recognised binary container rather than calling it plain binary', async () => {
     // gzip magic bytes 1f 8b, base64-encoded.
-    mockDetail(detail({ transport: 'CORE', bodyEncoding: 'BASE64', body: 'H4sIAAAAAAAA' }));
+    mockDetail(detail({ bodyEncoding: 'BASE64', body: 'H4sIAAAAAAAA' }));
     renderWithProviders(<MessageDetailPanel {...base} messageId="146" />);
 
     expect(await screen.findByText('binary · gzip')).toBeInTheDocument();
@@ -124,7 +122,7 @@ describe('MessageDetailPanel', () => {
   });
 
   it('shows JSON a producer sent as bytes as JSON, without saying anything about bytes', async () => {
-    mockDetail(detail({ type: 4, body: '{"status":"FAILED"}', bodyCompression: 'gzip', transport: 'CORE' }));
+    mockDetail(detail({ type: 4, body: '{"status":"FAILED"}', bodyCompression: 'gzip' }));
     renderWithProviders(<MessageDetailPanel {...base} messageId="146" />);
 
     expect(await screen.findByText('JSON · gzip')).toBeInTheDocument();
@@ -185,7 +183,7 @@ describe('MessageDetailPanel', () => {
   it('downloads a binary body as its bytes, not as base64', async () => {
     const user = userEvent.setup();
     const spy = vi.spyOn(downloads, 'download').mockImplementation(() => {});
-    mockDetail(detail({ transport: 'CORE', bodyEncoding: 'BASE64', body: 'AQIDBA==' }));
+    mockDetail(detail({ bodyEncoding: 'BASE64', body: 'AQIDBA==' }));
     renderWithProviders(<MessageDetailPanel {...base} messageId="146" />);
 
     await user.click(await screen.findByRole('button', { name: 'Download' }));
@@ -208,7 +206,6 @@ describe('MessageDetailPanel', () => {
 
     expect(await screen.findByRole('heading', { level: 3, name: 'Headers' })).toBeInTheDocument();
     const headers = screen.getByRole('group', { name: 'Message headers' });
-    expect(within(headers).getByText('Jolokia management channel')).toBeInTheDocument();
     expect(within(headers).getByText('durable')).toBeInTheDocument();
     expect(within(headers).getByText('8184 bytes')).toBeInTheDocument();
     expect(within(headers).getByText('never')).toBeInTheDocument();

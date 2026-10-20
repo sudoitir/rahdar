@@ -460,12 +460,10 @@ class Orders implements PluginMessageHandler {
   in Core) on related messages get them handled one at a time, in order, on each node: the broker
   hands every group to one consumer. For an order across a broker cluster's nodes, configure the
   broker's grouping handler. A concurrency of 1 keeps the queue's order on each node.
-- **Threads.** Rahdar calls the handler on threads of its own, from a pool that only plugin
-  handlers use: at most `rahdar.plugins.messaging.max-threads` (64 by default, at least 2)
-  per node for consumers, and as many for taps. A handler that blocks holds its own consumer and a
-  thread of that pool, never a thread message capture or an operator's session needs. Keep it
-  bounded all the same: blocked handlers across plugins share the pool, and one registration's
-  footprint is its `concurrency` threads per node.
+- **Threads.** Rahdar calls the handler on a virtual thread of its own for each unit of the
+  registration's `concurrency` on each node. A handler that blocks holds only that thread and its
+  own consumer, never a thread message capture or an operator's session needs. Keep it bounded all
+  the same: a blocked handler takes no further message on its slot.
 - Queues under Rahdar's own prefixes and the broker's management addresses are refused.
 
 **`PluginSecrets`** stores named values encrypted with Rahdar's secret key: `put`, `get`, `delete`

@@ -18,7 +18,6 @@ import io.github.sudoitir.rahdar.platform.clusters.ClusterOwnership;
 import io.github.sudoitir.rahdar.platform.clusters.ServingNodes;
 import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
 import io.github.sudoitir.rahdar.system.artemis.ArtemisNodes;
-import jakarta.jms.JMSException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -399,7 +398,7 @@ public class CaptureReconciler {
                 state(desired, node, CaptureState.PENDING, reason(e), false);
                 audit.fail(event, reason(e));
             }
-        } catch (RuntimeException | JMSException e) {
+        } catch (RuntimeException e) {
             state(desired, node, CaptureState.PENDING, reason(e), false);
             audit.fail(event, reason(e));
         }
@@ -422,12 +421,11 @@ public class CaptureReconciler {
                 + node.getCoreUrl() + "|" + node.getJolokiaUrl();
     }
 
-    private void startDraining(UUID clusterId, ClusterNode node, Desired desired) throws JMSException {
+    private void startDraining(UUID clusterId, ClusterNode node, Desired desired) {
         consumers.start(new CaptureConsumer.Spec(
                 clusterId,
                 node.getId(),
                 node.getName(),
-                node.getCoreUrl(),
                 desired.subscription().getId(),
                 desired.name(),
                 CaptureNames.queueOf(desired.name()),

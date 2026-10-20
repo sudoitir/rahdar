@@ -65,7 +65,6 @@ public final class MessageViews {
             @Schema(nullable = true) String contentType,
             @Schema(requiredMode = REQUIRED) boolean bodyTruncated,
             @Schema(nullable = true) Integer observedLimitBytes,
-            @Schema(requiredMode = REQUIRED) String transport,
             @Schema(requiredMode = REQUIRED) UUID node,
             @Schema(requiredMode = REQUIRED) Map<String, String> stringProperties,
             @Schema(requiredMode = REQUIRED) Map<String, Long> intProperties,
@@ -75,12 +74,7 @@ public final class MessageViews {
             @Schema(requiredMode = REQUIRED) List<RedactionView> redactions,
             @Schema(requiredMode = REQUIRED) List<WithheldView> withheld) {}
 
-    /**
-     * A page of messages: the shared list envelope plus where it was read. {@code node} echoes the endpoint the page was read
-     * from; {@code transport} is {@code CORE} or {@code JOLOKIA} — the channel
-     * that actually served this page (a Core browse falls back to Jolokia on a
-     * deep page).
-     */
+    /** A page of messages: the shared list envelope plus the node it was read from. */
     public record MessagePageView(
             @Schema(requiredMode = REQUIRED) List<MessageSummaryView> data,
             @Schema(requiredMode = REQUIRED) int page,
@@ -100,8 +94,7 @@ public final class MessageViews {
             @Schema(nullable = true, description = "Why count is null. Null whenever count is present.")
             String countUnavailable,
 
-            @Schema(requiredMode = REQUIRED) UUID node,
-            @Schema(requiredMode = REQUIRED) String transport) {}
+            @Schema(requiredMode = REQUIRED) UUID node) {}
 
     /** The result of a mutation: the broker's own affected count (not a dry-run estimate). */
     public record AffectedView(

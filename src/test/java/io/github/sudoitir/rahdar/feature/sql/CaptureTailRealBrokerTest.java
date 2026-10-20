@@ -184,7 +184,7 @@ class CaptureTailRealBrokerTest extends PostgresIntegrationTest {
         assertThat(executed.plan().resolvedSource())
                 .as("a captured queue plans onto the index")
                 .isEqualTo(QueryAst.Source.INDEX);
-        tail = tailPoller.start(clusterId, executed.plan(), console.transportFor(clusterId), collecting);
+        tail = tailPoller.start(clusterId, executed.plan(), collecting);
         executed.result().rows().forEach(tail::seen);
 
         // Taken off the queue before any read of it could see it: only the capture copy is left.

@@ -1,7 +1,6 @@
 package io.github.sudoitir.rahdar.feature.sql;
 
 import io.github.sudoitir.rahdar.feature.sql.QueryAst.Source;
-import io.github.sudoitir.rahdar.platform.broker.MessageTransport.Channel;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -72,14 +71,7 @@ public record QueryResult(
      * being left out of the result — an absent node is not an absence of messages.
      */
     public record NodeOutcome(
-            UUID nodeId,
-            String nodeName,
-            String queueName,
-            Status status,
-            long examined,
-            long matched,
-            Channel servedBy,
-            String detail) {
+            UUID nodeId, String nodeName, String queueName, Status status, long examined, long matched, String detail) {
 
         public enum Status {
             ANSWERED,

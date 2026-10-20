@@ -27,6 +27,7 @@ import java.util.Queue;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.function.UnaryOperator;
 import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
@@ -53,6 +54,7 @@ public final class FixtureJolokia implements AutoCloseable {
     private final List<String> requests = new CopyOnWriteArrayList<>();
     private final HttpServer server;
     private final List<AutoCloseable> opened = new ArrayList<>();
+    private volatile @Nullable UnaryOperator<String> otherwise;
 
     public FixtureJolokia() {
         try {
@@ -65,6 +67,15 @@ public final class FixtureJolokia implements AutoCloseable {
                 byte[] sent = exchange.getRequestBody().readAllBytes();
                 requests.add(new String(sent, StandardCharsets.UTF_8));
                 Answer next = answers.poll();
+                UnaryOperator<String> fallback = otherwise;
+                if (next == null && fallback != null) {
+                    byte[] body = fallback.apply(new String(sent, StandardCharsets.UTF_8))
+                            .getBytes(StandardCharsets.UTF_8);
+                    exchange.getResponseHeaders().add("Content-Type", MediaType.APPLICATION_JSON_VALUE);
+                    exchange.sendResponseHeaders(200, body.length);
+                    exchange.getResponseBody().write(body);
+                    return;
+                }
                 if (next == null) {
                     exchange.sendResponseHeaders(500, -1);
                     return;
@@ -88,6 +99,12 @@ public final class FixtureJolokia implements AutoCloseable {
     /** The next request is answered by what {@code andRespond} creates. */
     public Expectation expect(RequestMatcher ignored) {
         return new Expectation();
+    }
+
+    /** Answers every request no expectation is left for: the request body in, the response body out. */
+    public FixtureJolokia otherwise(UnaryOperator<String> answer) {
+        otherwise = answer;
+        return this;
     }
 
     /** The agent's URL. */

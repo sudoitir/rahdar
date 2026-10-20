@@ -6590,8 +6590,6 @@ export interface components {
             examined?: number;
             /** Format: int64 */
             matched?: number;
-            /** @description JOLOKIA or CORE — the channel that served this node. */
-            servedBy?: string;
             detail?: string;
         };
         /** @description One frame on the query stream. The SSE event name says which field is set. */
@@ -6943,7 +6941,6 @@ export interface components {
             countUnavailable?: string | null;
             /** Format: uuid */
             node: string;
-            transport: string;
         };
         MessageSummaryView: {
             /** Format: int64 */
@@ -6992,7 +6989,6 @@ export interface components {
             bodyTruncated: boolean;
             /** Format: int32 */
             observedLimitBytes?: number | null;
-            transport: string;
             /** Format: uuid */
             node: string;
             stringProperties: {
