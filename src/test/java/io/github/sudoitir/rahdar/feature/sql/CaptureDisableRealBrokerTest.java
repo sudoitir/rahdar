@@ -106,8 +106,22 @@ class CaptureDisableRealBrokerTest extends PostgresIntegrationTest {
 
         queueOps.createAddress(client, broker, address, "ANYCAST");
         // The scrape is not scheduled in tests; capture resolves its addresses from the snapshot.
-        snapshots.upsertBatch(List.of(
-                new QueueRow(clusterId, node.getId(), address, address, "ANYCAST", true, 0, 0, 0, 0, 0, 0, 0, false)));
+        snapshots.upsertBatch(List.of(new QueueRow(
+                clusterId,
+                node.getId(),
+                address,
+                address,
+                "ANYCAST",
+                true,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                false,
+                "artemis.queue")));
     }
 
     @AfterEach

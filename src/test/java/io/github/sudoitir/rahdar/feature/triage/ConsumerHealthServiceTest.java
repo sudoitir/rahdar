@@ -23,11 +23,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 
 /**
- * The consumer-health verdict ladder (ADR-0089) against real {@code queue_snapshot} and
+ * The consumer-health verdict ladder (ADR-0089) against real {@code subscription_snapshot} and
  * {@code metric_sample} rows.
  *
  * <p>Integration rather than isolated for the same reasons {@code SlowConsumerConditionTest}
- * is: {@code queue_snapshot} has no setters, the {@code paused} exclusion is only real
+ * is: {@code subscription_snapshot} has no setters, the {@code paused} exclusion is only real
  * against the actual column, and the rate and slope derivations this rests on live in SQL
  * rather than Java — a mocked repository would test the mock.
  *
@@ -228,10 +228,10 @@ class ConsumerHealthServiceTest extends PostgresIntegrationTest {
     private void queue(String name, long consumers, long messages, long delivering, boolean paused) {
         jdbc.update(
                 """
-                INSERT INTO queue_snapshot
-                  (node_id, queue_name, cluster_id, address, routing_type,
-                   consumer_count, message_count, delivering_count, paused)
-                VALUES (:n, :q, :c, :q, 'ANYCAST', :cc, :mc, :dc, :paused)
+                INSERT INTO subscription_snapshot
+                  (node_id, subscription, cluster_id, destination, kind, native_attributes,
+                   consumer_count, backlog, in_flight, paused)
+                VALUES (:n, :q, :c, :q, 'artemis.queue', '{"artemis.routing_type":"ANYCAST"}', :cc, :mc, :dc, :paused)
                 """,
                 Map.of(
                         "n", nodeId,
@@ -285,7 +285,7 @@ class ConsumerHealthServiceTest extends PostgresIntegrationTest {
         p.put("c", clusterId);
         p.put("n", nodeId);
         jdbc.update("""
-                INSERT INTO metric_sample (ts, value, subject_type, subject_name, metric, cluster_id, node_id)
+                INSERT INTO metric_sample (ts, value, subject_kind, subject_path, metric, cluster_id, node_id)
                 VALUES (:ts, :value, 'QUEUE', :subject, :metric, :c, :n)
                 """, p);
     }

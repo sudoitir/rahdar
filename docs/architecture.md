@@ -37,7 +37,7 @@ startup toggle and the manifest entry.
 | | `stream` | `SseHub`, `GET /api/v1/stream`, the topic registry |
 | platform | `broker` | Jolokia and Core clients, `NodeCallLimiter`, capability probing, notification subscriptions, `MessageTransport` |
 | | `clusters` | registration, nodes, credentials, TLS, environments, discovery, HA and split-brain, serving nodes, the capability ledger, `BrokerCommands` |
-| | `scrape` | the tiered scrape, `queue_snapshot`, `metric_sample` |
+| | `scrape` | the tiered scrape, `subscription_snapshot`, `metric_sample` |
 | | `mcp` | the MCP server, the tool catalogue, help, resources and runbook prompts (optional) |
 | feature | everything else | one module per capability, each with its own tables, endpoints, jobs, topics and tools |
 
@@ -220,7 +220,7 @@ tier B is best-effort speed on page 1, tier C is the coverage guarantee.
 `NodeCallLimiter` caps management calls per node. Network I/O runs on virtual
 threads, one slow node never blocks its siblings, and it never runs inside a DB
 transaction — each node's result is handed to a short `@Transactional` persist
-step. Queue rows upsert into `queue_snapshot` via a JDBC `INSERT … ON CONFLICT`
+step. Queue rows upsert into `subscription_snapshot` via a JDBC `INSERT … ON CONFLICT`
 batch (ADR-0016, a scoped exception to ADR-0011); metric points append to the
 partitioned `metric_sample`, and a reaper trims past the retention window. Six
 metrics are recorded per queue per sweep, under the broker SDK's standard keys —
@@ -236,7 +236,7 @@ thread, so ordering is what it was before the modules split.
 One queue's verdict — why a backlog is not draining — is an ordered ladder
 evaluated in `feature/triage`: `INSUFFICIENT_DATA`, `PAUSED`, `NO_CONSUMERS`,
 `BROKER_SLOW`, `STALLED`, `STARVED`, `FALLING_BEHIND`, `DRAINING`, `HEALTHY`,
-first match wins (ADR-0089). It is derived from `queue_snapshot` and windowed
+first match wins (ADR-0089). It is derived from `subscription_snapshot` and windowed
 `metric_sample` aggregates — a fixed number of queries per request whatever the
 queue count, and no broker call. `deliveringCount` is what separates a stalled
 consumer from a starved one; a `CONSUMER_SLOW` notification outranks any derived
@@ -253,7 +253,7 @@ what lets a module contribute a rule kind without alerting importing it.
 ### Cross-node aggregation (read)
 
 A primary and its synced backup share one `NodeID` and are **one logical node**
-(ADR-0017). The queue grid is built from `queue_snapshot`, grouped by
+(ADR-0017). The queue grid is built from `subscription_snapshot`, grouped by
 `(address, queueName, routingType)`: each row carries a per-node cell, rolled-up
 cluster totals, and `nodesPresent / nodesTotal`. A node whose last sweep is stale
 keeps its last numbers, flagged — never dropped. The other five views

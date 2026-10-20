@@ -87,7 +87,21 @@ class MessageBrowseControllerTest extends PostgresIntegrationTest {
         a.attachSeedUrl(URL_A);
         nodeAId = nodes.save(a).getId();
         upsert.upsertBatch(List.of(new QueueRow(
-                clusterId, nodeAId, "PHASE3.SRC", "PHASE3.SRC", "ANYCAST", true, 4, 0, 0, 0, 0, 0, 0, false)));
+                clusterId,
+                nodeAId,
+                "PHASE3.SRC",
+                "PHASE3.SRC",
+                "ANYCAST",
+                true,
+                4,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                false,
+                "artemis.queue")));
     }
 
     @AfterEach
@@ -200,8 +214,38 @@ class MessageBrowseControllerTest extends PostgresIntegrationTest {
         b.applyHaState(new HaObservation(true, "STARTED", "PRIMARY", null, "2.44.0", null), 1L, Instant.now());
         UUID nodeBId = nodes.save(b).getId();
         upsert.upsertBatch(List.of(
-                new QueueRow(clusterId, nodeAId, "SPLIT", "SPLIT", "ANYCAST", true, 0, 0, 0, 0, 0, 0, 0, false),
-                new QueueRow(clusterId, nodeBId, "SPLIT", "SPLIT", "ANYCAST", true, 4, 0, 0, 0, 0, 0, 0, false)));
+                new QueueRow(
+                        clusterId,
+                        nodeAId,
+                        "SPLIT",
+                        "SPLIT",
+                        "ANYCAST",
+                        true,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        false,
+                        "artemis.queue"),
+                new QueueRow(
+                        clusterId,
+                        nodeBId,
+                        "SPLIT",
+                        "SPLIT",
+                        "ANYCAST",
+                        true,
+                        4,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        false,
+                        "artemis.queue")));
 
         serving(nodeBId, "SPLIT", batch("browse.json", 4));
 

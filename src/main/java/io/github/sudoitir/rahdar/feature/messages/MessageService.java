@@ -75,7 +75,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 /**
  * Message browse and the destructive message operations for one queue on one
  * node (ADR-0021, ADR-0022). {@code address} / {@code routingType} come from the
- * cached {@code queue_snapshot} row, or a live read for a queue the scrape has not reached,
+ * cached {@code subscription_snapshot} row, or a live read for a queue the scrape has not reached,
  * never the client. Every broker request waits for
  * the node's rate ceiling in the transport itself (non-negotiable #1, ADR-0076); every mutation writes
  * an {@code audit_event} in its own transaction, before the broker call, updated

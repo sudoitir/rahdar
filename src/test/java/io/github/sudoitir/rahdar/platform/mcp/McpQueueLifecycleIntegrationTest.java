@@ -118,8 +118,8 @@ class McpQueueLifecycleIntegrationTest extends PostgresIntegrationTest {
         node.attachSeedUrl("http://a:8161/console/jolokia");
         node.applyHaState(new HaObservation(true, "STARTED", "PRIMARY", null, "2.44.0", null), 1L, Instant.now());
         UUID nodeId = nodes.save(node).getId();
-        upsert.upsertBatch(
-                List.of(new QueueRow(clusterId, nodeId, QUEUE, QUEUE, "ANYCAST", true, 9, 0, 0, 0, 0, 0, 0, false)));
+        upsert.upsertBatch(List.of(new QueueRow(
+                clusterId, nodeId, QUEUE, QUEUE, "ANYCAST", true, 9, 0, 0, 0, 0, 0, 0, false, "artemis.queue")));
 
         ArtemisNode client = mock(ArtemisNode.class);
         when(client.resolveBrokerObjectName()).thenReturn("org.apache.activemq.artemis:broker=\"b\"");

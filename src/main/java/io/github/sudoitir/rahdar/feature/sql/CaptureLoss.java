@@ -29,7 +29,7 @@ import org.springframework.transaction.annotation.Transactional;
  * What capture missed, per node (ADR-0062 D7).
  *
  * <p>The measurement is the change, between passes, in what was routed to the covered addresses
- * ({@code MessagesAdded} in {@code queue_snapshot}) that is neither stored nor still waiting in
+ * ({@code MessagesAdded} in {@code subscription_snapshot}) that is neither stored nor still waiting in
  * the subscription's capture queues. A message in the ring has not been lost yet — counting it
  * would report every in-flight backlog as loss, and nothing would ever take it back. A positive
  * remainder is messages the ring dropped, or that arrived while the tap was not installed.

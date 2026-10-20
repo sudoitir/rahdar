@@ -56,8 +56,22 @@ class MetricSampleWriterTest extends PostgresIntegrationTest {
         nodeId = nodes.save(BrokerNodeEntity.fromSeed(clusterId, "n1", "NONE", "node-1"))
                 .getId();
 
-        writer.appendQueueSamples(List.of(
-                new QueueRow(clusterId, nodeId, "orders", "orders", "ANYCAST", true, 42, 3, 7, 1, 900, 850, 5, false)));
+        writer.appendQueueSamples(List.of(new QueueRow(
+                clusterId,
+                nodeId,
+                "orders",
+                "orders",
+                "ANYCAST",
+                true,
+                42,
+                3,
+                7,
+                1,
+                900,
+                850,
+                5,
+                false,
+                "artemis.queue")));
 
         assertThat(metricsWritten())
                 .containsExactlyInAnyOrder(

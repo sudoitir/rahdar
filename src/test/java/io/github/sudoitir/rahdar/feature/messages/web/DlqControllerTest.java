@@ -82,8 +82,8 @@ class DlqControllerTest extends PostgresIntegrationTest {
         a.attachSeedUrl(URL);
         nodeId = nodes.save(a).getId();
         // DLQ fixture reports deadLetterAddress "DLQ"; seed a queue on it.
-        upsert.upsertBatch(
-                List.of(new QueueRow(clusterId, nodeId, "DLQ", "DLQ", "ANYCAST", true, 7, 0, 0, 0, 0, 0, 0, false)));
+        upsert.upsertBatch(List.of(new QueueRow(
+                clusterId, nodeId, "DLQ", "DLQ", "ANYCAST", true, 7, 0, 0, 0, 0, 0, 0, false, "artemis.queue")));
     }
 
     @AfterEach

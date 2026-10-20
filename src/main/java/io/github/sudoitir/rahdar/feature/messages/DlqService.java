@@ -31,7 +31,7 @@ import tools.jackson.databind.JsonNode;
  * own {@code getAddressSettingsAsJSON("#")}, never a name match — if that read
  * fails the view says so ({@code settingsAvailable = false}) and infers nothing.
  * Queues on those addresses and their per-node depth come from the
- * {@code queue_snapshot} cache. A queue the caller may not read is left out, and an address appears only
+ * {@code subscription_snapshot} cache. A queue the caller may not read is left out, and an address appears only
  * through a queue they may read or when they may read the address.
  */
 @Service

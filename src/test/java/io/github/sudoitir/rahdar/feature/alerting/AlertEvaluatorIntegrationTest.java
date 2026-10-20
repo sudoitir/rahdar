@@ -22,7 +22,7 @@ import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 
 /**
  * {@link AlertEvaluator} evaluating a real threshold rule against real
- * {@code queue_snapshot} rows (design.md decisions 3-4). Exercises the wiring
+ * {@code subscription_snapshot} rows (design.md decisions 3-4). Exercises the wiring
  * an isolated {@code AlertStateMachineTest} cannot: rule lookup, subject
  * discovery, and the {@code alert_state}/{@code alert_firing} writes.
  */
@@ -60,9 +60,9 @@ class AlertEvaluatorIntegrationTest extends PostgresIntegrationTest {
 
     private void snapshot(UUID clusterId, UUID nodeId, String queueName, long messageCount) {
         jdbc.update("""
-                INSERT INTO queue_snapshot (node_id, queue_name, cluster_id, address, routing_type, message_count)
-                VALUES (:n, :q, :c, :q, 'ANYCAST', :mc)
-                ON CONFLICT (node_id, queue_name) DO UPDATE SET message_count = :mc
+                INSERT INTO subscription_snapshot (node_id, subscription, cluster_id, destination, kind, backlog)
+                VALUES (:n, :q, :c, :q, 'artemis.queue', :mc)
+                ON CONFLICT (node_id, subscription) DO UPDATE SET backlog = :mc
                 """, Map.of("n", nodeId, "q", queueName, "c", clusterId, "mc", messageCount));
     }
 

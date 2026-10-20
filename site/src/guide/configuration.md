@@ -186,7 +186,7 @@ and the primary serves them otherwise:
 | `rahdar.database.read.max-lag` | `30s` | The most the standby may lag and still serve a read. A response served from it says it may lag |
 
 Postgres owns configuration, users and the audit trail. The broker-derived
-tables — `queue_snapshot`, `metric_sample` — are a **disposable cache**: losing
+tables — `subscription_snapshot`, `metric_sample` — are a **disposable cache**: losing
 them costs you history, never truth.
 
 ## Monitoring

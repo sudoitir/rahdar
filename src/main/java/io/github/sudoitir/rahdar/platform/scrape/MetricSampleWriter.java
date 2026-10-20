@@ -32,14 +32,14 @@ import org.springframework.transaction.support.TransactionTemplate;
 public class MetricSampleWriter {
 
     private static final String INSERT = """
-            INSERT INTO metric_sample (ts, value, subject_type, subject_name, metric, cluster_id, node_id)
+            INSERT INTO metric_sample (ts, value, subject_kind, subject_path, metric, cluster_id, node_id)
             VALUES (now(), :value, 'QUEUE', :subjectName, :metric, :clusterId, :nodeId)
             ON CONFLICT ON CONSTRAINT uq_metric_sample DO NOTHING
             """;
 
     private static final String PLUGIN_INSERT = """
-            INSERT INTO metric_sample (ts, value, subject_type, subject_name, metric, cluster_id, node_id)
-            VALUES (now(), :value, 'PLUGIN', :subjectName, :metric, :clusterId, NULL)
+            INSERT INTO metric_sample (ts, value, subject_kind, subject_path, metric, cluster_id, node_id)
+            VALUES (now(), :value, 'rahdar.plugin', :subjectName, :metric, :clusterId, NULL)
             ON CONFLICT ON CONSTRAINT uq_metric_sample DO NOTHING
             """;
 
@@ -63,7 +63,7 @@ public class MetricSampleWriter {
         write(INSERT, params.toArray(SqlParameterSource[]::new));
     }
 
-    /** A plugin metric's values on one cluster (ADR-0113): subject type {@code PLUGIN}, no node. */
+    /** A plugin metric's values on one cluster (ADR-0113): subject kind {@code rahdar.plugin}, no node. */
     public void appendPluginSamples(UUID clusterId, String metric, Map<String, Double> values) {
         if (values.isEmpty()) {
             return;

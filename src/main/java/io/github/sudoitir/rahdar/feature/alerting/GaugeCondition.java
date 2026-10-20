@@ -15,7 +15,7 @@ import org.springframework.stereotype.Component;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * Reads the latest per-{@code (node,queue)} gauge value from {@code queue_snapshot}
+ * Reads the latest per-{@code (node,queue)} gauge value from {@code subscription_snapshot}
  * (design.md decision 2) — one query per cluster per tick regardless of rule
  * count. A queue present on several nodes without a specific {@code scope.node}
  * is aggregated by summing, keyed {@code queue:<name>}; a node-scoped rule keys

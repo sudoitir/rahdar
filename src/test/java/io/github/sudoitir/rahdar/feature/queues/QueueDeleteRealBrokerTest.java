@@ -46,7 +46,7 @@ import org.springframework.web.context.WebApplicationContext;
  * still route afterwards. A divert out of that address keeps it bound, so then both stay and
  * the chain through it still delivers (ADR-0085).
  *
- * <p>Nothing seeds {@code queue_snapshot} here, so the delete also proves a queue the scrape
+ * <p>Nothing seeds {@code subscription_snapshot} here, so the delete also proves a queue the scrape
  * has not reached is found on the live node.
  */
 @ExtendWith(AdminAuthenticationExtension.class)

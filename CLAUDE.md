@@ -55,7 +55,7 @@ one is missing.
   (`src/main/resources/db/changelog/db.changelog-master.xml`) including one changelog
   per module, with one SQL changeset file per concern under that module's `changes/`. Boot runs migrations on startup; the
   `liquibase-maven-plugin` (`just db-*`) is for humans. Postgres owns config,
-  users, and audit; broker-derived tables (`queue_snapshot`, `metric_sample`) are
+  users, and audit; broker-derived tables (`subscription_snapshot`, `metric_sample`) are
   a disposable cache.
 - **Java formatting**: Palantir Java Format via Spotless, applied at
   `process-sources` (every `mvn compile`) and checked at `verify`. Never

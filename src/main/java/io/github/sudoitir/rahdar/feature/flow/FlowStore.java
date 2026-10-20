@@ -20,7 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * The flow module's disposable caches (ADR-0081): the observation lease, the latest aggregated
- * client edges and each node's sampling coverage. JDBC batch upserts, as for {@code queue_snapshot}
+ * client edges and each node's sampling coverage. JDBC batch upserts, as for {@code subscription_snapshot}
  * (ADR-0016): rows rewritten every sweep have no identity worth dirty-checking.
  */
 @Repository

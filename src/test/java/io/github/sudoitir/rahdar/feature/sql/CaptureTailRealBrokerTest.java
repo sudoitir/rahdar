@@ -148,8 +148,22 @@ class CaptureTailRealBrokerTest extends PostgresIntegrationTest {
                         "auto-create-address",
                         true));
         // The scrape does not run in tests, and capture resolves its addresses from the snapshot.
-        snapshots.upsertBatch(List.of(
-                new QueueRow(clusterId, node.getId(), address, address, "ANYCAST", true, 0, 0, 0, 0, 0, 0, 0, false)));
+        snapshots.upsertBatch(List.of(new QueueRow(
+                clusterId,
+                node.getId(),
+                address,
+                address,
+                "ANYCAST",
+                true,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                false,
+                "artemis.queue")));
     }
 
     @AfterEach

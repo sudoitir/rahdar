@@ -119,7 +119,7 @@ public class SqlTailPoller {
      * What the tail has seen, and what it can prove it missed.
      *
      * @param enqueued messages enqueued on the tailed queues since the tail started,
-     *     from the {@code MessagesAdded} deltas in {@code queue_snapshot}
+     *     from the {@code MessagesAdded} deltas in {@code subscription_snapshot}
      * @param shown rows this tail has delivered
      * @param everyMessageMatches true when the query has no predicate at all, so every
      *     enqueued message would have matched and {@code enqueued - shown} is exactly

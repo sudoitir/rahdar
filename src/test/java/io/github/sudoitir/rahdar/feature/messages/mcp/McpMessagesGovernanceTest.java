@@ -99,7 +99,21 @@ class McpMessagesGovernanceTest extends PostgresIntegrationTest {
         a.attachSeedUrl(URL_A);
         nodeId = nodes.save(a).getId();
         upsert.upsertBatch(List.of(new QueueRow(
-                clusterId, nodeId, "PHASE3.SRC", "PHASE3.SRC", "ANYCAST", true, 1, 0, 0, 0, 0, 0, 0, false)));
+                clusterId,
+                nodeId,
+                "PHASE3.SRC",
+                "PHASE3.SRC",
+                "ANYCAST",
+                true,
+                1,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                false,
+                "artemis.queue")));
     }
 
     @AfterEach

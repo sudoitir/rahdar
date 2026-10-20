@@ -41,7 +41,7 @@ import org.springframework.transaction.annotation.Transactional;
  * while {@code SlowConsumerCondition} computed a better answer from the same data, so the
  * console, an alert and an agent could each describe one queue differently.
  *
- * <p>Costs per request: one {@code queue_snapshot} read (already indexed by cluster),
+ * <p>Costs per request: one {@code subscription_snapshot} read (already indexed by cluster),
  * three windowed {@code metric_sample} aggregates, and one bounded event page — a fixed
  * number of queries regardless of how many queues the cluster has, and <em>no broker
  * call at all</em>. Reading health must never be a reason a broker falls over
@@ -116,7 +116,7 @@ public class ConsumerHealthService {
         // here protects nothing and fails as a 404 about a cluster that plainly exists.
         // The guard belongs at the request boundary — page() and forQueue() apply it —
         // which is the same split the other alert conditions make by reading
-        // queue_snapshot directly.
+        // subscription_snapshot directly.
         List<QueueView> rows = queues.rollUp(clusterId);
 
         Instant to = Instant.now();

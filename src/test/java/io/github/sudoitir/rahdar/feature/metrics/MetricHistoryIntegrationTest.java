@@ -141,8 +141,8 @@ class MetricHistoryIntegrationTest extends PostgresIntegrationTest {
         pluginId = "acme-history-" + Math.abs(new SecureRandom().nextInt());
         activatePluginDeclaringAMetric();
         jdbc.update("""
-                INSERT INTO metric_sample (ts, value, subject_type, subject_name, metric, cluster_id)
-                VALUES (:ts, 7, 'PLUGIN', 'daily', :m, :c)
+                INSERT INTO metric_sample (ts, value, subject_kind, subject_path, metric, cluster_id)
+                VALUES (:ts, 7, 'rahdar.plugin', 'daily', :m, :c)
                 """, Map.of("ts", Timestamp.from(now.minusSeconds(300)), "m", pluginId + ":edits", "c", clusterId));
         UUID withIt = userWith(Permissions.CLUSTER_READ, pluginId + ":stats");
         UUID without = userWith(Permissions.CLUSTER_READ);
@@ -229,7 +229,7 @@ class MetricHistoryIntegrationTest extends PostgresIntegrationTest {
 
     private void queueSample(Instant ts, double value) {
         jdbc.update("""
-                INSERT INTO metric_sample (ts, value, subject_type, subject_name, metric, cluster_id, node_id)
+                INSERT INTO metric_sample (ts, value, subject_kind, subject_path, metric, cluster_id, node_id)
                 VALUES (:ts, :v, 'QUEUE', 'orders', 'openbroker.backlog', :c, :n)
                 """, Map.of("ts", Timestamp.from(ts), "v", value, "c", clusterId, "n", nodeId));
     }

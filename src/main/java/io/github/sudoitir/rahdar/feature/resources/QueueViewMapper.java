@@ -10,7 +10,7 @@ import java.util.UUID;
 import org.springframework.stereotype.Component;
 
 /**
- * {@code queue_snapshot} rows sharing an {@code (address, queueName, routingType)}
+ * {@code subscription_snapshot} rows sharing an {@code (address, queueName, routingType)}
  * key → one {@link QueueView}: a per-node cell for each row, cluster totals, and
  * node presence (ADR-0017).
  */

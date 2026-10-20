@@ -29,7 +29,7 @@ import org.springframework.transaction.annotation.Transactional;
  * Evaluates one cluster's rules of one kind (design.md decision 3) — called
  * by {@link AlertScrapeListener} right after the scrape tier that kind's data
  * source depends on has persisted, never from an independent timer. DB-only:
- * reads already-persisted {@code queue_snapshot}/{@code metric_sample}/HA state
+ * reads already-persisted {@code subscription_snapshot}/{@code metric_sample}/HA state
  * and writes {@code alert_state}/{@code alert_firing}/{@code alert_delivery} —
  * no broker I/O, preserving ADR-0015's rule that network calls never share a
  * transaction with persistence.

@@ -149,8 +149,22 @@ class QueueLifecycleServiceTest extends PostgresIntegrationTest {
     }
 
     private void seedQueue() {
-        upsert.upsertBatch(List.of(
-                new QueueRow(clusterId, liveId, "orders.addr", QUEUE, "ANYCAST", true, 5, 0, 0, 0, 0, 0, 0, false)));
+        upsert.upsertBatch(List.of(new QueueRow(
+                clusterId,
+                liveId,
+                "orders.addr",
+                QUEUE,
+                "ANYCAST",
+                true,
+                5,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                false,
+                "artemis.queue")));
     }
 
     @AfterEach

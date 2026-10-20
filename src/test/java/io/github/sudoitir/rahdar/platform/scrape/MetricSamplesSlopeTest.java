@@ -125,7 +125,7 @@ class MetricSamplesSlopeTest extends PostgresIntegrationTest {
             p.put("c", clusterId);
             p.put("n", nodeId);
             jdbc.update("""
-                    INSERT INTO metric_sample (ts, value, subject_type, subject_name, metric, cluster_id, node_id)
+                    INSERT INTO metric_sample (ts, value, subject_kind, subject_path, metric, cluster_id, node_id)
                     VALUES (:ts, :value, 'QUEUE', :subject, 'openbroker.backlog', :c, :n)
                     """, p);
         }

@@ -26,7 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
  * Latency percentiles (Micrometer, ADR-0032) and their sampling coverage
  * ratio — never published without each other (request-reply-tracing spec,
  * non-negotiable #5). Coverage is a live best-effort estimate against the
- * current {@code queue_snapshot} counter, not a persisted metric (Phase 6's
+ * current {@code subscription_snapshot} counter, not a persisted metric (Phase 6's
  * {@code metric_sample} owns real history — see design.md Non-Goals).
  */
 @Service

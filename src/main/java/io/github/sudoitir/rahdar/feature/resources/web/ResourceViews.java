@@ -21,7 +21,7 @@ public final class ResourceViews {
 
     private ResourceViews() {}
 
-    // ---- queues (aggregated from queue_snapshot) --------------------------
+    // ---- queues (aggregated from subscription_snapshot) --------------------------
 
     public record QueueView(
             @Schema(requiredMode = REQUIRED) String address,

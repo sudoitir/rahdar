@@ -139,10 +139,10 @@ class HealthVerdictConditionTest extends PostgresIntegrationTest {
     private void queue(String name, long consumers, long messages, long delivering, boolean paused) {
         jdbc.update(
                 """
-                INSERT INTO queue_snapshot
-                  (node_id, queue_name, cluster_id, address, routing_type,
-                   consumer_count, message_count, delivering_count, paused)
-                VALUES (:n, :q, :c, :q, 'ANYCAST', :cc, :mc, :dc, :paused)
+                INSERT INTO subscription_snapshot
+                  (node_id, subscription, cluster_id, destination, kind, native_attributes,
+                   consumer_count, backlog, in_flight, paused)
+                VALUES (:n, :q, :c, :q, 'artemis.queue', '{"artemis.routing_type":"ANYCAST"}', :cc, :mc, :dc, :paused)
                 """,
                 Map.of(
                         "n", nodeId,
@@ -171,7 +171,7 @@ class HealthVerdictConditionTest extends PostgresIntegrationTest {
         p.put("c", clusterId);
         p.put("n", nodeId);
         jdbc.update("""
-                INSERT INTO metric_sample (ts, value, subject_type, subject_name, metric, cluster_id, node_id)
+                INSERT INTO metric_sample (ts, value, subject_kind, subject_path, metric, cluster_id, node_id)
                 VALUES (:ts, :value, 'QUEUE', :subject, :metric, :c, :n)
                 """, p);
     }

@@ -137,8 +137,22 @@ class QueueGateTest extends PostgresIntegrationTest {
         when(client.single(any())).thenReturn(new ManagementResponse(404, null, "no such queue", null, null));
         when(ops.deleteState(any(), anyString(), anyString(), anyString(), anyString()))
                 .thenReturn(new QueueLifecycleOperations.DeleteState(false, 0, List.of()));
-        upsert.upsertBatch(List.of(
-                new QueueRow(clusterId, nodeId, "orders.addr", QUEUE, "ANYCAST", true, 5, 0, 0, 0, 0, 0, 0, false)));
+        upsert.upsertBatch(List.of(new QueueRow(
+                clusterId,
+                nodeId,
+                "orders.addr",
+                QUEUE,
+                "ANYCAST",
+                true,
+                5,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                false,
+                "artemis.queue")));
     }
 
     @AfterEach

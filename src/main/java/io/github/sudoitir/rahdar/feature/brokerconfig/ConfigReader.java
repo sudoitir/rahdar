@@ -124,7 +124,7 @@ public class ConfigReader {
     /**
      * The match set to compare: {@code #} first, then the cluster's known addresses.
      *
-     * <p>These come from the caller's {@code queue_snapshot} cache, not from a broker
+     * <p>These come from the caller's {@code subscription_snapshot} cache, not from a broker
      * read, so a comparison still costs exactly one batched POST per node. Reading
      * {@code AddressNames} off the broker first would need a second round trip per
      * node — and a passive backup reports none anyway, so the cache is the better

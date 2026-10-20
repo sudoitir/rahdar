@@ -273,7 +273,7 @@ public class CaptureReconciler {
      *
      * <p>The address set is resolved cluster-wide and then asserted per node, not
      * resolved per node. That distinction is what makes failover work. A promoted
-     * backup has no {@code queue_snapshot} rows until the scrape reaches it, which can
+     * backup has no {@code subscription_snapshot} rows until the scrape reaches it, which can
      * be minutes; resolving per node would leave the newly live node untapped for
      * exactly that window — the window an operator is most likely to be watching. A
      * divert on an address a node has not seen traffic for yet costs nothing and is

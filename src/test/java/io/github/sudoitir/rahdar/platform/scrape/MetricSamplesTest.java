@@ -60,7 +60,7 @@ class MetricSamplesTest extends PostgresIntegrationTest {
     private void sample(String metric, String subjectName, UUID node, Instant ts, double value) {
         jdbc.update(
                 """
-                INSERT INTO metric_sample (ts, value, subject_type, subject_name, metric, cluster_id, node_id)
+                INSERT INTO metric_sample (ts, value, subject_kind, subject_path, metric, cluster_id, node_id)
                 VALUES (:ts, :value, 'QUEUE', :subject, :metric, :c, :n)
                 """,
                 Map.of(
@@ -219,12 +219,12 @@ class MetricSamplesTest extends PostgresIntegrationTest {
         sample("openbroker.enqueued", "orders", base, 100.0);
         sample("openbroker.enqueued", "orders", base.plusSeconds(10), 200.0);
         jdbc.update("""
-                INSERT INTO metric_sample (ts, value, subject_type, subject_name, metric, cluster_id, node_id)
+                INSERT INTO metric_sample (ts, value, subject_kind, subject_path, metric, cluster_id, node_id)
                 VALUES (:ts, :value, 'QUEUE', 'orders', 'openbroker.enqueued', :c, :n)
                 """, Map.of("ts", Timestamp.from(base), "value", 90_000.0, "c", clusterId, "n", otherNode));
         jdbc.update(
                 """
-                INSERT INTO metric_sample (ts, value, subject_type, subject_name, metric, cluster_id, node_id)
+                INSERT INTO metric_sample (ts, value, subject_kind, subject_path, metric, cluster_id, node_id)
                 VALUES (:ts, :value, 'QUEUE', 'orders', 'openbroker.enqueued', :c, :n)
                 """,
                 Map.of("ts", Timestamp.from(base.plusSeconds(10)), "value", 90_050.0, "c", clusterId, "n", otherNode));

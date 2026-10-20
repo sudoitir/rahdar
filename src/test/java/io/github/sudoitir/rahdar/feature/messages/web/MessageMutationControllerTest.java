@@ -93,7 +93,8 @@ class MessageMutationControllerTest extends PostgresIntegrationTest {
                 clusterId, "node-a", "PRIMARY", UUID.randomUUID().toString());
         a.attachSeedUrl(URL);
         nodeId = nodes.save(a).getId();
-        upsert.upsertBatch(List.of(new QueueRow(clusterId, nodeId, Q, Q, "ANYCAST", true, 3, 0, 0, 0, 0, 0, 0, false)));
+        upsert.upsertBatch(List.of(
+                new QueueRow(clusterId, nodeId, Q, Q, "ANYCAST", true, 3, 0, 0, 0, 0, 0, 0, false, "artemis.queue")));
         settings.reset(BrokerSettings.BULK_CAP);
     }
 

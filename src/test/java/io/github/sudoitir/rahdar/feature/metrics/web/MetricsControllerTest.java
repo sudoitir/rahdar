@@ -66,7 +66,7 @@ class MetricsControllerTest extends PostgresIntegrationTest {
 
     private void sample(Instant ts, double value) {
         jdbc.update("""
-                INSERT INTO metric_sample (ts, value, subject_type, subject_name, metric, cluster_id, node_id)
+                INSERT INTO metric_sample (ts, value, subject_kind, subject_path, metric, cluster_id, node_id)
                 VALUES (:ts, :v, 'QUEUE', 'orders', 'openbroker.backlog', :c, :n)
                 """, Map.of("ts", Timestamp.from(ts), "v", value, "c", clusterId, "n", nodeA));
     }

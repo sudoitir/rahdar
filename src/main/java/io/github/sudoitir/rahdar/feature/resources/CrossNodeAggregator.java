@@ -28,7 +28,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Builds the cross-node queue grid from {@code queue_snapshot} (ADR-0017). A
+ * Builds the cross-node queue grid from {@code subscription_snapshot} (ADR-0017). A
  * primary and its synced backup share a NodeID and are one logical node; the
  * scrape only ever writes the live endpoint's rows, so there is no double count.
  * A node whose last sweep is stale keeps its last numbers, flagged — never
@@ -88,7 +88,7 @@ public class CrossNodeAggregator {
      * permission check there does not protect anything — it simply fails, and
      * {@link ClusterAccessGuard} fails as a 404, which surfaces as "cluster does not
      * exist" about a cluster that plainly does. The alert conditions already read
-     * {@code queue_snapshot} unguarded for exactly this reason; this keeps the guard at
+     * {@code subscription_snapshot} unguarded for exactly this reason; this keeps the guard at
      * the request boundary, where there is a user to check, and off the scheduler path.
      *
      * <p><b>Never call this from a request path.</b> {@link #allQueues} is that entry point.

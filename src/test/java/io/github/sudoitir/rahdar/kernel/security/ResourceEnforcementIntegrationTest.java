@@ -124,7 +124,8 @@ class ResourceEnforcementIntegrationTest extends PostgresIntegrationTest {
     }
 
     private QueueRow row(UUID node, String name, long messages) {
-        return new QueueRow(cluster, node, name, name, "ANYCAST", true, messages, 0, 0, 0, 0, 0, 0, false);
+        return new QueueRow(
+                cluster, node, name, name, "ANYCAST", true, messages, 0, 0, 0, 0, 0, 0, false, "artemis.queue");
     }
 
     /** A user whose only access is the built-in Operator role, granted on every cluster. */

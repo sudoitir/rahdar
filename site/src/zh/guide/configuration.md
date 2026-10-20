@@ -102,7 +102,7 @@ KV 版本 2 默认只保留 **10 个版本**，写入第 11 个时会删除最�
 
 PostgreSQL，模式由 Liquibase 拥有，并在启动时迁移。Rahdar 在启动时会针对迁移后的模式校验映射，而不是生成 DDL，因此漂移的模式会大声失败，而不是悄悄出错。
 
-Postgres 拥有配置、用户与审计链路。来自 Broker 的表——`queue_snapshot`、`metric_sample`——是**可丢弃的缓存**：丢了它们只会损失历史，绝不会损失真相。
+Postgres 拥有配置、用户与审计链路。来自 Broker 的表——`subscription_snapshot`、`metric_sample`——是**可丢弃的缓存**：丢了它们只会损失历史，绝不会损失真相。
 
 ## Broker 连接
 

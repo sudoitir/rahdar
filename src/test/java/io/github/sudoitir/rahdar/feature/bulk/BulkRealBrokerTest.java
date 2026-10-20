@@ -118,8 +118,8 @@ class BulkRealBrokerTest extends PostgresIntegrationTest {
 
         for (String name : queueNames) {
             queueOps.createQueue(client, broker, queue(name));
-            snapshots.upsertBatch(
-                    List.of(new QueueRow(clusterId, nodeId, name, name, "ANYCAST", true, 0, 0, 0, 0, 0, 0, 0, false)));
+            snapshots.upsertBatch(List.of(new QueueRow(
+                    clusterId, nodeId, name, name, "ANYCAST", true, 0, 0, 0, 0, 0, 0, 0, false, "artemis.queue")));
         }
     }
 

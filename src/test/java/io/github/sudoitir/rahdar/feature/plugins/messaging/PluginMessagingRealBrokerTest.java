@@ -478,7 +478,21 @@ class PluginMessagingRealBrokerTest extends PostgresIntegrationTest {
         String captured = queue("CAPTURED");
         ClusterNode node = directory.nodes(clusterId).getFirst();
         snapshots.upsertBatch(List.of(new QueueRow(
-                clusterId, node.getId(), captured, captured, "ANYCAST", true, 0, 0, 0, 0, 0, 0, 0, false)));
+                clusterId,
+                node.getId(),
+                captured,
+                captured,
+                "ANYCAST",
+                true,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                false,
+                "artemis.queue")));
         UUID subscription = indexes.create(
                         clusterId,
                         new MessageIndexService.Spec(

@@ -8,7 +8,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 /**
- * Read access to {@code queue_snapshot} for the cross-node aggregator. Writes are
+ * Read access to {@code subscription_snapshot} for the cross-node aggregator. Writes are
  * {@link QueueSnapshotUpsert}'s job, not this repository's — never call
  * {@code save}/{@code delete} here (ADR-0016).
  */

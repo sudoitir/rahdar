@@ -22,7 +22,7 @@ import org.springframework.stereotype.Component;
  * every tick into a throttled warning the operator never saw, which is one of the
  * ways tracing could produce nothing and explain nothing.
  *
- * <p>Resolution reads {@code queue_snapshot}, which the scrape loop already fills,
+ * <p>Resolution reads {@code subscription_snapshot}, which the scrape loop already fills,
  * so this costs no broker call — the same trade {@link ReplyAddressResolver}
  * makes, and the same consequence: a queue created since the last scrape is
  * invisible until the next one.
