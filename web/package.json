@@ -22,7 +22,6 @@
     "sweep": "node --experimental-strip-types scripts/sweep.ts"
   },
   "dependencies": {
-    "@rahdar/plugin-sdk": "file:src/sdk",
     "@codemirror/autocomplete": "6.20.3",
     "@codemirror/commands": "6.11.1",
     "@codemirror/lang-json": "6.0.2",
@@ -45,6 +44,7 @@
     "@mantine/notifications": "9.7.2",
     "@mantine/spotlight": "9.7.2",
     "@module-federation/runtime": "2.9.2",
+    "@rahdar/plugin-sdk": "file:src/sdk",
     "@tabler/icons-react": "3.49.0",
     "@tanstack/react-query": "5.104.1",
     "@tanstack/react-router": "1.170.42",
@@ -55,8 +55,8 @@
     "dayjs": "1.11.23",
     "dompurify": "3.4.16",
     "elkjs": "0.12.0",
-    "react": "19.3.0",
-    "react-dom": "19.3.0",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
     "recharts": "3.10.1",
     "shiki": "4.5.0",
     "uqr": "0.1.3"
