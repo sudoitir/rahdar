@@ -100,8 +100,8 @@ import org.springframework.transaction.support.TransactionTemplate;
 @Slf4j
 public class ClusterService {
 
-    private static final String JOLOKIA_BASIC = "JOLOKIA_BASIC";
-    private static final String CORE = "CORE";
+    private static final String MANAGEMENT = "MANAGEMENT";
+    private static final String DATA = "DATA";
     private static final String REGISTER_CLUSTER = "REGISTER_CLUSTER";
     private static final String UPDATE_CONNECTION = "UPDATE_CLUSTER_CONNECTION";
     private static final String CLUSTER = "CLUSTER";
@@ -453,21 +453,21 @@ public class ClusterService {
         if (request.hasCredentials()) {
             credentials.save(new BrokerCredentialEntity(
                     clusterId,
-                    JOLOKIA_BASIC,
+                    MANAGEMENT,
                     request.credentials().username(),
                     vault.seal(
-                            SecretVault.aad(clusterId, JOLOKIA_BASIC),
+                            SecretVault.aad(clusterId, MANAGEMENT),
                             request.credentials().password())));
         }
         if (request.hasCoreCredentials()) {
-            // A CORE row is a genuinely separate sealed secret — AAD is clusterId|CORE
+            // A DATA row is a genuinely separate sealed secret — AAD is clusterId|CORE
             // (ADR-0026). When absent, coreSettingsFor falls back to the Jolokia credential.
             credentials.save(new BrokerCredentialEntity(
                     clusterId,
-                    CORE,
+                    DATA,
                     request.coreCredentials().username(),
                     vault.seal(
-                            SecretVault.aad(clusterId, CORE),
+                            SecretVault.aad(clusterId, DATA),
                             request.coreCredentials().password())));
         }
         if (request.tlsBundle() != null) {
@@ -635,11 +635,11 @@ public class ClusterService {
                 seeds,
                 tls == null ? null : tls.getTruststoreRef(),
                 credentials
-                        .findByClusterIdAndKind(clusterId, JOLOKIA_BASIC)
+                        .findByClusterIdAndKind(clusterId, MANAGEMENT)
                         .map(BrokerCredentialEntity::getUsername)
                         .orElse(null),
                 credentials
-                        .findByClusterIdAndKind(clusterId, CORE)
+                        .findByClusterIdAndKind(clusterId, DATA)
                         .map(BrokerCredentialEntity::getUsername)
                         .orElse(null));
     }
@@ -1037,8 +1037,8 @@ public class ClusterService {
         cluster.edit(edited.name(), edited.description(), edited.pattern());
         clusters.save(cluster);
         storeTls(clusterId, edited.tlsBundle());
-        storeCredential(clusterId, JOLOKIA_BASIC, edited.management());
-        storeCredential(clusterId, CORE, edited.core());
+        storeCredential(clusterId, MANAGEMENT, edited.management());
+        storeCredential(clusterId, DATA, edited.core());
         releaseDroppedSeeds(clusterId, edited.seedUrls());
         if (edited.retryProblems()) {
             // The pattern, the account or the TLS bundle changed, so why a node had no URL may no longer hold.
@@ -1068,7 +1068,7 @@ public class ClusterService {
             throw new IllegalArgumentException(ENTER_AGAIN.formatted("management"));
         }
         Account management = managementAccount(request, stored);
-        Optional<BrokerCredentialEntity> storedCore = credentials.findByClusterIdAndKind(clusterId, CORE);
+        Optional<BrokerCredentialEntity> storedCore = credentials.findByClusterIdAndKind(clusterId, DATA);
         Account core = coreAccount(clusterId, request, storedCore);
         requireCorePasswordAgain(request, storedCore, core, newHosts);
         if (management.username() != null && management.password() == null) {

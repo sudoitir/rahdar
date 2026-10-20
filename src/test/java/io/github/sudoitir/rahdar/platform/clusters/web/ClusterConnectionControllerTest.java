@@ -69,8 +69,8 @@ class ClusterConnectionControllerTest extends PostgresIntegrationTest {
     private static final String BACKUP_URL = "http://artemis-backup:8161/console/jolokia";
     private static final String PATTERN = "http://{host}:8161/console/jolokia";
     private static final String NODE_ID = "f7734597-a768-11f1-aa4c-ceae3fa2df1d";
-    private static final String JOLOKIA_BASIC = "JOLOKIA_BASIC";
-    private static final String CORE = "CORE";
+    private static final String MANAGEMENT = "MANAGEMENT";
+    private static final String DATA = "DATA";
     private static final String OLD_SECRET = "old-secret";
     private static final String NEW_SECRET = "new-secret";
     private static final String CORE_SECRET = "core-secret";
@@ -138,8 +138,8 @@ class ClusterConnectionControllerTest extends PostgresIntegrationTest {
         backup.attachDerivedUrl(BACKUP_URL);
         nodes.save(backup);
 
-        seal(JOLOKIA_BASIC, "old-user", OLD_SECRET);
-        seal(CORE, "core-user", CORE_SECRET);
+        seal(MANAGEMENT, "old-user", OLD_SECRET);
+        seal(DATA, "core-user", CORE_SECRET);
 
         when(dataPlaneCheck.check(any(), any())).thenAnswer(DataPlaneChecks.answering(url -> AccountResult.ACCEPTED));
         // Every discovery tick: each manageable node answers search, HA read and topology.
@@ -208,7 +208,7 @@ class ClusterConnectionControllerTest extends PostgresIntegrationTest {
                 .andExpect(jsonPath(ROW.formatted("artemis-backup:61616") + ".urlSource")
                         .value("DERIVED"));
 
-        assertThat(storedPassword(JOLOKIA_BASIC)).isEqualTo(OLD_SECRET);
+        assertThat(storedPassword(MANAGEMENT)).isEqualTo(OLD_SECRET);
         assertThat(audits.findAll())
                 .filteredOn(e -> "UPDATE_CLUSTER_CONNECTION".equals(e.getAction()))
                 .singleElement()
@@ -246,16 +246,16 @@ class ClusterConnectionControllerTest extends PostgresIntegrationTest {
                 .andExpect(jsonPath("$.connection.managementUsername").value("old-user"))
                 .andExpect(jsonPath("$.connection.coreUsername").value("core-user"));
 
-        assertThat(storedPassword(JOLOKIA_BASIC)).isEqualTo(OLD_SECRET);
-        assertThat(storedPassword(CORE)).isEqualTo(CORE_SECRET);
+        assertThat(storedPassword(MANAGEMENT)).isEqualTo(OLD_SECRET);
+        assertThat(storedPassword(DATA)).isEqualTo(CORE_SECRET);
     }
 
     @Test
     void aFieldLeftOutIsLeftAsItWas() throws Exception {
         edit("{\"name\":\"renamed\"}", false).andExpect(status().isOk());
 
-        assertThat(storedPassword(JOLOKIA_BASIC)).isEqualTo(OLD_SECRET);
-        assertThat(credentials.findByClusterIdAndKind(clusterId, CORE)).isPresent();
+        assertThat(storedPassword(MANAGEMENT)).isEqualTo(OLD_SECRET);
+        assertThat(credentials.findByClusterIdAndKind(clusterId, DATA)).isPresent();
         assertThat(clusters.findById(clusterId).orElseThrow().getManagementUrlPattern())
                 .isEqualTo(PATTERN);
     }
@@ -266,8 +266,8 @@ class ClusterConnectionControllerTest extends PostgresIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.connection.coreUsername").value(Matchers.nullValue()));
 
-        assertThat(credentials.findByClusterIdAndKind(clusterId, CORE)).isEmpty();
-        assertThat(credentials.findByClusterIdAndKind(clusterId, JOLOKIA_BASIC)).isPresent();
+        assertThat(credentials.findByClusterIdAndKind(clusterId, DATA)).isEmpty();
+        assertThat(credentials.findByClusterIdAndKind(clusterId, MANAGEMENT)).isPresent();
     }
 
     @Test
@@ -282,8 +282,8 @@ class ClusterConnectionControllerTest extends PostgresIntegrationTest {
                 .getContentAsString();
 
         assertThat(response).doesNotContain(NEW_SECRET);
-        assertThat(storedPassword(JOLOKIA_BASIC)).isEqualTo(NEW_SECRET);
-        assertThat(storedPassword(CORE)).isEqualTo(NEW_SECRET + "2");
+        assertThat(storedPassword(MANAGEMENT)).isEqualTo(NEW_SECRET);
+        assertThat(storedPassword(DATA)).isEqualTo(NEW_SECRET + "2");
         AuditEventEntity event = audits.findAll().stream()
                 .filter(e -> "UPDATE_CLUSTER_CONNECTION".equals(e.getAction()))
                 .findFirst()
@@ -333,7 +333,7 @@ class ClusterConnectionControllerTest extends PostgresIntegrationTest {
                         false)
                 .andExpect(status().isBadRequest());
 
-        assertThat(storedPassword(JOLOKIA_BASIC)).isEqualTo(OLD_SECRET);
+        assertThat(storedPassword(MANAGEMENT)).isEqualTo(OLD_SECRET);
     }
 
     @Test

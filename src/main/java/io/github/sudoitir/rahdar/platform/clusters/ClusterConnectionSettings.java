@@ -23,8 +23,8 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 class ClusterConnectionSettings implements ConnectionSettingsSource {
 
-    private static final String JOLOKIA_BASIC = "JOLOKIA_BASIC";
-    private static final String CORE = "CORE";
+    private static final String MANAGEMENT = "MANAGEMENT";
+    private static final String DATA = "DATA";
 
     private final BrokerCredentialRepository credentials;
     private final BrokerTlsRepository tlsRepository;
@@ -34,11 +34,11 @@ class ClusterConnectionSettings implements ConnectionSettingsSource {
     public BrokerConnectionSettings jolokiaSettings(UUID clusterId) {
         String username = null;
         String password = null;
-        var credential = credentials.findByClusterIdAndKind(clusterId, JOLOKIA_BASIC);
+        var credential = credentials.findByClusterIdAndKind(clusterId, MANAGEMENT);
         if (credential.isPresent()) {
             username = credential.get().getUsername();
             password = vault.open(
-                    SecretVault.aad(clusterId, JOLOKIA_BASIC), credential.get().getSealed());
+                    SecretVault.aad(clusterId, MANAGEMENT), credential.get().getSealed());
         }
 
         BrokerTlsEntity tls = tlsRepository.findByClusterId(clusterId).orElse(null);
@@ -52,8 +52,8 @@ class ClusterConnectionSettings implements ConnectionSettingsSource {
     @Override
     public CoreConnectionSettings coreSettings(UUID clusterId) {
         BrokerCredentialEntity credential = credentials
-                .findByClusterIdAndKind(clusterId, CORE)
-                .or(() -> credentials.findByClusterIdAndKind(clusterId, JOLOKIA_BASIC))
+                .findByClusterIdAndKind(clusterId, DATA)
+                .or(() -> credentials.findByClusterIdAndKind(clusterId, MANAGEMENT))
                 .orElse(null);
 
         BrokerTlsEntity tls = tlsRepository.findByClusterId(clusterId).orElse(null);

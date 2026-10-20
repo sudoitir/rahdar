@@ -192,8 +192,7 @@ class ClusterControllerTest extends PostgresIntegrationTest {
         assertThat(clusters.count()).isEqualTo(1);
         var clusterId = clusters.findAll().get(0).getId();
         assertThat(nodes.findByClusterIdOrderByNameAsc(clusterId)).hasSize(2);
-        assertThat(credentials.findByClusterIdAndKind(clusterId, "JOLOKIA_BASIC"))
-                .isPresent();
+        assertThat(credentials.findByClusterIdAndKind(clusterId, "MANAGEMENT")).isPresent();
 
         List<AuditEventEntity> registerEvents = audits.findAll().stream()
                 .filter(e -> e.getAction().equals("REGISTER_CLUSTER"))

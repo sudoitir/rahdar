@@ -166,10 +166,10 @@ class HaReplicasIntegrationTest {
         jdbc.update(
                 "INSERT INTO broker_credential (cluster_id, kind, username, sealed) VALUES (?, ?, ?, ?)",
                 copy,
-                "JOLOKIA_BASIC",
+                "MANAGEMENT",
                 ArtemisIntegrationTest.BROKER_USER,
                 a.getBean(SecretVault.class)
-                        .seal(SecretVault.aad(copy, "JOLOKIA_BASIC"), ArtemisIntegrationTest.BROKER_PASSWORD));
+                        .seal(SecretVault.aad(copy, "MANAGEMENT"), ArtemisIntegrationTest.BROKER_PASSWORD));
         return copy;
     }
 
