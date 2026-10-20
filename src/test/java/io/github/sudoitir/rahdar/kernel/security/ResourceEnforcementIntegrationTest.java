@@ -567,16 +567,20 @@ class ResourceEnforcementIntegrationTest extends PostgresIntegrationTest {
 
     @Test
     void aSeriesIsReadPerQueueAndTheClusterTotalNeedsEveryQueue() throws Exception {
-        assertThat(call(get(base() + "/metrics?metric=messageCount&subjectType=QUEUE&subject=orders.in"), ordersViewer)
+        assertThat(call(
+                                get(base() + "/metrics?metric=openbroker.backlog&subjectType=QUEUE&subject=orders.in"),
+                                ordersViewer)
                         .getStatus())
                 .isEqualTo(200);
-        assertThat(call(get(base() + "/metrics?metric=messageCount&subjectType=QUEUE&subject=billing.in"), ordersViewer)
+        assertThat(call(
+                                get(base() + "/metrics?metric=openbroker.backlog&subjectType=QUEUE&subject=billing.in"),
+                                ordersViewer)
                         .getStatus())
                 .isEqualTo(404);
-        assertThat(call(get(base() + "/metrics?metric=messageCount"), ordersViewer)
+        assertThat(call(get(base() + "/metrics?metric=openbroker.backlog"), ordersViewer)
                         .getStatus())
                 .isEqualTo(403);
-        assertThat(call(get(base() + "/metrics?metric=messageCount"), platformOperator)
+        assertThat(call(get(base() + "/metrics?metric=openbroker.backlog"), platformOperator)
                         .getStatus())
                 .isEqualTo(200);
     }
@@ -664,7 +668,7 @@ class ResourceEnforcementIntegrationTest extends PostgresIntegrationTest {
     }
 
     private static String rule(String name, String queuePattern) {
-        return "{\"name\":\"%s\",\"kind\":\"METRIC_THRESHOLD\",\"metric\":\"messageCount\",\"comparator\":\"GT\",\"threshold\":10,\"forSeconds\":0,\"severity\":\"WARNING\",\"scope\":\"{\\\"queuePattern\\\":\\\"%s\\\"}\",\"enabled\":true}"
+        return "{\"name\":\"%s\",\"kind\":\"METRIC_THRESHOLD\",\"metric\":\"openbroker.backlog\",\"comparator\":\"GT\",\"threshold\":10,\"forSeconds\":0,\"severity\":\"WARNING\",\"scope\":\"{\\\"queuePattern\\\":\\\"%s\\\"}\",\"enabled\":true}"
                 .formatted(name, queuePattern);
     }
 

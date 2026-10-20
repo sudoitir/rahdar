@@ -69,7 +69,7 @@ class HealthVerdictConditionTest extends PostgresIntegrationTest {
     void claimsOnlyItsOwnMetric() {
         assertThat(condition.supports(rule("GTE", 3))).isTrue();
         assertThat(condition.supports(
-                        new AlertRuleSpec(UUID.randomUUID(), true, "messageCount", "GTE", 3.0, null, null)))
+                        new AlertRuleSpec(UUID.randomUUID(), true, "openbroker.backlog", "GTE", 3.0, null, null)))
                 .isFalse();
         // A state rule is not a threshold rule and belongs to StateCondition.
         assertThat(condition.supports(
@@ -121,7 +121,7 @@ class HealthVerdictConditionTest extends PostgresIntegrationTest {
         givenCluster();
         queue("new-queue", 1, 10, 0, false);
         // One sample only: no computable rate, so INSUFFICIENT_DATA.
-        sample("new-queue", "messagesAcked", 5, Instant.now().minusSeconds(5));
+        sample("new-queue", "openbroker.acknowledged", 5, Instant.now().minusSeconds(5));
 
         Evaluation result = condition.evaluate(clusterId, rule("GTE", 3));
 
@@ -156,10 +156,10 @@ class HealthVerdictConditionTest extends PostgresIntegrationTest {
 
     private void counterSamples(String queue, double addFirst, double addSecond, double ackFirst, double ackSecond) {
         Instant now = Instant.now();
-        sample(queue, "messagesAdded", addFirst, now.minusSeconds(20));
-        sample(queue, "messagesAdded", addSecond, now.minusSeconds(1));
-        sample(queue, "messagesAcked", ackFirst, now.minusSeconds(20));
-        sample(queue, "messagesAcked", ackSecond, now.minusSeconds(1));
+        sample(queue, "openbroker.enqueued", addFirst, now.minusSeconds(20));
+        sample(queue, "openbroker.enqueued", addSecond, now.minusSeconds(1));
+        sample(queue, "openbroker.acknowledged", ackFirst, now.minusSeconds(20));
+        sample(queue, "openbroker.acknowledged", ackSecond, now.minusSeconds(1));
     }
 
     private void sample(String queue, String metric, double value, Instant at) {

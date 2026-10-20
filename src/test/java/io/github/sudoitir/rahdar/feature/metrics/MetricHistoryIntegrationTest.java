@@ -130,7 +130,7 @@ class MetricHistoryIntegrationTest extends PostgresIntegrationTest {
 
         assertThat(series.truncated()).isFalse();
         assertThat(series.series()).singleElement().satisfies(s -> {
-            assertThat(s.metric()).isEqualTo("messageCount");
+            assertThat(s.metric()).isEqualTo("openbroker.backlog");
             assertThat(s.points()).isNotEmpty();
         });
         assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
@@ -216,7 +216,7 @@ class MetricHistoryIntegrationTest extends PostgresIntegrationTest {
     }
 
     private MetricQuery depthQuery(Instant from) {
-        return new MetricQuery(List.of("messageCount"), "QUEUE", "orders", from, now, null, null);
+        return new MetricQuery(List.of("openbroker.backlog"), "QUEUE", "orders", from, now, null, null);
     }
 
     /** A user holding {@code permissions} on this cluster only; nobody is left signed in. */
@@ -230,7 +230,7 @@ class MetricHistoryIntegrationTest extends PostgresIntegrationTest {
     private void queueSample(Instant ts, double value) {
         jdbc.update("""
                 INSERT INTO metric_sample (ts, value, subject_type, subject_name, metric, cluster_id, node_id)
-                VALUES (:ts, :v, 'QUEUE', 'orders', 'messageCount', :c, :n)
+                VALUES (:ts, :v, 'QUEUE', 'orders', 'openbroker.backlog', :c, :n)
                 """, Map.of("ts", Timestamp.from(ts), "v", value, "c", clusterId, "n", nodeId));
     }
 

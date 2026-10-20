@@ -38,7 +38,7 @@ export function QueueHistoryPanels({
   const metrics = useMetrics(
     clusterId,
     {
-      metrics: ['messageCount', 'messagesAdded', 'messagesAcked'],
+      metrics: ['openbroker.backlog', 'openbroker.enqueued', 'openbroker.acknowledged'],
       subjectType: 'QUEUE',
       subject: queueName,
       from,
@@ -73,15 +73,21 @@ export function QueueHistoryPanels({
         <Text size="xs" fw={600} c="dimmed">
           Depth · last hour
         </Text>
-        <DepthChart series={byName('messageCount')} range={DRAWER_RANGE} from={fromMs} to={toMs} syncId={syncId} />
+        <DepthChart
+          series={byName('openbroker.backlog')}
+          range={DRAWER_RANGE}
+          from={fromMs}
+          to={toMs}
+          syncId={syncId}
+        />
       </Stack>
       <Stack gap="xs">
         <Text size="xs" fw={600} c="dimmed">
           Throughput · last hour
         </Text>
         <ThroughputChart
-          added={byName('messagesAdded')}
-          acked={byName('messagesAcked')}
+          added={byName('openbroker.enqueued')}
+          acked={byName('openbroker.acknowledged')}
           range={DRAWER_RANGE}
           from={fromMs}
           to={toMs}

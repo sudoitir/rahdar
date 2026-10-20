@@ -75,8 +75,8 @@ class ConsumerHealthServiceTest extends PostgresIntegrationTest {
         givenCluster();
         queue("orders", 2, 5_000, 10, false);
         // Exactly one sample of each counter: a rate needs two.
-        sample("orders", "messagesAdded", 100, Instant.now().minusSeconds(5));
-        sample("orders", "messagesAcked", 100, Instant.now().minusSeconds(5));
+        sample("orders", "openbroker.enqueued", 100, Instant.now().minusSeconds(5));
+        sample("orders", "openbroker.acknowledged", 100, Instant.now().minusSeconds(5));
 
         ConsumerHealth health = verdictFor("orders");
 
@@ -211,7 +211,7 @@ class ConsumerHealthServiceTest extends PostgresIntegrationTest {
         queue("broken", 0, 9_000, 0, false);
         counterSamples("broken", 100, 200, 100, 100);
         queue("unsampled", 1, 10, 0, false);
-        sample("unsampled", "messagesAcked", 5, Instant.now().minusSeconds(5));
+        sample("unsampled", "openbroker.acknowledged", 5, Instant.now().minusSeconds(5));
 
         var page = service.page(clusterId, ResourceQuery.of(null, 1, 50, null));
         var order = page.data().stream().map(ConsumerHealth::queueName).toList();
@@ -246,17 +246,17 @@ class ConsumerHealthServiceTest extends PostgresIntegrationTest {
     /** Two samples of each counter inside the evaluation window, so both rates resolve. */
     private void counterSamples(String queue, double addFirst, double addSecond, double ackFirst, double ackSecond) {
         Instant now = Instant.now();
-        sample(queue, "messagesAdded", addFirst, now.minusSeconds(20));
-        sample(queue, "messagesAdded", addSecond, now.minusSeconds(1));
-        sample(queue, "messagesAcked", ackFirst, now.minusSeconds(20));
-        sample(queue, "messagesAcked", ackSecond, now.minusSeconds(1));
+        sample(queue, "openbroker.enqueued", addFirst, now.minusSeconds(20));
+        sample(queue, "openbroker.enqueued", addSecond, now.minusSeconds(1));
+        sample(queue, "openbroker.acknowledged", ackFirst, now.minusSeconds(20));
+        sample(queue, "openbroker.acknowledged", ackSecond, now.minusSeconds(1));
     }
 
     /** A rising depth series, so the regression slope is positive. */
     private void depthClimbing(String queue, double first, double second) {
         Instant now = Instant.now();
-        sample(queue, "messageCount", first, now.minusSeconds(20));
-        sample(queue, "messageCount", second, now.minusSeconds(1));
+        sample(queue, "openbroker.backlog", first, now.minusSeconds(20));
+        sample(queue, "openbroker.backlog", second, now.minusSeconds(1));
     }
 
     private void brokerSlowConsumer(String address, String consumer) {

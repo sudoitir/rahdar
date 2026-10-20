@@ -96,7 +96,7 @@ class SlowConsumerConditionTest extends PostgresIntegrationTest {
         p.put("n", nodeId);
         jdbc.update("""
                 INSERT INTO metric_sample (ts, value, subject_type, subject_name, metric, cluster_id, node_id)
-                VALUES (:ts, :value, 'QUEUE', :subject, 'messagesAcked', :c, :n)
+                VALUES (:ts, :value, 'QUEUE', :subject, 'openbroker.acknowledged', :c, :n)
                 """, p);
     }
 
@@ -203,7 +203,7 @@ class SlowConsumerConditionTest extends PostgresIntegrationTest {
     @Test
     void anotherMetricIsNotThisConditionsBusiness() {
         givenCluster();
-        AlertRuleSpec r = new AlertRuleSpec(UUID.randomUUID(), true, "messageCount", "LT", 1.0, null, null);
+        AlertRuleSpec r = new AlertRuleSpec(UUID.randomUUID(), true, "openbroker.backlog", "LT", 1.0, null, null);
 
         assertThat(condition.supports(r)).isFalse();
         assertThat(condition.evaluate(clusterId, r)).isEqualTo(Evaluation.EMPTY);

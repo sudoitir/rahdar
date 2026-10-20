@@ -223,9 +223,10 @@ transaction — each node's result is handed to a short `@Transactional` persist
 step. Queue rows upsert into `queue_snapshot` via a JDBC `INSERT … ON CONFLICT`
 batch (ADR-0016, a scoped exception to ADR-0011); metric points append to the
 partitioned `metric_sample`, and a reaper trims past the retention window. Six
-metrics are recorded per queue per sweep — `messageCount`, `consumerCount`,
-`deliveringCount`, `messagesAdded`, `messagesAcked` and `messagesExpired` — all
-read off the `listQueues` row the sweep already fetched, so the set costs no
+metrics are recorded per queue per sweep, under the broker SDK's standard keys —
+`openbroker.backlog`, `openbroker.consumer.count`, `openbroker.in_flight`,
+`openbroker.enqueued`, `openbroker.acknowledged` and `openbroker.expired` — all
+read off the subscription listing the sweep already fetched, so the set costs no
 additional broker call (ADR-0089). When a
 tier completes, `ScrapeTierCompleted` lets alerting evaluate its rules in the same
 thread, so ordering is what it was before the modules split.

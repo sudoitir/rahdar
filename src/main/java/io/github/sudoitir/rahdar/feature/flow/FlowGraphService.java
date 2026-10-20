@@ -1,5 +1,6 @@
 package io.github.sudoitir.rahdar.feature.flow;
 
+import io.github.sudoitir.openbroker.model.MetricKeys;
 import io.github.sudoitir.rahdar.feature.flow.ClientEdges.Edge;
 import io.github.sudoitir.rahdar.feature.flow.ClientEdges.Kind;
 import io.github.sudoitir.rahdar.feature.flow.FlowQuery.Focus;
@@ -292,15 +293,15 @@ public class FlowGraphService {
     private Rates rates(UUID clusterId, boolean byNode, Instant windowStart, Instant now) {
         Instant until = now.plusSeconds(1);
         if (byNode) {
-            Map<String, Map<UUID, SubjectRate>> addedByNode =
-                    metrics.latestRateWithTimeBySubjectAndNode(clusterId, "messagesAdded", windowStart, until);
-            Map<String, Map<UUID, SubjectRate>> ackedByNode =
-                    metrics.latestRateWithTimeBySubjectAndNode(clusterId, "messagesAcked", windowStart, until);
+            Map<String, Map<UUID, SubjectRate>> addedByNode = metrics.latestRateWithTimeBySubjectAndNode(
+                    clusterId, MetricKeys.ENQUEUED.name(), windowStart, until);
+            Map<String, Map<UUID, SubjectRate>> ackedByNode = metrics.latestRateWithTimeBySubjectAndNode(
+                    clusterId, MetricKeys.ACKNOWLEDGED.name(), windowStart, until);
             return new Rates(summed(addedByNode), summed(ackedByNode), addedByNode, ackedByNode);
         }
         return new Rates(
-                metrics.latestRateWithTimeBySubject(clusterId, "messagesAdded", windowStart, until),
-                metrics.latestRateWithTimeBySubject(clusterId, "messagesAcked", windowStart, until),
+                metrics.latestRateWithTimeBySubject(clusterId, MetricKeys.ENQUEUED.name(), windowStart, until),
+                metrics.latestRateWithTimeBySubject(clusterId, MetricKeys.ACKNOWLEDGED.name(), windowStart, until),
                 Map.of(),
                 Map.of());
     }

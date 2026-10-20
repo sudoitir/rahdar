@@ -81,10 +81,10 @@ class MetricSamplesTest extends PostgresIntegrationTest {
     /** One queue on two nodes: 100 → 200 on this node, 90,000 → 90,050 on another, 10 s apart. */
     private void sampleOnTwoNodes(Instant base) {
         UUID otherNode = UUID.randomUUID();
-        sample("messagesAdded", "orders", base, 100.0);
-        sample("messagesAdded", "orders", base.plusSeconds(10), 200.0);
-        sample("messagesAdded", "orders", otherNode, base, 90_000.0);
-        sample("messagesAdded", "orders", otherNode, base.plusSeconds(10), 90_050.0);
+        sample("openbroker.enqueued", "orders", base, 100.0);
+        sample("openbroker.enqueued", "orders", base.plusSeconds(10), 200.0);
+        sample("openbroker.enqueued", "orders", otherNode, base, 90_000.0);
+        sample("openbroker.enqueued", "orders", otherNode, base.plusSeconds(10), 90_050.0);
     }
 
     @Test
@@ -95,7 +95,7 @@ class MetricSamplesTest extends PostgresIntegrationTest {
         sampleOnTwoNodes(base);
 
         Map<String, Double> rates =
-                repository.latestRateBySubject(clusterId, "messagesAdded", base, base.plusSeconds(60));
+                repository.latestRateBySubject(clusterId, "openbroker.enqueued", base, base.plusSeconds(60));
 
         assertThat(rates).containsEntry("orders", 15.0); // 10/s on one node + 5/s on the other
     }
@@ -106,7 +106,7 @@ class MetricSamplesTest extends PostgresIntegrationTest {
         sampleOnTwoNodes(base);
 
         List<MetricSamples.Bucket> buckets = repository.rateSeries(
-                clusterId, "messagesAdded", "orders", base, base.plusSeconds(60), Duration.ofSeconds(60));
+                clusterId, "openbroker.enqueued", "orders", base, base.plusSeconds(60), Duration.ofSeconds(60));
 
         assertThat(buckets).hasSize(1);
         assertThat(buckets.get(0).value()).isEqualTo(150.0 / 60.0); // (100 + 50) messages over the bucket
@@ -115,11 +115,11 @@ class MetricSamplesTest extends PostgresIntegrationTest {
     @Test
     void gaugeSeriesAveragesWithinABucketAndReportsThePeak() {
         Instant base = Instant.parse("2026-01-01T00:00:00Z");
-        sample("messageCount", base, 10.0);
-        sample("messageCount", base.plusSeconds(10), 20.0);
+        sample("openbroker.backlog", base, 10.0);
+        sample("openbroker.backlog", base.plusSeconds(10), 20.0);
 
         List<MetricSamples.Bucket> buckets = repository.gaugeSeries(
-                clusterId, "messageCount", "Q", base, base.plusSeconds(60), Duration.ofSeconds(60));
+                clusterId, "openbroker.backlog", "Q", base, base.plusSeconds(60), Duration.ofSeconds(60));
 
         assertThat(buckets).hasSize(1);
         assertThat(buckets.get(0).value()).isEqualTo(15.0);
@@ -132,16 +132,16 @@ class MetricSamplesTest extends PostgresIntegrationTest {
         // on another node, last sampled before the window. Its sample still stands at every bucket end.
         Instant base = Instant.parse("2026-01-01T00:00:00Z");
         UUID otherNode = UUID.randomUUID();
-        sample("messageCount", "slow", otherNode, base.minusSeconds(590), 5_000.0);
-        sample("messageCount", "slow", otherNode, base.minusSeconds(290), 7_000.0);
+        sample("openbroker.backlog", "slow", otherNode, base.minusSeconds(590), 5_000.0);
+        sample("openbroker.backlog", "slow", otherNode, base.minusSeconds(290), 7_000.0);
         for (int i = 0; i < 8; i++) {
             Instant ts = base.plusSeconds(15L * i);
-            sample("messageCount", "a", ts, 100.0 + i);
-            sample("messageCount", "b", ts, 200.0);
+            sample("openbroker.backlog", "a", ts, 100.0 + i);
+            sample("openbroker.backlog", "b", ts, 200.0);
         }
 
         List<MetricSamples.Bucket> buckets = repository.gaugeSeries(
-                clusterId, "messageCount", null, base, base.plusSeconds(60), Duration.ofSeconds(30));
+                clusterId, "openbroker.backlog", null, base, base.plusSeconds(60), Duration.ofSeconds(30));
 
         // Bucket [0, 30): at its end, a's last sample is 101 (t=15), b's 200, slow's 7,000.
         assertThat(buckets).hasSize(2);
@@ -153,13 +153,13 @@ class MetricSamplesTest extends PostgresIntegrationTest {
     @Test
     void aQueueThatStopsBeingSampledStopsCountingAfterItsOwnInterval() {
         Instant base = Instant.parse("2026-01-01T00:00:00Z");
-        sample("messageCount", "gone", base, 50.0);
-        sample("messageCount", "gone", base.plusSeconds(10), 60.0); // last sample, 10 s interval
-        sample("messageCount", "kept", base, 1.0);
-        sample("messageCount", "kept", base.plusSeconds(55), 1.0);
+        sample("openbroker.backlog", "gone", base, 50.0);
+        sample("openbroker.backlog", "gone", base.plusSeconds(10), 60.0); // last sample, 10 s interval
+        sample("openbroker.backlog", "kept", base, 1.0);
+        sample("openbroker.backlog", "kept", base.plusSeconds(55), 1.0);
 
         List<MetricSamples.Bucket> buckets = repository.gaugeSeries(
-                clusterId, "messageCount", null, base, base.plusSeconds(60), Duration.ofSeconds(20));
+                clusterId, "openbroker.backlog", null, base, base.plusSeconds(60), Duration.ofSeconds(20));
 
         // End 20 s: gone's t=10 sample is 10 s old, within 1.5 × its 10 s gap. End 40 s: 30 s old, not.
         assertThat(buckets).extracting(MetricSamples.Bucket::value).containsExactly(61.0, 1.0, 1.0);
@@ -168,11 +168,11 @@ class MetricSamplesTest extends PostgresIntegrationTest {
     @Test
     void rateSeriesDerivesFromTheCounterDeltaAcrossTheBucket() {
         Instant base = Instant.parse("2026-01-01T00:00:00Z");
-        sample("messagesAdded", base, 100.0);
-        sample("messagesAdded", base.plusSeconds(30), 130.0);
+        sample("openbroker.enqueued", base, 100.0);
+        sample("openbroker.enqueued", base.plusSeconds(30), 130.0);
 
         List<MetricSamples.Bucket> buckets = repository.rateSeries(
-                clusterId, "messagesAdded", null, base, base.plusSeconds(60), Duration.ofSeconds(60));
+                clusterId, "openbroker.enqueued", null, base, base.plusSeconds(60), Duration.ofSeconds(60));
 
         assertThat(buckets).hasSize(1);
         // (130 - 100) / 60s
@@ -186,11 +186,11 @@ class MetricSamplesTest extends PostgresIntegrationTest {
         // (100 then 40) still yields a non-negative, if imprecise, rate rather than
         // a negative spike.
         Instant base = Instant.parse("2026-01-01T00:00:00Z");
-        sample("messagesAdded", "orders", base, 100.0);
-        sample("messagesAdded", "orders", base.plusSeconds(30), 40.0);
+        sample("openbroker.enqueued", "orders", base, 100.0);
+        sample("openbroker.enqueued", "orders", base.plusSeconds(30), 40.0);
 
         Map<String, Double> rates =
-                repository.latestRateBySubject(clusterId, "messagesAdded", base, base.plusSeconds(60));
+                repository.latestRateBySubject(clusterId, "openbroker.enqueued", base, base.plusSeconds(60));
 
         assertThat(rates.get("orders")).isNotNegative();
     }
@@ -198,12 +198,12 @@ class MetricSamplesTest extends PostgresIntegrationTest {
     @Test
     void latestRateWithTimeDividesByTheSpanItCoversAndReportsItsAge() {
         Instant base = Instant.parse("2026-01-01T00:00:00Z");
-        sample("messagesAdded", "orders", base.plusSeconds(10), 100.0);
-        sample("messagesAdded", "orders", base.plusSeconds(310), 400.0);
-        sample("messagesAdded", "fresh-queue", base, 5.0);
+        sample("openbroker.enqueued", "orders", base.plusSeconds(10), 100.0);
+        sample("openbroker.enqueued", "orders", base.plusSeconds(310), 400.0);
+        sample("openbroker.enqueued", "fresh-queue", base, 5.0);
 
         Map<String, MetricSamples.SubjectRate> rates =
-                repository.latestRateWithTimeBySubject(clusterId, "messagesAdded", base, base.plusSeconds(900));
+                repository.latestRateWithTimeBySubject(clusterId, "openbroker.enqueued", base, base.plusSeconds(900));
 
         assertThat(rates).doesNotContainKey("fresh-queue");
         MetricSamples.SubjectRate orders = rates.get("orders");
@@ -216,21 +216,21 @@ class MetricSamplesTest extends PostgresIntegrationTest {
     void latestRateWithTimeSumsPerNodeRatesInsteadOfSubtractingOneNodesCounterFromAnothers() {
         Instant base = Instant.parse("2026-01-01T00:00:00Z");
         UUID otherNode = UUID.randomUUID();
-        sample("messagesAdded", "orders", base, 100.0);
-        sample("messagesAdded", "orders", base.plusSeconds(10), 200.0);
+        sample("openbroker.enqueued", "orders", base, 100.0);
+        sample("openbroker.enqueued", "orders", base.plusSeconds(10), 200.0);
         jdbc.update("""
                 INSERT INTO metric_sample (ts, value, subject_type, subject_name, metric, cluster_id, node_id)
-                VALUES (:ts, :value, 'QUEUE', 'orders', 'messagesAdded', :c, :n)
+                VALUES (:ts, :value, 'QUEUE', 'orders', 'openbroker.enqueued', :c, :n)
                 """, Map.of("ts", Timestamp.from(base), "value", 90_000.0, "c", clusterId, "n", otherNode));
         jdbc.update(
                 """
                 INSERT INTO metric_sample (ts, value, subject_type, subject_name, metric, cluster_id, node_id)
-                VALUES (:ts, :value, 'QUEUE', 'orders', 'messagesAdded', :c, :n)
+                VALUES (:ts, :value, 'QUEUE', 'orders', 'openbroker.enqueued', :c, :n)
                 """,
                 Map.of("ts", Timestamp.from(base.plusSeconds(10)), "value", 90_050.0, "c", clusterId, "n", otherNode));
 
         MetricSamples.SubjectRate orders = repository
-                .latestRateWithTimeBySubject(clusterId, "messagesAdded", base, base.plusSeconds(60))
+                .latestRateWithTimeBySubject(clusterId, "openbroker.enqueued", base, base.plusSeconds(60))
                 .get("orders");
 
         assertThat(orders.rate()).isEqualTo(15.0); // 10/s on one node + 5/s on the other
@@ -239,10 +239,10 @@ class MetricSamplesTest extends PostgresIntegrationTest {
     @Test
     void latestRateBySubjectOmitsAnUnderSampledSubject() {
         Instant base = Instant.parse("2026-01-01T00:00:00Z");
-        sample("messagesAdded", "fresh-queue", base, 5.0); // only one sample in the window
+        sample("openbroker.enqueued", "fresh-queue", base, 5.0); // only one sample in the window
 
         Map<String, Double> rates =
-                repository.latestRateBySubject(clusterId, "messagesAdded", base, base.plusSeconds(60));
+                repository.latestRateBySubject(clusterId, "openbroker.enqueued", base, base.plusSeconds(60));
 
         assertThat(rates).doesNotContainKey("fresh-queue");
     }
@@ -253,10 +253,10 @@ class MetricSamplesTest extends PostgresIntegrationTest {
         sampleOnTwoNodes(base);
 
         Map<UUID, MetricSamples.SubjectRate> perNode = repository
-                .latestRateWithTimeBySubjectAndNode(clusterId, "messagesAdded", base, base.plusSeconds(60))
+                .latestRateWithTimeBySubjectAndNode(clusterId, "openbroker.enqueued", base, base.plusSeconds(60))
                 .get("orders");
         MetricSamples.SubjectRate total = repository
-                .latestRateWithTimeBySubject(clusterId, "messagesAdded", base, base.plusSeconds(60))
+                .latestRateWithTimeBySubject(clusterId, "openbroker.enqueued", base, base.plusSeconds(60))
                 .get("orders");
 
         assertThat(perNode).hasSize(2);
@@ -268,12 +268,12 @@ class MetricSamplesTest extends PostgresIntegrationTest {
     void aNodeSampledOnceHasNoRateRatherThanZero() {
         Instant base = Instant.parse("2026-01-01T00:00:00Z");
         UUID once = UUID.randomUUID();
-        sample("messagesAdded", "orders", base, 100.0);
-        sample("messagesAdded", "orders", base.plusSeconds(10), 200.0);
-        sample("messagesAdded", "orders", once, base, 5.0);
+        sample("openbroker.enqueued", "orders", base, 100.0);
+        sample("openbroker.enqueued", "orders", base.plusSeconds(10), 200.0);
+        sample("openbroker.enqueued", "orders", once, base, 5.0);
 
         Map<UUID, MetricSamples.SubjectRate> perNode = repository
-                .latestRateWithTimeBySubjectAndNode(clusterId, "messagesAdded", base, base.plusSeconds(60))
+                .latestRateWithTimeBySubjectAndNode(clusterId, "openbroker.enqueued", base, base.plusSeconds(60))
                 .get("orders");
 
         assertThat(perNode).containsOnlyKeys(nodeId);
@@ -287,15 +287,16 @@ class MetricSamplesTest extends PostgresIntegrationTest {
         UUID otherNode = UUID.randomUUID();
         for (int i = 0; i < 6; i++) {
             Instant ts = base.plusSeconds(15L * i);
-            sample("messagesAdded", "orders", ts, 1_000.0 + 150.0 * i);
-            sample("messagesAdded", "orders", otherNode, ts, 50_000.0 + 150.0 * i);
+            sample("openbroker.enqueued", "orders", ts, 1_000.0 + 150.0 * i);
+            sample("openbroker.enqueued", "orders", otherNode, ts, 50_000.0 + 150.0 * i);
         }
         Instant to = base.plusSeconds(90);
         Duration step = Duration.ofSeconds(15);
 
-        List<MetricSamples.Bucket> total = repository.rateSeries(clusterId, "messagesAdded", "orders", base, to, step);
+        List<MetricSamples.Bucket> total =
+                repository.rateSeries(clusterId, "openbroker.enqueued", "orders", base, to, step);
         List<MetricSamples.NodeBucket> byNode =
-                repository.rateSeriesByNode(clusterId, "messagesAdded", "orders", base, to, step);
+                repository.rateSeriesByNode(clusterId, "openbroker.enqueued", "orders", base, to, step);
 
         // The first bucket's samples have no earlier sample to count from; every later one does.
         assertThat(total).hasSize(5).allSatisfy(b -> assertThat(b.value()).isEqualTo(20.0));
@@ -305,11 +306,11 @@ class MetricSamplesTest extends PostgresIntegrationTest {
     @Test
     void aCounterSampledBeforeTheWindowCountsTheFirstBucket() {
         Instant base = Instant.parse("2026-01-01T00:00:00Z");
-        sample("messagesAdded", base.minusSeconds(15), 100.0);
-        sample("messagesAdded", base, 250.0);
+        sample("openbroker.enqueued", base.minusSeconds(15), 100.0);
+        sample("openbroker.enqueued", base, 250.0);
 
         List<MetricSamples.Bucket> buckets = repository.rateSeries(
-                clusterId, "messagesAdded", null, base, base.plusSeconds(15), Duration.ofSeconds(15));
+                clusterId, "openbroker.enqueued", null, base, base.plusSeconds(15), Duration.ofSeconds(15));
 
         assertThat(buckets).singleElement().satisfies(b -> assertThat(b.value()).isEqualTo(10.0));
     }
@@ -320,9 +321,9 @@ class MetricSamplesTest extends PostgresIntegrationTest {
         sampleOnTwoNodes(base);
 
         List<MetricSamples.NodeBucket> byNode = repository.rateSeriesByNode(
-                clusterId, "messagesAdded", "orders", base, base.plusSeconds(60), Duration.ofSeconds(60));
+                clusterId, "openbroker.enqueued", "orders", base, base.plusSeconds(60), Duration.ofSeconds(60));
         List<MetricSamples.Bucket> total = repository.rateSeries(
-                clusterId, "messagesAdded", "orders", base, base.plusSeconds(60), Duration.ofSeconds(60));
+                clusterId, "openbroker.enqueued", "orders", base, base.plusSeconds(60), Duration.ofSeconds(60));
 
         assertThat(byNode).hasSize(2);
         assertThat(byNode.stream().mapToDouble(MetricSamples.NodeBucket::value).sum())
@@ -333,12 +334,12 @@ class MetricSamplesTest extends PostgresIntegrationTest {
     void perNodeGaugeSeriesKeepsEachNodeApartWithItsPeak() {
         Instant base = Instant.parse("2026-01-01T00:00:00Z");
         UUID other = UUID.randomUUID();
-        sample("messageCount", "orders", base, 10.0);
-        sample("messageCount", "orders", base.plusSeconds(15), 30.0);
-        sample("messageCount", "orders", other, base, 9_000.0);
+        sample("openbroker.backlog", "orders", base, 10.0);
+        sample("openbroker.backlog", "orders", base.plusSeconds(15), 30.0);
+        sample("openbroker.backlog", "orders", other, base, 9_000.0);
 
         List<MetricSamples.NodeBucket> byNode = repository.gaugeSeriesByNode(
-                clusterId, "messageCount", "orders", base, base.plusSeconds(60), Duration.ofSeconds(60));
+                clusterId, "openbroker.backlog", "orders", base, base.plusSeconds(60), Duration.ofSeconds(60));
 
         assertThat(byNode)
                 .extracting(

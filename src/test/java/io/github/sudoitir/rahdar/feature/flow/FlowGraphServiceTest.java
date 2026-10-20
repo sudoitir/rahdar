@@ -84,9 +84,9 @@ class FlowGraphServiceTest {
         when(store.edges(clusterId)).thenReturn(edges);
         when(store.nodeSamples(clusterId)).thenReturn(samples);
         when(store.routes(clusterId)).thenReturn(routes);
-        when(metrics.latestRateWithTimeBySubject(eq(clusterId), eq("messagesAdded"), any(), any()))
+        when(metrics.latestRateWithTimeBySubject(eq(clusterId), eq("openbroker.enqueued"), any(), any()))
                 .thenReturn(added);
-        when(metrics.latestRateWithTimeBySubject(eq(clusterId), eq("messagesAcked"), any(), any()))
+        when(metrics.latestRateWithTimeBySubject(eq(clusterId), eq("openbroker.acknowledged"), any(), any()))
                 .thenReturn(acked);
         ResourceFilter everything = mock(ResourceFilter.class);
         when(everything.everything()).thenReturn(true);
@@ -600,9 +600,9 @@ class FlowGraphServiceTest {
                 Map.of(
                         nodeA, new SubjectRate(3.0, now.minusSeconds(5), Duration.ofSeconds(15)),
                         nodeB, new SubjectRate(27.0, now.minusSeconds(5), Duration.ofSeconds(15))));
-        when(metrics.latestRateWithTimeBySubjectAndNode(eq(clusterId), eq("messagesAdded"), any(), any()))
+        when(metrics.latestRateWithTimeBySubjectAndNode(eq(clusterId), eq("openbroker.enqueued"), any(), any()))
                 .thenReturn(addedByNode);
-        when(metrics.latestRateWithTimeBySubjectAndNode(eq(clusterId), eq("messagesAcked"), any(), any()))
+        when(metrics.latestRateWithTimeBySubjectAndNode(eq(clusterId), eq("openbroker.acknowledged"), any(), any()))
                 .thenReturn(Map.of(
                         "orders", Map.of(nodeA, new SubjectRate(3.0, now.minusSeconds(5), Duration.ofSeconds(15)))));
         samples.add(sample(null, 0, 2));
@@ -1004,11 +1004,11 @@ class FlowGraphServiceTest {
         queue("q2", "orders", "MULTICAST", 5, 2);
         queues.add(
                 new QueueSnapshot(clusterId, gone, "q1", "orders", "MULTICAST", true, false, now, 1, 1, 0, 0, 0, 0, 0));
-        when(metrics.latestRateWithTimeBySubjectAndNode(eq(clusterId), eq("messagesAdded"), any(), any()))
+        when(metrics.latestRateWithTimeBySubjectAndNode(eq(clusterId), eq("openbroker.enqueued"), any(), any()))
                 .thenReturn(Map.of(
                         "q1", Map.of(nodeA, new SubjectRate(1.0, now.minusSeconds(5), Duration.ofSeconds(15))),
                         "q2", Map.of(nodeA, new SubjectRate(2.0, now.minusSeconds(5), Duration.ofSeconds(15)))));
-        when(metrics.latestRateWithTimeBySubjectAndNode(eq(clusterId), eq("messagesAcked"), any(), any()))
+        when(metrics.latestRateWithTimeBySubjectAndNode(eq(clusterId), eq("openbroker.acknowledged"), any(), any()))
                 .thenReturn(
                         Map.of("q1", Map.of(nodeA, new SubjectRate(4.0, now.minusSeconds(5), Duration.ofSeconds(15)))));
         samples.add(sample(null, 0, 3));

@@ -1,5 +1,6 @@
 package io.github.sudoitir.rahdar.feature.alerting;
 
+import io.github.sudoitir.openbroker.model.MetricKeys;
 import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshot;
 import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshots;
 import java.util.HashMap;
@@ -26,10 +27,10 @@ import tools.jackson.databind.ObjectMapper;
 public class GaugeCondition implements AlertCondition {
 
     private static final Map<String, ToLongFunction<QueueSnapshot>> GAUGES = Map.of(
-            "messageCount", QueueSnapshot::messageCount,
-            "consumerCount", QueueSnapshot::consumerCount,
-            "deliveringCount", QueueSnapshot::deliveringCount,
-            "scheduledCount", QueueSnapshot::scheduledCount);
+            MetricKeys.BACKLOG.name(), QueueSnapshot::messageCount,
+            MetricKeys.CONSUMER_COUNT.name(), QueueSnapshot::consumerCount,
+            MetricKeys.IN_FLIGHT.name(), QueueSnapshot::deliveringCount,
+            MetricKeys.SCHEDULED.name(), QueueSnapshot::scheduledCount);
 
     private final QueueSnapshots snapshots;
     private final ObjectMapper mapper;

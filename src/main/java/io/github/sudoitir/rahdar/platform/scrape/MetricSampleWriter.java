@@ -1,5 +1,6 @@
 package io.github.sudoitir.rahdar.platform.scrape;
 
+import io.github.sudoitir.openbroker.model.MetricKeys;
 import io.github.sudoitir.rahdar.kernel.core.PartitionProvisioner;
 import io.github.sudoitir.rahdar.platform.broker.QueueRow;
 import java.util.ArrayList;
@@ -52,12 +53,12 @@ public class MetricSampleWriter {
         }
         List<SqlParameterSource> params = new ArrayList<>(rows.size() * 6);
         for (QueueRow r : rows) {
-            params.add(sample(r, "messageCount", r.messageCount()));
-            params.add(sample(r, "consumerCount", r.consumerCount()));
-            params.add(sample(r, "messagesAdded", r.messagesAdded()));
-            params.add(sample(r, "messagesAcked", r.messagesAcked()));
-            params.add(sample(r, "deliveringCount", r.deliveringCount()));
-            params.add(sample(r, "messagesExpired", r.messagesExpired()));
+            params.add(sample(r, MetricKeys.BACKLOG.name(), r.messageCount()));
+            params.add(sample(r, MetricKeys.CONSUMER_COUNT.name(), r.consumerCount()));
+            params.add(sample(r, MetricKeys.ENQUEUED.name(), r.messagesAdded()));
+            params.add(sample(r, MetricKeys.ACKNOWLEDGED.name(), r.messagesAcked()));
+            params.add(sample(r, MetricKeys.IN_FLIGHT.name(), r.deliveringCount()));
+            params.add(sample(r, MetricKeys.EXPIRED.name(), r.messagesExpired()));
         }
         write(INSERT, params.toArray(SqlParameterSource[]::new));
     }

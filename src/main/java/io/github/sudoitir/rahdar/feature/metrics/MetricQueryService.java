@@ -1,5 +1,6 @@
 package io.github.sudoitir.rahdar.feature.metrics;
 
+import io.github.sudoitir.openbroker.model.MetricKeys;
 import io.github.sudoitir.rahdar.feature.metrics.web.MetricViews.MetricNodeSeries;
 import io.github.sudoitir.rahdar.feature.metrics.web.MetricViews.MetricPoint;
 import io.github.sudoitir.rahdar.feature.metrics.web.MetricViews.MetricSeries;
@@ -38,8 +39,10 @@ import org.springframework.stereotype.Service;
 @Service
 public class MetricQueryService {
 
-    private static final Set<String> GAUGE_METRICS = Set.of("messageCount", "consumerCount", "deliveringCount");
-    private static final Set<String> RATE_METRICS = Set.of("messagesAdded", "messagesAcked", "messagesExpired");
+    private static final Set<String> GAUGE_METRICS =
+            Set.of(MetricKeys.BACKLOG.name(), MetricKeys.CONSUMER_COUNT.name(), MetricKeys.IN_FLIGHT.name());
+    private static final Set<String> RATE_METRICS =
+            Set.of(MetricKeys.ENQUEUED.name(), MetricKeys.ACKNOWLEDGED.name(), MetricKeys.EXPIRED.name());
 
     /** No bucket finer than the fastest tier that samples metrics (tier B, 15s). */
     private static final Duration MIN_STEP = Duration.ofSeconds(15);

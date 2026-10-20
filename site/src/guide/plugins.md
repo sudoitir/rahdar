@@ -728,7 +728,7 @@ class QueueTrend {
         if (metrics == null) return null; // the metrics feature is switched off
         Instant now = Instant.now();
         return metrics.read(actingUserId, clusterId, new MetricQuery(
-                List.of("messageCount"), "QUEUE", queue, now.minus(Duration.ofHours(6)), now, null, null));
+                List.of("openbroker.backlog"), "QUEUE", queue, now.minus(Duration.ofHours(6)), now, null, null));
     }
 }
 ```

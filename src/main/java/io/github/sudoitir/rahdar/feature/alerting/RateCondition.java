@@ -1,5 +1,6 @@
 package io.github.sudoitir.rahdar.feature.alerting;
 
+import io.github.sudoitir.openbroker.model.MetricKeys;
 import io.github.sudoitir.rahdar.platform.scrape.MetricSamples;
 import io.github.sudoitir.rahdar.platform.scrape.ScrapeProperties;
 import java.time.Instant;
@@ -25,7 +26,7 @@ import tools.jackson.databind.ObjectMapper;
 @RequiredArgsConstructor
 public class RateCondition implements AlertCondition {
 
-    private static final Set<String> RATE_METRICS = Set.of("messagesAdded", "messagesAcked");
+    private static final Set<String> RATE_METRICS = Set.of(MetricKeys.ENQUEUED.name(), MetricKeys.ACKNOWLEDGED.name());
 
     private final MetricSamples series;
     private final ScrapeProperties properties;

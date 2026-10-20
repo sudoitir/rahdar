@@ -73,7 +73,7 @@ class AlertEvaluatorIntegrationTest extends PostgresIntegrationTest {
         BrokerNodeEntity node = nodes.save(BrokerNodeEntity.fromSeed(clusterId, "n1", "STANDALONE", "node-1"));
 
         AlertRuleEntity rule = rules.save(AlertRuleEntity.threshold(
-                clusterId, "Deep queue", new Condition("messageCount", "GT", 100.0), 0, "WARNING", null));
+                clusterId, "Deep queue", new Condition("openbroker.backlog", "GT", 100.0), 0, "WARNING", null));
 
         snapshot(clusterId, node.getId(), "orders", 150);
         evaluator.evaluate(clusterId, "METRIC_THRESHOLD");
@@ -98,7 +98,7 @@ class AlertEvaluatorIntegrationTest extends PostgresIntegrationTest {
         BrokerNodeEntity node = nodes.save(BrokerNodeEntity.fromSeed(clusterId, "n1", "STANDALONE", "node-1"));
 
         AlertRuleEntity rule = rules.save(AlertRuleEntity.threshold(
-                clusterId, "Deep queue", new Condition("messageCount", "GT", 100.0), 0, "WARNING", null));
+                clusterId, "Deep queue", new Condition("openbroker.backlog", "GT", 100.0), 0, "WARNING", null));
         rule.setEnabled(false);
         rules.save(rule);
 

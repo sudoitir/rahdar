@@ -58,7 +58,7 @@ class PartitionMaintainerIntegrationTest extends PostgresIntegrationTest {
     private void insertSample(Instant ts, UUID clusterId) {
         jdbc.update("""
                 INSERT INTO metric_sample (ts, value, subject_type, subject_name, metric, cluster_id)
-                VALUES (?, 1.0, 'QUEUE', 'Q', 'messageCount', ?)
+                VALUES (?, 1.0, 'QUEUE', 'Q', 'openbroker.backlog', ?)
                 """, Timestamp.from(ts), clusterId);
     }
 

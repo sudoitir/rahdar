@@ -1,5 +1,6 @@
 package io.github.sudoitir.rahdar.feature.alerting;
 
+import io.github.sudoitir.openbroker.model.MetricKeys;
 import io.github.sudoitir.rahdar.platform.scrape.MetricSamples;
 import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshot;
 import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshots;
@@ -18,10 +19,10 @@ import tools.jackson.databind.ObjectMapper;
 /**
  * Rahdar's own slow-consumer derivation (ADR-0044) — the fallback for brokers where
  * native {@code slow-consumer-threshold} detection is not configured. The broker's
- * own {@code CONSUMER_SLOW} notification is the truth source when it is.
+ * own slow-consumer notification is the truth source when it is.
  *
  * <p>The definition that matters is a triple, not a rate: <b>consumers attached,
- * backlog present, acknowledgements near zero</b>. A plain {@code messagesAcked}
+ * backlog present, acknowledgements near zero</b>. A plain {@code openbroker.acknowledged}
  * rate rule pages on every quiet queue at 3am; a queue with no consumers is not a
  * slow consumer, and a queue with no backlog and a zero ack rate is simply idle.
  * A <b>paused</b> queue satisfies all three and is operationally expected, so it is
@@ -50,7 +51,7 @@ public class SlowConsumerCondition implements AlertCondition {
     /** The derived metric's name. Free text in {@code alert_rule.metric} — no migration. */
     public static final String METRIC = "ackRatePerConsumer";
 
-    private static final String ACK_METRIC = "messagesAcked";
+    private static final String ACK_METRIC = MetricKeys.ACKNOWLEDGED.name();
 
     private final QueueSnapshots snapshots;
     private final MetricSamples series;

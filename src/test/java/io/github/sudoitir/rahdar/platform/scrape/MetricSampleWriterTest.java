@@ -61,14 +61,14 @@ class MetricSampleWriterTest extends PostgresIntegrationTest {
 
         assertThat(metricsWritten())
                 .containsExactlyInAnyOrder(
-                        "messageCount",
-                        "consumerCount",
-                        "messagesAdded",
-                        "messagesAcked",
-                        "deliveringCount",
-                        "messagesExpired");
-        assertThat(valueOf("deliveringCount")).isEqualTo(7.0);
-        assertThat(valueOf("messagesExpired")).isEqualTo(5.0);
+                        "openbroker.backlog",
+                        "openbroker.consumer.count",
+                        "openbroker.enqueued",
+                        "openbroker.acknowledged",
+                        "openbroker.in_flight",
+                        "openbroker.expired");
+        assertThat(valueOf("openbroker.in_flight")).isEqualTo(7.0);
+        assertThat(valueOf("openbroker.expired")).isEqualTo(5.0);
     }
 
     @Test

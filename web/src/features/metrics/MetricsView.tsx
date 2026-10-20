@@ -25,7 +25,7 @@ import { Section } from '../../ui/Section.tsx';
 import { StatusBadge } from '../../ui/StatusBadge.tsx';
 import { Toolbar } from '../../ui/Toolbar.tsx';
 
-const METRICS = ['messageCount', 'consumerCount', 'messagesAdded', 'messagesAcked'];
+const METRICS = ['openbroker.backlog', 'openbroker.consumer.count', 'openbroker.enqueued', 'openbroker.acknowledged'];
 
 /** The controls for a queue-scoped view: the way back to the cluster, and the per-node split. */
 function QueueScope({ split }: Readonly<{ split: boolean }>) {
@@ -147,10 +147,10 @@ export function MetricsView() {
   );
 
   const byName = (name: string): MetricSeries | undefined => metrics.data?.series.find((s) => s.metric === name);
-  const depth = byName('messageCount');
-  const added = byName('messagesAdded');
-  const acked = byName('messagesAcked');
-  const consumers = byName('consumerCount');
+  const depth = byName('openbroker.backlog');
+  const added = byName('openbroker.enqueued');
+  const acked = byName('openbroker.acknowledged');
+  const consumers = byName('openbroker.consumer.count');
 
   const syncId = `cluster-metrics-${clusterId}`;
   // The axis domain is the *requested* window, so a series that stops halfway

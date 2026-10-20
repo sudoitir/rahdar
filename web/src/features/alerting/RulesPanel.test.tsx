@@ -16,7 +16,7 @@ function rule(over: Record<string, unknown> = {}) {
     clusterId: 'c1',
     name: 'Deep queue',
     kind: 'METRIC_THRESHOLD',
-    metric: 'messageCount',
+    metric: 'openbroker.backlog',
     comparator: 'GT',
     threshold: 1000,
     stateCondition: null,
@@ -110,7 +110,7 @@ describe('RulesPanel', () => {
     renderRules();
 
     expect(await screen.findByText('Deep queue')).toBeInTheDocument();
-    expect(screen.getByText('messageCount > 1000')).toBeInTheDocument();
+    expect(screen.getByText('openbroker.backlog > 1000')).toBeInTheDocument();
   });
 
   it('shows an empty state with no rules', async () => {
@@ -159,7 +159,7 @@ describe('RulesPanel', () => {
     await screen.findByText(/No rules yet/);
     await user.type(screen.getByLabelText('Name'), 'Deep queue');
     await user.click(screen.getByRole('combobox', { name: 'Metric' }));
-    await user.click(await screen.findByText('messageCount (gauge)'));
+    await user.click(await screen.findByText('openbroker.backlog — messages waiting (gauge)'));
     await user.clear(screen.getByLabelText('Threshold'));
     await user.type(screen.getByLabelText('Threshold'), '1000');
     await user.click(screen.getByRole('button', { name: 'Add rule' }));

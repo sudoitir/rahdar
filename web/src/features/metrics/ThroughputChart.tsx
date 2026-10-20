@@ -14,7 +14,7 @@ import {
 import type { MetricRange } from './ranges.ts';
 
 /**
- * `messagesAdded` vs `messagesAcked`, both already rates (msg/s) from the API —
+ * `openbroker.enqueued` vs `openbroker.acknowledged`, both already rates (msg/s) from the API —
  * divergence between the two lines *is* the backlog signal, which is why they
  * share one axis and are never split into two panels.
  *
