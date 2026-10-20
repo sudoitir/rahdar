@@ -137,3 +137,25 @@ When a read-only database is configured, Rahdar SHALL serve heavy history reads 
 #### Scenario: Reads after writes
 - **WHEN** a request reads what it has just written
 - **THEN** it reads from the primary
+
+### Requirement: The schema uses broker-neutral names
+Tables, columns and stored enum values of shared modules SHALL use the SDK's neutral vocabulary (system, destination, subscription, kind, plane, native id) and SHALL store native details as namespaced attributes. A system module SHALL own its tables under its system's prefix (`artemis_`).
+
+#### Scenario: A fresh install
+- **WHEN** Rahdar creates its schema
+- **THEN** no table, column or stored enum value of a shared module names an Artemis concept, and every Artemis-only table starts with `artemis_`
+- **AND** the one exception is the resource kinds stored with team patterns, team shares and API token grants (QUEUE, ADDRESS, BOTH), which change together with the permission identifiers they scope
+
+### Requirement: Clusters and nodes are stored in neutral terms
+Every cluster SHALL record its system. Node endpoints SHALL be stored per plane and protocol, not as system-specific URL columns. A node's configured HA designation SHALL be stored apart from whether it is serving.
+
+#### Scenario: A node with two planes
+- **WHEN** an Artemis node is registered
+- **THEN** its management and data endpoints are stored as two endpoint rows, each with its plane and protocol
+
+### Requirement: Stored metric names are the standard keys
+Metric history and alert rules SHALL store the SDK's standard metric keys.
+
+#### Scenario: Metric history
+- **WHEN** the scrape writes a subscription's backlog
+- **THEN** the sample is stored under `openbroker.backlog`

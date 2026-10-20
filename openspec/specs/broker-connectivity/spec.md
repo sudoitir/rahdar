@@ -121,7 +121,9 @@ Every failed broker connection SHALL be reported as one of a fixed set of
 classified errors, each carrying a stable machine-readable type and a
 human-readable explanation. The set SHALL include: unreachable host, rejected
 credentials, reachable Jolokia agent with no Artemis broker registered, wrong
-path (no agent), and TLS handshake failure.
+path (no agent), and TLS handshake failure. The classification SHALL be derived
+from the broker SDK's canonical status and error reason, one to one, so the
+types an operator sees do not change.
 
 #### Scenario: Nothing listening
 
@@ -150,6 +152,11 @@ path (no agent), and TLS handshake failure.
 - **WHEN** the TLS handshake to an HTTPS broker fails
 - **THEN** the error is classified `TLS_FAILED` and names the bundle and whether
   hostname verification is enabled
+
+#### Scenario: Every SDK reason has a classification
+
+- **WHEN** the driver reports any standard error reason
+- **THEN** it maps to exactly one classification, and a table test covers every one
 
 ### Requirement: Broker MBean name is resolved, not assumed
 
@@ -230,10 +237,12 @@ forward.
 
 ### Requirement: Broker HTTP clients are bounded, shared resources
 
-The system SHALL reuse its broker HTTP clients across calls. The number of clients, and so
-the threads and file descriptors they hold, SHALL be bounded by the number of distinct
-transport configurations (for example TLS bundles), and SHALL NOT grow with the number of
-calls, polls, nodes, stream subscribers or reconnect attempts.
+The system SHALL reuse its broker HTTP clients across calls. The clients belong to
+the broker SDK's driver registry, which is created once and closed on application
+shutdown. The number of clients, and so the threads and file descriptors they hold,
+SHALL be bounded by the number of distinct transport configurations (for example TLS
+bundles), and SHALL NOT grow with the number of calls, polls, nodes, clusters, stream
+subscribers or reconnect attempts.
 
 A client whose configuration is replaced by a timeout change, or by a reload of its TLS
 material, SHALL be released. Requests already in flight SHALL be allowed to complete. Every
