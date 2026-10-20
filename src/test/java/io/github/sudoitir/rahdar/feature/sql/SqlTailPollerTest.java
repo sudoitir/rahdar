@@ -491,9 +491,9 @@ class SqlTailPollerTest {
         BrokerNodeEntity entity = instantiate(BrokerNodeEntity.class);
         set(entity, "id", UUID.randomUUID());
         set(entity, "name", "broker-1");
-        set(entity, "artemisNodeId", "node-a");
+        set(entity, "nativeNodeId", "node-a");
         set(entity, "clusterId", CLUSTER);
-        set(entity, "jolokiaUrl", "http://broker:8161/console/jolokia");
+        entity.attachSeedUrl("http://broker:8161/console/jolokia");
         return entity;
     }
 

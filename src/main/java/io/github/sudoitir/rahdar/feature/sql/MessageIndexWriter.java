@@ -42,7 +42,7 @@ public class MessageIndexWriter {
     private static final String INSERT_MESSAGE = """
                 INSERT INTO message_index (
                     observed_at, last_seen_at, message_id, timestamp_ms, expiration_ms, size_bytes,
-                    priority, message_type, queue_name, address, node_name, correlation_id, group_id,
+                    priority, message_type, subscription, destination, node_name, correlation_id, group_id,
                     user_id, reply_to, jms_type, body, body_compression, props, cluster_id, node_id, durable,
                     body_truncated, body_base64, policy_version, sealed)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?, ?, ?, ?, ?, ?, ?)
@@ -95,7 +95,7 @@ public class MessageIndexWriter {
     public boolean observe(UUID clusterId, Row row, Instant at) {
         int updated = jdbc.update("""
                 UPDATE message_index SET last_seen_at = ?
-                 WHERE cluster_id = ? AND node_id = ? AND queue_name = ? AND message_id = ?
+                 WHERE cluster_id = ? AND node_id = ? AND subscription = ? AND message_id = ?
                 """, Timestamp.from(at), clusterId, row.nodeId(), row.queueName(), row.messageId());
         if (updated > 0) {
             return false;
@@ -143,7 +143,7 @@ public class MessageIndexWriter {
      *
      * <p>{@code origAddress} and {@code sourceMessageId} come from the message's origin
      * headers and are both nullable. The row's own
-     * {@code queue_name} and {@code address} are Rahdar's answer, resolved from which
+     * {@code subscription} and {@code destination} are Rahdar's answer, resolved from which
      * capture queue the message was drained from, so a query by the original queue
      * name works whether or not the broker copied a header (D2). Where the two
      * disagree the disagreement is visible rather than resolved silently.
@@ -218,14 +218,14 @@ public class MessageIndexWriter {
     private static final String CAPTURED_INSERT = """
             INSERT INTO message_index (
                 observed_at, last_seen_at, message_id, timestamp_ms, expiration_ms, size_bytes,
-                source_message_id, priority, message_type, queue_name, address, node_name,
+                source_message_id, priority, message_type, subscription, destination, node_name,
                 correlation_id, group_id, user_id, reply_to, jms_type, body, body_compression, props, origin,
-                orig_address, cluster_id, node_id, durable, body_truncated, body_base64, policy_version, sealed)
+                orig_destination, cluster_id, node_id, durable, body_truncated, body_base64, policy_version, sealed)
             SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb, 'CAPTURED',
                    ?, ?, ?, ?, ?, ?, ?, ?
              WHERE NOT EXISTS (
                    SELECT 1 FROM message_index
-                    WHERE cluster_id = ? AND queue_name = ? AND node_id = ? AND message_id = ?
+                    WHERE cluster_id = ? AND subscription = ? AND node_id = ? AND message_id = ?
                       AND observed_at > ? )
             """;
 

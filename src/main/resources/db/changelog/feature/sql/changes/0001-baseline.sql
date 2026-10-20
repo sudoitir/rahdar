@@ -29,8 +29,8 @@ CREATE TABLE message_index (
     priority integer DEFAULT 4 NOT NULL,
     message_type integer DEFAULT 0 NOT NULL,
     policy_version integer DEFAULT 0 NOT NULL,
-    queue_name text NOT NULL,
-    address text NOT NULL,
+    subscription text NOT NULL,
+    destination text,
     node_name text NOT NULL,
     correlation_id text,
     group_id text,
@@ -40,7 +40,7 @@ CREATE TABLE message_index (
     body text,
     props jsonb DEFAULT '{}'::jsonb NOT NULL,
     origin text DEFAULT 'SAMPLED'::text NOT NULL,
-    orig_address text,
+    orig_destination text,
     sealed bytea,
     body_compression text,
     cluster_id uuid NOT NULL,
@@ -61,7 +61,7 @@ CREATE TABLE message_index_subscription (
     retention_days integer DEFAULT 7 NOT NULL,
     max_rate integer DEFAULT 500 NOT NULL,
     body_cap_bytes integer DEFAULT 262144 NOT NULL,
-    queue_pattern text NOT NULL,
+    subscription_pattern text NOT NULL,
     created_by text,
     mode text DEFAULT 'SAMPLE'::text NOT NULL,
     filter_string text,
@@ -88,7 +88,7 @@ CREATE UNLOGGED TABLE sql_query_ticket (
 WITH (autovacuum_vacuum_scale_factor='0.0', autovacuum_vacuum_threshold='50');
 
 ALTER TABLE message_index
-    ADD CONSTRAINT pk_message_index PRIMARY KEY (node_id, queue_name, message_id, observed_at);
+    ADD CONSTRAINT pk_message_index PRIMARY KEY (node_id, subscription, message_id, observed_at);
 
 ALTER TABLE ONLY message_capture_node
     ADD CONSTRAINT pk_message_capture_node PRIMARY KEY (subscription_id, node_id);
@@ -100,7 +100,7 @@ ALTER TABLE ONLY sql_query_ticket
     ADD CONSTRAINT pk_sql_query_ticket PRIMARY KEY (id);
 
 ALTER TABLE ONLY message_index_subscription
-    ADD CONSTRAINT uq_message_index_subscription UNIQUE (cluster_id, queue_pattern);
+    ADD CONSTRAINT uq_message_index_subscription UNIQUE (cluster_id, subscription_pattern);
 
 CREATE INDEX ix_message_capture_node_node_id ON message_capture_node USING btree (node_id);
 
@@ -108,7 +108,7 @@ CREATE INDEX ix_message_index_body ON message_index USING gin (body gin_trgm_ops
 
 CREATE INDEX ix_message_index_body_fts ON message_index USING gin (to_tsvector('simple'::regconfig, body)) WHERE ((body IS NOT NULL) AND (NOT body_base64));
 
-CREATE INDEX ix_message_index_lookup ON message_index USING btree (cluster_id, queue_name, observed_at DESC);
+CREATE INDEX ix_message_index_lookup ON message_index USING btree (cluster_id, subscription, observed_at DESC);
 
 CREATE INDEX ix_message_index_policy_version ON message_index USING btree (policy_version);
 

@@ -9,6 +9,6 @@ import org.springframework.stereotype.Component;
 class MessageIndexSealedStore extends TableSealedStore {
 
     MessageIndexSealedStore(JdbcTemplate jdbc) {
-        super(jdbc, "message_index", "node_id", "queue_name", "message_id", "observed_at");
+        super(jdbc, "message_index", "node_id", "subscription", "message_id", "observed_at");
     }
 }

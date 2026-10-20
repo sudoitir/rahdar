@@ -331,7 +331,7 @@ public class CaptureLoss {
         }
         return jdbc.queryForObject(
                 select + " FROM message_index WHERE cluster_id = ? AND node_id = ? AND origin = 'CAPTURED'"
-                        + " AND observed_at >= ? AND queue_name IN (" + placeholders + ')' + until,
+                        + " AND observed_at >= ? AND subscription IN (" + placeholders + ')' + until,
                 Long.class,
                 binds.toArray());
     }
