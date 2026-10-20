@@ -128,8 +128,8 @@ class McpDryRunIntegrationTest extends PostgresIntegrationTest {
                 Map.of(
                         "clusterId",
                         clusterId.toString(),
-                        "queue",
-                        QUEUE,
+                        "subscription",
+                        "artemis.queue/" + QUEUE,
                         "action",
                         "delete",
                         "messageIds",
@@ -158,8 +158,8 @@ class McpDryRunIntegrationTest extends PostgresIntegrationTest {
                 Map.of(
                         "clusterId",
                         clusterId.toString(),
-                        "queue",
-                        QUEUE,
+                        "subscription",
+                        "artemis.queue/" + QUEUE,
                         "action",
                         "delete",
                         "messageIds",
@@ -185,8 +185,8 @@ class McpDryRunIntegrationTest extends PostgresIntegrationTest {
                 Map.of(
                         "clusterId",
                         clusterId.toString(),
-                        "queue",
-                        QUEUE,
+                        "subscription",
+                        "artemis.queue/" + QUEUE,
                         "action",
                         "delete",
                         "messageIds",

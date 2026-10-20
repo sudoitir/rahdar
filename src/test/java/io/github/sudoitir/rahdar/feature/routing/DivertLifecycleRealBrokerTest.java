@@ -279,11 +279,11 @@ class DivertLifecycleRealBrokerTest extends PostgresIntegrationTest {
         JsonNode response = McpFixture.callTool(
                 mvc,
                 key,
-                "divert_lifecycle",
+                "artemis_divert_lifecycle",
                 Map.of(
                         "clusterId", clusterId.toString(),
                         "kind", "create_divert",
-                        "name", "rahdar.capture.x",
+                        "resource", "artemis.divert/rahdar.capture.x",
                         "config", "{\"address\":\"A\",\"forwardingAddress\":\"B\"}",
                         "dryRun", false));
 

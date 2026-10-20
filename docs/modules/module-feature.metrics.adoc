@@ -22,4 +22,5 @@ _Others_
 * `i.g.s.r.k.s.ClusterAccessGuard` (in Security)
 * `i.g.s.r.p.c.ClusterDirectory` (in Clusters)
 * `i.g.s.r.p.s.PluginMetrics` (in Scraping)
+* `i.g.s.r.p.m.McpResources` (in MCP server)
 |===

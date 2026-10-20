@@ -3,7 +3,7 @@ package io.github.sudoitir.rahdar.feature.routing;
 import io.github.sudoitir.rahdar.feature.resources.ResourcePermissions;
 
 /**
- * The divert operations Rahdar exposes (ADR-0065), shared by the HTTP API and the {@code divert_lifecycle}
+ * The divert operations Rahdar exposes (ADR-0065), shared by the HTTP API and the {@code artemis_divert_lifecycle}
  * MCP tool so a kind cannot be reachable through one and not the other.
  *
  * <p>A divert changes where traffic goes rather than what a queue holds, so it has its own authority

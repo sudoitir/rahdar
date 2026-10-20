@@ -184,7 +184,7 @@ class FeatureToggleTest {
     private static String runbooks(McpRunbookPrompts prompts) {
         return Stream.of(
                         prompts.triageCluster(null),
-                        prompts.investigateQueue(null, null),
+                        prompts.investigateSubscription(null, null),
                         prompts.beforeYouPurge(null, null),
                         prompts.tuneScrapeLoad(null))
                 .flatMap(result -> result.messages().stream())

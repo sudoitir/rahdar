@@ -114,7 +114,15 @@ class McpAuthorizationIntegrationTest extends PostgresIntegrationTest {
                 mvc,
                 key,
                 "message_action",
-                Map.of("clusterId", clusterId.toString(), "queue", QUEUE, "action", "purge", "dryRun", true));
+                Map.of(
+                        "clusterId",
+                        clusterId.toString(),
+                        "subscription",
+                        "artemis.queue/" + QUEUE,
+                        "action",
+                        "purge",
+                        "dryRun",
+                        true));
 
         // A refusal is a result the model can act on, not a transport fault: an
         // error envelope here would mean the exception escaped the tool body.
@@ -141,7 +149,7 @@ class McpAuthorizationIntegrationTest extends PostgresIntegrationTest {
                 Set.of(Permissions.CLUSTER_READ, Permissions.SUBSCRIPTION_READ, MessagePermissions.MESSAGE_READ));
 
         JsonNode response = McpFixture.callTool(
-                mvc, key, "list_resources", Map.of("clusterId", clusterId.toString(), "kind", "queues"));
+                mvc, key, "list_resources", Map.of("clusterId", clusterId.toString(), "role", "subscription"));
 
         assertThat(response.path("result").path("isError").asBoolean(false))
                 .describedAs("%s", response)

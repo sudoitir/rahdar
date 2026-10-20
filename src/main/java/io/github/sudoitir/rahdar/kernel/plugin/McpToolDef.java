@@ -15,16 +15,25 @@ import java.util.Locale;
  * @param params the detail the schema deliberately leaves out
  * @param access what a plugin tool requires, which Rahdar checks before it runs (ADR-0114); absent
  *     for built-in tools, whose services check their own permissions
+ * @param system the broker system the tool exists for (ADR-0207), such as {@code artemis}; absent for a
+ *     tool that applies to every system. It is offered only to a caller who can read a cluster of that
+ *     system, and a call naming a cluster of another system is a tool error
  */
 public record McpToolDef(
         String name,
         Posture posture,
         String summary,
         List<Param> params,
-        @JsonInclude(JsonInclude.Include.NON_NULL) Access access) {
+        @JsonInclude(JsonInclude.Include.NON_NULL) Access access,
+        @JsonInclude(JsonInclude.Include.NON_NULL) String system) {
 
     public McpToolDef(String name, Posture posture, String summary, List<Param> params) {
-        this(name, posture, summary, params, null);
+        this(name, posture, summary, params, null, null);
+    }
+
+    /** This tool as one that exists for the clusters of {@code systemId} only. */
+    public McpToolDef forSystem(String systemId) {
+        return new McpToolDef(name, posture, summary, params, access, systemId);
     }
 
     /**

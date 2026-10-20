@@ -1,17 +1,16 @@
 package io.github.sudoitir.rahdar.feature.resources.mcp;
 
-import io.github.sudoitir.openbroker.ClusterConnection;
 import io.github.sudoitir.openbroker.model.ResourceClass;
+import io.github.sudoitir.openbroker.model.ResourceId;
 import io.github.sudoitir.rahdar.feature.resources.LifecycleKind;
 import io.github.sudoitir.rahdar.feature.resources.LifecycleRequests.CreateDestinationRequest;
 import io.github.sudoitir.rahdar.feature.resources.LifecycleRequests.CreateSubscriptionRequest;
 import io.github.sudoitir.rahdar.feature.resources.LifecycleRequests.UpdateResourceRequest;
 import io.github.sudoitir.rahdar.feature.resources.QueueLifecycleService;
-import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
-import io.github.sudoitir.rahdar.platform.broker.ResourceIds;
 import io.github.sudoitir.rahdar.platform.mcp.McpArgs;
 import io.github.sudoitir.rahdar.platform.mcp.McpErrors;
 import io.github.sudoitir.rahdar.platform.mcp.McpLifecycle;
+import io.github.sudoitir.rahdar.platform.mcp.McpResources;
 import io.modelcontextprotocol.spec.McpSchema;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -22,7 +21,7 @@ import org.springframework.ai.mcp.annotation.McpToolParam;
 import org.springframework.stereotype.Component;
 
 /**
- * The {@code queue_lifecycle} MCP tool.
+ * The {@code resource_lifecycle} MCP tool.
  *
  * <p>Mutating tools (ADR-0045). They go through the same services the REST layer calls, so
  * authorization, the bulk cap and the audit row are the existing ones; this class adds only
@@ -32,14 +31,14 @@ import org.springframework.stereotype.Component;
  */
 @Component
 @RequiredArgsConstructor
-public class QueuesMcpTools {
+public class ResourceLifecycleMcpTools {
 
     private final QueueLifecycleService lifecycle;
-    private final BrokerGateway gateway;
+    private final McpResources resources;
 
-    /** The queue configuration a create or update carries. Every field optional; checked per kind. */
-    public record QueueConfigBody(
-            String address,
+    /** The configuration a create or update carries. Every field optional; checked per kind. */
+    public record ResourceConfigBody(
+            String destination,
             String routingType,
             Boolean durable,
             String filter,
@@ -50,7 +49,7 @@ public class QueuesMcpTools {
             Long ringSize) {}
 
     /**
-     * Queue and address lifecycle, as <b>one</b> tool discriminated by
+     * Subscription and destination lifecycle, as <b>one</b> tool discriminated by
      * {@code kind} rather than eight — the tool-count budget the MCP capability sets is
      * a real constraint, and eight near-identical verbs would spend it for nothing.
      *
@@ -60,12 +59,12 @@ public class QueuesMcpTools {
      * its own.
      */
     @McpTool(
-            name = "queue_lifecycle",
-            description = "Queue and address lifecycle, cluster-wide. Previews first.",
+            name = "resource_lifecycle",
+            description = "Subscription and destination lifecycle, cluster-wide. Previews first.",
             annotations =
                     @McpTool.McpAnnotations(
                             readOnlyHint = false,
-                            // Some kinds destroy a queue and its messages irrecoverably, and a
+                            // Some kinds destroy a subscription and its messages irrecoverably, and a
                             // host gates the whole tool on one flag — so the honest value for a
                             // tool that can delete is true.
                             destructiveHint = true,
@@ -73,79 +72,94 @@ public class QueuesMcpTools {
                             // makes retrying after a partial fan-out safe (D2).
                             idempotentHint = true,
                             openWorldHint = false))
-    public McpSchema.CallToolResult queueLifecycle(
+    public McpSchema.CallToolResult resourceLifecycle(
             @McpToolParam(required = true) String clusterId,
             @McpToolParam(required = true) String kind,
-            @McpToolParam(required = true) String name,
+            @McpToolParam(required = true) String resource,
             @McpToolParam(required = false) String config,
             @McpToolParam(required = false) Boolean dryRun,
             @McpToolParam(required = false) String confirm,
             @McpToolParam(required = false) Boolean override,
             @McpToolParam(required = false) Boolean disconnectConsumers) {
         UUID id = McpArgs.uuid("clusterId", clusterId);
-        String subject = McpArgs.required("name", name);
         LifecycleKind op = McpArgs.enumOf(LifecycleKind.class, "kind", kind, null);
         boolean dry = McpArgs.flag(dryRun, true);
         boolean over = McpArgs.flag(override, false);
         boolean disconnect = McpArgs.flag(disconnectConsumers, false);
-        if (!dry && op.destructive()) {
-            McpArgs.confirm(subject, confirm);
-        }
-        QueueConfigBody body = parseConfig(config);
-        return McpErrors.guard(() -> McpLifecycle.summary(
-                op.name(),
-                subject,
-                op.destructive(),
-                dry,
-                switch (op) {
-                    case CREATE_SUBSCRIPTION -> lifecycle.createQueue(id, createRequest(id, subject, body), dry);
-                    case UPDATE_RESOURCE -> lifecycle.updateQueue(id, subject, updateRequest(body), dry);
-                    case DELETE_SUBSCRIPTION -> lifecycle.deleteQueue(id, subject, dry, over, disconnect);
-                    case PAUSE_SUBSCRIPTION -> lifecycle.setPaused(id, subject, true, dry);
-                    case RESUME_SUBSCRIPTION -> lifecycle.setPaused(id, subject, false, dry);
-                    case RESET_COUNTERS -> lifecycle.resetCounter(id, subject, dry);
-                    case CREATE_DESTINATION -> lifecycle.createAddress(id, addressRequest(id, subject, body), dry);
-                    case DELETE_DESTINATION -> lifecycle.deleteAddress(id, subject, dry);
-                }));
+        ResourceConfigBody body = parseConfig(config);
+        return McpErrors.guard(() -> {
+            ResourceId target = target(id, op, resource);
+            String subject = target.name();
+            if (!dry && op.destructive()) {
+                McpArgs.confirm(subject, confirm);
+            }
+            return McpLifecycle.summary(
+                    op.name(),
+                    subject,
+                    op.destructive(),
+                    dry,
+                    switch (op) {
+                        case CREATE_SUBSCRIPTION -> lifecycle.createQueue(id, createRequest(id, target, body), dry);
+                        case UPDATE_RESOURCE -> lifecycle.updateQueue(id, subject, updateRequest(body), dry);
+                        case DELETE_SUBSCRIPTION -> lifecycle.deleteQueue(id, subject, dry, over, disconnect);
+                        case PAUSE_SUBSCRIPTION -> lifecycle.setPaused(id, subject, true, dry);
+                        case RESUME_SUBSCRIPTION -> lifecycle.setPaused(id, subject, false, dry);
+                        case RESET_COUNTERS -> lifecycle.resetCounter(id, subject, dry);
+                        case CREATE_DESTINATION -> lifecycle.createAddress(id, destinationRequest(target, body), dry);
+                        case DELETE_DESTINATION -> lifecycle.deleteAddress(id, subject, dry);
+                    });
+        });
     }
 
-    private static QueueConfigBody parseConfig(String raw) {
+    /** The resource the kind acts on: one that exists, or for a create the id of the one to make. */
+    private ResourceId target(UUID clusterId, LifecycleKind op, String resource) {
+        return switch (op) {
+            case CREATE_SUBSCRIPTION -> resources.newId(clusterId, "resource", resource, ResourceClass.SUBSCRIPTION);
+            case CREATE_DESTINATION -> resources.newId(clusterId, "resource", resource, ResourceClass.DESTINATION);
+            case DELETE_DESTINATION ->
+                resources
+                        .require(clusterId, "resource", resource, ResourceClass.DESTINATION)
+                        .id();
+            case UPDATE_RESOURCE, DELETE_SUBSCRIPTION, PAUSE_SUBSCRIPTION, RESUME_SUBSCRIPTION, RESET_COUNTERS ->
+                resources
+                        .require(clusterId, "resource", resource, ResourceClass.SUBSCRIPTION)
+                        .id();
+        };
+    }
+
+    private static ResourceConfigBody parseConfig(String raw) {
         if (raw == null || raw.isBlank()) {
-            return new QueueConfigBody(null, null, null, null, null, null, null, null, null);
+            return new ResourceConfigBody(null, null, null, null, null, null, null, null, null);
         }
-        return McpErrors.parse("config", raw, QueueConfigBody.class);
+        return McpErrors.parse("config", raw, ResourceConfigBody.class);
     }
 
-    private CreateSubscriptionRequest createRequest(UUID clusterId, String name, QueueConfigBody body) {
-        if (body.address() == null || body.routingType() == null) {
-            throw McpErrors.invalidParams("create_subscription needs config with at least address and routingType.");
+    private CreateSubscriptionRequest createRequest(UUID clusterId, ResourceId target, ResourceConfigBody body) {
+        if (body.destination() == null || body.routingType() == null) {
+            throw McpErrors.invalidParams(
+                    "create_subscription needs config with at least destination (a destination id) and routingType.");
         }
-        ClusterConnection connection = gateway.cluster(clusterId);
+        ResourceId destination =
+                resources.newId(clusterId, "config.destination", body.destination(), ResourceClass.DESTINATION);
         Map<String, Object> attributes = attributes(body);
         attributes.put("routingType", body.routingType());
         attributes.put("durable", body.durable());
-        return new CreateSubscriptionRequest(
-                ResourceIds.kind(connection, ResourceClass.SUBSCRIPTION).value(),
-                name,
-                ResourceIds.of(connection, ResourceClass.DESTINATION, body.address())
-                        .format(),
-                attributes);
+        return new CreateSubscriptionRequest(target.kind().value(), target.name(), destination.format(), attributes);
     }
 
-    private static UpdateResourceRequest updateRequest(QueueConfigBody body) {
+    private static UpdateResourceRequest updateRequest(ResourceConfigBody body) {
         return new UpdateResourceRequest(attributes(body));
     }
 
-    private CreateDestinationRequest addressRequest(UUID clusterId, String name, QueueConfigBody body) {
+    private static CreateDestinationRequest destinationRequest(ResourceId target, ResourceConfigBody body) {
         return new CreateDestinationRequest(
-                ResourceIds.kind(gateway.cluster(clusterId), ResourceClass.DESTINATION)
-                        .value(),
-                name,
+                target.kind().value(),
+                target.name(),
                 Map.of("routingTypes", body.routingType() == null ? "ANYCAST" : body.routingType()));
     }
 
     /** The body's tuning fields that were sent. */
-    private static Map<String, Object> attributes(QueueConfigBody body) {
+    private static Map<String, Object> attributes(ResourceConfigBody body) {
         Map<String, Object> attributes = new LinkedHashMap<>();
         putIfSet(attributes, "filter", body.filter());
         putIfSet(attributes, "maxConsumers", body.maxConsumers());

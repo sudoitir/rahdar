@@ -1,11 +1,14 @@
 package io.github.sudoitir.rahdar.feature.routing.mcp;
 
+import io.github.sudoitir.openbroker.model.ResourceClass;
+import io.github.sudoitir.openbroker.model.ResourceId;
 import io.github.sudoitir.rahdar.feature.routing.CreateDivertRequest;
 import io.github.sudoitir.rahdar.feature.routing.DivertKind;
 import io.github.sudoitir.rahdar.feature.routing.DivertLifecycleService;
 import io.github.sudoitir.rahdar.platform.mcp.McpArgs;
 import io.github.sudoitir.rahdar.platform.mcp.McpErrors;
 import io.github.sudoitir.rahdar.platform.mcp.McpLifecycle;
+import io.github.sudoitir.rahdar.platform.mcp.McpResources;
 import io.modelcontextprotocol.spec.McpSchema;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -14,7 +17,7 @@ import org.springframework.ai.mcp.annotation.McpToolParam;
 import org.springframework.stereotype.Component;
 
 /**
- * The {@code divert_lifecycle} MCP tool (ADR-0045): the same service the REST layer calls, so
+ * The {@code artemis_divert_lifecycle} MCP tool (ADR-0045): the same service the REST layer calls, so
  * authorization and the audit row are the existing ones. This class adds only the model-facing gate:
  * {@code dryRun} defaults to true, and a real delete needs {@code confirm} to equal the divert's name.
  */
@@ -22,7 +25,10 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class DivertMcpTools {
 
+    private static final String DIVERT_KIND = "artemis.divert";
+
     private final DivertLifecycleService lifecycle;
+    private final McpResources resources;
 
     /** The divert a create carries. Every field optional here; {@code address} and {@code forwardingAddress} are required. */
     public record DivertConfigBody(
@@ -40,7 +46,7 @@ public class DivertMcpTools {
      * agent acting on Rahdar's behalf must not report it as temporary.
      */
     @McpTool(
-            name = "divert_lifecycle",
+            name = "artemis_divert_lifecycle",
             description = "Divert creation and deletion, cluster-wide. Previews first.",
             annotations =
                     @McpTool.McpAnnotations(
@@ -49,30 +55,41 @@ public class DivertMcpTools {
                             destructiveHint = true,
                             idempotentHint = true,
                             openWorldHint = false))
-    public McpSchema.CallToolResult divertLifecycle(
+    public McpSchema.CallToolResult artemisDivertLifecycle(
             @McpToolParam(required = true) String clusterId,
             @McpToolParam(required = true) String kind,
-            @McpToolParam(required = true) String name,
+            @McpToolParam(required = true) String resource,
             @McpToolParam(required = false) String config,
             @McpToolParam(required = false) Boolean dryRun,
             @McpToolParam(required = false) String confirm) {
         UUID id = McpArgs.uuid("clusterId", clusterId);
-        String subject = McpArgs.required("name", name);
         DivertKind op = McpArgs.enumOf(DivertKind.class, "kind", kind, null);
         boolean dry = McpArgs.flag(dryRun, true);
-        if (!dry && op.destructive()) {
-            McpArgs.confirm(subject, confirm);
-        }
         DivertConfigBody body = parseConfig(config);
-        return McpErrors.guard(() -> McpLifecycle.summary(
-                op.name(),
-                subject,
-                op.destructive(),
-                dry,
-                switch (op) {
-                    case CREATE_DIVERT -> lifecycle.createDivert(id, createRequest(subject, body), dry);
-                    case DELETE_DIVERT -> lifecycle.deleteDivert(id, subject, dry);
-                }));
+        return McpErrors.guard(() -> {
+            ResourceId target = op == DivertKind.CREATE_DIVERT
+                    ? resources.newId(id, "resource", resource, ResourceClass.ROUTE)
+                    : resources
+                            .require(id, "resource", resource, ResourceClass.ROUTE)
+                            .id();
+            if (!DIVERT_KIND.equals(target.kind().value())) {
+                throw McpErrors.invalidParams("resource must be a divert, such as " + DIVERT_KIND + "/orders-copy; got "
+                        + target.format() + ".");
+            }
+            String subject = target.name();
+            if (!dry && op.destructive()) {
+                McpArgs.confirm(subject, confirm);
+            }
+            return McpLifecycle.summary(
+                    op.name(),
+                    subject,
+                    op.destructive(),
+                    dry,
+                    switch (op) {
+                        case CREATE_DIVERT -> lifecycle.createDivert(id, createRequest(subject, body), dry);
+                        case DELETE_DIVERT -> lifecycle.deleteDivert(id, subject, dry);
+                    });
+        });
     }
 
     private static DivertConfigBody parseConfig(String raw) {

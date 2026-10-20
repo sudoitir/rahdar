@@ -4,7 +4,7 @@ import io.github.sudoitir.rahdar.kernel.security.ResourceRef;
 
 /**
  * The lifecycle operations Rahdar exposes (ADR-0049). One enum shared by the HTTP
- * API and the single MCP {@code queue_lifecycle} tool, so a kind cannot be
+ * API and the single MCP {@code resource_lifecycle} tool, so a kind cannot be
  * reachable through one and not the other.
  *
  * <p>Holding a message-level permission implies none of these. Purging a subscription and

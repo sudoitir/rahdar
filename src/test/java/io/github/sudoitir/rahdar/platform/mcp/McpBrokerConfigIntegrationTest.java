@@ -50,7 +50,7 @@ import org.springframework.web.context.WebApplicationContext;
 import tools.jackson.databind.JsonNode;
 
 /**
- * The {@code broker_config} / {@code broker_config_change} contract from the
+ * The {@code artemis_config} / {@code artemis_config_change} contract from the
  * model's side of the wire (ADR-0067 D11): a dry-run apply names the hazard ids a
  * real run must acknowledge, a real run needs the cluster's name, and a halted
  * run says what stopped it, what was not attempted, and that re-running converges.
@@ -165,7 +165,7 @@ class McpBrokerConfigIntegrationTest extends PostgresIntegrationTest {
         if (!dryRun) {
             args.put("confirm", clusterName);
         }
-        return McpFixture.callTool(mvc, key, "broker_config_change", args);
+        return McpFixture.callTool(mvc, key, "artemis_config_change", args);
     }
 
     @Test
@@ -182,7 +182,7 @@ class McpBrokerConfigIntegrationTest extends PostgresIntegrationTest {
         assertThat(saved.path("revision").asInt()).isEqualTo(1);
 
         JsonNode read = McpFixture.callTool(
-                        mvc, key, "broker_config", Map.of("clusterId", clusterId.toString(), "kind", "declaration"))
+                        mvc, key, "artemis_config", Map.of("clusterId", clusterId.toString(), "kind", "declaration"))
                 .path("result")
                 .path("structuredContent");
         assertThat(read.path("declared").asBoolean()).isTrue();
@@ -197,7 +197,7 @@ class McpBrokerConfigIntegrationTest extends PostgresIntegrationTest {
         declare(key, false);
 
         JsonNode plan = McpFixture.callTool(
-                        mvc, key, "broker_config_change", Map.of("clusterId", clusterId.toString(), "op", "apply"))
+                        mvc, key, "artemis_config_change", Map.of("clusterId", clusterId.toString(), "op", "apply"))
                 .path("result")
                 .path("structuredContent");
         assertThat(plan.path("dryRun").asBoolean()).isTrue();
@@ -216,7 +216,7 @@ class McpBrokerConfigIntegrationTest extends PostgresIntegrationTest {
         JsonNode refused = McpFixture.callTool(
                 mvc,
                 key,
-                "broker_config_change",
+                "artemis_config_change",
                 Map.of(
                         "clusterId",
                         clusterId.toString(),
@@ -238,7 +238,7 @@ class McpBrokerConfigIntegrationTest extends PostgresIntegrationTest {
         JsonNode applied = McpFixture.callTool(
                         mvc,
                         key,
-                        "broker_config_change",
+                        "artemis_config_change",
                         Map.of(
                                 "clusterId",
                                 clusterId.toString(),
@@ -264,7 +264,7 @@ class McpBrokerConfigIntegrationTest extends PostgresIntegrationTest {
                 Permissions.CLUSTER_READ, BrokerConfigPermissions.CONFIG_WRITE, BrokerConfigPermissions.CONFIG_APPLY));
         declare(key, false);
         JsonNode plan = McpFixture.callTool(
-                        mvc, key, "broker_config_change", Map.of("clusterId", clusterId.toString(), "op", "apply"))
+                        mvc, key, "artemis_config_change", Map.of("clusterId", clusterId.toString(), "op", "apply"))
                 .path("result")
                 .path("structuredContent");
         // The canary refuses the write.
@@ -275,7 +275,7 @@ class McpBrokerConfigIntegrationTest extends PostgresIntegrationTest {
         JsonNode halted = McpFixture.callTool(
                         mvc,
                         key,
-                        "broker_config_change",
+                        "artemis_config_change",
                         Map.of(
                                 "clusterId",
                                 clusterId.toString(),
@@ -317,7 +317,7 @@ class McpBrokerConfigIntegrationTest extends PostgresIntegrationTest {
         declare(key, false);
 
         JsonNode response = McpFixture.callTool(
-                mvc, key, "broker_config_change", Map.of("clusterId", clusterId.toString(), "op", "apply"));
+                mvc, key, "artemis_config_change", Map.of("clusterId", clusterId.toString(), "op", "apply"));
         assertThat(response.path("result").path("isError").asBoolean(false)
                         || response.path("error").isObject())
                 .describedAs("%s", response)

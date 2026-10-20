@@ -29,7 +29,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 /**
- * {@code config_diff} is a thin adapter over {@link ConfigDiffService}: what it adds is the
+ * {@code artemis_config_diff} is a thin adapter over {@link ConfigDiffService}: what it adds is the
  * comma-separated node narrowing and a response of drifting keys only (ADR-0178).
  */
 class BrokerConfigMcpReadToolsTest {
@@ -108,7 +108,7 @@ class BrokerConfigMcpReadToolsTest {
     void reportsOnlyTheDriftingKeysWithTheirOutliersAndTheUnavailableNodes() {
         when(configDiff.compare(eq(CLUSTER), any())).thenReturn(view());
 
-        McpSchema.CallToolResult result = tools.configDiff(CLUSTER.toString(), null);
+        McpSchema.CallToolResult result = tools.artemisConfigDiff(CLUSTER.toString(), null);
 
         assertThat(result.isError()).isNotEqualTo(true);
         McpViews.ConfigDiff diff = (McpViews.ConfigDiff) result.structuredContent();
@@ -139,7 +139,7 @@ class BrokerConfigMcpReadToolsTest {
     void passesTheNamedNodesThroughAsASet() {
         when(configDiff.compare(eq(CLUSTER), any())).thenReturn(view());
 
-        tools.configDiff(CLUSTER.toString(), A + ", " + B);
+        tools.artemisConfigDiff(CLUSTER.toString(), A + ", " + B);
 
         verify(configDiff).compare(CLUSTER, new LinkedHashSet<>(List.of(A, B)));
     }
@@ -148,7 +148,7 @@ class BrokerConfigMcpReadToolsTest {
     void omittingNodesComparesEveryNode() {
         when(configDiff.compare(eq(CLUSTER), any())).thenReturn(view());
 
-        tools.configDiff(CLUSTER.toString(), " ");
+        tools.artemisConfigDiff(CLUSTER.toString(), " ");
 
         verify(configDiff).compare(CLUSTER, Set.of());
     }
@@ -162,7 +162,7 @@ class BrokerConfigMcpReadToolsTest {
         String cluster = CLUSTER.toString();
         String node = A.toString();
 
-        assertThatThrownBy(() -> tools.configDiff(cluster, node))
+        assertThatThrownBy(() -> tools.artemisConfigDiff(cluster, node))
                 .isInstanceOf(McpError.class)
                 .hasMessageContaining("at least two nodes");
     }

@@ -29,6 +29,7 @@ _Others_
 * `i.g.s.r.p.g.ContentPolicy` (in Data governance)
 * `i.g.s.r.p.g.ClearViewAudit` (in Data governance)
 * `i.g.s.r.k.g.OperationGate` (in Approval gate contract)
+* `i.g.s.r.p.m.McpResources` (in MCP server)
 * `i.g.s.r.p.m.McpProperties` (in MCP server)
 * `i.g.s.r.p.c.ResourceTargets` (in Clusters)
 |===

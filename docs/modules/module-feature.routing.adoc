@@ -20,4 +20,5 @@ _Others_
 * `i.g.s.r.p.b.SystemExtensions` (in Broker connectivity)
 * `i.g.s.r.k.s.PermissionResolver` (in Security)
 * `i.g.s.r.k.a.AuditService` (in Audit log)
+* `i.g.s.r.p.m.McpResources` (in MCP server)
 |===

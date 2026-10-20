@@ -1,10 +1,12 @@
 package io.github.sudoitir.rahdar.feature.messages.mcp;
 
+import io.github.sudoitir.openbroker.model.ResourceClass;
 import io.github.sudoitir.rahdar.feature.messages.MessageService;
 import io.github.sudoitir.rahdar.feature.messages.web.MessageViews;
 import io.github.sudoitir.rahdar.platform.mcp.McpArgs;
 import io.github.sudoitir.rahdar.platform.mcp.McpErrors;
 import io.github.sudoitir.rahdar.platform.mcp.McpProperties;
+import io.github.sudoitir.rahdar.platform.mcp.McpResources;
 import io.github.sudoitir.rahdar.platform.mcp.McpViews;
 import io.modelcontextprotocol.spec.McpSchema;
 import java.time.Instant;
@@ -16,7 +18,8 @@ import org.springframework.ai.mcp.annotation.McpToolParam;
 import org.springframework.stereotype.Component;
 
 /**
- * The {@code browse_messages} MCP tool. *
+ * The {@code browse_messages} MCP tool.
+ *
  * <p>Reads only: nothing here needs the dry-run/confirm contract, which is the review
  * boundary ADR-0045 draws between read and mutating tool classes. Every method is a thin
  * adapter over the services the REST layer already uses.
@@ -27,17 +30,18 @@ public class MessagesMcpReadTools {
 
     private final McpProperties props;
     private final MessageService messages;
+    private final McpResources resources;
 
     /**
      * Headers, or one body, behind an optional id (ADR-0054).
      *
      * <p>The body was always the drill-down from a header row: same cluster, same
-     * queue, one more identifier. Two tools made a model choose between them before
+     * subscription, one more identifier. Two tools made a model choose between them before
      * it had the id that distinguishes them.
      */
     @McpTool(
             name = "browse_messages",
-            description = "A capped page of message headers on a queue, or one message's full body by id.",
+            description = "A capped page of message headers on a subscription, or one message's full body by id.",
             annotations =
                     @McpTool.McpAnnotations(
                             readOnlyHint = true,
@@ -46,31 +50,38 @@ public class MessagesMcpReadTools {
                             openWorldHint = false))
     public McpSchema.CallToolResult browseMessages(
             @McpToolParam(required = true) String clusterId,
-            @McpToolParam(required = true) String queue,
+            @McpToolParam(required = true) String subscription,
             @McpToolParam(required = false) String messageId,
             @McpToolParam(required = false) String filter,
             @McpToolParam(required = false) Integer limit) {
         UUID id = McpArgs.uuid("clusterId", clusterId);
-        String q = McpArgs.required("queue", queue);
-        if (messageId != null && !messageId.isBlank()) {
-            long mid;
+        McpArgs.required("subscription", subscription);
+        long mid = 0;
+        boolean body = messageId != null && !messageId.isBlank();
+        if (body) {
             try {
                 mid = Long.parseLong(messageId.trim());
             } catch (NumberFormatException _) {
                 throw McpErrors.invalidParams("messageId must be the numeric id a header row returned.");
             }
-            return McpErrors.guard(() -> messages.detail(id, q, mid, null, null));
         }
+        long detailId = mid;
         int capped = props.clamp(limit);
-        return McpErrors.guard(() -> headers(id, q, filter, capped));
+        return McpErrors.guard(() -> {
+            String name = resources
+                    .require(id, "subscription", subscription, ResourceClass.SUBSCRIPTION)
+                    .name();
+            return body ? messages.detail(id, name, detailId, null, null) : headers(id, name, filter, capped);
+        });
     }
 
-    private McpViews.Page<McpViews.MessageHeader> headers(UUID clusterId, String queue, String filter, int limit) {
-        MessageViews.MessagePageView page = messages.browse(clusterId, queue, null, filter, 1, limit + 1);
+    private McpViews.Page<McpViews.MessageHeader> headers(
+            UUID clusterId, String subscription, String filter, int limit) {
+        MessageViews.MessagePageView page = messages.browse(clusterId, subscription, null, filter, 1, limit + 1);
         List<McpViews.MessageHeader> rows = page.data().stream()
                 .map(m -> new McpViews.MessageHeader(
                         m.position(),
-                        queue,
+                        subscription,
                         page.node().toString(),
                         m.timestamp() > 0 ? Instant.ofEpochMilli(m.timestamp()) : null,
                         m.size(),

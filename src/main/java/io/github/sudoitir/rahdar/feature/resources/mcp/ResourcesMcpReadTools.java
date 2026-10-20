@@ -8,6 +8,7 @@ import io.github.sudoitir.rahdar.platform.broker.ResourceIds;
 import io.github.sudoitir.rahdar.platform.mcp.McpArgs;
 import io.github.sudoitir.rahdar.platform.mcp.McpErrors;
 import io.github.sudoitir.rahdar.platform.mcp.McpProperties;
+import io.github.sudoitir.rahdar.platform.mcp.McpRouteRows;
 import io.github.sudoitir.rahdar.platform.mcp.McpViews;
 import io.modelcontextprotocol.spec.McpSchema;
 import java.util.ArrayList;
@@ -16,10 +17,12 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.ai.mcp.annotation.McpTool;
 import org.springframework.ai.mcp.annotation.McpToolParam;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Component;
 
 /**
- * The {@code list_resources} MCP tool. *
+ * The {@code list_resources} MCP tool.
+ *
  * <p>Reads only: nothing here needs the dry-run/confirm contract, which is the review
  * boundary ADR-0045 draws between read and mutating tool classes. Every method is a thin
  * adapter over the services the REST layer already uses.
@@ -31,26 +34,28 @@ public class ResourcesMcpReadTools {
     private static final String PROTOCOL_LABEL = "protocol=";
 
     private final McpProperties props;
-    private final CrossNodeAggregator queues;
+    private final CrossNodeAggregator subscriptions;
     private final PagedListService lists;
+    private final ObjectProvider<McpRouteRows> routeRows;
 
     /**
-     * The six resource lists behind one discriminator (design D5). Six tools would
-     * cost six schemas on every {@code tools/list} to describe what is, to a model,
-     * one question with a parameter.
+     * The resource lists behind one discriminator (design D5), by the role a resource plays whatever
+     * system it is of. Seven tools would cost seven schemas on every {@code tools/list} to describe what
+     * is, to a model, one question with a parameter.
      */
-    public enum ListKind {
-        QUEUES,
-        ADDRESSES,
-        CONSUMERS,
-        SESSIONS,
-        CONNECTIONS,
-        PRODUCERS
+    public enum ListRole {
+        DESTINATION,
+        SUBSCRIPTION,
+        ROUTE,
+        CONNECTION,
+        CHANNEL,
+        CONSUMER,
+        PRODUCER
     }
 
     @McpTool(
             name = "list_resources",
-            description = "Merged cross-node listing of one kind of cluster resource. Capped and ordered.",
+            description = "Merged cross-node listing of one role of cluster resource. Capped and ordered.",
             annotations =
                     @McpTool.McpAnnotations(
                             readOnlyHint = true,
@@ -59,94 +64,131 @@ public class ResourcesMcpReadTools {
                             openWorldHint = false))
     public McpSchema.CallToolResult listResources(
             @McpToolParam(required = true) String clusterId,
-            @McpToolParam(required = true) String kind,
+            @McpToolParam(required = true) String role,
+            @McpToolParam(required = false) String kind,
             @McpToolParam(required = false) String filter,
             @McpToolParam(required = false) Integer limit) {
         UUID id = McpArgs.uuid("clusterId", clusterId);
-        ListKind k = McpArgs.enumOf(ListKind.class, "kind", kind, null);
+        ListRole r = McpArgs.enumOf(ListRole.class, "role", role, null);
         int capped = props.clamp(limit);
-        return McpErrors.guard(() -> resources(id, k, filter, capped));
+        return McpErrors.guard(() -> resources(id, r, kind, filter, capped));
     }
 
-    private McpViews.Page<McpViews.ResourceRow> resources(UUID clusterId, ListKind kind, String filter, int limit) {
+    private McpViews.Page<McpViews.ResourceRow> resources(
+            UUID clusterId, ListRole role, String kind, String filter, int limit) {
         // One row over the cap is fetched so "truncated" is a fact, not a guess: a
-        // page of exactly `limit` rows is ambiguous about whether more exist.
-        ResourceQuery query = ResourceQuery.of(filter, 1, limit + 1, null);
+        // page of exactly `limit` rows is ambiguous about whether more exist. A kind filter is applied
+        // to the rows, so the window it is applied to is the widest one.
+        boolean ofKind = kind != null && !kind.isBlank();
+        ResourceQuery query = ResourceQuery.of(filter, 1, ofKind ? ResourceQuery.MAX_SIZE : limit + 1, null);
         List<McpViews.ResourceRow> rows = new ArrayList<>();
         String orderedBy;
-        switch (kind) {
-            case QUEUES -> {
+        switch (role) {
+            case SUBSCRIPTION -> {
                 orderedBy = "name";
-                // Queues keep their own snapshot-backed path — they are aggregated from
+                // Subscriptions keep their own snapshot-backed path — they are aggregated from
                 // subscription_snapshot, not fanned out live, and that is the cheap read.
                 for (ResourceViews.SubscriptionView q :
-                        queues.subscriptions(clusterId, query).data()) {
+                        subscriptions.subscriptions(clusterId, query).data()) {
                     rows.add(new McpViews.ResourceRow(
-                            "queue",
+                            q.id(),
+                            q.kind(),
+                            q.kindLabel(),
                             q.name(),
                             q.nodesPresent() + "/" + q.nodesTotal() + " nodes",
-                            "address=" + q.destinationName() + " consumers=" + q.totalConsumerCount(),
+                            null,
+                            "destination=" + q.destination() + " consumers=" + q.totalConsumerCount(),
                             q.totalMessageCount()));
                 }
             }
-            case ADDRESSES -> {
+            case DESTINATION -> {
                 orderedBy = "name";
                 for (ResourceViews.DestinationView a :
                         lists.destinations(clusterId, query).data()) {
                     rows.add(new McpViews.ResourceRow(
-                            "address", a.name(), a.nodeName(), "queues=" + a.subscriptionCount(), a.messageCount()));
+                            a.id(),
+                            a.kind(),
+                            a.kindLabel(),
+                            a.name(),
+                            a.nodeName(),
+                            a.nodeId(),
+                            "subscriptions=" + a.subscriptionCount(),
+                            a.messageCount()));
                 }
             }
-            case CONSUMERS -> {
-                orderedBy = "queueName";
+            case ROUTE -> {
+                orderedBy = "source";
+                McpRouteRows routes = routeRows.getIfAvailable();
+                if (routes != null) {
+                    rows.addAll(routes.rows(clusterId, query));
+                }
+            }
+            case CONSUMER -> {
+                orderedBy = "subscription";
                 for (ResourceViews.ConsumerView c :
                         lists.consumers(clusterId, query).data()) {
                     rows.add(new McpViews.ResourceRow(
-                            "consumer",
-                            c.subscriptionName(),
+                            c.id(),
+                            c.kind(),
+                            c.kindLabel(),
+                            ResourceIds.nameOf(c.id()),
                             c.nodeName(),
-                            PROTOCOL_LABEL + c.protocol() + " acked=" + c.messagesAcknowledged(),
+                            c.nodeId(),
+                            "subscription=" + c.subscription() + " " + PROTOCOL_LABEL + c.protocol() + " acked="
+                                    + c.messagesAcknowledged(),
                             c.messagesDelivered()));
                 }
             }
-            case SESSIONS -> {
-                orderedBy = "sessionId";
+            case CHANNEL -> {
+                orderedBy = "id";
                 for (ResourceViews.ChannelView x :
                         lists.channels(clusterId, query).data()) {
                     rows.add(new McpViews.ResourceRow(
-                            "session",
+                            x.id(),
+                            x.kind(),
+                            x.kindLabel(),
                             ResourceIds.nameOf(x.id()),
                             x.nodeName(),
+                            x.nodeId(),
                             "user=" + x.user() + " producers=" + x.producerCount(),
                             x.consumerCount()));
                 }
             }
-            case CONNECTIONS -> {
+            case CONNECTION -> {
                 orderedBy = "remoteAddress";
                 for (ResourceViews.ConnectionView x :
                         lists.connections(clusterId, query).data()) {
                     rows.add(new McpViews.ResourceRow(
-                            "connection",
-                            x.remoteAddress(),
+                            x.id(),
+                            x.kind(),
+                            x.kindLabel(),
+                            ResourceIds.nameOf(x.id()),
                             x.nodeName(),
-                            PROTOCOL_LABEL + x.protocol() + " client=" + x.clientId(),
+                            x.nodeId(),
+                            "remote=" + x.remoteAddress() + " " + PROTOCOL_LABEL + x.protocol() + " client="
+                                    + x.clientId(),
                             x.channelCount()));
                 }
             }
-            case PRODUCERS -> {
-                orderedBy = "address";
+            case PRODUCER -> {
+                orderedBy = "destination";
                 for (ResourceViews.ProducerView x :
                         lists.producers(clusterId, query).data()) {
                     rows.add(new McpViews.ResourceRow(
-                            "producer",
-                            x.destinationName(),
+                            x.id(),
+                            x.kind(),
+                            x.kindLabel(),
+                            ResourceIds.nameOf(x.id()),
                             x.nodeName(),
-                            PROTOCOL_LABEL + x.protocol(),
+                            x.nodeId(),
+                            "destination=" + x.destination() + " " + PROTOCOL_LABEL + x.protocol(),
                             x.messagesSent()));
                 }
             }
-            default -> throw McpErrors.invalidParams("unsupported kind");
+            default -> throw McpErrors.invalidParams("unsupported role");
         }
-        return McpViews.Page.of(rows, limit, orderedBy);
+        List<McpViews.ResourceRow> wanted =
+                ofKind ? rows.stream().filter(r -> kind.trim().equals(r.kind())).toList() : rows;
+        return McpViews.Page.of(wanted, limit, orderedBy);
     }
 }

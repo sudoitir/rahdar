@@ -1,5 +1,6 @@
 package io.github.sudoitir.rahdar.feature.resources.mcp;
 
+import io.github.sudoitir.openbroker.model.ResourceClass;
 import io.github.sudoitir.rahdar.feature.resources.ConnectionCloseKind;
 import io.github.sudoitir.rahdar.feature.resources.ConnectionControlService;
 import io.github.sudoitir.rahdar.feature.resources.ConnectionControlService.CloseResult;
@@ -8,6 +9,7 @@ import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
 import io.github.sudoitir.rahdar.platform.clusters.LifecycleOutcome;
 import io.github.sudoitir.rahdar.platform.mcp.McpArgs;
 import io.github.sudoitir.rahdar.platform.mcp.McpErrors;
+import io.github.sudoitir.rahdar.platform.mcp.McpResources;
 import io.github.sudoitir.rahdar.platform.mcp.McpViews;
 import io.modelcontextprotocol.spec.McpSchema;
 import java.util.List;
@@ -31,17 +33,34 @@ import org.springframework.stereotype.Component;
 public class ResourcesMcpActionTools {
 
     private final ConnectionControlService connectionControl;
+    private final McpResources resources;
+
+    /** What a close targets, by the role of the resource it names. */
+    public enum CloseTarget {
+        CONNECTION(ConnectionCloseKind.CONNECTION, ResourceClass.CONNECTION),
+        CHANNEL(ConnectionCloseKind.SESSION, ResourceClass.CHANNEL),
+        CONSUMER(ConnectionCloseKind.CONSUMER, ResourceClass.CONSUMER),
+        DESTINATION(ConnectionCloseKind.ADDRESS_CONSUMERS, ResourceClass.DESTINATION);
+
+        private final ConnectionCloseKind close;
+        private final ResourceClass resourceClass;
+
+        CloseTarget(ConnectionCloseKind close, ResourceClass resourceClass) {
+            this.close = close;
+            this.resourceClass = resourceClass;
+        }
+    }
 
     /**
-     * Closing a connection, a session, the connection behind a consumer, or every
-     * consumer connection on an address — as one tool discriminated by {@code kind}.
+     * Closing a connection, a channel, the connection behind a consumer, or every
+     * consumer connection on a destination — as one tool discriminated by {@code kind}.
      *
      * <p>Declared not idempotent, and it means it: a connection identifier is
      * node-local and can be reissued, so a retried close may land on a different
      * application. Nothing here retries, and a host must not either.
      *
      * <p>The confirmation gate is against something a human recognises — the client
-     * id the broker reports, or the address — never the opaque connection id. For a
+     * id the broker reports, or the destination — never the opaque connection id. For a
      * by-id kind the identity is not knowable until the target has been read, so a
      * real run previews first and compares the confirmation against what came back.
      * A target that has already gone needs no confirmation: there is nothing left to
@@ -49,7 +68,7 @@ public class ResourcesMcpActionTools {
      */
     @McpTool(
             name = "connection_action",
-            description = "Close a connection, a session, a consumer's connection, or an address's consumers.",
+            description = "Close a connection, a channel, a consumer's connection, or a destination's consumers.",
             annotations =
                     @McpTool.McpAnnotations(
                             readOnlyHint = false,
@@ -67,30 +86,32 @@ public class ResourcesMcpActionTools {
             @McpToolParam(required = false) String confirm,
             @McpToolParam(required = false) Boolean override) {
         UUID id = McpArgs.uuid("clusterId", clusterId);
-        ConnectionCloseKind op = McpArgs.enumOf(ConnectionCloseKind.class, "kind", kind, null);
-        String subject = McpArgs.required("target", target);
+        CloseTarget closing = McpArgs.enumOf(CloseTarget.class, "kind", kind, null);
+        ConnectionCloseKind op = closing.close;
         boolean dry = McpArgs.flag(dryRun, true);
         boolean over = McpArgs.flag(override, false);
+        UUID node = op.nodeScoped() ? McpArgs.uuid("nodeId", nodeId) : null;
 
-        if (op.nodeScoped()) {
-            UUID node = McpArgs.uuid("nodeId", nodeId);
-            return McpErrors.guard(() -> {
+        return McpErrors.guard(() -> {
+            String subject = resources
+                    .require(id, "target", target, closing.resourceClass)
+                    .name();
+            if (op.nodeScoped()) {
                 CloseResult preview = result(closeById(id, node, op, subject, true));
                 if (dry || preview.target() == null) {
                     // Already gone, or a preview was all that was asked for. Either way
                     // nothing was closed and there is nothing to confirm against.
-                    return closeOutcome(op, subject, preview);
+                    return closeOutcome(closing, subject, preview);
                 }
                 McpArgs.confirm(preview.target().label(), confirm);
-                return closeOutcome(op, subject, result(closeById(id, node, op, subject, false)));
-            });
-        }
-
-        if (!dry) {
-            McpArgs.confirm(subject, confirm);
-        }
-        return McpErrors.guard(() ->
-                closeOutcome(op, subject, result(connectionControl.closeAddressConsumers(id, subject, dry, over))));
+                return closeOutcome(closing, subject, result(closeById(id, node, op, subject, false)));
+            }
+            if (!dry) {
+                McpArgs.confirm(subject, confirm);
+            }
+            return closeOutcome(
+                    closing, subject, result(connectionControl.closeAddressConsumers(id, subject, dry, over)));
+        });
     }
 
     private Attempt<CloseResult> closeById(
@@ -115,14 +136,15 @@ public class ResourcesMcpActionTools {
      * treating a vanished target as a failure and retrying onto whatever now holds
      * that identifier.
      */
-    private static McpViews.CloseOutcome closeOutcome(ConnectionCloseKind kind, String subject, CloseResult result) {
+    private static McpViews.CloseOutcome closeOutcome(CloseTarget closing, String subject, CloseResult result) {
+        ConnectionCloseKind kind = closing.close;
         LifecycleOutcome outcome = result.outcome();
         boolean gone = kind != ConnectionCloseKind.ADDRESS_CONSUMERS && result.target() == null;
         List<McpViews.LifecycleNode> nodes = outcome.nodes().stream()
                 .map(n -> new McpViews.LifecycleNode(n.nodeName(), n.status().name(), n.affected(), n.error()))
                 .toList();
         return new McpViews.CloseOutcome(
-                kind.name().toLowerCase(Locale.ROOT),
+                closing.name().toLowerCase(Locale.ROOT),
                 subject,
                 outcome.dryRun(),
                 gone,
