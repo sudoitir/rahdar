@@ -20,6 +20,8 @@ import java.util.Set;
 import java.util.jar.JarEntry;
 import java.util.jar.JarOutputStream;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.info.BuildProperties;
 
@@ -169,6 +171,14 @@ class PluginValidatorTest {
     @Test
     void basePackageOverlapsReservedPrefix() throws Exception {
         var jar = validPlugin("acme-notes").descriptorField("basePackage", "org.springframework.acme");
+        assertThat(has(validate(jar), "base-package-overlap")).isTrue();
+    }
+
+    /** The broker SDK and every installed driver's own client libraries are the host's, never a plugin's. */
+    @ParameterizedTest
+    @ValueSource(strings = {"io.github.sudoitir.openbroker.acme", "org.apache.activemq.acme", "org.jolokia.acme"})
+    void basePackageOverlapsTheBrokerSdkOrADriversClient(String basePackage) throws Exception {
+        var jar = validPlugin("acme-notes").descriptorField("basePackage", basePackage);
         assertThat(has(validate(jar), "base-package-overlap")).isTrue();
     }
 
