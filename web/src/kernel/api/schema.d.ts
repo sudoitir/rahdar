@@ -6570,7 +6570,7 @@ export interface components {
             origin?: string;
             /**
              * Format: int64
-             * @description The message's id on its source queue, for a captured row. Null when the broker did not copy _AMQ_ORIG_MESSAGE_ID, which is what makes verifying it against the live broker impossible.
+             * @description The message's id on its source queue, for a captured row. Null when the broker did not record the message's origin id, which is what makes verifying it against the live broker impossible.
              */
             sourceMessageId?: number;
             /** @description Every sensitive value in this row, masked or shown in clear by grant. */
