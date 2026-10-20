@@ -1,16 +1,14 @@
-package io.github.sudoitir.rahdar.system.artemis;
+package io.github.sudoitir.rahdar.platform.scrape;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
-import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
+import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
-import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshots;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -19,8 +17,7 @@ class QueueLocatorTest {
 
     private final UUID clusterId = UUID.randomUUID();
     private final ClusterDirectory clusters = mock(ClusterDirectory.class);
-    private final BrokerConnections connections = mock(BrokerConnections.class);
-    ArtemisNodes artemisNodes = mock(ArtemisNodes.class);
+    private final BrokerGateway gateway = mock(BrokerGateway.class);
     private final QueueSnapshots snapshots = mock(QueueSnapshots.class);
 
     @Test
@@ -28,10 +25,10 @@ class QueueLocatorTest {
         ClusterNode node = node();
         when(clusters.nodes(clusterId)).thenReturn(List.of(node));
         when(snapshots.forCluster(clusterId)).thenReturn(List.of());
-        when(artemisNodes.on(any(UUID.class), any(UUID.class)))
+        when(gateway.cluster(clusterId))
                 .thenThrow(new BrokerConnectionException(BrokerConnectionException.Kind.THROTTLED, "held back"));
 
-        QueueLocator locator = new QueueLocator(snapshots, clusters, connections, artemisNodes);
+        QueueLocator locator = new QueueLocator(snapshots, clusters, gateway);
 
         assertThatThrownBy(() -> locator.locate(clusterId, "orders"))
                 .isInstanceOf(BrokerConnectionException.class)
@@ -45,7 +42,7 @@ class QueueLocatorTest {
         when(clusters.nodes(clusterId)).thenReturn(List.of(node));
         when(snapshots.forCluster(clusterId)).thenReturn(List.of());
 
-        assertThat(new QueueLocator(snapshots, clusters, connections, artemisNodes).locate(clusterId, "orders"))
+        assertThat(new QueueLocator(snapshots, clusters, gateway).locate(clusterId, "orders"))
                 .isEmpty();
     }
 

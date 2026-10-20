@@ -38,6 +38,8 @@ import io.github.sudoitir.rahdar.platform.broker.BrokerSettings;
 import io.github.sudoitir.rahdar.platform.broker.BrowsePage;
 import io.github.sudoitir.rahdar.platform.broker.BrowsedMessage;
 import io.github.sudoitir.rahdar.platform.broker.BulkCapExceededException;
+import io.github.sudoitir.rahdar.platform.broker.BulkResult;
+import io.github.sudoitir.rahdar.platform.broker.MessageExpiry;
 import io.github.sudoitir.rahdar.platform.broker.MessageKind;
 import io.github.sudoitir.rahdar.platform.broker.SendNames;
 import io.github.sudoitir.rahdar.platform.broker.SentMessages;
@@ -49,10 +51,8 @@ import io.github.sudoitir.rahdar.platform.governance.GovernContext;
 import io.github.sudoitir.rahdar.platform.governance.GovernanceViews;
 import io.github.sudoitir.rahdar.platform.governance.GovernedMessage;
 import io.github.sudoitir.rahdar.platform.governance.MessageContent;
-import io.github.sudoitir.rahdar.system.artemis.ArtemisExpiry;
-import io.github.sudoitir.rahdar.system.artemis.MessageOperations;
-import io.github.sudoitir.rahdar.system.artemis.QueueLocator;
-import io.github.sudoitir.rahdar.system.artemis.QueueLocator.QueueLocation;
+import io.github.sudoitir.rahdar.platform.scrape.QueueLocator;
+import io.github.sudoitir.rahdar.platform.scrape.QueueLocator.QueueLocation;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Comparator;
@@ -95,7 +95,7 @@ public class MessageService {
     private final QueueLocator queueLocator;
     private final ClusterDirectory brokerNodes;
     private final BrokerMessages messages;
-    private final ArtemisExpiry expiry;
+    private final MessageExpiry expiry;
     private final AuditService audit;
     private final ActorResolver actorResolver;
     private final SettingsService settings;
@@ -399,7 +399,7 @@ public class MessageService {
 
     private Attempt<Outcome> executeByIds(
             AuditEvent event, QueueAction call, UUID clusterId, String queueName, UUID node) {
-        MessageOperations.BulkResult result = performByIds(call);
+        BulkResult result = performByIds(call);
         MessageActionRequest req = call.req();
         publishQueuesAfterCommit(clusterId, queueName);
         if (result.partial()) {
@@ -556,14 +556,7 @@ public class MessageService {
             case DELETE ->
                 messages.byFilter(call.clusterId(), node, call.queue(), req.filter(), Optional.empty(), new Delete())
                         .done();
-            case EXPIRE ->
-                expiry.byFilter(
-                        call.clusterId(),
-                        node,
-                        call.queue(),
-                        call.resolved().address(),
-                        call.resolved().routingType(),
-                        req.filter());
+            case EXPIRE -> expiry.byFilter(call.clusterId(), node, call.queue(), req.filter());
             case RETRY -> throw new IllegalStateException("unreachable");
         };
     }
@@ -604,20 +597,14 @@ public class MessageService {
         return MessageFilter.portable("header.origin = '" + origin.replace("'", "''") + "'");
     }
 
-    private MessageOperations.BulkResult performByIds(QueueAction call) {
+    private BulkResult performByIds(QueueAction call) {
         MessageActionRequest req = call.req();
         UUID node = call.resolved().node().getId();
         List<Long> ids = call.action() == MessageAction.RETRY && call.scope().restricted()
                 ? fromCheckedOrigins(call, req.ids())
                 : req.ids();
         if (call.action() == MessageAction.EXPIRE) {
-            return expiry.byIds(
-                    call.clusterId(),
-                    node,
-                    call.queue(),
-                    call.resolved().address(),
-                    call.resolved().routingType(),
-                    ids);
+            return expiry.byIds(call.clusterId(), node, call.queue(), ids);
         }
         io.github.sudoitir.openbroker.messaging.MessageAction act =
                 switch (call.action()) {
@@ -630,7 +617,7 @@ public class MessageService {
         List<Long> notDone = outcome.notDone().stream()
                 .map(ref -> Long.parseLong(ref.position()))
                 .toList();
-        return new MessageOperations.BulkResult(
+        return new BulkResult(
                 outcome.done(), notDone, outcome.notDoneReason().isEmpty() ? null : outcome.notDoneReason());
     }
 

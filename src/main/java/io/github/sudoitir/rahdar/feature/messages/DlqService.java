@@ -10,12 +10,11 @@ import io.github.sudoitir.rahdar.kernel.security.PermissionResolver;
 import io.github.sudoitir.rahdar.kernel.security.ResourceFilter;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
+import io.github.sudoitir.rahdar.platform.broker.DeadLetterDestinations;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
 import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshot;
 import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshots;
-import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
-import io.github.sudoitir.rahdar.system.artemis.ArtemisNodes;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -24,7 +23,6 @@ import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import tools.jackson.databind.JsonNode;
 
 /**
  * Dead-letter / expiry view (ADR-0021, D8). The DLA and EA come from the broker's
@@ -43,7 +41,7 @@ public class DlqService {
     private final BrokerConnections connections;
     private final ClusterAccessGuard clusterAccess;
     private final PermissionResolver permissions;
-    private final ArtemisNodes artemisNodes;
+    private final DeadLetterDestinations deadLetters;
 
     public DlqView view(UUID clusterId) {
         clusterAccess.requireVisible(clusterId);
@@ -56,7 +54,7 @@ public class DlqService {
                         BrokerConnectionException.Kind.UNREACHABLE,
                         "This cluster has no node with a management URL yet."));
 
-        Optional<Map<String, String>> kinds = deadLetterKinds(clusterId, manageable);
+        Optional<Map<String, String>> kinds = deadLetters.defaults(clusterId, manageable.getId());
         if (kinds.isEmpty()) {
             return new DlqView(List.of(), false);
         }
@@ -74,26 +72,6 @@ public class DlqService {
             }
         }
         return new DlqView(addresses, true);
-    }
-
-    /** The dead-letter and expiry addresses by kind, or empty when the broker's settings cannot be read. */
-    private Optional<Map<String, String>> deadLetterKinds(UUID clusterId, ClusterNode manageable) {
-        try {
-            ArtemisNode client = artemisNodes.on(clusterId, manageable.getId());
-            JsonNode settings = client.execOnBrokerParsed("getAddressSettingsAsJSON(java.lang.String)", "#");
-            String dla = text(settings, "deadLetterAddress");
-            String ea = text(settings, "expiryAddress");
-            Map<String, String> kinds = new LinkedHashMap<>();
-            if (dla != null && !dla.isBlank()) {
-                kinds.put(dla, "dead-letter");
-            }
-            if (ea != null && !ea.isBlank()) {
-                kinds.putIfAbsent(ea, "expiry");
-            }
-            return Optional.of(kinds);
-        } catch (BrokerConnectionException _) {
-            return Optional.empty();
-        }
     }
 
     private static List<DlqQueue> readableQueuesOn(
@@ -117,10 +95,5 @@ public class DlqService {
             queues.add(new DlqQueue(queueName, address, totalDepth, perNode));
         });
         return queues;
-    }
-
-    private static String text(JsonNode node, String field) {
-        JsonNode v = node == null ? null : node.get(field);
-        return v == null || v.isNull() ? null : v.asText();
     }
 }

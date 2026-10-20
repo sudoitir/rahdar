@@ -60,6 +60,8 @@ import io.github.sudoitir.rahdar.platform.broker.BrokerSettings;
 import io.github.sudoitir.rahdar.platform.broker.BrowsePage;
 import io.github.sudoitir.rahdar.platform.broker.BrowsedMessage;
 import io.github.sudoitir.rahdar.platform.broker.BulkCapExceededException;
+import io.github.sudoitir.rahdar.platform.broker.BulkResult;
+import io.github.sudoitir.rahdar.platform.broker.MessageExpiry;
 import io.github.sudoitir.rahdar.platform.broker.MessageKind;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
@@ -68,10 +70,8 @@ import io.github.sudoitir.rahdar.platform.governance.ContentPolicy;
 import io.github.sudoitir.rahdar.platform.governance.GovernContext;
 import io.github.sudoitir.rahdar.platform.governance.GovernedMessage;
 import io.github.sudoitir.rahdar.platform.governance.MessageContent;
-import io.github.sudoitir.rahdar.system.artemis.ArtemisExpiry;
-import io.github.sudoitir.rahdar.system.artemis.MessageOperations;
-import io.github.sudoitir.rahdar.system.artemis.QueueLocator;
-import io.github.sudoitir.rahdar.system.artemis.QueueLocator.QueueLocation;
+import io.github.sudoitir.rahdar.platform.scrape.QueueLocator;
+import io.github.sudoitir.rahdar.platform.scrape.QueueLocator.QueueLocation;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -103,7 +103,7 @@ class MessageServiceTest {
     private final QueueLocator locator = mock(QueueLocator.class);
     private final ClusterDirectory directory = mock(ClusterDirectory.class);
     private final BrokerMessages messages = mock(BrokerMessages.class);
-    private final ArtemisExpiry expiry = mock(ArtemisExpiry.class);
+    private final MessageExpiry expiry = mock(MessageExpiry.class);
     private final AuditService audit = mock(AuditService.class);
     private final ActorResolver actors = mock(ActorResolver.class);
     private final SettingsService settings = mock(SettingsService.class);
@@ -619,8 +619,7 @@ class MessageServiceTest {
                 .thenReturn(done(1));
         when(messages.byFilter(CLUSTER, NODE_B, "orders", "f", Optional.empty(), new Delete()))
                 .thenReturn(done(2));
-        when(expiry.byFilter(CLUSTER, NODE_B, "orders", "orders.addr", "ANYCAST", "f"))
-                .thenReturn(3L);
+        when(expiry.byFilter(CLUSTER, NODE_B, "orders", "f")).thenReturn(3L);
 
         assertThat(service.execute(CLUSTER, "orders", null, MessageAction.MOVE, filter("f", "target"), false, false))
                 .isInstanceOfSatisfying(
@@ -656,8 +655,7 @@ class MessageServiceTest {
         when(access.holds(CLUSTER, MessagePermissions.MESSAGE_SEND)).thenReturn(true);
         when(messages.byIds(eq(CLUSTER), eq(NODE_B), eq("orders"), eq(List.of(1L, 2L)), any()))
                 .thenReturn(done(2));
-        when(expiry.byIds(CLUSTER, NODE_B, "orders", "orders.addr", "ANYCAST", List.of(1L, 2L)))
-                .thenReturn(new MessageOperations.BulkResult(2, List.of(), null));
+        when(expiry.byIds(CLUSTER, NODE_B, "orders", List.of(1L, 2L))).thenReturn(new BulkResult(2, List.of(), null));
 
         for (MessageAction action : MessageAction.values()) {
             MessageActionRequest request = new MessageActionRequest(List.of(1L, 2L), null, "target");
@@ -1011,8 +1009,7 @@ class MessageServiceTest {
         MessageActionRequest request = new MessageActionRequest(List.of(1L, 2L), null, "target");
         when(access.holds(CLUSTER, MessagePermissions.MESSAGE_SEND)).thenReturn(true);
         when(messages.byIds(any(), any(), anyString(), anyList(), any())).thenReturn(done(2));
-        when(expiry.byIds(any(), any(), anyString(), anyString(), anyString(), anyList()))
-                .thenReturn(new MessageOperations.BulkResult(2, List.of(), null));
+        when(expiry.byIds(any(), any(), anyString(), anyList())).thenReturn(new BulkResult(2, List.of(), null));
 
         service.execute(CLUSTER, "orders", null, MessageAction.MOVE, request, false, true);
         service.execute(CLUSTER, "orders", null, MessageAction.RETRY, request, false, true);

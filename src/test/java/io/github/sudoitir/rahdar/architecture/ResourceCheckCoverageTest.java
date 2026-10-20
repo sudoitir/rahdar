@@ -90,10 +90,10 @@ class ResourceCheckCoverageTest {
      */
     private static final Map<String, String> EXEMPT = Map.ofEntries(
             Map.entry(
-                    "feature.queues.QueueLifecycleOperations",
+                    "system.artemis.QueueLifecycleOperations",
                     "broker primitives; QueueLifecycleService checks before it calls them"),
             Map.entry(
-                    "feature.queues.DivertOperations",
+                    "system.artemis.DivertOperations",
                     "broker primitives; QueueLifecycleService and RoutingService check before they call them"),
             Map.entry(
                     "feature.brokerconfig.BrokerConfigOperations",
@@ -110,8 +110,19 @@ class ResourceCheckCoverageTest {
             Map.entry(
                     "system.artemis.AcceptanceProbe", "reads a target's facts for a transfer that was already checked"),
             Map.entry(
-                    "system.artemis.QueueLocator",
-                    "finds where a name is on the scraped snapshot; its callers have checked the name"),
+                    "platform.scrape.QueueLocator",
+                    "finds where a name is on the scraped snapshot or the live nodes; its callers have checked the"
+                            + " name"),
+            Map.entry(
+                    "platform.broker.BrokerMessages",
+                    "the SDK's message primitives; the message, queue, SQL and plugin messaging services check"
+                            + " before they call them, and the request-reply sampler and capture read for Rahdar"),
+            Map.entry(
+                    "system.artemis.ArtemisExpiry",
+                    "broker primitive behind MessageExpiry; MessageService checks before it calls it"),
+            Map.entry(
+                    "system.artemis.ArtemisQueueCounters",
+                    "broker primitive behind QueueCounters; QueueLifecycleService checks before it calls it"),
             Map.entry(
                     "platform.scrape.QueueSnapshotUpsert",
                     "the scrape's own bookkeeping, driven by the broker and no caller"),
@@ -137,7 +148,7 @@ class ResourceCheckCoverageTest {
             Map.entry(
                     "platform.mcp.McpRunbookPrompts",
                     "returns a fixed procedure that repeats the name it was given; it reads nothing"),
-            Map.entry("feature.queues.BridgeOperations", "broker primitive; RoutingService checks before it calls it"),
+            Map.entry("system.artemis.BridgeOperations", "broker primitive; RoutingService checks before it calls it"),
             Map.entry(
                     "feature.sql.CaptureConsumer",
                     "drains the captures Rahdar runs for itself; no caller names a queue"),

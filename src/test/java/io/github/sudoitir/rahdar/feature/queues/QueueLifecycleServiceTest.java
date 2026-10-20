@@ -15,6 +15,14 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import io.github.sudoitir.openbroker.ClusterConnection;
+import io.github.sudoitir.openbroker.Partial;
+import io.github.sudoitir.openbroker.model.Attributes;
+import io.github.sudoitir.openbroker.model.Resource;
+import io.github.sudoitir.openbroker.model.ResourcePage;
+import io.github.sudoitir.openbroker.model.ResourceQuery;
+import io.github.sudoitir.openbroker.model.Resources;
+import io.github.sudoitir.openbroker.model.StandardAttributes;
 import io.github.sudoitir.rahdar.feature.queues.LifecycleRequests.CreateQueueRequest;
 import io.github.sudoitir.rahdar.kernel.audit.internal.persistence.AuditEventEntity;
 import io.github.sudoitir.rahdar.kernel.audit.internal.persistence.AuditEventRepository;
@@ -26,6 +34,7 @@ import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
 import io.github.sudoitir.rahdar.platform.broker.BrokerTarget;
 import io.github.sudoitir.rahdar.platform.broker.BulkCapExceededException;
 import io.github.sudoitir.rahdar.platform.broker.ManagementRefusal;
+import io.github.sudoitir.rahdar.platform.broker.QueueCounters;
 import io.github.sudoitir.rahdar.platform.broker.QueueRow;
 import io.github.sudoitir.rahdar.platform.clusters.LifecycleOutcome;
 import io.github.sudoitir.rahdar.platform.clusters.LifecycleOutcome.NodeOutcome;
@@ -44,12 +53,12 @@ import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
 import io.github.sudoitir.rahdar.system.artemis.ArtemisNodes;
 import io.github.sudoitir.rahdar.system.artemis.DivertOperations;
 import io.github.sudoitir.rahdar.system.artemis.DivertRow;
-import io.github.sudoitir.rahdar.system.artemis.ManagementResponse;
 import io.github.sudoitir.rahdar.system.artemis.QueueLifecycleOperations;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
@@ -57,7 +66,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.ArgumentMatchers;
 import org.mockito.InOrder;
 import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -110,6 +118,9 @@ class QueueLifecycleServiceTest extends PostgresIntegrationTest {
     QueueLifecycleOperations ops;
 
     @MockitoBean
+    QueueCounters counters;
+
+    @MockitoBean
     DivertOperations divertOps;
 
     @MockitoBean
@@ -119,6 +130,7 @@ class QueueLifecycleServiceTest extends PostgresIntegrationTest {
     CaptureTaps captureTaps;
 
     private ArtemisNode client;
+    private Resources liveResources;
 
     private UUID clusterId;
     private UUID liveId;
@@ -137,6 +149,25 @@ class QueueLifecycleServiceTest extends PostgresIntegrationTest {
         when(artemisNodes.on(any(BrokerTarget.class))).thenReturn(client);
         BrokerTarget anyNode = Targets.target();
         when(gateway.node(any(UUID.class), any(UUID.class))).thenReturn(anyNode);
+        // What the live nodes list for a queue the scrape has not reached: nothing, unless a test says so.
+        ClusterConnection live = mock(ClusterConnection.class);
+        liveResources = mock(Resources.class);
+        when(gateway.cluster(clusterId)).thenReturn(live);
+        when(live.resources()).thenReturn(liveResources);
+        when(liveResources.read(any(ResourceQuery.class))).thenReturn(page());
+    }
+
+    private static Partial<ResourcePage> page(Resource... items) {
+        return new Partial<>(new ResourcePage(List.of(items), Optional.empty()), Map.of(), Map.of());
+    }
+
+    /** The queue as a live node lists it. */
+    private static Resource liveQueue() {
+        Attributes attributes = Attributes.builder()
+                .put(StandardAttributes.DESTINATION, Targets.id("artemis.address", ADDRESS))
+                .putRaw(QueueRow.ROUTING_TYPE, "ANYCAST")
+                .build();
+        return new Resource(Targets.id("artemis.queue", QUEUE), attributes, List.of(), List.of(), Instant.now());
     }
 
     /** Each node is its own logical node, so both are considered as targets. */
@@ -550,13 +581,7 @@ class QueueLifecycleServiceTest extends PostgresIntegrationTest {
 
     @Test
     void aQueueTheScrapeHasNotReachedIsFoundOnTheLiveNode() {
-        String mbean = "org.apache.activemq.artemis:broker=\"b\",component=addresses,address=\"" + ADDRESS
-                + "\",subcomponent=queues,routing-type=\"anycast\",queue=\"" + QUEUE + "\"";
-        tools.jackson.databind.node.ObjectNode value = new tools.jackson.databind.json.JsonMapper().createObjectNode();
-        value.putObject(mbean).put("MessageCount", 0);
-        when(client.single(ArgumentMatchers.argThat(
-                        r -> r != null && "read".equals(r.type()) && r.mbean().contains("queue=\"" + QUEUE + "\""))))
-                .thenReturn(new ManagementResponse(200, value, null, null, null));
+        when(liveResources.read(any(ResourceQuery.class))).thenReturn(page(liveQueue()));
         onTheNode(0, QUEUE);
 
         NodeOutcome preview = live(ok(lifecycle.deleteQueue(clusterId, QUEUE, true, false, false)));
@@ -566,10 +591,6 @@ class QueueLifecycleServiceTest extends PostgresIntegrationTest {
 
     @Test
     void aQueueNoNodeHasIsNotFound() {
-        // What a broker answers a pattern read that matches nothing.
-        when(client.single(ArgumentMatchers.any()))
-                .thenReturn(new ManagementResponse(
-                        404, null, "No MBean with pattern found", "javax.management.InstanceNotFoundException", null));
         assertThatThrownBy(() -> lifecycle.deleteQueue(clusterId, QUEUE, true, false, false))
                 .isInstanceOf(NotFoundException.class);
     }
@@ -752,10 +773,6 @@ class QueueLifecycleServiceTest extends PostgresIntegrationTest {
 
     @Test
     void anUpdateOfAQueueNoNodeHasIsNotFound() {
-        when(client.single(any()))
-                .thenReturn(new ManagementResponse(
-                        404, null, "No MBean", "javax.management.InstanceNotFoundException", null));
-
         var update = new LifecycleRequests.UpdateQueueRequest(null, 1, null, null, null, null);
 
         assertThatThrownBy(() -> lifecycle.updateQueue(clusterId, "ghost", update, false))
@@ -799,7 +816,7 @@ class QueueLifecycleServiceTest extends PostgresIntegrationTest {
         LifecycleOutcome outcome = ok(lifecycle.resetCounter(clusterId, QUEUE, false));
 
         assertThat(status(outcome, liveId)).isEqualTo(NodeStatus.APPLIED);
-        verify(ops).resetMessageCounter(any(), anyString());
+        verify(counters).reset(any(), eq(QUEUE));
     }
 
     // ---- addresses --------------------------------------------------------------

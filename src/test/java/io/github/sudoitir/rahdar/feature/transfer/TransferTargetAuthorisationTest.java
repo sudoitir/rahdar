@@ -17,7 +17,7 @@ import io.github.sudoitir.rahdar.kernel.security.ClusterAccessGuard;
 import io.github.sudoitir.rahdar.kernel.security.ClusterAccessGuard.Requirement;
 import io.github.sudoitir.rahdar.kernel.security.Permissions;
 import io.github.sudoitir.rahdar.kernel.security.ResourceRef;
-import io.github.sudoitir.rahdar.system.artemis.QueueLocator.QueueLocation;
+import io.github.sudoitir.rahdar.platform.scrape.QueueLocator.QueueLocation;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;

@@ -1,16 +1,15 @@
-package io.github.sudoitir.rahdar.system.artemis;
+package io.github.sudoitir.rahdar.platform.scrape;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
+import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
-import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshots;
+import io.github.sudoitir.rahdar.platform.scrape.QueueLocator.QueueLocation;
 import io.github.sudoitir.rahdar.support.ArtemisIntegrationTest;
-import io.github.sudoitir.rahdar.system.artemis.QueueLocator.QueueLocation;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
 import jakarta.jms.Connection;
 import jakarta.jms.Session;
 import java.util.List;
@@ -19,9 +18,9 @@ import org.apache.activemq.artemis.jms.client.ActiveMQConnectionFactory;
 import org.junit.jupiter.api.Test;
 
 /**
- * The live lookup against a real broker, with no snapshot to answer first. The pattern read's
- * response shape is the broker's, not an assumption: a shape the locator misread would skip the
- * node silently and report a queue on the broker as one that does not exist.
+ * The live lookup against a real broker, with no snapshot to answer first. The listing's shape is
+ * the broker's, not an assumption: a shape the locator misread would skip the node silently and
+ * report a queue on the broker as one that does not exist.
  */
 class QueueLocatorBrokerTest extends ArtemisIntegrationTest {
 
@@ -46,14 +45,12 @@ class QueueLocatorBrokerTest extends ArtemisIntegrationTest {
         when(node.getActive()).thenReturn(true);
         ClusterDirectory clusters = mock(ClusterDirectory.class);
         when(clusters.nodes(clusterId)).thenReturn(List.of(node));
-        BrokerConnections connections = mock(BrokerConnections.class);
-        ArtemisNodes artemisNodes = mock(ArtemisNodes.class);
-        when(artemisNodes.on(any(UUID.class), any(UUID.class))).thenReturn(client);
+        BrokerGateway gateway = mock(BrokerGateway.class);
+        when(gateway.cluster(clusterId)).thenReturn(cluster(nodeId));
         QueueSnapshots snapshots = mock(QueueSnapshots.class);
         when(snapshots.forCluster(clusterId)).thenReturn(List.of());
 
-        List<QueueLocation> found =
-                new QueueLocator(snapshots, clusters, connections, artemisNodes).locate(clusterId, queueName);
+        List<QueueLocation> found = new QueueLocator(snapshots, clusters, gateway).locate(clusterId, queueName);
 
         assertThat(found).containsExactly(new QueueLocation(nodeId, queueName, address, "MULTICAST", 3));
     }

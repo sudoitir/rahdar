@@ -20,9 +20,9 @@ import io.github.sudoitir.rahdar.platform.broker.ClockOffsetRegistry.ClockOffset
 import io.github.sudoitir.rahdar.platform.broker.ClockOffsetService;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNodeEntity;
+import io.github.sudoitir.rahdar.platform.scrape.QueueLocator;
 import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshot;
 import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshots;
-import io.github.sudoitir.rahdar.system.artemis.QueueLocator;
 import java.lang.reflect.Field;
 import java.time.Clock;
 import java.time.Duration;

@@ -15,8 +15,7 @@
             "platform.clusters",
             "platform.governance",
             "platform.mcp",
-            "platform.scrape",
-            "system.artemis"
+            "platform.scrape"
         })
 package io.github.sudoitir.rahdar.feature.messages;
 

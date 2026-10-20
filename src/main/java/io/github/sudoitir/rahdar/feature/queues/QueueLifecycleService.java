@@ -19,6 +19,7 @@ import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
 import io.github.sudoitir.rahdar.platform.broker.BrokerMessages;
 import io.github.sudoitir.rahdar.platform.broker.ManagementRefusal;
+import io.github.sudoitir.rahdar.platform.broker.QueueCounters;
 import io.github.sudoitir.rahdar.platform.clusters.BrokerCommands;
 import io.github.sudoitir.rahdar.platform.clusters.BrokerCommands.Check;
 import io.github.sudoitir.rahdar.platform.clusters.BrokerCommands.Command;
@@ -29,6 +30,8 @@ import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
 import io.github.sudoitir.rahdar.platform.clusters.LifecycleOutcome;
 import io.github.sudoitir.rahdar.platform.clusters.LifecycleOutcome.NodeStatus;
+import io.github.sudoitir.rahdar.platform.scrape.QueueLocator;
+import io.github.sudoitir.rahdar.platform.scrape.QueueLocator.QueueLocation;
 import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshotUpsert;
 import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
 import io.github.sudoitir.rahdar.system.artemis.ArtemisNodes;
@@ -36,8 +39,6 @@ import io.github.sudoitir.rahdar.system.artemis.DivertOperations;
 import io.github.sudoitir.rahdar.system.artemis.DivertRow;
 import io.github.sudoitir.rahdar.system.artemis.MBeanNames;
 import io.github.sudoitir.rahdar.system.artemis.QueueLifecycleOperations;
-import io.github.sudoitir.rahdar.system.artemis.QueueLocator;
-import io.github.sudoitir.rahdar.system.artemis.QueueLocator.QueueLocation;
 import jakarta.validation.Validator;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -104,6 +105,7 @@ public class QueueLifecycleService {
     private final OperationGate gate;
     private final ArtemisNodes artemisNodes;
     private final BrokerMessages messages;
+    private final QueueCounters counters;
 
     /** What a delete would touch: how many messages, and the target's identity for the gate's state key. */
     public record Reach(long count, String identity) {}
@@ -435,12 +437,12 @@ public class QueueLifecycleService {
 
     public Attempt<LifecycleOutcome> resetCounter(UUID clusterId, String queueName, boolean dryRun) {
         access.requireResource(clusterId, ResourceRef.queue(queueName), LifecycleKind.RESET_QUEUE_COUNTER.permission());
-        ResolvedQueue queue = resolveQueue(clusterId, queueName);
-        return run(
-                clusterId, LifecycleKind.RESET_QUEUE_COUNTER, queueName, Map.of(), dryRun, false, (client, broker) -> {
-                    ops.resetMessageCounter(client, queueMbean(client, queue));
-                    return NodeStatus.APPLIED;
-                });
+        // Resolved first, so a queue no node has is not found rather than reset nowhere.
+        resolveQueue(clusterId, queueName);
+        return runOn(clusterId, LifecycleKind.RESET_QUEUE_COUNTER, queueName, Map.of(), dryRun, false, node -> {
+            counters.reset(node, queueName);
+            return NodeStatus.APPLIED;
+        });
     }
 
     public Attempt<LifecycleOutcome> createAddress(UUID clusterId, CreateAddressRequest req, boolean dryRun) {
@@ -675,6 +677,17 @@ public class QueueLifecycleService {
             boolean dryRun,
             boolean override,
             ArtemisAction action) {
+        return runOn(clusterId, kind, targetName, params, dryRun, override, artemis(action));
+    }
+
+    private Attempt<LifecycleOutcome> runOn(
+            UUID clusterId,
+            LifecycleKind kind,
+            String targetName,
+            Map<String, ?> params,
+            boolean dryRun,
+            boolean override,
+            NodeAction action) {
         return new Attempt.Ok<>(commands.run(Command.builder()
                 .clusterId(clusterId)
                 .permission(kind.permission())
@@ -685,7 +698,7 @@ public class QueueLifecycleService {
                 .params(params)
                 .dryRun(dryRun)
                 .override(override)
-                .action(artemis(action))
+                .action(action)
                 .signal(() -> sseHub.publishAbout(
                         clusterId,
                         QUEUES_TOPIC,

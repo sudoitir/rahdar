@@ -10,6 +10,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
+import io.github.sudoitir.rahdar.platform.broker.BulkResult;
 import java.util.List;
 import java.util.stream.IntStream;
 import java.util.stream.LongStream;
@@ -37,7 +38,7 @@ class MessageOperationsTest {
             return requests.stream().map(r -> acted()).toList();
         });
 
-        MessageOperations.BulkResult result = operations.deleteByIds(client, QUEUE, ids(1, 120));
+        BulkResult result = operations.deleteByIds(client, QUEUE, ids(1, 120));
 
         assertThat(result.affected()).isEqualTo(120);
         assertThat(result.partial()).isFalse();
@@ -53,7 +54,7 @@ class MessageOperationsTest {
                     .toList();
         });
 
-        MessageOperations.BulkResult result = operations.deleteByIds(client, QUEUE, ids(1, 60));
+        BulkResult result = operations.deleteByIds(client, QUEUE, ids(1, 60));
 
         assertThat(result.partial()).isTrue();
         // Every result of the first batch is counted, because the broker ran all of them.
@@ -71,7 +72,7 @@ class MessageOperationsTest {
                 .thenThrow(
                         new BrokerConnectionException(BrokerConnectionException.Kind.UNREACHABLE, "connection reset"));
 
-        MessageOperations.BulkResult result = operations.moveByIds(client, QUEUE, ids(1, 60), "DLQ");
+        BulkResult result = operations.moveByIds(client, QUEUE, ids(1, 60), "DLQ");
 
         assertThat(result.affected()).isEqualTo(50);
         assertThat(result.notDone()).containsExactlyElementsOf(ids(51, 60));
@@ -93,7 +94,7 @@ class MessageOperationsTest {
     void aMessageTheBrokerDidNotFindIsNotCountedButIsNotAFailure() {
         when(client.batch(anyList())).thenReturn(List.of(acted(), notFound()));
 
-        MessageOperations.BulkResult result = operations.expireByIds(client, QUEUE, List.of(1L, 2L));
+        BulkResult result = operations.expireByIds(client, QUEUE, List.of(1L, 2L));
 
         assertThat(result.partial()).isFalse();
         assertThat(result.affected()).isEqualTo(1);

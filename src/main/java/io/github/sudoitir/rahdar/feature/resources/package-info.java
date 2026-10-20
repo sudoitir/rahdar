@@ -12,8 +12,7 @@
             "platform.broker",
             "platform.clusters",
             "platform.mcp",
-            "platform.scrape",
-            "system.artemis"
+            "platform.scrape"
         })
 package io.github.sudoitir.rahdar.feature.resources;
 

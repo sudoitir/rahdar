@@ -1,6 +1,7 @@
 package io.github.sudoitir.rahdar.system.artemis;
 
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
+import io.github.sudoitir.rahdar.platform.broker.BulkResult;
 import io.github.sudoitir.rahdar.platform.broker.QueueDepth;
 import java.util.ArrayList;
 import java.util.List;
@@ -145,18 +146,6 @@ public class MessageOperations {
     static final int BY_ID_BATCH = 50;
 
     private static final String MESSAGE_COUNT = "MessageCount";
-
-    /**
-     * What an operation on a list of ids did. When it stopped part-way, {@code error} says why
-     * and {@code notDone} holds every id that was not acted on — the ones the broker refused and
-     * every id after the batch that failed — so a caller never reports "failed" for an operation
-     * that already acted on some messages.
-     */
-    public record BulkResult(long affected, List<Long> notDone, String error) {
-        public boolean partial() {
-            return error != null;
-        }
-    }
 
     public BulkResult moveByIds(ArtemisNode client, String queueMbean, List<Long> ids, String targetQueue) {
         return eachId(

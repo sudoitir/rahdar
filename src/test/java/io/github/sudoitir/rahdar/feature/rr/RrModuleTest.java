@@ -1,10 +1,10 @@
 package io.github.sudoitir.rahdar.feature.rr;
 
 import io.github.sudoitir.rahdar.kernel.lifecycle.LifecycleRegistry;
+import io.github.sudoitir.rahdar.platform.scrape.QueueLocator;
 import io.github.sudoitir.rahdar.support.ModuleIntegrationTest;
 import io.github.sudoitir.rahdar.system.artemis.DivertOperations;
 import io.github.sudoitir.rahdar.system.artemis.QueueLifecycleOperations;
-import io.github.sudoitir.rahdar.system.artemis.QueueLocator;
 import org.springframework.modulith.test.ApplicationModuleTest;
 import org.springframework.modulith.test.ApplicationModuleTest.BootstrapMode;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;

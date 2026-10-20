@@ -1,7 +1,5 @@
 package io.github.sudoitir.rahdar.feature.messages.web;
 
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
@@ -23,7 +21,6 @@ import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshotUpsert;
 import io.github.sudoitir.rahdar.support.AdminAuthenticationExtension;
 import io.github.sudoitir.rahdar.support.FixtureJolokia;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
-import io.github.sudoitir.rahdar.system.artemis.ArtemisNodes;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
@@ -67,9 +64,6 @@ class MessageBrowseControllerTest extends PostgresIntegrationTest {
 
     @MockitoBean
     BrokerConnections connections;
-
-    @MockitoBean
-    ArtemisNodes artemisNodes;
 
     @MockitoBean
     BrokerGateway gateway;
@@ -265,16 +259,20 @@ class MessageBrowseControllerTest extends PostgresIntegrationTest {
         BrokerNodeEntity a = nodes.findById(nodeAId).orElseThrow();
         a.applyHaState(new HaObservation(true, "STARTED", "PRIMARY", null, "2.44.0", null), 1L, Instant.now());
         nodes.save(a);
-        String located = "{\"status\":200,\"value\":{"
-                + "\"org.apache.activemq.artemis:address=\\\"FRESH.ADDR\\\",broker=\\\"primary\\\",component=addresses,"
-                + "queue=\\\"FRESH\\\",routing-type=\\\"anycast\\\",subcomponent=queues\":{\"MessageCount\":4}}}";
-
+        // The live node lists the queue by name, then the browse finds and reads it.
+        String listed = "{\"status\":200,\"value\":\"{\\\"data\\\":[{\\\"id\\\":\\\"7\\\","
+                + "\\\"name\\\":\\\"FRESH\\\",\\\"address\\\":\\\"FRESH\\\","
+                + "\\\"routingType\\\":\\\"ANYCAST\\\",\\\"messageCount\\\":\\\"4\\\"}],"
+                + "\\\"count\\\":1}\"}";
         FixtureJolokia server = new FixtureJolokia();
-        server.expect(requestTo(URL_A))
+        server.expect(requestTo(server.url()))
                 .andRespond(withSuccess(fixture("search-broker.json"), MediaType.APPLICATION_JSON));
-        server.expect(requestTo(URL_A)).andRespond(withSuccess(located, MediaType.APPLICATION_JSON));
-        when(artemisNodes.on(eq(clusterId), any(UUID.class))).thenReturn(server.node());
-        serving(nodeAId, "FRESH", batch("browse.json", 4));
+        server.expect(requestTo(server.url())).andRespond(withSuccess(listed, MediaType.APPLICATION_JSON));
+        server.expect(requestTo(server.url()))
+                .andRespond(withSuccess(queueSearch("FRESH"), MediaType.APPLICATION_JSON));
+        server.expect(requestTo(server.url()))
+                .andRespond(withSuccess(batch("browse.json", 4), MediaType.APPLICATION_JSON));
+        when(gateway.cluster(clusterId)).thenReturn(FixtureJolokia.cluster(Map.of(nodeAId, server)));
 
         mvc.perform(get("/api/v1/clusters/{c}/queues/{q}/messages", clusterId, "FRESH"))
                 .andExpect(status().isOk())
