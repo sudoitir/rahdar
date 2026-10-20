@@ -24,7 +24,7 @@ COPY --from=web /web/dist/ ./src/main/resources/static/
 RUN mvn -q -B clean package -DskipTests
 
 # ── 3. Runtime (Ubuntu 26.04 LTS "resolute") ─────────────────────────────────
-FROM eclipse-temurin:25-jre-resolute@sha256:628f28c18211e8633d02cefb9698489abcbd43337c61fba67837e4ffb86d50d6 AS runtime
+FROM eclipse-temurin:25-jre-resolute@sha256:41d9263c0d5b2a74d89af6e29e73b04298bc65e3cb705d03e9e2271ef49fef84 AS runtime
 # The distribution's security updates are applied at build time: a fix often reaches the Ubuntu
 # archive days before a new base image does, and the image scan fails on a fixable high finding.
 # Ubuntu's base also ships Pebble, a service manager outside any package, so no upgrade patches it;
