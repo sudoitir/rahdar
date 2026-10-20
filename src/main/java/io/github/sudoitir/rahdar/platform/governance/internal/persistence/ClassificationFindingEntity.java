@@ -35,7 +35,7 @@ public class ClassificationFindingEntity {
     @Column(name = "hit_count", nullable = false)
     private long hitCount;
 
-    @Column(name = "address", nullable = false, updatable = false)
+    @Column(name = "destination", nullable = false, updatable = false)
     private String address;
 
     @Column(name = "location", nullable = false, updatable = false)

@@ -54,8 +54,8 @@ class GovernanceFindingsControllerTest extends PostgresIntegrationTest {
 
     @AfterEach
     void cleanUp() {
-        jdbc.update("DELETE FROM classification_finding WHERE address = ?", ADDRESS);
-        jdbc.update("DELETE FROM governance_rule WHERE address_pattern = ?", ADDRESS);
+        jdbc.update("DELETE FROM classification_finding WHERE destination = ?", ADDRESS);
+        jdbc.update("DELETE FROM governance_rule WHERE destination_pattern = ?", ADDRESS);
         jdbc.update("DELETE FROM audit_event WHERE target_type = 'CLASSIFICATION_FINDING'");
     }
 
@@ -63,7 +63,7 @@ class GovernanceFindingsControllerTest extends PostgresIntegrationTest {
         UUID id = UUID.randomUUID();
         jdbc.update("""
                 INSERT INTO classification_finding
-                    (first_seen_at, last_seen_at, hit_count, address, location, field_path, data_class, id)
+                    (first_seen_at, last_seen_at, hit_count, destination, location, field_path, data_class, id)
                 VALUES (now(), now(), 12, ?, 'PROPERTY', ?, ?, ?)
                 """, ADDRESS, fieldPath, dataClass, id);
         return id;
@@ -100,7 +100,7 @@ class GovernanceFindingsControllerTest extends PostgresIntegrationTest {
 
         assertThat(jdbc.queryForList(
                         "SELECT target || ':' || selector || ':' || data_class FROM governance_rule"
-                                + " WHERE address_pattern = ? AND NOT is_exception",
+                                + " WHERE destination_pattern = ? AND NOT is_exception",
                         String.class,
                         ADDRESS))
                 .containsExactly("PROPERTY:customerRef:PERSONAL");

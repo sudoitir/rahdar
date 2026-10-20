@@ -23,9 +23,9 @@ class FindingsRecorder {
 
     private static final String UPSERT = """
             INSERT INTO classification_finding
-                (first_seen_at, last_seen_at, hit_count, address, location, field_path, data_class)
+                (first_seen_at, last_seen_at, hit_count, destination, location, field_path, data_class)
             VALUES (?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT (address, location, field_path, data_class) DO UPDATE
+            ON CONFLICT (destination, location, field_path, data_class) DO UPDATE
                SET last_seen_at = EXCLUDED.last_seen_at,
                    hit_count = classification_finding.hit_count + EXCLUDED.hit_count
             """;
