@@ -4,7 +4,9 @@ import { diffRoles } from './diffRoles.ts';
 
 describe('diffRoles', () => {
   it('lists what only one role holds and leaves shared permissions out', () => {
-    expect(diffRoles(['subscription:purge', 'cluster:read', 'subscription:*'], ['cluster:read', 'message:read'])).toEqual({
+    expect(
+      diffRoles(['subscription:purge', 'cluster:read', 'subscription:*'], ['cluster:read', 'message:read']),
+    ).toEqual({
       onlyA: ['subscription:*', 'subscription:purge'],
       onlyB: ['message:read'],
     });

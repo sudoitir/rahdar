@@ -95,7 +95,9 @@ describe('AccessCheckDrawer', () => {
     await person.type(screen.getByRole('textbox', { name: 'Subscription' }), 'orders.in');
     await person.click(screen.getByRole('button', { name: 'Check access' }));
 
-    await waitFor(() => expect(asked.at(-1)).toEqual({ clusterId: CLUSTER.id, type: 'SUBSCRIPTION', name: 'orders.in' }));
+    await waitFor(() =>
+      expect(asked.at(-1)).toEqual({ clusterId: CLUSTER.id, type: 'SUBSCRIPTION', name: 'orders.in' }),
+    );
     const read = await screen.findByRole('row', { name: /subscription:read/ });
     await waitFor(() => expect(read).toHaveTextContent('TEAM_OPERATOR in team Orders'));
     expect(read).toHaveTextContent('TEAM_VIEWER shared by team Orders with team Billing');

@@ -164,7 +164,13 @@ describe('useCan', () => {
     it('separates the page-level right from the right on one row', async () => {
       serveAccess(
         { permissions: [] },
-        { c1: { permissions: [], anywhere: ['subscription:purge'], createPatterns: { subscription: ['orders.#'], destination: [] } } },
+        {
+          c1: {
+            permissions: [],
+            anywhere: ['subscription:purge'],
+            createPatterns: { subscription: ['orders.#'], destination: [] },
+          },
+        },
       );
       renderWithProviders(<Reach clusterId="c1" />);
 

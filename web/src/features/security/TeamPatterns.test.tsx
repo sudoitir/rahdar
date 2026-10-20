@@ -74,7 +74,9 @@ describe('TeamPatterns preview', () => {
     await choose(person, screen, /Cluster/, 'prod');
     await person.type(patternBox(), 'orders.audit.*');
 
-    expect(await screen.findByText(/Overlaps the subscriptions pattern "orders.audit.#" of team Billing/)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/Overlaps the subscriptions pattern "orders.audit.#" of team Billing/),
+    ).toBeInTheDocument();
     await person.click(screen.getByRole('button', { name: 'Add pattern' }));
 
     expect(posted).toBe(false);

@@ -13,7 +13,11 @@ const perm = (action: string, requires: string[] = []): PermissionView => ({
   requires,
 });
 
-const CATALOGUE = [perm('subscription:read'), perm('subscription:purge', ['subscription:read']), perm('subscription:delete', ['subscription:purge'])];
+const CATALOGUE = [
+  perm('subscription:read'),
+  perm('subscription:purge', ['subscription:read']),
+  perm('subscription:delete', ['subscription:purge']),
+];
 
 describe('withRequired', () => {
   it('adds the requirements of a permission, transitively, and names who asked', () => {
@@ -49,6 +53,8 @@ describe('dependentsOf', () => {
 
   it('finds nothing when no held permission needs it, or a wildcard still gives it', () => {
     expect(dependentsOf(CATALOGUE, ['subscription:read', 'subscription:purge'], ['subscription:purge'])).toEqual([]);
-    expect(dependentsOf(CATALOGUE, ['subscription:*', 'subscription:read', 'subscription:purge'], ['subscription:read'])).toEqual([]);
+    expect(
+      dependentsOf(CATALOGUE, ['subscription:*', 'subscription:read', 'subscription:purge'], ['subscription:read']),
+    ).toEqual([]);
   });
 });

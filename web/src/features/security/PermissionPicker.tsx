@@ -228,8 +228,8 @@ export function PermissionPicker({
             </Button>
           }
         >
-          A team role holds only permissions that act on a subscription or destination, and team:admin. Saving is refused while it
-          holds {barred.join(', ')}.
+          A team role holds only permissions that act on a subscription or destination, and team:admin. Saving is
+          refused while it holds {barred.join(', ')}.
         </Notice>
       ) : null}
 

@@ -139,10 +139,20 @@ function Matches({
   const parts = [
     kind === 'DESTINATION'
       ? null
-      : { word: 'subscription', plural: 'subscriptions', count: preview.subscriptionMatches, examples: preview.subscriptionExamples },
+      : {
+          word: 'subscription',
+          plural: 'subscriptions',
+          count: preview.subscriptionMatches,
+          examples: preview.subscriptionExamples,
+        },
     kind === 'SUBSCRIPTION'
       ? null
-      : { word: 'destination', plural: 'destinations', count: preview.destinationMatches, examples: preview.destinationExamples },
+      : {
+          word: 'destination',
+          plural: 'destinations',
+          count: preview.destinationMatches,
+          examples: preview.destinationExamples,
+        },
   ].filter((p) => p !== null);
   const total = parts.reduce((sum, p) => sum + p.count, 0);
   if (total === 0) {

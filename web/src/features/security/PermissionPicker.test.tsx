@@ -191,7 +191,10 @@ describe('PermissionPicker', () => {
   it('removes a permission others require at once, with them, says which, and undoes it', async () => {
     const user = userEvent.setup();
     renderWithProviders(
-      <Harness catalogue={RESOURCE_CATALOGUE} initial={['subscription:read', 'subscription:purge', 'subscription:delete']} />,
+      <Harness
+        catalogue={RESOURCE_CATALOGUE}
+        initial={['subscription:read', 'subscription:purge', 'subscription:delete']}
+      />,
     );
 
     await user.click(await screen.findByRole('checkbox', { name: /subscription:read/ }));
@@ -209,7 +212,9 @@ describe('PermissionPicker', () => {
 
   it('removes a permission nobody requires without asking', async () => {
     const user = userEvent.setup();
-    renderWithProviders(<Harness catalogue={RESOURCE_CATALOGUE} initial={['subscription:read', 'subscription:purge']} />);
+    renderWithProviders(
+      <Harness catalogue={RESOURCE_CATALOGUE} initial={['subscription:read', 'subscription:purge']} />,
+    );
 
     await user.click(await screen.findByRole('checkbox', { name: /subscription:purge/ }));
 
@@ -230,7 +235,9 @@ describe('PermissionPicker', () => {
 
   it('lists what a team role holds that it may not, and removes it on request', async () => {
     const user = userEvent.setup();
-    renderWithProviders(<Harness catalogue={RESOURCE_CATALOGUE} initial={['broker:restart', 'subscription:read']} teamRole />);
+    renderWithProviders(
+      <Harness catalogue={RESOURCE_CATALOGUE} initial={['broker:restart', 'subscription:read']} teamRole />,
+    );
 
     const notice = screen.getByText('Not allowed in a team role').closest('output')!;
     expect(notice).toHaveTextContent('Not allowed in a team role');

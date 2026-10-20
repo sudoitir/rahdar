@@ -472,7 +472,9 @@ export function useResourceAccess(
   return useQuery({
     queryKey: keys.resourceAccess(clusterId, kind, name),
     queryFn: () =>
-      request<ResourceAccessView>(`/clusters/${clusterId}/resource-access?${new URLSearchParams({ type: kind, name })}`),
+      request<ResourceAccessView>(
+        `/clusters/${clusterId}/resource-access?${new URLSearchParams({ type: kind, name })}`,
+      ),
     enabled,
     retry: false,
   });

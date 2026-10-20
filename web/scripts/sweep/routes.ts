@@ -193,7 +193,12 @@ export const ROUTES: RouteSpec[] = [
     area: 'messages',
     id: 'messages-long-name',
     path: cluster(`queues/${LONG_ADDRESS}/messages`),
-    data: [{ path: cluster('resources/artemis.queue/*/messages'), empty: { ...page, node: 'primary', transport: 'jolokia' } }],
+    data: [
+      {
+        path: cluster('resources/artemis.queue/*/messages'),
+        empty: { ...page, node: 'primary', transport: 'jolokia' },
+      },
+    ],
   },
   {
     area: 'messages',

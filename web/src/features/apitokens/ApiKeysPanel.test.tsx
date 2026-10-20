@@ -189,7 +189,9 @@ describe('ApiKeysPanel', () => {
     await user.click(await screen.findByRole('checkbox', { name: 'Select all in Clusters' }));
     await user.click(await screen.findByRole('checkbox', { name: 'Select all in Messages' }));
     await user.click(screen.getByRole('combobox', { name: 'Limit to' }));
-    await user.click(await screen.findByRole('option', { name: 'Subscriptions whose names match a pattern', hidden: true }));
+    await user.click(
+      await screen.findByRole('option', { name: 'Subscriptions whose names match a pattern', hidden: true }),
+    );
     await user.type(await screen.findByRole('textbox', { name: /Name pattern/ }), 'orders.#');
     await user.click(screen.getByRole('button', { name: 'Create key' }));
 
@@ -217,7 +219,9 @@ describe('ApiKeysPanel', () => {
     await user.type(await screen.findByRole('textbox', { name: /Name/ }), 'orders');
     await user.click(await screen.findByRole('checkbox', { name: 'Select all in Messages' }));
     await user.click(screen.getByRole('combobox', { name: 'Limit to' }));
-    await user.click(await screen.findByRole('option', { name: 'Subscriptions whose names match a pattern', hidden: true }));
+    await user.click(
+      await screen.findByRole('option', { name: 'Subscriptions whose names match a pattern', hidden: true }),
+    );
     await user.click(screen.getByRole('button', { name: 'Create key' }));
 
     expect(await screen.findByText('Give the pattern the names must match, such as orders.#')).toBeInTheDocument();

@@ -396,7 +396,9 @@ describe('RolesPanel compare', () => {
     await pick('Second role', 'queue-creator');
 
     expect(within(dialog).getByText('Only in queue-operator (1)')).toBeInTheDocument();
-    expect(within(dialog).getByRole('list', { name: 'Only in queue-operator' })).toHaveTextContent('subscription:delete');
+    expect(within(dialog).getByRole('list', { name: 'Only in queue-operator' })).toHaveTextContent(
+      'subscription:delete',
+    );
     expect(within(dialog).getByText('Only in queue-creator (0)')).toBeInTheDocument();
     expect(within(dialog).getByText('Nothing')).toBeInTheDocument();
   });
