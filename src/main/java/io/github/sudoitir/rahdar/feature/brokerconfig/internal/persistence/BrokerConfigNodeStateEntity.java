@@ -22,7 +22,7 @@ import org.hibernate.type.SqlTypes;
  * planner's, serialised, so the drift screen and the alert condition read one truth.
  */
 @Entity
-@Table(name = "broker_config_node_state")
+@Table(name = "artemis_config_node_state")
 @IdClass(BrokerConfigNodeStateEntity.Key.class)
 @Getter
 @NoArgsConstructor(access = AccessLevel.PUBLIC)

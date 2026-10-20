@@ -39,7 +39,7 @@ class BrokerConfigHistoryStoreIntegrationTest extends PostgresIntegrationTest {
                 "hist-" + UUID.randomUUID());
         for (int n = 1; n <= 7; n++) {
             revisions[n] = jdbc.queryForObject(
-                    "INSERT INTO broker_config_revision (created_at, revision, document, source, created_by, cluster_id)"
+                    "INSERT INTO artemis_config_revision (created_at, revision, document, source, created_by, cluster_id)"
                             + " VALUES (" + (n == 6 ? "now()" : OLD) + ", ?, '{}', 'EDIT', 'test', ?) RETURNING id",
                     Long.class,
                     n,
@@ -53,12 +53,12 @@ class BrokerConfigHistoryStoreIntegrationTest extends PostgresIntegrationTest {
         nodeState(nodeA, 2, "'VERIFIED_APPLY'", a2);
         nodeState(nodeB, 7, "NULL", null);
         jdbc.update(
-                "INSERT INTO broker_config_owned_item (revision_id, kind, item_key, cluster_id)"
+                "INSERT INTO artemis_config_owned_item (revision_id, kind, item_key, cluster_id)"
                         + " VALUES (?, 'ADDRESS_SETTING', 'orders', ?)",
                 revisions[4],
                 clusterId);
         jdbc.update(
-                "INSERT INTO broker_config_declaration (current_revision_id, cluster_id) VALUES (?, ?)",
+                "INSERT INTO artemis_config_declaration (current_revision_id, cluster_id) VALUES (?, ?)",
                 revisions[5],
                 clusterId);
     }
@@ -70,7 +70,7 @@ class BrokerConfigHistoryStoreIntegrationTest extends PostgresIntegrationTest {
 
     private long apply(long revisionId, String startedAt) {
         return jdbc.queryForObject(
-                "INSERT INTO broker_config_apply (started_at, revision_id, plan, outcome, actor, cluster_id, dry_run)"
+                "INSERT INTO artemis_config_apply (started_at, revision_id, plan, outcome, actor, cluster_id, dry_run)"
                         + " VALUES (" + startedAt + ", ?, '{}', 'APPLIED', 'test', ?, false) RETURNING id",
                 Long.class,
                 revisionId,
@@ -84,7 +84,7 @@ class BrokerConfigHistoryStoreIntegrationTest extends PostgresIntegrationTest {
 
     private void nodeState(UUID nodeId, int verifiedRevision, String basis, Long basisRef) {
         jdbc.update(
-                "INSERT INTO broker_config_node_state (state, cluster_id, node_id, verified_revision, basis, basis_ref)"
+                "INSERT INTO artemis_config_node_state (state, cluster_id, node_id, verified_revision, basis, basis_ref)"
                         + " VALUES ('IN_SYNC', ?, ?, ?, " + basis + ", ?)",
                 clusterId,
                 nodeId,
@@ -98,7 +98,7 @@ class BrokerConfigHistoryStoreIntegrationTest extends PostgresIntegrationTest {
 
     private List<Integer> keptRevisionNumbers() {
         return jdbc.queryForList(
-                "SELECT revision FROM broker_config_revision WHERE cluster_id = ? ORDER BY revision",
+                "SELECT revision FROM artemis_config_revision WHERE cluster_id = ? ORDER BY revision",
                 Integer.class,
                 clusterId);
     }
@@ -110,8 +110,8 @@ class BrokerConfigHistoryStoreIntegrationTest extends PostgresIntegrationTest {
         // a1, then r1 and r3
         assertThat(store.preview(cutoff).rows()).isEqualTo(3);
 
-        assertThat(count("broker_config_apply")).isEqualTo(3);
-        assertThat(count("broker_config_revision")).isEqualTo(7);
+        assertThat(count("artemis_config_apply")).isEqualTo(3);
+        assertThat(count("artemis_config_revision")).isEqualTo(7);
     }
 
     @Test
@@ -127,7 +127,7 @@ class BrokerConfigHistoryStoreIntegrationTest extends PostgresIntegrationTest {
 
         assertThat(total).isEqualTo(3);
         assertThat(store.purgeBatch(cutoff, 1)).isZero();
-        assertThat(count("broker_config_apply")).isEqualTo(2);
+        assertThat(count("artemis_config_apply")).isEqualTo(2);
         assertThat(keptRevisionNumbers()).containsExactly(2, 4, 5, 6, 7);
     }
 }

@@ -21,7 +21,7 @@ import org.hibernate.type.SqlTypes;
  * history that happened.
  */
 @Entity
-@Table(name = "broker_config_revision")
+@Table(name = "artemis_config_revision")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
