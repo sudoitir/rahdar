@@ -2,7 +2,7 @@
 
 - **Status**: accepted; supersedes in part [ADR-0088](0088-path-filtered-ci-and-releases.md)
   (the site's pull-request build and the release trigger's path list) and
-  [ADR-0124](0124-codeql-and-osv-scanner-run-in-ci.md) (OSV on every pull request); decision 5 superseded by [ADR-0129](0129-releases-tag-the-merge-commit-and-commit-nothing.md); the cost of the up-to-date rule of decisions 1 and 2 is cut by [ADR-0170](0170-auto-update-keeps-pull-requests-up-to-date.md)
+  [ADR-0124](0124-codeql-and-osv-scanner-run-in-ci.md) (OSV on every pull request); decision 5 superseded by [ADR-0129](0129-releases-tag-the-merge-commit-and-commit-nothing.md); the cost of the up-to-date rule of decisions 1 and 2 is cut by [ADR-0170](0170-auto-update-keeps-pull-requests-up-to-date.md); Maven Central publishing is a maintainer's step since [ADR-0205](0205-a-maintainer-publishes-releases-to-maven-central.md)
 - **Date**: 2026-09-29
 - **Deciders**: Mahdi Amirabdollahi
 

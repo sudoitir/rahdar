@@ -153,7 +153,8 @@ Pull requests carry the verification: parallel, path-filtered jobs behind the on
 `ci-ok` check, on a branch up to date with `main`; `gh pr merge <n> --merge --auto` merges a ready PR, and
 the `pr-auto-update` workflow updates the waiting PRs from `main` one at a time, oldest auto-merge first (ADR-0170). `main` does not re-test. Every push to `main`
 that changes a build input cuts a CalVer release to Docker Hub (image, git tag, GitHub
-pre-release), and Central and npm get it only when their inputs changed; docs-, site- and
+pre-release), and npm gets it when its inputs changed; Maven Central gets a release only when a
+maintainer runs `publish-central.yml` for it (ADR-0205); docs-, site- and
 CI-only pushes release nothing (ADR-0088, ADR-0126). See `.claude/rules/10-release.md` for the versioning. There is no
 `CHANGELOG.md`: each release's notes are its GitHub release body (tag only, nothing is
 committed; ADR-0129), and the commit message is the release note — `.claude/rules/05-commits.md` (Conventional Commits,

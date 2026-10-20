@@ -1,6 +1,6 @@
 # ADR-0151: Every release publishes its OpenAPI document and generated TypeScript and Java clients
 
-- **Status**: accepted
+- **Status**: accepted; the Java client reaches Maven Central when a maintainer publishes a release, per [ADR-0205](0205-a-maintainer-publishes-releases-to-maven-central.md)
 - **Date**: 2026-09-30
 - **Deciders**: Mahdi Amirabdollahi
 - **Change**: `openspec/changes/09-public-api-contract`
