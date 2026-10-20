@@ -20,6 +20,7 @@ import io.github.sudoitir.rahdar.kernel.security.internal.persistence.RoleReposi
 import io.github.sudoitir.rahdar.kernel.security.web.UserViews.GrantRequest;
 import io.github.sudoitir.rahdar.kernel.security.web.UserViews.RoleRequest;
 import io.github.sudoitir.rahdar.platform.broker.QueueRow;
+import io.github.sudoitir.rahdar.platform.broker.ResourceIds;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNodeEntity;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNodeRepository;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterEntity;
@@ -177,7 +178,7 @@ class ResourceEnforcementIntegrationTest extends PostgresIntegrationTest {
         return body(response)
                 .get("data")
                 .valueStream()
-                .map(r -> ResourceIdTexts.name(r.get("subscription").asString()))
+                .map(r -> ResourceIds.nameOf(r.get("subscription").asString()))
                 .toList();
     }
 

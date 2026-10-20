@@ -42,6 +42,7 @@ import io.github.sudoitir.rahdar.platform.broker.BrokerSettings;
 import io.github.sudoitir.rahdar.platform.broker.BrokerXmlSnippets;
 import io.github.sudoitir.rahdar.platform.broker.BulkCapExceededException;
 import io.github.sudoitir.rahdar.platform.broker.RahdarNames;
+import io.github.sudoitir.rahdar.platform.broker.ResourceIds;
 import io.github.sudoitir.rahdar.platform.broker.TransferAcceptance;
 import io.github.sudoitir.rahdar.platform.broker.TransferAcceptance.AcceptanceFacts;
 import io.github.sudoitir.rahdar.platform.broker.TransferAcceptance.AcceptanceFinding;
@@ -135,7 +136,7 @@ public class TransferService {
      */
     public TransferRunView preview(UUID clusterId, TransferPreviewRequest request) {
         TransferMode mode = request.mode();
-        String sourceName = ResourceIdTexts.name(request.source());
+        String sourceName = ResourceIds.nameOf(request.source());
         access.requireResource(clusterId, ResourceRef.subscription(sourceName), mode.sourcePermission());
         access.requireVisible(request.targetClusterId());
         requireSubscription(clusterId, request.source());
@@ -296,7 +297,7 @@ public class TransferService {
                         "transfer-target-unknown",
                         "%s is not a subscription or a destination of the target cluster."
                                 .formatted(request.target())));
-        String name = ResourceIdTexts.name(request.target());
+        String name = ResourceIds.nameOf(request.target());
         return switch (type) {
             case SUBSCRIPTION -> new Target(name, null);
             case DESTINATION -> new Target(name, name);
@@ -852,7 +853,7 @@ public class TransferService {
         // A staging queue is named by no team's pattern, so only a grant that reaches the cluster passes; the queue the
         // messages go back into is read and sent to through its own address, as in a transfer.
         access.requireVisible(clusterId);
-        String target = ResourceIdTexts.name(request.target());
+        String target = ResourceIds.nameOf(request.target());
         requireSubscription(clusterId, request.target());
         String returnAddress = locator.locate(clusterId, target).stream()
                 .findFirst()

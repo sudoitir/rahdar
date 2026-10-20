@@ -11,6 +11,7 @@ import io.github.sudoitir.rahdar.feature.sql.web.SqlViews.SqlQueryTicketView;
 import io.github.sudoitir.rahdar.feature.sql.web.SqlViews.VerifyRequest;
 import io.github.sudoitir.rahdar.feature.sql.web.SqlViews.VerifyView;
 import io.github.sudoitir.rahdar.kernel.security.ResourceIdTexts;
+import io.github.sudoitir.rahdar.platform.broker.ResourceIds;
 import java.time.Instant;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -73,7 +74,7 @@ public class SqlController {
         MessageVerifier.Verdict verdict = verifier.verify(
                 clusterId,
                 request.nodeId(),
-                ResourceIdTexts.name(request.subscription()),
+                ResourceIds.nameOf(request.subscription()),
                 request.messageId(),
                 request.timestamp());
         return new VerifyView(verdict.presence().name(), verdict.detail());

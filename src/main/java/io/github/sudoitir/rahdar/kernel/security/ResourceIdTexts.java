@@ -1,14 +1,12 @@
 package io.github.sudoitir.rahdar.kernel.security;
 
 import io.github.sudoitir.rahdar.kernel.plugin.ResourceType;
-import java.net.URLDecoder;
-import java.nio.charset.StandardCharsets;
 import java.util.Optional;
 import java.util.UUID;
 
 /**
  * The canonical id text of a subscription or a destination a view names by role (ADR-0206), such as
- * {@code artemis.queue/orders}, and the name an id text carries back. The kind each system gives its
+ * {@code artemis.queue/orders}. The kind each system gives its
  * resources is the broker module's knowledge, so the module that reaches the brokers implements this and
  * the kernel and the features need no broker access.
  */
@@ -32,15 +30,5 @@ public interface ResourceIdTexts {
         String subscription(String name);
 
         String destination(String name);
-    }
-
-    /** The name an id text carries: its last path segment, decoded. An id with no path is returned as it is. */
-    static String name(String id) {
-        int slash = id.indexOf('/');
-        if (slash < 0) {
-            return id;
-        }
-        String path = id.substring(slash + 1);
-        return URLDecoder.decode(path.substring(path.lastIndexOf('/') + 1).replace("+", "%2B"), StandardCharsets.UTF_8);
     }
 }

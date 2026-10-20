@@ -6,8 +6,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import io.github.sudoitir.rahdar.feature.bulk.web.BulkViews.BulkItemView;
 import io.github.sudoitir.rahdar.feature.bulk.web.BulkViews.BulkPreviewRequest;
 import io.github.sudoitir.rahdar.feature.bulk.web.BulkViews.BulkRunDetailView;
-import io.github.sudoitir.rahdar.kernel.security.ResourceIdTexts;
 import io.github.sudoitir.rahdar.platform.broker.BrokerSettings;
+import io.github.sudoitir.rahdar.platform.broker.ResourceIds;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
@@ -55,7 +55,7 @@ class BulkPreviewTest extends BulkTestSupport {
         BulkRunDetailView preview = preview(BulkOperation.DELETE, "orders");
 
         assertThat(preview.items())
-                .filteredOn(i -> ResourceIdTexts.name(i.subscription()).equals("orders.busy"))
+                .filteredOn(i -> ResourceIds.nameOf(i.subscription()).equals("orders.busy"))
                 .singleElement()
                 .satisfies(i -> {
                     assertThat(i.status()).isEqualTo(BulkItemStatus.REFUSED);
@@ -71,7 +71,7 @@ class BulkPreviewTest extends BulkTestSupport {
         BulkRunDetailView preview = preview(BulkOperation.PAUSE, List.of("orders.a", "gone"));
 
         assertThat(preview.items())
-                .extracting(i -> ResourceIdTexts.name(i.subscription()))
+                .extracting(i -> ResourceIds.nameOf(i.subscription()))
                 .containsExactly("orders.a", "gone");
         assertThat(preview.items().get(1).status()).isEqualTo(BulkItemStatus.REFUSED);
     }
@@ -109,7 +109,7 @@ class BulkPreviewTest extends BulkTestSupport {
 
     private static List<String> names(BulkRunDetailView run) {
         return run.items().stream()
-                .map(i -> ResourceIdTexts.name(i.subscription()))
+                .map(i -> ResourceIds.nameOf(i.subscription()))
                 .toList();
     }
 }

@@ -19,6 +19,7 @@ import io.github.sudoitir.rahdar.kernel.settings.SettingsService;
 import io.github.sudoitir.rahdar.platform.broker.Attempt;
 import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
 import io.github.sudoitir.rahdar.platform.broker.BrokerSettings;
+import io.github.sudoitir.rahdar.platform.broker.ResourceIds;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterService;
@@ -284,7 +285,7 @@ abstract class TransferTestSupport extends PostgresIntegrationTest {
                         preview.planHash(),
                         override,
                         warnings,
-                        ResourceIdTexts.name(preview.source().subscription())));
+                        ResourceIds.nameOf(preview.source().subscription())));
         started.add(run.id());
         return run;
     }
