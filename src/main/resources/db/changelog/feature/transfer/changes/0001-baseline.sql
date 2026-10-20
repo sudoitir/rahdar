@@ -32,16 +32,16 @@ CREATE TABLE transfer_run (
     id_cursor integer DEFAULT 0 NOT NULL,
     mode text NOT NULL,
     state text NOT NULL,
-    source_queue text NOT NULL,
-    source_address text NOT NULL,
-    source_routing_type text NOT NULL,
+    source_subscription text NOT NULL,
+    source_destination text,
+    source_native_attributes jsonb DEFAULT '{}'::jsonb NOT NULL,
     source_node_name text NOT NULL,
-    source_artemis_node_id text NOT NULL,
-    target_queue text NOT NULL,
-    target_address text NOT NULL,
-    target_routing_type text NOT NULL,
+    source_native_node_id text NOT NULL,
+    target_subscription text NOT NULL,
+    target_destination text,
+    target_native_attributes jsonb DEFAULT '{}'::jsonb NOT NULL,
     target_node_name text NOT NULL,
-    target_artemis_node_id text NOT NULL,
+    target_native_node_id text NOT NULL,
     plan_hash text NOT NULL,
     username text NOT NULL,
     last_error text,
@@ -74,7 +74,7 @@ CREATE INDEX ix_transfer_run_source ON transfer_run USING btree (source_cluster_
 
 CREATE INDEX ix_transfer_run_target ON transfer_run USING btree (target_cluster_id, created_at DESC);
 
-CREATE UNIQUE INDEX ux_transfer_run_active ON transfer_run USING btree (source_cluster_id, source_queue) WHERE (state = ANY (ARRAY['RUNNING'::text, 'WAITING_FOR_CAPACITY'::text, 'RETURNING'::text]));
+CREATE UNIQUE INDEX ux_transfer_run_active ON transfer_run USING btree (source_cluster_id, source_subscription) WHERE (state = ANY (ARRAY['RUNNING'::text, 'WAITING_FOR_CAPACITY'::text, 'RETURNING'::text]));
 
 ALTER TABLE ONLY transfer_copied
     ADD CONSTRAINT fk_transfer_copied_run FOREIGN KEY (run_id) REFERENCES transfer_run(id) ON DELETE CASCADE;

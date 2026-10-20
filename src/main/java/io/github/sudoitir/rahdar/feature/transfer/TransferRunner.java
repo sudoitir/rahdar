@@ -170,8 +170,8 @@ class TransferRunner {
         }
 
         void resolve() {
-            source = nodes.serving(run.getSourceClusterId(), run.getSourceArtemisNodeId(), run.getSourceNodeName());
-            target = nodes.serving(run.getTargetClusterId(), run.getTargetArtemisNodeId(), run.getTargetNodeName());
+            source = nodes.serving(run.getSourceClusterId(), run.getSourceNativeNodeId(), run.getSourceNodeName());
+            target = nodes.serving(run.getTargetClusterId(), run.getTargetNativeNodeId(), run.getTargetNodeName());
         }
     }
 
@@ -540,7 +540,7 @@ class TransferRunner {
     private End giveBack(Segment s) throws IOException {
         String stagingQueue = StagingQueues.queueName(s.id());
         ClusterNode node =
-                nodes.serving(s.run.getSourceClusterId(), s.run.getSourceArtemisNodeId(), s.run.getSourceNodeName());
+                nodes.serving(s.run.getSourceClusterId(), s.run.getSourceNativeNodeId(), s.run.getSourceNodeName());
         ArtemisNode source = nodes.client(node);
         String mbean = s.stagingMbean(source);
         Set<Long> unsettled = settle(s, node, ledger.all(s.id()));
@@ -604,8 +604,8 @@ class TransferRunner {
             }
         };
         try {
-            ClusterNode target = nodes.serving(
-                    s.run.getTargetClusterId(), s.run.getTargetArtemisNodeId(), s.run.getTargetNodeName());
+            ClusterNode target =
+                    nodes.serving(s.run.getTargetClusterId(), s.run.getTargetNativeNodeId(), s.run.getTargetNodeName());
             try (RelayLink link = relay.link(nodes.core(source), nodes.core(target), route)) {
                 // A duplicate refusal costs one pass before the messages go one by one; two per message is ample.
                 for (int pass = 0; pass <= 2 * inDoubt.size() && !left.isEmpty(); pass++) {

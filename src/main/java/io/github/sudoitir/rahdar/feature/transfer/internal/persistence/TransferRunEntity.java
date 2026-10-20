@@ -2,6 +2,7 @@ package io.github.sudoitir.rahdar.feature.transfer.internal.persistence;
 
 import io.github.sudoitir.rahdar.feature.transfer.TransferMode;
 import io.github.sudoitir.rahdar.feature.transfer.TransferState;
+import io.github.sudoitir.rahdar.platform.broker.QueueRow;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -9,6 +10,7 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.Instant;
+import java.util.Map;
 import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Builder;
@@ -53,17 +55,19 @@ public class TransferRunEntity {
     @Column(name = "source_node_name", nullable = false, updatable = false)
     private String sourceNodeName;
 
-    @Column(name = "source_artemis_node_id", nullable = false, updatable = false)
-    private String sourceArtemisNodeId;
+    @Column(name = "source_native_node_id", nullable = false, updatable = false)
+    private String sourceNativeNodeId;
 
-    @Column(name = "source_queue", nullable = false, updatable = false)
+    @Column(name = "source_subscription", nullable = false, updatable = false)
     private String sourceQueue;
 
-    @Column(name = "source_address", nullable = false, updatable = false)
+    @Column(name = "source_destination", updatable = false)
     private String sourceAddress;
 
-    @Column(name = "source_routing_type", nullable = false, updatable = false)
-    private String sourceRoutingType;
+    @Getter(AccessLevel.NONE)
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "source_native_attributes", nullable = false, updatable = false)
+    private Map<String, String> sourceNativeAttributes;
 
     @Column(name = "target_cluster_id", nullable = false, updatable = false)
     private UUID targetClusterId;
@@ -74,17 +78,19 @@ public class TransferRunEntity {
     @Column(name = "target_node_name", nullable = false, updatable = false)
     private String targetNodeName;
 
-    @Column(name = "target_artemis_node_id", nullable = false, updatable = false)
-    private String targetArtemisNodeId;
+    @Column(name = "target_native_node_id", nullable = false, updatable = false)
+    private String targetNativeNodeId;
 
-    @Column(name = "target_queue", nullable = false, updatable = false)
+    @Column(name = "target_subscription", nullable = false, updatable = false)
     private String targetQueue;
 
-    @Column(name = "target_address", nullable = false, updatable = false)
+    @Column(name = "target_destination", updatable = false)
     private String targetAddress;
 
-    @Column(name = "target_routing_type", nullable = false, updatable = false)
-    private String targetRoutingType;
+    @Getter(AccessLevel.NONE)
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "target_native_attributes", nullable = false, updatable = false)
+    private Map<String, String> targetNativeAttributes;
 
     /** Source and target are the same broker node: the broker moves the messages itself. */
     @Column(name = "same_node", nullable = false, updatable = false)
@@ -191,14 +197,14 @@ public class TransferRunEntity {
             UUID sourceClusterId,
             UUID sourceNodeId,
             String sourceNodeName,
-            String sourceArtemisNodeId,
+            String sourceNativeNodeId,
             String sourceQueue,
             String sourceAddress,
             String sourceRoutingType,
             UUID targetClusterId,
             UUID targetNodeId,
             String targetNodeName,
-            String targetArtemisNodeId,
+            String targetNativeNodeId,
             String targetQueue,
             String targetAddress,
             String targetRoutingType,
@@ -216,17 +222,17 @@ public class TransferRunEntity {
         this.sourceClusterId = sourceClusterId;
         this.sourceNodeId = sourceNodeId;
         this.sourceNodeName = sourceNodeName;
-        this.sourceArtemisNodeId = sourceArtemisNodeId;
+        this.sourceNativeNodeId = sourceNativeNodeId;
         this.sourceQueue = sourceQueue;
         this.sourceAddress = sourceAddress;
-        this.sourceRoutingType = sourceRoutingType;
+        this.sourceNativeAttributes = nativeAttributes(sourceRoutingType);
         this.targetClusterId = targetClusterId;
         this.targetNodeId = targetNodeId;
         this.targetNodeName = targetNodeName;
-        this.targetArtemisNodeId = targetArtemisNodeId;
+        this.targetNativeNodeId = targetNativeNodeId;
         this.targetQueue = targetQueue;
         this.targetAddress = targetAddress;
-        this.targetRoutingType = targetRoutingType;
+        this.targetNativeAttributes = nativeAttributes(targetRoutingType);
         this.sameNode = sameNode;
         this.selection = selection;
         this.findings = findings;
@@ -305,5 +311,19 @@ public class TransferRunEntity {
         this.errorSnippet = snippet;
         this.updatedAt = now;
         this.finishedAt = now;
+    }
+
+    /** The source queue's Artemis routing type; {@code null} on another system. */
+    public String getSourceRoutingType() {
+        return sourceNativeAttributes.get(QueueRow.ROUTING_TYPE);
+    }
+
+    /** The target queue's Artemis routing type; {@code null} on another system. */
+    public String getTargetRoutingType() {
+        return targetNativeAttributes.get(QueueRow.ROUTING_TYPE);
+    }
+
+    private static Map<String, String> nativeAttributes(String routingType) {
+        return routingType == null ? Map.of() : Map.of(QueueRow.ROUTING_TYPE, routingType);
     }
 }
