@@ -2,9 +2,15 @@ import { http, HttpResponse } from 'msw';
 
 import type { Finding, TransferRunView } from './api.ts';
 import { paged } from '../../kernel/api/paging.ts';
-import { ARTEMIS_KINDS, ARTEMIS_SYSTEM } from '../../test/wire.ts';
 
 /** Test fixtures for the transfer screens. Placeholder names only. */
+
+const SYSTEM = { id: 'artemis', name: 'Artemis' };
+
+const KINDS = [
+  { id: 'artemis.queue', resourceClass: 'SUBSCRIPTION', label: 'Queue', verbs: ['move-messages', 'retry-messages'] },
+  { id: 'artemis.address', resourceClass: 'DESTINATION', label: 'Address', verbs: [] },
+];
 
 export const AVAILABLE = { status: 'AVAILABLE', reason: 'ok', brokerXmlSnippet: null };
 
@@ -57,8 +63,8 @@ export function clusterHandlers(
     name,
     description: null,
     topology: topologyOf(id),
-    system: ARTEMIS_SYSTEM,
-    kinds: ARTEMIS_KINDS,
+    system: SYSTEM,
+    kinds: KINDS,
     capabilities: {
       managementRead: AVAILABLE,
       managementWrite: AVAILABLE,
