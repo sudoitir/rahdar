@@ -5,7 +5,10 @@
 |Spring components
 |* `i.g.s.r.s.a.AcceptanceProbe`
 * `i.g.s.r.s.a.ArtemisExpiry`
+* `i.g.s.r.s.a.ArtemisFlowSampler`
 * `i.g.s.r.s.a.ArtemisNodes`
+* `i.g.s.r.s.a.ArtemisTransferAcceptance`
+* `i.g.s.r.s.a.ArtemisTransferStaging`
 * `i.g.s.r.s.a.BridgeOperations`
 * `i.g.s.r.s.a.BrokerAccountRoles`
 * `i.g.s.r.s.a.BrokerConnectors`

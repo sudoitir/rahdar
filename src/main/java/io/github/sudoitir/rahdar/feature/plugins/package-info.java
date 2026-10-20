@@ -22,8 +22,7 @@
             "kernel.security",
             "kernel.settings",
             "platform.broker",
-            "platform.clusters",
-            "system.artemis"
+            "platform.clusters"
         })
 package io.github.sudoitir.rahdar.feature.plugins;
 

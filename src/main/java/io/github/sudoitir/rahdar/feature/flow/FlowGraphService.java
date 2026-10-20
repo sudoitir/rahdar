@@ -33,6 +33,7 @@ import io.github.sudoitir.rahdar.kernel.security.ClusterAccessGuard;
 import io.github.sudoitir.rahdar.kernel.security.PermissionResolver;
 import io.github.sudoitir.rahdar.kernel.security.ResourceFilter;
 import io.github.sudoitir.rahdar.kernel.settings.SettingsService;
+import io.github.sudoitir.rahdar.platform.broker.RahdarNames;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
 import io.github.sudoitir.rahdar.platform.scrape.MetricSamples;
@@ -40,7 +41,6 @@ import io.github.sudoitir.rahdar.platform.scrape.MetricSamples.SubjectRate;
 import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshot;
 import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshots;
 import io.github.sudoitir.rahdar.platform.scrape.ScrapeSettings;
-import io.github.sudoitir.rahdar.system.artemis.DivertOperations;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -1101,7 +1101,7 @@ public class FlowGraphService {
 
     /** A divert, address or queue Rahdar's message capture owns (ADR-0079). */
     static boolean captureOwned(String name) {
-        return name != null && name.startsWith(DivertOperations.CAPTURE_PREFIX);
+        return name != null && name.startsWith(RahdarNames.CAPTURE_PREFIX);
     }
 
     private static Delivery delivery(String routingType) {

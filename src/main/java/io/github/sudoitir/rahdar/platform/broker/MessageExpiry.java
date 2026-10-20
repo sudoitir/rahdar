@@ -8,7 +8,7 @@ import java.util.UUID;
  * out. Only some systems offer it, so their system module provides this; where none does, the
  * action is unavailable.
  */
-public interface MessageExpiry {
+public interface MessageExpiry extends SystemExtension {
 
     /** Expires the messages with these ids in the queue on the node; reports what it did not act on. */
     BulkResult byIds(UUID clusterId, UUID nodeId, String queue, List<Long> ids);

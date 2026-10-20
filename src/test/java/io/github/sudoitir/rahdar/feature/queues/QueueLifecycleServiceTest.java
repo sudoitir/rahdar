@@ -36,6 +36,7 @@ import io.github.sudoitir.rahdar.platform.broker.BulkCapExceededException;
 import io.github.sudoitir.rahdar.platform.broker.ManagementRefusal;
 import io.github.sudoitir.rahdar.platform.broker.QueueCounters;
 import io.github.sudoitir.rahdar.platform.broker.QueueRow;
+import io.github.sudoitir.rahdar.platform.broker.RahdarNames;
 import io.github.sudoitir.rahdar.platform.clusters.LifecycleOutcome;
 import io.github.sudoitir.rahdar.platform.clusters.LifecycleOutcome.NodeOutcome;
 import io.github.sudoitir.rahdar.platform.clusters.LifecycleOutcome.NodeStatus;
@@ -496,7 +497,7 @@ class QueueLifecycleServiceTest extends PostgresIntegrationTest {
     void aCaptureTapIsNeverRemovedByAQueueDelete() {
         seedQueue();
         onTheNode(0, QUEUE);
-        String tap = DivertOperations.CAPTURE_PREFIX + "x";
+        String tap = RahdarNames.CAPTURE_PREFIX + "x";
         diverts(divert(tap, ADDRESS, tap));
 
         NodeOutcome preview = live(ok(lifecycle.deleteQueue(clusterId, QUEUE, true, false, false)));
@@ -510,7 +511,7 @@ class QueueLifecycleServiceTest extends PostgresIntegrationTest {
     void aCaptureTapStillCoveringAnotherQueueOnTheAddressIsNamedAsKept() {
         seedQueue();
         onTheNode(0, QUEUE, "orders.audit");
-        String tap = DivertOperations.CAPTURE_PREFIX + "x";
+        String tap = RahdarNames.CAPTURE_PREFIX + "x";
         diverts(divert(tap, ADDRESS, tap));
         when(captureTaps.coversWithout(clusterId, tap, ADDRESS, QUEUE)).thenReturn(true);
 
@@ -870,7 +871,7 @@ class QueueLifecycleServiceTest extends PostgresIntegrationTest {
     }
 
     private static DivertRow captureTap(String address) {
-        return divert(DivertOperations.CAPTURE_PREFIX + "tap", address, "capture.sink");
+        return divert(RahdarNames.CAPTURE_PREFIX + "tap", address, "capture.sink");
     }
 
     @Test
@@ -952,8 +953,8 @@ class QueueLifecycleServiceTest extends PostgresIntegrationTest {
 
     @Test
     void divertNamesInTheNamespacesRahdarReservesAreRefused() {
-        var captureRequest = divertRequest(DivertOperations.CAPTURE_PREFIX + "x", false, false);
-        var tapRequest = divertRequest(DivertOperations.PLUGIN_TAP_PREFIX + "x", false, false);
+        var captureRequest = divertRequest(RahdarNames.CAPTURE_PREFIX + "x", false, false);
+        var tapRequest = divertRequest(RahdarNames.PLUGIN_TAP_PREFIX + "x", false, false);
 
         assertThatThrownBy(() -> lifecycle.createDivert(clusterId, captureRequest, false))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -961,9 +962,9 @@ class QueueLifecycleServiceTest extends PostgresIntegrationTest {
         assertThatThrownBy(() -> lifecycle.createDivert(clusterId, tapRequest, false))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("reserved for plugins' message taps");
-        assertThatThrownBy(() -> lifecycle.deleteDivert(clusterId, DivertOperations.CAPTURE_PREFIX + "x", false))
+        assertThatThrownBy(() -> lifecycle.deleteDivert(clusterId, RahdarNames.CAPTURE_PREFIX + "x", false))
                 .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> lifecycle.deleteDivert(clusterId, DivertOperations.PLUGIN_TAP_PREFIX + "x", false))
+        assertThatThrownBy(() -> lifecycle.deleteDivert(clusterId, RahdarNames.PLUGIN_TAP_PREFIX + "x", false))
                 .isInstanceOf(IllegalArgumentException.class);
         verify(divertOps, never()).destroyDivert(any(), anyString(), anyString());
     }

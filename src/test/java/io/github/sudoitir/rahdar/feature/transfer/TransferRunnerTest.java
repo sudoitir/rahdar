@@ -47,6 +47,9 @@ import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
 import io.github.sudoitir.rahdar.system.artemis.AcceptanceProbe;
 import io.github.sudoitir.rahdar.system.artemis.AcceptanceProbe.Facts;
 import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNodes;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisTransferAcceptance;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisTransferStaging;
 import io.github.sudoitir.rahdar.system.artemis.MessageOperations;
 import io.github.sudoitir.rahdar.system.artemis.StagingQueues;
 import java.io.IOException;
@@ -133,7 +136,11 @@ class TransferRunnerTest {
         when(targetNode.getDataUrl()).thenReturn("core-tgt");
         when(nodes.serving(eq(SRC_CLUSTER), any(), any())).thenReturn(sourceNode);
         when(nodes.serving(eq(TGT_CLUSTER), any(), any())).thenReturn(targetNode);
-        when(nodes.client(any())).thenReturn(client);
+        ArtemisNodes artemisNodes = mock(ArtemisNodes.class);
+        when(artemisNodes.on(any(), any())).thenReturn(client);
+        when(nodes.staging(any(ClusterNode.class)))
+                .thenReturn(new ArtemisTransferStaging(artemisNodes, staging, messages));
+        when(nodes.acceptance(any(ClusterNode.class))).thenReturn(new ArtemisTransferAcceptance(artemisNodes, probe));
         when(client.resolveBrokerObjectName()).thenReturn("broker");
         when(relay.link(any(), any(), any())).thenReturn(link);
         when(probe.read(any(), any(), any(), any())).thenReturn(facts(null));
@@ -159,9 +166,6 @@ class TransferRunnerTest {
                 nodes,
                 faults,
                 relay,
-                messages,
-                staging,
-                probe,
                 limiter,
                 handoff,
                 audit,

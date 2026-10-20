@@ -46,24 +46,6 @@ public class DivertOperations {
     private static final String EXCLUSIVE = "exclusive";
     private static final String ROUTING_TYPE = "routing-type";
 
-    /**
-     * The name prefix Rahdar reserves for the diverts that serve message capture (ADR-0079).
-     * A divert under it is Rahdar's by construction, and is never created or deleted as an
-     * operator's divert.
-     */
-    public static final String CAPTURE_PREFIX = "rahdar.capture.";
-
-    /**
-     * The name prefix Rahdar reserves for the taps it installs for plugins' message registrations
-     * (ADR-0111). Like {@link #CAPTURE_PREFIX}, a divert under it is Rahdar's by construction.
-     */
-    public static final String PLUGIN_TAP_PREFIX = "rahdar.plugin.";
-
-    /** Whether a name is one of the objects Rahdar installs for itself: a capture or a plugin tap. */
-    public static boolean isRahdarTap(String name) {
-        return name != null && (name.startsWith(CAPTURE_PREFIX) || name.startsWith(PLUGIN_TAP_PREFIX));
-    }
-
     private final ObjectMapper mapper;
 
     public DivertOperations(ObjectMapper mapper) {

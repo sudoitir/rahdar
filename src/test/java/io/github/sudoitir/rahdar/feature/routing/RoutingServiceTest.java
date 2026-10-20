@@ -16,6 +16,7 @@ import io.github.sudoitir.rahdar.kernel.core.ResourceQuery;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
 import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
 import io.github.sudoitir.rahdar.platform.broker.BrokerTarget;
+import io.github.sudoitir.rahdar.platform.broker.RahdarNames;
 import io.github.sudoitir.rahdar.platform.clusters.LifecycleOutcome;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNodeEntity;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNodeEntity.HaObservation;
@@ -204,7 +205,7 @@ class RoutingServiceTest extends PostgresIntegrationTest {
     @Test
     void aCaptureDivertIsAttributedToCaptureAndNamesItsSubscription() {
         UUID subscription = UUID.randomUUID();
-        String name = DivertOperations.CAPTURE_PREFIX + "instance." + subscription;
+        String name = RahdarNames.CAPTURE_PREFIX + "instance." + subscription;
         when(divertOps.listDiverts(any(), eq(nodeA), anyString()))
                 .thenReturn(List.of(divert(nodeA, "node-a", name, "ORDER.IN", "cap")));
         when(divertOps.listDiverts(any(), eq(nodeB), anyString())).thenReturn(List.of());

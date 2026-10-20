@@ -22,8 +22,6 @@ import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterLock;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterOwnership;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNodeEntity;
-import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
-import io.github.sudoitir.rahdar.system.artemis.ArtemisNodes;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -62,8 +60,6 @@ class CaptureReconcilerTest {
     private BrokerConnections connections;
     private ClusterOwnership ownership;
 
-    private final ArtemisNodes artemisNodes = mock(ArtemisNodes.class);
-
     @BeforeEach
     void setUp() {
         subscriptions = mock(MessageIndexSubscriptionRepository.class);
@@ -84,7 +80,6 @@ class CaptureReconcilerTest {
         when(instance.id()).thenReturn(INSTANCE);
         nodeEntity = node();
         when(nodes.nodes(CLUSTER)).thenReturn(List.of(nodeEntity));
-        when(artemisNodes.on(any(UUID.class), any(UUID.class))).thenReturn(mock(ArtemisNode.class));
         MessageIndexSubscriptionEntity subscription = subscription();
         when(subscriptions.findByEnabledTrue()).thenReturn(List.of(subscription));
         QueryPlan plan = plan();
@@ -114,17 +109,16 @@ class CaptureReconcilerTest {
                 instance,
                 addresses,
                 audit,
-                mock(CaptureLoss.class),
-                artemisNodes);
+                mock(CaptureLoss.class));
     }
 
     @Test
     void installsTheTapThatIsMissing() {
-        when(tap.installedNames(any(), eq(INSTANCE))).thenReturn(List.of());
+        when(tap.installedNames(any(), any(), eq(INSTANCE))).thenReturn(List.of());
 
         reconciler.reconcile();
 
-        verify(tap).install(any(), eq(INSTANCE), any());
+        verify(tap).install(any(), any(), eq(INSTANCE), any());
         verify(consumers).start(any());
     }
 
@@ -141,28 +135,28 @@ class CaptureReconcilerTest {
 
     @Test
     void doesNothingWhenNothingHasDrifted() {
-        when(tap.installedNames(any(), eq(INSTANCE))).thenReturn(List.of(WANTED));
+        when(tap.installedNames(any(), any(), eq(INSTANCE))).thenReturn(List.of(WANTED));
         when(consumers.isDraining(NODE, WANTED)).thenReturn(true);
         when(consumers.drainingOn(NODE)).thenReturn(Set.of(WANTED));
 
         reconciler.reconcile();
         reconciler.reconcile();
 
-        verify(tap, never()).install(any(), any(), any());
-        verify(tap, never()).remove(any(), any(), any());
+        verify(tap, never()).install(any(), any(), any(), any());
+        verify(tap, never()).remove(any(), any(), any(), any());
         verify(consumers, never()).start(any());
     }
 
     @Test
     void removesItsOwnOrphanWhenTheSubscriptionIsGone() {
         when(subscriptions.findByEnabledTrue()).thenReturn(List.of());
-        when(tap.installedNames(any(), eq(INSTANCE))).thenReturn(List.of(WANTED));
+        when(tap.installedNames(any(), any(), eq(INSTANCE))).thenReturn(List.of(WANTED));
 
         // No capturing subscription at all: the pass is not even entered per cluster,
         // so the orphan is removed by the pass that still has one for that cluster.
         reconciler.reconcileCluster(CLUSTER);
 
-        verify(tap).remove(any(), eq(INSTANCE), eq(WANTED));
+        verify(tap).remove(any(), any(), eq(INSTANCE), eq(WANTED));
         verify(consumers).stop(NODE, WANTED);
     }
 
@@ -171,7 +165,7 @@ class CaptureReconcilerTest {
         when(nodeEntity.getClusterId()).thenReturn(CLUSTER);
         when(nodes.allNodes()).thenReturn(List.of(nodeEntity));
         when(subscriptions.findByEnabledTrue()).thenReturn(List.of());
-        when(tap.installedNames(any(), eq(INSTANCE)))
+        when(tap.installedNames(any(), any(), eq(INSTANCE)))
                 .thenReturn(List.of(WANTED))
                 .thenReturn(List.of());
 
@@ -179,8 +173,8 @@ class CaptureReconcilerTest {
         reconciler.sweepOnStartup();
         reconciler.reconcile();
 
-        verify(tap).remove(any(), eq(INSTANCE), eq(WANTED));
-        verify(tap, times(1)).installedNames(any(), eq(INSTANCE));
+        verify(tap).remove(any(), any(), eq(INSTANCE), eq(WANTED));
+        verify(tap, times(1)).installedNames(any(), any(), eq(INSTANCE));
     }
 
     @Test
@@ -188,52 +182,52 @@ class CaptureReconcilerTest {
         when(nodeEntity.getClusterId()).thenReturn(CLUSTER);
         when(nodes.allNodes()).thenReturn(List.of(nodeEntity));
         when(subscriptions.findByEnabledTrue()).thenReturn(List.of());
-        when(tap.installedNames(any(), eq(INSTANCE))).thenReturn(List.of(WANTED));
+        when(tap.installedNames(any(), any(), eq(INSTANCE))).thenReturn(List.of(WANTED));
         doAnswer(invocation -> {
                     throw new IllegalStateException("broker did not answer");
                 })
                 .doNothing()
                 .when(tap)
-                .remove(any(), eq(INSTANCE), eq(WANTED));
+                .remove(any(), any(), eq(INSTANCE), eq(WANTED));
 
         reconciler.sweepOnStartup();
         reconciler.reconcile();
 
-        verify(tap, times(2)).remove(any(), eq(INSTANCE), eq(WANTED));
+        verify(tap, times(2)).remove(any(), any(), eq(INSTANCE), eq(WANTED));
     }
 
     @Test
     void anOrphanThatCouldNotBeRemovedKeepsItsClusterVisitedWhenAnotherNodeIsClean() {
-        ArtemisNode failing = twoNodesWhereOnlyTheFirstHasAnOrphan();
+        UUID failing = twoNodesWhereOnlyTheFirstHasAnOrphan();
         doAnswer(invocation -> {
                     throw new IllegalStateException("broker did not answer");
                 })
                 .doNothing()
                 .when(tap)
-                .remove(failing, INSTANCE, WANTED);
+                .remove(CLUSTER, failing, INSTANCE, WANTED);
 
         // The clean second node must not drop the cluster the first still has an orphan on.
         reconciler.sweepOnStartup();
         reconciler.reconcile();
 
-        verify(tap, times(2)).remove(failing, INSTANCE, WANTED);
+        verify(tap, times(2)).remove(CLUSTER, failing, INSTANCE, WANTED);
     }
 
     @Test
     void aNodeThatDidNotAnswerKeepsItsClusterVisitedWhenAnotherNodeIsClean() {
-        ArtemisNode unanswering = twoNodesWhereOnlyTheFirstHasAnOrphan();
-        when(tap.installedNames(unanswering, INSTANCE))
+        UUID unanswering = twoNodesWhereOnlyTheFirstHasAnOrphan();
+        when(tap.installedNames(CLUSTER, unanswering, INSTANCE))
                 .thenThrow(new IllegalStateException("broker did not answer"))
                 .thenReturn(List.of(WANTED));
 
         reconciler.sweepOnStartup();
         reconciler.reconcile();
 
-        verify(tap).remove(unanswering, INSTANCE, WANTED);
+        verify(tap).remove(CLUSTER, unanswering, INSTANCE, WANTED);
     }
 
-    /** The first node's client, which reports {@link #WANTED} as an orphan; the second reports nothing. */
-    private ArtemisNode twoNodesWhereOnlyTheFirstHasAnOrphan() {
+    /** The first node's id, which reports {@link #WANTED} as an orphan; the second reports nothing. */
+    private UUID twoNodesWhereOnlyTheFirstHasAnOrphan() {
         BrokerNodeEntity second = mock(BrokerNodeEntity.class);
         when(second.getId()).thenReturn(UUID.randomUUID());
         when(second.getName()).thenReturn("second");
@@ -245,15 +239,11 @@ class CaptureReconcilerTest {
         when(nodes.nodes(CLUSTER)).thenReturn(List.of(nodeEntity, second));
         when(nodes.allNodes()).thenReturn(List.of(nodeEntity, second));
         when(subscriptions.findByEnabledTrue()).thenReturn(List.of());
-        ArtemisNode first = mock(ArtemisNode.class);
-        ArtemisNode clean = mock(ArtemisNode.class);
         UUID firstId = nodeEntity.getId();
         UUID secondId = second.getId();
-        when(artemisNodes.on(CLUSTER, firstId)).thenReturn(first);
-        when(artemisNodes.on(CLUSTER, secondId)).thenReturn(clean);
-        when(tap.installedNames(first, INSTANCE)).thenReturn(List.of(WANTED));
-        when(tap.installedNames(clean, INSTANCE)).thenReturn(List.of());
-        return first;
+        when(tap.installedNames(CLUSTER, firstId, INSTANCE)).thenReturn(List.of(WANTED));
+        when(tap.installedNames(CLUSTER, secondId, INSTANCE)).thenReturn(List.of());
+        return firstId;
     }
 
     @Test
@@ -261,45 +251,45 @@ class CaptureReconcilerTest {
         // installedNames only ever reports this instance's own names — the filter is in
         // the tap — so a divert belonging to another Rahdar is invisible here. This
         // pins the consequence: nothing in a pass removes a name it did not recognise.
-        when(tap.installedNames(any(), eq(INSTANCE))).thenReturn(List.of());
+        when(tap.installedNames(any(), any(), eq(INSTANCE))).thenReturn(List.of());
 
         reconciler.reconcileCluster(CLUSTER);
 
-        verify(tap, never()).remove(any(), any(), eq(OTHER_RAHDAR));
-        verify(tap, times(1)).installedNames(any(), eq(INSTANCE));
+        verify(tap, never()).remove(any(), any(), any(), eq(OTHER_RAHDAR));
+        verify(tap, times(1)).installedNames(any(), any(), eq(INSTANCE));
     }
 
     @Test
     void aDivertRemovedOutOfBandIsReinstalledEvenWhileItsDrainIsRunning() {
         // The drain is still attached to its queue, but the divert feeding it is gone: capture
         // would report ACTIVE while recording nothing.
-        when(tap.installedNames(any(), eq(INSTANCE))).thenReturn(List.of());
+        when(tap.installedNames(any(), any(), eq(INSTANCE))).thenReturn(List.of());
         when(consumers.isDraining(NODE, WANTED)).thenReturn(true);
 
         reconciler.reconcileCluster(CLUSTER);
 
         verify(consumers).stop(NODE, WANTED);
-        verify(tap).install(any(), eq(INSTANCE), any());
+        verify(tap).install(any(), any(), eq(INSTANCE), any());
     }
 
     @Test
     void aRefusedTapIsRecordedOnceAndNotRetriedEveryPass() {
-        when(tap.installedNames(any(), eq(INSTANCE))).thenReturn(List.of());
-        when(tap.install(any(), eq(INSTANCE), any()))
+        when(tap.installedNames(any(), any(), eq(INSTANCE))).thenReturn(List.of());
+        when(tap.install(any(), any(), eq(INSTANCE), any()))
                 .thenThrow(new CaptureRefusedException("the filter is not valid selector syntax", null));
 
         reconciler.reconcileCluster(CLUSTER);
         reconciler.reconcileCluster(CLUSTER);
         reconciler.reconcileCluster(CLUSTER);
 
-        verify(tap, times(1)).install(any(), eq(INSTANCE), any());
+        verify(tap, times(1)).install(any(), any(), eq(INSTANCE), any());
         verify(audit, times(1)).begin(any(), eq("INSTALL_CAPTURE"), anyString(), any(), any(), any(), any(), eq(false));
     }
 
     @Test
     void reinstallRemovesTheSubscriptionsTapsAndInstallsThemAgain() {
         // Installed before the reinstall; gone once it has removed them.
-        when(tap.installedNames(any(), eq(INSTANCE)))
+        when(tap.installedNames(any(), any(), eq(INSTANCE)))
                 .thenReturn(List.of(WANTED))
                 .thenReturn(List.of());
 
@@ -308,9 +298,9 @@ class CaptureReconcilerTest {
         // The old divert and queue carry the old filter; a divert is never changed in place.
         var order = Mockito.inOrder(consumers, tap);
         order.verify(consumers).stop(NODE, WANTED);
-        order.verify(tap).remove(any(), eq(INSTANCE), eq(WANTED));
-        order.verify(tap).install(any(), eq(INSTANCE), any());
-        verify(tap, times(1)).remove(any(), any(), any());
+        order.verify(tap).remove(any(), any(), eq(INSTANCE), eq(WANTED));
+        order.verify(tap).install(any(), any(), eq(INSTANCE), any());
+        verify(tap, times(1)).remove(any(), any(), any(), any());
     }
 
     @Test
@@ -323,7 +313,7 @@ class CaptureReconcilerTest {
         when(gone.getActive()).thenReturn(false);
         when(gone.getLastError()).thenReturn("unreachable");
         when(nodes.nodes(CLUSTER)).thenReturn(List.of(nodeEntity, gone));
-        when(tap.installedNames(any(), eq(INSTANCE))).thenReturn(List.of(WANTED));
+        when(tap.installedNames(any(), any(), eq(INSTANCE))).thenReturn(List.of(WANTED));
         when(consumers.isDraining(NODE, WANTED)).thenReturn(true);
         when(consumers.drainingOn(goneId)).thenReturn(Set.of(WANTED));
 

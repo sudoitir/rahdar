@@ -15,11 +15,11 @@ import io.github.sudoitir.rahdar.kernel.security.ActorResolver;
 import io.github.sudoitir.rahdar.kernel.security.ClusterAccessGuard;
 import io.github.sudoitir.rahdar.kernel.security.SettingsPermissions;
 import io.github.sudoitir.rahdar.kernel.settings.RahdarInstance;
+import io.github.sudoitir.rahdar.platform.broker.RahdarNames;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
 import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshot;
 import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshots;
-import io.github.sudoitir.rahdar.system.artemis.DivertOperations;
 import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
@@ -116,7 +116,7 @@ public class MessageIndexService {
                 draft.getRingSize(),
                 captureProperties.maxRingBytes().toBytes(),
                 List.copyOf(objects),
-                tap.captureBrokerXml(instance.id(), draft.getRingSize()),
+                tap.captureBrokerXml(clusterId, instance.id(), draft.getRingSize()),
                 refusal);
     }
 
@@ -604,8 +604,8 @@ public class MessageIndexService {
         if (CaptureAddresses.isCaptureObject(trimmed)) {
             // Rahdar's own capture queues are never captured: doing so taps the taps (ADR-0079).
             throw new IllegalArgumentException("A pattern under "
-                    + DivertOperations.CAPTURE_PREFIX + " or "
-                    + DivertOperations.PLUGIN_TAP_PREFIX
+                    + RahdarNames.CAPTURE_PREFIX + " or "
+                    + RahdarNames.PLUGIN_TAP_PREFIX
                     + " names Rahdar's own capture or plugin tap objects, which cannot be captured.");
         }
         return trimmed;

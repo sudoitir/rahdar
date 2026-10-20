@@ -15,6 +15,7 @@ import io.github.sudoitir.rahdar.kernel.security.ResourceFilter;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
 import io.github.sudoitir.rahdar.platform.broker.BrokerXmlSnippets;
+import io.github.sudoitir.rahdar.platform.broker.RahdarNames;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
 import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
@@ -133,8 +134,7 @@ public class RoutingService {
     private static boolean seen(DivertView divert, ResourceFilter addresses) {
         String name = divert.name();
         boolean tap = name != null
-                && (name.startsWith(DivertOperations.CAPTURE_PREFIX)
-                        || name.startsWith(DivertOperations.PLUGIN_TAP_PREFIX));
+                && (name.startsWith(RahdarNames.CAPTURE_PREFIX) || name.startsWith(RahdarNames.PLUGIN_TAP_PREFIX));
         return addresses.readable(divert.address()) && (tap || addresses.readable(divert.forwardingAddress()));
     }
 
@@ -191,7 +191,7 @@ public class RoutingService {
     private DivertView toDivertView(List<DivertRow> group, int nodesTotal, Set<String> ownedByOperator) {
         DivertRow first = group.get(0);
         String name = first.uniqueName();
-        boolean capture = name != null && name.startsWith(DivertOperations.CAPTURE_PREFIX);
+        boolean capture = name != null && name.startsWith(RahdarNames.CAPTURE_PREFIX);
         String owner = capture ? OWNER_CAPTURE : operatorOwner(name, ownedByOperator);
         return new DivertView(
                 name,

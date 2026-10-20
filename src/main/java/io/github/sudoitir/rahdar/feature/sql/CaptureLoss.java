@@ -4,9 +4,9 @@ import io.github.sudoitir.rahdar.feature.sql.internal.persistence.MessageCapture
 import io.github.sudoitir.rahdar.feature.sql.internal.persistence.MessageCaptureNodeRepository;
 import io.github.sudoitir.rahdar.feature.sql.internal.persistence.MessageIndexSubscriptionEntity;
 import io.github.sudoitir.rahdar.feature.sql.internal.persistence.MessageIndexSubscriptionRepository;
+import io.github.sudoitir.rahdar.platform.broker.RahdarNames;
 import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshot;
 import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshots;
-import io.github.sudoitir.rahdar.system.artemis.DivertOperations;
 import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
@@ -275,7 +275,7 @@ public class CaptureLoss {
      */
     private static boolean isCaptureQueue(QueueSnapshot row, String suffix) {
         return row.queueName() != null
-                && row.queueName().startsWith(DivertOperations.CAPTURE_PREFIX)
+                && row.queueName().startsWith(RahdarNames.CAPTURE_PREFIX)
                 && row.queueName().endsWith(suffix);
     }
 

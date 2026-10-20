@@ -30,6 +30,7 @@ import io.github.sudoitir.rahdar.kernel.security.internal.persistence.UserRoleRe
 import io.github.sudoitir.rahdar.platform.broker.Attempt;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
 import io.github.sudoitir.rahdar.platform.broker.QueueRow;
+import io.github.sudoitir.rahdar.platform.broker.RahdarNames;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterService;
@@ -850,14 +851,14 @@ class PluginMessagingRealBrokerTest extends PostgresIntegrationTest {
                 client.single(ManagementRequest.read(broker, "QueueNames")).attribute("QueueNames");
         return value.valueStream()
                 .map(JsonNode::asString)
-                .filter(n -> n.startsWith(DivertOperations.PLUGIN_TAP_PREFIX))
+                .filter(n -> n.startsWith(RahdarNames.PLUGIN_TAP_PREFIX))
                 .toList();
     }
 
     private List<String> tapDiverts() {
         return divertOps.listDiverts(client, null, null).stream()
                 .map(d -> d.uniqueName())
-                .filter(n -> n != null && n.startsWith(DivertOperations.PLUGIN_TAP_PREFIX))
+                .filter(n -> n != null && n.startsWith(RahdarNames.PLUGIN_TAP_PREFIX))
                 .toList();
     }
 

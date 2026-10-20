@@ -1,5 +1,6 @@
 package io.github.sudoitir.rahdar.system.artemis;
 
+import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
 import io.github.sudoitir.rahdar.platform.broker.BrokerTarget;
 import io.github.sudoitir.rahdar.platform.broker.QueueCounters;
 import java.util.List;
@@ -10,6 +11,11 @@ import org.springframework.stereotype.Component;
 @Component
 @RequiredArgsConstructor
 class ArtemisQueueCounters implements QueueCounters {
+
+    @Override
+    public String system() {
+        return BrokerGateway.SYSTEM;
+    }
 
     private final ArtemisNodes nodes;
     private final QueueLifecycleOperations ops;

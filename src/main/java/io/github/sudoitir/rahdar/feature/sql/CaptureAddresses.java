@@ -1,7 +1,7 @@
 package io.github.sudoitir.rahdar.feature.sql;
 
 import io.github.sudoitir.rahdar.feature.sql.internal.persistence.MessageIndexSubscriptionEntity;
-import io.github.sudoitir.rahdar.system.artemis.DivertOperations;
+import io.github.sudoitir.rahdar.platform.broker.RahdarNames;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
@@ -65,6 +65,6 @@ public class CaptureAddresses {
     /** Whether a name belongs to Rahdar's own capture objects, which no capture may cover. */
     public static boolean isCaptureObject(String name) {
         // A plugin's tap is Rahdar's own object too, and a capture of it would copy a copy.
-        return DivertOperations.isRahdarTap(name);
+        return RahdarNames.isRahdarTap(name);
     }
 }

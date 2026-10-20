@@ -3,10 +3,11 @@ package io.github.sudoitir.rahdar.feature.transfer;
 import io.github.sudoitir.rahdar.kernel.core.NotFoundException;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
 import io.github.sudoitir.rahdar.platform.broker.BrokerRelay;
+import io.github.sudoitir.rahdar.platform.broker.SystemExtensions;
+import io.github.sudoitir.rahdar.platform.broker.TransferAcceptance;
+import io.github.sudoitir.rahdar.platform.broker.TransferStaging;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
-import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
-import io.github.sudoitir.rahdar.system.artemis.ArtemisNodes;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -21,7 +22,7 @@ import org.springframework.stereotype.Component;
 class TransferNodes {
 
     private final ClusterDirectory directory;
-    private final ArtemisNodes artemisNodes;
+    private final SystemExtensions extensions;
 
     /** A node of this cluster by Rahdar's id; 404 when it is not one. */
     ClusterNode node(UUID clusterId, UUID nodeId) {
@@ -50,8 +51,19 @@ class TransferNodes {
                         "Node " + name + " has no live, manageable endpoint now."));
     }
 
-    ArtemisNode client(ClusterNode node) {
-        return artemisNodes.on(node.getClusterId(), node.getId());
+    /** The staging a node's cluster's system provides. */
+    TransferStaging staging(ClusterNode node) {
+        return staging(node.getClusterId());
+    }
+
+    /** The staging a cluster's system provides. */
+    TransferStaging staging(UUID clusterId) {
+        return extensions.require(clusterId, TransferStaging.class);
+    }
+
+    /** The acceptance rules a node's cluster's system provides. */
+    TransferAcceptance acceptance(ClusterNode node) {
+        return extensions.require(node.getClusterId(), TransferAcceptance.class);
     }
 
     /** The node as a relay end: one it reaches over its data plane, which it must have. */
