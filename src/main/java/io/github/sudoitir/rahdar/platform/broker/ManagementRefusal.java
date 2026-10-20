@@ -6,9 +6,9 @@ import java.util.regex.Pattern;
 /**
  * A management operation the broker refused for a reason that is not a connection
  * failure. Telling these apart is what {@code managementWrite} honesty depends on
- * (ADR-0049 D5): an {@link Kind#AUTHORIZATION} refusal is evidence the connection
- * cannot write, and every other kind is evidence about the <em>request</em>, which
- * must never disable the capability.
+ * (ADR-0049 D5): a refusal is evidence about the <em>request</em>, which must never
+ * disable the capability. Only a rejected credential is evidence the connection
+ * cannot write, and that is a connection failure (see below), not a refusal.
  *
  * <p>The codes are the ones Artemis 2.44 actually returns, measured over Jolokia
  * during this change's groundwork and recorded in ADR-0049 / the change's

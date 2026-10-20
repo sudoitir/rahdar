@@ -250,6 +250,14 @@ public class TransferService {
                             "transfer-nothing-selected",
                             "A filter selection needs a filter. Choose the whole queue instead to take everything.");
                 }
+                if (!FrozenFilter.isCompleteExpression(selection.filter())) {
+                    throw new TransferRefusedException(
+                            HttpStatus.UNPROCESSABLE_ENTITY,
+                            "transfer-invalid-filter",
+                            "The filter is not one complete selector expression, so it cannot be limited to the"
+                                    + " messages that existed when the transfer started. Check its parentheses and"
+                                    + " quotes.");
+                }
                 yield new TransferSelection(
                         SelectionKind.FILTER, null, selection.filter().strip());
             }
