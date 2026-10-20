@@ -8,7 +8,9 @@ import io.github.sudoitir.rahdar.platform.broker.SystemExtensions;
 import io.github.sudoitir.rahdar.platform.clusters.BrokerCommands;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterEnvironmentIndex;
+import io.github.sudoitir.rahdar.platform.clusters.ClusterKinds;
 import io.github.sudoitir.rahdar.platform.clusters.NodeStateRecorder;
+import io.github.sudoitir.rahdar.platform.clusters.ResourceTargets;
 import io.github.sudoitir.rahdar.platform.governance.ClearViewAudit;
 import io.github.sudoitir.rahdar.platform.governance.ContentPolicy;
 import io.github.sudoitir.rahdar.platform.mcp.McpProperties;
@@ -112,4 +114,12 @@ class BulkModuleTest extends ModuleIntegrationTest {
 
     @MockitoBean
     ArtemisNodes artemisNodes;
+
+    /** The estate's subscriptions, in a direct dependency, name each one's kind through the clusters module. */
+    @MockitoBean
+    ClusterKinds clusterKinds;
+
+    /** The resource controllers, in a direct dependency, resolve a target's nodes through the clusters module. */
+    @MockitoBean
+    ResourceTargets resourceTargets;
 }

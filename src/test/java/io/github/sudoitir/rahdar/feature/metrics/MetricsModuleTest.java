@@ -7,6 +7,7 @@ import io.github.sudoitir.rahdar.platform.broker.BrokerSessions;
 import io.github.sudoitir.rahdar.platform.broker.DataPlaneCheck;
 import io.github.sudoitir.rahdar.platform.broker.NodeCallLimiter;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
+import io.github.sudoitir.rahdar.platform.clusters.ClusterKinds;
 import io.github.sudoitir.rahdar.platform.clusters.NodeStateRecorder;
 import io.github.sudoitir.rahdar.support.ModuleIntegrationTest;
 import io.github.sudoitir.rahdar.system.artemis.ArtemisNodes;
@@ -47,4 +48,8 @@ class MetricsModuleTest extends ModuleIntegrationTest {
 
     @MockitoBean
     BrokerGateway gateway;
+
+    /** The clusters module, a direct dependency, names each cluster's kinds. */
+    @MockitoBean
+    ClusterKinds clusterKinds;
 }
