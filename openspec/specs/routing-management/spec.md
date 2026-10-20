@@ -7,27 +7,30 @@ broker while remaining absent from whatever manages that broker's configuration.
 
 ## Requirements
 
-### Requirement: Diverts and bridges are visible across the cluster
+### Requirement: Routes are visible across the cluster
 
-The system SHALL present the diverts and the bridges of a cluster, merged across its
-nodes, at the same quality as its other resource views — paged, filterable, and
-attributed to the nodes each was found on.
+The system SHALL present the routes of a cluster — the edges that move messages, of
+every kind the cluster's system has (for an Artemis cluster, its diverts and bridges)
+— merged across its nodes, in one list at the same quality as its other resource
+views: paged, filterable, and attributed to the nodes each was found on. Each route
+SHALL carry its route class (binding, forward or link), its kind label, its source
+and its target as canonical resource ids.
 
-A bridge SHALL carry its running state, so that an operator can answer whether a
-configured bridge is actually running.
+A route that is a link to another system, such as an Artemis bridge, SHALL carry its
+running state, so that an operator can answer whether a configured link is actually
+running.
 
-Viewing diverts and bridges SHALL require only the permission needed to view a
-cluster.
+Viewing routes SHALL require only the permission needed to view a cluster.
 
 #### Scenario: The routing between endpoints is visible
 
-- **WHEN** an operator views a cluster's diverts
-- **THEN** each divert is listed with its source address, forwarding address,
-  filter, exclusivity, and the nodes it exists on
+- **WHEN** an operator views a cluster's routes
+- **THEN** each route is listed with its source, its target, its kind label,
+  its filter and exclusivity where its kind has them, and the nodes it exists on
 
-#### Scenario: A bridge's running state is answerable
+#### Scenario: A link's running state is answerable
 
-- **WHEN** an operator views a cluster's bridges
+- **WHEN** an operator views a cluster's routes that include bridges
 - **THEN** each bridge is listed with whether it is currently running
 
 ### Requirement: The system does not claim where a divert came from
@@ -81,8 +84,11 @@ declaration's drift report is where its presence on every node is tracked.
 
 ### Requirement: Creating and deleting a divert is an authorized, audited act
 
-The system SHALL allow an authorized operator to create and to delete a divert, and SHALL
-NOT write to broker configuration files.
+The system SHALL allow an authorized operator to create and to delete a divert
+through the Artemis namespace of a cluster (`/clusters/{c}/artemis/diverts`), which
+exists only for clusters of that system, and SHALL NOT write to broker configuration
+files. A divert is a route of kind `artemis.divert`; once created it is listed with
+every other route.
 
 Because nothing removes a divert on the system's behalf, deletion SHALL be presented as the
 only thing that removes one.
@@ -98,12 +104,17 @@ only thing that removes one.
 - **WHEN** a divert is created
 - **THEN** the running broker is changed and no broker configuration file is written
 
+#### Scenario: Another system has no divert route
+
+- **WHEN** a client creates a divert on a cluster that is not Artemis
+- **THEN** the request answers not found, as the route does not exist for that cluster
+
 ### Requirement: Divert mutations apply across live nodes and report per node
 
-A divert exists per node. The system SHALL apply a divert creation or deletion to
-every live node of the cluster, determined from observed topology, and SHALL report
-the outcome for each node, using the same per-node outcome vocabulary as other
-cluster-wide topology mutations.
+A divert exists per node. The system SHALL apply a divert creation or deletion, made
+through the Artemis namespace, to every live node of the cluster, determined from
+observed topology, and SHALL report the outcome for each node, using the same
+per-node outcome vocabulary as other cluster-wide topology mutations.
 
 A node's creation outcome SHALL reflect what the broker actually deployed, checked after the
 request. The outcome is:
@@ -178,23 +189,23 @@ something will remove it.
 - **WHEN** an operator selects the marking
 - **THEN** the configuration that would make the broker and its configuration agree is shown
 
-### Requirement: A routing view answers where a message goes without being read end to end
+### Requirement: A routes view answers where a message goes without being read end to end
 
-The divert view SHALL make the source and the forwarding address of each divert
-legible as a direction, so an operator scanning for "where does traffic on this
-address go" is not reconstructing it from two columns.
+The routes view SHALL make the source and the target of each route legible as a
+direction, so an operator scanning for "where does traffic on this destination go"
+is not reconstructing it from two columns.
 
-Where a divert is exclusive — diverting rather than copying — that SHALL be
-distinguishable at a glance, because it is the difference between traffic being
+Where a route diverts rather than copies — an exclusive Artemis divert — that SHALL
+be distinguishable at a glance, because it is the difference between traffic being
 duplicated and traffic being taken away.
 
-The view SHALL be filterable by address so that the question "what touches this
-address" is answerable directly.
+The view SHALL be filterable by destination so that the question "what touches this
+destination" is answerable directly.
 
 #### Scenario: Direction is legible
 
-- **WHEN** an operator scans the divert view
-- **THEN** the direction from source to forwarding address is apparent without
+- **WHEN** an operator scans the routes view
+- **THEN** the direction from source to target is apparent without
   cross-referencing columns
 
 #### Scenario: Exclusive diverts are distinguishable
@@ -203,43 +214,44 @@ address" is answerable directly.
 - **THEN** the difference is apparent, and conveyed in text rather than by colour
   alone
 
-#### Scenario: What touches an address is answerable
+#### Scenario: What touches a destination is answerable
 
-- **WHEN** an operator filters the divert view by an address
-- **THEN** the diverts that read from or write to it are shown
+- **WHEN** an operator filters the routes view by a destination
+- **THEN** the routes that read from or write to it are shown
 
-### Requirement: Capture diverts are identified as Rahdar's own and are not managed here
+### Requirement: Capture taps are identified as Rahdar's own and are not managed here
 
-A divert that exists to serve a message capture subscription SHALL be identified as such
-wherever diverts are listed, together with the subscription it serves.
+A route that exists to serve a message capture subscription (the tap Rahdar installs
+on an Artemis cluster is built with a divert) SHALL be identified as such wherever
+routes are listed, together with the capture subscription it serves.
 
-The system SHALL NOT offer to delete such a divert from the routing view. Removing it there
+The system SHALL NOT offer to delete such a route from the routes view. Removing it there
 would leave a capture subscription whose tap is reinstated on the next reconciliation, so
-the deletion would appear to succeed and then silently undo itself. The routing view SHALL
-instead lead to the subscription that owns it.
+the deletion would appear to succeed and then silently undo itself. The routes view SHALL
+instead lead to the capture subscription that owns it.
 
 The system SHALL refuse, on every interface (the REST API and the MCP tools included), to
-create or delete a divert whose name is in the namespace reserved for capture. The refusal
-SHALL name the capture subscription to manage instead.
+create or delete a route whose name is in the namespace reserved for Rahdar's taps. The
+refusal SHALL name the capture subscription to manage instead.
 
-#### Scenario: A capture divert is attributed to its subscription
+#### Scenario: A capture tap is attributed to its subscription
 
-- **WHEN** an operator views a cluster's diverts while a capture subscription is active
-- **THEN** the capture divert is listed, identified as serving message capture, and names the subscription it belongs to
+- **WHEN** an operator views a cluster's routes while a capture subscription is active
+- **THEN** the tap's route is listed, identified as serving message capture, and names the subscription it belongs to
 
-#### Scenario: Deleting a capture divert is not offered in the routing view
+#### Scenario: Deleting a capture tap is not offered in the routes view
 
-- **WHEN** an operator opens a capture divert in the routing view
+- **WHEN** an operator opens a capture tap's route in the routes view
 - **THEN** no delete action is offered there, and the view leads to the capture subscription that owns it
 
-#### Scenario: The API refuses to delete a capture divert
+#### Scenario: The API refuses to delete a capture tap
 
-- **WHEN** a client calls the divert delete API or tool with a capture divert's name
+- **WHEN** a client calls the route delete API or tool with a capture tap's name
 - **THEN** the request is refused with the reason, and no broker is changed
 
-#### Scenario: The API refuses to create a divert in the capture namespace
+#### Scenario: The API refuses to create a route in the capture namespace
 
-- **WHEN** a client creates a divert whose name is in the capture namespace
+- **WHEN** a client creates a route whose name is in the capture namespace
 - **THEN** the request is refused with the reason, and no broker is changed
 
 ### Requirement: A divert that would break routing is refused before it is created
@@ -299,10 +311,12 @@ characters the name, addresses or filter contain.
 
 ### Requirement: A cluster's routing is presented as a graph that can be edited
 
-The system SHALL present a cluster's routing as a graph — its addresses, its queues, the
-diverts between addresses, the bridges out of queues, and the targets those bridges reach —
-so that "where does traffic on this address go" is answered by following a line rather than
-by cross-referencing rows on separate screens.
+The system SHALL present a cluster's routing as a graph — its destinations, its
+subscriptions, the routes between destinations, the links out of subscriptions, and
+the targets those links reach — so that "where does traffic on this destination go"
+is answered by following a line rather than by cross-referencing rows on separate
+screens. Each element carries its kind label, so an Artemis divert and bridge are
+still named as such.
 
 The graph SHALL be an editing surface for the cluster's declared configuration. Composing a
 route in it SHALL change only the declaration, and SHALL change no broker until the
@@ -318,9 +332,9 @@ declaration.
 
 #### Scenario: A route is followed rather than reconstructed
 
-- **WHEN** an operator opens the routing graph for a cluster with a divert from one address to
-  another and a bridge out of a queue on the second address
-- **THEN** the path from the first address through the divert, the second address, its queue
+- **WHEN** an operator opens the routing graph for a cluster with a divert from one destination to
+  another and a bridge out of a subscription on the second destination
+- **THEN** the path from the first destination through the divert, the second destination, its subscription
   and the bridge to its target is drawn as connected elements
 
 #### Scenario: Composing a route changes no broker
@@ -352,7 +366,7 @@ A cluster's routing can be larger than a graph can usefully draw. The system SHA
 it renders, and SHALL state the bound and what has been left out rather than silently drawing
 a subset.
 
-Where the graph is bounded, the system SHALL let the operator choose the address the drawn
+Where the graph is bounded, the system SHALL let the operator choose the destination the drawn
 region is anchored on, so the part they came to see is the part they get.
 
 #### Scenario: A large cluster states what is not drawn

@@ -5,15 +5,16 @@ Closing a connection, a session or an address's consumers from Rahdar: what a cl
 
 ## Requirements
 
-### Requirement: An operator can close a connection, a session, or an address's consumers
+### Requirement: An operator can close a connection, a channel, or a destination's consumers
 
 The system SHALL allow an authorized operator to close one client connection, to
-close one session within a connection, and to close every consumer connection bound
-to an address.
+close one channel within a connection, and to close every consumer connection bound
+to a destination. Each is the close custom method on the one resource, addressed by
+its canonical resource id, offered only where the resource's kind supports it.
 
-Closing a connection or a session SHALL name the node that issued the identifier,
-because a connection identifier is meaningful only on that node. Closing an
-address's consumers SHALL name the cluster and SHALL apply to every live node,
+Closing a connection or a channel SHALL name the node that issued the identifier,
+because a connection identifier is meaningful only on that node. Closing a
+destination's consumers SHALL name the cluster and SHALL apply to every live node,
 reporting the outcome per node.
 
 #### Scenario: A wedged consumer's connection is closed
@@ -23,11 +24,16 @@ reporting the outcome per node.
 - **THEN** the connection is closed on the named node and the consumer no longer
   holds its messages
 
-#### Scenario: An address's consumers are closed across the cluster
+#### Scenario: A destination's consumers are closed across the cluster
 
-- **WHEN** an operator closes the consumers bound to an address
+- **WHEN** an operator closes the consumers bound to a destination
 - **THEN** the consumers on every live node are closed and the result reports each
   node separately
+
+#### Scenario: A kind that cannot be closed
+
+- **WHEN** an operator opens a resource whose kind has no close
+- **THEN** the close action is disabled and says why, and a direct request is refused as unsupported
 
 ### Requirement: A close is best-effort about identity and treats a vanished target as success
 
@@ -54,41 +60,41 @@ the same identifier.
 
 ### Requirement: A close states its consequence for in-flight messages before it is confirmed
 
-Closing a consumer returns the messages it holds to their queue and increases their
-delivery count, which may move a message to a dead-letter address.
+Closing a consumer returns the messages it holds to their subscription and increases their
+delivery count, which may move a message to a dead-letter destination.
 
 The system SHALL state this consequence at the point of confirmation, together with
 the number of in-flight messages where the broker reports it, so that an operator
-does not discover it afterwards from a dead-letter queue.
+does not discover it afterwards from a dead-letter subscription.
 
 #### Scenario: The confirmation discloses the message effect
 
 - **WHEN** an operator is asked to confirm closing a consumer holding in-flight
   messages
-- **THEN** the confirmation states that those messages return to the queue with an
+- **THEN** the confirmation states that those messages return to the subscription with an
   increased delivery count, and how many there are
 
-### Requirement: Closing an address's consumers is governed by the bulk safety cap
+### Requirement: Closing a destination's consumers is governed by the bulk safety cap
 
 Because it affects an unbounded number of connections, the system SHALL support
-previewing an address-scoped close, reporting the number of consumers that would be
+previewing a destination-scoped close, reporting the number of consumers that would be
 closed on each node without closing any, and SHALL evaluate the total against the
 bulk safety cap, refusing it above the cap unless explicitly overridden.
 
 #### Scenario: A preview closes nothing
 
-- **WHEN** an operator previews closing an address's consumers
+- **WHEN** an operator previews closing a destination's consumers
 - **THEN** the per-node counts are reported and no connection is closed
 
 #### Scenario: A large close is refused by default
 
-- **WHEN** an address-scoped close would affect more consumers than the safety cap
+- **WHEN** a destination-scoped close would affect more consumers than the safety cap
 - **THEN** it is refused, stating the estimate and the cap, until explicitly
   overridden
 
 ### Requirement: The system never selects its own targets to close
 
-The system SHALL close only connections, sessions, or addresses that an operator
+The system SHALL close only connections, channels, or destinations that an operator
 has explicitly named. It SHALL NOT offer an operation that selects targets from a
 detection heuristic, such as closing every consumer currently judged slow, because
 such a detection has false positives by construction and the consequence of acting
@@ -103,12 +109,12 @@ on one is a disconnected production application.
 ### Requirement: Closes are permission-gated and audited with a resolvable identity
 
 The system SHALL require a permission distinct from every message permission in
-order to close a connection, session, or an address's consumers, resolvable at
+order to close a connection, channel, or a destination's consumers, resolvable at
 global, environment, or cluster scope.
 
 The system SHALL record an audit event capturing the actor, the cluster, the node,
 and the identity of what was closed as read immediately before the close — client
-identifier, remote address, user, and session and consumer counts — because none of
+identifier, remote address, user, and channel and consumer counts — because none of
 it is resolvable afterwards.
 
 #### Scenario: A message permission does not grant a close

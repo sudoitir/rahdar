@@ -5,43 +5,53 @@ Creating, destroying, pausing, resuming and reconfiguring queues and addresses a
 
 ## Requirements
 
-### Requirement: Queues and addresses can be created and destroyed from Rahdar
+### Requirement: Subscriptions and destinations can be created and destroyed from Rahdar
 
-The system SHALL allow an authorized operator to create a queue, destroy a queue,
-create an address and destroy an address on a registered cluster, without leaving
-the product for a broker CLI or a JMX console.
+The system SHALL allow an authorized operator to create a subscription, destroy a
+subscription, create a destination and destroy a destination on a registered
+cluster, without leaving the product for a broker CLI or a JMX console. Each is
+addressed by its kind and its canonical resource id, and each is a create or a
+delete of a resource, whatever the system calls it.
 
-A queue creation SHALL carry the address it binds to, its routing type, its name,
-and whether it is durable; a filter MAY be supplied at creation.
+A subscription creation SHALL carry its kind, its name, the destination it binds
+to, and the system's native attributes for that kind (for an Artemis queue, its
+routing type and whether it is durable); a filter MAY be supplied at creation.
+A destination creation SHALL carry its kind, its name and its native attributes.
 
-Destroying an address that still has queues bound to it SHALL be refused, and the
-refusal SHALL name the bound queues, so that the operator destroys them
-explicitly rather than through a single action whose blast radius is not stated.
+Destroying a destination that still has subscriptions bound to it SHALL be
+refused, and the refusal SHALL name the bound subscriptions, so that the operator
+destroys them explicitly rather than through a single action whose blast radius
+is not stated.
 
-#### Scenario: A queue is created across the cluster
+#### Scenario: A subscription is created across the cluster
 
-- **WHEN** an operator creates a queue on a cluster
-- **THEN** the queue exists on every live node of that cluster and the result
+- **WHEN** an operator creates a subscription on a cluster
+- **THEN** the subscription exists on every live node of that cluster and the result
   reports the outcome for each node individually
 
-#### Scenario: Creating a queue that already exists is not a failure
+#### Scenario: Creating a subscription that already exists is not a failure
 
-- **WHEN** an operator creates a queue that already exists on a node with the same
-  configuration
+- **WHEN** an operator creates a subscription that already exists on a node with the
+  same configuration
 - **THEN** that node is reported as already in the requested state, and the command
   is not treated as an error
 
-#### Scenario: Creating a queue that exists with a different configuration is reported
+#### Scenario: Creating a subscription that exists with a different configuration is reported
 
-- **WHEN** an operator creates a queue whose name already exists on a node with a
+- **WHEN** an operator creates a subscription whose name already exists on a node with a
   different configuration
 - **THEN** that node is reported as failed, and the report names how the existing
   configuration differs from the requested one
 
-#### Scenario: An address with bound queues is not destroyed
+#### Scenario: A destination with bound subscriptions is not destroyed
 
-- **WHEN** an operator destroys an address that still has queues bound to it
-- **THEN** the operation is refused and the refusal names the bound queues
+- **WHEN** an operator destroys a destination that still has subscriptions bound to it
+- **THEN** the operation is refused and the refusal names the bound subscriptions
+
+#### Scenario: A kind the cluster does not have is refused
+
+- **WHEN** an operator creates a resource of a kind the cluster's system does not offer
+- **THEN** the request is refused as unsupported, naming the kind, and no broker is called
 
 ### Requirement: A lifecycle command targets the cluster and reports per node
 
@@ -93,22 +103,22 @@ would be destroyed, per node.
 
 #### Scenario: A destructive preview reports what would be lost
 
-- **WHEN** an operator previews destroying a queue that holds messages
+- **WHEN** an operator previews destroying a subscription that holds messages
 - **THEN** the preview reports the number of messages that would be destroyed on
   each node
 
-### Requirement: Destroying a queue is governed by the bulk safety cap
+### Requirement: Destroying a subscription is governed by the bulk safety cap
 
-Destroying a queue destroys the messages it holds, and the system SHALL therefore
-evaluate it against the same bulk safety cap as any other bulk destructive
-operation, using the total message count across the target nodes.
+Destroying a subscription destroys the messages it holds, and the system SHALL
+therefore evaluate it against the same bulk safety cap as any other bulk
+destructive operation, using the total message count across the target nodes.
 
 A destroy whose estimate exceeds the cap SHALL be refused unless the caller
 explicitly overrides the cap.
 
-#### Scenario: Destroying a large queue is refused by default
+#### Scenario: Destroying a large subscription is refused by default
 
-- **WHEN** an operator destroys a queue holding more messages than the safety cap
+- **WHEN** an operator destroys a subscription holding more messages than the safety cap
 - **THEN** the operation is refused and the refusal states the estimate and the cap
 
 #### Scenario: An explicit override proceeds
@@ -116,41 +126,51 @@ explicitly overrides the cap.
 - **WHEN** the same operator repeats the destroy with an explicit override
 - **THEN** the operation proceeds and the override is recorded
 
-### Requirement: A live queue can be paused, resumed, and reconfigured within limits
+### Requirement: A live subscription can be paused, resumed, and reconfigured within limits
 
-The system SHALL allow pausing and resuming a queue, resetting its message counter,
-and changing the subset of its configuration that the broker accepts on a live
-queue.
+The system SHALL allow pausing and resuming a subscription, resetting its message
+counters, and changing the subset of its configuration that the broker accepts on
+a live subscription. Each is a custom method on the one resource, offered only
+where the resource's kind has that verb, and an unsupported verb SHALL be shown
+disabled with the reason.
 
 The system SHALL NOT offer to change configuration the broker will not accept on an
-existing queue — in particular its routing type, which the broker refuses to change
-on a live queue. Such fields SHALL be presented as immutable, with the reason,
-rather than offered and then refused.
+existing subscription — in particular, for an Artemis queue, its routing type,
+which the broker refuses to change on a live queue. Such fields SHALL be presented
+as immutable, with the reason, rather than offered and then refused.
 
-Where the broker's update operation replaces a queue's whole configuration rather
-than merging into it, the system SHALL send the queue's complete configuration with
-the operator's changes applied, so that a field the operator did not touch is not
-silently cleared. A partial update SHALL NOT be forwarded to the broker as-is.
+Where the broker's update operation replaces a subscription's whole configuration
+rather than merging into it, the system SHALL send the subscription's complete
+configuration with the operator's changes applied, so that a field the operator did
+not touch is not silently cleared. A partial update SHALL NOT be forwarded to the
+broker as-is.
 
-A paused queue SHALL be identifiable as paused in the cluster's queue view.
+A paused subscription SHALL be identifiable as paused in the cluster's subscriptions
+view.
 
-#### Scenario: A paused queue stops delivering
+#### Scenario: A paused subscription stops delivering
 
-- **WHEN** an operator pauses a queue
-- **THEN** the queue stops delivering to its consumers, retains its messages, and is
-  shown as paused
+- **WHEN** an operator pauses a subscription
+- **THEN** the subscription stops delivering to its consumers, retains its messages,
+  and is shown as paused
 
 #### Scenario: An immutable field is not offered for edit
 
-- **WHEN** an operator opens a queue for editing
+- **WHEN** an operator opens an Artemis queue for editing
 - **THEN** the routing type is shown as immutable with the reason, and cannot be
   submitted as a change
 
 #### Scenario: An untouched field survives an update
 
-- **WHEN** an operator changes one field of a queue whose configuration also sets a
-  filter
+- **WHEN** an operator changes one field of a subscription whose configuration also
+  sets a filter
 - **THEN** the filter is unchanged after the update
+
+#### Scenario: A verb the kind lacks is disabled with its reason
+
+- **WHEN** an operator opens a resource whose kind cannot be paused
+- **THEN** the pause action is shown disabled and names why, and a direct request for
+  it is refused as unsupported
 
 ### Requirement: Lifecycle operations are permission-gated and audited
 

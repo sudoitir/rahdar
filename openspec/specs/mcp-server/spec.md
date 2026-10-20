@@ -211,9 +211,10 @@ to enable it. A capability SHALL NEVER be silently absent.
 ### Requirement: Prompts orchestrate and never act
 
 The system SHALL publish diagnostic runbooks as prompts that sequence the surface's read
-primitives. A prompt SHALL be stateless, SHALL NOT perform any operation itself, and a
-runbook covering a destructive operation SHALL direct the caller to dry-run and report to a
-human rather than to act.
+primitives, named by role (for example `investigate_subscription` and
+`before_you_purge`, which takes a subscription). A prompt SHALL be stateless, SHALL NOT
+perform any operation itself, and a runbook covering a destructive operation SHALL direct
+the caller to dry-run and report to a human rather than to act.
 
 #### Scenario: A destructive runbook stops before acting
 
@@ -221,15 +222,18 @@ human rather than to act.
 - **THEN** it prescribes a dry run, verification of consumer state, and a report to a human,
   and does not prescribe a confirmed run
 
-### Requirement: Queue lifecycle is exposed as one guarded tool
+### Requirement: Resource lifecycle is exposed as one guarded tool
 
-The system SHALL expose queue and address lifecycle to an MCP client as a single
-tool discriminated by the kind of operation, rather than as one tool per verb, so
-that the surface stays within the tool-count budget the MCP capability sets.
+The system SHALL expose subscription and destination lifecycle to an MCP client as a
+single tool, `resource_lifecycle`, discriminated by the kind of operation, rather than as
+one tool per verb, so that the surface stays within the tool-count budget the MCP
+capability sets. The tool SHALL name its target as a resource argument holding the
+canonical resource id, and SHALL be refused for a kind that does not support the
+operation.
 
 The tool SHALL default to previewing rather than acting. Turning the preview off
 SHALL additionally require a confirmation argument that exactly matches the name of
-the queue or address being operated on, so that a client which ignores every
+the subscription or destination being operated on, so that a client which ignores every
 protocol hint still cannot destroy a resource by accident.
 
 The tool SHALL delegate to the same service the HTTP API uses, inheriting its
@@ -272,7 +276,7 @@ is not producing flows that the interface presents.
 #### Scenario: An assistant asks why there are no flows
 
 - **WHEN** a client calls the request-reply tool with the diagnostics mode
-- **THEN** it receives the sampler's account per traced address and the ranked
+- **THEN** it receives the sampler's account per traced destination and the ranked
   reasons with their remedies
 
 #### Scenario: The listing cost is unchanged
@@ -404,13 +408,13 @@ surface.
 
 ### Requirement: Connection control is exposed as one destructive tool
 
-The system SHALL expose closing a connection, a session, and an address's consumers
+The system SHALL expose closing a connection, a channel, and a destination's consumers
 to an MCP client as a single tool discriminated by the kind of operation, declared
-as destructive and as not idempotent.
+as destructive and as not idempotent, and naming its target as a resource argument.
 
 The tool SHALL default to previewing for the kind that affects an unbounded number
 of connections, and turning the preview off SHALL require a confirmation argument
-matching the client identifier or address being targeted.
+matching the client identifier or destination being targeted.
 
 The tool SHALL delegate to the same service the HTTP API uses and SHALL NOT
 implement authorization, capping, or auditing of its own.
@@ -434,16 +438,15 @@ was already gone.
 - **WHEN** an MCP client closes a connection that has already disconnected
 - **THEN** the result reports it as already gone rather than as closed or as an error
 
-### Requirement: Routing is discoverable and mutable through the existing tool shapes
+### Requirement: Routes are discoverable and mutable through the existing tool shapes
 
-The system SHALL make diverts and bridges available to an MCP client through the
-existing resource listing tool, by extending its resource-kind discriminator rather
-than by adding a tool per resource, so the surface stays within its tool-count
-budget.
+The system SHALL make routes available to an MCP client through the existing resource
+listing tool, `list_resources`, by its role and kind arguments rather than by adding a
+tool per resource, so the surface stays within its tool-count budget.
 
-The system SHALL expose divert creation and deletion as one guarded mutating tool,
-previewing by default, requiring a confirmation matching the divert's name before
-acting.
+The system SHALL expose divert creation and deletion as one guarded mutating tool that
+is offered only for Artemis clusters, previewing by default, requiring a confirmation
+matching the divert's name before acting.
 
 The result of creating a divert SHALL state in words that the divert persists on the
 broker and is absent from the configuration that broker will next deploy, so that an
@@ -453,8 +456,8 @@ restarts.
 
 #### Scenario: Routing is listed through the existing tool
 
-- **WHEN** an MCP client lists resources of the divert kind
-- **THEN** the cluster's diverts are returned without a new tool having been added
+- **WHEN** an MCP client lists resources with the route role
+- **THEN** the cluster's routes of every kind are returned, each with its kind label, without a new tool having been added
 
 #### Scenario: A created divert reports the drift it creates
 
@@ -488,7 +491,11 @@ at the interface that states it, not a tool call an agent can make on their beha
 The system SHALL expose a cluster's declared configuration, its drift, its fragment and
 its apply history to an MCP client through one read-only tool with a kind discriminator,
 and SHALL expose declaring and applying through one mutating tool with an operation
-discriminator.
+discriminator. These tools (`artemis_config`, `artemis_config_change` and
+`artemis_config_diff`), and the setup review tool, exist for Artemis clusters only: they
+SHALL be offered only to a caller who can read a cluster of that system, and a call that
+names a cluster of another system SHALL return a tool error that says the tool applies to
+Artemis clusters and which system the cluster runs.
 
 The mutating tool SHALL dry-run by default. A dry-run apply SHALL return the plan — the
 steps per node, the hazards in words with their identifiers, and the canary — and SHALL
@@ -520,6 +527,11 @@ what the planner sends or reports it back.
 
 - **WHEN** a real run halts on the second node
 - **THEN** the result states the node and step, the nodes not attempted, that nothing was rolled back, and that re-running converges
+
+#### Scenario: A configuration tool on another system's cluster
+
+- **WHEN** a client calls a configuration tool with a cluster that is not Artemis
+- **THEN** the call returns a tool error naming the system the cluster runs, and nothing is changed
 
 ### Requirement: The agent surface reflects the installation's enabled features
 
@@ -578,29 +590,29 @@ A message body or property returned through the agent surface SHALL be governed 
 - **WHEN** an assistant using a token holding clear access fetches a message with an `Authorization` property
 - **THEN** the result shows the credential dropped
 
-### Requirement: Queue diagnosis reports the same verdict as the console
+### Requirement: Subscription diagnosis reports the same verdict as the console
 
-The agent surface's queue diagnosis SHALL report the shared consumer-health verdict and
+The agent surface's subscription diagnosis SHALL report the shared consumer-health verdict and
 its evidence as structured values, rather than deriving its own trend or slow-consumer
 judgement. A verdict that could not be computed SHALL be reported as such.
 
 #### Scenario: A trend is a value, not a sentence
 
-- **WHEN** an agent diagnoses a queue
+- **WHEN** an agent diagnoses a subscription
 - **THEN** the depth trend is returned as a direction and a rate, not as prose a model must
   parse
 
 #### Scenario: The agent reports the broker's verdict where there is one
 
-- **WHEN** the broker has reported a slow consumer on the diagnosed queue
+- **WHEN** the broker has reported a slow consumer on the diagnosed subscription
 - **THEN** the diagnosis reports that verdict and the named consumer, in preference to a
   derived one
 
 #### Scenario: Insufficient sampling is stated
 
-- **WHEN** an agent diagnoses a queue with too few samples to derive a rate
+- **WHEN** an agent diagnoses a subscription with too few samples to derive a rate
 - **THEN** the diagnosis states that the verdict could not be computed, rather than
-  reporting the queue as healthy
+  reporting the subscription as healthy
 
 ### Requirement: A token can be restricted to named MCP tools
 A token SHALL optionally carry an allow-list of MCP tool names; calls to other tools SHALL be
@@ -631,3 +643,18 @@ read-only token SHALL remain a token granted only read permissions, with no seco
 #### Scenario: Mutating tools hidden
 - **WHEN** global read-only is on and an agent lists tools
 - **THEN** mutating tools are not offered
+
+### Requirement: MCP tools speak the SDK's vocabulary
+MCP tool names, arguments and prompts SHALL use roles, kinds and canonical resource names. A tool argument naming a resource SHALL hold its canonical resource id. Tools that exist for one system only SHALL be offered only for clusters of that system.
+
+#### Scenario: An agent lists resources
+- **WHEN** an agent calls `list_resources` with a role
+- **THEN** it receives resources of every connected system with that role, with native kinds
+
+#### Scenario: An Artemis-only tool on another system
+- **WHEN** an agent works on a cluster that is not Artemis
+- **THEN** the Artemis configuration tools are not offered for it
+
+#### Scenario: A system tool when no cluster of that system is readable
+- **WHEN** a caller can read no cluster of a system
+- **THEN** that system's tools are absent from the listing and the catalogue, as for a disabled feature

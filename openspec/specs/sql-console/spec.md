@@ -13,7 +13,7 @@ bounded, and honest about what it could not see.
 
 The system SHALL accept a query written in a restricted SQL dialect and return
 matching messages. The dialect SHALL support `SELECT`, a single `FROM` naming one
-or more queues, `WHERE`, `ORDER BY` and `LIMIT`, over a fixed catalogue of columns
+or more subscriptions, `WHERE`, `ORDER BY` and `LIMIT`, over a fixed catalogue of columns
 covering message identity, JMS headers, the message body, and application
 properties addressed by name.
 
@@ -24,20 +24,20 @@ outside a documented whitelist, and any column not in the catalogue. A rejection
 SHALL name the offending token, state why it is not allowed, and where a near
 match exists in the catalogue, suggest it.
 
-A `FROM` target SHALL be matched against the queues known for the cluster, and
-MAY use the broker's own wildcard syntax to name a set of queues rather than one.
-A query naming no queue that exists SHALL say so, distinctly from a query that
-matched queues and found no messages.
+A `FROM` target SHALL be matched against the subscriptions known for the cluster, and
+MAY use the broker's own wildcard syntax to name a set of subscriptions rather than one.
+A query naming no subscription that exists SHALL say so, distinctly from a query that
+matched subscriptions and found no messages.
 
 #### Scenario: A header query returns matching messages
 
-- **WHEN** an operator runs a query selecting messages on a queue with a priority predicate
+- **WHEN** an operator runs a query selecting messages on a subscription with a priority predicate
 - **THEN** only messages matching that predicate are returned
 
-#### Scenario: A wildcard names a set of queues
+#### Scenario: A wildcard names a set of subscriptions
 
 - **WHEN** a query's FROM target uses the broker's wildcard syntax
-- **THEN** every queue on the cluster matching that pattern is searched and each returned row names the queue it came from
+- **THEN** every subscription on the cluster matching that pattern is searched and each returned row names the subscription it came from
 
 #### Scenario: A statement outside the subset is rejected before execution
 
@@ -51,14 +51,14 @@ matched queues and found no messages.
 
 #### Scenario: A FROM target matching nothing is distinguished from an empty result
 
-- **WHEN** a query names a queue pattern that matches no queue on the cluster
-- **THEN** the response states that no queue matched, and does not present the outcome as zero matching messages
+- **WHEN** a query names a subscription pattern that matches no subscription on the cluster
+- **THEN** the response states that no subscription matched, and does not present the outcome as zero matching messages
 
 ### Requirement: A query names its source and every result states which source answered
 
 A query SHALL be executable against either the live brokers or the historical
 message index, selected by an optional source qualifier on the `FROM` target. When
-the qualifier is absent the system SHALL choose the index for a queue that is
+the qualifier is absent the system SHALL choose the index for a subscription that is
 indexed and the live brokers otherwise, and SHALL state the choice it made.
 
 Every result set SHALL carry the source that produced it, and every row SHALL carry
@@ -72,7 +72,7 @@ that message from the live broker and reports whether it is still present.
 #### Scenario: The source qualifier forces the live brokers
 
 - **WHEN** a query qualifies its FROM target with the broker source
-- **THEN** the query is executed against the live brokers even though the queue is indexed, and the result states the broker source answered
+- **THEN** the query is executed against the live brokers even though the subscription is indexed, and the result states the broker source answered
 
 #### Scenario: An indexed row is presented as possibly stale
 
@@ -120,7 +120,7 @@ column catalogue.
 
 The system SHALL expose planning as an operation distinct from execution, which
 parses and validates a query, resolves its targets, and returns without contacting a
-broker: which source will answer, how many queues and nodes will be read, which
+broker: which source will answer, how many subscriptions and nodes will be read, which
 predicates are pushed down, whether a body scan is required, and an estimate of how
 many messages will be examined.
 
@@ -144,7 +144,7 @@ Every broker read a query performs SHALL take a per-node management-call permit
 like every other management call, so that a query throttles itself against the
 broker rather than the broker against the query.
 
-Execution SHALL be bounded by a configured maximum number of target queues, a
+Execution SHALL be bounded by a configured maximum number of target subscriptions, a
 maximum number of messages examined, a maximum number of rows returned, and a wall
 clock timeout. A query that reaches any bound SHALL return the rows it has, stating
 which bound it reached — never presenting a bounded result as a complete one.
@@ -171,7 +171,7 @@ The number of queries one operator may run concurrently SHALL be capped.
 
 ### Requirement: A node that does not answer is reported, not omitted
 
-A query fans out across the nodes serving its target queues. When a node fails to
+A query fans out across the nodes serving its target subscriptions. When a node fails to
 answer, the result SHALL report that node and the reason, and SHALL be presented as
 partial. Rows from the nodes that did answer SHALL still be returned.
 
@@ -182,12 +182,12 @@ matching message once, not once per endpoint.
 
 #### Scenario: One node fails and the rest answer
 
-- **WHEN** one of three nodes serving a queue pattern does not answer a query
+- **WHEN** one of three nodes serving a subscription pattern does not answer a query
 - **THEN** the result contains the rows from the other two, is marked partial, and names the failed node and the reason
 
 #### Scenario: A paired cluster does not double count
 
-- **WHEN** a query targets a queue on a node with a synced backup endpoint
+- **WHEN** a query targets a subscription on a node with a synced backup endpoint
 - **THEN** each matching message appears once in the result
 
 ### Requirement: A body predicate over truncated content reports an incomplete result
@@ -218,13 +218,13 @@ warning SHALL be shown.
 
 A message identifier is issued by, and meaningful only on, the node holding the
 message. A result row SHALL identify a message by the combination of its node, its
-queue and its message identifier, and SHALL NOT present the identifier alone as a
+subscription and its message identifier, and SHALL NOT present the identifier alone as a
 cluster-wide identity. Any action taken on a row SHALL carry that full identity.
 
-#### Scenario: A row identifies its node and queue
+#### Scenario: A row identifies its node and subscription
 
-- **WHEN** a query returns messages from several queues across several nodes
-- **THEN** each row names the node and queue it came from alongside its message identifier
+- **WHEN** a query returns messages from several subscriptions across several nodes
+- **THEN** each row names the node and subscription it came from alongside its message identifier
 
 ### Requirement: Time predicates are expressed in broker time
 
@@ -251,7 +251,7 @@ window could not be normalised for that node.
 The system SHALL stream new messages matching a query as they are observed, over a
 stream scoped to that query, which ends when the client disconnects.
 
-Where the tailed queues are not captured, a tail SHALL be implemented without mutating
+Where the tailed subscriptions are not captured, a tail SHALL be implemented without mutating
 broker configuration and without consuming messages, and SHALL therefore be presented as a
 **sample**: messages that arrive and are consumed between two observations are not seen. The
 system SHALL state this for the duration of the tail, and the statement SHALL NOT be
@@ -259,7 +259,7 @@ dismissable.
 
 Where every target of the tail is covered by an active capture subscription, the tail SHALL
 be served from the capture and SHALL state that instead — that it shows every message routed
-to those addresses while capture has been active — together with the coverage that claim
+to those destinations while capture has been active — together with the coverage that claim
 rests on. The system SHALL NOT present a captured tail and a sampled tail identically, and
 SHALL NOT claim capture for a target that is only partly covered.
 
@@ -276,13 +276,13 @@ A tail SHALL respect the same per-node rate limit, bounds and cancellation as a 
 
 #### Scenario: The sampling limitation is always stated
 
-- **WHEN** a tail is running over queues that are not captured
+- **WHEN** a tail is running over subscriptions that are not captured
 - **THEN** the interface states that messages consumed between observations are not shown, and the operator cannot dismiss that statement
 
 #### Scenario: A captured tail states the stronger claim
 
-- **WHEN** a tail is running over queues every one of which is covered by an active capture subscription
-- **THEN** the interface states that it is showing every message routed to those addresses while capture has been active, rather than the sampling statement
+- **WHEN** a tail is running over subscriptions every one of which is covered by an active capture subscription
+- **THEN** the interface states that it is showing every message routed to those destinations while capture has been active, rather than the sampling statement
 
 #### Scenario: Partial capture does not claim capture
 
@@ -291,7 +291,7 @@ A tail SHALL respect the same per-node rate limit, bounds and cancellation as a 
 
 #### Scenario: A message consumed immediately is tailed when captured
 
-- **WHEN** a message is routed to a captured address and consumed before any poll could observe it
+- **WHEN** a message is routed to a captured destination and consumed before any poll could observe it
 - **THEN** it is delivered on the tail's stream
 
 #### Scenario: Disconnecting ends the tail
@@ -306,7 +306,7 @@ the existing message operations, with their dry run, their bulk cap and their au
 record — the console SHALL NOT provide a second path to a destructive verb.
 
 Running a query SHALL require the message read permission on the target cluster, and
-SHALL only search queues within the caller's cluster scope. A query naming a queue
+SHALL only search subscriptions within the caller's cluster scope. A query naming a subscription
 outside that scope SHALL say so rather than returning it as an empty match.
 
 Every executed query SHALL write an audit record carrying the query text, the number
@@ -321,10 +321,10 @@ also carry the classes and counts served in clear.
 - **WHEN** an operator submits a statement that would delete or move messages
 - **THEN** it is rejected at parse time as outside the dialect
 
-#### Scenario: An out-of-scope queue is named, not hidden
+#### Scenario: An out-of-scope subscription is named, not hidden
 
-- **WHEN** a query's FROM pattern matches a queue the caller has no access to
-- **THEN** the response states that a matching queue was excluded by permission, rather than silently omitting it
+- **WHEN** a query's FROM pattern matches a subscription the caller has no access to
+- **THEN** the response states that a matching subscription was excluded by permission, rather than silently omitting it
 
 #### Scenario: A query is audited
 
@@ -342,7 +342,7 @@ The console SHALL provide, in the page rather than through an external link, the
 column catalogue, the source qualifiers, and worked examples an operator can place
 into the editor in one action.
 
-The editor SHALL offer completion over the queues that actually exist on the cluster
+The editor SHALL offer completion over the subscriptions that actually exist on the cluster
 and over the column catalogue, and SHALL report a syntax error against the query
 being typed without requiring the operator to run it.
 
@@ -448,7 +448,7 @@ that is fanning out across a cluster.
 
 Where a result can contain rows from more than one source, each row SHALL state which source
 it came from, and a captured row SHALL be distinguishable from a sampled one — the first
-records everything routed to an address while capture was active, the second records only
+records everything routed to a destination while capture was active, the second records only
 what happened to be observed.
 
 Coverage SHALL be reported per node. A result whose targets are captured on some nodes and
@@ -521,7 +521,7 @@ Every result row, whether streamed, tailed, or returned in the final result, SHA
 
 ### Requirement: A predicate cannot reveal a masked value
 
-For a caller without clear access on the target cluster, the system SHALL refuse a query whose predicate references a header or property the content policy classifies for any target address, and the refusal SHALL name the field. Body predicates for such a caller SHALL be evaluated over the governed body.
+For a caller without clear access on the target cluster, the system SHALL refuse a query whose predicate references a header or property the content policy classifies for any target destination, and the refusal SHALL name the field. Body predicates for such a caller SHALL be evaluated over the governed body.
 
 #### Scenario: A predicate on a classified property is refused
 
@@ -532,3 +532,14 @@ For a caller without clear access on the target cluster, the system SHALL refuse
 
 - **WHEN** a user without clear access searches bodies for a card number that appears in a message
 - **THEN** the message does not match, because the predicate is evaluated over the masked body
+
+### Requirement: The dialect's columns and plan codes are named by role
+The dialect's catalogue SHALL name the columns that identify where a message is by role: `subscription`, `destination` and `orig_destination`, never one system's words for them. The planner's findings SHALL use role codes in the same way (`NO_SUBSCRIPTION_MATCHED`, `DESTINATION_SCOPED_CAPTURE`). A query using an old system-specific column name SHALL be rejected at parse time, naming the column to use.
+
+#### Scenario: A query selects by subscription
+- **WHEN** an operator runs a query that filters on the `subscription` column
+- **THEN** it is accepted on a cluster of any system, and each returned row names its subscription
+
+#### Scenario: An old column name is refused
+- **WHEN** an operator runs a query that uses the column `queue`
+- **THEN** it is rejected before any broker is contacted, and the message names `subscription`

@@ -51,7 +51,7 @@ A role MAY hold a permission of a feature that is currently disabled, or of a pl
 
 ### Requirement: Three built-in roles exist and cannot be altered
 
-The system SHALL provide built-in Administrator, Operator and Viewer roles and built-in Team Viewer, Team Operator and Team Admin roles, and SHALL prevent their permissions, name, or existence from being changed or deleted. Administrator SHALL hold every permission. Operator SHALL hold every catalogue permission that acts at cluster or resource scope except those that change broker configuration, settings, environments, users, roles, teams, tokens, plugins or data, or reveal governed content in clear. Viewer SHALL hold every read permission. Team Viewer SHALL hold the read permissions that act on a resource; Team Operator SHALL add every message and queue permission that acts on a resource; Team Admin SHALL add `team:admin`. Whenever the catalogue gains a core permission, a test SHALL fail until each built-in role's set is updated or the permission is listed as deliberately excluded. Custom roles with any permission combination MAY be created, changed, and deleted.
+The system SHALL provide built-in Administrator, Operator and Viewer roles and built-in Team Viewer, Team Operator and Team Admin roles, and SHALL prevent their permissions, name, or existence from being changed or deleted. Administrator SHALL hold every permission. Operator SHALL hold every catalogue permission that acts at cluster or resource scope except those that change broker configuration, settings, environments, users, roles, teams, tokens, plugins or data, or reveal governed content in clear. Viewer SHALL hold every read permission. Team Viewer SHALL hold the read permissions that act on a resource; Team Operator SHALL add every message and subscription permission that acts on a resource; Team Admin SHALL add `team:admin`. Whenever the catalogue gains a core permission, a test SHALL fail until each built-in role's set is updated or the permission is listed as deliberately excluded. Custom roles with any permission combination MAY be created, changed, and deleted.
 
 #### Scenario: A built-in role cannot be edited
 
@@ -63,10 +63,10 @@ The system SHALL provide built-in Administrator, Operator and Viewer roles and b
 - **WHEN** an administrator creates a role with a chosen name and permission set
 - **THEN** the role exists and can be granted to users
 
-#### Scenario: Operator can manage queues
+#### Scenario: Operator can manage subscriptions
 
 - **WHEN** a user holds Operator on a cluster
-- **THEN** the user may create, update, pause and delete queues, write diverts and close connections on that cluster
+- **THEN** the user may create, update, pause and delete subscriptions, write routes and close connections on that cluster
 
 ### Requirement: A grant applies at a global, environment, or cluster scope
 
@@ -108,7 +108,7 @@ permission before returning it. An operation on a broker resource SHALL be check
 resource, as the team-access capability defines. A principal without the required permission at
 the resolved scope SHALL receive a `403` response, except where a cluster or resource it may not
 read is addressed, which SHALL receive a not-found response. A build-time test SHALL fail when an
-operation that takes a cluster, queue or address has no check.
+operation that takes a cluster, subscription or destination has no check.
 
 #### Scenario: A permitted action succeeds
 
@@ -122,9 +122,10 @@ operation that takes a cluster, queue or address has no check.
   scope attempts that action
 - **THEN** the response is `403` and the action is not performed
 
-#### Scenario: A queue's configuration needs read permission
+#### Scenario: A subscription's configuration needs read permission
 
-- **WHEN** a signed-in user without read access to a queue requests its configuration
+- **WHEN** a signed-in user without read access to a subscription requests the resource
+  with its attributes
 - **THEN** the response is not found
 
 ### Requirement: Cluster listings are filtered to what the caller may see
@@ -170,28 +171,29 @@ and SHALL prevent a user from removing their own administrative grant.
 - **WHEN** an administrator attempts to remove their own full-access grant
 - **THEN** the request is rejected
 
-### Requirement: Queue lifecycle permissions
+### Requirement: Subscription and destination lifecycle permissions
 
-The system SHALL define distinct permissions for creating a queue or address,
-destroying a queue or address, updating a queue's configuration, and pausing or
-resuming a queue. Each SHALL be resolvable at global, environment, or cluster
+The system SHALL define distinct permissions, named by role (`subscription:*` and
+`destination:*`), for creating a subscription or destination, destroying a
+subscription or destination, updating a subscription's configuration, and pausing or
+resuming a subscription. Each SHALL be resolvable at global, environment, or cluster
 scope through the existing scope walk, and SHALL appear in the permission
 catalogue with a human label so the role editor presents it without a client-side
-change.
+change. No permission name SHALL be one system's word for the resource.
 
 Holding a message-level permission SHALL NOT imply any lifecycle permission.
-Purging a queue and destroying a queue are different authorities: one empties a
-resource the operator keeps, the other removes the resource itself.
+Purging a subscription and destroying a subscription are different authorities: one
+empties a resource the operator keeps, the other removes the resource itself.
 
 #### Scenario: Purge does not imply destroy
 
-- **WHEN** a role holds the queue-purge permission but not the destroy permission
-- **THEN** its holder can purge a queue and cannot destroy one
+- **WHEN** a role holds the subscription-purge permission but not the destroy permission
+- **THEN** its holder can purge a subscription and cannot destroy one
 
 #### Scenario: A lifecycle permission is scoped like every other
 
 - **WHEN** a role is granted the create permission on a single environment
-- **THEN** its holder can create queues on clusters in that environment and not on
+- **THEN** its holder can create subscriptions on clusters in that environment and not on
   clusters outside it
 
 #### Scenario: A new permission needs no client change to be assignable
@@ -201,8 +203,8 @@ resource the operator keeps, the other removes the resource itself.
 
 ### Requirement: Connection control permission
 
-The system SHALL define a permission for closing connections, sessions and an
-address's consumers, resolvable at global, environment, or cluster scope through
+The system SHALL define a permission for closing connections, channels and a
+destination's consumers, resolvable at global, environment, or cluster scope through
 the existing scope walk, and listed in the permission catalogue with a human label.
 
 This permission SHALL be independent of every message permission. Authority over a
@@ -211,7 +213,7 @@ producing and consuming them.
 
 #### Scenario: Independent of message authority
 
-- **WHEN** a role holds message send, move, delete and queue purge, and not the
+- **WHEN** a role holds message send, move, delete and subscription purge, and not the
   connection-close permission
 - **THEN** its holder cannot close a connection
 
@@ -220,23 +222,23 @@ producing and consuming them.
 - **WHEN** the connection-close permission is granted on one cluster
 - **THEN** its holder can close connections on that cluster and on no other
 
-### Requirement: Divert write permission
+### Requirement: Route write permission
 
-The system SHALL define a permission for creating and deleting diverts, resolvable
-at global, environment, or cluster scope through the existing scope walk, and listed
-in the permission catalogue with a human label.
+The system SHALL define a permission for creating and deleting routes (`route:write`),
+resolvable at global, environment, or cluster scope through the existing scope walk,
+and listed in the permission catalogue with a human label.
 
-Viewing diverts and bridges SHALL require only the permission to view the cluster.
+Viewing routes SHALL require only the permission to view the cluster.
 No permission SHALL grant mutation of a bridge, because no such operation exists.
 
 #### Scenario: Viewing needs no additional grant
 
-- **WHEN** a caller who may view a cluster opens its divert view
-- **THEN** the diverts are listed
+- **WHEN** a caller who may view a cluster opens its routes view
+- **THEN** the routes are listed
 
-#### Scenario: Creating needs the divert permission
+#### Scenario: Creating needs the route permission
 
-- **WHEN** a caller without the divert permission attempts to create a divert
+- **WHEN** a caller without the route permission attempts to create a divert
 - **THEN** the request is refused
 
 ### Requirement: Capture write permission
@@ -268,15 +270,16 @@ way, as querying a broker directly.
 The system SHALL define a permission for editing a cluster's declared configuration and
 a distinct permission for applying it to brokers, each resolvable at global, environment,
 or cluster scope through the existing scope walk, and each listed in the permission
-catalogue with a human label.
+catalogue with a human label. Both apply to Artemis clusters only, as the declaration is
+Artemis broker configuration.
 
 Viewing a declaration, its drift and its history SHALL require only the permission to
 view the cluster.
 
 The apply permission SHALL be a create-and-update authority: it covers creating declared
 addresses, queues and diverts and adding or replacing address and security settings. It
-SHALL NOT grant destroying a queue or an address, which remain governed by the queue
-lifecycle permissions.
+SHALL NOT grant destroying a queue or an address, which remain governed by the subscription
+and destination lifecycle permissions.
 
 #### Scenario: Declaring is not applying
 
@@ -333,7 +336,7 @@ Membership SHALL be checked on every request, so a removal SHALL take effect on 
 
 ### Requirement: A permission has an owner, a description and the scopes at which it takes effect
 
-Every catalogue entry SHALL state its owning module or plugin, a human description, the scope it acts at (`global`, `cluster` or `resource`), the resource kinds a `resource` permission applies to (`queue`, `address`), and the permissions it requires. A `global` permission SHALL take effect only through a global grant; a `cluster` permission through a global, environment or cluster grant; a `resource` permission through any grant, a team role or a share. A permission's required permissions SHALL be held wherever it is: the role editor SHALL add them with a note when the permission is chosen, and saving a role without them SHALL be refused, naming what is missing. The consistency check SHALL report an entry whose required permission is not in the catalogue, or whose requirements form a cycle.
+Every catalogue entry SHALL state its owning module or plugin, a human description, the scope it acts at (`global`, `cluster` or `resource`), the resource types a `resource` permission applies to (`subscription`, `destination`), and the permissions it requires. A `global` permission SHALL take effect only through a global grant; a `cluster` permission through a global, environment or cluster grant; a `resource` permission through any grant, a team role or a share. A permission's required permissions SHALL be held wherever it is: the role editor SHALL add them with a note when the permission is chosen, and saving a role without them SHALL be refused, naming what is missing. The consistency check SHALL report an entry whose required permission is not in the catalogue, or whose requirements form a cycle.
 
 #### Scenario: An entry lacks a description
 
@@ -347,17 +350,17 @@ Every catalogue entry SHALL state its owning module or plugin, a human descripti
 
 #### Scenario: A required permission is added
 
-- **WHEN** an administrator adds `queue:purge` to a role that lacks `queue:read`
-- **THEN** the editor adds `queue:read` and says why
+- **WHEN** an administrator adds `subscription:purge` to a role that lacks `subscription:read`
+- **THEN** the editor adds `subscription:read` and says why
 
 #### Scenario: A role missing a required permission is refused
 
-- **WHEN** a role holding `queue:purge` without `queue:read` is saved through the API
-- **THEN** the save is refused, naming `queue:read`
+- **WHEN** a role holding `subscription:purge` without `subscription:read` is saved through the API
+- **THEN** the save is refused, naming `subscription:read`
 
 ### Requirement: Effective permissions can be previewed for a user
 
-Rahdar SHALL compute and return the effective permissions of a chosen user: for each of the user's role grants, team memberships and shares, every permission it gives, at its scope, and its source. A wildcard SHALL be expanded to the catalogue entries it matches, naming the wildcard it came through. Rahdar SHALL also answer an access check for a user, a cluster and an optional queue or address name: for each permission, whether it is allowed there and every source that allows it. A queue or address detail SHALL show its owning team and which teams and roles may act on it. These reads SHALL require the permission to administer users.
+Rahdar SHALL compute and return the effective permissions of a chosen user: for each of the user's role grants, team memberships and shares, every permission it gives, at its scope, and its source. A wildcard SHALL be expanded to the catalogue entries it matches, naming the wildcard it came through. Rahdar SHALL also answer an access check for a user, a cluster and an optional subscription or destination name: for each permission, whether it is allowed there and every source that allows it. A subscription or destination detail SHALL show its owning team and which teams and roles may act on it. These reads SHALL require the permission to administer users.
 
 #### Scenario: Preview for a user
 
@@ -369,9 +372,9 @@ Rahdar SHALL compute and return the effective permissions of a chosen user: for 
 - **WHEN** the user holds a role with a resource-scoped wildcard
 - **THEN** the preview lists each catalogue permission of that resource, each naming the wildcard as its source
 
-#### Scenario: Access check on a queue
+#### Scenario: Access check on a subscription
 
-- **WHEN** an administrator checks a user on prod for queue `orders.in`
+- **WHEN** an administrator checks a user on prod for subscription `orders.in`
 - **THEN** each permission is listed as allowed or not, and an allowed one names its source, for example "team Orders, Team Operator"
 
 #### Scenario: Preview without permission

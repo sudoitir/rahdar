@@ -75,7 +75,7 @@ A plugin's contributions SHALL be confined to its identifier's namespace, so tha
 - UI routes under `/p/<id>/` or `/clusters/{clusterId}/p/<id>/`
 
 #### Scenario: A plugin cannot claim a core permission
-- **WHEN** a plugin declares the permission `queue:purge`
+- **WHEN** a plugin declares the permission `subscription:purge`
 - **THEN** it is refused as outside its namespace
 
 ### Requirement: Only installers manage plugins, interactively and freshly authenticated
@@ -296,8 +296,8 @@ A plugin UI that fails to load, or a plugin component that throws, SHALL NOT aff
 
 After plugins change, the console SHALL offer a reload without forcing one.
 
-#### Scenario: A broken plugin panel does not break the queue drawer
-- **WHEN** a plugin's queue-drawer panel throws while rendering
+#### Scenario: A broken plugin panel does not break the subscription drawer
+- **WHEN** a plugin's subscription-drawer panel throws while rendering
 - **THEN** the drawer renders its own content and shows that the plugin's panel failed
 
 #### Scenario: A disabled plugin's address explains itself
@@ -321,7 +321,7 @@ The release process SHALL build, install, update and roll back a reference plugi
 
 ### Requirement: A plugin's row actions are namespaced and sectioned, and links stay Rahdar's
 
-A plugin MAY contribute actions to a resource's row menu. Each such contribution SHALL be
+A plugin MAY contribute actions to a resource's row menu, on a target named by role (destination, subscription, route, connection, channel, consumer, producer, message). Each such contribution SHALL be
 named with the plugin's id as its prefix and SHALL name one of the menu's sections. A
 failure inside it SHALL stay inside it.
 
@@ -329,14 +329,14 @@ A plugin SHALL NOT contribute the link that another view uses for a built-in res
 plugin bundle that does either of these things SHALL be refused, and the reason SHALL be
 stated.
 
-#### Scenario: A plugin tries to own queue links
+#### Scenario: A plugin tries to own subscription links
 
-- **WHEN** a plugin bundle contributes to the queue link slot
+- **WHEN** a plugin bundle contributes to the subscription link slot
 - **THEN** it is refused, stating that links to built-in resources are Rahdar's own
 
 ### Requirement: A plugin's assistant tools declare the permission Rahdar enforces
 
-Each assistant tool a plugin declares SHALL name a `permission` (one of the plugin's own permissions) and a `scope` (`resource`, `cluster` or `global`), and MAY declare `params: [{name, values?, shape?, note?}]`. A `resource` tool SHALL also name the argument that holds the queue or address name and its kind. Its `posture` SHALL be `read` or `write`. Before a plugin tool runs, Rahdar SHALL check the caller's permission, as follows:
+Each assistant tool a plugin declares SHALL name a `permission` (one of the plugin's own permissions) and a `scope` (`resource`, `cluster` or `global`), and MAY declare `params: [{name, values?, shape?, note?}]`. A `resource` tool SHALL also name the argument that holds the resource name and its resource type (subscription or destination). Its `posture` SHALL be `read` or `write`. Before a plugin tool runs, Rahdar SHALL check the caller's permission, as follows:
 - a `cluster` tool's `clusterId` argument is parsed (a missing or malformed one is a malformed call, -32602), and the permission is required on that cluster. A denial hides the cluster exactly as Rahdar's own tools do.
 - a `resource` tool's `clusterId` and resource arguments are parsed the same way, and the permission is required on that resource. A denial hides the resource exactly as Rahdar's own tools do.
 - a `global` tool's permission is required globally, and a denial names it.
@@ -356,8 +356,8 @@ The plugin's code SHALL NOT run when the check fails. Activation SHALL be refuse
 - **THEN** the answer is "No such cluster, or this key has no grant on it", and the plugin's method was not invoked
 
 #### Scenario: A denied resource tool hides the resource
-- **WHEN** an Orders-only key calls a plugin's resource tool for queue `billing.in`
-- **THEN** the answer is the same as for a queue that does not exist, and the plugin's method was not invoked
+- **WHEN** an Orders-only key calls a plugin's resource tool for subscription `billing.in`
+- **THEN** the answer is the same as for a subscription that does not exist, and the plugin's method was not invoked
 
 #### Scenario: A denied global tool names the permission
 - **WHEN** a key without `acme-notes:admin` calls a global tool that declares it
@@ -425,10 +425,10 @@ Rahdar SHALL offer plugins a `@PluginApi` bean that gives the running Rahdar ver
 ### Requirement: A plugin permission declares the scope it acts at
 
 Each permission a plugin declares SHALL state `scope` as `global`, `cluster` or `resource`, and a
-`resource` permission SHALL state `resourceKinds` (`queue`, `address`) and MAY state `requires`
-(other permissions of the plugin or of Rahdar). A manifest with any other form, including the
-removed `globalOnly` field, SHALL be refused at install, naming the permission. Rahdar SHALL publish
-for plugins a check of a permission on a named queue or address, a filter of a list by such a check,
+`resource` permission SHALL state `resourceTypes` (`subscription`, `destination`) and MAY state `requires`
+(other permissions of the plugin or of Rahdar, such as `subscription:read`). A manifest with any other form, including the
+removed `globalOnly` field and the removed `resourceKinds` field, SHALL be refused at install, naming the permission. Rahdar SHALL publish
+for plugins a check of a permission on a named subscription or destination, a filter of a list by such a check,
 and the same check for the console SDK; these SHALL give exactly the answers Rahdar's own checks give.
 
 #### Scenario: A manifest with globalOnly is refused
@@ -436,7 +436,12 @@ and the same check for the console SDK; these SHALL give exactly the answers Rah
 - **WHEN** a plugin declaring a permission with `globalOnly: true` is uploaded
 - **THEN** the upload is refused, naming the permission and the `scope` field to use
 
-#### Scenario: A plugin checks a queue
+#### Scenario: A manifest with resourceKinds is refused
+
+- **WHEN** a plugin declaring a permission with `resourceKinds` is uploaded
+- **THEN** the upload is refused, naming the permission and the `resourceTypes` field to use
+
+#### Scenario: A plugin checks a subscription
 
 - **WHEN** a plugin checks its `resource` permission on `orders.in` for an Orders Team Operator whose team role holds it
 - **THEN** the check succeeds, and fails for `billing.in`
@@ -456,12 +461,12 @@ re-enables it.
 
 #### Scenario: Losing a right suspends the work
 
-- **WHEN** the owner is removed from the team owning the work's source queue
+- **WHEN** the owner is removed from the team owning the work's source subscription
 - **THEN** the work is suspended before its next run, and shows why
 
 ### Requirement: A plugin SHALL declare itself an approval provider
 
-A plugin SHALL declare in its descriptor that it is an approval provider, naming the permission its approvers need, which the plugin itself declares. At most one approval provider SHALL be active. The gate SHALL count as installed whenever the provider is meant to be active, even while it is starting or has failed, so that gated operations fail closed.
+A plugin SHALL declare in its descriptor that it is an approval provider, naming the permission its approvers need, which the plugin itself declares. At most one approval provider SHALL be active. The gate SHALL count as installed whenever the provider is meant to be active, even while it is starting or has failed, so that gated operations fail closed. A held operation SHALL be named by its operation type in dot form (`subscription.delete`, `destination.delete`, `subscription.purge`), and a previewed effect SHALL carry an etag that the held action must still match when it runs.
 
 #### Scenario: Second provider
 
@@ -470,5 +475,10 @@ A plugin SHALL declare in its descriptor that it is an approval provider, naming
 
 #### Scenario: Provider failed to start
 
-- **WHEN** the approval provider failed to start and an operator purges a queue
+- **WHEN** the approval provider failed to start and an operator purges a subscription
 - **THEN** the purge is not run and the operator is told approvals are unavailable
+
+#### Scenario: A held action runs only on the state that was approved
+
+- **WHEN** a held action's resource has changed since its effect was previewed
+- **THEN** the action does not run, because the etag no longer matches

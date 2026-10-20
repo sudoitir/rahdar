@@ -212,9 +212,9 @@ show its children, reachable from the parent.
 
 #### Scenario: A child event links to its parent
 
-- **WHEN** an operator opens the audit event for a queue deleted by a bulk run
+- **WHEN** an operator opens the audit event for a subscription deleted by a bulk run
 - **THEN** the event shows the bulk run's event it belongs to, and following that link
-  shows the run's event with all of its queue events
+  shows the run's event with all of its subscription events
 
 ### Requirement: A single audit event is readable by id and can be linked to
 
@@ -299,17 +299,24 @@ Rahdar SHALL record an audit event for every request refused for lack of a permi
 actor, the permission, the cluster and the resource, and whether the resource was hidden (answered
 as not found) or forbidden. Identical refusals by the same actor within one minute SHALL be counted
 on one event rather than recorded again. A refused broker change SHALL leave a refused audit event,
-not a missing one.
+not a missing one. The action and the target of a lifecycle event SHALL be named by role
+(create, update, delete, pause, resume and reset counters of a subscription, destination or
+route), and the resource by its canonical id.
 
 #### Scenario: A refused purge is audited
 
 - **WHEN** a Team Viewer tries to purge `orders.in`
-- **THEN** an audit event records the refusal with `queue:purge` and `orders.in`
+- **THEN** an audit event records the refusal with `subscription:purge` and `orders.in`
 
 #### Scenario: Repeated refusals are counted
 
 - **WHEN** the same client is refused the same action 50 times in a minute
 - **THEN** one audit event records the refusal with a count of 50
+
+#### Scenario: A lifecycle event names a role, not a system word
+
+- **WHEN** an operator deletes an Artemis queue
+- **THEN** the audit event records a subscription delete whose target is the queue's canonical resource id
 
 ### Requirement: The audit trail shows only what the reader may see
 
