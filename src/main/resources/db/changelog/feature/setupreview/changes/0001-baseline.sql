@@ -5,7 +5,7 @@
 -- Until the first stable release a change edits this file, and operators recreate the database.
 
 --changeset rahdar:feature-setupreview-0001-baseline splitStatements:true
-CREATE TABLE setup_finding (
+CREATE TABLE artemis_setup_finding (
     first_seen_at timestamp with time zone NOT NULL,
     last_seen_at timestamp with time zone NOT NULL,
     code text NOT NULL,
@@ -18,7 +18,7 @@ CREATE TABLE setup_finding (
 )
 WITH (fillfactor='70', autovacuum_vacuum_scale_factor='0.05', autovacuum_analyze_scale_factor='0.05');
 
-CREATE TABLE setup_finding_acceptance (
+CREATE TABLE artemis_setup_finding_acceptance (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     expires_at timestamp with time zone,
     code text NOT NULL,
@@ -28,7 +28,7 @@ CREATE TABLE setup_finding_acceptance (
     cluster_id uuid NOT NULL
 );
 
-CREATE TABLE setup_review (
+CREATE TABLE artemis_setup_review (
     reviewed_at timestamp with time zone NOT NULL,
     duration_ms bigint NOT NULL,
     nodes_total integer NOT NULL,
@@ -40,23 +40,23 @@ CREATE TABLE setup_review (
 )
 WITH (fillfactor='70', autovacuum_vacuum_scale_factor='0.05', autovacuum_analyze_scale_factor='0.05');
 
-ALTER TABLE ONLY setup_finding
-    ADD CONSTRAINT pk_setup_finding PRIMARY KEY (cluster_id, code, subject);
+ALTER TABLE ONLY artemis_setup_finding
+    ADD CONSTRAINT pk_artemis_setup_finding PRIMARY KEY (cluster_id, code, subject);
 
-ALTER TABLE ONLY setup_finding_acceptance
-    ADD CONSTRAINT pk_setup_finding_acceptance PRIMARY KEY (cluster_id, code, subject);
+ALTER TABLE ONLY artemis_setup_finding_acceptance
+    ADD CONSTRAINT pk_artemis_setup_finding_acceptance PRIMARY KEY (cluster_id, code, subject);
 
-ALTER TABLE ONLY setup_review
-    ADD CONSTRAINT pk_setup_review PRIMARY KEY (cluster_id);
+ALTER TABLE ONLY artemis_setup_review
+    ADD CONSTRAINT pk_artemis_setup_review PRIMARY KEY (cluster_id);
 
-ALTER TABLE ONLY setup_finding_acceptance
+ALTER TABLE ONLY artemis_setup_finding_acceptance
     ADD CONSTRAINT fk_setup_finding_acceptance_cluster FOREIGN KEY (cluster_id) REFERENCES cluster(id) ON DELETE CASCADE;
 
-ALTER TABLE ONLY setup_finding
+ALTER TABLE ONLY artemis_setup_finding
     ADD CONSTRAINT fk_setup_finding_cluster FOREIGN KEY (cluster_id) REFERENCES cluster(id) ON DELETE CASCADE;
 
-ALTER TABLE ONLY setup_review
+ALTER TABLE ONLY artemis_setup_review
     ADD CONSTRAINT fk_setup_review_cluster FOREIGN KEY (cluster_id) REFERENCES cluster(id) ON DELETE CASCADE;
---rollback DROP TABLE IF EXISTS setup_review CASCADE;
---rollback DROP TABLE IF EXISTS setup_finding_acceptance CASCADE;
---rollback DROP TABLE IF EXISTS setup_finding CASCADE;
+--rollback DROP TABLE IF EXISTS artemis_setup_review CASCADE;
+--rollback DROP TABLE IF EXISTS artemis_setup_finding_acceptance CASCADE;
+--rollback DROP TABLE IF EXISTS artemis_setup_finding CASCADE;

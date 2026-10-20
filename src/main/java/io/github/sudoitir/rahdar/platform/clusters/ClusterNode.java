@@ -1,9 +1,11 @@
 package io.github.sudoitir.rahdar.platform.clusters;
 
+import io.github.sudoitir.openbroker.Endpoint;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
 import io.github.sudoitir.rahdar.platform.broker.ManagementUrlProblem;
 import io.github.sudoitir.rahdar.platform.broker.ManagementUrlSource;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -18,13 +20,17 @@ public interface ClusterNode {
 
     String getName();
 
-    /** {@code null} for a node Rahdar cannot manage yet. */
-    String getJolokiaUrl();
+    /** Where the node is managed; {@code null} for a node Rahdar cannot manage yet. */
+    String getManagementUrl();
 
-    String getCoreUrl();
+    /** Where the node sends and receives messages; {@code null} while none is known. */
+    String getDataUrl();
 
-    /** The broker's own NodeID, shared by a live/backup pair; {@code null} until first read. */
-    String getArtemisNodeId();
+    /** Every endpoint the node is reached at, with its plane and protocol. */
+    List<Endpoint> getEndpoints();
+
+    /** The broker's own id for the node, shared by a primary and its backup; {@code null} until first read. */
+    String getNativeNodeId();
 
     /** Whether the node reported itself live at the last read; {@code null} before any read. */
     Boolean getActive();
@@ -33,8 +39,8 @@ public interface ClusterNode {
 
     Boolean getReplicaSync();
 
-    /** {@code PRIMARY}, {@code BACKUP} or {@code STANDALONE}. */
-    String getHaRole();
+    /** How the node is configured for high availability: {@code PRIMARY}, {@code BACKUP} or {@code NONE}. */
+    String getHaDesignation();
 
     String getState();
 
@@ -57,6 +63,6 @@ public interface ClusterNode {
     /** The class of the last probe failure, set with {@link #getLastError()}. */
     BrokerConnectionException.Kind getLastErrorKind();
 
-    /** An operator set the Core URL, so discovery must not replace it. */
-    boolean isCoreUrlManual();
+    /** An operator set the data URL, so discovery must not replace it. */
+    boolean isDataUrlManual();
 }

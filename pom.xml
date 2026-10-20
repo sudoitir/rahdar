@@ -54,8 +54,8 @@
         <maven.compiler.release>25</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 
-        <!-- Pinned; verified against Maven Central during workspace setup. -->
-        <artemis.version>2.57.0</artemis.version>
+        <!-- The broker SDK and its Artemis driver (ADR-0203). Never a SNAPSHOT on main: CI refuses one. -->
+        <openbroker.version>0.1.0</openbroker.version>
         <testcontainers.version>2.0.5</testcontainers.version>
         <spotless.version>3.10.4</spotless.version>
         <!-- Publishing the plugin API (ADR-0102); verified against Maven Central 2026-09-23. -->
@@ -274,13 +274,23 @@
             <artifactId>postgresql</artifactId>
         </dependency>
 
-        <!-- Artemis Core / JMS client: the second broker channel (activemq.notifications,
-             faithful message I/O). Not exercised until Phase 4, pinned now so the
-             dependency surface is fixed. -->
+        <!-- Every broker is reached through the broker SDK (ADR-0203). The Artemis driver brings the
+             Artemis client; no Rahdar code may use it (BoundaryRulesTest), and the tests drive the
+             broker with it. -->
         <dependency>
-            <groupId>org.apache.artemis</groupId>
-            <artifactId>artemis-jakarta-client</artifactId>
-            <version>${artemis.version}</version>
+            <groupId>io.github.sudoitir</groupId>
+            <artifactId>openbroker-api</artifactId>
+            <version>${openbroker.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.github.sudoitir</groupId>
+            <artifactId>openbroker-support</artifactId>
+            <version>${openbroker.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.github.sudoitir</groupId>
+            <artifactId>openbroker-artemis</artifactId>
+            <version>${openbroker.version}</version>
         </dependency>
 
         <dependency>
@@ -305,14 +315,6 @@
             <groupId>net.ttddyy.observation</groupId>
             <artifactId>datasource-micrometer-spring-boot</artifactId>
             <version>${datasource-micrometer.version}</version>
-        </dependency>
-
-        <!-- Phase 5: pools the Core connection the request-reply sampler and
-             CoreMessageTransport share, instead of opening one per call
-             (ADR-0031). Version managed by spring-boot-dependencies. -->
-        <dependency>
-            <groupId>org.messaginghub</groupId>
-            <artifactId>pooled-jms</artifactId>
         </dependency>
 
         <!-- Phase 5: the correlator's hot in-flight-flow lookup cache, in front

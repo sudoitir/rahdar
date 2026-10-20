@@ -31,7 +31,7 @@ import org.springframework.web.context.WebApplicationContext;
  * typing.
  *
  * <p>Its whole contract is that it contacts no broker (ADR-0058 D6): it resolves
- * targets from {@code queue_snapshot}, splits the predicates, and states the cost.
+ * targets from {@code subscription_snapshot}, splits the predicates, and states the cost.
  * These tests therefore stub nothing — a plan that reached a broker would fail here
  * for want of one, which is the point.
  */
@@ -64,9 +64,38 @@ class SqlControllerTest extends PostgresIntegrationTest {
         node.attachSeedUrl("http://a:8161/console/jolokia");
         UUID nodeId = nodes.save(node).getId();
         upsert.upsertBatch(List.of(
-                new QueueRow(clusterId, nodeId, "ORDER.IN", "ORDER.IN", "ANYCAST", true, 120, 0, 0, 0, 0, 0, 0, false),
                 new QueueRow(
-                        clusterId, nodeId, "ORDER.OUT", "ORDER.OUT", "ANYCAST", true, 5, 0, 0, 0, 0, 0, 0, false)));
+                        clusterId,
+                        nodeId,
+                        "ORDER.IN",
+                        "ORDER.IN",
+                        "ANYCAST",
+                        true,
+                        120,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        false,
+                        "artemis.queue"),
+                new QueueRow(
+                        clusterId,
+                        nodeId,
+                        "ORDER.OUT",
+                        "ORDER.OUT",
+                        "ANYCAST",
+                        true,
+                        5,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        false,
+                        "artemis.queue")));
     }
 
     @AfterEach

@@ -5,8 +5,13 @@ export function severityTone(severity: string): { word: string; tone: 'neutral' 
   return { word: 'info', tone: 'neutral' };
 }
 
-export const GAUGE_METRICS = ['messageCount', 'consumerCount', 'deliveringCount', 'scheduledCount'] as const;
-export const RATE_METRICS = ['messagesAdded', 'messagesAcked', 'messagesExpired'] as const;
+export const GAUGE_METRICS = [
+  'openbroker.backlog',
+  'openbroker.consumer.count',
+  'openbroker.in_flight',
+  'openbroker.scheduled',
+] as const;
+export const RATE_METRICS = ['openbroker.enqueued', 'openbroker.acknowledged', 'openbroker.expired'] as const;
 
 /**
  * Derived metrics are computed from more than one reading (ADR-0044). Their
@@ -21,6 +26,13 @@ export function metricKind(metric: string): 'gauge' | 'rate' | 'derived' {
 }
 
 const METRIC_LABELS: Record<string, string> = {
+  'openbroker.backlog': 'openbroker.backlog — messages waiting',
+  'openbroker.consumer.count': 'openbroker.consumer.count — consumers attached',
+  'openbroker.in_flight': 'openbroker.in_flight — delivered, not yet acknowledged',
+  'openbroker.scheduled': 'openbroker.scheduled — held for later delivery',
+  'openbroker.enqueued': 'openbroker.enqueued — messages in per second',
+  'openbroker.acknowledged': 'openbroker.acknowledged — messages acknowledged per second',
+  'openbroker.expired': 'openbroker.expired — messages expired per second',
   ackRatePerConsumer: 'ackRatePerConsumer — slow consumers',
   consumerHealth: 'consumerHealth — consumer health verdict',
 };

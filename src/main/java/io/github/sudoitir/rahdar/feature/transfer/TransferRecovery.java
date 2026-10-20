@@ -19,7 +19,7 @@ import org.springframework.stereotype.Component;
  * (transfer design D6, ADR-0152). A run another live replica is executing is left alone; the others
  * are marked interrupted, once at startup and then every 30 seconds on one replica, and offered for resume: a move's held messages are safe in its durable
  * staging queue, and a copy's ledger says what it has copied. The large-message spool is swept by
- * {@code CoreRelay}; a staging queue whose run is gone shows as orphaned in the transfers list.
+ * {@code BrokerRelay}; a staging queue whose run is gone shows as orphaned in the transfers list.
  */
 @Slf4j
 @Component

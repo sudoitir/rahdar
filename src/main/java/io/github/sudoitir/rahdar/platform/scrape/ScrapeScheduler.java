@@ -1,12 +1,16 @@
 package io.github.sudoitir.rahdar.platform.scrape;
 
+import io.github.sudoitir.openbroker.BrokerException;
+import io.github.sudoitir.openbroker.model.NodeDescription;
+import io.github.sudoitir.openbroker.model.ResourceClass;
+import io.github.sudoitir.openbroker.model.ResourcePage;
+import io.github.sudoitir.openbroker.model.ResourceQuery;
+import io.github.sudoitir.openbroker.model.Scope;
 import io.github.sudoitir.rahdar.kernel.settings.SettingsService;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
-import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
-import io.github.sudoitir.rahdar.platform.broker.BrokerListOps;
-import io.github.sudoitir.rahdar.platform.broker.CoreSubscriptionManager;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaBrokerClient;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaResponse;
+import io.github.sudoitir.rahdar.platform.broker.BrokerFailures;
+import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
+import io.github.sudoitir.rahdar.platform.broker.BrokerNotifications;
 import io.github.sudoitir.rahdar.platform.broker.NodeEndpoint;
 import io.github.sudoitir.rahdar.platform.broker.QueueRow;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
@@ -21,6 +25,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -39,7 +44,6 @@ import org.springframework.context.annotation.DependsOn;
 import org.springframework.context.event.EventListener;
 import org.springframework.core.NestedExceptionUtils;
 import org.springframework.stereotype.Component;
-import tools.jackson.databind.JsonNode;
 
 /**
  * The tiered scrape scheduler (ADR-0015). Retires {@code HaRefreshTask}.
@@ -88,26 +92,22 @@ public class ScrapeScheduler implements DisposableBean {
     /** Where tier A probes run: one virtual thread each, so a stalled node holds nothing but its own. */
     private final ExecutorService probes = Executors.newVirtualThreadPerTaskExecutor();
 
-    private static final String[] HA_ATTRS = {
-        "Active", "Started", "Backup", "ReplicaSync", "NodeID", "Clustered", "Version"
-    };
-    private static final String LIST_QUEUES = "listQueues(java.lang.String,int,int)";
     private static final int PAGE_SIZE = 200;
 
     private final SettingsService settings;
     private final ClusterDirectory clusters;
     private final ClusterOwnership ownership;
     private final ClusterService clusterService;
-    private final BrokerConnections connections;
+    private final BrokerGateway gateway;
     private final ScrapeCycle scrapeCycle;
     private final NodeStateRecorder persist;
     private final QueueSnapshotUpsert upsert;
     private final MetricSampleWriter metrics;
     private final StreamSignals streamSignals;
-    private final CoreSubscriptionManager coreSubscriptions;
+    private final BrokerNotifications notifications;
     private final ApplicationEventPublisher eventPublisher;
 
-    private record QueuesPage(List<QueueRow> rows, long count) {}
+    private record QueuesPage(List<QueueRow> rows, Optional<String> next) {}
 
     // ---- tiers -------------------------------------------------------------
 
@@ -164,10 +164,10 @@ public class ScrapeScheduler implements DisposableBean {
             streamSignals.afterTierA(clusterId, endpoints);
             // Follow failover: reconcile Core notification subscriptions against
             // who is live now. Never in a transaction, on this virtual-thread pool.
-            coreSubscriptions.reconcile(clusterId, endpoints);
+            notifications.reconcile(clusterId, endpoints);
             if (!ownership.owns(clusterId)) {
                 // Ownership moved while this pass ran, after the release had already dropped its state.
-                coreSubscriptions.forget(clusterId);
+                notifications.forget(clusterId);
             }
         } catch (RuntimeException e) {
             log.warn("Split-brain corroboration failed for cluster {}: {}", clusterId, e.toString());
@@ -218,7 +218,7 @@ public class ScrapeScheduler implements DisposableBean {
         scrapeCycle.forget(clusterId);
         streamSignals.forget(clusterId);
         lastFailures.keySet().removeIf(key -> key.startsWith(clusterId + "/"));
-        Thread.startVirtualThread(() -> coreSubscriptions.forget(clusterId));
+        Thread.startVirtualThread(() -> notifications.forget(clusterId));
     }
 
     public void tierB() {
@@ -265,10 +265,19 @@ public class ScrapeScheduler implements DisposableBean {
      * observation, so the node keeps the state and the error it had.
      */
     private void probe(UUID clusterId, ClusterNode node, long cycle) {
-        JolokiaResponse ha;
+        NodeDescription ha;
         try {
-            ha = connections.forCluster(clusterId, node.getJolokiaUrl()).readBrokerAttributes(HA_ATTRS);
-        } catch (RuntimeException e) {
+            ha = gateway.cluster(clusterId)
+                    .nodes()
+                    .describe(Scope.node(BrokerGateway.idOf(node.getId())))
+                    .orThrow()
+                    .getFirst();
+        } catch (BrokerException failure) {
+            RuntimeException e = BrokerFailures.translate(failure);
+            // An answer that carries an error is a failed observation: the node keeps its state and error.
+            if (failure.info().metadata().containsKey(BrokerFailures.NATIVE_ERROR)) {
+                throw e;
+            }
             // Rahdar held the read back itself, so the node was never asked and nothing is known of it.
             BrokerConnectionException.Kind kind = e instanceof BrokerConnectionException bce ? bce.kind() : null;
             if (kind != BrokerConnectionException.Kind.THROTTLED) {
@@ -278,15 +287,11 @@ public class ScrapeScheduler implements DisposableBean {
             }
             throw e;
         }
-        if (!ha.ok()) {
-            throw new BrokerConnectionException(
-                    BrokerConnectionException.Kind.BAD_RESPONSE, "The HA read answered with an error: " + ha.failure());
-        }
-        persist.applyTierA(node.getId(), ha.value(), cycle);
+        persist.applyTierA(node.getId(), ha, cycle);
     }
 
     private void scrapeHotQueues(UUID clusterId, ClusterNode node) {
-        QueuesPage page = listQueues(clusterId, node, BrokerListOps.ALL, 1, PAGE_SIZE);
+        QueuesPage page = listQueues(clusterId, node, Optional.empty());
         upsert.upsertBatch(page.rows());
         metrics.appendQueueSamples(page.rows());
         streamSignals.afterQueueScrape(clusterId, page.rows());
@@ -299,18 +304,17 @@ public class ScrapeScheduler implements DisposableBean {
      */
     private void sweepQueues(UUID clusterId, ClusterNode node) {
         Instant sweepStart = Instant.now();
-        for (int pageNo = 1; ; pageNo++) {
+        Optional<String> next = Optional.empty();
+        do {
             if (Thread.currentThread().isInterrupted()) {
                 return;
             }
-            QueuesPage page = listQueues(clusterId, node, BrokerListOps.ALL, pageNo, PAGE_SIZE);
+            QueuesPage page = listQueues(clusterId, node, next);
             upsert.upsertBatch(page.rows());
             metrics.appendQueueSamples(page.rows());
             streamSignals.afterQueueScrape(clusterId, page.rows());
-            if (page.rows().isEmpty() || (long) pageNo * PAGE_SIZE >= page.count()) {
-                break;
-            }
-        }
+            next = page.next();
+        } while (next.isPresent());
         int reaped = upsert.reapStale(node.getId(), sweepStart);
         if (reaped > 0) {
             log.info("Sweep of {} complete: reaped {} stale queue rows", node.getName(), reaped);
@@ -319,17 +323,29 @@ public class ScrapeScheduler implements DisposableBean {
 
     // ---- plumbing -------------------------------------------------------
 
-    private QueuesPage listQueues(UUID clusterId, ClusterNode node, String options, int page, int size) {
-        JolokiaBrokerClient client = connections.forCluster(clusterId, node.getJolokiaUrl());
-        JsonNode env = client.execOnBrokerParsed(LIST_QUEUES, options, page, size);
-        List<QueueRow> rows = QueueRow.parsePage(env == null ? null : env.get("data"), clusterId, node.getId());
-        long count = env == null ? rows.size() : env.path("count").asLong(rows.size());
-        return new QueuesPage(rows, count);
+    /** One page of the node's queues; each is one request through the node's rate ceiling. */
+    private QueuesPage listQueues(UUID clusterId, ClusterNode node, Optional<String> from) {
+        ResourceQuery query = ResourceQuery.of(ResourceClass.SUBSCRIPTION)
+                .in(Scope.node(BrokerGateway.idOf(node.getId())))
+                .limit(PAGE_SIZE);
+        ResourcePage page;
+        try {
+            page = gateway.cluster(clusterId)
+                    .resources()
+                    .read(from.map(query::continueFrom).orElse(query))
+                    .orThrow();
+        } catch (BrokerException e) {
+            throw BrokerFailures.translate(e);
+        }
+        List<QueueRow> rows = page.items().stream()
+                .map(r -> QueueRow.of(clusterId, node.getId(), r))
+                .toList();
+        return new QueuesPage(rows, page.continueToken());
     }
 
     private List<ClusterNode> manageableNodes(UUID clusterId) {
         return clusters.nodes(clusterId).stream()
-                .filter(n -> n.getJolokiaUrl() != null)
+                .filter(n -> n.getManagementUrl() != null)
                 .toList();
     }
 
@@ -360,7 +376,7 @@ public class ScrapeScheduler implements DisposableBean {
             Throwable root = NestedExceptionUtils.getMostSpecificCause(e);
             String why = root == e ? e.toString() : e + ", caused by " + root;
             if (!why.equals(lastFailures.put(key, why))) {
-                log.warn("The {} of {} ({}) failed: {}", jobName, node.getName(), node.getJolokiaUrl(), why);
+                log.warn("The {} of {} ({}) failed: {}", jobName, node.getName(), node.getManagementUrl(), why);
             }
         }
     }

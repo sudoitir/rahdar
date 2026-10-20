@@ -8,50 +8,50 @@
 CREATE TABLE metric_sample (
     ts timestamp with time zone NOT NULL,
     value double precision NOT NULL,
-    subject_type text NOT NULL,
-    subject_name text NOT NULL,
+    subject_kind text NOT NULL,
+    subject_path text NOT NULL,
     metric text NOT NULL,
     cluster_id uuid NOT NULL,
     node_id uuid
 )
 PARTITION BY RANGE (ts);
 
-CREATE TABLE queue_snapshot (
+CREATE TABLE subscription_snapshot (
     ts timestamp with time zone DEFAULT now() NOT NULL,
-    message_count bigint DEFAULT 0 NOT NULL,
+    backlog bigint DEFAULT 0 NOT NULL,
     consumer_count bigint DEFAULT 0 NOT NULL,
-    delivering_count bigint DEFAULT 0 NOT NULL,
-    scheduled_count bigint DEFAULT 0 NOT NULL,
-    messages_added bigint DEFAULT 0 NOT NULL,
-    messages_acked bigint DEFAULT 0 NOT NULL,
-    messages_expired bigint DEFAULT 0 NOT NULL,
-    address text NOT NULL,
-    queue_name text NOT NULL,
-    routing_type text NOT NULL,
+    in_flight bigint DEFAULT 0 NOT NULL,
+    scheduled bigint DEFAULT 0 NOT NULL,
+    enqueued bigint DEFAULT 0 NOT NULL,
+    acknowledged bigint DEFAULT 0 NOT NULL,
+    expired bigint DEFAULT 0 NOT NULL,
+    destination text,
+    subscription text NOT NULL,
+    kind text NOT NULL,
+    native_attributes jsonb DEFAULT '{}'::jsonb NOT NULL,
     cluster_id uuid NOT NULL,
     node_id uuid NOT NULL,
     durable boolean DEFAULT true NOT NULL,
-    paused boolean DEFAULT false NOT NULL,
-    CONSTRAINT ck_queue_snapshot_routing CHECK ((routing_type = ANY (ARRAY['ANYCAST'::text, 'MULTICAST'::text])))
+    paused boolean DEFAULT false NOT NULL
 )
 WITH (fillfactor='80', autovacuum_vacuum_scale_factor='0.02', autovacuum_analyze_scale_factor='0.02', autovacuum_vacuum_cost_delay='2');
 
 ALTER TABLE metric_sample
-    ADD CONSTRAINT uq_metric_sample UNIQUE NULLS NOT DISTINCT (cluster_id, subject_type, subject_name, metric, node_id, ts);
+    ADD CONSTRAINT uq_metric_sample UNIQUE NULLS NOT DISTINCT (cluster_id, subject_kind, subject_path, metric, node_id, ts);
 
-ALTER TABLE ONLY queue_snapshot
-    ADD CONSTRAINT pk_queue_snapshot PRIMARY KEY (node_id, queue_name);
+ALTER TABLE ONLY subscription_snapshot
+    ADD CONSTRAINT pk_subscription_snapshot PRIMARY KEY (node_id, subscription);
 
 CREATE INDEX ix_metric_sample_ts_brin ON metric_sample USING brin (ts) WITH (pages_per_range='32');
 
-CREATE INDEX ix_queue_snapshot_address ON queue_snapshot USING btree (cluster_id, address);
+CREATE INDEX ix_subscription_snapshot_destination ON subscription_snapshot USING btree (cluster_id, destination);
 
-CREATE INDEX ix_queue_snapshot_cluster ON queue_snapshot USING btree (cluster_id);
+CREATE INDEX ix_subscription_snapshot_cluster ON subscription_snapshot USING btree (cluster_id);
 
-ALTER TABLE ONLY queue_snapshot
-    ADD CONSTRAINT fk_queue_snapshot_cluster FOREIGN KEY (cluster_id) REFERENCES cluster(id) ON DELETE CASCADE;
+ALTER TABLE ONLY subscription_snapshot
+    ADD CONSTRAINT fk_subscription_snapshot_cluster FOREIGN KEY (cluster_id) REFERENCES cluster(id) ON DELETE CASCADE;
 
-ALTER TABLE ONLY queue_snapshot
-    ADD CONSTRAINT fk_queue_snapshot_node FOREIGN KEY (node_id) REFERENCES broker_node(id) ON DELETE CASCADE;
---rollback DROP TABLE IF EXISTS queue_snapshot CASCADE;
+ALTER TABLE ONLY subscription_snapshot
+    ADD CONSTRAINT fk_subscription_snapshot_node FOREIGN KEY (node_id) REFERENCES broker_node(id) ON DELETE CASCADE;
+--rollback DROP TABLE IF EXISTS subscription_snapshot CASCADE;
 --rollback DROP TABLE IF EXISTS metric_sample CASCADE;

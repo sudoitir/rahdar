@@ -1,0 +1,27 @@
+{
+  "request": {
+    "mbean": "org.apache.activemq.artemis:broker=\"primary\"",
+    "attribute": [
+      "Active",
+      "Started",
+      "Backup",
+      "HAPolicy",
+      "NodeID",
+      "Clustered",
+      "Version",
+      "ReplicaSync"
+    ],
+    "type": "read"
+  },
+  "value": {
+    "Active": true,
+    "Started": true,
+    "Version": "2.31.2",
+    "ReplicaSync": true,
+    "Backup": false,
+    "HAPolicy": "Replication Primary w/quorum voting",
+    "NodeID": "f7734597-a768-11f1-aa4c-ceae3fa2df1d",
+    "Clustered": true
+  },
+  "status": 200
+}

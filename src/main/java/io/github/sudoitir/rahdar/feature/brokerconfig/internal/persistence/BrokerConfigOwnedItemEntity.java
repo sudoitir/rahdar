@@ -19,7 +19,7 @@ import lombok.Setter;
  * D6) — the record that lets an apply remove what it created and nothing else.
  */
 @Entity
-@Table(name = "broker_config_owned_item")
+@Table(name = "artemis_config_owned_item")
 @IdClass(BrokerConfigOwnedItemEntity.Key.class)
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)

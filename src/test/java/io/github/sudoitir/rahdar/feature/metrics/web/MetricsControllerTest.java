@@ -66,8 +66,8 @@ class MetricsControllerTest extends PostgresIntegrationTest {
 
     private void sample(Instant ts, double value) {
         jdbc.update("""
-                INSERT INTO metric_sample (ts, value, subject_type, subject_name, metric, cluster_id, node_id)
-                VALUES (:ts, :v, 'QUEUE', 'orders', 'messageCount', :c, :n)
+                INSERT INTO metric_sample (ts, value, subject_kind, subject_path, metric, cluster_id, node_id)
+                VALUES (:ts, :v, 'QUEUE', 'orders', 'openbroker.backlog', :c, :n)
                 """, Map.of("ts", Timestamp.from(ts), "v", value, "c", clusterId, "n", nodeA));
     }
 
@@ -80,13 +80,13 @@ class MetricsControllerTest extends PostgresIntegrationTest {
     @Test
     void aQueueSplitByNodeNamesEachNodeBesideTheUnchangedTotal() throws Exception {
         mvc.perform(get("/api/v1/clusters/{id}/metrics", clusterId)
-                        .param("metric", "messageCount")
+                        .param("metric", "openbroker.backlog")
                         .param("subjectType", "QUEUE")
                         .param("subject", "orders")
                         .param("splitBy", "NODE"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.splitBy").value("NODE"))
-                .andExpect(jsonPath("$.series[0].metric").value("messageCount"))
+                .andExpect(jsonPath("$.series[0].metric").value("openbroker.backlog"))
                 .andExpect(jsonPath("$.byNode[0].nodeName").value("node-a"))
                 .andExpect(jsonPath("$.byNode[0].sampled").value(true))
                 .andExpect(jsonPath("$.byNode[0].series[0].points[0].peak").value(400.0));
@@ -94,7 +94,7 @@ class MetricsControllerTest extends PostgresIntegrationTest {
 
     @Test
     void anUnsplitQueryCarriesNoSplit() throws Exception {
-        mvc.perform(get("/api/v1/clusters/{id}/metrics", clusterId).param("metric", "messageCount"))
+        mvc.perform(get("/api/v1/clusters/{id}/metrics", clusterId).param("metric", "openbroker.backlog"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.splitBy").doesNotExist())
                 .andExpect(jsonPath("$.byNode").doesNotExist());
@@ -103,7 +103,7 @@ class MetricsControllerTest extends PostgresIntegrationTest {
     @Test
     void aSplitOfTheClusterScopeIsABadRequest() throws Exception {
         mvc.perform(get("/api/v1/clusters/{id}/metrics", clusterId)
-                        .param("metric", "messageCount")
+                        .param("metric", "openbroker.backlog")
                         .param("splitBy", "NODE"))
                 .andExpect(status().isBadRequest());
     }

@@ -1,6 +1,6 @@
 package io.github.sudoitir.rahdar.platform.clusters;
 
-import io.github.sudoitir.rahdar.platform.broker.JolokiaBrokerClient;
+import io.github.sudoitir.rahdar.platform.broker.BrokerTarget;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -13,7 +13,7 @@ import java.util.UUID;
 public interface RegistrationAdoption {
 
     /** A live node the check reached, with the connection to read it through. */
-    record LiveNode(String name, JolokiaBrokerClient client) {}
+    record LiveNode(String name, BrokerTarget target) {}
 
     /** How many entries of each section adoption would declare. */
     record Counts(int addresses, int addressSettings, int securitySettings, int diverts) {}

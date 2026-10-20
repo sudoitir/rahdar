@@ -28,6 +28,7 @@ _Others_
 * `i.g.s.r.p.c.ClusterOwnership` (in Clusters)
 * `i.g.s.r.k.s.SettingsService` (in Settings)
 * `i.g.s.r.k.s.SseHub` (in Event stream)
+* `i.g.s.r.s.a.ArtemisNodes` (in Artemis)
 * `i.g.s.r.p.s.QueueSnapshots` (in Scraping)
 * `i.g.s.r.p.s.MetricSamples` (in Scraping)
 * `i.g.s.r.k.s.ClusterAccessGuard` (in Security)

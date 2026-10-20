@@ -51,17 +51,26 @@ The `release` job in `.github/workflows/ci.yml` does all of it, with no manual s
   so the site's changelog lists it (a release made with the workflow token triggers
   no workflow on its own).
 
-After it, each registry gets the release only when its inputs changed since the newest
-version already there, so a failed publish is retried by the next release:
+After it, npm gets the release:
 
-- `publish-api`: the plugin API to Maven Central, when `src/main` or `pom.xml` changed, and
-  attests the files it deployed;
-- `publish-sdk`: `@rahdar/plugin-sdk` to npm, when `web/packages`, `web/src/sdk`,
-  `web/src/kernel` or the web manifests changed. Its job stays in `ci.yml`: npm trusted
-  publishing is bound to that file name;
-- `publish-client-ts` and `publish-client-java`: `@rahdar/client` to npm and
-  `io.github.sudoitir:rahdar-client` to Central, on **every** release, generated from the
-  release's `web/openapi.json` (ADR-0151). The release also attaches `rahdar-<version>.openapi.json`.
+- `publish-sdk`: `@rahdar/plugin-sdk`, when `web/packages`, `web/src/sdk`, `web/src/kernel` or the
+  web manifests changed since the newest version on npm, so a failed publish is retried by the next
+  release. Its job stays in `ci.yml`: npm trusted publishing is bound to that file name;
+- `publish-client-ts`: `@rahdar/client`, on **every** release, generated from the release's
+  `web/openapi.json` (ADR-0151). The release also attaches `rahdar-<version>.openapi.json`.
+
+## Maven Central is a maintainer's step
+
+Central limits how much a namespace publishes, so no release goes there on its own (ADR-0205). A
+maintainer publishes a release when a plugin author or a Java client user needs it: Actions → Publish
+to Maven Central → Run workflow with the release's version, or
+`gh workflow run publish-central.yml -f version=YYYY.MM.N`. One run of `publish-central.yml` publishes:
+
+- the plugin API, `io.github.sudoitir:rahdar`, when `src/main` or `pom.xml` changed since the newest
+  version on Central, japicmp-gated as before, and attests the files it deployed;
+- the Java client, `io.github.sudoitir:rahdar-client`, generated from the release's `web/openapi.json`.
+
+It refuses a version that is not a release tag. Runs do not overlap.
 
 A pull request that changes the image inputs scans the built image with Grype and fails on a
 critical or high finding that has a fix; bump the base-image digest or the dependency.

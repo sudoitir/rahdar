@@ -22,7 +22,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * The cross-node resource views (ADR-0017). {@code queues} is aggregated from the
- * {@code queue_snapshot} cache; the rest are live-through fan-outs. All share the
+ * {@code subscription_snapshot} cache; the rest are live-through fan-outs. All share the
  * {@code ?q=&page=&size=&sort=} envelope. A cluster with no reachable management
  * endpoint surfaces the classified {@code BrokerConnectionException} through
  * {@link ApiExceptionHandler}.

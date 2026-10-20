@@ -4,9 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import io.github.sudoitir.rahdar.feature.transfer.web.TransferViews.FindingKind;
 import io.github.sudoitir.rahdar.feature.transfer.web.TransferViews.TransferRunView;
-import io.github.sudoitir.rahdar.platform.broker.StagingQueues;
 import io.github.sudoitir.rahdar.support.ArtemisBrokers;
 import io.github.sudoitir.rahdar.support.ArtemisBrokers.Broker;
+import io.github.sudoitir.rahdar.system.artemis.StagingQueues;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 

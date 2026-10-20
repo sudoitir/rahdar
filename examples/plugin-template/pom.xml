@@ -25,7 +25,7 @@
         <rahdar.version>2026.10.5</rahdar.version>
         <rahdar.since>${rahdar.version}</rahdar.since>
         <!-- Rahdar's extension contract; a plugin built for another is refused. -->
-        <rahdar.contract>15</rahdar.contract>
+        <rahdar.contract>16</rahdar.contract>
         <node.version>v24.21.0</node.version>
         <!-- Normally empty: the SDK comes from npm. Set to a packed SDK (.tgz) to build against a
              Rahdar that is not released yet, as Rahdar's own CI does. -->

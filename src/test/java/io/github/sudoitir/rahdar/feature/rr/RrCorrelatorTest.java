@@ -116,7 +116,7 @@ class RrCorrelatorTest extends PostgresIntegrationTest {
         List<RrFlowEntity> created =
                 flows.findByClusterIdAndRequestAddressAndState(clusterId, "rr.request", RrState.AWAITING_REPLY.name());
         assertThat(created).hasSize(1);
-        assertThat(created.getFirst().getReplyKind()).isEqualTo("SHARED_QUEUE");
+        assertThat(created.getFirst().getReplyKind()).isEqualTo("SHARED");
 
         correlator.accept(
                 new Observation.ReplySeen(clusterId, null, t0.plusSeconds(2), null, "m2", "corr-1", null, Map.of()));
@@ -142,7 +142,7 @@ class RrCorrelatorTest extends PostgresIntegrationTest {
 
         RrFlowEntity awaiting = flows.findByClusterIdAndRequestAddressAndRequestMessageId(clusterId, "rr.request", "m1")
                 .orElseThrow();
-        assertThat(awaiting.getReplyKind()).isEqualTo("SHARED_QUEUE");
+        assertThat(awaiting.getReplyKind()).isEqualTo("SHARED");
         assertThat(awaiting.getReplyDestination()).isNull();
 
         correlator.accept(new Observation.ReplySeen(
@@ -183,7 +183,7 @@ class RrCorrelatorTest extends PostgresIntegrationTest {
         RrFlowEntity flow = flows.findByClusterIdAndRequestAddressAndState(
                         clusterId, "rr.request", RrState.COMPLETED.name())
                 .getFirst();
-        assertThat(flow.getReplyKind()).isEqualTo("TEMP_QUEUE");
+        assertThat(flow.getReplyKind()).isEqualTo("TEMPORARY");
         // Postgres timestamptz round-trips can lose sub-millisecond precision.
         assertThat(flow.getLatencyMs()).isCloseTo(500L, Offset.offset(2L));
     }

@@ -21,8 +21,9 @@ import io.github.sudoitir.rahdar.kernel.gate.OperationGate;
 import io.github.sudoitir.rahdar.kernel.gate.OperationHeldException;
 import io.github.sudoitir.rahdar.kernel.gate.Trait;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaBrokerClient;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaResponse;
+import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
+import io.github.sudoitir.rahdar.platform.broker.BrokerMessages;
+import io.github.sudoitir.rahdar.platform.broker.BrokerTarget;
 import io.github.sudoitir.rahdar.platform.broker.ManagementRefusal;
 import io.github.sudoitir.rahdar.platform.broker.QueueRow;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNodeEntity;
@@ -33,6 +34,11 @@ import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterR
 import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshotUpsert;
 import io.github.sudoitir.rahdar.support.AdminAuthenticationExtension;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
+import io.github.sudoitir.rahdar.support.Targets;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNodes;
+import io.github.sudoitir.rahdar.system.artemis.DivertOperations;
+import io.github.sudoitir.rahdar.system.artemis.QueueLifecycleOperations;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -88,6 +94,15 @@ class QueueGateTest extends PostgresIntegrationTest {
     BrokerConnections connections;
 
     @MockitoBean
+    ArtemisNodes artemisNodes;
+
+    @MockitoBean
+    BrokerGateway gateway;
+
+    @MockitoBean
+    BrokerMessages messages;
+
+    @MockitoBean
     QueueLifecycleOperations ops;
 
     @MockitoBean
@@ -111,15 +126,32 @@ class QueueGateTest extends PostgresIntegrationTest {
         node.attachSeedUrl("http://live:8161/console/jolokia");
         node.applyHaState(new HaObservation(true, "STARTED", "PRIMARY", null, "2.44.0", null), 1L, Instant.now());
         nodeId = nodes.save(node).getId();
-        JolokiaBrokerClient client = Mockito.mock(JolokiaBrokerClient.class);
+        ArtemisNode client = Mockito.mock(ArtemisNode.class);
         when(client.resolveBrokerObjectName()).thenReturn("org.apache.activemq.artemis:broker=\"b\"");
-        when(connections.forCluster(eq(clusterId), anyString())).thenReturn(client);
+        when(artemisNodes.on(eq(clusterId), any(UUID.class))).thenReturn(client);
+        when(artemisNodes.on(any(BrokerTarget.class))).thenReturn(client);
+        BrokerTarget anyNode = Targets.target();
+        when(gateway.node(any(UUID.class), any(UUID.class))).thenReturn(anyNode);
         // No node has a queue the scrape does not show.
-        when(client.single(any())).thenReturn(new JolokiaResponse(404, null, "no such queue", null, null));
+        when(gateway.cluster(clusterId)).thenReturn(anyNode.connection());
         when(ops.deleteState(any(), anyString(), anyString(), anyString(), anyString()))
                 .thenReturn(new QueueLifecycleOperations.DeleteState(false, 0, List.of()));
-        upsert.upsertBatch(List.of(
-                new QueueRow(clusterId, nodeId, "orders.addr", QUEUE, "ANYCAST", true, 5, 0, 0, 0, 0, 0, 0, false)));
+        upsert.upsertBatch(List.of(new QueueRow(
+                clusterId,
+                nodeId,
+                "orders.addr",
+                QUEUE,
+                "ANYCAST",
+                true,
+                5,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                false,
+                "artemis.queue")));
     }
 
     @AfterEach
@@ -178,23 +210,22 @@ class QueueGateTest extends PostgresIntegrationTest {
 
     @Test
     void aQueueDeleteIsEstimatedFromTheScrapeAndPinnedToTheQueuesIdentity() {
-        assertThat(lifecycle.reachOfQueueDelete(clusterId, QUEUE)).isEqualTo(new Reach(5, "orders.addr|ANYCAST"));
+        when(messages.identity(clusterId, QUEUE)).thenReturn("etag-1");
+        assertThat(lifecycle.reachOfQueueDelete(clusterId, QUEUE)).isEqualTo(new Reach(5, "etag-1"));
 
         Effect effect = queueDeleteOperation.estimate(new QueueDeleteParams(clusterId, QUEUE, false, false));
 
-        assertThat(effect).isEqualTo(new Effect(5, "messages", "orders.addr|ANYCAST", null));
+        assertThat(effect).isEqualTo(new Effect(5, "messages", "etag-1", null));
         assertThat(queueDeleteOperation.traits(new QueueDeleteParams(clusterId, QUEUE, false, false)))
                 .isEqualTo(Set.of(Trait.DESTRUCTIVE));
     }
 
     @Test
-    void aQueueBoundAnotherWayAfterTheRequestHasAnotherStateKey() {
+    void aQueueRecreatedAfterTheRequestHasAnotherStateKey() {
+        when(messages.identity(clusterId, QUEUE)).thenReturn("etag-1", "etag-2");
         String asked = queueDeleteOperation
                 .estimate(new QueueDeleteParams(clusterId, QUEUE, false, false))
                 .stateKey();
-        jdbc.update("DELETE FROM queue_snapshot WHERE cluster_id = ?", clusterId);
-        upsert.upsertBatch(List.of(
-                new QueueRow(clusterId, nodeId, "other.addr", QUEUE, "MULTICAST", true, 5, 0, 0, 0, 0, 0, 0, false)));
 
         String now = queueDeleteOperation
                 .estimate(new QueueDeleteParams(clusterId, QUEUE, false, false))

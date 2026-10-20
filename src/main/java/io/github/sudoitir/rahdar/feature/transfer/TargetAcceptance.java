@@ -2,7 +2,7 @@ package io.github.sudoitir.rahdar.feature.transfer;
 
 import io.github.sudoitir.rahdar.feature.transfer.web.TransferViews.Finding;
 import io.github.sudoitir.rahdar.feature.transfer.web.TransferViews.FindingKind;
-import io.github.sudoitir.rahdar.platform.broker.AcceptanceProbe.Facts;
+import io.github.sudoitir.rahdar.system.artemis.AcceptanceProbe.Facts;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;

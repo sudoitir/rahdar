@@ -14,16 +14,14 @@ import io.github.sudoitir.rahdar.kernel.plugin.PluginPurged;
 import io.github.sudoitir.rahdar.kernel.plugin.PluginScopedBeans;
 import io.github.sudoitir.rahdar.kernel.security.Actor;
 import io.github.sudoitir.rahdar.kernel.security.ActorResolver;
-import io.github.sudoitir.rahdar.platform.broker.CoreMessageTransport;
+import io.github.sudoitir.rahdar.platform.broker.BrokerMessages;
 import io.github.sudoitir.rahdar.platform.broker.MessageKind;
-import io.github.sudoitir.rahdar.platform.broker.MessageTransport;
 import io.github.sudoitir.rahdar.platform.broker.SendNames;
+import io.github.sudoitir.rahdar.platform.broker.SentMessages;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
-import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.util.ArrayList;
-import java.util.Base64;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -59,7 +57,7 @@ public class PluginMessagingService implements PluginScopedBeans {
     private final PluginMessagingReconciler reconciler;
     private final PluginDrains drains;
     private final ClusterDirectory clusters;
-    private final CoreMessageTransport transport;
+    private final BrokerMessages messages;
     private final AuditService audit;
     private final ActorResolver actors;
     private final TransactionTemplate tx;
@@ -201,7 +199,7 @@ public class PluginMessagingService implements PluginScopedBeans {
                     throw new RegistrationRefusedException(why);
                 });
         ClusterNode node = servingWithCore(message.clusterId());
-        // A plugin's headers are plain string properties; the transport's headers are the JMS ones.
+        // A plugin's headers are plain string properties, never the message's standard headers.
         Map<String, Object> properties = new LinkedHashMap<>();
         if (message.headers() != null) {
             properties.putAll(message.headers());
@@ -225,21 +223,14 @@ public class PluginMessagingService implements PluginScopedBeans {
                 Map.of(PLUGIN, pluginId, "bytes", body.length),
                 false);
         try {
-            transport.send(
-                    new MessageTransport.TransportTarget(
-                            message.clusterId(),
-                            node.getId(),
-                            message.address(),
-                            message.address(),
-                            "ANYCAST",
-                            node.getJolokiaUrl(),
-                            node.getCoreUrl()),
-                    new MessageTransport.SendSpec(
+            messages.send(
+                    message.clusterId(),
+                    node.getId(),
+                    message.address(),
+                    SentMessages.of(
                             message.text() ? MessageKind.TEXT : MessageKind.BYTES,
                             message.durable(),
-                            message.text()
-                                    ? new String(body, StandardCharsets.UTF_8)
-                                    : Base64.getEncoder().encodeToString(body),
+                            body,
                             Map.of(),
                             properties));
             audit.succeed(event, 1);
@@ -297,7 +288,7 @@ public class PluginMessagingService implements PluginScopedBeans {
 
     private ClusterNode servingWithCore(UUID clusterId) {
         return reconciler.servingNodes(clusterId).stream()
-                .filter(n -> n.getCoreUrl() != null)
+                .filter(n -> n.getDataUrl() != null)
                 .findFirst()
                 .orElseThrow(() -> new RegistrationRefusedException(
                         "No serving node of cluster " + clusterId + " has a Core URL, and sends go over Core."));

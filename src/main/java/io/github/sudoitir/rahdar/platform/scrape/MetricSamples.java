@@ -17,7 +17,7 @@ import org.springframework.stereotype.Repository;
 /**
  * Bucketed reads over {@code metric_sample} (metrics spec, ADR-0033). JDBC, no JPA
  * entity — an analytic read of a partitioned, disposable cache, the same shape as
- * {@code queue_snapshot}'s bulk-upsert path (ADR-0016).
+ * {@code subscription_snapshot}'s bulk-upsert path (ADR-0016).
  *
  * <p>A gauge (point-in-time quantity, e.g. {@code messageCount}) is averaged per
  * bucket with its maximum reported as a peak. A counter (broker-lifetime monotonic,
@@ -34,7 +34,11 @@ import org.springframework.stereotype.Repository;
 @RequiredArgsConstructor
 public class MetricSamples {
 
-    private static final String SUBJECT_NAME = "subject_name";
+    private static final String SUBJECT_PATH = "subject_path";
+
+    /** The subject kind of a plugin's own metric (ADR-0113). */
+    public static final String PLUGIN_SUBJECT = "rahdar.plugin";
+
     private static final String NODE_ID = "node_id";
     private static final String BUCKET = "bucket";
 
@@ -87,27 +91,27 @@ public class MetricSamples {
         // Per node first: each node's counter is its own lifetime count, so max - min across
         // nodes would subtract one broker's counter from another's.
         String sql = """
-                SELECT subject_name,
+                SELECT subject_path,
                        sum(delta / span_seconds) AS rate,
                        max(as_of) AS as_of,
                        max(span_seconds) AS span_seconds
-                  FROM (SELECT subject_name,
+                  FROM (SELECT subject_path,
                                GREATEST(max(value) - min(value), 0)::double precision AS delta,
                                max(ts) AS as_of,
                                EXTRACT(EPOCH FROM max(ts) - min(ts))::double precision AS span_seconds
                           FROM metric_sample
-                         WHERE cluster_id = :clusterId AND subject_type = 'QUEUE' AND metric = :metric
+                         WHERE cluster_id = :clusterId AND subject_kind = 'QUEUE' AND metric = :metric
                            AND ts >= :from AND ts < :to
-                         GROUP BY subject_name, node_id
+                         GROUP BY subject_path, node_id
                         HAVING count(*) >= 2 AND max(ts) > min(ts)) per_node
-                 GROUP BY subject_name
+                 GROUP BY subject_path
                 """;
         MapSqlParameterSource p = windowParams(clusterId, metric, from, to);
         Map<String, SubjectRate> out = new HashMap<>();
         jdbc.query(sql, p, rs -> {
             double spanSeconds = rs.getDouble("span_seconds");
             out.put(
-                    rs.getString(SUBJECT_NAME),
+                    rs.getString(SUBJECT_PATH),
                     new SubjectRate(
                             rs.getDouble("rate"),
                             rs.getTimestamp("as_of").toInstant(),
@@ -126,21 +130,21 @@ public class MetricSamples {
     public Map<String, Map<UUID, SubjectRate>> latestRateWithTimeBySubjectAndNode(
             UUID clusterId, String metric, Instant from, Instant to) {
         String sql = """
-                SELECT subject_name, node_id,
+                SELECT subject_path, node_id,
                        GREATEST(max(value) - min(value), 0)::double precision AS delta,
                        max(ts) AS as_of,
                        EXTRACT(EPOCH FROM max(ts) - min(ts))::double precision AS span_seconds
                   FROM metric_sample
-                 WHERE cluster_id = :clusterId AND subject_type = 'QUEUE' AND metric = :metric
+                 WHERE cluster_id = :clusterId AND subject_kind = 'QUEUE' AND metric = :metric
                    AND ts >= :from AND ts < :to
-                 GROUP BY subject_name, node_id
+                 GROUP BY subject_path, node_id
                 HAVING count(*) >= 2 AND max(ts) > min(ts)
                 """;
         MapSqlParameterSource p = windowParams(clusterId, metric, from, to);
         Map<String, Map<UUID, SubjectRate>> out = new HashMap<>();
         jdbc.query(sql, p, rs -> {
             double spanSeconds = rs.getDouble("span_seconds");
-            out.computeIfAbsent(rs.getString(SUBJECT_NAME), k -> new HashMap<>())
+            out.computeIfAbsent(rs.getString(SUBJECT_PATH), k -> new HashMap<>())
                     .put(
                             rs.getObject(NODE_ID, UUID.class),
                             new SubjectRate(
@@ -172,21 +176,21 @@ public class MetricSamples {
      */
     public Map<String, Double> depthSlopeBySubject(UUID clusterId, String metric, Instant from, Instant to) {
         String sql = """
-                SELECT subject_name, sum(slope) AS slope
-                  FROM (SELECT subject_name,
+                SELECT subject_path, sum(slope) AS slope
+                  FROM (SELECT subject_path,
                                regr_slope(value, EXTRACT(EPOCH FROM ts)) AS slope
                           FROM metric_sample
-                         WHERE cluster_id = :clusterId AND subject_type = 'QUEUE' AND metric = :metric
+                         WHERE cluster_id = :clusterId AND subject_kind = 'QUEUE' AND metric = :metric
                            AND ts >= :from AND ts < :to
-                         GROUP BY subject_name, node_id
+                         GROUP BY subject_path, node_id
                         HAVING count(*) >= 2 AND max(ts) > min(ts)) per_node
                  WHERE slope IS NOT NULL
-                 GROUP BY subject_name
+                 GROUP BY subject_path
                 """;
         MapSqlParameterSource p = windowParams(clusterId, metric, from, to);
         Map<String, Double> out = new HashMap<>();
         jdbc.query(sql, p, rs -> {
-            out.put(rs.getString(SUBJECT_NAME), rs.getDouble("slope"));
+            out.put(rs.getString(SUBJECT_PATH), rs.getDouble("slope"));
         });
         return out;
     }
@@ -221,9 +225,9 @@ public class MetricSamples {
                          lead(ts) OVER w AS next_ts,
                          ts - lag(ts) OVER w AS gap
                     FROM metric_sample
-                   WHERE cluster_id = :clusterId AND subject_type = 'QUEUE' AND metric = :metric
+                   WHERE cluster_id = :clusterId AND subject_kind = 'QUEUE' AND metric = :metric
                      AND ts >= :lookbackFrom AND ts < :to
-                  WINDOW w AS (PARTITION BY subject_name, node_id ORDER BY ts)
+                  WINDOW w AS (PARTITION BY subject_path, node_id ORDER BY ts)
                 ), spans AS (
                   -- The bucket ends at which this sample is the queue's latest, still-fresh value.
                   SELECT value,
@@ -249,7 +253,7 @@ public class MetricSamples {
     /** A plugin metric's gauge buckets for one subject (ADR-0113). */
     public List<Bucket> pluginSeries(
             UUID clusterId, String metric, String subjectName, Instant from, Instant to, Duration step) {
-        return gaugeSeries("PLUGIN", clusterId, metric, subjectName, from, to, step);
+        return gaugeSeries(PLUGIN_SUBJECT, clusterId, metric, subjectName, from, to, step);
     }
 
     private List<Bucket> gaugeSeries(
@@ -264,8 +268,8 @@ public class MetricSamples {
                 SELECT date_bin(make_interval(secs => :stepSeconds), ts, TIMESTAMPTZ '2000-01-01') AS bucket,
                        avg(value) AS v, max(value) AS peak
                   FROM metric_sample
-                 WHERE cluster_id = :clusterId AND subject_type = :subjectType AND metric = :metric
-                   AND (:subjectName::text IS NULL OR subject_name = :subjectName)
+                 WHERE cluster_id = :clusterId AND subject_kind = :subjectType AND metric = :metric
+                   AND (:subjectName::text IS NULL OR subject_path = :subjectName)
                    AND ts >= :from AND ts < :to
                  GROUP BY bucket ORDER BY bucket
                 """;
@@ -298,10 +302,10 @@ public class MetricSamples {
             SELECT node_id, bucket, GREATEST(value - previous, 0) AS delta
               FROM (SELECT node_id, ts, value,
                            date_bin(make_interval(secs => :stepSeconds), ts, TIMESTAMPTZ '2000-01-01') AS bucket,
-                           lag(value) OVER (PARTITION BY subject_name, node_id ORDER BY ts) AS previous
+                           lag(value) OVER (PARTITION BY subject_path, node_id ORDER BY ts) AS previous
                       FROM metric_sample
-                     WHERE cluster_id = :clusterId AND subject_type = 'QUEUE' AND metric = :metric
-                       AND (:subjectName::text IS NULL OR subject_name = :subjectName)
+                     WHERE cluster_id = :clusterId AND subject_kind = 'QUEUE' AND metric = :metric
+                       AND (:subjectName::text IS NULL OR subject_path = :subjectName)
                        AND ts >= :lookbackFrom AND ts < :to) samples
              -- Tested before the clamp: GREATEST skips NULLs, so it would read "no predecessor" as 0.
              WHERE ts >= :from AND previous IS NOT NULL
@@ -334,8 +338,8 @@ public class MetricSamples {
                        date_bin(make_interval(secs => :stepSeconds), ts, TIMESTAMPTZ '2000-01-01') AS bucket,
                        avg(value) AS v, max(value) AS peak
                   FROM metric_sample
-                 WHERE cluster_id = :clusterId AND subject_type = 'QUEUE' AND metric = :metric
-                   AND subject_name = :subjectName
+                 WHERE cluster_id = :clusterId AND subject_kind = 'QUEUE' AND metric = :metric
+                   AND subject_path = :subjectName
                    AND ts >= :from AND ts < :to
                  GROUP BY node_id, bucket ORDER BY node_id, bucket
                 """;

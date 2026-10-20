@@ -10,7 +10,7 @@ import io.github.sudoitir.rahdar.kernel.security.PermissionResolver;
 import io.github.sudoitir.rahdar.kernel.security.ResourceFilter;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaBrokerClient;
+import io.github.sudoitir.rahdar.platform.broker.DeadLetterDestinations;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
 import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshot;
@@ -23,14 +23,13 @@ import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import tools.jackson.databind.JsonNode;
 
 /**
  * Dead-letter / expiry view (ADR-0021, D8). The DLA and EA come from the broker's
  * own {@code getAddressSettingsAsJSON("#")}, never a name match — if that read
  * fails the view says so ({@code settingsAvailable = false}) and infers nothing.
  * Queues on those addresses and their per-node depth come from the
- * {@code queue_snapshot} cache. A queue the caller may not read is left out, and an address appears only
+ * {@code subscription_snapshot} cache. A queue the caller may not read is left out, and an address appears only
  * through a queue they may read or when they may read the address.
  */
 @Service
@@ -42,19 +41,20 @@ public class DlqService {
     private final BrokerConnections connections;
     private final ClusterAccessGuard clusterAccess;
     private final PermissionResolver permissions;
+    private final DeadLetterDestinations deadLetters;
 
     public DlqView view(UUID clusterId) {
         clusterAccess.requireVisible(clusterId);
         ResourceFilter readableQueues = permissions.filter(clusterId, ResourceKind.QUEUE);
         ResourceFilter readableAddresses = permissions.filter(clusterId, ResourceKind.ADDRESS);
         ClusterNode manageable = brokerNodes.nodes(clusterId).stream()
-                .filter(n -> n.getJolokiaUrl() != null)
+                .filter(n -> n.getManagementUrl() != null)
                 .findFirst()
                 .orElseThrow(() -> new BrokerConnectionException(
                         BrokerConnectionException.Kind.UNREACHABLE,
                         "This cluster has no node with a management URL yet."));
 
-        Optional<Map<String, String>> kinds = deadLetterKinds(clusterId, manageable);
+        Optional<Map<String, String>> kinds = deadLetters.defaults(clusterId, manageable.getId());
         if (kinds.isEmpty()) {
             return new DlqView(List.of(), false);
         }
@@ -72,26 +72,6 @@ public class DlqService {
             }
         }
         return new DlqView(addresses, true);
-    }
-
-    /** The dead-letter and expiry addresses by kind, or empty when the broker's settings cannot be read. */
-    private Optional<Map<String, String>> deadLetterKinds(UUID clusterId, ClusterNode manageable) {
-        try {
-            JolokiaBrokerClient client = connections.forCluster(clusterId, manageable.getJolokiaUrl());
-            JsonNode settings = client.execOnBrokerParsed("getAddressSettingsAsJSON(java.lang.String)", "#");
-            String dla = text(settings, "deadLetterAddress");
-            String ea = text(settings, "expiryAddress");
-            Map<String, String> kinds = new LinkedHashMap<>();
-            if (dla != null && !dla.isBlank()) {
-                kinds.put(dla, "dead-letter");
-            }
-            if (ea != null && !ea.isBlank()) {
-                kinds.putIfAbsent(ea, "expiry");
-            }
-            return Optional.of(kinds);
-        } catch (BrokerConnectionException _) {
-            return Optional.empty();
-        }
     }
 
     private static List<DlqQueue> readableQueuesOn(
@@ -115,10 +95,5 @@ public class DlqService {
             queues.add(new DlqQueue(queueName, address, totalDepth, perNode));
         });
         return queues;
-    }
-
-    private static String text(JsonNode node, String field) {
-        JsonNode v = node == null ? null : node.get(field);
-        return v == null || v.isNull() ? null : v.asText();
     }
 }

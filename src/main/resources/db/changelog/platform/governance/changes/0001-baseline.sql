@@ -9,7 +9,7 @@ CREATE TABLE classification_finding (
     first_seen_at timestamp with time zone NOT NULL,
     last_seen_at timestamp with time zone NOT NULL,
     hit_count bigint NOT NULL,
-    address text NOT NULL,
+    destination text NOT NULL,
     location text NOT NULL,
     field_path text NOT NULL,
     data_class text NOT NULL,
@@ -29,7 +29,7 @@ CREATE TABLE governance_policy (
 CREATE TABLE governance_rule (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    address_pattern text,
+    destination_pattern text,
     target text NOT NULL,
     selector text NOT NULL,
     data_class text NOT NULL,
@@ -53,7 +53,7 @@ ALTER TABLE ONLY governance_rule
     ADD CONSTRAINT pk_governance_rule PRIMARY KEY (id);
 
 ALTER TABLE ONLY classification_finding
-    ADD CONSTRAINT uq_classification_finding UNIQUE (address, location, field_path, data_class);
+    ADD CONSTRAINT uq_classification_finding UNIQUE (destination, location, field_path, data_class);
 
 INSERT INTO governance_policy (version) VALUES (1);
 

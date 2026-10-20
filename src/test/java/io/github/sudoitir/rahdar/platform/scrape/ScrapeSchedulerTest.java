@@ -11,20 +11,41 @@ import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
-import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
+import io.github.sudoitir.openbroker.BrokerException;
+import io.github.sudoitir.openbroker.ClusterConnection;
+import io.github.sudoitir.openbroker.Dispatch;
+import io.github.sudoitir.openbroker.ErrorInfo;
+import io.github.sudoitir.openbroker.ErrorReasons;
+import io.github.sudoitir.openbroker.NodeId;
+import io.github.sudoitir.openbroker.Partial;
+import io.github.sudoitir.openbroker.Status;
+import io.github.sudoitir.openbroker.model.Attributes;
+import io.github.sudoitir.openbroker.model.Condition;
+import io.github.sudoitir.openbroker.model.ConditionStatus;
+import io.github.sudoitir.openbroker.model.ConditionTypes;
+import io.github.sudoitir.openbroker.model.Designation;
+import io.github.sudoitir.openbroker.model.Membership;
+import io.github.sudoitir.openbroker.model.NodeDescription;
+import io.github.sudoitir.openbroker.model.NodeFunction;
+import io.github.sudoitir.openbroker.model.Nodes;
+import io.github.sudoitir.openbroker.model.Resource;
+import io.github.sudoitir.openbroker.model.ResourceId;
+import io.github.sudoitir.openbroker.model.ResourcePage;
+import io.github.sudoitir.openbroker.model.ResourceQuery;
+import io.github.sudoitir.openbroker.model.Resources;
+import io.github.sudoitir.openbroker.model.Scope;
+import io.github.sudoitir.openbroker.model.Serving;
 import io.github.sudoitir.rahdar.kernel.settings.SettingsService;
 import io.github.sudoitir.rahdar.kernel.stream.SseHub;
-import io.github.sudoitir.rahdar.platform.broker.BrokerAccount;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
-import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
-import io.github.sudoitir.rahdar.platform.broker.CoreSubscriptionManager;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaBrokerClient;
+import io.github.sudoitir.rahdar.platform.broker.BrokerFailures;
+import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
+import io.github.sudoitir.rahdar.platform.broker.BrokerNotifications;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDutyAcquired;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDutyReleased;
@@ -33,11 +54,14 @@ import io.github.sudoitir.rahdar.platform.clusters.ClusterService;
 import io.github.sudoitir.rahdar.platform.clusters.NodeStateRecorder;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNodeEntity;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterEntity;
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
+import java.util.stream.IntStream;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -49,12 +73,6 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.core.io.ClassPathResource;
-import org.springframework.http.MediaType;
-import org.springframework.test.web.client.MockRestServiceServer;
-import org.springframework.test.web.client.ResponseCreator;
-import org.springframework.web.client.RestClient;
-import tools.jackson.databind.json.JsonMapper;
 
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -64,8 +82,6 @@ class ScrapeSchedulerTest {
     private static final String BAD = "http://bad:8161/console/jolokia";
     private static final String STALLED = "http://stalled:8161/console/jolokia";
 
-    private final JsonMapper mapper = new JsonMapper();
-
     @Mock
     ClusterDirectory clusters;
 
@@ -73,7 +89,16 @@ class ScrapeSchedulerTest {
     ClusterService clusterService;
 
     @Mock
-    BrokerConnections connections;
+    BrokerGateway gateway;
+
+    @Mock
+    ClusterConnection connection;
+
+    @Mock
+    Nodes nodes;
+
+    @Mock
+    Resources resources;
 
     @Mock
     NodeStateRecorder persist;
@@ -85,7 +110,7 @@ class ScrapeSchedulerTest {
     MetricSampleWriter metrics;
 
     @Mock
-    CoreSubscriptionManager coreSubscriptions;
+    BrokerNotifications notifications;
 
     @Mock
     SettingsService settings;
@@ -106,19 +131,22 @@ class ScrapeSchedulerTest {
         logs.start();
         ((Logger) LoggerFactory.getLogger(ScrapeScheduler.class)).addAppender(logs);
         when(ownership.owns(any())).thenReturn(true);
+        when(gateway.cluster(any())).thenReturn(connection);
+        when(connection.nodes()).thenReturn(nodes);
+        when(connection.resources()).thenReturn(resources);
         scrapeCycle = new ScrapeCycle(persist);
         scheduler = new ScrapeScheduler(
                 settings,
                 clusters,
                 ownership,
                 clusterService,
-                connections,
+                gateway,
                 scrapeCycle,
                 persist,
                 upsert,
                 metrics,
                 new StreamSignals(Mockito.mock(SseHub.class)),
-                coreSubscriptions,
+                notifications,
                 eventPublisher);
     }
 
@@ -127,23 +155,45 @@ class ScrapeSchedulerTest {
         ((Logger) LoggerFactory.getLogger(ScrapeScheduler.class)).detachAppender(logs);
     }
 
-    private JolokiaBrokerClient client(String... fixtures) {
-        RestClient.Builder builder = RestClient.builder();
-        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
-        for (String fixture : fixtures) {
-            server.expect(requestTo(GOOD)).andRespond(body(fixture));
-        }
-        return new JolokiaBrokerClient(builder.build(), GOOD, mapper);
+    private static Scope scope(BrokerNodeEntity node) {
+        return Scope.node(BrokerGateway.idOf(node.getId()));
     }
 
-    private static ResponseCreator body(String fixture) {
-        try {
-            String json = new String(
-                    new ClassPathResource("jolokia/" + fixture).getContentAsByteArray(), StandardCharsets.UTF_8);
-            return withSuccess(json, MediaType.APPLICATION_JSON);
-        } catch (IOException e) {
-            throw new IllegalStateException(e);
-        }
+    /** A primary that is serving, as one HA read describes it. */
+    private static Partial<List<NodeDescription>> primary(BrokerNodeEntity node) {
+        NodeId id = BrokerGateway.idOf(node.getId());
+        NodeDescription d = new NodeDescription(
+                id,
+                "node-id-1",
+                new Membership(Optional.empty(), Designation.PRIMARY, Serving.ACTIVE, Optional.empty()),
+                Set.of(NodeFunction.BROKER),
+                List.of(),
+                Optional.of("2.57.0"),
+                List.of(new Condition(ConditionTypes.STARTED, ConditionStatus.TRUE, "", "", Optional.empty())),
+                Attributes.empty(),
+                Optional.empty());
+        return Partial.complete(List.of(d), List.of(id));
+    }
+
+    private static BrokerException failure(Status status, String reason, String message, Map<String, String> metadata) {
+        return new BrokerException(status, ErrorInfo.of(reason, metadata), Dispatch.NOT_SENT, null, message);
+    }
+
+    private static BrokerException unreachable(String message) {
+        return failure(Status.UNAVAILABLE, ErrorReasons.UNREACHABLE, message, Map.of());
+    }
+
+    /** A page of {@code count} queues, continuing when {@code next} is present. */
+    private static Partial<ResourcePage> queues(int count, Optional<String> next) {
+        List<Resource> items = IntStream.range(0, count)
+                .mapToObj(i -> new Resource(
+                        ResourceId.of("artemis.queue", "q" + i),
+                        Attributes.empty(),
+                        List.of(),
+                        List.of(),
+                        Instant.now()))
+                .toList();
+        return new Partial<>(new ResourcePage(items, next), Map.of(), Map.of());
     }
 
     private static BrokerNodeEntity node(UUID clusterId, String name, String url) {
@@ -192,9 +242,8 @@ class ScrapeSchedulerTest {
 
         when(clusters.owned()).thenReturn(List.of(cluster));
         when(clusters.nodes(cluster.getId())).thenReturn(List.of(a, b));
-        when(connections.forCluster(cluster.getId(), GOOD))
-                .thenReturn(client("search-broker.json", "ha-read-primary.json"))
-                .thenReturn(client("search-broker.json", "ha-read-primary.json"));
+        when(nodes.describe(scope(a))).thenReturn(primary(a));
+        when(nodes.describe(scope(b))).thenReturn(primary(b));
 
         scheduler.tierA();
 
@@ -210,7 +259,7 @@ class ScrapeSchedulerTest {
         scheduler.tierA();
         scheduler.tierB();
 
-        verify(connections, never()).forCluster(any(), any());
+        verify(gateway, never()).cluster(any());
         verify(eventPublisher, never()).publishEvent(any(Object.class));
     }
 
@@ -220,7 +269,7 @@ class ScrapeSchedulerTest {
         ClusterEntity cluster = cluster("c");
         BrokerNodeEntity a = node(clusterId, "a", GOOD);
         when(clusters.nodes(any())).thenReturn(List.of(a));
-        when(connections.forCluster(any(), any())).thenReturn(client("search-broker.json", "ha-read-primary.json"));
+        when(nodes.describe(scope(a))).thenReturn(primary(a));
 
         scheduler.onDutyAcquired(new ClusterDutyAcquired(cluster.getId()));
 
@@ -237,19 +286,18 @@ class ScrapeSchedulerTest {
         CountDownLatch release = new CountDownLatch(1);
         when(clusters.owned()).thenReturn(List.of(cluster));
         when(clusters.nodes(cluster.getId())).thenReturn(List.of(stalled, healthy));
-        when(connections.forCluster(cluster.getId(), STALLED)).thenAnswer(call -> {
+        when(nodes.describe(scope(stalled))).thenAnswer(call -> {
             release.await();
-            return client("search-broker.json", "ha-read-primary.json");
+            return primary(stalled);
         });
-        when(connections.forCluster(cluster.getId(), GOOD))
-                .thenReturn(client("search-broker.json", "ha-read-primary.json", "ha-read-primary.json"));
+        when(nodes.describe(scope(healthy))).thenReturn(primary(healthy));
         try {
             scheduler.tierA();
             scheduler.tierA();
 
             verify(persist).applyTierA(eq(healthy.getId()), any(), eq(1L));
             verify(persist).applyTierA(eq(healthy.getId()), any(), eq(2L));
-            verify(connections, times(1)).forCluster(cluster.getId(), STALLED);
+            verify(nodes, times(1)).describe(scope(stalled));
         } finally {
             release.countDown();
         }
@@ -263,8 +311,12 @@ class ScrapeSchedulerTest {
         BrokerNodeEntity n = node(clusterId, "n", GOOD);
         when(clusters.owned()).thenReturn(List.of(cluster));
         when(clusters.nodes(cluster.getId())).thenReturn(List.of(n));
-        when(connections.forCluster(cluster.getId(), GOOD))
-                .thenReturn(client("search-broker.json", "ha-read-instance-not-found.json"));
+        when(nodes.describe(scope(n)))
+                .thenThrow(failure(
+                        Status.INTERNAL,
+                        ErrorReasons.BAD_RESPONSE,
+                        "The HA read answered with an error: javax.management.InstanceNotFoundException",
+                        Map.of(BrokerFailures.NATIVE_ERROR, "javax.management.InstanceNotFoundException")));
 
         scheduler.tierA();
 
@@ -280,9 +332,9 @@ class ScrapeSchedulerTest {
         when(clusters.owned()).thenReturn(List.of(cluster));
         when(clusters.clusters()).thenReturn(List.of(cluster));
         when(clusters.nodes(cluster.getId())).thenReturn(List.of(n));
-        when(connections.forCluster(cluster.getId(), GOOD))
-                .thenReturn(client("search-broker.json", "list-queues-failed.json"))
-                .thenReturn(client("search-broker.json", "list-queues-failed.json"));
+        when(resources.read(any(ResourceQuery.class)))
+                .thenThrow(
+                        failure(Status.INTERNAL, ErrorReasons.BAD_RESPONSE, "Operation listQueues failed", Map.of()));
 
         scheduler.tierB();
         scheduler.tierC();
@@ -298,8 +350,7 @@ class ScrapeSchedulerTest {
         BrokerNodeEntity n = node(clusterId, "n", GOOD);
         when(clusters.owned()).thenReturn(List.of(cluster));
         when(clusters.nodes(cluster.getId())).thenReturn(List.of(n));
-        when(connections.forCluster(cluster.getId(), GOOD))
-                .thenReturn(client("search-broker.json", "list-queues.json"));
+        when(resources.read(any(ResourceQuery.class))).thenReturn(queues(1, Optional.empty()));
         doThrow(new IllegalStateException("database down")).when(upsert).upsertBatch(any());
 
         scheduler.tierB();
@@ -315,20 +366,15 @@ class ScrapeSchedulerTest {
         BrokerNodeEntity n = node(clusterId, "n", BAD);
         when(clusters.owned()).thenReturn(List.of(cluster));
         when(clusters.nodes(cluster.getId())).thenReturn(List.of(n));
-        IllegalStateException refused = new IllegalStateException("Connection refused");
-        when(connections.forCluster(cluster.getId(), BAD))
-                .thenThrow(new BrokerConnectionException(
-                        BrokerConnectionException.Kind.UNREACHABLE, "Nothing is listening at bad:8161.", refused));
+        when(nodes.describe(scope(n))).thenThrow(unreachable("Nothing is listening at bad:8161."));
 
         scheduler.tierA();
         scheduler.tierA();
         assertThat(warnings()).hasSize(1);
-        assertThat(warnings().get(0)).contains("bad", "Nothing is listening at bad:8161.", "Connection refused");
+        assertThat(warnings().get(0)).contains("bad", "Nothing is listening at bad:8161.");
 
-        doThrow(new BrokerConnectionException(
-                        BrokerConnectionException.Kind.UNREACHABLE, "The name 'bad' does not resolve."))
-                .when(connections)
-                .forCluster(cluster.getId(), BAD);
+        Mockito.reset(nodes);
+        when(nodes.describe(scope(n))).thenThrow(unreachable("The name 'bad' does not resolve."));
         scheduler.tierA();
         scheduler.tierA();
         assertThat(warnings()).hasSize(2);
@@ -350,7 +396,7 @@ class ScrapeSchedulerTest {
         scheduler.onDutyReleased(new ClusterDutyReleased(clusterId));
 
         assertThat(scrapeCycle.current(clusterId)).isZero();
-        verify(coreSubscriptions, timeout(5000)).forget(clusterId);
+        verify(notifications, timeout(5000)).forget(clusterId);
     }
 
     @Test
@@ -362,7 +408,7 @@ class ScrapeSchedulerTest {
 
         scheduler.tierA();
 
-        verify(coreSubscriptions).forget(cluster.getId());
+        verify(notifications).forget(cluster.getId());
     }
 
     @Test
@@ -374,10 +420,8 @@ class ScrapeSchedulerTest {
 
         when(clusters.owned()).thenReturn(List.of(cluster));
         when(clusters.nodes(cluster.getId())).thenReturn(List.of(bad, good));
-        when(connections.forCluster(cluster.getId(), BAD))
-                .thenThrow(BrokerConnectionException.of(BrokerConnectionException.Kind.UNREACHABLE));
-        when(connections.forCluster(cluster.getId(), GOOD))
-                .thenReturn(client("search-broker.json", "ha-read-primary.json"));
+        when(nodes.describe(scope(bad))).thenThrow(unreachable("Nothing answered at this address."));
+        when(nodes.describe(scope(good))).thenReturn(primary(good));
 
         scheduler.tierA();
 
@@ -393,8 +437,8 @@ class ScrapeSchedulerTest {
 
         when(clusters.owned()).thenReturn(List.of(cluster));
         when(clusters.nodes(cluster.getId())).thenReturn(List.of(node));
-        when(connections.forCluster(cluster.getId(), BAD))
-                .thenThrow(BrokerConnectionException.credentialsRejected(BrokerAccount.MANAGEMENT, "401", null));
+        when(nodes.describe(scope(node)))
+                .thenThrow(failure(Status.UNAUTHENTICATED, ErrorReasons.CREDENTIALS_REJECTED, "401", Map.of()));
 
         scheduler.tierA();
 
@@ -409,8 +453,12 @@ class ScrapeSchedulerTest {
         BrokerNodeEntity n = node(clusterId, "n", GOOD);
         when(clusters.owned()).thenReturn(List.of(cluster));
         when(clusters.nodes(cluster.getId())).thenReturn(List.of(n));
-        when(connections.forCluster(cluster.getId(), GOOD))
-                .thenThrow(BrokerConnectionException.of(BrokerConnectionException.Kind.THROTTLED));
+        when(nodes.describe(scope(n)))
+                .thenThrow(failure(
+                        Status.RESOURCE_EXHAUSTED,
+                        ErrorReasons.RATE_LIMITED,
+                        "Rahdar is calling this node as fast as its rate ceiling allows.",
+                        Map.of()));
 
         scheduler.tierA();
 
@@ -427,12 +475,11 @@ class ScrapeSchedulerTest {
         CountDownLatch release = new CountDownLatch(1);
         when(clusters.owned()).thenReturn(List.of(cluster));
         when(clusters.nodes(cluster.getId())).thenReturn(List.of(slow, healthy));
-        when(connections.forCluster(cluster.getId(), STALLED)).thenAnswer(call -> {
+        when(nodes.describe(scope(slow))).thenAnswer(call -> {
             release.await();
-            return client("search-broker.json", "ha-read-primary.json");
+            return primary(slow);
         });
-        when(connections.forCluster(cluster.getId(), GOOD))
-                .thenReturn(client("search-broker.json", "ha-read-primary.json"));
+        when(nodes.describe(scope(healthy))).thenReturn(primary(healthy));
         try {
             scheduler.tierA();
 
@@ -453,8 +500,7 @@ class ScrapeSchedulerTest {
         BrokerNodeEntity n = node(clusterId, "n", BAD);
         when(clusters.owned()).thenReturn(List.of(cluster));
         when(clusters.nodes(cluster.getId())).thenReturn(List.of(n));
-        when(connections.forCluster(cluster.getId(), BAD))
-                .thenThrow(BrokerConnectionException.of(BrokerConnectionException.Kind.UNREACHABLE));
+        when(nodes.describe(scope(n))).thenThrow(unreachable("Nothing answered at this address."));
 
         scheduler.tierA();
         scheduler.tierA();
@@ -478,10 +524,8 @@ class ScrapeSchedulerTest {
         when(clusters.owned()).thenReturn(List.of(clusterA, clusterB));
         when(clusters.nodes(clusterA.getId())).thenReturn(List.of(nodeA));
         when(clusters.nodes(clusterB.getId())).thenReturn(List.of(nodeB));
-        when(connections.forCluster(clusterA.getId(), BAD))
-                .thenThrow(BrokerConnectionException.of(BrokerConnectionException.Kind.UNREACHABLE));
-        when(connections.forCluster(clusterB.getId(), GOOD))
-                .thenReturn(client("search-broker.json", "ha-read-primary.json"));
+        when(nodes.describe(scope(nodeA))).thenThrow(unreachable("Nothing answered at this address."));
+        when(nodes.describe(scope(nodeB))).thenReturn(primary(nodeB));
 
         scheduler.tierA();
 
@@ -497,9 +541,8 @@ class ScrapeSchedulerTest {
 
         when(clusters.clusters()).thenReturn(List.of(cluster));
         when(clusters.nodes(cluster.getId())).thenReturn(List.of(n));
-        // search + listQueues page 1 (fixture reports count=1, so page 1 is the last page)
-        when(connections.forCluster(cluster.getId(), GOOD))
-                .thenReturn(client("search-broker.json", "list-queues.json"));
+        // One page, with nothing after it.
+        when(resources.read(any(ResourceQuery.class))).thenReturn(queues(1, Optional.empty()));
 
         scheduler.tierC();
 
@@ -516,9 +559,10 @@ class ScrapeSchedulerTest {
 
         when(clusters.clusters()).thenReturn(List.of(cluster));
         when(clusters.nodes(cluster.getId())).thenReturn(List.of(n));
-        // count=201: two pages of 200, both read in this one tick
-        when(connections.forCluster(cluster.getId(), GOOD))
-                .thenReturn(client("search-broker.json", "list-queues-of-201.json", "list-queues-of-201.json"));
+        // Two pages, both read in this one tick.
+        when(resources.read(any(ResourceQuery.class)))
+                .thenReturn(queues(200, Optional.of("2")))
+                .thenReturn(queues(1, Optional.empty()));
 
         scheduler.tierC();
 
@@ -534,8 +578,10 @@ class ScrapeSchedulerTest {
 
         when(clusters.clusters()).thenReturn(List.of(cluster));
         when(clusters.nodes(cluster.getId())).thenReturn(List.of(n));
-        when(connections.forCluster(cluster.getId(), GOOD))
-                .thenReturn(client("search-broker.json", "list-queues-of-201.json", "list-queues-failed.json"));
+        when(resources.read(any(ResourceQuery.class)))
+                .thenReturn(queues(200, Optional.of("2")))
+                .thenThrow(
+                        failure(Status.INTERNAL, ErrorReasons.BAD_RESPONSE, "Operation listQueues failed", Map.of()));
 
         scheduler.tierC();
 

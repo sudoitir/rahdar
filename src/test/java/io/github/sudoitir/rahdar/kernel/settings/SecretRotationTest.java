@@ -121,7 +121,8 @@ class SecretRotationTest extends PostgresIntegrationTest {
         jdbc.update("UPDATE secret_key_state SET current_kek_version = 1");
         vault.refreshCurrentVersion();
         ReflectionTestUtils.setField(rotations, "counts", null);
-        jdbc.update("INSERT INTO cluster (id, name) VALUES (?, ?)", clusterId, "rotation-" + clusterId);
+        jdbc.update(
+                "INSERT INTO cluster (id, name, system) VALUES (?, ?, 'artemis')", clusterId, "rotation-" + clusterId);
     }
 
     @AfterEach
@@ -156,13 +157,13 @@ class SecretRotationTest extends PostgresIntegrationTest {
                 vault.seal(channelAad, "channel-secret"));
         secretsOf(plugin).put("token", "plugin-secret");
         jdbc.update(
-                "INSERT INTO message_index (observed_at, last_seen_at, message_id, queue_name, address, node_name,"
+                "INSERT INTO message_index (observed_at, last_seen_at, message_id, subscription, destination, node_name,"
                         + " cluster_id, node_id, sealed) VALUES (now(), now(), 1, 'q', 'a', 'n', ?, ?, ?)",
                 clusterId,
                 UUID.randomUUID(),
                 vault.seal("message|" + clusterId, "message-original"));
         jdbc.update(
-                "INSERT INTO rr_flow (id, reply_kind, state, cluster_id) VALUES (?, 'SHARED_QUEUE', 'COMPLETED', ?)",
+                "INSERT INTO rr_flow (id, reply_kind, state, cluster_id) VALUES (?, 'SHARED', 'COMPLETED', ?)",
                 flowId,
                 clusterId);
         String eventAad = "rr|" + flowId;

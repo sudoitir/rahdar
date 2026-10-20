@@ -1,9 +1,8 @@
 package io.github.sudoitir.rahdar.platform.clusters;
 
-import static io.github.sudoitir.rahdar.platform.broker.JolokiaJson.bool;
-import static io.github.sudoitir.rahdar.platform.broker.JolokiaJson.boxedBool;
-import static io.github.sudoitir.rahdar.platform.broker.JolokiaJson.text;
-
+import io.github.sudoitir.openbroker.model.ConditionTypes;
+import io.github.sudoitir.openbroker.model.NodeDescription;
+import io.github.sudoitir.openbroker.model.Serving;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
 import io.github.sudoitir.rahdar.platform.broker.NodeEndpoint;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNodeEntity;
@@ -17,7 +16,6 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
-import tools.jackson.databind.JsonNode;
 
 /**
  * The scheduler's persistence adapter: each method is a short transaction that
@@ -30,7 +28,6 @@ public class NodeStateRecorder {
 
     private final BrokerNodeRepository nodes;
     private final BrokerNodeMapper nodeMapper;
-    private final HaStateEvaluator evaluator;
     private final ClusterIdentityClaims identityClaims;
 
     /**
@@ -38,22 +35,30 @@ public class NodeStateRecorder {
      * from the stored one (the broker's journal was replaced) moves the cluster's claim with it (ADR-0167).
      */
     @Transactional
-    public void applyTierA(UUID nodeId, JsonNode ha, long cycle) {
+    public void applyTierA(UUID nodeId, NodeDescription ha, long cycle) {
         nodes.findById(nodeId).ifPresent(node -> {
-            String nodeIdBefore = node.getArtemisNodeId();
-            String state = evaluator.deriveState(boxedBool(ha, "Started"));
-            String haRole = evaluator.deriveHaRole(boxedBool(ha, "Backup"), boxedBool(ha, "Clustered"));
+            String nodeIdBefore = node.getNativeNodeId();
+            String state = ha.conditions().stream()
+                    .filter(c -> c.type().equals(ConditionTypes.STARTED))
+                    .findFirst()
+                    .map(c -> switch (c.status()) {
+                        case TRUE -> "STARTED";
+                        case FALSE -> "STOPPED";
+                        case UNKNOWN -> "UNKNOWN";
+                    })
+                    .orElse("UNKNOWN");
+            String haDesignation = ha.membership().designation().name();
             node.applyHaState(
                     new HaObservation(
-                            bool(ha, "Active"),
+                            ha.membership().serving() == Serving.ACTIVE,
                             state,
-                            haRole,
-                            boxedBool(ha, "ReplicaSync"),
-                            text(ha, "Version"),
-                            text(ha, "NodeID")),
+                            haDesignation,
+                            ha.membership().inSync().orElse(null),
+                            ha.version().orElse(null),
+                            ha.nativeId().isEmpty() ? null : ha.nativeId()),
                     cycle,
                     Instant.now());
-            if (!Objects.equals(nodeIdBefore, node.getArtemisNodeId())) {
+            if (!Objects.equals(nodeIdBefore, node.getNativeNodeId())) {
                 identityClaims.sync(node.getClusterId());
             }
         });
@@ -76,7 +81,7 @@ public class NodeStateRecorder {
     @Transactional
     public void recordSplitBrain(UUID clusterId, Map<String, SplitBrainStatus> verdictsByNodeId) {
         for (BrokerNodeEntity node : nodes.findByClusterIdOrderByNameAsc(clusterId)) {
-            String nodeId = node.getArtemisNodeId();
+            String nodeId = node.getNativeNodeId();
             node.recordSplitBrain(
                     nodeId == null
                             ? SplitBrainStatus.NONE

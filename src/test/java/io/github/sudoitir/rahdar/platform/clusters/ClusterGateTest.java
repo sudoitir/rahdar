@@ -312,18 +312,18 @@ class ClusterGateTest extends PostgresIntegrationTest {
         assertThatThrownBy(() -> clusterService.overrideNodeUrl(clusterId, nodeId, override))
                 .isInstanceOf(OperationHeldException.class);
 
-        assertThat(nodes.findById(nodeId).orElseThrow().getCoreUrl()).isNotEqualTo("tcp://a-core:61616");
+        assertThat(nodes.findById(nodeId).orElseThrow().getDataUrl()).isNotEqualTo("tcp://a-core:61616");
         assertThat(gated().params()).isEqualTo(params);
         assertThat(clusterNodeOverrideOperation.traits(params)).isEqualTo(Set.of(Trait.ACCESS_CONTROL));
         assertThat(clusterNodeOverrideOperation.display(params))
-                .contains(new DisplayRow("Core URL", seeded.getCoreUrl(), "tcp://a-core:61616"));
+                .contains(new DisplayRow("Data URL", seeded.getDataUrl(), "tcp://a-core:61616"));
         String before = clusterNodeOverrideOperation.estimate(params).stateKey();
         Mockito.reset(gate);
 
         allows();
         clusterNodeOverrideOperation.replay(params);
 
-        assertThat(nodes.findById(nodeId).orElseThrow().getCoreUrl()).isEqualTo("tcp://a-core:61616");
+        assertThat(nodes.findById(nodeId).orElseThrow().getDataUrl()).isEqualTo("tcp://a-core:61616");
         assertThat(clusterNodeOverrideOperation.estimate(params).stateKey())
                 .as("a node pointed elsewhere since the request is a different target")
                 .isNotEqualTo(before);

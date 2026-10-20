@@ -1,10 +1,10 @@
 package io.github.sudoitir.rahdar.feature.setupreview;
 
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaBrokerClient;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaRequest;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaResponse;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
+import io.github.sudoitir.rahdar.system.artemis.ManagementRequest;
+import io.github.sudoitir.rahdar.system.artemis.ManagementResponse;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -34,18 +34,18 @@ public class SetupReader {
 
     private final ObjectMapper mapper;
 
-    public NodeRead read(JolokiaBrokerClient client, ClusterNode node) {
+    public NodeRead read(ArtemisNode client, ClusterNode node) {
         boolean live = Boolean.TRUE.equals(node.getActive());
         try {
             String broker = client.resolveBrokerObjectName();
-            List<JolokiaResponse> responses = client.batch(List.of(
-                    JolokiaRequest.readAll(broker),
-                    JolokiaRequest.exec(broker, "getAddressSettingsAsJSON(java.lang.String)", "#"),
-                    JolokiaRequest.readAll(broker + ",component=cluster-connections,name=*")));
+            List<ManagementResponse> responses = client.batch(List.of(
+                    ManagementRequest.readAll(broker),
+                    ManagementRequest.exec(broker, "getAddressSettingsAsJSON(java.lang.String)", "#"),
+                    ManagementRequest.readAll(broker + ",component=cluster-connections,name=*")));
             if (responses.size() != 3) {
                 return unreadable(node, live, "The node answered " + responses.size() + " of 3 batched requests.");
             }
-            JolokiaResponse attributes = responses.get(0);
+            ManagementResponse attributes = responses.get(0);
             if (!attributes.ok()) {
                 return unreadable(node, live, "The broker MBean could not be read: " + reason(attributes));
             }
@@ -60,7 +60,7 @@ public class SetupReader {
             return new NodeRead(
                     node.getId(),
                     node.getName(),
-                    reportedNodeId(brokerAttributes, node.getArtemisNodeId()),
+                    reportedNodeId(brokerAttributes, node.getNativeNodeId()),
                     live,
                     true,
                     null,
@@ -83,10 +83,10 @@ public class SetupReader {
     private record Part<T>(T value, String error) {}
 
     private static NodeRead unreadable(ClusterNode node, boolean live, String reason) {
-        return NodeRead.unreadable(node.getId(), node.getName(), node.getArtemisNodeId(), live, true, reason);
+        return NodeRead.unreadable(node.getId(), node.getName(), node.getNativeNodeId(), live, true, reason);
     }
 
-    private static Part<JsonNode> defaultSettings(JolokiaBrokerClient client, JolokiaResponse response) {
+    private static Part<JsonNode> defaultSettings(ArtemisNode client, ManagementResponse response) {
         JsonNode parsed = response.ok() ? client.parsed(response) : null;
         if (parsed != null && parsed.isObject()) {
             return new Part<>(parsed, null);
@@ -94,7 +94,7 @@ public class SetupReader {
         return new Part<>(null, "The default address settings could not be read: " + reason(response));
     }
 
-    private static Part<Map<String, JsonNode>> clusterConnections(JolokiaResponse cc) {
+    private static Part<Map<String, JsonNode>> clusterConnections(ManagementResponse cc) {
         if (cc.ok() && cc.value() != null && cc.value().isObject()) {
             Map<String, JsonNode> connections = new LinkedHashMap<>();
             for (var entry : cc.value().properties()) {
@@ -133,7 +133,7 @@ public class SetupReader {
                 : name;
     }
 
-    private static String reason(JolokiaResponse response) {
+    private static String reason(ManagementResponse response) {
         return response.error() != null ? response.error() : "status " + response.status();
     }
 }

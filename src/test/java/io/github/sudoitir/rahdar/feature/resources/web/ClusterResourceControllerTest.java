@@ -1,9 +1,6 @@
 package io.github.sudoitir.rahdar.feature.resources.web;
 
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
-import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -12,7 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.setup.MockMvcBuilders.webAppContextSetup;
 
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaBrokerClient;
+import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
 import io.github.sudoitir.rahdar.platform.broker.QueueRow;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNodeEntity;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNodeRepository;
@@ -20,10 +17,13 @@ import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterE
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterRepository;
 import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshotUpsert;
 import io.github.sudoitir.rahdar.support.AdminAuthenticationExtension;
+import io.github.sudoitir.rahdar.support.FixtureJolokia;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.hamcrest.Matchers;
 import org.junit.jupiter.api.AfterEach;
@@ -35,11 +35,8 @@ import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.web.client.RestClient;
 import org.springframework.web.context.WebApplicationContext;
-import tools.jackson.databind.json.JsonMapper;
 
 /** {@code /api/v1/clusters/{id}/{queues,consumers,...}} — one endpoint per resource, plus the capability-gated path. */
 @ExtendWith(AdminAuthenticationExtension.class)
@@ -47,8 +44,6 @@ class ClusterResourceControllerTest extends PostgresIntegrationTest {
 
     private static final String URL_A = "http://a:8161/console/jolokia";
     private static final String URL_B = "http://b:8161/console/jolokia";
-
-    private final JsonMapper mapper = new JsonMapper();
 
     MockMvc mvc;
 
@@ -66,6 +61,9 @@ class ClusterResourceControllerTest extends PostgresIntegrationTest {
 
     @MockitoBean
     BrokerConnections connections;
+
+    @MockitoBean
+    BrokerGateway gateway;
 
     private UUID clusterId;
     private UUID nodeAId;
@@ -91,20 +89,26 @@ class ClusterResourceControllerTest extends PostgresIntegrationTest {
         clusters.deleteById(clusterId);
     }
 
-    private JolokiaBrokerClient client(String url, String... fixtures) {
-        RestClient.Builder builder = RestClient.builder();
-        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+    private static FixtureJolokia client(String url, String... fixtures) {
+        FixtureJolokia server = new FixtureJolokia();
         for (String fixture : fixtures) {
-            server.expect(requestTo(url)).andRespond(withSuccess(body(fixture), MediaType.APPLICATION_JSON));
+            server.expect().andRespond(withSuccess(body(fixture), MediaType.APPLICATION_JSON));
         }
-        return new JolokiaBrokerClient(builder.build(), url, mapper);
+        return server;
     }
 
-    private JolokiaBrokerClient unauthorized(String url) {
-        RestClient.Builder builder = RestClient.builder();
-        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
-        server.expect(requestTo(url)).andRespond(withStatus(HttpStatus.UNAUTHORIZED));
-        return new JolokiaBrokerClient(builder.build(), url, mapper);
+    private static FixtureJolokia unauthorized(String url) {
+        FixtureJolokia server = new FixtureJolokia();
+        server.expect().andRespond(withStatus(HttpStatus.UNAUTHORIZED));
+        return server;
+    }
+
+    /** The cluster as the gateway gives it: node A answered by one agent, node B by the other. */
+    private void serving(FixtureJolokia a, FixtureJolokia b) {
+        Map<UUID, FixtureJolokia> agents = new LinkedHashMap<>();
+        agents.put(nodeAId, a);
+        agents.put(nodeBId, b);
+        when(gateway.cluster(clusterId)).thenReturn(FixtureJolokia.cluster(agents));
     }
 
     private static String body(String fixture) {
@@ -117,7 +121,8 @@ class ClusterResourceControllerTest extends PostgresIntegrationTest {
     }
 
     private QueueRow row(UUID node, String queue, long messageCount) {
-        return new QueueRow(clusterId, node, queue, queue, "ANYCAST", true, messageCount, 1, 0, 0, 0, 0, 0, false);
+        return new QueueRow(
+                clusterId, node, queue, queue, "ANYCAST", true, messageCount, 1, 0, 0, 0, 0, 0, false, "artemis.queue");
     }
 
     @Test
@@ -134,10 +139,9 @@ class ClusterResourceControllerTest extends PostgresIntegrationTest {
 
     @Test
     void consumersFansOutLiveAndTagsEachRowWithItsNode() throws Exception {
-        when(connections.forCluster(clusterId, URL_A))
-                .thenReturn(client(URL_A, "search-broker.json", "list-consumers.json"));
-        when(connections.forCluster(clusterId, URL_B))
-                .thenReturn(client(URL_B, "search-broker.json", "list-consumers.json"));
+        serving(
+                client(URL_A, "search-broker.json", "list-consumers.json"),
+                client(URL_B, "search-broker.json", "list-consumers.json"));
 
         mvc.perform(get("/api/v1/clusters/{id}/consumers", clusterId))
                 .andExpect(status().isOk())
@@ -148,9 +152,7 @@ class ClusterResourceControllerTest extends PostgresIntegrationTest {
 
     @Test
     void aClusterWithNoReadableNodeSurfacesAClassifiedProblem() throws Exception {
-        when(connections.forCluster(eq(clusterId), any()))
-                .thenReturn(unauthorized(URL_A))
-                .thenReturn(unauthorized(URL_B));
+        serving(unauthorized(URL_A), unauthorized(URL_B));
 
         mvc.perform(get("/api/v1/clusters/{id}/sessions", clusterId))
                 .andExpect(status().is4xxClientError())

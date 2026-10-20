@@ -3,9 +3,10 @@ package io.github.sudoitir.rahdar.support;
 import static io.github.sudoitir.rahdar.support.ArtemisIntegrationTest.BROKER_PASSWORD;
 import static io.github.sudoitir.rahdar.support.ArtemisIntegrationTest.BROKER_USER;
 
-import io.github.sudoitir.rahdar.platform.broker.BrokerMBeans;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaBrokerClient;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaRequest;
+import io.github.sudoitir.rahdar.support.wire.WireRecorder;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
+import io.github.sudoitir.rahdar.system.artemis.MBeanNames;
+import io.github.sudoitir.rahdar.system.artemis.ManagementRequest;
 import jakarta.jms.BytesMessage;
 import jakarta.jms.Connection;
 import jakarta.jms.JMSException;
@@ -54,13 +55,18 @@ public final class ArtemisBrokers {
             return "tcp://%s:%d".formatted(container.getHost(), container.getMappedPort(61616));
         }
 
+        /** The URL to hand to Rahdar: through the {@link WireRecorder}'s proxy when recording. */
         public String jolokiaUrl() {
+            return WireRecorder.proxied(directJolokiaUrl());
+        }
+
+        private String directJolokiaUrl() {
             return "http://%s:%d/console/jolokia".formatted(container.getHost(), container.getMappedPort(8161));
         }
 
-        /** A Jolokia client of the test's own, outside Rahdar's rate limiter. */
-        public JolokiaBrokerClient jolokia() {
-            return ArtemisIntegrationTest.jolokiaClient(jolokiaUrl());
+        /** A Jolokia client of the test's own, outside Rahdar's rate limiter and the recording. */
+        public ArtemisNode jolokia() {
+            return ArtemisIntegrationTest.jolokiaClient(directJolokiaUrl());
         }
 
         /** An anycast queue on its own address, with an optional filter; kept if it exists. */
@@ -81,7 +87,7 @@ public final class ArtemisBrokers {
 
         /** Drop the queue and its messages, and its address. Quiet when either is gone. */
         public void destroyQueue(String queue) {
-            JolokiaBrokerClient client = jolokia();
+            ArtemisNode client = jolokia();
             try {
                 client.execOnBroker("destroyQueue(java.lang.String,boolean)", queue, true);
             } catch (RuntimeException _) {
@@ -111,29 +117,29 @@ public final class ArtemisBrokers {
             }
         }
 
-        private String queueMbean(JolokiaBrokerClient client, String queue) {
-            return BrokerMBeans.queue(client.resolveBrokerObjectName(), queue, queue, "ANYCAST");
+        private String queueMbean(ArtemisNode client, String queue) {
+            return MBeanNames.queue(client.resolveBrokerObjectName(), queue, queue, "ANYCAST");
         }
 
         public boolean queueExists(String queue) {
-            JolokiaBrokerClient client = jolokia();
-            return !client.search(BrokerMBeans.queuePattern(client.resolveBrokerObjectName(), queue))
+            ArtemisNode client = jolokia();
+            return !client.search(MBeanNames.queuePattern(client.resolveBrokerObjectName(), queue))
                     .isEmpty();
         }
 
         /** Messages on the queue, including any in delivery. */
         public long depth(String queue) {
-            JolokiaBrokerClient client = jolokia();
+            ArtemisNode client = jolokia();
             JsonNode value =
-                    client.parsed(client.single(JolokiaRequest.read(queueMbean(client, queue), "MessageCount")));
+                    client.parsed(client.single(ManagementRequest.read(queueMbean(client, queue), "MessageCount")));
             return value.isObject() ? value.path("MessageCount").asLong() : value.asLong();
         }
 
         /** The messages on the queue as the broker lists them, in queue order, without consuming any. */
         public List<JsonNode> list(String queue) {
-            JolokiaBrokerClient client = jolokia();
+            ArtemisNode client = jolokia();
             JsonNode listed = client.parsed(client.single(
-                    JolokiaRequest.exec(queueMbean(client, queue), "listMessages(java.lang.String)", "")));
+                    ManagementRequest.exec(queueMbean(client, queue), "listMessages(java.lang.String)", "")));
             List<JsonNode> messages = new ArrayList<>();
             listed.forEach(messages::add);
             return messages;

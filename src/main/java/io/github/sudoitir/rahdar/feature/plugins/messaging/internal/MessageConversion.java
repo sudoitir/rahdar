@@ -1,72 +1,78 @@
 package io.github.sudoitir.rahdar.feature.plugins.messaging.internal;
 
+import io.github.sudoitir.openbroker.messaging.JmsExtension;
+import io.github.sudoitir.openbroker.messaging.Message;
+import io.github.sudoitir.openbroker.messaging.MessageHeaders;
+import io.github.sudoitir.openbroker.messaging.PropertyValue;
 import io.github.sudoitir.rahdar.feature.plugins.messaging.PluginMessage;
-import jakarta.jms.BytesMessage;
-import jakarta.jms.DeliveryMode;
-import jakarta.jms.JMSException;
-import jakarta.jms.Message;
-import jakarta.jms.TextMessage;
-import java.nio.charset.StandardCharsets;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.UncheckedIOException;
+import java.time.Instant;
 import java.util.Collections;
-import java.util.Enumeration;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
 
-/** Turns a received JMS message into what a plugin is handed. */
+/** Turns a received message into what a plugin is handed. */
 final class MessageConversion {
+
+    /** The default priority, for a message whose system has none. */
+    private static final int DEFAULT_PRIORITY = 4;
 
     private MessageConversion() {}
 
-    static PluginMessage toPlugin(String key, UUID clusterId, UUID nodeId, String queue, Message m)
-            throws JMSException {
-        byte[] body = new byte[0];
-        boolean text = false;
-        if (m instanceof TextMessage t) {
-            String s = t.getText();
-            body = s == null ? body : s.getBytes(StandardCharsets.UTF_8);
-            text = true;
-        } else if (m instanceof BytesMessage b) {
-            body = new byte[(int) b.getBodyLength()];
-            b.readBytes(body);
-        }
+    static PluginMessage toPlugin(String key, UUID clusterId, UUID nodeId, String queue, Message m) {
+        MessageHeaders h = m.headers();
         Map<String, Object> headers = new LinkedHashMap<>();
-        putIfSet(headers, "messageId", m.getJMSMessageID());
-        putIfSet(headers, "correlationId", m.getJMSCorrelationID());
-        putIfSet(headers, "type", m.getJMSType());
-        headers.put("priority", m.getJMSPriority());
-        headers.put("timestamp", m.getJMSTimestamp());
-        if (m.getJMSExpiration() > 0) {
-            headers.put("expiration", m.getJMSExpiration());
-        }
-        headers.put("durable", m.getJMSDeliveryMode() == DeliveryMode.PERSISTENT);
-        if (m.getJMSReplyTo() != null) {
-            headers.put("replyTo", m.getJMSReplyTo().toString());
-        }
+        h.id().ifPresent(id -> headers.put("messageId", id));
+        h.correlationId().ifPresent(id -> headers.put("correlationId", id));
+        h.type().ifPresent(type -> headers.put("type", type));
+        headers.put("priority", h.priority().orElse(DEFAULT_PRIORITY));
+        headers.put("timestamp", h.producedAt().map(Instant::toEpochMilli).orElse(0L));
+        h.expiresAt().ifPresent(at -> headers.put("expiration", at.toEpochMilli()));
+        headers.put("durable", h.durable().orElse(false));
+        h.replyTo().ifPresent(to -> headers.put("replyTo", to));
         Map<String, Object> properties = new LinkedHashMap<>();
-        @SuppressWarnings("unchecked")
-        Enumeration<String> names = m.getPropertyNames();
-        for (String name : Collections.list(names)) {
+        m.properties().forEach((name, value) -> {
             if (!name.startsWith("_AMQ") && !name.startsWith("__AMQ") && !name.startsWith("JMSX")) {
-                properties.put(name, m.getObjectProperty(name));
+                properties.put(name, plain(value));
             }
-        }
-        int deliveryCount = m.propertyExists("JMSXDeliveryCount") ? m.getIntProperty("JMSXDeliveryCount") : 1;
+        });
         return new PluginMessage(
                 key,
                 clusterId,
                 nodeId,
                 queue,
-                body,
-                text,
+                body(m),
+                JmsExtension.messageType(m).orElse(JmsExtension.GENERIC) == JmsExtension.TEXT,
                 Collections.unmodifiableMap(headers),
                 Collections.unmodifiableMap(properties),
-                deliveryCount);
+                h.deliveryCount().orElse(1));
     }
 
-    private static void putIfSet(Map<String, Object> map, String key, String value) {
-        if (value != null) {
-            map.put(key, value);
+    private static byte[] body(Message m) {
+        if (m.body().bytes().isPresent()) {
+            return m.body().bytes().get().toByteArray();
         }
+        try (InputStream in = m.body().openStream()) {
+            return in.readAllBytes();
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    private static Object plain(PropertyValue value) {
+        return switch (value) {
+            case PropertyValue.OfBoolean(var b) -> b;
+            case PropertyValue.OfByte(var b) -> b;
+            case PropertyValue.OfShort(var s) -> s;
+            case PropertyValue.OfInt(var i) -> i;
+            case PropertyValue.OfLong(var l) -> l;
+            case PropertyValue.OfFloat(var f) -> f;
+            case PropertyValue.OfDouble(var d) -> d;
+            case PropertyValue.OfString(var s) -> s;
+            case PropertyValue.OfBytes(var b) -> b.toByteArray();
+        };
     }
 }

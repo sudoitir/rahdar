@@ -21,7 +21,7 @@ public final class ResourceViews {
 
     private ResourceViews() {}
 
-    // ---- queues (aggregated from queue_snapshot) --------------------------
+    // ---- queues (aggregated from subscription_snapshot) --------------------------
 
     public record QueueView(
             @Schema(requiredMode = REQUIRED) String address,
@@ -91,11 +91,24 @@ public final class ResourceViews {
 
     // ---- live-through resources (one POST per serving node, merged) -------
 
+    /** How a destination delivers. */
+    public enum Delivery {
+        /** Each message goes to one consumer. */
+        POINT_TO_POINT,
+        /** Each message goes to every subscription. */
+        PUBLISH_SUBSCRIBE
+    }
+
     public record AddressView(
             @Schema(requiredMode = REQUIRED) UUID nodeId,
             @Schema(requiredMode = REQUIRED) String nodeName,
             @Schema(requiredMode = REQUIRED) String name,
-            @Schema(nullable = true) String routingTypes,
+
+            @Schema(
+                    requiredMode = REQUIRED,
+                    description = "How the address delivers: to one consumer, to every subscription, or both.")
+            List<Delivery> delivery,
+
             @Schema(requiredMode = REQUIRED) long queueCount,
             @Schema(requiredMode = REQUIRED) long messageCount,
 
@@ -109,7 +122,7 @@ public final class ResourceViews {
             TeamRef ownerTeam) {
 
         public AddressView withAccess(List<String> actions, TeamRef owner) {
-            return new AddressView(nodeId, nodeName, name, routingTypes, queueCount, messageCount, actions, owner);
+            return new AddressView(nodeId, nodeName, name, delivery, queueCount, messageCount, actions, owner);
         }
     }
 
@@ -123,7 +136,11 @@ public final class ResourceViews {
             @Schema(nullable = true) String protocol,
             @Schema(requiredMode = REQUIRED) long messagesDelivered,
             @Schema(requiredMode = REQUIRED) long messagesAcknowledged,
-            @Schema(nullable = true) String status,
+
+            @Schema(
+                    requiredMode = REQUIRED,
+                    description = "Messages delivered to this consumer and not yet acknowledged.")
+            long messagesInFlight,
 
             @Schema(
                     requiredMode = REQUIRED,
@@ -142,7 +159,7 @@ public final class ResourceViews {
                     protocol,
                     messagesDelivered,
                     messagesAcknowledged,
-                    status,
+                    messagesInFlight,
                     actions);
         }
     }
@@ -239,7 +256,7 @@ public final class ResourceViews {
             @Schema(requiredMode = REQUIRED) UUID nodeId,
             @Schema(requiredMode = REQUIRED) String nodeName,
             @Schema(nullable = true) String producerId,
-            @Schema(nullable = true) String name,
+            @Schema(nullable = true) String clientId,
             @Schema(nullable = true) String sessionId,
             @Schema(nullable = true) String address,
             @Schema(nullable = true) String protocol,
@@ -253,7 +270,7 @@ public final class ResourceViews {
 
         public ProducerView withAllowedActions(List<String> actions) {
             return new ProducerView(
-                    nodeId, nodeName, producerId, name, sessionId, address, protocol, messagesSent, actions);
+                    nodeId, nodeName, producerId, clientId, sessionId, address, protocol, messagesSent, actions);
         }
     }
 }

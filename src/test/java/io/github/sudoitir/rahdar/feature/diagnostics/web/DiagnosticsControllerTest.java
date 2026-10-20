@@ -3,8 +3,6 @@ package io.github.sudoitir.rahdar.feature.diagnostics.web;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.when;
-import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
-import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -21,7 +19,7 @@ import io.github.sudoitir.rahdar.kernel.security.Grant;
 import io.github.sudoitir.rahdar.kernel.security.Permissions;
 import io.github.sudoitir.rahdar.kernel.security.RahdarPrincipal;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaBrokerClient;
+import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
 import io.github.sudoitir.rahdar.platform.broker.QueueRow;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterSecrets;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNodeEntity;
@@ -30,9 +28,10 @@ import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterE
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterRepository;
 import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshotUpsert;
 import io.github.sudoitir.rahdar.support.AdminAuthenticationExtension;
+import io.github.sudoitir.rahdar.support.FakeArtemis;
+import io.github.sudoitir.rahdar.support.FixtureJolokia;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
 import java.io.ByteArrayInputStream;
-import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -49,16 +48,13 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.env.Environment;
-import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.MediaType;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
-import org.springframework.web.client.RestClient;
 import org.springframework.web.context.WebApplicationContext;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
@@ -69,9 +65,6 @@ class DiagnosticsControllerTest extends PostgresIntegrationTest {
 
     private static final String URL = "http://diag:8161/console/jolokia";
     private static final String Q = "DIAG.Q";
-    private static final String SEARCH =
-            "{\"value\":[\"org.apache.activemq.artemis:broker=\\\"primary\\\"\"],\"status\":200}";
-
     private final JsonMapper json = new JsonMapper();
 
     MockMvc mvc;
@@ -103,7 +96,11 @@ class DiagnosticsControllerTest extends PostgresIntegrationTest {
     @MockitoBean
     BrokerConnections connections;
 
+    @MockitoBean
+    BrokerGateway gateway;
+
     private UUID clusterId;
+    private UUID nodeId;
 
     @BeforeEach
     void setUp() {
@@ -113,8 +110,9 @@ class DiagnosticsControllerTest extends PostgresIntegrationTest {
         BrokerNodeEntity node = BrokerNodeEntity.fromSeed(
                 clusterId, "node-a", "PRIMARY", UUID.randomUUID().toString());
         node.attachSeedUrl(URL);
-        UUID nodeId = nodes.save(node).getId();
-        upsert.upsertBatch(List.of(new QueueRow(clusterId, nodeId, Q, Q, "ANYCAST", true, 0, 0, 0, 0, 0, 0, 0, false)));
+        nodeId = nodes.save(node).getId();
+        upsert.upsertBatch(List.of(
+                new QueueRow(clusterId, nodeId, Q, Q, "ANYCAST", true, 0, 0, 0, 0, 0, 0, 0, false, "artemis.queue")));
     }
 
     @AfterEach
@@ -131,7 +129,8 @@ class DiagnosticsControllerTest extends PostgresIntegrationTest {
         LoggerFactory.getLogger(DiagnosticsControllerTest.class)
                 .warn("broker login failed password={} for tcp://bob:{}@broker:61616", loggedPassword, loggedPassword);
         secrets.store(clusterId, "diag", "bob", storedPassword);
-        when(connections.forCluster(clusterId, URL)).thenReturn(client(SEARCH, fixture("send-message.json")));
+        FakeArtemis broker = new FakeArtemis().queue(Q).operation("sendMessage", "ID:1");
+        when(gateway.cluster(clusterId)).thenReturn(FixtureJolokia.cluster(Map.of(nodeId, broker.agent())));
         mvc.perform(post("/api/v1/clusters/{c}/queues/{q}/messages", clusterId, Q)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"kind\":\"TEXT\",\"durable\":true,\"body\":\"%s\",\"properties\":{\"k\":\"%s\"}}"
@@ -261,18 +260,5 @@ class DiagnosticsControllerTest extends PostgresIntegrationTest {
         SecurityContextHolder.getContext()
                 .setAuthentication(
                         UsernamePasswordAuthenticationToken.authenticated(principal, null, principal.getAuthorities()));
-    }
-
-    private JolokiaBrokerClient client(String... bodies) {
-        RestClient.Builder builder = RestClient.builder();
-        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
-        for (String b : bodies) {
-            server.expect(requestTo(URL)).andRespond(withSuccess(b, MediaType.APPLICATION_JSON));
-        }
-        return new JolokiaBrokerClient(builder.build(), URL, json);
-    }
-
-    private static String fixture(String name) throws IOException {
-        return new String(new ClassPathResource("jolokia/" + name).getContentAsByteArray(), StandardCharsets.UTF_8);
     }
 }

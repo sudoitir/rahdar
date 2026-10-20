@@ -27,27 +27,32 @@ CREATE TABLE broker_node (
     clock_offset_ms bigint,
     url_checked_at timestamp with time zone,
     clock_uncertainty_ms integer,
-    artemis_node_id text,
+    native_node_id text,
     name text NOT NULL,
-    jolokia_url text,
-    core_url text,
-    ha_role text DEFAULT 'STANDALONE'::text NOT NULL,
-    pair_group text,
+    ha_designation text DEFAULT 'NONE'::text NOT NULL,
+    ha_group text,
     state text DEFAULT 'UNKNOWN'::text NOT NULL,
     version text,
     last_error text,
     split_brain text DEFAULT 'NONE'::text NOT NULL,
-    url_source text,
     url_problem text,
     last_error_kind text,
     id uuid DEFAULT uuidv7() NOT NULL,
     cluster_id uuid NOT NULL,
     active boolean,
     replica_sync boolean,
-    core_url_manual boolean DEFAULT false NOT NULL,
-    CONSTRAINT ck_broker_node_ha_role CHECK ((ha_role = ANY (ARRAY['PRIMARY'::text, 'BACKUP'::text, 'STANDALONE'::text]))),
-    CONSTRAINT ck_broker_node_split_brain CHECK ((split_brain = ANY (ARRAY['NONE'::text, 'SUSPECTED'::text, 'CRITICAL'::text]))),
-    CONSTRAINT ck_broker_node_url_source CHECK (((url_source IS NULL) OR (url_source = ANY (ARRAY['SEED'::text, 'DERIVED'::text, 'MANUAL'::text]))))
+    CONSTRAINT ck_broker_node_ha_designation CHECK ((ha_designation = ANY (ARRAY['PRIMARY'::text, 'BACKUP'::text, 'NONE'::text]))),
+    CONSTRAINT ck_broker_node_split_brain CHECK ((split_brain = ANY (ARRAY['NONE'::text, 'SUSPECTED'::text, 'CRITICAL'::text])))
+);
+
+CREATE TABLE broker_node_endpoint (
+    plane text NOT NULL,
+    protocol text NOT NULL,
+    url text NOT NULL,
+    source text NOT NULL,
+    node_id uuid NOT NULL,
+    CONSTRAINT ck_broker_node_endpoint_plane CHECK ((plane = ANY (ARRAY['MANAGEMENT'::text, 'DATA'::text]))),
+    CONSTRAINT ck_broker_node_endpoint_source CHECK ((source = ANY (ARRAY['SEED'::text, 'DERIVED'::text, 'DISCOVERED'::text, 'MANUAL'::text])))
 );
 
 CREATE TABLE broker_tls (
@@ -67,6 +72,7 @@ CREATE TABLE cluster (
     management_write_status text,
     management_write_reason text,
     management_url_pattern text,
+    system text NOT NULL,
     id uuid DEFAULT uuidv7() NOT NULL,
     environment_id uuid,
     read_only boolean DEFAULT false NOT NULL,
@@ -96,6 +102,9 @@ ALTER TABLE ONLY broker_identity
 ALTER TABLE ONLY broker_node
     ADD CONSTRAINT pk_broker_node PRIMARY KEY (id);
 
+ALTER TABLE ONLY broker_node_endpoint
+    ADD CONSTRAINT pk_broker_node_endpoint PRIMARY KEY (node_id, plane, protocol);
+
 ALTER TABLE ONLY broker_tls
     ADD CONSTRAINT pk_broker_tls PRIMARY KEY (id);
 
@@ -110,9 +119,6 @@ ALTER TABLE ONLY environment
 
 ALTER TABLE ONLY broker_credential
     ADD CONSTRAINT uq_broker_credential_cluster_kind UNIQUE (cluster_id, kind);
-
-ALTER TABLE ONLY broker_node
-    ADD CONSTRAINT uq_broker_node_cluster_jolokia_url UNIQUE (cluster_id, jolokia_url);
 
 ALTER TABLE ONLY broker_node
     ADD CONSTRAINT uq_broker_node_cluster_name UNIQUE (cluster_id, name);
@@ -139,6 +145,9 @@ ALTER TABLE ONLY broker_identity
 ALTER TABLE ONLY broker_node
     ADD CONSTRAINT fk_broker_node_cluster FOREIGN KEY (cluster_id) REFERENCES cluster(id) ON DELETE CASCADE;
 
+ALTER TABLE ONLY broker_node_endpoint
+    ADD CONSTRAINT fk_broker_node_endpoint_node FOREIGN KEY (node_id) REFERENCES broker_node(id) ON DELETE CASCADE;
+
 ALTER TABLE ONLY broker_tls
     ADD CONSTRAINT fk_broker_tls_cluster FOREIGN KEY (cluster_id) REFERENCES cluster(id) ON DELETE CASCADE;
 
@@ -152,11 +161,18 @@ COMMENT ON COLUMN broker_node.clock_offset_ms IS 'How far ahead of Rahdar this b
 
 COMMENT ON COLUMN broker_node.clock_uncertainty_ms IS 'Half the best round trip plus Jolokia''s second granularity. An offset inside this band is indistinguishable from agreement and is never reported as skew.';
 
+COMMENT ON COLUMN cluster.system IS 'The broker system the cluster runs, as the broker SDK names it (artemis). It picks the driver Rahdar connects through.';
+
+COMMENT ON COLUMN broker_node.native_node_id IS 'The broker''s own id for the node; a primary and its backup share it on Artemis.';
+
+COMMENT ON TABLE broker_node_endpoint IS 'Where a node is reached, per plane (MANAGEMENT, DATA) and protocol, and where each address came from: a seed, derived from the cluster''s pattern, discovered from the broker''s topology, or set by an operator.';
+
 COMMENT ON COLUMN cluster.management_write_status IS 'Evidence of an attempted management write (ADR-0049 D5): AVAILABLE once one has succeeded, UNAVAILABLE once one has been refused for an authorization reason, NULL until one is attempted. A write that fails for any other reason must not set this.';
 --rollback DROP TABLE IF EXISTS environment CASCADE;
 --rollback DROP TABLE IF EXISTS cluster_lease CASCADE;
 --rollback DROP TABLE IF EXISTS cluster CASCADE;
 --rollback DROP TABLE IF EXISTS broker_tls CASCADE;
+--rollback DROP TABLE IF EXISTS broker_node_endpoint CASCADE;
 --rollback DROP TABLE IF EXISTS broker_node CASCADE;
 --rollback DROP TABLE IF EXISTS broker_identity CASCADE;
 --rollback DROP TABLE IF EXISTS broker_credential CASCADE;

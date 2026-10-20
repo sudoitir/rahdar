@@ -29,7 +29,7 @@ public interface RrFlowRepository extends JpaRepository<RrFlowEntity, UUID> {
             select f from RrFlowEntity f
             where f.clusterId = :clusterId
               and f.state = 'AWAITING_REPLY'
-              and ( (f.replyKind = 'TEMP_QUEUE' and f.replyDestination = :destination)
+              and ( (f.replyKind = 'TEMPORARY' and f.replyDestination = :destination)
                  or f.correlationId = :correlationId
                  or f.requestMessageId = :correlationId )
             order by f.requestedAt asc

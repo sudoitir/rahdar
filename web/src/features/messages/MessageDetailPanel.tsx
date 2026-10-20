@@ -213,11 +213,6 @@ function Headers({ m }: Readonly<{ m: MessageDetailView }>) {
     { term: 'Durability', value: m.durable ? 'durable' : 'non-durable' },
     { term: 'Priority', value: m.priority },
     { term: 'Size', value: `${m.size} bytes` },
-    {
-      term: 'Read via',
-      value: m.transport === 'CORE' ? 'Core protocol client' : 'Jolokia management channel',
-      hint: m.transport === 'CORE' ? 'Read faithfully.' : 'Read as text over management.',
-    },
     { term: 'Enqueued', value: absoluteLabel(m.timestamp) },
     { term: 'Expiration', value: m.expiration > 0 ? absoluteLabel(m.expiration) : 'never' },
     ...header('Group', m.groupId, 'groupId'),

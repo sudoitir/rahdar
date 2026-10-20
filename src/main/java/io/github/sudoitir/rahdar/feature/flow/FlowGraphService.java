@@ -1,5 +1,6 @@
 package io.github.sudoitir.rahdar.feature.flow;
 
+import io.github.sudoitir.openbroker.model.MetricKeys;
 import io.github.sudoitir.rahdar.feature.flow.ClientEdges.Edge;
 import io.github.sudoitir.rahdar.feature.flow.ClientEdges.Kind;
 import io.github.sudoitir.rahdar.feature.flow.FlowQuery.Focus;
@@ -26,7 +27,6 @@ import io.github.sudoitir.rahdar.feature.flow.web.FlowViews.NodeKind;
 import io.github.sudoitir.rahdar.feature.flow.web.FlowViews.NodeRole;
 import io.github.sudoitir.rahdar.feature.flow.web.FlowViews.NodeSampleState;
 import io.github.sudoitir.rahdar.feature.flow.web.FlowViews.RateSource;
-import io.github.sudoitir.rahdar.feature.queues.DivertOperations;
 import io.github.sudoitir.rahdar.kernel.core.HeavyRequests;
 import io.github.sudoitir.rahdar.kernel.plugin.ResourceKind;
 import io.github.sudoitir.rahdar.kernel.security.ClusterAccessGuard;
@@ -40,6 +40,7 @@ import io.github.sudoitir.rahdar.platform.scrape.MetricSamples.SubjectRate;
 import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshot;
 import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshots;
 import io.github.sudoitir.rahdar.platform.scrape.ScrapeSettings;
+import io.github.sudoitir.rahdar.system.artemis.DivertOperations;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -203,11 +204,11 @@ public class FlowGraphService {
         Map<String, String> byArtemisId = new HashMap<>();
         for (ClusterNode n : directory.nodes(clusterId)) {
             byId.put(n.getId(), n.getName());
-            if (n.getArtemisNodeId() != null) {
+            if (n.getNativeNodeId() != null) {
                 // A live/backup pair shares one NodeID: name the logical node by its serving endpoint,
                 // never by whichever of the pair happens to be listed last.
                 byArtemisId.merge(
-                        n.getArtemisNodeId(),
+                        n.getNativeNodeId(),
                         n.getName(),
                         (first, next) -> Boolean.TRUE.equals(n.getActive()) ? next : first);
             }
@@ -292,15 +293,15 @@ public class FlowGraphService {
     private Rates rates(UUID clusterId, boolean byNode, Instant windowStart, Instant now) {
         Instant until = now.plusSeconds(1);
         if (byNode) {
-            Map<String, Map<UUID, SubjectRate>> addedByNode =
-                    metrics.latestRateWithTimeBySubjectAndNode(clusterId, "messagesAdded", windowStart, until);
-            Map<String, Map<UUID, SubjectRate>> ackedByNode =
-                    metrics.latestRateWithTimeBySubjectAndNode(clusterId, "messagesAcked", windowStart, until);
+            Map<String, Map<UUID, SubjectRate>> addedByNode = metrics.latestRateWithTimeBySubjectAndNode(
+                    clusterId, MetricKeys.ENQUEUED.name(), windowStart, until);
+            Map<String, Map<UUID, SubjectRate>> ackedByNode = metrics.latestRateWithTimeBySubjectAndNode(
+                    clusterId, MetricKeys.ACKNOWLEDGED.name(), windowStart, until);
             return new Rates(summed(addedByNode), summed(ackedByNode), addedByNode, ackedByNode);
         }
         return new Rates(
-                metrics.latestRateWithTimeBySubject(clusterId, "messagesAdded", windowStart, until),
-                metrics.latestRateWithTimeBySubject(clusterId, "messagesAcked", windowStart, until),
+                metrics.latestRateWithTimeBySubject(clusterId, MetricKeys.ENQUEUED.name(), windowStart, until),
+                metrics.latestRateWithTimeBySubject(clusterId, MetricKeys.ACKNOWLEDGED.name(), windowStart, until),
                 Map.of(),
                 Map.of());
     }

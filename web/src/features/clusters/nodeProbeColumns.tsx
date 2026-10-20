@@ -20,7 +20,7 @@ function coreWords(node: NodeProbeView): string {
   return accountResultWords(node.core);
 }
 
-const ROLE: Record<string, string> = { PRIMARY: 'Primary', BACKUP: 'Backup', STANDALONE: 'Standalone' };
+const ROLE: Record<string, string> = { PRIMARY: 'Primary', BACKUP: 'Backup', NONE: 'Standalone' };
 
 /** Who the node is, in one line under its name: role, version and NodeID. */
 function nodeFacts(n: NodeProbeView): string {

@@ -15,7 +15,7 @@ import org.junit.jupiter.api.Test;
 /**
  * Glob semantics and the resolution cap (design.md D1, D4, D7). Pure unit tests —
  * the only collaborator is the snapshot repository, stubbed, because the point of
- * resolving from {@code queue_snapshot} is that no broker is involved.
+ * resolving from {@code subscription_snapshot} is that no broker is involved.
  */
 class ReplyAddressResolverTest {
 

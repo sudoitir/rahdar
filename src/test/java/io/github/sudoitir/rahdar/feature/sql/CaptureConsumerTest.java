@@ -8,22 +8,26 @@ import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import io.github.sudoitir.rahdar.platform.broker.BrokerCallGuard;
-import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
-import io.github.sudoitir.rahdar.platform.broker.BrokerProperties;
-import io.github.sudoitir.rahdar.platform.broker.CoreConnectionFactory;
-import io.github.sudoitir.rahdar.platform.broker.CoreConnectionSettings;
-import io.github.sudoitir.rahdar.platform.broker.CoreObservations;
-import io.github.sudoitir.rahdar.platform.broker.CorePool;
+import io.github.sudoitir.openbroker.ClusterConnection;
+import io.github.sudoitir.openbroker.NodeId;
+import io.github.sudoitir.openbroker.messaging.Blob;
+import io.github.sudoitir.openbroker.messaging.Disposition;
+import io.github.sudoitir.openbroker.messaging.Message;
+import io.github.sudoitir.openbroker.messaging.MessageBody;
+import io.github.sudoitir.openbroker.messaging.MessageHeaders;
+import io.github.sudoitir.openbroker.messaging.MessageRef;
+import io.github.sudoitir.openbroker.messaging.Receiver;
+import io.github.sudoitir.openbroker.model.ResourceId;
+import io.github.sudoitir.openbroker.model.Shard;
+import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
+import io.github.sudoitir.rahdar.platform.broker.BrokerMessages;
 import io.github.sudoitir.rahdar.support.ArtemisIntegrationTest;
 import jakarta.jms.Connection;
-import jakarta.jms.JMSException;
-import jakarta.jms.Message;
-import jakarta.jms.MessageConsumer;
 import jakarta.jms.MessageProducer;
 import jakarta.jms.Session;
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -37,7 +41,6 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
-import org.springframework.boot.ssl.SslBundles;
 import org.springframework.dao.DataAccessResourceFailureException;
 
 /**
@@ -54,27 +57,23 @@ class CaptureConsumerTest extends ArtemisIntegrationTest {
     private final UUID subscriptionId = UUID.randomUUID();
     private final List<MessageIndexWriter.Captured> stored = new CopyOnWriteArrayList<>();
 
-    private CorePool pool;
+    private ClusterConnection connection;
     private MessageIndexWriter writer;
     private CaptureConsumer consumer;
 
     @BeforeEach
     void setUp() {
-        BrokerProperties properties = new BrokerProperties(Duration.ofSeconds(3), Duration.ofSeconds(10), 2_000);
-        pool = new CorePool(
-                new CoreConnectionFactory(properties, mock(SslBundles.class), BrokerCallGuard.OFF),
-                CoreObservations.none());
-        BrokerConnections connections = mock(BrokerConnections.class);
-        when(connections.coreSettingsFor(any()))
-                .thenReturn(new CoreConnectionSettings(clusterId, BROKER_USER, BROKER_PASSWORD, null, true));
+        connection = cluster(nodeId);
+        BrokerGateway gateway = mock(BrokerGateway.class);
+        when(gateway.cluster(any())).thenAnswer(invocation -> connection);
         writer = mock(MessageIndexWriter.class);
-        consumer = new CaptureConsumer(pool, connections, new CaptureBus(), writer);
+        consumer = new CaptureConsumer(new BrokerMessages(gateway), new CaptureBus(), writer);
     }
 
     @AfterEach
     void tearDown() {
         consumer.closeAll();
-        pool.closeAll();
+        connection.close();
     }
 
     @Test
@@ -140,6 +139,7 @@ class CaptureConsumerTest extends ArtemisIntegrationTest {
     @Test
     void stoppingAClusterClosesItsDrainsAndLeavesOthersRunning() throws Exception {
         String queue = "capture.cluster." + UUID.randomUUID();
+        send(queue, 1);
         consumer.start(spec(queue, "ORDER.IN"));
         assertThat(consumer.isDraining(nodeId, "tap." + queue)).isTrue();
 
@@ -217,10 +217,11 @@ class CaptureConsumerTest extends ArtemisIntegrationTest {
         consumer.start(spec);
         assertThat(consumer.isDraining(nodeId, spec.name())).isTrue();
 
-        consumer.connectionFailed(clusterId, nodeId, new JMSException("AMQ219016: connection failure"));
+        connection.close();
+        connection = cluster(nodeId);
 
         // The reconciler installs a tap again whenever its node is not draining it.
-        assertThat(consumer.isDraining(nodeId, spec.name())).isFalse();
+        awaitTrue(() -> !consumer.isDraining(nodeId, spec.name()), Duration.ofSeconds(10));
         assertThat(consumer.drainingOn(nodeId)).isEmpty();
     }
 
@@ -246,25 +247,27 @@ class CaptureConsumerTest extends ArtemisIntegrationTest {
     }
 
     @Test
-    void aPoisonMessageIsRetriedThenCountedAsLostAndAcknowledged() throws Exception {
-        Session session = mock(Session.class);
-        Message poison = mock(Message.class);
-        when(poison.getJMSMessageID()).thenReturn("ID:poison");
-        when(poison.getPropertyNames()).thenThrow(new JMSException("unreadable property"));
-        CaptureConsumer.Drain drain = consumer
-        .new Drain(
-                spec("capture.poison", "ORDER.IN"),
-                new CorePool.PooledSession(mock(Connection.class), session),
-                mock(MessageConsumer.class));
+    void aPoisonMessageIsRetriedThenCountedAsLostAndAcknowledged() {
+        Receiver receiver = mock(Receiver.class);
+        // An id that is not a number cannot be read into a row.
+        Message poison = new Message(
+                new MessageRef(ResourceId.of("artemis.queue", "capture.poison"), Shard.node(NodeId.of("n")), "poison"),
+                MessageHeaders.builder().build(),
+                Map.of(),
+                MessageBody.of(Blob.of(new byte[0])),
+                Set.of(),
+                Map.of());
+        CaptureConsumer.Drain drain = consumer.new Drain(spec("capture.poison", "ORDER.IN"), receiver);
 
-        // The broker redelivers after each recover; here the redeliveries are the calls themselves.
-        drain.onMessage(poison);
-        drain.onMessage(poison);
-        Mockito.verify(poison, Mockito.never()).acknowledge();
-        drain.onMessage(poison);
+        // The broker redelivers after each rollback; here the redeliveries are the calls themselves.
+        drain.take(poison);
+        drain.take(poison);
+        Mockito.verify(receiver, Mockito.never()).settle(any(), any());
+        drain.take(poison);
 
-        Mockito.verify(session, Mockito.times(2)).recover();
-        Mockito.verify(poison).acknowledge();
+        Mockito.verify(receiver, Mockito.times(2)).rollback();
+        Mockito.verify(receiver).settle(poison, Disposition.accept());
+        Mockito.verify(receiver).commit();
         assertThat(drain.takeShortfall().unreadable()).isEqualTo(1);
     }
 
@@ -278,16 +281,7 @@ class CaptureConsumerTest extends ArtemisIntegrationTest {
 
     private CaptureConsumer.Spec spec(String queue, String sourceAddress, int maxRate) {
         return new CaptureConsumer.Spec(
-                clusterId,
-                nodeId,
-                "primary",
-                coreUrl(),
-                subscriptionId,
-                "tap." + queue,
-                queue,
-                sourceAddress,
-                10_000,
-                maxRate);
+                clusterId, nodeId, "primary", subscriptionId, "tap." + queue, queue, sourceAddress, 10_000, maxRate);
     }
 
     private static void send(String queue, int count) throws Exception {

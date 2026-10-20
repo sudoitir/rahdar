@@ -55,6 +55,7 @@ import io.github.sudoitir.rahdar.platform.clusters.ClustersModule;
 import io.github.sudoitir.rahdar.platform.governance.GovernanceModule;
 import io.github.sudoitir.rahdar.platform.mcp.McpModule;
 import io.github.sudoitir.rahdar.platform.scrape.ScrapeModule;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisModule;
 import java.util.List;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -105,6 +106,7 @@ public class RahdarFeatures {
                 ClustersModule.DESCRIPTOR,
                 GovernanceModule.DESCRIPTOR,
                 ScrapeModule.DESCRIPTOR,
+                ArtemisModule.DESCRIPTOR,
                 McpModule.DESCRIPTOR,
                 QueuesModule.DESCRIPTOR,
                 ResourcesModule.DESCRIPTOR,

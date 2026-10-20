@@ -1,14 +1,28 @@
 package io.github.sudoitir.rahdar.support;
 
-import io.github.sudoitir.rahdar.platform.broker.BrokerClientFactory;
+import io.github.sudoitir.openbroker.BrokerDrivers;
+import io.github.sudoitir.openbroker.ClusterConnection;
+import io.github.sudoitir.openbroker.ClusterSpec;
+import io.github.sudoitir.openbroker.ConnectOptions;
+import io.github.sudoitir.openbroker.ConnectRequest;
+import io.github.sudoitir.openbroker.CredentialSource;
+import io.github.sudoitir.openbroker.Credentials;
+import io.github.sudoitir.openbroker.Endpoint;
+import io.github.sudoitir.openbroker.NodeId;
+import io.github.sudoitir.openbroker.NodeSpec;
+import io.github.sudoitir.openbroker.Plane;
+import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
+import io.github.sudoitir.rahdar.platform.broker.BrokerTarget;
 import io.github.sudoitir.rahdar.platform.broker.BrokerVersion;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaBrokerClient;
+import io.github.sudoitir.rahdar.support.wire.WireRecorder;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNodes;
 import java.time.Duration;
-import org.springframework.web.client.RestClient;
+import java.util.List;
+import java.util.UUID;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.utility.MountableFile;
-import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Base for tests that need a real Apache ActiveMQ Artemis broker — the Core
@@ -71,28 +85,52 @@ public abstract class ArtemisIntegrationTest {
      * class and therefore starts the shared container, which is the point.
      */
     public static String jolokiaUrl() {
-        return "http://%s:%d/console/jolokia".formatted(ARTEMIS.getHost(), ARTEMIS.getMappedPort(8161));
+        return WireRecorder.proxied(
+                "http://%s:%d/console/jolokia".formatted(ARTEMIS.getHost(), ARTEMIS.getMappedPort(8161)));
     }
 
-    /** A Jolokia client of the test's own for the shared broker, outside Rahdar's rate limiter. */
-    public static JolokiaBrokerClient jolokiaClient() {
+    /** The shared broker's management agent, through the broker SDK, outside Rahdar's rate limiter. */
+    public static ArtemisNode jolokiaClient() {
         return jolokiaClient(jolokiaUrl());
     }
 
-    /**
-     * A Jolokia client for any test broker, with the converters Rahdar's own clients use:
-     * an older broker's agent labels its JSON {@code text/plain}.
-     */
-    public static JolokiaBrokerClient jolokiaClient(String url) {
-        JsonMapper mapper = JsonMapper.builder().build();
-        RestClient rest = RestClient.builder()
-                .configureMessageConverters(b ->
-                        b.configureMessageConvertersList(c -> BrokerClientFactory.applyJolokiaConverters(c, mapper)))
-                .requestInterceptor((request, body, execution) -> {
-                    request.getHeaders().setBasicAuth(BROKER_USER, BROKER_PASSWORD);
-                    return execution.execute(request, body);
-                })
-                .build();
-        return new JolokiaBrokerClient(rest, url, mapper);
+    /** Any test broker's management agent, through the broker SDK, with the test account. */
+    public static ArtemisNode jolokiaClient(String url) {
+        return ArtemisNodes.node(target(url));
     }
+
+    /** A test broker as one SDK node, for code that takes a {@link BrokerTarget}. */
+    public static BrokerTarget target(String url) {
+        ClusterConnection connection = DRIVERS.connect(new ConnectRequest(
+                "artemis",
+                ClusterSpec.ofNodes(
+                        List.of(new NodeSpec(NodeId.of(url), List.of(new Endpoint(Plane.MANAGEMENT, "jolokia", url))))),
+                CredentialSource.of(Credentials.of(BROKER_USER, BROKER_PASSWORD)),
+                ConnectOptions.defaults()));
+        return new BrokerTarget(connection, NodeId.of(url));
+    }
+
+    /**
+     * The shared broker as a one-node SDK cluster over Jolokia and Core, the node known by Rahdar's id
+     * for it, for code that reaches a cluster through the gateway.
+     */
+    public static ClusterConnection cluster(UUID nodeId) {
+        return cluster(nodeId, coreUrl());
+    }
+
+    /** As {@link #cluster(UUID)}, with the node's data plane at the given address. */
+    public static ClusterConnection cluster(UUID nodeId, String core) {
+        return DRIVERS.connect(new ConnectRequest(
+                BrokerGateway.SYSTEM,
+                ClusterSpec.ofNodes(List.of(new NodeSpec(
+                        BrokerGateway.idOf(nodeId),
+                        List.of(
+                                new Endpoint(Plane.MANAGEMENT, BrokerGateway.JOLOKIA, jolokiaUrl()),
+                                new Endpoint(Plane.DATA, BrokerGateway.CORE, core))))),
+                CredentialSource.of(Credentials.of(BROKER_USER, BROKER_PASSWORD)),
+                ConnectOptions.defaults()));
+    }
+
+    /** One driver registry for the test JVM, as an application keeps one. */
+    private static final BrokerDrivers DRIVERS = BrokerDrivers.load();
 }

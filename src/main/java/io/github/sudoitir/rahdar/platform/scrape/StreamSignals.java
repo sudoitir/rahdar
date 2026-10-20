@@ -32,7 +32,7 @@ public class StreamSignals {
     public void afterTierA(UUID clusterId, List<NodeEndpoint> endpoints) {
         String signature = endpoints.stream()
                 .sorted((a, b) -> a.name().compareToIgnoreCase(b.name()))
-                .map(e -> e.artemisNodeId() + "|" + e.haRole() + "|" + e.state() + "|" + e.active() + "|"
+                .map(e -> e.nativeNodeId() + "|" + e.haDesignation() + "|" + e.state() + "|" + e.active() + "|"
                         + e.replicaSync() + "|" + (e.lastError() != null))
                 .collect(Collectors.joining(";"));
         String previous = topologySignature.put(clusterId, signature);

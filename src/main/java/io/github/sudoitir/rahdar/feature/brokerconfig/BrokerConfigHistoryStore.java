@@ -32,12 +32,12 @@ class BrokerConfigHistoryStore implements HousekeepingContributor, ManagedStore 
 
     /** A node state that a verified or drifted node names as the apply that wrote it. */
     private static String namedByNodeState(String apply) {
-        return "EXISTS (SELECT 1 FROM broker_config_node_state ns WHERE ns.basis_ref = " + apply
+        return "EXISTS (SELECT 1 FROM artemis_config_node_state ns WHERE ns.basis_ref = " + apply
                 + ".id AND ns.basis IS DISTINCT FROM 'ADOPTED')";
     }
 
-    private static final String APPLY_TABLE = "broker_config_apply";
-    private static final String REVISION_TABLE = "broker_config_revision";
+    private static final String APPLY_TABLE = "artemis_config_apply";
+    private static final String REVISION_TABLE = "artemis_config_revision";
     private static final String APPLIES = "started_at < ? AND NOT " + namedByNodeState(APPLY_TABLE);
 
     /**
@@ -45,16 +45,16 @@ class BrokerConfigHistoryStore implements HousekeepingContributor, ManagedStore 
      * not keep its revision: the preview then counts what the whole run removes.
      */
     private static final String REVISIONS = "EXISTS (SELECT 1 FROM (SELECT ?::timestamptz AS at) k"
-            + " WHERE broker_config_revision.created_at < k.at"
-            + " AND NOT EXISTS (SELECT 1 FROM broker_config_declaration d"
-            + " WHERE d.current_revision_id = broker_config_revision.id)"
-            + " AND NOT EXISTS (SELECT 1 FROM broker_config_apply a WHERE a.revision_id = broker_config_revision.id"
+            + " WHERE artemis_config_revision.created_at < k.at"
+            + " AND NOT EXISTS (SELECT 1 FROM artemis_config_declaration d"
+            + " WHERE d.current_revision_id = artemis_config_revision.id)"
+            + " AND NOT EXISTS (SELECT 1 FROM artemis_config_apply a WHERE a.revision_id = artemis_config_revision.id"
             + " AND (a.started_at >= k.at OR " + namedByNodeState("a") + "))"
-            + " AND NOT EXISTS (SELECT 1 FROM broker_config_owned_item o"
-            + " WHERE o.revision_id = broker_config_revision.id)"
-            + " AND NOT EXISTS (SELECT 1 FROM broker_config_node_state ns"
-            + " WHERE ns.cluster_id = broker_config_revision.cluster_id"
-            + " AND ns.verified_revision = broker_config_revision.revision))";
+            + " AND NOT EXISTS (SELECT 1 FROM artemis_config_owned_item o"
+            + " WHERE o.revision_id = artemis_config_revision.id)"
+            + " AND NOT EXISTS (SELECT 1 FROM artemis_config_node_state ns"
+            + " WHERE ns.cluster_id = artemis_config_revision.cluster_id"
+            + " AND ns.verified_revision = artemis_config_revision.revision))";
 
     private static final StoreDef DEF = new StoreDef(
             "broker-config-history",

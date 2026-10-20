@@ -55,11 +55,11 @@ public class BrokerEventWriter implements BrokerEventSink {
 
     private static final String INSERT = """
             INSERT INTO broker_event
-              (occurred_at, type, address, routing_name, consumer_name, session_name,
-               connection_name, remote_address, username, props, cluster_id, node_id)
+              (occurred_at, type, destination, subscription, consumer, channel,
+               connection, remote_address, principal, data, cluster_id, node_id)
             VALUES
-              (:occurredAt, :type, :address, :routingName, :consumerName, :sessionName,
-               :connectionName, :remoteAddress, :username, CAST(:props AS jsonb), :clusterId, :nodeId)
+              (:occurredAt, :type, :destination, :subscription, :consumer, :channel,
+               :connection, :remoteAddress, :principal, CAST(:data AS jsonb), :clusterId, :nodeId)
             """;
 
     private final NamedParameterJdbcTemplate jdbc;
@@ -235,14 +235,14 @@ public class BrokerEventWriter implements BrokerEventSink {
         return new MapSqlParameterSource()
                 .addValue("occurredAt", Timestamp.from(e.occurredAt()))
                 .addValue("type", e.type())
-                .addValue("address", e.address())
-                .addValue("routingName", e.routingName())
-                .addValue("consumerName", e.consumerName())
-                .addValue("sessionName", e.sessionName())
-                .addValue("connectionName", e.connectionName())
+                .addValue("destination", e.destination())
+                .addValue("subscription", e.subscription())
+                .addValue("consumer", e.consumer())
+                .addValue("channel", e.channel())
+                .addValue("connection", e.connection())
                 .addValue("remoteAddress", e.remoteAddress())
-                .addValue("username", e.username())
-                .addValue("props", toJson(e.props()))
+                .addValue("principal", e.principal())
+                .addValue("data", toJson(e.data()))
                 .addValue("clusterId", e.clusterId())
                 .addValue("nodeId", e.nodeId());
     }

@@ -18,9 +18,9 @@ PARTITION BY RANGE (ts);
 CREATE TABLE rr_expectation (
     deadline_ms integer,
     sample_per_min integer DEFAULT 10 NOT NULL,
-    request_address text NOT NULL,
+    request_destination text NOT NULL,
     correlation_property text,
-    reply_addresses text[] DEFAULT '{}'::text[] NOT NULL,
+    reply_destinations text[] DEFAULT '{}'::text[] NOT NULL,
     id uuid DEFAULT uuidv7() NOT NULL,
     cluster_id uuid NOT NULL,
     enabled boolean DEFAULT true NOT NULL,
@@ -38,7 +38,7 @@ CREATE TABLE rr_flow (
     request_skew_ms bigint,
     reply_skew_ms bigint,
     latency_bound_ms integer,
-    request_address text,
+    request_destination text,
     reply_destination text,
     reply_kind text NOT NULL,
     state text NOT NULL,
@@ -53,7 +53,7 @@ CREATE TABLE rr_flow (
     cluster_id uuid NOT NULL,
     node_id uuid,
     CONSTRAINT ck_rr_flow_latency_source CHECK ((latency_source = ANY (ARRAY['OBSERVED'::text, 'MESSAGE_TIMESTAMPS'::text]))),
-    CONSTRAINT ck_rr_flow_reply_kind CHECK ((reply_kind = ANY (ARRAY['TEMP_QUEUE'::text, 'SHARED_QUEUE'::text]))),
+    CONSTRAINT ck_rr_flow_reply_kind CHECK ((reply_kind = ANY (ARRAY['TEMPORARY'::text, 'SHARED'::text]))),
     CONSTRAINT ck_rr_flow_state CHECK ((state = ANY (ARRAY['AWAITING_REPLY'::text, 'COMPLETED'::text, 'TIMED_OUT'::text, 'ORPHANED'::text, 'RESPONDER_DROPPED'::text, 'ORPHANED_REPLY'::text])))
 )
 WITH (fillfactor='90', autovacuum_vacuum_scale_factor='0.05', autovacuum_analyze_scale_factor='0.05');
@@ -77,11 +77,11 @@ ALTER TABLE ONLY rr_flow
     ADD CONSTRAINT pk_rr_flow PRIMARY KEY (id);
 
 ALTER TABLE ONLY rr_expectation
-    ADD CONSTRAINT uq_rr_expectation UNIQUE (cluster_id, request_address);
+    ADD CONSTRAINT uq_rr_expectation UNIQUE (cluster_id, request_destination);
 
 CREATE INDEX ix_rr_event_flow ON rr_event USING btree (flow_id, ts);
 
-CREATE INDEX ix_rr_flow_address ON rr_flow USING btree (cluster_id, request_address, requested_at DESC);
+CREATE INDEX ix_rr_flow_destination ON rr_flow USING btree (cluster_id, request_destination, requested_at DESC);
 
 CREATE INDEX ix_rr_flow_cluster_state ON rr_flow USING btree (cluster_id, state);
 
@@ -93,7 +93,7 @@ CREATE INDEX ix_rr_flow_node_id ON rr_flow USING btree (node_id);
 
 CREATE INDEX ix_rr_flow_open_reply ON rr_flow USING btree (cluster_id, reply_destination, correlation_id) WHERE (state = 'AWAITING_REPLY'::text);
 
-CREATE UNIQUE INDEX uq_rr_flow_request ON rr_flow USING btree (cluster_id, request_address, request_message_id) WHERE (request_message_id IS NOT NULL);
+CREATE UNIQUE INDEX uq_rr_flow_request ON rr_flow USING btree (cluster_id, request_destination, request_message_id) WHERE (request_message_id IS NOT NULL);
 
 ALTER TABLE ONLY rr_expectation
     ADD CONSTRAINT fk_rr_expectation_cluster FOREIGN KEY (cluster_id) REFERENCES cluster(id) ON DELETE CASCADE;

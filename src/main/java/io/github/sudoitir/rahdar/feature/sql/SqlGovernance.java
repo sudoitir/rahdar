@@ -5,7 +5,7 @@ import io.github.sudoitir.rahdar.feature.sql.ColumnCatalogue.Column;
 import io.github.sudoitir.rahdar.feature.sql.QueryAst.Predicate;
 import io.github.sudoitir.rahdar.feature.sql.QueryAst.Term;
 import io.github.sudoitir.rahdar.feature.sql.QueryResult.Row;
-import io.github.sudoitir.rahdar.platform.broker.MessageBrowser.BrowsedMessage;
+import io.github.sudoitir.rahdar.platform.broker.BrowsedMessage;
 import io.github.sudoitir.rahdar.platform.governance.ContentPolicy;
 import io.github.sudoitir.rahdar.platform.governance.GovernContext;
 import io.github.sudoitir.rahdar.platform.governance.GovernedMessage;

@@ -2,11 +2,11 @@ package io.github.sudoitir.rahdar.feature.transfer;
 
 import io.github.sudoitir.rahdar.kernel.core.NotFoundException;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
-import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
-import io.github.sudoitir.rahdar.platform.broker.CoreRelay;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaBrokerClient;
+import io.github.sudoitir.rahdar.platform.broker.BrokerRelay;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNodes;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -21,7 +21,7 @@ import org.springframework.stereotype.Component;
 class TransferNodes {
 
     private final ClusterDirectory directory;
-    private final BrokerConnections connections;
+    private final ArtemisNodes artemisNodes;
 
     /** A node of this cluster by Rahdar's id; 404 when it is not one. */
     ClusterNode node(UUID clusterId, UUID nodeId) {
@@ -36,31 +36,31 @@ class TransferNodes {
     }
 
     static boolean backup(ClusterNode node) {
-        return "BACKUP".equals(node.getHaRole());
+        return "BACKUP".equals(node.getHaDesignation());
     }
 
     /** The manageable endpoint live now for this broker node id. */
-    ClusterNode serving(UUID clusterId, String artemisNodeId, String name) {
+    ClusterNode serving(UUID clusterId, String nativeNodeId, String name) {
         return directory.nodes(clusterId).stream()
-                .filter(n -> artemisNodeId.equals(n.getArtemisNodeId()))
-                .filter(n -> n.getJolokiaUrl() != null && live(n) && !backup(n))
+                .filter(n -> nativeNodeId.equals(n.getNativeNodeId()))
+                .filter(n -> n.getManagementUrl() != null && live(n) && !backup(n))
                 .findFirst()
                 .orElseThrow(() -> new BrokerConnectionException(
                         BrokerConnectionException.Kind.UNREACHABLE,
                         "Node " + name + " has no live, manageable endpoint now."));
     }
 
-    JolokiaBrokerClient client(ClusterNode node) {
-        return connections.forCluster(node.getClusterId(), node.getJolokiaUrl());
+    ArtemisNode client(ClusterNode node) {
+        return artemisNodes.on(node.getClusterId(), node.getId());
     }
 
-    CoreRelay.Endpoint core(ClusterNode node) {
-        if (node.getCoreUrl() == null) {
+    /** The node as a relay end: one it reaches over its data plane, which it must have. */
+    BrokerRelay.Endpoint core(ClusterNode node) {
+        if (node.getDataUrl() == null) {
             throw new BrokerConnectionException(
                     BrokerConnectionException.Kind.UNREACHABLE,
                     "Node " + node.getName() + " has no Core URL, so Rahdar cannot relay messages to or from it.");
         }
-        return new CoreRelay.Endpoint(
-                node.getClusterId(), node.getCoreUrl(), connections.coreSettingsFor(node.getClusterId()));
+        return new BrokerRelay.Endpoint(node.getClusterId(), node.getId());
     }
 }

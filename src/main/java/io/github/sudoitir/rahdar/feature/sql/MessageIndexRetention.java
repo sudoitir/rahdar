@@ -79,7 +79,7 @@ public class MessageIndexRetention {
                 binds.addAll(queues);
                 int removed = jdbc.getJdbcTemplate()
                         .update(
-                                "DELETE FROM message_index WHERE cluster_id = ? AND observed_at < ? AND queue_name IN ("
+                                "DELETE FROM message_index WHERE cluster_id = ? AND observed_at < ? AND subscription IN ("
                                         + placeholders + ')',
                                 binds.toArray());
                 if (removed > 0) {

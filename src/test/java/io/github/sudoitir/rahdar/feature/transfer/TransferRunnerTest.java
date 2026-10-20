@@ -34,21 +34,21 @@ import io.github.sudoitir.rahdar.kernel.security.Permissions;
 import io.github.sudoitir.rahdar.kernel.security.ResourceRef;
 import io.github.sudoitir.rahdar.kernel.settings.SettingsService;
 import io.github.sudoitir.rahdar.kernel.stream.SseHub;
-import io.github.sudoitir.rahdar.platform.broker.AcceptanceProbe;
-import io.github.sudoitir.rahdar.platform.broker.AcceptanceProbe.Facts;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
+import io.github.sudoitir.rahdar.platform.broker.BrokerRelay;
 import io.github.sudoitir.rahdar.platform.broker.BrokerXmlSnippets;
-import io.github.sudoitir.rahdar.platform.broker.CoreRelay;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaBrokerClient;
-import io.github.sudoitir.rahdar.platform.broker.MessageOperations;
-import io.github.sudoitir.rahdar.platform.broker.MessageOperations.BulkResult;
+import io.github.sudoitir.rahdar.platform.broker.BulkResult;
 import io.github.sudoitir.rahdar.platform.broker.NodeCallLimiter;
 import io.github.sudoitir.rahdar.platform.broker.RelayLink;
 import io.github.sudoitir.rahdar.platform.broker.RelayLink.Batch;
 import io.github.sudoitir.rahdar.platform.broker.RelayLink.Hooks;
 import io.github.sudoitir.rahdar.platform.broker.RelayLink.Outcome;
-import io.github.sudoitir.rahdar.platform.broker.StagingQueues;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
+import io.github.sudoitir.rahdar.system.artemis.AcceptanceProbe;
+import io.github.sudoitir.rahdar.system.artemis.AcceptanceProbe.Facts;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
+import io.github.sudoitir.rahdar.system.artemis.MessageOperations;
+import io.github.sudoitir.rahdar.system.artemis.StagingQueues;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
@@ -87,7 +87,7 @@ class TransferRunnerTest {
     private TransferLedger ledger;
     private TransferNodes nodes;
     private TransferFaults faults;
-    private CoreRelay relay;
+    private BrokerRelay relay;
     private MessageOperations messages;
     private StagingQueues staging;
     private AcceptanceProbe probe;
@@ -100,7 +100,7 @@ class TransferRunnerTest {
     private ReplicaRegistry replicas;
     private ClusterNode sourceNode;
     private ClusterNode targetNode;
-    private JolokiaBrokerClient client;
+    private ArtemisNode client;
     private RelayLink link;
     private TransferRunner runner;
     private final Operator operator = new Operator(null, null, null);
@@ -111,7 +111,7 @@ class TransferRunnerTest {
         ledger = mock(TransferLedger.class);
         nodes = mock(TransferNodes.class);
         faults = mock(TransferFaults.class);
-        relay = mock(CoreRelay.class);
+        relay = mock(BrokerRelay.class);
         messages = mock(MessageOperations.class);
         staging = mock(StagingQueues.class);
         probe = mock(AcceptanceProbe.class);
@@ -124,13 +124,13 @@ class TransferRunnerTest {
         replicas = mock(ReplicaRegistry.class);
         sourceNode = mock(ClusterNode.class);
         targetNode = mock(ClusterNode.class);
-        client = mock(JolokiaBrokerClient.class);
+        client = mock(ArtemisNode.class);
         link = mock(RelayLink.class);
 
-        when(sourceNode.getJolokiaUrl()).thenReturn("http://src");
-        when(sourceNode.getCoreUrl()).thenReturn("core-src");
-        when(targetNode.getJolokiaUrl()).thenReturn("http://tgt");
-        when(targetNode.getCoreUrl()).thenReturn("core-tgt");
+        when(sourceNode.getManagementUrl()).thenReturn("http://src");
+        when(sourceNode.getDataUrl()).thenReturn("core-src");
+        when(targetNode.getManagementUrl()).thenReturn("http://tgt");
+        when(targetNode.getDataUrl()).thenReturn("core-tgt");
         when(nodes.serving(eq(SRC_CLUSTER), any(), any())).thenReturn(sourceNode);
         when(nodes.serving(eq(TGT_CLUSTER), any(), any())).thenReturn(targetNode);
         when(nodes.client(any())).thenReturn(client);
@@ -213,14 +213,14 @@ class TransferRunnerTest {
                 .sourceClusterId(SRC_CLUSTER)
                 .sourceNodeId(UUID.randomUUID())
                 .sourceNodeName("src")
-                .sourceArtemisNodeId("src-id")
+                .sourceNativeNodeId("src-id")
                 .sourceQueue("SRC.Q")
                 .sourceAddress("SRC.A")
                 .sourceRoutingType("ANYCAST")
                 .targetClusterId(targetCluster)
                 .targetNodeId(UUID.randomUUID())
                 .targetNodeName("tgt")
-                .targetArtemisNodeId("tgt-id")
+                .targetNativeNodeId("tgt-id")
                 .targetQueue("TGT.Q")
                 .targetAddress("TGT.A")
                 .targetRoutingType("ANYCAST")
@@ -380,8 +380,9 @@ class TransferRunnerTest {
         verify(relay).link(any(), any(), route.capture());
         assertThat(route.getValue().staged()).isFalse();
         assertThat(route.getValue().sourceQueue()).isEqualTo("SRC.Q");
-        assertThat(route.getValue().browseFilter()).isEqualTo("(color = 'red') AND AMQTimestamp <= 1767225600000");
-        assertThat(route.getValue().targetAddress()).isEqualTo("TGT.A");
+        assertThat(route.getValue().browseFilter()).isEqualTo("color = 'red'");
+        assertThat(route.getValue().producedAtOrBefore()).contains(Instant.ofEpochMilli(1767225600000L));
+        assertThat(route.getValue().targetQueue()).isEqualTo("TGT.Q");
         assertThat(route.getValue().provenance().staged()).isFalse();
         verify(link).relay(eq(BATCH), hooks.capture());
         when(ledger.known(RUN, List.of(1L, 2L))).thenReturn(Set.of(1L));
@@ -408,6 +409,7 @@ class TransferRunnerTest {
         ArgumentCaptor<RelayLink.Route> route = ArgumentCaptor.forClass(RelayLink.Route.class);
         verify(relay).link(any(), any(), route.capture());
         assertThat(route.getValue().browseFilter()).isNull();
+        assertThat(route.getValue().producedAtOrBefore()).isEmpty();
     }
 
     @Test

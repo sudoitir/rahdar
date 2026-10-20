@@ -12,11 +12,11 @@ import io.github.sudoitir.rahdar.kernel.replica.RahdarBus;
 import io.github.sudoitir.rahdar.kernel.replica.ReplicaSignal;
 import io.github.sudoitir.rahdar.platform.broker.BrokerCapabilities;
 import io.github.sudoitir.rahdar.platform.broker.BrokerCapabilities.CapabilityAssessment;
+import io.github.sudoitir.rahdar.platform.broker.BrokerCapabilityProbe;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
-import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
-import io.github.sudoitir.rahdar.platform.broker.CapabilityProbe;
-import io.github.sudoitir.rahdar.platform.broker.CoreSubscriptionManager;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaBrokerClient;
+import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
+import io.github.sudoitir.rahdar.platform.broker.BrokerNotifications;
+import io.github.sudoitir.rahdar.platform.broker.BrokerTarget;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNodeEntity;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNodeRepository;
 import java.time.Duration;
@@ -40,11 +40,11 @@ class CapabilityAssessmentsTest {
 
     private final UUID clusterId = UUID.randomUUID();
     private final BrokerNodeRepository nodes = mock(BrokerNodeRepository.class);
-    private final BrokerConnections connections = mock(BrokerConnections.class);
-    private final CapabilityProbe probe = mock(CapabilityProbe.class);
+    private final BrokerGateway gateway = mock(BrokerGateway.class);
+    private final BrokerCapabilityProbe probe = mock(BrokerCapabilityProbe.class);
     private final RahdarBus bus = mock(RahdarBus.class);
     private final CapabilityAssessments assessments = new CapabilityAssessments(
-            nodes, connections, probe, mock(CapabilityLedger.class), mock(CoreSubscriptionManager.class), bus);
+            nodes, gateway, probe, mock(CapabilityLedger.class), mock(BrokerNotifications.class), bus);
     private final BrokerCapabilities result = new BrokerCapabilities(
             CapabilityAssessment.available("read"),
             CapabilityAssessment.unknown("write", null),
@@ -54,9 +54,9 @@ class CapabilityAssessmentsTest {
 
     CapabilityAssessmentsTest() {
         BrokerNodeEntity node = mock(BrokerNodeEntity.class);
-        when(node.getJolokiaUrl()).thenReturn(URL);
+        when(node.getManagementUrl()).thenReturn(URL);
         when(nodes.findByClusterIdOrderByNameAsc(clusterId)).thenReturn(List.of(node));
-        when(connections.forCluster(any(), any())).thenReturn(mock(JolokiaBrokerClient.class));
+        when(gateway.node(any(UUID.class), any(UUID.class))).thenReturn(mock(BrokerTarget.class));
     }
 
     @Test

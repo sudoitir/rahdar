@@ -9,10 +9,6 @@ import io.github.sudoitir.rahdar.kernel.plugin.ResourceKind;
 import io.github.sudoitir.rahdar.kernel.security.Actor;
 import io.github.sudoitir.rahdar.kernel.security.ActorResolver;
 import io.github.sudoitir.rahdar.kernel.security.ClusterAccessGuard;
-import io.github.sudoitir.rahdar.platform.broker.CoreMessageTransport;
-import io.github.sudoitir.rahdar.platform.broker.CoreSubscriptionManager;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaMessageTransport;
-import io.github.sudoitir.rahdar.platform.broker.MessageTransport;
 import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -34,9 +30,6 @@ public class SqlConsoleService {
     private final QueryPlanner planner;
     private final BrokerQueryExecutor brokerExecutor;
     private final IndexQueryExecutor indexExecutor;
-    private final JolokiaMessageTransport jolokiaTransport;
-    private final CoreMessageTransport coreTransport;
-    private final CoreSubscriptionManager subscriptions;
     private final ClusterAccessGuard clusterAccess;
     private final ActorResolver actorResolver;
     private final AuditService audit;
@@ -88,7 +81,7 @@ public class SqlConsoleService {
         try {
             QueryResult result = plan.resolvedSource() == Source.INDEX
                     ? indexExecutor.execute(clusterId, plan, sink)
-                    : brokerExecutor.execute(clusterId, plan, transportFor(clusterId), sink);
+                    : brokerExecutor.execute(clusterId, plan, sink);
             // Failed only when a node failed. Reaching a bound — the row limit above
             // all — is an ordinary bounded query, and recording every `LIMIT 5` as a
             // failure would leave an audit log nobody can read for real failures.
@@ -140,11 +133,6 @@ public class SqlConsoleService {
                 .map(b -> b.kind().name())
                 .reduce((a, b) -> a + ", " + b)
                 .orElse("bounded");
-    }
-
-    /** Core when the cluster has a live Core subscription (ADR-0029); Jolokia otherwise. */
-    public MessageTransport transportFor(UUID clusterId) {
-        return subscriptions.verdictFor(clusterId).isConnected() ? coreTransport : jolokiaTransport;
     }
 
     /** A run, with the plan it ran — the console shows both, and they must be the same one. */

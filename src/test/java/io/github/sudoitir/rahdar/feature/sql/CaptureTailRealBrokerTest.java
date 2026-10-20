@@ -3,14 +3,11 @@ package io.github.sudoitir.rahdar.feature.sql;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 
-import io.github.sudoitir.rahdar.feature.queues.DivertOperations;
-import io.github.sudoitir.rahdar.feature.queues.QueueLifecycleOperations;
 import io.github.sudoitir.rahdar.feature.sql.QueryResult.NodeOutcome;
 import io.github.sudoitir.rahdar.feature.sql.QueryResult.Row;
 import io.github.sudoitir.rahdar.kernel.settings.RahdarInstance;
 import io.github.sudoitir.rahdar.platform.broker.Attempt;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaBrokerClient;
 import io.github.sudoitir.rahdar.platform.broker.QueueRow;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
@@ -23,6 +20,9 @@ import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshotUpsert;
 import io.github.sudoitir.rahdar.support.AdminAuthenticationExtension;
 import io.github.sudoitir.rahdar.support.ArtemisIntegrationTest;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
+import io.github.sudoitir.rahdar.system.artemis.DivertOperations;
+import io.github.sudoitir.rahdar.system.artemis.QueueLifecycleOperations;
 import jakarta.jms.Connection;
 import jakarta.jms.MessageConsumer;
 import jakarta.jms.Session;
@@ -101,7 +101,7 @@ class CaptureTailRealBrokerTest extends PostgresIntegrationTest {
 
     private UUID clusterId;
     private UUID subscriptionId;
-    private JolokiaBrokerClient client;
+    private ArtemisNode client;
     private String broker;
     private ActiveMQConnectionFactory factory;
     private SqlTailPoller.Tail tail;
@@ -126,7 +126,7 @@ class CaptureTailRealBrokerTest extends PostgresIntegrationTest {
         ClusterNode node = directory.nodes(clusterId).getFirst();
         clusterService.overrideNodeUrl(
                 clusterId, node.getId(), new NodeOverrideRequest(null, ArtemisIntegrationTest.coreUrl()));
-        client = connections.forCluster(clusterId, ArtemisIntegrationTest.jolokiaUrl());
+        client = ArtemisIntegrationTest.jolokiaClient(ArtemisIntegrationTest.jolokiaUrl());
         broker = client.resolveBrokerObjectName();
         factory = new ActiveMQConnectionFactory(
                 ArtemisIntegrationTest.coreUrl(),
@@ -148,8 +148,22 @@ class CaptureTailRealBrokerTest extends PostgresIntegrationTest {
                         "auto-create-address",
                         true));
         // The scrape does not run in tests, and capture resolves its addresses from the snapshot.
-        snapshots.upsertBatch(List.of(
-                new QueueRow(clusterId, node.getId(), address, address, "ANYCAST", true, 0, 0, 0, 0, 0, 0, 0, false)));
+        snapshots.upsertBatch(List.of(new QueueRow(
+                clusterId,
+                node.getId(),
+                address,
+                address,
+                "ANYCAST",
+                true,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                false,
+                "artemis.queue")));
     }
 
     @AfterEach
@@ -184,7 +198,7 @@ class CaptureTailRealBrokerTest extends PostgresIntegrationTest {
         assertThat(executed.plan().resolvedSource())
                 .as("a captured queue plans onto the index")
                 .isEqualTo(QueryAst.Source.INDEX);
-        tail = tailPoller.start(clusterId, executed.plan(), console.transportFor(clusterId), collecting);
+        tail = tailPoller.start(clusterId, executed.plan(), collecting);
         executed.result().rows().forEach(tail::seen);
 
         // Taken off the queue before any read of it could see it: only the capture copy is left.

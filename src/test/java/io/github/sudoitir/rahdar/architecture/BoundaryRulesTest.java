@@ -11,6 +11,8 @@ import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.domain.JavaMethodCall;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.core.importer.ImportOption;
+import io.github.sudoitir.openbroker.ClusterConnection;
+import io.github.sudoitir.openbroker.messaging.Message;
 import jakarta.persistence.Entity;
 import java.util.Set;
 import java.util.regex.Pattern;
@@ -83,14 +85,73 @@ class BoundaryRulesTest {
                 .check(CLASSES);
     }
 
+    /** Rahdar reaches every broker through the broker SDK (ADR-0203): no broker's own client appears in it. */
     @Test
-    void brokerClientTypesStayInsideThePlatformBroker() {
+    void noBrokerClientAppearsAnywhere() {
         noClasses()
                 .that()
-                .resideOutsideOfPackage(ROOT + ".platform.broker..")
+                .resideInAPackage(ROOT + "..")
                 .should()
                 .dependOnClassesThat()
-                .resideInAnyPackage("org.jolokia..", "org.apache.activemq.artemis.api.core.client..")
+                .resideInAnyPackage("org.jolokia..", "org.apache.activemq..", "jakarta.jms..")
+                .check(CLASSES);
+    }
+
+    /** The SDK's driver interface is for drivers; Rahdar is a consumer of the SDK. */
+    @Test
+    void theSdksDriverInterfaceIsNeverUsed() {
+        noClasses()
+                .that()
+                .resideInAPackage(ROOT + "..")
+                .should()
+                .dependOnClassesThat()
+                .resideInAPackage("io.github.sudoitir.openbroker.spi..")
+                .check(CLASSES);
+    }
+
+    /** What only Artemis has is reached through the Artemis module and nowhere else. */
+    @Test
+    void onlyTheArtemisModuleKnowsTheArtemisDriver() {
+        noClasses()
+                .that()
+                .resideOutsideOfPackage(ROOT + ".system.artemis..")
+                .should()
+                .dependOnClassesThat()
+                .resideInAPackage("io.github.sudoitir.openbroker.artemis..")
+                .orShould()
+                .callMethod(ClusterConnection.class, "unwrap", Class.class)
+                .check(CLASSES);
+    }
+
+    /**
+     * The features that reach Artemis's own mechanics through the Artemis module. Broker configuration,
+     * setup review and routing exist only for Artemis. The others are shared features that still set up
+     * Artemis-only machinery (diverts, taps, staging queues, routes sampled from MBeans); the broker
+     * SDK's operations and Rahdar's system interfaces replace that one feature at a time, and this list
+     * only ever shrinks.
+     */
+    private static final String[] REACH_ARTEMIS = {
+        ROOT + ".system.artemis..",
+        // The composition root lists the module.
+        ROOT + ".app..",
+        ROOT + ".feature.brokerconfig..",
+        ROOT + ".feature.setupreview..",
+        ROOT + ".feature.routing..",
+        ROOT + ".feature.queues..",
+        ROOT + ".feature.sql..",
+        ROOT + ".feature.plugins..",
+        ROOT + ".feature.transfer..",
+        ROOT + ".feature.flow..",
+    };
+
+    @Test
+    void onlyTheListedFeaturesReachTheArtemisModule() {
+        noClasses()
+                .that()
+                .resideOutsideOfPackages(REACH_ARTEMIS)
+                .should()
+                .dependOnClassesThat()
+                .resideInAPackage(ROOT + ".system.artemis..")
                 .check(CLASSES);
     }
 
@@ -145,9 +206,12 @@ class BoundaryRulesTest {
                     @Override
                     public boolean test(JavaMethodCall call) {
                         String owner = call.getTargetOwner().getFullName();
-                        return (owner.equals(ROOT + ".platform.broker.MessageBrowser$BrowsedMessage")
-                                        || owner.equals(ROOT + ".feature.sql.QueryResult$Row"))
-                                && content.contains(call.getName());
+                        return ((owner.equals(ROOT + ".platform.broker.BrowsedMessage")
+                                                || owner.equals(ROOT + ".feature.sql.QueryResult$Row"))
+                                        && content.contains(call.getName()))
+                                || (owner.equals(Message.class.getName())
+                                        && Set.of("body", "properties", "headers")
+                                                .contains(call.getName()));
                     }
                 })
                 .check(CLASSES);

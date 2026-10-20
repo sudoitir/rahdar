@@ -8,7 +8,7 @@ import java.util.UUID;
 /**
  * Everything the executors need, and everything the operator is shown before the
  * query runs (ADR-0058 D6). A plan contacts no broker: it is built from
- * {@code queue_snapshot} and the measured clock offsets, so it is cheap enough to
+ * {@code subscription_snapshot} and the measured clock offsets, so it is cheap enough to
  * recompute on every keystroke.
  */
 public record QueryPlan(

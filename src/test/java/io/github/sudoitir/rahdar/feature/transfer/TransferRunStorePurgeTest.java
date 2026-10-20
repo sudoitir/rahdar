@@ -69,12 +69,12 @@ class TransferRunStorePurgeTest extends PostgresIntegrationTest {
         jdbc.update(
                 """
                 INSERT INTO transfer_run (id, t0, created_at, finished_at, expires_at, mode, state,
-                    source_queue, source_address, source_routing_type, source_node_name, source_artemis_node_id,
-                    target_queue, target_address, target_routing_type, target_node_name, target_artemis_node_id,
+                    source_subscription, source_destination, source_node_name, source_native_node_id,
+                    target_subscription, target_destination, target_node_name, target_native_node_id,
                     plan_hash, username, selection, findings, source_cluster_id, source_node_id,
                     target_cluster_id, target_node_id, same_node)
                 VALUES (?, now(), now() - ?::interval, now() - ?::interval, now() + ?::interval, 'MOVE', ?,
-                    ?, 'a', 'ANYCAST', 'n', 'x', 'q2', 'a2', 'ANYCAST', 'n', 'x',
+                    ?, 'a', 'n', 'x', 'q2', 'a2', 'n', 'x',
                     'h', 'test', '{}'::jsonb, '[]'::jsonb, ?, ?, ?, ?, false)""",
                 id,
                 createdAgo,

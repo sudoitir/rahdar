@@ -19,7 +19,8 @@
             "platform.broker",
             "platform.clusters",
             "platform.governance",
-            "platform.scrape"
+            "platform.scrape",
+            "system.artemis"
         })
 package io.github.sudoitir.rahdar.feature.sql;
 

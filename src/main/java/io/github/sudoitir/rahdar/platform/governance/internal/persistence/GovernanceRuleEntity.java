@@ -36,7 +36,7 @@ public class GovernanceRuleEntity {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
-    @Column(name = "address_pattern")
+    @Column(name = "destination_pattern")
     private String addressPattern;
 
     @Column(name = "target", nullable = false)

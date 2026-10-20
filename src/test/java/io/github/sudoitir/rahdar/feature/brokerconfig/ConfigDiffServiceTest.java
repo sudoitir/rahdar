@@ -20,11 +20,12 @@ import io.github.sudoitir.rahdar.kernel.security.Permissions;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException.Kind;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaBrokerClient;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
 import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshot;
 import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshots;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNodes;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -54,13 +55,16 @@ class ConfigDiffServiceTest {
     private ConfigDiffService service;
     private final List<ClusterNode> nodes = new ArrayList<>();
 
+    private final ArtemisNodes artemisNodes = mock(ArtemisNodes.class);
+
     @BeforeEach
     void setUp() {
         directory = mock(ClusterDirectory.class);
         snapshots = mock(QueueSnapshots.class);
         connections = mock(BrokerConnections.class);
         reader = mock(ConfigReader.class);
-        service = new ConfigDiffService(directory, snapshots, connections, reader, mock(ClusterAccessGuard.class));
+        service = new ConfigDiffService(
+                directory, snapshots, connections, reader, mock(ClusterAccessGuard.class), artemisNodes);
         when(directory.nodes(clusterId)).thenReturn(nodes);
         when(snapshots.forCluster(clusterId)).thenReturn(List.of());
     }
@@ -73,7 +77,7 @@ class ConfigDiffServiceTest {
         ClusterNode node = mock(ClusterNode.class);
         when(node.getId()).thenReturn(UUID.randomUUID());
         when(node.getName()).thenReturn(name);
-        when(node.getJolokiaUrl()).thenReturn(url);
+        when(node.getManagementUrl()).thenReturn(url);
         nodes.add(node);
         return node;
     }
@@ -89,16 +93,18 @@ class ConfigDiffServiceTest {
     /** A node that answers with {@code config}. */
     private ClusterNode answering(String name, NodeConfig config) {
         ClusterNode node = node(name, "http://" + name + "/jolokia");
-        JolokiaBrokerClient client = mock(JolokiaBrokerClient.class);
-        when(connections.forCluster(clusterId, node.getJolokiaUrl())).thenReturn(client);
+        ArtemisNode client = mock(ArtemisNode.class);
+        UUID nodeId = node.getId();
+        when(artemisNodes.on(clusterId, nodeId)).thenReturn(client);
         when(reader.read(eq(client), anyList())).thenReturn(config);
         return node;
     }
 
     private ClusterNode failing(String name, Kind kind, String message) {
         ClusterNode node = node(name, "http://" + name + "/jolokia");
-        JolokiaBrokerClient client = mock(JolokiaBrokerClient.class);
-        when(connections.forCluster(clusterId, node.getJolokiaUrl())).thenReturn(client);
+        ArtemisNode client = mock(ArtemisNode.class);
+        UUID nodeId = node.getId();
+        when(artemisNodes.on(clusterId, nodeId)).thenReturn(client);
         when(reader.read(eq(client), anyList())).thenThrow(new BrokerConnectionException(kind, message));
         return node;
     }
@@ -287,7 +293,7 @@ class ConfigDiffServiceTest {
         assertThat(view.matchesCompared()).isEqualTo(ConfigReader.MATCH_CAP);
         assertThat(view.matchesAvailable()).isEqualTo(41);
         assertThat(view.notes()).singleElement().asString().contains("Compared 25 of 41 address settings");
-        verify(connections, times(2)).forCluster(eq(clusterId), any());
+        verify(artemisNodes, times(2)).on(eq(clusterId), any(UUID.class));
         verify(reader, times(2)).read(any(), anyList());
     }
 
@@ -330,7 +336,7 @@ class ConfigDiffServiceTest {
     @Test
     void theComparisonRequiresTheTopologyReadPermission() {
         ClusterAccessGuard guard = mock(ClusterAccessGuard.class);
-        service = new ConfigDiffService(directory, snapshots, connections, reader, guard);
+        service = new ConfigDiffService(directory, snapshots, connections, reader, guard, artemisNodes);
 
         service.compare(clusterId, null);
 

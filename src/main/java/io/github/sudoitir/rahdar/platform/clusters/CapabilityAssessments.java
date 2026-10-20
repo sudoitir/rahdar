@@ -6,11 +6,11 @@ import io.github.sudoitir.rahdar.kernel.replica.BusResumed;
 import io.github.sudoitir.rahdar.kernel.replica.RahdarBus;
 import io.github.sudoitir.rahdar.kernel.replica.ReplicaSignal;
 import io.github.sudoitir.rahdar.platform.broker.BrokerCapabilities;
+import io.github.sudoitir.rahdar.platform.broker.BrokerCapabilityProbe;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
-import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
-import io.github.sudoitir.rahdar.platform.broker.CapabilityProbe;
-import io.github.sudoitir.rahdar.platform.broker.CoreSubscriptionManager;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaBrokerClient;
+import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
+import io.github.sudoitir.rahdar.platform.broker.BrokerNotifications;
+import io.github.sudoitir.rahdar.platform.broker.BrokerTarget;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNodeEntity;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNodeRepository;
 import java.time.Duration;
@@ -55,23 +55,23 @@ public class CapabilityAssessments {
     }
 
     private final BrokerNodeRepository nodes;
-    private final BrokerConnections connections;
-    private final CapabilityProbe probe;
+    private final BrokerGateway gateway;
+    private final BrokerCapabilityProbe probe;
     private final CapabilityLedger ledger;
-    private final CoreSubscriptionManager coreSubscriptions;
+    private final BrokerNotifications coreSubscriptions;
     private final RahdarBus bus;
 
     private final AsyncCache<UUID, Outcome> cache;
 
     CapabilityAssessments(
             BrokerNodeRepository nodes,
-            BrokerConnections connections,
-            CapabilityProbe probe,
+            BrokerGateway gateway,
+            BrokerCapabilityProbe probe,
             CapabilityLedger ledger,
-            CoreSubscriptionManager coreSubscriptions,
+            BrokerNotifications coreSubscriptions,
             RahdarBus bus) {
         this.nodes = nodes;
-        this.connections = connections;
+        this.gateway = gateway;
         this.probe = probe;
         this.ledger = ledger;
         this.coreSubscriptions = coreSubscriptions;
@@ -116,9 +116,9 @@ public class CapabilityAssessments {
     private Outcome assess(UUID clusterId) {
         try {
             BrokerNodeEntity manageable = manageableNode(clusterId);
-            JolokiaBrokerClient client = connections.forCluster(clusterId, manageable.getJolokiaUrl());
+            BrokerTarget target = gateway.node(clusterId, manageable.getId());
             return new Outcome(
-                    probe.probe(client, coreSubscriptions.verdictFor(clusterId), ledger.managementWrite(clusterId)),
+                    probe.probe(target, coreSubscriptions.verdictFor(clusterId), ledger.managementWrite(clusterId)),
                     null);
         } catch (BrokerConnectionException e) {
             return new Outcome(null, e);
@@ -142,7 +142,7 @@ public class CapabilityAssessments {
 
     static Optional<BrokerNodeEntity> chooseManageable(List<BrokerNodeEntity> nodes) {
         List<BrokerNodeEntity> manageable =
-                nodes.stream().filter(n -> n.getJolokiaUrl() != null).toList();
+                nodes.stream().filter(n -> n.getManagementUrl() != null).toList();
         return manageable.stream()
                 .filter(n -> Boolean.TRUE.equals(n.getActive()) && n.getLastError() == null)
                 .findFirst()

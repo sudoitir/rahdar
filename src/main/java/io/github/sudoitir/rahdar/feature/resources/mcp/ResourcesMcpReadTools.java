@@ -77,7 +77,7 @@ public class ResourcesMcpReadTools {
             case QUEUES -> {
                 orderedBy = "queueName";
                 // Queues keep their own snapshot-backed path — they are aggregated from
-                // queue_snapshot, not fanned out live, and that is the cheap read.
+                // subscription_snapshot, not fanned out live, and that is the cheap read.
                 for (ResourceViews.QueueView q : queues.queues(clusterId, query).data()) {
                     rows.add(new McpViews.ResourceRow(
                             "queue",

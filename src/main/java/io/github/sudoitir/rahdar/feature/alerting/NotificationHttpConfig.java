@@ -8,10 +8,8 @@ import org.springframework.web.client.RestClient;
 
 /**
  * A {@code RestClient} for outbound notification delivery only (ADR-0036) — built
- * with the same {@link HttpClientSettings} recipe as
- * {@code BrokerClientFactory}, but its own bean: it must never share the
- * per-node Jolokia rate limiter or a broker's TLS bundle with a call to a
- * Slack/webhook endpoint.
+ * with the {@link HttpClientSettings} recipe, and never through the broker gateway: a call to a
+ * Slack or webhook endpoint must not share the per-node broker rate limiter or a broker's TLS bundle.
  */
 @Configuration
 public class NotificationHttpConfig {

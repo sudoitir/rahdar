@@ -23,7 +23,7 @@ import org.springframework.stereotype.Component;
  * {@link #resolve} browses an address that {@link #matches} would reject, a reply
  * is read and then discarded.
  *
- * <p>Resolution reads {@code queue_snapshot}, which the scrape loop already fills,
+ * <p>Resolution reads {@code subscription_snapshot}, which the scrape loop already fills,
  * so a pattern costs no broker call at all and a reply queue created by a new
  * responder is picked up within one scrape cycle of appearing (design.md, D4). The
  * cost is that such a queue is invisible to tracing until that first scrape — the

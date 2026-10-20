@@ -23,7 +23,6 @@ import io.github.sudoitir.rahdar.kernel.security.internal.persistence.RolePermis
 import io.github.sudoitir.rahdar.kernel.security.internal.persistence.RoleRepository;
 import io.github.sudoitir.rahdar.kernel.security.internal.persistence.UserRoleRepository;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaBrokerClient;
 import io.github.sudoitir.rahdar.platform.broker.ManagementRefusal;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNodeEntity;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNodeEntity.HaObservation;
@@ -32,6 +31,8 @@ import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterE
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterRepository;
 import io.github.sudoitir.rahdar.support.McpFixture;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNodes;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
@@ -87,13 +88,16 @@ class McpBrokerConfigIntegrationTest extends PostgresIntegrationTest {
     BrokerConnections connections;
 
     @MockitoBean
+    ArtemisNodes artemisNodes;
+
+    @MockitoBean
     BrokerConfigOperations ops;
 
     private MockMvc mvc;
     private UUID clusterId;
     private String clusterName;
     private final Map<UUID, Map<String, Map<String, Object>>> broker = new HashMap<>();
-    private final Map<JolokiaBrokerClient, UUID> clientToNode = new HashMap<>();
+    private final Map<ArtemisNode, UUID> clientToNode = new HashMap<>();
 
     @BeforeEach
     void setUp() {
@@ -134,9 +138,9 @@ class McpBrokerConfigIntegrationTest extends PostgresIntegrationTest {
         n.attachSeedUrl(url);
         n.applyHaState(new HaObservation(true, "STARTED", "PRIMARY", null, "2.44.0", null), 1L, Instant.now());
         UUID id = nodes.save(n).getId();
-        JolokiaBrokerClient client = mock(JolokiaBrokerClient.class);
+        ArtemisNode client = mock(ArtemisNode.class);
         when(client.resolveBrokerObjectName()).thenReturn("org.apache.activemq.artemis:broker=\"b\"");
-        when(connections.forCluster(clusterId, url)).thenReturn(client);
+        when(artemisNodes.on(clusterId, id)).thenReturn(client);
         clientToNode.put(client, id);
     }
 

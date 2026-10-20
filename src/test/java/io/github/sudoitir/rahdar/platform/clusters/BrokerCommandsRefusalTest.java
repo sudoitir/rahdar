@@ -18,9 +18,9 @@ import io.github.sudoitir.rahdar.kernel.security.ClusterAccessGuard;
 import io.github.sudoitir.rahdar.kernel.security.ResourceRef;
 import io.github.sudoitir.rahdar.kernel.settings.SettingsService;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
+import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
 import io.github.sudoitir.rahdar.platform.clusters.BrokerCommands.Command;
 import io.github.sudoitir.rahdar.platform.clusters.LifecycleOutcome.NodeStatus;
-import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNodeRepository;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -32,7 +32,8 @@ class BrokerCommandsRefusalTest {
 
     private static final UUID CLUSTER = UUID.randomUUID();
 
-    private final BrokerNodeRepository nodes = mock(BrokerNodeRepository.class);
+    private final BrokerGateway gateway = mock(BrokerGateway.class);
+    private final ClusterDirectory nodes = mock(ClusterDirectory.class);
     private final BrokerConnections connections = mock(BrokerConnections.class);
     private final AuditService audit = mock(AuditService.class);
     private final ClusterAccessGuard guard = mock(ClusterAccessGuard.class);
@@ -44,7 +45,8 @@ class BrokerCommandsRefusalTest {
             mock(ActorResolver.class),
             mock(SettingsService.class),
             guard,
-            mock(CapabilityLedger.class));
+            mock(CapabilityLedger.class),
+            gateway);
 
     private Command command() {
         return Command.builder()
@@ -54,7 +56,7 @@ class BrokerCommandsRefusalTest {
                 .auditAction("PURGE_QUEUE")
                 .targetType("QUEUE")
                 .targetName("orders.in")
-                .action((client, broker) -> NodeStatus.APPLIED)
+                .action(node -> NodeStatus.APPLIED)
                 .build();
     }
 
@@ -73,7 +75,7 @@ class BrokerCommandsRefusalTest {
         order.verify(guard).requireAll(eq(CLUSTER), any());
         order.verify(audit).refuse(event, "no queue:purge");
         verify(audit, never()).fail(any(), any());
-        verify(connections, never()).forCluster(any(), any());
+        verify(gateway, never()).node(any(UUID.class), any(UUID.class));
     }
 
     @Test

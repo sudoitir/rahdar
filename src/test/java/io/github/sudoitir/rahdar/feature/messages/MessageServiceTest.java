@@ -16,6 +16,17 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import io.github.sudoitir.openbroker.NodeId;
+import io.github.sudoitir.openbroker.messaging.BulkOutcome;
+import io.github.sudoitir.openbroker.messaging.MessageAction.Delete;
+import io.github.sudoitir.openbroker.messaging.MessageAction.Move;
+import io.github.sudoitir.openbroker.messaging.MessageAction.Retry;
+import io.github.sudoitir.openbroker.messaging.MessageField;
+import io.github.sudoitir.openbroker.messaging.MessageFilter;
+import io.github.sudoitir.openbroker.messaging.MessageRef;
+import io.github.sudoitir.openbroker.messaging.OutboundMessage;
+import io.github.sudoitir.openbroker.model.ResourceId;
+import io.github.sudoitir.openbroker.model.Shard;
 import io.github.sudoitir.rahdar.feature.messages.MessageActionParams.MessageDeleteParams;
 import io.github.sudoitir.rahdar.feature.messages.MessageActionParams.MessageExpireParams;
 import io.github.sudoitir.rahdar.feature.messages.MessageActionParams.MessageMoveParams;
@@ -42,26 +53,16 @@ import io.github.sudoitir.rahdar.kernel.settings.SettingsService;
 import io.github.sudoitir.rahdar.kernel.stream.SseHub;
 import io.github.sudoitir.rahdar.platform.broker.Attempt;
 import io.github.sudoitir.rahdar.platform.broker.BodyDecoder.Compression;
+import io.github.sudoitir.rahdar.platform.broker.BodyEncoding;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
-import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
-import io.github.sudoitir.rahdar.platform.broker.BrokerMBeans;
+import io.github.sudoitir.rahdar.platform.broker.BrokerMessages;
 import io.github.sudoitir.rahdar.platform.broker.BrokerSettings;
+import io.github.sudoitir.rahdar.platform.broker.BrowsePage;
+import io.github.sudoitir.rahdar.platform.broker.BrowsedMessage;
 import io.github.sudoitir.rahdar.platform.broker.BulkCapExceededException;
-import io.github.sudoitir.rahdar.platform.broker.CoreMessageTransport;
-import io.github.sudoitir.rahdar.platform.broker.CoreSubscriptionManager;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaBrokerClient;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaMessageTransport;
-import io.github.sudoitir.rahdar.platform.broker.MessageBrowser.BodyEncoding;
-import io.github.sudoitir.rahdar.platform.broker.MessageBrowser.BrowsePage;
-import io.github.sudoitir.rahdar.platform.broker.MessageBrowser.BrowsedMessage;
+import io.github.sudoitir.rahdar.platform.broker.BulkResult;
+import io.github.sudoitir.rahdar.platform.broker.MessageExpiry;
 import io.github.sudoitir.rahdar.platform.broker.MessageKind;
-import io.github.sudoitir.rahdar.platform.broker.MessageOperations;
-import io.github.sudoitir.rahdar.platform.broker.MessageTransport;
-import io.github.sudoitir.rahdar.platform.broker.MessageTransport.BrowseResult;
-import io.github.sudoitir.rahdar.platform.broker.MessageTransport.Channel;
-import io.github.sudoitir.rahdar.platform.broker.MessageTransport.SendSpec;
-import io.github.sudoitir.rahdar.platform.broker.MessageTransport.TransportTarget;
-import io.github.sudoitir.rahdar.platform.broker.SubscriptionVerdict;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
 import io.github.sudoitir.rahdar.platform.governance.ClearViewAudit;
@@ -75,7 +76,8 @@ import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.TreeSet;
+import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Supplier;
 import org.junit.jupiter.api.AfterEach;
@@ -88,24 +90,20 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /**
- * Message browse and the destructive message operations with the broker and persistence stubbed: which
- * transport serves a read, how a queue is resolved onto a node, what each operation asks the broker for, and
- * what is audited as it goes.
+ * Message browse and the destructive message operations with the broker and persistence stubbed: how a
+ * queue is resolved onto a node, what each operation asks the broker for, and what is audited as it goes.
  */
 class MessageServiceTest {
 
     private static final UUID CLUSTER = UUID.randomUUID();
     private static final UUID NODE_A = UUID.randomUUID();
     private static final UUID NODE_B = UUID.randomUUID();
-    private static final String BROKER = "org.apache.activemq.artemis:broker=\"b\"";
+    private static final String ETAG = "W/\"orders@b\"";
 
     private final QueueLocator locator = mock(QueueLocator.class);
     private final ClusterDirectory directory = mock(ClusterDirectory.class);
-    private final BrokerConnections connections = mock(BrokerConnections.class);
-    private final MessageOperations messageOps = mock(MessageOperations.class);
-    private final JolokiaMessageTransport jolokia = mock(JolokiaMessageTransport.class);
-    private final CoreMessageTransport core = mock(CoreMessageTransport.class);
-    private final CoreSubscriptionManager subscriptions = mock(CoreSubscriptionManager.class);
+    private final BrokerMessages messages = mock(BrokerMessages.class);
+    private final MessageExpiry expiry = mock(MessageExpiry.class);
     private final AuditService audit = mock(AuditService.class);
     private final ActorResolver actors = mock(ActorResolver.class);
     private final SettingsService settings = mock(SettingsService.class);
@@ -114,7 +112,6 @@ class MessageServiceTest {
     private final ContentPolicy policy = mock(ContentPolicy.class);
     private final ClearViewAudit clearViews = mock(ClearViewAudit.class);
     private final OperationGate gate = mock(OperationGate.class);
-    private final JolokiaBrokerClient client = mock(JolokiaBrokerClient.class);
     private final AuditEvent event = mock(AuditEvent.class);
     private final ClusterNode nodeA = node(NODE_A, "node-a", "http://a/jolokia", "tcp://a", true);
     private final ClusterNode nodeB = node(NODE_B, "node-b", "http://b/jolokia", "tcp://b", true);
@@ -127,21 +124,7 @@ class MessageServiceTest {
         // No provider is armed: the gate runs every action as it is.
         when(gate.run(any(), any())).thenAnswer(call -> ((Supplier<Object>) call.getArgument(1)).get());
         service = new MessageService(
-                locator,
-                directory,
-                connections,
-                messageOps,
-                jolokia,
-                core,
-                subscriptions,
-                audit,
-                actors,
-                settings,
-                hub,
-                access,
-                policy,
-                clearViews,
-                gate);
+                locator, directory, messages, expiry, audit, actors, settings, hub, access, policy, clearViews, gate);
         when(locator.locate(CLUSTER, "target"))
                 .thenReturn(List.of(new QueueLocation(NODE_A, "target", "target", "ANYCAST", 1)));
         when(locator.locate(CLUSTER, "t")).thenReturn(List.of(new QueueLocation(NODE_A, "t", "t", "ANYCAST", 1)));
@@ -150,13 +133,13 @@ class MessageServiceTest {
                         new QueueLocation(NODE_A, "orders", "orders.addr", "ANYCAST", 5),
                         new QueueLocation(NODE_B, "orders", "orders.addr", "ANYCAST", 50)));
         when(directory.nodes(CLUSTER)).thenReturn(List.of(nodeA, nodeB));
-        when(subscriptions.verdictFor(CLUSTER)).thenReturn(new SubscriptionVerdict.NotAttempted());
         when(actors.resolve()).thenReturn(new Actor("alice", "127.0.0.1", "req", null));
         when(audit.begin(any(), anyString(), anyString(), anyString(), any(), any(), any(), any(Boolean.class)))
                 .thenReturn(event);
         when(settings.intValue(BrokerSettings.BULK_CAP)).thenReturn(100);
-        when(connections.forCluster(eq(CLUSTER), anyString())).thenReturn(client);
-        when(client.resolveBrokerObjectName()).thenReturn(BROKER);
+        when(messages.identity(eq(CLUSTER), any(UUID.class), anyString())).thenReturn(ETAG);
+        when(messages.queueId(eq(CLUSTER), anyString()))
+                .thenAnswer(i -> ResourceId.of("artemis.queue", i.<String>getArgument(1)));
         when(policy.context(eq(CLUSTER), anyString(), anyString()))
                 .thenReturn(GovernContext.masked(CLUSTER, "orders.addr"));
         when(policy.govern(any(), any())).thenAnswer(invocation -> {
@@ -177,8 +160,8 @@ class MessageServiceTest {
         ClusterNode node = mock(ClusterNode.class);
         when(node.getId()).thenReturn(id);
         when(node.getName()).thenReturn(name);
-        when(node.getJolokiaUrl()).thenReturn(jolokia);
-        when(node.getCoreUrl()).thenReturn(core);
+        when(node.getManagementUrl()).thenReturn(jolokia);
+        when(node.getDataUrl()).thenReturn(core);
         when(node.getActive()).thenReturn(active);
         return node;
     }
@@ -209,27 +192,27 @@ class MessageServiceTest {
                 Map.of("urgent", true));
     }
 
-    private void browses(MessageTransport transport, List<BrowsedMessage> messages, Channel servedBy) {
-        when(transport.browse(any(TransportTarget.class), anyInt(), anyInt(), any()))
-                .thenReturn(new BrowseResult(new BrowsePage(messages, 42L, null), servedBy));
+    private void browses(List<BrowsedMessage> served) {
+        when(messages.browse(eq(CLUSTER), any(UUID.class), anyString(), anyInt(), anyInt(), any()))
+                .thenReturn(new BrowsePage(served, 42L, null));
+    }
+
+    /** What the broker reports for an action over the busiest node's queue. */
+    private static BulkOutcome done(long count) {
+        return BulkOutcome.of(count);
     }
 
     // ---- browse and detail ------------------------------------------------------
 
     @Test
-    void browseReadsTheBusiestNodeThroughJolokiaWhenCoreIsNotConnected() {
-        browses(jolokia, List.of(message(1, "hello", BodyEncoding.TEXT)), Channel.JOLOKIA);
+    void browseReadsTheBusiestNode() {
+        browses(List.of(message(1, "hello", BodyEncoding.TEXT)));
 
         MessagePageView page = service.browse(CLUSTER, "orders", null, "priority > 3", 2, 500);
 
-        ArgumentCaptor<TransportTarget> target = ArgumentCaptor.forClass(TransportTarget.class);
-        verify(jolokia).browse(target.capture(), eq(2), eq(MessageService.BROKER_PAGE_CAP), eq("priority > 3"));
         // Both nodes are live and hold the queue; the one holding more messages is the one that is opened.
-        assertThat(target.getValue().nodeId()).isEqualTo(NODE_B);
-        assertThat(target.getValue().address()).isEqualTo("orders.addr");
-        assertThat(target.getValue().jolokiaUrl()).isEqualTo("http://b/jolokia");
+        verify(messages).browse(CLUSTER, NODE_B, "orders", 2, MessageService.BROKER_PAGE_CAP, "priority > 3");
         assertThat(page.node()).isEqualTo(NODE_B);
-        assertThat(page.transport()).isEqualTo("JOLOKIA");
         assertThat(page.count()).isEqualTo(42L);
         assertThat(page.page()).isEqualTo(2);
         assertThat(page.pageSize()).isEqualTo(MessageService.BROKER_PAGE_CAP);
@@ -244,21 +227,19 @@ class MessageServiceTest {
     }
 
     @Test
-    void browseUsesCoreWhenItsSubscriptionIsConnected() {
-        when(subscriptions.verdictFor(CLUSTER)).thenReturn(new SubscriptionVerdict.Connected(2, Instant.now()));
-        browses(core, List.of(), Channel.CORE);
+    void aRequestedNodeIsTheOneBrowsed() {
+        browses(List.of());
 
         MessagePageView page = service.browse(CLUSTER, "orders", NODE_A, null, 1, 50);
 
-        verify(jolokia, never()).browse(any(), anyInt(), anyInt(), any());
-        assertThat(page.transport()).isEqualTo("CORE");
+        verify(messages).browse(CLUSTER, NODE_A, "orders", 1, 50, null);
         assertThat(page.node()).isEqualTo(NODE_A);
         assertThat(page.data()).isEmpty();
     }
 
     @Test
     void aLongBodyIsCutToAPreview() {
-        browses(jolokia, List.of(message(1, "x".repeat(500), BodyEncoding.TEXT)), Channel.JOLOKIA);
+        browses(List.of(message(1, "x".repeat(500), BodyEncoding.TEXT)));
 
         assertThat(service.browse(CLUSTER, "orders", null, null, 1, 50)
                         .data()
@@ -269,7 +250,7 @@ class MessageServiceTest {
 
     @Test
     void aMessageWithNoBodyHasNoPreview() {
-        browses(jolokia, List.of(message(1, null, BodyEncoding.TEXT)), Channel.JOLOKIA);
+        browses(List.of(message(1, null, BodyEncoding.TEXT)));
 
         assertThat(service.browse(CLUSTER, "orders", null, null, 1, 50)
                         .data()
@@ -280,10 +261,7 @@ class MessageServiceTest {
 
     @Test
     void detailFindsOneMessageAndListsItsTypedProperties() {
-        browses(
-                jolokia,
-                List.of(message(1, "a", BodyEncoding.TEXT), message(2, "b", BodyEncoding.BASE64)),
-                Channel.JOLOKIA);
+        browses(List.of(message(1, "a", BodyEncoding.TEXT), message(2, "b", BodyEncoding.BASE64)));
 
         MessageDetailView detail = service.detail(CLUSTER, "orders", 2, null, null);
 
@@ -303,7 +281,7 @@ class MessageServiceTest {
 
     @Test
     void aMaskedPropertyIsListedWithTheStringsWhateverItsOriginalType() {
-        browses(jolokia, List.of(message(1, "a", BodyEncoding.TEXT)), Channel.JOLOKIA);
+        browses(List.of(message(1, "a", BodyEncoding.TEXT)));
         Mockito.doAnswer(invocation -> {
                     Map<String, Object> properties = new LinkedHashMap<>();
                     properties.put("attempt", "[redacted]");
@@ -351,7 +329,7 @@ class MessageServiceTest {
                 m.longProperties(),
                 m.doubleProperties(),
                 m.booleanProperties());
-        browses(jolokia, List.of(gzipped), Channel.JOLOKIA);
+        browses(List.of(gzipped));
 
         MessageDetailView detail = service.detail(CLUSTER, "orders", 3, null, null);
 
@@ -366,7 +344,7 @@ class MessageServiceTest {
 
     @Test
     void detailOfAnAbsentMessageIs404() {
-        browses(jolokia, List.of(message(1, "a", BodyEncoding.TEXT)), Channel.JOLOKIA);
+        browses(List.of(message(1, "a", BodyEncoding.TEXT)));
 
         assertThatThrownBy(() -> service.detail(CLUSTER, "orders", 99, null, null))
                 .isInstanceOf(NotFoundException.class);
@@ -437,7 +415,7 @@ class MessageServiceTest {
                         Attempt.Ok.class,
                         ok -> assertThat(ok.value()).isEqualTo(new Outcome.DryRun(1, 100, false, NODE_B)));
         verify(audit).succeed(event, 1);
-        verify(jolokia, never()).send(any(), any());
+        verify(messages, never()).send(any(), any(), any(), any());
         verify(hub, never()).publishAbout(any(UUID.class), anyString(), anyCollection(), anyCollection());
     }
 
@@ -451,7 +429,7 @@ class MessageServiceTest {
                 .hasMessageContaining("'x-long-name'");
         verify(audit, never())
                 .begin(any(), anyString(), anyString(), anyString(), any(), any(), any(), any(Boolean.class));
-        verify(jolokia, never()).send(any(), any());
+        verify(messages, never()).send(any(), any(), any(), any());
     }
 
     @Test
@@ -463,7 +441,7 @@ class MessageServiceTest {
                 .hasMessageContaining("base64");
         verify(audit, never())
                 .begin(any(), anyString(), anyString(), anyString(), any(), any(), any(), any(Boolean.class));
-        verify(jolokia, never()).send(any(), any());
+        verify(messages, never()).send(any(), any(), any(), any());
     }
 
     @Test
@@ -478,17 +456,17 @@ class MessageServiceTest {
     }
 
     @Test
-    void aSendGoesThroughTheTransportAndRefreshesTheQueuesTopic() {
+    void aSendGoesToTheQueuesAddressThroughItsNodeAndRefreshesTheQueuesTopic() {
         Attempt<Outcome> result = service.send(CLUSTER, "orders", NODE_A, sendRequest(), false);
 
         assertThat(result)
                 .isInstanceOfSatisfying(
                         Attempt.Ok.class, ok -> assertThat(ok.value()).isEqualTo(new Outcome.Affected(1, NODE_A)));
-        ArgumentCaptor<SendSpec> spec = ArgumentCaptor.forClass(SendSpec.class);
-        verify(jolokia).send(any(TransportTarget.class), spec.capture());
-        assertThat(spec.getValue().kind()).isEqualTo(MessageKind.TEXT);
-        assertThat(spec.getValue().durable()).isTrue();
-        assertThat(spec.getValue().body()).isEqualTo("{}");
+        ArgumentCaptor<OutboundMessage> sent = ArgumentCaptor.forClass(OutboundMessage.class);
+        verify(messages).send(eq(CLUSTER), eq(NODE_A), eq("orders.addr"), sent.capture());
+        assertThat(sent.getValue().headers().durable()).contains(true);
+        assertThat(sent.getValue().headers().correlationId()).contains("c-1");
+        assertThat(sent.getValue().body().bytes().orElseThrow().toByteArray()).isEqualTo("{}".getBytes());
         verify(audit).succeed(event, 1);
         verify(hub).publishAbout(eq(CLUSTER), eq("queues"), anyCollection(), anyCollection());
     }
@@ -496,8 +474,8 @@ class MessageServiceTest {
     @Test
     void aSendThatTheBrokerRefusesIsReportedAndAuditedAsFailed() {
         doThrow(new BrokerConnectionException(BrokerConnectionException.Kind.CREDENTIALS_REJECTED, "denied"))
-                .when(jolokia)
-                .send(any(), any());
+                .when(messages)
+                .send(any(), any(), any(), any());
 
         Attempt<Outcome> result = service.send(CLUSTER, "orders", null, sendRequest(), false);
 
@@ -528,8 +506,8 @@ class MessageServiceTest {
         return new MessageActionRequest(null, filter, target);
     }
 
-    private String queueMbean() {
-        return BrokerMBeans.queue(BROKER, "orders.addr", "orders", "ANYCAST");
+    private void counts(String filter, long count) {
+        when(messages.count(CLUSTER, NODE_B, "orders", filter)).thenReturn(count);
     }
 
     @Test
@@ -540,7 +518,7 @@ class MessageServiceTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("MOVE requires a target queue.");
         verify(audit).fail(event, "MOVE requires a target queue.");
-        verify(messageOps, never()).moveByIds(any(), anyString(), anyList(), anyString());
+        verify(messages, never()).byIds(any(), any(), any(), anyList(), any());
     }
 
     @Test
@@ -561,7 +539,8 @@ class MessageServiceTest {
                         Attempt.Ok.class,
                         ok -> assertThat(ok.value()).isEqualTo(new Outcome.DryRun(3, 100, false, NODE_B)));
         verify(audit).succeed(event, 3);
-        verify(connections, never()).forCluster(any(), anyString());
+        verify(messages, never()).count(any(), any(), any(), any());
+        verify(messages, never()).byIds(any(), any(), any(), anyList(), any());
     }
 
     @Test
@@ -579,7 +558,7 @@ class MessageServiceTest {
 
     @Test
     void aByFilterDryRunAsksTheBrokerToCount() {
-        when(messageOps.countMessages(client, queueMbean(), "priority > 3")).thenReturn(7L);
+        counts("priority > 3", 7L);
 
         Attempt<Outcome> result = service.execute(
                 CLUSTER, "orders", null, MessageAction.DELETE, filter("priority > 3", null), true, false);
@@ -588,12 +567,12 @@ class MessageServiceTest {
                 .isInstanceOfSatisfying(
                         Attempt.Ok.class,
                         ok -> assertThat(ok.value()).isEqualTo(new Outcome.DryRun(7, 100, false, NODE_B)));
-        verify(messageOps, never()).deleteByFilter(any(), anyString(), anyString());
+        verify(messages, never()).byFilter(any(), any(), any(), anyString(), any(), any());
     }
 
     @Test
     void aRetryAllDryRunCountsTheWholeQueue() {
-        when(messageOps.messageCount(client, queueMbean())).thenReturn(12L);
+        counts(null, 12L);
 
         Attempt<Outcome> result = service.execute(
                 CLUSTER,
@@ -612,9 +591,10 @@ class MessageServiceTest {
 
     @Test
     void aRetryAllRetriesEverythingAndRefreshesTheQueues() {
-        when(messageOps.messageCount(client, queueMbean())).thenReturn(12L);
+        counts(null, 12L);
         when(access.holds(CLUSTER, MessagePermissions.MESSAGE_SEND)).thenReturn(true);
-        when(messageOps.retryAll(client, queueMbean())).thenReturn(12L);
+        when(messages.byFilter(CLUSTER, NODE_B, "orders", null, Optional.empty(), new Retry()))
+                .thenReturn(done(12));
 
         Attempt<Outcome> result = service.execute(
                 CLUSTER, "orders", null, MessageAction.RETRY, new MessageActionRequest(null, null, null), false, false);
@@ -628,10 +608,18 @@ class MessageServiceTest {
 
     @Test
     void byFilterOperationsEachCallTheirOwnBrokerOperation() {
-        when(messageOps.countMessages(any(), anyString(), anyString())).thenReturn(1L);
-        when(messageOps.moveByFilter(client, queueMbean(), "f", "target")).thenReturn(1L);
-        when(messageOps.deleteByFilter(client, queueMbean(), "f")).thenReturn(2L);
-        when(messageOps.expireByFilter(client, queueMbean(), "f")).thenReturn(3L);
+        counts("f", 1L);
+        when(messages.byFilter(
+                        CLUSTER,
+                        NODE_B,
+                        "orders",
+                        "f",
+                        Optional.empty(),
+                        new Move(ResourceId.of("artemis.queue", "target"))))
+                .thenReturn(done(1));
+        when(messages.byFilter(CLUSTER, NODE_B, "orders", "f", Optional.empty(), new Delete()))
+                .thenReturn(done(2));
+        when(expiry.byFilter(CLUSTER, NODE_B, "orders", "f")).thenReturn(3L);
 
         assertThat(service.execute(CLUSTER, "orders", null, MessageAction.MOVE, filter("f", "target"), false, false))
                 .isInstanceOfSatisfying(
@@ -647,8 +635,9 @@ class MessageServiceTest {
     @Test
     void anActionOverTheCapIsRefusedUnlessOverridden() {
         when(settings.intValue(BrokerSettings.BULK_CAP)).thenReturn(5);
-        when(messageOps.countMessages(client, queueMbean(), "f")).thenReturn(9L);
-        when(messageOps.deleteByFilter(client, queueMbean(), "f")).thenReturn(9L);
+        counts("f", 9L);
+        when(messages.byFilter(CLUSTER, NODE_B, "orders", "f", Optional.empty(), new Delete()))
+                .thenReturn(done(9));
 
         var request = filter("f", null);
 
@@ -664,12 +653,9 @@ class MessageServiceTest {
     @Test
     void byIdOperationsCallTheirOwnBrokerOperation() {
         when(access.holds(CLUSTER, MessagePermissions.MESSAGE_SEND)).thenReturn(true);
-        MessageOperations.BulkResult done = new MessageOperations.BulkResult(2, List.of(), null);
-        when(messageOps.moveByIds(client, queueMbean(), List.of(1L, 2L), "target"))
-                .thenReturn(done);
-        when(messageOps.retryByIds(client, queueMbean(), List.of(1L, 2L))).thenReturn(done);
-        when(messageOps.deleteByIds(client, queueMbean(), List.of(1L, 2L))).thenReturn(done);
-        when(messageOps.expireByIds(client, queueMbean(), List.of(1L, 2L))).thenReturn(done);
+        when(messages.byIds(eq(CLUSTER), eq(NODE_B), eq("orders"), eq(List.of(1L, 2L)), any()))
+                .thenReturn(done(2));
+        when(expiry.byIds(CLUSTER, NODE_B, "orders", List.of(1L, 2L))).thenReturn(new BulkResult(2, List.of(), null));
 
         for (MessageAction action : MessageAction.values()) {
             MessageActionRequest request = new MessageActionRequest(List.of(1L, 2L), null, "target");
@@ -682,8 +668,14 @@ class MessageServiceTest {
 
     @Test
     void anIdOperationThatStoppedPartWayIsReportedAsPartialNotFailed() {
-        when(messageOps.deleteByIds(client, queueMbean(), List.of(1L, 2L, 3L)))
-                .thenReturn(new MessageOperations.BulkResult(1, List.of(2L, 3L), "connection reset"));
+        ResourceId queue = ResourceId.of("artemis.queue", "orders");
+        when(messages.byIds(CLUSTER, NODE_B, "orders", List.of(1L, 2L, 3L), new Delete()))
+                .thenReturn(new BulkOutcome(
+                        1,
+                        List.of(
+                                new MessageRef(queue, Shard.node(NodeId.of("b")), "2"),
+                                new MessageRef(queue, Shard.node(NodeId.of("b")), "3")),
+                        "connection reset"));
 
         Attempt<Outcome> result =
                 service.execute(CLUSTER, "orders", null, MessageAction.DELETE, ids(1L, 2L, 3L), false, false);
@@ -700,7 +692,7 @@ class MessageServiceTest {
 
     @Test
     void aBrokerFailureDuringAnActionIsAuditedAndReturned() {
-        when(messageOps.countMessages(any(), anyString(), anyString()))
+        when(messages.count(any(), any(), anyString(), anyString()))
                 .thenThrow(new BrokerConnectionException(BrokerConnectionException.Kind.UNREACHABLE, "down"));
 
         Attempt<Outcome> result =
@@ -712,7 +704,7 @@ class MessageServiceTest {
 
     @Test
     void aFilterTheBrokerRejectsClosesTheAuditRowAndRethrows() {
-        when(messageOps.countMessages(any(), anyString(), anyString()))
+        when(messages.count(any(), any(), anyString(), anyString()))
                 .thenThrow(new IllegalArgumentException("bad selector"));
 
         var request = filter("f", null);
@@ -724,11 +716,9 @@ class MessageServiceTest {
 
     @Test
     void theAuditParametersNameTheFilterOrTheIdCountAndTheTarget() {
-        when(messageOps.countMessages(any(), anyString(), anyString())).thenReturn(0L);
-        when(messageOps.moveByFilter(any(), anyString(), anyString(), anyString()))
-                .thenReturn(0L);
-        MessageOperations.BulkResult none = new MessageOperations.BulkResult(0, List.of(), null);
-        when(messageOps.moveByIds(any(), anyString(), anyList(), anyString())).thenReturn(none);
+        when(messages.byFilter(any(), any(), anyString(), anyString(), any(), any()))
+                .thenReturn(done(0));
+        when(messages.byIds(any(), any(), anyString(), anyList(), any())).thenReturn(done(0));
 
         service.execute(CLUSTER, "orders", null, MessageAction.MOVE, filter("f", "t"), false, false);
         service.execute(
@@ -760,7 +750,7 @@ class MessageServiceTest {
 
     @Test
     void aPurgeDryRunEstimatesFromTheQueueDepth() {
-        when(messageOps.messageCount(client, queueMbean())).thenReturn(150L);
+        counts(null, 150L);
 
         Attempt<Outcome> result = service.purge(CLUSTER, "orders", null, true, false);
 
@@ -768,18 +758,18 @@ class MessageServiceTest {
                 .isInstanceOfSatisfying(
                         Attempt.Ok.class,
                         ok -> assertThat(ok.value()).isEqualTo(new Outcome.DryRun(150, 100, true, NODE_B)));
-        verify(messageOps, never()).purge(any(), anyString());
+        verify(messages, never()).purge(any(), any(), any());
     }
 
     @Test
     void aPurgeOverTheCapNeedsAnOverride() {
-        when(messageOps.messageCount(client, queueMbean())).thenReturn(150L);
-        when(messageOps.purge(client, queueMbean())).thenReturn(150L);
+        counts(null, 150L);
+        when(messages.purge(CLUSTER, NODE_B, "orders")).thenReturn(150L);
 
         assertThatThrownBy(() -> service.purge(CLUSTER, "orders", null, false, false))
                 .isInstanceOf(BulkCapExceededException.class);
         verify(audit).fail(event, "Over the safety cap (150 > 100).");
-        verify(messageOps, never()).purge(any(), anyString());
+        verify(messages, never()).purge(any(), any(), any());
 
         assertThat(service.purge(CLUSTER, "orders", null, false, true))
                 .isInstanceOfSatisfying(
@@ -789,8 +779,8 @@ class MessageServiceTest {
 
     @Test
     void aPurgeUnderTheCapRunsAndAuditsTheRemovedCount() {
-        when(messageOps.messageCount(client, queueMbean())).thenReturn(3L);
-        when(messageOps.purge(client, queueMbean())).thenReturn(3L);
+        counts(null, 3L);
+        when(messages.purge(CLUSTER, NODE_B, "orders")).thenReturn(3L);
 
         service.purge(CLUSTER, "orders", null, false, false);
 
@@ -799,7 +789,7 @@ class MessageServiceTest {
 
     @Test
     void aPurgeThatCannotReachTheBrokerIsAuditedAndReturned() {
-        when(messageOps.messageCount(any(), anyString()))
+        when(messages.count(any(), any(), anyString(), any()))
                 .thenThrow(new BrokerConnectionException(BrokerConnectionException.Kind.UNREACHABLE, "down"));
 
         assertThat(service.purge(CLUSTER, "orders", null, false, false))
@@ -817,7 +807,7 @@ class MessageServiceTest {
 
     @Test
     void browsingNeedsMessageReadOnTheQueue() {
-        browses(jolokia, List.of(message(1, "hello", BodyEncoding.TEXT)), Channel.JOLOKIA);
+        browses(List.of(message(1, "hello", BodyEncoding.TEXT)));
 
         service.browse(CLUSTER, "orders", null, null, 1, 50);
 
@@ -888,13 +878,13 @@ class MessageServiceTest {
                         CLUSTER, "orders", null, MessageAction.MOVE, filter("f", "ghost"), false, false))
                 .isSameAs(unknown);
         verify(access, never()).requireAll(any(), any());
-        verify(messageOps, never()).moveByFilter(any(), anyString(), anyString(), anyString());
+        verify(messages, never()).byFilter(any(), any(), anyString(), anyString(), any(), any());
     }
 
     @Test
     void aRetryNeedsMessageSendOnEveryAddressTheDeadLettersCameFrom() {
-        when(messageOps.originalAddresses(client, queueMbean())).thenReturn(new TreeSet<>(List.of("a", "b")));
-        when(messageOps.messageCount(client, queueMbean())).thenReturn(3L);
+        origins("a", "b");
+        counts(null, 3L);
 
         service.execute(
                 CLUSTER, "orders", null, MessageAction.RETRY, new MessageActionRequest(null, null, null), true, false);
@@ -910,39 +900,36 @@ class MessageServiceTest {
     @Test
     void aRetryByACallerWhoMaySendAnywhereDoesNotLookAtTheOriginalAddresses() {
         when(access.holds(CLUSTER, MessagePermissions.MESSAGE_SEND)).thenReturn(true);
-        when(messageOps.messageCount(client, queueMbean())).thenReturn(3L);
+        counts(null, 3L);
 
         service.execute(
                 CLUSTER, "orders", null, MessageAction.RETRY, new MessageActionRequest(null, null, null), true, false);
 
-        verify(messageOps, never()).originalAddresses(any(), anyString());
+        verify(messages, never()).countBy(any(), any(), any(), any());
     }
 
     @Test
     void aRetryOfEverythingByACallerWhoMayNotSendEverywhereRetriesOnlyTheMessagesFromTheCheckedAddresses() {
-        when(messageOps.originalAddresses(client, queueMbean())).thenReturn(new TreeSet<>(List.of("a", "b")));
-        when(messageOps.originalAddressFilter("a")).thenReturn("from a");
-        when(messageOps.originalAddressFilter("b")).thenReturn("from b");
-        when(messageOps.listIds(client, queueMbean(), "from a")).thenReturn(List.of(1L, 2L));
-        when(messageOps.listIds(client, queueMbean(), "from b")).thenReturn(List.of(3L));
-        when(messageOps.messageCount(client, queueMbean())).thenReturn(4L);
-        when(messageOps.retryByIds(client, queueMbean(), List.of(1L, 2L, 3L)))
-                .thenReturn(new MessageOperations.BulkResult(3, List.of(), null));
+        origins("a", "b");
+        counts(null, 4L);
+        when(messages.byFilter(CLUSTER, NODE_B, "orders", fromOrigin("a"), new Retry()))
+                .thenReturn(done(2));
+        when(messages.byFilter(CLUSTER, NODE_B, "orders", fromOrigin("b"), new Retry()))
+                .thenReturn(done(1));
 
         Attempt<Outcome> result = service.execute(
                 CLUSTER, "orders", null, MessageAction.RETRY, new MessageActionRequest(null, null, null), false, false);
 
         assertThat(result).isEqualTo(new Attempt.Ok<Outcome>(new Outcome.Affected(3, NODE_B)));
-        verify(messageOps, never()).retryAll(any(), anyString());
+        verify(messages, never()).byFilter(any(), any(), any(), any(String.class), any(), any());
     }
 
     @Test
     void aRetryByIdsLeavesOutAMessageThatDidNotComeFromACheckedAddress() {
-        when(messageOps.originalAddresses(client, queueMbean())).thenReturn(new TreeSet<>(List.of("a")));
-        when(messageOps.originalAddressFilter("a")).thenReturn("from a");
-        when(messageOps.listIds(client, queueMbean(), "from a")).thenReturn(List.of(1L));
-        when(messageOps.retryByIds(client, queueMbean(), List.of(1L)))
-                .thenReturn(new MessageOperations.BulkResult(1, List.of(), null));
+        origins("a");
+        when(messages.ids(CLUSTER, NODE_B, "orders", fromOrigin("a"))).thenReturn(Set.of(1L));
+        when(messages.byIds(CLUSTER, NODE_B, "orders", List.of(1L), new Retry()))
+                .thenReturn(done(1));
 
         service.execute(
                 CLUSTER,
@@ -953,20 +940,20 @@ class MessageServiceTest {
                 false,
                 false);
 
-        verify(messageOps).retryByIds(client, queueMbean(), List.of(1L));
-        verify(messageOps, never()).retryByIds(client, queueMbean(), List.of(1L, 99L));
+        verify(messages).byIds(CLUSTER, NODE_B, "orders", List.of(1L), new Retry());
+        verify(messages, never()).byIds(CLUSTER, NODE_B, "orders", List.of(1L, 99L), new Retry());
     }
 
     @Test
     void aRetryWhoseOriginsCannotBeReadDoesNotProceed() {
-        when(messageOps.originalAddresses(client, queueMbean()))
+        when(messages.countBy(CLUSTER, NODE_B, "orders", MessageField.header("origin")))
                 .thenThrow(new BrokerConnectionException(BrokerConnectionException.Kind.UNREACHABLE, "down"));
 
         Attempt<Outcome> result = service.execute(
                 CLUSTER, "orders", null, MessageAction.RETRY, new MessageActionRequest(null, null, null), false, false);
 
         assertThat(result).isEqualTo(new Attempt.Failed<Outcome>(BrokerConnectionException.Kind.UNREACHABLE, "down"));
-        verify(messageOps, never()).retryAll(any(), anyString());
+        verify(messages, never()).byFilter(any(), any(), any(), any(String.class), any(), any());
     }
 
     // ---- the policy's view of a message ----------------------------------------------------------------
@@ -994,10 +981,6 @@ class MessageServiceTest {
 
     // ---- the approval gate ---------------------------------------------------------------------------------
 
-    private static MessageOperations.BulkResult bulkResult(long affected) {
-        return new MessageOperations.BulkResult(affected, List.of(), null);
-    }
-
     private Operation gatedOperation() {
         ArgumentCaptor<Operation> operation = ArgumentCaptor.forClass(Operation.class);
         verify(gate).run(operation.capture(), any());
@@ -1006,7 +989,7 @@ class MessageServiceTest {
 
     @Test
     void aDryRunIsNeverGated() {
-        when(messageOps.messageCount(client, queueMbean())).thenReturn(4L);
+        counts(null, 4L);
 
         service.purge(CLUSTER, "orders", null, true, false);
         service.execute(
@@ -1024,10 +1007,9 @@ class MessageServiceTest {
     @Test
     void eachRealActionPassesTheGateAsItsOwnTypeWithTheRequestAsItsParameters() {
         MessageActionRequest request = new MessageActionRequest(List.of(1L, 2L), null, "target");
-        when(messageOps.moveByIds(any(), anyString(), anyList(), anyString())).thenReturn(bulkResult(2));
-        when(messageOps.deleteByIds(any(), anyString(), anyList())).thenReturn(bulkResult(2));
-        when(messageOps.expireByIds(any(), anyString(), anyList())).thenReturn(bulkResult(2));
-        when(messageOps.retryByIds(any(), anyString(), anyList())).thenReturn(bulkResult(2));
+        when(access.holds(CLUSTER, MessagePermissions.MESSAGE_SEND)).thenReturn(true);
+        when(messages.byIds(any(), any(), anyString(), anyList(), any())).thenReturn(done(2));
+        when(expiry.byIds(any(), any(), anyString(), anyList())).thenReturn(new BulkResult(2, List.of(), null));
 
         service.execute(CLUSTER, "orders", null, MessageAction.MOVE, request, false, true);
         service.execute(CLUSTER, "orders", null, MessageAction.RETRY, request, false, true);
@@ -1047,8 +1029,8 @@ class MessageServiceTest {
 
     @Test
     void aPurgePassesTheGateAsAQueuePurge() {
-        when(messageOps.messageCount(client, queueMbean())).thenReturn(3L);
-        when(messageOps.purge(client, queueMbean())).thenReturn(3L);
+        counts(null, 3L);
+        when(messages.purge(CLUSTER, NODE_B, "orders")).thenReturn(3L);
 
         service.purge(CLUSTER, "orders", null, false, false);
 
@@ -1068,8 +1050,8 @@ class MessageServiceTest {
         assertThatThrownBy(() -> service.execute(CLUSTER, "orders", null, MessageAction.DELETE, request, false, false))
                 .isInstanceOf(OperationHeldException.class);
 
-        verify(messageOps, never()).purge(any(), anyString());
-        verify(messageOps, never()).deleteByIds(any(), anyString(), anyList());
+        verify(messages, never()).purge(any(), any(), any());
+        verify(messages, never()).byIds(any(), any(), any(), anyList(), any());
         verify(audit, never())
                 .begin(any(), anyString(), anyString(), anyString(), any(), any(), any(), any(Boolean.class));
     }
@@ -1088,7 +1070,7 @@ class MessageServiceTest {
 
     @Test
     void whatAnActionReachesIsReadWithoutAnAuditRowAndPinsTheQueuesIdentity() {
-        when(messageOps.countMessages(client, queueMbean(), "priority > 3")).thenReturn(7L);
+        counts("priority > 3", 7L);
 
         assertThat(service.reach(
                         CLUSTER,
@@ -1096,26 +1078,36 @@ class MessageServiceTest {
                         null,
                         MessageAction.DELETE,
                         new MessageActionRequest(null, "priority > 3", null)))
-                .isEqualTo(new MessageService.Reach(7, "orders.addr|ANYCAST"));
+                .isEqualTo(new MessageService.Reach(7, ETAG));
         assertThat(service.reach(
                         CLUSTER,
                         "orders",
                         null,
                         MessageAction.DELETE,
                         new MessageActionRequest(List.of(1L, 2L, 3L), null, null)))
-                .isEqualTo(new MessageService.Reach(3, "orders.addr|ANYCAST"));
+                .isEqualTo(new MessageService.Reach(3, ETAG));
         verify(audit, never())
                 .begin(any(), anyString(), anyString(), anyString(), any(), any(), any(), any(Boolean.class));
     }
 
     @Test
-    void aPurgeReachIsTheQueueDepthAndAQueueBoundElsewhereHasAnotherIdentity() {
-        when(messageOps.messageCount(client, queueMbean())).thenReturn(12L);
-        assertThat(service.reachOfPurge(CLUSTER, "orders", null))
-                .isEqualTo(new MessageService.Reach(12, "orders.addr|ANYCAST"));
+    void aPurgeReachIsTheQueueDepthAndTheIdentityTheBrokerGivesTheQueueOnItsNode() {
+        counts(null, 12L);
 
-        when(locator.locate(CLUSTER, "orders"))
-                .thenReturn(List.of(new QueueLocation(NODE_A, "orders", "other.addr", "MULTICAST", 5)));
-        assertThat(service.reachOfPurge(CLUSTER, "orders", null).identity()).isEqualTo("other.addr|MULTICAST");
+        assertThat(service.reachOfPurge(CLUSTER, "orders", null)).isEqualTo(new MessageService.Reach(12, ETAG));
+        verify(messages).identity(CLUSTER, NODE_B, "orders");
+    }
+
+    private void origins(String... addresses) {
+        Map<String, Long> byOrigin = new LinkedHashMap<>();
+        for (String address : addresses) {
+            byOrigin.put(address, 1L);
+        }
+        when(messages.countBy(CLUSTER, NODE_B, "orders", MessageField.header("origin")))
+                .thenReturn(byOrigin);
+    }
+
+    private static MessageFilter fromOrigin(String address) {
+        return MessageFilter.portable("header.origin = '" + address + "'");
     }
 }

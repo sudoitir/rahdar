@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -23,7 +22,8 @@ import io.github.sudoitir.rahdar.kernel.security.internal.persistence.RolePermis
 import io.github.sudoitir.rahdar.kernel.security.internal.persistence.RoleRepository;
 import io.github.sudoitir.rahdar.kernel.security.internal.persistence.UserRoleRepository;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaBrokerClient;
+import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
+import io.github.sudoitir.rahdar.platform.broker.BrokerTarget;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNodeEntity;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNodeEntity.HaObservation;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNodeRepository;
@@ -31,6 +31,7 @@ import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterE
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterRepository;
 import io.github.sudoitir.rahdar.support.McpFixture;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
+import io.github.sudoitir.rahdar.support.Targets;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -62,7 +63,6 @@ class McpConnectionControlIntegrationTest extends PostgresIntegrationTest {
 
     private static final String CONNECTION = "a3f1c9de";
     private static final String CLIENT_ID = "orders-worker-7";
-    private static final String BROKER_MBEAN = "org.apache.activemq.artemis:broker=\"b\"";
 
     @Autowired
     WebApplicationContext webContext;
@@ -95,13 +95,16 @@ class McpConnectionControlIntegrationTest extends PostgresIntegrationTest {
     BrokerConnections connections;
 
     @MockitoBean
+    BrokerGateway gateway;
+
+    @MockitoBean
     ConnectionOperations ops;
 
     private MockMvc mvc;
     private UUID clusterId;
     private UUID nodeId;
     private McpFixture.Key key;
-    private JolokiaBrokerClient client;
+    private BrokerTarget client;
 
     @BeforeEach
     void setUp() {
@@ -116,9 +119,8 @@ class McpConnectionControlIntegrationTest extends PostgresIntegrationTest {
         node.applyHaState(new HaObservation(true, "STARTED", "PRIMARY", null, "2.56.0", null), 1L, Instant.now());
         nodeId = nodes.save(node).getId();
 
-        client = mock(JolokiaBrokerClient.class);
-        when(client.resolveBrokerObjectName()).thenReturn(BROKER_MBEAN);
-        when(connections.forCluster(eq(clusterId), anyString())).thenReturn(client);
+        client = Targets.target();
+        when(gateway.node(eq(clusterId), any(UUID.class))).thenReturn(client);
 
         key = McpFixture.mintKey(
                 users,
@@ -170,7 +172,7 @@ class McpConnectionControlIntegrationTest extends PostgresIntegrationTest {
         assertThat(outcome.path("dryRun").asBoolean()).isTrue();
         assertThat(outcome.path("label").asString()).isEqualTo(CLIENT_ID);
         assertThat(outcome.path("messagesInTransit").asInt()).isEqualTo(41);
-        verify(ops, never()).closeConnection(any(), anyString(), anyString());
+        verify(ops, never()).close(any(), any());
     }
 
     /** The identifier is not the confirmation: only the client id the preview reported arms a real run. */
@@ -183,13 +185,13 @@ class McpConnectionControlIntegrationTest extends PostgresIntegrationTest {
 
         assertThat(response.path("error").path("code").asInt()).isEqualTo(-32602);
         assertThat(response.path("error").path("message").asString()).contains(CLIENT_ID);
-        verify(ops, never()).closeConnection(any(), anyString(), anyString());
+        verify(ops, never()).close(any(), any());
     }
 
     @Test
     void aRealRunConfirmedWithTheClientIdCloses() throws Exception {
         when(ops.readConnection(client, CONNECTION)).thenReturn(snapshot());
-        when(ops.closeConnection(client, BROKER_MBEAN, CONNECTION)).thenReturn(true);
+        when(ops.close(client, Targets.id("artemis.connection", CONNECTION))).thenReturn(true);
 
         JsonNode response =
                 McpFixture.callTool(mvc, key, "connection_action", args("dryRun", false, "confirm", CLIENT_ID));
@@ -197,7 +199,7 @@ class McpConnectionControlIntegrationTest extends PostgresIntegrationTest {
 
         assertThat(outcome.path("dryRun").asBoolean()).isFalse();
         assertThat(outcome.path("alreadyGone").asBoolean()).isFalse();
-        verify(ops).closeConnection(client, BROKER_MBEAN, CONNECTION);
+        verify(ops).close(client, Targets.id("artemis.connection", CONNECTION));
     }
 
     /** An agent must be able to tell "gone" from "closed", and from a failure. */
@@ -211,7 +213,7 @@ class McpConnectionControlIntegrationTest extends PostgresIntegrationTest {
         assertThat(response.path("result").path("isError").asBoolean(false)).isFalse();
         assertThat(outcome.path("alreadyGone").asBoolean()).isTrue();
         assertThat(outcome.path("message").asString()).contains("do not retry");
-        verify(ops, never()).closeConnection(any(), anyString(), anyString());
+        verify(ops, never()).close(any(), any());
     }
 
     /** Every message permission in the world does not add up to this one. */

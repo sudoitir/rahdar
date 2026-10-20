@@ -15,7 +15,7 @@ import io.github.sudoitir.rahdar.feature.brokerconfig.Plan.NodePlan;
 import io.github.sudoitir.rahdar.feature.brokerconfig.Plan.Op;
 import io.github.sudoitir.rahdar.feature.brokerconfig.Plan.Section;
 import io.github.sudoitir.rahdar.feature.brokerconfig.Plan.Step;
-import io.github.sudoitir.rahdar.feature.queues.QueueLifecycleOperations;
+import io.github.sudoitir.rahdar.system.artemis.QueueLifecycleOperations;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;

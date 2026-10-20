@@ -5,23 +5,21 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * One {@code activemq.notifications} notification, normalised (ADR-0026). The
- * promoted fields are the ones every screen and Phase 5's correlator need to
- * filter on; {@link #props} keeps the full {@code _AMQ_*} map verbatim so nothing
- * is lost. {@code type} is a {@code CoreNotificationType} name, or
- * {@code "UNKNOWN:<raw>"} when the broker sent a type this client's enum does not
- * carry.
+ * Something that happened on a broker, as the broker SDK reports it (ADR-0026). {@code type} is one of
+ * the SDK's standard event types ({@code openbroker.consumer.attached}) or a system's own, namespaced
+ * ({@code artemis.message_acknowledged}). The promoted fields name what the event involves, by name,
+ * wherever the broker says it; {@link #data} keeps everything the broker said.
  */
 public record BrokerEvent(
         UUID clusterId,
         UUID nodeId,
         String type,
         Instant occurredAt,
-        String address,
-        String routingName,
-        String consumerName,
-        String sessionName,
-        String connectionName,
+        String destination,
+        String subscription,
+        String consumer,
+        String channel,
+        String connection,
         String remoteAddress,
-        String username,
-        Map<String, Object> props) {}
+        String principal,
+        Map<String, Object> data) {}

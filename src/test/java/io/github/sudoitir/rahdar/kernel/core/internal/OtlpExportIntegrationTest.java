@@ -9,11 +9,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import io.github.sudoitir.rahdar.kernel.security.Grant;
 import io.github.sudoitir.rahdar.kernel.security.Permissions;
 import io.github.sudoitir.rahdar.kernel.security.RahdarPrincipal;
-import io.github.sudoitir.rahdar.platform.broker.BrokerClientFactory;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionSettings;
-import io.github.sudoitir.rahdar.platform.broker.CoreConnectionSettings;
-import io.github.sudoitir.rahdar.platform.broker.CorePool;
+import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
+import io.github.sudoitir.rahdar.platform.broker.ProbeSession;
 import io.github.sudoitir.rahdar.support.ArtemisIntegrationTest;
+import io.github.sudoitir.rahdar.support.CoreProbe;
 import io.github.sudoitir.rahdar.support.MockOtlpServer;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
 import io.github.sudoitir.rahdar.support.SignedInSession;
@@ -163,7 +163,7 @@ class OtlpExportIntegrationTest extends PostgresIntegrationTest {
                 .toList();
         List<String> names = trace.stream().map(SpanData::getName).toList();
 
-        assertThat(names).contains("jolokia", "core borrow");
+        assertThat(names).contains("jolokia", "core send");
         assertThat(trace.stream()
                         .filter(s -> s.getAttributes().asMap().keySet().stream()
                                 .anyMatch(k -> k.getKey().startsWith("jdbc."))))
@@ -236,14 +236,12 @@ class OtlpExportIntegrationTest extends PostgresIntegrationTest {
 
         private static final Logger log = LoggerFactory.getLogger("otel-probe");
 
-        private final BrokerClientFactory clients;
-        private final CorePool corePool;
+        private final BrokerGateway clients;
         private final JdbcTemplate jdbc;
         private final ObservationRegistry observations;
 
-        Probe(BrokerClientFactory clients, CorePool corePool, JdbcTemplate jdbc, ObservationRegistry observations) {
+        Probe(BrokerGateway clients, JdbcTemplate jdbc, ObservationRegistry observations) {
             this.clients = clients;
-            this.corePool = corePool;
             this.jdbc = jdbc;
             this.observations = observations;
         }
@@ -252,23 +250,11 @@ class OtlpExportIntegrationTest extends PostgresIntegrationTest {
         String probe() throws Exception {
             UUID cluster = UUID.randomUUID();
             jdbc.queryForObject("select 1", Integer.class);
-            clients.forNode(
-                            BrokerConnectionSettings.basicAuth(
-                                    cluster,
-                                    ArtemisIntegrationTest.BROKER_USER,
-                                    ArtemisIntegrationTest.BROKER_PASSWORD),
-                            ArtemisIntegrationTest.jolokiaUrl())
-                    .readBrokerAttributes("Version");
-            corePool.borrow(
-                            cluster,
-                            ArtemisIntegrationTest.coreUrl(),
-                            new CoreConnectionSettings(
-                                    cluster,
-                                    ArtemisIntegrationTest.BROKER_USER,
-                                    ArtemisIntegrationTest.BROKER_PASSWORD,
-                                    null,
-                                    true))
-                    .close();
+            try (ProbeSession session = clients.probe(BrokerConnectionSettings.basicAuth(
+                    cluster, ArtemisIntegrationTest.BROKER_USER, ArtemisIntegrationTest.BROKER_PASSWORD))) {
+                session.node(ArtemisIntegrationTest.jolokiaUrl()).describe();
+            }
+            CoreProbe.send(clients, cluster);
 
             Observation secret = Observation.createNotStarted("test.probe.secret", observations)
                     .contextualName("test probe secret")

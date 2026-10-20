@@ -1,6 +1,7 @@
 package io.github.sudoitir.rahdar.feature.setupreview;
 
 import io.github.sudoitir.rahdar.platform.clusters.ClusterEnvironmentIndex;
+import io.github.sudoitir.rahdar.platform.scrape.QueueLocator;
 import io.github.sudoitir.rahdar.support.ModuleIntegrationTest;
 import org.springframework.modulith.test.ApplicationModuleTest;
 import org.springframework.modulith.test.ApplicationModuleTest.BootstrapMode;
@@ -16,4 +17,7 @@ class SetupReviewModuleTest extends ModuleIntegrationTest {
      */
     @MockitoBean
     ClusterEnvironmentIndex clusterEnvironmentIndex;
+
+    @MockitoBean
+    QueueLocator queueLocator;
 }

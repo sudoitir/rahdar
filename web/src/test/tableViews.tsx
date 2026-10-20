@@ -217,7 +217,7 @@ const queue = (f: Fixture, i: number): QueueView => ({
 const address_ = (f: Fixture, i: number): AddressView => ({
   ...NODE(f, i),
   name: address(f, i),
-  routingTypes: 'ANYCAST, MULTICAST',
+  delivery: ['POINT_TO_POINT', 'PUBLISH_SUBSCRIBE'],
   queueCount: num(f, 3 + i),
   messageCount: num(f, 9_200 + i),
   allowedActions: [],
@@ -232,7 +232,7 @@ const consumer = (f: Fixture, i: number): ConsumerView => ({
   protocol: 'AMQP',
   messagesDelivered: num(f, 8_431 + i),
   messagesAcknowledged: num(f, 8_400 + i),
-  status: i === 1 ? 'slow' : 'ok',
+  messagesInFlight: num(f, 12 + i),
   allowedActions: [],
 });
 
@@ -261,7 +261,7 @@ const connection = (f: Fixture, i: number): ConnectionView => ({
 const producer = (f: Fixture, i: number): ProducerView => ({
   ...NODE(f, i),
   producerId: ident(f, 'producer', i),
-  name: f === 'normal' ? 'order-writer' : name(f, 'writer', i),
+  clientId: f === 'normal' ? 'order-writer' : name(f, 'writer', i),
   sessionId: ident(f, 'session', i),
   address: address(f, i),
   protocol: 'CORE',
@@ -341,12 +341,12 @@ const brokerEvent = (f: Fixture, i: number): BrokerEventView => ({
   occurredAt: at(i),
   receivedAt: at(i),
   type: [
-    'CONSUMER_CREATED',
-    'SESSION_CLOSED',
-    'CONNECTION_DESTROYED',
-    'BINDING_ADDED',
-    'ADDRESS_REMOVED',
-    'MESSAGE_EXPIRED',
+    'openbroker.consumer.attached',
+    'openbroker.channel.closed',
+    'openbroker.client.disconnected',
+    'openbroker.resource.created',
+    'openbroker.resource.deleted',
+    'openbroker.message.expired',
   ][i],
   address: address(f, i),
   routingName: name(f, 'orders', i),
@@ -706,7 +706,7 @@ export const VIEWS: TableView_[] = [
     rowKey: (r) => `${r.nodeId}/${r.name}`,
     menu: true,
     identifiers: ['name'],
-    visible1280: ['name', 'owner', 'routing', 'queues', 'depth', 'node', 'action'],
+    visible1280: ['name', 'owner', 'delivery', 'queues', 'depth', 'node', 'action'],
   }),
   view({
     name: 'consumers',
@@ -716,7 +716,7 @@ export const VIEWS: TableView_[] = [
     rowKey: (r) => `${r.nodeId}/${r.consumerId}`,
     menu: true,
     identifiers: ['queue', 'address'],
-    visible1280: ['queue', 'address', 'protocol', 'delivered', 'acked', 'status', 'node', 'action'],
+    visible1280: ['queue', 'address', 'protocol', 'delivered', 'acked', 'inFlight', 'node', 'action'],
   }),
   view({
     name: 'sessions',
@@ -746,7 +746,7 @@ export const VIEWS: TableView_[] = [
     rowKey: (r) => `${r.nodeId}/${r.producerId}`,
     menu: true,
     identifiers: ['address'],
-    visible1280: ['address', 'name', 'protocol', 'sent', 'node'],
+    visible1280: ['address', 'client', 'protocol', 'sent', 'node'],
   }),
   view({
     name: 'diverts',

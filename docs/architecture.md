@@ -18,7 +18,7 @@ startup toggle and the manifest entry.
                  └───────────────┬───────────────────────────────┬─────────────────┘
                                  │ api / events / SPI beans      │
                  ┌───────────────▼────────── platform ───────────▼─────────────────┐
-                 │ broker (Jolokia, Core)  clusters (registration, topology,       │
+                 │ broker (OpenBroker gateway)  clusters (registration, topology,  │
                  │ BrokerCommands)  scrape (tiers, snapshots)  mcp (server)         │
                  └───────────────┬─────────────────────────────────────────────────┘
                  ┌───────────────▼─────────── kernel ──────────────────────────────┐
@@ -35,10 +35,11 @@ startup toggle and the manifest entry.
 | | `settings` | the runtime settings registry (`rahdar_setting`) and the JDBC bootstrap property source |
 | | `jobs` | `ScheduledJob`, the one scheduler, job status and its health |
 | | `stream` | `SseHub`, `GET /api/v1/stream`, the topic registry |
-| platform | `broker` | Jolokia and Core clients, `NodeCallLimiter`, capability probing, notification subscriptions, `MessageTransport` |
+| platform | `broker` | the OpenBroker gateway (`BrokerGateway`: one `ClusterConnection` per cluster), `RahdarCallInterceptor` with `NodeCallLimiter`, notifications, messages, the transfer relay |
 | | `clusters` | registration, nodes, credentials, TLS, environments, discovery, HA and split-brain, serving nodes, the capability ledger, `BrokerCommands` |
-| | `scrape` | the tiered scrape, `queue_snapshot`, `metric_sample` |
+| | `scrape` | the tiered scrape, `subscription_snapshot`, `metric_sample` |
 | | `mcp` | the MCP server, the tool catalogue, help, resources and runbook prompts (optional) |
+| system | `artemis` | what only Artemis has: the one use of the SDK's `ArtemisManagement` extension, MBean operations, the capability probe and its `broker.xml` remedies (ADR-0203) |
 | feature | everything else | one module per capability, each with its own tables, endpoints, jobs, topics and tools |
 
 The generated module graph and one canvas per module are in `docs/modules/` in the repository,
@@ -93,7 +94,8 @@ module's `internal` package. `BoundaryRulesTest` adds what Modulith does not see
 - features use only method security from Spring Security; only the security kernel
   and redirect sign-in see `HttpSecurity`;
 - entities and repositories live in the owning module's `internal.persistence`;
-- Jolokia and Artemis client library types stay inside `platform.broker`;
+- no Artemis, Jolokia or JMS type appears anywhere, the SDK's driver SPI is never used, and
+  only `system.artemis` knows the SDK's Artemis driver (ADR-0203);
 - only the stream kernel and the SQL tail hold an `SseEmitter`;
 - scheduling stays in the jobs kernel and the scrape tiers;
 - features never inject the container or enable framework features.
@@ -212,20 +214,22 @@ via `rahdar_setting`; the values below are the defaults.
 | B | the first `listQueues` page per node — a fast refresh of the busiest queues | 15s |
 | C | every `listQueues` page per node in one tick, walking the whole set, then reaping removed queues | 5m |
 
-Each tick is **one Jolokia POST per node** (the resolved broker MBean name is
-cached process-wide, so a tick does not pay an extra `search`). Artemis 2.44's
+Each tick is **one management call per node** through the broker SDK; for Artemis the
+driver sends one Jolokia POST (and caches the resolved broker MBean name, so a tick does
+not pay an extra `search`). Artemis 2.44's
 `sortColumn` / `GREATER_THAN` options both 500 with an NPE
 (`docs/broker-management-notes.md` §10), so there is no broker-sorted "hot page":
 tier B is best-effort speed on page 1, tier C is the coverage guarantee.
 `NodeCallLimiter` caps management calls per node. Network I/O runs on virtual
 threads, one slow node never blocks its siblings, and it never runs inside a DB
 transaction — each node's result is handed to a short `@Transactional` persist
-step. Queue rows upsert into `queue_snapshot` via a JDBC `INSERT … ON CONFLICT`
+step. Queue rows upsert into `subscription_snapshot` via a JDBC `INSERT … ON CONFLICT`
 batch (ADR-0016, a scoped exception to ADR-0011); metric points append to the
 partitioned `metric_sample`, and a reaper trims past the retention window. Six
-metrics are recorded per queue per sweep — `messageCount`, `consumerCount`,
-`deliveringCount`, `messagesAdded`, `messagesAcked` and `messagesExpired` — all
-read off the `listQueues` row the sweep already fetched, so the set costs no
+metrics are recorded per queue per sweep, under the broker SDK's standard keys —
+`openbroker.backlog`, `openbroker.consumer.count`, `openbroker.in_flight`,
+`openbroker.enqueued`, `openbroker.acknowledged` and `openbroker.expired` — all
+read off the subscription listing the sweep already fetched, so the set costs no
 additional broker call (ADR-0089). When a
 tier completes, `ScrapeTierCompleted` lets alerting evaluate its rules in the same
 thread, so ordering is what it was before the modules split.
@@ -235,7 +239,7 @@ thread, so ordering is what it was before the modules split.
 One queue's verdict — why a backlog is not draining — is an ordered ladder
 evaluated in `feature/triage`: `INSUFFICIENT_DATA`, `PAUSED`, `NO_CONSUMERS`,
 `BROKER_SLOW`, `STALLED`, `STARVED`, `FALLING_BEHIND`, `DRAINING`, `HEALTHY`,
-first match wins (ADR-0089). It is derived from `queue_snapshot` and windowed
+first match wins (ADR-0089). It is derived from `subscription_snapshot` and windowed
 `metric_sample` aggregates — a fixed number of queries per request whatever the
 queue count, and no broker call. `deliveringCount` is what separates a stalled
 consumer from a starved one; a `CONSUMER_SLOW` notification outranks any derived
@@ -252,7 +256,7 @@ what lets a module contribute a rule kind without alerting importing it.
 ### Cross-node aggregation (read)
 
 A primary and its synced backup share one `NodeID` and are **one logical node**
-(ADR-0017). The queue grid is built from `queue_snapshot`, grouped by
+(ADR-0017). The queue grid is built from `subscription_snapshot`, grouped by
 `(address, queueName, routingType)`: each row carries a per-node cell, rolled-up
 cluster totals, and `nodesPresent / nodesTotal`. A node whose last sweep is stale
 keeps its last numbers, flagged — never dropped. The other five views
@@ -264,15 +268,15 @@ capability ledger + `broker.xml` advice).
 
 ### Event path (push)
 
-The Core client (`artemis-jakarta-client`) subscribes to `activemq.notifications`
-on every *serving* node of a cluster (ADR-0026). `CoreSubscriptionManager`
-reconciles the subscription set against the live topology at the end of each
-tier-A scrape, so a failover is followed — a subscription moves to the survivor,
-not to a configured node. The subscriber polls `receive(timeout)` on a virtual
-thread (a `MessageListener` deadlocks against `close()` on the pinned client),
-and Rahdar drives its own reconnect with backoff (the broker advertises
-connector hosts a client often cannot resolve). Each notification is normalised
-to a `BrokerEvent` and handed to every `BrokerEventSink`. The events feature's
+`BrokerNotifications` keeps one notification stream from the broker SDK on every
+*serving* node of a cluster (ADR-0026, ADR-0203). It reconciles the streams against the
+live topology at the end of each tier-A scrape, so a failover is followed — a stream
+moves to the survivor, not to a configured node. The SDK reconnects a stream with
+backoff and reports what it may have missed as a gap; for Artemis the driver
+subscribes to `activemq.notifications` over Core. Each event arrives in the SDK's
+standard terms (`openbroker.consumer.attached`, with its destination, subscription and
+consumer named under standard keys), becomes a `BrokerEvent`, and is handed to every
+`BrokerEventSink`. The events feature's
 buffered writer (ADR-0028) batch-inserts into `broker_event`; the buffer is bounded
 and overflow increments a per-cluster `dropped` counter the events API surfaces. A
 reaper trims past a retention window (default 72h, a `rahdar_setting`).
@@ -282,11 +286,11 @@ subscription verdict (`AVAILABLE` on ≥1 subscribed node; `UNAVAILABLE` with th
 exact `broker.xml` security-setting or acceptor snippet when refused or
 unreachable; `UNKNOWN` only until the first scrape). It opens no connection.
 
-Message browse and send are served over the Core client when a subscription is
-live (`MessageTransport`, ADR-0029): a `QueueBrowser` returns real byte bodies
-(base64 with an encoding indicator), real typed properties, and does not
-truncate. By-id / by-filter mutations stay on Jolokia. A page past the broker
-page size falls back to Jolokia and every response says which channel served it.
+Message browse and send go through the broker SDK (`BrokerMessages`, ADR-0203), and
+the driver picks the channel. The Artemis driver reads the first window of a queue
+over the Core client (ADR-0029), which returns whole bodies and typed properties
+without truncating, and a deeper page, or a node without Core, over Jolokia. By-id
+and by-filter mutations go over management.
 
 ### Realtime to the browser
 
@@ -331,6 +335,17 @@ result and shows the `broker.xml` needed to unlock the rest. An unestablished
 capability is `UNKNOWN`, and unknown leaves a control enabled with the uncertainty
 stated (ADR-0049 D5).
 
+Rahdar reaches every broker through the OpenBroker SDK (ADR-0203). `platform.broker`'s
+`BrokerGateway` opens one `ClusterConnection` per cluster with the cluster's system
+(`cluster.system`), Rahdar's credentials and SSL bundles, and a `RahdarCallInterceptor`
+that admits every management and control call through the per-node limiter, the call
+guard and node call health, and records the `rahdar.broker.*` observations. Features use
+the SDK's facets: resources, metrics under standard keys, operations with a preview and an
+etag the approval gate pins, messages, the transport, and notifications. What only Artemis
+has goes through `system.artemis`, the one module that unwraps the SDK's Artemis extension.
+The driver chooses the channel per call: for Artemis, Jolokia for management and Core for
+messages and notifications.
+
 Oversized body and property values are truncated by the broker at
 `management-message-attribute-size-limit` over Jolokia, and Rahdar discloses that
 **per message** (a `bodyTruncated` flag and the `broker.xml` snippet that raises the
@@ -366,8 +381,8 @@ Both patterns are handled by one correlator:
   join on `JMSCorrelationID` / `_AMQ_CORRELATION_ID`, compute latency. No reply
   past the deadline → `TIMED_OUT`; reply with no request → `ORPHANED_REPLY`.
 - **Temporary reply queues** — invisible to browsing; reconstructed from the
-  notification lifecycle (`BINDING_ADDED` → `CONSUMER_CREATED` → … →
-  `CONSUMER_CLOSED` / `BINDING_REMOVED`):
+  event lifecycle (`openbroker.resource.created` → `openbroker.consumer.attached` → … →
+  `openbroker.consumer.detached` / `openbroker.resource.deleted`):
 
   | Observed | State |
   |---|---|
@@ -398,7 +413,7 @@ bounded result that does not say so reads as a complete one.
   long enough to be seen. A queue that drains faster than the interval is invisible,
   which the console states permanently and non-dismissably on every sampled tail.
 - **Captured** (ADR-0062). A non-exclusive divert copies the address into a
-  Rahdar-owned queue, drained by a Core consumer. Complete for what the address
+  Rahdar-owned queue, drained by a transacted receiver of the broker SDK. Complete for what the address
   routed, whether or not anything consumed it in between.
 
 ```
@@ -406,7 +421,7 @@ source address ──non-exclusive divert──► rahdar.capture.<instance>.<ad
       (per node)                              ring-size N, address-full-policy=DROP,
                                               expiry-delay, non-durable
                                                        │
-                                              Core consumer (CorePool, CLIENT_ACKNOWLEDGE)
+                                              transacted SDK receiver, committed after the store
                                                        │
                                                   CaptureBus
                                      ┌─────────────────┼─────────────────┐

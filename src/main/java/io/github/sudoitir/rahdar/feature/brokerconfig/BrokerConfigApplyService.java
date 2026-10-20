@@ -34,13 +34,13 @@ import io.github.sudoitir.rahdar.kernel.settings.SettingsService;
 import io.github.sudoitir.rahdar.kernel.stream.SseHub;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
 import io.github.sudoitir.rahdar.platform.broker.BulkCapExceededException;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaBrokerClient;
 import io.github.sudoitir.rahdar.platform.broker.ManagementRefusal;
 import io.github.sudoitir.rahdar.platform.clusters.CapabilityLedger;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterLock;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterSecrets;
 import io.github.sudoitir.rahdar.platform.clusters.SplitBrainStatus;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
 import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.HashSet;
@@ -426,7 +426,7 @@ public class BrokerConfigApplyService {
         ClusterNode entity = p.nodes.get(node.nodeId());
         boolean canary = node.nodeId().equals(p.plan.canaryNodeId());
         List<StepApply> steps = new ArrayList<>();
-        JolokiaBrokerClient client;
+        ArtemisNode client;
         String broker;
         try {
             client = reads.client(clusterId, entity);
@@ -491,7 +491,7 @@ public class BrokerConfigApplyService {
             NodePlan node,
             boolean canary,
             long applyId,
-            JolokiaBrokerClient client,
+            ArtemisNode client,
             String broker,
             List<StepApply> steps) {}
 
@@ -643,7 +643,7 @@ public class BrokerConfigApplyService {
                             + ", which is no longer live. The cluster moved since the preview; preview again.");
         }
         List<String> unstable = p.nodes.values().stream()
-                .filter(n -> n.getArtemisNodeId() != null)
+                .filter(n -> n.getNativeNodeId() != null)
                 .filter(n -> n.getSplitBrain() != SplitBrainStatus.NONE)
                 .map(ClusterNode::getName)
                 .distinct()
@@ -714,8 +714,7 @@ public class BrokerConfigApplyService {
     }
 
     /** The one management write a step stands for. */
-    private StepStatus execute(
-            UUID clusterId, JolokiaBrokerClient client, String broker, BrokerConfigDocument doc, Step s) {
+    private StepStatus execute(UUID clusterId, ArtemisNode client, String broker, BrokerConfigDocument doc, Step s) {
         switch (s.section()) {
             case ADDRESS -> writeAddress(client, broker, s);
             case QUEUE -> writeQueue(client, broker, s);
@@ -727,7 +726,7 @@ public class BrokerConfigApplyService {
         return StepStatus.APPLIED;
     }
 
-    private void writeAddress(JolokiaBrokerClient client, String broker, Step s) {
+    private void writeAddress(ArtemisNode client, String broker, Step s) {
         @SuppressWarnings("unchecked")
         List<String> types = (List<String>) s.after().get("routingTypes");
         if (s.op() == Op.REPLACE) {
@@ -737,7 +736,7 @@ public class BrokerConfigApplyService {
         }
     }
 
-    private void writeQueue(JolokiaBrokerClient client, String broker, Step s) {
+    private void writeQueue(ArtemisNode client, String broker, Step s) {
         if (s.op() == Op.REPLACE) {
             ops.updateQueue(client, broker, s.after());
         } else {
@@ -745,7 +744,7 @@ public class BrokerConfigApplyService {
         }
     }
 
-    private void writeAddressSetting(JolokiaBrokerClient client, String broker, BrokerConfigDocument doc, Step s) {
+    private void writeAddressSetting(ArtemisNode client, String broker, BrokerConfigDocument doc, Step s) {
         if (s.op() == Op.REMOVE) {
             ops.removeAddressSettings(client, broker, s.key());
         } else {
@@ -757,7 +756,7 @@ public class BrokerConfigApplyService {
         }
     }
 
-    private void writeSecuritySetting(JolokiaBrokerClient client, String broker, BrokerConfigDocument doc, Step s) {
+    private void writeSecuritySetting(ArtemisNode client, String broker, BrokerConfigDocument doc, Step s) {
         if (s.op() == Op.REMOVE) {
             ops.removeSecuritySettings(client, broker, s.key());
         } else {
@@ -771,7 +770,7 @@ public class BrokerConfigApplyService {
         }
     }
 
-    private void writeDivert(JolokiaBrokerClient client, String broker, Step s) {
+    private void writeDivert(ArtemisNode client, String broker, Step s) {
         if (s.op() == Op.REMOVE) {
             ops.destroyDivert(client, broker, s.key());
         } else {
@@ -779,8 +778,7 @@ public class BrokerConfigApplyService {
         }
     }
 
-    private void writeBridge(
-            UUID clusterId, JolokiaBrokerClient client, String broker, BrokerConfigDocument doc, Step s) {
+    private void writeBridge(UUID clusterId, ArtemisNode client, String broker, BrokerConfigDocument doc, Step s) {
         if (s.op() == Op.REMOVE) {
             // The declared name, which removes every instance a concurrency
             // above one deployed (ADR-0091).

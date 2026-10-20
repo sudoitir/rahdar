@@ -1,6 +1,6 @@
 # ADR-0112: Plugin consumers set their concurrency, take no prefetch, and run on a thread pool of their own
 
-- **Status**: accepted
+- **Status**: accepted; D5 amended by [ADR-0203](0203-rahdar-reaches-every-broker-through-openbroker.md)
 - **Date**: 2026-09-24
 - **Deciders**: Mahdi Amirabdollahi
 - **Change**: `openspec/changes/plugin-consumer-concurrency`

@@ -57,7 +57,7 @@ class AlertsControllerTest extends PostgresIntegrationTest {
     @Test
     void createUpdateAndDeleteAThresholdRuleIsAudited() throws Exception {
         String body = """
-                {"name":"Deep queue","kind":"METRIC_THRESHOLD","metric":"messageCount","comparator":"GT",
+                {"name":"Deep queue","kind":"METRIC_THRESHOLD","metric":"openbroker.backlog","comparator":"GT",
                  "threshold":1000,"forSeconds":60,"severity":"WARNING","enabled":true,"channelIds":[]}""";
 
         String created = mvc.perform(post("/api/v1/clusters/{id}/alerts/rules", clusterId)
@@ -65,7 +65,7 @@ class AlertsControllerTest extends PostgresIntegrationTest {
                         .content(body))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.kind").value("METRIC_THRESHOLD"))
-                .andExpect(jsonPath("$.metric").value("messageCount"))
+                .andExpect(jsonPath("$.metric").value("openbroker.backlog"))
                 .andReturn()
                 .getResponse()
                 .getContentAsString();
@@ -76,7 +76,7 @@ class AlertsControllerTest extends PostgresIntegrationTest {
                 .andExpect(jsonPath("$.data[*].name", Matchers.hasItem("Deep queue")));
 
         String updateBody = """
-                {"name":"Deep queue v2","kind":"METRIC_THRESHOLD","metric":"messageCount","comparator":"GT",
+                {"name":"Deep queue v2","kind":"METRIC_THRESHOLD","metric":"openbroker.backlog","comparator":"GT",
                  "threshold":2000,"forSeconds":30,"severity":"CRITICAL","enabled":true,"channelIds":[]}""";
         mvc.perform(put("/api/v1/clusters/{id}/alerts/rules/{rid}", clusterId, id)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -93,7 +93,7 @@ class AlertsControllerTest extends PostgresIntegrationTest {
     @Test
     void rejectsARuleWithBothMetricAndStateCondition() throws Exception {
         String body = """
-                {"name":"bad","kind":"METRIC_THRESHOLD","metric":"messageCount","comparator":"GT",
+                {"name":"bad","kind":"METRIC_THRESHOLD","metric":"openbroker.backlog","comparator":"GT",
                  "threshold":1,"stateCondition":"SPLIT_BRAIN","forSeconds":0,"severity":"WARNING",
                  "enabled":true,"channelIds":[]}""";
 

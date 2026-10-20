@@ -1,9 +1,6 @@
 package io.github.sudoitir.rahdar.feature.messages.web;
 
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
-import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -12,7 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.setup.MockMvcBuilders.webAppContextSetup;
 
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaBrokerClient;
+import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
 import io.github.sudoitir.rahdar.platform.broker.QueueRow;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNodeEntity;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNodeEntity.HaObservation;
@@ -21,11 +18,13 @@ import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterE
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterRepository;
 import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshotUpsert;
 import io.github.sudoitir.rahdar.support.AdminAuthenticationExtension;
+import io.github.sudoitir.rahdar.support.FixtureJolokia;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -36,19 +35,14 @@ import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.web.client.RestClient;
 import org.springframework.web.context.WebApplicationContext;
-import tools.jackson.databind.json.JsonMapper;
 
 /** {@code GET .../queues/{q}/messages} — page shape, single-message detail + 404, node echo, bad filter, capability path. */
 @ExtendWith(AdminAuthenticationExtension.class)
 class MessageBrowseControllerTest extends PostgresIntegrationTest {
 
     private static final String URL_A = "http://a:8161/console/jolokia";
-
-    private final JsonMapper mapper = new JsonMapper();
 
     MockMvc mvc;
 
@@ -67,6 +61,9 @@ class MessageBrowseControllerTest extends PostgresIntegrationTest {
     @MockitoBean
     BrokerConnections connections;
 
+    @MockitoBean
+    BrokerGateway gateway;
+
     private UUID clusterId;
     private UUID nodeAId;
 
@@ -80,7 +77,21 @@ class MessageBrowseControllerTest extends PostgresIntegrationTest {
         a.attachSeedUrl(URL_A);
         nodeAId = nodes.save(a).getId();
         upsert.upsertBatch(List.of(new QueueRow(
-                clusterId, nodeAId, "PHASE3.SRC", "PHASE3.SRC", "ANYCAST", true, 4, 0, 0, 0, 0, 0, 0, false)));
+                clusterId,
+                nodeAId,
+                "PHASE3.SRC",
+                "PHASE3.SRC",
+                "ANYCAST",
+                true,
+                4,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                false,
+                "artemis.queue")));
     }
 
     @AfterEach
@@ -88,21 +99,28 @@ class MessageBrowseControllerTest extends PostgresIntegrationTest {
         clusters.deleteById(clusterId);
     }
 
-    /** search resolves the broker MBean, then one batched browse POST. */
-    private JolokiaBrokerClient client(String batchBody) {
-        RestClient.Builder builder = RestClient.builder();
-        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
-        server.expect(requestTo(URL_A))
-                .andRespond(withSuccess(fixture("search-broker.json"), MediaType.APPLICATION_JSON));
-        server.expect(requestTo(URL_A)).andRespond(withSuccess(batchBody, MediaType.APPLICATION_JSON));
-        return new JolokiaBrokerClient(builder.build(), URL_A, mapper);
+    /**
+     * The node as the broker SDK reads it: a search for the broker MBean, one for the queue's, then one
+     * batched browse POST.
+     */
+    private void serving(UUID node, String queue, String batchBody) {
+        FixtureJolokia server = new FixtureJolokia();
+        server.expect().andRespond(withSuccess(fixture("search-broker.json"), MediaType.APPLICATION_JSON));
+        server.expect().andRespond(withSuccess(queueSearch(queue), MediaType.APPLICATION_JSON));
+        server.expect().andRespond(withSuccess(batchBody, MediaType.APPLICATION_JSON));
+        when(gateway.cluster(clusterId)).thenReturn(FixtureJolokia.cluster(Map.of(node, server)));
     }
 
-    private JolokiaBrokerClient unauthorized() {
-        RestClient.Builder builder = RestClient.builder();
-        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
-        server.expect(requestTo(URL_A)).andRespond(withStatus(HttpStatus.UNAUTHORIZED));
-        return new JolokiaBrokerClient(builder.build(), URL_A, mapper);
+    private static String queueSearch(String queue) {
+        return "{\"status\":200,\"value\":[\"org.apache.activemq.artemis:address=\\\"" + queue
+                + "\\\",broker=\\\"primary\\\",component=addresses,queue=\\\"" + queue
+                + "\\\",routing-type=\\\"anycast\\\",subcomponent=queues\"]}";
+    }
+
+    private void unauthorized() {
+        FixtureJolokia server = new FixtureJolokia();
+        server.expect().andRespond(withStatus(HttpStatus.UNAUTHORIZED));
+        when(gateway.cluster(clusterId)).thenReturn(FixtureJolokia.cluster(Map.of(nodeAId, server)));
     }
 
     private static String batch(String browseFixture, long count) {
@@ -119,7 +137,7 @@ class MessageBrowseControllerTest extends PostgresIntegrationTest {
 
     @Test
     void browseReturnsAPageAndEchoesTheNode() throws Exception {
-        when(connections.forCluster(clusterId, URL_A)).thenReturn(client(batch("browse.json", 4)));
+        serving(nodeAId, "PHASE3.SRC", batch("browse.json", 4));
 
         mvc.perform(get("/api/v1/clusters/{c}/queues/{q}/messages", clusterId, "PHASE3.SRC"))
                 .andExpect(status().isOk())
@@ -132,7 +150,7 @@ class MessageBrowseControllerTest extends PostgresIntegrationTest {
 
     @Test
     void detailFindsOneMessageById() throws Exception {
-        when(connections.forCluster(clusterId, URL_A)).thenReturn(client(batch("browse.json", 4)));
+        serving(nodeAId, "PHASE3.SRC", batch("browse.json", 4));
 
         mvc.perform(get("/api/v1/clusters/{c}/queues/{q}/messages/{id}", clusterId, "PHASE3.SRC", 133))
                 .andExpect(status().isOk())
@@ -143,7 +161,7 @@ class MessageBrowseControllerTest extends PostgresIntegrationTest {
 
     @Test
     void detailIsA404WhenTheIdIsNotInRange() throws Exception {
-        when(connections.forCluster(clusterId, URL_A)).thenReturn(client(batch("browse.json", 4)));
+        serving(nodeAId, "PHASE3.SRC", batch("browse.json", 4));
 
         mvc.perform(get("/api/v1/clusters/{c}/queues/{q}/messages/{id}", clusterId, "PHASE3.SRC", 999999))
                 .andExpect(status().isNotFound());
@@ -151,7 +169,7 @@ class MessageBrowseControllerTest extends PostgresIntegrationTest {
 
     @Test
     void anInvalidFilterIsA400() throws Exception {
-        when(connections.forCluster(clusterId, URL_A)).thenReturn(client(batch("browse-bad-filter.json", 0)));
+        serving(nodeAId, "PHASE3.SRC", batch("browse.json", 4));
 
         mvc.perform(get("/api/v1/clusters/{c}/queues/{q}/messages", clusterId, "PHASE3.SRC")
                         .param("filter", "this is not a filter =="))
@@ -161,7 +179,7 @@ class MessageBrowseControllerTest extends PostgresIntegrationTest {
 
     @Test
     void aBrokerThatRefusesTheReadSurfacesAClassifiedProblem() throws Exception {
-        when(connections.forCluster(eq(clusterId), any())).thenReturn(unauthorized());
+        unauthorized();
 
         mvc.perform(get("/api/v1/clusters/{c}/queues/{q}/messages", clusterId, "PHASE3.SRC"))
                 .andExpect(status().is4xxClientError())
@@ -185,16 +203,40 @@ class MessageBrowseControllerTest extends PostgresIntegrationTest {
         b.applyHaState(new HaObservation(true, "STARTED", "PRIMARY", null, "2.44.0", null), 1L, Instant.now());
         UUID nodeBId = nodes.save(b).getId();
         upsert.upsertBatch(List.of(
-                new QueueRow(clusterId, nodeAId, "SPLIT", "SPLIT", "ANYCAST", true, 0, 0, 0, 0, 0, 0, 0, false),
-                new QueueRow(clusterId, nodeBId, "SPLIT", "SPLIT", "ANYCAST", true, 4, 0, 0, 0, 0, 0, 0, false)));
+                new QueueRow(
+                        clusterId,
+                        nodeAId,
+                        "SPLIT",
+                        "SPLIT",
+                        "ANYCAST",
+                        true,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        false,
+                        "artemis.queue"),
+                new QueueRow(
+                        clusterId,
+                        nodeBId,
+                        "SPLIT",
+                        "SPLIT",
+                        "ANYCAST",
+                        true,
+                        4,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        false,
+                        "artemis.queue")));
 
-        RestClient.Builder builder = RestClient.builder();
-        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
-        server.expect(requestTo(urlB))
-                .andRespond(withSuccess(fixture("search-broker.json"), MediaType.APPLICATION_JSON));
-        server.expect(requestTo(urlB)).andRespond(withSuccess(batch("browse.json", 4), MediaType.APPLICATION_JSON));
-        when(connections.forCluster(clusterId, urlB))
-                .thenReturn(new JolokiaBrokerClient(builder.build(), urlB, mapper));
+        serving(nodeBId, "SPLIT", batch("browse.json", 4));
 
         mvc.perform(get("/api/v1/clusters/{c}/queues/{q}/messages", clusterId, "SPLIT"))
                 .andExpect(status().isOk())
@@ -212,18 +254,17 @@ class MessageBrowseControllerTest extends PostgresIntegrationTest {
         BrokerNodeEntity a = nodes.findById(nodeAId).orElseThrow();
         a.applyHaState(new HaObservation(true, "STARTED", "PRIMARY", null, "2.44.0", null), 1L, Instant.now());
         nodes.save(a);
-        String located = "{\"status\":200,\"value\":{"
-                + "\"org.apache.activemq.artemis:address=\\\"FRESH.ADDR\\\",broker=\\\"primary\\\",component=addresses,"
-                + "queue=\\\"FRESH\\\",routing-type=\\\"anycast\\\",subcomponent=queues\":{\"MessageCount\":4}}}";
-
-        RestClient.Builder builder = RestClient.builder();
-        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
-        server.expect(requestTo(URL_A))
-                .andRespond(withSuccess(fixture("search-broker.json"), MediaType.APPLICATION_JSON));
-        server.expect(requestTo(URL_A)).andRespond(withSuccess(located, MediaType.APPLICATION_JSON));
-        server.expect(requestTo(URL_A)).andRespond(withSuccess(batch("browse.json", 4), MediaType.APPLICATION_JSON));
-        when(connections.forCluster(clusterId, URL_A))
-                .thenReturn(new JolokiaBrokerClient(builder.build(), URL_A, mapper));
+        // The live node lists the queue by name, then the browse finds and reads it.
+        String listed = "{\"status\":200,\"value\":\"{\\\"data\\\":[{\\\"id\\\":\\\"7\\\","
+                + "\\\"name\\\":\\\"FRESH\\\",\\\"address\\\":\\\"FRESH\\\","
+                + "\\\"routingType\\\":\\\"ANYCAST\\\",\\\"messageCount\\\":\\\"4\\\"}],"
+                + "\\\"count\\\":1}\"}";
+        FixtureJolokia server = new FixtureJolokia();
+        server.expect().andRespond(withSuccess(fixture("search-broker.json"), MediaType.APPLICATION_JSON));
+        server.expect().andRespond(withSuccess(listed, MediaType.APPLICATION_JSON));
+        server.expect().andRespond(withSuccess(queueSearch("FRESH"), MediaType.APPLICATION_JSON));
+        server.expect().andRespond(withSuccess(batch("browse.json", 4), MediaType.APPLICATION_JSON));
+        when(gateway.cluster(clusterId)).thenReturn(FixtureJolokia.cluster(Map.of(nodeAId, server)));
 
         mvc.perform(get("/api/v1/clusters/{c}/queues/{q}/messages", clusterId, "FRESH"))
                 .andExpect(status().isOk())

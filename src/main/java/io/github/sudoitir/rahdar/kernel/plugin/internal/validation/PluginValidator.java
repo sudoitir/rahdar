@@ -1,5 +1,7 @@
 package io.github.sudoitir.rahdar.kernel.plugin.internal.validation;
 
+import io.github.sudoitir.openbroker.BrokerDrivers;
+import io.github.sudoitir.openbroker.BrokerSystem;
 import io.github.sudoitir.rahdar.kernel.plugin.CalVer;
 import io.github.sudoitir.rahdar.kernel.plugin.Contract;
 import io.github.sudoitir.rahdar.kernel.plugin.RahdarVersion;
@@ -61,18 +63,31 @@ public class PluginValidator {
     private static final Set<String> DENIED_MANIFEST_ATTRIBUTES =
             Set.of("Class-Path", "Launcher-Agent-Class", "Add-Opens", "Add-Exports", "Enable-Native-Access");
 
-    /** Packages no plugin may claim as, or nest its {@code basePackage} under. */
-    private static final List<String> RESERVED_PREFIXES = List.of(
-            "io.github.sudoitir.rahdar",
-            "java.",
-            "javax.",
-            "jakarta.",
-            "org.springframework.",
-            "com.fasterxml.",
-            "tools.jackson.",
-            "org.hibernate.",
-            "liquibase.",
-            "org.apache.activemq.");
+    /**
+     * Packages no plugin may claim as, or nest its {@code basePackage} under: Rahdar's, the JDK's and
+     * the frameworks', the broker SDK's, and every installed broker driver's own client libraries.
+     */
+    private static final List<String> RESERVED_PREFIXES = reservedPrefixes();
+
+    private static List<String> reservedPrefixes() {
+        List<String> reserved = new ArrayList<>(List.of(
+                "io.github.sudoitir.rahdar",
+                "java.",
+                "javax.",
+                "jakarta.",
+                "org.springframework.",
+                "com.fasterxml.",
+                "tools.jackson.",
+                "org.hibernate.",
+                "liquibase.",
+                "io.github.sudoitir.openbroker."));
+        try (BrokerDrivers drivers = BrokerDrivers.load()) {
+            for (BrokerSystem system : drivers.systems()) {
+                system.nativePackages().forEach(p -> reserved.add(p.endsWith(".") ? p : p + "."));
+            }
+        }
+        return List.copyOf(reserved);
+    }
 
     private static final Pattern ID_PATTERN = Pattern.compile("^[a-z0-9]++(?:-[a-z0-9]++)++$");
     private static final Pattern PACKAGE_PATTERN = Pattern.compile("^[a-z][a-z0-9_]*+(?:\\.[a-z][a-z0-9_]*+)*+$");

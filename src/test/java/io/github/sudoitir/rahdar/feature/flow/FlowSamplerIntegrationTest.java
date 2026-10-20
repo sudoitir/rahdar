@@ -8,18 +8,17 @@ import static org.mockito.Mockito.when;
 
 import io.github.sudoitir.rahdar.feature.flow.ClientEdges.Kind;
 import io.github.sudoitir.rahdar.feature.flow.FlowStore.StoredEdge;
-import io.github.sudoitir.rahdar.feature.queues.DivertOperations;
 import io.github.sudoitir.rahdar.kernel.jobs.ScheduledJob;
-import io.github.sudoitir.rahdar.platform.broker.BrokerClientFactory;
-import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionSettings;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaBrokerClient;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNodeEntity;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNodeRepository;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterEntity;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterRepository;
 import io.github.sudoitir.rahdar.support.ArtemisIntegrationTest;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNodes;
+import io.github.sudoitir.rahdar.system.artemis.DivertOperations;
 import jakarta.jms.Connection;
 import jakarta.jms.MessageConsumer;
 import jakarta.jms.MessageProducer;
@@ -49,9 +48,6 @@ class FlowSamplerIntegrationTest extends PostgresIntegrationTest {
     FlowStore store;
 
     @Autowired
-    BrokerClientFactory clients;
-
-    @Autowired
     DivertOperations divertOps;
 
     @Autowired
@@ -63,6 +59,9 @@ class FlowSamplerIntegrationTest extends PostgresIntegrationTest {
     /** The real client for the container, under the credentials a registered cluster would carry. */
     @MockitoBean
     BrokerConnections connections;
+
+    @MockitoBean
+    ArtemisNodes artemisNodes;
 
     /**
      * The scheduled sweep, stopped. It forgets the rate baseline of every cluster nobody is watching,
@@ -89,11 +88,8 @@ class FlowSamplerIntegrationTest extends PostgresIntegrationTest {
                 clusterId, "artemis", "PRIMARY", UUID.randomUUID().toString());
         node.attachSeedUrl(jolokia);
         nodeId = nodes.save(node).getId();
-        when(connections.forCluster(eq(clusterId), any()))
-                .thenAnswer(inv -> clients.forNode(
-                        BrokerConnectionSettings.basicAuth(
-                                clusterId, ArtemisIntegrationTest.BROKER_USER, ArtemisIntegrationTest.BROKER_PASSWORD),
-                        jolokia));
+        when(artemisNodes.on(eq(clusterId), any(UUID.class)))
+                .thenAnswer(inv -> ArtemisIntegrationTest.jolokiaClient(jolokia));
     }
 
     @AfterEach
@@ -151,7 +147,7 @@ class FlowSamplerIntegrationTest extends PostgresIntegrationTest {
         String source = "flow.it.src." + suffix;
         String target = "flow.it.dst." + suffix;
         String filtered = "flow.it.red." + suffix;
-        JolokiaBrokerClient client = connections.forCluster(clusterId, ArtemisIntegrationTest.jolokiaUrl());
+        ArtemisNode client = ArtemisIntegrationTest.jolokiaClient(ArtemisIntegrationTest.jolokiaUrl());
         assertThat(client.execOnBroker(
                                 "createQueue(java.lang.String,java.lang.String,java.lang.String,boolean,java.lang.String)",
                                 source,

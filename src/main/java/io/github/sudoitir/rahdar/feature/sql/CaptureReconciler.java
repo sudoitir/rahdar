@@ -9,7 +9,6 @@ import io.github.sudoitir.rahdar.kernel.audit.AuditService;
 import io.github.sudoitir.rahdar.kernel.security.Actor;
 import io.github.sudoitir.rahdar.kernel.settings.RahdarInstance;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaBrokerClient;
 import io.github.sudoitir.rahdar.platform.broker.ManagementRefusal;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDutyReleased;
@@ -17,7 +16,8 @@ import io.github.sudoitir.rahdar.platform.clusters.ClusterLock;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterOwnership;
 import io.github.sudoitir.rahdar.platform.clusters.ServingNodes;
-import jakarta.jms.JMSException;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNodes;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -72,6 +72,7 @@ public class CaptureReconciler {
     private final CaptureAddresses addresses;
     private final AuditService audit;
     private final CaptureLoss loss;
+    private final ArtemisNodes artemisNodes;
 
     /**
      * Clusters this instance has installed a tap on. In memory, because it exists only
@@ -153,7 +154,7 @@ public class CaptureReconciler {
             refused.keySet().removeIf(key -> key.endsWith("." + subscriptionId));
             for (ClusterNode node : servingNodes(clusterId)) {
                 try {
-                    JolokiaBrokerClient client = client(clusterId, node);
+                    ArtemisNode client = client(clusterId, node);
                     for (String name : tap.installedNames(client, instance.id())) {
                         if (subscriptionId.equals(CaptureNames.subscriptionOf(name))) {
                             consumers.stop(node.getId(), name);
@@ -272,7 +273,7 @@ public class CaptureReconciler {
      *
      * <p>The address set is resolved cluster-wide and then asserted per node, not
      * resolved per node. That distinction is what makes failover work. A promoted
-     * backup has no {@code queue_snapshot} rows until the scrape reaches it, which can
+     * backup has no {@code subscription_snapshot} rows until the scrape reaches it, which can
      * be minutes; resolving per node would leave the newly live node untapped for
      * exactly that window — the window an operator is most likely to be watching. A
      * divert on an address a node has not seen traffic for yet costs nothing and is
@@ -302,7 +303,7 @@ public class CaptureReconciler {
 
     /** Whether this node has nothing wanted and nothing of this instance's left on it. */
     private boolean reconcileNode(UUID clusterId, ClusterNode node, List<Desired> wanted) {
-        JolokiaBrokerClient client = client(clusterId, node);
+        ArtemisNode client = client(clusterId, node);
         Set<String> actual = new LinkedHashSet<>(tap.installedNames(client, instance.id()));
         log.debug("Capture pass on {}: {} tap(s) already installed", node.getName(), actual.size());
         Set<String> wantedNames = new LinkedHashSet<>();
@@ -364,7 +365,7 @@ public class CaptureReconciler {
         try {
             // Checked before anything is created: a tap nobody can drain copies production
             // payload into a queue that only fills.
-            if (node.getCoreUrl() == null) {
+            if (node.getDataUrl() == null) {
                 throw new CaptureRefusedException(
                         "This node has no Core URL registered, and capture is drained over the Core protocol. "
                                 + "Add one to the cluster's connection and capture starts on the next pass.",
@@ -397,7 +398,7 @@ public class CaptureReconciler {
                 state(desired, node, CaptureState.PENDING, reason(e), false);
                 audit.fail(event, reason(e));
             }
-        } catch (RuntimeException | JMSException e) {
+        } catch (RuntimeException e) {
             state(desired, node, CaptureState.PENDING, reason(e), false);
             audit.fail(event, reason(e));
         }
@@ -417,15 +418,14 @@ public class CaptureReconciler {
     private static String fingerprint(Desired desired, ClusterNode node) {
         MessageIndexSubscriptionEntity s = desired.subscription();
         return s.getRingSize() + "|" + s.getFilterString() + "|" + s.getBodyCapBytes() + "|" + s.getMaxRate() + "|"
-                + node.getCoreUrl() + "|" + node.getJolokiaUrl();
+                + node.getDataUrl() + "|" + node.getManagementUrl();
     }
 
-    private void startDraining(UUID clusterId, ClusterNode node, Desired desired) throws JMSException {
+    private void startDraining(UUID clusterId, ClusterNode node, Desired desired) {
         consumers.start(new CaptureConsumer.Spec(
                 clusterId,
                 node.getId(),
                 node.getName(),
-                node.getCoreUrl(),
                 desired.subscription().getId(),
                 desired.name(),
                 CaptureNames.queueOf(desired.name()),
@@ -435,7 +435,7 @@ public class CaptureReconciler {
     }
 
     /** Whether the tap is gone from the node. A failure is audited and retried on the next pass. */
-    private boolean removeOrphan(UUID clusterId, ClusterNode node, JolokiaBrokerClient client, String name) {
+    private boolean removeOrphan(UUID clusterId, ClusterNode node, ArtemisNode client, String name) {
         AuditEvent event = audit.begin(
                 Actor.system(), "REMOVE_CAPTURE", "CAPTURE", name, clusterId, node.getId(), Map.of(), false);
         try {
@@ -509,8 +509,8 @@ public class CaptureReconciler {
     }
 
     /** The client waits for the node's ceiling before each of an install's requests (ADR-0076). */
-    private JolokiaBrokerClient client(UUID clusterId, ClusterNode node) {
-        return connections.forCluster(clusterId, node.getJolokiaUrl());
+    private ArtemisNode client(UUID clusterId, ClusterNode node) {
+        return artemisNodes.on(clusterId, node.getId());
     }
 
     private static String reason(Exception e) {

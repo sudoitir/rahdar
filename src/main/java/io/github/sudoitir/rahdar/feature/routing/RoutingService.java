@@ -1,9 +1,5 @@
 package io.github.sudoitir.rahdar.feature.routing;
 
-import io.github.sudoitir.rahdar.feature.queues.BridgeOperations;
-import io.github.sudoitir.rahdar.feature.queues.BridgeRow;
-import io.github.sudoitir.rahdar.feature.queues.DivertOperations;
-import io.github.sudoitir.rahdar.feature.queues.DivertRow;
 import io.github.sudoitir.rahdar.feature.queues.LifecycleKind;
 import io.github.sudoitir.rahdar.feature.routing.web.RoutingViews.BridgeNodeCell;
 import io.github.sudoitir.rahdar.feature.routing.web.RoutingViews.BridgeView;
@@ -19,9 +15,14 @@ import io.github.sudoitir.rahdar.kernel.security.ResourceFilter;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
 import io.github.sudoitir.rahdar.platform.broker.BrokerXmlSnippets;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaBrokerClient;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNodes;
+import io.github.sudoitir.rahdar.system.artemis.BridgeOperations;
+import io.github.sudoitir.rahdar.system.artemis.BridgeRow;
+import io.github.sudoitir.rahdar.system.artemis.DivertOperations;
+import io.github.sudoitir.rahdar.system.artemis.DivertRow;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -70,6 +71,7 @@ public class RoutingService {
     private final ClusterAccessGuard clusterAccess;
     private final PermissionResolver permissions;
     private final AuditService audit;
+    private final ArtemisNodes artemisNodes;
 
     public PagedView<DivertView> diverts(UUID clusterId, ResourceQuery query) {
         clusterAccess.requireVisible(clusterId);
@@ -141,7 +143,7 @@ public class RoutingService {
     /** What one node contributes to a routing view. */
     @FunctionalInterface
     private interface NodeRead<T> {
-        List<T> apply(JolokiaBrokerClient client, UUID nodeId, String nodeName);
+        List<T> apply(ArtemisNode client, UUID nodeId, String nodeName);
     }
 
     private <T> List<T> fanOut(UUID clusterId, List<ClusterNode> serving, NodeRead<T> read) {
@@ -154,7 +156,7 @@ public class RoutingService {
         BrokerConnectionException firstError = null;
         for (ClusterNode node : serving) {
             try {
-                JolokiaBrokerClient client = connections.forCluster(clusterId, node.getJolokiaUrl());
+                ArtemisNode client = artemisNodes.on(clusterId, node.getId());
                 merged.addAll(read.apply(client, node.getId(), node.getName()));
             } catch (BrokerConnectionException e) {
                 if (firstError == null) {
@@ -297,10 +299,10 @@ public class RoutingService {
     private List<ClusterNode> servingManageableNodes(UUID clusterId) {
         Map<String, ClusterNode> perNodeId = new LinkedHashMap<>();
         for (ClusterNode n : nodes.nodes(clusterId)) {
-            if (n.getJolokiaUrl() == null) {
+            if (n.getManagementUrl() == null) {
                 continue;
             }
-            String key = n.getArtemisNodeId() != null ? n.getArtemisNodeId() : "id:" + n.getId();
+            String key = n.getNativeNodeId() != null ? n.getNativeNodeId() : "id:" + n.getId();
             perNodeId.merge(key, n, (kept, candidate) -> Boolean.TRUE.equals(candidate.getActive()) ? candidate : kept);
         }
         return List.copyOf(perNodeId.values());

@@ -3,13 +3,13 @@ package io.github.sudoitir.rahdar.feature.sql;
 import io.github.sudoitir.rahdar.feature.messages.MessagePermissions;
 import io.github.sudoitir.rahdar.kernel.security.ClusterAccessGuard;
 import io.github.sudoitir.rahdar.kernel.security.ResourceRef;
-import io.github.sudoitir.rahdar.platform.broker.MessageBrowser;
-import io.github.sudoitir.rahdar.platform.broker.MessageTransport;
-import io.github.sudoitir.rahdar.platform.broker.MessageTransport.TransportTarget;
+import io.github.sudoitir.rahdar.platform.broker.BrokerMessages;
+import io.github.sudoitir.rahdar.platform.broker.BrowsedMessage;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
 import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshot;
 import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshots;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -38,7 +38,7 @@ public class MessageVerifier {
     private final ClusterDirectory nodes;
     private final QueueSnapshots snapshots;
     private final ClusterAccessGuard clusterAccess;
-    private final SqlConsoleService console;
+    private final BrokerMessages messages;
 
     public enum Presence {
         /** The broker still holds it. */
@@ -71,26 +71,19 @@ public class MessageVerifier {
                             + " any more, so the message cannot be looked for.");
         }
 
-        TransportTarget target = new TransportTarget(
-                clusterId,
-                nodeId,
-                queueName,
-                queue.get().address(),
-                queue.get().routingType(),
-                node.get().getJolokiaUrl(),
-                node.get().getCoreUrl());
         // Enqueue time is the one selector-visible attribute that narrows a queue to
         // a handful of messages without knowing anything else about this one.
         String selector = timestamp > 0 ? "AMQTimestamp = " + timestamp : null;
 
-        MessageTransport transport = console.transportFor(clusterId);
         try {
-            var result = transport.browse(target, 1, MessageBrowser.BROKER_PAGE_CAP, selector);
-            boolean found = result.page().messages().stream().anyMatch(m -> m.messageId() == messageId);
+            List<BrowsedMessage> read = messages.browse(
+                            clusterId, nodeId, queueName, 1, BrokerMessages.PAGE_CAP, selector)
+                    .messages();
+            boolean found = read.stream().anyMatch(m -> m.messageId() == messageId);
             if (found) {
                 return new Verdict(Presence.PRESENT, "Read from " + node.get().getName() + " just now.");
             }
-            if (result.page().messages().size() >= MessageBrowser.BROKER_PAGE_CAP) {
+            if (read.size() >= BrokerMessages.PAGE_CAP) {
                 return new Verdict(
                         Presence.UNKNOWN,
                         "More messages share this message's enqueue time than one read returns, so its"

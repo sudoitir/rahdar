@@ -44,7 +44,7 @@ public class MessageIndexSubscriptionEntity {
     private UUID clusterId;
 
     /** An Artemis wildcard pattern, matched the same way a FROM target is. */
-    @Column(name = "queue_pattern", nullable = false)
+    @Column(name = "subscription_pattern", nullable = false)
     private String queuePattern;
 
     @Column(name = "interval_ms", nullable = false)

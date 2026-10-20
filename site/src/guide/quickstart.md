@@ -144,7 +144,7 @@ the first run. It also sets up an authenticator app for `admin`, which its role 
 and prints `ADMIN_TOTP_SECRET`. Later runs, and `just shots` and `just demo-gif`, need
 `ADMIN_PASSWORD` set to the new password and `ADMIN_TOTP_SECRET` to that secret.
 
-Nothing in that seed writes to `metric_sample` or `queue_snapshot` directly —
+Nothing in that seed writes to `metric_sample` or `subscription_snapshot` directly —
 the traffic is produced and consumed through the broker's own CLI, so the charts
 are measurements rather than fiction.
 

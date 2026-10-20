@@ -4,7 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import io.github.sudoitir.rahdar.feature.transfer.internal.persistence.TransferLedger;
 import io.github.sudoitir.rahdar.feature.transfer.web.TransferViews.TransferRunView;
-import io.github.sudoitir.rahdar.platform.broker.StagingQueues;
+import io.github.sudoitir.rahdar.system.artemis.StagingQueues;
 import java.time.Duration;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

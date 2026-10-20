@@ -19,21 +19,20 @@ import io.github.sudoitir.rahdar.kernel.security.SecretVault;
 import io.github.sudoitir.rahdar.platform.broker.AccountResult;
 import io.github.sudoitir.rahdar.platform.broker.Attempt;
 import io.github.sudoitir.rahdar.platform.broker.BrokerCapabilities;
-import io.github.sudoitir.rahdar.platform.broker.BrokerClientFactory;
+import io.github.sudoitir.rahdar.platform.broker.BrokerCapabilityProbe;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionSettings;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
+import io.github.sudoitir.rahdar.platform.broker.BrokerFailures;
+import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
+import io.github.sudoitir.rahdar.platform.broker.BrokerNotifications;
+import io.github.sudoitir.rahdar.platform.broker.BrokerTarget;
 import io.github.sudoitir.rahdar.platform.broker.BrokerVersion;
-import io.github.sudoitir.rahdar.platform.broker.CapabilityProbe;
-import io.github.sudoitir.rahdar.platform.broker.CoreAccountCheck;
 import io.github.sudoitir.rahdar.platform.broker.CoreConnectionSettings;
-import io.github.sudoitir.rahdar.platform.broker.CoreEventClient;
-import io.github.sudoitir.rahdar.platform.broker.CoreSubscriptionCheck;
-import io.github.sudoitir.rahdar.platform.broker.CoreSubscriptionManager;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaBrokerClient;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaResponse;
+import io.github.sudoitir.rahdar.platform.broker.DataPlaneCheck;
 import io.github.sudoitir.rahdar.platform.broker.ManagementUrlSource;
 import io.github.sudoitir.rahdar.platform.broker.NodeEndpoint;
+import io.github.sudoitir.rahdar.platform.broker.ProbeSession;
 import io.github.sudoitir.rahdar.platform.broker.SubscriptionVerdict;
 import io.github.sudoitir.rahdar.platform.broker.VersionGate;
 import io.github.sudoitir.rahdar.platform.clusters.TopologyDiscovery.ProbedSeed;
@@ -77,10 +76,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.UUID;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -105,13 +100,12 @@ import org.springframework.transaction.support.TransactionTemplate;
 @Slf4j
 public class ClusterService {
 
-    private static final String JOLOKIA_BASIC = "JOLOKIA_BASIC";
-    private static final String CORE = "CORE";
+    private static final String MANAGEMENT = "MANAGEMENT";
+    private static final String DATA = "DATA";
     private static final String REGISTER_CLUSTER = "REGISTER_CLUSTER";
     private static final String UPDATE_CONNECTION = "UPDATE_CLUSTER_CONNECTION";
     private static final String CLUSTER = "CLUSTER";
     private static final String SEED_URLS = "seedUrls";
-    private static final String VERSION = "Version";
     private static final UUID UNBOUND = new UUID(0L, 0L);
 
     private final ClusterRepository clusters;
@@ -121,16 +115,15 @@ public class ClusterService {
     private final BrokerIdentityClaims identityClaims;
     private final ClusterIdentityClaims clusterClaims;
 
-    private final BrokerClientFactory clientFactory;
+    private final BrokerGateway gateway;
     private final BrokerConnections connections;
     private final List<RegistrationCheckContributor> checkContributors;
-    private final CapabilityProbe capabilityProbe;
+    private final BrokerCapabilityProbe capabilityProbe;
     private final CapabilityAssessments capabilityAssessments;
     private final TopologyDiscovery topologyDiscovery;
     private final HaStateEvaluator evaluator;
-    private final CoreSubscriptionManager coreSubscriptions;
-    private final CoreSubscriptionCheck coreSubscriptionCheck;
-    private final CoreAccountCheck coreAccountCheck;
+    private final BrokerNotifications coreSubscriptions;
+    private final DataPlaneCheck dataPlaneCheck;
     private final SeedExpander seedExpander;
     private final Optional<RegistrationAdoption> adoption;
     private final EnvironmentRepository environments;
@@ -180,25 +173,21 @@ public class ClusterService {
     record ClusterDeleteParams(UUID clusterId) {}
 
     /** What the gate holds of a node's URL override: the URLs it sets, either of which may be absent. */
-    record NodeOverrideParams(UUID clusterId, UUID nodeId, String jolokiaUrl, String coreUrl) {
+    record NodeOverrideParams(UUID clusterId, UUID nodeId, String managementUrl, String dataUrl) {
 
         NodeOverrideRequest toRequest() {
-            return new NodeOverrideRequest(jolokiaUrl, coreUrl);
+            return new NodeOverrideRequest(managementUrl, dataUrl);
         }
     }
 
     private record Probe(
-            String url,
-            boolean attachable,
-            JolokiaBrokerClient client,
-            String version,
-            BrokerConnectionException error) {
+            String url, boolean attachable, BrokerTarget target, String version, BrokerConnectionException error) {
         boolean ok() {
             return error == null;
         }
 
         ProbedSeed asSeed() {
-            return new ProbedSeed(url, client, attachable);
+            return new ProbedSeed(url, target, attachable);
         }
     }
 
@@ -215,6 +204,14 @@ public class ClusterService {
 
     @PreAuthorize("@perm.can(T(io.github.sudoitir.rahdar.platform.clusters.ClusterPermissions).CLUSTER_WRITE)")
     public Attempt<RegisterPreview> checkConnection(RegisterClusterRequest request) {
+        ConnectionInputs inputs = inputsOf(request);
+        try (ProbeSession session = gateway.probe(inputs.management())) {
+            return checkConnection(request, inputs, session);
+        }
+    }
+
+    private Attempt<RegisterPreview> checkConnection(
+            RegisterClusterRequest request, ConnectionInputs inputs, ProbeSession session) {
         AuditEvent event = audit.begin(
                 actorResolver.resolve(),
                 REGISTER_CLUSTER,
@@ -225,8 +222,7 @@ public class ClusterService {
                 Map.of(SEED_URLS, request.seedUrls()),
                 true);
 
-        ConnectionInputs inputs = inputsOf(request);
-        List<Probe> probes = connectAll(inputs);
+        List<Probe> probes = connectAll(inputs, session);
         List<Probe> reachable = probes.stream().filter(Probe::ok).toList();
         if (reachable.isEmpty()) {
             return failed(event, probes.get(0).error());
@@ -242,15 +238,12 @@ public class ClusterService {
         TopologyDiscovery.Preview found = topologyDiscovery.preview(survey, inputs.derivation());
         ClusterTopology preview = found.topology();
         List<NodeEndpoint> endpoints = endpoints(preview);
-        List<AccountResult> coreResults = checkCore(endpoints, inputs.core());
-
-        // Actually open a Core subscription rather than reporting NotAttempted. A
-        // check that stays silent about the Core channel is how a wrong Core account
-        // — or a management account the broker reserves as its <cluster-user> —
-        // reaches a registered cluster and fails there instead, where the operator
-        // has no obvious way back.
-        SubscriptionVerdict coreVerdict = coreSubscriptionCheck.probe(endpoints, inputs.core());
-        BrokerCapabilities capabilities = capabilityProbe.probe(reachable.get(0).client(), coreVerdict);
+        // One subscription per node rather than reporting NotAttempted: it says both whether the broker lets the
+        // Core account in on each node and whether it may subscribe to notifications.
+        DataPlaneCheck.Result dataPlane = dataPlaneCheck.check(endpoints, inputs.core());
+        List<AccountResult> coreResults = dataPlane.accounts();
+        SubscriptionVerdict coreVerdict = dataPlane.verdict();
+        BrokerCapabilities capabilities = capabilityProbe.probe(reachable.get(0).target(), coreVerdict);
         int nodeCount =
                 (int) endpoints.stream().map(NodeEndpoint::name).distinct().count();
 
@@ -260,7 +253,7 @@ public class ClusterService {
                     contributor.featureId(),
                     contributor.contribute(
                             capabilities,
-                            reachable.get(0).client(),
+                            reachable.get(0).target(),
                             coreSettingsFrom(request).username()));
         }
 
@@ -272,7 +265,7 @@ public class ClusterService {
                 viewMapper.topology(preview),
                 inputs.pattern(),
                 probeRows(endpoints, found.management(), coreResults),
-                adoptionPreview(endpoints, inputs.management()),
+                adoptionPreview(endpoints, session),
                 contributions));
     }
 
@@ -308,35 +301,6 @@ public class ClusterService {
                 : new CoreConnectionSettings(null, core.username(), core.password(), request.tlsBundle(), true);
     }
 
-    /** One Core session per node that takes Core connections, concurrently: a dead address must not queue the rest. */
-    private List<AccountResult> checkCore(List<NodeEndpoint> endpoints, CoreConnectionSettings core) {
-        try (ExecutorService pool = Executors.newVirtualThreadPerTaskExecutor()) {
-            List<Future<AccountResult>> results = endpoints.stream()
-                    .map(e -> pool.submit(() -> coreResult(e, core)))
-                    .toList();
-            return results.stream().map(ClusterService::resultOf).toList();
-        }
-    }
-
-    /** A passive backup opens no Core acceptor, so asking it would only report a refusal that means nothing. */
-    private AccountResult coreResult(NodeEndpoint node, CoreConnectionSettings core) {
-        if (node.coreUrl() == null || (node.isBackup() && !node.active())) {
-            return AccountResult.NOT_TRIED;
-        }
-        return coreAccountCheck.check(node.coreUrl(), core);
-    }
-
-    private static AccountResult resultOf(Future<AccountResult> result) {
-        try {
-            return result.get();
-        } catch (InterruptedException _) {
-            Thread.currentThread().interrupt();
-            return AccountResult.UNREACHABLE;
-        } catch (ExecutionException _) {
-            return AccountResult.UNREACHABLE;
-        }
-    }
-
     private static List<NodeProbeView> probeRows(
             List<NodeEndpoint> endpoints, Map<String, AccountResult> management, List<AccountResult> core) {
         List<NodeProbeView> rows = new ArrayList<>();
@@ -344,10 +308,10 @@ public class ClusterService {
             NodeEndpoint e = endpoints.get(i);
             rows.add(new NodeProbeView(
                     e.name(),
-                    e.haRole(),
-                    e.artemisNodeId(),
+                    e.haDesignation(),
+                    e.nativeNodeId(),
                     e.version(),
-                    e.jolokiaUrl(),
+                    e.managementUrl(),
                     e.urlSource(),
                     e.urlProblem(),
                     management.getOrDefault(e.name(), AccountResult.NOT_TRIED),
@@ -357,11 +321,10 @@ public class ClusterService {
     }
 
     /** What adopting the running configuration would declare, read from the live nodes the check reached. */
-    private AdoptionPreviewView adoptionPreview(List<NodeEndpoint> endpoints, BrokerConnectionSettings management) {
+    private AdoptionPreviewView adoptionPreview(List<NodeEndpoint> endpoints, ProbeSession session) {
         return adoption.flatMap(adopter -> adopter.preview(endpoints.stream()
-                        .filter(e -> e.active() && e.jolokiaUrl() != null)
-                        .map(e -> new RegistrationAdoption.LiveNode(
-                                e.name(), clientFactory.forNode(management, e.jolokiaUrl())))
+                        .filter(e -> e.active() && e.managementUrl() != null)
+                        .map(e -> new RegistrationAdoption.LiveNode(e.name(), session.node(e.managementUrl())))
                         .toList()))
                 .map(p -> new AdoptionPreviewView(
                         new AdoptionCountsView(
@@ -401,7 +364,14 @@ public class ClusterService {
 
     private Attempt<ClusterDetail> registerNow(RegisterClusterRequest request) {
         ConnectionInputs inputs = inputsOf(request);
-        List<Probe> probes = connectAll(inputs);
+        try (ProbeSession session = gateway.probe(inputs.management())) {
+            return registerNow(request, inputs, session);
+        }
+    }
+
+    private Attempt<ClusterDetail> registerNow(
+            RegisterClusterRequest request, ConnectionInputs inputs, ProbeSession session) {
+        List<Probe> probes = connectAll(inputs, session);
         List<Probe> reachable = probes.stream().filter(Probe::ok).toList();
         if (reachable.isEmpty()) {
             AuditEvent event = audit.begin(
@@ -431,18 +401,17 @@ public class ClusterService {
         // A cluster not yet registered has no Core subscription and no recorded write, so this is the whole
         // assessment; it is read here so that no broker call is made inside the registration transaction.
         BrokerCapabilities capabilities =
-                capabilityProbe.probe(reachable.get(0).client(), new SubscriptionVerdict.NotAttempted());
-        RegistrationAdoption.Reading adopted = request.adopts() ? readAdoption(found, inputs) : null;
+                capabilityProbe.probe(reachable.get(0).target(), new SubscriptionVerdict.NotAttempted());
+        RegistrationAdoption.Reading adopted = request.adopts() ? readAdoption(found, session) : null;
         return transactions.execute(status -> saveRegistration(request, inputs, survey, found, capabilities, adopted));
     }
 
     /** What the live nodes run, read before the registration transaction opens (ADR-0176). */
-    private RegistrationAdoption.Reading readAdoption(TopologyDiscovery.Preview found, ConnectionInputs inputs) {
+    private RegistrationAdoption.Reading readAdoption(TopologyDiscovery.Preview found, ProbeSession session) {
         return adoption.orElseThrow()
                 .read(endpoints(found.topology()).stream()
-                        .filter(e -> e.active() && e.jolokiaUrl() != null)
-                        .map(e -> new RegistrationAdoption.LiveNode(
-                                e.name(), clientFactory.forNode(inputs.management(), e.jolokiaUrl())))
+                        .filter(e -> e.active() && e.managementUrl() != null)
+                        .map(e -> new RegistrationAdoption.LiveNode(e.name(), session.node(e.managementUrl())))
                         .toList())
                 .orElseThrow(() -> new ConflictException(
                         "no-live-node", "No live node could be read, so there is nothing to adopt."));
@@ -484,21 +453,21 @@ public class ClusterService {
         if (request.hasCredentials()) {
             credentials.save(new BrokerCredentialEntity(
                     clusterId,
-                    JOLOKIA_BASIC,
+                    MANAGEMENT,
                     request.credentials().username(),
                     vault.seal(
-                            SecretVault.aad(clusterId, JOLOKIA_BASIC),
+                            SecretVault.aad(clusterId, MANAGEMENT),
                             request.credentials().password())));
         }
         if (request.hasCoreCredentials()) {
-            // A CORE row is a genuinely separate sealed secret — AAD is clusterId|CORE
+            // A DATA row is a genuinely separate sealed secret — AAD is clusterId|CORE
             // (ADR-0026). When absent, coreSettingsFor falls back to the Jolokia credential.
             credentials.save(new BrokerCredentialEntity(
                     clusterId,
-                    CORE,
+                    DATA,
                     request.coreCredentials().username(),
                     vault.seal(
-                            SecretVault.aad(clusterId, CORE),
+                            SecretVault.aad(clusterId, DATA),
                             request.coreCredentials().password())));
         }
         if (request.tlsBundle() != null) {
@@ -565,9 +534,9 @@ public class ClusterService {
 
     /** The registered cluster holding any of these brokers, by NodeID or by a management URL's normal form. */
     private Optional<ClusterIdentity.Overlap> registeredOverlap(ClusterIdentity identity) {
-        List<BrokerNodeEntity> candidates = new ArrayList<>(nodes.findByJolokiaUrlIsNotNull());
+        List<BrokerNodeEntity> candidates = new ArrayList<>(nodes.findManaged());
         if (!identity.nodeIds().isEmpty()) {
-            candidates.addAll(nodes.findByArtemisNodeIdIn(identity.nodeIds()));
+            candidates.addAll(nodes.findByNativeNodeIdIn(identity.nodeIds()));
         }
         Map<UUID, String> names = new HashMap<>();
         clusters.findAllById(candidates.stream()
@@ -658,7 +627,7 @@ public class ClusterService {
     private ClusterConnectionDetail connectionView(UUID clusterId, ClusterEntity cluster) {
         List<String> seeds = nodes.findByClusterIdOrderByNameAsc(clusterId).stream()
                 .filter(n -> n.getUrlSource() == ManagementUrlSource.SEED)
-                .map(BrokerNodeEntity::getJolokiaUrl)
+                .map(BrokerNodeEntity::getManagementUrl)
                 .toList();
         BrokerTlsEntity tls = tlsRepository.findByClusterId(clusterId).orElse(null);
         return new ClusterConnectionDetail(
@@ -666,11 +635,11 @@ public class ClusterService {
                 seeds,
                 tls == null ? null : tls.getTruststoreRef(),
                 credentials
-                        .findByClusterIdAndKind(clusterId, JOLOKIA_BASIC)
+                        .findByClusterIdAndKind(clusterId, MANAGEMENT)
                         .map(BrokerCredentialEntity::getUsername)
                         .orElse(null),
                 credentials
-                        .findByClusterIdAndKind(clusterId, CORE)
+                        .findByClusterIdAndKind(clusterId, DATA)
                         .map(BrokerCredentialEntity::getUsername)
                         .orElse(null));
     }
@@ -680,12 +649,12 @@ public class ClusterService {
      * its last scrape; a Core one is held by this replica's subscriptions, so another replica does not see it.
      */
     private ClusterHealth healthOf(UUID clusterId, List<LogicalNode> logical) {
-        Map<UUID, CoreEventClient.State> states = coreSubscriptions.nodeStates();
+        Map<UUID, SubscriptionVerdict.NodeState> states = coreSubscriptions.nodeStates();
         Set<UUID> coreRejected = logical.stream()
                 .flatMap(n -> n.endpoints().stream())
                 .map(NodeEndpoint::id)
-                .filter(id -> states.get(id) instanceof CoreEventClient.State.Failed failed
-                        && failed.kind() == CoreEventClient.Kind.UNAUTHORIZED)
+                .filter(id -> states.get(id) instanceof SubscriptionVerdict.NodeState.Failed failed
+                        && failed.kind() == SubscriptionVerdict.Kind.UNAUTHORIZED)
                 .collect(Collectors.toSet());
         return evaluator.toHealth(clusterId, logical, coreRejected);
     }
@@ -774,24 +743,25 @@ public class ClusterService {
         if (cluster.isEmpty()) {
             return;
         }
-        List<ProbedSeed> seeds = new ArrayList<>();
-        Set<String> seen = new HashSet<>();
-        for (BrokerNodeEntity node : nodes.findByClusterIdOrderByNameAsc(clusterId)) {
-            if (node.getJolokiaUrl() != null && seen.add(node.getJolokiaUrl())) {
-                seeds.add(
-                        new ProbedSeed(node.getJolokiaUrl(), connections.forCluster(clusterId, node.getJolokiaUrl())));
+        try (ProbeSession session = gateway.probe(clusterId)) {
+            List<ProbedSeed> seeds = new ArrayList<>();
+            Set<String> seen = new HashSet<>();
+            for (BrokerNodeEntity node : nodes.findByClusterIdOrderByNameAsc(clusterId)) {
+                if (node.getManagementUrl() != null && seen.add(node.getManagementUrl())) {
+                    seeds.add(new ProbedSeed(node.getManagementUrl(), session.node(node.getManagementUrl())));
+                }
             }
-        }
-        for (SeedExpander.Seed seed : extraSeeds) {
-            if (seen.add(seed.url())) {
-                seeds.add(new ProbedSeed(seed.url(), connections.forCluster(clusterId, seed.url()), seed.attachable()));
+            for (SeedExpander.Seed seed : extraSeeds) {
+                if (seen.add(seed.url())) {
+                    seeds.add(new ProbedSeed(seed.url(), session.node(seed.url()), seed.attachable()));
+                }
             }
-        }
-        if (!seeds.isEmpty()) {
-            topologyDiscovery.discover(
-                    clusterId,
-                    seeds,
-                    new UrlDerivation(cluster.get().getManagementUrlPattern(), connections.settingsFor(clusterId)));
+            if (!seeds.isEmpty()) {
+                topologyDiscovery.discover(
+                        clusterId,
+                        seeds,
+                        new UrlDerivation(cluster.get().getManagementUrlPattern(), connections.settingsFor(clusterId)));
+            }
         }
     }
 
@@ -804,8 +774,7 @@ public class ClusterService {
         clusterAccess.requireCluster(clusterId, ClusterPermissions.CLUSTER_WRITE);
         requireCluster(clusterId);
         BrokerNodeEntity node = requireNode(clusterId, nodeId);
-        if (request.hasJolokiaUrl()
-                && nodes.existsByClusterIdAndJolokiaUrlAndIdNot(clusterId, request.jolokiaUrl(), nodeId)) {
+        if (request.hasJolokiaUrl() && nodes.existsManagementUrlElsewhere(clusterId, request.jolokiaUrl(), nodeId)) {
             throw new ConflictException(
                     "duplicate-node-url", "Another node of this cluster already uses " + request.jolokiaUrl() + ".");
         }
@@ -839,8 +808,9 @@ public class ClusterService {
                 actorResolver.resolve(), "OVERRIDE_NODE_URL", "NODE", nodeName, clusterId, nodeId, params, false);
 
         if (request.hasJolokiaUrl()) {
-            try {
-                connections.forCluster(clusterId, request.jolokiaUrl()).resolveBrokerObjectName();
+            // The address must reach a broker before Rahdar sends the cluster's credentials there for good.
+            try (ProbeSession session = gateway.probe(clusterId)) {
+                session.node(request.jolokiaUrl()).describe();
             } catch (BrokerConnectionException e) {
                 return failed(event, e);
             }
@@ -853,7 +823,7 @@ public class ClusterService {
                     node.applyManualUrl(request.jolokiaUrl());
                 }
                 if (request.hasCoreUrl()) {
-                    node.applyManualCoreUrl(request.coreUrl());
+                    node.applyManualDataUrl(request.coreUrl());
                 }
                 BrokerNodeEntity result = nodes.save(node);
                 // A node known only by its URL is claimed by it: the old URL is released, the new one claimed.
@@ -927,13 +897,15 @@ public class ClusterService {
         UrlDerivation derivation = new UrlDerivation(edited.pattern(), management);
         List<BrokerNodeEntity> stored = nodes.findByClusterIdOrderByNameAsc(clusterId);
         List<NodeEndpoint> endpoints = nodeMapper.toEndpoints(stored);
-        List<AccountResult> core = checkCore(endpoints, edited.coreSettings(clusterId));
+        List<AccountResult> core =
+                dataPlaneCheck.check(endpoints, edited.coreSettings(clusterId)).accounts();
 
         List<NodeProbeView> rows = new ArrayList<>();
         for (int i = 0; i < stored.size(); i++) {
             rows.add(storedRow(stored.get(i), derivation, core.get(i)));
         }
-        Set<String> known = stored.stream().map(BrokerNodeEntity::getJolokiaUrl).collect(Collectors.toSet());
+        Set<String> known =
+                stored.stream().map(BrokerNodeEntity::getManagementUrl).collect(Collectors.toSet());
         Set<String> knownHosts = knownHostPorts(stored);
         for (String url : edited.seedUrls()) {
             if (!known.contains(url)) {
@@ -950,18 +922,18 @@ public class ClusterService {
      * again with the new account; a derived one, or none, is derived afresh from the pattern, as discovery would.
      */
     private NodeProbeView storedRow(BrokerNodeEntity node, UrlDerivation derivation, AccountResult core) {
-        boolean fixed = node.getJolokiaUrl() != null && node.getUrlSource() != ManagementUrlSource.DERIVED;
+        boolean fixed = node.getManagementUrl() != null && node.getUrlSource() != ManagementUrlSource.DERIVED;
         TopologyDiscovery.UrlProof proof = fixed
-                ? topologyDiscovery.probe(derivation.settings(), node.getJolokiaUrl(), node.getArtemisNodeId())
-                : topologyDiscovery.prove(derivation, node.getName(), node.getArtemisNodeId());
+                ? topologyDiscovery.probe(derivation.settings(), node.getManagementUrl(), node.getNativeNodeId())
+                : topologyDiscovery.prove(derivation, node.getName(), node.getNativeNodeId());
         boolean derived = !fixed && proof.url() != null;
         ManagementUrlSource source = derived ? ManagementUrlSource.DERIVED : null;
         return new NodeProbeView(
                 node.getName(),
-                node.getHaRole(),
-                node.getArtemisNodeId(),
+                node.getHaDesignation(),
+                node.getNativeNodeId(),
                 proof.version() != null ? proof.version() : node.getVersion(),
-                fixed ? node.getJolokiaUrl() : proof.url(),
+                fixed ? node.getManagementUrl() : proof.url(),
                 fixed ? node.getUrlSource() : source,
                 fixed || derived ? null : proof.problem(),
                 proof.management(),
@@ -973,7 +945,7 @@ public class ClusterService {
         TopologyDiscovery.UrlProof proof = topologyDiscovery.probe(management, url, null);
         return new NodeProbeView(
                 hostOf(url),
-                proof.haRole() != null ? proof.haRole() : "STANDALONE",
+                proof.haDesignation() != null ? proof.haDesignation() : "NONE",
                 proof.nodeId(),
                 proof.version(),
                 url,
@@ -1065,8 +1037,8 @@ public class ClusterService {
         cluster.edit(edited.name(), edited.description(), edited.pattern());
         clusters.save(cluster);
         storeTls(clusterId, edited.tlsBundle());
-        storeCredential(clusterId, JOLOKIA_BASIC, edited.management());
-        storeCredential(clusterId, CORE, edited.core());
+        storeCredential(clusterId, MANAGEMENT, edited.management());
+        storeCredential(clusterId, DATA, edited.core());
         releaseDroppedSeeds(clusterId, edited.seedUrls());
         if (edited.retryProblems()) {
             // The pattern, the account or the TLS bundle changed, so why a node had no URL may no longer hold.
@@ -1096,7 +1068,7 @@ public class ClusterService {
             throw new IllegalArgumentException(ENTER_AGAIN.formatted("management"));
         }
         Account management = managementAccount(request, stored);
-        Optional<BrokerCredentialEntity> storedCore = credentials.findByClusterIdAndKind(clusterId, CORE);
+        Optional<BrokerCredentialEntity> storedCore = credentials.findByClusterIdAndKind(clusterId, DATA);
         Account core = coreAccount(clusterId, request, storedCore);
         requireCorePasswordAgain(request, storedCore, core, newHosts);
         if (management.username() != null && management.password() == null) {
@@ -1124,7 +1096,7 @@ public class ClusterService {
         }
         return storedNodes.stream()
                 .filter(n -> n.getUrlSource() == ManagementUrlSource.SEED)
-                .map(BrokerNodeEntity::getJolokiaUrl)
+                .map(BrokerNodeEntity::getManagementUrl)
                 .toList();
     }
 
@@ -1199,7 +1171,7 @@ public class ClusterService {
     /** The {@code host:port} of every management URL the cluster's nodes already have. */
     private static Set<String> knownHostPorts(List<BrokerNodeEntity> storedNodes) {
         return storedNodes.stream()
-                .map(BrokerNodeEntity::getJolokiaUrl)
+                .map(BrokerNodeEntity::getManagementUrl)
                 .filter(Objects::nonNull)
                 .map(ClusterService::hostPort)
                 .collect(Collectors.toSet());
@@ -1306,7 +1278,7 @@ public class ClusterService {
     /** A seed the operator no longer lists stops being one: its node keeps no URL until one is derived for it. */
     private void releaseDroppedSeeds(UUID clusterId, List<String> seedUrls) {
         for (BrokerNodeEntity node : nodes.findByClusterIdOrderByNameAsc(clusterId)) {
-            if (node.getUrlSource() == ManagementUrlSource.SEED && !seedUrls.contains(node.getJolokiaUrl())) {
+            if (node.getUrlSource() == ManagementUrlSource.SEED && !seedUrls.contains(node.getManagementUrl())) {
                 node.releaseSeedUrl();
             }
         }
@@ -1352,14 +1324,13 @@ public class ClusterService {
      * address (ADR-0175). A seed that fails is kept with its error, so the first failure can be reported when
      * none answers.
      */
-    private List<Probe> connectAll(ConnectionInputs inputs) {
+    private List<Probe> connectAll(ConnectionInputs inputs, ProbeSession session) {
         List<Probe> probes = new ArrayList<>();
         for (String given : inputs.seedUrls()) {
             for (SeedExpander.Seed seed : seedExpander.expand(given)) {
+                BrokerTarget target = session.node(seed.url());
                 try {
-                    JolokiaBrokerClient client = clientFactory.forNode(inputs.management(), seed.url());
-                    client.resolveBrokerObjectName();
-                    probes.add(new Probe(seed.url(), seed.attachable(), client, brokerVersion(client), null));
+                    probes.add(new Probe(seed.url(), seed.attachable(), target, brokerVersion(target), null));
                 } catch (BrokerConnectionException e) {
                     probes.add(new Probe(seed.url(), seed.attachable(), null, null, e));
                 }
@@ -1368,12 +1339,19 @@ public class ClusterService {
         return probes;
     }
 
-    /** The broker's {@code Version} attribute, or null when the read is refused; the range check then has nothing to refuse on. */
-    private static String brokerVersion(JolokiaBrokerClient client) {
-        JolokiaResponse response = client.readBrokerAttributes(VERSION);
-        return response.ok() && response.attribute(VERSION) != null
-                ? response.attribute(VERSION).asString()
-                : null;
+    /**
+     * The broker's version from one read of its HA attributes, or null when the broker refused the read;
+     * the range check then has nothing to refuse on.
+     */
+    private static String brokerVersion(BrokerTarget target) {
+        try {
+            return target.describe().version().orElse(null);
+        } catch (BrokerConnectionException e) {
+            if (BrokerFailures.answeredError(e).isPresent()) {
+                return null;
+            }
+            throw e;
+        }
     }
 
     /** A refusal naming the minimum when any reachable seed runs an older release (ADR-0142), else null. */

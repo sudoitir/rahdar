@@ -73,9 +73,9 @@ public class IndexQueryExecutor {
         List<Object> binds = new ArrayList<>();
         StringBuilder sql = new StringBuilder("""
                 SELECT observed_at, last_seen_at, message_id, timestamp_ms, expiration_ms, size_bytes,
-                       priority, message_type, queue_name, address, node_name, correlation_id, group_id,
+                       priority, message_type, subscription, destination, node_name, correlation_id, group_id,
                        user_id, reply_to, jms_type, body, props, cluster_id, node_id, durable,
-                       origin, orig_address, source_message_id, body_truncated, body_base64, body_compression, sealed
+                       origin, orig_destination, source_message_id, body_truncated, body_base64, body_compression, sealed
                   FROM message_index
                  WHERE cluster_id = ?
                 """);
@@ -84,7 +84,7 @@ public class IndexQueryExecutor {
         List<String> queues =
                 plan.targets().stream().map(Target::queueName).distinct().toList();
         if (!queues.isEmpty()) {
-            sql.append(" AND queue_name IN (")
+            sql.append(" AND subscription IN (")
                     .append(String.join(", ", Collections.nCopies(queues.size(), "?")))
                     .append(')');
             binds.addAll(queues);
@@ -143,7 +143,6 @@ public class IndexQueryExecutor {
                     NodeOutcome.Status.ANSWERED,
                     matched,
                     matched,
-                    null,
                     null);
             outcomes.add(outcome);
             sink.nodeFinished(outcome);
@@ -265,8 +264,8 @@ public class IndexQueryExecutor {
     private String columnName(Column column) {
         return switch (column) {
             case MESSAGE_ID -> "message_id";
-            case QUEUE -> "queue_name";
-            case ADDRESS -> "address";
+            case QUEUE -> "subscription";
+            case ADDRESS -> "destination";
             case NODE -> "node_name";
             case PRIORITY -> "priority";
             case DURABLE -> "durable";
@@ -283,7 +282,7 @@ public class IndexQueryExecutor {
             case OBSERVED_AT -> "observed_at";
             case LAST_SEEN_AT -> "last_seen_at";
             case ORIGIN -> "origin";
-            case ORIG_ADDRESS -> "orig_address";
+            case ORIG_ADDRESS -> "orig_destination";
             case SOURCE_MESSAGE_ID -> "source_message_id";
         };
     }
@@ -372,8 +371,8 @@ public class IndexQueryExecutor {
         Row row = new Row(
                 rs.getObject("node_id", UUID.class),
                 rs.getString("node_name"),
-                rs.getString("queue_name"),
-                rs.getString("address"),
+                rs.getString("subscription"),
+                rs.getString("destination"),
                 rs.getLong("message_id"),
                 rs.getInt("message_type"),
                 rs.getBoolean("durable"),

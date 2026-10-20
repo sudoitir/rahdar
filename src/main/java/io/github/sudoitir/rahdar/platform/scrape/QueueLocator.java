@@ -1,11 +1,18 @@
 package io.github.sudoitir.rahdar.platform.scrape;
 
+import io.github.sudoitir.openbroker.BrokerException;
+import io.github.sudoitir.openbroker.ClusterConnection;
+import io.github.sudoitir.openbroker.model.MetricKeys;
+import io.github.sudoitir.openbroker.model.Resource;
+import io.github.sudoitir.openbroker.model.ResourceClass;
+import io.github.sudoitir.openbroker.model.ResourceQuery;
+import io.github.sudoitir.openbroker.model.Scope;
+import io.github.sudoitir.openbroker.model.StandardAttributes;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
-import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
-import io.github.sudoitir.rahdar.platform.broker.BrokerMBeans;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaBrokerClient;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaRequest;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaResponse;
+import io.github.sudoitir.rahdar.platform.broker.BrokerFailures;
+import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
+import io.github.sudoitir.rahdar.platform.broker.QueueRow;
+import io.github.sudoitir.rahdar.platform.broker.ResourceIds;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
 import io.github.sudoitir.rahdar.platform.clusters.ServingNodes;
@@ -13,8 +20,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
-import javax.management.MalformedObjectNameException;
-import javax.management.ObjectName;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -22,9 +27,9 @@ import org.springframework.stereotype.Component;
  * Where a queue lives in a cluster: its address and routing type on each node that has it.
  *
  * <p>The scraped snapshot answers first. A queue the scrape has not reached yet — created a
- * moment ago, or on a node whose sweep has not come round — is looked up live, with one
- * pattern read per live node that answers where the queue is and how many messages it holds,
- * so an operator acting on a queue they can see on the broker is not told it does not exist.
+ * moment ago, or on a node whose sweep has not come round — is looked up live through the broker
+ * SDK, one listing by name per live node, so an operator acting on a queue they can see on the
+ * broker is not told it does not exist.
  */
 @Component
 @RequiredArgsConstructor
@@ -32,12 +37,12 @@ public class QueueLocator {
 
     private final QueueSnapshots snapshots;
     private final ClusterDirectory clusters;
-    private final BrokerConnections connections;
+    private final BrokerGateway gateway;
 
     /**
-     * One node's copy of a queue. {@code routingType} is upper case, as the snapshot stores it;
-     * {@code messageCount} is the scraped depth, or the depth read live for a queue the scrape
-     * has not reached.
+     * One node's copy of a queue. {@code routingType} is upper case, as the snapshot stores it, and
+     * {@code null} on a system without one; {@code messageCount} is the scraped depth, or the depth
+     * read live for a queue the scrape has not reached.
      */
     public record QueueLocation(UUID nodeId, String queueName, String address, String routingType, long messageCount) {}
 
@@ -57,13 +62,15 @@ public class QueueLocator {
      */
     private List<QueueLocation> live(UUID clusterId, String queueName) {
         List<QueueLocation> found = new ArrayList<>();
-        BrokerConnectionException unread = null;
+        RuntimeException unread = null;
         for (ClusterNode node : ServingNodes.from(clusters.nodes(clusterId))) {
             if (Boolean.TRUE.equals(node.getActive())) {
                 try {
-                    readLocations(clusterId, node, queueName, found);
+                    read(clusterId, node, queueName, found);
                 } catch (BrokerConnectionException e) {
                     unread = e;
+                } catch (BrokerException e) {
+                    unread = BrokerFailures.translate(e);
                 }
             }
         }
@@ -73,33 +80,28 @@ public class QueueLocator {
         return found;
     }
 
-    private void readLocations(UUID clusterId, ClusterNode node, String queueName, List<QueueLocation> found) {
-        try {
-            JolokiaBrokerClient client = connections.forCluster(clusterId, node.getJolokiaUrl());
-            // A pattern read answers for every match at once, keyed by MBean name; a node
-            // without the queue answers 404, which is simply not a location.
-            JolokiaResponse read = client.single(JolokiaRequest.read(
-                    BrokerMBeans.queuePattern(client.resolveBrokerObjectName(), queueName), "MessageCount"));
-            if (!read.ok() || read.value() == null || !read.value().isObject()) {
-                return;
+    private void read(UUID clusterId, ClusterNode node, String queueName, List<QueueLocation> found) {
+        ClusterConnection c = gateway.cluster(clusterId);
+        List<Resource> items = c.resources()
+                .read(ResourceQuery.of(ResourceClass.SUBSCRIPTION)
+                        .named(queueName)
+                        .in(Scope.node(BrokerGateway.idOf(node.getId()))))
+                .orThrow()
+                .items();
+        for (Resource r : items) {
+            if (!r.id().name().equals(queueName)) {
+                continue;
             }
-            for (var entry : read.value().properties()) {
-                ObjectName mbean = new ObjectName(entry.getKey());
-                found.add(new QueueLocation(
-                        node.getId(),
-                        queueName,
-                        value(mbean, "address"),
-                        value(mbean, "routing-type").toUpperCase(Locale.ROOT),
-                        entry.getValue().path("MessageCount").asLong()));
-            }
-        } catch (MalformedObjectNameException _) {
-            // A name the broker answered with that is not an MBean name is not a location.
+            String routingType = r.attributes()
+                    .raw(QueueRow.ROUTING_TYPE)
+                    .map(t -> String.valueOf(t).toUpperCase(Locale.ROOT))
+                    .orElse(null);
+            found.add(new QueueLocation(
+                    node.getId(),
+                    queueName,
+                    ResourceIds.name(r, StandardAttributes.DESTINATION),
+                    routingType,
+                    ResourceIds.count(r, MetricKeys.BACKLOG)));
         }
-    }
-
-    /** Artemis quotes these values; an unquoted one is taken as it is. */
-    private static String value(ObjectName mbean, String key) {
-        String raw = mbean.getKeyProperty(key);
-        return raw.startsWith("\"") ? ObjectName.unquote(raw) : raw;
     }
 }

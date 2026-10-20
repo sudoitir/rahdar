@@ -20,7 +20,7 @@ import {
 } from '../../kernel/metrics/axis.ts';
 import classes from './NodeSplit.module.css';
 
-const METRICS = ['messageCount', 'messagesAdded', 'messagesAcked'];
+const METRICS = ['openbroker.backlog', 'openbroker.enqueued', 'openbroker.acknowledged'];
 const SMALL_HEIGHT = '7.5rem';
 /** The legend's band above the added and acked plot. */
 const LEGEND = '1.75rem';
@@ -56,8 +56,8 @@ export function NodeSplitCharts({
 }>) {
   useDisplayZone();
   const nodes = response.byNode ?? [];
-  const depthMax = peak(nodes, ['messageCount']);
-  const rateMax = peak(nodes, ['messagesAdded', 'messagesAcked']);
+  const depthMax = peak(nodes, ['openbroker.backlog']);
+  const rateMax = peak(nodes, ['openbroker.enqueued', 'openbroker.acknowledged']);
   const common = {
     h: SMALL_HEIGHT,
     dataKey: 'ts',
@@ -87,9 +87,9 @@ export function NodeSplitCharts({
       ) : null}
       <div className={classes.grid}>
         {nodes.map((node) => {
-          const depth = latest(series(node, 'messageCount'));
-          const added = latest(series(node, 'messagesAdded'));
-          const acked = latest(series(node, 'messagesAcked'));
+          const depth = latest(series(node, 'openbroker.backlog'));
+          const added = latest(series(node, 'openbroker.enqueued'));
+          const acked = latest(series(node, 'openbroker.acknowledged'));
           return (
             <section key={node.nodeId} className={classes.node} aria-label={`History on ${node.nodeName}`}>
               <Text size="sm" fw={600}>
@@ -111,7 +111,7 @@ export function NodeSplitCharts({
                   </Text>
                   <CompositeChart
                     {...common}
-                    data={mergeByTimestamp([{ name: 'depth', series: series(node, 'messageCount') }])}
+                    data={mergeByTimestamp([{ name: 'depth', series: series(node, 'openbroker.backlog') }])}
                     valueFormatter={formatCount}
                     yAxisProps={{ ...yAxisProps(), domain: [0, depthMax] }}
                     series={[{ name: 'depth', label: 'Depth (avg)', color: 'var(--as-chart-1)', type: 'line' }]}
@@ -122,8 +122,8 @@ export function NodeSplitCharts({
                   <CompositeChart
                     {...common}
                     data={mergeByTimestamp([
-                      { name: 'added', series: series(node, 'messagesAdded') },
-                      { name: 'acked', series: series(node, 'messagesAcked') },
+                      { name: 'added', series: series(node, 'openbroker.enqueued') },
+                      { name: 'acked', series: series(node, 'openbroker.acknowledged') },
                     ])}
                     withLegend
                     legendProps={{ verticalAlign: 'top', height: 28 }}

@@ -42,7 +42,7 @@ public class RrExpectationEntity {
     @Column(name = "cluster_id", nullable = false, updatable = false)
     private UUID clusterId;
 
-    @Column(name = "request_address", nullable = false)
+    @Column(name = "request_destination", nullable = false)
     private String requestAddress;
 
     /**
@@ -51,7 +51,7 @@ public class RrExpectationEntity {
      * read whole with its parent and never queried on its own, so a join would only
      * add a query to the correlator's hot path (design.md, D2).
      */
-    @Column(name = "reply_addresses", nullable = false, columnDefinition = "text[]")
+    @Column(name = "reply_destinations", nullable = false, columnDefinition = "text[]")
     @JdbcTypeCode(SqlTypes.ARRAY)
     private List<String> replyAddresses = new ArrayList<>();
 

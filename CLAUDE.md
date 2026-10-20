@@ -55,7 +55,7 @@ one is missing.
   (`src/main/resources/db/changelog/db.changelog-master.xml`) including one changelog
   per module, with one SQL changeset file per concern under that module's `changes/`. Boot runs migrations on startup; the
   `liquibase-maven-plugin` (`just db-*`) is for humans. Postgres owns config,
-  users, and audit; broker-derived tables (`queue_snapshot`, `metric_sample`) are
+  users, and audit; broker-derived tables (`subscription_snapshot`, `metric_sample`) are
   a disposable cache.
 - **Java formatting**: Palantir Java Format via Spotless, applied at
   `process-sources` (every `mvn compile`) and checked at `verify`. Never
@@ -67,8 +67,10 @@ one is missing.
   TanStack Router/Query/Table, `@mantine/charts`, `@xyflow/react` for topology.
   `typescript` is pinned to `5.9.3` for tool compatibility; bump to 7.x once the
   ESLint/Vite/TanStack toolchain all declare support.
-- **Broker transport**: Jolokia HTTP is primary; the Artemis Core client is the
-  second channel (notifications, faithful message I/O), added in Phase 4. No JMX.
+- **Broker access**: the OpenBroker SDK (`io.github.sudoitir:openbroker-*`, released versions
+  only), one `ClusterConnection` per cluster through `platform.broker`'s gateway (ADR-0203). No
+  broker client type anywhere in Rahdar; only `system.artemis` knows the Artemis driver, whose
+  channels are Jolokia for management and Core for messages and notifications. No JMX.
 - **Realtime**: SSE only. `GET /api/v1/stream`. Commands are ordinary POSTs.
 - **Packaging**: one container image, `compose.yaml` first. Helm in v1.0.
 
@@ -151,7 +153,8 @@ Pull requests carry the verification: parallel, path-filtered jobs behind the on
 `ci-ok` check, on a branch up to date with `main`; `gh pr merge <n> --merge --auto` merges a ready PR, and
 the `pr-auto-update` workflow updates the waiting PRs from `main` one at a time, oldest auto-merge first (ADR-0170). `main` does not re-test. Every push to `main`
 that changes a build input cuts a CalVer release to Docker Hub (image, git tag, GitHub
-pre-release), and Central and npm get it only when their inputs changed; docs-, site- and
+pre-release), and npm gets it when its inputs changed; Maven Central gets a release only when a
+maintainer runs `publish-central.yml` for it (ADR-0205); docs-, site- and
 CI-only pushes release nothing (ADR-0088, ADR-0126). See `.claude/rules/10-release.md` for the versioning. There is no
 `CHANGELOG.md`: each release's notes are its GitHub release body (tag only, nothing is
 committed; ADR-0129), and the commit message is the release note — `.claude/rules/05-commits.md` (Conventional Commits,

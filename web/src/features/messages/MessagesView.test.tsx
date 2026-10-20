@@ -305,7 +305,6 @@ describe('MessagesView', () => {
           page: 1,
           pageSize: 200,
           node: 'n2',
-          transport: 'CORE',
         }),
       ),
       http.get('*/api/v1/clusters/c1/queues/PHASE3.SRC/messages/102', () =>
@@ -316,7 +315,6 @@ describe('MessagesView', () => {
           bodyEncoding: 'TEXT',
           contentType: null,
           observedLimitBytes: null,
-          transport: 'CORE',
           node: 'n2',
           stringProperties: { orderId: 'A-2' },
           intProperties: {},
@@ -468,7 +466,6 @@ describe('one message, from its row (ADR-0107)', () => {
           page: 1,
           pageSize: 200,
           node: 'n1',
-          transport: 'CORE',
         }),
       ),
       http.post('*/api/v1/clusters/c1/queues/PHASE3.SRC/messages/actions/delete', async ({ request }) => {

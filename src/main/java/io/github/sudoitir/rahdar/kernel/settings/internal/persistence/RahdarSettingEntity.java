@@ -15,7 +15,7 @@ import org.hibernate.type.SqlTypes;
  * Maps {@code rahdar_setting} (changeset 009). One row per operator-tunable key;
  * the value is a JSON string (scalar or object) so a key can gain structure
  * without a migration. Low churn — plain JPA, unlike the disposable
- * {@code queue_snapshot} cache.
+ * {@code subscription_snapshot} cache.
  */
 @Entity
 @Table(name = "rahdar_setting")

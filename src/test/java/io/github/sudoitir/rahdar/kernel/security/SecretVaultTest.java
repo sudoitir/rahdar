@@ -117,9 +117,9 @@ class SecretVaultTest {
     void aadBindsTheBlobToItsRow() {
         SecretVault vault = vault(new FakeProvider(1));
         UUID clusterA = UUID.randomUUID();
-        byte[] blob = vault.seal(SecretVault.aad(clusterA, "JOLOKIA_BASIC"), "x");
+        byte[] blob = vault.seal(SecretVault.aad(clusterA, "MANAGEMENT"), "x");
 
-        assertThatThrownBy(() -> vault.open(SecretVault.aad(UUID.randomUUID(), "JOLOKIA_BASIC"), blob))
+        assertThatThrownBy(() -> vault.open(SecretVault.aad(UUID.randomUUID(), "MANAGEMENT"), blob))
                 .isInstanceOf(SecretVault.SecretDecryptException.class);
         assertThatThrownBy(() -> vault.open(SecretVault.aad(clusterA, "CORE"), blob))
                 .isInstanceOf(SecretVault.SecretDecryptException.class);

@@ -1,25 +1,25 @@
 package io.github.sudoitir.rahdar.platform.clusters;
 
+import io.github.sudoitir.openbroker.BrokerException;
 import io.github.sudoitir.rahdar.kernel.audit.AuditEvent;
 import io.github.sudoitir.rahdar.kernel.audit.AuditScope;
 import io.github.sudoitir.rahdar.kernel.audit.AuditService;
 import io.github.sudoitir.rahdar.kernel.core.NotFoundException;
-import io.github.sudoitir.rahdar.kernel.plugin.PluginApi;
 import io.github.sudoitir.rahdar.kernel.security.ActorResolver;
 import io.github.sudoitir.rahdar.kernel.security.ClusterAccessGuard;
 import io.github.sudoitir.rahdar.kernel.security.ResourceRef;
 import io.github.sudoitir.rahdar.kernel.settings.SettingsService;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
+import io.github.sudoitir.rahdar.platform.broker.BrokerFailures;
+import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
 import io.github.sudoitir.rahdar.platform.broker.BrokerSettings;
+import io.github.sudoitir.rahdar.platform.broker.BrokerTarget;
 import io.github.sudoitir.rahdar.platform.broker.BulkCapExceededException;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaBrokerClient;
 import io.github.sudoitir.rahdar.platform.broker.ManagementRefusal;
 import io.github.sudoitir.rahdar.platform.broker.VersionGate;
 import io.github.sudoitir.rahdar.platform.clusters.LifecycleOutcome.NodeOutcome;
 import io.github.sudoitir.rahdar.platform.clusters.LifecycleOutcome.NodeStatus;
-import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNodeEntity;
-import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNodeRepository;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -28,6 +28,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import lombok.Builder;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.AccessDeniedException;
@@ -60,22 +61,22 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
  * connection for N nodes × the read timeout.
  */
 @Component
-@PluginApi
 @RequiredArgsConstructor
 public class BrokerCommands {
 
-    private final BrokerNodeRepository brokerNodes;
+    private final ClusterDirectory directory;
     private final BrokerConnections connections;
     private final AuditService audit;
     private final ActorResolver actorResolver;
     private final SettingsService settings;
     private final ClusterAccessGuard clusterAccess;
     private final CapabilityLedger capabilities;
+    private final BrokerGateway gateway;
 
     /** What one node's attempt does; returns the state the node reached. */
     @FunctionalInterface
     public interface NodeAction {
-        NodeStatus apply(JolokiaBrokerClient client, String brokerMbean);
+        NodeStatus apply(BrokerTarget target);
     }
 
     /**
@@ -84,7 +85,7 @@ public class BrokerCommands {
      */
     @FunctionalInterface
     public interface NodePreflight {
-        Check apply(JolokiaBrokerClient client, String brokerMbean);
+        Check apply(BrokerTarget target);
     }
 
     /**
@@ -107,7 +108,7 @@ public class BrokerCommands {
     /** How much one node's attempt would destroy, for the cap check (ADR-0022). */
     @FunctionalInterface
     public interface NodeEstimate {
-        long apply(JolokiaBrokerClient client);
+        long apply(BrokerTarget target);
     }
 
     /**
@@ -157,7 +158,7 @@ public class BrokerCommands {
         }
     }
 
-    private record Target(BrokerNodeEntity node, boolean live) {}
+    private record Target(ClusterNode node, boolean live) {}
 
     public LifecycleOutcome run(Command c) {
         // Opened first, so a change the caller may not make leaves a REFUSED event rather than none.
@@ -259,7 +260,7 @@ public class BrokerCommands {
 
     private Long estimateOn(Command c, Target t) {
         try {
-            return c.estimate().count().apply(clientFor(c.clusterId(), t.node()));
+            return translated(() -> c.estimate().count().apply(targetOf(c.clusterId(), t.node())));
         } catch (ManagementRefusal _) {
             // Nothing to destroy here — an absent resource counts as zero, and
             // the action reports the node as ALREADY.
@@ -324,8 +325,7 @@ public class BrokerCommands {
             return NodeOutcome.failed(nodeId, nodeName, check.refusal());
         }
         try {
-            JolokiaBrokerClient client = clientFor(clusterId, t.node());
-            NodeStatus status = c.action().apply(client, client.resolveBrokerObjectName());
+            NodeStatus status = translated(() -> c.action().apply(targetOf(clusterId, t.node())));
             capabilities.recordWriteSucceeded(clusterId);
             // The preflight's warning stays on the result, so what the preview stated beside
             // this node is still stated once it has happened — in the audit row too.
@@ -355,8 +355,7 @@ public class BrokerCommands {
             return Check.OK;
         }
         try {
-            JolokiaBrokerClient client = clientFor(c.clusterId(), t.node());
-            return c.preflight().apply(client, client.resolveBrokerObjectName());
+            return translated(() -> c.preflight().apply(targetOf(c.clusterId(), t.node())));
         } catch (ManagementRefusal | BrokerConnectionException e) {
             return Check.refuse("Could not be checked before changing it: " + e.getMessage());
         }
@@ -368,16 +367,16 @@ public class BrokerCommands {
      * so targeting the pair twice would report a healthy backup as skipped on every command.
      */
     private List<Target> targets(UUID clusterId) {
-        Map<String, List<BrokerNodeEntity>> logical = new LinkedHashMap<>();
-        for (BrokerNodeEntity node : brokerNodes.findByClusterIdOrderByNameAsc(clusterId)) {
-            if (node.getJolokiaUrl() == null) {
+        Map<String, List<ClusterNode>> logical = new LinkedHashMap<>();
+        for (ClusterNode node : directory.nodes(clusterId)) {
+            if (node.getManagementUrl() == null) {
                 continue;
             }
-            String key = node.getArtemisNodeId() != null ? node.getArtemisNodeId() : "id:" + node.getId();
+            String key = node.getNativeNodeId() != null ? node.getNativeNodeId() : "id:" + node.getId();
             logical.computeIfAbsent(key, k -> new ArrayList<>()).add(node);
         }
         List<Target> targets = new ArrayList<>();
-        for (List<BrokerNodeEntity> group : logical.values()) {
+        for (List<ClusterNode> group : logical.values()) {
             group.stream()
                     .filter(n -> Boolean.TRUE.equals(n.getActive()))
                     .findFirst()
@@ -402,9 +401,18 @@ public class BrokerCommands {
         return failed.isEmpty() ? null : String.join(" | ", failed);
     }
 
-    /** Every request the client sends waits for the node's ceiling itself (ADR-0076). */
-    private JolokiaBrokerClient clientFor(UUID clusterId, BrokerNodeEntity node) {
-        return connections.forCluster(clusterId, node.getJolokiaUrl());
+    /** The node, through the cluster's connection: every request waits for the node's ceiling (ADR-0076). */
+    private BrokerTarget targetOf(UUID clusterId, ClusterNode node) {
+        return gateway.node(clusterId, node.getId());
+    }
+
+    /** A node's call, failing as Rahdar's broker exceptions whether it went through the SDK or not. */
+    private static <T> T translated(Supplier<T> call) {
+        try {
+            return call.get();
+        } catch (BrokerException e) {
+            throw BrokerFailures.translate(e);
+        }
     }
 
     private static void signalAfterCommit(Runnable signal) {

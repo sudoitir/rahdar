@@ -137,7 +137,7 @@ public class McpRunbookPrompts {
                 2. Rahdar batches its reads: one management call per node per tier, not one per \
                 queue. A cluster with thousands of queues costs the same per tick as a small one, \
                 so queue count alone is not evidence.
-                3. metric_series on messageCount for the cluster over 6h. If broker load tracks \
+                3. metric_series on openbroker.backlog for the cluster over 6h. If broker load tracks \
                 message volume rather than a fixed cadence, Rahdar is not the cause.
                 4. If it is the cause, raise tier-c first — the full queue walk is the expensive \
                 one and the least time-sensitive. Leave tier-a alone: it is what detects \

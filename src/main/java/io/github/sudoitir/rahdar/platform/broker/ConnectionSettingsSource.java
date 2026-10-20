@@ -9,12 +9,12 @@ import java.util.UUID;
  */
 public interface ConnectionSettingsSource {
 
-    /** Jolokia settings: the stored {@code JOLOKIA_BASIC} credential and the TLS bundle, if any. */
+    /** Jolokia settings: the stored {@code MANAGEMENT} credential and the TLS bundle, if any. */
     BrokerConnectionSettings jolokiaSettings(UUID clusterId);
 
     /**
-     * Core settings: the stored {@code CORE} credential if there is one, otherwise the
-     * {@code JOLOKIA_BASIC} credential, otherwise anonymous (ADR-0026, D6).
+     * Core settings: the stored {@code DATA} credential if there is one, otherwise the
+     * {@code MANAGEMENT} credential, otherwise anonymous (ADR-0026, D6).
      */
     CoreConnectionSettings coreSettings(UUID clusterId);
 }

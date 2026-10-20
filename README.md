@@ -248,8 +248,9 @@ A merge that changes the application publishes a release, versioned with CalVer
 `YYYY.MM.PATCH` and tagged three ways on Docker Hub: `2026.09.3` (immutable), `2026.09`
 (that month) and `dev` (the latest). There is no `:latest` until the first stable
 release. Each release attaches the runnable jar with its `.sha256`, and its notes are
-generated from the commit messages ([releases](https://github.com/sudoitir/rahdar/releases), [changelog](https://rahdar.dev/reference/changelog/)). The plugin API
-(Maven Central) and SDK (npm) are published with the releases that change them.
+generated from the commit messages ([releases](https://github.com/sudoitir/rahdar/releases), [changelog](https://rahdar.dev/reference/changelog/)). The plugin SDK
+(npm) is published with the releases that change it; the plugin API and the Java client reach Maven Central
+when a maintainer publishes a release there.
 
 ## Licence
 

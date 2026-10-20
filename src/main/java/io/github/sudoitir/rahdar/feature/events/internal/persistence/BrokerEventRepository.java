@@ -39,10 +39,10 @@ public interface BrokerEventRepository extends JpaRepository<BrokerEventEntity, 
               and (:type is null or e.type = :type)
               and (:nodeId is null or e.nodeId = :nodeId)
               and (:everything = true
-                   or (e.address is not null and e.address in :readable)
-                   or (e.address is null and :unaddressed = true))
-              and (:everything = true or e.routingName is null or e.routingName in :readableNames)
-              and (:address is null or e.address = :address)
+                   or (e.destination is not null and e.destination in :readable)
+                   or (e.destination is null and :unaddressed = true))
+              and (:everything = true or e.subscription is null or e.subscription in :readableNames)
+              and (:address is null or e.destination = :address)
               and e.occurredAt >= :from
               and e.occurredAt <= :to
             order by e.seq desc
@@ -61,12 +61,12 @@ public interface BrokerEventRepository extends JpaRepository<BrokerEventEntity, 
             Pageable pageable);
 
     /** The names events of the cluster carry as their routing name, which for a binding is a queue. */
-    @Query("select distinct e.routingName from BrokerEventEntity e"
-            + " where e.clusterId = :clusterId and e.routingName is not null")
-    List<String> findDistinctRoutingNameByClusterId(@Param("clusterId") UUID clusterId);
+    @Query("select distinct e.subscription from BrokerEventEntity e"
+            + " where e.clusterId = :clusterId and e.subscription is not null")
+    List<String> findDistinctSubscriptionByClusterId(@Param("clusterId") UUID clusterId);
 
     /** The addresses events of the cluster are about, for deciding which of them a reader may see. */
     @Query(
-            "select distinct e.address from BrokerEventEntity e where e.clusterId = :clusterId and e.address is not null")
-    List<String> findDistinctAddressByClusterId(@Param("clusterId") UUID clusterId);
+            "select distinct e.destination from BrokerEventEntity e where e.clusterId = :clusterId and e.destination is not null")
+    List<String> findDistinctDestinationByClusterId(@Param("clusterId") UUID clusterId);
 }

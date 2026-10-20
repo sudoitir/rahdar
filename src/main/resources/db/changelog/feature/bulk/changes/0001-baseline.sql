@@ -40,7 +40,7 @@ CREATE TABLE bulk_run_item (
     finished_at timestamp with time zone,
     affected bigint,
     ordinal integer NOT NULL,
-    queue_name text NOT NULL,
+    subscription text NOT NULL,
     status text NOT NULL,
     error text,
     estimate jsonb NOT NULL,

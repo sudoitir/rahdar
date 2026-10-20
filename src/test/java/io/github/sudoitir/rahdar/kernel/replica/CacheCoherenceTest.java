@@ -120,7 +120,7 @@ class CacheCoherenceTest extends PostgresIntegrationTest {
         ClusterEnvironmentIndex indexB = other.getBean(ClusterEnvironmentIndex.class);
         UUID clusterId = UUID.randomUUID();
         jdbc.update(
-                "INSERT INTO cluster (id, name) VALUES (:id, :name)",
+                "INSERT INTO cluster (id, name, system) VALUES (:id, :name, 'artemis')",
                 Map.of("id", clusterId, "name", "coherence-" + clusterId));
         UUID environmentId = environmentsA
                 .create(new EnvironmentRequest("coherence-" + clusterId, null, 0))

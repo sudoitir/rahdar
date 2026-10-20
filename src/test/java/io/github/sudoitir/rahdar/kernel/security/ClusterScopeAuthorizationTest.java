@@ -138,7 +138,7 @@ class ClusterScopeAuthorizationTest extends PostgresIntegrationTest {
         // which is exactly the control this needs.
         visibleNode = brokerNodes
                 .save(BrokerNodeEntity.fromSeed(
-                        visible, "node-a", "STANDALONE", UUID.randomUUID().toString()))
+                        visible, "node-a", "NONE", UUID.randomUUID().toString()))
                 .getId();
 
         MockMvc mvc = MockMvcBuilders.webAppContextSetup(webContext)
@@ -209,7 +209,7 @@ class ClusterScopeAuthorizationTest extends PostgresIntegrationTest {
      * that is the signal to add a row here, not to relax the assertion.
      */
     private static final Map<String, String> REQUIRED_PARAMS =
-            Map.of("/api/v1/clusters/{clusterId}/metrics", "?metric=messageCount");
+            Map.of("/api/v1/clusters/{clusterId}/metrics", "?metric=openbroker.backlog");
 
     private static int statusFor(
             MockMvc mvc, String pattern, UUID clusterId, UsernamePasswordAuthenticationToken auth, UUID nodeId)

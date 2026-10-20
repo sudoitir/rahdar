@@ -1,5 +1,7 @@
 package io.github.sudoitir.rahdar.feature.triage;
 
+import io.github.sudoitir.openbroker.model.MetricKeys;
+import io.github.sudoitir.openbroker.notification.EventTypes;
 import io.github.sudoitir.rahdar.feature.events.BrokerEventService;
 import io.github.sudoitir.rahdar.feature.events.web.EventViews.BrokerEventView;
 import io.github.sudoitir.rahdar.feature.resources.CrossNodeAggregator;
@@ -39,7 +41,7 @@ import org.springframework.transaction.annotation.Transactional;
  * while {@code SlowConsumerCondition} computed a better answer from the same data, so the
  * console, an alert and an agent could each describe one queue differently.
  *
- * <p>Costs per request: one {@code queue_snapshot} read (already indexed by cluster),
+ * <p>Costs per request: one {@code subscription_snapshot} read (already indexed by cluster),
  * three windowed {@code metric_sample} aggregates, and one bounded event page — a fixed
  * number of queries regardless of how many queues the cluster has, and <em>no broker
  * call at all</em>. Reading health must never be a reason a broker falls over
@@ -49,10 +51,10 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class ConsumerHealthService {
 
-    private static final String DEPTH = "messageCount";
-    private static final String ADDED = "messagesAdded";
-    private static final String ACKED = "messagesAcked";
-    private static final String BROKER_SLOW_EVENT = "CONSUMER_SLOW";
+    private static final String DEPTH = MetricKeys.BACKLOG.name();
+    private static final String ADDED = MetricKeys.ENQUEUED.name();
+    private static final String ACKED = MetricKeys.ACKNOWLEDGED.name();
+    private static final String BROKER_SLOW_EVENT = EventTypes.CONSUMER_SLOW;
 
     /** How many broker slow-consumer notifications to consider. Bounded; the newest win. */
     private static final int BROKER_SLOW_CAP = 200;
@@ -114,7 +116,7 @@ public class ConsumerHealthService {
         // here protects nothing and fails as a 404 about a cluster that plainly exists.
         // The guard belongs at the request boundary — page() and forQueue() apply it —
         // which is the same split the other alert conditions make by reading
-        // queue_snapshot directly.
+        // subscription_snapshot directly.
         List<QueueView> rows = queues.rollUp(clusterId);
 
         Instant to = Instant.now();

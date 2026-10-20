@@ -5,7 +5,7 @@ import java.util.UUID;
 
 /**
  * The last scraped state of one queue on one node (ADR-0015). A read of the disposable
- * {@code queue_snapshot} cache, so {@code ts} says how old it is.
+ * {@code subscription_snapshot} cache, so {@code ts} says how old it is.
  */
 public record QueueSnapshot(
         UUID clusterId,

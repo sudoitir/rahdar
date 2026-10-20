@@ -48,7 +48,7 @@ describe('MetricsView', () => {
           step: 'PT1M',
           truncated: false,
           series: [
-            series('messageCount', 'GAUGE', [
+            series('openbroker.backlog', 'GAUGE', [
               { ts: '2026-09-04T09:00:00.000Z', value: 10 },
               { ts: '2026-09-04T09:01:00.000Z', value: 4200 },
             ]),
@@ -80,7 +80,7 @@ describe('MetricsView', () => {
           step: 'PT1M',
           truncated: false,
           series: [
-            series('messageCount', 'GAUGE', [
+            series('openbroker.backlog', 'GAUGE', [
               { ts: '2026-09-04T09:00:00.000Z', value: 10 },
               { ts: '2026-09-04T09:01:00.000Z', value: 4200 },
             ]),
@@ -220,7 +220,7 @@ describe('MetricsView', () => {
           to: '2026-09-04T10:00:00.000Z',
           step: 'PT1M',
           truncated: false,
-          series: [series('messagesAdded', 'RATE', [{ ts: '2026-09-04T09:00:00.000Z', value: 40 }])],
+          series: [series('openbroker.enqueued', 'RATE', [{ ts: '2026-09-04T09:00:00.000Z', value: 40 }])],
           ...(split
             ? {
                 splitBy: 'NODE',
@@ -229,7 +229,7 @@ describe('MetricsView', () => {
                     nodeId: 'a',
                     nodeName: 'artemis-a',
                     sampled: true,
-                    series: [series('messagesAdded', 'RATE', points)],
+                    series: [series('openbroker.enqueued', 'RATE', points)],
                   },
                   { nodeId: 'b', nodeName: 'artemis-b', sampled: false, series: [] },
                 ],

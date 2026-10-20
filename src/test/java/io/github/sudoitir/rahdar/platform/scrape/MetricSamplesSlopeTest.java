@@ -45,7 +45,7 @@ class MetricSamplesSlopeTest extends PostgresIntegrationTest {
     private void givenCluster() {
         clusterId = clusters.save(new ClusterEntity("c-" + UUID.randomUUID(), null, null))
                 .getId();
-        nodeId = nodes.save(BrokerNodeEntity.fromSeed(clusterId, "n1", "STANDALONE", "node-1"))
+        nodeId = nodes.save(BrokerNodeEntity.fromSeed(clusterId, "n1", "NONE", "node-1"))
                 .getId();
     }
 
@@ -110,7 +110,7 @@ class MetricSamplesSlopeTest extends PostgresIntegrationTest {
 
     private Map<String, Double> slopes() {
         Instant now = Instant.now();
-        return samples.depthSlopeBySubject(clusterId, "messageCount", now.minusSeconds(600), now.plusSeconds(1));
+        return samples.depthSlopeBySubject(clusterId, "openbroker.backlog", now.minusSeconds(600), now.plusSeconds(1));
     }
 
     /** Values 10 seconds apart, oldest first, ending just before now. */
@@ -125,8 +125,8 @@ class MetricSamplesSlopeTest extends PostgresIntegrationTest {
             p.put("c", clusterId);
             p.put("n", nodeId);
             jdbc.update("""
-                    INSERT INTO metric_sample (ts, value, subject_type, subject_name, metric, cluster_id, node_id)
-                    VALUES (:ts, :value, 'QUEUE', :subject, 'messageCount', :c, :n)
+                    INSERT INTO metric_sample (ts, value, subject_kind, subject_path, metric, cluster_id, node_id)
+                    VALUES (:ts, :value, 'QUEUE', :subject, 'openbroker.backlog', :c, :n)
                     """, p);
         }
     }

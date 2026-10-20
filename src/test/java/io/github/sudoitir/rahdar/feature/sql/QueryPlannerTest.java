@@ -96,7 +96,7 @@ class QueryPlannerTest {
         BrokerNodeEntity entity = instantiate(BrokerNodeEntity.class);
         set(entity, "id", UUID.randomUUID());
         set(entity, "name", name);
-        set(entity, "artemisNodeId", artemisNodeId);
+        set(entity, "nativeNodeId", artemisNodeId);
         set(entity, "clusterId", CLUSTER);
         return entity;
     }

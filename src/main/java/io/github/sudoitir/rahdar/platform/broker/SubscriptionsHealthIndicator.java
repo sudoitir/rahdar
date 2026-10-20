@@ -20,7 +20,7 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 class SubscriptionsHealthIndicator extends AbstractHealthIndicator {
 
-    private final CoreSubscriptionManager subscriptions;
+    private final BrokerNotifications subscriptions;
     private final NodeDirectory nodes;
 
     @Override
@@ -29,16 +29,16 @@ class SubscriptionsHealthIndicator extends AbstractHealthIndicator {
                 .collect(Collectors.toMap(NodeDirectory.KnownNode::id, NodeDirectory.KnownNode::name, (a, b) -> a));
         Map<String, Object> perNode = new LinkedHashMap<>();
         boolean lost = false;
-        for (Map.Entry<UUID, CoreEventClient.State> e :
+        for (Map.Entry<UUID, SubscriptionVerdict.NodeState> e :
                 subscriptions.nodeStates().entrySet()) {
             Map<String, Object> detail = new LinkedHashMap<>();
             detail.put("name", names.getOrDefault(e.getKey(), e.getKey().toString()));
             switch (e.getValue()) {
-                case CoreEventClient.State.Connected(var since) -> {
+                case SubscriptionVerdict.NodeState.Connected(var since) -> {
                     detail.put("established", true);
                     detail.put("since", since);
                 }
-                case CoreEventClient.State.Failed(var kind, var reason, var at) -> {
+                case SubscriptionVerdict.NodeState.Failed(var kind, var reason, var at) -> {
                     lost = true;
                     detail.put("established", false);
                     detail.put("reason", kind + ": " + reason);

@@ -18,7 +18,7 @@ import org.hibernate.type.SqlTypes;
  * resources are reported. The document itself lives in the revision.
  */
 @Entity
-@Table(name = "broker_config_declaration")
+@Table(name = "artemis_config_declaration")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class BrokerConfigDeclarationEntity {

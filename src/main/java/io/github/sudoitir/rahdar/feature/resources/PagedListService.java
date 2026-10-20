@@ -3,6 +3,10 @@ package io.github.sudoitir.rahdar.feature.resources;
 import static io.github.sudoitir.rahdar.kernel.plugin.ResourceKind.ADDRESS;
 import static io.github.sudoitir.rahdar.kernel.plugin.ResourceKind.QUEUE;
 
+import io.github.sudoitir.openbroker.BrokerException;
+import io.github.sudoitir.openbroker.model.Resource;
+import io.github.sudoitir.openbroker.model.ResourceClass;
+import io.github.sudoitir.openbroker.model.Scope;
 import io.github.sudoitir.rahdar.feature.resources.ResourceViewMapper.NodeRef;
 import io.github.sudoitir.rahdar.feature.resources.web.ResourceViews.AddressView;
 import io.github.sudoitir.rahdar.feature.resources.web.ResourceViews.ConnectionView;
@@ -17,10 +21,8 @@ import io.github.sudoitir.rahdar.kernel.security.ResourceFilter;
 import io.github.sudoitir.rahdar.kernel.security.ResourceRef;
 import io.github.sudoitir.rahdar.kernel.security.TeamIndex;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
-import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
-import io.github.sudoitir.rahdar.platform.broker.BrokerListOps;
-import io.github.sudoitir.rahdar.platform.broker.BrokerListOps.ListPage;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaBrokerClient;
+import io.github.sudoitir.rahdar.platform.broker.BrokerFailures;
+import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
 import java.time.Duration;
@@ -38,13 +40,12 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import tools.jackson.databind.JsonNode;
 
 /**
  * Live-through fan-out for the five point-in-time resource views (addresses,
  * consumers, sessions, connections, producers) — ADR-0017.
  *
- * <p>One batched POST per serving node (the {@code -1/-1} full page), rows tagged
+ * <p>One list per serving node (the whole list, never a page), rows tagged
  * with their logical node, then merged / filtered / sorted / paged in memory. A
  * node that errors contributes nothing and is reflected only by a shorter list —
  * it is not an error unless <em>every</em> node failed, in which case the first
@@ -61,17 +62,16 @@ import tools.jackson.databind.JsonNode;
 public class PagedListService {
 
     private final ClusterDirectory nodes;
-    private final BrokerConnections connections;
-    private final BrokerListOps listOps;
     private final ResourceViewMapper mapper;
     private final ClusterAccessGuard clusterAccess;
     private final PermissionResolver permissions;
     private final TeamIndex teams;
+    private final BrokerGateway gateway;
 
     public PagedView<AddressView> addresses(UUID clusterId, ResourceQuery query) {
         clusterAccess.requireVisible(clusterId);
         ResourceFilter readable = permissions.filter(clusterId, ADDRESS);
-        List<AddressView> rows = gather(clusterId, ResourceKind.ADDRESSES, mapper::address).stream()
+        List<AddressView> rows = gather(clusterId, ResourceClass.DESTINATION, mapper::address).stream()
                 .filter(a -> readable.readable(a.name()))
                 .toList();
         return page(rows, query, List.of(AddressView::name), nameComparator())
@@ -123,7 +123,7 @@ public class PagedListService {
         return page(
                 rows,
                 query,
-                List.of(ProducerView::address, ProducerView::name, ProducerView::sessionId),
+                List.of(ProducerView::address, ProducerView::clientId, ProducerView::sessionId),
                 Comparator.comparing(ProducerView::address, nullSafe()));
     }
 
@@ -132,7 +132,7 @@ public class PagedListService {
     /** A consumer is seen through its queue. */
     private List<ConsumerView> readableConsumers(UUID clusterId) {
         ResourceFilter readable = permissions.filter(clusterId, QUEUE);
-        return gather(clusterId, ResourceKind.CONSUMERS, mapper::consumer).stream()
+        return gather(clusterId, ResourceClass.CONSUMER, mapper::consumer).stream()
                 .filter(c -> readable.readable(c.queueName()))
                 .toList();
     }
@@ -140,7 +140,7 @@ public class PagedListService {
     /** A producer is seen through its address. */
     private List<ProducerView> readableProducers(UUID clusterId) {
         ResourceFilter readable = permissions.filter(clusterId, ADDRESS);
-        return gather(clusterId, ResourceKind.PRODUCERS, mapper::producer).stream()
+        return gather(clusterId, ResourceClass.PRODUCER, mapper::producer).stream()
                 .filter(p -> readable.readable(p.address()))
                 .toList();
     }
@@ -150,7 +150,7 @@ public class PagedListService {
      * consumers and producers of it that they may read, counting no others.
      */
     private List<SessionView> visibleSessions(UUID clusterId) {
-        List<SessionView> all = gather(clusterId, ResourceKind.SESSIONS, mapper::session);
+        List<SessionView> all = gather(clusterId, ResourceClass.CHANNEL, mapper::session);
         if (permissions.can(clusterId, ResourcePermissions.CONNECTION_READ)) {
             return all;
         }
@@ -169,7 +169,7 @@ public class PagedListService {
 
     /** A connection is seen by a caller who reads connections, and otherwise through the sessions they see. */
     private List<ConnectionView> visibleConnections(UUID clusterId) {
-        List<ConnectionView> all = gather(clusterId, ResourceKind.CONNECTIONS, mapper::connection);
+        List<ConnectionView> all = gather(clusterId, ResourceClass.CONNECTION, mapper::connection);
         if (permissions.can(clusterId, ResourcePermissions.CONNECTION_READ)) {
             return all;
         }
@@ -205,7 +205,7 @@ public class PagedListService {
     }
 
     /** Every node's rows of one kind, merged and tagged with their node; unfiltered, so never returned as is. */
-    private <T> List<T> gather(UUID clusterId, ResourceKind kind, BiFunction<JsonNode, NodeRef, T> rowMapper) {
+    private <T> List<T> gather(UUID clusterId, ResourceClass kind, BiFunction<Resource, NodeRef, T> rowMapper) {
         List<ClusterNode> servingNodes = servingManageableNodes(clusterId);
         if (servingNodes.isEmpty()) {
             throw new BrokerConnectionException(
@@ -217,11 +217,8 @@ public class PagedListService {
         BrokerConnectionException firstError = null;
         for (ClusterNode node : servingNodes) {
             try {
-                ListPage page = fetch(clusterId, node, kind);
-                if (page.data() != null && page.data().isArray()) {
-                    NodeRef ref = new NodeRef(node.getId(), node.getName());
-                    page.data().forEach(row -> merged.add(rowMapper.apply(row, ref)));
-                }
+                NodeRef ref = new NodeRef(node.getId(), node.getName());
+                fetch(clusterId, node, kind).forEach(resource -> merged.add(rowMapper.apply(resource, ref)));
             } catch (BrokerConnectionException e) {
                 if (firstError == null) {
                     firstError = e;
@@ -242,10 +239,10 @@ public class PagedListService {
      * one broker call rather than each making their own. A failed read is not kept, so the
      * next request tries again.
      */
-    private ListPage fetch(UUID clusterId, ClusterNode node, ResourceKind kind) {
+    private List<Resource> fetch(UUID clusterId, ClusterNode node, ResourceClass kind) {
         ListKey key = new ListKey(clusterId, node.getId(), kind);
         long now = System.nanoTime();
-        CompletableFuture<ListPage> mine = new CompletableFuture<>();
+        CompletableFuture<List<Resource>> mine = new CompletableFuture<>();
         RecentList winner = recent.compute(
                 key,
                 (k, current) -> current != null && current.freshUntil() > now
@@ -253,8 +250,7 @@ public class PagedListService {
                         : new RecentList(mine, now + FRESH.toNanos()));
         if (winner.page() == mine) {
             try {
-                JolokiaBrokerClient client = connections.forCluster(clusterId, node.getJolokiaUrl());
-                mine.complete(listOps.fetch(client, kind.op(), BrokerListOps.ALL, -1, -1));
+                mine.complete(list(clusterId, node, kind));
             } catch (RuntimeException e) {
                 recent.remove(key, winner);
                 mine.completeExceptionally(e);
@@ -267,12 +263,26 @@ public class PagedListService {
         }
     }
 
+    /** One node's whole list of one class, failing as Rahdar's broker exceptions. */
+    private List<Resource> list(UUID clusterId, ClusterNode node, ResourceClass kind) {
+        try {
+            return gateway.cluster(clusterId)
+                    .resources()
+                    .read(io.github.sudoitir.openbroker.model.ResourceQuery.of(kind)
+                            .in(Scope.node(BrokerGateway.idOf(node.getId()))))
+                    .orThrow()
+                    .items();
+        } catch (BrokerException e) {
+            throw BrokerFailures.translate(e);
+        }
+    }
+
     /** How long a node's list is shared between requests. Short enough that a view is never visibly stale. */
     private static final Duration FRESH = Duration.ofSeconds(2);
 
-    private record ListKey(UUID clusterId, UUID nodeId, ResourceKind kind) {}
+    private record ListKey(UUID clusterId, UUID nodeId, ResourceClass kind) {}
 
-    private record RecentList(CompletableFuture<ListPage> page, long freshUntil) {}
+    private record RecentList(CompletableFuture<List<Resource>> page, long freshUntil) {}
 
     /** At most one entry per (cluster, node, kind), so bounded by the estate, not by traffic. */
     private final Map<ListKey, RecentList> recent = new ConcurrentHashMap<>();
@@ -281,10 +291,10 @@ public class PagedListService {
     private List<ClusterNode> servingManageableNodes(UUID clusterId) {
         Map<String, ClusterNode> perNodeId = new LinkedHashMap<>();
         for (ClusterNode n : nodes.nodes(clusterId)) {
-            if (n.getJolokiaUrl() == null) {
+            if (n.getManagementUrl() == null) {
                 continue;
             }
-            String key = n.getArtemisNodeId() != null ? n.getArtemisNodeId() : "id:" + n.getId();
+            String key = n.getNativeNodeId() != null ? n.getNativeNodeId() : "id:" + n.getId();
             perNodeId.merge(key, n, (kept, candidate) -> Boolean.TRUE.equals(candidate.getActive()) ? candidate : kept);
         }
         return List.copyOf(perNodeId.values());

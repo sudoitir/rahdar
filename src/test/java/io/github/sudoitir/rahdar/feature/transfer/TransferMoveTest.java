@@ -3,7 +3,7 @@ package io.github.sudoitir.rahdar.feature.transfer;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import io.github.sudoitir.rahdar.feature.transfer.web.TransferViews.TransferRunView;
-import io.github.sudoitir.rahdar.platform.broker.StagingQueues;
+import io.github.sudoitir.rahdar.system.artemis.StagingQueues;
 import jakarta.jms.Connection;
 import jakarta.jms.JMSException;
 import jakarta.jms.Message;

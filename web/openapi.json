@@ -34207,7 +34207,7 @@
           "sourceMessageId" : {
             "type" : "integer",
             "format" : "int64",
-            "description" : "The message's id on its source queue, for a captured row. Null when the broker did not copy _AMQ_ORIG_MESSAGE_ID, which is what makes verifying it against the live broker impossible."
+            "description" : "The message's id on its source queue, for a captured row. Null when the broker did not record the message's origin id, which is what makes verifying it against the live broker impossible."
           },
           "redactions" : {
             "type" : "array",
@@ -34251,10 +34251,6 @@
           "matched" : {
             "type" : "integer",
             "format" : "int64"
-          },
-          "servedBy" : {
-            "type" : "string",
-            "description" : "JOLOKIA or CORE — the channel that served this node."
           },
           "detail" : {
             "type" : "string"
@@ -35054,12 +35050,9 @@
           "node" : {
             "type" : "string",
             "format" : "uuid"
-          },
-          "transport" : {
-            "type" : "string"
           }
         },
-        "required" : [ "data", "hasNext", "node", "page", "pageSize", "transport" ]
+        "required" : [ "data", "hasNext", "node", "page", "pageSize" ]
       },
       "MessageSummaryView" : {
         "type" : "object",
@@ -35175,9 +35168,6 @@
             "type" : [ "integer", "null" ],
             "format" : "int32"
           },
-          "transport" : {
-            "type" : "string"
-          },
           "node" : {
             "type" : "string",
             "format" : "uuid"
@@ -35228,7 +35218,7 @@
             }
           }
         },
-        "required" : [ "bodyEncoding", "bodyTruncated", "booleanProperties", "doubleProperties", "durable", "expiration", "intProperties", "longProperties", "messageId", "node", "priority", "redactions", "size", "stringProperties", "timestamp", "transport", "type", "withheld" ]
+        "required" : [ "bodyEncoding", "bodyTruncated", "booleanProperties", "doubleProperties", "durable", "expiration", "intProperties", "longProperties", "messageId", "node", "priority", "redactions", "size", "stringProperties", "timestamp", "type", "withheld" ]
       },
       "NodeConfiguration" : {
         "type" : "object",
@@ -35310,7 +35300,7 @@
           "producerId" : {
             "type" : [ "string", "null" ]
           },
-          "name" : {
+          "clientId" : {
             "type" : [ "string", "null" ]
           },
           "sessionId" : {
@@ -36213,8 +36203,10 @@
             "type" : "integer",
             "format" : "int64"
           },
-          "status" : {
-            "type" : [ "string", "null" ]
+          "messagesInFlight" : {
+            "type" : "integer",
+            "format" : "int64",
+            "description" : "Messages delivered to this consumer and not yet acknowledged."
           },
           "allowedActions" : {
             "type" : "array",
@@ -36224,7 +36216,7 @@
             }
           }
         },
-        "required" : [ "allowedActions", "messagesAcknowledged", "messagesDelivered", "nodeId", "nodeName" ]
+        "required" : [ "allowedActions", "messagesAcknowledged", "messagesDelivered", "messagesInFlight", "nodeId", "nodeName" ]
       },
       "PagedViewConsumerView" : {
         "type" : "object",
@@ -37463,8 +37455,13 @@
           "name" : {
             "type" : "string"
           },
-          "routingTypes" : {
-            "type" : [ "string", "null" ]
+          "delivery" : {
+            "type" : "array",
+            "description" : "How the address delivers: to one consumer, to every subscription, or both.",
+            "items" : {
+              "type" : "string",
+              "enum" : [ "POINT_TO_POINT", "PUBLISH_SUBSCRIBE" ]
+            }
           },
           "queueCount" : {
             "type" : "integer",
@@ -37489,7 +37486,7 @@
             } ]
           }
         },
-        "required" : [ "allowedActions", "messageCount", "name", "nodeId", "nodeName", "queueCount" ]
+        "required" : [ "allowedActions", "delivery", "messageCount", "name", "nodeId", "nodeName", "queueCount" ]
       },
       "PagedViewAddressView" : {
         "type" : "object",

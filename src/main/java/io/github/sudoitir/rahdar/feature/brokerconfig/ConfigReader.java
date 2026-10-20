@@ -1,9 +1,9 @@
 package io.github.sudoitir.rahdar.feature.brokerconfig;
 
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaBrokerClient;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaRequest;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaResponse;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
+import io.github.sudoitir.rahdar.system.artemis.ManagementRequest;
+import io.github.sudoitir.rahdar.system.artemis.ManagementResponse;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashSet;
@@ -82,19 +82,19 @@ public class ConfigReader {
      * @throws BrokerConnectionException if the node cannot be read at all — the caller
      *     marks that side unavailable rather than rendering half a diff
      */
-    public NodeConfig read(JolokiaBrokerClient client, List<String> matches) {
+    public NodeConfig read(ArtemisNode client, List<String> matches) {
         String mbean = client.resolveBrokerObjectName();
 
         List<String> compared = cap(matches);
-        List<JolokiaRequest> requests = new ArrayList<>();
-        requests.add(JolokiaRequest.read(mbean, "Active", "AcceptorsAsJSON"));
-        requests.add(JolokiaRequest.readAll(mbean));
-        requests.add(JolokiaRequest.exec(mbean, "getRolesAsJSON(java.lang.String)", DEFAULT_MATCH));
+        List<ManagementRequest> requests = new ArrayList<>();
+        requests.add(ManagementRequest.read(mbean, "Active", "AcceptorsAsJSON"));
+        requests.add(ManagementRequest.readAll(mbean));
+        requests.add(ManagementRequest.exec(mbean, "getRolesAsJSON(java.lang.String)", DEFAULT_MATCH));
         for (String match : compared) {
-            requests.add(JolokiaRequest.exec(mbean, "getAddressSettingsAsJSON(java.lang.String)", match));
+            requests.add(ManagementRequest.exec(mbean, "getAddressSettingsAsJSON(java.lang.String)", match));
         }
 
-        List<JolokiaResponse> responses = client.batch(requests);
+        List<ManagementResponse> responses = client.batch(requests);
         if (responses.size() != requests.size()) {
             throw new BrokerConnectionException(
                     BrokerConnectionException.Kind.BAD_RESPONSE,
@@ -124,7 +124,7 @@ public class ConfigReader {
     /**
      * The match set to compare: {@code #} first, then the cluster's known addresses.
      *
-     * <p>These come from the caller's {@code queue_snapshot} cache, not from a broker
+     * <p>These come from the caller's {@code subscription_snapshot} cache, not from a broker
      * read, so a comparison still costs exactly one batched POST per node. Reading
      * {@code AddressNames} off the broker first would need a second round trip per
      * node — and a passive backup reports none anyway, so the cache is the better

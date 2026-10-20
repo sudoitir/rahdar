@@ -31,7 +31,7 @@ import org.slf4j.LoggerFactory;
  * written. Findings recorded in {@code docs/broker-management-notes.md} §13.
  *
  * <p>Not assertion-heavy by design — this test's job is to dump observed shapes
- * to the log for a human to read, the way {@code CoreEventClientTest} (Phase 4's
+ * to the log for a human to read, the way the notification catalogue spike (Phase 4's
  * equivalent spike) does. A handful of assertions guard the properties the
  * design already committed to (§13 answers 4 and 5); the rest is captured for
  * inspection.

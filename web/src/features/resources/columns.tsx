@@ -58,6 +58,12 @@ function nodeColumn<T extends { nodeName: string }>(): Column<T> {
   return { id: 'node', header: 'Node', accessor: (r) => r.nodeName, kind: 'identifier', priority: 'essential' };
 }
 
+/** How an address delivers, as an operator reads it. */
+const DELIVERY: Record<AddressView['delivery'][number], string> = {
+  POINT_TO_POINT: 'Point to point',
+  PUBLISH_SUBSCRIBE: 'Publish-subscribe',
+};
+
 /** Each resource's columns. The first column identifies a row; the node column is never hidden. */
 export const resourceColumns = {
   addresses: ({ clusterId }: ColumnDeps): Column<AddressView>[] => [
@@ -81,7 +87,14 @@ export const resourceColumns = {
       max: 9,
       priority: 'high',
     },
-    { id: 'routing', header: 'Routing', accessor: (r) => r.routingTypes ?? '', kind: 'status', priority: 'low' },
+    {
+      id: 'delivery',
+      header: 'Delivery',
+      description: 'To one consumer, to every subscription, or both',
+      accessor: (r) => r.delivery.map((mode) => DELIVERY[mode]).join(', '),
+      kind: 'status',
+      priority: 'low',
+    },
     { id: 'queues', header: 'Queues', accessor: (r) => r.queueCount, kind: 'number', priority: 'high' },
     { id: 'depth', header: 'Messages', accessor: (r) => r.messageCount, kind: 'number', priority: 'high' },
     nodeColumn<AddressView>(),
@@ -110,7 +123,14 @@ export const resourceColumns = {
     { id: 'protocol', header: 'Protocol', accessor: (r) => r.protocol ?? '', kind: 'status', priority: 'low' },
     { id: 'delivered', header: 'Delivered', accessor: (r) => r.messagesDelivered, kind: 'number', priority: 'high' },
     { id: 'acked', header: 'Acked', accessor: (r) => r.messagesAcknowledged, kind: 'number', priority: 'low' },
-    { id: 'status', header: 'Status', accessor: (r) => r.status ?? '', kind: 'status', priority: 'high' },
+    {
+      id: 'inFlight',
+      header: 'In flight',
+      description: 'Delivered to this consumer and not yet acknowledged',
+      accessor: (r) => r.messagesInFlight,
+      kind: 'number',
+      priority: 'high',
+    },
     nodeColumn<ConsumerView>(),
     actionColumn<ConsumerView>('Close', (row) => (
       <CloseConnectionAction
@@ -192,7 +212,7 @@ export const resourceColumns = {
       priority: 'essential',
       sortKey: 'address',
     },
-    { id: 'name', header: 'Name', accessor: (r) => r.name ?? '', kind: 'text', priority: 'high' },
+    { id: 'client', header: 'Client', accessor: (r) => r.clientId ?? '', kind: 'text', priority: 'high' },
     { id: 'protocol', header: 'Protocol', accessor: (r) => r.protocol ?? '', kind: 'status', priority: 'low' },
     { id: 'sent', header: 'Sent', accessor: (r) => r.messagesSent, kind: 'number', priority: 'high' },
     nodeColumn<ProducerView>(),

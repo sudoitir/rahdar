@@ -101,7 +101,7 @@ class SecretLeakTest extends PostgresIntegrationTest {
         // The connection edit lays the request over what the cluster has now, which is nothing yet.
         when(connections.settingsFor(any()))
                 .thenReturn(new BrokerConnectionSettings(clusterId, null, null, null, true));
-        jdbc.update("INSERT INTO cluster (id, name) VALUES (?, ?)", clusterId, "leak-" + clusterId);
+        jdbc.update("INSERT INTO cluster (id, name, system) VALUES (?, ?, 'artemis')", clusterId, "leak-" + clusterId);
 
         String base = "/api/v1/clusters/" + clusterId;
         send(patch(base)

@@ -7,7 +7,7 @@ import type { NavGroupId } from './nav/groups.ts';
 import type { SlotContributions } from './slots.ts';
 
 /** The extension contract version, shared with the backend's `Contract.VERSION` (ADR-0070). */
-export const CONTRACT = 15;
+export const CONTRACT = 16;
 
 /** The module ids the backend manifest reports. A frontend feature uses the same id as its backend module. */
 export const FEATURE_IDS = [
@@ -23,6 +23,7 @@ export const FEATURE_IDS = [
   'clusters',
   'governance',
   'scrape',
+  'artemis',
   'mcp',
   'queues',
   'resources',

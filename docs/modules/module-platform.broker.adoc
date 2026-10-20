@@ -9,8 +9,8 @@
 
 _Event listeners_
 
+* `i.g.s.r.p.b.BrokerGateway`
 * `i.g.s.r.p.b.BrokerSessions`
-* `i.g.s.r.p.b.CoreRelay`
 
 _Configuration properties_
 
@@ -20,35 +20,24 @@ _Configuration properties_
 
 _Others_
 
-* `i.g.s.r.p.b.AcceptanceProbe`
-* `i.g.s.r.p.b.BrokerAccountRoles`
 * `i.g.s.r.p.b.BrokerCallGuard`
-* `i.g.s.r.p.b.BrokerClientFactory`
 * `i.g.s.r.p.b.BrokerConnections`
-* `i.g.s.r.p.b.BrokerConnectors`
-* `i.g.s.r.p.b.BrokerListOps`
+* `i.g.s.r.p.b.BrokerMessages`
+* `i.g.s.r.p.b.BrokerNotifications`
+* `i.g.s.r.p.b.BrokerRelay`
 * `i.g.s.r.p.b.BrokerSettings`
-* `i.g.s.r.p.b.CapabilityProbe`
+* `i.g.s.r.p.b.BrokerTimeouts`
+* `i.g.s.r.p.b.BrokerTls`
 * `i.g.s.r.p.b.ClockOffsetRegistry`
-* `i.g.s.r.p.b.CoreAccountCheck`
-* `i.g.s.r.p.b.CoreConnectionFactory`
-* `i.g.s.r.p.b.MessageTransport` (via `i.g.s.r.p.b.CoreMessageTransport`)
-* `i.g.s.r.p.b.CoreObservations`
-* `i.g.s.r.p.b.CorePool`
-* `i.g.s.r.p.b.CoreSubscriptionCheck`
-* `i.g.s.r.p.b.CoreSubscriptionManager`
-* `i.g.s.r.p.b.MessageTransport` (via `i.g.s.r.p.b.JolokiaMessageTransport`)
-* `i.g.s.r.p.b.MessageBrowser`
-* `i.g.s.r.p.b.MessageOperations`
+* `i.g.s.r.p.b.DataPlaneCheck`
 * `i.g.s.r.p.b.MonotonicClockWatch`
 * `i.g.s.r.p.b.NodeCallHealth`
 * `i.g.s.r.p.b.NodeCallLimiter`
-* `i.g.s.r.p.b.NotificationMapper`
-* `i.g.s.r.p.b.StagingQueues`
+* `i.g.s.r.p.b.RahdarCallInterceptor`
 |Bean references
 |* `i.g.s.r.k.r.ReplicaRegistry` (in Replicas)
 * `i.g.s.r.k.j.JobStatuses` (in Scheduled jobs)
 |Events listened to
-|* `i.g.s.r.k.r.ReplicaSignal` 
-* `org.springframework.boot.context.event.ApplicationReadyEvent` 
+|* `org.springframework.boot.context.event.ApplicationReadyEvent` 
+* `i.g.s.r.k.r.ReplicaSignal` 
 |===

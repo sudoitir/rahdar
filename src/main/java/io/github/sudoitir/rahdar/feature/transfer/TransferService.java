@@ -34,18 +34,11 @@ import io.github.sudoitir.rahdar.kernel.security.PermissionResolver;
 import io.github.sudoitir.rahdar.kernel.security.Permissions;
 import io.github.sudoitir.rahdar.kernel.security.ResourceRef;
 import io.github.sudoitir.rahdar.kernel.settings.SettingsService;
-import io.github.sudoitir.rahdar.platform.broker.AcceptanceProbe;
-import io.github.sudoitir.rahdar.platform.broker.AcceptanceProbe.Facts;
 import io.github.sudoitir.rahdar.platform.broker.BrokerCapabilities;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
-import io.github.sudoitir.rahdar.platform.broker.BrokerMBeans;
 import io.github.sudoitir.rahdar.platform.broker.BrokerSettings;
 import io.github.sudoitir.rahdar.platform.broker.BrokerXmlSnippets;
 import io.github.sudoitir.rahdar.platform.broker.BulkCapExceededException;
-import io.github.sudoitir.rahdar.platform.broker.FrozenFilter;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaBrokerClient;
-import io.github.sudoitir.rahdar.platform.broker.MessageOperations;
-import io.github.sudoitir.rahdar.platform.broker.StagingQueues;
 import io.github.sudoitir.rahdar.platform.clusters.CapabilityLedger;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
@@ -53,6 +46,13 @@ import io.github.sudoitir.rahdar.platform.clusters.ServingNodes;
 import io.github.sudoitir.rahdar.platform.clusters.SplitBrainStatus;
 import io.github.sudoitir.rahdar.platform.scrape.QueueLocator;
 import io.github.sudoitir.rahdar.platform.scrape.QueueLocator.QueueLocation;
+import io.github.sudoitir.rahdar.system.artemis.AcceptanceProbe;
+import io.github.sudoitir.rahdar.system.artemis.AcceptanceProbe.Facts;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisSelectors;
+import io.github.sudoitir.rahdar.system.artemis.MBeanNames;
+import io.github.sudoitir.rahdar.system.artemis.MessageOperations;
+import io.github.sudoitir.rahdar.system.artemis.StagingQueues;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -142,7 +142,7 @@ public class TransferService {
         ClusterNode source = nodes.node(clusterId, request.sourceNodeId());
         ClusterNode target = nodes.node(request.targetClusterId(), request.targetNodeId());
         for (ClusterNode node : List.of(source, target)) {
-            if (node.getArtemisNodeId() == null || node.getJolokiaUrl() == null) {
+            if (node.getNativeNodeId() == null || node.getManagementUrl() == null) {
                 throw new TransferRefusedException(
                         HttpStatus.UNPROCESSABLE_ENTITY,
                         "transfer-node-unmanaged",
@@ -156,10 +156,10 @@ public class TransferService {
         String targetAddress = authorisedTargetAddress(request, to);
         String targetRoutingType = to.map(QueueLocation::routingType).orElse(ANYCAST);
         boolean sameCluster = clusterId.equals(request.targetClusterId());
-        boolean sameNode = sameCluster && source.getArtemisNodeId().equals(target.getArtemisNodeId());
+        boolean sameNode = sameCluster && source.getNativeNodeId().equals(target.getNativeNodeId());
         Instant t0 = Instant.now();
 
-        JolokiaBrokerClient sourceClient = nodes.client(source);
+        ArtemisNode sourceClient = nodes.client(source);
         Facts sourceFacts = probe.read(sourceClient, from.address(), from.queueName(), from.routingType());
         Long count = estimate(sourceClient, from, selection, t0, sourceFacts);
         Long bytes = projectedBytes(count, sourceFacts);
@@ -200,14 +200,14 @@ public class TransferService {
                 .sourceClusterId(clusterId)
                 .sourceNodeId(source.getId())
                 .sourceNodeName(source.getName())
-                .sourceArtemisNodeId(source.getArtemisNodeId())
+                .sourceNativeNodeId(source.getNativeNodeId())
                 .sourceQueue(from.queueName())
                 .sourceAddress(from.address())
                 .sourceRoutingType(from.routingType())
                 .targetClusterId(request.targetClusterId())
                 .targetNodeId(target.getId())
                 .targetNodeName(target.getName())
-                .targetArtemisNodeId(target.getArtemisNodeId())
+                .targetNativeNodeId(target.getNativeNodeId())
                 .targetQueue(request.targetQueue())
                 .targetAddress(targetAddress)
                 .targetRoutingType(targetRoutingType)
@@ -250,6 +250,14 @@ public class TransferService {
                             "transfer-nothing-selected",
                             "A filter selection needs a filter. Choose the whole queue instead to take everything.");
                 }
+                if (!ArtemisSelectors.isCompleteExpression(selection.filter())) {
+                    throw new TransferRefusedException(
+                            HttpStatus.UNPROCESSABLE_ENTITY,
+                            "transfer-invalid-filter",
+                            "The filter is not one complete selector expression, so it cannot be limited to the"
+                                    + " messages that existed when the transfer started. Check its parentheses and"
+                                    + " quotes.");
+                }
                 yield new TransferSelection(
                         SelectionKind.FILTER, null, selection.filter().strip());
             }
@@ -260,7 +268,7 @@ public class TransferService {
     /** The queue's copy on this node, or on another endpoint of the same broker node. */
     private Optional<QueueLocation> locate(UUID clusterId, String queue, ClusterNode node) {
         List<UUID> sameBroker = directory.nodes(clusterId).stream()
-                .filter(n -> node.getArtemisNodeId().equals(n.getArtemisNodeId()))
+                .filter(n -> node.getNativeNodeId().equals(n.getNativeNodeId()))
                 .map(ClusterNode::getId)
                 .toList();
         List<QueueLocation> found = locator.locate(clusterId, queue);
@@ -315,7 +323,7 @@ public class TransferService {
      * so the size is then unknown.
      */
     private Long estimate(
-            JolokiaBrokerClient client, QueueLocation from, TransferSelection selection, Instant t0, Facts source) {
+            ArtemisNode client, QueueLocation from, TransferSelection selection, Instant t0, Facts source) {
         return switch (selection.kind()) {
             case IDS -> (long) selection.ids().size();
             case ALL -> source.messageCount();
@@ -324,9 +332,9 @@ public class TransferService {
                     yield null;
                 }
                 try {
-                    String mbean = BrokerMBeans.queue(
+                    String mbean = MBeanNames.queue(
                             client.resolveBrokerObjectName(), from.address(), from.queueName(), from.routingType());
-                    yield messages.countMessages(client, mbean, FrozenFilter.compose(selection.filter(), t0));
+                    yield messages.countMessages(client, mbean, ArtemisSelectors.frozen(selection.filter(), t0));
                 } catch (BrokerConnectionException _) {
                     yield null;
                 }
@@ -374,7 +382,7 @@ public class TransferService {
 
     private static void coreFindings(List<ClusterNode> nodes, ClusterNode source, List<Finding> out) {
         for (ClusterNode node : nodes) {
-            if (node.getCoreUrl() == null) {
+            if (node.getDataUrl() == null) {
                 out.add(new Finding(
                         FindingKind.REFUSE,
                         node == source ? "source-no-core" : "target-no-core",
@@ -434,10 +442,10 @@ public class TransferService {
                     "\n",
                     mode.name(),
                     source.getClusterId().toString(),
-                    source.getArtemisNodeId(),
+                    source.getNativeNodeId(),
                     sourceQueue,
                     target.getClusterId().toString(),
-                    target.getArtemisNodeId(),
+                    target.getNativeNodeId(),
                     targetQueue,
                     targetAddress,
                     selection.kind().name(),
@@ -798,7 +806,7 @@ public class TransferService {
                 continue;
             }
             try {
-                JolokiaBrokerClient client = nodes.client(node);
+                ArtemisNode client = nodes.client(node);
                 for (String queue : staging.list(client)) {
                     UUID runId = runIdOf(queue);
                     if (runId != null && runs.existsById(runId)) {
@@ -852,8 +860,8 @@ public class TransferService {
                 false);
         long returned = 0;
         try {
-            JolokiaBrokerClient client = nodes.client(node);
-            String mbean = BrokerMBeans.queue(client.resolveBrokerObjectName(), queue, queue, ANYCAST);
+            ArtemisNode client = nodes.client(node);
+            String mbean = MBeanNames.queue(client.resolveBrokerObjectName(), queue, queue, ANYCAST);
             int chunk = settings.intValue(TransferSettings.BATCH_SIZE);
             long moved;
             do {
@@ -883,10 +891,10 @@ public class TransferService {
         }
     }
 
-    private Long depth(JolokiaBrokerClient client, String queue) {
+    private Long depth(ArtemisNode client, String queue) {
         try {
             return messages.messageCount(
-                    client, BrokerMBeans.queue(client.resolveBrokerObjectName(), queue, queue, ANYCAST));
+                    client, MBeanNames.queue(client.resolveBrokerObjectName(), queue, queue, ANYCAST));
         } catch (BrokerConnectionException _) {
             return null;
         }

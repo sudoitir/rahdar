@@ -217,7 +217,7 @@ public class RahdarHealthController {
     }
 
     private NodeHealth nodeHealth(NodeDirectory.KnownNode node) {
-        String url = node.jolokiaUrl();
+        String url = node.managementUrl();
         Optional<Calls> latest = url == null ? Optional.empty() : calls.calls(url);
         String address = url == null ? null : NodeAddress.hostPort(url);
         return new NodeHealth(

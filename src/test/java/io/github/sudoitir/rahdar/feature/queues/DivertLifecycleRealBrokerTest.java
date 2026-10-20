@@ -18,8 +18,6 @@ import io.github.sudoitir.rahdar.kernel.security.internal.persistence.RoleReposi
 import io.github.sudoitir.rahdar.kernel.security.internal.persistence.UserRoleRepository;
 import io.github.sudoitir.rahdar.platform.broker.Attempt;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaBrokerClient;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaRequest;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterService;
 import io.github.sudoitir.rahdar.platform.clusters.LifecycleOutcome;
 import io.github.sudoitir.rahdar.platform.clusters.LifecycleOutcome.NodeOutcome;
@@ -31,6 +29,11 @@ import io.github.sudoitir.rahdar.support.AdminAuthenticationExtension;
 import io.github.sudoitir.rahdar.support.ArtemisIntegrationTest;
 import io.github.sudoitir.rahdar.support.McpFixture;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
+import io.github.sudoitir.rahdar.system.artemis.DivertOperations;
+import io.github.sudoitir.rahdar.system.artemis.DivertRow;
+import io.github.sudoitir.rahdar.system.artemis.ManagementRequest;
+import io.github.sudoitir.rahdar.system.artemis.QueueLifecycleOperations;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -98,7 +101,7 @@ class DivertLifecycleRealBrokerTest extends PostgresIntegrationTest {
     private final String run = UUID.randomUUID().toString().substring(0, 8);
     private final List<String> created = new ArrayList<>();
     private UUID clusterId;
-    private JolokiaBrokerClient client;
+    private ArtemisNode client;
     private String broker;
 
     @BeforeEach
@@ -118,7 +121,7 @@ class DivertLifecycleRealBrokerTest extends PostgresIntegrationTest {
             throw new IllegalStateException("could not register the container broker: " + attempt);
         }
         clusterId = ok.value().id();
-        client = connections.forCluster(clusterId, ArtemisIntegrationTest.jolokiaUrl());
+        client = ArtemisIntegrationTest.jolokiaClient(ArtemisIntegrationTest.jolokiaUrl());
         broker = client.resolveBrokerObjectName();
     }
 
@@ -207,7 +210,7 @@ class DivertLifecycleRealBrokerTest extends PostgresIntegrationTest {
     @Test
     void aForwardingAddressThatDoesNotExistAndIsNotAutoCreatedIsRefusedInThePreviewAndForReal() {
         String match = "NOAUTO." + run + ".#";
-        client.single(JolokiaRequest.exec(
+        client.single(ManagementRequest.exec(
                 broker,
                 "addAddressSettings(java.lang.String,java.lang.String)",
                 match,
@@ -224,7 +227,7 @@ class DivertLifecycleRealBrokerTest extends PostgresIntegrationTest {
             assertThat(create(name, a, missing, false).status()).isEqualTo(NodeStatus.FAILED);
             assertThat(divertOps.find(client, name)).isEmpty();
         } finally {
-            client.single(JolokiaRequest.exec(broker, "removeAddressSettings(java.lang.String)", match));
+            client.single(ManagementRequest.exec(broker, "removeAddressSettings(java.lang.String)", match));
         }
     }
 

@@ -9,8 +9,6 @@ import io.github.sudoitir.rahdar.kernel.audit.internal.persistence.AuditEventEnt
 import io.github.sudoitir.rahdar.kernel.audit.internal.persistence.AuditEventRepository;
 import io.github.sudoitir.rahdar.platform.broker.Attempt;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
-import io.github.sudoitir.rahdar.platform.broker.BrokerMBeans;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaBrokerClient;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterService;
 import io.github.sudoitir.rahdar.platform.clusters.LifecycleOutcome;
 import io.github.sudoitir.rahdar.platform.clusters.LifecycleOutcome.NodeOutcome;
@@ -21,6 +19,10 @@ import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.ClusterDetai
 import io.github.sudoitir.rahdar.support.AdminAuthenticationExtension;
 import io.github.sudoitir.rahdar.support.ArtemisIntegrationTest;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
+import io.github.sudoitir.rahdar.system.artemis.DivertOperations;
+import io.github.sudoitir.rahdar.system.artemis.MBeanNames;
+import io.github.sudoitir.rahdar.system.artemis.QueueLifecycleOperations;
 import jakarta.jms.Connection;
 import jakarta.jms.Session;
 import java.util.LinkedHashMap;
@@ -44,7 +46,7 @@ import org.springframework.web.context.WebApplicationContext;
  * still route afterwards. A divert out of that address keeps it bound, so then both stay and
  * the chain through it still delivers (ADR-0085).
  *
- * <p>Nothing seeds {@code queue_snapshot} here, so the delete also proves a queue the scrape
+ * <p>Nothing seeds {@code subscription_snapshot} here, so the delete also proves a queue the scrape
  * has not reached is found on the live node.
  */
 @ExtendWith(AdminAuthenticationExtension.class)
@@ -81,7 +83,7 @@ class QueueDeleteRealBrokerTest extends PostgresIntegrationTest {
     private final String feed = "feed-" + run;
     private final String fanOut = "fan-out-" + run;
     private UUID clusterId;
-    private JolokiaBrokerClient client;
+    private ArtemisNode client;
     private String broker;
     private ActiveMQConnectionFactory factory;
 
@@ -102,7 +104,7 @@ class QueueDeleteRealBrokerTest extends PostgresIntegrationTest {
             throw new IllegalStateException("could not register the container broker: " + attempt);
         }
         clusterId = ok.value().id();
-        client = connections.forCluster(clusterId, ArtemisIntegrationTest.jolokiaUrl());
+        client = ArtemisIntegrationTest.jolokiaClient(ArtemisIntegrationTest.jolokiaUrl());
         broker = client.resolveBrokerObjectName();
         factory = new ActiveMQConnectionFactory(
                 ArtemisIntegrationTest.coreUrl() + "?useTopologyForLoadBalancing=false",
@@ -159,7 +161,7 @@ class QueueDeleteRealBrokerTest extends PostgresIntegrationTest {
     }
 
     private boolean dstQueueExists() {
-        return queueOps.boundQueues(client, BrokerMBeans.address(broker, dst)).contains(dst);
+        return queueOps.boundQueues(client, MBeanNames.address(broker, dst)).contains(dst);
     }
 
     @Test
@@ -199,7 +201,7 @@ class QueueDeleteRealBrokerTest extends PostgresIntegrationTest {
             Session session = producerConnection.createSession(false, Session.AUTO_ACKNOWLEDGE);
             session.createProducer(session.createTopic(src)).send(session.createTextMessage("after"));
         }
-        assertThat(queueOps.messageCount(client, BrokerMBeans.queue(broker, src, src + ".copy", "MULTICAST")))
+        assertThat(queueOps.messageCount(client, MBeanNames.queue(broker, src, src + ".copy", "MULTICAST")))
                 .isEqualTo(1L);
         assertThat(dstQueueExists()).isFalse();
 
@@ -233,7 +235,7 @@ class QueueDeleteRealBrokerTest extends PostgresIntegrationTest {
             Session session = producerConnection.createSession(false, Session.AUTO_ACKNOWLEDGE);
             session.createProducer(session.createTopic(src)).send(session.createTextMessage("through"));
         }
-        assertThat(queueOps.messageCount(client, BrokerMBeans.queue(broker, other, other, "ANYCAST")))
+        assertThat(queueOps.messageCount(client, MBeanNames.queue(broker, other, other, "ANYCAST")))
                 .isEqualTo(1L);
     }
 }

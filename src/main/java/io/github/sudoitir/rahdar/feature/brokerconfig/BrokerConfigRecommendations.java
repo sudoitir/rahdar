@@ -2,12 +2,12 @@ package io.github.sudoitir.rahdar.feature.brokerconfig;
 
 import io.github.sudoitir.rahdar.feature.brokerconfig.BrokerConfigDocument.AddressSettingDecl;
 import io.github.sudoitir.rahdar.feature.brokerconfig.BrokerConfigDocument.SecuritySettingDecl;
-import io.github.sudoitir.rahdar.platform.broker.BrokerAccountRoles;
 import io.github.sudoitir.rahdar.platform.broker.BrokerCapabilities;
 import io.github.sudoitir.rahdar.platform.broker.BrokerCapabilities.CapabilityAssessment;
 import io.github.sudoitir.rahdar.platform.broker.BrokerCapabilities.CapabilityStatus;
+import io.github.sudoitir.rahdar.platform.broker.BrokerCapabilityProbe;
 import io.github.sudoitir.rahdar.platform.broker.BrokerXmlSnippets;
-import io.github.sudoitir.rahdar.platform.broker.CapabilityProbe;
+import io.github.sudoitir.rahdar.system.artemis.BrokerAccountRoles;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -348,6 +348,6 @@ public final class BrokerConfigRecommendations {
      * been applied rather than reappearing for ever.
      */
     private static boolean truncating(CapabilityAssessment assessment) {
-        return assessment.reason() != null && assessment.reason().contains(CapabilityProbe.TRUNCATING);
+        return assessment.reason() != null && assessment.reason().contains(BrokerCapabilityProbe.TRUNCATING);
     }
 }

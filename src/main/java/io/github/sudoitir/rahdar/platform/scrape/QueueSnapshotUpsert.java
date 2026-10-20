@@ -12,9 +12,10 @@ import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.jdbc.core.namedparam.SqlParameterSource;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.databind.ObjectMapper;
 
 /**
- * Bulk writer for {@code queue_snapshot} (ADR-0016). A sweep rewrites thousands
+ * Bulk writer for {@code subscription_snapshot} (ADR-0016). A sweep rewrites thousands
  * of rows that have no identity worth dirty-checking, so this is a JDBC batched
  * {@code INSERT … ON CONFLICT (node_id, queue_name) DO UPDATE} rather than JPA.
  * {@code NamedParameterJdbcTemplate} + {@code ON CONFLICT} — both stock, no new
@@ -25,36 +26,37 @@ import org.springframework.transaction.annotation.Transactional;
 public class QueueSnapshotUpsert {
 
     private static final String UPSERT = """
-            INSERT INTO queue_snapshot
-              (ts, message_count, consumer_count, delivering_count, scheduled_count,
-               messages_added, messages_acked, messages_expired,
-               address, queue_name, routing_type, cluster_id, node_id, durable, paused)
+            INSERT INTO subscription_snapshot
+              (ts, backlog, consumer_count, in_flight, scheduled, enqueued, acknowledged, expired,
+               destination, subscription, kind, native_attributes, cluster_id, node_id, durable, paused)
             VALUES
-              (now(), :messageCount, :consumerCount, :deliveringCount, :scheduledCount,
-               :messagesAdded, :messagesAcked, :messagesExpired,
-               :address, :queueName, :routingType, :clusterId, :nodeId, :durable, :paused)
-            ON CONFLICT (node_id, queue_name) DO UPDATE SET
-               ts               = now(),
-               message_count    = EXCLUDED.message_count,
-               consumer_count   = EXCLUDED.consumer_count,
-               delivering_count = EXCLUDED.delivering_count,
-               scheduled_count  = EXCLUDED.scheduled_count,
-               messages_added   = EXCLUDED.messages_added,
-               messages_acked   = EXCLUDED.messages_acked,
-               messages_expired = EXCLUDED.messages_expired,
-               address          = EXCLUDED.address,
-               routing_type     = EXCLUDED.routing_type,
-               cluster_id       = EXCLUDED.cluster_id,
-               durable          = EXCLUDED.durable,
-               paused           = EXCLUDED.paused
+              (now(), :backlog, :consumerCount, :inFlight, :scheduled, :enqueued, :acknowledged, :expired,
+               :destination, :subscription, :kind, :nativeAttributes::jsonb, :clusterId, :nodeId, :durable, :paused)
+            ON CONFLICT (node_id, subscription) DO UPDATE SET
+               ts                = now(),
+               backlog           = EXCLUDED.backlog,
+               consumer_count    = EXCLUDED.consumer_count,
+               in_flight         = EXCLUDED.in_flight,
+               scheduled         = EXCLUDED.scheduled,
+               enqueued          = EXCLUDED.enqueued,
+               acknowledged      = EXCLUDED.acknowledged,
+               expired           = EXCLUDED.expired,
+               destination       = EXCLUDED.destination,
+               kind              = EXCLUDED.kind,
+               native_attributes = EXCLUDED.native_attributes,
+               cluster_id        = EXCLUDED.cluster_id,
+               durable           = EXCLUDED.durable,
+               paused            = EXCLUDED.paused
             """;
 
-    private static final String REAP_STALE = "DELETE FROM queue_snapshot WHERE node_id = :nodeId AND ts < :sweepStart";
+    private static final String REAP_STALE =
+            "DELETE FROM subscription_snapshot WHERE node_id = :nodeId AND ts < :sweepStart";
 
     private static final String FORGET_QUEUE =
-            "DELETE FROM queue_snapshot WHERE cluster_id = :clusterId AND queue_name = :queueName";
+            "DELETE FROM subscription_snapshot WHERE cluster_id = :clusterId AND subscription = :queueName";
 
     private final NamedParameterJdbcTemplate jdbc;
+    private final ObjectMapper mapper;
 
     /** Upsert a batch of rows in one round trip. */
     @Transactional
@@ -62,8 +64,7 @@ public class QueueSnapshotUpsert {
         if (rows.isEmpty()) {
             return;
         }
-        SqlParameterSource[] params =
-                rows.stream().map(QueueSnapshotUpsert::params).toArray(SqlParameterSource[]::new);
+        SqlParameterSource[] params = rows.stream().map(this::params).toArray(SqlParameterSource[]::new);
         jdbc.batchUpdate(UPSERT, params);
     }
 
@@ -91,21 +92,26 @@ public class QueueSnapshotUpsert {
         return jdbc.update(FORGET_QUEUE, Map.of("clusterId", clusterId, "queueName", queueName));
     }
 
-    private static SqlParameterSource params(QueueRow r) {
+    private SqlParameterSource params(QueueRow r) {
         return new MapSqlParameterSource()
-                .addValue("messageCount", r.messageCount())
+                .addValue("backlog", r.messageCount())
                 .addValue("consumerCount", r.consumerCount())
-                .addValue("deliveringCount", r.deliveringCount())
-                .addValue("scheduledCount", r.scheduledCount())
-                .addValue("messagesAdded", r.messagesAdded())
-                .addValue("messagesAcked", r.messagesAcked())
-                .addValue("messagesExpired", r.messagesExpired())
-                .addValue("address", r.address())
-                .addValue("queueName", r.queueName())
-                .addValue("routingType", r.routingType())
+                .addValue("inFlight", r.deliveringCount())
+                .addValue("scheduled", r.scheduledCount())
+                .addValue("enqueued", r.messagesAdded())
+                .addValue("acknowledged", r.messagesAcked())
+                .addValue("expired", r.messagesExpired())
+                .addValue("destination", r.address())
+                .addValue("subscription", r.queueName())
+                .addValue("kind", r.kind())
+                .addValue("nativeAttributes", nativeAttributes(r))
                 .addValue("clusterId", r.clusterId())
                 .addValue("nodeId", r.nodeId())
                 .addValue("durable", r.durable())
                 .addValue("paused", r.paused());
+    }
+
+    private String nativeAttributes(QueueRow r) {
+        return mapper.writeValueAsString(r.nativeAttributes());
     }
 }

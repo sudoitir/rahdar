@@ -38,12 +38,12 @@ class ClassificationFindingsStoreIntegrationTest extends PostgresIntegrationTest
 
     @AfterEach
     void tearDown() {
-        jdbc.update("DELETE FROM classification_finding WHERE address = ?", address);
+        jdbc.update("DELETE FROM classification_finding WHERE destination = ?", address);
     }
 
     private void finding(String path, String status, String lastSeenAt) {
         jdbc.update(
-                "INSERT INTO classification_finding (first_seen_at, last_seen_at, hit_count, address, location,"
+                "INSERT INTO classification_finding (first_seen_at, last_seen_at, hit_count, destination, location,"
                         + " field_path, data_class, status) VALUES (" + OLD + ", " + lastSeenAt
                         + ", 1, ?, 'BODY', ?, 'PAN', ?)",
                 address,
@@ -53,7 +53,7 @@ class ClassificationFindingsStoreIntegrationTest extends PostgresIntegrationTest
 
     private long count() {
         return jdbc.queryForObject(
-                "SELECT count(*) FROM classification_finding WHERE address = ?", Long.class, address);
+                "SELECT count(*) FROM classification_finding WHERE destination = ?", Long.class, address);
     }
 
     @Test

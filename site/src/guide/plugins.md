@@ -460,12 +460,10 @@ class Orders implements PluginMessageHandler {
   in Core) on related messages get them handled one at a time, in order, on each node: the broker
   hands every group to one consumer. For an order across a broker cluster's nodes, configure the
   broker's grouping handler. A concurrency of 1 keeps the queue's order on each node.
-- **Threads.** Rahdar calls the handler on threads of its own, from a pool that only plugin
-  handlers use: at most `rahdar.plugins.messaging.max-threads` (64 by default, at least 2)
-  per node for consumers, and as many for taps. A handler that blocks holds its own consumer and a
-  thread of that pool, never a thread message capture or an operator's session needs. Keep it
-  bounded all the same: blocked handlers across plugins share the pool, and one registration's
-  footprint is its `concurrency` threads per node.
+- **Threads.** Rahdar calls the handler on a virtual thread of its own for each unit of the
+  registration's `concurrency` on each node. A handler that blocks holds only that thread and its
+  own consumer, never a thread message capture or an operator's session needs. Keep it bounded all
+  the same: a blocked handler takes no further message on its slot.
 - Queues under Rahdar's own prefixes and the broker's management addresses are refused.
 
 **`PluginSecrets`** stores named values encrypted with Rahdar's secret key: `put`, `get`, `delete`
@@ -730,7 +728,7 @@ class QueueTrend {
         if (metrics == null) return null; // the metrics feature is switched off
         Instant now = Instant.now();
         return metrics.read(actingUserId, clusterId, new MetricQuery(
-                List.of("messageCount"), "QUEUE", queue, now.minus(Duration.ofHours(6)), now, null, null));
+                List.of("openbroker.backlog"), "QUEUE", queue, now.minus(Duration.ofHours(6)), now, null, null));
     }
 }
 ```
@@ -838,6 +836,15 @@ string into markup or script (Trusted Types):
 React, Mantine and the SDK's components work as they are. A library of your own that sets `innerHTML`
 (a rich-text editor, a Markdown renderer) is what to check: it stops working here. Pick one that renders
 through React, or show the text as text.
+
+### Moving a plugin from contract 15 to 16
+
+Contract 16 moves Rahdar onto a broker-neutral SDK. Rahdar refuses a plugin built for contract 15, so
+rebuild it and set `<rahdar.contract>16</rahdar.contract>` in its `pom.xml`:
+
+- **No broker client.** `BrokerClientFactory` and `BrokerCommands` are no longer part of the plugin API.
+  A plugin reaches brokers through the messaging contributions and the services marked `@PluginApi`; it
+  never sends management requests of its own.
 
 ### Moving a plugin from contract 14 to 15
 

@@ -1,16 +1,15 @@
 package io.github.sudoitir.rahdar.feature.metrics;
 
-import io.github.sudoitir.rahdar.platform.broker.BrokerClientFactory;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
+import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
+import io.github.sudoitir.rahdar.platform.broker.BrokerNotifications;
 import io.github.sudoitir.rahdar.platform.broker.BrokerSessions;
-import io.github.sudoitir.rahdar.platform.broker.CapabilityProbe;
-import io.github.sudoitir.rahdar.platform.broker.CoreAccountCheck;
-import io.github.sudoitir.rahdar.platform.broker.CoreSubscriptionCheck;
-import io.github.sudoitir.rahdar.platform.broker.CoreSubscriptionManager;
+import io.github.sudoitir.rahdar.platform.broker.DataPlaneCheck;
 import io.github.sudoitir.rahdar.platform.broker.NodeCallLimiter;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.NodeStateRecorder;
 import io.github.sudoitir.rahdar.support.ModuleIntegrationTest;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNodes;
 import org.springframework.modulith.test.ApplicationModuleTest;
 import org.springframework.modulith.test.ApplicationModuleTest.BootstrapMode;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -32,23 +31,20 @@ class MetricsModuleTest extends ModuleIntegrationTest {
 
     /** The clusters module, a direct dependency since a split names its nodes (ADR-0110), builds broker clients. */
     @MockitoBean
-    BrokerClientFactory clientFactory;
+    ArtemisNodes clientFactory;
 
     @MockitoBean
     BrokerSessions sessions;
 
     @MockitoBean
-    CapabilityProbe capabilityProbe;
+    DataPlaneCheck dataPlaneCheck;
 
     @MockitoBean
-    CoreAccountCheck coreAccountCheck;
-
-    @MockitoBean
-    CoreSubscriptionCheck coreSubscriptionCheck;
-
-    @MockitoBean
-    CoreSubscriptionManager coreSubscriptions;
+    BrokerNotifications coreSubscriptions;
 
     @MockitoBean
     NodeCallLimiter limiter;
+
+    @MockitoBean
+    BrokerGateway gateway;
 }

@@ -1,5 +1,6 @@
 package io.github.sudoitir.rahdar.feature.alerting;
 
+import io.github.sudoitir.openbroker.model.MetricKeys;
 import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshot;
 import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshots;
 import java.util.HashMap;
@@ -14,11 +15,11 @@ import org.springframework.stereotype.Component;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * Reads the latest per-{@code (node,queue)} gauge value from {@code queue_snapshot}
+ * Reads the latest per-{@code (node,queue)} gauge value from {@code subscription_snapshot}
  * (design.md decision 2) — one query per cluster per tick regardless of rule
  * count. A queue present on several nodes without a specific {@code scope.node}
  * is aggregated by summing, keyed {@code queue:<name>}; a node-scoped rule keys
- * {@code node:<artemisNodeId>/queue:<name>} on that node's own value.
+ * {@code node:<nativeNodeId>/queue:<name>} on that node's own value.
  */
 @Component
 @Order(30)
@@ -26,10 +27,10 @@ import tools.jackson.databind.ObjectMapper;
 public class GaugeCondition implements AlertCondition {
 
     private static final Map<String, ToLongFunction<QueueSnapshot>> GAUGES = Map.of(
-            "messageCount", QueueSnapshot::messageCount,
-            "consumerCount", QueueSnapshot::consumerCount,
-            "deliveringCount", QueueSnapshot::deliveringCount,
-            "scheduledCount", QueueSnapshot::scheduledCount);
+            MetricKeys.BACKLOG.name(), QueueSnapshot::messageCount,
+            MetricKeys.CONSUMER_COUNT.name(), QueueSnapshot::consumerCount,
+            MetricKeys.IN_FLIGHT.name(), QueueSnapshot::deliveringCount,
+            MetricKeys.SCHEDULED.name(), QueueSnapshot::scheduledCount);
 
     private final QueueSnapshots snapshots;
     private final ObjectMapper mapper;

@@ -38,8 +38,7 @@ import io.github.sudoitir.rahdar.kernel.security.ActorResolver;
 import io.github.sudoitir.rahdar.kernel.security.ClusterAccessGuard;
 import io.github.sudoitir.rahdar.kernel.security.Permissions;
 import io.github.sudoitir.rahdar.kernel.settings.SettingsService;
-import io.github.sudoitir.rahdar.platform.broker.BrokerConnectors;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaBrokerClient;
+import io.github.sudoitir.rahdar.platform.broker.BrokerTarget;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterLock;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
@@ -48,6 +47,9 @@ import io.github.sudoitir.rahdar.platform.clusters.RegisteredCluster;
 import io.github.sudoitir.rahdar.platform.clusters.RegistrationAdoption;
 import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshot;
 import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshots;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNodes;
+import io.github.sudoitir.rahdar.system.artemis.BrokerConnectors;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Arrays;
@@ -89,7 +91,16 @@ class BrokerConfigServiceTest {
     private final RegisteredCluster cluster = mock(RegisteredCluster.class);
     private final AuditEvent event = mock(AuditEvent.class);
 
+    private final ArtemisNodes artemisNodes = mock(ArtemisNodes.class);
+
     private BrokerConfigService service;
+
+    /** A target the mocked {@link ArtemisNodes} resolves to this node. */
+    private BrokerTarget target(ArtemisNode node) {
+        BrokerTarget target = mock(BrokerTarget.class);
+        when(artemisNodes.on(target)).thenReturn(node);
+        return target;
+    }
 
     @BeforeEach
     void setUp() {
@@ -108,7 +119,8 @@ class BrokerConfigServiceTest {
                 settings,
                 audit,
                 actors,
-                mapper);
+                mapper,
+                artemisNodes);
         when(cluster.getName()).thenReturn("prod");
         when(clusters.cluster(CLUSTER)).thenReturn(Optional.of(cluster));
         when(settings.duration(BrokerConfigSettings.DRIFT_INTERVAL)).thenReturn(Duration.ofMillis(200));
@@ -432,8 +444,8 @@ class BrokerConfigServiceTest {
         ClusterNode idle = node(NODE_A, "backup", false);
         ClusterNode good = node(UUID.randomUUID(), "good", true);
         ClusterNode bad = node(UUID.randomUUID(), "bad", true);
-        JolokiaBrokerClient goodClient = mock(JolokiaBrokerClient.class);
-        JolokiaBrokerClient badClient = mock(JolokiaBrokerClient.class);
+        ArtemisNode goodClient = mock(ArtemisNode.class);
+        ArtemisNode badClient = mock(ArtemisNode.class);
         when(reads.targets(CLUSTER)).thenReturn(List.of(idle, good, bad));
         when(reads.client(CLUSTER, good)).thenReturn(goodClient);
         when(reads.client(CLUSTER, bad)).thenReturn(badClient);
@@ -533,8 +545,8 @@ class BrokerConfigServiceTest {
     void anUnreadableNodeIsNotedAndTheRestAreStillAdopted() {
         ClusterNode a = node(NODE_A, "node-a", true);
         ClusterNode b = node(NODE_B, "node-b", true);
-        JolokiaBrokerClient ca = mock(JolokiaBrokerClient.class);
-        JolokiaBrokerClient cb = mock(JolokiaBrokerClient.class);
+        ArtemisNode ca = mock(ArtemisNode.class);
+        ArtemisNode cb = mock(ArtemisNode.class);
         when(reads.targets(CLUSTER)).thenReturn(List.of(a, b));
         when(reads.client(CLUSTER, a)).thenReturn(ca);
         when(reads.client(CLUSTER, b)).thenReturn(cb);
@@ -558,8 +570,8 @@ class BrokerConfigServiceTest {
     void adoptionMergesNodesAndKeepsTheFirstNodesValuesListingEveryDisagreement() {
         ClusterNode a = node(NODE_A, "node-a", true);
         ClusterNode b = node(NODE_B, "node-b", true);
-        JolokiaBrokerClient ca = mock(JolokiaBrokerClient.class);
-        JolokiaBrokerClient cb = mock(JolokiaBrokerClient.class);
+        ArtemisNode ca = mock(ArtemisNode.class);
+        ArtemisNode cb = mock(ArtemisNode.class);
         when(reads.targets(CLUSTER)).thenReturn(List.of(a, b));
         when(reads.client(CLUSTER, a)).thenReturn(ca);
         when(reads.client(CLUSTER, b)).thenReturn(cb);
@@ -648,15 +660,15 @@ class BrokerConfigServiceTest {
 
     @Test
     void aPreviewBeforeRegistrationDeclaresWhatNodesThatAgreeRunWithoutQueuesOrFindings() {
-        JolokiaBrokerClient ca = mock(JolokiaBrokerClient.class);
-        JolokiaBrokerClient cb = mock(JolokiaBrokerClient.class);
+        ArtemisNode ca = mock(ArtemisNode.class);
+        ArtemisNode cb = mock(ArtemisNode.class);
         Map<String, Object> orders = Map.of("max-size-bytes", 100, "address-full-policy", "BLOCK");
         when(ops.readForAdoption(eq(ca), any(), eq("node-a"))).thenReturn(sameAs(NODE_A, "node-a", orders));
         when(ops.readForAdoption(eq(cb), any(), eq("node-b"))).thenReturn(sameAs(NODE_B, "node-b", orders));
 
         Adoption adoption = service.previewAdoption(List.of(
-                        new RegistrationAdoption.LiveNode("node-a", ca),
-                        new RegistrationAdoption.LiveNode("node-b", cb)))
+                        new RegistrationAdoption.LiveNode("node-a", target(ca)),
+                        new RegistrationAdoption.LiveNode("node-b", target(cb))))
                 .orElseThrow();
 
         assertThat(adoption.disagreements()).isEmpty();
@@ -674,16 +686,16 @@ class BrokerConfigServiceTest {
 
     @Test
     void aPreviewBeforeRegistrationListsWhereTheNodesDisagree() {
-        JolokiaBrokerClient ca = mock(JolokiaBrokerClient.class);
-        JolokiaBrokerClient cb = mock(JolokiaBrokerClient.class);
+        ArtemisNode ca = mock(ArtemisNode.class);
+        ArtemisNode cb = mock(ArtemisNode.class);
         when(ops.readForAdoption(eq(ca), any(), eq("node-a")))
                 .thenReturn(sameAs(NODE_A, "node-a", Map.of("max-size-bytes", 100, "address-full-policy", "BLOCK")));
         when(ops.readForAdoption(eq(cb), any(), eq("node-b")))
                 .thenReturn(sameAs(NODE_B, "node-b", Map.of("max-size-bytes", 5, "address-full-policy", "PAGE")));
 
         Adoption adoption = service.previewAdoption(List.of(
-                        new RegistrationAdoption.LiveNode("node-a", ca),
-                        new RegistrationAdoption.LiveNode("node-b", cb)))
+                        new RegistrationAdoption.LiveNode("node-a", target(ca)),
+                        new RegistrationAdoption.LiveNode("node-b", target(cb))))
                 .orElseThrow();
 
         assertThat(adoption.disagreements())
@@ -694,17 +706,17 @@ class BrokerConfigServiceTest {
 
     @Test
     void aPreviewOfNodesNoneOfWhichCouldBeReadOffersNothing() {
-        JolokiaBrokerClient dead = mock(JolokiaBrokerClient.class);
+        ArtemisNode dead = mock(ArtemisNode.class);
         when(ops.readForAdoption(eq(dead), any(), eq("node-a"))).thenThrow(new IllegalStateException("down"));
 
-        assertThat(service.previewAdoption(List.of(new RegistrationAdoption.LiveNode("node-a", dead))))
+        assertThat(service.previewAdoption(List.of(new RegistrationAdoption.LiveNode("node-a", target(dead)))))
                 .isEmpty();
     }
 
     @Test
     void adoptionWithoutCatchAllSettingsOrRolesStillProducesADocument() {
         ClusterNode a = node(NODE_A, "node-a", true);
-        JolokiaBrokerClient ca = mock(JolokiaBrokerClient.class);
+        ArtemisNode ca = mock(ArtemisNode.class);
         when(reads.targets(CLUSTER)).thenReturn(List.of(a));
         when(reads.client(CLUSTER, a)).thenReturn(ca);
         when(ops.readForAdoption(ca, NODE_A, "node-a"))

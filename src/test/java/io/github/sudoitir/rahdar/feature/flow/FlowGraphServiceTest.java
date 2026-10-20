@@ -84,9 +84,9 @@ class FlowGraphServiceTest {
         when(store.edges(clusterId)).thenReturn(edges);
         when(store.nodeSamples(clusterId)).thenReturn(samples);
         when(store.routes(clusterId)).thenReturn(routes);
-        when(metrics.latestRateWithTimeBySubject(eq(clusterId), eq("messagesAdded"), any(), any()))
+        when(metrics.latestRateWithTimeBySubject(eq(clusterId), eq("openbroker.enqueued"), any(), any()))
                 .thenReturn(added);
-        when(metrics.latestRateWithTimeBySubject(eq(clusterId), eq("messagesAcked"), any(), any()))
+        when(metrics.latestRateWithTimeBySubject(eq(clusterId), eq("openbroker.acknowledged"), any(), any()))
                 .thenReturn(acked);
         ResourceFilter everything = mock(ResourceFilter.class);
         when(everything.everything()).thenReturn(true);
@@ -348,7 +348,7 @@ class FlowGraphServiceTest {
         ClusterNode b = mock(ClusterNode.class);
         when(b.getId()).thenReturn(nodeB);
         when(b.getName()).thenReturn("node-b");
-        when(b.getArtemisNodeId()).thenReturn("abc-123");
+        when(b.getNativeNodeId()).thenReturn("abc-123");
         when(directory.nodes(clusterId)).thenReturn(List.of(a, b));
         route(
                 nodeA,
@@ -386,12 +386,12 @@ class FlowGraphServiceTest {
         ClusterNode serving = mock(ClusterNode.class);
         when(serving.getId()).thenReturn(nodeA);
         when(serving.getName()).thenReturn("artemis-secondary");
-        when(serving.getArtemisNodeId()).thenReturn("pair-2");
+        when(serving.getNativeNodeId()).thenReturn("pair-2");
         when(serving.getActive()).thenReturn(true);
         ClusterNode standby = mock(ClusterNode.class);
         when(standby.getId()).thenReturn(nodeB);
         when(standby.getName()).thenReturn("artemis-secondary-backup");
-        when(standby.getArtemisNodeId()).thenReturn("pair-2");
+        when(standby.getNativeNodeId()).thenReturn("pair-2");
         when(standby.getActive()).thenReturn(false);
         // The standby sorts after its serving endpoint, which is exactly how the directory lists them.
         when(directory.nodes(clusterId)).thenReturn(List.of(serving, standby));
@@ -600,9 +600,9 @@ class FlowGraphServiceTest {
                 Map.of(
                         nodeA, new SubjectRate(3.0, now.minusSeconds(5), Duration.ofSeconds(15)),
                         nodeB, new SubjectRate(27.0, now.minusSeconds(5), Duration.ofSeconds(15))));
-        when(metrics.latestRateWithTimeBySubjectAndNode(eq(clusterId), eq("messagesAdded"), any(), any()))
+        when(metrics.latestRateWithTimeBySubjectAndNode(eq(clusterId), eq("openbroker.enqueued"), any(), any()))
                 .thenReturn(addedByNode);
-        when(metrics.latestRateWithTimeBySubjectAndNode(eq(clusterId), eq("messagesAcked"), any(), any()))
+        when(metrics.latestRateWithTimeBySubjectAndNode(eq(clusterId), eq("openbroker.acknowledged"), any(), any()))
                 .thenReturn(Map.of(
                         "orders", Map.of(nodeA, new SubjectRate(3.0, now.minusSeconds(5), Duration.ofSeconds(15)))));
         samples.add(sample(null, 0, 2));
@@ -1004,11 +1004,11 @@ class FlowGraphServiceTest {
         queue("q2", "orders", "MULTICAST", 5, 2);
         queues.add(
                 new QueueSnapshot(clusterId, gone, "q1", "orders", "MULTICAST", true, false, now, 1, 1, 0, 0, 0, 0, 0));
-        when(metrics.latestRateWithTimeBySubjectAndNode(eq(clusterId), eq("messagesAdded"), any(), any()))
+        when(metrics.latestRateWithTimeBySubjectAndNode(eq(clusterId), eq("openbroker.enqueued"), any(), any()))
                 .thenReturn(Map.of(
                         "q1", Map.of(nodeA, new SubjectRate(1.0, now.minusSeconds(5), Duration.ofSeconds(15))),
                         "q2", Map.of(nodeA, new SubjectRate(2.0, now.minusSeconds(5), Duration.ofSeconds(15)))));
-        when(metrics.latestRateWithTimeBySubjectAndNode(eq(clusterId), eq("messagesAcked"), any(), any()))
+        when(metrics.latestRateWithTimeBySubjectAndNode(eq(clusterId), eq("openbroker.acknowledged"), any(), any()))
                 .thenReturn(
                         Map.of("q1", Map.of(nodeA, new SubjectRate(4.0, now.minusSeconds(5), Duration.ofSeconds(15)))));
         samples.add(sample(null, 0, 3));

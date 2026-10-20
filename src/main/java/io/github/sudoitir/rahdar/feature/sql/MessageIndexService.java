@@ -1,7 +1,6 @@
 package io.github.sudoitir.rahdar.feature.sql;
 
 import io.github.sudoitir.rahdar.feature.messages.MessagePermissions;
-import io.github.sudoitir.rahdar.feature.queues.DivertOperations;
 import io.github.sudoitir.rahdar.feature.sql.internal.persistence.MessageCaptureNodeEntity;
 import io.github.sudoitir.rahdar.feature.sql.internal.persistence.MessageCaptureNodeRepository;
 import io.github.sudoitir.rahdar.feature.sql.internal.persistence.MessageIndexSubscriptionEntity;
@@ -20,6 +19,7 @@ import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
 import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshot;
 import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshots;
+import io.github.sudoitir.rahdar.system.artemis.DivertOperations;
 import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
@@ -554,7 +554,7 @@ public class MessageIndexService {
                        coalesce(sum(coalesce(octet_length(body), 0) + pg_column_size(props)), 0) AS payload_bytes,
                        min(observed_at) AS oldest
                   FROM message_index
-                 WHERE cluster_id = ? AND queue_name IN (%s)
+                 WHERE cluster_id = ? AND subscription IN (%s)
                 """.formatted(placeholders),
                 (rs, rowNum) -> new Footprint(
                         rs.getLong("messages"),
@@ -580,8 +580,8 @@ public class MessageIndexService {
         binds.addAll(queues);
         String placeholders = String.join(", ", Collections.nCopies(queues.size(), "?"));
         return jdbc.update(
-                "DELETE FROM message_index WHERE cluster_id = ? AND observed_at >= ? AND queue_name IN (" + placeholders
-                        + ')',
+                "DELETE FROM message_index WHERE cluster_id = ? AND observed_at >= ? AND subscription IN ("
+                        + placeholders + ')',
                 binds.toArray());
     }
 

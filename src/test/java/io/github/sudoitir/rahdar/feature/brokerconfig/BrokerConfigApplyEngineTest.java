@@ -49,13 +49,13 @@ import io.github.sudoitir.rahdar.kernel.settings.SettingsService;
 import io.github.sudoitir.rahdar.kernel.stream.SseHub;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
 import io.github.sudoitir.rahdar.platform.broker.BulkCapExceededException;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaBrokerClient;
 import io.github.sudoitir.rahdar.platform.broker.ManagementRefusal;
 import io.github.sudoitir.rahdar.platform.clusters.CapabilityLedger;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterLock;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterSecrets;
 import io.github.sudoitir.rahdar.platform.clusters.SplitBrainStatus;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -112,7 +112,7 @@ class BrokerConfigApplyEngineTest {
     private final SseHub hub = mock(SseHub.class);
     private final ObjectMapper mapper = JsonMapper.builder().build();
     private final AuditEvent event = mock(AuditEvent.class);
-    private final JolokiaBrokerClient client = mock(JolokiaBrokerClient.class);
+    private final ArtemisNode client = mock(ArtemisNode.class);
     private final ClusterNode nodeA = node(NODE_A, "a-first", true);
     private final ClusterNode nodeB = node(NODE_B, "b-second", true);
 
@@ -186,9 +186,9 @@ class BrokerConfigApplyEngineTest {
         when(node.getId()).thenReturn(id);
         when(node.getName()).thenReturn(name);
         when(node.getActive()).thenReturn(active);
-        when(node.getArtemisNodeId()).thenReturn("artemis-" + name);
+        when(node.getNativeNodeId()).thenReturn("artemis-" + name);
         when(node.getSplitBrain()).thenReturn(SplitBrainStatus.NONE);
-        when(node.getJolokiaUrl()).thenReturn("http://" + name + ":8161/console/jolokia");
+        when(node.getManagementUrl()).thenReturn("http://" + name + ":8161/console/jolokia");
         return node;
     }
 

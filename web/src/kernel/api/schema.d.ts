@@ -6570,7 +6570,7 @@ export interface components {
             origin?: string;
             /**
              * Format: int64
-             * @description The message's id on its source queue, for a captured row. Null when the broker did not copy _AMQ_ORIG_MESSAGE_ID, which is what makes verifying it against the live broker impossible.
+             * @description The message's id on its source queue, for a captured row. Null when the broker did not record the message's origin id, which is what makes verifying it against the live broker impossible.
              */
             sourceMessageId?: number;
             /** @description Every sensitive value in this row, masked or shown in clear by grant. */
@@ -6590,8 +6590,6 @@ export interface components {
             examined?: number;
             /** Format: int64 */
             matched?: number;
-            /** @description JOLOKIA or CORE — the channel that served this node. */
-            servedBy?: string;
             detail?: string;
         };
         /** @description One frame on the query stream. The SSE event name says which field is set. */
@@ -6943,7 +6941,6 @@ export interface components {
             countUnavailable?: string | null;
             /** Format: uuid */
             node: string;
-            transport: string;
         };
         MessageSummaryView: {
             /** Format: int64 */
@@ -6992,7 +6989,6 @@ export interface components {
             bodyTruncated: boolean;
             /** Format: int32 */
             observedLimitBytes?: number | null;
-            transport: string;
             /** Format: uuid */
             node: string;
             stringProperties: {
@@ -7046,7 +7042,7 @@ export interface components {
             nodeId: string;
             nodeName: string;
             producerId?: string | null;
-            name?: string | null;
+            clientId?: string | null;
             sessionId?: string | null;
             address?: string | null;
             protocol?: string | null;
@@ -7386,7 +7382,11 @@ export interface components {
             messagesDelivered: number;
             /** Format: int64 */
             messagesAcknowledged: number;
-            status?: string | null;
+            /**
+             * Format: int64
+             * @description Messages delivered to this consumer and not yet acknowledged.
+             */
+            messagesInFlight: number;
             /** @description The actions of the catalogue that apply to this row and that the caller holds on it, such as queue:purge. The console gates its controls from this. */
             allowedActions: string[];
         };
@@ -7913,7 +7913,8 @@ export interface components {
             nodeId: string;
             nodeName: string;
             name: string;
-            routingTypes?: string | null;
+            /** @description How the address delivers: to one consumer, to every subscription, or both. */
+            delivery: ("POINT_TO_POINT" | "PUBLISH_SUBSCRIBE")[];
             /** Format: int64 */
             queueCount: number;
             /** Format: int64 */

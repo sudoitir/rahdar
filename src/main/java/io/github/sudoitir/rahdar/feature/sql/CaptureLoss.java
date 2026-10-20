@@ -1,12 +1,12 @@
 package io.github.sudoitir.rahdar.feature.sql;
 
-import io.github.sudoitir.rahdar.feature.queues.DivertOperations;
 import io.github.sudoitir.rahdar.feature.sql.internal.persistence.MessageCaptureNodeEntity;
 import io.github.sudoitir.rahdar.feature.sql.internal.persistence.MessageCaptureNodeRepository;
 import io.github.sudoitir.rahdar.feature.sql.internal.persistence.MessageIndexSubscriptionEntity;
 import io.github.sudoitir.rahdar.feature.sql.internal.persistence.MessageIndexSubscriptionRepository;
 import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshot;
 import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshots;
+import io.github.sudoitir.rahdar.system.artemis.DivertOperations;
 import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
@@ -29,7 +29,7 @@ import org.springframework.transaction.annotation.Transactional;
  * What capture missed, per node (ADR-0062 D7).
  *
  * <p>The measurement is the change, between passes, in what was routed to the covered addresses
- * ({@code MessagesAdded} in {@code queue_snapshot}) that is neither stored nor still waiting in
+ * ({@code MessagesAdded} in {@code subscription_snapshot}) that is neither stored nor still waiting in
  * the subscription's capture queues. A message in the ring has not been lost yet — counting it
  * would report every in-flight backlog as loss, and nothing would ever take it back. A positive
  * remainder is messages the ring dropped, or that arrived while the tap was not installed.
@@ -331,7 +331,7 @@ public class CaptureLoss {
         }
         return jdbc.queryForObject(
                 select + " FROM message_index WHERE cluster_id = ? AND node_id = ? AND origin = 'CAPTURED'"
-                        + " AND observed_at >= ? AND queue_name IN (" + placeholders + ')' + until,
+                        + " AND observed_at >= ? AND subscription IN (" + placeholders + ')' + until,
                 Long.class,
                 binds.toArray());
     }

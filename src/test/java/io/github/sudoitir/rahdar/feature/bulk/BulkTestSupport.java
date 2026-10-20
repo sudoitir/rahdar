@@ -99,12 +99,26 @@ abstract class BulkTestSupport extends PostgresIntegrationTest {
 
     void queue(UUID node, String name, long messages, long consumers, boolean paused) {
         upsert.upsertBatch(List.of(new QueueRow(
-                clusterId, node, name, name, "ANYCAST", true, messages, consumers, 0, 0, 0, 0, 0, paused)));
+                clusterId,
+                node,
+                name,
+                name,
+                "ANYCAST",
+                true,
+                messages,
+                consumers,
+                0,
+                0,
+                0,
+                0,
+                0,
+                paused,
+                "artemis.queue")));
     }
 
     /** The node stops answering: its last snapshot is older than the freshness window. */
     void stale(UUID node) {
-        jdbc.update("UPDATE queue_snapshot SET ts = now() - interval '1 day' WHERE node_id = ?", node);
+        jdbc.update("UPDATE subscription_snapshot SET ts = now() - interval '1 day' WHERE node_id = ?", node);
     }
 
     BulkRunDetailView preview(BulkOperation operation, String q) {

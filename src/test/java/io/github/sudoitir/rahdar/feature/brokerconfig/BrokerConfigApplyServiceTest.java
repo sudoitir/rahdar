@@ -28,7 +28,6 @@ import io.github.sudoitir.rahdar.kernel.audit.internal.persistence.AuditEventRep
 import io.github.sudoitir.rahdar.kernel.core.ConflictException;
 import io.github.sudoitir.rahdar.kernel.stream.SseHub;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaBrokerClient;
 import io.github.sudoitir.rahdar.platform.broker.ManagementRefusal;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterLock;
 import io.github.sudoitir.rahdar.platform.clusters.SplitBrainStatus;
@@ -39,6 +38,8 @@ import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterE
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterRepository;
 import io.github.sudoitir.rahdar.support.AdminAuthenticationExtension;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNodes;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -100,6 +101,9 @@ class BrokerConfigApplyServiceTest extends PostgresIntegrationTest {
     BrokerConnections connections;
 
     @MockitoBean
+    ArtemisNodes artemisNodes;
+
+    @MockitoBean
     BrokerConfigOperations ops;
 
     @MockitoSpyBean
@@ -123,10 +127,9 @@ class BrokerConfigApplyServiceTest extends PostgresIntegrationTest {
 
         // One client per node, so a write can be attributed to the node it went to.
         for (UUID id : List.of(firstId, secondId, deadId)) {
-            BrokerNodeEntity n = nodes.findById(id).orElseThrow();
-            JolokiaBrokerClient client = mock(JolokiaBrokerClient.class);
+            ArtemisNode client = mock(ArtemisNode.class);
             when(client.resolveBrokerObjectName()).thenReturn("org.apache.activemq.artemis:broker=\"b\"");
-            when(connections.forCluster(clusterId, n.getJolokiaUrl())).thenReturn(client);
+            when(artemisNodes.on(clusterId, id)).thenReturn(client);
             clientToNode.put(client, id);
         }
 
@@ -155,7 +158,7 @@ class BrokerConfigApplyServiceTest extends PostgresIntegrationTest {
                 .addAddressSettings(any(), anyString(), anyString(), any());
     }
 
-    private final Map<JolokiaBrokerClient, UUID> clientToNode = new HashMap<>();
+    private final Map<ArtemisNode, UUID> clientToNode = new HashMap<>();
 
     private UUID nodeFor(Object client) {
         return clientToNode.get(client);

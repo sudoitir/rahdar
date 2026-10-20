@@ -57,8 +57,8 @@ class PartitionMaintainerIntegrationTest extends PostgresIntegrationTest {
 
     private void insertSample(Instant ts, UUID clusterId) {
         jdbc.update("""
-                INSERT INTO metric_sample (ts, value, subject_type, subject_name, metric, cluster_id)
-                VALUES (?, 1.0, 'QUEUE', 'Q', 'messageCount', ?)
+                INSERT INTO metric_sample (ts, value, subject_kind, subject_path, metric, cluster_id)
+                VALUES (?, 1.0, 'QUEUE', 'Q', 'openbroker.backlog', ?)
                 """, Timestamp.from(ts), clusterId);
     }
 
@@ -129,8 +129,8 @@ class PartitionMaintainerIntegrationTest extends PostgresIntegrationTest {
 
         assertThatThrownBy(() -> maintainer.retryingNoPartition(() -> {
                     attempts[0]++;
-                    jdbc.update("INSERT INTO queue_snapshot (address, queue_name, routing_type, cluster_id, node_id)"
-                            + " VALUES ('a', 'q', 'NOPE', gen_random_uuid(), gen_random_uuid())");
+                    jdbc.update("INSERT INTO broker_node (name, ha_designation, cluster_id)"
+                            + " VALUES ('n', 'NOPE', gen_random_uuid())");
                     return null;
                 }))
                 .isInstanceOf(DataIntegrityViolationException.class);

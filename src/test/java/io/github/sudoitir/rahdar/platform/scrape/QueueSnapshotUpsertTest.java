@@ -45,7 +45,7 @@ class QueueSnapshotUpsertTest extends PostgresIntegrationTest {
     @AfterEach
     void cleanUp() {
         if (clusterId != null) {
-            clusters.deleteById(clusterId); // cascades to broker_node + queue_snapshot
+            clusters.deleteById(clusterId); // cascades to broker_node + subscription_snapshot
         }
     }
 
@@ -58,7 +58,21 @@ class QueueSnapshotUpsertTest extends PostgresIntegrationTest {
 
     private QueueRow row(String queue, long messageCount) {
         return new QueueRow(
-                clusterId, nodeId, "addr." + queue, queue, "ANYCAST", true, messageCount, 0, 0, 0, 0, 0, 0, false);
+                clusterId,
+                nodeId,
+                "addr." + queue,
+                queue,
+                "ANYCAST",
+                true,
+                messageCount,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                false,
+                "artemis.queue");
     }
 
     @Test

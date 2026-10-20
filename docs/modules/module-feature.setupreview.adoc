@@ -25,4 +25,5 @@ _Others_
 * `i.g.s.r.k.s.ClusterAccessGuard` (in Security)
 * `i.g.s.r.k.a.AuditService` (in Audit log)
 * `i.g.s.r.k.s.ActorResolver` (in Security)
+* `i.g.s.r.s.a.ArtemisNodes` (in Artemis)
 |===

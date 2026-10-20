@@ -2,13 +2,9 @@ package io.github.sudoitir.rahdar.feature.sql;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import io.github.sudoitir.rahdar.feature.queues.DivertOperations;
-import io.github.sudoitir.rahdar.feature.queues.QueueLifecycleOperations;
 import io.github.sudoitir.rahdar.kernel.settings.RahdarInstance;
 import io.github.sudoitir.rahdar.platform.broker.Attempt;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaBrokerClient;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaRequest;
 import io.github.sudoitir.rahdar.platform.broker.QueueRow;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
@@ -21,6 +17,10 @@ import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshotUpsert;
 import io.github.sudoitir.rahdar.support.AdminAuthenticationExtension;
 import io.github.sudoitir.rahdar.support.ArtemisIntegrationTest;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
+import io.github.sudoitir.rahdar.system.artemis.DivertOperations;
+import io.github.sudoitir.rahdar.system.artemis.ManagementRequest;
+import io.github.sudoitir.rahdar.system.artemis.QueueLifecycleOperations;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -78,7 +78,7 @@ class CaptureDisableRealBrokerTest extends PostgresIntegrationTest {
 
     private UUID clusterId;
     private UUID subscriptionId;
-    private JolokiaBrokerClient client;
+    private ArtemisNode client;
     private String broker;
 
     @BeforeEach
@@ -101,13 +101,27 @@ class CaptureDisableRealBrokerTest extends PostgresIntegrationTest {
         ClusterNode node = directory.nodes(clusterId).getFirst();
         clusterService.overrideNodeUrl(
                 clusterId, node.getId(), new NodeOverrideRequest(null, ArtemisIntegrationTest.coreUrl()));
-        client = connections.forCluster(clusterId, ArtemisIntegrationTest.jolokiaUrl());
+        client = ArtemisIntegrationTest.jolokiaClient(ArtemisIntegrationTest.jolokiaUrl());
         broker = client.resolveBrokerObjectName();
 
         queueOps.createAddress(client, broker, address, "ANYCAST");
         // The scrape is not scheduled in tests; capture resolves its addresses from the snapshot.
-        snapshots.upsertBatch(List.of(
-                new QueueRow(clusterId, node.getId(), address, address, "ANYCAST", true, 0, 0, 0, 0, 0, 0, 0, false)));
+        snapshots.upsertBatch(List.of(new QueueRow(
+                clusterId,
+                node.getId(),
+                address,
+                address,
+                "ANYCAST",
+                true,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                false,
+                "artemis.queue")));
     }
 
     @AfterEach
@@ -144,7 +158,7 @@ class CaptureDisableRealBrokerTest extends PostgresIntegrationTest {
 
     private Set<String> queueNames() {
         JsonNode value =
-                client.single(JolokiaRequest.read(broker, "QueueNames")).attribute("QueueNames");
+                client.single(ManagementRequest.read(broker, "QueueNames")).attribute("QueueNames");
         return Set.copyOf(value.valueStream().map(JsonNode::asString).toList());
     }
 

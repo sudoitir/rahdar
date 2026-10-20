@@ -38,6 +38,7 @@ import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterLock;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
 import io.github.sudoitir.rahdar.platform.clusters.RegisteredCluster;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNodes;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -57,6 +58,7 @@ class SetupReviewServiceTest {
     private static final UUID CLUSTER = UUID.randomUUID();
     private static final UUID NODE = UUID.randomUUID();
 
+    private final ArtemisNodes artemisNodes = mock(ArtemisNodes.class);
     private final ClusterDirectory clusters = mock(ClusterDirectory.class);
     private final BrokerConnections connections = mock(BrokerConnections.class);
     private final SetupReader reader = mock(SetupReader.class);
@@ -90,7 +92,8 @@ class SetupReviewServiceTest {
                 access,
                 audit,
                 actors,
-                mapper);
+                mapper,
+                artemisNodes);
         when(settings.duration(SetupReviewSettings.MIN_INTERVAL)).thenReturn(Duration.ofMinutes(1));
         when(clusters.nodes(CLUSTER)).thenReturn(List.of());
         when(reviews.findById(CLUSTER)).thenReturn(Optional.empty());
@@ -106,8 +109,8 @@ class SetupReviewServiceTest {
         ClusterNode node = mock(ClusterNode.class);
         when(node.getId()).thenReturn(id);
         when(node.getName()).thenReturn(name);
-        when(node.getJolokiaUrl()).thenReturn(jolokiaUrl);
-        when(node.getArtemisNodeId()).thenReturn("artemis-" + name);
+        when(node.getManagementUrl()).thenReturn(jolokiaUrl);
+        when(node.getNativeNodeId()).thenReturn("artemis-" + name);
         when(node.getActive()).thenReturn(active);
         return node;
     }

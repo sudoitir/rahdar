@@ -4,7 +4,7 @@ import io.github.sudoitir.rahdar.feature.sql.ColumnCatalogue.Column;
 import io.github.sudoitir.rahdar.feature.sql.QueryAst.Literal;
 import io.github.sudoitir.rahdar.feature.sql.QueryAst.Predicate;
 import io.github.sudoitir.rahdar.feature.sql.QueryAst.Term;
-import io.github.sudoitir.rahdar.platform.broker.MessageBrowser.BrowsedMessage;
+import io.github.sudoitir.rahdar.platform.broker.BrowsedMessage;
 import java.time.Instant;
 import java.util.Locale;
 import java.util.regex.Pattern;

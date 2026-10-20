@@ -16,21 +16,21 @@ import io.github.sudoitir.rahdar.kernel.security.Permissions;
 import io.github.sudoitir.rahdar.kernel.security.ResourceRef;
 import io.github.sudoitir.rahdar.kernel.settings.SettingsService;
 import io.github.sudoitir.rahdar.kernel.stream.SseHub;
-import io.github.sudoitir.rahdar.platform.broker.AcceptanceProbe;
-import io.github.sudoitir.rahdar.platform.broker.AcceptanceProbe.Facts;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
-import io.github.sudoitir.rahdar.platform.broker.BrokerMBeans;
+import io.github.sudoitir.rahdar.platform.broker.BrokerRelay;
 import io.github.sudoitir.rahdar.platform.broker.BrokerXmlSnippets;
-import io.github.sudoitir.rahdar.platform.broker.CoreRelay;
-import io.github.sudoitir.rahdar.platform.broker.FrozenFilter;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaBrokerClient;
-import io.github.sudoitir.rahdar.platform.broker.MessageOperations;
-import io.github.sudoitir.rahdar.platform.broker.MessageOperations.BulkResult;
+import io.github.sudoitir.rahdar.platform.broker.BulkResult;
 import io.github.sudoitir.rahdar.platform.broker.NodeCallLimiter;
-import io.github.sudoitir.rahdar.platform.broker.OutboundMessages.Provenance;
 import io.github.sudoitir.rahdar.platform.broker.RelayLink;
-import io.github.sudoitir.rahdar.platform.broker.StagingQueues;
+import io.github.sudoitir.rahdar.platform.broker.RelayedMessages.Provenance;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
+import io.github.sudoitir.rahdar.system.artemis.AcceptanceProbe;
+import io.github.sudoitir.rahdar.system.artemis.AcceptanceProbe.Facts;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisSelectors;
+import io.github.sudoitir.rahdar.system.artemis.MBeanNames;
+import io.github.sudoitir.rahdar.system.artemis.MessageOperations;
+import io.github.sudoitir.rahdar.system.artemis.StagingQueues;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
@@ -40,6 +40,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -87,7 +88,7 @@ class TransferRunner {
     private final TransferLedger ledger;
     private final TransferNodes nodes;
     private final TransferFaults faults;
-    private final CoreRelay relay;
+    private final BrokerRelay relay;
     private final MessageOperations messages;
     private final StagingQueues staging;
     private final AcceptanceProbe probe;
@@ -152,25 +153,25 @@ class TransferRunner {
         }
 
         String frozenFilter() {
-            return FrozenFilter.compose(selection.filter(), run.getT0());
+            return ArtemisSelectors.frozen(selection.filter(), run.getT0());
         }
 
-        String sourceMbean(JolokiaBrokerClient client) {
-            return BrokerMBeans.queue(
+        String sourceMbean(ArtemisNode client) {
+            return MBeanNames.queue(
                     client.resolveBrokerObjectName(),
                     run.getSourceAddress(),
                     run.getSourceQueue(),
                     run.getSourceRoutingType());
         }
 
-        String stagingMbean(JolokiaBrokerClient client) {
+        String stagingMbean(ArtemisNode client) {
             String queue = StagingQueues.queueName(id());
-            return BrokerMBeans.queue(client.resolveBrokerObjectName(), queue, queue, "ANYCAST");
+            return MBeanNames.queue(client.resolveBrokerObjectName(), queue, queue, "ANYCAST");
         }
 
         void resolve() {
-            source = nodes.serving(run.getSourceClusterId(), run.getSourceArtemisNodeId(), run.getSourceNodeName());
-            target = nodes.serving(run.getTargetClusterId(), run.getTargetArtemisNodeId(), run.getTargetNodeName());
+            source = nodes.serving(run.getSourceClusterId(), run.getSourceNativeNodeId(), run.getSourceNodeName());
+            target = nodes.serving(run.getTargetClusterId(), run.getTargetNativeNodeId(), run.getTargetNodeName());
         }
     }
 
@@ -234,7 +235,7 @@ class TransferRunner {
                     BrokerXmlSnippets.STAGING_SECURITY_SETTING);
         }
         RelayLink.Route route = new RelayLink.Route(
-                stagingQueue, true, null, s.run.getTargetAddress(), s.run.getTargetQueue(), provenance(s, true));
+                stagingQueue, true, null, Optional.empty(), s.run.getTargetQueue(), provenance(s, true));
         InDoubt inDoubt = new InDoubt(s.id());
         Staged progress = new Staged();
         Link link = new Link();
@@ -245,7 +246,7 @@ class TransferRunner {
                     return g;
                 }
                 int batch = settings.intValue(TransferSettings.BATCH_SIZE);
-                JolokiaBrokerClient source = nodes.client(s.source);
+                ArtemisNode source = nodes.client(s.source);
                 // The larger of what the broker counts in staging and what the run has put there and not
                 // yet delivered: the bound holds even when either is off for a moment. The bound is on
                 // held(): it never exceeds twice the batch. The broker's count can read higher for an
@@ -278,7 +279,7 @@ class TransferRunner {
             RelayLink.Batch b,
             InDoubt inDoubt,
             Staged progress,
-            JolokiaBrokerClient source,
+            ArtemisNode source,
             String stagingQueue,
             long started) {
         switch (b.outcome()) {
@@ -347,7 +348,7 @@ class TransferRunner {
      * Take up to {@code want} more selected messages off the source into staging. True when the source
      * has no more to give: every id tried, or fewer matched than asked for.
      */
-    private boolean refill(Segment s, JolokiaBrokerClient source, int want, String stagingQueue) {
+    private boolean refill(Segment s, ArtemisNode source, int want, String stagingQueue) {
         String mbean = s.sourceMbean(source);
         if (s.selection.kind() == SelectionKind.IDS) {
             List<Long> ids = s.selection.ids();
@@ -375,7 +376,7 @@ class TransferRunner {
     }
 
     /** Staging is empty and the source has no more: count what could not be taken, and remove staging. */
-    private End finishStaged(Segment s, JolokiaBrokerClient source, String stagingQueue) {
+    private End finishStaged(Segment s, ArtemisNode source, String stagingQueue) {
         s.run.expired(Math.max(0, s.run.getStaged() - s.run.getDelivered() - s.run.getReturned()));
         if (s.selection.kind() != SelectionKind.IDS) {
             s.run.notTransferred(messages.countMessages(source, s.sourceMbean(source), s.frozenFilter()));
@@ -397,7 +398,7 @@ class TransferRunner {
                 return g;
             }
             int batch = settings.intValue(TransferSettings.BATCH_SIZE);
-            JolokiaBrokerClient source = nodes.client(s.source);
+            ArtemisNode source = nodes.client(s.source);
             String mbean = s.sourceMbean(source);
             long started = System.nanoTime();
             boolean byIds = s.selection.kind() == SelectionKind.IDS;
@@ -423,7 +424,7 @@ class TransferRunner {
     }
 
     /** Moves the next {@code batch} selected ids straight to the target queue; how many moved. */
-    private long moveIdChunk(Segment s, JolokiaBrokerClient source, String mbean, int batch) {
+    private long moveIdChunk(Segment s, ArtemisNode source, String mbean, int batch) {
         List<Long> ids = s.selection.ids();
         int from = s.run.getIdCursor();
         List<Long> chunk = ids.subList(from, Math.min(ids.size(), from + batch));
@@ -445,11 +446,12 @@ class TransferRunner {
 
     private End copy(Segment s) throws IOException {
         Set<Long> ids = s.selection.kind() == SelectionKind.IDS ? Set.copyOf(s.selection.ids()) : null;
+        // The selection's end is when the run started: a filter or the whole queue is read as it was then.
         RelayLink.Route route = new RelayLink.Route(
                 s.run.getSourceQueue(),
                 false,
-                ids == null ? s.frozenFilter() : null,
-                s.run.getTargetAddress(),
+                ids == null ? s.selection.filter() : null,
+                ids == null ? Optional.of(s.run.getT0()) : Optional.empty(),
                 s.run.getTargetQueue(),
                 provenance(s, false));
         RelayLink.Hooks hooks = new RelayLink.Hooks() {
@@ -521,7 +523,7 @@ class TransferRunner {
         } else {
             // ponytail: countMessages looks at no more than management-browse-page-size messages, so on
             // a deep queue this under-counts; only reached when the preview could not size the selection.
-            JolokiaBrokerClient source = nodes.client(s.source);
+            ArtemisNode source = nodes.client(s.source);
             long matching = messages.countMessages(source, s.sourceMbean(source), s.frozenFilter());
             s.run.notTransferred(Math.max(0, matching - copied));
         }
@@ -538,8 +540,8 @@ class TransferRunner {
     private End giveBack(Segment s) throws IOException {
         String stagingQueue = StagingQueues.queueName(s.id());
         ClusterNode node =
-                nodes.serving(s.run.getSourceClusterId(), s.run.getSourceArtemisNodeId(), s.run.getSourceNodeName());
-        JolokiaBrokerClient source = nodes.client(node);
+                nodes.serving(s.run.getSourceClusterId(), s.run.getSourceNativeNodeId(), s.run.getSourceNodeName());
+        ArtemisNode source = nodes.client(node);
         String mbean = s.stagingMbean(source);
         Set<Long> unsettled = settle(s, node, ledger.all(s.id()));
         if (!unsettled.isEmpty()) {
@@ -592,7 +594,7 @@ class TransferRunner {
                 StagingQueues.queueName(s.id()),
                 true,
                 null,
-                s.run.getTargetAddress(),
+                Optional.empty(),
                 s.run.getTargetQueue(),
                 provenance(s, true));
         RelayLink.Hooks only = new RelayLink.Hooks() {
@@ -602,8 +604,8 @@ class TransferRunner {
             }
         };
         try {
-            ClusterNode target = nodes.serving(
-                    s.run.getTargetClusterId(), s.run.getTargetArtemisNodeId(), s.run.getTargetNodeName());
+            ClusterNode target =
+                    nodes.serving(s.run.getTargetClusterId(), s.run.getTargetNativeNodeId(), s.run.getTargetNodeName());
             try (RelayLink link = relay.link(nodes.core(source), nodes.core(target), route)) {
                 // A duplicate refusal costs one pass before the messages go one by one; two per message is ample.
                 for (int pass = 0; pass <= 2 * inDoubt.size() && !left.isEmpty(); pass++) {
@@ -675,8 +677,8 @@ class TransferRunner {
             return waitForCapacity(s, verdict.waitReason());
         }
         // One permit on each node per batch, on top of the management calls the transports charge.
-        limiter.acquire(s.source.getJolokiaUrl(), 1, TOPIC);
-        limiter.acquire(s.target.getJolokiaUrl(), 1, TOPIC);
+        limiter.acquire(s.source.getManagementUrl(), 1, TOPIC);
+        limiter.acquire(s.target.getManagementUrl(), 1, TOPIC);
         return null;
     }
 
@@ -812,7 +814,7 @@ class TransferRunner {
         private String key;
 
         RelayLink to(Segment s, RelayLink.Route route) {
-            String now = s.source.getCoreUrl() + "|" + s.target.getCoreUrl();
+            String now = s.source.getDataUrl() + "|" + s.target.getDataUrl();
             if (!now.equals(key)) {
                 close();
                 open = relay.link(nodes.core(s.source), nodes.core(s.target), route);

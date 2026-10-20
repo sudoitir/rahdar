@@ -65,7 +65,21 @@ class FlowControllerTest extends PostgresIntegrationTest {
         a.attachSeedUrl("http://a:8161/console/jolokia");
         UUID nodeId = nodes.save(a).getId();
         upsert.upsertBatch(List.of(new QueueRow(
-                clusterId, nodeId, "orders", "orders.dead", "ANYCAST", true, 12, 0, 0, 0, 0, 0, 0, false)));
+                clusterId,
+                nodeId,
+                "orders",
+                "orders.dead",
+                "ANYCAST",
+                true,
+                12,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                false,
+                "artemis.queue")));
     }
 
     @AfterEach

@@ -17,14 +17,15 @@ import io.github.sudoitir.rahdar.kernel.stream.SseHub;
 import io.github.sudoitir.rahdar.platform.broker.Attempt;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
-import io.github.sudoitir.rahdar.platform.broker.BrokerMBeans;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaBrokerClient;
+import io.github.sudoitir.rahdar.platform.broker.BrokerMessages;
 import io.github.sudoitir.rahdar.platform.broker.ManagementRefusal;
+import io.github.sudoitir.rahdar.platform.broker.QueueCounters;
 import io.github.sudoitir.rahdar.platform.clusters.BrokerCommands;
 import io.github.sudoitir.rahdar.platform.clusters.BrokerCommands.Check;
 import io.github.sudoitir.rahdar.platform.clusters.BrokerCommands.Command;
 import io.github.sudoitir.rahdar.platform.clusters.BrokerCommands.Estimate;
 import io.github.sudoitir.rahdar.platform.clusters.BrokerCommands.NodeAction;
+import io.github.sudoitir.rahdar.platform.clusters.BrokerCommands.NodePreflight;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
 import io.github.sudoitir.rahdar.platform.clusters.LifecycleOutcome;
@@ -32,6 +33,12 @@ import io.github.sudoitir.rahdar.platform.clusters.LifecycleOutcome.NodeStatus;
 import io.github.sudoitir.rahdar.platform.scrape.QueueLocator;
 import io.github.sudoitir.rahdar.platform.scrape.QueueLocator.QueueLocation;
 import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshotUpsert;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNodes;
+import io.github.sudoitir.rahdar.system.artemis.DivertOperations;
+import io.github.sudoitir.rahdar.system.artemis.DivertRow;
+import io.github.sudoitir.rahdar.system.artemis.MBeanNames;
+import io.github.sudoitir.rahdar.system.artemis.QueueLifecycleOperations;
 import jakarta.validation.Validator;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -96,6 +103,9 @@ public class QueueLifecycleService {
     private final ObjectMapper mapper;
     private final Validator validator;
     private final OperationGate gate;
+    private final ArtemisNodes artemisNodes;
+    private final BrokerMessages messages;
+    private final QueueCounters counters;
 
     /** What a delete would touch: how many messages, and the target's identity for the gate's state key. */
     public record Reach(long count, String identity) {}
@@ -176,8 +186,8 @@ public class QueueLifecycleService {
     }
 
     /**
-     * What deleting the queue would remove now, read without an audit row or a broker call: the messages the
-     * scrape counts on its nodes, and the queue's identity for the gate's state key.
+     * What deleting the queue would remove now, read without an audit row: the messages the scrape counts on its
+     * nodes, and the queue's identity across the cluster for the gate's state key, which the broker reports.
      */
     public Reach reachOfQueueDelete(UUID clusterId, String queueName) {
         access.requireResource(clusterId, ResourceRef.queue(queueName), LifecycleKind.DELETE_QUEUE.permission());
@@ -186,8 +196,7 @@ public class QueueLifecycleService {
             throw new NotFoundException("queue", queueName);
         }
         return new Reach(
-                found.stream().mapToLong(QueueLocation::messageCount).sum(),
-                found.getFirst().address() + "|" + found.getFirst().routingType());
+                found.stream().mapToLong(QueueLocation::messageCount).sum(), messages.identity(clusterId, queueName));
     }
 
     private Attempt<LifecycleOutcome> runDeleteQueue(
@@ -205,12 +214,14 @@ public class QueueLifecycleService {
                 .params(Map.of("disconnectConsumers", disconnectConsumers))
                 .dryRun(dryRun)
                 .override(override)
-                .preflight((client, broker) -> deletePreflight(
-                        deletePlan(clusterId, client, broker, queue), queue, disconnectConsumers, declared))
-                .action((client, broker) -> deleteWithDiverts(
-                        client, broker, deletePlan(clusterId, client, broker, queue), disconnectConsumers))
-                .estimate(new Estimate(
-                        "message count", false, client -> ops.messageCount(client, queueMbean(client, queue))))
+                .preflight(artemisPreflight((client, broker) -> deletePreflight(
+                        deletePlan(clusterId, client, broker, queue), queue, disconnectConsumers, declared)))
+                .action(artemis((client, broker) -> deleteWithDiverts(
+                        client, broker, deletePlan(clusterId, client, broker, queue), disconnectConsumers)))
+                .estimate(new Estimate("message count", false, node -> {
+                    ArtemisNode client = artemisNodes.on(node);
+                    return ops.messageCount(client, queueMbean(client, queue));
+                }))
                 .signal(() -> {
                     // The queue is gone from the brokers; the snapshot is a cache of
                     // what they run. Left alone it keeps the row until the next sweep,
@@ -242,7 +253,7 @@ public class QueueLifecycleService {
             List<DivertRow> tapsGone,
             List<DivertRow> tapsKept) {}
 
-    private DeletePlan deletePlan(UUID clusterId, JolokiaBrokerClient client, String broker, ResolvedQueue queue) {
+    private DeletePlan deletePlan(UUID clusterId, ArtemisNode client, String broker, ResolvedQueue queue) {
         var state = ops.deleteState(client, broker, queue.address(), queue.queueName(), queue.routingType());
         if (!state.present()) {
             return new DeletePlan(queue, state, List.of(), List.of(), List.of(), List.of(), List.of());
@@ -353,7 +364,7 @@ public class QueueLifecycleService {
 
     /** The dependent diverts first, then the queue (D3). Nothing is rolled back. */
     private NodeStatus deleteWithDiverts(
-            JolokiaBrokerClient client, String broker, DeletePlan plan, boolean disconnectConsumers) {
+            ArtemisNode client, String broker, DeletePlan plan, boolean disconnectConsumers) {
         List<DivertRow> removed = new ArrayList<>();
         for (DivertRow d : plan.dependents()) {
             try {
@@ -426,12 +437,12 @@ public class QueueLifecycleService {
 
     public Attempt<LifecycleOutcome> resetCounter(UUID clusterId, String queueName, boolean dryRun) {
         access.requireResource(clusterId, ResourceRef.queue(queueName), LifecycleKind.RESET_QUEUE_COUNTER.permission());
-        ResolvedQueue queue = resolveQueue(clusterId, queueName);
-        return run(
-                clusterId, LifecycleKind.RESET_QUEUE_COUNTER, queueName, Map.of(), dryRun, false, (client, broker) -> {
-                    ops.resetMessageCounter(client, queueMbean(client, queue));
-                    return NodeStatus.APPLIED;
-                });
+        // Resolved first, so a queue no node has is not found rather than reset nowhere.
+        resolveQueue(clusterId, queueName);
+        return runOn(clusterId, LifecycleKind.RESET_QUEUE_COUNTER, queueName, Map.of(), dryRun, false, node -> {
+            counters.reset(node, queueName);
+            return NodeStatus.APPLIED;
+        });
     }
 
     public Attempt<LifecycleOutcome> createAddress(UUID clusterId, CreateAddressRequest req, boolean dryRun) {
@@ -523,14 +534,14 @@ public class QueueLifecycleService {
                 .targetName(req.name())
                 .params(audited)
                 .dryRun(dryRun)
-                .preflight((client, broker) -> divertPreflight(client, broker, req))
-                .action((client, broker) -> divertOps.createVerified(client, broker, config))
+                .preflight(artemisPreflight((client, broker) -> divertPreflight(client, broker, req)))
+                .action(artemis((client, broker) -> divertOps.createVerified(client, broker, config)))
                 .signal(() -> sseHub.publishAbout(
                         clusterId, QUEUES_TOPIC, List.of(), List.of(req.address(), req.forwardingAddress())))
                 .build()));
     }
 
-    private Check divertPreflight(JolokiaBrokerClient client, String broker, CreateDivertRequest req) {
+    private Check divertPreflight(ArtemisNode client, String broker, CreateDivertRequest req) {
         List<DivertRow> existing = divertOps.listDiverts(client, null, null);
         String cycle = DivertOperations.cycle(existing, req.name(), req.address(), req.forwardingAddress());
         if (cycle != null) {
@@ -602,14 +613,14 @@ public class QueueLifecycleService {
                 .dryRun(dryRun)
                 // Each node's own divert is what is destroyed there: one that runs between addresses nobody
                 // checked is left alone, so a name that means something else on another node costs nothing.
-                .preflight((client, broker) -> wholeCluster
+                .preflight(artemisPreflight((client, broker) -> wholeCluster
                                 || endsOn(client, name).stream().allMatch(ends::contains)
                         ? Check.OK
-                        : Check.refuse("The divert on this node is not one you may delete, so it was left alone."))
-                .action((client, broker) -> {
+                        : Check.refuse("The divert on this node is not one you may delete, so it was left alone.")))
+                .action(artemis((client, broker) -> {
                     divertOps.destroyDivert(client, broker, name);
                     return NodeStatus.APPLIED;
-                })
+                }))
                 .signal(() -> sseHub.publishAbout(clusterId, QUEUES_TOPIC, ends))
                 .build()));
     }
@@ -624,11 +635,11 @@ public class QueueLifecycleService {
         access.requireVisible(clusterId);
         Set<ResourceRef> ends = new LinkedHashSet<>();
         for (ClusterNode node : clusters.nodes(clusterId)) {
-            if (node.getJolokiaUrl() == null) {
+            if (node.getManagementUrl() == null) {
                 continue;
             }
             try {
-                ends.addAll(endsOn(connections.forCluster(clusterId, node.getJolokiaUrl()), name));
+                ends.addAll(endsOn(artemisNodes.on(clusterId, node.getId()), name));
             } catch (BrokerConnectionException _) {
                 // Another node may still answer; a node that cannot is checked again when it is acted on.
             }
@@ -649,7 +660,7 @@ public class QueueLifecycleService {
         return ends;
     }
 
-    private List<ResourceRef> endsOn(JolokiaBrokerClient client, String name) {
+    private List<ResourceRef> endsOn(ArtemisNode client, String name) {
         return divertOps
                 .find(client, name)
                 .map(d -> List.of(ResourceRef.address(d.address()), ResourceRef.address(d.forwardingAddress())))
@@ -659,6 +670,17 @@ public class QueueLifecycleService {
     // ---- the fan-out -----------------------------------------------------
 
     private Attempt<LifecycleOutcome> run(
+            UUID clusterId,
+            LifecycleKind kind,
+            String targetName,
+            Map<String, ?> params,
+            boolean dryRun,
+            boolean override,
+            ArtemisAction action) {
+        return runOn(clusterId, kind, targetName, params, dryRun, override, artemis(action));
+    }
+
+    private Attempt<LifecycleOutcome> runOn(
             UUID clusterId,
             LifecycleKind kind,
             String targetName,
@@ -684,6 +706,32 @@ public class QueueLifecycleService {
                 .build()));
     }
 
+    /** What a command does on one node's Artemis agent. */
+    @FunctionalInterface
+    interface ArtemisAction {
+        NodeStatus apply(ArtemisNode client, String brokerMbean);
+    }
+
+    /** A check on one node's Artemis agent. */
+    @FunctionalInterface
+    interface ArtemisPreflight {
+        Check apply(ArtemisNode client, String brokerMbean);
+    }
+
+    private NodeAction artemis(ArtemisAction action) {
+        return node -> {
+            ArtemisNode client = artemisNodes.on(node);
+            return action.apply(client, client.resolveBrokerObjectName());
+        };
+    }
+
+    private NodePreflight artemisPreflight(ArtemisPreflight check) {
+        return node -> {
+            ArtemisNode client = artemisNodes.on(node);
+            return check.apply(client, client.resolveBrokerObjectName());
+        };
+    }
+
     // ---- queue resolution ------------------------------------------------
 
     /** A queue's address and routing type, which the queue MBean object name needs. */
@@ -701,8 +749,8 @@ public class QueueLifecycleService {
                 .orElseThrow(() -> new NotFoundException("queue", queueName));
     }
 
-    private static String queueMbean(JolokiaBrokerClient client, ResolvedQueue queue) {
-        return BrokerMBeans.queue(
+    private static String queueMbean(ArtemisNode client, ResolvedQueue queue) {
+        return MBeanNames.queue(
                 client.resolveBrokerObjectName(), queue.address(), queue.queueName(), queue.routingType());
     }
 
@@ -710,9 +758,8 @@ public class QueueLifecycleService {
      * What stops an address from being deleted. It names the queues the caller may read and counts the rest,
      * so deleting an address does not list another team's queues.
      */
-    private String boundQueuesMessage(
-            JolokiaBrokerClient client, String brokerMbean, String address, ResourceFilter readable) {
-        List<String> queues = ops.boundQueues(client, BrokerMBeans.address(brokerMbean, address));
+    private String boundQueuesMessage(ArtemisNode client, String brokerMbean, String address, ResourceFilter readable) {
+        List<String> queues = ops.boundQueues(client, MBeanNames.address(brokerMbean, address));
         if (queues.isEmpty()) {
             return "Address '" + address + "' still has queues bound to it.";
         }

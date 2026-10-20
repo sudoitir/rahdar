@@ -33,7 +33,6 @@ describe('a message that carries markup', () => {
           contentType: null,
           bodyTruncated: false,
           observedLimitBytes: null,
-          transport: 'JOLOKIA',
           node: '11111111-1111-1111-1111-111111111111',
           stringProperties: { [HEADER_NAME]: HEADER_VALUE },
           intProperties: {},

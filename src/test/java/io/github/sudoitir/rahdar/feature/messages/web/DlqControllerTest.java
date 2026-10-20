@@ -3,7 +3,6 @@ package io.github.sudoitir.rahdar.feature.messages.web;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
-import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -12,7 +11,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.setup.MockMvcBuilders.webAppContextSetup;
 
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaBrokerClient;
 import io.github.sudoitir.rahdar.platform.broker.QueueRow;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNodeEntity;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNodeRepository;
@@ -20,7 +18,10 @@ import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterE
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterRepository;
 import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshotUpsert;
 import io.github.sudoitir.rahdar.support.AdminAuthenticationExtension;
+import io.github.sudoitir.rahdar.support.FixtureJolokia;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNodes;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -35,19 +36,14 @@ import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.web.client.RestClient;
 import org.springframework.web.context.WebApplicationContext;
-import tools.jackson.databind.json.JsonMapper;
 
 /** {@code GET .../dlq} — addresses from broker settings, per-node depth from the cache, honest unavailable path. */
 @ExtendWith(AdminAuthenticationExtension.class)
 class DlqControllerTest extends PostgresIntegrationTest {
 
     private static final String URL = "http://a:8161/console/jolokia";
-
-    private final JsonMapper mapper = new JsonMapper();
 
     MockMvc mvc;
 
@@ -66,6 +62,9 @@ class DlqControllerTest extends PostgresIntegrationTest {
     @MockitoBean
     BrokerConnections connections;
 
+    @MockitoBean
+    ArtemisNodes artemisNodes;
+
     private UUID clusterId;
     private UUID nodeId;
 
@@ -79,8 +78,8 @@ class DlqControllerTest extends PostgresIntegrationTest {
         a.attachSeedUrl(URL);
         nodeId = nodes.save(a).getId();
         // DLQ fixture reports deadLetterAddress "DLQ"; seed a queue on it.
-        upsert.upsertBatch(
-                List.of(new QueueRow(clusterId, nodeId, "DLQ", "DLQ", "ANYCAST", true, 7, 0, 0, 0, 0, 0, 0, false)));
+        upsert.upsertBatch(List.of(new QueueRow(
+                clusterId, nodeId, "DLQ", "DLQ", "ANYCAST", true, 7, 0, 0, 0, 0, 0, 0, false, "artemis.queue")));
     }
 
     @AfterEach
@@ -88,20 +87,18 @@ class DlqControllerTest extends PostgresIntegrationTest {
         clusters.deleteById(clusterId);
     }
 
-    private JolokiaBrokerClient client(String... bodies) {
-        RestClient.Builder builder = RestClient.builder();
-        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+    private ArtemisNode client(String... bodies) {
+        FixtureJolokia server = new FixtureJolokia();
         for (String b : bodies) {
-            server.expect(requestTo(URL)).andRespond(withSuccess(b, MediaType.APPLICATION_JSON));
+            server.expect().andRespond(withSuccess(b, MediaType.APPLICATION_JSON));
         }
-        return new JolokiaBrokerClient(builder.build(), URL, mapper);
+        return server.node();
     }
 
-    private JolokiaBrokerClient unauthorized() {
-        RestClient.Builder builder = RestClient.builder();
-        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
-        server.expect(requestTo(URL)).andRespond(withStatus(HttpStatus.UNAUTHORIZED));
-        return new JolokiaBrokerClient(builder.build(), URL, mapper);
+    private ArtemisNode unauthorized() {
+        FixtureJolokia server = new FixtureJolokia();
+        server.expect().andRespond(withStatus(HttpStatus.UNAUTHORIZED));
+        return server.node();
     }
 
     private static final String SEARCH =
@@ -117,7 +114,8 @@ class DlqControllerTest extends PostgresIntegrationTest {
 
     @Test
     void listsTheDlaFromSettingsWithItsQueuesAndPerNodeDepth() throws Exception {
-        when(connections.forCluster(clusterId, URL)).thenReturn(client(SEARCH, fixture("address-settings.json")));
+        when(artemisNodes.on(eq(clusterId), any(UUID.class)))
+                .thenReturn(client(SEARCH, fixture("address-settings.json")));
 
         mvc.perform(get("/api/v1/clusters/{c}/dlq", clusterId))
                 .andExpect(status().isOk())
@@ -130,7 +128,7 @@ class DlqControllerTest extends PostgresIntegrationTest {
 
     @Test
     void whenTheSettingsReadFailsItSaysSoAndInfersNothing() throws Exception {
-        when(connections.forCluster(eq(clusterId), any())).thenReturn(unauthorized());
+        when(artemisNodes.on(eq(clusterId), any(UUID.class))).thenReturn(unauthorized());
 
         mvc.perform(get("/api/v1/clusters/{c}/dlq", clusterId))
                 .andExpect(status().isOk())

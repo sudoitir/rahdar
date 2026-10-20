@@ -67,7 +67,7 @@ class MessageIndexRemasker implements StoredContentRemasker {
     public int remask(int version, int limit) {
         List<Stale> rows = jdbc.query(
                 """
-                SELECT observed_at, cluster_id, node_id, queue_name, message_id, address, body_base64,
+                SELECT observed_at, cluster_id, node_id, subscription, message_id, destination, body_base64,
                        correlation_id, group_id, user_id, reply_to, body, props, sealed
                   FROM message_index
                  WHERE policy_version < ?
@@ -84,9 +84,9 @@ class MessageIndexRemasker implements StoredContentRemasker {
                             rs.getTimestamp("observed_at"),
                             rs.getObject("cluster_id", UUID.class),
                             rs.getObject("node_id", UUID.class),
-                            rs.getString("queue_name"),
+                            rs.getString("subscription"),
                             rs.getLong("message_id"),
-                            rs.getString("address"),
+                            rs.getString("destination"),
                             rs.getBoolean("body_base64"),
                             headers,
                             rs.getString("body"),
@@ -102,7 +102,7 @@ class MessageIndexRemasker implements StoredContentRemasker {
                 UPDATE message_index
                    SET correlation_id = ?, group_id = ?, user_id = ?, reply_to = ?, body = ?, props = ?::jsonb,
                        policy_version = ?, sealed = ?
-                 WHERE cluster_id = ? AND node_id = ? AND queue_name = ? AND message_id = ? AND observed_at = ?
+                 WHERE cluster_id = ? AND node_id = ? AND subscription = ? AND message_id = ? AND observed_at = ?
                 """, rows, rows.size(), (statement, row) -> {
             String aad = MessageIndexWriter.aad(row.clusterId(), row.nodeId(), row.queueName(), row.messageId());
             MessageContent stored =

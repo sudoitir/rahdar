@@ -1,5 +1,8 @@
 package io.github.sudoitir.rahdar.feature.resources;
 
+import io.github.sudoitir.openbroker.ClusterConnection;
+import io.github.sudoitir.openbroker.model.ResourceClass;
+import io.github.sudoitir.openbroker.model.ResourceId;
 import io.github.sudoitir.rahdar.feature.resources.ConnectionOperations.ConnectionSnapshot;
 import io.github.sudoitir.rahdar.kernel.audit.AuditEvent;
 import io.github.sudoitir.rahdar.kernel.audit.AuditService;
@@ -9,8 +12,9 @@ import io.github.sudoitir.rahdar.kernel.security.ClusterAccessGuard;
 import io.github.sudoitir.rahdar.kernel.stream.SseHub;
 import io.github.sudoitir.rahdar.platform.broker.Attempt;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
-import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaBrokerClient;
+import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
+import io.github.sudoitir.rahdar.platform.broker.BrokerTarget;
+import io.github.sudoitir.rahdar.platform.broker.ResourceIds;
 import io.github.sudoitir.rahdar.platform.clusters.BrokerCommands;
 import io.github.sudoitir.rahdar.platform.clusters.BrokerCommands.Command;
 import io.github.sudoitir.rahdar.platform.clusters.BrokerCommands.Estimate;
@@ -61,13 +65,13 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 public class ConnectionControlService {
 
     private final ClusterDirectory brokerNodes;
-    private final BrokerConnections connections;
     private final ConnectionOperations ops;
     private final AuditService audit;
     private final ActorResolver actorResolver;
     private final SseHub sseHub;
     private final ClusterAccessGuard clusterAccess;
     private final BrokerCommands commands;
+    private final BrokerGateway gateway;
 
     /**
      * One close's result: what was found immediately before it, and what each node
@@ -126,8 +130,8 @@ public class ConnectionControlService {
                 dryRun);
 
         try {
-            JolokiaBrokerClient client = clientFor(clusterId, node);
-            Resolved resolved = resolve(client, kind, subject);
+            BrokerTarget broker = gateway.node(clusterId, node.getId());
+            Resolved resolved = resolve(broker, kind, subject);
 
             // Already gone. The requested state holds, so this is a success on every
             // path — including the audit row, which records what was asked for and
@@ -149,10 +153,7 @@ public class ConnectionControlService {
                 return new Attempt.Ok<>(new CloseResult(kind, subject, target, outcome));
             }
 
-            boolean closed = kind == ConnectionCloseKind.SESSION
-                    ? ops.closeSession(
-                            client, client.resolveBrokerObjectName(), resolved.connectionId(), resolved.sessionId())
-                    : ops.closeConnection(client, client.resolveBrokerObjectName(), resolved.connectionId());
+            boolean closed = ops.close(broker, resolved.closes());
 
             LifecycleOutcome outcome = single(
                     node,
@@ -169,36 +170,36 @@ public class ConnectionControlService {
     }
 
     /** What a close by id ends up acting on, once the broker's own rows have been walked. */
-    private record Resolved(String connectionId, String sessionId, ConnectionSnapshot target) {}
+    private record Resolved(ResourceId closes, ConnectionSnapshot target) {}
 
-    private Resolved resolve(JolokiaBrokerClient client, ConnectionCloseKind kind, String id) {
+    private Resolved resolve(BrokerTarget node, ConnectionCloseKind kind, String id) {
+        ClusterConnection c = node.connection();
         switch (kind) {
             case CONNECTION -> {
-                ConnectionSnapshot target = ops.readConnection(client, id);
-                return target == null ? null : new Resolved(id, null, target);
+                ConnectionSnapshot target = ops.readConnection(node, id);
+                return target == null ? null : new Resolved(ResourceIds.of(c, ResourceClass.CONNECTION, id), target);
             }
             case SESSION -> {
-                ConnectionSnapshot target = ops.readSession(client, id);
+                ConnectionSnapshot target = ops.readSession(node, id);
                 if (target == null || target.connectionId() == null) {
                     return null;
                 }
-                return new Resolved(target.connectionId(), id, target);
+                return new Resolved(ResourceIds.of(c, ResourceClass.CHANNEL, id), target);
             }
             case CONSUMER -> {
-                // A consumer row names its session but not its connection, so the
-                // connection is found through the session rather than guessed from the
-                // remote address. Closing a consumer closes the connection behind it —
-                // which is the intervention the slow-consumer finding implies.
-                String sessionId = ops.sessionIdOfConsumer(client, id);
-                if (sessionId == null) {
-                    return null;
-                }
-                String connectionId = ops.connectionIdOfSession(client, sessionId);
+                // A consumer names its session, and the session its connection, so the connection
+                // is found through them rather than guessed from the remote address. Closing a
+                // consumer closes the connection behind it: the intervention the slow-consumer
+                // finding implies.
+                String sessionId = ops.sessionOfConsumer(node, id);
+                String connectionId = sessionId == null ? null : ops.connectionOfSession(node, sessionId);
                 if (connectionId == null) {
                     return null;
                 }
-                ConnectionSnapshot target = ops.readConnection(client, connectionId);
-                return target == null ? null : new Resolved(connectionId, sessionId, target);
+                ConnectionSnapshot target = ops.readConnection(node, connectionId);
+                return target == null
+                        ? null
+                        : new Resolved(ResourceIds.of(c, ResourceClass.CONNECTION, connectionId), target);
             }
             default -> throw new IllegalStateException("not a by-id close: " + kind);
         }
@@ -229,12 +230,12 @@ public class ConnectionControlService {
                 .params(Map.of("address", subject))
                 .dryRun(dryRun)
                 .override(override)
-                .action((client, broker) -> ops.closeConsumerConnectionsForAddress(client, broker, subject)
+                .action(node -> ops.close(node, ResourceIds.of(node.connection(), ResourceClass.DESTINATION, subject))
                         ? NodeStatus.APPLIED
                         : NodeStatus.ALREADY)
                 // Each consumer it closes returns its in-flight messages to a queue, and a
                 // node that could not be counted leaves the blast radius unknown.
-                .estimate(new Estimate("consumer count", true, client -> ops.countConsumersForAddress(client, subject)))
+                .estimate(new Estimate("consumer count", true, node -> ops.countConsumersForAddress(node, subject)))
                 .auditDetail(nodes -> new CloseDetail(null, nodes))
                 .signal(() -> publishTopics(clusterId))
                 .build());
@@ -264,13 +265,9 @@ public class ConnectionControlService {
     /** The node an id was issued by. A node with no management URL cannot be asked. */
     private ClusterNode manageableNode(UUID clusterId, UUID nodeId) {
         return brokerNodes.nodes(clusterId).stream()
-                .filter(n -> n.getId().equals(nodeId) && n.getJolokiaUrl() != null)
+                .filter(n -> n.getId().equals(nodeId) && n.getManagementUrl() != null)
                 .findFirst()
                 .orElseThrow(() -> new NotFoundException("node", nodeId));
-    }
-
-    private JolokiaBrokerClient clientFor(UUID clusterId, ClusterNode node) {
-        return connections.forCluster(clusterId, node.getJolokiaUrl());
     }
 
     private void publishTopics(UUID clusterId) {

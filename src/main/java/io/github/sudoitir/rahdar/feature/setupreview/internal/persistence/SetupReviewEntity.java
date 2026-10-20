@@ -12,9 +12,9 @@ import lombok.NoArgsConstructor;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
-/** Maps {@code setup_review} (changeset feature-setupreview 0001): a cluster's last review run. */
+/** Maps {@code artemis_setup_review} (changeset feature-setupreview 0001): a cluster's last review run. */
 @Entity
-@Table(name = "setup_review")
+@Table(name = "artemis_setup_review")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class SetupReviewEntity {

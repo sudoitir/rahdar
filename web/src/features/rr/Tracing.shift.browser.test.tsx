@@ -24,7 +24,7 @@ const flow = (id: string, state: string) => ({
   nodeId: null,
   requestAddress: 'orders.request',
   replyDestination: null,
-  replyKind: 'SHARED_QUEUE',
+  replyKind: 'SHARED',
   state,
   correlationId: `corr-${id}`,
   requestedAt: '2026-09-04T10:00:00.000Z',

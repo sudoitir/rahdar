@@ -21,14 +21,21 @@ import org.mapstruct.Mapping;
  * Domain → browser projections (ADR-0014). Enum-to-{@code String} conversions
  * ({@code SplitBrainStatus}, {@code CapabilityStatus}, {@code Level}) are
  * MapStruct defaults. {@code observedCycle} is intentionally not on
- * {@link NodeEndpointView} — an internal corroboration detail, not for the API.
+ * {@link NodeEndpointView} — an internal corroboration detail, not for the API. The view's field names
+ * are the REST contract's, which names the node's endpoints in Artemis terms until the API is renamed.
  */
 @Mapper(config = CentralMapperConfig.class)
 public interface ClusterViewMapper {
 
     @Mapping(target = "versionSupport", expression = "java(BrokerVersion.support(endpoint.version()))")
+    @Mapping(target = "artemisNodeId", source = "nativeNodeId")
+    @Mapping(target = "jolokiaUrl", source = "managementUrl")
+    @Mapping(target = "coreUrl", source = "dataUrl")
+    @Mapping(target = "haRole", source = "haDesignation")
+    @Mapping(target = "coreUrlManual", source = "dataUrlManual")
     NodeEndpointView endpoint(NodeEndpoint endpoint);
 
+    @Mapping(target = "artemisNodeId", source = "nativeNodeId")
     LogicalNodeView logicalNode(LogicalNode node);
 
     TopologyView topology(ClusterTopology topology);

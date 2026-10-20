@@ -92,7 +92,6 @@ public class SqlViewMapper {
                 outcome.status().name(),
                 outcome.examined(),
                 outcome.matched(),
-                outcome.servedBy() == null ? null : outcome.servedBy().name(),
                 outcome.detail());
     }
 

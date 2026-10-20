@@ -1,7 +1,6 @@
 package io.github.sudoitir.rahdar.feature.brokerconfig.web;
 
 import static org.mockito.Mockito.when;
-import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -11,13 +10,15 @@ import static org.springframework.test.web.servlet.setup.MockMvcBuilders.webAppC
 
 import io.github.sudoitir.rahdar.kernel.audit.internal.persistence.AuditEventRepository;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaBrokerClient;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNodeEntity;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNodeRepository;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterEntity;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterRepository;
 import io.github.sudoitir.rahdar.support.AdminAuthenticationExtension;
+import io.github.sudoitir.rahdar.support.FixtureJolokia;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNodes;
 import java.util.UUID;
 import org.assertj.core.api.Assertions;
 import org.hamcrest.Matchers;
@@ -29,12 +30,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultMatcher;
-import org.springframework.web.client.RestClient;
 import org.springframework.web.context.WebApplicationContext;
-import tools.jackson.databind.json.JsonMapper;
 
 /**
  * {@code GET .../config-diff} — every node against the majority, the expected-vs-drift
@@ -48,8 +46,6 @@ class ConfigDiffControllerTest extends PostgresIntegrationTest {
     private static final String B_URL = "http://b:8261/console/jolokia";
     private static final String C_URL = "http://c:8361/console/jolokia";
     private static final String NODE_ID = "shared-node-id";
-
-    private final JsonMapper mapper = new JsonMapper();
 
     MockMvc mvc;
 
@@ -68,6 +64,9 @@ class ConfigDiffControllerTest extends PostgresIntegrationTest {
     @MockitoBean
     BrokerConnections connections;
 
+    @MockitoBean
+    ArtemisNodes artemisNodes;
+
     private UUID clusterId;
     private UUID aId;
     private UUID bId;
@@ -79,7 +78,7 @@ class ConfigDiffControllerTest extends PostgresIntegrationTest {
                 .getId();
         aId = node("node-a", "PRIMARY", A_URL);
         bId = node("node-b", "BACKUP", B_URL);
-        node("node-c", "STANDALONE", C_URL);
+        node("node-c", "NONE", C_URL);
     }
 
     private UUID node(String name, String role, String url) {
@@ -97,26 +96,32 @@ class ConfigDiffControllerTest extends PostgresIntegrationTest {
      * One batched POST per node: a search to resolve the MBean name, then the batch.
      * The mock server fails the test if more calls are made than bodies given.
      */
-    private JolokiaBrokerClient client(String url, String brokerName, String journalType, boolean active) {
+    private ArtemisNode client(String url, String brokerName, String journalType, boolean active) {
         return client(url, brokerName, journalType, active, "[]");
     }
 
-    private JolokiaBrokerClient client(
-            String url, String brokerName, String journalType, boolean active, String addressNames) {
-        RestClient.Builder builder = RestClient.builder();
-        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
-        server.expect(requestTo(url)).andRespond(withSuccess(search(brokerName), MediaType.APPLICATION_JSON));
-        server.expect(requestTo(url))
+    private ArtemisNode client(String url, String brokerName, String journalType, boolean active, String addressNames) {
+        FixtureJolokia server = new FixtureJolokia();
+        server.expect().andRespond(withSuccess(search(brokerName), MediaType.APPLICATION_JSON));
+        server.expect()
                 .andRespond(
                         withSuccess(batch(brokerName, journalType, active, addressNames), MediaType.APPLICATION_JSON));
-        return new JolokiaBrokerClient(builder.build(), url, mapper);
+        return server.node();
     }
 
-    private JolokiaBrokerClient unauthorized(String url) {
-        RestClient.Builder builder = RestClient.builder();
-        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
-        server.expect(requestTo(url)).andRespond(withStatus(HttpStatus.UNAUTHORIZED));
-        return new JolokiaBrokerClient(builder.build(), url, mapper);
+    private ArtemisNode unauthorized(String url) {
+        FixtureJolokia server = new FixtureJolokia();
+        server.expect().andRespond(withStatus(HttpStatus.UNAUTHORIZED));
+        return server.node();
+    }
+
+    /** The id of the node registered with this Jolokia URL. */
+    private UUID at(String url) {
+        return nodes.findByClusterIdOrderByNameAsc(clusterId).stream()
+                .filter(n -> url.equals(n.getManagementUrl()))
+                .findFirst()
+                .orElseThrow()
+                .getId();
     }
 
     private static String search(String brokerName) {
@@ -146,9 +151,9 @@ class ConfigDiffControllerTest extends PostgresIntegrationTest {
     }
 
     private void threeNodes(String cType) {
-        when(connections.forCluster(clusterId, A_URL)).thenReturn(client(A_URL, "primary", "ASYNCIO", true));
-        when(connections.forCluster(clusterId, B_URL)).thenReturn(client(B_URL, "backup", "ASYNCIO", true));
-        when(connections.forCluster(clusterId, C_URL)).thenReturn(client(C_URL, "third", cType, true));
+        when(artemisNodes.on(clusterId, at(A_URL))).thenReturn(client(A_URL, "primary", "ASYNCIO", true));
+        when(artemisNodes.on(clusterId, at(B_URL))).thenReturn(client(B_URL, "backup", "ASYNCIO", true));
+        when(artemisNodes.on(clusterId, at(C_URL))).thenReturn(client(C_URL, "third", cType, true));
     }
 
     @Test
@@ -186,9 +191,9 @@ class ConfigDiffControllerTest extends PostgresIntegrationTest {
 
     @Test
     void anUnreadableNodeIsListedWithItsReasonAndTheOthersAreStillCompared() throws Exception {
-        when(connections.forCluster(clusterId, A_URL)).thenReturn(client(A_URL, "primary", "ASYNCIO", true));
-        when(connections.forCluster(clusterId, B_URL)).thenReturn(client(B_URL, "backup", "NIO", true));
-        when(connections.forCluster(clusterId, C_URL)).thenReturn(unauthorized(C_URL));
+        when(artemisNodes.on(clusterId, at(A_URL))).thenReturn(client(A_URL, "primary", "ASYNCIO", true));
+        when(artemisNodes.on(clusterId, at(B_URL))).thenReturn(client(B_URL, "backup", "NIO", true));
+        when(artemisNodes.on(clusterId, at(C_URL))).thenReturn(unauthorized(C_URL));
 
         mvc.perform(get("/api/v1/clusters/{c}/config-diff", clusterId))
                 .andExpect(status().isOk())
@@ -204,9 +209,9 @@ class ConfigDiffControllerTest extends PostgresIntegrationTest {
 
     @Test
     void whenFewerThanTwoNodesAnswerNoComparisonIsMadeAndEveryReasonIsGiven() throws Exception {
-        when(connections.forCluster(clusterId, A_URL)).thenReturn(client(A_URL, "primary", "ASYNCIO", true));
-        when(connections.forCluster(clusterId, B_URL)).thenReturn(unauthorized(B_URL));
-        when(connections.forCluster(clusterId, C_URL)).thenReturn(unauthorized(C_URL));
+        when(artemisNodes.on(clusterId, at(A_URL))).thenReturn(client(A_URL, "primary", "ASYNCIO", true));
+        when(artemisNodes.on(clusterId, at(B_URL))).thenReturn(unauthorized(B_URL));
+        when(artemisNodes.on(clusterId, at(C_URL))).thenReturn(unauthorized(C_URL));
 
         mvc.perform(get("/api/v1/clusters/{c}/config-diff", clusterId))
                 .andExpect(status().isOk())
@@ -220,8 +225,8 @@ class ConfigDiffControllerTest extends PostgresIntegrationTest {
 
     @Test
     void nodesNarrowsTheComparisonToTheNamedNodes() throws Exception {
-        when(connections.forCluster(clusterId, A_URL)).thenReturn(client(A_URL, "primary", "ASYNCIO", true));
-        when(connections.forCluster(clusterId, B_URL)).thenReturn(client(B_URL, "backup", "NIO", true));
+        when(artemisNodes.on(clusterId, at(A_URL))).thenReturn(client(A_URL, "primary", "ASYNCIO", true));
+        when(artemisNodes.on(clusterId, at(B_URL))).thenReturn(client(B_URL, "backup", "NIO", true));
 
         mvc.perform(get("/api/v1/clusters/{c}/config-diff", clusterId).param("nodes", aId + "," + bId))
                 .andExpect(status().isOk())
@@ -239,10 +244,10 @@ class ConfigDiffControllerTest extends PostgresIntegrationTest {
         // A passive backup reports AddressNames: [] where the primary reports entries.
         // That is a value difference, not a smaller surface, and must not suppress the
         // comparison — the live check against the dev pair caught exactly this.
-        when(connections.forCluster(clusterId, A_URL))
+        when(artemisNodes.on(clusterId, at(A_URL)))
                 .thenReturn(client(A_URL, "primary", "ASYNCIO", true, "[\"orders\",\"events\"]"));
-        when(connections.forCluster(clusterId, B_URL)).thenReturn(client(B_URL, "backup", "ASYNCIO", false, "[]"));
-        when(connections.forCluster(clusterId, C_URL)).thenReturn(client(C_URL, "third", "ASYNCIO", true));
+        when(artemisNodes.on(clusterId, at(B_URL))).thenReturn(client(B_URL, "backup", "ASYNCIO", false, "[]"));
+        when(artemisNodes.on(clusterId, at(C_URL))).thenReturn(client(C_URL, "third", "ASYNCIO", true));
 
         mvc.perform(get("/api/v1/clusters/{c}/config-diff", clusterId))
                 .andExpect(status().isOk())

@@ -51,7 +51,7 @@ function event(over: Record<string, unknown> = {}) {
     seq: 1,
     occurredAt: '2026-09-04T10:00:00.000Z',
     receivedAt: '2026-09-04T10:00:00.000Z',
-    type: 'CONSUMER_CREATED',
+    type: 'openbroker.consumer.attached',
     address: 'orders',
     routingName: 'orders',
     consumerName: 'c-42',
@@ -60,7 +60,7 @@ function event(over: Record<string, unknown> = {}) {
     remoteAddress: '10.0.0.9:5445',
     username: 'alice',
     nodeId: null,
-    props: { _AMQ_NotifType: 'CONSUMER_CREATED', _AMQ_Address: 'orders' },
+    props: { 'artemis._AMQ_NotifType': 'CONSUMER_CREATED', 'artemis._AMQ_Address': 'orders' },
     ...over,
   };
 }
@@ -106,7 +106,7 @@ describe('EventsView', () => {
 
     // The grid is virtualised, so the payload lives in a drawer rather than in a
     // row expanded underneath.
-    await user.click(await screen.findByRole('gridcell', { name: 'CONSUMER_CREATED' }));
+    await user.click(await screen.findByRole('gridcell', { name: 'openbroker.consumer.attached' }));
     const update = navigate.mock.calls[0][0].search as (prev: object) => object;
     expect(update({})).toEqual({ event: 1 });
   });
@@ -119,7 +119,7 @@ describe('EventsView', () => {
     );
     renderWithProviders(<EventsView />);
 
-    const dialog = await screen.findByRole('dialog', { name: 'CONSUMER_CREATED' });
+    const dialog = await screen.findByRole('dialog', { name: 'openbroker.consumer.attached' });
     // What the event is about is stated as terms and values; its raw properties follow, in a region the keyboard can scroll.
     expect(within(dialog).getByText('Subject')).toBeInTheDocument();
     expect(within(dialog).getByText('c-42')).toBeInTheDocument();
@@ -133,12 +133,14 @@ describe('EventsView', () => {
       http.get('*/api/v1/clusters/c1', () => HttpResponse.json(cluster('AVAILABLE'))),
       http.get('*/api/v1/clusters/c1/events', () => HttpResponse.json(page([event()]))),
       http.get('*/api/v1/clusters/c1/events/7', () =>
-        HttpResponse.json(event({ seq: 7, type: 'SESSION_CLOSED', props: { _AMQ_Reason: 'aged out' } })),
+        HttpResponse.json(
+          event({ seq: 7, type: 'openbroker.channel.closed', props: { 'artemis._AMQ_Reason': 'aged out' } }),
+        ),
       ),
     );
     renderWithProviders(<EventsView />);
 
-    expect(await screen.findByRole('dialog', { name: 'SESSION_CLOSED' })).toBeInTheDocument();
+    expect(await screen.findByRole('dialog', { name: 'openbroker.channel.closed' })).toBeInTheDocument();
     expect(await screen.findByText(/aged out/)).toBeInTheDocument();
   });
 
@@ -168,7 +170,7 @@ describe('EventsView', () => {
     const user = userEvent.setup();
     renderWithProviders(<EventsView />);
 
-    await user.click(await screen.findByRole('button', { name: /^Actions for CONSUMER_CREATED/ }));
+    await user.click(await screen.findByRole('button', { name: /^Actions for openbroker\.consumer\.attached/ }));
     await user.click(await screen.findByRole('menuitem', { name: 'Copy link' }));
 
     expect(await navigator.clipboard.readText()).toBe(`${window.location.origin}/clusters/c1/events?event=1`);
@@ -199,11 +201,11 @@ describe('EventsView', () => {
     await screen.findByText('No broker events yet');
     await waitFor(() => expect(EventSourceStub.instances.length).toBeGreaterThan(0));
 
-    EventSourceStub.emit('events', event({ seq: 99, type: 'SESSION_CREATED', remoteAddress: '10.9.9.9:1' }));
+    EventSourceStub.emit('events', event({ seq: 99, type: 'openbroker.channel.opened', remoteAddress: '10.9.9.9:1' }));
     expect(await screen.findByText('10.9.9.9:1')).toBeInTheDocument();
 
     // Re-delivering the same seq must not add a second row (remoteAddress is row-only).
-    EventSourceStub.emit('events', event({ seq: 99, type: 'SESSION_CREATED', remoteAddress: '10.9.9.9:1' }));
+    EventSourceStub.emit('events', event({ seq: 99, type: 'openbroker.channel.opened', remoteAddress: '10.9.9.9:1' }));
     await waitFor(() => expect(screen.getAllByText('10.9.9.9:1')).toHaveLength(1));
   });
 
@@ -215,12 +217,12 @@ describe('EventsView', () => {
     renderWithProviders(<EventsView />);
 
     const grid = await screen.findByRole('grid', { name: 'Broker events' });
-    await within(grid).findByText('CONSUMER_CREATED');
+    await within(grid).findByText('openbroker.consumer.attached');
     await waitFor(() => expect(EventSourceStub.instances.length).toBeGreaterThan(0));
     const scroller = grid.parentElement!;
 
     fireEvent.scroll(scroller, { target: { scrollTop: 200 } });
-    EventSourceStub.emit('events', event({ seq: 99, type: 'SESSION_CREATED', remoteAddress: '10.9.9.9:1' }));
+    EventSourceStub.emit('events', event({ seq: 99, type: 'openbroker.channel.opened', remoteAddress: '10.9.9.9:1' }));
     await new Promise((r) => setTimeout(r, 50));
     expect(within(grid).queryByText('10.9.9.9:1')).not.toBeInTheDocument();
 
@@ -229,7 +231,7 @@ describe('EventsView', () => {
   });
 
   it('says a filter excludes every event, and clearing it drops the filters from the address', async () => {
-    search = { type: 'SESSION_CLOSED' };
+    search = { type: 'openbroker.channel.closed' };
     server.use(
       http.get('*/api/v1/clusters/c1', () => HttpResponse.json(cluster('AVAILABLE'))),
       http.get('*/api/v1/clusters/c1/events', () => HttpResponse.json(page([]))),
@@ -240,7 +242,11 @@ describe('EventsView', () => {
     expect(await screen.findByText('No event matches these filters')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Clear filters' }));
     const update = navigate.mock.calls.at(-1)![0].search as (prev: object) => object;
-    expect(update({ type: 'SESSION_CLOSED' })).toEqual({ type: undefined, address: undefined, page: undefined });
+    expect(update({ type: 'openbroker.channel.closed' })).toEqual({
+      type: undefined,
+      address: undefined,
+      page: undefined,
+    });
   });
 
   it('names the nodes that did not answer instead of presenting no events as a fact', async () => {

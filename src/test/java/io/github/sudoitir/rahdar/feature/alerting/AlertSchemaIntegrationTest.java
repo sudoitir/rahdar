@@ -74,7 +74,7 @@ class AlertSchemaIntegrationTest extends PostgresIntegrationTest {
     void thresholdAndStateRulesBothPersistAndAreFilterableByKind() {
         UUID c = cluster();
         rules.save(AlertRuleEntity.threshold(
-                c, "Deep queue", new Condition("messageCount", "GT", 1000.0), 60, "WARNING", null));
+                c, "Deep queue", new Condition("openbroker.backlog", "GT", 1000.0), 60, "WARNING", null));
         rules.save(AlertRuleEntity.state(c, "Split-brain", "SPLIT_BRAIN", 0, "CRITICAL"));
 
         List<AlertRuleEntity> thresholds = rules.findByClusterIdAndKindAndEnabledTrue(c, "METRIC_THRESHOLD");
@@ -113,7 +113,7 @@ class AlertSchemaIntegrationTest extends PostgresIntegrationTest {
         var params = Map.of("c", cluster());
         assertThatThrownBy(() -> jdbc.update("""
                         INSERT INTO alert_rule (cluster_id, kind, metric, comparator, threshold, state_condition, name)
-                        VALUES (:c, 'METRIC_THRESHOLD', 'messageCount', 'GT', 1, 'SPLIT_BRAIN', 'bad')
+                        VALUES (:c, 'METRIC_THRESHOLD', 'openbroker.backlog', 'GT', 1, 'SPLIT_BRAIN', 'bad')
                         """, params)).isInstanceOf(DataIntegrityViolationException.class);
     }
 

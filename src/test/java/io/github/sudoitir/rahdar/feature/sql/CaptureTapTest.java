@@ -8,12 +8,12 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import io.github.sudoitir.rahdar.feature.queues.DivertOperations;
-import io.github.sudoitir.rahdar.feature.queues.DivertRow;
-import io.github.sudoitir.rahdar.feature.queues.QueueLifecycleOperations;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaBrokerClient;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaRequest;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaResponse;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
+import io.github.sudoitir.rahdar.system.artemis.DivertOperations;
+import io.github.sudoitir.rahdar.system.artemis.DivertRow;
+import io.github.sudoitir.rahdar.system.artemis.ManagementRequest;
+import io.github.sudoitir.rahdar.system.artemis.ManagementResponse;
+import io.github.sudoitir.rahdar.system.artemis.QueueLifecycleOperations;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -36,7 +36,7 @@ class CaptureTapTest {
 
     private DivertOperations diverts;
     private QueueLifecycleOperations queues;
-    private JolokiaBrokerClient client;
+    private ArtemisNode client;
     private CaptureTap tap;
 
     private final CaptureTap.Spec spec = new CaptureTap.Spec(UUID.randomUUID(), "ORDER.IN", 10_000L, null);
@@ -45,11 +45,11 @@ class CaptureTapTest {
     void setUp() {
         diverts = mock(DivertOperations.class);
         queues = mock(QueueLifecycleOperations.class);
-        client = mock(JolokiaBrokerClient.class);
+        client = mock(ArtemisNode.class);
         deployed.clear();
         when(diverts.listDiverts(any(), any(), any())).thenAnswer(invocation -> List.copyOf(deployed));
         when(client.resolveBrokerObjectName()).thenReturn(BROKER);
-        when(client.single(any(JolokiaRequest.class))).thenReturn(ok());
+        when(client.single(any(ManagementRequest.class))).thenReturn(ok());
         tap = new CaptureTap(diverts, queues, properties(), new ObjectMapper());
     }
 
@@ -82,8 +82,8 @@ class CaptureTapTest {
 
     @Test
     void refusesWhenTheCaptureQueueCannotBeRestricted() {
-        when(client.single(any(JolokiaRequest.class))).thenAnswer(invocation -> {
-            JolokiaRequest request = invocation.getArgument(0);
+        when(client.single(any(ManagementRequest.class))).thenAnswer(invocation -> {
+            ManagementRequest request = invocation.getArgument(0);
             return String.valueOf(request.operation()).startsWith("addSecuritySettings")
                     ? refused("AMQ229032: unauthorized")
                     : ok();
@@ -133,9 +133,9 @@ class CaptureTapTest {
 
         tap.install(client, "abc12345", spec);
 
-        ArgumentCaptor<JolokiaRequest> requests = ArgumentCaptor.forClass(JolokiaRequest.class);
+        ArgumentCaptor<ManagementRequest> requests = ArgumentCaptor.forClass(ManagementRequest.class);
         verify(client, Mockito.atLeastOnce()).single(requests.capture());
-        JolokiaRequest addressSettings = requests.getAllValues().stream()
+        ManagementRequest addressSettings = requests.getAllValues().stream()
                 .filter(r -> String.valueOf(r.operation()).startsWith("addAddressSettings"))
                 .findFirst()
                 .orElseThrow();
@@ -150,7 +150,7 @@ class CaptureTapTest {
 
         tap.remove(client, "abc12345", "rahdar.capture.abc12345.ORDER.IN." + spec.subscriptionId());
 
-        ArgumentCaptor<JolokiaRequest> requests = ArgumentCaptor.forClass(JolokiaRequest.class);
+        ArgumentCaptor<ManagementRequest> requests = ArgumentCaptor.forClass(ManagementRequest.class);
         verify(client, Mockito.atLeastOnce()).single(requests.capture());
         List<String> removals = requests.getAllValues().stream()
                 .filter(r -> String.valueOf(r.operation()).startsWith("remove"))
@@ -163,7 +163,7 @@ class CaptureTapTest {
     void theLegacySharedMatchGoesOnlyWhenNoCaptureOfAnyInstanceIsLeft() {
         tap.remove(client, "abc12345", "rahdar.capture.abc12345.ORDER.IN." + spec.subscriptionId());
 
-        ArgumentCaptor<JolokiaRequest> requests = ArgumentCaptor.forClass(JolokiaRequest.class);
+        ArgumentCaptor<ManagementRequest> requests = ArgumentCaptor.forClass(ManagementRequest.class);
         verify(client, Mockito.atLeastOnce()).single(requests.capture());
         assertThat(requests.getAllValues().stream().map(r -> String.valueOf(r.arguments())))
                 .anySatisfy(r -> assertThat(r).contains("rahdar.capture.#"));
@@ -218,11 +218,11 @@ class CaptureTapTest {
                 null, null, name, name, address, forwarding, null, "ANYCAST", null, Map.of(), exclusive, false);
     }
 
-    private static JolokiaResponse ok() {
-        return new JolokiaResponse(200, null, null, null, null);
+    private static ManagementResponse ok() {
+        return new ManagementResponse(200, null, null, null, null);
     }
 
-    private static JolokiaResponse refused(String error) {
-        return new JolokiaResponse(403, null, error, "java.lang.SecurityException", null);
+    private static ManagementResponse refused(String error) {
+        return new ManagementResponse(403, null, error, "java.lang.SecurityException", null);
     }
 }

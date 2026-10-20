@@ -68,8 +68,8 @@ public class BrokerEventService {
             new HeavyRequests.Endpoint("event history reads", 4, Duration.ofSeconds(30), ResourceQuery.MAX_SIZE);
 
     private static final String COLUMNS = """
-            seq, occurred_at, received_at, type, address, routing_name, consumer_name, session_name, connection_name,
-            remote_address, username, node_id, props::text AS props""";
+            seq, occurred_at, received_at, type, destination, subscription, consumer, channel, connection,
+            remote_address, principal, node_id, data::text AS data""";
 
     /** Notification props carry filter strings and user-supplied names; the detectors run over them. */
     private final ContentPolicy contentPolicy;
@@ -90,7 +90,7 @@ public class BrokerEventService {
         // may not read. An event about no address belongs to the cluster, and is read with it.
         List<String> readable = addresses.everything()
                 ? List.of("")
-                : events.findDistinctAddressByClusterId(clusterId).stream()
+                : events.findDistinctDestinationByClusterId(clusterId).stream()
                         .filter(addresses::readable)
                         .toList();
         Where where = new Where(
@@ -150,15 +150,15 @@ public class BrokerEventService {
             conditions
                     .append(
                             w.unaddressed()
-                                    ? " AND (address IN (:addresses) OR address IS NULL)"
-                                    : " AND address IN (:addresses)")
-                    .append(" AND (routing_name IS NULL OR routing_name IN (:names))");
+                                    ? " AND (destination IN (:addresses) OR destination IS NULL)"
+                                    : " AND destination IN (:addresses)")
+                    .append(" AND (subscription IS NULL OR subscription IN (:names))");
             params.put("addresses", w.readableAddresses());
             params.put("names", w.readableNames());
         }
         optional(conditions, params, "type", w.type());
         optional(conditions, params, "node_id", w.nodeId());
-        optional(conditions, params, "address", w.address());
+        optional(conditions, params, "destination", w.address());
         Cursor after = query.after();
         String sql = "SELECT " + COLUMNS + " FROM broker_event WHERE " + conditions
                 + (after == null ? "" : " AND seq < :afterSeq")
@@ -199,15 +199,15 @@ public class BrokerEventService {
                 rs.getObject("occurred_at", OffsetDateTime.class).toInstant(),
                 rs.getObject("received_at", OffsetDateTime.class).toInstant(),
                 rs.getString("type"),
-                rs.getString("address"),
-                rs.getString("routing_name"),
-                rs.getString("consumer_name"),
-                rs.getString("session_name"),
-                rs.getString("connection_name"),
+                rs.getString("destination"),
+                rs.getString("subscription"),
+                rs.getString("consumer"),
+                rs.getString("channel"),
+                rs.getString("connection"),
                 rs.getString("remote_address"),
-                rs.getString("username"),
+                rs.getString("principal"),
                 rs.getObject("node_id", UUID.class),
-                parseProps(rs.getString("props")));
+                parseProps(rs.getString("data")));
     }
 
     /**
@@ -216,7 +216,7 @@ public class BrokerEventService {
      */
     private List<String> readableRoutingNames(UUID clusterId, ResourceFilter addresses) {
         ResourceFilter queues = permissions.filter(clusterId, ResourceKind.QUEUE);
-        List<String> names = events.findDistinctRoutingNameByClusterId(clusterId).stream()
+        List<String> names = events.findDistinctSubscriptionByClusterId(clusterId).stream()
                 .filter(name -> queues.readable(name) || addresses.readable(name))
                 .toList();
         return names.isEmpty() ? List.of("") : names;
@@ -236,8 +236,8 @@ public class BrokerEventService {
         ResourceFilter addresses = permissions.filter(clusterId, ResourceKind.ADDRESS);
         boolean clusterWide = clusterAccess.holds(clusterId, Permissions.CLUSTER_READ);
         return events.findByClusterIdAndSeq(clusterId, seq)
-                .filter(e -> e.getAddress() == null ? clusterWide : addresses.readable(e.getAddress()))
-                .filter(e -> addresses.everything() || namesOnlyWhatIsReadable(clusterId, e.getRoutingName()))
+                .filter(e -> e.getDestination() == null ? clusterWide : addresses.readable(e.getDestination()))
+                .filter(e -> addresses.everything() || namesOnlyWhatIsReadable(clusterId, e.getSubscription()))
                 .map(this::toView)
                 .orElseThrow(() -> new NotFoundException("event", seq));
     }
@@ -295,15 +295,15 @@ public class BrokerEventService {
                 e.getOccurredAt(),
                 e.getReceivedAt(),
                 e.getType(),
-                e.getAddress(),
-                e.getRoutingName(),
-                e.getConsumerName(),
-                e.getSessionName(),
-                e.getConnectionName(),
+                e.getDestination(),
+                e.getSubscription(),
+                e.getConsumer(),
+                e.getChannel(),
+                e.getConnection(),
                 e.getRemoteAddress(),
-                e.getUsername(),
+                e.getPrincipal(),
                 e.getNodeId(),
-                parseProps(e.getProps()));
+                parseProps(e.getData()));
     }
 
     private Map<String, Object> parseProps(String json) {

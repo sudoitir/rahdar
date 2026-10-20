@@ -2,7 +2,17 @@ package io.github.sudoitir.rahdar.platform.clusters;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import io.github.sudoitir.openbroker.model.Attributes;
+import io.github.sudoitir.openbroker.model.Condition;
+import io.github.sudoitir.openbroker.model.ConditionStatus;
+import io.github.sudoitir.openbroker.model.ConditionTypes;
+import io.github.sudoitir.openbroker.model.Designation;
+import io.github.sudoitir.openbroker.model.Membership;
+import io.github.sudoitir.openbroker.model.NodeDescription;
+import io.github.sudoitir.openbroker.model.NodeFunction;
+import io.github.sudoitir.openbroker.model.Serving;
 import io.github.sudoitir.rahdar.platform.broker.Attempt;
+import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNodeEntity;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNodeRepository;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterRepository;
@@ -14,6 +24,7 @@ import io.github.sudoitir.rahdar.support.ArtemisBrokers;
 import io.github.sudoitir.rahdar.support.ArtemisIntegrationTest;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
@@ -23,7 +34,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
-import tools.jackson.databind.json.JsonMapper;
 
 /**
  * A cluster's claims follow its nodes (ADR-0167), against a real broker: an overridden URL moves its claim,
@@ -92,7 +102,7 @@ class ClaimsStayCurrentRealBrokerTest extends PostgresIntegrationTest {
     /** The seed's row: the one node of the cluster with a management URL. */
     private BrokerNodeEntity seedNode(UUID cluster) {
         return nodes.findByClusterIdOrderByNameAsc(cluster).stream()
-                .filter(n -> n.getJolokiaUrl() != null)
+                .filter(n -> n.getManagementUrl() != null)
                 .findFirst()
                 .orElseThrow();
     }
@@ -105,7 +115,7 @@ class ClaimsStayCurrentRealBrokerTest extends PostgresIntegrationTest {
     void anOverriddenUrlMovesTheClaimOfANodeKnownByItsUrl() {
         UUID first = registered("first", ArtemisIntegrationTest.jolokiaUrl());
         // A broker that reports no NodeID is known by its management URL alone.
-        jdbc.sql("UPDATE broker_node SET artemis_node_id = NULL WHERE cluster_id = ?")
+        jdbc.sql("UPDATE broker_node SET native_node_id = NULL WHERE cluster_id = ?")
                 .param(first)
                 .update();
         new TransactionTemplate(transactions).executeWithoutResult(status -> clusterClaims.sync(first));
@@ -122,15 +132,16 @@ class ClaimsStayCurrentRealBrokerTest extends PostgresIntegrationTest {
     @Test
     void aClaimNoNodeBacksAnyMoreIsReleasedByTheNextRegistration() {
         UUID first = registered("first", ArtemisIntegrationTest.jolokiaUrl());
-        String nodeId = seedNode(first).getArtemisNodeId();
+        String nodeId = seedNode(first).getNativeNodeId();
         assertThat(claimsOf(first)).contains(ClusterIdentity.NODE_ID + ":" + nodeId);
         // The first cluster's nodes no longer carry the broker (its journal replaced, its URL moved), but its
         // claim was left behind: the state a claim from before claims followed their nodes would be in.
+        jdbc.sql("UPDATE broker_node SET native_node_id = 'replaced-' || id WHERE cluster_id = ?")
+                .param(first)
+                .update();
         jdbc.sql("""
-                        UPDATE broker_node SET artemis_node_id = 'replaced-' || id,
-                               jolokia_url = CASE WHEN jolokia_url IS NULL THEN NULL
-                                                  ELSE 'http://elsewhere.invalid:8161/console/jolokia' END
-                        WHERE cluster_id = ?
+                        UPDATE broker_node_endpoint SET url = 'http://elsewhere.invalid:8161/console/jolokia'
+                        WHERE plane = 'MANAGEMENT' AND node_id IN (SELECT id FROM broker_node WHERE cluster_id = ?)
                         """).param(first).update();
 
         UUID second = registered("second", ArtemisIntegrationTest.jolokiaUrl());
@@ -154,13 +165,24 @@ class ClaimsStayCurrentRealBrokerTest extends PostgresIntegrationTest {
     }
 
     @Test
-    void aNodeIdThatChangesMovesTheClaim() throws Exception {
+    void aNodeIdThatChangesMovesTheClaim() {
         UUID first = registered("first", ArtemisIntegrationTest.jolokiaUrl());
         String replaced = run + "-new-journal";
 
-        recorder.applyTierA(seedNode(first).getId(), new JsonMapper().readTree("""
-                        {"Active": true, "Started": true, "Backup": false, "NodeID": "%s"}
-                        """.formatted(replaced)), 1L);
+        UUID node = seedNode(first).getId();
+        recorder.applyTierA(
+                node,
+                new NodeDescription(
+                        BrokerGateway.idOf(node),
+                        replaced,
+                        new Membership(Optional.empty(), Designation.NONE, Serving.ACTIVE, Optional.empty()),
+                        Set.of(NodeFunction.BROKER),
+                        List.of(),
+                        Optional.empty(),
+                        List.of(new Condition(ConditionTypes.STARTED, ConditionStatus.TRUE, "", "", Optional.empty())),
+                        Attributes.empty(),
+                        Optional.empty()),
+                1L);
 
         assertThat(claimsOf(first)).contains(ClusterIdentity.NODE_ID + ":" + replaced);
     }

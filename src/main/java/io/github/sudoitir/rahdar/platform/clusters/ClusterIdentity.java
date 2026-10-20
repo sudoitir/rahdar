@@ -57,10 +57,10 @@ record ClusterIdentity(Set<String> nodeIds, Set<String> seedUrls, Set<String> un
         Set<String> nodeIds = new TreeSet<>();
         Set<String> urls = new TreeSet<>();
         for (ClusterNode node : nodes) {
-            if (node.getArtemisNodeId() != null) {
-                nodeIds.add(node.getArtemisNodeId());
-            } else if (node.getJolokiaUrl() != null) {
-                urls.add(normalise(node.getJolokiaUrl()));
+            if (node.getNativeNodeId() != null) {
+                nodeIds.add(node.getNativeNodeId());
+            } else if (node.getManagementUrl() != null) {
+                urls.add(normalise(node.getManagementUrl()));
             }
         }
         return Map.of(NODE_ID, nodeIds, URL, urls);
@@ -77,8 +77,8 @@ record ClusterIdentity(Set<String> nodeIds, Set<String> seedUrls, Set<String> un
     Optional<Overlap> overlapWith(Collection<? extends ClusterNode> registered, Map<UUID, String> clusterNames) {
         Map<UUID, Set<String>> matched = new TreeMap<>();
         for (ClusterNode node : registered) {
-            boolean sameNode = node.getArtemisNodeId() != null && nodeIds.contains(node.getArtemisNodeId());
-            boolean sameUrl = node.getJolokiaUrl() != null && seedUrls.contains(normalise(node.getJolokiaUrl()));
+            boolean sameNode = node.getNativeNodeId() != null && nodeIds.contains(node.getNativeNodeId());
+            boolean sameUrl = node.getManagementUrl() != null && seedUrls.contains(normalise(node.getManagementUrl()));
             if (sameNode || sameUrl) {
                 matched.computeIfAbsent(node.getClusterId(), k -> new TreeSet<>())
                         .add(node.getName());

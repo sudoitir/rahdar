@@ -12,6 +12,10 @@
     "kind" : "KERNEL",
     "required" : true
   }, {
+    "id" : "artemis",
+    "kind" : "PLATFORM",
+    "required" : true
+  }, {
     "id" : "audit",
     "kind" : "KERNEL",
     "required" : true

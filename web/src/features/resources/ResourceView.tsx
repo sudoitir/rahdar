@@ -157,7 +157,7 @@ const CONFIG: {
         sessionId: r.sessionId,
         snapshot: r,
       }),
-      label: (r) => r.name || r.address || r.producerId || 'producer',
+      label: (r) => r.clientId || r.address || r.producerId || 'producer',
     },
   },
 };

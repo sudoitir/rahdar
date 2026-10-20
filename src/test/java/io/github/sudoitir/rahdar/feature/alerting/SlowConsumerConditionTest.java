@@ -19,13 +19,13 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 
 /**
- * {@link SlowConsumerCondition} against real {@code queue_snapshot} and
+ * {@link SlowConsumerCondition} against real {@code subscription_snapshot} and
  * {@code metric_sample} rows (ADR-0044). The definition under test is the triple,
  * not the rate — <b>consumers attached, backlog present, acknowledgements near
  * zero</b> — and each guard gets its own case, because dropping any one of them is
  * what turns this rule into the 3am pager.
  *
- * <p>Integration rather than isolated on purpose: {@code queue_snapshot} is a
+ * <p>Integration rather than isolated on purpose: {@code subscription_snapshot} is a
  * write-through cache with no setters (writes go through {@code QueueSnapshotUpsert}),
  * the {@code paused} exclusion is only real against the actual column, and the
  * never-negative rate clamp this relies on lives in the SQL of
@@ -51,7 +51,7 @@ class SlowConsumerConditionTest extends PostgresIntegrationTest {
     private void givenCluster() {
         ClusterEntity cluster = clusters.save(new ClusterEntity("c-" + UUID.randomUUID(), null, null));
         clusterId = cluster.getId();
-        nodeId = nodes.save(BrokerNodeEntity.fromSeed(clusterId, "n1", "STANDALONE", "node-1"))
+        nodeId = nodes.save(BrokerNodeEntity.fromSeed(clusterId, "n1", "NONE", "node-1"))
                 .getId();
     }
 
@@ -66,10 +66,10 @@ class SlowConsumerConditionTest extends PostgresIntegrationTest {
     private void queue(String name, long consumers, long messages, boolean paused) {
         jdbc.update(
                 """
-                INSERT INTO queue_snapshot
-                  (node_id, queue_name, cluster_id, address, routing_type,
-                   consumer_count, message_count, paused)
-                VALUES (:n, :q, :c, :q, 'ANYCAST', :cc, :mc, :paused)
+                INSERT INTO subscription_snapshot
+                  (node_id, subscription, cluster_id, destination, kind, native_attributes,
+                   consumer_count, backlog, paused)
+                VALUES (:n, :q, :c, :q, 'artemis.queue', '{"artemis.routing_type":"ANYCAST"}', :cc, :mc, :paused)
                 """,
                 Map.of(
                         "n", nodeId,
@@ -95,8 +95,8 @@ class SlowConsumerConditionTest extends PostgresIntegrationTest {
         p.put("c", clusterId);
         p.put("n", nodeId);
         jdbc.update("""
-                INSERT INTO metric_sample (ts, value, subject_type, subject_name, metric, cluster_id, node_id)
-                VALUES (:ts, :value, 'QUEUE', :subject, 'messagesAcked', :c, :n)
+                INSERT INTO metric_sample (ts, value, subject_kind, subject_path, metric, cluster_id, node_id)
+                VALUES (:ts, :value, 'QUEUE', :subject, 'openbroker.acknowledged', :c, :n)
                 """, p);
     }
 
@@ -203,7 +203,7 @@ class SlowConsumerConditionTest extends PostgresIntegrationTest {
     @Test
     void anotherMetricIsNotThisConditionsBusiness() {
         givenCluster();
-        AlertRuleSpec r = new AlertRuleSpec(UUID.randomUUID(), true, "messageCount", "LT", 1.0, null, null);
+        AlertRuleSpec r = new AlertRuleSpec(UUID.randomUUID(), true, "openbroker.backlog", "LT", 1.0, null, null);
 
         assertThat(condition.supports(r)).isFalse();
         assertThat(condition.evaluate(clusterId, r)).isEqualTo(Evaluation.EMPTY);

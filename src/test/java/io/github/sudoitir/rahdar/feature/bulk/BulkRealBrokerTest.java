@@ -6,7 +6,6 @@ import io.github.sudoitir.rahdar.feature.bulk.web.BulkViews.BulkExecuteRequest;
 import io.github.sudoitir.rahdar.feature.bulk.web.BulkViews.BulkItemView;
 import io.github.sudoitir.rahdar.feature.bulk.web.BulkViews.BulkPreviewRequest;
 import io.github.sudoitir.rahdar.feature.bulk.web.BulkViews.BulkRunDetailView;
-import io.github.sudoitir.rahdar.feature.queues.QueueLifecycleOperations;
 import io.github.sudoitir.rahdar.kernel.security.GrantLoader;
 import io.github.sudoitir.rahdar.kernel.security.internal.persistence.AppUserRepository;
 import io.github.sudoitir.rahdar.kernel.security.internal.persistence.RolePermissionRepository;
@@ -14,8 +13,6 @@ import io.github.sudoitir.rahdar.kernel.security.internal.persistence.RoleReposi
 import io.github.sudoitir.rahdar.kernel.security.internal.persistence.UserRoleRepository;
 import io.github.sudoitir.rahdar.platform.broker.Attempt;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
-import io.github.sudoitir.rahdar.platform.broker.BrokerMBeans;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaBrokerClient;
 import io.github.sudoitir.rahdar.platform.broker.QueueRow;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterService;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNodeRepository;
@@ -26,6 +23,9 @@ import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshotUpsert;
 import io.github.sudoitir.rahdar.support.ArtemisIntegrationTest;
 import io.github.sudoitir.rahdar.support.OperatorFixture;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
+import io.github.sudoitir.rahdar.system.artemis.MBeanNames;
+import io.github.sudoitir.rahdar.system.artemis.QueueLifecycleOperations;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.LinkedHashMap;
@@ -90,7 +90,7 @@ class BulkRealBrokerTest extends PostgresIntegrationTest {
     private final String run = UUID.randomUUID().toString().substring(0, 8);
     private final List<String> queueNames = List.of("BULK." + run + ".1", "BULK." + run + ".2", "BULK." + run + ".3");
     private UUID clusterId;
-    private JolokiaBrokerClient client;
+    private ArtemisNode client;
     private String broker;
 
     @BeforeEach
@@ -111,15 +111,15 @@ class BulkRealBrokerTest extends PostgresIntegrationTest {
             throw new IllegalStateException("could not register the container broker: " + attempt);
         }
         clusterId = ok.value().id();
-        client = connections.forCluster(clusterId, ArtemisIntegrationTest.jolokiaUrl());
+        client = ArtemisIntegrationTest.jolokiaClient(ArtemisIntegrationTest.jolokiaUrl());
         broker = client.resolveBrokerObjectName();
         UUID nodeId =
                 brokerNodes.findByClusterIdOrderByNameAsc(clusterId).getFirst().getId();
 
         for (String name : queueNames) {
             queueOps.createQueue(client, broker, queue(name));
-            snapshots.upsertBatch(
-                    List.of(new QueueRow(clusterId, nodeId, name, name, "ANYCAST", true, 0, 0, 0, 0, 0, 0, 0, false)));
+            snapshots.upsertBatch(List.of(new QueueRow(
+                    clusterId, nodeId, name, name, "ANYCAST", true, 0, 0, 0, 0, 0, 0, 0, false, "artemis.queue")));
         }
     }
 
@@ -189,7 +189,7 @@ class BulkRealBrokerTest extends PostgresIntegrationTest {
         assertThat(childAuditIds(deleted.run().auditEventId())).hasSize(3);
 
         for (String name : queueNames) {
-            assertThat(queueOps.boundQueues(client, BrokerMBeans.address(broker, name)))
+            assertThat(queueOps.boundQueues(client, MBeanNames.address(broker, name)))
                     .doesNotContain(name);
         }
     }

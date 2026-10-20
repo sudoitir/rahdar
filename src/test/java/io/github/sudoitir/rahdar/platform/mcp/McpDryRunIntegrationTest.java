@@ -96,8 +96,8 @@ class McpDryRunIntegrationTest extends PostgresIntegrationTest {
                 clusterId, "node-a", "PRIMARY", UUID.randomUUID().toString());
         node.attachSeedUrl("http://a:8161/console/jolokia");
         UUID nodeId = nodes.save(node).getId();
-        upsert.upsertBatch(
-                List.of(new QueueRow(clusterId, nodeId, QUEUE, QUEUE, "ANYCAST", true, 9, 0, 0, 0, 0, 0, 0, false)));
+        upsert.upsertBatch(List.of(new QueueRow(
+                clusterId, nodeId, QUEUE, QUEUE, "ANYCAST", true, 9, 0, 0, 0, 0, 0, 0, false, "artemis.queue")));
         key = McpFixture.mintKey(
                 users,
                 roles,

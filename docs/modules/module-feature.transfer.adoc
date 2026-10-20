@@ -19,13 +19,13 @@ _Others_
 * `i.g.s.r.f.t.TransferSettings`
 |Bean references
 |* `i.g.s.r.p.c.ClusterDirectory` (in Clusters)
-* `i.g.s.r.p.b.BrokerConnections` (in Broker connectivity)
+* `i.g.s.r.s.a.ArtemisNodes` (in Artemis)
 * `i.g.s.r.k.a.AuditService` (in Audit log)
 * `i.g.s.r.k.r.ReplicaRegistry` (in Replicas)
-* `i.g.s.r.p.b.CoreRelay` (in Broker connectivity)
-* `i.g.s.r.p.b.MessageOperations` (in Broker connectivity)
-* `i.g.s.r.p.b.StagingQueues` (in Broker connectivity)
-* `i.g.s.r.p.b.AcceptanceProbe` (in Broker connectivity)
+* `i.g.s.r.p.b.BrokerRelay` (in Broker connectivity)
+* `i.g.s.r.s.a.MessageOperations` (in Artemis)
+* `i.g.s.r.s.a.StagingQueues` (in Artemis)
+* `i.g.s.r.s.a.AcceptanceProbe` (in Artemis)
 * `i.g.s.r.p.b.NodeCallLimiter` (in Broker connectivity)
 * `i.g.s.r.k.s.OperatorHandoff` (in Security)
 * `i.g.s.r.k.s.SseHub` (in Event stream)

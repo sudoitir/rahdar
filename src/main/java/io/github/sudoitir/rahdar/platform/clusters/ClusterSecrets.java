@@ -27,7 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class ClusterSecrets {
 
-    /** The {@code broker_credential.kind} prefix, so these never collide with JOLOKIA_BASIC or CORE. */
+    /** The {@code broker_credential.kind} prefix, so these never collide with the MANAGEMENT and DATA credentials. */
     private static final String PREFIX = "REF:";
 
     private final BrokerCredentialRepository credentials;

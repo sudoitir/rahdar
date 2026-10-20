@@ -1,0 +1,4 @@
+CORE consumer | {"browseOnly":false,"queueName":"notif.<uuid>.ActiveMQServerImpl_name=cluster-node-1"}
+CORE consumer | {"browseOnly":false,"queueName":"notif.<uuid>.ActiveMQServerImpl_name=cluster-node-2"}
+POST /console/jolokia | Accept: application/json | Authorization: Basic YXJ0ZW1pczphcnRlbWlz | Connection: Upgrade, HTTP2-Settings | Content-Type: application/json | Upgrade: h2c | User-Agent: Java-http-client/<v> | {"attribute":["Active","Started","Backup","ReplicaSync","NodeID","Clustered","Version"],"mbean":"org.apache.activemq.artemis:broker=\"primary\"","type":"read"}
+POST /console/jolokia | Accept: application/json | Authorization: Basic YXJ0ZW1pczphcnRlbWlz | Connection: Upgrade, HTTP2-Settings | Content-Type: application/json | Upgrade: h2c | User-Agent: Java-http-client/<v> | {"mbean":"org.apache.activemq.artemis:broker=*","type":"search"}

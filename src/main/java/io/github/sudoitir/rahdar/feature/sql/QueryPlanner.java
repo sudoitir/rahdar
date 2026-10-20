@@ -33,7 +33,7 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Turns a validated {@link QueryAst} into a {@link QueryPlan} (ADR-0058 D6).
  *
- * <p>Planning contacts no broker. Targets come from {@code queue_snapshot}, the cost
+ * <p>Planning contacts no broker. Targets come from {@code subscription_snapshot}, the cost
  * estimate from the message counts already in it, and the per-node "now" from the
  * measured clock offsets. That is what lets the console state the cost of a query
  * while the operator is still typing — the only moment at which stating it is
@@ -180,7 +180,7 @@ public class QueryPlanner {
         }
 
         // A primary and its synced backup share an Artemis node id and are one
-        // logical node; queue_snapshot holds a row per endpoint. Without this a
+        // logical node; subscription_snapshot holds a row per endpoint. Without this a
         // paired cluster returns every matching message twice.
         Set<String> seen = new HashSet<>();
         List<Target> targets = new ArrayList<>();
@@ -242,7 +242,7 @@ public class QueryPlanner {
     }
 
     private static String logicalKey(ClusterNode node) {
-        return node.getArtemisNodeId() != null ? node.getArtemisNodeId() : "id:" + node.getId();
+        return node.getNativeNodeId() != null ? node.getNativeNodeId() : "id:" + node.getId();
     }
 
     // ---- source ---------------------------------------------------------

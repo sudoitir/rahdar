@@ -82,7 +82,22 @@ class CrossNodeAggregatorTest extends PostgresIntegrationTest {
     }
 
     private QueueRow row(UUID node, String address, String queue, long messageCount) {
-        return new QueueRow(clusterId, node, address, queue, "ANYCAST", true, messageCount, 1, 0, 0, 0, 0, 0, false);
+        return new QueueRow(
+                clusterId,
+                node,
+                address,
+                queue,
+                "ANYCAST",
+                true,
+                messageCount,
+                1,
+                0,
+                0,
+                0,
+                0,
+                0,
+                false,
+                "artemis.queue");
     }
 
     @Test
@@ -123,7 +138,7 @@ class CrossNodeAggregatorTest extends PostgresIntegrationTest {
         Fixture f = pairPlusStandalone();
         upsert.upsertBatch(List.of(row(f.nodeA(), "ORDERS", "ORDERS", 7)));
         jdbc.update(
-                "UPDATE queue_snapshot SET ts = now() - interval '30 minutes' WHERE node_id = :n",
+                "UPDATE subscription_snapshot SET ts = now() - interval '30 minutes' WHERE node_id = :n",
                 Map.of("n", f.nodeA()));
 
         QueueView orders = aggregator

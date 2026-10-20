@@ -1,17 +1,30 @@
 package io.github.sudoitir.rahdar.platform.clusters.internal.persistence;
 
+import io.github.sudoitir.openbroker.Endpoint;
+import io.github.sudoitir.openbroker.Plane;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
+import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
+import io.github.sudoitir.rahdar.platform.broker.CoreUrl;
 import io.github.sudoitir.rahdar.platform.broker.ManagementUrlProblem;
 import io.github.sudoitir.rahdar.platform.broker.ManagementUrlSource;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
 import io.github.sudoitir.rahdar.platform.clusters.SplitBrainStatus;
+import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNodeEndpoint.Source;
+import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
+import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
 import jakarta.persistence.Table;
 import java.time.Instant;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.EqualsAndHashCode;
@@ -43,17 +56,16 @@ public class BrokerNodeEntity implements ClusterNode {
     @Column(name = "name", nullable = false)
     private String name;
 
-    @Column(name = "jolokia_url")
-    private String jolokiaUrl;
+    @Getter(AccessLevel.NONE)
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "broker_node_endpoint", joinColumns = @JoinColumn(name = "node_id"))
+    private Set<BrokerNodeEndpoint> endpoints = new HashSet<>();
 
-    @Column(name = "core_url")
-    private String coreUrl;
+    @Column(name = "ha_designation", nullable = false)
+    private String haDesignation = "NONE";
 
-    @Column(name = "ha_role", nullable = false)
-    private String haRole = "STANDALONE";
-
-    @Column(name = "pair_group")
-    private String pairGroup;
+    @Column(name = "ha_group")
+    private String haGroup;
 
     @Column(name = "state", nullable = false)
     private String state = "UNKNOWN";
@@ -61,8 +73,8 @@ public class BrokerNodeEntity implements ClusterNode {
     @Column(name = "version")
     private String version;
 
-    @Column(name = "artemis_node_id")
-    private String artemisNodeId;
+    @Column(name = "native_node_id")
+    private String nativeNodeId;
 
     @Column(name = "last_error")
     private String lastError;
@@ -74,19 +86,12 @@ public class BrokerNodeEntity implements ClusterNode {
     private Instant urlCheckedAt;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "url_source")
-    private ManagementUrlSource urlSource;
-
-    @Enumerated(EnumType.STRING)
     @Column(name = "url_problem")
     private ManagementUrlProblem urlProblem;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "last_error_kind")
     private BrokerConnectionException.Kind lastErrorKind;
-
-    @Column(name = "core_url_manual", nullable = false)
-    private boolean coreUrlManual;
 
     @Column(name = "active")
     private Boolean active;
@@ -110,65 +115,105 @@ public class BrokerNodeEntity implements ClusterNode {
     @Column(name = "clock_uncertainty_ms")
     private Integer clockUncertaintyMs;
 
-    /** A row learned from {@code listNetworkTopology()} — connector-named, no management URL yet. */
-    public static BrokerNodeEntity discovered(UUID clusterId, String connector, String haRole, String nodeId) {
+    /** A row learned from the broker's topology: named after its connector, no management URL yet. */
+    public static BrokerNodeEntity discovered(UUID clusterId, String connector, String haDesignation, String nodeId) {
         BrokerNodeEntity n = new BrokerNodeEntity();
         n.clusterId = clusterId;
         n.name = connector;
-        n.coreUrl = connector;
-        n.haRole = haRole;
-        n.pairGroup = nodeId;
-        n.artemisNodeId = nodeId;
+        n.setEndpoint(Plane.DATA, BrokerGateway.CORE, CoreUrl.dialable(connector), Source.DISCOVERED);
+        n.haDesignation = haDesignation;
+        n.haGroup = nodeId;
+        n.nativeNodeId = nodeId;
         return n;
     }
 
     /** A row created directly from a registration seed (no matching topology entry). */
-    public static BrokerNodeEntity fromSeed(UUID clusterId, String name, String haRole, String nodeId) {
+    public static BrokerNodeEntity fromSeed(UUID clusterId, String name, String haDesignation, String nodeId) {
         BrokerNodeEntity n = new BrokerNodeEntity();
         n.clusterId = clusterId;
         n.name = name;
-        n.haRole = haRole;
-        n.pairGroup = nodeId;
-        n.artemisNodeId = nodeId;
+        n.haDesignation = haDesignation;
+        n.haGroup = nodeId;
+        n.nativeNodeId = nodeId;
         return n;
     }
 
-    /** Discovery merge: enrich a row with what the topology reports, leaving a manual Core URL and the management URL as they are. */
-    public void mergeDiscovered(String coreUrl, String haRole, String nodeId) {
-        if (coreUrl != null && !coreUrlManual) {
-            this.coreUrl = coreUrl;
+    /** Discovery merge: enrich a row with what the topology reports, leaving a manual data URL and the management URL as they are. */
+    public void mergeDiscovered(String connector, String haDesignation, String nodeId) {
+        if (connector != null && !isDataUrlManual()) {
+            setEndpoint(Plane.DATA, BrokerGateway.CORE, CoreUrl.dialable(connector), Source.DISCOVERED);
         }
-        this.haRole = haRole;
-        this.pairGroup = nodeId;
+        this.haDesignation = haDesignation;
+        this.haGroup = nodeId;
         if (nodeId != null) {
-            this.artemisNodeId = nodeId;
+            this.nativeNodeId = nodeId;
         }
+    }
+
+    @Override
+    public String getManagementUrl() {
+        return endpoint(Plane.MANAGEMENT).map(BrokerNodeEndpoint::getUrl).orElse(null);
+    }
+
+    @Override
+    public String getDataUrl() {
+        return endpoint(Plane.DATA).map(BrokerNodeEndpoint::getUrl).orElse(null);
+    }
+
+    @Override
+    public ManagementUrlSource getUrlSource() {
+        return endpoint(Plane.MANAGEMENT)
+                .map(e -> ManagementUrlSource.valueOf(e.getSource().name()))
+                .orElse(null);
+    }
+
+    @Override
+    public boolean isDataUrlManual() {
+        return endpoint(Plane.DATA).map(e -> e.getSource() == Source.MANUAL).orElse(false);
+    }
+
+    @Override
+    public List<Endpoint> getEndpoints() {
+        return endpoints.stream()
+                .map(e -> new Endpoint(e.getPlane(), e.getProtocol(), e.getUrl()))
+                .toList();
+    }
+
+    private Optional<BrokerNodeEndpoint> endpoint(Plane plane) {
+        return endpoints.stream().filter(e -> e.getPlane() == plane).findFirst();
+    }
+
+    /** The node's one endpoint on a plane, replacing any it had; a {@code null} url removes it. */
+    private void setEndpoint(Plane plane, String protocol, String url, Source source) {
+        endpoints.removeIf(e -> e.getPlane() == plane);
+        if (url != null) {
+            endpoints.add(new BrokerNodeEndpoint(plane, protocol, url, source));
+        }
+    }
+
+    private void setManagementUrl(String url, Source source) {
+        setEndpoint(Plane.MANAGEMENT, BrokerGateway.JOLOKIA, url, source);
     }
 
     /**
      * A management URL the operator gave as a seed. A URL already set manually stays manual; any other
      * source becomes {@code SEED}, because the operator has now named it.
      */
-    public void attachSeedUrl(String jolokiaUrl) {
-        this.jolokiaUrl = jolokiaUrl;
-        if (urlSource != ManagementUrlSource.MANUAL) {
-            this.urlSource = ManagementUrlSource.SEED;
-        }
+    public void attachSeedUrl(String managementUrl) {
+        setManagementUrl(managementUrl, getUrlSource() == ManagementUrlSource.MANUAL ? Source.MANUAL : Source.SEED);
         this.urlProblem = null;
     }
 
     /** A management URL built from the cluster's pattern and proved by the broker's NodeID (ADR-0175). */
-    public void attachDerivedUrl(String jolokiaUrl) {
-        this.jolokiaUrl = jolokiaUrl;
-        this.urlSource = ManagementUrlSource.DERIVED;
+    public void attachDerivedUrl(String managementUrl) {
+        setManagementUrl(managementUrl, Source.DERIVED);
         this.urlProblem = null;
         this.urlCheckedAt = null;
     }
 
     /** The attempt to derive a management URL failed: the node has none, and says why. */
     public void recordUrlProblem(ManagementUrlProblem problem, Instant checkedAt) {
-        this.jolokiaUrl = null;
-        this.urlSource = null;
+        setManagementUrl(null, null);
         this.urlProblem = problem;
         this.urlCheckedAt = checkedAt;
     }
@@ -181,44 +226,46 @@ public class BrokerNodeEntity implements ClusterNode {
 
     /** A seed the operator no longer lists: the node keeps no URL until one is derived again. */
     public void releaseSeedUrl() {
-        this.jolokiaUrl = null;
-        this.urlSource = null;
+        setManagementUrl(null, null);
         this.urlProblem = null;
     }
 
     /** The {@code PATCH} override: an operator supplies a reachable URL; discovery must never overwrite it. */
-    public void applyManualUrl(String jolokiaUrl) {
-        this.jolokiaUrl = jolokiaUrl;
-        this.urlSource = ManagementUrlSource.MANUAL;
+    public void applyManualUrl(String managementUrl) {
+        setManagementUrl(managementUrl, Source.MANUAL);
         this.urlProblem = null;
     }
 
     /**
-     * The {@code PATCH} override for the Core URL: discovery stores the
+     * The {@code PATCH} override for the data URL: discovery stores the
      * broker-advertised connector, which is often unreachable from where Rahdar
-     * runs (ADR-0026). Marks the Core URL manual so discovery leaves it alone.
+     * runs (ADR-0026). Marks the data URL manual so discovery leaves it alone.
      */
-    public void applyManualCoreUrl(String coreUrl) {
-        this.coreUrl = coreUrl;
-        this.coreUrlManual = true;
+    public void applyManualDataUrl(String dataUrl) {
+        setEndpoint(Plane.DATA, BrokerGateway.CORE, CoreUrl.dialable(dataUrl), Source.MANUAL);
     }
 
-    /** What one HA read of a broker reported; a null {@code version} or {@code artemisNodeId} leaves the stored one. */
+    /** What one HA read of a broker reported; a null {@code version} or {@code nativeNodeId} leaves the stored one. */
     public record HaObservation(
-            Boolean active, String state, String haRole, Boolean replicaSync, String version, String artemisNodeId) {}
+            Boolean active,
+            String state,
+            String haDesignation,
+            Boolean replicaSync,
+            String version,
+            String nativeNodeId) {}
 
     /** The refresh loop's write: HA state tagged with the cycle it was observed in (ADR-0012). */
     public void applyHaState(HaObservation observed, long observedCycle, Instant lastSeenAt) {
         this.active = observed.active();
         this.state = observed.state();
-        this.haRole = observed.haRole();
+        this.haDesignation = observed.haDesignation();
         this.replicaSync = observed.replicaSync();
         this.observedCycle = observedCycle;
         if (observed.version() != null) {
             this.version = observed.version();
         }
-        if (observed.artemisNodeId() != null) {
-            this.artemisNodeId = observed.artemisNodeId();
+        if (observed.nativeNodeId() != null) {
+            this.nativeNodeId = observed.nativeNodeId();
         }
         this.lastSeenAt = lastSeenAt;
         this.lastError = null;

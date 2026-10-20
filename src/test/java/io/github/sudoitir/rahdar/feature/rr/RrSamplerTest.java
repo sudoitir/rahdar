@@ -14,12 +14,12 @@ import io.github.sudoitir.rahdar.feature.rr.internal.persistence.RrExpectationEn
 import io.github.sudoitir.rahdar.feature.rr.internal.persistence.RrExpectationRepository;
 import io.github.sudoitir.rahdar.feature.sql.CaptureCoverage;
 import io.github.sudoitir.rahdar.platform.broker.BodyDecoder.Compression;
+import io.github.sudoitir.rahdar.platform.broker.BodyEncoding;
+import io.github.sudoitir.rahdar.platform.broker.BrokerMessages;
 import io.github.sudoitir.rahdar.platform.broker.BrokerTime;
+import io.github.sudoitir.rahdar.platform.broker.BrowsePage;
+import io.github.sudoitir.rahdar.platform.broker.BrowsedMessage;
 import io.github.sudoitir.rahdar.platform.broker.ClockOffsetService;
-import io.github.sudoitir.rahdar.platform.broker.CoreMessageTransport;
-import io.github.sudoitir.rahdar.platform.broker.MessageBrowser.BodyEncoding;
-import io.github.sudoitir.rahdar.platform.broker.MessageBrowser.BrowsedMessage;
-import io.github.sudoitir.rahdar.platform.broker.MessageTransport.TransportTarget;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterOwnership;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNodeEntity;
@@ -32,6 +32,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.BiFunction;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.ObjectProvider;
 
@@ -46,9 +47,39 @@ class RrSamplerTest {
 
     private static BrokerNodeEntity node(String name, String coreUrl) {
         BrokerNodeEntity n = BrokerNodeEntity.fromSeed(CLUSTER, name, "PRIMARY", name);
-        n.applyManualCoreUrl(coreUrl);
+        n.applyManualDataUrl(coreUrl);
         n.applyHaState(new HaObservation(true, "STARTED", "PRIMARY", true, "2.44.0", name), 1L, Instant.now());
+        return identified(n);
+    }
+
+    /** As the directory hands nodes out: each with its id. */
+    private static BrokerNodeEntity identified(BrokerNodeEntity n) {
+        try {
+            Field id = BrokerNodeEntity.class.getDeclaredField("id");
+            id.setAccessible(true);
+            id.set(n, UUID.randomUUID());
+        } catch (ReflectiveOperationException ex) {
+            throw new IllegalStateException(ex);
+        }
         return n;
+    }
+
+    /** Messages whose browse answers by the browsed node's Core URL and the queue, as these tests name them. */
+    private static BrokerMessages browsing(
+            List<BrokerNodeEntity> nodes, BiFunction<String, String, List<BrowsedMessage>> byCoreUrlAndQueue) {
+        BrokerMessages messages = mock(BrokerMessages.class);
+        when(messages.browse(eq(CLUSTER), any(), any(), anyInt(), anyInt(), any()))
+                .thenAnswer(invocation -> {
+                    UUID nodeId = invocation.getArgument(1);
+                    String coreUrl = nodes.stream()
+                            .filter(n -> n.getId().equals(nodeId))
+                            .findFirst()
+                            .orElseThrow()
+                            .getDataUrl();
+                    List<BrowsedMessage> found = byCoreUrlAndQueue.apply(coreUrl, invocation.getArgument(2));
+                    return new BrowsePage(found, (long) found.size());
+                });
+        return messages;
     }
 
     private static BrowsedMessage message(long id, String correlationId) {
@@ -99,16 +130,13 @@ class RrSamplerTest {
 
     @SuppressWarnings("unchecked")
     private static Fixture samplerOver(
-            List<BrokerNodeEntity> nodes, RrExpectationEntity expectation, CoreMessageTransport transport) {
+            List<BrokerNodeEntity> nodes, RrExpectationEntity expectation, BrokerMessages transport) {
         return samplerOver(nodes, expectation, transport, true);
     }
 
     @SuppressWarnings("unchecked")
     private static Fixture samplerOver(
-            List<BrokerNodeEntity> nodes,
-            RrExpectationEntity expectation,
-            CoreMessageTransport transport,
-            boolean owned) {
+            List<BrokerNodeEntity> nodes, RrExpectationEntity expectation, BrokerMessages transport, boolean owned) {
         RrExpectationRepository expectations = mock(RrExpectationRepository.class);
         when(expectations.findByEnabledTrue()).thenReturn(List.of(expectation));
 
@@ -162,19 +190,16 @@ class RrSamplerTest {
         RrExpectationEntity expectation =
                 saved(new RrExpectationEntity(CLUSTER, "rr.request", List.of(), null, null, 10, false));
 
-        CoreMessageTransport transport = mock(CoreMessageTransport.class);
-        when(transport.sample(any(TransportTarget.class), anyInt())).thenAnswer(invocation -> {
-            TransportTarget target = invocation.getArgument(0);
-            if ("core://broken:61616".equals(target.coreUrl())) {
+        List<BrokerNodeEntity> nodes =
+                List.of(node("a-broken", "core://broken:61616"), node("b-healthy", "core://healthy:61616"));
+        BrokerMessages transport = browsing(nodes, (coreUrl, queue) -> {
+            if ("core://broken:61616".equals(coreUrl)) {
                 throw new IllegalStateException("node unreachable");
             }
             return List.of(message(1L, "corr-1"));
         });
 
-        Fixture f = samplerOver(
-                List.of(node("a-broken", "core://broken:61616"), node("b-healthy", "core://healthy:61616")),
-                expectation,
-                transport);
+        Fixture f = samplerOver(nodes, expectation, transport);
 
         f.sampler().tick();
 
@@ -190,15 +215,13 @@ class RrSamplerTest {
                 CLUSTER, "rr.request", List.of("rr.reply.a", "rr.reply.b"), null, null, 10, false));
 
         List<String> browsed = new ArrayList<>();
-        CoreMessageTransport transport = mock(CoreMessageTransport.class);
-        when(transport.sample(any(TransportTarget.class), anyInt())).thenAnswer(invocation -> {
-            TransportTarget target = invocation.getArgument(0);
-            browsed.add(target.coreUrl() + " " + target.address());
+        List<BrokerNodeEntity> nodes = List.of(node("n1", "core://one:61616"), node("n2", "core://two:61616"));
+        BrokerMessages transport = browsing(nodes, (coreUrl, queue) -> {
+            browsed.add(coreUrl + " " + queue);
             return List.of();
         });
 
-        Fixture f = samplerOver(
-                List.of(node("n1", "core://one:61616"), node("n2", "core://two:61616")), expectation, transport);
+        Fixture f = samplerOver(nodes, expectation, transport);
 
         f.sampler().tick();
 
@@ -216,7 +239,7 @@ class RrSamplerTest {
     void aClusterThisReplicaDoesNotOwnIsNotSampled() {
         RrExpectationEntity expectation =
                 saved(new RrExpectationEntity(CLUSTER, "rr.request", List.of(), null, null, 10, false));
-        CoreMessageTransport transport = mock(CoreMessageTransport.class);
+        BrokerMessages transport = mock(BrokerMessages.class);
         Fixture f = samplerOver(List.of(node("broker-1", "core://broker-1:61616")), expectation, transport, false);
 
         f.sampler().tick();
@@ -232,18 +255,18 @@ class RrSamplerTest {
 
         BrokerNodeEntity errored = node("n-errored", "core://errored:61616");
         errored.recordError(Instant.now(), "last scrape failed", null);
-        BrokerNodeEntity noCore = BrokerNodeEntity.fromSeed(CLUSTER, "n-no-core", "PRIMARY", "n-no-core");
+        BrokerNodeEntity noCore = identified(BrokerNodeEntity.fromSeed(CLUSTER, "n-no-core", "PRIMARY", "n-no-core"));
         noCore.applyHaState(
                 new HaObservation(true, "STARTED", "PRIMARY", true, "2.44.0", "n-no-core"), 1L, Instant.now());
 
         List<String> browsed = new ArrayList<>();
-        CoreMessageTransport transport = mock(CoreMessageTransport.class);
-        when(transport.sample(any(TransportTarget.class), anyInt())).thenAnswer(invocation -> {
-            browsed.add(((TransportTarget) invocation.getArgument(0)).coreUrl());
+        List<BrokerNodeEntity> nodes = List.of(errored, noCore, node("n-ok", "core://ok:61616"));
+        BrokerMessages transport = browsing(nodes, (coreUrl, queue) -> {
+            browsed.add(coreUrl);
             return List.of();
         });
 
-        Fixture f = samplerOver(List.of(errored, noCore, node("n-ok", "core://ok:61616")), expectation, transport);
+        Fixture f = samplerOver(nodes, expectation, transport);
 
         f.sampler().tick();
 
@@ -258,7 +281,7 @@ class RrSamplerTest {
         RrExpectationEntity expectation =
                 saved(new RrExpectationEntity(CLUSTER, "rr.request", List.of(), null, null, 10, false));
         BrokerNodeEntity noCore = node("broker-1", null);
-        Fixture f = samplerOver(List.of(noCore), expectation, mock(CoreMessageTransport.class));
+        Fixture f = samplerOver(List.of(noCore), expectation, mock(BrokerMessages.class));
 
         f.sampler().tick();
 
@@ -276,14 +299,14 @@ class RrSamplerTest {
         // UI was offering a control that did nothing.
         RrExpectationEntity expectation =
                 saved(new RrExpectationEntity(CLUSTER, "rr.request", List.of(), null, null, 1, false));
-        CoreMessageTransport transport = mock(CoreMessageTransport.class);
-        when(transport.sample(any(TransportTarget.class), anyInt())).thenReturn(List.of());
-        Fixture f = samplerOver(List.of(node("broker-1", "tcp://10.0.0.1:61616")), expectation, transport);
+        List<BrokerNodeEntity> nodes = List.of(node("broker-1", "tcp://10.0.0.1:61616"));
+        BrokerMessages transport = browsing(nodes, (coreUrl, queue) -> List.of());
+        Fixture f = samplerOver(nodes, expectation, transport);
 
         // One sample per minute: the second tick, moments later, must not browse.
         f.sampler().tick();
         f.sampler().tick();
 
-        verify(transport, times(1)).sample(any(TransportTarget.class), anyInt());
+        verify(transport, times(1)).browse(eq(CLUSTER), any(), any(), anyInt(), anyInt(), any());
     }
 }

@@ -112,7 +112,7 @@ public final class SqlViews {
 
             @Schema(
                     description = "The message's id on its source queue, for a captured row. Null when the"
-                            + " broker did not copy _AMQ_ORIG_MESSAGE_ID, which is what makes verifying it"
+                            + " broker did not record the message's origin id, which is what makes verifying it"
                             + " against the live broker impossible.")
             Long sourceMessageId,
 
@@ -133,9 +133,6 @@ public final class SqlViews {
 
             long examined,
             long matched,
-
-            @Schema(description = "JOLOKIA or CORE — the channel that served this node.")
-            String servedBy,
 
             String detail) {}
 

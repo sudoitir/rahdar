@@ -1,5 +1,11 @@
 package io.github.sudoitir.rahdar.feature.messages;
 
+import io.github.sudoitir.openbroker.messaging.BulkOutcome;
+import io.github.sudoitir.openbroker.messaging.MessageAction.Delete;
+import io.github.sudoitir.openbroker.messaging.MessageAction.Move;
+import io.github.sudoitir.openbroker.messaging.MessageAction.Retry;
+import io.github.sudoitir.openbroker.messaging.MessageField;
+import io.github.sudoitir.openbroker.messaging.MessageFilter;
 import io.github.sudoitir.rahdar.feature.messages.MessageActionParams.MessageDeleteParams;
 import io.github.sudoitir.rahdar.feature.messages.MessageActionParams.MessageExpireParams;
 import io.github.sudoitir.rahdar.feature.messages.MessageActionParams.MessageMoveParams;
@@ -25,24 +31,18 @@ import io.github.sudoitir.rahdar.kernel.security.ResourceRef;
 import io.github.sudoitir.rahdar.kernel.settings.SettingsService;
 import io.github.sudoitir.rahdar.kernel.stream.SseHub;
 import io.github.sudoitir.rahdar.platform.broker.Attempt;
+import io.github.sudoitir.rahdar.platform.broker.BodyEncoding;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
-import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
-import io.github.sudoitir.rahdar.platform.broker.BrokerMBeans;
+import io.github.sudoitir.rahdar.platform.broker.BrokerMessages;
 import io.github.sudoitir.rahdar.platform.broker.BrokerSettings;
+import io.github.sudoitir.rahdar.platform.broker.BrowsePage;
+import io.github.sudoitir.rahdar.platform.broker.BrowsedMessage;
 import io.github.sudoitir.rahdar.platform.broker.BulkCapExceededException;
-import io.github.sudoitir.rahdar.platform.broker.CoreMessageTransport;
-import io.github.sudoitir.rahdar.platform.broker.CoreSubscriptionManager;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaBrokerClient;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaMessageTransport;
-import io.github.sudoitir.rahdar.platform.broker.MessageBrowser;
-import io.github.sudoitir.rahdar.platform.broker.MessageBrowser.BrowsedMessage;
+import io.github.sudoitir.rahdar.platform.broker.BulkResult;
+import io.github.sudoitir.rahdar.platform.broker.MessageExpiry;
 import io.github.sudoitir.rahdar.platform.broker.MessageKind;
-import io.github.sudoitir.rahdar.platform.broker.MessageOperations;
-import io.github.sudoitir.rahdar.platform.broker.MessageTransport;
-import io.github.sudoitir.rahdar.platform.broker.MessageTransport.BrowseResult;
-import io.github.sudoitir.rahdar.platform.broker.MessageTransport.SendSpec;
-import io.github.sudoitir.rahdar.platform.broker.MessageTransport.TransportTarget;
 import io.github.sudoitir.rahdar.platform.broker.SendNames;
+import io.github.sudoitir.rahdar.platform.broker.SentMessages;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
 import io.github.sudoitir.rahdar.platform.governance.ClearViewAudit;
@@ -61,7 +61,9 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -73,7 +75,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 /**
  * Message browse and the destructive message operations for one queue on one
  * node (ADR-0021, ADR-0022). {@code address} / {@code routingType} come from the
- * cached {@code queue_snapshot} row, or a live read for a queue the scrape has not reached,
+ * cached {@code subscription_snapshot} row, or a live read for a queue the scrape has not reached,
  * never the client. Every broker request waits for
  * the node's rate ceiling in the transport itself (non-negotiable #1, ADR-0076); every mutation writes
  * an {@code audit_event} in its own transaction, before the broker call, updated
@@ -85,19 +87,15 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 @RequiredArgsConstructor
 public class MessageService {
 
-    /** {@code managementBrowsePageSize} default — the broker will not return more per page. */
-    static final int BROKER_PAGE_CAP = 200;
+    static final int BROKER_PAGE_CAP = BrokerMessages.PAGE_CAP;
 
     private static final String CORRELATION_ID = "correlationId";
     private static final String GROUP_ID = "groupId";
 
     private final QueueLocator queueLocator;
     private final ClusterDirectory brokerNodes;
-    private final BrokerConnections connections;
-    private final MessageOperations messageOps;
-    private final JolokiaMessageTransport jolokiaTransport;
-    private final CoreMessageTransport coreTransport;
-    private final CoreSubscriptionManager subscriptions;
+    private final BrokerMessages messages;
+    private final MessageExpiry expiry;
     private final AuditService audit;
     private final ActorResolver actorResolver;
     private final SettingsService settings;
@@ -136,18 +134,18 @@ public class MessageService {
         ResolvedQueue resolved = resolve(clusterId, queueName, nodeId);
         // The broker serves at most BROKER_PAGE_CAP rows; the page size reported and used for hasNext is that one.
         int size = Math.min(requestedSize, BROKER_PAGE_CAP);
-        BrowseResult result = browseAt(clusterId, queueName, resolved, page, size, filter);
+        BrowsePage result = messages.browse(clusterId, resolved.node().getId(), queueName, page, size, filter);
         GovernContext context = contentPolicy.context(clusterId, resolved.address(), queueName);
-        List<BrowsedMessage> messages = result.page().messages();
-        List<GovernedMessage> governed = messages.stream()
+        List<BrowsedMessage> browsed = result.messages();
+        List<GovernedMessage> governed = browsed.stream()
                 .map(m -> contentPolicy.govern(context, content(m)))
                 .toList();
-        List<MessageSummaryView> rows = new ArrayList<>(messages.size());
-        for (int i = 0; i < messages.size(); i++) {
-            rows.add(toSummary(messages.get(i), governed.get(i)));
+        List<MessageSummaryView> rows = new ArrayList<>(browsed.size());
+        for (int i = 0; i < browsed.size(); i++) {
+            rows.add(toSummary(browsed.get(i), governed.get(i)));
         }
         clearViews.recordClear(context, "QUEUE", queueName, governed);
-        Long total = result.page().total();
+        Long total = result.total();
         // ponytail: with no broker count, a full page is taken to have a successor; the last page can be a false yes
         boolean hasNext = total != null ? (long) page * size < total : rows.size() == size;
         return new MessagePageView(
@@ -156,24 +154,22 @@ public class MessageService {
                 size,
                 total,
                 hasNext,
-                result.page().totalUnavailable(),
-                resolved.node().getId(),
-                result.servedBy().name());
+                result.totalUnavailable(),
+                resolved.node().getId());
     }
 
     public MessageDetailView detail(UUID clusterId, String queueName, long messageId, UUID nodeId, String filter) {
         clusterAccess.requireResource(clusterId, ResourceRef.queue(queueName), MessagePermissions.MESSAGE_READ);
         ResolvedQueue resolved = resolve(clusterId, queueName, nodeId);
-        BrowseResult result = browseAt(clusterId, queueName, resolved, 1, BROKER_PAGE_CAP, filter);
-        BrowsedMessage message = result.page().messages().stream()
+        BrowsePage result = messages.browse(clusterId, resolved.node().getId(), queueName, 1, BROKER_PAGE_CAP, filter);
+        BrowsedMessage message = result.messages().stream()
                 .filter(m -> m.messageId() == messageId)
                 .findFirst()
                 .orElseThrow(() -> new NotFoundException("message", messageId));
         GovernContext context = contentPolicy.context(clusterId, resolved.address(), queueName);
         GovernedMessage governed = contentPolicy.govern(context, content(message));
         clearViews.recordClear(context, "MESSAGE", queueName + "/" + messageId, List.of(governed));
-        return toDetail(
-                message, governed, resolved.node().getId(), result.servedBy().name());
+        return toDetail(message, governed, resolved.node().getId());
     }
 
     // ---- send (Slice 4) -------------------------------------------------
@@ -208,10 +204,11 @@ public class MessageService {
                     resolved.node().getId()));
         }
         try {
-            transportFor(clusterId)
-                    .send(
-                            targetOf(clusterId, queueName, resolved),
-                            new SendSpec(req.kind(), req.durable(), req.body(), req.headers(), req.properties()));
+            messages.send(
+                    clusterId,
+                    resolved.node().getId(),
+                    resolved.address(),
+                    SentMessages.of(req.kind(), req.durable(), req.body(), req.headers(), req.properties()));
             audit.succeed(event, 1);
             publishQueuesAfterCommit(clusterId, queueName);
             return new Attempt.Ok<>(new Outcome.Affected(1, resolved.node().getId()));
@@ -290,24 +287,27 @@ public class MessageService {
         requireAllowed(clusterId, queueName, action, req);
         ResolvedQueue resolved = resolve(clusterId, queueName, nodeId);
         if (!req.byFilter() && !req.ids().isEmpty()) {
-            return new Reach(req.ids().size(), identityOf(resolved));
+            return new Reach(req.ids().size(), identityOf(clusterId, resolved, queueName));
         }
-        JolokiaBrokerClient client = clientFor(clusterId, resolved);
-        return new Reach(estimate(client, queueMbean(client, resolved, queueName), action, req), identityOf(resolved));
+        return new Reach(
+                estimate(clusterId, resolved, queueName, action, req), identityOf(clusterId, resolved, queueName));
     }
 
     /** What a purge would remove now, read as {@link #reach} reads an action. */
     public Reach reachOfPurge(UUID clusterId, String queueName, UUID nodeId) {
         clusterAccess.requireResource(clusterId, ResourceRef.queue(queueName), MessagePermissions.QUEUE_PURGE);
         ResolvedQueue resolved = resolve(clusterId, queueName, nodeId);
-        JolokiaBrokerClient client = clientFor(clusterId, resolved);
         return new Reach(
-                messageOps.messageCount(client, queueMbean(client, resolved, queueName)), identityOf(resolved));
+                messages.count(clusterId, resolved.node().getId(), queueName, null),
+                identityOf(clusterId, resolved, queueName));
     }
 
-    /** The queue as the gate pins it: the address and routing type it is bound with, so a queue recreated elsewhere differs. */
-    private static String identityOf(ResolvedQueue resolved) {
-        return resolved.address() + "|" + resolved.routingType();
+    /**
+     * The queue as the gate pins it: which incarnation of it is on the node, so a queue deleted and created
+     * again since the request differs, and a backlog that grew does not.
+     */
+    private String identityOf(UUID clusterId, ResolvedQueue resolved, String queueName) {
+        return messages.identity(clusterId, resolved.node().getId(), queueName);
     }
 
     private Attempt<Outcome> run(
@@ -347,9 +347,7 @@ public class MessageService {
         }
 
         try {
-            JolokiaBrokerClient client = clientFor(clusterId, resolved);
-            String mbean = queueMbean(client, resolved, queueName);
-            long estimate = estimate(client, mbean, action, req);
+            long estimate = estimate(clusterId, resolved, queueName, action, req);
             boolean over = estimate > cap;
             if (dryRun) {
                 audit.succeed(event, estimate);
@@ -360,11 +358,11 @@ public class MessageService {
                 throw new BulkCapExceededException(estimate, cap);
             }
 
+            QueueAction call = new QueueAction(clusterId, resolved, queueName, action, req, scope);
             if (idBased) {
-                return executeByIds(
-                        event, new QueueAction(client, mbean, action, req, scope), clusterId, queueName, node);
+                return executeByIds(event, call, clusterId, queueName, node);
             }
-            long affected = perform(new QueueAction(client, mbean, action, req, scope));
+            long affected = perform(call);
             audit.succeed(event, affected);
             publishQueuesAfterCommit(clusterId, queueName);
             return new Attempt.Ok<>(new Outcome.Affected(affected, node));
@@ -401,7 +399,7 @@ public class MessageService {
 
     private Attempt<Outcome> executeByIds(
             AuditEvent event, QueueAction call, UUID clusterId, String queueName, UUID node) {
-        MessageOperations.BulkResult result = performByIds(call);
+        BulkResult result = performByIds(call);
         MessageActionRequest req = call.req();
         publishQueuesAfterCommit(clusterId, queueName);
         if (result.partial()) {
@@ -437,22 +435,20 @@ public class MessageService {
         UUID node = resolved.node().getId();
         AuditEvent event = begin("PURGE_QUEUE", queueName, clusterId, node, Map.of(), dryRun);
         try {
-            JolokiaBrokerClient client = clientFor(clusterId, resolved);
-            String mbean = queueMbean(client, resolved, queueName);
             long cap = settings.intValue(BrokerSettings.BULK_CAP);
 
             if (dryRun) {
-                long estimate = messageOps.messageCount(client, mbean);
+                long estimate = messages.count(clusterId, node, queueName, null);
                 audit.succeed(event, estimate);
                 return new Attempt.Ok<>(new Outcome.DryRun(estimate, cap, estimate > cap, node));
             }
 
-            long estimate = messageOps.messageCount(client, mbean);
+            long estimate = messages.count(clusterId, node, queueName, null);
             if (estimate > cap && !override) {
                 audit.fail(event, "Over the safety cap (" + estimate + " > " + cap + ").");
                 throw new BulkCapExceededException(estimate, cap);
             }
-            long removed = messageOps.purge(client, mbean);
+            long removed = messages.purge(clusterId, node, queueName);
             audit.succeed(event, removed);
             publishQueuesAfterCommit(clusterId, queueName);
             return new Attempt.Ok<>(new Outcome.Affected(removed, node));
@@ -504,8 +500,10 @@ public class MessageService {
         if (clusterAccess.holds(clusterId, MessagePermissions.MESSAGE_SEND)) {
             return RetryScope.UNRESTRICTED;
         }
-        JolokiaBrokerClient client = clientFor(clusterId, resolved);
-        Set<String> origins = messageOps.originalAddresses(client, queueMbean(client, resolved, queueName));
+        Set<String> origins = new TreeSet<>(
+                messages.countBy(clusterId, resolved.node().getId(), queueName, MessageField.header("origin"))
+                        .keySet());
+        origins.removeIf(o -> o.isBlank() || "null".equals(o));
         clusterAccess.requireAll(
                 clusterId,
                 origins.stream()
@@ -523,30 +521,42 @@ public class MessageService {
 
     // ---- estimate / perform dispatch --------------------------------
 
-    private long estimate(JolokiaBrokerClient client, String mbean, MessageAction action, MessageActionRequest req) {
+    private long estimate(
+            UUID clusterId, ResolvedQueue resolved, String queueName, MessageAction action, MessageActionRequest req) {
+        UUID node = resolved.node().getId();
         if (action == MessageAction.RETRY && req.ids().isEmpty()) {
-            return messageOps.messageCount(client, mbean);
+            return messages.count(clusterId, node, queueName, null);
         }
         if (req.byFilter()) {
-            return messageOps.countMessages(client, mbean, req.filter());
+            return messages.count(clusterId, node, queueName, req.filter());
         }
         return req.ids().size();
     }
 
-    /** A retry-all or a by-filter operation: one broker call, which returns its own count. */
+    /** A retry-all or a by-filter operation, which the broker counts itself. */
     private long perform(QueueAction call) {
-        JolokiaBrokerClient client = call.client();
-        String mbean = call.mbean();
         MessageActionRequest req = call.req();
+        UUID node = call.resolved().node().getId();
         if (call.action() == MessageAction.RETRY && req.ids().isEmpty()) {
             return call.scope().restricted()
-                    ? retryFromCheckedOrigins(client, mbean, call.scope().addresses())
-                    : messageOps.retryAll(client, mbean);
+                    ? retryFromCheckedOrigins(call)
+                    : messages.byFilter(call.clusterId(), node, call.queue(), null, Optional.empty(), new Retry())
+                            .done();
         }
         return switch (call.action()) {
-            case MOVE -> messageOps.moveByFilter(client, mbean, req.filter(), req.targetQueue());
-            case DELETE -> messageOps.deleteByFilter(client, mbean, req.filter());
-            case EXPIRE -> messageOps.expireByFilter(client, mbean, req.filter());
+            case MOVE ->
+                messages.byFilter(
+                                call.clusterId(),
+                                node,
+                                call.queue(),
+                                req.filter(),
+                                Optional.empty(),
+                                new Move(messages.queueId(call.clusterId(), req.targetQueue())))
+                        .done();
+            case DELETE ->
+                messages.byFilter(call.clusterId(), node, call.queue(), req.filter(), Optional.empty(), new Delete())
+                        .done();
+            case EXPIRE -> expiry.byFilter(call.clusterId(), node, call.queue(), req.filter());
             case RETRY -> throw new IllegalStateException("unreachable");
         };
     }
@@ -554,37 +564,61 @@ public class MessageService {
     /**
      * A retry sends each message back to the address it came from, which the caller was checked against
      * a moment ago. Retrying the whole queue would also retry what arrived since, so the messages to
-     * retry are fixed now, by the checked addresses, and retried by id: a message that came from another
-     * address in the meantime is not among them.
+     * retry are the ones from the checked addresses: a message from another address is not among them.
      */
-    private long retryFromCheckedOrigins(JolokiaBrokerClient client, String mbean, Set<String> checkedOrigins) {
-        List<Long> ids = new ArrayList<>();
-        for (String origin : checkedOrigins) {
-            ids.addAll(messageOps.listIds(client, mbean, messageOps.originalAddressFilter(origin)));
+    private long retryFromCheckedOrigins(QueueAction call) {
+        long retried = 0;
+        for (String origin : call.scope().addresses()) {
+            retried += messages.byFilter(
+                            call.clusterId(),
+                            call.resolved().node().getId(),
+                            call.queue(),
+                            originFilter(origin),
+                            new Retry())
+                    .done();
         }
-        return ids.isEmpty() ? 0 : messageOps.retryByIds(client, mbean, ids).affected();
+        return retried;
     }
 
-    private MessageOperations.BulkResult performByIds(QueueAction call) {
-        JolokiaBrokerClient client = call.client();
-        String mbean = call.mbean();
-        MessageActionRequest req = call.req();
-        List<Long> ids = req.ids();
-        if (call.action() == MessageAction.RETRY && call.scope().restricted()) {
-            // Only messages that came from the addresses checked: an id of a message that arrived since, from
-            // another address, is not retried.
-            Set<Long> fromChecked = new HashSet<>();
-            for (String origin : call.scope().addresses()) {
-                fromChecked.addAll(messageOps.listIds(client, mbean, messageOps.originalAddressFilter(origin)));
-            }
-            ids = ids.stream().filter(fromChecked::contains).toList();
+    /**
+     * The chosen ids that came from the addresses the caller was checked against: a message chosen by id
+     * that arrived from another address since the check is left out, as a retry of everything leaves it.
+     */
+    private List<Long> fromCheckedOrigins(QueueAction call, List<Long> chosen) {
+        Set<Long> allowed = new HashSet<>();
+        for (String origin : call.scope().addresses()) {
+            allowed.addAll(
+                    messages.ids(call.clusterId(), call.resolved().node().getId(), call.queue(), originFilter(origin)));
         }
-        return switch (call.action()) {
-            case MOVE -> messageOps.moveByIds(client, mbean, ids, req.targetQueue());
-            case RETRY -> messageOps.retryByIds(client, mbean, ids);
-            case DELETE -> messageOps.deleteByIds(client, mbean, ids);
-            case EXPIRE -> messageOps.expireByIds(client, mbean, ids);
-        };
+        return chosen.stream().filter(allowed::contains).toList();
+    }
+
+    private static MessageFilter originFilter(String origin) {
+        return MessageFilter.portable("header.origin = '" + origin.replace("'", "''") + "'");
+    }
+
+    private BulkResult performByIds(QueueAction call) {
+        MessageActionRequest req = call.req();
+        UUID node = call.resolved().node().getId();
+        List<Long> ids = call.action() == MessageAction.RETRY && call.scope().restricted()
+                ? fromCheckedOrigins(call, req.ids())
+                : req.ids();
+        if (call.action() == MessageAction.EXPIRE) {
+            return expiry.byIds(call.clusterId(), node, call.queue(), ids);
+        }
+        io.github.sudoitir.openbroker.messaging.MessageAction act =
+                switch (call.action()) {
+                    case MOVE -> new Move(messages.queueId(call.clusterId(), req.targetQueue()));
+                    case RETRY -> new Retry();
+                    case DELETE -> new Delete();
+                    case EXPIRE -> throw new IllegalStateException("unreachable");
+                };
+        BulkOutcome outcome = messages.byIds(call.clusterId(), node, call.queue(), ids, act);
+        List<Long> notDone = outcome.notDone().stream()
+                .map(ref -> Long.parseLong(ref.position()))
+                .toList();
+        return new BulkResult(
+                outcome.done(), notDone, outcome.notDoneReason().isEmpty() ? null : outcome.notDoneReason());
     }
 
     /** A retry's reach: the addresses it was checked against, or none when {@code message:send} is cluster-wide. */
@@ -594,44 +628,14 @@ public class MessageService {
 
     /** One message action, ready to run against a resolved queue. */
     private record QueueAction(
-            JolokiaBrokerClient client,
-            String mbean,
+            UUID clusterId,
+            ResolvedQueue resolved,
+            String queue,
             MessageAction action,
             MessageActionRequest req,
             RetryScope scope) {}
 
     // ---- resolution + plumbing ------------------------------------
-
-    private BrowseResult browseAt(
-            UUID clusterId, String queueName, ResolvedQueue resolved, int page, int size, String filter) {
-        return transportFor(clusterId).browse(targetOf(clusterId, queueName, resolved), page, size, filter);
-    }
-
-    /** Core when the cluster has a live Core subscription (ADR-0029, D-honesty); Jolokia otherwise. */
-    private MessageTransport transportFor(UUID clusterId) {
-        return subscriptions.verdictFor(clusterId).isConnected() ? coreTransport : jolokiaTransport;
-    }
-
-    private static TransportTarget targetOf(UUID clusterId, String queueName, ResolvedQueue resolved) {
-        ClusterNode node = resolved.node();
-        return new TransportTarget(
-                clusterId,
-                node.getId(),
-                queueName,
-                resolved.address(),
-                resolved.routingType(),
-                node.getJolokiaUrl(),
-                node.getCoreUrl());
-    }
-
-    private JolokiaBrokerClient clientFor(UUID clusterId, ResolvedQueue resolved) {
-        return connections.forCluster(clusterId, resolved.node().getJolokiaUrl());
-    }
-
-    private static String queueMbean(JolokiaBrokerClient client, ResolvedQueue resolved, String queueName) {
-        return BrokerMBeans.queue(
-                client.resolveBrokerObjectName(), resolved.address(), queueName, resolved.routingType());
-    }
 
     private AuditEvent begin(
             String action, String queueName, UUID clusterId, UUID node, Map<String, ?> params, boolean dryRun) {
@@ -668,7 +672,7 @@ public class MessageService {
         List<ClusterNode> candidates = locations.stream()
                 .sorted(Comparator.comparingLong(QueueLocation::messageCount).reversed())
                 .map(l -> byId.get(l.nodeId()))
-                .filter(n -> n != null && n.getJolokiaUrl() != null)
+                .filter(n -> n != null && n.getManagementUrl() != null)
                 .toList();
         if (candidates.isEmpty()) {
             throw new BrokerConnectionException(
@@ -707,7 +711,7 @@ public class MessageService {
         properties.putAll(m.doubleProperties());
         properties.putAll(m.booleanProperties());
         return new MessageContent(
-                headers, properties, m.body(), m.bodyEncoding() == MessageBrowser.BodyEncoding.BASE64, m.contentType());
+                headers, properties, m.body(), m.bodyEncoding() == BodyEncoding.BASE64, m.contentType());
     }
 
     private static MessageSummaryView toSummary(BrowsedMessage m, GovernedMessage g) {
@@ -735,7 +739,7 @@ public class MessageService {
         return body.substring(0, 200);
     }
 
-    private static MessageDetailView toDetail(BrowsedMessage m, GovernedMessage g, UUID node, String transport) {
+    private static MessageDetailView toDetail(BrowsedMessage m, GovernedMessage g, UUID node) {
         // A masked value is a marker string whatever its original type, so it is listed with the strings.
         Map<String, String> strings = new LinkedHashMap<>();
         Map<String, Long> ints = new LinkedHashMap<>();
@@ -768,7 +772,6 @@ public class MessageService {
                 m.contentType(),
                 m.bodyTruncated(),
                 m.observedLimitBytes(),
-                transport,
                 node,
                 strings,
                 ints,

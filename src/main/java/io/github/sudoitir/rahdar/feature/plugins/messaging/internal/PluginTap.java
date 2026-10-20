@@ -1,14 +1,14 @@
 package io.github.sudoitir.rahdar.feature.plugins.messaging.internal;
 
-import io.github.sudoitir.rahdar.feature.queues.DivertOperations;
-import io.github.sudoitir.rahdar.feature.queues.DivertRow;
-import io.github.sudoitir.rahdar.feature.queues.QueueLifecycleOperations;
 import io.github.sudoitir.rahdar.feature.sql.CaptureProperties;
-import io.github.sudoitir.rahdar.platform.broker.BrokerMBeans;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaBrokerClient;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaRequest;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaResponse;
 import io.github.sudoitir.rahdar.platform.broker.ManagementRefusal;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
+import io.github.sudoitir.rahdar.system.artemis.DivertOperations;
+import io.github.sudoitir.rahdar.system.artemis.DivertRow;
+import io.github.sudoitir.rahdar.system.artemis.MBeanNames;
+import io.github.sudoitir.rahdar.system.artemis.ManagementRequest;
+import io.github.sudoitir.rahdar.system.artemis.ManagementResponse;
+import io.github.sudoitir.rahdar.system.artemis.QueueLifecycleOperations;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -80,9 +80,9 @@ class PluginTap {
     record Source(String queue, String address, String routingType, String filter) {}
 
     /** The tapped queue on this node, or {@code null} when the node does not have it. */
-    Source source(JolokiaBrokerClient client, String queue) {
-        JolokiaResponse read = client.single(JolokiaRequest.read(
-                BrokerMBeans.queuePattern(client.resolveBrokerObjectName(), queue), "Address", "RoutingType", FILTER));
+    Source source(ArtemisNode client, String queue) {
+        ManagementResponse read = client.single(ManagementRequest.read(
+                MBeanNames.queuePattern(client.resolveBrokerObjectName(), queue), "Address", "RoutingType", FILTER));
         if (!read.ok() || read.value() == null || !read.value().isObject()) {
             return null;
         }
@@ -100,7 +100,7 @@ class PluginTap {
     }
 
     /** Refuse, or install (idempotently) and verify. Returns the tap's name. */
-    String install(JolokiaBrokerClient client, String instanceId, UUID registrationId, Source source, long ringSize) {
+    String install(ArtemisNode client, String instanceId, UUID registrationId, Source source, long ringSize) {
         String broker = client.resolveBrokerObjectName();
         refuseIfShadowed(client, source.address());
         String role = capture().brokerRole();
@@ -137,22 +137,22 @@ class PluginTap {
     }
 
     /** Remove a tap, and this instance's settings once it has no tap left on the node. Idempotent. */
-    void remove(JolokiaBrokerClient client, String instanceId, String name) {
+    void remove(ArtemisNode client, String instanceId, String name) {
         String broker = client.resolveBrokerObjectName();
         String queue = TapNames.queueOf(name);
         tolerateAlready(() -> divertOps().destroyDivert(client, broker, name));
         tolerateAlready(() -> queueOps().destroyQueue(client, broker, queue, true));
         tolerateAlready(() -> queueOps().deleteAddress(client, broker, queue));
         if (installedNames(client, instanceId).isEmpty()) {
-            client.single(JolokiaRequest.exec(
+            client.single(ManagementRequest.exec(
                     broker, "removeAddressSettings(java.lang.String)", TapNames.matchFor(instanceId)));
-            client.single(JolokiaRequest.exec(
+            client.single(ManagementRequest.exec(
                     broker, "removeSecuritySettings(java.lang.String)", TapNames.matchFor(instanceId)));
         }
     }
 
     /** This instance's tap diverts on the node: the reconciler's view of what exists. */
-    List<String> installedNames(JolokiaBrokerClient client, String instanceId) {
+    List<String> installedNames(ArtemisNode client, String instanceId) {
         if (divertOperations.getIfAvailable() == null) {
             return List.of();
         }
@@ -168,10 +168,10 @@ class PluginTap {
      * {@code MessagesAdded} minus what is still there and what was acknowledged. {@code null} when
      * the node did not answer.
      */
-    Long dropped(JolokiaBrokerClient client, String name) {
+    Long dropped(ArtemisNode client, String name) {
         String queue = TapNames.queueOf(name);
-        JolokiaResponse read = client.single(JolokiaRequest.read(
-                BrokerMBeans.queuePattern(client.resolveBrokerObjectName(), queue),
+        ManagementResponse read = client.single(ManagementRequest.read(
+                MBeanNames.queuePattern(client.resolveBrokerObjectName(), queue),
                 "MessagesAdded",
                 "MessagesAcknowledged",
                 "MessageCount",
@@ -193,7 +193,7 @@ class PluginTap {
     }
 
     /** An exclusive divert runs before every other one, so a tap behind it would copy nothing. */
-    private void refuseIfShadowed(JolokiaBrokerClient client, String address) {
+    private void refuseIfShadowed(ArtemisNode client, String address) {
         divertOps().listDiverts(client, null, null).stream()
                 .filter(DivertRow::exclusive)
                 .filter(d -> address.equals(d.address()))
@@ -206,7 +206,7 @@ class PluginTap {
                 });
     }
 
-    private void applyAddressSettings(JolokiaBrokerClient client, String broker, String instanceId, long ringSize) {
+    private void applyAddressSettings(ArtemisNode client, String broker, String instanceId, long ringSize) {
         Map<String, Object> settings = new LinkedHashMap<>();
         settings.put("addressFullMessagePolicy", "DROP");
         settings.put("defaultRingSize", ringSize);
@@ -220,7 +220,7 @@ class PluginTap {
         settings.put("autoDeleteAddresses", true);
         settings.put("autoCreateQueues", false);
         settings.put("autoDeleteQueues", false);
-        JolokiaResponse res = client.single(JolokiaRequest.exec(
+        ManagementResponse res = client.single(ManagementRequest.exec(
                 broker, ADD_ADDRESS_SETTINGS, TapNames.matchFor(instanceId), mapper.writeValueAsString(settings)));
         if (!res.ok()) {
             throw new TapRefusedException(
@@ -229,9 +229,8 @@ class PluginTap {
         }
     }
 
-    private static void applySecuritySettings(
-            JolokiaBrokerClient client, String broker, String instanceId, String role) {
-        JolokiaResponse res = client.single(JolokiaRequest.exec(
+    private static void applySecuritySettings(ArtemisNode client, String broker, String instanceId, String role) {
+        ManagementResponse res = client.single(ManagementRequest.exec(
                 broker,
                 ADD_SECURITY_SETTINGS,
                 TapNames.matchFor(instanceId),

@@ -7,9 +7,9 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaBrokerClient;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaResponse;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
+import io.github.sudoitir.rahdar.system.artemis.ManagementResponse;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -24,7 +24,7 @@ class SetupReaderTest {
     private static final ObjectMapper MAPPER = JsonMapper.builder().build();
     private static final UUID NODE_ID = UUID.randomUUID();
 
-    private final JolokiaBrokerClient client = mock(JolokiaBrokerClient.class);
+    private final ArtemisNode client = mock(ArtemisNode.class);
     private final SetupReader reader = new SetupReader(MAPPER);
 
     @BeforeEach
@@ -37,19 +37,19 @@ class SetupReaderTest {
         when(node.getId()).thenReturn(NODE_ID);
         when(node.getName()).thenReturn("node-a");
         when(node.getActive()).thenReturn(active);
-        when(node.getArtemisNodeId()).thenReturn(artemisNodeId);
+        when(node.getNativeNodeId()).thenReturn(artemisNodeId);
         return node;
     }
 
-    private static JolokiaResponse ok(String json) {
-        return new JolokiaResponse(200, MAPPER.readTree(json), null, null, null);
+    private static ManagementResponse ok(String json) {
+        return new ManagementResponse(200, MAPPER.readTree(json), null, null, null);
     }
 
-    private static JolokiaResponse failed(int status, String error) {
-        return new JolokiaResponse(status, null, error, null, null);
+    private static ManagementResponse failed(int status, String error) {
+        return new ManagementResponse(status, null, error, null, null);
     }
 
-    private void answer(JolokiaResponse... responses) {
+    private void answer(ManagementResponse... responses) {
         when(client.batch(anyList())).thenReturn(List.of(responses));
     }
 
@@ -59,7 +59,7 @@ class SetupReaderTest {
                 ok("{\"NodeID\":\"reported\",\"Active\":true}"),
                 ok("{\"deadLetterAddress\":\"DLQ\"}"),
                 ok("{\"org.x:name=\\\"my-cluster\\\"\":{\"Started\":true}}"));
-        when(client.parsed(ArgumentMatchers.any())).thenAnswer(i -> ((JolokiaResponse) i.getArgument(0)).value());
+        when(client.parsed(ArgumentMatchers.any())).thenAnswer(i -> ((ManagementResponse) i.getArgument(0)).value());
 
         NodeRead read = reader.read(client, node(true, "known"));
 
@@ -76,7 +76,7 @@ class SetupReaderTest {
     @Test
     void theBrokersOwnActiveFlagOverridesTheLastScrape() {
         answer(ok("{\"Active\":false}"), ok("{}"), failed(404, null));
-        when(client.parsed(ArgumentMatchers.any())).thenAnswer(i -> ((JolokiaResponse) i.getArgument(0)).value());
+        when(client.parsed(ArgumentMatchers.any())).thenAnswer(i -> ((ManagementResponse) i.getArgument(0)).value());
 
         assertThat(reader.read(client, node(true, "known")).live()).isFalse();
     }
@@ -84,7 +84,7 @@ class SetupReaderTest {
     @Test
     void anAbsentOrNonBooleanActiveKeepsTheKnownState() {
         answer(ok("{\"Active\":\"yes\"}"), ok("{}"), failed(404, null));
-        when(client.parsed(ArgumentMatchers.any())).thenAnswer(i -> ((JolokiaResponse) i.getArgument(0)).value());
+        when(client.parsed(ArgumentMatchers.any())).thenAnswer(i -> ((ManagementResponse) i.getArgument(0)).value());
 
         assertThat(reader.read(client, node(true, "known")).live()).isTrue();
         assertThat(reader.read(client, node(null, "known")).live()).isFalse();
@@ -93,7 +93,7 @@ class SetupReaderTest {
     @Test
     void aMissingOrBlankReportedNodeIdFallsBackToTheKnownOne() {
         answer(ok("{\"NodeID\":\" \"}"), ok("{}"), failed(404, null));
-        when(client.parsed(ArgumentMatchers.any())).thenAnswer(i -> ((JolokiaResponse) i.getArgument(0)).value());
+        when(client.parsed(ArgumentMatchers.any())).thenAnswer(i -> ((ManagementResponse) i.getArgument(0)).value());
         assertThat(reader.read(client, node(true, "known")).artemisNodeId()).isEqualTo("known");
 
         answer(ok("{\"NodeID\":null}"), ok("{}"), failed(404, null));
@@ -106,7 +106,7 @@ class SetupReaderTest {
     @Test
     void aBrokerWithNoClusterConnectionAnswers404AndThatIsNone() {
         answer(ok("{}"), ok("{}"), failed(404, "no such mbean"));
-        when(client.parsed(ArgumentMatchers.any())).thenAnswer(i -> ((JolokiaResponse) i.getArgument(0)).value());
+        when(client.parsed(ArgumentMatchers.any())).thenAnswer(i -> ((ManagementResponse) i.getArgument(0)).value());
 
         NodeRead read = reader.read(client, node(true, null));
 
@@ -117,7 +117,7 @@ class SetupReaderTest {
     @Test
     void otherClusterConnectionFailuresLeaveThatPartNullWithItsReason() {
         answer(ok("{}"), ok("{}"), failed(500, "boom"));
-        when(client.parsed(ArgumentMatchers.any())).thenAnswer(i -> ((JolokiaResponse) i.getArgument(0)).value());
+        when(client.parsed(ArgumentMatchers.any())).thenAnswer(i -> ((ManagementResponse) i.getArgument(0)).value());
         NodeRead withError = reader.read(client, node(true, null));
         assertThat(withError.clusterConnections()).isNull();
         assertThat(withError.clusterConnectionsError()).contains("boom");
@@ -141,7 +141,7 @@ class SetupReaderTest {
         assertThat(failedRead.readable()).isTrue();
 
         answer(ok("{}"), ok("\"text\""), failed(404, null));
-        when(client.parsed(ArgumentMatchers.any())).thenAnswer(i -> ((JolokiaResponse) i.getArgument(0)).value());
+        when(client.parsed(ArgumentMatchers.any())).thenAnswer(i -> ((ManagementResponse) i.getArgument(0)).value());
         NodeRead scalar = reader.read(client, node(true, null));
         assertThat(scalar.defaultAddressSettings()).isNull();
         assertThat(scalar.addressSettingsError()).contains("status 200");

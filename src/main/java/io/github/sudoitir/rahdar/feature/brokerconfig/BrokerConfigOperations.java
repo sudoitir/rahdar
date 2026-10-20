@@ -5,17 +5,16 @@ import io.github.sudoitir.rahdar.feature.brokerconfig.BrokerConfigDocument.Diver
 import io.github.sudoitir.rahdar.feature.brokerconfig.BrokerConfigDocument.TransformerDecl;
 import io.github.sudoitir.rahdar.feature.brokerconfig.ObservedNodeConfig.AddressUsage;
 import io.github.sudoitir.rahdar.feature.brokerconfig.ObservedNodeConfig.ObservedBridge;
-import io.github.sudoitir.rahdar.feature.queues.BridgeOperations;
-import io.github.sudoitir.rahdar.feature.queues.BridgeRow;
-import io.github.sudoitir.rahdar.feature.queues.DivertOperations;
-import io.github.sudoitir.rahdar.feature.queues.DivertRow;
-import io.github.sudoitir.rahdar.feature.queues.QueueLifecycleOperations;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
-import io.github.sudoitir.rahdar.platform.broker.BrokerMBeans;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaBrokerClient;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaRequest;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaResponse;
-import io.github.sudoitir.rahdar.platform.broker.ManagementRefusal;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
+import io.github.sudoitir.rahdar.system.artemis.BridgeOperations;
+import io.github.sudoitir.rahdar.system.artemis.BridgeRow;
+import io.github.sudoitir.rahdar.system.artemis.DivertOperations;
+import io.github.sudoitir.rahdar.system.artemis.DivertRow;
+import io.github.sudoitir.rahdar.system.artemis.MBeanNames;
+import io.github.sudoitir.rahdar.system.artemis.ManagementRequest;
+import io.github.sudoitir.rahdar.system.artemis.ManagementResponse;
+import io.github.sudoitir.rahdar.system.artemis.QueueLifecycleOperations;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumMap;
@@ -90,36 +89,35 @@ public class BrokerConfigOperations {
     // ---- writes ----------------------------------------------------------
 
     /** Replace the address setting for a match with exactly these keys (the broker replaces, §15 M2). */
-    public void addAddressSettings(
-            JolokiaBrokerClient client, String brokerMbean, String match, Map<String, Object> values) {
-        JolokiaResponse res = client.single(
-                JolokiaRequest.exec(brokerMbean, ADD_ADDRESS_SETTINGS, match, mapper.writeValueAsString(values)));
-        ManagementRefusal.require(res, "addAddressSettings");
+    public void addAddressSettings(ArtemisNode client, String brokerMbean, String match, Map<String, Object> values) {
+        ManagementResponse res = client.single(
+                ManagementRequest.exec(brokerMbean, ADD_ADDRESS_SETTINGS, match, mapper.writeValueAsString(values)));
+        ArtemisNode.require(res, "addAddressSettings");
     }
 
     /** Remove the address setting for a match. Absent is a success (§15 M4). */
-    public void removeAddressSettings(JolokiaBrokerClient client, String brokerMbean, String match) {
-        ManagementRefusal.require(
-                client.single(JolokiaRequest.exec(brokerMbean, REMOVE_ADDRESS_SETTINGS, match)),
+    public void removeAddressSettings(ArtemisNode client, String brokerMbean, String match) {
+        ArtemisNode.require(
+                client.single(ManagementRequest.exec(brokerMbean, REMOVE_ADDRESS_SETTINGS, match)),
                 "removeAddressSettings");
     }
 
     /** Replace the role set for a match. Roles are comma-joined per permission type, {@code ""} for none. */
     public void addSecuritySettings(
-            JolokiaBrokerClient client, String brokerMbean, String match, Map<PermissionType, Set<String>> roles) {
+            ArtemisNode client, String brokerMbean, String match, Map<PermissionType, Set<String>> roles) {
         Object[] args = new Object[PermissionType.values().length + 1];
         args[0] = match;
         for (PermissionType t : PermissionType.values()) {
             Set<String> r = roles.getOrDefault(t, Set.of());
             args[t.ordinal() + 1] = String.join(",", new TreeSet<>(r));
         }
-        ManagementRefusal.require(
-                client.single(JolokiaRequest.exec(brokerMbean, ADD_SECURITY_SETTINGS, args)), "addSecuritySettings");
+        ArtemisNode.require(
+                client.single(ManagementRequest.exec(brokerMbean, ADD_SECURITY_SETTINGS, args)), "addSecuritySettings");
     }
 
-    public void removeSecuritySettings(JolokiaBrokerClient client, String brokerMbean, String match) {
-        ManagementRefusal.require(
-                client.single(JolokiaRequest.exec(brokerMbean, REMOVE_SECURITY_SETTINGS, match)),
+    public void removeSecuritySettings(ArtemisNode client, String brokerMbean, String match) {
+        ArtemisNode.require(
+                client.single(ManagementRequest.exec(brokerMbean, REMOVE_SECURITY_SETTINGS, match)),
                 "removeSecuritySettings");
     }
 
@@ -127,11 +125,11 @@ public class BrokerConfigOperations {
      * Create a divert and read it back: the broker answers 200 for a transformer shape it
      * ignores, which once deployed every transformed divert without its transformer.
      */
-    public void createDivert(JolokiaBrokerClient client, String brokerMbean, Map<String, Object> config) {
+    public void createDivert(ArtemisNode client, String brokerMbean, Map<String, Object> config) {
         divertOps.createVerified(client, brokerMbean, config);
     }
 
-    public void destroyDivert(JolokiaBrokerClient client, String brokerMbean, String name) {
+    public void destroyDivert(ArtemisNode client, String brokerMbean, String name) {
         divertOps.destroyDivert(client, brokerMbean, name);
     }
 
@@ -139,26 +137,24 @@ public class BrokerConfigOperations {
      * Create a bridge and read it back (ADR-0091): the broker answers 200 for a
      * document it ignores entirely, so the status code proves nothing.
      */
-    public void createBridge(JolokiaBrokerClient client, String brokerMbean, Map<String, Object> config) {
+    public void createBridge(ArtemisNode client, String brokerMbean, Map<String, Object> config) {
         bridgeOps.createVerified(client, brokerMbean, config);
     }
 
     /** Destroy a bridge by its declared name, which removes every instance its concurrency deployed. */
-    public void destroyBridge(JolokiaBrokerClient client, String brokerMbean, String name) {
+    public void destroyBridge(ArtemisNode client, String brokerMbean, String name) {
         bridgeOps.destroyBridge(client, brokerMbean, name);
     }
 
-    public void createAddress(
-            JolokiaBrokerClient client, String brokerMbean, String address, Set<String> routingTypes) {
+    public void createAddress(ArtemisNode client, String brokerMbean, String address, Set<String> routingTypes) {
         queueOps.createAddress(client, brokerMbean, address, String.join(",", new TreeSet<>(routingTypes)));
     }
 
-    public void createQueue(JolokiaBrokerClient client, String brokerMbean, Map<String, Object> config) {
+    public void createQueue(ArtemisNode client, String brokerMbean, Map<String, Object> config) {
         queueOps.createQueue(client, brokerMbean, config);
     }
 
-    public void updateAddress(
-            JolokiaBrokerClient client, String brokerMbean, String address, Set<String> routingTypes) {
+    public void updateAddress(ArtemisNode client, String brokerMbean, String address, Set<String> routingTypes) {
         queueOps.updateAddress(client, brokerMbean, address, String.join(",", new TreeSet<>(routingTypes)));
     }
 
@@ -166,10 +162,10 @@ public class BrokerConfigOperations {
      * Update a live queue to the declared keys through the queue module's read-merge
      * update, so a key the declaration does not set keeps its live value (ADR-0082 D1).
      */
-    public void updateQueue(JolokiaBrokerClient client, String brokerMbean, Map<String, Object> declared) {
+    public void updateQueue(ArtemisNode client, String brokerMbean, Map<String, Object> declared) {
         Map<String, Object> patch = new LinkedHashMap<>(declared);
         patch.remove("auto-create-address");
-        String queueMbean = BrokerMBeans.queue(
+        String queueMbean = MBeanNames.queue(
                 brokerMbean,
                 declared.get(ADDRESS).toString(),
                 declared.get("name").toString(),
@@ -212,10 +208,10 @@ public class BrokerConfigOperations {
     }
 
     private static List<BridgeRow> readBridgeRows(
-            Iterator<JolokiaResponse> responses, int count, UUID nodeId, String nodeName) {
+            Iterator<ManagementResponse> responses, int count, UUID nodeId, String nodeName) {
         List<BridgeRow> rows = new ArrayList<>();
         for (int k = 0; k < count; k++) {
-            JolokiaResponse res = responses.next();
+            ManagementResponse res = responses.next();
             if (res.ok() && res.value() != null && res.value().isObject()) {
                 rows.add(BridgeRow.parse(res.value(), nodeId, nodeName));
             }
@@ -231,19 +227,19 @@ public class BrokerConfigOperations {
      * @throws io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException when
      *     the node cannot be read at all — the caller marks it unreachable
      */
-    public ObservedNodeConfig read(JolokiaBrokerClient client, UUID nodeId, String nodeName, ReadScope scope) {
+    public ObservedNodeConfig read(ArtemisNode client, UUID nodeId, String nodeName, ReadScope scope) {
         String broker = client.resolveBrokerObjectName();
 
         List<String> settingMatches = withDefaultMatch(scope.addressSettingMatches());
         List<String> securityMatches = withDefaultMatch(scope.securitySettingMatches());
 
-        List<JolokiaRequest> first = new ArrayList<>();
-        first.add(JolokiaRequest.read(broker, ACTIVE, ADDRESS_NAMES, "QueueNames", "DivertNames"));
-        settingMatches.forEach(m -> first.add(JolokiaRequest.exec(broker, GET_ADDRESS_SETTINGS, m)));
-        securityMatches.forEach(m -> first.add(JolokiaRequest.exec(broker, GET_ROLES, m)));
-        first.add(JolokiaRequest.search(BrokerMBeans.divertsPattern(broker)));
-        first.add(JolokiaRequest.search(BrokerMBeans.bridgesPattern(broker)));
-        Iterator<JolokiaResponse> r1 = batch(client, first).iterator();
+        List<ManagementRequest> first = new ArrayList<>();
+        first.add(ManagementRequest.read(broker, ACTIVE, ADDRESS_NAMES, "QueueNames", "DivertNames"));
+        settingMatches.forEach(m -> first.add(ManagementRequest.exec(broker, GET_ADDRESS_SETTINGS, m)));
+        securityMatches.forEach(m -> first.add(ManagementRequest.exec(broker, GET_ROLES, m)));
+        first.add(ManagementRequest.search(MBeanNames.divertsPattern(broker)));
+        first.add(ManagementRequest.search(MBeanNames.bridgesPattern(broker)));
+        Iterator<ManagementResponse> r1 = batch(client, first).iterator();
 
         JsonNode head = client.parsed(r1.next());
         boolean live = head.path(ACTIVE).asBoolean(false);
@@ -263,20 +259,20 @@ public class BrokerConfigOperations {
         List<String> declaredPresent = scope.addresses().keySet().stream()
                 .filter(addressNames::contains)
                 .toList();
-        List<JolokiaRequest> second = new ArrayList<>();
-        divertMbeans.stream().map(JolokiaRequest::readAll).forEach(second::add);
-        bridgeMbeans.stream().map(JolokiaRequest::readAll).forEach(second::add);
+        List<ManagementRequest> second = new ArrayList<>();
+        divertMbeans.stream().map(ManagementRequest::readAll).forEach(second::add);
+        bridgeMbeans.stream().map(ManagementRequest::readAll).forEach(second::add);
         addressesToRead.stream()
-                .map(a -> JolokiaRequest.read(
-                        BrokerMBeans.address(broker, a), ROUTING_TYPES, "AddressSize", "MessageCount"))
+                .map(a -> ManagementRequest.read(
+                        MBeanNames.address(broker, a), ROUTING_TYPES, "AddressSize", "MessageCount"))
                 .forEach(second::add);
         queuesToRead.stream()
-                .map(q -> JolokiaRequest.readAll(BrokerMBeans.queue(broker, q[0], q[1], q[2])))
+                .map(q -> ManagementRequest.readAll(MBeanNames.queue(broker, q[0], q[1], q[2])))
                 .forEach(second::add);
         declaredPresent.stream()
-                .map(a -> JolokiaRequest.search(BrokerMBeans.address(broker, a) + ",subcomponent=queues,*"))
+                .map(a -> ManagementRequest.search(MBeanNames.address(broker, a) + ",subcomponent=queues,*"))
                 .forEach(second::add);
-        Iterator<JolokiaResponse> r2 = batch(client, second).iterator();
+        Iterator<ManagementResponse> r2 = batch(client, second).iterator();
 
         Map<String, DivertDecl> diverts = readDiverts(r2, divertMbeans.size(), nodeId, nodeName);
         Map<String, ObservedBridge> bridges =
@@ -285,7 +281,7 @@ public class BrokerConfigOperations {
         addressNames.forEach(a -> addresses.put(a, Set.of()));
         Map<String, AddressUsage> usage = new LinkedHashMap<>();
         for (String a : addressesToRead) {
-            JolokiaResponse res = r2.next();
+            ManagementResponse res = r2.next();
             if (res.ok() && res.value() != null) {
                 JsonNode v = res.value();
                 addresses.put(a, names(v.get(ROUTING_TYPES)));
@@ -298,13 +294,13 @@ public class BrokerConfigOperations {
         }
         Map<String, Map<String, Object>> queues = new LinkedHashMap<>();
         for (String[] q : queuesToRead) {
-            JolokiaResponse res = r2.next();
+            ManagementResponse res = r2.next();
             if (res.ok()) {
                 queues.put(q[1], queueOps.toQueueConfig(res.value()));
             }
         }
         for (int k = 0; k < declaredPresent.size(); k++) {
-            JolokiaResponse res = r2.next();
+            ManagementResponse res = r2.next();
             if (res.ok() && res.value() != null && res.value().isArray()) {
                 res.value()
                         .forEach(n ->
@@ -331,11 +327,11 @@ public class BrokerConfigOperations {
     }
 
     /** One POST of the batch, checked to have been answered in full; nothing to send is nothing to ask. */
-    private static List<JolokiaResponse> batch(JolokiaBrokerClient client, List<JolokiaRequest> requests) {
+    private static List<ManagementResponse> batch(ArtemisNode client, List<ManagementRequest> requests) {
         if (requests.isEmpty()) {
             return List.of();
         }
-        List<JolokiaResponse> responses = client.batch(requests);
+        List<ManagementResponse> responses = client.batch(requests);
         requireCount(responses, requests);
         return responses;
     }
@@ -349,10 +345,10 @@ public class BrokerConfigOperations {
     }
 
     private Map<String, Map<String, Object>> readAddressSettings(
-            JolokiaBrokerClient client, List<String> matches, Iterator<JolokiaResponse> responses) {
+            ArtemisNode client, List<String> matches, Iterator<ManagementResponse> responses) {
         Map<String, Map<String, Object>> out = new LinkedHashMap<>();
         for (String m : matches) {
-            JolokiaResponse res = responses.next();
+            ManagementResponse res = responses.next();
             if (res.ok()) {
                 JsonNode json = client.parsed(res);
                 if (json != null && json.isObject()) {
@@ -364,10 +360,10 @@ public class BrokerConfigOperations {
     }
 
     private static Map<String, Map<PermissionType, Set<String>>> readRoles(
-            JolokiaBrokerClient client, List<String> matches, Iterator<JolokiaResponse> responses) {
+            ArtemisNode client, List<String> matches, Iterator<ManagementResponse> responses) {
         Map<String, Map<PermissionType, Set<String>>> out = new LinkedHashMap<>();
         for (String m : matches) {
-            JolokiaResponse res = responses.next();
+            ManagementResponse res = responses.next();
             if (res.ok()) {
                 out.put(m, roles(client.parsed(res)));
             }
@@ -376,10 +372,10 @@ public class BrokerConfigOperations {
     }
 
     private static Map<String, DivertDecl> readDiverts(
-            Iterator<JolokiaResponse> responses, int count, UUID nodeId, String nodeName) {
+            Iterator<ManagementResponse> responses, int count, UUID nodeId, String nodeName) {
         Map<String, DivertDecl> diverts = new LinkedHashMap<>();
         for (int k = 0; k < count; k++) {
-            JolokiaResponse res = responses.next();
+            ManagementResponse res = responses.next();
             if (res.ok() && res.value() != null && res.value().isObject()) {
                 DivertRow row = DivertRow.parse(res.value(), nodeId, nodeName);
                 diverts.put(row.uniqueName(), asDecl(row));
@@ -397,7 +393,7 @@ public class BrokerConfigOperations {
                 .toList();
     }
 
-    private static List<String> mbeanNames(JolokiaResponse search) {
+    private static List<String> mbeanNames(ManagementResponse search) {
         List<String> out = new ArrayList<>();
         if (search.ok() && search.value() != null && search.value().isArray()) {
             search.value().forEach(n -> out.add(n.asString()));
@@ -489,14 +485,14 @@ public class BrokerConfigOperations {
      * capped at {@link #ADDRESS_READ_CAP} addresses; queues come from the snapshot
      * cache, which already holds their address, routing type and durability.
      */
-    public ObservedNodeConfig readForAdoption(JolokiaBrokerClient client, UUID nodeId, String nodeName) {
+    public ObservedNodeConfig readForAdoption(ArtemisNode client, UUID nodeId, String nodeName) {
         String broker = client.resolveBrokerObjectName();
-        List<JolokiaRequest> first = List.of(
-                JolokiaRequest.read(broker, ACTIVE, ADDRESS_NAMES),
-                JolokiaRequest.exec(broker, GET_ADDRESS_SETTINGS, DEFAULT_MATCH),
-                JolokiaRequest.exec(broker, GET_ROLES, DEFAULT_MATCH),
-                JolokiaRequest.search(BrokerMBeans.divertsPattern(broker)));
-        List<JolokiaResponse> r1 = batch(client, first);
+        List<ManagementRequest> first = List.of(
+                ManagementRequest.read(broker, ACTIVE, ADDRESS_NAMES),
+                ManagementRequest.exec(broker, GET_ADDRESS_SETTINGS, DEFAULT_MATCH),
+                ManagementRequest.exec(broker, GET_ROLES, DEFAULT_MATCH),
+                ManagementRequest.search(MBeanNames.divertsPattern(broker)));
+        List<ManagementResponse> r1 = batch(client, first);
         JsonNode head = client.parsed(r1.get(0));
         boolean live = head.path(ACTIVE).asBoolean(false);
         List<String> addressNames = new TreeSet<>(names(head.get(ADDRESS_NAMES)))
@@ -512,19 +508,19 @@ public class BrokerConfigOperations {
         }
         List<String> divertMbeans = mbeanNames(r1.get(3));
 
-        List<JolokiaRequest> second = new ArrayList<>();
+        List<ManagementRequest> second = new ArrayList<>();
         for (String a : addressNames) {
-            second.add(JolokiaRequest.read(BrokerMBeans.address(broker, a), ROUTING_TYPES));
-            second.add(JolokiaRequest.exec(broker, GET_ADDRESS_SETTINGS, a));
-            second.add(JolokiaRequest.exec(broker, GET_ROLES, a));
+            second.add(ManagementRequest.read(MBeanNames.address(broker, a), ROUTING_TYPES));
+            second.add(ManagementRequest.exec(broker, GET_ADDRESS_SETTINGS, a));
+            second.add(ManagementRequest.exec(broker, GET_ROLES, a));
         }
-        divertMbeans.stream().map(JolokiaRequest::readAll).forEach(second::add);
-        Iterator<JolokiaResponse> r2 = batch(client, second).iterator();
+        divertMbeans.stream().map(ManagementRequest::readAll).forEach(second::add);
+        Iterator<ManagementResponse> r2 = batch(client, second).iterator();
         Map<String, Set<String>> addresses = new LinkedHashMap<>();
         for (String a : addressNames) {
-            JolokiaResponse types = r2.next();
-            JolokiaResponse settings = r2.next();
-            JolokiaResponse roles = r2.next();
+            ManagementResponse types = r2.next();
+            ManagementResponse settings = r2.next();
+            ManagementResponse roles = r2.next();
             addresses.put(
                     a, types.ok() && types.value() != null ? names(types.value().get(ROUTING_TYPES)) : Set.of());
             if (settings.ok()) {
@@ -629,7 +625,7 @@ public class BrokerConfigOperations {
         return frozen;
     }
 
-    private static void requireCount(List<JolokiaResponse> responses, List<JolokiaRequest> requests) {
+    private static void requireCount(List<ManagementResponse> responses, List<ManagementRequest> requests) {
         if (responses.size() != requests.size()) {
             throw new BrokerConnectionException(
                     BrokerConnectionException.Kind.BAD_RESPONSE,

@@ -86,7 +86,6 @@ const node = (nodeId: string, nodeName: string, over: Record<string, unknown> = 
   status: 'ANSWERED',
   examined: 500,
   matched: 1,
-  servedBy: 'JOLOKIA',
   detail: null,
   ...over,
 });

@@ -18,6 +18,7 @@ top to bottom direction
 System_Boundary("RahdarApplication_boundary", "RahdarApplication", $tags="") {
   Container_Boundary("RahdarApplication.RahdarApplication_boundary", "RahdarApplication", $tags="") {
     Component(RahdarApplication.RahdarApplication.Alerting, "Alerting", $techn="Module", $descr="", $tags="", $link="")
+    Component(RahdarApplication.RahdarApplication.Artemis, "Artemis", $techn="Module", $descr="", $tags="", $link="")
     Component(RahdarApplication.RahdarApplication.Auditlog, "Audit log", $techn="Module", $descr="", $tags="", $link="")
     Component(RahdarApplication.RahdarApplication.Brokerconnectivity, "Broker connectivity", $techn="Module", $descr="", $tags="", $link="")
     Component(RahdarApplication.RahdarApplication.Clusters, "Clusters", $techn="Module", $descr="", $tags="", $link="")
@@ -47,6 +48,11 @@ Rel(RahdarApplication.RahdarApplication.Alerting, RahdarApplication.RahdarApplic
 Rel(RahdarApplication.RahdarApplication.Alerting, RahdarApplication.RahdarApplication.Scheduledjobs, "uses", $techn="", $tags="", $link="")
 Rel(RahdarApplication.RahdarApplication.Alerting, RahdarApplication.RahdarApplication.Security, "uses", $techn="", $tags="", $link="")
 Rel(RahdarApplication.RahdarApplication.Alerting, RahdarApplication.RahdarApplication.Settings, "uses", $techn="", $tags="", $link="")
+Rel(RahdarApplication.RahdarApplication.Artemis, RahdarApplication.RahdarApplication.Brokerconnectivity, "uses", $techn="", $tags="", $link="")
+Rel(RahdarApplication.RahdarApplication.Artemis, RahdarApplication.RahdarApplication.Clusters, "uses", $techn="", $tags="", $link="")
+Rel(RahdarApplication.RahdarApplication.Artemis, RahdarApplication.RahdarApplication.Core, "depends on", $techn="", $tags="", $link="")
+Rel(RahdarApplication.RahdarApplication.Artemis, RahdarApplication.RahdarApplication.Plugincontract, "depends on", $techn="", $tags="", $link="")
+Rel(RahdarApplication.RahdarApplication.Artemis, RahdarApplication.RahdarApplication.Security, "uses", $techn="", $tags="", $link="")
 Rel(RahdarApplication.RahdarApplication.Auditlog, RahdarApplication.RahdarApplication.Core, "uses", $techn="", $tags="", $link="")
 Rel(RahdarApplication.RahdarApplication.Auditlog, RahdarApplication.RahdarApplication.Plugincontract, "depends on", $techn="", $tags="", $link="")
 Rel(RahdarApplication.RahdarApplication.Auditlog, RahdarApplication.RahdarApplication.Security, "listens to", $techn="", $tags="", $link="")
@@ -93,6 +99,7 @@ Rel(RahdarApplication.RahdarApplication.Settings, RahdarApplication.RahdarApplic
 Rel(RahdarApplication.RahdarApplication.Settings, RahdarApplication.RahdarApplication.Scheduledjobs, "uses", $techn="", $tags="", $link="")
 Rel(RahdarApplication.RahdarApplication.Settings, RahdarApplication.RahdarApplication.Security, "uses", $techn="", $tags="", $link="")
 Rel(RahdarApplication.RahdarApplication.Setupreview, RahdarApplication.RahdarApplication.Alerting, "depends on", $techn="", $tags="", $link="")
+Rel(RahdarApplication.RahdarApplication.Setupreview, RahdarApplication.RahdarApplication.Artemis, "uses", $techn="", $tags="", $link="")
 Rel(RahdarApplication.RahdarApplication.Setupreview, RahdarApplication.RahdarApplication.Auditlog, "uses", $techn="", $tags="", $link="")
 Rel(RahdarApplication.RahdarApplication.Setupreview, RahdarApplication.RahdarApplication.Brokerconnectivity, "uses", $techn="", $tags="", $link="")
 Rel(RahdarApplication.RahdarApplication.Setupreview, RahdarApplication.RahdarApplication.Clusters, "uses", $techn="", $tags="", $link="")

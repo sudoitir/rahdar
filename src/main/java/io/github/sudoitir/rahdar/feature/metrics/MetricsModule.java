@@ -1,5 +1,6 @@
 package io.github.sudoitir.rahdar.feature.metrics;
 
+import io.github.sudoitir.openbroker.model.MetricKeys;
 import io.github.sudoitir.rahdar.kernel.plugin.FeatureDescriptor;
 import io.github.sudoitir.rahdar.kernel.plugin.McpToolDef;
 import java.util.List;
@@ -20,12 +21,12 @@ public final class MetricsModule {
                             McpToolDef.Param.values(
                                     "metric",
                                     List.of(
-                                            "messageCount",
-                                            "consumerCount",
-                                            "deliveringCount",
-                                            "messagesAdded",
-                                            "messagesAcked",
-                                            "messagesExpired"),
+                                            MetricKeys.BACKLOG.name(),
+                                            MetricKeys.CONSUMER_COUNT.name(),
+                                            MetricKeys.IN_FLIGHT.name(),
+                                            MetricKeys.ENQUEUED.name(),
+                                            MetricKeys.ACKNOWLEDGED.name(),
+                                            MetricKeys.EXPIRED.name()),
                                     null),
                             McpToolDef.Param.note("queue", "Omit for the whole cluster."),
                             McpToolDef.Param.note("window", "e.g. 15m, 6h, 2d. Units s, m, h, d. Defaults to 1h."))))

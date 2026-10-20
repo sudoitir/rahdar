@@ -21,7 +21,7 @@ import org.hibernate.type.SqlTypes;
  * happened are readable side by side.
  */
 @Entity
-@Table(name = "broker_config_apply")
+@Table(name = "artemis_config_apply")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)

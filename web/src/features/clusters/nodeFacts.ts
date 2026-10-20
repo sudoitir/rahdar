@@ -74,7 +74,7 @@ function roleOf(endpoint: NodeEndpointView): Role {
       return 'Primary';
     case 'BACKUP':
       return 'Backup';
-    case 'STANDALONE':
+    case 'NONE':
       return 'Standalone';
     default:
       return 'Unknown';

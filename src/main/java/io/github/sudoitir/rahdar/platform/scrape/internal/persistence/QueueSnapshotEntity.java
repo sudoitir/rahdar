@@ -1,5 +1,6 @@
 package io.github.sudoitir.rahdar.platform.scrape.internal.persistence;
 
+import io.github.sudoitir.rahdar.platform.broker.QueueRow;
 import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshotUpsert;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -8,20 +9,23 @@ import jakarta.persistence.IdClass;
 import jakarta.persistence.Table;
 import java.io.Serializable;
 import java.time.Instant;
+import java.util.Map;
 import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 /**
- * Read-only JPA view of {@code queue_snapshot} (changeset 005). Writes go through
+ * Read-only JPA view of {@code subscription_snapshot} (changeset 005). Writes go through
  * {@link QueueSnapshotUpsert} (JDBC {@code INSERT … ON CONFLICT}, ADR-0016) —
  * this is a disposable cache with no stable row identity, so the estate-table
  * dirty-checking rule (ADR-0011) does not apply. Never {@code save()} this entity.
  */
 @Entity
-@Table(name = "queue_snapshot")
+@Table(name = "subscription_snapshot")
 @IdClass(QueueSnapshotEntity.Key.class)
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -32,17 +36,23 @@ public class QueueSnapshotEntity {
     private UUID nodeId;
 
     @Id
-    @Column(name = "queue_name", nullable = false, updatable = false)
+    @Column(name = "subscription", nullable = false, updatable = false)
     private String queueName;
 
     @Column(name = "cluster_id", nullable = false)
     private UUID clusterId;
 
-    @Column(name = "address", nullable = false)
+    @Column(name = "destination")
     private String address;
 
-    @Column(name = "routing_type", nullable = false)
-    private String routingType;
+    @Column(name = "kind", nullable = false)
+    private String kind;
+
+    /** What the system says about the subscription beyond the standard attributes, by its native names. */
+    @Getter(AccessLevel.NONE)
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "native_attributes", nullable = false)
+    private Map<String, String> nativeAttributes;
 
     @Column(name = "durable", nullable = false)
     private boolean durable;
@@ -54,28 +64,33 @@ public class QueueSnapshotEntity {
     @Column(name = "ts", nullable = false)
     private Instant ts;
 
-    @Column(name = "message_count", nullable = false)
+    @Column(name = "backlog", nullable = false)
     private long messageCount;
 
     @Column(name = "consumer_count", nullable = false)
     private long consumerCount;
 
-    @Column(name = "delivering_count", nullable = false)
+    @Column(name = "in_flight", nullable = false)
     private long deliveringCount;
 
-    @Column(name = "scheduled_count", nullable = false)
+    @Column(name = "scheduled", nullable = false)
     private long scheduledCount;
 
-    @Column(name = "messages_added", nullable = false)
+    @Column(name = "enqueued", nullable = false)
     private long messagesAdded;
 
-    @Column(name = "messages_acked", nullable = false)
+    @Column(name = "acknowledged", nullable = false)
     private long messagesAcked;
 
-    @Column(name = "messages_expired", nullable = false)
+    @Column(name = "expired", nullable = false)
     private long messagesExpired;
 
-    /** Composite PK {@code (node_id, queue_name)} — matches the changeset-005 constraint. */
+    /** An Artemis queue's routing type, {@code ANYCAST} or {@code MULTICAST}; {@code null} on another system. */
+    public String getRoutingType() {
+        return nativeAttributes.get(QueueRow.ROUTING_TYPE);
+    }
+
+    /** Composite PK {@code (node_id, subscription)}. */
     @EqualsAndHashCode
     public static class Key implements Serializable {
         private UUID nodeId;

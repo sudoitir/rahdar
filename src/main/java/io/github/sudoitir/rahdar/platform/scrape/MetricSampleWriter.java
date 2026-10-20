@@ -1,5 +1,6 @@
 package io.github.sudoitir.rahdar.platform.scrape;
 
+import io.github.sudoitir.openbroker.model.MetricKeys;
 import io.github.sudoitir.rahdar.kernel.core.PartitionProvisioner;
 import io.github.sudoitir.rahdar.platform.broker.QueueRow;
 import java.util.ArrayList;
@@ -31,14 +32,14 @@ import org.springframework.transaction.support.TransactionTemplate;
 public class MetricSampleWriter {
 
     private static final String INSERT = """
-            INSERT INTO metric_sample (ts, value, subject_type, subject_name, metric, cluster_id, node_id)
+            INSERT INTO metric_sample (ts, value, subject_kind, subject_path, metric, cluster_id, node_id)
             VALUES (now(), :value, 'QUEUE', :subjectName, :metric, :clusterId, :nodeId)
             ON CONFLICT ON CONSTRAINT uq_metric_sample DO NOTHING
             """;
 
     private static final String PLUGIN_INSERT = """
-            INSERT INTO metric_sample (ts, value, subject_type, subject_name, metric, cluster_id, node_id)
-            VALUES (now(), :value, 'PLUGIN', :subjectName, :metric, :clusterId, NULL)
+            INSERT INTO metric_sample (ts, value, subject_kind, subject_path, metric, cluster_id, node_id)
+            VALUES (now(), :value, 'rahdar.plugin', :subjectName, :metric, :clusterId, NULL)
             ON CONFLICT ON CONSTRAINT uq_metric_sample DO NOTHING
             """;
 
@@ -52,17 +53,17 @@ public class MetricSampleWriter {
         }
         List<SqlParameterSource> params = new ArrayList<>(rows.size() * 6);
         for (QueueRow r : rows) {
-            params.add(sample(r, "messageCount", r.messageCount()));
-            params.add(sample(r, "consumerCount", r.consumerCount()));
-            params.add(sample(r, "messagesAdded", r.messagesAdded()));
-            params.add(sample(r, "messagesAcked", r.messagesAcked()));
-            params.add(sample(r, "deliveringCount", r.deliveringCount()));
-            params.add(sample(r, "messagesExpired", r.messagesExpired()));
+            params.add(sample(r, MetricKeys.BACKLOG.name(), r.messageCount()));
+            params.add(sample(r, MetricKeys.CONSUMER_COUNT.name(), r.consumerCount()));
+            params.add(sample(r, MetricKeys.ENQUEUED.name(), r.messagesAdded()));
+            params.add(sample(r, MetricKeys.ACKNOWLEDGED.name(), r.messagesAcked()));
+            params.add(sample(r, MetricKeys.IN_FLIGHT.name(), r.deliveringCount()));
+            params.add(sample(r, MetricKeys.EXPIRED.name(), r.messagesExpired()));
         }
         write(INSERT, params.toArray(SqlParameterSource[]::new));
     }
 
-    /** A plugin metric's values on one cluster (ADR-0113): subject type {@code PLUGIN}, no node. */
+    /** A plugin metric's values on one cluster (ADR-0113): subject kind {@code rahdar.plugin}, no node. */
     public void appendPluginSamples(UUID clusterId, String metric, Map<String, Double> values) {
         if (values.isEmpty()) {
             return;

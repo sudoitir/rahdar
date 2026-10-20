@@ -27,7 +27,7 @@ public class MetricHistory {
     private final MetricQueryService queries;
     private final OperatorHandoff handoff;
 
-    /** Queue and cluster metrics ({@code messageCount}, {@code messagesAdded}, ...), as the REST API returns them. */
+    /** Queue and cluster metrics ({@code openbroker.backlog}, {@code openbroker.enqueued}, ...), as the REST API returns them. */
     public MetricSeriesResponse read(UUID actingUserId, UUID clusterId, MetricQuery query) {
         return asUser(actingUserId, clusterId, () -> queries.query(clusterId, query));
     }

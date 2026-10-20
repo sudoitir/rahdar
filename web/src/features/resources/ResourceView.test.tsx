@@ -50,7 +50,7 @@ function consumer(id: string) {
     protocol: 'CORE',
     messagesDelivered: 7,
     messagesAcknowledged: 5,
-    status: 'ok',
+    messagesInFlight: 0,
   };
 }
 
@@ -162,7 +162,7 @@ describe('ResourceView addresses of teams', () => {
       nodeId: 'n1',
       nodeName: 'node-a',
       name,
-      routingTypes: 'ANYCAST',
+      delivery: ['POINT_TO_POINT'],
       queueCount: 1,
       messageCount: 3,
       allowedActions: ['address:read'],

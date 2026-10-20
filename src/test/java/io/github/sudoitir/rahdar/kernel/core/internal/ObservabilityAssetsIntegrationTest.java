@@ -9,13 +9,13 @@ import static org.springframework.test.web.servlet.setup.MockMvcBuilders.webAppC
 
 import io.github.sudoitir.rahdar.kernel.jobs.JobRunner;
 import io.github.sudoitir.rahdar.kernel.jobs.ScheduledJob;
-import io.github.sudoitir.rahdar.platform.broker.BrokerClientFactory;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionSettings;
-import io.github.sudoitir.rahdar.platform.broker.CoreConnectionSettings;
-import io.github.sudoitir.rahdar.platform.broker.CorePool;
+import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
 import io.github.sudoitir.rahdar.platform.broker.NodeCallLimiter;
+import io.github.sudoitir.rahdar.platform.broker.ProbeSession;
 import io.github.sudoitir.rahdar.support.ArtemisIntegrationTest;
+import io.github.sudoitir.rahdar.support.CoreProbe;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.nio.file.Files;
@@ -62,10 +62,7 @@ class ObservabilityAssetsIntegrationTest extends PostgresIntegrationTest {
     WebApplicationContext webContext;
 
     @Autowired
-    BrokerClientFactory clients;
-
-    @Autowired
-    CorePool corePool;
+    BrokerGateway clients;
 
     @Autowired
     JobRunner jobs;
@@ -103,23 +100,13 @@ class ObservabilityAssetsIntegrationTest extends PostgresIntegrationTest {
                 .isSubsetOf(served);
     }
 
-    private void exerciseTheMeters() throws Exception {
+    private void exerciseTheMeters() {
         UUID cluster = UUID.randomUUID();
-        clients.forNode(
-                        BrokerConnectionSettings.basicAuth(
-                                cluster, ArtemisIntegrationTest.BROKER_USER, ArtemisIntegrationTest.BROKER_PASSWORD),
-                        ArtemisIntegrationTest.jolokiaUrl())
-                .readBrokerAttributes("Version");
-        corePool.borrow(
-                        cluster,
-                        ArtemisIntegrationTest.coreUrl(),
-                        new CoreConnectionSettings(
-                                cluster,
-                                ArtemisIntegrationTest.BROKER_USER,
-                                ArtemisIntegrationTest.BROKER_PASSWORD,
-                                null,
-                                true))
-                .close();
+        try (ProbeSession session = clients.probe(BrokerConnectionSettings.basicAuth(
+                cluster, ArtemisIntegrationTest.BROKER_USER, ArtemisIntegrationTest.BROKER_PASSWORD))) {
+            session.node(ArtemisIntegrationTest.jolokiaUrl()).describe();
+        }
+        CoreProbe.send(clients, cluster);
         await().atMost(Duration.ofSeconds(10))
                 .until(() -> meters.find("rahdar.job").tag("job.id", ASSETS_JOB).timer() != null);
         // A permit that cannot come within the wait is the only way a timeout counter exists. The

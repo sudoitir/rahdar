@@ -138,7 +138,7 @@ function serveHistory() {
             nodeId: 'a',
             nodeName: 'artemis-a',
             sampled: true,
-            series: ['messageCount', 'messagesAdded', 'messagesAcked'].map(series),
+            series: ['openbroker.backlog', 'openbroker.enqueued', 'openbroker.acknowledged'].map(series),
           },
           { nodeId: 'b', nodeName: 'artemis-b', sampled: false, series: [] },
         ],

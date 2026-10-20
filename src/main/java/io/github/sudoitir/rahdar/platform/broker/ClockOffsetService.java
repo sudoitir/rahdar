@@ -131,7 +131,7 @@ public class ClockOffsetService {
         Map<UUID, List<NodeSkew>> perCluster = new HashMap<>();
 
         for (NodeDirectory.KnownNode node : nodes.nodes()) {
-            ClockOffset offset = readings.get(node.jolokiaUrl());
+            ClockOffset offset = readings.get(node.managementUrl());
             if (offset == null) {
                 continue;
             }

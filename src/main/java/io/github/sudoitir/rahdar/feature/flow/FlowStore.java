@@ -1,5 +1,6 @@
 package io.github.sudoitir.rahdar.feature.flow;
 
+import io.github.sudoitir.openbroker.model.RouteClass;
 import io.github.sudoitir.rahdar.feature.flow.ClientEdges.Edge;
 import io.github.sudoitir.rahdar.feature.flow.ClientEdges.Kind;
 import java.sql.ResultSet;
@@ -20,7 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * The flow module's disposable caches (ADR-0081): the observation lease, the latest aggregated
- * client edges and each node's sampling coverage. JDBC batch upserts, as for {@code queue_snapshot}
+ * client edges and each node's sampling coverage. JDBC batch upserts, as for {@code subscription_snapshot}
  * (ADR-0016): rows rewritten every sweep have no identity worth dirty-checking.
  */
 @Repository
@@ -53,13 +54,24 @@ public class FlowStore {
 
     /** What a routing row describes (ADR-0081): the objects the flow graph draws beyond clients. */
     public enum RouteKind {
-        DIVERT,
-        BRIDGE,
-        STORE_AND_FORWARD,
-        TEMPORARY_QUEUE,
-        QUEUE_FILTER,
-        DEAD_LETTER,
-        EXPIRY
+        DIVERT(RouteClass.FORWARD),
+        BRIDGE(RouteClass.LINK),
+        STORE_AND_FORWARD(RouteClass.LINK),
+        TEMPORARY_QUEUE(RouteClass.BINDING),
+        QUEUE_FILTER(RouteClass.BINDING),
+        DEAD_LETTER(RouteClass.FORWARD),
+        EXPIRY(RouteClass.FORWARD);
+
+        private final RouteClass routeClass;
+
+        RouteKind(RouteClass routeClass) {
+            this.routeClass = routeClass;
+        }
+
+        /** What kind of route this is in the broker SDK's terms, whatever the system calls it. */
+        public RouteClass routeClass() {
+            return routeClass;
+        }
     }
 
     /**
@@ -93,11 +105,12 @@ public class FlowStore {
     private static final String UPSERT_EDGE = """
             INSERT INTO flow_client_edge
               (sampled_at, rate, unacked, member_count, kind, client_id, user_name, remote_host,
-               protocol, address, queue_name, node_id, cluster_id, stalled)
+               protocol, destination, subscription, node_id, cluster_id, stalled)
             VALUES
               (:sampledAt, :rate, :unacked, :memberCount, :kind, :clientId, :userName, :remoteHost,
                :protocol, :address, :queueName, :nodeId, :clusterId, :stalled)
-            ON CONFLICT (node_id, kind, client_id, user_name, remote_host, protocol, address, queue_name) DO UPDATE SET
+            ON CONFLICT (node_id, kind, client_id, user_name, remote_host, protocol, destination, subscription)
+            DO UPDATE SET
                sampled_at   = EXCLUDED.sampled_at,
                rate         = EXCLUDED.rate,
                unacked      = EXCLUDED.unacked,
@@ -126,12 +139,12 @@ public class FlowStore {
 
     private static final String UPSERT_ROUTE = """
             INSERT INTO flow_route
-              (sampled_at, rate, counter, kind, name, source, target, filter, transformer,
+              (sampled_at, rate, counter, route_class, native_kind, name, source, target, filter, transformer,
                node_id, cluster_id, exclusive, connected)
             VALUES
-              (:sampledAt, :rate, :counter, :kind, :name, :source, :target, :filter, :transformer,
+              (:sampledAt, :rate, :counter, :routeClass, :kind, :name, :source, :target, :filter, :transformer,
                :nodeId, :clusterId, :exclusive, :connected)
-            ON CONFLICT (node_id, kind, name, source, target) DO UPDATE SET
+            ON CONFLICT (node_id, native_kind, name, source, target) DO UPDATE SET
                sampled_at  = EXCLUDED.sampled_at,
                rate        = EXCLUDED.rate,
                counter     = EXCLUDED.counter,
@@ -233,7 +246,7 @@ public class FlowStore {
                         rs.getObject(NODE_ID_COLUMN, UUID.class),
                         rs.getTimestamp(SAMPLED_AT_COLUMN).toInstant(),
                         new Route(
-                                RouteKind.valueOf(rs.getString("kind")),
+                                RouteKind.valueOf(rs.getString("native_kind")),
                                 rs.getString("name"),
                                 rs.getString("source"),
                                 rs.getString("target"),
@@ -251,6 +264,7 @@ public class FlowStore {
                 .addValue("rate", r.rate())
                 .addValue("counter", r.counter())
                 .addValue("kind", r.kind().name())
+                .addValue("routeClass", r.kind().routeClass().name())
                 .addValue("name", r.name() == null ? "" : r.name())
                 .addValue("source", r.source() == null ? "" : r.source())
                 .addValue("target", r.target() == null ? "" : r.target())
@@ -272,8 +286,8 @@ public class FlowStore {
                 rs.getString("user_name"),
                 rs.getString("remote_host"),
                 rs.getString("protocol"),
-                rs.getString("address"),
-                rs.getString("queue_name"),
+                rs.getString("destination"),
+                rs.getString("subscription"),
                 rate,
                 rs.getLong("unacked"),
                 rs.getInt("member_count"),

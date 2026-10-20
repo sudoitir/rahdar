@@ -1,12 +1,12 @@
 package io.github.sudoitir.rahdar.feature.sql;
 
-import io.github.sudoitir.rahdar.feature.queues.DivertOperations;
-import io.github.sudoitir.rahdar.feature.queues.DivertRow;
-import io.github.sudoitir.rahdar.feature.queues.QueueLifecycleOperations;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaBrokerClient;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaRequest;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaResponse;
 import io.github.sudoitir.rahdar.platform.broker.ManagementRefusal;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
+import io.github.sudoitir.rahdar.system.artemis.DivertOperations;
+import io.github.sudoitir.rahdar.system.artemis.DivertRow;
+import io.github.sudoitir.rahdar.system.artemis.ManagementRequest;
+import io.github.sudoitir.rahdar.system.artemis.ManagementResponse;
+import io.github.sudoitir.rahdar.system.artemis.QueueLifecycleOperations;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -85,7 +85,7 @@ public class CaptureTap {
      *     would either see nothing or leave payload unguarded — both of which are worse
      *     than not capturing at all.
      */
-    public String install(JolokiaBrokerClient client, String instanceId, Spec spec) {
+    public String install(ArtemisNode client, String instanceId, Spec spec) {
         String broker = client.resolveBrokerObjectName();
         refuseIfShadowedByExclusiveDivert(client, spec.address());
 
@@ -122,7 +122,7 @@ public class CaptureTap {
      * Remove a tap, and the shared settings with it once this instance has no tap left
      * on the node. Idempotent: anything already gone is a success.
      */
-    public void remove(JolokiaBrokerClient client, String instanceId, String name) {
+    public void remove(ArtemisNode client, String instanceId, String name) {
         String broker = client.resolveBrokerObjectName();
         String queue = CaptureNames.queueOf(name);
         tolerateAlready(() -> divertOps.destroyDivert(client, broker, name));
@@ -143,9 +143,9 @@ public class CaptureTap {
         }
     }
 
-    private static void removeSettings(JolokiaBrokerClient client, String broker, String match) {
-        client.single(JolokiaRequest.exec(broker, "removeAddressSettings(java.lang.String)", match));
-        client.single(JolokiaRequest.exec(broker, "removeSecuritySettings(java.lang.String)", match));
+    private static void removeSettings(ArtemisNode client, String broker, String match) {
+        client.single(ManagementRequest.exec(broker, "removeAddressSettings(java.lang.String)", match));
+        client.single(ManagementRequest.exec(broker, "removeSecuritySettings(java.lang.String)", match));
     }
 
     /**
@@ -184,7 +184,7 @@ public class CaptureTap {
     }
 
     /** The capture diverts this instance owns on this node — the reconciler's actual state. */
-    public List<String> installedNames(JolokiaBrokerClient client, String instanceId) {
+    public List<String> installedNames(ArtemisNode client, String instanceId) {
         return divertOps.listDiverts(client, null, null).stream()
                 .map(DivertRow::uniqueName)
                 .filter(n -> CaptureNames.ownedBy(n, instanceId))
@@ -199,7 +199,7 @@ public class CaptureTap {
      * nothing — the worst available outcome, because an empty index reads as a quiet
      * queue rather than as a defeated tap.
      */
-    private void refuseIfShadowedByExclusiveDivert(JolokiaBrokerClient client, String address) {
+    private void refuseIfShadowedByExclusiveDivert(ArtemisNode client, String address) {
         List<DivertRow> shadowing = divertOps.listDiverts(client, null, null).stream()
                 .filter(DivertRow::exclusive)
                 .filter(d -> address.equals(d.address()))
@@ -218,7 +218,7 @@ public class CaptureTap {
 
     // ---- the four objects ------------------------------------------------
 
-    private void applyAddressSettings(JolokiaBrokerClient client, String broker, String instanceId, long ringSize) {
+    private void applyAddressSettings(ArtemisNode client, String broker, String instanceId, long ringSize) {
         Map<String, Object> settings = new LinkedHashMap<>();
         settings.put("addressFullMessagePolicy", "DROP");
         settings.put("defaultRingSize", ringSize);
@@ -244,7 +244,7 @@ public class CaptureTap {
         settings.put("autoDeleteAddresses", true);
         settings.put("autoCreateQueues", false);
         settings.put("autoDeleteQueues", false);
-        JolokiaResponse res = client.single(JolokiaRequest.exec(
+        ManagementResponse res = client.single(ManagementRequest.exec(
                 broker, ADD_ADDRESS_SETTINGS, CaptureNames.matchFor(instanceId), mapper.writeValueAsString(settings)));
         if (!res.ok()) {
             throw new CaptureRefusedException(
@@ -262,9 +262,9 @@ public class CaptureTap {
      * inside the server and is not a client send, so granting it would only widen who
      * can write into the capture address.
      */
-    private void applySecuritySettings(JolokiaBrokerClient client, String broker, String instanceId) {
+    private void applySecuritySettings(ArtemisNode client, String broker, String instanceId) {
         String role = properties.brokerRole();
-        JolokiaResponse res = client.single(JolokiaRequest.exec(
+        ManagementResponse res = client.single(ManagementRequest.exec(
                 broker,
                 ADD_SECURITY_SETTINGS,
                 CaptureNames.matchFor(instanceId),

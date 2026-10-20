@@ -109,8 +109,8 @@ class PluginMetricsIntegrationTest extends PostgresIntegrationTest {
         tierB();
 
         assertThat(jdbc.queryForObject(
-                        "SELECT value FROM metric_sample WHERE cluster_id = ? AND subject_type = 'PLUGIN'"
-                                + " AND metric = ? AND subject_name = 'daily' AND node_id IS NULL",
+                        "SELECT value FROM metric_sample WHERE cluster_id = ? AND subject_kind = 'rahdar.plugin'"
+                                + " AND metric = ? AND subject_path = 'daily' AND node_id IS NULL",
                         Double.class,
                         clusterId,
                         id + ":edits"))

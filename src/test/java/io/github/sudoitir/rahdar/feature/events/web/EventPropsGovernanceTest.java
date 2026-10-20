@@ -44,8 +44,8 @@ class EventPropsGovernanceTest extends PostgresIntegrationTest {
                 .getId();
         jdbc.update(
                 """
-                INSERT INTO broker_event (occurred_at, type, address, props, cluster_id)
-                VALUES (now(), 'CONSUMER_CREATED', 'orders', CAST(:props AS jsonb), :c)
+                INSERT INTO broker_event (occurred_at, type, destination, data, cluster_id)
+                VALUES (now(), 'openbroker.consumer.attached', 'orders', CAST(:props AS jsonb), :c)
                 """,
                 Map.of(
                         "props",

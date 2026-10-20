@@ -1,0 +1,192 @@
+name: Publish to Maven Central
+
+# A maintainer publishes a release to Maven Central by hand: Actions → Publish to Maven Central → Run
+# workflow, with the release's version, or `gh workflow run publish-central.yml -f version=YYYY.MM.N`.
+# Central limits how much a namespace publishes, so a release no longer goes there on its own
+# (ADR-0205). One run publishes the release's plugin API and its Java client. Docker Hub, npm and the
+# GitHub release still come from every release in ci.yml.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "The release to publish, YYYY.MM.N (an existing tag)"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+# Scripts read the version from here, never from an expression pasted into them.
+env:
+  VERSION: ${{ inputs.version }}
+
+concurrency:
+  group: publish-central
+  cancel-in-progress: false
+
+jobs:
+  # Only a release: a tag of the CalVer shape that exists on this repository.
+  check:
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: The version is a release
+        run: |
+          echo "$VERSION" | grep -Eq '^[0-9]{4}\.[0-9]{2}\.[0-9]+$' || { echo "::error::not a release version: $VERSION"; exit 1; }
+          git rev-parse -q --verify "refs/tags/$VERSION" >/dev/null || { echo "::error::no release tag $VERSION"; exit 1; }
+
+  # The plugin API (ADR-0102): the plain jar of the release, with its sources and javadoc, signed. Only
+  # when the backend changed since the newest version on Central, so a release whose backend is
+  # unchanged publishes nothing here. japicmp refuses an incompatible change to @PluginApi types
+  # first, unless this release raised Contract.VERSION: that is a deliberate break (ADR-0102, ADR-0112).
+  publish-api:
+    needs: check
+    runs-on: ubuntu-26.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      # Keyless provenance for the files deployed to Central (ADR-0139).
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.version }}
+          # Every tag: the last published version and the contract of the release before this one.
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Did the backend change since the newest version on Central?
+        id: needed
+        run: |
+          V="$VERSION"
+          LAST=$(curl -sf https://repo1.maven.org/maven2/io/github/sudoitir/rahdar/maven-metadata.xml \
+            | sed -n 's:.*<release>\(.*\)</release>.*:\1:p' || true)
+          if [ -n "$LAST" ] && git rev-parse -q --verify "refs/tags/$LAST" >/dev/null \
+            && git diff --quiet "$LAST" "$V" -- src/main pom.xml; then
+            echo "Backend unchanged since $LAST on Central: nothing to publish."
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "Backend changed since ${LAST:-nothing on Central}: publishing $V."
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          fi
+          echo "last=$LAST" >> "$GITHUB_OUTPUT"
+      # japicmp compares with the newest version on Central (`RELEASE`), so the contract is compared with
+      # that version too, not with the previous tag: after a publish that failed, the previous tag may
+      # already carry the raised contract while Central still has the old one.
+      - name: Compare the contract version with the newest on Central
+        id: contract
+        if: steps.needed.outputs.publish == 'true'
+        env:
+          LAST: ${{ steps.needed.outputs.last }}
+        run: |
+          V="$VERSION"
+          if [ -n "$LAST" ] && git rev-parse -q --verify "refs/tags/$LAST" >/dev/null; then
+            PREV="$LAST"
+          else
+            PREV=$(git tag -l | grep -E '^[0-9]{4}\.[0-9]{2}\.[0-9]+$' | sort -V | awk -v v="$V" '$0 == v { print p; exit } { p = $0 }')
+          fi
+          FILE=src/main/java/io/github/sudoitir/rahdar/kernel/plugin/Contract.java
+          contract() { git show "$1:$FILE" | sed -n 's/.*int VERSION = \([0-9]*\);.*/\1/p'; }
+          NOW=$(contract "$V")
+          [ -n "$NOW" ] || { echo "::error::no Contract.VERSION in $FILE at $V"; exit 1; }
+          BEFORE=$([ -n "$PREV" ] && contract "$PREV" || true)
+          if [ -n "$BEFORE" ] && [ "$NOW" != "$BEFORE" ]; then
+            echo "Contract $BEFORE -> $NOW since $PREV: a deliberate API break, so japicmp is skipped."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Contract $NOW, unchanged since ${PREV:-the first release}: japicmp checks the API."
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Check the publishing secrets are set
+        if: steps.needed.outputs.publish == 'true'
+        env:
+          SONATYPE_USERNAME: ${{ secrets.SONATYPE_USERNAME }}
+          SONATYPE_PASSWORD: ${{ secrets.SONATYPE_PASSWORD }}
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+        run: |
+          missing=0
+          for name in SONATYPE_USERNAME SONATYPE_PASSWORD GPG_PRIVATE_KEY GPG_PASSPHRASE; do
+            if [ -z "${!name}" ]; then echo "::error::repository secret $name is not set"; missing=1; fi
+          done
+          exit $missing
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        if: steps.needed.outputs.publish == 'true'
+        with:
+          distribution: temurin
+          java-version: "25"
+          server-id: central
+          server-username-env-var: MAVEN_USERNAME
+          server-password-env-var: MAVEN_PASSWORD
+      - name: Publish io.github.sudoitir:rahdar:${{ inputs.version }}
+        if: steps.needed.outputs.publish == 'true'
+        env:
+          MAVEN_USERNAME: ${{ secrets.SONATYPE_USERNAME }}
+          MAVEN_PASSWORD: ${{ secrets.SONATYPE_PASSWORD }}
+          MAVEN_GPG_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+          MAVEN_GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+        run: |
+          ./mvnw -B versions:set -DnewVersion="$VERSION" -DgenerateBackupPoms=false
+          ./mvnw -B -Prelease,api-check -DskipTests -Dspring-boot.repackage.skip=true -Dgpg.signer=bc \
+            -Djapicmp.skip=${{ steps.contract.outputs.skip }} deploy
+      # The bytes Central serves: the plain, sources and javadoc jars and the pom.
+      - uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        if: steps.needed.outputs.publish == 'true'
+        with:
+          subject-path: |
+            target/rahdar*.jar
+            pom.xml
+
+  # The Java client (ADR-0151): generated from the release's OpenAPI document, signed and attested
+  # like the plugin API.
+  publish-client-java:
+    needs: check
+    runs-on: ubuntu-26.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.version }}
+          persist-credentials: false
+      - name: Check the publishing secrets are set
+        env:
+          SONATYPE_USERNAME: ${{ secrets.SONATYPE_USERNAME }}
+          SONATYPE_PASSWORD: ${{ secrets.SONATYPE_PASSWORD }}
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+        run: |
+          missing=0
+          for name in SONATYPE_USERNAME SONATYPE_PASSWORD GPG_PRIVATE_KEY GPG_PASSPHRASE; do
+            if [ -z "${!name}" ]; then echo "::error::repository secret $name is not set"; missing=1; fi
+          done
+          exit $missing
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: "25"
+          server-id: central
+          server-username-env-var: MAVEN_USERNAME
+          server-password-env-var: MAVEN_PASSWORD
+      - name: Publish io.github.sudoitir:rahdar-client:${{ inputs.version }}
+        env:
+          MAVEN_USERNAME: ${{ secrets.SONATYPE_USERNAME }}
+          MAVEN_PASSWORD: ${{ secrets.SONATYPE_PASSWORD }}
+          MAVEN_GPG_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+          MAVEN_GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+        run: |
+          ./mvnw -B -f clients/java/pom.xml versions:set -DnewVersion="$VERSION" -DgenerateBackupPoms=false
+          ./mvnw -B -f clients/java/pom.xml -Prelease -Dgpg.signer=bc deploy
+      # The bytes Central serves: the jar, its sources and javadoc, and the pom.
+      - uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: |
+            clients/java/target/rahdar-client*.jar
+            clients/java/pom.xml

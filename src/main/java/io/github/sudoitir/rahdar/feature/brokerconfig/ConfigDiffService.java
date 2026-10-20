@@ -17,11 +17,12 @@ import io.github.sudoitir.rahdar.kernel.security.ClusterAccessGuard;
 import io.github.sudoitir.rahdar.kernel.security.Permissions;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
-import io.github.sudoitir.rahdar.platform.broker.JolokiaBrokerClient;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
 import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshot;
 import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshots;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisNodes;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -60,6 +61,7 @@ public class ConfigDiffService {
     private final BrokerConnections connections;
     private final ConfigReader reader;
     private final ClusterAccessGuard clusterAccess;
+    private final ArtemisNodes artemisNodes;
 
     /**
      * @param only narrows the comparison to these nodes; {@code null} or empty compares every
@@ -291,12 +293,12 @@ public class ConfigDiffService {
     }
 
     private Read read(UUID clusterId, ClusterNode node, List<String> matches) {
-        if (node.getJolokiaUrl() == null) {
+        if (node.getManagementUrl() == null) {
             return Read.failed(
                     "NO_MANAGEMENT_URL", "This node has no management URL, so its configuration cannot be read.");
         }
         try {
-            JolokiaBrokerClient client = connections.forCluster(clusterId, node.getJolokiaUrl());
+            ArtemisNode client = artemisNodes.on(clusterId, node.getId());
             return Read.answered(reader.read(client, matches));
         } catch (BrokerConnectionException e) {
             return Read.failed(e.kind().name(), e.getMessage());

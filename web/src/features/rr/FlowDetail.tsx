@@ -125,7 +125,7 @@ function FlowContent({ f }: Readonly<{ f: Flow }>) {
     <Stack gap="lg">
       <Group gap="xs">
         <FlowStateBadge state={f.state} />
-        <StatusBadge>{f.replyKind === 'TEMP_QUEUE' ? 'temp reply queue' : 'shared reply queue'}</StatusBadge>
+        <StatusBadge>{f.replyKind === 'TEMPORARY' ? 'temp reply queue' : 'shared reply queue'}</StatusBadge>
       </Group>
 
       <FlowFacts f={f} />

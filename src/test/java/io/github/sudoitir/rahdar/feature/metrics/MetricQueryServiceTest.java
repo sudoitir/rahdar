@@ -71,13 +71,13 @@ class MetricQueryServiceTest {
         // the repository's own SQL, so the service must pass the already-clamped value straight
         // through and never introduce a negative number of its own.
         Instant bucket = Instant.parse("2026-01-01T00:00:00Z");
-        when(repository.rateSeries(eq(clusterId), eq("messagesAdded"), any(), any(), any(), any()))
+        when(repository.rateSeries(eq(clusterId), eq("openbroker.enqueued"), any(), any(), any(), any()))
                 .thenReturn(List.of(new Bucket(bucket, 0.0, null)));
 
         MetricSeriesResponse response = service.query(
                 clusterId,
                 new MetricQuery(
-                        List.of("messagesAdded"),
+                        List.of("openbroker.enqueued"),
                         "CLUSTER",
                         null,
                         bucket,
@@ -99,7 +99,7 @@ class MetricQueryServiceTest {
         Instant from = to.minus(Duration.ofDays(7));
         MetricSeriesResponse response = service.query(
                 clusterId,
-                new MetricQuery(List.of("messageCount"), "CLUSTER", null, from, to, Duration.ofSeconds(1), null));
+                new MetricQuery(List.of("openbroker.backlog"), "CLUSTER", null, from, to, Duration.ofSeconds(1), null));
 
         assertThat(response.truncated()).isTrue();
         assertThat(Duration.parse(response.step())).isGreaterThan(Duration.ofSeconds(1));
@@ -113,7 +113,7 @@ class MetricQueryServiceTest {
         Instant to = Instant.now();
         Instant from = to.minus(Duration.ofDays(30));
         MetricSeriesResponse response = service.query(
-                clusterId, new MetricQuery(List.of("messageCount"), "CLUSTER", null, from, to, null, null));
+                clusterId, new MetricQuery(List.of("openbroker.backlog"), "CLUSTER", null, from, to, null, null));
 
         assertThat(response.truncated()).isTrue();
         assertThat(response.from()).isAfter(from);
@@ -139,12 +139,13 @@ class MetricQueryServiceTest {
         Instant to = Instant.now();
         when(repository.rateSeries(any(), anyString(), any(), any(), any(), any()))
                 .thenReturn(List.of(new Bucket(to.minusSeconds(60), 30.0, null)));
-        when(repository.rateSeriesByNode(eq(clusterId), eq("messagesAdded"), eq("orders"), any(), any(), any()))
+        when(repository.rateSeriesByNode(eq(clusterId), eq("openbroker.enqueued"), eq("orders"), any(), any(), any()))
                 .thenReturn(List.of(new NodeBucket(a, to.minusSeconds(60), 30.0, null)));
 
         MetricSeriesResponse response = service.query(
                 clusterId,
-                new MetricQuery(List.of("messagesAdded"), "QUEUE", "orders", to.minusSeconds(3600), to, null, "NODE"));
+                new MetricQuery(
+                        List.of("openbroker.enqueued"), "QUEUE", "orders", to.minusSeconds(3600), to, null, "NODE"));
 
         assertThat(response.splitBy()).isEqualTo("NODE");
         assertThat(response.series().get(0).points()).hasSize(1);
@@ -167,7 +168,7 @@ class MetricQueryServiceTest {
         MetricSeriesResponse response = service.query(
                 clusterId,
                 new MetricQuery(
-                        List.of("messageCount"),
+                        List.of("openbroker.backlog"),
                         "QUEUE",
                         "orders",
                         to.minus(Duration.ofHours(24)),
@@ -184,12 +185,12 @@ class MetricQueryServiceTest {
     void aSplitIsRefusedForTheClusterScopeAndForAnyOtherDimension() {
         Instant to = Instant.now();
         MetricQuery clusterSplit =
-                new MetricQuery(List.of("messageCount"), "CLUSTER", null, to.minusSeconds(60), to, null, "NODE");
+                new MetricQuery(List.of("openbroker.backlog"), "CLUSTER", null, to.minusSeconds(60), to, null, "NODE");
         assertThatThrownBy(() -> service.query(clusterId, clusterSplit))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("needs one queue");
-        MetricQuery addressSplit =
-                new MetricQuery(List.of("messageCount"), "QUEUE", "orders", to.minusSeconds(60), to, null, "ADDRESS");
+        MetricQuery addressSplit = new MetricQuery(
+                List.of("openbroker.backlog"), "QUEUE", "orders", to.minusSeconds(60), to, null, "ADDRESS");
         assertThatThrownBy(() -> service.query(clusterId, addressSplit))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("splitBy must be NODE");

@@ -1,7 +1,7 @@
 package io.github.sudoitir.rahdar.feature.sql;
 
-import io.github.sudoitir.rahdar.feature.queues.DivertOperations;
 import io.github.sudoitir.rahdar.feature.sql.internal.persistence.MessageIndexSubscriptionEntity;
+import io.github.sudoitir.rahdar.system.artemis.DivertOperations;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
