@@ -21,7 +21,8 @@ under that system's name.
 - **Clusters and nodes.** `cluster.system` names the system a cluster runs. A node has
   `native_node_id`, `ha_group` and `ha_designation` (PRIMARY, BACKUP or NONE); its addresses are rows of
   `broker_node_endpoint` (plane, protocol, url, and whether the address was a seed, derived,
-  discovered or set by an operator). Data URLs are stored ready to dial.
+  discovered or set by an operator). Data URLs are stored ready to dial. A cluster's stored broker
+  accounts are named by plane (`MANAGEMENT`, `DATA`), not by protocol.
 - **Destinations and subscriptions.** Columns that held an address hold a `destination`; columns that
   held a queue hold a `subscription` (`subscription_snapshot`, `message_index`, flow edges, bulk items,
   plugin registrations, transfer runs, request-reply flows, governance findings and rules). A
@@ -35,7 +36,7 @@ under that system's name.
 - **Kinds and classes.** A snapshot row records the SDK kind (`artemis.queue`); a sampled route
   records its SDK route class (binding, forward, link) beside its native kind.
 - **A system's own tables carry its prefix.** Tables of a module that exists for one system are named
-  after it: broker configuration's `artemis_config_*`.
+  after it: broker configuration's `artemis_config_*` and setup review's `artemis_setup_*`.
 
 ## Consequences
 

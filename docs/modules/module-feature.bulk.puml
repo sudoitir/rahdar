@@ -71,6 +71,7 @@ Rel(RahdarApplication.RahdarApplication.Clusters, RahdarApplication.RahdarApplic
 Rel(RahdarApplication.RahdarApplication.Clusters, RahdarApplication.RahdarApplication.Replicas, "listens to", $techn="", $tags="", $link="")
 Rel(RahdarApplication.RahdarApplication.Clusters, RahdarApplication.RahdarApplication.Replicas, "uses", $techn="", $tags="", $link="")
 Rel(RahdarApplication.RahdarApplication.Clusters, RahdarApplication.RahdarApplication.Security, "uses", $techn="", $tags="", $link="")
+Rel(RahdarApplication.RahdarApplication.Clusters, RahdarApplication.RahdarApplication.Settings, "uses", $techn="", $tags="", $link="")
 Rel(RahdarApplication.RahdarApplication.Datalifecycle, RahdarApplication.RahdarApplication.Approvalgatecontract, "depends on", $techn="", $tags="", $link="")
 Rel(RahdarApplication.RahdarApplication.Datalifecycle, RahdarApplication.RahdarApplication.Auditlog, "uses", $techn="", $tags="", $link="")
 Rel(RahdarApplication.RahdarApplication.Datalifecycle, RahdarApplication.RahdarApplication.Core, "depends on", $techn="", $tags="", $link="")

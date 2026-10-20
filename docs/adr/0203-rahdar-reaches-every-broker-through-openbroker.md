@@ -34,9 +34,13 @@ Rahdar reaches every broker through the OpenBroker API, and only through it.
   relay all call SDK facets. The approval gate pins a queue or message action to the SDK's preview
   etag, which names the nodes that hold the resource and the incarnation each holds.
 - **Artemis stays in one module.** `system/artemis` is the only code that imports the SDK's
-  Artemis extension (`ArtemisManagement`, through `ClusterConnection.unwrap`). Features that exist
-  only for Artemis (broker configuration, setup review, diverts and bridges, expiry and counter reset)
-  call it; shared features never do.
+  Artemis extension (`ArtemisManagement`, through `ClusterConnection.unwrap`). What some systems
+  have and others lack is a small Rahdar interface in `platform.broker` (message expiry, counter
+  reset, the default dead-letter destinations) that `system/artemis` implements. Features that exist
+  only for Artemis (broker configuration, setup review, routing) call the module directly. Shared
+  features that still set up Artemis machinery through it (queue and divert lifecycle, capture and
+  plugin taps, transfer staging, flow routes) are listed in `BoundaryRulesTest`; that list only
+  shrinks, and roadmap change 19d moves the rest onto the SDK's operations or a system interface.
 - **No broker client in Rahdar.** Architecture rules hold that `org.apache.activemq..`,
   `org.jolokia..` and `jakarta.jms..` appear nowhere in Rahdar's main code, that the SDK's driver
   SPI is never used, and that only `system/artemis` knows the Artemis driver. The plugin validator

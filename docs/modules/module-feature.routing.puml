@@ -30,9 +30,9 @@ System_Boundary("RahdarApplication_boundary", "RahdarApplication", $tags="") {
 
 }
 
-Rel(RahdarApplication.RahdarApplication.Artemis, RahdarApplication.RahdarApplication.Auditlog, "uses", $techn="", $tags="", $link="")
 Rel(RahdarApplication.RahdarApplication.Artemis, RahdarApplication.RahdarApplication.Brokerconnectivity, "uses", $techn="", $tags="", $link="")
 Rel(RahdarApplication.RahdarApplication.Artemis, RahdarApplication.RahdarApplication.Clusters, "uses", $techn="", $tags="", $link="")
+Rel(RahdarApplication.RahdarApplication.Artemis, RahdarApplication.RahdarApplication.Core, "depends on", $techn="", $tags="", $link="")
 Rel(RahdarApplication.RahdarApplication.Artemis, RahdarApplication.RahdarApplication.Plugincontract, "depends on", $techn="", $tags="", $link="")
 Rel(RahdarApplication.RahdarApplication.Artemis, RahdarApplication.RahdarApplication.Security, "uses", $techn="", $tags="", $link="")
 Rel(RahdarApplication.RahdarApplication.Auditlog, RahdarApplication.RahdarApplication.Core, "uses", $techn="", $tags="", $link="")

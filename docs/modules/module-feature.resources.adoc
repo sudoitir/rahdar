@@ -22,13 +22,12 @@ _Others_
 * `i.g.s.r.f.r.ResourcesFeature`
 |Bean references
 |* `i.g.s.r.p.c.ClusterDirectory` (in Clusters)
-* `i.g.s.r.p.b.BrokerConnections` (in Broker connectivity)
 * `i.g.s.r.k.a.AuditService` (in Audit log)
 * `i.g.s.r.k.s.ActorResolver` (in Security)
 * `i.g.s.r.k.s.SseHub` (in Event stream)
 * `i.g.s.r.k.s.ClusterAccessGuard` (in Security)
-* `i.g.s.r.s.a.BrokerCommands` (in Artemis)
-* `i.g.s.r.s.a.ArtemisNodes` (in Artemis)
+* `i.g.s.r.p.c.BrokerCommands` (in Clusters)
+* `i.g.s.r.p.b.BrokerGateway` (in Broker connectivity)
 * `i.g.s.r.p.s.QueueSnapshots` (in Scraping)
 * `i.g.s.r.p.s.ScrapeProperties` (in Scraping)
 * `i.g.s.r.k.s.PermissionResolver` (in Security)

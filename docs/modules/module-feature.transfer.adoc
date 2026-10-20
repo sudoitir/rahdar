@@ -19,11 +19,10 @@ _Others_
 * `i.g.s.r.f.t.TransferSettings`
 |Bean references
 |* `i.g.s.r.p.c.ClusterDirectory` (in Clusters)
-* `i.g.s.r.p.b.BrokerConnections` (in Broker connectivity)
 * `i.g.s.r.s.a.ArtemisNodes` (in Artemis)
 * `i.g.s.r.k.a.AuditService` (in Audit log)
 * `i.g.s.r.k.r.ReplicaRegistry` (in Replicas)
-* `i.g.s.r.p.b.CoreRelay` (in Broker connectivity)
+* `i.g.s.r.p.b.BrokerRelay` (in Broker connectivity)
 * `i.g.s.r.s.a.MessageOperations` (in Artemis)
 * `i.g.s.r.s.a.StagingQueues` (in Artemis)
 * `i.g.s.r.s.a.AcceptanceProbe` (in Artemis)
@@ -33,7 +32,7 @@ _Others_
 * `i.g.s.r.k.s.SettingsService` (in Settings)
 * `i.g.s.r.k.j.BackgroundRuns` (in Scheduled jobs)
 * `i.g.s.r.p.c.CapabilityLedger` (in Clusters)
-* `i.g.s.r.s.a.QueueLocator` (in Artemis)
+* `i.g.s.r.p.s.QueueLocator` (in Scraping)
 * `i.g.s.r.k.s.ClusterAccessGuard` (in Security)
 * `i.g.s.r.k.s.PermissionResolver` (in Security)
 * `i.g.s.r.k.g.OperationGate` (in Approval gate contract)
