@@ -1,7 +1,5 @@
 package io.github.sudoitir.rahdar.system.artemis;
 
-import io.github.sudoitir.openbroker.artemis.JolokiaRequest;
-import io.github.sudoitir.openbroker.artemis.JolokiaResponse;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
 import io.github.sudoitir.rahdar.platform.broker.QueueDepth;
 import java.util.ArrayList;
@@ -49,7 +47,7 @@ public class MessageOperations {
 
     /** Enqueue one message on the address MBean. Returns the broker-assigned id, or {@code null}. */
     public String send(ArtemisNode client, String addressMbean, Outgoing message, Sender sender) {
-        JolokiaResponse res = client.single(JolokiaRequest.exec(
+        ManagementResponse res = client.single(ManagementRequest.exec(
                 addressMbean,
                 SEND_SIG,
                 message.headers() == null ? Map.of() : message.headers(),
@@ -69,8 +67,8 @@ public class MessageOperations {
      * {@link FrozenFilter} the size of a frozen selection.
      */
     public long countMessages(ArtemisNode client, String queueMbean, String filter) {
-        JolokiaResponse res = client.single(
-                JolokiaRequest.exec(queueMbean, "countMessages(java.lang.String)", filter == null ? "" : filter));
+        ManagementResponse res = client.single(
+                ManagementRequest.exec(queueMbean, "countMessages(java.lang.String)", filter == null ? "" : filter));
         rejectBadFilter(res);
         requireOk(res, "countMessages");
         return res.value() == null ? 0L : res.value().asLong();
@@ -82,7 +80,7 @@ public class MessageOperations {
      * property. A retry sends each message back to its address, so this is where a retry would write.
      */
     public Set<String> originalAddresses(ArtemisNode client, String queueMbean) {
-        JolokiaResponse res = client.single(JolokiaRequest.exec(
+        ManagementResponse res = client.single(ManagementRequest.exec(
                 queueMbean, "countMessages(java.lang.String,java.lang.String)", "", ORIGINAL_ADDRESS));
         requireOk(res, "countMessages");
         Set<String> addresses = new TreeSet<>();
@@ -107,7 +105,8 @@ public class MessageOperations {
 
     /** The ids of the messages on the queue that match the filter, in queue order. */
     public List<Long> listIds(ArtemisNode client, String queueMbean, String filter) {
-        JolokiaResponse res = client.single(JolokiaRequest.exec(queueMbean, "listMessages(java.lang.String)", filter));
+        ManagementResponse res =
+                client.single(ManagementRequest.exec(queueMbean, "listMessages(java.lang.String)", filter));
         requireOk(res, "listMessages");
         List<Long> ids = new ArrayList<>();
         JsonNode listed = client.parsed(res);
@@ -124,15 +123,15 @@ public class MessageOperations {
 
     /** Current {@code MessageCount} of the queue — the purge / retry-all dry-run estimate. */
     public long messageCount(ArtemisNode client, String queueMbean) {
-        JolokiaResponse res = client.single(JolokiaRequest.read(queueMbean, MESSAGE_COUNT));
+        ManagementResponse res = client.single(ManagementRequest.read(queueMbean, MESSAGE_COUNT));
         requireOk(res, MESSAGE_COUNT);
         JsonNode count = res.attribute(MESSAGE_COUNT);
         return count == null ? 0L : count.asLong();
     }
 
     public QueueDepth depth(ArtemisNode client, String queueMbean) {
-        JolokiaResponse res =
-                client.single(JolokiaRequest.read(queueMbean, MESSAGE_COUNT, "DeliveringCount", "ScheduledCount"));
+        ManagementResponse res =
+                client.single(ManagementRequest.read(queueMbean, MESSAGE_COUNT, "DeliveringCount", "ScheduledCount"));
         requireOk(res, MESSAGE_COUNT);
         return new QueueDepth(
                 res.value().path(MESSAGE_COUNT).asLong(),
@@ -164,7 +163,7 @@ public class MessageOperations {
                 client,
                 ids,
                 "moveMessage",
-                id -> JolokiaRequest.exec(queueMbean, "moveMessage(long,java.lang.String)", id, targetQueue));
+                id -> ManagementRequest.exec(queueMbean, "moveMessage(long,java.lang.String)", id, targetQueue));
     }
 
     public BulkResult retryByIds(ArtemisNode client, String queueMbean, List<Long> ids) {
@@ -219,22 +218,22 @@ public class MessageOperations {
 
     /** {@code copyMessage(id, otherQueue)}: false when the broker found no message with this id. */
     public boolean copyMessage(ArtemisNode client, String queueMbean, long messageId, String targetQueue) {
-        JolokiaResponse res = client.single(
-                JolokiaRequest.exec(queueMbean, "copyMessage(long,java.lang.String)", messageId, targetQueue));
+        ManagementResponse res = client.single(
+                ManagementRequest.exec(queueMbean, "copyMessage(long,java.lang.String)", messageId, targetQueue));
         requireOk(res, "copyMessage");
         return res.value() != null && res.value().asBoolean();
     }
 
     /** Retry every message on the queue — Artemis has no by-filter retry. Returns the count retried. */
     public long retryAll(ArtemisNode client, String queueMbean) {
-        JolokiaResponse res = client.single(JolokiaRequest.exec(queueMbean, "retryMessages()"));
+        ManagementResponse res = client.single(ManagementRequest.exec(queueMbean, "retryMessages()"));
         requireOk(res, "retryMessages");
         return res.value() == null ? 0L : res.value().asLong();
     }
 
     /** {@code removeAllMessages()} — the purge. Returns the count removed. */
     public long purge(ArtemisNode client, String queueMbean) {
-        JolokiaResponse res = client.single(JolokiaRequest.exec(queueMbean, "removeAllMessages()"));
+        ManagementResponse res = client.single(ManagementRequest.exec(queueMbean, "removeAllMessages()"));
         requireOk(res, "removeAllMessages");
         return res.value() == null ? 0L : res.value().asLong();
     }
@@ -242,7 +241,7 @@ public class MessageOperations {
     // ---- helpers -------------------------------------------------------
 
     private BulkResult countTrue(ArtemisNode client, String queueMbean, String op, List<Long> ids) {
-        return eachId(client, ids, op, id -> JolokiaRequest.exec(queueMbean, op, id));
+        return eachId(client, ids, op, id -> ManagementRequest.exec(queueMbean, op, id));
     }
 
     /**
@@ -251,12 +250,13 @@ public class MessageOperations {
      * of that batch is counted before the run stops; later batches are not sent. A failure that
      * acted on nothing at all is thrown as it is, because nothing changed.
      */
-    private BulkResult eachId(ArtemisNode client, List<Long> ids, String op, Function<Long, JolokiaRequest> request) {
+    private BulkResult eachId(
+            ArtemisNode client, List<Long> ids, String op, Function<Long, ManagementRequest> request) {
         long affected = 0;
         for (int from = 0; from < ids.size(); from += BY_ID_BATCH) {
             List<Long> chunk = ids.subList(from, Math.min(ids.size(), from + BY_ID_BATCH));
             List<Long> later = ids.subList(from + chunk.size(), ids.size());
-            List<JolokiaResponse> responses;
+            List<ManagementResponse> responses;
             try {
                 responses = client.batch(chunk.stream().map(request).toList());
             } catch (RuntimeException e) {
@@ -283,7 +283,7 @@ public class MessageOperations {
     /** What one batch did: how many ids the broker acted on, the ones it refused, and the first refusal. */
     private record ChunkOutcome(long affected, List<Long> refused, RuntimeException firstError) {}
 
-    private static ChunkOutcome countChunk(List<Long> chunk, List<JolokiaResponse> responses, String op) {
+    private static ChunkOutcome countChunk(List<Long> chunk, List<ManagementResponse> responses, String op) {
         long affected = 0;
         List<Long> refused = new ArrayList<>();
         RuntimeException firstError = null;
@@ -294,7 +294,7 @@ public class MessageOperations {
                             BrokerConnectionException.Kind.BAD_RESPONSE,
                             "The broker returned fewer results than operations.");
                 }
-                JolokiaResponse res = responses.get(i);
+                ManagementResponse res = responses.get(i);
                 requireOk(res, op);
                 if (res.value() != null && res.value().asBoolean()) {
                     affected++;
@@ -310,13 +310,13 @@ public class MessageOperations {
     }
 
     private long filterExec(ArtemisNode client, String queueMbean, String op, Object... args) {
-        JolokiaResponse res = client.single(JolokiaRequest.exec(queueMbean, op, args));
+        ManagementResponse res = client.single(ManagementRequest.exec(queueMbean, op, args));
         rejectBadFilter(res);
         requireOk(res, op);
         return res.value() == null ? 0L : res.value().asLong();
     }
 
-    private static void rejectBadFilter(JolokiaResponse res) {
+    private static void rejectBadFilter(ManagementResponse res) {
         if (!res.ok() && res.error() != null) {
             String e = res.error();
             if (e.contains("AMQ229020") || e.toLowerCase().contains("invalid filter")) {
@@ -325,7 +325,7 @@ public class MessageOperations {
         }
     }
 
-    private static void requireOk(JolokiaResponse res, String op) {
+    private static void requireOk(ManagementResponse res, String op) {
         if (!res.ok()) {
             throw new BrokerConnectionException(
                     BrokerConnectionException.Kind.BAD_RESPONSE,

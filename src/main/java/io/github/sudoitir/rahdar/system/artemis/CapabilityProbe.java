@@ -1,8 +1,5 @@
 package io.github.sudoitir.rahdar.system.artemis;
 
-import io.github.sudoitir.openbroker.artemis.ArtemisMBeans;
-import io.github.sudoitir.openbroker.artemis.JolokiaRequest;
-import io.github.sudoitir.openbroker.artemis.JolokiaResponse;
 import io.github.sudoitir.rahdar.platform.broker.BrokerCapabilities;
 import io.github.sudoitir.rahdar.platform.broker.BrokerCapabilities.CapabilityAssessment;
 import io.github.sudoitir.rahdar.platform.broker.BrokerCapabilityProbe;
@@ -76,7 +73,7 @@ public class CapabilityProbe implements BrokerCapabilityProbe {
 
     private CapabilityAssessment probeManagementRead(ArtemisNode client) {
         try {
-            JolokiaResponse response = client.readBrokerAttributes("Version");
+            ManagementResponse response = client.readBrokerAttributes("Version");
             if (response.ok()) {
                 return CapabilityAssessment.available("A broker attribute read returned 200.");
             }
@@ -269,10 +266,10 @@ public class CapabilityProbe implements BrokerCapabilityProbe {
     }
 
     private boolean hasCoreAcceptor(ArtemisNode client) {
-        List<String> acceptors = client.search(ArtemisMBeans.acceptorsPattern(client.resolveBrokerObjectName()));
+        List<String> acceptors = client.search(MBeanNames.acceptorsPattern(client.resolveBrokerObjectName()));
         for (String acceptor : acceptors) {
             try {
-                JolokiaResponse response = client.single(JolokiaRequest.read(acceptor, "Parameters"));
+                ManagementResponse response = client.single(ManagementRequest.read(acceptor, "Parameters"));
                 JsonNode parameters = response.ok() ? response.attribute("Parameters") : null;
                 if (parameters == null) {
                     continue;
@@ -294,7 +291,7 @@ public class CapabilityProbe implements BrokerCapabilityProbe {
     }
 
     private boolean hasNotificationsAddress(ArtemisNode client) {
-        List<String> addresses = client.search(ArtemisMBeans.addressesPattern(client.resolveBrokerObjectName()));
+        List<String> addresses = client.search(MBeanNames.addressesPattern(client.resolveBrokerObjectName()));
         String needle = "address=\"" + NOTIFICATIONS_ADDRESS + "\"";
         return addresses.stream().anyMatch(name -> name.contains(needle));
     }

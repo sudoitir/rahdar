@@ -1,9 +1,5 @@
 package io.github.sudoitir.rahdar.system.artemis;
 
-import io.github.sudoitir.openbroker.artemis.ArtemisLists;
-import io.github.sudoitir.openbroker.artemis.ArtemisMBeans;
-import io.github.sudoitir.openbroker.artemis.JolokiaRequest;
-import io.github.sudoitir.openbroker.artemis.JolokiaResponse;
 import io.github.sudoitir.rahdar.platform.broker.ManagementRefusal;
 import io.github.sudoitir.rahdar.platform.clusters.LifecycleOutcome.NodeStatus;
 import java.util.ArrayList;
@@ -48,10 +44,8 @@ public class BridgeOperations {
     /** Every bridge deployed on this node, with its started and connected state. */
     public List<BridgeRow> listBridges(ArtemisNode client, UUID nodeId, String nodeName) {
         String broker = client.resolveBrokerObjectName();
-        return ArtemisLists.readAll(
-                client.jolokia(),
-                client.search(ArtemisMBeans.bridgesPattern(broker)),
-                a -> BridgeRow.parse(a, nodeId, nodeName));
+        return ListRows.readAll(
+                client, client.search(MBeanNames.bridgesPattern(broker)), a -> BridgeRow.parse(a, nodeId, nodeName));
     }
 
     /**
@@ -93,8 +87,8 @@ public class BridgeOperations {
 
     /** Create a bridge from a hyphenated {@code BridgeConfiguration} document. */
     public void createBridge(ArtemisNode client, String brokerMbean, Map<String, Object> config) {
-        JolokiaResponse res = client.single(
-                JolokiaRequest.exec(brokerMbean, "createBridge(java.lang.String)", mapper.writeValueAsString(config)));
+        ManagementResponse res = client.single(ManagementRequest.exec(
+                brokerMbean, "createBridge(java.lang.String)", mapper.writeValueAsString(config)));
         require(res, "createBridge");
     }
 
@@ -105,7 +99,7 @@ public class BridgeOperations {
      */
     public void destroyBridge(ArtemisNode client, String brokerMbean, String name) {
         require(
-                client.single(JolokiaRequest.exec(brokerMbean, "destroyBridge(java.lang.String)", name)),
+                client.single(ManagementRequest.exec(brokerMbean, "destroyBridge(java.lang.String)", name)),
                 "destroyBridge");
     }
 
@@ -254,7 +248,7 @@ public class BridgeOperations {
         return properties instanceof Map<?, ?> m ? m : Map.of();
     }
 
-    private static void require(JolokiaResponse res, String operation) {
+    private static void require(ManagementResponse res, String operation) {
         ArtemisNode.require(res, operation);
     }
 }

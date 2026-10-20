@@ -10,7 +10,6 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import io.github.sudoitir.openbroker.artemis.JolokiaResponse;
 import io.github.sudoitir.rahdar.feature.queues.QueueLifecycleService.AddressDeleteParams;
 import io.github.sudoitir.rahdar.feature.queues.QueueLifecycleService.QueueDeleteParams;
 import io.github.sudoitir.rahdar.feature.queues.QueueLifecycleService.Reach;
@@ -38,6 +37,7 @@ import io.github.sudoitir.rahdar.support.Targets;
 import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
 import io.github.sudoitir.rahdar.system.artemis.ArtemisNodes;
 import io.github.sudoitir.rahdar.system.artemis.DivertOperations;
+import io.github.sudoitir.rahdar.system.artemis.ManagementResponse;
 import io.github.sudoitir.rahdar.system.artemis.QueueLifecycleOperations;
 import java.time.Duration;
 import java.time.Instant;
@@ -130,7 +130,7 @@ class QueueGateTest extends PostgresIntegrationTest {
         BrokerTarget anyNode = Targets.target();
         when(gateway.node(any(UUID.class), any(UUID.class))).thenReturn(anyNode);
         // No node has a queue the scrape does not show.
-        when(client.single(any())).thenReturn(new JolokiaResponse(404, null, "no such queue", null, null));
+        when(client.single(any())).thenReturn(new ManagementResponse(404, null, "no such queue", null, null));
         when(ops.deleteState(any(), anyString(), anyString(), anyString(), anyString()))
                 .thenReturn(new QueueLifecycleOperations.DeleteState(false, 0, List.of()));
         upsert.upsertBatch(List.of(

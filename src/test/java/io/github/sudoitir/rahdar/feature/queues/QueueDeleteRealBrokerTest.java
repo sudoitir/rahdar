@@ -5,7 +5,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import io.github.sudoitir.openbroker.artemis.ArtemisMBeans;
 import io.github.sudoitir.rahdar.kernel.audit.internal.persistence.AuditEventEntity;
 import io.github.sudoitir.rahdar.kernel.audit.internal.persistence.AuditEventRepository;
 import io.github.sudoitir.rahdar.platform.broker.Attempt;
@@ -22,6 +21,7 @@ import io.github.sudoitir.rahdar.support.ArtemisIntegrationTest;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
 import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
 import io.github.sudoitir.rahdar.system.artemis.DivertOperations;
+import io.github.sudoitir.rahdar.system.artemis.MBeanNames;
 import io.github.sudoitir.rahdar.system.artemis.QueueLifecycleOperations;
 import jakarta.jms.Connection;
 import jakarta.jms.Session;
@@ -161,7 +161,7 @@ class QueueDeleteRealBrokerTest extends PostgresIntegrationTest {
     }
 
     private boolean dstQueueExists() {
-        return queueOps.boundQueues(client, ArtemisMBeans.address(broker, dst)).contains(dst);
+        return queueOps.boundQueues(client, MBeanNames.address(broker, dst)).contains(dst);
     }
 
     @Test
@@ -201,7 +201,7 @@ class QueueDeleteRealBrokerTest extends PostgresIntegrationTest {
             Session session = producerConnection.createSession(false, Session.AUTO_ACKNOWLEDGE);
             session.createProducer(session.createTopic(src)).send(session.createTextMessage("after"));
         }
-        assertThat(queueOps.messageCount(client, ArtemisMBeans.queue(broker, src, src + ".copy", "MULTICAST")))
+        assertThat(queueOps.messageCount(client, MBeanNames.queue(broker, src, src + ".copy", "MULTICAST")))
                 .isEqualTo(1L);
         assertThat(dstQueueExists()).isFalse();
 
@@ -235,7 +235,7 @@ class QueueDeleteRealBrokerTest extends PostgresIntegrationTest {
             Session session = producerConnection.createSession(false, Session.AUTO_ACKNOWLEDGE);
             session.createProducer(session.createTopic(src)).send(session.createTextMessage("through"));
         }
-        assertThat(queueOps.messageCount(client, ArtemisMBeans.queue(broker, other, other, "ANYCAST")))
+        assertThat(queueOps.messageCount(client, MBeanNames.queue(broker, other, other, "ANYCAST")))
                 .isEqualTo(1L);
     }
 }

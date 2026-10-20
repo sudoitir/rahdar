@@ -6,7 +6,6 @@ import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import io.github.sudoitir.openbroker.artemis.JolokiaResponse;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
 import java.util.List;
 import java.util.Map;
@@ -21,18 +20,18 @@ class QueueLifecycleOperationsTest {
     private final QueueLifecycleOperations ops = new QueueLifecycleOperations(mapper);
     private final ArtemisNode client = mock(ArtemisNode.class);
 
-    private JolokiaResponse ok(String attribute, Object value) {
-        return new JolokiaResponse(200, mapper.valueToTree(Map.of(attribute, value)), null, null, null);
+    private ManagementResponse ok(String attribute, Object value) {
+        return new ManagementResponse(200, mapper.valueToTree(Map.of(attribute, value)), null, null, null);
     }
 
-    private static JolokiaResponse failed(String type, String error) {
-        return new JolokiaResponse(type.contains("InstanceNotFound") ? 404 : 500, null, error, type, null);
+    private static ManagementResponse failed(String type, String error) {
+        return new ManagementResponse(type.contains("InstanceNotFound") ? 404 : 500, null, error, type, null);
     }
 
-    private static final JolokiaResponse NOT_FOUND =
+    private static final ManagementResponse NOT_FOUND =
             failed("javax.management.InstanceNotFoundException", "javax.management.InstanceNotFoundException : x");
 
-    private QueueLifecycleOperations.DeleteState read(JolokiaResponse names, JolokiaResponse consumers) {
+    private QueueLifecycleOperations.DeleteState read(ManagementResponse names, ManagementResponse consumers) {
         when(client.batch(anyList())).thenReturn(List.of(names, consumers));
         return ops.deleteState(client, BROKER, "orders.addr", "orders", "ANYCAST");
     }
@@ -55,8 +54,8 @@ class QueueLifecycleOperationsTest {
 
     @Test
     void aQueueNamesReadThatFailsIsNotTakenAsAbsence() {
-        JolokiaResponse names = failed("java.lang.SecurityException", "denied");
-        JolokiaResponse consumers = ok("ConsumerCount", 0);
+        ManagementResponse names = failed("java.lang.SecurityException", "denied");
+        ManagementResponse consumers = ok("ConsumerCount", 0);
 
         assertThatThrownBy(() -> read(names, consumers))
                 .isInstanceOf(BrokerConnectionException.class)
@@ -65,8 +64,8 @@ class QueueLifecycleOperationsTest {
 
     @Test
     void aConsumerCountReadThatFailsIsNotTakenAsZero() {
-        JolokiaResponse names = ok("QueueNames", List.of("orders"));
-        JolokiaResponse consumers = failed("java.lang.RuntimeException", "timeout");
+        ManagementResponse names = ok("QueueNames", List.of("orders"));
+        ManagementResponse consumers = failed("java.lang.RuntimeException", "timeout");
 
         assertThatThrownBy(() -> read(names, consumers))
                 .isInstanceOf(BrokerConnectionException.class)

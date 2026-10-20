@@ -9,8 +9,6 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import io.github.sudoitir.openbroker.artemis.JolokiaRequest;
-import io.github.sudoitir.openbroker.artemis.JolokiaResponse;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
 import java.util.List;
 import java.util.stream.IntStream;
@@ -109,27 +107,27 @@ class MessageOperationsTest {
     @Test
     void theOriginalAddressesAreTheKeysOfOneCountGroupedByThatProperty() {
         when(client.single(any()))
-                .thenReturn(new JolokiaResponse(
+                .thenReturn(new ManagementResponse(
                         200, mapper.valueToTree("{\"orders.in\":2,\"billing.in\":1,\"null\":4}"), null, null, null));
-        when(client.parsed(any())).thenAnswer(i -> ((JolokiaResponse) i.getArgument(0)).valueParsed(mapper));
+        when(client.parsed(any())).thenAnswer(i -> ((ManagementResponse) i.getArgument(0)).valueParsed(mapper));
 
         assertThat(operations.originalAddresses(client, QUEUE)).containsExactly("billing.in", "orders.in");
 
-        ArgumentCaptor<JolokiaRequest> sent = ArgumentCaptor.forClass(JolokiaRequest.class);
+        ArgumentCaptor<ManagementRequest> sent = ArgumentCaptor.forClass(ManagementRequest.class);
         verify(client).single(sent.capture());
         assertThat(sent.getValue().operation()).isEqualTo("countMessages(java.lang.String,java.lang.String)");
         assertThat(sent.getValue().arguments()).containsExactly("", "_AMQ_ORIG_ADDRESS");
     }
 
-    private JolokiaResponse acted() {
-        return new JolokiaResponse(200, mapper.valueToTree(true), null, null, null);
+    private ManagementResponse acted() {
+        return new ManagementResponse(200, mapper.valueToTree(true), null, null, null);
     }
 
-    private JolokiaResponse notFound() {
-        return new JolokiaResponse(200, mapper.valueToTree(false), null, null, null);
+    private ManagementResponse notFound() {
+        return new ManagementResponse(200, mapper.valueToTree(false), null, null, null);
     }
 
-    private static JolokiaResponse refused(String error) {
-        return new JolokiaResponse(500, null, error, "java.lang.IllegalArgumentException", null);
+    private static ManagementResponse refused(String error) {
+        return new ManagementResponse(500, null, error, "java.lang.IllegalArgumentException", null);
     }
 }

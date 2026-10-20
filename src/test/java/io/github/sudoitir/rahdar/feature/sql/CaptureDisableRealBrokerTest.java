@@ -2,7 +2,6 @@ package io.github.sudoitir.rahdar.feature.sql;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import io.github.sudoitir.openbroker.artemis.JolokiaRequest;
 import io.github.sudoitir.rahdar.kernel.settings.RahdarInstance;
 import io.github.sudoitir.rahdar.platform.broker.Attempt;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
@@ -20,6 +19,7 @@ import io.github.sudoitir.rahdar.support.ArtemisIntegrationTest;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
 import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
 import io.github.sudoitir.rahdar.system.artemis.DivertOperations;
+import io.github.sudoitir.rahdar.system.artemis.ManagementRequest;
 import io.github.sudoitir.rahdar.system.artemis.QueueLifecycleOperations;
 import java.util.List;
 import java.util.Set;
@@ -144,7 +144,7 @@ class CaptureDisableRealBrokerTest extends PostgresIntegrationTest {
 
     private Set<String> queueNames() {
         JsonNode value =
-                client.single(JolokiaRequest.read(broker, "QueueNames")).attribute("QueueNames");
+                client.single(ManagementRequest.read(broker, "QueueNames")).attribute("QueueNames");
         return Set.copyOf(value.valueStream().map(JsonNode::asString).toList());
     }
 

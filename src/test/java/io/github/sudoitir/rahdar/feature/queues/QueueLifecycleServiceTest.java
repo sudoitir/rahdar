@@ -15,7 +15,6 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import io.github.sudoitir.openbroker.artemis.JolokiaResponse;
 import io.github.sudoitir.rahdar.feature.queues.LifecycleRequests.CreateQueueRequest;
 import io.github.sudoitir.rahdar.kernel.audit.internal.persistence.AuditEventEntity;
 import io.github.sudoitir.rahdar.kernel.audit.internal.persistence.AuditEventRepository;
@@ -45,6 +44,7 @@ import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
 import io.github.sudoitir.rahdar.system.artemis.ArtemisNodes;
 import io.github.sudoitir.rahdar.system.artemis.DivertOperations;
 import io.github.sudoitir.rahdar.system.artemis.DivertRow;
+import io.github.sudoitir.rahdar.system.artemis.ManagementResponse;
 import io.github.sudoitir.rahdar.system.artemis.QueueLifecycleOperations;
 import java.time.Instant;
 import java.util.HashMap;
@@ -542,7 +542,7 @@ class QueueLifecycleServiceTest extends PostgresIntegrationTest {
         value.putObject(mbean).put("MessageCount", 0);
         when(client.single(ArgumentMatchers.argThat(
                         r -> r != null && "read".equals(r.type()) && r.mbean().contains("queue=\"" + QUEUE + "\""))))
-                .thenReturn(new JolokiaResponse(200, value, null, null, null));
+                .thenReturn(new ManagementResponse(200, value, null, null, null));
         onTheNode(0, QUEUE);
 
         NodeOutcome preview = live(ok(lifecycle.deleteQueue(clusterId, QUEUE, true, false, false)));
@@ -554,7 +554,7 @@ class QueueLifecycleServiceTest extends PostgresIntegrationTest {
     void aQueueNoNodeHasIsNotFound() {
         // What a broker answers a pattern read that matches nothing.
         when(client.single(ArgumentMatchers.any()))
-                .thenReturn(new JolokiaResponse(
+                .thenReturn(new ManagementResponse(
                         404, null, "No MBean with pattern found", "javax.management.InstanceNotFoundException", null));
         assertThatThrownBy(() -> lifecycle.deleteQueue(clusterId, QUEUE, true, false, false))
                 .isInstanceOf(NotFoundException.class);
@@ -739,8 +739,8 @@ class QueueLifecycleServiceTest extends PostgresIntegrationTest {
     @Test
     void anUpdateOfAQueueNoNodeHasIsNotFound() {
         when(client.single(any()))
-                .thenReturn(
-                        new JolokiaResponse(404, null, "No MBean", "javax.management.InstanceNotFoundException", null));
+                .thenReturn(new ManagementResponse(
+                        404, null, "No MBean", "javax.management.InstanceNotFoundException", null));
 
         var update = new LifecycleRequests.UpdateQueueRequest(null, 1, null, null, null, null);
 

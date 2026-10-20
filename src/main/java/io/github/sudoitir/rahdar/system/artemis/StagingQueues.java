@@ -1,8 +1,5 @@
 package io.github.sudoitir.rahdar.system.artemis;
 
-import io.github.sudoitir.openbroker.artemis.ArtemisMBeans;
-import io.github.sudoitir.openbroker.artemis.JolokiaRequest;
-import io.github.sudoitir.openbroker.artemis.JolokiaResponse;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
 import java.util.List;
 import java.util.UUID;
@@ -43,9 +40,10 @@ public class StagingQueues {
         String config = "{\"name\":\"%s\",\"address\":\"%s\",\"routing-type\":\"ANYCAST\",\"durable\":true,"
                         .formatted(queue, queue)
                 + "\"auto-delete\":false,\"auto-create-address\":true}";
-        List<JolokiaResponse> responses = client.batch(List.of(
-                JolokiaRequest.exec(broker, "addAddressSettings(java.lang.String,java.lang.String)", queue, SETTINGS),
-                JolokiaRequest.exec(broker, "createQueue(java.lang.String,boolean)", config, true)));
+        List<ManagementResponse> responses = client.batch(List.of(
+                ManagementRequest.exec(
+                        broker, "addAddressSettings(java.lang.String,java.lang.String)", queue, SETTINGS),
+                ManagementRequest.exec(broker, "createQueue(java.lang.String,boolean)", config, true)));
         requireAll(responses, 2, "create staging queue " + queue);
     }
 
@@ -58,8 +56,8 @@ public class StagingQueues {
     public boolean destroyIfEmpty(ArtemisNode client, String queue) {
         requireStaging(queue);
         String broker = client.resolveBrokerObjectName();
-        JolokiaResponse depth = client.single(
-                JolokiaRequest.read(ArtemisMBeans.queue(broker, queue, queue, "ANYCAST"), "MessageCount"));
+        ManagementResponse depth = client.single(
+                ManagementRequest.read(MBeanNames.queue(broker, queue, queue, "ANYCAST"), "MessageCount"));
         if (depth.ok()) {
             if (depth.attribute("MessageCount").asLong() > 0) {
                 return false;
@@ -67,17 +65,17 @@ public class StagingQueues {
         } else if (!"javax.management.InstanceNotFoundException".equals(depth.errorType())) {
             throw failed("read the depth of " + queue, depth);
         }
-        List<JolokiaResponse> responses = client.batch(List.of(
-                JolokiaRequest.exec(broker, "destroyQueue(java.lang.String,boolean,boolean)", queue, true, true),
-                JolokiaRequest.exec(broker, "deleteAddress(java.lang.String,boolean)", queue, false),
-                JolokiaRequest.exec(broker, "removeAddressSettings(java.lang.String)", queue)));
+        List<ManagementResponse> responses = client.batch(List.of(
+                ManagementRequest.exec(broker, "destroyQueue(java.lang.String,boolean,boolean)", queue, true, true),
+                ManagementRequest.exec(broker, "deleteAddress(java.lang.String,boolean)", queue, false),
+                ManagementRequest.exec(broker, "removeAddressSettings(java.lang.String)", queue)));
         requireAll(responses, 3, "destroy staging queue " + queue);
         return true;
     }
 
     /** The staging queues on this node, whether or not a run still knows them. */
     public List<String> list(ArtemisNode client) {
-        String pattern = ArtemisMBeans.queuePattern(client.resolveBrokerObjectName(), PREFIX + "*");
+        String pattern = MBeanNames.queuePattern(client.resolveBrokerObjectName(), PREFIX + "*");
         return client.search(pattern).stream()
                 .map(StagingQueues::queueOf)
                 .filter(q -> q != null && q.startsWith(PREFIX))
@@ -102,25 +100,25 @@ public class StagingQueues {
     }
 
     /** Every response succeeded, or failed only because what it removes is already gone. */
-    private static void requireAll(List<JolokiaResponse> responses, int expected, String what) {
+    private static void requireAll(List<ManagementResponse> responses, int expected, String what) {
         if (responses.size() < expected) {
             throw new BrokerConnectionException(
                     BrokerConnectionException.Kind.BAD_RESPONSE,
                     "Could not " + what + ": the broker returned fewer results than operations.");
         }
-        for (JolokiaResponse res : responses) {
+        for (ManagementResponse res : responses) {
             if (!res.ok() && !alreadyGone(res)) {
                 throw failed(what, res);
             }
         }
     }
 
-    private static boolean alreadyGone(JolokiaResponse res) {
+    private static boolean alreadyGone(ManagementResponse res) {
         String error = res.error();
         return error != null && (error.contains(QUEUE_MISSING) || error.contains(ADDRESS_MISSING));
     }
 
-    private static BrokerConnectionException failed(String what, JolokiaResponse res) {
+    private static BrokerConnectionException failed(String what, ManagementResponse res) {
         return new BrokerConnectionException(
                 BrokerConnectionException.Kind.BAD_RESPONSE,
                 "Could not " + what + ": " + (res.error() != null ? res.error() : "status " + res.status()));

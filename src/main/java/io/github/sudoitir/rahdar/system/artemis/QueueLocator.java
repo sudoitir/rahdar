@@ -1,8 +1,5 @@
 package io.github.sudoitir.rahdar.system.artemis;
 
-import io.github.sudoitir.openbroker.artemis.ArtemisMBeans;
-import io.github.sudoitir.openbroker.artemis.JolokiaRequest;
-import io.github.sudoitir.openbroker.artemis.JolokiaResponse;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
@@ -79,8 +76,8 @@ public class QueueLocator {
             ArtemisNode client = artemisNodes.on(clusterId, node.getId());
             // A pattern read answers for every match at once, keyed by MBean name; a node
             // without the queue answers 404, which is simply not a location.
-            JolokiaResponse read = client.single(JolokiaRequest.read(
-                    ArtemisMBeans.queuePattern(client.resolveBrokerObjectName(), queueName), "MessageCount"));
+            ManagementResponse read = client.single(ManagementRequest.read(
+                    MBeanNames.queuePattern(client.resolveBrokerObjectName(), queueName), "MessageCount"));
             if (!read.ok() || read.value() == null || !read.value().isObject()) {
                 return;
             }

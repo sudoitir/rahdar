@@ -3,7 +3,6 @@ package io.github.sudoitir.rahdar.system.artemis;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import io.github.sudoitir.openbroker.artemis.ArtemisMBeans;
 import io.github.sudoitir.rahdar.support.ArtemisIntegrationTest;
 import jakarta.jms.Connection;
 import jakarta.jms.MessageConsumer;
@@ -103,7 +102,7 @@ class TransferPrimitivesTest extends ArtemisIntegrationTest {
         produce(source, 2);
 
         String frozen = ArtemisSelectors.frozen(null, t0);
-        String mbean = ArtemisMBeans.queue(client.resolveBrokerObjectName(), source, source, "ANYCAST");
+        String mbean = MBeanNames.queue(client.resolveBrokerObjectName(), source, source, "ANYCAST");
         assertThat(operations.countMessages(client, mbean, frozen)).isEqualTo(5);
 
         assertThat(operations.moveMessages(client, mbean, 100, frozen, target, false, 3))

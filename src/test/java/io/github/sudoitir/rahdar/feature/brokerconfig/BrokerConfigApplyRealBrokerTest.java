@@ -3,9 +3,6 @@ package io.github.sudoitir.rahdar.feature.brokerconfig;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 
-import io.github.sudoitir.openbroker.artemis.ArtemisMBeans;
-import io.github.sudoitir.openbroker.artemis.JolokiaRequest;
-import io.github.sudoitir.openbroker.artemis.JolokiaResponse;
 import io.github.sudoitir.rahdar.feature.brokerconfig.BrokerConfigDocument.AddressDecl;
 import io.github.sudoitir.rahdar.feature.brokerconfig.BrokerConfigDocument.AddressSettingDecl;
 import io.github.sudoitir.rahdar.feature.brokerconfig.BrokerConfigDocument.DivertDecl;
@@ -23,6 +20,9 @@ import io.github.sudoitir.rahdar.support.ArtemisIntegrationTest;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
 import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
 import io.github.sudoitir.rahdar.system.artemis.DivertOperations;
+import io.github.sudoitir.rahdar.system.artemis.MBeanNames;
+import io.github.sudoitir.rahdar.system.artemis.ManagementRequest;
+import io.github.sudoitir.rahdar.system.artemis.ManagementResponse;
 import io.github.sudoitir.rahdar.system.artemis.QueueLifecycleOperations;
 import java.util.List;
 import java.util.Map;
@@ -239,8 +239,8 @@ class BrokerConfigApplyRealBrokerTest extends PostgresIntegrationTest {
 
         assertThat(routingTypes(events)).containsExactlyInAnyOrder("ANYCAST", "MULTICAST");
         assertThat(routingTypes(fanout)).containsExactly("MULTICAST");
-        JsonNode queue = client.single(JolokiaRequest.read(
-                        ArtemisMBeans.queue(broker, events, events, "ANYCAST"), "MaxConsumers", "Filter", "Exclusive"))
+        JsonNode queue = client.single(ManagementRequest.read(
+                        MBeanNames.queue(broker, events, events, "ANYCAST"), "MaxConsumers", "Filter", "Exclusive"))
                 .value();
         assertThat(queue.path("MaxConsumers").asInt()).isEqualTo(5);
         assertThat(queue.path("Filter").asString()).isEqualTo("region = 'eu'");
@@ -303,7 +303,7 @@ class BrokerConfigApplyRealBrokerTest extends PostgresIntegrationTest {
     }
 
     private Set<String> routingTypes(String address) {
-        JsonNode value = client.single(JolokiaRequest.read(ArtemisMBeans.address(broker, address), "RoutingTypes"))
+        JsonNode value = client.single(ManagementRequest.read(MBeanNames.address(broker, address), "RoutingTypes"))
                 .attribute("RoutingTypes");
         return Set.copyOf(value.valueStream().map(JsonNode::asString).toList());
     }
@@ -340,12 +340,13 @@ class BrokerConfigApplyRealBrokerTest extends PostgresIntegrationTest {
     }
 
     private Set<String> names(String attribute) {
-        JsonNode value = client.single(JolokiaRequest.read(broker, attribute)).attribute(attribute);
+        JsonNode value =
+                client.single(ManagementRequest.read(broker, attribute)).attribute(attribute);
         return Set.copyOf(value.valueStream().map(JsonNode::asString).toList());
     }
 
     private JsonNode exec(String operation, String argument) {
-        JolokiaResponse res = client.single(JolokiaRequest.exec(broker, operation, argument));
+        ManagementResponse res = client.single(ManagementRequest.exec(broker, operation, argument));
         assertThat(res.ok()).describedAs("%s: %s", operation, res.error()).isTrue();
         return res.value();
     }

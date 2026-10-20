@@ -1,11 +1,11 @@
 package io.github.sudoitir.rahdar.feature.sql;
 
-import io.github.sudoitir.openbroker.artemis.JolokiaRequest;
-import io.github.sudoitir.openbroker.artemis.JolokiaResponse;
 import io.github.sudoitir.rahdar.platform.broker.ManagementRefusal;
 import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
 import io.github.sudoitir.rahdar.system.artemis.DivertOperations;
 import io.github.sudoitir.rahdar.system.artemis.DivertRow;
+import io.github.sudoitir.rahdar.system.artemis.ManagementRequest;
+import io.github.sudoitir.rahdar.system.artemis.ManagementResponse;
 import io.github.sudoitir.rahdar.system.artemis.QueueLifecycleOperations;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -144,8 +144,8 @@ public class CaptureTap {
     }
 
     private static void removeSettings(ArtemisNode client, String broker, String match) {
-        client.single(JolokiaRequest.exec(broker, "removeAddressSettings(java.lang.String)", match));
-        client.single(JolokiaRequest.exec(broker, "removeSecuritySettings(java.lang.String)", match));
+        client.single(ManagementRequest.exec(broker, "removeAddressSettings(java.lang.String)", match));
+        client.single(ManagementRequest.exec(broker, "removeSecuritySettings(java.lang.String)", match));
     }
 
     /**
@@ -244,7 +244,7 @@ public class CaptureTap {
         settings.put("autoDeleteAddresses", true);
         settings.put("autoCreateQueues", false);
         settings.put("autoDeleteQueues", false);
-        JolokiaResponse res = client.single(JolokiaRequest.exec(
+        ManagementResponse res = client.single(ManagementRequest.exec(
                 broker, ADD_ADDRESS_SETTINGS, CaptureNames.matchFor(instanceId), mapper.writeValueAsString(settings)));
         if (!res.ok()) {
             throw new CaptureRefusedException(
@@ -264,7 +264,7 @@ public class CaptureTap {
      */
     private void applySecuritySettings(ArtemisNode client, String broker, String instanceId) {
         String role = properties.brokerRole();
-        JolokiaResponse res = client.single(JolokiaRequest.exec(
+        ManagementResponse res = client.single(ManagementRequest.exec(
                 broker,
                 ADD_SECURITY_SETTINGS,
                 CaptureNames.matchFor(instanceId),

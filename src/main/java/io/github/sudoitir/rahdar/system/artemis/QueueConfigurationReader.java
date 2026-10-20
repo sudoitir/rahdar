@@ -1,6 +1,5 @@
 package io.github.sudoitir.rahdar.system.artemis;
 
-import io.github.sudoitir.openbroker.artemis.ArtemisMBeans;
 import io.github.sudoitir.rahdar.kernel.core.NotFoundException;
 import io.github.sudoitir.rahdar.kernel.security.ClusterAccessGuard;
 import io.github.sudoitir.rahdar.kernel.security.Permissions;
@@ -71,7 +70,7 @@ public class QueueConfigurationReader {
             }
             try {
                 ArtemisNode client = artemisNodes.on(clusterId, node.getId());
-                String mbean = ArtemisMBeans.queue(
+                String mbean = MBeanNames.queue(
                         client.resolveBrokerObjectName(),
                         location.address(),
                         location.queueName(),

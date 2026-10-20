@@ -15,7 +15,7 @@ import tools.jackson.databind.ObjectMapper;
 /**
  * One node's Artemis management agent, for what has no neutral meaning. Every request goes through
  * the cluster's connection and so through Rahdar's call interceptor; a call that gets no answer fails
- * as one of Rahdar's broker exceptions, and a refusal is the {@link JolokiaResponse} the caller reads.
+ * as one of Rahdar's broker exceptions, and a refusal is the {@link ManagementResponse} the caller reads.
  */
 public final class ArtemisNode {
 
@@ -33,40 +33,44 @@ public final class ArtemisNode {
         return call(jolokia::brokerName);
     }
 
-    public JolokiaResponse single(JolokiaRequest request) {
-        return call(() -> jolokia.single(request));
+    public ManagementResponse single(ManagementRequest request) {
+        return ManagementResponse.of(call(() -> jolokia.single(request.toDriver())));
     }
 
-    public List<JolokiaResponse> batch(List<JolokiaRequest> requests) {
-        return call(() -> jolokia.batch(requests));
+    public List<ManagementResponse> batch(List<ManagementRequest> requests) {
+        return call(() -> jolokia.batch(
+                        requests.stream().map(ManagementRequest::toDriver).toList()))
+                .stream()
+                .map(ManagementResponse::of)
+                .toList();
     }
 
     public List<String> search(String pattern) {
         return call(() -> jolokia.search(pattern));
     }
 
-    public JolokiaResponse readBrokerAttributes(String... attributes) {
-        return call(() -> jolokia.readBroker(attributes));
+    public ManagementResponse readBrokerAttributes(String... attributes) {
+        return ManagementResponse.of(call(() -> jolokia.readBroker(attributes)));
     }
 
-    public JolokiaResponse execOnBroker(String operation, Object... arguments) {
-        return call(() -> jolokia.execOnBroker(operation, arguments));
+    public ManagementResponse execOnBroker(String operation, Object... arguments) {
+        return ManagementResponse.of(call(() -> jolokia.execOnBroker(operation, arguments)));
     }
 
     public JsonNode execOnBrokerParsed(String operation, Object... arguments) {
         return call(() -> jolokia.execOnBrokerParsed(operation, arguments));
     }
 
-    public JsonNode parsed(JolokiaResponse entry) {
-        return call(() -> jolokia.parsed(entry));
+    public JsonNode parsed(ManagementResponse entry) {
+        return call(() -> jolokia.parsed(entry.toDriver()));
     }
 
     /**
      * Throws the refusal of a failed response as Rahdar has always named it: a {@code
      * ManagementRefusal} for a broker code it knows, a bad response otherwise.
      */
-    public static void require(JolokiaResponse response, String operation) {
-        ArtemisErrors.refusal(response, operation).ifPresent(e -> {
+    public static void require(ManagementResponse response, String operation) {
+        ArtemisErrors.refusal(response.toDriver(), operation).ifPresent(e -> {
             throw BrokerFailures.translate(e);
         });
     }
@@ -76,10 +80,10 @@ public final class ArtemisNode {
     }
 
     /**
-     * This node's agent for the SDK's own Artemis helpers ({@code ArtemisLists}), failing as Rahdar's
+     * This node's agent for the SDK's own Artemis helpers ({@link ListRows}), failing as Rahdar's
      * broker exceptions like every other call here.
      */
-    public ArtemisJolokia jolokia() {
+    ArtemisJolokia jolokia() {
         return translating;
     }
 
@@ -96,12 +100,12 @@ public final class ArtemisNode {
 
         @Override
         public JolokiaResponse single(JolokiaRequest request) {
-            return ArtemisNode.this.single(request);
+            return call(() -> jolokia.single(request));
         }
 
         @Override
         public List<JolokiaResponse> batch(List<JolokiaRequest> requests) {
-            return ArtemisNode.this.batch(requests);
+            return call(() -> jolokia.batch(requests));
         }
 
         @Override
@@ -111,12 +115,12 @@ public final class ArtemisNode {
 
         @Override
         public JolokiaResponse readBroker(String... attributes) {
-            return readBrokerAttributes(attributes);
+            return call(() -> jolokia.readBroker(attributes));
         }
 
         @Override
         public JolokiaResponse execOnBroker(String operation, Object... arguments) {
-            return ArtemisNode.this.execOnBroker(operation, arguments);
+            return call(() -> jolokia.execOnBroker(operation, arguments));
         }
 
         @Override
@@ -126,7 +130,7 @@ public final class ArtemisNode {
 
         @Override
         public JsonNode parsed(JolokiaResponse entry) {
-            return ArtemisNode.this.parsed(entry);
+            return call(() -> jolokia.parsed(entry));
         }
 
         @Override

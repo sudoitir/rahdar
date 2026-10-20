@@ -2,8 +2,6 @@ package io.github.sudoitir.rahdar.system.artemis;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import io.github.sudoitir.openbroker.artemis.JolokiaRequest;
-import io.github.sudoitir.openbroker.artemis.JolokiaResponse;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -70,22 +68,22 @@ class DivertOperationsTest {
     /** Before 2.38 the JSON create is missing; the positional arm carries the same fields (ADR-0142). */
     @Test
     void anOlderBrokerGetsThePositionalCreateWithTheSameFields() {
-        JolokiaResponse missing = new JolokiaResponse(
+        ManagementResponse missing = new ManagementResponse(
                 400,
                 null,
                 "java.lang.IllegalArgumentException : No operation createDivert(java.lang.String) on MBean x exists.",
                 "java.lang.IllegalArgumentException",
                 null);
         assertThat(DivertOperations.lacksJsonCreate(missing)).isTrue();
-        assertThat(DivertOperations.lacksJsonCreate(new JolokiaResponse(200, null, null, null, null)))
+        assertThat(DivertOperations.lacksJsonCreate(new ManagementResponse(200, null, null, null, null)))
                 .isFalse();
 
         DivertOperations ops = new DivertOperations(new tools.jackson.databind.json.JsonMapper());
-        JolokiaRequest plain =
+        ManagementRequest plain =
                 ops.positionalCreate("b", DivertOperations.divertConfig("d", null, "A", "B", true, null, null));
         assertThat(plain.arguments()).containsExactly("d", "d", "A", "B", true, "", "", Map.of(), "STRIP");
 
-        JolokiaRequest filtered =
+        ManagementRequest filtered =
                 ops.positionalCreate("b", DivertOperations.divertConfig("d", "r", "A", "B", false, "p = 1", "anycast"));
         assertThat(filtered.arguments()).containsExactly("d", "r", "A", "B", false, "p = 1", "", Map.of(), "ANYCAST");
 

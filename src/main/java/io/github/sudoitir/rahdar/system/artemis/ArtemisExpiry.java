@@ -1,6 +1,5 @@
 package io.github.sudoitir.rahdar.system.artemis;
 
-import io.github.sudoitir.openbroker.artemis.ArtemisMBeans;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.stereotype.Component;
@@ -34,6 +33,6 @@ public class ArtemisExpiry {
     }
 
     private static String mbean(ArtemisNode client, String queue, String address, String routingType) {
-        return ArtemisMBeans.queue(client.resolveBrokerObjectName(), address, queue, routingType);
+        return MBeanNames.queue(client.resolveBrokerObjectName(), address, queue, routingType);
     }
 }

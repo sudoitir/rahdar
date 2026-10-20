@@ -1,9 +1,5 @@
 package io.github.sudoitir.rahdar.system.artemis;
 
-import io.github.sudoitir.openbroker.artemis.ArtemisLists;
-import io.github.sudoitir.openbroker.artemis.ArtemisMBeans;
-import io.github.sudoitir.openbroker.artemis.JolokiaRequest;
-import io.github.sudoitir.openbroker.artemis.JolokiaResponse;
 import io.github.sudoitir.rahdar.platform.broker.ManagementRefusal;
 import io.github.sudoitir.rahdar.platform.clusters.LifecycleOutcome.NodeStatus;
 import java.util.ArrayList;
@@ -36,7 +32,7 @@ import tools.jackson.databind.ObjectMapper;
  *
  * <p>Mutations use the single-String JSON {@code DivertConfiguration} overloads.
  * The positional {@code createDivert} arms take a nullable filter and transformer,
- * and {@code JolokiaRequest.exec} cannot carry a null argument; the JSON arm takes
+ * and {@code ManagementRequest.exec} cannot carry a null argument; the JSON arm takes
  * one argument, omits what is unset, and is the current surface besides. A broker
  * older than 2.38 lacks the JSON create, and only then is the positional arm used.
  */
@@ -79,10 +75,8 @@ public class DivertOperations {
     /** Every divert deployed on this node. An empty list is a real answer, not a failure. */
     public List<DivertRow> listDiverts(ArtemisNode client, UUID nodeId, String nodeName) {
         String broker = client.resolveBrokerObjectName();
-        return ArtemisLists.readAll(
-                client.jolokia(),
-                client.search(ArtemisMBeans.divertsPattern(broker)),
-                a -> DivertRow.parse(a, nodeId, nodeName));
+        return ListRows.readAll(
+                client, client.search(MBeanNames.divertsPattern(broker)), a -> DivertRow.parse(a, nodeId, nodeName));
     }
 
     /** One divert by name on this node, or empty when it is not deployed there. */
@@ -94,7 +88,7 @@ public class DivertOperations {
 
     /** Whether the address exists on this node, or would be created the first time something is sent to it. */
     public boolean addressAvailable(ArtemisNode client, String brokerMbean, String address) {
-        if (!client.search(ArtemisMBeans.address(brokerMbean, address)).isEmpty()) {
+        if (!client.search(MBeanNames.address(brokerMbean, address)).isEmpty()) {
             return true;
         }
         JsonNode settings = client.execOnBrokerParsed("getAddressSettingsAsJSON(java.lang.String)", address);
@@ -109,8 +103,8 @@ public class DivertOperations {
      * reports as "already in the requested state" rather than as a failure.
      */
     public void createDivert(ArtemisNode client, String brokerMbean, Map<String, Object> config) {
-        JolokiaResponse res = client.single(
-                JolokiaRequest.exec(brokerMbean, "createDivert(java.lang.String)", mapper.writeValueAsString(config)));
+        ManagementResponse res = client.single(ManagementRequest.exec(
+                brokerMbean, "createDivert(java.lang.String)", mapper.writeValueAsString(config)));
         if (lacksJsonCreate(res)) {
             res = client.single(positionalCreate(brokerMbean, config));
         }
@@ -121,7 +115,7 @@ public class DivertOperations {
      * Artemis before 2.38 has no JSON {@code createDivert(String)} and says so with this
      * error; everything else Rahdar sends it works from the supported minimum (ADR-0142).
      */
-    static boolean lacksJsonCreate(JolokiaResponse res) {
+    static boolean lacksJsonCreate(ManagementResponse res) {
         return !res.ok() && res.error() != null && res.error().contains("No operation createDivert(java.lang.String)");
     }
 
@@ -135,7 +129,7 @@ public class DivertOperations {
      * An absent routing type is the broker's own default,
      * {@code STRIP}.
      */
-    JolokiaRequest positionalCreate(String brokerMbean, Map<String, Object> config) {
+    ManagementRequest positionalCreate(String brokerMbean, Map<String, Object> config) {
         String transformerClass = "";
         Object transformerProperties = Map.of();
         if (config.get("transformer-configuration") instanceof Map<?, ?> transformer) {
@@ -144,7 +138,7 @@ public class DivertOperations {
                 transformerProperties = transformer.get("properties");
             }
         }
-        return JolokiaRequest.exec(
+        return ManagementRequest.exec(
                 brokerMbean,
                 "createDivert(java.lang.String,java.lang.String,java.lang.String,java.lang.String,boolean,"
                         + "java.lang.String,java.lang.String,java.util.Map,java.lang.String)",
@@ -267,7 +261,7 @@ public class DivertOperations {
     /** Destroy a divert. One that is already gone raises {@link ManagementRefusal.Kind#ALREADY}. */
     public void destroyDivert(ArtemisNode client, String brokerMbean, String name) {
         require(
-                client.single(JolokiaRequest.exec(brokerMbean, "destroyDivert(java.lang.String)", name)),
+                client.single(ManagementRequest.exec(brokerMbean, "destroyDivert(java.lang.String)", name)),
                 "destroyDivert");
     }
 
@@ -300,7 +294,7 @@ public class DivertOperations {
         return config;
     }
 
-    private static void require(JolokiaResponse res, String operation) {
+    private static void require(ManagementResponse res, String operation) {
         ArtemisNode.require(res, operation);
     }
 }

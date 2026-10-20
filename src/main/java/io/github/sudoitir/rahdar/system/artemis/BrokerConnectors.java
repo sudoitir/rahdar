@@ -1,7 +1,5 @@
 package io.github.sudoitir.rahdar.system.artemis;
 
-import io.github.sudoitir.openbroker.artemis.JolokiaRequest;
-import io.github.sudoitir.openbroker.artemis.JolokiaResponse;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
 import java.util.ArrayList;
 import java.util.List;
@@ -48,7 +46,7 @@ public class BrokerConnectors {
     public Connectors read(ArtemisNode client) {
         try {
             String broker = client.resolveBrokerObjectName();
-            JolokiaResponse response = client.single(JolokiaRequest.read(broker, "ConnectorsAsJSON"));
+            ManagementResponse response = client.single(ManagementRequest.read(broker, "ConnectorsAsJSON"));
             if (!response.ok()) {
                 return Connectors.unknown("The node did not answer the connector read: " + response.error());
             }

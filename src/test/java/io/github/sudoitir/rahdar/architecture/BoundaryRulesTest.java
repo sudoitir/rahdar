@@ -11,6 +11,8 @@ import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.domain.JavaMethodCall;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.core.importer.ImportOption;
+import io.github.sudoitir.openbroker.ClusterConnection;
+import io.github.sudoitir.openbroker.messaging.Message;
 import jakarta.persistence.Entity;
 import java.util.Set;
 import java.util.regex.Pattern;
@@ -83,14 +85,41 @@ class BoundaryRulesTest {
                 .check(CLASSES);
     }
 
+    /** Rahdar reaches every broker through the broker SDK (ADR-0203): no broker's own client appears in it. */
     @Test
-    void brokerClientTypesStayInsideTheBrokerLayer() {
+    void noBrokerClientAppearsAnywhere() {
         noClasses()
                 .that()
-                .resideOutsideOfPackages(ROOT + ".platform.broker..", ROOT + ".system.artemis..")
+                .resideInAPackage(ROOT + "..")
                 .should()
                 .dependOnClassesThat()
-                .resideInAnyPackage("org.jolokia..", "org.apache.activemq.artemis.api.core.client..")
+                .resideInAnyPackage("org.jolokia..", "org.apache.activemq..", "jakarta.jms..")
+                .check(CLASSES);
+    }
+
+    /** The SDK's driver interface is for drivers; Rahdar is a consumer of the SDK. */
+    @Test
+    void theSdksDriverInterfaceIsNeverUsed() {
+        noClasses()
+                .that()
+                .resideInAPackage(ROOT + "..")
+                .should()
+                .dependOnClassesThat()
+                .resideInAPackage("io.github.sudoitir.openbroker.spi..")
+                .check(CLASSES);
+    }
+
+    /** What only Artemis has is reached through the Artemis module and nowhere else. */
+    @Test
+    void onlyTheArtemisModuleKnowsTheArtemisDriver() {
+        noClasses()
+                .that()
+                .resideOutsideOfPackage(ROOT + ".system.artemis..")
+                .should()
+                .dependOnClassesThat()
+                .resideInAPackage("io.github.sudoitir.openbroker.artemis..")
+                .orShould()
+                .callMethod(ClusterConnection.class, "unwrap", Class.class)
                 .check(CLASSES);
     }
 
@@ -145,9 +174,12 @@ class BoundaryRulesTest {
                     @Override
                     public boolean test(JavaMethodCall call) {
                         String owner = call.getTargetOwner().getFullName();
-                        return (owner.equals(ROOT + ".platform.broker.MessageBrowser$BrowsedMessage")
-                                        || owner.equals(ROOT + ".feature.sql.QueryResult$Row"))
-                                && content.contains(call.getName());
+                        return ((owner.equals(ROOT + ".platform.broker.BrowsedMessage")
+                                                || owner.equals(ROOT + ".feature.sql.QueryResult$Row"))
+                                        && content.contains(call.getName()))
+                                || (owner.equals(Message.class.getName())
+                                        && Set.of("body", "properties", "headers")
+                                                .contains(call.getName()));
                     }
                 })
                 .check(CLASSES);

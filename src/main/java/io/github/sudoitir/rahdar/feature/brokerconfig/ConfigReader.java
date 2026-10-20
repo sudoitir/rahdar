@@ -1,9 +1,9 @@
 package io.github.sudoitir.rahdar.feature.brokerconfig;
 
-import io.github.sudoitir.openbroker.artemis.JolokiaRequest;
-import io.github.sudoitir.openbroker.artemis.JolokiaResponse;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
 import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
+import io.github.sudoitir.rahdar.system.artemis.ManagementRequest;
+import io.github.sudoitir.rahdar.system.artemis.ManagementResponse;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashSet;
@@ -86,15 +86,15 @@ public class ConfigReader {
         String mbean = client.resolveBrokerObjectName();
 
         List<String> compared = cap(matches);
-        List<JolokiaRequest> requests = new ArrayList<>();
-        requests.add(JolokiaRequest.read(mbean, "Active", "AcceptorsAsJSON"));
-        requests.add(JolokiaRequest.readAll(mbean));
-        requests.add(JolokiaRequest.exec(mbean, "getRolesAsJSON(java.lang.String)", DEFAULT_MATCH));
+        List<ManagementRequest> requests = new ArrayList<>();
+        requests.add(ManagementRequest.read(mbean, "Active", "AcceptorsAsJSON"));
+        requests.add(ManagementRequest.readAll(mbean));
+        requests.add(ManagementRequest.exec(mbean, "getRolesAsJSON(java.lang.String)", DEFAULT_MATCH));
         for (String match : compared) {
-            requests.add(JolokiaRequest.exec(mbean, "getAddressSettingsAsJSON(java.lang.String)", match));
+            requests.add(ManagementRequest.exec(mbean, "getAddressSettingsAsJSON(java.lang.String)", match));
         }
 
-        List<JolokiaResponse> responses = client.batch(requests);
+        List<ManagementResponse> responses = client.batch(requests);
         if (responses.size() != requests.size()) {
             throw new BrokerConnectionException(
                     BrokerConnectionException.Kind.BAD_RESPONSE,

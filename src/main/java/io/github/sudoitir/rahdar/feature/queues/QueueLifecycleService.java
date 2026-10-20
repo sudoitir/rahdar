@@ -1,6 +1,5 @@
 package io.github.sudoitir.rahdar.feature.queues;
 
-import io.github.sudoitir.openbroker.artemis.ArtemisMBeans;
 import io.github.sudoitir.rahdar.feature.queues.LifecycleRequests.CreateAddressRequest;
 import io.github.sudoitir.rahdar.feature.queues.LifecycleRequests.CreateDivertRequest;
 import io.github.sudoitir.rahdar.feature.queues.LifecycleRequests.CreateQueueRequest;
@@ -34,6 +33,7 @@ import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
 import io.github.sudoitir.rahdar.system.artemis.ArtemisNodes;
 import io.github.sudoitir.rahdar.system.artemis.DivertOperations;
 import io.github.sudoitir.rahdar.system.artemis.DivertRow;
+import io.github.sudoitir.rahdar.system.artemis.MBeanNames;
 import io.github.sudoitir.rahdar.system.artemis.QueueLifecycleOperations;
 import io.github.sudoitir.rahdar.system.artemis.QueueLocator;
 import io.github.sudoitir.rahdar.system.artemis.QueueLocator.QueueLocation;
@@ -736,7 +736,7 @@ public class QueueLifecycleService {
     }
 
     private static String queueMbean(ArtemisNode client, ResolvedQueue queue) {
-        return ArtemisMBeans.queue(
+        return MBeanNames.queue(
                 client.resolveBrokerObjectName(), queue.address(), queue.queueName(), queue.routingType());
     }
 
@@ -745,7 +745,7 @@ public class QueueLifecycleService {
      * so deleting an address does not list another team's queues.
      */
     private String boundQueuesMessage(ArtemisNode client, String brokerMbean, String address, ResourceFilter readable) {
-        List<String> queues = ops.boundQueues(client, ArtemisMBeans.address(brokerMbean, address));
+        List<String> queues = ops.boundQueues(client, MBeanNames.address(brokerMbean, address));
         if (queues.isEmpty()) {
             return "Address '" + address + "' still has queues bound to it.";
         }

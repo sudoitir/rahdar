@@ -1,6 +1,5 @@
 package io.github.sudoitir.rahdar.feature.transfer;
 
-import io.github.sudoitir.openbroker.artemis.ArtemisMBeans;
 import io.github.sudoitir.rahdar.feature.messages.MessagePermissions;
 import io.github.sudoitir.rahdar.feature.queues.QueuePermissions;
 import io.github.sudoitir.rahdar.feature.transfer.TransferRunMapper.Derived;
@@ -49,6 +48,7 @@ import io.github.sudoitir.rahdar.system.artemis.AcceptanceProbe;
 import io.github.sudoitir.rahdar.system.artemis.AcceptanceProbe.Facts;
 import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
 import io.github.sudoitir.rahdar.system.artemis.ArtemisSelectors;
+import io.github.sudoitir.rahdar.system.artemis.MBeanNames;
 import io.github.sudoitir.rahdar.system.artemis.MessageOperations;
 import io.github.sudoitir.rahdar.system.artemis.QueueLocator;
 import io.github.sudoitir.rahdar.system.artemis.QueueLocator.QueueLocation;
@@ -332,7 +332,7 @@ public class TransferService {
                     yield null;
                 }
                 try {
-                    String mbean = ArtemisMBeans.queue(
+                    String mbean = MBeanNames.queue(
                             client.resolveBrokerObjectName(), from.address(), from.queueName(), from.routingType());
                     yield messages.countMessages(client, mbean, ArtemisSelectors.frozen(selection.filter(), t0));
                 } catch (BrokerConnectionException _) {
@@ -861,7 +861,7 @@ public class TransferService {
         long returned = 0;
         try {
             ArtemisNode client = nodes.client(node);
-            String mbean = ArtemisMBeans.queue(client.resolveBrokerObjectName(), queue, queue, ANYCAST);
+            String mbean = MBeanNames.queue(client.resolveBrokerObjectName(), queue, queue, ANYCAST);
             int chunk = settings.intValue(TransferSettings.BATCH_SIZE);
             long moved;
             do {
@@ -894,7 +894,7 @@ public class TransferService {
     private Long depth(ArtemisNode client, String queue) {
         try {
             return messages.messageCount(
-                    client, ArtemisMBeans.queue(client.resolveBrokerObjectName(), queue, queue, ANYCAST));
+                    client, MBeanNames.queue(client.resolveBrokerObjectName(), queue, queue, ANYCAST));
         } catch (BrokerConnectionException _) {
             return null;
         }

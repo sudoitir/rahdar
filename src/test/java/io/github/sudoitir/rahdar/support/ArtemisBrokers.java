@@ -3,10 +3,10 @@ package io.github.sudoitir.rahdar.support;
 import static io.github.sudoitir.rahdar.support.ArtemisIntegrationTest.BROKER_PASSWORD;
 import static io.github.sudoitir.rahdar.support.ArtemisIntegrationTest.BROKER_USER;
 
-import io.github.sudoitir.openbroker.artemis.ArtemisMBeans;
-import io.github.sudoitir.openbroker.artemis.JolokiaRequest;
 import io.github.sudoitir.rahdar.support.wire.WireRecorder;
 import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
+import io.github.sudoitir.rahdar.system.artemis.MBeanNames;
+import io.github.sudoitir.rahdar.system.artemis.ManagementRequest;
 import jakarta.jms.BytesMessage;
 import jakarta.jms.Connection;
 import jakarta.jms.JMSException;
@@ -118,12 +118,12 @@ public final class ArtemisBrokers {
         }
 
         private String queueMbean(ArtemisNode client, String queue) {
-            return ArtemisMBeans.queue(client.resolveBrokerObjectName(), queue, queue, "ANYCAST");
+            return MBeanNames.queue(client.resolveBrokerObjectName(), queue, queue, "ANYCAST");
         }
 
         public boolean queueExists(String queue) {
             ArtemisNode client = jolokia();
-            return !client.search(ArtemisMBeans.queuePattern(client.resolveBrokerObjectName(), queue))
+            return !client.search(MBeanNames.queuePattern(client.resolveBrokerObjectName(), queue))
                     .isEmpty();
         }
 
@@ -131,7 +131,7 @@ public final class ArtemisBrokers {
         public long depth(String queue) {
             ArtemisNode client = jolokia();
             JsonNode value =
-                    client.parsed(client.single(JolokiaRequest.read(queueMbean(client, queue), "MessageCount")));
+                    client.parsed(client.single(ManagementRequest.read(queueMbean(client, queue), "MessageCount")));
             return value.isObject() ? value.path("MessageCount").asLong() : value.asLong();
         }
 
@@ -139,7 +139,7 @@ public final class ArtemisBrokers {
         public List<JsonNode> list(String queue) {
             ArtemisNode client = jolokia();
             JsonNode listed = client.parsed(client.single(
-                    JolokiaRequest.exec(queueMbean(client, queue), "listMessages(java.lang.String)", "")));
+                    ManagementRequest.exec(queueMbean(client, queue), "listMessages(java.lang.String)", "")));
             List<JsonNode> messages = new ArrayList<>();
             listed.forEach(messages::add);
             return messages;

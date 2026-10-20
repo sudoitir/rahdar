@@ -1,13 +1,13 @@
 package io.github.sudoitir.rahdar.feature.plugins.messaging.internal;
 
-import io.github.sudoitir.openbroker.artemis.ArtemisMBeans;
-import io.github.sudoitir.openbroker.artemis.JolokiaRequest;
-import io.github.sudoitir.openbroker.artemis.JolokiaResponse;
 import io.github.sudoitir.rahdar.feature.sql.CaptureProperties;
 import io.github.sudoitir.rahdar.platform.broker.ManagementRefusal;
 import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
 import io.github.sudoitir.rahdar.system.artemis.DivertOperations;
 import io.github.sudoitir.rahdar.system.artemis.DivertRow;
+import io.github.sudoitir.rahdar.system.artemis.MBeanNames;
+import io.github.sudoitir.rahdar.system.artemis.ManagementRequest;
+import io.github.sudoitir.rahdar.system.artemis.ManagementResponse;
 import io.github.sudoitir.rahdar.system.artemis.QueueLifecycleOperations;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -81,8 +81,8 @@ class PluginTap {
 
     /** The tapped queue on this node, or {@code null} when the node does not have it. */
     Source source(ArtemisNode client, String queue) {
-        JolokiaResponse read = client.single(JolokiaRequest.read(
-                ArtemisMBeans.queuePattern(client.resolveBrokerObjectName(), queue), "Address", "RoutingType", FILTER));
+        ManagementResponse read = client.single(ManagementRequest.read(
+                MBeanNames.queuePattern(client.resolveBrokerObjectName(), queue), "Address", "RoutingType", FILTER));
         if (!read.ok() || read.value() == null || !read.value().isObject()) {
             return null;
         }
@@ -144,9 +144,9 @@ class PluginTap {
         tolerateAlready(() -> queueOps().destroyQueue(client, broker, queue, true));
         tolerateAlready(() -> queueOps().deleteAddress(client, broker, queue));
         if (installedNames(client, instanceId).isEmpty()) {
-            client.single(JolokiaRequest.exec(
+            client.single(ManagementRequest.exec(
                     broker, "removeAddressSettings(java.lang.String)", TapNames.matchFor(instanceId)));
-            client.single(JolokiaRequest.exec(
+            client.single(ManagementRequest.exec(
                     broker, "removeSecuritySettings(java.lang.String)", TapNames.matchFor(instanceId)));
         }
     }
@@ -170,8 +170,8 @@ class PluginTap {
      */
     Long dropped(ArtemisNode client, String name) {
         String queue = TapNames.queueOf(name);
-        JolokiaResponse read = client.single(JolokiaRequest.read(
-                ArtemisMBeans.queuePattern(client.resolveBrokerObjectName(), queue),
+        ManagementResponse read = client.single(ManagementRequest.read(
+                MBeanNames.queuePattern(client.resolveBrokerObjectName(), queue),
                 "MessagesAdded",
                 "MessagesAcknowledged",
                 "MessageCount",
@@ -220,7 +220,7 @@ class PluginTap {
         settings.put("autoDeleteAddresses", true);
         settings.put("autoCreateQueues", false);
         settings.put("autoDeleteQueues", false);
-        JolokiaResponse res = client.single(JolokiaRequest.exec(
+        ManagementResponse res = client.single(ManagementRequest.exec(
                 broker, ADD_ADDRESS_SETTINGS, TapNames.matchFor(instanceId), mapper.writeValueAsString(settings)));
         if (!res.ok()) {
             throw new TapRefusedException(
@@ -230,7 +230,7 @@ class PluginTap {
     }
 
     private static void applySecuritySettings(ArtemisNode client, String broker, String instanceId, String role) {
-        JolokiaResponse res = client.single(JolokiaRequest.exec(
+        ManagementResponse res = client.single(ManagementRequest.exec(
                 broker,
                 ADD_SECURITY_SETTINGS,
                 TapNames.matchFor(instanceId),

@@ -1,8 +1,5 @@
 package io.github.sudoitir.rahdar.system.artemis;
 
-import io.github.sudoitir.openbroker.artemis.ArtemisMBeans;
-import io.github.sudoitir.openbroker.artemis.JolokiaRequest;
-import io.github.sudoitir.openbroker.artemis.JolokiaResponse;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
 import java.util.ArrayList;
 import java.util.List;
@@ -57,16 +54,16 @@ public class AcceptanceProbe {
     private static final String NOT_FOUND = "javax.management.InstanceNotFoundException";
 
     public Facts read(ArtemisNode client, String address, String queue, String routingType) {
-        List<JolokiaResponse> r;
+        List<ManagementResponse> r;
         String broker;
         try {
             broker = client.resolveBrokerObjectName();
-            String q = ArtemisMBeans.queue(broker, address, queue, routingType);
-            String a = ArtemisMBeans.address(broker, address);
-            List<JolokiaRequest> requests = new ArrayList<>(reads(q, QUEUE));
+            String q = MBeanNames.queue(broker, address, queue, routingType);
+            String a = MBeanNames.address(broker, address);
+            List<ManagementRequest> requests = new ArrayList<>(reads(q, QUEUE));
             requests.addAll(reads(a, ADDRESS));
             requests.addAll(reads(broker, BROKER));
-            requests.add(JolokiaRequest.exec(broker, "getAddressSettingsAsJSON(java.lang.String)", address));
+            requests.add(ManagementRequest.exec(broker, "getAddressSettingsAsJSON(java.lang.String)", address));
             r = client.batch(requests);
             if (r.size() < requests.size()) {
                 return Facts.unknown();
@@ -75,7 +72,7 @@ public class AcceptanceProbe {
             return Facts.unknown();
         }
         int i = 0;
-        JolokiaResponse filterRead = r.get(i++);
+        ManagementResponse filterRead = r.get(i++);
         Boolean exists = exists(filterRead);
         String filter = filterRead.ok() ? text(filterRead, "Filter", "") : null;
         String type = value(r.get(i++), "RoutingType", JsonNode::asText);
@@ -121,21 +118,21 @@ public class AcceptanceProbe {
     private static final List<String> BROKER =
             List.of("DiskStoreUsage", "MaxDiskUsage", "AddressMemoryUsagePercentage", "IDCacheSize", "PersistIDCache");
 
-    private static List<JolokiaRequest> reads(String mbean, List<String> attributes) {
+    private static List<ManagementRequest> reads(String mbean, List<String> attributes) {
         return attributes.stream()
-                .map(attribute -> JolokiaRequest.read(mbean, attribute))
+                .map(attribute -> ManagementRequest.read(mbean, attribute))
                 .toList();
     }
 
     /** The filter read answering means the queue exists; a not-found error means it does not; else unknown. */
-    private static Boolean exists(JolokiaResponse filterRead) {
+    private static Boolean exists(ManagementResponse filterRead) {
         if (filterRead.ok()) {
             return Boolean.TRUE;
         }
         return NOT_FOUND.equals(filterRead.errorType()) ? Boolean.FALSE : null;
     }
 
-    private static <T> T value(JolokiaResponse res, String attribute, Function<JsonNode, T> as) {
+    private static <T> T value(ManagementResponse res, String attribute, Function<JsonNode, T> as) {
         if (!res.ok()) {
             return null;
         }
@@ -143,12 +140,12 @@ public class AcceptanceProbe {
         return v == null || v.isNull() ? null : as.apply(v);
     }
 
-    private static String text(JolokiaResponse res, String attribute, String absent) {
+    private static String text(ManagementResponse res, String attribute, String absent) {
         JsonNode v = res.attribute(attribute);
         return v == null || v.isNull() ? absent : v.asText();
     }
 
-    private static JsonNode settings(ArtemisNode client, JolokiaResponse res) {
+    private static JsonNode settings(ArtemisNode client, ManagementResponse res) {
         if (!res.ok()) {
             return null;
         }

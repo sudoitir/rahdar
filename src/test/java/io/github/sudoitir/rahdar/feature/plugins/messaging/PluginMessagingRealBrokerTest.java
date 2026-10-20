@@ -5,8 +5,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.InstanceOfAssertFactories.STRING;
 import static org.awaitility.Awaitility.await;
 
-import io.github.sudoitir.openbroker.artemis.ArtemisMBeans;
-import io.github.sudoitir.openbroker.artemis.JolokiaRequest;
 import io.github.sudoitir.rahdar.feature.plugins.messaging.internal.PluginMessagingReconciler;
 import io.github.sudoitir.rahdar.feature.sql.CaptureMode;
 import io.github.sudoitir.rahdar.feature.sql.CaptureReconciler;
@@ -45,6 +43,8 @@ import io.github.sudoitir.rahdar.support.ArtemisIntegrationTest;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
 import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
 import io.github.sudoitir.rahdar.system.artemis.DivertOperations;
+import io.github.sudoitir.rahdar.system.artemis.MBeanNames;
+import io.github.sudoitir.rahdar.system.artemis.ManagementRequest;
 import io.github.sudoitir.rahdar.system.artemis.QueueLifecycleOperations;
 import jakarta.jms.Connection;
 import jakarta.jms.DeliveryMode;
@@ -813,7 +813,7 @@ class PluginMessagingRealBrokerTest extends PostgresIntegrationTest {
 
     private long queueAttribute(String queue, String attribute) {
         JsonNode value = client.single(
-                        JolokiaRequest.read(ArtemisMBeans.queue(broker, queue, queue, "anycast"), attribute))
+                        ManagementRequest.read(MBeanNames.queue(broker, queue, queue, "anycast"), attribute))
                 .attribute(attribute);
         return value == null ? -1 : value.asLong();
     }
@@ -833,7 +833,7 @@ class PluginMessagingRealBrokerTest extends PostgresIntegrationTest {
 
     private List<String> tapQueues() {
         JsonNode value =
-                client.single(JolokiaRequest.read(broker, "QueueNames")).attribute("QueueNames");
+                client.single(ManagementRequest.read(broker, "QueueNames")).attribute("QueueNames");
         return value.valueStream()
                 .map(JsonNode::asString)
                 .filter(n -> n.startsWith(DivertOperations.PLUGIN_TAP_PREFIX))

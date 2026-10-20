@@ -2,7 +2,6 @@ package io.github.sudoitir.rahdar.feature.bulk;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import io.github.sudoitir.openbroker.artemis.ArtemisMBeans;
 import io.github.sudoitir.rahdar.feature.bulk.web.BulkViews.BulkExecuteRequest;
 import io.github.sudoitir.rahdar.feature.bulk.web.BulkViews.BulkItemView;
 import io.github.sudoitir.rahdar.feature.bulk.web.BulkViews.BulkPreviewRequest;
@@ -25,6 +24,7 @@ import io.github.sudoitir.rahdar.support.ArtemisIntegrationTest;
 import io.github.sudoitir.rahdar.support.OperatorFixture;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
 import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
+import io.github.sudoitir.rahdar.system.artemis.MBeanNames;
 import io.github.sudoitir.rahdar.system.artemis.QueueLifecycleOperations;
 import java.time.Duration;
 import java.time.Instant;
@@ -189,7 +189,7 @@ class BulkRealBrokerTest extends PostgresIntegrationTest {
         assertThat(childAuditIds(deleted.run().auditEventId())).hasSize(3);
 
         for (String name : queueNames) {
-            assertThat(queueOps.boundQueues(client, ArtemisMBeans.address(broker, name)))
+            assertThat(queueOps.boundQueues(client, MBeanNames.address(broker, name)))
                     .doesNotContain(name);
         }
     }

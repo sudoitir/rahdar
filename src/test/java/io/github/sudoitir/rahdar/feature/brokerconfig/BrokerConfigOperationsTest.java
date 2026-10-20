@@ -9,9 +9,6 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import io.github.sudoitir.openbroker.artemis.ArtemisMBeans;
-import io.github.sudoitir.openbroker.artemis.JolokiaRequest;
-import io.github.sudoitir.openbroker.artemis.JolokiaResponse;
 import io.github.sudoitir.rahdar.feature.brokerconfig.BrokerConfigDocument.AddressDecl;
 import io.github.sudoitir.rahdar.feature.brokerconfig.BrokerConfigDocument.AddressSettingDecl;
 import io.github.sudoitir.rahdar.feature.brokerconfig.BrokerConfigDocument.BridgeDecl;
@@ -26,6 +23,9 @@ import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
 import io.github.sudoitir.rahdar.system.artemis.BridgeOperations;
 import io.github.sudoitir.rahdar.system.artemis.BridgeRow;
 import io.github.sudoitir.rahdar.system.artemis.DivertOperations;
+import io.github.sudoitir.rahdar.system.artemis.MBeanNames;
+import io.github.sudoitir.rahdar.system.artemis.ManagementRequest;
+import io.github.sudoitir.rahdar.system.artemis.ManagementResponse;
 import io.github.sudoitir.rahdar.system.artemis.QueueLifecycleOperations;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -59,28 +59,28 @@ class BrokerConfigOperationsTest {
     private final BrokerConfigOperations ops = new BrokerConfigOperations(mapper, queueOps, divertOps, bridgeOps);
 
     /** Requests the scripted broker was sent, one list per batched POST. */
-    private final List<List<JolokiaRequest>> batches = new ArrayList<>();
+    private final List<List<ManagementRequest>> batches = new ArrayList<>();
 
     private final List<Rule> rules = new ArrayList<>();
     private boolean dropLastResponse;
 
-    private record Rule(Predicate<JolokiaRequest> when, JolokiaResponse answer) {}
+    private record Rule(Predicate<ManagementRequest> when, ManagementResponse answer) {}
 
     @BeforeEach
     void setUp() {
         when(client.resolveBrokerObjectName()).thenReturn(BROKER);
         when(client.parsed(any())).thenAnswer(invocation -> {
-            JolokiaResponse res = invocation.getArgument(0);
+            ManagementResponse res = invocation.getArgument(0);
             if (!res.ok()) {
                 throw new BrokerConnectionException(BrokerConnectionException.Kind.BAD_RESPONSE, "entry failed");
             }
             return res.valueParsed(mapper);
         });
         when(client.batch(any())).thenAnswer(invocation -> {
-            List<JolokiaRequest> requests = invocation.getArgument(0);
+            List<ManagementRequest> requests = invocation.getArgument(0);
             batches.add(requests);
-            List<JolokiaResponse> out = new ArrayList<>();
-            for (JolokiaRequest request : requests) {
+            List<ManagementResponse> out = new ArrayList<>();
+            for (ManagementRequest request : requests) {
                 out.add(answerFor(request));
             }
             if (dropLastResponse) {
@@ -90,7 +90,7 @@ class BrokerConfigOperationsTest {
         });
     }
 
-    private JolokiaResponse answerFor(JolokiaRequest request) {
+    private ManagementResponse answerFor(ManagementRequest request) {
         for (Rule rule : rules) {
             if (rule.when().test(request)) {
                 return rule.answer();
@@ -99,44 +99,44 @@ class BrokerConfigOperationsTest {
         return failure("no such MBean");
     }
 
-    private void on(Predicate<JolokiaRequest> when, JolokiaResponse answer) {
+    private void on(Predicate<ManagementRequest> when, ManagementResponse answer) {
         rules.add(new Rule(when, answer));
     }
 
-    private JolokiaResponse json(String value) {
-        return new JolokiaResponse(200, mapper.readTree(value), null, null, null);
+    private ManagementResponse json(String value) {
+        return new ManagementResponse(200, mapper.readTree(value), null, null, null);
     }
 
     /** A JSON array of strings, as Jolokia answers a search. */
-    private JolokiaResponse names(String... names) {
+    private ManagementResponse names(String... names) {
         return json(mapper.writeValueAsString(List.of(names)));
     }
 
     /** A JSON document delivered as a string value, which is how the broker answers its *AsJSON operations. */
-    private JolokiaResponse asString(String document) {
+    private ManagementResponse asString(String document) {
         return json(mapper.writeValueAsString(document));
     }
 
-    private static JolokiaResponse failure(String error) {
-        return new JolokiaResponse(500, null, error, "java.lang.Exception", null);
+    private static ManagementResponse failure(String error) {
+        return new ManagementResponse(500, null, error, "java.lang.Exception", null);
     }
 
-    private static Predicate<JolokiaRequest> exec(String operation, String firstArgument) {
+    private static Predicate<ManagementRequest> exec(String operation, String firstArgument) {
         return r -> "exec".equals(r.type())
                 && operation.equals(r.operation())
                 && firstArgument.equals(String.valueOf(r.arguments().get(0)));
     }
 
-    private static Predicate<JolokiaRequest> readOf(String mbean) {
+    private static Predicate<ManagementRequest> readOf(String mbean) {
         return r -> "read".equals(r.type()) && mbean.equals(r.mbean());
     }
 
-    private static Predicate<JolokiaRequest> search(String pattern) {
+    private static Predicate<ManagementRequest> search(String pattern) {
         return r -> "search".equals(r.type()) && pattern.equals(r.mbean());
     }
 
-    private static JolokiaResponse ok() {
-        return new JolokiaResponse(200, null, null, null, null);
+    private static ManagementResponse ok() {
+        return new ManagementResponse(200, null, null, null, null);
     }
 
     // ---- writes ---------------------------------------------------------------
@@ -147,7 +147,7 @@ class BrokerConfigOperationsTest {
 
         ops.addAddressSettings(client, BROKER, "orders.#", Map.of("max-size-bytes", 1024));
 
-        ArgumentCaptor<JolokiaRequest> sent = ArgumentCaptor.forClass(JolokiaRequest.class);
+        ArgumentCaptor<ManagementRequest> sent = ArgumentCaptor.forClass(ManagementRequest.class);
         verify(client).single(sent.capture());
         assertThat(sent.getValue().operation()).isEqualTo(BrokerConfigOperations.ADD_ADDRESS_SETTINGS);
         assertThat(sent.getValue().arguments()).containsExactly("orders.#", "{\"max-size-bytes\":1024}");
@@ -185,7 +185,7 @@ class BrokerConfigOperationsTest {
         ops.removeAddressSettings(client, BROKER, "a.#");
         ops.removeSecuritySettings(client, BROKER, "s.#");
 
-        ArgumentCaptor<JolokiaRequest> sent = ArgumentCaptor.forClass(JolokiaRequest.class);
+        ArgumentCaptor<ManagementRequest> sent = ArgumentCaptor.forClass(ManagementRequest.class);
         verify(client, times(2)).single(sent.capture());
         assertThat(sent.getAllValues().get(0).operation()).isEqualTo(BrokerConfigOperations.REMOVE_ADDRESS_SETTINGS);
         assertThat(sent.getAllValues().get(0).arguments()).containsExactly("a.#");
@@ -205,7 +205,7 @@ class BrokerConfigOperationsTest {
                         PermissionType.SEND, Set.of("writers", "admins"),
                         PermissionType.CONSUME, Set.of("readers")));
 
-        ArgumentCaptor<JolokiaRequest> sent = ArgumentCaptor.forClass(JolokiaRequest.class);
+        ArgumentCaptor<ManagementRequest> sent = ArgumentCaptor.forClass(ManagementRequest.class);
         verify(client).single(sent.capture());
         List<Object> args = sent.getValue().arguments();
         assertThat(args).hasSize(PermissionType.values().length + 1);
@@ -254,7 +254,7 @@ class BrokerConfigOperationsTest {
                 .updateQueue(
                         eq(client),
                         eq(BROKER),
-                        eq(ArtemisMBeans.queue(BROKER, "orders", "orders.q", "ANYCAST")),
+                        eq(MBeanNames.queue(BROKER, "orders", "orders.q", "ANYCAST")),
                         patch.capture());
         assertThat(patch.getValue())
                 .containsEntry("max-consumers", 3)
@@ -326,8 +326,8 @@ class BrokerConfigOperationsTest {
 
     @Test
     void readsANodeInTwoBatchedPostsAndBuildsItsConfiguration() {
-        String orders = ArtemisMBeans.address(BROKER, "orders");
-        String ordersQueue = ArtemisMBeans.queue(BROKER, "orders", "orders.q", "ANYCAST");
+        String orders = MBeanNames.address(BROKER, "orders");
+        String ordersQueue = MBeanNames.queue(BROKER, "orders", "orders.q", "ANYCAST");
         String divertMbean = BROKER + ",component=addresses,address=\"orders\",subcomponent=diverts,divert=\"d1\"";
         String bridgeA = BROKER + ",component=bridges,name=\"to-dc2-0\"";
         String bridgeB = BROKER + ",component=bridges,name=\"to-dc2-1\"";
@@ -349,8 +349,8 @@ class BrokerConfigOperationsTest {
                 json("\"[{\\\"name\\\":\\\"admins\\\",\\\"send\\\":true,"
                         + "\\\"consume\\\":true},{\\\"name\\\":\\\"\\\",\\\"send\\\":true},{\\\"name\\\":\\\"guests\\\","
                         + "\\\"browse\\\":true}]\""));
-        on(search(ArtemisMBeans.divertsPattern(BROKER)), names(divertMbean));
-        on(search(ArtemisMBeans.bridgesPattern(BROKER)), names(bridgeA, bridgeB, stray));
+        on(search(MBeanNames.divertsPattern(BROKER)), names(divertMbean));
+        on(search(MBeanNames.bridgesPattern(BROKER)), names(bridgeA, bridgeB, stray));
         on(
                 readOf(divertMbean),
                 json("{\"UniqueName\":\"d1\",\"Address\":\"orders\",\"ForwardingAddress\":\"audit\","
@@ -362,7 +362,7 @@ class BrokerConfigOperationsTest {
         on(readOf(bridgeB), json("{\"Name\":\"to-dc2-1\",\"QueueName\":\"q\",\"Started\":true,\"Connected\":false}"));
         on(readOf(stray), json("{\"Name\":\"stray\",\"Started\":false}"));
         on(readOf(orders), json("{\"RoutingTypes\":[\"ANYCAST\"],\"AddressSize\":42,\"MessageCount\":7}"));
-        on(readOf(ArtemisMBeans.address(BROKER, "orders.eu")), json("{\"RoutingTypes\":[\"MULTICAST\"]}"));
+        on(readOf(MBeanNames.address(BROKER, "orders.eu")), json("{\"RoutingTypes\":[\"MULTICAST\"]}"));
         on(readOf(ordersQueue), json("{\"Name\":\"orders.q\"}"));
         on(
                 search(orders + ",subcomponent=queues,*"),
@@ -470,17 +470,16 @@ class BrokerConfigOperationsTest {
                         && r.attribute().contains("Active"),
                 json("{\"Active\":true,\"AddressNames\":[\"orders.eu\",\"orders.us\",\"activemq.x\",\"billing\"]}"));
         on(r -> "search".equals(r.type()), json("[]"));
-        on(readOf(ArtemisMBeans.address(BROKER, "orders.eu")), json("{\"RoutingTypes\":[\"ANYCAST\"]}"));
-        on(readOf(ArtemisMBeans.address(BROKER, "orders.us")), failure("gone"));
+        on(readOf(MBeanNames.address(BROKER, "orders.eu")), json("{\"RoutingTypes\":[\"ANYCAST\"]}"));
+        on(readOf(MBeanNames.address(BROKER, "orders.us")), failure("gone"));
 
         ObservedNodeConfig observed =
                 ops.read(client, NODE, "node-a", scope(Set.of("orders.#"), Set.of(), Map.of(), Set.of(), List.of()));
 
         List<String> readAddresses =
-                batches.get(1).stream().map(JolokiaRequest::mbean).toList();
+                batches.get(1).stream().map(ManagementRequest::mbean).toList();
         assertThat(readAddresses)
-                .containsExactly(
-                        ArtemisMBeans.address(BROKER, "orders.eu"), ArtemisMBeans.address(BROKER, "orders.us"));
+                .containsExactly(MBeanNames.address(BROKER, "orders.eu"), MBeanNames.address(BROKER, "orders.us"));
         assertThat(observed.addresses().get("orders.eu")).containsExactly("ANYCAST");
         // An address whose MBean would not answer is still known by name.
         assertThat(observed.addresses().get("orders.us")).isEmpty();
@@ -499,11 +498,11 @@ class BrokerConfigOperationsTest {
                 json("{\"Active\":true,\"AddressNames\":[\"a\",\"b\",\"$sys.x\",\"activemq.notifications\"]}"));
         on(exec(BrokerConfigOperations.GET_ADDRESS_SETTINGS, "#"), json("\"{\\\"a\\\":1}\""));
         on(exec(BrokerConfigOperations.GET_ROLES, "#"), json("\"[{\\\"name\\\":\\\"r\\\",\\\"send\\\":true}]\""));
-        on(search(ArtemisMBeans.divertsPattern(BROKER)), names(divertMbean));
-        on(readOf(ArtemisMBeans.address(BROKER, "a")), json("{\"RoutingTypes\":[\"MULTICAST\"]}"));
+        on(search(MBeanNames.divertsPattern(BROKER)), names(divertMbean));
+        on(readOf(MBeanNames.address(BROKER, "a")), json("{\"RoutingTypes\":[\"MULTICAST\"]}"));
         on(exec(BrokerConfigOperations.GET_ADDRESS_SETTINGS, "a"), json("\"{\\\"b\\\":2}\""));
         on(exec(BrokerConfigOperations.GET_ROLES, "a"), json("\"[]\""));
-        on(readOf(ArtemisMBeans.address(BROKER, "b")), failure("gone"));
+        on(readOf(MBeanNames.address(BROKER, "b")), failure("gone"));
         on(exec(BrokerConfigOperations.GET_ADDRESS_SETTINGS, "b"), failure("gone"));
         on(exec(BrokerConfigOperations.GET_ROLES, "b"), failure("gone"));
         on(readOf(divertMbean), json("{\"UniqueName\":\"d\",\"Address\":\"a\"}"));
@@ -532,7 +531,7 @@ class BrokerConfigOperationsTest {
         on(exec(BrokerConfigOperations.GET_ADDRESS_SETTINGS, "#"), failure("no"));
         on(exec(BrokerConfigOperations.GET_ROLES, "#"), failure("no"));
         on(r -> "search".equals(r.type()), json("[]"));
-        on(readOf(ArtemisMBeans.address(BROKER, "a")), json("{\"RoutingTypes\":[\"ANYCAST\"]}"));
+        on(readOf(MBeanNames.address(BROKER, "a")), json("{\"RoutingTypes\":[\"ANYCAST\"]}"));
         on(exec(BrokerConfigOperations.GET_ADDRESS_SETTINGS, "a"), json("\"[]\""));
         on(exec(BrokerConfigOperations.GET_ROLES, "a"), json("\"[]\""));
 

@@ -1,6 +1,5 @@
 package io.github.sudoitir.rahdar.feature.transfer;
 
-import io.github.sudoitir.openbroker.artemis.ArtemisMBeans;
 import io.github.sudoitir.rahdar.feature.messages.MessagePermissions;
 import io.github.sudoitir.rahdar.feature.transfer.internal.persistence.TransferLedger;
 import io.github.sudoitir.rahdar.feature.transfer.internal.persistence.TransferRunEntity;
@@ -28,6 +27,7 @@ import io.github.sudoitir.rahdar.system.artemis.AcceptanceProbe;
 import io.github.sudoitir.rahdar.system.artemis.AcceptanceProbe.Facts;
 import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
 import io.github.sudoitir.rahdar.system.artemis.ArtemisSelectors;
+import io.github.sudoitir.rahdar.system.artemis.MBeanNames;
 import io.github.sudoitir.rahdar.system.artemis.MessageOperations;
 import io.github.sudoitir.rahdar.system.artemis.MessageOperations.BulkResult;
 import io.github.sudoitir.rahdar.system.artemis.StagingQueues;
@@ -157,7 +157,7 @@ class TransferRunner {
         }
 
         String sourceMbean(ArtemisNode client) {
-            return ArtemisMBeans.queue(
+            return MBeanNames.queue(
                     client.resolveBrokerObjectName(),
                     run.getSourceAddress(),
                     run.getSourceQueue(),
@@ -166,7 +166,7 @@ class TransferRunner {
 
         String stagingMbean(ArtemisNode client) {
             String queue = StagingQueues.queueName(id());
-            return ArtemisMBeans.queue(client.resolveBrokerObjectName(), queue, queue, "ANYCAST");
+            return MBeanNames.queue(client.resolveBrokerObjectName(), queue, queue, "ANYCAST");
         }
 
         void resolve() {

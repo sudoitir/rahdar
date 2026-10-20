@@ -11,9 +11,6 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import io.github.sudoitir.openbroker.artemis.ArtemisLists;
-import io.github.sudoitir.openbroker.artemis.JolokiaRequest;
-import io.github.sudoitir.openbroker.artemis.JolokiaResponse;
 import io.github.sudoitir.rahdar.feature.flow.ClientEdges.Edge;
 import io.github.sudoitir.rahdar.feature.flow.ClientEdges.Kind;
 import io.github.sudoitir.rahdar.feature.flow.ClientSampler.NodeResult;
@@ -30,6 +27,9 @@ import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterOwnership;
 import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
 import io.github.sudoitir.rahdar.system.artemis.ArtemisNodes;
+import io.github.sudoitir.rahdar.system.artemis.ListRows;
+import io.github.sudoitir.rahdar.system.artemis.ManagementRequest;
+import io.github.sudoitir.rahdar.system.artemis.ManagementResponse;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Clock;
 import java.time.Duration;
@@ -117,19 +117,19 @@ class ClientSamplerTest {
         return MAPPER.readTree(json);
     }
 
-    private static JolokiaResponse ok(String json) {
-        return new JolokiaResponse(200, json(json), null, null, null);
+    private static ManagementResponse ok(String json) {
+        return new ManagementResponse(200, json(json), null, null, null);
     }
 
-    private static JolokiaResponse failed(int status, String error) {
-        return new JolokiaResponse(status, null, error, null, null);
+    private static ManagementResponse failed(int status, String error) {
+        return new ManagementResponse(status, null, error, null, null);
     }
 
-    private static JolokiaResponse listing(long count, String... rows) {
+    private static ManagementResponse listing(long count, String... rows) {
         return ok("{\"count\":" + count + ",\"data\":[" + String.join(",", rows) + "]}");
     }
 
-    private static JolokiaResponse pattern(String... attributes) {
+    private static ManagementResponse pattern(String... attributes) {
         StringBuilder value = new StringBuilder("{");
         for (int i = 0; i < attributes.length; i++) {
             value.append(i == 0 ? "" : ",")
@@ -156,26 +156,26 @@ class ClientSamplerTest {
 
     /** The eight entries of one node's POST, in request order, defaulting to "nothing here". */
     private static final class Batch {
-        JolokiaResponse producers = listing(0);
-        JolokiaResponse consumers = listing(0);
-        JolokiaResponse diverts = failed(404, "no diverts");
-        JolokiaResponse bridges = failed(404, "no bridges");
-        JolokiaResponse storeAndForward = listing(0);
-        JolokiaResponse temporary = listing(0);
-        JolokiaResponse filtered = listing(0);
-        JolokiaResponse addressSettings = ok("{}");
+        ManagementResponse producers = listing(0);
+        ManagementResponse consumers = listing(0);
+        ManagementResponse diverts = failed(404, "no diverts");
+        ManagementResponse bridges = failed(404, "no bridges");
+        ManagementResponse storeAndForward = listing(0);
+        ManagementResponse temporary = listing(0);
+        ManagementResponse filtered = listing(0);
+        ManagementResponse addressSettings = ok("{}");
 
-        List<JolokiaResponse> entries() {
+        List<ManagementResponse> entries() {
             return List.of(
                     producers, consumers, diverts, bridges, storeAndForward, temporary, filtered, addressSettings);
         }
     }
 
-    private ArtemisNode client(List<JolokiaResponse> entries) {
+    private ArtemisNode client(List<ManagementResponse> entries) {
         ArtemisNode client = mock(ArtemisNode.class);
         when(client.resolveBrokerObjectName()).thenReturn("org.apache.activemq.artemis:broker=\"b\"");
         when(client.batch(anyList())).thenReturn(entries);
-        when(client.parsed(any())).thenAnswer(inv -> ((JolokiaResponse) inv.getArgument(0)).value());
+        when(client.parsed(any())).thenAnswer(inv -> ((ManagementResponse) inv.getArgument(0)).value());
         return client;
     }
 
@@ -590,9 +590,9 @@ class ClientSamplerTest {
         sampler.sweep(clusterId);
 
         @SuppressWarnings("unchecked")
-        ArgumentCaptor<List<JolokiaRequest>> requests = ArgumentCaptor.forClass(List.class);
+        ArgumentCaptor<List<ManagementRequest>> requests = ArgumentCaptor.forClass(List.class);
         verify(client).batch(requests.capture());
-        assertThat(requests.getValue().get(0).arguments()).containsExactly(ArtemisLists.ALL, 1, 1);
+        assertThat(requests.getValue().get(0).arguments()).containsExactly(ListRows.ALL, 1, 1);
     }
 
     // ---- sweepObserved -------------------------------------------------

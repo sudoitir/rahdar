@@ -6,10 +6,10 @@ import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import io.github.sudoitir.openbroker.artemis.JolokiaRequest;
-import io.github.sudoitir.openbroker.artemis.JolokiaResponse;
 import io.github.sudoitir.rahdar.feature.brokerconfig.ConfigReader.NodeConfig;
 import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
+import io.github.sudoitir.rahdar.system.artemis.ManagementRequest;
+import io.github.sudoitir.rahdar.system.artemis.ManagementResponse;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.IntStream;
@@ -36,11 +36,11 @@ class ConfigReaderTest {
         matches.add("#");
         ArtemisNode client = mock(ArtemisNode.class);
         when(client.resolveBrokerObjectName()).thenReturn("m");
-        List<List<JolokiaRequest>> batches = new ArrayList<>();
+        List<List<ManagementRequest>> batches = new ArrayList<>();
         when(client.batch(anyList())).thenAnswer(call -> {
-            List<JolokiaRequest> requests = call.getArgument(0);
+            List<ManagementRequest> requests = call.getArgument(0);
             batches.add(requests);
-            return requests.stream().map(r -> mock(JolokiaResponse.class)).toList();
+            return requests.stream().map(r -> mock(ManagementResponse.class)).toList();
         });
         when(client.parsed(any())).thenAnswer(call -> mapper.createObjectNode());
 

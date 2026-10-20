@@ -7,7 +7,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import io.github.sudoitir.openbroker.artemis.JolokiaRequest;
 import io.github.sudoitir.rahdar.feature.apitokens.ApiTokenService;
 import io.github.sudoitir.rahdar.feature.queues.LifecycleRequests.CreateDivertRequest;
 import io.github.sudoitir.rahdar.kernel.audit.internal.persistence.AuditEventRepository;
@@ -33,6 +32,7 @@ import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
 import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
 import io.github.sudoitir.rahdar.system.artemis.DivertOperations;
 import io.github.sudoitir.rahdar.system.artemis.DivertRow;
+import io.github.sudoitir.rahdar.system.artemis.ManagementRequest;
 import io.github.sudoitir.rahdar.system.artemis.QueueLifecycleOperations;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -210,7 +210,7 @@ class DivertLifecycleRealBrokerTest extends PostgresIntegrationTest {
     @Test
     void aForwardingAddressThatDoesNotExistAndIsNotAutoCreatedIsRefusedInThePreviewAndForReal() {
         String match = "NOAUTO." + run + ".#";
-        client.single(JolokiaRequest.exec(
+        client.single(ManagementRequest.exec(
                 broker,
                 "addAddressSettings(java.lang.String,java.lang.String)",
                 match,
@@ -227,7 +227,7 @@ class DivertLifecycleRealBrokerTest extends PostgresIntegrationTest {
             assertThat(create(name, a, missing, false).status()).isEqualTo(NodeStatus.FAILED);
             assertThat(divertOps.find(client, name)).isEmpty();
         } finally {
-            client.single(JolokiaRequest.exec(broker, "removeAddressSettings(java.lang.String)", match));
+            client.single(ManagementRequest.exec(broker, "removeAddressSettings(java.lang.String)", match));
         }
     }
 
