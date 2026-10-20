@@ -83,7 +83,7 @@ public class McpRunbookPrompts {
                 are attached but not acknowledging.
                 4. browse_messages for a few headers. Check whether they are all one type, one \
                 correlation id, or all expired.
-                5. Only read a body (browse_messages with messageId) once the headers have narrowed \
+                5. Only read a body (browse_messages with position) once the headers have narrowed \
                 it to a specific message worth looking at.
                 6. activity_log source=broker_events filtered to its destination, for consumer \
                 connect/disconnect churn.

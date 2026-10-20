@@ -29832,7 +29832,7 @@
           "kind" : {
             "type" : "string",
             "description" : "What was closed: a connection, one channel of it (SESSION), the connection behind a consumer, or every consumer connection of a destination.",
-            "enum" : [ "CONNECTION", "SESSION", "CONSUMER", "ADDRESS_CONSUMERS" ]
+            "enum" : [ "CONNECTION", "CHANNEL", "CONSUMER", "DESTINATION" ]
           },
           "subject" : {
             "type" : "string",

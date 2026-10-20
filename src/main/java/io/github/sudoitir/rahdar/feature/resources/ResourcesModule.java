@@ -1,6 +1,5 @@
 package io.github.sudoitir.rahdar.feature.resources;
 
-import io.github.sudoitir.rahdar.feature.resources.mcp.ResourcesMcpActionTools.CloseTarget;
 import io.github.sudoitir.rahdar.feature.resources.mcp.ResourcesMcpReadTools.ListRole;
 import io.github.sudoitir.rahdar.kernel.plugin.FeatureDescriptor;
 import io.github.sudoitir.rahdar.kernel.plugin.McpToolDef;
@@ -98,7 +97,7 @@ public final class ResourcesModule {
                     List.of(
                             McpToolDef.Param.enumValues(
                                     "kind",
-                                    CloseTarget.values(),
+                                    ConnectionCloseKind.values(),
                                     "destination closes every consumer connection of a destination."),
                             McpToolDef.Param.note(
                                     "target",

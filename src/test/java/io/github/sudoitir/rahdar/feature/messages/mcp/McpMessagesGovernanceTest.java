@@ -164,7 +164,7 @@ class McpMessagesGovernanceTest extends PostgresIntegrationTest {
                         clusterId.toString(),
                         "subscription",
                         "artemis.queue/PHASE3.SRC",
-                        "messageId",
+                        "position",
                         "501"));
 
         String text = response.toString();

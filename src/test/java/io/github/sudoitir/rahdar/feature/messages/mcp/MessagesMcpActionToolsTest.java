@@ -190,7 +190,7 @@ class MessagesMcpActionToolsTest {
                 .hasMessageContaining("action is required");
         assertThatThrownBy(() -> action("move", "1,abc", true, null, null))
                 .isInstanceOf(McpError.class)
-                .hasMessageContaining("messageIds must be comma-separated numbers; got \"abc\"");
+                .hasMessageContaining("positions must be comma-separated numbers; got \"abc\"");
     }
 
     @Test

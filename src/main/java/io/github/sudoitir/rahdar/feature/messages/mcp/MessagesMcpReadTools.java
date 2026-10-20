@@ -51,18 +51,18 @@ public class MessagesMcpReadTools {
     public McpSchema.CallToolResult browseMessages(
             @McpToolParam(required = true) String clusterId,
             @McpToolParam(required = true) String subscription,
-            @McpToolParam(required = false) String messageId,
+            @McpToolParam(required = false) String position,
             @McpToolParam(required = false) String filter,
             @McpToolParam(required = false) Integer limit) {
         UUID id = McpArgs.uuid("clusterId", clusterId);
         McpArgs.required("subscription", subscription);
         long mid = 0;
-        boolean body = messageId != null && !messageId.isBlank();
+        boolean body = position != null && !position.isBlank();
         if (body) {
             try {
-                mid = Long.parseLong(messageId.trim());
+                mid = Long.parseLong(position.trim());
             } catch (NumberFormatException _) {
-                throw McpErrors.invalidParams("messageId must be the numeric id a header row returned.");
+                throw McpErrors.invalidParams("position must be the numeric id a header row returned.");
             }
         }
         long detailId = mid;

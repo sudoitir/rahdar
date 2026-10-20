@@ -74,7 +74,7 @@ public final class ConnectionViews {
     public record ConnectionCloseView(
             @Schema(
                     requiredMode = REQUIRED,
-                    allowableValues = {"CONNECTION", "SESSION", "CONSUMER", "ADDRESS_CONSUMERS"},
+                    allowableValues = {"CONNECTION", "CHANNEL", "CONSUMER", "DESTINATION"},
                     description = "What was closed: a connection, one channel of it (SESSION), the connection"
                             + " behind a consumer, or every consumer connection of a destination.")
             String kind,
@@ -98,7 +98,7 @@ public final class ConnectionViews {
                     // A preview of a target that has already gone is already gone too:
                     // the operator asked about a row the broker no longer has, and
                     // saying so is more useful than an empty estimate.
-                    result.kind() != ConnectionCloseKind.ADDRESS_CONSUMERS && result.target() == null,
+                    result.kind() != ConnectionCloseKind.DESTINATION && result.target() == null,
                     result.target() == null ? null : ConnectionTargetView.of(result.target()),
                     LifecycleOutcomeView.of(result.outcome()));
         }

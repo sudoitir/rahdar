@@ -132,7 +132,7 @@ class McpDryRunIntegrationTest extends PostgresIntegrationTest {
                         "artemis.queue/" + QUEUE,
                         "action",
                         "delete",
-                        "messageIds",
+                        "positions",
                         "11,12,13"));
 
         JsonNode outcome = response.path("result").path("structuredContent");
@@ -162,7 +162,7 @@ class McpDryRunIntegrationTest extends PostgresIntegrationTest {
                         "artemis.queue/" + QUEUE,
                         "action",
                         "delete",
-                        "messageIds",
+                        "positions",
                         "11",
                         "dryRun",
                         false,
@@ -189,7 +189,7 @@ class McpDryRunIntegrationTest extends PostgresIntegrationTest {
                         "artemis.queue/" + QUEUE,
                         "action",
                         "delete",
-                        "messageIds",
+                        "positions",
                         "11",
                         "dryRun",
                         false));

@@ -208,7 +208,7 @@ public final class McpViews {
 
     /** A message header row from {@code browse_messages}; bodies are a separate, explicit call. */
     public record MessageHeader(
-            String messageId,
+            String position,
             String subscription,
             String node,
             Instant timestamp,

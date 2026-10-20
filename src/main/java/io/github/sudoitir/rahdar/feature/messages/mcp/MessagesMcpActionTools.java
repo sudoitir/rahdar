@@ -58,7 +58,7 @@ public class MessagesMcpActionTools {
     @McpTool(
             name = "message_action",
             description = "Move, retry, delete, expire or purge messages on a subscription. "
-                    + "Select with messageIds or filter.",
+                    + "Select with positions or filter.",
             annotations =
                     @McpTool.McpAnnotations(
                             readOnlyHint = false,
@@ -69,7 +69,7 @@ public class MessagesMcpActionTools {
             @McpToolParam(required = true) String clusterId,
             @McpToolParam(required = true) String subscription,
             @McpToolParam(required = true) String action,
-            @McpToolParam(required = false) String messageIds,
+            @McpToolParam(required = false) String positions,
             @McpToolParam(required = false) String filter,
             @McpToolParam(required = false) String target,
             @McpToolParam(required = false) Boolean dryRun,
@@ -94,7 +94,7 @@ public class MessagesMcpActionTools {
                             q,
                             null,
                             MessageAction.valueOf(kind.name()),
-                            messages.actionRequest(id, parseIds(messageIds), filter, targetName(id, target)),
+                            messages.actionRequest(id, parseIds(positions), filter, targetName(id, target)),
                             dry,
                             over);
             return outcome(kind.name().toLowerCase(Locale.ROOT), q, attempt);
@@ -160,7 +160,7 @@ public class MessagesMcpActionTools {
             try {
                 ids.add(Long.parseLong(trimmed));
             } catch (NumberFormatException _) {
-                throw McpErrors.invalidParams("messageIds must be comma-separated numbers; got \"" + trimmed + "\".");
+                throw McpErrors.invalidParams("positions must be comma-separated numbers; got \"" + trimmed + "\".");
             }
         }
         return ids;

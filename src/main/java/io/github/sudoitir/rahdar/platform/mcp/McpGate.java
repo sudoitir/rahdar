@@ -73,7 +73,7 @@ class McpGate {
             "id",
             "ruleId",
             "connectionId",
-            "messageIds",
+            "positions",
             "metric",
             "window",
             "from",

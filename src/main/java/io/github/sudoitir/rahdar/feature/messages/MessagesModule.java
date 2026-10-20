@@ -50,8 +50,8 @@ public final class MessagesModule {
                                     "subscription",
                                     "The subscription's id from list_resources, such as artemis.queue/orders."),
                             McpToolDef.Param.note(
-                                    "messageId",
-                                    "Omit for a capped page of headers. Give the numeric id from a header row "
+                                    "position",
+                                    "Omit for a capped page of headers. Give the position from a header row "
                                             + "for that message's full body and properties."),
                             McpToolDef.Param.note("filter", "Broker filter expression, e.g. JMSPriority > 5."))))
             .mcpTool(new McpToolDef(
@@ -65,8 +65,8 @@ public final class MessagesModule {
                                             + "confirm must equal its name."),
                             McpToolDef.Param.enumValues("action", MessageAction.values(), "purge is also accepted."),
                             McpToolDef.Param.note(
-                                    "messageIds",
-                                    "Comma-separated ids from browse_messages, or use filter instead. move "
+                                    "positions",
+                                    "Comma-separated positions from browse_messages, or use filter instead. move "
                                             + "additionally needs target, the id of the subscription to move into."),
                             McpToolDef.Param.note("dryRun", McpToolDef.DRY_RUN),
                             McpToolDef.Param.note("confirm", McpToolDef.CONFIRM),

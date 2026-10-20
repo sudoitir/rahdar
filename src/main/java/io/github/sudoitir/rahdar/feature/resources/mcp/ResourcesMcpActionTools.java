@@ -35,22 +35,6 @@ public class ResourcesMcpActionTools {
     private final ConnectionControlService connectionControl;
     private final McpResources resources;
 
-    /** What a close targets, by the role of the resource it names. */
-    public enum CloseTarget {
-        CONNECTION(ConnectionCloseKind.CONNECTION, ResourceClass.CONNECTION),
-        CHANNEL(ConnectionCloseKind.SESSION, ResourceClass.CHANNEL),
-        CONSUMER(ConnectionCloseKind.CONSUMER, ResourceClass.CONSUMER),
-        DESTINATION(ConnectionCloseKind.ADDRESS_CONSUMERS, ResourceClass.DESTINATION);
-
-        private final ConnectionCloseKind close;
-        private final ResourceClass resourceClass;
-
-        CloseTarget(ConnectionCloseKind close, ResourceClass resourceClass) {
-            this.close = close;
-            this.resourceClass = resourceClass;
-        }
-    }
-
     /**
      * Closing a connection, a channel, the connection behind a consumer, or every
      * consumer connection on a destination — as one tool discriminated by {@code kind}.
@@ -86,41 +70,43 @@ public class ResourcesMcpActionTools {
             @McpToolParam(required = false) String confirm,
             @McpToolParam(required = false) Boolean override) {
         UUID id = McpArgs.uuid("clusterId", clusterId);
-        CloseTarget closing = McpArgs.enumOf(CloseTarget.class, "kind", kind, null);
-        ConnectionCloseKind op = closing.close;
+        ConnectionCloseKind op = McpArgs.enumOf(ConnectionCloseKind.class, "kind", kind, null);
         boolean dry = McpArgs.flag(dryRun, true);
         boolean over = McpArgs.flag(override, false);
         UUID node = op.nodeScoped() ? McpArgs.uuid("nodeId", nodeId) : null;
 
         return McpErrors.guard(() -> {
-            String subject = resources
-                    .require(id, "target", target, closing.resourceClass)
-                    .name();
+            String subject =
+                    resources.require(id, "target", target, resourceClass(op)).name();
             if (op.nodeScoped()) {
                 CloseResult preview = result(closeById(id, node, op, subject, true));
                 if (dry || preview.target() == null) {
                     // Already gone, or a preview was all that was asked for. Either way
                     // nothing was closed and there is nothing to confirm against.
-                    return closeOutcome(closing, subject, preview);
+                    return closeOutcome(op, subject, preview);
                 }
                 McpArgs.confirm(preview.target().label(), confirm);
-                return closeOutcome(closing, subject, result(closeById(id, node, op, subject, false)));
+                return closeOutcome(op, subject, result(closeById(id, node, op, subject, false)));
             }
             if (!dry) {
                 McpArgs.confirm(subject, confirm);
             }
-            return closeOutcome(
-                    closing, subject, result(connectionControl.closeAddressConsumers(id, subject, dry, over)));
+            return closeOutcome(op, subject, result(connectionControl.closeAddressConsumers(id, subject, dry, over)));
         });
+    }
+
+    /** The class of resource the kind closes, which the target's id must name. */
+    private static ResourceClass resourceClass(ConnectionCloseKind kind) {
+        return ResourceClass.valueOf(kind.name());
     }
 
     private Attempt<CloseResult> closeById(
             UUID clusterId, UUID nodeId, ConnectionCloseKind kind, String subject, boolean dryRun) {
         return switch (kind) {
             case CONNECTION -> connectionControl.closeConnection(clusterId, nodeId, subject, dryRun);
-            case SESSION -> connectionControl.closeSession(clusterId, nodeId, subject, dryRun);
+            case CHANNEL -> connectionControl.closeSession(clusterId, nodeId, subject, dryRun);
             case CONSUMER -> connectionControl.closeConsumerConnection(clusterId, nodeId, subject, dryRun);
-            case ADDRESS_CONSUMERS -> throw new IllegalStateException("not a by-id close");
+            case DESTINATION -> throw new IllegalStateException("not a by-id close");
         };
     }
 
@@ -136,15 +122,14 @@ public class ResourcesMcpActionTools {
      * treating a vanished target as a failure and retrying onto whatever now holds
      * that identifier.
      */
-    private static McpViews.CloseOutcome closeOutcome(CloseTarget closing, String subject, CloseResult result) {
-        ConnectionCloseKind kind = closing.close;
+    private static McpViews.CloseOutcome closeOutcome(ConnectionCloseKind kind, String subject, CloseResult result) {
         LifecycleOutcome outcome = result.outcome();
-        boolean gone = kind != ConnectionCloseKind.ADDRESS_CONSUMERS && result.target() == null;
+        boolean gone = kind != ConnectionCloseKind.DESTINATION && result.target() == null;
         List<McpViews.LifecycleNode> nodes = outcome.nodes().stream()
                 .map(n -> new McpViews.LifecycleNode(n.nodeName(), n.status().name(), n.affected(), n.error()))
                 .toList();
         return new McpViews.CloseOutcome(
-                closing.name().toLowerCase(Locale.ROOT),
+                kind.name().toLowerCase(Locale.ROOT),
                 subject,
                 outcome.dryRun(),
                 gone,
@@ -168,7 +153,7 @@ public class ResourcesMcpActionTools {
             if (outcome.overCap()) {
                 return "Nothing was closed. A real run is over the bulk cap and would need override=true.";
             }
-            String token = kind == ConnectionCloseKind.ADDRESS_CONSUMERS
+            String token = kind == ConnectionCloseKind.DESTINATION
                     ? result.subject()
                     : result.target().label();
             return "Nothing was closed. Re-run with dryRun=false and confirm=\"" + token + "\".";
