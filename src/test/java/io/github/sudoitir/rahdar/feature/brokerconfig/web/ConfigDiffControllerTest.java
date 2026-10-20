@@ -96,11 +96,11 @@ class ConfigDiffControllerTest extends PostgresIntegrationTest {
      * One batched POST per node: a search to resolve the MBean name, then the batch.
      * The mock server fails the test if more calls are made than bodies given.
      */
-    private ArtemisNode client(String url, String brokerName, String journalType, boolean active) {
-        return client(url, brokerName, journalType, active, "[]");
+    private ArtemisNode client(String brokerName, String journalType, boolean active) {
+        return client(brokerName, journalType, active, "[]");
     }
 
-    private ArtemisNode client(String url, String brokerName, String journalType, boolean active, String addressNames) {
+    private ArtemisNode client(String brokerName, String journalType, boolean active, String addressNames) {
         FixtureJolokia server = new FixtureJolokia();
         server.expect().andRespond(withSuccess(search(brokerName), MediaType.APPLICATION_JSON));
         server.expect()
@@ -109,7 +109,7 @@ class ConfigDiffControllerTest extends PostgresIntegrationTest {
         return server.node();
     }
 
-    private ArtemisNode unauthorized(String url) {
+    private ArtemisNode unauthorized() {
         FixtureJolokia server = new FixtureJolokia();
         server.expect().andRespond(withStatus(HttpStatus.UNAUTHORIZED));
         return server.node();
@@ -151,9 +151,9 @@ class ConfigDiffControllerTest extends PostgresIntegrationTest {
     }
 
     private void threeNodes(String cType) {
-        when(artemisNodes.on(clusterId, at(A_URL))).thenReturn(client(A_URL, "primary", "ASYNCIO", true));
-        when(artemisNodes.on(clusterId, at(B_URL))).thenReturn(client(B_URL, "backup", "ASYNCIO", true));
-        when(artemisNodes.on(clusterId, at(C_URL))).thenReturn(client(C_URL, "third", cType, true));
+        when(artemisNodes.on(clusterId, at(A_URL))).thenReturn(client("primary", "ASYNCIO", true));
+        when(artemisNodes.on(clusterId, at(B_URL))).thenReturn(client("backup", "ASYNCIO", true));
+        when(artemisNodes.on(clusterId, at(C_URL))).thenReturn(client("third", cType, true));
     }
 
     @Test
@@ -191,9 +191,9 @@ class ConfigDiffControllerTest extends PostgresIntegrationTest {
 
     @Test
     void anUnreadableNodeIsListedWithItsReasonAndTheOthersAreStillCompared() throws Exception {
-        when(artemisNodes.on(clusterId, at(A_URL))).thenReturn(client(A_URL, "primary", "ASYNCIO", true));
-        when(artemisNodes.on(clusterId, at(B_URL))).thenReturn(client(B_URL, "backup", "NIO", true));
-        when(artemisNodes.on(clusterId, at(C_URL))).thenReturn(unauthorized(C_URL));
+        when(artemisNodes.on(clusterId, at(A_URL))).thenReturn(client("primary", "ASYNCIO", true));
+        when(artemisNodes.on(clusterId, at(B_URL))).thenReturn(client("backup", "NIO", true));
+        when(artemisNodes.on(clusterId, at(C_URL))).thenReturn(unauthorized());
 
         mvc.perform(get("/api/v1/clusters/{c}/config-diff", clusterId))
                 .andExpect(status().isOk())
@@ -209,9 +209,9 @@ class ConfigDiffControllerTest extends PostgresIntegrationTest {
 
     @Test
     void whenFewerThanTwoNodesAnswerNoComparisonIsMadeAndEveryReasonIsGiven() throws Exception {
-        when(artemisNodes.on(clusterId, at(A_URL))).thenReturn(client(A_URL, "primary", "ASYNCIO", true));
-        when(artemisNodes.on(clusterId, at(B_URL))).thenReturn(unauthorized(B_URL));
-        when(artemisNodes.on(clusterId, at(C_URL))).thenReturn(unauthorized(C_URL));
+        when(artemisNodes.on(clusterId, at(A_URL))).thenReturn(client("primary", "ASYNCIO", true));
+        when(artemisNodes.on(clusterId, at(B_URL))).thenReturn(unauthorized());
+        when(artemisNodes.on(clusterId, at(C_URL))).thenReturn(unauthorized());
 
         mvc.perform(get("/api/v1/clusters/{c}/config-diff", clusterId))
                 .andExpect(status().isOk())
@@ -225,8 +225,8 @@ class ConfigDiffControllerTest extends PostgresIntegrationTest {
 
     @Test
     void nodesNarrowsTheComparisonToTheNamedNodes() throws Exception {
-        when(artemisNodes.on(clusterId, at(A_URL))).thenReturn(client(A_URL, "primary", "ASYNCIO", true));
-        when(artemisNodes.on(clusterId, at(B_URL))).thenReturn(client(B_URL, "backup", "NIO", true));
+        when(artemisNodes.on(clusterId, at(A_URL))).thenReturn(client("primary", "ASYNCIO", true));
+        when(artemisNodes.on(clusterId, at(B_URL))).thenReturn(client("backup", "NIO", true));
 
         mvc.perform(get("/api/v1/clusters/{c}/config-diff", clusterId).param("nodes", aId + "," + bId))
                 .andExpect(status().isOk())
@@ -245,9 +245,9 @@ class ConfigDiffControllerTest extends PostgresIntegrationTest {
         // That is a value difference, not a smaller surface, and must not suppress the
         // comparison — the live check against the dev pair caught exactly this.
         when(artemisNodes.on(clusterId, at(A_URL)))
-                .thenReturn(client(A_URL, "primary", "ASYNCIO", true, "[\"orders\",\"events\"]"));
-        when(artemisNodes.on(clusterId, at(B_URL))).thenReturn(client(B_URL, "backup", "ASYNCIO", false, "[]"));
-        when(artemisNodes.on(clusterId, at(C_URL))).thenReturn(client(C_URL, "third", "ASYNCIO", true));
+                .thenReturn(client("primary", "ASYNCIO", true, "[\"orders\",\"events\"]"));
+        when(artemisNodes.on(clusterId, at(B_URL))).thenReturn(client("backup", "ASYNCIO", false, "[]"));
+        when(artemisNodes.on(clusterId, at(C_URL))).thenReturn(client("third", "ASYNCIO", true));
 
         mvc.perform(get("/api/v1/clusters/{c}/config-diff", clusterId))
                 .andExpect(status().isOk())
