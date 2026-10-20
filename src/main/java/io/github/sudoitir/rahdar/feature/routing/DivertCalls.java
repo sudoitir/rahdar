@@ -4,12 +4,10 @@ import io.github.sudoitir.openbroker.ClusterConnection;
 import io.github.sudoitir.openbroker.model.Attributes;
 import io.github.sudoitir.openbroker.model.ResourceClass;
 import io.github.sudoitir.openbroker.model.ResourceId;
-import io.github.sudoitir.openbroker.model.ResourceQuery;
 import io.github.sudoitir.openbroker.model.RouteEndpoint;
 import io.github.sudoitir.openbroker.model.StandardAttributes;
 import io.github.sudoitir.openbroker.operation.Operation;
 import io.github.sudoitir.openbroker.operation.OperationResult;
-import io.github.sudoitir.rahdar.platform.broker.BrokerFailures;
 import io.github.sudoitir.rahdar.platform.broker.BrokerTarget;
 import io.github.sudoitir.rahdar.platform.broker.DivertRoute;
 import io.github.sudoitir.rahdar.platform.broker.ResourceIds;
@@ -45,15 +43,6 @@ final class DivertCalls {
 
     static NodeStatus delete(BrokerTarget node, String name) {
         return status(node.execute(DivertRoute.id(name), Operation.delete()));
-    }
-
-    /** Whether the address is there on the node. */
-    static boolean addressExists(BrokerTarget node, String address) {
-        ClusterConnection c = node.connection();
-        ResourceQuery query =
-                ResourceQuery.of(ResourceClass.DESTINATION).named(address).in(node.scope());
-        return BrokerFailures.translated(() ->
-                c.resources().read(query).orThrow().items().stream().anyMatch(r -> address.equals(r.id().name())));
     }
 
     private static RouteEndpoint endpoint(ClusterConnection c, String address) {

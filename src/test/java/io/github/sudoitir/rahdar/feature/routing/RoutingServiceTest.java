@@ -1,7 +1,9 @@
 package io.github.sudoitir.rahdar.feature.routing;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import io.github.sudoitir.openbroker.model.Resource;
@@ -12,7 +14,9 @@ import io.github.sudoitir.rahdar.kernel.core.ResourceQuery;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
 import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
 import io.github.sudoitir.rahdar.platform.broker.BrokerTarget;
+import io.github.sudoitir.rahdar.platform.broker.DivertSettings;
 import io.github.sudoitir.rahdar.platform.broker.RahdarNames;
+import io.github.sudoitir.rahdar.platform.broker.SystemExtensions;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNodeEntity;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNodeEntity.HaObservation;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNodeRepository;
@@ -64,6 +68,11 @@ class RoutingServiceTest extends PostgresIntegrationTest {
     @MockitoBean
     BrokerGateway gateway;
 
+    @MockitoBean
+    SystemExtensions extensions;
+
+    private final DivertSettings settings = mock(DivertSettings.class);
+
     private UUID clusterId;
     private UUID nodeA;
     private UUID nodeB;
@@ -75,6 +84,8 @@ class RoutingServiceTest extends PostgresIntegrationTest {
         nodeA = node("node-a", NODE_A_URL);
         nodeB = node("node-b", NODE_B_URL);
 
+        when(extensions.require(any(), eq(DivertSettings.class))).thenReturn(settings);
+        when(settings.addressAvailable(any(), any())).thenReturn(true);
         nodeHolds(nodeA);
         nodeHolds(nodeB);
     }

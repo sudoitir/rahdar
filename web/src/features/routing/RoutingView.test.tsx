@@ -34,6 +34,7 @@ function divert(over: Partial<DivertView> = {}): DivertView {
     address: 'orders',
     forwardingAddress: 'orders.audit',
     exclusive: false,
+    retroactiveResource: false,
     nodesPresent: 2,
     nodesTotal: 2,
     perNode: [],

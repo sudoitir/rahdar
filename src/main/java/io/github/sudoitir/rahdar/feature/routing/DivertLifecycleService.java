@@ -9,7 +9,9 @@ import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
 import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
 import io.github.sudoitir.rahdar.platform.broker.BrokerTarget;
 import io.github.sudoitir.rahdar.platform.broker.DivertRoute;
+import io.github.sudoitir.rahdar.platform.broker.DivertSettings;
 import io.github.sudoitir.rahdar.platform.broker.RahdarNames;
+import io.github.sudoitir.rahdar.platform.broker.SystemExtensions;
 import io.github.sudoitir.rahdar.platform.clusters.BrokerCommands;
 import io.github.sudoitir.rahdar.platform.clusters.BrokerCommands.Check;
 import io.github.sudoitir.rahdar.platform.clusters.BrokerCommands.Command;
@@ -50,6 +52,7 @@ public class DivertLifecycleService {
     private final ClusterAccessGuard access;
     private final ClusterDirectory clusters;
     private final BrokerGateway gateway;
+    private final SystemExtensions extensions;
     private final Validator validator;
 
     /**
@@ -79,6 +82,7 @@ public class DivertLifecycleService {
             audited.put("routing-type", req.routingType().toUpperCase(Locale.ROOT));
         }
         audited.put("acknowledgeCaptureShadowing", req.acknowledgeCaptureShadowing());
+        DivertSettings settings = extensions.require(clusterId, DivertSettings.class);
         return new Attempt.Ok<>(commands.run(Command.builder()
                 .clusterId(clusterId)
                 .permission(DivertKind.CREATE_DIVERT.permission())
@@ -89,23 +93,23 @@ public class DivertLifecycleService {
                 .targetName(req.name())
                 .params(audited)
                 .dryRun(dryRun)
-                .preflight(node -> createPreflight(node, req))
+                .preflight(node -> createPreflight(settings, node, req))
                 .action(node -> DivertCalls.create(node, req))
                 .signal(() -> sseHub.publishAbout(
                         clusterId, QUEUES_TOPIC, List.of(), List.of(req.address(), req.forwardingAddress())))
                 .build()));
     }
 
-    private Check createPreflight(BrokerTarget node, CreateDivertRequest req) {
+    private Check createPreflight(DivertSettings settings, BrokerTarget node, CreateDivertRequest req) {
         List<DivertRoute> existing = DivertRoute.list(node);
         String cycle = cycle(existing, req.name(), req.address(), req.forwardingAddress());
         if (cycle != null) {
             return Check.refuse("This divert would complete a cycle of diverts: " + cycle
                     + ". A message would be copied around it without end.");
         }
-        if (!DivertCalls.addressExists(node, req.forwardingAddress())) {
+        if (!settings.addressAvailable(node, req.forwardingAddress())) {
             return Check.refuse("The forwarding address '" + req.forwardingAddress() + "' does not exist on this node"
-                    + ", so producers to '" + req.address() + "' would fail."
+                    + " and is not created automatically, so producers to '" + req.address() + "' would fail."
                     + " Create the address first, or declare it in broker.xml: <addresses><address name=\""
                     + req.forwardingAddress() + "\"><anycast/></address></addresses>");
         }

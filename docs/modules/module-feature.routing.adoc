@@ -17,6 +17,7 @@ _Others_
 * `i.g.s.r.k.s.ClusterAccessGuard` (in Security)
 * `i.g.s.r.p.c.ClusterDirectory` (in Clusters)
 * `i.g.s.r.p.b.BrokerGateway` (in Broker connectivity)
+* `i.g.s.r.p.b.SystemExtensions` (in Broker connectivity)
 * `i.g.s.r.k.s.PermissionResolver` (in Security)
 * `i.g.s.r.k.a.AuditService` (in Audit log)
 |===

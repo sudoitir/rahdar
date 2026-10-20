@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -19,7 +20,9 @@ import io.github.sudoitir.rahdar.platform.broker.Attempt;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
 import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
 import io.github.sudoitir.rahdar.platform.broker.BrokerTarget;
+import io.github.sudoitir.rahdar.platform.broker.DivertSettings;
 import io.github.sudoitir.rahdar.platform.broker.RahdarNames;
+import io.github.sudoitir.rahdar.platform.broker.SystemExtensions;
 import io.github.sudoitir.rahdar.platform.clusters.LifecycleOutcome;
 import io.github.sudoitir.rahdar.platform.clusters.LifecycleOutcome.NodeOutcome;
 import io.github.sudoitir.rahdar.platform.clusters.LifecycleOutcome.NodeStatus;
@@ -76,6 +79,11 @@ class DivertLifecycleServiceTest extends PostgresIntegrationTest {
     @MockitoBean
     BrokerGateway gateway;
 
+    @MockitoBean
+    SystemExtensions extensions;
+
+    private final DivertSettings settings = mock(DivertSettings.class);
+
     private BrokerTarget node;
     private Operations ops;
     private final List<Resource> held = new ArrayList<>();
@@ -90,6 +98,8 @@ class DivertLifecycleServiceTest extends PostgresIntegrationTest {
         liveId = node("live", LIVE_URL, true);
         node("dead", DEAD_URL, false);
 
+        when(extensions.require(any(), eq(DivertSettings.class))).thenReturn(settings);
+        when(settings.addressAvailable(any(), eq("dst"))).thenReturn(true);
         node = Targets.target();
         ops = Targets.operations(node);
         when(gateway.node(any(UUID.class), any(UUID.class))).thenReturn(node);
@@ -172,13 +182,13 @@ class DivertLifecycleServiceTest extends PostgresIntegrationTest {
 
     @Test
     void aDivertToAnAddressTheNodeLacksIsRefusedWithTheDeclarationThatWouldFixIt() {
-        nodeHolds();
+        when(settings.addressAvailable(any(), eq("dst"))).thenReturn(false);
 
         NodeOutcome preview = preview(request("feed", false, false));
 
         assertThat(preview.status()).isEqualTo(NodeStatus.FAILED);
         assertThat(preview.error())
-                .contains("'dst' does not exist on this node")
+                .contains("'dst' does not exist on this node and is not created automatically")
                 .contains("producers to 'src' would fail")
                 .contains("<address name=\"dst\">");
     }

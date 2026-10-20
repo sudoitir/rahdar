@@ -124,6 +124,9 @@ class ResourceCheckCoverageTest {
                     "system.artemis.ArtemisQueueCounters",
                     "broker primitive behind QueueCounters; QueueLifecycleService checks before it calls it"),
             Map.entry(
+                    "system.artemis.ArtemisDivertSettings",
+                    "broker primitive behind DivertSettings; the divert and routing services check before they call it"),
+            Map.entry(
                     "system.artemis.ArtemisQueueSettings",
                     "broker primitive behind QueueSettings; QueueConfigurationReader checks before it calls it"),
             Map.entry(

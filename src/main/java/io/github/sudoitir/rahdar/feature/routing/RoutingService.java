@@ -16,7 +16,9 @@ import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
 import io.github.sudoitir.rahdar.platform.broker.BrokerTarget;
 import io.github.sudoitir.rahdar.platform.broker.BrokerXmlSnippets;
 import io.github.sudoitir.rahdar.platform.broker.DivertRoute;
+import io.github.sudoitir.rahdar.platform.broker.DivertSettings;
 import io.github.sudoitir.rahdar.platform.broker.RahdarNames;
+import io.github.sudoitir.rahdar.platform.broker.SystemExtensions;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
 import java.util.ArrayList;
@@ -62,12 +64,13 @@ public class RoutingService {
 
     private final ClusterDirectory nodes;
     private final BrokerGateway gateway;
+    private final SystemExtensions extensions;
     private final ClusterAccessGuard clusterAccess;
     private final PermissionResolver permissions;
     private final AuditService audit;
 
     /** A divert and the node it was read from. */
-    private record NodeDivert(UUID nodeId, String nodeName, DivertRoute route) {}
+    private record NodeDivert(UUID nodeId, String nodeName, DivertRoute route, boolean retroactive) {}
 
     /** A bridge and the node it was read from. */
     private record NodeBridge(UUID nodeId, String nodeName, BridgeRoute route) {}
@@ -75,16 +78,17 @@ public class RoutingService {
     public PagedView<DivertView> diverts(UUID clusterId, ResourceQuery query) {
         clusterAccess.requireVisible(clusterId);
         ResourceFilter addresses = permissions.filter(clusterId, ResourceKind.ADDRESS);
+        DivertSettings settings = extensions.require(clusterId, DivertSettings.class);
         List<ClusterNode> serving = servingManageableNodes(clusterId);
         int nodesTotal = serving.size();
         Set<String> ownedByOperator = operatorOwnedDivertNames(clusterId);
 
-        List<NodeDivert> rows = fanOut(
-                clusterId,
-                serving,
-                (target, nodeId, nodeName) -> DivertRoute.list(target).stream()
-                        .map(route -> new NodeDivert(nodeId, nodeName, route))
-                        .toList());
+        List<NodeDivert> rows = fanOut(clusterId, serving, (target, nodeId, nodeName) -> {
+            Set<String> retroactive = settings.retroactiveDiverts(target);
+            return DivertRoute.list(target).stream()
+                    .map(route -> new NodeDivert(nodeId, nodeName, route, retroactive.contains(route.name())))
+                    .toList();
+        });
 
         // Merged on the whole routing shape, not on the name: the same name pointing
         // somewhere else on one node is a divergence, and collapsing it would hide
@@ -210,6 +214,7 @@ public class RoutingService {
                 first.routingType(),
                 first.transformerClassName(),
                 first.exclusive(),
+                group.get(0).retroactive(),
                 owner,
                 capture ? captureSubscriptionId(name) : null,
                 OWNER_OPERATOR.equals(owner)
