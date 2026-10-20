@@ -31,13 +31,13 @@ function open(data: Diff, search = '') {
   const root = createRootRoute();
   const route = createRoute({
     getParentRoute: () => root,
-    path: '/clusters/$clusterId/config-diff',
+    path: '/clusters/$clusterId/artemis/config-diff',
     component: ConfigDiffView,
     validateSearch: validateConfigDiffSearch,
   });
   const router = createRouter({
     routeTree: root.addChildren([route]),
-    history: createMemoryHistory({ initialEntries: [`/clusters/c1/config-diff${search}`] }),
+    history: createMemoryHistory({ initialEntries: [`/clusters/c1/artemis/config-diff${search}`] }),
   });
   renderThemed(
     <QueryClientProvider client={client}>

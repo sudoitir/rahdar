@@ -79,6 +79,12 @@ export interface NavContribution {
   /** The view's path below `/clusters/$clusterId/`. */
   path: string;
   /**
+   * The id of the broker system the view is for (`artemis`). Without it the view applies to every system; with
+   * it, the navigation lists the view only for a cluster that runs that system, and its route is under
+   * `/clusters/$clusterId/<system>/`, which another system's cluster answers with the not-found page.
+   */
+  system?: string;
+  /**
    * The permission the view reads with. Without it the entry stays visible and disabled,
    * and says why; the server enforces it regardless.
    */

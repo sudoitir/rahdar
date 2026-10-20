@@ -3,6 +3,7 @@ import { useNavigate, useParams } from '@tanstack/react-router';
 
 import { FEATURE_IDS, type NavContribution } from '../feature.ts';
 import { useFeatures } from '../features.ts';
+import { useClusterSystem } from '../shell/useClusterSystem.ts';
 import { focusFilter } from './filterShortcut.ts';
 import { ignoredForShortcuts, latinKey } from './keys.ts';
 import { setShortcutsHelpOpen, singleKeyShortcutsEnabled } from './shortcuts.ts';
@@ -14,13 +15,18 @@ const BUILT_IN = new Set<string>(FEATURE_IDS);
 
 /**
  * The views that have a `g` letter: built-in views only — a plugin's letter is ignored, so a plugin
- * can never take a letter an operator already relies on (ADR-0109).
+ * can never take a letter an operator already relies on (ADR-0109). A system-only view has no letter on a
+ * cluster known to run another system; while the system is not known the letter is offered.
  */
-export function viewHotkeys(features: { id: string; nav?: NavContribution[] }[]): Map<string, NavContribution> {
+export function viewHotkeys(
+  features: { id: string; nav?: NavContribution[] }[],
+  systemId?: string,
+): Map<string, NavContribution> {
   const out = new Map<string, NavContribution>();
   for (const feature of features) {
     if (!BUILT_IN.has(feature.id)) continue;
     for (const item of feature.nav ?? []) {
+      if (item.system && systemId && item.system !== systemId) continue;
       if (item.hotkey && !out.has(item.hotkey)) out.set(item.hotkey, item);
     }
   }
@@ -37,9 +43,10 @@ export function useKeySequences() {
   const navigate = useNavigate();
   const { clusterId } = useParams({ strict: false }) as { clusterId?: string };
   const features = useFeatures();
+  const systemId = useClusterSystem(clusterId);
   const pendingUntil = useRef(0);
-  const state = useRef({ navigate, clusterId, hotkeys: viewHotkeys(features) });
-  state.current = { navigate, clusterId, hotkeys: viewHotkeys(features) };
+  const state = useRef({ navigate, clusterId, hotkeys: viewHotkeys(features, systemId) });
+  state.current = { navigate, clusterId, hotkeys: viewHotkeys(features, systemId) };
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {

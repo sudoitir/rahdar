@@ -109,7 +109,10 @@ export function CapabilityLedger({
                   {cap.brokerXmlSnippet && clusterId && declarable ? (
                     <Text size="xs" mt="xs">
                       {declarable}{' '}
-                      <Link to={`/clusters/${clusterId}/configuration?tab=recommended`} className={linkClasses.link}>
+                      <Link
+                        to={`/clusters/${clusterId}/artemis/configuration?tab=recommended`}
+                        className={linkClasses.link}
+                      >
                         Declare &amp; apply it
                       </Link>
                     </Text>

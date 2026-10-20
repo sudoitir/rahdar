@@ -252,7 +252,7 @@ describe('ConfigDiffView', () => {
     renderWithProviders(<ConfigDiffView />);
 
     const link = await screen.findByRole('link', { name: 'declared configuration' });
-    expect(link).toHaveAttribute('href', '/clusters/c1/configuration');
+    expect(link).toHaveAttribute('href', '/clusters/c1/artemis/configuration');
     expect(link.parentElement).toHaveTextContent('compares the nodes with each other');
     expect(link.parentElement).toHaveTextContent('every live node against what you declared');
   });

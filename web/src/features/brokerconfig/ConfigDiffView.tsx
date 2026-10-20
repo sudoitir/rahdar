@@ -160,7 +160,7 @@ export function ConfigDiffView() {
             ))}
             <Text size="sm" c="dimmed">
               This compares the nodes with each other; the{' '}
-              <Link to={`/clusters/${clusterId}/configuration`} className={linkClasses.link}>
+              <Link to={`/clusters/${clusterId}/artemis/configuration`} className={linkClasses.link}>
                 declared configuration
               </Link>{' '}
               reports drift of every live node against what you declared.

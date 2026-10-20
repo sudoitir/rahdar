@@ -4,6 +4,7 @@ import { lazyRouteComponent } from '@tanstack/react-router';
 import { LoadingState } from '../../ui/LoadingState.tsx';
 import type { ModuleId } from '../feature.ts';
 import { FeatureGate } from '../shell/FeatureGate.tsx';
+import { SystemGate } from '../shell/SystemGate.tsx';
 
 /** The named export `exportName` of the module `load` imports, as the default export `lazyRouteComponent` expects. */
 function namedExport<K extends string, P extends object>(
@@ -19,17 +20,25 @@ function namedExport<K extends string, P extends object>(
  * A feature's view, loaded when its route is first opened or preloaded on intent, so its code and
  * everything only it uses is a chunk of its own. A feature's `feature.ts` registers its routes at
  * startup, which makes its views the one thing it must not import statically. Behind the same
- * {@link FeatureGate} as any view: a disabled feature shows the page explaining it.
+ * {@link FeatureGate} as any view: a disabled feature shows the page explaining it. A view that exists
+ * for one broker system (`system`) shows the not-found page on a cluster that runs another.
  */
 export function lazyFeatureView<K extends string>(
   feature: ModuleId,
   load: () => Promise<{ [Name in NoInfer<K>]: () => ReactNode }>,
   exportName: K,
+  system?: string,
 ) {
   const View = namedExport(load, exportName);
   const FeatureView = () => (
     <FeatureGate feature={feature}>
-      <View />
+      {system ? (
+        <SystemGate system={system}>
+          <View />
+        </SystemGate>
+      ) : (
+        <View />
+      )}
     </FeatureGate>
   );
   FeatureView.preload = () => View.preload?.();

@@ -1,6 +1,7 @@
 import { useCan } from '../auth/useCan.ts';
 import { useFeatures } from '../features.ts';
 import { navGroups } from '../registry.ts';
+import { useClusterSystem } from './useClusterSystem.ts';
 import { NavGroup } from './NavGroup.tsx';
 import { NavItem } from './NavItem.tsx';
 import styles from './ClusterViewNav.module.css';
@@ -15,7 +16,7 @@ import styles from './ClusterViewNav.module.css';
  * active route.
  */
 export function ClusterViewNav({ clusterId, collapsed }: Readonly<{ clusterId: string; collapsed: boolean }>) {
-  const groups = navGroups(useFeatures());
+  const groups = navGroups(useFeatures(), useClusterSystem(clusterId));
   // While grants are still loading the entries are offered: refusing before the answer arrives
   // would claim something that has not been checked.
   const { canAnywhere, loading } = useCan();
