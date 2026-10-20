@@ -121,13 +121,12 @@ class ClusterControllerTest extends PostgresIntegrationTest {
         audits.deleteAll();
         clusters.deleteAll();
         // The backup answers where the seed's pattern puts it, as its own NodeID's broker.
-        when(session.node(BACKUP_URL))
-                .thenAnswer(inv -> client(BACKUP_URL, "search-broker.json", "ha-read-backup.json"));
+        when(session.node(BACKUP_URL)).thenAnswer(inv -> client("search-broker.json", "ha-read-backup.json"));
         when(dataPlaneCheck.check(any(), any())).thenAnswer(DataPlaneChecks.answering(url -> AccountResult.ACCEPTED));
     }
 
     /** A client whose mock server answers the given fixtures at {@link #SEED}, in order. */
-    private BrokerTarget client(String url, String... fixtures) {
+    private BrokerTarget client(String... fixtures) {
         FixtureJolokia server = new FixtureJolokia();
         for (String fixture : fixtures) {
             server.expect().andRespond(withSuccess(body(fixture), MediaType.APPLICATION_JSON));
@@ -135,7 +134,7 @@ class ClusterControllerTest extends PostgresIntegrationTest {
         return server.target();
     }
 
-    private BrokerTarget unauthorizedClient(String url) {
+    private BrokerTarget unauthorizedClient() {
         FixtureJolokia server = new FixtureJolokia();
         server.expect().andRespond(withStatus(HttpStatus.UNAUTHORIZED));
         return server.target();
@@ -175,7 +174,7 @@ class ClusterControllerTest extends PostgresIntegrationTest {
 
     @Test
     void registerPersistsClusterNodesAndAudit() throws Exception {
-        when(session.node(SEED)).thenReturn(client(SEED, registerSequence()));
+        when(session.node(SEED)).thenReturn(client(registerSequence()));
 
         mvc.perform(post("/api/v1/clusters")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -204,7 +203,7 @@ class ClusterControllerTest extends PostgresIntegrationTest {
         // checkConnection order: connect, then the in-memory preview (which the Core
         // subscription pre-check needs for a Core URL), then the capability probe
         // (which is handed that check's verdict).
-        when(session.node(SEED)).thenReturn(client(SEED, registerSequence()));
+        when(session.node(SEED)).thenReturn(client(registerSequence()));
 
         mvc.perform(post("/api/v1/clusters")
                         .param("dryRun", "true")
@@ -228,7 +227,7 @@ class ClusterControllerTest extends PostgresIntegrationTest {
 
     @Test
     void theCheckListsEveryNodeWithItsUrlAndWhereItCameFrom() throws Exception {
-        when(session.node(SEED)).thenReturn(client(SEED, registerSequence()));
+        when(session.node(SEED)).thenReturn(client(registerSequence()));
 
         mvc.perform(post("/api/v1/clusters")
                         .param("dryRun", "true")
@@ -248,7 +247,7 @@ class ClusterControllerTest extends PostgresIntegrationTest {
 
     @Test
     void aCoreAccountTheBrokerRefusesDoesNotHideTheManagementAccountItAccepted() throws Exception {
-        when(session.node(SEED)).thenReturn(client(SEED, registerSequence()));
+        when(session.node(SEED)).thenReturn(client(registerSequence()));
         doAnswer(DataPlaneChecks.answering(
                         url -> "artemis-primary:61616".equals(url) ? AccountResult.REJECTED : AccountResult.ACCEPTED))
                 .when(dataPlaneCheck)
@@ -268,8 +267,8 @@ class ClusterControllerTest extends PostgresIntegrationTest {
 
     @Test
     void aManagementAccountTheBrokerRefusesDoesNotHideTheCoreAccountItAccepted() throws Exception {
-        when(session.node(SEED)).thenReturn(client(SEED, registerSequence()));
-        when(session.node(BACKUP_URL)).thenReturn(unauthorizedClient(BACKUP_URL));
+        when(session.node(SEED)).thenReturn(client(registerSequence()));
+        when(session.node(BACKUP_URL)).thenReturn(unauthorizedClient());
 
         mvc.perform(post("/api/v1/clusters")
                         .param("dryRun", "true")
@@ -284,7 +283,7 @@ class ClusterControllerTest extends PostgresIntegrationTest {
 
     @Test
     void thePreviewCarriesWhatAdoptingWouldDeclareWhenTheNodesAgree() throws Exception {
-        when(session.node(SEED)).thenReturn(client(SEED, registerSequence()));
+        when(session.node(SEED)).thenReturn(client(registerSequence()));
         when(adoption.preview(any()))
                 .thenReturn(Optional.of(new RegistrationAdoption.Preview(
                         new RegistrationAdoption.Counts(3, 2, 1, 0), List.of(), List.of("note"))));
@@ -302,7 +301,7 @@ class ClusterControllerTest extends PostgresIntegrationTest {
 
     @Test
     void thePreviewListsWhereTheNodesDisagree() throws Exception {
-        when(session.node(SEED)).thenReturn(client(SEED, registerSequence()));
+        when(session.node(SEED)).thenReturn(client(registerSequence()));
         String disagreement = "Address settings for orders differ between a and b; a's were kept.";
         when(adoption.preview(any()))
                 .thenReturn(Optional.of(new RegistrationAdoption.Preview(
@@ -318,7 +317,7 @@ class ClusterControllerTest extends PostgresIntegrationTest {
 
     @Test
     void thePreviewOffersNoAdoptionToACallerWhoMayNotDeclare() throws Exception {
-        when(session.node(SEED)).thenReturn(client(SEED, registerSequence()));
+        when(session.node(SEED)).thenReturn(client(registerSequence()));
 
         mvc.perform(post("/api/v1/clusters")
                         .param("dryRun", "true")
@@ -337,7 +336,7 @@ class ClusterControllerTest extends PostgresIntegrationTest {
 
     @Test
     void registeringWithTheAdoptionOnAdoptsInTheRegistrationsTransaction() throws Exception {
-        when(session.node(SEED)).thenReturn(client(SEED, registerSequence()));
+        when(session.node(SEED)).thenReturn(client(registerSequence()));
         RegistrationAdoption.Reading reading = new RegistrationAdoption.Reading() {};
         when(adoption.read(any())).thenReturn(Optional.of(reading));
 
@@ -359,7 +358,7 @@ class ClusterControllerTest extends PostgresIntegrationTest {
 
     @Test
     void registeringWithTheAdoptionOffSavesNoRevision() throws Exception {
-        when(session.node(SEED)).thenReturn(client(SEED, registerSequence()));
+        when(session.node(SEED)).thenReturn(client(registerSequence()));
 
         mvc.perform(post("/api/v1/clusters")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -371,7 +370,7 @@ class ClusterControllerTest extends PostgresIntegrationTest {
 
     @Test
     void anAdoptionWithNoReadableNodeIsRefusedBeforeAnythingIsSaved() throws Exception {
-        when(session.node(SEED)).thenReturn(client(SEED, registerSequence()));
+        when(session.node(SEED)).thenReturn(client(registerSequence()));
         when(adoption.read(any())).thenReturn(Optional.empty());
 
         mvc.perform(post("/api/v1/clusters")
@@ -384,7 +383,7 @@ class ClusterControllerTest extends PostgresIntegrationTest {
 
     @Test
     void anAdoptionThatFailsLeavesNoClusterBehind() throws Exception {
-        when(session.node(SEED)).thenReturn(client(SEED, registerSequence()));
+        when(session.node(SEED)).thenReturn(client(registerSequence()));
         when(adoption.read(any())).thenReturn(Optional.of(new RegistrationAdoption.Reading() {}));
         doThrow(new ConflictException("adoption-failed", "The first revision could not be saved."))
                 .when(adoption)
@@ -403,7 +402,7 @@ class ClusterControllerTest extends PostgresIntegrationTest {
     @ParameterizedTest
     @ValueSource(booleans = {true, false})
     void aBrokerOlderThanTheMinimumIsRefusedAndNothingIsStored(boolean dryRun) throws Exception {
-        when(session.node(SEED)).thenReturn(client(SEED, "search-broker.json", "ha-read-too-old.json"));
+        when(session.node(SEED)).thenReturn(client("search-broker.json", "ha-read-too-old.json"));
 
         mvc.perform(post("/api/v1/clusters")
                         .param("dryRun", String.valueOf(dryRun))
@@ -423,7 +422,7 @@ class ClusterControllerTest extends PostgresIntegrationTest {
 
     @Test
     void badSeedYieldsClassifiedProblemDetailAndPersistsNothing() throws Exception {
-        when(session.node(SEED)).thenReturn(unauthorizedClient(SEED));
+        when(session.node(SEED)).thenReturn(unauthorizedClient());
 
         mvc.perform(post("/api/v1/clusters")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -442,7 +441,7 @@ class ClusterControllerTest extends PostgresIntegrationTest {
 
     @Test
     void discoveryKeepsAnOverriddenNode() throws Exception {
-        when(session.node(SEED)).thenReturn(client(SEED, registerSequence()));
+        when(session.node(SEED)).thenReturn(client(registerSequence()));
         mvc.perform(post("/api/v1/clusters")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(registerBody()))
@@ -452,7 +451,7 @@ class ClusterControllerTest extends PostgresIntegrationTest {
                 nodes.findByClusterIdAndName(clusterId, "artemis-backup:61616").orElseThrow();
 
         // PATCH the backup with a reachable management URL.
-        when(session.node(OVERRIDE_URL)).thenReturn(client(OVERRIDE_URL, "search-broker.json", "ha-read-primary.json"));
+        when(session.node(OVERRIDE_URL)).thenReturn(client("search-broker.json", "ha-read-primary.json"));
         mvc.perform(patch("/api/v1/clusters/{c}/nodes/{n}", clusterId, backup.getId())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"jolokiaUrl\":\"" + OVERRIDE_URL + "\"}"))
@@ -461,8 +460,7 @@ class ClusterControllerTest extends PostgresIntegrationTest {
 
         // A discovery tick: every manageable node answers search + HA read + topology.
         when(session.node(any()))
-                .thenAnswer(inv ->
-                        client(inv.getArgument(0), "search-broker.json", "ha-read-primary.json", "topology.json"));
+                .thenAnswer(inv -> client("search-broker.json", "ha-read-primary.json", "topology.json"));
 
         clusterService.rediscover(clusterId);
 
@@ -474,7 +472,7 @@ class ClusterControllerTest extends PostgresIntegrationTest {
 
     @Test
     void deleteRemovesClusterAndCredentialsButKeepsAudit() throws Exception {
-        when(session.node(SEED)).thenReturn(client(SEED, registerSequence()));
+        when(session.node(SEED)).thenReturn(client(registerSequence()));
         mvc.perform(post("/api/v1/clusters")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(registerBody()))
@@ -512,8 +510,8 @@ class ClusterControllerTest extends PostgresIntegrationTest {
     @ValueSource(booleans = {true, false})
     void theSameBrokersAreRegisteredOnlyOnce(boolean dryRun) throws Exception {
         String alias = "http://BROKER-1.example:8161/console/jolokia/";
-        when(session.node(SEED)).thenReturn(client(SEED, registerSequence()));
-        when(session.node(alias)).thenReturn(client(alias, untilIdentityKnown()));
+        when(session.node(SEED)).thenReturn(client(registerSequence()));
+        when(session.node(alias)).thenReturn(client(untilIdentityKnown()));
         mvc.perform(post("/api/v1/clusters")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(registerBody()))
@@ -548,7 +546,7 @@ class ClusterControllerTest extends PostgresIntegrationTest {
     /** A caller who cannot read the cluster holding the brokers is refused without being told which it is. */
     @Test
     void aClusterTheCallerCannotSeeIsNotNamed() throws Exception {
-        when(session.node(SEED)).thenReturn(client(SEED, registerSequence()), client(SEED, untilIdentityKnown()));
+        when(session.node(SEED)).thenReturn(client(registerSequence()), client(untilIdentityKnown()));
         mvc.perform(post("/api/v1/clusters")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(registerBody()))

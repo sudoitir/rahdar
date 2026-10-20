@@ -89,7 +89,7 @@ class ClusterResourceControllerTest extends PostgresIntegrationTest {
         clusters.deleteById(clusterId);
     }
 
-    private static FixtureJolokia client(String url, String... fixtures) {
+    private static FixtureJolokia client(String... fixtures) {
         FixtureJolokia server = new FixtureJolokia();
         for (String fixture : fixtures) {
             server.expect().andRespond(withSuccess(body(fixture), MediaType.APPLICATION_JSON));
@@ -97,7 +97,7 @@ class ClusterResourceControllerTest extends PostgresIntegrationTest {
         return server;
     }
 
-    private static FixtureJolokia unauthorized(String url) {
+    private static FixtureJolokia unauthorized() {
         FixtureJolokia server = new FixtureJolokia();
         server.expect().andRespond(withStatus(HttpStatus.UNAUTHORIZED));
         return server;
@@ -140,8 +140,8 @@ class ClusterResourceControllerTest extends PostgresIntegrationTest {
     @Test
     void consumersFansOutLiveAndTagsEachRowWithItsNode() throws Exception {
         serving(
-                client(URL_A, "search-broker.json", "list-consumers.json"),
-                client(URL_B, "search-broker.json", "list-consumers.json"));
+                client("search-broker.json", "list-consumers.json"),
+                client("search-broker.json", "list-consumers.json"));
 
         mvc.perform(get("/api/v1/clusters/{id}/consumers", clusterId))
                 .andExpect(status().isOk())
@@ -152,7 +152,7 @@ class ClusterResourceControllerTest extends PostgresIntegrationTest {
 
     @Test
     void aClusterWithNoReadableNodeSurfacesAClassifiedProblem() throws Exception {
-        serving(unauthorized(URL_A), unauthorized(URL_B));
+        serving(unauthorized(), unauthorized());
 
         mvc.perform(get("/api/v1/clusters/{id}/sessions", clusterId))
                 .andExpect(status().is4xxClientError())
