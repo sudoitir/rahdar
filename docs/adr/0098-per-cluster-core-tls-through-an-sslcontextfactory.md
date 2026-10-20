@@ -1,6 +1,6 @@
 # ADR-0098: Per-cluster Core TLS through an Artemis SSLContextFactory
 
-- **Status**: accepted
+- **Status**: superseded by [ADR-0203](0203-rahdar-reaches-every-broker-through-openbroker.md)
 - **Date**: 2026-09-21
 - **Deciders**: Artemis Studio maintainers
 

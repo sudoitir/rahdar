@@ -1,6 +1,6 @@
 # ADR-0031: Pooled Core connections via `pooled-jms`, superseding connect-per-call
 
-- **Status**: accepted
+- **Status**: superseded by [ADR-0203](0203-rahdar-reaches-every-broker-through-openbroker.md)
 - **Date**: 2026-09-04
 - **Deciders**: Mahdi Amirabdollahi
 

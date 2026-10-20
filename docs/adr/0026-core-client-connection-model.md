@@ -1,6 +1,6 @@
 # ADR-0026: Core protocol client — one subscription per live node, poll loop, Studio-driven reconnect
 
-- **Status**: accepted
+- **Status**: superseded by [ADR-0203](0203-rahdar-reaches-every-broker-through-openbroker.md)
 - **Date**: 2026-09-04
 - **Deciders**: Mahdi Amirabdollahi
 

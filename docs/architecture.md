@@ -18,7 +18,7 @@ startup toggle and the manifest entry.
                  └───────────────┬───────────────────────────────┬─────────────────┘
                                  │ api / events / SPI beans      │
                  ┌───────────────▼────────── platform ───────────▼─────────────────┐
-                 │ broker (Jolokia, Core)  clusters (registration, topology,       │
+                 │ broker (OpenBroker gateway)  clusters (registration, topology,  │
                  │ BrokerCommands)  scrape (tiers, snapshots)  mcp (server)         │
                  └───────────────┬─────────────────────────────────────────────────┘
                  ┌───────────────▼─────────── kernel ──────────────────────────────┐
@@ -35,10 +35,11 @@ startup toggle and the manifest entry.
 | | `settings` | the runtime settings registry (`rahdar_setting`) and the JDBC bootstrap property source |
 | | `jobs` | `ScheduledJob`, the one scheduler, job status and its health |
 | | `stream` | `SseHub`, `GET /api/v1/stream`, the topic registry |
-| platform | `broker` | Jolokia and Core clients, `NodeCallLimiter`, capability probing, notification subscriptions, `MessageTransport` |
+| platform | `broker` | the OpenBroker gateway (`BrokerGateway`: one `ClusterConnection` per cluster), `RahdarCallInterceptor` with `NodeCallLimiter`, notifications, messages, the transfer relay |
 | | `clusters` | registration, nodes, credentials, TLS, environments, discovery, HA and split-brain, serving nodes, the capability ledger, `BrokerCommands` |
 | | `scrape` | the tiered scrape, `subscription_snapshot`, `metric_sample` |
 | | `mcp` | the MCP server, the tool catalogue, help, resources and runbook prompts (optional) |
+| system | `artemis` | what only Artemis has: the one use of the SDK's `ArtemisManagement` extension, MBean operations, the capability probe and its `broker.xml` remedies (ADR-0203) |
 | feature | everything else | one module per capability, each with its own tables, endpoints, jobs, topics and tools |
 
 The generated module graph and one canvas per module are in `docs/modules/` in the repository,
@@ -93,7 +94,8 @@ module's `internal` package. `BoundaryRulesTest` adds what Modulith does not see
 - features use only method security from Spring Security; only the security kernel
   and redirect sign-in see `HttpSecurity`;
 - entities and repositories live in the owning module's `internal.persistence`;
-- Jolokia and Artemis client library types stay inside `platform.broker`;
+- no Artemis, Jolokia or JMS type appears anywhere, the SDK's driver SPI is never used, and
+  only `system.artemis` knows the SDK's Artemis driver (ADR-0203);
 - only the stream kernel and the SQL tail hold an `SseEmitter`;
 - scheduling stays in the jobs kernel and the scrape tiers;
 - features never inject the container or enable framework features.
@@ -212,8 +214,9 @@ via `rahdar_setting`; the values below are the defaults.
 | B | the first `listQueues` page per node — a fast refresh of the busiest queues | 15s |
 | C | every `listQueues` page per node in one tick, walking the whole set, then reaping removed queues | 5m |
 
-Each tick is **one Jolokia POST per node** (the resolved broker MBean name is
-cached process-wide, so a tick does not pay an extra `search`). Artemis 2.44's
+Each tick is **one management call per node** through the broker SDK; for Artemis the
+driver sends one Jolokia POST (and caches the resolved broker MBean name, so a tick does
+not pay an extra `search`). Artemis 2.44's
 `sortColumn` / `GREATER_THAN` options both 500 with an NPE
 (`docs/broker-management-notes.md` §10), so there is no broker-sorted "hot page":
 tier B is best-effort speed on page 1, tier C is the coverage guarantee.
@@ -332,6 +335,17 @@ result and shows the `broker.xml` needed to unlock the rest. An unestablished
 capability is `UNKNOWN`, and unknown leaves a control enabled with the uncertainty
 stated (ADR-0049 D5).
 
+Rahdar reaches every broker through the OpenBroker SDK (ADR-0203). `platform.broker`'s
+`BrokerGateway` opens one `ClusterConnection` per cluster with the cluster's system
+(`cluster.system`), Rahdar's credentials and SSL bundles, and a `RahdarCallInterceptor`
+that admits every management and control call through the per-node limiter, the call
+guard and node call health, and records the `rahdar.broker.*` observations. Features use
+the SDK's facets: resources, metrics under standard keys, operations with a preview and an
+etag the approval gate pins, messages, the transport, and notifications. What only Artemis
+has goes through `system.artemis`, the one module that unwraps the SDK's Artemis extension.
+The driver chooses the channel per call: for Artemis, Jolokia for management and Core for
+messages and notifications.
+
 Oversized body and property values are truncated by the broker at
 `management-message-attribute-size-limit` over Jolokia, and Rahdar discloses that
 **per message** (a `bodyTruncated` flag and the `broker.xml` snippet that raises the
@@ -399,7 +413,7 @@ bounded result that does not say so reads as a complete one.
   long enough to be seen. A queue that drains faster than the interval is invisible,
   which the console states permanently and non-dismissably on every sampled tail.
 - **Captured** (ADR-0062). A non-exclusive divert copies the address into a
-  Rahdar-owned queue, drained by a Core consumer. Complete for what the address
+  Rahdar-owned queue, drained by a transacted receiver of the broker SDK. Complete for what the address
   routed, whether or not anything consumed it in between.
 
 ```
@@ -407,7 +421,7 @@ source address ──non-exclusive divert──► rahdar.capture.<instance>.<ad
       (per node)                              ring-size N, address-full-policy=DROP,
                                               expiry-delay, non-durable
                                                        │
-                                              Core consumer (CorePool, CLIENT_ACKNOWLEDGE)
+                                              transacted SDK receiver, committed after the store
                                                        │
                                                   CaptureBus
                                      ┌─────────────────┼─────────────────┐

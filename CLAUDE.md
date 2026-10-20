@@ -67,8 +67,10 @@ one is missing.
   TanStack Router/Query/Table, `@mantine/charts`, `@xyflow/react` for topology.
   `typescript` is pinned to `5.9.3` for tool compatibility; bump to 7.x once the
   ESLint/Vite/TanStack toolchain all declare support.
-- **Broker transport**: Jolokia HTTP is primary; the Artemis Core client is the
-  second channel (notifications, faithful message I/O), added in Phase 4. No JMX.
+- **Broker access**: the OpenBroker SDK (`io.github.sudoitir:openbroker-*`, released versions
+  only), one `ClusterConnection` per cluster through `platform.broker`'s gateway (ADR-0203). No
+  broker client type anywhere in Rahdar; only `system.artemis` knows the Artemis driver, whose
+  channels are Jolokia for management and Core for messages and notifications. No JMX.
 - **Realtime**: SSE only. `GET /api/v1/stream`. Commands are ordinary POSTs.
 - **Packaging**: one container image, `compose.yaml` first. Helm in v1.0.
 
