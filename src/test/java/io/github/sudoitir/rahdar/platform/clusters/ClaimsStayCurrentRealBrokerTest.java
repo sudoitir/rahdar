@@ -2,7 +2,17 @@ package io.github.sudoitir.rahdar.platform.clusters;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import io.github.sudoitir.openbroker.model.Attributes;
+import io.github.sudoitir.openbroker.model.Condition;
+import io.github.sudoitir.openbroker.model.ConditionStatus;
+import io.github.sudoitir.openbroker.model.ConditionTypes;
+import io.github.sudoitir.openbroker.model.Designation;
+import io.github.sudoitir.openbroker.model.Membership;
+import io.github.sudoitir.openbroker.model.NodeDescription;
+import io.github.sudoitir.openbroker.model.NodeFunction;
+import io.github.sudoitir.openbroker.model.Serving;
 import io.github.sudoitir.rahdar.platform.broker.Attempt;
+import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNodeEntity;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNodeRepository;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterRepository;
@@ -14,6 +24,7 @@ import io.github.sudoitir.rahdar.support.ArtemisBrokers;
 import io.github.sudoitir.rahdar.support.ArtemisIntegrationTest;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
@@ -23,7 +34,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
-import tools.jackson.databind.json.JsonMapper;
 
 /**
  * A cluster's claims follow its nodes (ADR-0167), against a real broker: an overridden URL moves its claim,
@@ -158,9 +168,20 @@ class ClaimsStayCurrentRealBrokerTest extends PostgresIntegrationTest {
         UUID first = registered("first", ArtemisIntegrationTest.jolokiaUrl());
         String replaced = run + "-new-journal";
 
-        recorder.applyTierA(seedNode(first).getId(), new JsonMapper().readTree("""
-                        {"Active": true, "Started": true, "Backup": false, "NodeID": "%s"}
-                        """.formatted(replaced)), 1L);
+        UUID node = seedNode(first).getId();
+        recorder.applyTierA(
+                node,
+                new NodeDescription(
+                        BrokerGateway.idOf(node),
+                        replaced,
+                        new Membership(Optional.empty(), Designation.NONE, Serving.ACTIVE, Optional.empty()),
+                        Set.of(NodeFunction.BROKER),
+                        List.of(),
+                        Optional.empty(),
+                        List.of(new Condition(ConditionTypes.STARTED, ConditionStatus.TRUE, "", "", Optional.empty())),
+                        Attributes.empty(),
+                        Optional.empty()),
+                1L);
 
         assertThat(claimsOf(first)).contains(ClusterIdentity.NODE_ID + ":" + replaced);
     }

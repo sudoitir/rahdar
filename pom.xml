@@ -56,6 +56,8 @@
 
         <!-- Pinned; verified against Maven Central during workspace setup. -->
         <artemis.version>2.57.0</artemis.version>
+        <!-- The broker SDK and its Artemis driver (ADR-0203). Never a SNAPSHOT on main: CI refuses one. -->
+        <openbroker.version>0.1.0-SNAPSHOT</openbroker.version>
         <testcontainers.version>2.0.5</testcontainers.version>
         <spotless.version>3.10.4</spotless.version>
         <!-- Publishing the plugin API (ADR-0102); verified against Maven Central 2026-09-23. -->
@@ -281,6 +283,21 @@
             <groupId>org.apache.artemis</groupId>
             <artifactId>artemis-jakarta-client</artifactId>
             <version>${artemis.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.github.sudoitir</groupId>
+            <artifactId>openbroker-api</artifactId>
+            <version>${openbroker.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.github.sudoitir</groupId>
+            <artifactId>openbroker-support</artifactId>
+            <version>${openbroker.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.github.sudoitir</groupId>
+            <artifactId>openbroker-artemis</artifactId>
+            <version>${openbroker.version}</version>
         </dependency>
 
         <dependency>

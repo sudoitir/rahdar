@@ -1,0 +1,173 @@
+package io.github.sudoitir.rahdar.platform.broker;
+
+import io.github.sudoitir.openbroker.BrokerDrivers;
+import io.github.sudoitir.openbroker.ClusterConnection;
+import io.github.sudoitir.openbroker.ClusterSpec;
+import io.github.sudoitir.openbroker.ConnectOptions;
+import io.github.sudoitir.openbroker.ConnectRequest;
+import io.github.sudoitir.openbroker.CredentialSource;
+import io.github.sudoitir.openbroker.Credentials;
+import io.github.sudoitir.openbroker.Endpoint;
+import io.github.sudoitir.openbroker.NodeId;
+import io.github.sudoitir.openbroker.NodeSpec;
+import io.github.sudoitir.openbroker.Plane;
+import io.github.sudoitir.openbroker.TlsProvider;
+import java.time.Clock;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.UnaryOperator;
+import org.springframework.beans.factory.DisposableBean;
+import org.springframework.stereotype.Component;
+
+/**
+ * Rahdar's one way to a broker (ADR-0203): a broker SDK connection per registered cluster, built
+ * from its nodes, its credentials (asked on every connect, so a rotated secret applies at once) and
+ * its TLS bundle, and reconfigured when its nodes change rather than reconnected, so receivers and
+ * notification subscriptions on unchanged nodes go on. A node's SDK id is its Rahdar id.
+ *
+ * <p>{@link #probe} is for addresses that are not registered nodes yet: a seed during registration or
+ * discovery. Close what it returns.
+ */
+@Component
+public class BrokerGateway implements DisposableBean {
+
+    /** Every cluster is Artemis until a second driver arrives. */
+    public static final String SYSTEM = "artemis";
+
+    /** The protocol names of the Artemis driver's endpoints. */
+    public static final String JOLOKIA = "jolokia";
+
+    public static final String CORE = "core";
+
+    private final BrokerDrivers drivers;
+    private final NodeDirectory directory;
+    private final ConnectionSettingsSource settings;
+    private final BrokerTls tls;
+    private final RahdarCallInterceptor interceptor;
+    private final BrokerTimeouts timeouts;
+    private final Map<UUID, Held> clusters = new ConcurrentHashMap<>();
+
+    private record Held(ClusterConnection connection, ClusterSpec spec) {}
+
+    public BrokerGateway(
+            BrokerDrivers drivers,
+            NodeDirectory directory,
+            ConnectionSettingsSource settings,
+            BrokerTls tls,
+            RahdarCallInterceptor interceptor,
+            BrokerTimeouts timeouts) {
+        this.drivers = drivers;
+        this.directory = directory;
+        this.settings = settings;
+        this.tls = tls;
+        this.interceptor = interceptor;
+        this.timeouts = timeouts;
+    }
+
+    /** The cluster's connection, following its registered nodes. */
+    public ClusterConnection cluster(UUID clusterId) {
+        ClusterSpec spec = specFor(clusterId);
+        Held held = clusters.compute(clusterId, (id, existing) -> {
+            if (existing == null) {
+                return new Held(drivers.connect(request(id, spec)), spec);
+            }
+            if (!existing.spec().equals(spec)) {
+                existing.connection().reconfigure(spec);
+                return new Held(existing.connection(), spec);
+            }
+            return existing;
+        });
+        return held.connection();
+    }
+
+    /**
+     * A connection to addresses that are not registered nodes, with a cluster's credentials and TLS.
+     * Each node's id is its management URL. Close it when done.
+     */
+    public ClusterConnection probe(UUID clusterId, List<String> managementUrls) {
+        List<NodeSpec> nodes = managementUrls.stream()
+                .map(url -> new NodeSpec(NodeId.of(url), List.of(new Endpoint(Plane.MANAGEMENT, JOLOKIA, url))))
+                .toList();
+        return drivers.connect(request(clusterId, ClusterSpec.ofNodes(nodes)));
+    }
+
+    /** As {@link #probe(UUID, List)}, with credentials and TLS given before the cluster exists. */
+    public ClusterConnection probe(BrokerConnectionSettings with, List<String> managementUrls) {
+        List<NodeSpec> nodes = managementUrls.stream()
+                .map(url -> new NodeSpec(NodeId.of(url), List.of(new Endpoint(Plane.MANAGEMENT, JOLOKIA, url))))
+                .toList();
+        CredentialSource credentials =
+                plane -> with.hasCredentials() ? Credentials.of(with.username(), with.password()) : Credentials.none();
+        return drivers.connect(
+                new ConnectRequest(SYSTEM, ClusterSpec.ofNodes(nodes), credentials, options(tls.forCluster(with))));
+    }
+
+    /** Closes a cluster's connection: it was removed, or this replica no longer owns it. */
+    public void forget(UUID clusterId) {
+        Held held = clusters.remove(clusterId);
+        if (held != null) {
+            held.connection().close();
+        }
+    }
+
+    @Override
+    public void destroy() {
+        clusters.keySet().forEach(this::forget);
+    }
+
+    /** The registered node an SDK node id names. */
+    public static UUID nodeOf(NodeId node) {
+        return UUID.fromString(node.value());
+    }
+
+    public static NodeId idOf(UUID node) {
+        return NodeId.of(node.toString());
+    }
+
+    private ClusterSpec specFor(UUID clusterId) {
+        List<NodeSpec> nodes = new ArrayList<>();
+        for (NodeDirectory.KnownNode n : directory.nodes()) {
+            if (!Objects.equals(n.clusterId(), clusterId)) {
+                continue;
+            }
+            List<Endpoint> endpoints = new ArrayList<>();
+            if (n.jolokiaUrl() != null) {
+                endpoints.add(new Endpoint(Plane.MANAGEMENT, JOLOKIA, n.jolokiaUrl()));
+            }
+            String core = CoreUrl.dialable(n.coreUrl());
+            if (core != null) {
+                endpoints.add(new Endpoint(Plane.DATA, CORE, core));
+            }
+            nodes.add(new NodeSpec(idOf(n.id()), endpoints));
+        }
+        return ClusterSpec.ofNodes(nodes);
+    }
+
+    private ConnectRequest request(UUID clusterId, ClusterSpec spec) {
+        CredentialSource credentials = plane -> switch (plane) {
+            case MANAGEMENT -> {
+                BrokerConnectionSettings s = settings.jolokiaSettings(clusterId);
+                yield s.hasCredentials() ? Credentials.of(s.username(), s.password()) : Credentials.none();
+            }
+            case DATA -> {
+                CoreConnectionSettings s = settings.coreSettings(clusterId);
+                yield s.hasCredentials() ? Credentials.of(s.username(), s.password()) : Credentials.none();
+            }
+        };
+        return new ConnectRequest(
+                SYSTEM, spec, credentials, options(tls.forCluster(settings.jolokiaSettings(clusterId))));
+    }
+
+    private ConnectOptions options(TlsProvider clusterTls) {
+        return ConnectOptions.defaults()
+                .withInterceptor(interceptor)
+                .withTls(clusterTls)
+                .withClock(Clock.systemUTC())
+                .withContextPropagation(UnaryOperator.identity())
+                .withTimeouts(timeouts);
+    }
+}
