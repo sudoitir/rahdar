@@ -21,18 +21,18 @@ export function useRecentNotes(clusterId: string) {
   });
 }
 
-export function useQueueNotes(clusterId: string, queue: string) {
+export function useSubscriptionNotes(clusterId: string, subscription: string) {
   return useQuery({
-    queryKey: notesKey(clusterId, 'queue', queue),
-    queryFn: () => request<Note[]>(pluginApi(ID, `queues/${encodeURIComponent(queue)}/notes`, clusterId)),
+    queryKey: notesKey(clusterId, 'subscription', subscription),
+    queryFn: () => request<Note[]>(pluginApi(ID, `queues/${encodeURIComponent(subscription)}/notes`, clusterId)),
   });
 }
 
-export function useAddNote(clusterId: string, queue: string) {
+export function useAddNote(clusterId: string, subscription: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (body: string) =>
-      request<Note>(pluginApi(ID, `queues/${encodeURIComponent(queue)}/notes`, clusterId), {
+      request<Note>(pluginApi(ID, `queues/${encodeURIComponent(subscription)}/notes`, clusterId), {
         method: 'POST',
         body: JSON.stringify({ body }),
       }),

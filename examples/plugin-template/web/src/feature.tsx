@@ -24,13 +24,13 @@ export default definePlugin({
   routes: { cluster: [notesRoute] },
   nav: [{ group: 'messaging', order: 90, label: 'Notes', icon: IconNotes, path: pluginPath(ID), permission: `${ID}:read` }],
   slots: {
-    // In every queue's detail drawer.
-    'queue.detail.panels': [
+    // In every subscription's detail drawer.
+    'subscription.detail.panels': [
       {
-        id: `${ID}.queue-notes`,
+        id: `${ID}.subscription-notes`,
         order: 90,
         title: 'Notes',
-        Component: ({ clusterId, queueName }) => <NotesList clusterId={clusterId} queue={queueName} />,
+        Component: ({ clusterId, subscription }) => <NotesList clusterId={clusterId} subscription={subscription.name} />,
       },
     ],
   },

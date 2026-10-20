@@ -308,7 +308,7 @@ and each plugin starts on its own, within a time limit.
 
 Start from the template:
 [`examples/plugin-template`](https://github.com/sudoitir/rahdar/tree/main/examples/plugin-template).
-It is a complete plugin, **Notes**, notes operators leave on queues, with every kind of contribution:
+It is a complete plugin, **Notes**, notes operators leave on subscriptions, with every kind of contribution:
 
 - an entity in its own schema, with a reversible changelog
 - an audited service
@@ -316,7 +316,7 @@ It is a complete plugin, **Notes**, notes operators leave on queues, with every 
 - an assistant tool
 - a setting and a background job
 - a metric with a default alert rule
-- a page in every cluster, a navigation entry, a panel in every queue's details, and live updates
+- a page in every cluster, a navigation entry, a panel in every subscription's details, and live updates
 
 ```bash
 mvn verify
@@ -901,7 +901,7 @@ Rahdar refuses a plugin built for contract 12 with "built for extension contract
 - **Destructive confirmations are held, not typed.** `ConfirmByTyping` and `ConfirmDialog`'s `typedName` are
   gone from the SDK. A `ConfirmDialog` with `tone="danger"` is confirmed by pressing and holding its button,
   and `HoldToConfirm` is exported for a confirmation outside a dialog. Name the action and its count in the
-  label (`Delete 37 queues`). A UI test holds the button (mouse down, wait the hold, mouse up) instead of
+  label (`Delete 37 subscriptions`). A UI test holds the button (mouse down, wait the hold, mouse up) instead of
   typing a name.
 - **Administration and Settings are links, not tabs.** A section is `role="link"` with
   `aria-current="page"` in a navigation named after the page, and its content is a group named by the
@@ -952,7 +952,7 @@ extension contract 10", so rebuild it and set `<rahdar.contract>11</rahdar.contr
 - Scheduled work that acts for a user is published as `OwnerWork`, naming the permissions and resources
   it needs. Rahdar refuses the publish naming each missing one, checks again before every run, and
   suspends the work with the reason when the owner loses one.
-- In the UI, `useCan().can(permission, { clusterId, kind, name })` answers for one queue or address, and
+- In the UI, `useCan().can(permission, { clusterId, type, name })` answers for one subscription or destination, and
   adding the row's `allowedActions` answers with no request.
 
 ### Moving a plugin from contract 9 to 10
@@ -1005,9 +1005,9 @@ name, or through a share. Check it the way Rahdar does, so your answers are exac
   included. Filter before you sort, page and count, so a total never counts what the caller cannot see.
   `everything()` is true for a caller who reads the whole cluster, so they pay nothing for it.
 
-In the UI, `useCan().can('acme-notes:write', { clusterId, kind: 'queue', name })` answers for one queue or
-address, and `allowedActions` on a row you already fetched answers with no request:
-`can('acme-notes:write', { clusterId, kind: 'queue', name, allowedActions: row.allowedActions })`.
+In the UI, `useCan().can('acme-notes:write', { clusterId, type: 'subscription', name })` answers for one
+subscription or destination, and `allowedActions` on a row you already fetched answers with no request:
+`can('acme-notes:write', { clusterId, type: 'subscription', name, allowedActions: row.allowedActions })`.
 `can(permission, clusterId)` is about the cluster as a whole, which a team's rights never reach.
 
 ### Work that runs later as its owner

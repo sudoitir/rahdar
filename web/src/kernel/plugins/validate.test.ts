@@ -26,7 +26,7 @@ describe('checkPlugin', () => {
           'settings.sections': [
             { id: 'acme-notes.settings', order: 1, title: 'Notes', group: 'cluster', Component: Panel },
           ],
-          'queue.actions': [{ id: 'acme-notes.annotate', order: 1, section: 'operate', Component: Panel }],
+          'subscription.actions': [{ id: 'acme-notes.annotate', order: 1, section: 'operate', Component: Panel }],
           'admin.tabs': [
             { id: 'acme-notes.policy', order: 1, title: 'Note policy', group: 'governance', Component: Panel },
           ],
@@ -36,7 +36,7 @@ describe('checkPlugin', () => {
     expect(checked.ok).toBe(true);
     if (!checked.ok) return;
     // A row action is kept, in its section, and guarded like any other contribution.
-    const action = checked.feature.slots?.['queue.actions']?.[0];
+    const action = checked.feature.slots?.['subscription.actions']?.[0];
     expect(action?.section).toBe('operate');
     expect(action?.Component).not.toBe(Panel);
     const section = checked.feature.slots?.['settings.sections']?.[0];
@@ -58,7 +58,7 @@ describe('checkPlugin', () => {
       }),
       /outside p\/acme-notes/,
     ],
-    ['an undeclared topic', plugin({ streamTopics: { queues: () => {} } }), /never declared/],
+    ['an undeclared topic', plugin({ streamTopics: { subscriptions: () => {} } }), /never declared/],
     [
       'a slot id outside its namespace',
       plugin({ slots: { 'shell.header': [{ id: 'banner', order: 0, Component: Panel }] } }),
@@ -66,12 +66,12 @@ describe('checkPlugin', () => {
     ],
     [
       'a contribution to a built-in link',
-      plugin({ slots: { 'queue.link': [{ id: 'acme-notes.link', order: 0, Component: Panel }] } }),
+      plugin({ slots: { 'subscription.link': [{ id: 'acme-notes.link', order: 0, Component: Panel }] } }),
       /links to built-in resources are Rahdar's own/,
     ],
     [
       'a row action with no section',
-      plugin({ slots: { 'queue.actions': [{ id: 'acme-notes.note', order: 0, Component: Panel }] } }),
+      plugin({ slots: { 'subscription.actions': [{ id: 'acme-notes.note', order: 0, Component: Panel }] } }),
       /names no menu section/,
     ],
     [

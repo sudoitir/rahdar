@@ -83,7 +83,7 @@ function contributionProblem(
 function checkSlots(id: string, feature: RahdarFeature): { slots: SlotContributions } | { reason: string } {
   const slots: SlotContributions = {};
   for (const [name, contributions] of Object.entries(feature.slots ?? {}) as [SlotName, SlotContribution<never>[]][]) {
-    // Where a resource name links to is Rahdar's own: a plugin that could redirect every queue
+    // Where a resource name links to is Rahdar's own: a plugin that could redirect every subscription
     // link would be a phishing surface inside the console (ADR-0107).
     if (name.endsWith('.link')) {
       return { reason: `it contributes to ${name}, and links to built-in resources are Rahdar's own` };
