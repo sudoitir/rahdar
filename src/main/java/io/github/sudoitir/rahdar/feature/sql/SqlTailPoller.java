@@ -224,7 +224,7 @@ public class SqlTailPoller {
          * poll does not send it a second time.
          */
         public void seen(Row row) {
-            advance(key(row.nodeId(), row.queueName()), row);
+            advance(key(row.nodeId(), row.subscription()), row);
         }
 
         private boolean cancelled() {
@@ -242,7 +242,7 @@ public class SqlTailPoller {
         }
 
         private boolean isNew(Row row) {
-            Mark mark = marks.get(key(row.nodeId(), row.queueName()));
+            Mark mark = marks.get(key(row.nodeId(), row.subscription()));
             if (mark == null) {
                 return true;
             }
@@ -412,7 +412,7 @@ public class SqlTailPoller {
     }
 
     private static String key(Target target) {
-        return key(target.nodeId(), target.queueName());
+        return key(target.nodeId(), target.subscription());
     }
 
     private static String key(UUID nodeId, String queueName) {
@@ -433,7 +433,7 @@ public class SqlTailPoller {
             if (!tail.isNew(row)) {
                 return;
             }
-            tail.advance(key(row.nodeId(), row.queueName()), row);
+            tail.advance(key(row.nodeId(), row.subscription()), row);
             tail.shown.incrementAndGet();
             tail.listener.row(row);
         }

@@ -417,11 +417,12 @@ class IndexQueryExecutorTest extends PostgresIntegrationTest {
         seedShapes();
 
         // Each column resolves to a real message_index column: a wrong mapping is a SQL error, not a short list.
-        assertThat(ids("queue = 'ORDER.IN' AND address = 'ORDER.IN' AND node = 'primary' AND messageId IS NOT NULL"
-                        + " AND durable = true AND timestamp > 0 AND expiration = 0 AND size > 0 AND jmsType IS NULL"
-                        + " AND groupId IS NULL AND userId IS NULL AND messageType = 3 AND replyTo IS NULL"
-                        + " AND body LIKE 'body%' AND observedAt IS NOT NULL AND lastSeenAt IS NOT NULL"
-                        + " AND origin = 'SAMPLED' AND origAddress IS NULL AND sourceMessageId IS NULL"))
+        assertThat(ids(
+                        "subscription = 'ORDER.IN' AND destination = 'ORDER.IN' AND node = 'primary' AND messageId IS NOT NULL"
+                                + " AND durable = true AND timestamp > 0 AND expiration = 0 AND size > 0 AND jmsType IS NULL"
+                                + " AND groupId IS NULL AND userId IS NULL AND messageType = 3 AND replyTo IS NULL"
+                                + " AND body LIKE 'body%' AND observedAt IS NOT NULL AND lastSeenAt IS NOT NULL"
+                                + " AND origin = 'SAMPLED' AND orig_destination IS NULL AND sourceMessageId IS NULL"))
                 .containsExactly(1L, 2L, 3L);
     }
 
@@ -507,7 +508,7 @@ class IndexQueryExecutorTest extends PostgresIntegrationTest {
 
         assertThat(result.rows()).hasSize(3);
         assertThat(result.nodes())
-                .extracting(NodeOutcome::queueName, NodeOutcome::matched, NodeOutcome::status)
+                .extracting(NodeOutcome::subscription, NodeOutcome::matched, NodeOutcome::status)
                 .containsExactly(
                         Assertions.tuple("ORDER.IN", 2L, NodeOutcome.Status.ANSWERED),
                         Assertions.tuple("ORDER.OUT", 1L, NodeOutcome.Status.ANSWERED),

@@ -6,6 +6,7 @@ import { useNavigate, useParams, useSearch } from '@tanstack/react-router';
 import { CapabilityLedger, useCluster } from '../clusters/index.ts';
 import { useQueues } from '../queues/index.ts';
 import { MessageDetailPanel } from '../messages/index.ts';
+import { resourceName } from '../../kernel/api/resourceId.ts';
 import { useCan } from '../../kernel/auth/useCan.ts';
 import type { ApiError } from '../../kernel/api/request.ts';
 import { gateFor } from '../../ui/capabilityGate.ts';
@@ -240,7 +241,7 @@ export function SqlConsoleView() {
           an empty message. */}
       <MessageDetailPanel
         clusterId={clusterId}
-        queueName={openRow?.queueName ?? ''}
+        queueName={openRow ? resourceName(openRow.subscription) : ''}
         messageId={openRow ? String(openRow.messageId) : null}
         node={openRow?.nodeId}
         onClose={() => setOpenRow(null)}

@@ -339,7 +339,7 @@ class CaptureReconcilerTest {
         MessageIndexSubscriptionEntity entity = new MessageIndexSubscriptionEntity();
         entity.setId(SUBSCRIPTION);
         entity.setClusterId(CLUSTER);
-        entity.setQueuePattern("ORDER.IN");
+        entity.setSubscriptionPattern("ORDER.IN");
         entity.setMode(CaptureMode.CAPTURE);
         entity.setRingSize(10_000);
         entity.setMaxRate(500);

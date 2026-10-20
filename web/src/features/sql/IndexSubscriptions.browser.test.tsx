@@ -26,7 +26,7 @@ afterAll(() => onlineManager.setOnline(true));
 
 const subscription = (over: Record<string, unknown> = {}) => ({
   id: 's1',
-  queuePattern: 'ORDER.IN',
+  subscriptionPattern: 'ORDER.IN',
   retentionDays: 7,
   intervalMs: 5000,
   captureFrom: '2026-09-01T09:00:00Z',
@@ -44,7 +44,7 @@ const SUBSCRIPTIONS = [
   subscription(),
   subscription({
     id: 's2',
-    queuePattern: 'PAYMENT.#',
+    subscriptionPattern: 'PAYMENT.#',
     mode: 'CAPTURE',
     enabled: false,
     maxBytes: 536_870_912,

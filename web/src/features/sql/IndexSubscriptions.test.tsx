@@ -19,7 +19,7 @@ const { IndexSubscriptions } = await import('./IndexSubscriptions.tsx');
 function subscription(over: Record<string, unknown> = {}) {
   return {
     id: 's1',
-    queuePattern: 'ORDER.IN',
+    subscriptionPattern: 'ORDER.IN',
     retentionDays: 7,
     intervalMs: 5000,
     captureFrom: '2026-09-01T09:00:00Z',
@@ -223,7 +223,7 @@ describe('IndexSubscriptions', () => {
       http.post('*/api/v1/clusters/c1/sql/index', ({ request }) => {
         if (new URL(request.url).searchParams.get('dryRun') === 'true') {
           return HttpResponse.json({
-            addresses: ['ORDER.IN'],
+            destinations: ['artemis.address/ORDER.IN'],
             nodes: ['primary'],
             ringMessages: 10000,
             ringBytes: 67_108_864,
@@ -270,7 +270,7 @@ describe('IndexSubscriptions', () => {
       http.get('*/api/v1/clusters/c1/sql/index', () => HttpResponse.json(paged([]))),
       http.post('*/api/v1/clusters/c1/sql/index', () =>
         HttpResponse.json({
-          addresses: [],
+          destinations: [],
           nodes: ['primary'],
           ringMessages: 10000,
           ringBytes: 1024,
@@ -463,7 +463,7 @@ describe('IndexSubscriptions rows', () => {
   it('keeps the switch and delete visible but disabled without the permission the subscription needs', async () => {
     // Sampling is settings:write; capture is its own authority, capture:write.
     grants(['capture:write']);
-    listing([subscription(), subscription({ id: 's2', queuePattern: 'PAY.IN', mode: 'CAPTURE', nodes: [] })]);
+    listing([subscription(), subscription({ id: 's2', subscriptionPattern: 'PAY.IN', mode: 'CAPTURE', nodes: [] })]);
     renderWithProviders(<IndexSubscriptions />);
 
     const sampled = (await screen.findByText('ORDER.IN')).closest('tr')!;
@@ -579,7 +579,7 @@ describe('IndexSubscriptions sampling form', () => {
 
     await waitFor(() => expect(bodies).toHaveLength(1));
     expect(bodies[0]).toEqual({
-      queuePattern: 'ORDER.IN',
+      subscriptionPattern: 'ORDER.IN',
       retentionDays: 7,
       intervalMs: 5000,
       enabled: true,
@@ -665,7 +665,7 @@ describe('IndexSubscriptions sampling form', () => {
 
 describe('IndexSubscriptions capture form', () => {
   const previewBody = {
-    addresses: ['ORDER.IN', 'ORDER.OUT'],
+    destinations: ['artemis.address/ORDER.IN', 'artemis.address/ORDER.OUT'],
     nodes: ['primary', 'backup'],
     ringMessages: 10000,
     ringBytes: 500,
@@ -704,7 +704,7 @@ describe('IndexSubscriptions capture form', () => {
 
     await waitFor(() => expect(bodies).toHaveLength(1));
     expect(bodies[0]).toEqual({
-      queuePattern: 'ORDER.#',
+      subscriptionPattern: 'ORDER.#',
       retentionDays: 7,
       intervalMs: 5000,
       enabled: true,
@@ -737,7 +737,12 @@ describe('IndexSubscriptions capture form', () => {
     server.use(
       http.post('*/api/v1/clusters/c1/sql/index', async ({ request }) => {
         bodies.push(await request.json());
-        return HttpResponse.json({ ...previewBody, addresses: ['ORDER.IN'], nodes: ['primary'], brokerXml: null });
+        return HttpResponse.json({
+          ...previewBody,
+          destinations: ['artemis.address/ORDER.IN'],
+          nodes: ['primary'],
+          brokerXml: null,
+        });
       }),
     );
     const user = userEvent.setup();
@@ -749,7 +754,7 @@ describe('IndexSubscriptions capture form', () => {
 
     await waitFor(() => expect(bodies).toHaveLength(1));
     expect(bodies[0]).toEqual({
-      queuePattern: 'ORDER.IN',
+      subscriptionPattern: 'ORDER.IN',
       retentionDays: 7,
       intervalMs: 5000,
       enabled: true,

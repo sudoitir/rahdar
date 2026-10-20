@@ -68,7 +68,7 @@ public class MessageIndexService {
 
     /** What creating a capture subscription would do on the broker, resolved without changing anything. */
     public record Preview(
-            List<String> addresses,
+            List<String> destinations,
             List<String> nodes,
             long ringMessages,
             long ringBytes,
@@ -78,17 +78,17 @@ public class MessageIndexService {
 
     /**
      * The dry run of {@link #create} for a capture subscription (message-capture spec): the same
-     * permission and the same validation, then what it resolves to — addresses, target nodes,
+     * permission and the same validation, then what it resolves to — destinations, target nodes,
      * bounds and broker objects — with nothing saved and no broker contacted.
      */
     @Transactional(readOnly = true)
     public Preview preview(UUID clusterId, Spec spec) {
-        String pattern = validPattern(spec.queuePattern());
+        String pattern = validPattern(spec.subscriptionPattern());
         clusterAccess.requireOnAll(clusterId, ResourceType.SUBSCRIPTION, pattern, SqlPermissions.CAPTURE_WRITE);
         MessageIndexSubscriptionEntity draft = new MessageIndexSubscriptionEntity();
         draft.setId(Ids.v7());
         draft.setClusterId(clusterId);
-        draft.setQueuePattern(pattern);
+        draft.setSubscriptionPattern(pattern);
         draft.setMode(CaptureMode.CAPTURE);
         if (spec.retentionDays() != null) {
             draft.setRetentionDays(validRetention(spec.retentionDays()));
@@ -169,7 +169,7 @@ public class MessageIndexService {
 
     /** The bounds and mode a subscription is created or changed with. Null means "leave it". */
     public record Spec(
-            String queuePattern,
+            String subscriptionPattern,
             Long intervalMs,
             Integer retentionDays,
             Boolean enabled,
@@ -192,13 +192,13 @@ public class MessageIndexService {
     @Transactional
     public Subscription create(UUID clusterId, Spec spec) {
         CaptureMode mode = spec.mode() == null ? CaptureMode.SAMPLE : spec.mode();
-        String pattern = validPattern(spec.queuePattern());
+        String pattern = validPattern(spec.subscriptionPattern());
         requireMayChange(clusterId, mode, pattern);
 
         MessageIndexSubscriptionEntity entity = new MessageIndexSubscriptionEntity();
         entity.setId(Ids.v7());
         entity.setClusterId(clusterId);
-        entity.setQueuePattern(pattern);
+        entity.setSubscriptionPattern(pattern);
         entity.setIntervalMs(spec.intervalMs() == null ? 5000L : validInterval(spec.intervalMs()));
         entity.setRetentionDays(
                 spec.retentionDays() == null
@@ -212,7 +212,7 @@ public class MessageIndexService {
         applyBounds(entity, spec);
 
         Map<String, Object> params = new LinkedHashMap<>();
-        params.put("queuePattern", pattern);
+        params.put("subscriptionPattern", pattern);
         params.put("mode", mode.name());
         params.put(INTERVAL_MS, entity.getIntervalMs());
         params.put(RETENTION_DAYS, entity.getRetentionDays());
@@ -251,7 +251,7 @@ public class MessageIndexService {
                 target == CaptureMode.CAPTURE || entity.getMode() == CaptureMode.CAPTURE
                         ? CaptureMode.CAPTURE
                         : CaptureMode.SAMPLE,
-                entity.getQueuePattern());
+                entity.getSubscriptionPattern());
 
         Map<String, Object> before = bounds(entity);
         CaptureMode modeBefore = entity.getMode();
@@ -266,7 +266,7 @@ public class MessageIndexService {
                 actorResolver.resolve(),
                 "sql.index.update",
                 CLUSTER,
-                entity.getQueuePattern(),
+                entity.getSubscriptionPattern(),
                 clusterId,
                 null,
                 params,
@@ -327,17 +327,17 @@ public class MessageIndexService {
         if (!readable(clusterId, entity)) {
             throw new NotFoundException("Index subscription", id);
         }
-        requireMayChange(clusterId, entity.getMode(), entity.getQueuePattern());
+        requireMayChange(clusterId, entity.getMode(), entity.getSubscriptionPattern());
         Footprint before = footprint(entity);
 
         AuditEvent event = audit.begin(
                 actorResolver.resolve(),
                 "sql.index.delete",
                 CLUSTER,
-                entity.getQueuePattern(),
+                entity.getSubscriptionPattern(),
                 clusterId,
                 null,
-                Map.of("queuePattern", entity.getQueuePattern(), "capturedMessages", before.messages()),
+                Map.of("subscriptionPattern", entity.getSubscriptionPattern(), "capturedMessages", before.messages()),
                 false);
         try {
             // Recording stops before any row is deleted, so nothing captured after the operator's
@@ -379,7 +379,10 @@ public class MessageIndexService {
     /** A subscription is seen by a caller who may read every message it indexes. */
     private boolean readable(UUID clusterId, MessageIndexSubscriptionEntity subscription) {
         return clusterAccess.mayOnAll(
-                clusterId, ResourceType.SUBSCRIPTION, subscription.getQueuePattern(), MessagePermissions.MESSAGE_READ);
+                clusterId,
+                ResourceType.SUBSCRIPTION,
+                subscription.getSubscriptionPattern(),
+                MessagePermissions.MESSAGE_READ);
     }
 
     /** The largest capture queue, in messages (ADR-0079). The byte bound on the broker is the other half. */
@@ -392,8 +395,8 @@ public class MessageIndexService {
     /** Why a capture cannot start, or null when nothing stands in its way. */
     private String refusal(List<String> addresses, MessageIndexSubscriptionEntity draft) {
         if (addresses.isEmpty()) {
-            return "The pattern '" + draft.getQueuePattern() + "' matches no address on this cluster, so nothing would"
-                    + " be captured.";
+            return "The pattern '" + draft.getSubscriptionPattern()
+                    + "' matches no address on this cluster, so nothing would" + " be captured.";
         }
         String role = captureProperties.brokerRole();
         if (role == null || role.isBlank()) {
@@ -535,7 +538,7 @@ public class MessageIndexService {
         return snapshots.forCluster(subscription.getClusterId()).stream()
                 .map(QueueSnapshot::queueName)
                 .distinct()
-                .filter(q -> QueueNamePattern.matches(subscription.getQueuePattern(), q))
+                .filter(q -> QueueNamePattern.matches(subscription.getSubscriptionPattern(), q))
                 .toList();
     }
 

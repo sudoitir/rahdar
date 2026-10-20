@@ -88,15 +88,16 @@ public class MessageIndexWriter {
         GovernedMessage governed = governance.forStorage(clusterId, row);
         return new Stored(
                 governed,
-                sealer.seal(aad(clusterId, row.nodeId(), row.queueName(), row.messageId()), governed.sealable()));
+                sealer.seal(aad(clusterId, row.nodeId(), row.subscription(), row.messageId()), governed.sealable()));
     }
 
     /** Record one observation. Returns true when it was a message the index had not held. */
     public boolean observe(UUID clusterId, Row row, Instant at) {
-        int updated = jdbc.update("""
+        int updated =
+                jdbc.update("""
                 UPDATE message_index SET last_seen_at = ?
                  WHERE cluster_id = ? AND node_id = ? AND subscription = ? AND message_id = ?
-                """, Timestamp.from(at), clusterId, row.nodeId(), row.queueName(), row.messageId());
+                """, Timestamp.from(at), clusterId, row.nodeId(), row.subscription(), row.messageId());
         if (updated > 0) {
             return false;
         }
@@ -114,8 +115,8 @@ public class MessageIndexWriter {
                 row.size(),
                 row.priority(),
                 row.messageType(),
-                row.queueName(),
-                row.address(),
+                row.subscription(),
+                row.destination(),
                 row.nodeName(),
                 governed.headers().get("correlationId"),
                 governed.headers().get("groupId"),
@@ -188,8 +189,8 @@ public class MessageIndexWriter {
                     statement.setObject(++i, captured.sourceMessageId());
                     statement.setInt(++i, row.priority());
                     statement.setInt(++i, row.messageType());
-                    statement.setString(++i, row.queueName());
-                    statement.setString(++i, row.address());
+                    statement.setString(++i, row.subscription());
+                    statement.setString(++i, row.destination());
                     statement.setString(++i, row.nodeName());
                     statement.setString(++i, governed.headers().get("correlationId"));
                     statement.setString(++i, governed.headers().get("groupId"));
@@ -208,7 +209,7 @@ public class MessageIndexWriter {
                     statement.setInt(++i, governed.policyVersion());
                     statement.setObject(++i, entry.stored().sealed(), Types.BINARY);
                     statement.setObject(++i, captured.clusterId());
-                    statement.setString(++i, row.queueName());
+                    statement.setString(++i, row.subscription());
                     statement.setObject(++i, row.nodeId());
                     statement.setLong(++i, row.messageId());
                     statement.setTimestamp(++i, Timestamp.from(captured.at().minus(REDELIVERY_WINDOW)));

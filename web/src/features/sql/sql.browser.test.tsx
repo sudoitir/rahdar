@@ -40,8 +40,8 @@ const BAD = 'SELECT * FROM "ORDER.IN" JOIN "ORDER.OUT"';
 const target = (nodeId: string, nodeName: string) => ({
   nodeId,
   nodeName,
-  queueName: 'ORDER.IN',
-  address: 'ORDER.IN',
+  subscription: 'artemis.queue/ORDER.IN',
+  destination: 'artemis.address/ORDER.IN',
   messageCount: 1200,
 });
 
@@ -62,8 +62,8 @@ const plan = (over: Record<string, unknown> = {}) => ({
 const row = (messageId: number, source = 'BROKER') => ({
   nodeId: `n${(messageId % 2) + 1}`,
   nodeName: `broker-${(messageId % 2) + 1}`,
-  queueName: 'ORDER.IN',
-  address: 'ORDER.IN',
+  subscription: 'artemis.queue/ORDER.IN',
+  destination: 'artemis.address/ORDER.IN',
   messageId,
   messageType: 3,
   durable: true,
@@ -82,7 +82,7 @@ const row = (messageId: number, source = 'BROKER') => ({
 const node = (nodeId: string, nodeName: string, over: Record<string, unknown> = {}) => ({
   nodeId,
   nodeName,
-  queueName: 'ORDER.IN',
+  subscription: 'artemis.queue/ORDER.IN',
   status: 'ANSWERED',
   examined: 500,
   matched: 1,

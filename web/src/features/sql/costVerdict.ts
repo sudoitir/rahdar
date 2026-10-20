@@ -53,7 +53,7 @@ function failed(error: ApiError): CostVerdict {
 /** What a plan costs, worked out from the plan alone. */
 function planned(plan: SqlPlanView): CostVerdict {
   const targets = plan.targets ?? [];
-  const queues = new Set(targets.map((t) => t.queueName)).size;
+  const queues = new Set(targets.map((t) => t.subscription)).size;
   const nodes = new Set(targets.map((t) => t.nodeId)).size;
   if (targets.length === 0) {
     return { badge: 'No cost', tone: 'neutral', sentence: 'Reads nothing: no queue matches the FROM pattern.' };

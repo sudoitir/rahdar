@@ -37,7 +37,7 @@ public class CaptureRrSink implements CaptureBus.Listener {
 
     private final CaptureBus bus;
     private final RrExpectationRepository expectations;
-    private final ReplyAddressResolver replyAddresses;
+    private final ReplyDestinationResolver replyDestinations;
     private final ObjectProvider<RrObservationSink> sink;
 
     @PostConstruct
@@ -63,12 +63,12 @@ public class CaptureRrSink implements CaptureBus.Listener {
     }
 
     private Observation observationFor(CaptureBus.Captured captured, Row row, RrExpectationEntity expectation) {
-        if (expectation.getRequestAddress().equals(row.address())) {
+        if (expectation.getRequestDestination().equals(row.destination())) {
             return new Observation.RequestSeen(
                     captured.clusterId(),
                     row.nodeId(),
                     Instant.now(),
-                    row.address(),
+                    row.destination(),
                     String.valueOf(row.messageId()),
                     correlationOf(row),
                     row.replyTo() == null ? null : CoreDestinationName.extract(row.replyTo()),
@@ -77,12 +77,12 @@ public class CaptureRrSink implements CaptureBus.Listener {
                     Map.of(),
                     enqueuedAt(row));
         }
-        if (row.address() != null && replyAddresses.matches(expectation, row.address())) {
+        if (row.destination() != null && replyDestinations.matches(expectation, row.destination())) {
             return new Observation.ReplySeen(
                     captured.clusterId(),
                     row.nodeId(),
                     Instant.now(),
-                    row.address(),
+                    row.destination(),
                     String.valueOf(row.messageId()),
                     correlationOf(row),
                     row.body(),

@@ -44,7 +44,7 @@ class CaptureLossTest {
         subscription = new MessageIndexSubscriptionEntity();
         subscription.setId(UUID.randomUUID());
         subscription.setClusterId(CLUSTER);
-        subscription.setQueuePattern("ORDERS");
+        subscription.setSubscriptionPattern("ORDERS");
         subscription.setMode(CaptureMode.CAPTURE);
         subscription.setEnabled(true);
         subscription.setRetentionDays(7);

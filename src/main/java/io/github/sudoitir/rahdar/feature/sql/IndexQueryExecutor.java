@@ -82,7 +82,7 @@ public class IndexQueryExecutor {
         binds.add(clusterId);
 
         List<String> queues =
-                plan.targets().stream().map(Target::queueName).distinct().toList();
+                plan.targets().stream().map(Target::subscription).distinct().toList();
         if (!queues.isEmpty()) {
             sql.append(" AND subscription IN (")
                     .append(String.join(", ", Collections.nCopies(queues.size(), "?")))
@@ -116,7 +116,7 @@ public class IndexQueryExecutor {
 
         // Resolved on the caller's thread. Only a caller with clear access has stored originals unsealed; everyone
         // else reads the masked stored row, which the console governs again under the current policy.
-        boolean clearAccess = governance.clearAccess(clusterId, plan.ast().queuePattern());
+        boolean clearAccess = governance.clearAccess(clusterId, plan.ast().subscriptionPattern());
         List<Row> rows = jdbc.query(sql.toString(), (rs, n) -> toRow(rs, clusterId, clearAccess), binds.toArray());
 
         List<Bound> bounds = new ArrayList<>();
@@ -132,14 +132,14 @@ public class IndexQueryExecutor {
         List<NodeOutcome> outcomes = new ArrayList<>();
         Map<String, Long> perQueue = new LinkedHashMap<>();
         for (Row row : rows) {
-            perQueue.merge(row.queueName(), 1L, Long::sum);
+            perQueue.merge(row.subscription(), 1L, Long::sum);
         }
         for (Target target : plan.targets()) {
-            long matched = perQueue.getOrDefault(target.queueName(), 0L);
+            long matched = perQueue.getOrDefault(target.subscription(), 0L);
             NodeOutcome outcome = new NodeOutcome(
                     target.nodeId(),
                     target.nodeName(),
-                    target.queueName(),
+                    target.subscription(),
                     NodeOutcome.Status.ANSWERED,
                     matched,
                     matched,
@@ -264,8 +264,8 @@ public class IndexQueryExecutor {
     private String columnName(Column column) {
         return switch (column) {
             case MESSAGE_ID -> "message_id";
-            case QUEUE -> "subscription";
-            case ADDRESS -> "destination";
+            case SUBSCRIPTION -> "subscription";
+            case DESTINATION -> "destination";
             case NODE -> "node_name";
             case PRIORITY -> "priority";
             case DURABLE -> "durable";
@@ -282,7 +282,7 @@ public class IndexQueryExecutor {
             case OBSERVED_AT -> "observed_at";
             case LAST_SEEN_AT -> "last_seen_at";
             case ORIGIN -> "origin";
-            case ORIG_ADDRESS -> "orig_destination";
+            case ORIG_DESTINATION -> "orig_destination";
             case SOURCE_MESSAGE_ID -> "source_message_id";
         };
     }
@@ -400,7 +400,7 @@ public class IndexQueryExecutor {
             return row;
         }
         Map<String, String> originals = sealer.unseal(
-                MessageIndexWriter.aad(clusterId, row.nodeId(), row.queueName(), row.messageId()), sealed);
+                MessageIndexWriter.aad(clusterId, row.nodeId(), row.subscription(), row.messageId()), sealed);
         return SqlGovernance.withContent(row, ContentSealer.restore(SqlGovernance.content(row), originals));
     }
 

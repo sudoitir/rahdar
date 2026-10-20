@@ -10,6 +10,7 @@ import io.github.sudoitir.rahdar.feature.sql.web.SqlViews.SqlQueryRequest;
 import io.github.sudoitir.rahdar.feature.sql.web.SqlViews.SqlQueryTicketView;
 import io.github.sudoitir.rahdar.feature.sql.web.SqlViews.VerifyRequest;
 import io.github.sudoitir.rahdar.feature.sql.web.SqlViews.VerifyView;
+import io.github.sudoitir.rahdar.kernel.security.ResourceIdTexts;
 import java.time.Instant;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -37,13 +38,14 @@ public class SqlController {
     private final SqlConsoleService console;
     private final MessageVerifier verifier;
     private final SqlViewMapper mapper;
+    private final ResourceIdTexts ids;
     private final SqlQueryTickets tickets;
 
     /** Parse, validate and cost a query without running it. */
     @PostMapping("/plan")
     public PlanView plan(@PathVariable UUID clusterId, @RequestBody SqlQueryRequest request) {
         QueryPlan plan = console.plan(clusterId, request.sql());
-        return mapper.toView(plan);
+        return mapper.toView(ids.of(clusterId), plan);
     }
 
     /**
@@ -69,7 +71,11 @@ public class SqlController {
     @PostMapping("/verify")
     public VerifyView verify(@PathVariable UUID clusterId, @RequestBody VerifyRequest request) {
         MessageVerifier.Verdict verdict = verifier.verify(
-                clusterId, request.nodeId(), request.queueName(), request.messageId(), request.timestamp());
+                clusterId,
+                request.nodeId(),
+                ResourceIdTexts.name(request.subscription()),
+                request.messageId(),
+                request.timestamp());
         return new VerifyView(verdict.presence().name(), verdict.detail());
     }
 }

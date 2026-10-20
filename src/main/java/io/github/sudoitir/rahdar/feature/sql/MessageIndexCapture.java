@@ -121,7 +121,11 @@ public class MessageIndexCapture {
                 // tell "nothing matched the pattern" from "nothing was on the queue".
                 String reason = e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
                 if (notCapturing.put(subscription.getId(), reason) == null) {
-                    log.warn("Index capture for {} is not running: {}", subscription.getQueuePattern(), reason, e);
+                    log.warn(
+                            "Index capture for {} is not running: {}",
+                            subscription.getSubscriptionPattern(),
+                            reason,
+                            e);
                 }
             }
         }
@@ -158,17 +162,17 @@ public class MessageIndexCapture {
         // Explicitly the broker source: the default source would resolve to the index
         // for a queue this very subscription covers, and capture would read from what
         // it is supposed to be filling.
-        QueryPlan plan =
-                planner.plan(clusterId, parser.parse("SELECT * FROM broker.\"" + subscription.getQueuePattern() + '"'));
+        QueryPlan plan = planner.plan(
+                clusterId, parser.parse("SELECT * FROM broker.\"" + subscription.getSubscriptionPattern() + '"'));
         if (plan.targets().isEmpty()) {
             notCapturing.put(
                     subscription.getId(),
-                    "the pattern '" + subscription.getQueuePattern()
+                    "the pattern '" + subscription.getSubscriptionPattern()
                             + "' matches no queue on any node of this cluster, so nothing is being indexed");
             return;
         }
         String fingerprint = plan.targets().stream()
-                .map(t -> t.nodeId() + "/" + t.queueName())
+                .map(t -> t.nodeId() + "/" + t.subscription())
                 .sorted()
                 .reduce((a, b) -> a + "," + b)
                 .orElse("");
@@ -191,7 +195,7 @@ public class MessageIndexCapture {
         notCapturing.remove(subscription.getId());
         log.info(
                 "Indexing {} on {} target(s), every {} ms",
-                subscription.getQueuePattern(),
+                subscription.getSubscriptionPattern(),
                 plan.targets().size(),
                 subscription.getIntervalMs());
     }
@@ -222,7 +226,7 @@ public class MessageIndexCapture {
         @Override
         public void nodeFinished(NodeOutcome outcome) {
             if (outcome.status() != NodeOutcome.Status.ANSWERED) {
-                log.debug("Index capture: {} did not answer for {}", outcome.nodeName(), outcome.queueName());
+                log.debug("Index capture: {} did not answer for {}", outcome.nodeName(), outcome.subscription());
             }
         }
 

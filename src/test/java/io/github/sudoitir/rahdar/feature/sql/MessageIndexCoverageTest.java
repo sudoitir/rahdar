@@ -48,7 +48,7 @@ class MessageIndexCoverageTest {
         MessageIndexSubscriptionEntity entity = new MessageIndexSubscriptionEntity();
         entity.setId(UUID.randomUUID());
         entity.setClusterId(CLUSTER);
-        entity.setQueuePattern(pattern);
+        entity.setSubscriptionPattern(pattern);
         entity.setCaptureFrom(captureFrom);
         entity.setRetentionDays(retentionDays);
         entity.setIntervalMs(5000);
@@ -297,7 +297,7 @@ class MessageIndexCoverageTest {
                 coverage.check(CLUSTER, ast("SELECT * FROM \"SUB.*\""), List.of(one, two, lone, noAddress));
 
         assertThat(notices)
-                .filteredOn(n -> n.kind() == Notice.Kind.ADDRESS_SCOPED_CAPTURE)
+                .filteredOn(n -> n.kind() == Notice.Kind.DESTINATION_SCOPED_CAPTURE)
                 .singleElement()
                 .satisfies(notice ->
                         assertThat(notice.detail()).isEqualTo("topic.a, topic.b have more than one queue bound."));
@@ -315,7 +315,7 @@ class MessageIndexCoverageTest {
                 .thenReturn(List.of(snapshot("SUB.ONE", "topic.a"), snapshot("SUB.ONE.B", "topic.a")));
 
         assertThat(coverage.check(CLUSTER, ast("SELECT * FROM \"SUB.*\""), List.of(one)))
-                .filteredOn(n -> n.kind() == Notice.Kind.ADDRESS_SCOPED_CAPTURE)
+                .filteredOn(n -> n.kind() == Notice.Kind.DESTINATION_SCOPED_CAPTURE)
                 .singleElement()
                 .satisfies(notice -> assertThat(notice.detail()).isEqualTo("topic.a has more than one queue bound."));
     }

@@ -115,10 +115,10 @@ Selector-eligible (free): `priority`, `durable`, `timestamp`, `expiration`,
 `size`, `jmsType`, `correlationId`, `groupId`, `userId`, and any application
 property as `props.<name>`.
 
-Target (free): `queue`, `address`, `node`.
+Target (free): `subscription`, `destination`, `node`.
 
 Scan: `body`, `messageId`, `messageType`, `replyTo`, and — on the index only —
-`observedAt`, `lastSeenAt`, `origin`, `origAddress` and `sourceMessageId`.
+`observedAt`, `lastSeenAt`, `origin`, `orig_destination` and `sourceMessageId`.
 
 Over the index, `MATCH (body) AGAINST ('terms')` is full-text search over stored
 bodies, served from a GIN index rather than scanned, and `ORDER BY match_rank`

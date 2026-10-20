@@ -64,19 +64,30 @@ public final class SqlViews {
             @Schema(description = "Everything true about this plan the operator has to be told.")
             List<NoticeView> notices) {}
 
-    public record TargetView(UUID nodeId, String nodeName, String queueName, String address, long messageCount) {}
+    public record TargetView(
+            UUID nodeId,
+            String nodeName,
+            @Schema(description = "The subscription's id.") String subscription,
+
+            @Schema(description = "The id of the destination the subscription is bound to.")
+            String destination,
+
+            long messageCount) {}
 
     @Schema(description = "Something true about a plan or result that changes how it should be read.")
     public record NoticeView(String kind, String detail) {}
 
     @Schema(description = "A message, and where it came from.")
     public record RowView(
-            @Schema(description = "The node holding the message. Identity is (node, queue, messageId).")
+            @Schema(description = "The node holding the message. Identity is (node, subscription, messageId).")
             UUID nodeId,
 
             String nodeName,
-            String queueName,
-            String address,
+            @Schema(description = "The subscription's id.") String subscription,
+
+            @Schema(description = "The id of the destination the subscription is bound to.")
+            String destination,
+
             long messageId,
             int messageType,
             boolean durable,
@@ -126,7 +137,7 @@ public final class SqlViews {
     public record SqlNodeOutcomeView(
             UUID nodeId,
             String nodeName,
-            String queueName,
+            @Schema(description = "The subscription's id.") String subscription,
 
             @Schema(description = "ANSWERED, FAILED or NOT_READ.")
             String status,
@@ -187,7 +198,7 @@ public final class SqlViews {
             RowView row, SqlNodeOutcomeView node, ResultView done, TailStatusView tail, ProblemDetail error) {}
 
     @Schema(description = "Which indexed row to look for on the live broker.")
-    public record VerifyRequest(UUID nodeId, String queueName, long messageId, long timestamp) {}
+    public record VerifyRequest(UUID nodeId, String subscription, long messageId, long timestamp) {}
 
     @Schema(description = "Whether an indexed row is still on the broker.")
     public record VerifyView(
@@ -202,7 +213,7 @@ public final class SqlViews {
 
     @Schema(description = "A request to start capturing a queue's messages into the index.")
     public record IndexSubscriptionRequest(
-            String queuePattern,
+            String subscriptionPattern,
             Integer retentionDays,
             Long intervalMs,
             Boolean enabled,
@@ -234,9 +245,10 @@ public final class SqlViews {
                     + " how much it may hold, and the broker objects and configuration it amounts to.")
     public record CapturePreviewView(
             @Schema(
-                    description = "The addresses the pattern resolves to. Rahdar's own capture addresses are never"
-                            + " included.")
-            List<String> addresses,
+                    description =
+                            "The ids of the destinations the pattern resolves to. Rahdar's own capture destinations are"
+                                    + " never included.")
+            List<String> destinations,
 
             @Schema(description = "The live nodes the tap would be installed on.")
             List<String> nodes,
@@ -277,7 +289,7 @@ public final class SqlViews {
     @Schema(description = "One index subscription and what it currently holds.")
     public record IndexSubscriptionView(
             UUID id,
-            String queuePattern,
+            String subscriptionPattern,
             int retentionDays,
             long intervalMs,
             String captureFrom,

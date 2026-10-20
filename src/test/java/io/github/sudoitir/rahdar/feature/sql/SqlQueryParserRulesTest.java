@@ -56,18 +56,18 @@ class SqlQueryParserRulesTest {
 
     @Test
     void aFromThatIsNotAQueueIsRefused() {
-        rejects("SELECT * FROM (SELECT * FROM \"q\") t", "FROM must name a queue");
+        rejects("SELECT * FROM (SELECT * FROM \"q\") t", "FROM must name a subscription");
     }
 
     @Test
     void aSelectWithoutFromIsRefused() {
-        rejects("SELECT 1", "FROM must name a queue");
+        rejects("SELECT 1", "FROM must name a subscription");
     }
 
     @Test
     void theProjectionNarrowsToCatalogueColumnsOnly() {
-        assertThat(parser.parse("SELECT priority, queue FROM \"q\"").projection())
-                .containsExactly(Column.PRIORITY, Column.QUEUE);
+        assertThat(parser.parse("SELECT priority, subscription FROM \"q\"").projection())
+                .containsExactly(Column.PRIORITY, Column.SUBSCRIPTION);
         assertThat(parser.parse("SELECT * FROM \"q\"").projection()).isEmpty();
         // a property or json path asks for the whole row
         assertThat(parser.parse("SELECT priority, props.tenant FROM \"q\"").projection())
@@ -159,8 +159,8 @@ class SqlQueryParserRulesTest {
     @Test
     void matchAgainstTakesOneBodyColumnAndAQuotedString() {
         assertThat(where("MATCH (body) AGAINST ('order 4471')")).isEqualTo(new Predicate.Match("order 4471"));
-        rejectsWhere("MATCH (body, queue) AGAINST ('x')", "MATCH searches one column");
-        rejectsWhere("MATCH (queue) AGAINST ('x')", "MATCH searches the body column");
+        rejectsWhere("MATCH (body, subscription) AGAINST ('x')", "MATCH searches one column");
+        rejectsWhere("MATCH (subscription) AGAINST ('x')", "MATCH searches the body column");
         rejectsWhere("MATCH (props) AGAINST ('x')", "There is no column 'props'");
         rejectsWhere("MATCH (body) AGAINST (5)", "quoted string");
         rejectsWhere("MATCH (body) AGAINST ('x' IN BOOLEAN MODE)", "no search modifiers");
@@ -204,7 +204,7 @@ class SqlQueryParserRulesTest {
         assertThat(where("lower(props.a) = 'x'"))
                 .isEqualTo(new Predicate.Compare(
                         new Term.CaseFold(new Term.PropertyTerm("a"), false), Operator.EQ, new Literal.Str("x")));
-        assertThat(where("UPPER(queue) = 'X'")).isInstanceOf(Predicate.Compare.class);
+        assertThat(where("UPPER(subscription) = 'X'")).isInstanceOf(Predicate.Compare.class);
         rejectsWhere("now() = 'x'", "is not a value here");
         rejectsWhere("lower(props.a, props.b) = 'x'", "exactly one column");
         rejectsWhere("lower() = 'x'", "exactly one column");

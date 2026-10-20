@@ -93,7 +93,7 @@ public class SqlQueryParser {
         List<Order> orderBy = parseOrderBy(select);
         Integer limit = parseLimit(select);
 
-        return new QueryAst(from.source(), from.queuePattern(), projection, where, orderBy, limit, sql.trim());
+        return new QueryAst(from.source(), from.subscriptionPattern(), projection, where, orderBy, limit, sql.trim());
     }
 
     // ---- clause-level rejections ---------------------------------------
@@ -101,7 +101,7 @@ public class SqlQueryParser {
     private void rejectUnsupportedSelectClauses(PlainSelect select) {
         if (select.getJoins() != null && !select.getJoins().isEmpty()) {
             throw new SqlSyntaxException(
-                    "The dialect has no joins. A query reads one queue pattern; use a wildcard in FROM to span queues.",
+                    "The dialect has no joins. A query reads one subscription pattern; use a wildcard in FROM to span subscriptions.",
                     "JOIN");
         }
         if (select.getGroupBy() != null) {
@@ -126,10 +126,10 @@ public class SqlQueryParser {
 
     // ---- FROM ----------------------------------------------------------
 
-    private record FromTarget(Source source, String queuePattern) {}
+    private record FromTarget(Source source, String subscriptionPattern) {}
 
     /**
-     * Resolves the source qualifier and the queue pattern.
+     * Resolves the source qualifier and the subscription pattern.
      *
      * <p>JSqlParser splits a dotted name into schema and table parts <em>even inside
      * double quotes</em>, so {@code "ORDER.IN"} arrives as {@code "ORDER"."IN"}. The
@@ -141,7 +141,7 @@ public class SqlQueryParser {
     private FromTarget parseFrom(PlainSelect select) {
         if (!(select.getFromItem() instanceof Table table)) {
             throw new SqlSyntaxException(
-                    "FROM must name a queue or a queue wildcard, in double quotes.",
+                    "FROM must name a subscription or a subscription wildcard, in double quotes.",
                     select.getFromItem() == null ? "FROM" : select.getFromItem().toString());
         }
         List<String> segments =
@@ -159,7 +159,7 @@ public class SqlQueryParser {
         // "ORDER / IN"), so the name is reassembled first and unquoted after.
         String pattern = String.join(".", segments).replace("\"", "");
         if (pattern.isBlank()) {
-            throw new SqlSyntaxException("FROM names no queue.", "FROM");
+            throw new SqlSyntaxException("FROM names no subscription.", "FROM");
         }
         return new FromTarget(source, pattern);
     }

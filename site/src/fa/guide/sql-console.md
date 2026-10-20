@@ -65,7 +65,7 @@ predicate ای که به‌تنهایی رایگان است، درون یک `OR`
 
 سازگار با selector (رایگان): `priority`، `durable`، `timestamp`، `expiration`، `size`، `jmsType`، `correlationId`، `groupId`، `userId`، و هر ویژگی اپلیکیشن به‌صورت `props.<name>`.
 
-Target (رایگان): `queue`، `address`، `node`.
+Target (رایگان): `subscription`، `destination`، `node`.
 
 Scan: `body`، `messageId`، `messageType`، `replyTo`، و — فقط روی ایندکس — `observedAt` و `lastSeenAt`.
 

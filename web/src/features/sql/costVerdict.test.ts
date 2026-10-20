@@ -7,8 +7,8 @@ import { costVerdict, type CostInput } from './costVerdict.ts';
 const target = (nodeId: string, queueName: string) => ({
   nodeId,
   nodeName: nodeId,
-  queueName,
-  address: queueName,
+  subscription: `artemis.queue/${queueName}`,
+  destination: `artemis.address/${queueName}`,
   messageCount: 10,
 });
 

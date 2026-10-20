@@ -33,13 +33,13 @@ class SqlQueryParserTest {
             // inside quotes; the whole name has to come back out.
             QueryAst ast = parser.parse("SELECT * FROM \"ORDER.IN\"");
 
-            assertThat(ast.queuePattern()).isEqualTo("ORDER.IN");
+            assertThat(ast.subscriptionPattern()).isEqualTo("ORDER.IN");
             assertThat(ast.source()).isEqualTo(Source.DEFAULT);
         }
 
         @Test
         void aQueueNameWithADollarIsAQueueName() {
-            assertThat(parser.parse("SELECT * FROM \"DLQ.$sys\"").queuePattern())
+            assertThat(parser.parse("SELECT * FROM \"DLQ.$sys\"").subscriptionPattern())
                     .isEqualTo("DLQ.$sys");
         }
 
@@ -49,7 +49,7 @@ class SqlQueryParserTest {
                     .isEqualTo(Source.BROKER);
             assertThat(parser.parse("SELECT * FROM index.\"ORDER.IN\"").source())
                     .isEqualTo(Source.INDEX);
-            assertThat(parser.parse("SELECT * FROM index.\"ORDER.IN\"").queuePattern())
+            assertThat(parser.parse("SELECT * FROM index.\"ORDER.IN\"").subscriptionPattern())
                     .isEqualTo("ORDER.IN");
         }
 
@@ -58,13 +58,15 @@ class SqlQueryParserTest {
             QueryAst ast = parser.parse("SELECT * FROM broker.\"broker.things\"");
 
             assertThat(ast.source()).isEqualTo(Source.BROKER);
-            assertThat(ast.queuePattern()).isEqualTo("broker.things");
+            assertThat(ast.subscriptionPattern()).isEqualTo("broker.things");
         }
 
         @Test
         void anArtemisWildcardIsJustPartOfTheName() {
-            assertThat(parser.parse("SELECT * FROM \"ORDER.*\"").queuePattern()).isEqualTo("ORDER.*");
-            assertThat(parser.parse("SELECT * FROM \"ORDER.#\"").queuePattern()).isEqualTo("ORDER.#");
+            assertThat(parser.parse("SELECT * FROM \"ORDER.*\"").subscriptionPattern())
+                    .isEqualTo("ORDER.*");
+            assertThat(parser.parse("SELECT * FROM \"ORDER.#\"").subscriptionPattern())
+                    .isEqualTo("ORDER.#");
         }
 
         @Test

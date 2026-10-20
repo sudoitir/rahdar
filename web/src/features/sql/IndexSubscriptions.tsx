@@ -9,6 +9,7 @@ import {
   type SqlCapturePreviewView,
   type SqlIndexSubscriptionRequest,
 } from './api.ts';
+import { resourceName } from '../../kernel/api/resourceId.ts';
 import { useCan } from '../../kernel/auth/useCan.ts';
 import { HoldToConfirm } from '../../ui/HoldToConfirm.tsx';
 import { EmptyState } from '../../ui/EmptyState.tsx';
@@ -159,7 +160,7 @@ function CapturePreview({ preview }: Readonly<{ preview: SqlCapturePreviewView }
       </Notice>
     );
   }
-  const addresses = preview.addresses ?? [];
+  const addresses = (preview.destinations ?? []).map(resourceName);
   const nodes = preview.nodes ?? [];
   return (
     <Stack gap={6} role="status" aria-live="polite">
@@ -210,7 +211,7 @@ function subscriptionBody(form: {
 }): SqlIndexSubscriptionRequest {
   const { pattern, retention, intervalMs, mode, filterString, bounds } = form;
   const base = {
-    queuePattern: pattern.trim(),
+    subscriptionPattern: pattern.trim(),
     retentionDays: retention,
     intervalMs: Number(intervalMs) || 5000,
     enabled: true,
@@ -291,7 +292,7 @@ function SubmitControls({
         <CapturePreview preview={preview} />
         {preview.refusal ? null : (
           <HoldToConfirm
-            label={`Start capturing ${body.queuePattern ?? ''}`.trim()}
+            label={`Start capturing ${body.subscriptionPattern ?? ''}`.trim()}
             loading={creating}
             disabled={!canCapture}
             onConfirm={onStart}
@@ -375,7 +376,9 @@ function CreateSubscription({
       onSuccess: () => {
         notify.succeeded({
           action: capture ? CAPTURE : SAMPLE,
-          subject: capture ? `${body.queuePattern} — the tap is installed on the next pass` : `${body.queuePattern}`,
+          subject: capture
+            ? `${body.subscriptionPattern} — the tap is installed on the next pass`
+            : `${body.subscriptionPattern}`,
         });
         setPattern('');
         setPreview(null);

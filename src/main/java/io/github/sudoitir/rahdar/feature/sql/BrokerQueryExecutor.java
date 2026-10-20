@@ -139,7 +139,7 @@ public class BrokerQueryExecutor {
             this.split = planner.splitOf(plan.ast());
             // Resolved here, on the caller's thread: the per-node threads below carry no security context.
             // A tail poll has none either, so it evaluates over masked content — the safe side.
-            this.clearAccess = governance.clearAccess(clusterId, plan.ast().queuePattern());
+            this.clearAccess = governance.clearAccess(clusterId, plan.ast().subscriptionPattern());
             nodes.nodes(clusterId).forEach(n -> nodesById.put(n.getId(), n));
             this.notices = new ArrayList<>(plan.notices());
             this.deadline = System.nanoTime() + limits.timeout().toNanos();
@@ -210,7 +210,7 @@ public class BrokerQueryExecutor {
                     finished(new NodeOutcome(
                             target.nodeId(),
                             target.nodeName(),
-                            target.queueName(),
+                            target.subscription(),
                             NodeOutcome.Status.NOT_READ,
                             0,
                             0,
@@ -240,7 +240,10 @@ public class BrokerQueryExecutor {
                     residuals.compile(
                             split.scan(),
                             new EvalContext(
-                                    target.queueName(), target.address(), target.nodeName(), target.brokerNow())));
+                                    target.subscription(),
+                                    target.destination(),
+                                    target.nodeName(),
+                                    target.brokerNow())));
             int page = 1;
             boolean more = true;
             while (more) {
@@ -273,12 +276,17 @@ public class BrokerQueryExecutor {
                 // Every read waits for the node's ceiling first (ADR-0076).
                 return new Fetched(
                         messages.browse(
-                                clusterId, read.node.getId(), read.target.queueName(), page, PAGE_SIZE, read.selector),
+                                clusterId,
+                                read.node.getId(),
+                                read.target.subscription(),
+                                page,
+                                PAGE_SIZE,
+                                read.selector),
                         null);
             } catch (BrokerConnectionException e) {
                 return new Fetched(null, read.outcome(NodeOutcome.Status.FAILED, e.getMessage()));
             } catch (RuntimeException e) {
-                log.debug("SQL console browse of {} failed", read.target.queueName(), e);
+                log.debug("SQL console browse of {} failed", read.target.subscription(), e);
                 return new Fetched(
                         null,
                         read.outcome(
@@ -297,7 +305,7 @@ public class BrokerQueryExecutor {
                 // A body search over the raw body would confirm a value the caller only ever sees masked.
                 BrowsedMessage evaluated = split.scan() == null || clearAccess
                         ? message
-                        : governance.forEvaluation(clusterId, read.target.address(), message);
+                        : governance.forEvaluation(clusterId, read.target.destination(), message);
                 if (read.residual.test(evaluated)) {
                     read.matched++;
                     Row row = toRow(message, read.node, read.target);
@@ -364,8 +372,8 @@ public class BrokerQueryExecutor {
             return new Row(
                     node.getId(),
                     target.nodeName(),
-                    target.queueName(),
-                    target.address(),
+                    target.subscription(),
+                    target.destination(),
                     message.messageId(),
                     message.type(),
                     message.durable(),
@@ -409,7 +417,7 @@ public class BrokerQueryExecutor {
 
         NodeOutcome outcome(NodeOutcome.Status status, String detail) {
             return new NodeOutcome(
-                    node.getId(), target.nodeName(), target.queueName(), status, examinedHere, matched, detail);
+                    node.getId(), target.nodeName(), target.subscription(), status, examinedHere, matched, detail);
         }
     }
 

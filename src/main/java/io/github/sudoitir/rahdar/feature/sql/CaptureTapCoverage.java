@@ -25,7 +25,7 @@ class CaptureTapCoverage implements CaptureTaps {
                         .findById(id)
                         .map(s -> addresses.targets(clusterId, s).stream()
                                 .anyMatch(t -> address.equals(CaptureAddresses.addressOf(t))
-                                        && !queueName.equals(t.queueName())))
+                                        && !queueName.equals(t.subscription())))
                         .orElse(false);
     }
 }

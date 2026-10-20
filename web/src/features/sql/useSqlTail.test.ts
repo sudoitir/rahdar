@@ -9,8 +9,8 @@ import { useSqlTail } from './useSqlTail.ts';
 const row = (messageId: number): SqlRowView => ({
   nodeId: 'n1',
   nodeName: 'primary',
-  queueName: 'ORDER.IN',
-  address: 'ORDER.IN',
+  subscription: 'artemis.queue/ORDER.IN',
+  destination: 'artemis.address/ORDER.IN',
   messageId,
   messageType: 4,
   durable: true,
@@ -111,7 +111,11 @@ describe('useSqlTail: batching', () => {
     frame();
 
     expect(hook.result.current.rows.map((r) => r.messageId)).toEqual([12, 11, 10]);
-    expect([...hook.result.current.freshKeys].sort()).toEqual(['n1/ORDER.IN/10', 'n1/ORDER.IN/11', 'n1/ORDER.IN/12']);
+    expect([...hook.result.current.freshKeys].sort()).toEqual([
+      'n1/artemis.queue/ORDER.IN/10',
+      'n1/artemis.queue/ORDER.IN/11',
+      'n1/artemis.queue/ORDER.IN/12',
+    ]);
   });
 
   it('keeps a paused tail’s buffer bounded, and shows the newest of it on resume', async () => {
