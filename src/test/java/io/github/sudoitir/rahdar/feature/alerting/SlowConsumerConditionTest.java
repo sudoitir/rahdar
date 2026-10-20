@@ -51,7 +51,7 @@ class SlowConsumerConditionTest extends PostgresIntegrationTest {
     private void givenCluster() {
         ClusterEntity cluster = clusters.save(new ClusterEntity("c-" + UUID.randomUUID(), null, null));
         clusterId = cluster.getId();
-        nodeId = nodes.save(BrokerNodeEntity.fromSeed(clusterId, "n1", "STANDALONE", "node-1"))
+        nodeId = nodes.save(BrokerNodeEntity.fromSeed(clusterId, "n1", "NONE", "node-1"))
                 .getId();
     }
 

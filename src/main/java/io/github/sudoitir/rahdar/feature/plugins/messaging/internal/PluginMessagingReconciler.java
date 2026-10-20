@@ -228,12 +228,12 @@ public class PluginMessagingReconciler {
             return new NodeResult(RegistrationState.ACTIVE, null, tap.dropped(client, name));
         }
         String refusalKey = node.getId() + "|" + name;
-        String fingerprint = reg.getQueue() + "|" + node.getCoreUrl() + "|" + node.getJolokiaUrl();
+        String fingerprint = reg.getQueue() + "|" + node.getDataUrl() + "|" + node.getManagementUrl();
         if (installed && fingerprint.equals(refused.get(refusalKey))) {
             return new NodeResult(RegistrationState.FAILED, "Refused earlier on this node; see the audit log.", null);
         }
         drains.stop(reg.getId(), node.getId());
-        if (node.getCoreUrl() == null) {
+        if (node.getDataUrl() == null) {
             return new NodeResult(
                     RegistrationState.FAILED,
                     "This node has no Core URL registered, and delivery is over the Core protocol. Add one to the"
@@ -287,7 +287,7 @@ public class PluginMessagingReconciler {
             // slots held and had not settled goes back to the queue.
             drains.stop(reg.getId(), node.getId());
         }
-        if (node.getCoreUrl() == null) {
+        if (node.getDataUrl() == null) {
             return new NodeResult(
                     RegistrationState.FAILED,
                     "This node has no Core URL registered, and delivery is over the Core protocol. Add one to the"

@@ -288,7 +288,7 @@ public class PluginMessagingService implements PluginScopedBeans {
 
     private ClusterNode servingWithCore(UUID clusterId) {
         return reconciler.servingNodes(clusterId).stream()
-                .filter(n -> n.getCoreUrl() != null)
+                .filter(n -> n.getDataUrl() != null)
                 .findFirst()
                 .orElseThrow(() -> new RegistrationRefusedException(
                         "No serving node of cluster " + clusterId + " has a Core URL, and sends go over Core."));

@@ -72,7 +72,7 @@ public class StateCondition implements AlertCondition {
         Set<String> universe = new HashSet<>();
         Map<String, Double> active = new HashMap<>();
         for (ClusterNode node : rows) {
-            if (node.getJolokiaUrl() == null) {
+            if (node.getManagementUrl() == null) {
                 continue; // not manageable — nothing to be "down" from Rahdar's view
             }
             String key = NODE_PREFIX + node.getId();
@@ -89,7 +89,7 @@ public class StateCondition implements AlertCondition {
         Set<String> universe = new HashSet<>();
         Map<String, Double> active = new HashMap<>();
         for (ClusterNode node : rows) {
-            if (!"BACKUP".equals(node.getHaRole())) {
+            if (!"BACKUP".equals(node.getHaDesignation())) {
                 continue;
             }
             String key = NODE_PREFIX + node.getId();

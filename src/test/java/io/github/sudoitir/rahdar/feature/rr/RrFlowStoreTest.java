@@ -40,7 +40,7 @@ class RrFlowStoreTest extends PostgresIntegrationTest {
         flows = new RrFlowStore(plain, drops);
         payloads = new CapturedPayloadStore(plain);
         jdbc.update(
-                "INSERT INTO cluster (id, name) VALUES (:id, :name)",
+                "INSERT INTO cluster (id, name, system) VALUES (:id, :name, 'artemis')",
                 Map.of("id", clusterId, "name", "rr-store-" + clusterId));
     }
 

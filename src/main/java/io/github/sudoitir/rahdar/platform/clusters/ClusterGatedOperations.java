@@ -319,11 +319,11 @@ class ClusterGatedOperations {
                 List<DisplayRow> rows = new ArrayList<>();
                 rows.add(DisplayRow.of(LABEL_CLUSTER, clusters.labelOf(p.clusterId())));
                 rows.add(DisplayRow.of("Node", node.getName()));
-                if (p.jolokiaUrl() != null) {
-                    rows.add(new DisplayRow("Management URL", node.getJolokiaUrl(), p.jolokiaUrl()));
+                if (p.managementUrl() != null) {
+                    rows.add(new DisplayRow("Management URL", node.getManagementUrl(), p.managementUrl()));
                 }
-                if (p.coreUrl() != null) {
-                    rows.add(new DisplayRow("Core URL", node.getCoreUrl(), p.coreUrl()));
+                if (p.dataUrl() != null) {
+                    rows.add(new DisplayRow("Data URL", node.getDataUrl(), p.dataUrl()));
                 }
                 return rows;
             }
@@ -332,7 +332,8 @@ class ClusterGatedOperations {
             @Override
             public Effect estimate(NodeOverrideParams p) {
                 ClusterNode node = node(p);
-                return new Effect(1, "nodes", p.nodeId() + "|" + node.getJolokiaUrl() + "|" + node.getCoreUrl(), null);
+                return new Effect(
+                        1, "nodes", p.nodeId() + "|" + node.getManagementUrl() + "|" + node.getDataUrl(), null);
             }
 
             @Override

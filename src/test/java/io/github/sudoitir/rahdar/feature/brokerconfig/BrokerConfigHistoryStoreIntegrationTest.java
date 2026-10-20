@@ -34,7 +34,9 @@ class BrokerConfigHistoryStoreIntegrationTest extends PostgresIntegrationTest {
     @BeforeEach
     void seed() {
         clusterId = jdbc.queryForObject(
-                "INSERT INTO cluster (name) VALUES (?) RETURNING id", UUID.class, "hist-" + UUID.randomUUID());
+                "INSERT INTO cluster (name, system) VALUES (?, 'artemis') RETURNING id",
+                UUID.class,
+                "hist-" + UUID.randomUUID());
         for (int n = 1; n <= 7; n++) {
             revisions[n] = jdbc.queryForObject(
                     "INSERT INTO broker_config_revision (created_at, revision, document, source, created_by, cluster_id)"

@@ -54,7 +54,7 @@ class CapabilityAssessmentsTest {
 
     CapabilityAssessmentsTest() {
         BrokerNodeEntity node = mock(BrokerNodeEntity.class);
-        when(node.getJolokiaUrl()).thenReturn(URL);
+        when(node.getManagementUrl()).thenReturn(URL);
         when(nodes.findByClusterIdOrderByNameAsc(clusterId)).thenReturn(List.of(node));
         when(gateway.node(any(UUID.class), any(UUID.class))).thenReturn(mock(BrokerTarget.class));
     }

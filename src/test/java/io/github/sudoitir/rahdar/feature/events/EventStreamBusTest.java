@@ -66,7 +66,7 @@ class EventStreamBusTest extends PostgresIntegrationTest {
                 .run(properties.stream().map(property -> "--" + property).toArray(String[]::new));
         hubB = other.getBean(SseHub.class);
         jdbc.update(
-                "INSERT INTO cluster (id, name) VALUES (:id, :name)",
+                "INSERT INTO cluster (id, name, system) VALUES (:id, :name, 'artemis')",
                 Map.of("id", clusterId, "name", "bus-" + clusterId));
     }
 

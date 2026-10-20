@@ -32,7 +32,7 @@ class FlowStoreTest extends PostgresIntegrationTest {
     @BeforeEach
     void cluster() {
         jdbc.update(
-                "INSERT INTO cluster (id, name) VALUES (:id, :name)",
+                "INSERT INTO cluster (id, name, system) VALUES (:id, :name, 'artemis')",
                 Map.of("id", clusterId, "name", "flow-store-" + clusterId));
         jdbc.update(
                 "INSERT INTO broker_node (id, cluster_id, name) VALUES (:id, :c, :name)",

@@ -36,14 +36,14 @@ class TransferNodes {
     }
 
     static boolean backup(ClusterNode node) {
-        return "BACKUP".equals(node.getHaRole());
+        return "BACKUP".equals(node.getHaDesignation());
     }
 
     /** The manageable endpoint live now for this broker node id. */
-    ClusterNode serving(UUID clusterId, String artemisNodeId, String name) {
+    ClusterNode serving(UUID clusterId, String nativeNodeId, String name) {
         return directory.nodes(clusterId).stream()
-                .filter(n -> artemisNodeId.equals(n.getArtemisNodeId()))
-                .filter(n -> n.getJolokiaUrl() != null && live(n) && !backup(n))
+                .filter(n -> nativeNodeId.equals(n.getNativeNodeId()))
+                .filter(n -> n.getManagementUrl() != null && live(n) && !backup(n))
                 .findFirst()
                 .orElseThrow(() -> new BrokerConnectionException(
                         BrokerConnectionException.Kind.UNREACHABLE,
@@ -56,7 +56,7 @@ class TransferNodes {
 
     /** The node as a relay end: one it reaches over its data plane, which it must have. */
     BrokerRelay.Endpoint core(ClusterNode node) {
-        if (node.getCoreUrl() == null) {
+        if (node.getDataUrl() == null) {
             throw new BrokerConnectionException(
                     BrokerConnectionException.Kind.UNREACHABLE,
                     "Node " + node.getName() + " has no Core URL, so Rahdar cannot relay messages to or from it.");

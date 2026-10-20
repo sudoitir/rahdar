@@ -199,7 +199,7 @@ abstract class TransferTestSupport extends PostgresIntegrationTest {
         List<UUID> nodes = new ArrayList<>();
         for (Broker broker : brokers) {
             ClusterNode node = directory.nodes(id).stream()
-                    .filter(n -> broker.jolokiaUrl().equals(n.getJolokiaUrl()))
+                    .filter(n -> broker.jolokiaUrl().equals(n.getManagementUrl()))
                     .findFirst()
                     .orElseThrow();
             clusterService.overrideNodeUrl(id, node.getId(), new NodeOverrideRequest(null, broker.coreUrl()));

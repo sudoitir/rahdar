@@ -19,7 +19,7 @@ import tools.jackson.databind.ObjectMapper;
  * (design.md decision 2) — one query per cluster per tick regardless of rule
  * count. A queue present on several nodes without a specific {@code scope.node}
  * is aggregated by summing, keyed {@code queue:<name>}; a node-scoped rule keys
- * {@code node:<artemisNodeId>/queue:<name>} on that node's own value.
+ * {@code node:<nativeNodeId>/queue:<name>} on that node's own value.
  */
 @Component
 @Order(30)

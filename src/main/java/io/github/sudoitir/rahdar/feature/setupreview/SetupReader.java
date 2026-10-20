@@ -60,7 +60,7 @@ public class SetupReader {
             return new NodeRead(
                     node.getId(),
                     node.getName(),
-                    reportedNodeId(brokerAttributes, node.getArtemisNodeId()),
+                    reportedNodeId(brokerAttributes, node.getNativeNodeId()),
                     live,
                     true,
                     null,
@@ -83,7 +83,7 @@ public class SetupReader {
     private record Part<T>(T value, String error) {}
 
     private static NodeRead unreadable(ClusterNode node, boolean live, String reason) {
-        return NodeRead.unreadable(node.getId(), node.getName(), node.getArtemisNodeId(), live, true, reason);
+        return NodeRead.unreadable(node.getId(), node.getName(), node.getNativeNodeId(), live, true, reason);
     }
 
     private static Part<JsonNode> defaultSettings(ArtemisNode client, ManagementResponse response) {

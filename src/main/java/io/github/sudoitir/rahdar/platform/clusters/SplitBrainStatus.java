@@ -30,8 +30,8 @@ public enum SplitBrainStatus {
     public static Map<String, SplitBrainStatus> byNodeId(Collection<? extends ClusterNode> rows) {
         Map<String, SplitBrainStatus> byNodeId = new HashMap<>();
         for (ClusterNode row : rows) {
-            if (row.getArtemisNodeId() != null) {
-                byNodeId.merge(row.getArtemisNodeId(), row.getSplitBrain(), (a, b) -> a.compareTo(b) >= 0 ? a : b);
+            if (row.getNativeNodeId() != null) {
+                byNodeId.merge(row.getNativeNodeId(), row.getSplitBrain(), (a, b) -> a.compareTo(b) >= 0 ? a : b);
             }
         }
         return byNodeId;

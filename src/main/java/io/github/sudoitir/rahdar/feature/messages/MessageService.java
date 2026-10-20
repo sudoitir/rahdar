@@ -685,7 +685,7 @@ public class MessageService {
         List<ClusterNode> candidates = locations.stream()
                 .sorted(Comparator.comparingLong(QueueLocation::messageCount).reversed())
                 .map(l -> byId.get(l.nodeId()))
-                .filter(n -> n != null && n.getJolokiaUrl() != null)
+                .filter(n -> n != null && n.getManagementUrl() != null)
                 .toList();
         if (candidates.isEmpty()) {
             throw new BrokerConnectionException(

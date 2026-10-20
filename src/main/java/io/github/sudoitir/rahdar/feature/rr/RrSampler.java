@@ -286,7 +286,7 @@ public class RrSampler {
     private List<ClusterNode> servingNodes(UUID clusterId) {
         return nodes.nodes(clusterId).stream()
                 .filter(n -> Boolean.TRUE.equals(n.getActive()) && n.getLastError() == null)
-                .filter(n -> n.getCoreUrl() != null)
+                .filter(n -> n.getDataUrl() != null)
                 .toList();
     }
 }

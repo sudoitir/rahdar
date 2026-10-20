@@ -45,7 +45,7 @@ class MetricSamplesSlopeTest extends PostgresIntegrationTest {
     private void givenCluster() {
         clusterId = clusters.save(new ClusterEntity("c-" + UUID.randomUUID(), null, null))
                 .getId();
-        nodeId = nodes.save(BrokerNodeEntity.fromSeed(clusterId, "n1", "STANDALONE", "node-1"))
+        nodeId = nodes.save(BrokerNodeEntity.fromSeed(clusterId, "n1", "NONE", "node-1"))
                 .getId();
     }
 

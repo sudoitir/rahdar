@@ -204,11 +204,11 @@ public class FlowGraphService {
         Map<String, String> byArtemisId = new HashMap<>();
         for (ClusterNode n : directory.nodes(clusterId)) {
             byId.put(n.getId(), n.getName());
-            if (n.getArtemisNodeId() != null) {
+            if (n.getNativeNodeId() != null) {
                 // A live/backup pair shares one NodeID: name the logical node by its serving endpoint,
                 // never by whichever of the pair happens to be listed last.
                 byArtemisId.merge(
-                        n.getArtemisNodeId(),
+                        n.getNativeNodeId(),
                         n.getName(),
                         (first, next) -> Boolean.TRUE.equals(n.getActive()) ? next : first);
             }

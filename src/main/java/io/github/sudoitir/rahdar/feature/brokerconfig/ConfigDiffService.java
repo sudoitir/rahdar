@@ -293,7 +293,7 @@ public class ConfigDiffService {
     }
 
     private Read read(UUID clusterId, ClusterNode node, List<String> matches) {
-        if (node.getJolokiaUrl() == null) {
+        if (node.getManagementUrl() == null) {
             return Read.failed(
                     "NO_MANAGEMENT_URL", "This node has no management URL, so its configuration cannot be read.");
         }

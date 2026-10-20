@@ -49,10 +49,10 @@ class HaStateEvaluatorTest {
     }
 
     @Test
-    void deriveHaRoleFromBackupThenClustered() {
-        assertThat(evaluator.deriveHaRole(true, true)).isEqualTo("BACKUP");
-        assertThat(evaluator.deriveHaRole(false, true)).isEqualTo("PRIMARY");
-        assertThat(evaluator.deriveHaRole(false, false)).isEqualTo("STANDALONE");
+    void deriveHaDesignationFromBackupThenClustered() {
+        assertThat(evaluator.deriveHaDesignation(true, true)).isEqualTo("BACKUP");
+        assertThat(evaluator.deriveHaDesignation(false, true)).isEqualTo("PRIMARY");
+        assertThat(evaluator.deriveHaDesignation(false, false)).isEqualTo("NONE");
     }
 
     @Test
@@ -179,10 +179,10 @@ class HaStateEvaluatorTest {
         return new NodeEndpoint(
                 e.id(),
                 name,
-                e.artemisNodeId(),
-                e.jolokiaUrl(),
-                e.coreUrl(),
-                e.haRole(),
+                e.nativeNodeId(),
+                e.managementUrl(),
+                e.dataUrl(),
+                e.haDesignation(),
                 e.state(),
                 e.active(),
                 null,

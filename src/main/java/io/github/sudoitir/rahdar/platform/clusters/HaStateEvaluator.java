@@ -31,15 +31,15 @@ public class HaStateEvaluator {
         return started ? "STARTED" : "STOPPED";
     }
 
-    /** {@code Backup} / {@code Clustered} → HA role. */
-    public String deriveHaRole(Boolean backup, Boolean clustered) {
+    /** {@code Backup} / {@code Clustered} → HA designation. */
+    public String deriveHaDesignation(Boolean backup, Boolean clustered) {
         if (Boolean.TRUE.equals(backup)) {
             return "BACKUP";
         }
         if (Boolean.TRUE.equals(clustered)) {
             return "PRIMARY";
         }
-        return "STANDALONE";
+        return "NONE";
     }
 
     /** Group endpoints into logical nodes by NodeID; split-brain defaults to NONE (no corroboration supplied). */
@@ -56,13 +56,13 @@ public class HaStateEvaluator {
             List<NodeEndpoint> endpoints, Map<String, SplitBrainStatus> splitBrainByNodeId) {
         Map<String, List<NodeEndpoint>> byNode = new LinkedHashMap<>();
         for (NodeEndpoint e : endpoints) {
-            String key = e.artemisNodeId() != null ? e.artemisNodeId() : "endpoint:" + e.id();
+            String key = e.nativeNodeId() != null ? e.nativeNodeId() : "endpoint:" + e.id();
             byNode.computeIfAbsent(key, k -> new ArrayList<>()).add(e);
         }
 
         List<LogicalNode> nodes = new ArrayList<>();
         byNode.forEach((key, eps) -> {
-            String nodeId = eps.get(0).artemisNodeId();
+            String nodeId = eps.get(0).nativeNodeId();
             SplitBrainStatus splitBrain = splitBrainByNodeId.getOrDefault(nodeId, SplitBrainStatus.NONE);
             boolean behind = eps.stream().anyMatch(e -> e.isBackup() && Boolean.FALSE.equals(e.replicaSync()));
             nodes.add(new LogicalNode(nodeId, List.copyOf(eps), splitBrain, behind));

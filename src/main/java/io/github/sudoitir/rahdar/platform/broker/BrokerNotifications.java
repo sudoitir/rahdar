@@ -52,7 +52,7 @@ public class BrokerNotifications {
     public void reconcile(UUID clusterId, List<NodeEndpoint> endpoints) {
         Set<UUID> desired = endpoints.stream()
                 .filter(NodeEndpoint::live)
-                .filter(e -> CoreUrl.dialable(e.coreUrl()) != null)
+                .filter(e -> CoreUrl.dialable(e.dataUrl()) != null)
                 .map(NodeEndpoint::id)
                 .collect(Collectors.toSet());
         nodesByCluster.put(clusterId, endpoints.stream().map(NodeEndpoint::id).collect(Collectors.toSet()));

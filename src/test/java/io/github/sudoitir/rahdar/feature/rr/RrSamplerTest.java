@@ -47,7 +47,7 @@ class RrSamplerTest {
 
     private static BrokerNodeEntity node(String name, String coreUrl) {
         BrokerNodeEntity n = BrokerNodeEntity.fromSeed(CLUSTER, name, "PRIMARY", name);
-        n.applyManualCoreUrl(coreUrl);
+        n.applyManualDataUrl(coreUrl);
         n.applyHaState(new HaObservation(true, "STARTED", "PRIMARY", true, "2.44.0", name), 1L, Instant.now());
         return identified(n);
     }
@@ -75,7 +75,7 @@ class RrSamplerTest {
                             .filter(n -> n.getId().equals(nodeId))
                             .findFirst()
                             .orElseThrow()
-                            .getCoreUrl();
+                            .getDataUrl();
                     List<BrowsedMessage> found = byCoreUrlAndQueue.apply(coreUrl, invocation.getArgument(2));
                     return new BrowsePage(found, (long) found.size());
                 });

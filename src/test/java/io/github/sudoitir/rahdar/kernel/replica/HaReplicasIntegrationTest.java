@@ -150,11 +150,19 @@ class HaReplicasIntegrationTest {
      * with their management URLs, and its credential sealed again for the copy.
      */
     private static UUID copyOf(UUID cluster, String name) {
-        UUID copy = jdbc.queryForObject("INSERT INTO cluster (name) VALUES (?) RETURNING id", UUID.class, name);
+        UUID copy = jdbc.queryForObject(
+                "INSERT INTO cluster (name, system) VALUES (?, 'artemis') RETURNING id", UUID.class, name);
         jdbc.update("""
-                INSERT INTO broker_node (cluster_id, name, jolokia_url, core_url, ha_role, url_source)
-                SELECT ?, name, jolokia_url, core_url, ha_role, url_source FROM broker_node WHERE cluster_id = ?
-                """, copy, cluster);
+                WITH copied AS (
+                    INSERT INTO broker_node (cluster_id, name, ha_designation)
+                    SELECT ?, name, ha_designation FROM broker_node WHERE cluster_id = ?
+                    RETURNING id, name)
+                INSERT INTO broker_node_endpoint (node_id, plane, protocol, url, source)
+                SELECT c.id, e.plane, e.protocol, e.url, e.source
+                FROM copied c
+                JOIN broker_node o ON o.cluster_id = ? AND o.name = c.name
+                JOIN broker_node_endpoint e ON e.node_id = o.id
+                """, copy, cluster, cluster);
         jdbc.update(
                 "INSERT INTO broker_credential (cluster_id, kind, username, sealed) VALUES (?, ?, ?, ?)",
                 copy,

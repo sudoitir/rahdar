@@ -127,10 +127,10 @@ class TransferRunnerTest {
         client = mock(ArtemisNode.class);
         link = mock(RelayLink.class);
 
-        when(sourceNode.getJolokiaUrl()).thenReturn("http://src");
-        when(sourceNode.getCoreUrl()).thenReturn("core-src");
-        when(targetNode.getJolokiaUrl()).thenReturn("http://tgt");
-        when(targetNode.getCoreUrl()).thenReturn("core-tgt");
+        when(sourceNode.getManagementUrl()).thenReturn("http://src");
+        when(sourceNode.getDataUrl()).thenReturn("core-src");
+        when(targetNode.getManagementUrl()).thenReturn("http://tgt");
+        when(targetNode.getDataUrl()).thenReturn("core-tgt");
         when(nodes.serving(eq(SRC_CLUSTER), any(), any())).thenReturn(sourceNode);
         when(nodes.serving(eq(TGT_CLUSTER), any(), any())).thenReturn(targetNode);
         when(nodes.client(any())).thenReturn(client);

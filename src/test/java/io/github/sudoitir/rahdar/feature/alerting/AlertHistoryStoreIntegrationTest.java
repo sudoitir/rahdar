@@ -30,7 +30,9 @@ class AlertHistoryStoreIntegrationTest extends PostgresIntegrationTest {
     @BeforeEach
     void seed() {
         clusterId = jdbc.queryForObject(
-                "INSERT INTO cluster (name) VALUES (?) RETURNING id", UUID.class, "hist-" + UUID.randomUUID());
+                "INSERT INTO cluster (name, system) VALUES (?, 'artemis') RETURNING id",
+                UUID.class,
+                "hist-" + UUID.randomUUID());
         ruleId = jdbc.queryForObject(
                 "INSERT INTO alert_rule (name, kind, state_condition, cluster_id)"
                         + " VALUES ('r', 'STATE', 'NODE_DOWN', ?) RETURNING id",

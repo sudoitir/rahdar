@@ -77,7 +77,7 @@ class ConfigDiffServiceTest {
         ClusterNode node = mock(ClusterNode.class);
         when(node.getId()).thenReturn(UUID.randomUUID());
         when(node.getName()).thenReturn(name);
-        when(node.getJolokiaUrl()).thenReturn(url);
+        when(node.getManagementUrl()).thenReturn(url);
         nodes.add(node);
         return node;
     }

@@ -28,7 +28,7 @@ class BrokerEventStoreTest extends PostgresIntegrationTest {
     @BeforeEach
     void seedCluster() {
         jdbc.update(
-                "INSERT INTO cluster (id, name) VALUES (:id, :name)",
+                "INSERT INTO cluster (id, name, system) VALUES (:id, :name, 'artemis')",
                 Map.of("id", clusterId, "name", "events-store-" + clusterId));
     }
 

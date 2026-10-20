@@ -46,8 +46,8 @@ class SplitBrainPersistenceTest extends PostgresIntegrationTest {
                 .getId();
         nodes.save(BrokerNodeEntity.fromSeed(clusterId, "a-live", "PRIMARY", PAIR));
         nodes.save(BrokerNodeEntity.fromSeed(clusterId, "b-backup", "BACKUP", PAIR));
-        nodes.save(BrokerNodeEntity.fromSeed(clusterId, "c-other", "STANDALONE", "other-pair"));
-        nodes.save(BrokerNodeEntity.fromSeed(clusterId, "d-unread", "STANDALONE", null));
+        nodes.save(BrokerNodeEntity.fromSeed(clusterId, "c-other", "NONE", "other-pair"));
+        nodes.save(BrokerNodeEntity.fromSeed(clusterId, "d-unread", "NONE", null));
     }
 
     private Map<String, SplitBrainStatus> verdicts() {

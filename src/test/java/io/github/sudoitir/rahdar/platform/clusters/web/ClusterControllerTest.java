@@ -473,7 +473,7 @@ class ClusterControllerTest extends PostgresIntegrationTest {
 
         var after =
                 nodes.findByClusterIdAndName(clusterId, "artemis-backup:61616").orElseThrow();
-        assertThat(after.getJolokiaUrl()).isEqualTo(OVERRIDE_URL);
+        assertThat(after.getManagementUrl()).isEqualTo(OVERRIDE_URL);
         assertThat(after.getUrlSource()).isEqualTo(ManagementUrlSource.MANUAL);
     }
 

@@ -37,7 +37,7 @@ public class NodeStateRecorder {
     @Transactional
     public void applyTierA(UUID nodeId, NodeDescription ha, long cycle) {
         nodes.findById(nodeId).ifPresent(node -> {
-            String nodeIdBefore = node.getArtemisNodeId();
+            String nodeIdBefore = node.getNativeNodeId();
             String state = ha.conditions().stream()
                     .filter(c -> c.type().equals(ConditionTypes.STARTED))
                     .findFirst()
@@ -47,23 +47,18 @@ public class NodeStateRecorder {
                         case UNKNOWN -> "UNKNOWN";
                     })
                     .orElse("UNKNOWN");
-            String haRole =
-                    switch (ha.membership().designation()) {
-                        case PRIMARY -> "PRIMARY";
-                        case BACKUP -> "BACKUP";
-                        case NONE -> "STANDALONE";
-                    };
+            String haDesignation = ha.membership().designation().name();
             node.applyHaState(
                     new HaObservation(
                             ha.membership().serving() == Serving.ACTIVE,
                             state,
-                            haRole,
+                            haDesignation,
                             ha.membership().inSync().orElse(null),
                             ha.version().orElse(null),
                             ha.nativeId().isEmpty() ? null : ha.nativeId()),
                     cycle,
                     Instant.now());
-            if (!Objects.equals(nodeIdBefore, node.getArtemisNodeId())) {
+            if (!Objects.equals(nodeIdBefore, node.getNativeNodeId())) {
                 identityClaims.sync(node.getClusterId());
             }
         });
@@ -86,7 +81,7 @@ public class NodeStateRecorder {
     @Transactional
     public void recordSplitBrain(UUID clusterId, Map<String, SplitBrainStatus> verdictsByNodeId) {
         for (BrokerNodeEntity node : nodes.findByClusterIdOrderByNameAsc(clusterId)) {
-            String nodeId = node.getArtemisNodeId();
+            String nodeId = node.getNativeNodeId();
             node.recordSplitBrain(
                     nodeId == null
                             ? SplitBrainStatus.NONE

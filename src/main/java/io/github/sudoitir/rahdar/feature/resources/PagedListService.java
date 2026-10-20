@@ -291,10 +291,10 @@ public class PagedListService {
     private List<ClusterNode> servingManageableNodes(UUID clusterId) {
         Map<String, ClusterNode> perNodeId = new LinkedHashMap<>();
         for (ClusterNode n : nodes.nodes(clusterId)) {
-            if (n.getJolokiaUrl() == null) {
+            if (n.getManagementUrl() == null) {
                 continue;
             }
-            String key = n.getArtemisNodeId() != null ? n.getArtemisNodeId() : "id:" + n.getId();
+            String key = n.getNativeNodeId() != null ? n.getNativeNodeId() : "id:" + n.getId();
             perNodeId.merge(key, n, (kept, candidate) -> Boolean.TRUE.equals(candidate.getActive()) ? candidate : kept);
         }
         return List.copyOf(perNodeId.values());

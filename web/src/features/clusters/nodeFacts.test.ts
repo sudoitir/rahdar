@@ -54,7 +54,7 @@ describe('nodeFacts: role', () => {
   it.each([
     ['PRIMARY', 'Primary'],
     ['BACKUP', 'Backup'],
-    ['STANDALONE', 'Standalone'],
+    ['NONE', 'Standalone'],
     ['SOMETHING_NEW', 'Unknown'],
   ])('%s reads %s', (haRole, role) => {
     expect(nodeFacts(endpoint({ haRole }), pair([endpoint({ haRole })]).logical).role).toBe(role);
@@ -149,7 +149,7 @@ describe('nodeFacts: pair', () => {
   });
 
   it('a lone node has no pair', () => {
-    expect(pair([endpoint({ haRole: 'STANDALONE' })]).of('e1').pair).toBe('no pair (standalone)');
+    expect(pair([endpoint({ haRole: 'NONE' })]).of('e1').pair).toBe('no pair (standalone)');
   });
 
   it('a backup alone says its primary is not seen', () => {

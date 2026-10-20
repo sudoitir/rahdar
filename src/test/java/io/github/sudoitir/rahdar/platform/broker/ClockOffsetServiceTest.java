@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import io.github.sudoitir.openbroker.Endpoint;
+import io.github.sudoitir.openbroker.Plane;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -31,7 +33,8 @@ class ClockOffsetServiceTest {
     }
 
     private static NodeDirectory.KnownNode node(String name, String url) {
-        return new NodeDirectory.KnownNode(UUID.randomUUID(), CLUSTER, name, url, null);
+        return new NodeDirectory.KnownNode(
+                UUID.randomUUID(), CLUSTER, name, List.of(new Endpoint(Plane.MANAGEMENT, BrokerGateway.JOLOKIA, url)));
     }
 
     private void reading(String url, long offsetMs) {

@@ -633,7 +633,7 @@ public class QueueLifecycleService {
         access.requireVisible(clusterId);
         Set<ResourceRef> ends = new LinkedHashSet<>();
         for (ClusterNode node : clusters.nodes(clusterId)) {
-            if (node.getJolokiaUrl() == null) {
+            if (node.getManagementUrl() == null) {
                 continue;
             }
             try {

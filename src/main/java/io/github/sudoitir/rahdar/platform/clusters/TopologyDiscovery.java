@@ -45,7 +45,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * backup share it (Phase 0), so they merge into one {@link LogicalNode}.
  * {@code listNetworkTopology()} returns broker-to-broker {@code host:port}
  * connectors, never Jolokia URLs, so a discovered endpoint lands with
- * {@code coreUrl} set and {@code jolokiaUrl} null, until a management URL is derived for it from
+ * {@code dataUrl} set and {@code managementUrl} null, until a management URL is derived for it from
  * the cluster's pattern and proved by the broker's NodeID (ADR-0175). A seed or manual URL is never
  * rewritten by discovery; a derived one is re-derived when the pattern changes. A topology view that
  * omits the {@code backup} key (the post-failover shape) means "not currently announced", not "delete".
@@ -70,10 +70,10 @@ public class TopologyDiscovery {
      * it reports and its URL is never given to a node: a TLS seed's addresses are read to learn the
      * NodeIDs behind its host name, which stays the seed.
      */
-    public record ProbedSeed(String jolokiaUrl, BrokerTarget target, boolean attachable) {
+    public record ProbedSeed(String managementUrl, BrokerTarget target, boolean attachable) {
 
-        public ProbedSeed(String jolokiaUrl, BrokerTarget target) {
-            this(jolokiaUrl, target, true);
+        public ProbedSeed(String managementUrl, BrokerTarget target) {
+            this(managementUrl, target, true);
         }
     }
 
@@ -98,8 +98,10 @@ public class TopologyDiscovery {
             return reading == null ? null : reading.version();
         }
 
-        String haRole() {
-            return reading == null ? null : new HaStateEvaluator().deriveHaRole(reading.backup(), reading.clustered());
+        String haDesignation() {
+            return reading == null
+                    ? null
+                    : new HaStateEvaluator().deriveHaDesignation(reading.backup(), reading.clustered());
         }
 
         AccountResult management() {
@@ -114,7 +116,7 @@ public class TopologyDiscovery {
     }
 
     private record SeedReading(
-            String jolokiaUrl,
+            String managementUrl,
             boolean attachable,
             String nodeId,
             boolean backup,
@@ -127,7 +129,7 @@ public class TopologyDiscovery {
 
         SeedReading withEntries(List<TopologyEntry> found) {
             return new SeedReading(
-                    jolokiaUrl, attachable, nodeId, backup, started, active, replicaSync, version, clustered, found);
+                    managementUrl, attachable, nodeId, backup, started, active, replicaSync, version, clustered, found);
         }
     }
 
@@ -156,7 +158,7 @@ public class TopologyDiscovery {
             Set<String> seedUrls = new TreeSet<>();
             Set<String> unidentified = new TreeSet<>();
             for (SeedReading r : readings) {
-                String url = ClusterIdentity.normalise(r.jolokiaUrl());
+                String url = ClusterIdentity.normalise(r.managementUrl());
                 seedUrls.add(url);
                 if (r.nodeId() == null) {
                     unidentified.add(url);
@@ -212,12 +214,12 @@ public class TopologyDiscovery {
         // 2. Attach each seed's management URL and live state to its own row.
         Set<String> brokers = new HashSet<>();
         Set<String> known = nodes.findByClusterIdOrderByNameAsc(clusterId).stream()
-                .map(BrokerNodeEntity::getJolokiaUrl)
+                .map(BrokerNodeEntity::getManagementUrl)
                 .filter(Objects::nonNull)
                 .collect(Collectors.toSet());
         for (SeedReading r : readings) {
             boolean first = firstOfItsBroker(brokers, r);
-            if (r.attachable() && (known.contains(r.jolokiaUrl()) || first)) {
+            if (r.attachable() && (known.contains(r.managementUrl()) || first)) {
                 attachSeed(clusterId, r);
             }
         }
@@ -289,19 +291,19 @@ public class TopologyDiscovery {
             if (!firstOfItsBroker(brokers, r)) {
                 continue;
             }
-            String haRole = scratch.deriveHaRole(r.backup(), r.clustered());
+            String haDesignation = scratch.deriveHaDesignation(r.backup(), r.clustered());
             String key = byName.entrySet().stream()
                     .filter(en -> r.nodeId() != null
-                            && r.nodeId().equals(en.getValue().artemisNodeId()))
-                    .filter(en -> haRole.equals(en.getValue().haRole()))
+                            && r.nodeId().equals(en.getValue().nativeNodeId()))
+                    .filter(en -> haDesignation.equals(en.getValue().haDesignation()))
                     .map(Map.Entry::getKey)
                     .findFirst()
-                    .orElse(seedName(r.jolokiaUrl()));
+                    .orElse(seedName(r.managementUrl()));
             NodeEndpoint connector = byName.get(key);
             byName.put(
                     key,
                     liveEndpoint(
-                            scratch, key, connector == null ? null : connector.coreUrl(), r, ManagementUrlSource.SEED));
+                            scratch, key, connector == null ? null : connector.dataUrl(), r, ManagementUrlSource.SEED));
             management.put(key, AccountResult.ACCEPTED);
         }
     }
@@ -315,17 +317,17 @@ public class TopologyDiscovery {
             Map<String, UrlProof> proofs) {
         for (Map.Entry<String, NodeEndpoint> en : List.copyOf(byName.entrySet())) {
             NodeEndpoint node = en.getValue();
-            if (node.jolokiaUrl() != null) {
+            if (node.managementUrl() != null) {
                 continue;
             }
-            UrlProof proof = prove(derivation, node.name(), node.artemisNodeId());
+            UrlProof proof = prove(derivation, node.name(), node.nativeNodeId());
             management.put(en.getKey(), proof.management());
             proofs.put(en.getKey(), proof);
             if (proof.url() != null) {
                 byName.put(
                         en.getKey(),
                         liveEndpoint(
-                                scratch, en.getKey(), node.coreUrl(), proof.reading(), ManagementUrlSource.DERIVED));
+                                scratch, en.getKey(), node.dataUrl(), proof.reading(), ManagementUrlSource.DERIVED));
             } else if (!proof.throttled()) {
                 byName.put(en.getKey(), withProblem(node, proof.problem()));
             }
@@ -342,14 +344,14 @@ public class TopologyDiscovery {
     }
 
     private static NodeEndpoint liveEndpoint(
-            HaStateEvaluator scratch, String name, String coreUrl, SeedReading r, ManagementUrlSource source) {
+            HaStateEvaluator scratch, String name, String dataUrl, SeedReading r, ManagementUrlSource source) {
         return new NodeEndpoint(
                 UUID.randomUUID(),
                 name,
                 r.nodeId(),
-                r.jolokiaUrl(),
-                coreUrl,
-                scratch.deriveHaRole(r.backup(), r.clustered()),
+                r.managementUrl(),
+                dataUrl,
+                scratch.deriveHaDesignation(r.backup(), r.clustered()),
                 scratch.deriveState(r.started()),
                 r.active(),
                 r.replicaSync(),
@@ -364,14 +366,14 @@ public class TopologyDiscovery {
                 true);
     }
 
-    private static NodeEndpoint connectorEndpoint(String name, String haRole, String nodeId) {
+    private static NodeEndpoint connectorEndpoint(String name, String haDesignation, String nodeId) {
         return new NodeEndpoint(
                 UUID.randomUUID(),
                 name,
                 nodeId,
                 null,
                 name,
-                haRole,
+                haDesignation,
                 "UNKNOWN",
                 false,
                 null,
@@ -390,10 +392,10 @@ public class TopologyDiscovery {
         return new NodeEndpoint(
                 node.id(),
                 node.name(),
-                node.artemisNodeId(),
+                node.nativeNodeId(),
                 null,
-                node.coreUrl(),
-                node.haRole(),
+                node.dataUrl(),
+                node.haDesignation(),
                 node.state(),
                 node.active(),
                 node.replicaSync(),
@@ -404,18 +406,18 @@ public class TopologyDiscovery {
                 node.lastSeenAt(),
                 null,
                 problem,
-                node.coreUrlManual(),
+                node.dataUrlManual(),
                 false);
     }
 
-    private void upsertDiscovered(UUID clusterId, String connector, String haRole, String nodeId) {
+    private void upsertDiscovered(UUID clusterId, String connector, String haDesignation, String nodeId) {
         Optional<BrokerNodeEntity> existing = nodes.findByClusterIdAndName(clusterId, connector);
         if (existing.isPresent()) {
-            existing.get().mergeDiscovered(connector, haRole, nodeId);
+            existing.get().mergeDiscovered(connector, haDesignation, nodeId);
             nodes.save(existing.get());
             return;
         }
-        nodes.save(BrokerNodeEntity.discovered(clusterId, connector, haRole, nodeId));
+        nodes.save(BrokerNodeEntity.discovered(clusterId, connector, haDesignation, nodeId));
     }
 
     /**
@@ -428,27 +430,27 @@ public class TopologyDiscovery {
      * its URL a seed.
      */
     private void attachSeed(UUID clusterId, SeedReading r) {
-        String haRole = evaluator.deriveHaRole(r.backup(), r.clustered());
+        String haDesignation = evaluator.deriveHaDesignation(r.backup(), r.clustered());
         String state = evaluator.deriveState(r.started());
 
         List<BrokerNodeEntity> rows = nodes.findByClusterIdOrderByNameAsc(clusterId);
         BrokerNodeEntity node = rows.stream()
-                .filter(n -> r.jolokiaUrl().equals(n.getJolokiaUrl()))
+                .filter(n -> r.managementUrl().equals(n.getManagementUrl()))
                 .findFirst()
-                .or(() -> unmanaged(rows, n -> connectorHost(n.getName()).equals(seedHost(r.jolokiaUrl()))))
+                .or(() -> unmanaged(rows, n -> connectorHost(n.getName()).equals(seedHost(r.managementUrl()))))
                 .or(() -> unmanaged(
                         rows,
                         n -> r.nodeId() != null
-                                && r.nodeId().equals(n.getArtemisNodeId())
-                                && haRole.equals(n.getHaRole())))
-                .orElseGet(() ->
-                        nodes.save(BrokerNodeEntity.fromSeed(clusterId, seedName(r.jolokiaUrl()), haRole, r.nodeId())));
+                                && r.nodeId().equals(n.getNativeNodeId())
+                                && haDesignation.equals(n.getHaDesignation())))
+                .orElseGet(() -> nodes.save(
+                        BrokerNodeEntity.fromSeed(clusterId, seedName(r.managementUrl()), haDesignation, r.nodeId())));
 
-        if (!r.jolokiaUrl().equals(node.getJolokiaUrl())) {
-            node.attachSeedUrl(r.jolokiaUrl());
+        if (!r.managementUrl().equals(node.getManagementUrl())) {
+            node.attachSeedUrl(r.managementUrl());
         }
         node.applyHaState(
-                new HaObservation(r.active(), state, haRole, r.replicaSync(), r.version(), r.nodeId()),
+                new HaObservation(r.active(), state, haDesignation, r.replicaSync(), r.version(), r.nodeId()),
                 0L,
                 Instant.now());
         nodes.save(node);
@@ -458,7 +460,7 @@ public class TopologyDiscovery {
     private static Optional<BrokerNodeEntity> unmanaged(
             List<BrokerNodeEntity> rows, Predicate<BrokerNodeEntity> match) {
         return rows.stream()
-                .filter(n -> n.getJolokiaUrl() == null || n.getUrlSource() == ManagementUrlSource.DERIVED)
+                .filter(n -> n.getManagementUrl() == null || n.getUrlSource() == ManagementUrlSource.DERIVED)
                 .filter(match)
                 .findFirst();
     }
@@ -481,7 +483,7 @@ public class TopologyDiscovery {
         for (BrokerNodeEntity node : nodes.findByClusterIdOrderByNameAsc(clusterId)) {
             known.add(node.getName());
             if (needsProof(node, derivation, now)) {
-                prove(proofs, derivation, node.getName(), node.getArtemisNodeId());
+                prove(proofs, derivation, node.getName(), node.getNativeNodeId());
             }
         }
         // A node the topology names for the first time has no row yet, and no seed answered for it.
@@ -502,14 +504,15 @@ public class TopologyDiscovery {
             Survey survey,
             UrlDerivation derivation,
             String connector,
-            String haRole,
+            String haDesignation,
             String nodeId) {
         boolean answered = survey.readings.stream()
                 .anyMatch(r -> r.attachable()
-                        && (connectorHost(connector).equals(seedHost(r.jolokiaUrl()))
+                        && (connectorHost(connector).equals(seedHost(r.managementUrl()))
                                 || (nodeId != null
                                         && nodeId.equals(r.nodeId())
-                                        && haRole.equals(evaluator.deriveHaRole(r.backup(), r.clustered())))));
+                                        && haDesignation.equals(
+                                                evaluator.deriveHaDesignation(r.backup(), r.clustered())))));
         if (known.add(connector) && !answered) {
             prove(proofs, derivation, connector, nodeId);
         }
@@ -523,9 +526,9 @@ public class TopologyDiscovery {
     }
 
     private static boolean needsProof(BrokerNodeEntity node, UrlDerivation derivation, Instant now) {
-        if (node.getJolokiaUrl() != null) {
+        if (node.getManagementUrl() != null) {
             return node.getUrlSource() == ManagementUrlSource.DERIVED
-                    && (derivation.pattern() == null || !node.getJolokiaUrl().equals(derivedUrl(derivation, node)));
+                    && (derivation.pattern() == null || !node.getManagementUrl().equals(derivedUrl(derivation, node)));
         }
         ManagementUrlProblem problem = node.getUrlProblem();
         if (problem == null || problem == ManagementUrlProblem.NO_PATTERN) {
@@ -543,7 +546,7 @@ public class TopologyDiscovery {
     private void applyProofs(UUID clusterId, Map<String, UrlProof> proofs) {
         for (BrokerNodeEntity node : nodes.findByClusterIdOrderByNameAsc(clusterId)) {
             UrlProof proof = proofs.get(node.getName());
-            boolean replaceable = node.getJolokiaUrl() == null || node.getUrlSource() == ManagementUrlSource.DERIVED;
+            boolean replaceable = node.getManagementUrl() == null || node.getUrlSource() == ManagementUrlSource.DERIVED;
             if (proof != null && replaceable && applyProof(clusterId, node, proof)) {
                 nodes.save(node);
             }
@@ -556,7 +559,7 @@ public class TopologyDiscovery {
             node.recordUrlProblem(proof.problem(), Instant.now());
             return true;
         }
-        if (nodes.existsByClusterIdAndJolokiaUrlAndIdNot(clusterId, proof.url(), node.getId())) {
+        if (nodes.existsManagementUrlElsewhere(clusterId, proof.url(), node.getId())) {
             log.debug("Derived URL {} already belongs to another node of cluster {}", proof.url(), clusterId);
             return false;
         }
@@ -566,7 +569,7 @@ public class TopologyDiscovery {
                 new HaObservation(
                         r.active(),
                         evaluator.deriveState(r.started()),
-                        evaluator.deriveHaRole(r.backup(), r.clustered()),
+                        evaluator.deriveHaDesignation(r.backup(), r.clustered()),
                         r.replicaSync(),
                         r.version(),
                         r.nodeId()),
@@ -642,7 +645,7 @@ public class TopologyDiscovery {
     }
 
     private static SeedReading read(ProbedSeed seed) {
-        SeedReading ha = readHa(seed.jolokiaUrl(), seed.attachable(), seed.target());
+        SeedReading ha = readHa(seed.managementUrl(), seed.attachable(), seed.target());
         List<TopologyEntry> entries = new ArrayList<>();
         for (ClusterMember m : seed.target().members()) {
             entries.add(new TopologyEntry(
@@ -659,7 +662,7 @@ public class TopologyDiscovery {
     }
 
     /** One batched read of the HA attributes, with no topology: all a node's URL has to prove. */
-    private static SeedReading readHa(String jolokiaUrl, boolean attachable, BrokerTarget target) {
+    private static SeedReading readHa(String managementUrl, boolean attachable, BrokerTarget target) {
         NodeDescription ha;
         try {
             ha = target.describe();
@@ -671,7 +674,7 @@ public class TopologyDiscovery {
         }
         Attributes a = ha.attributes();
         return new SeedReading(
-                jolokiaUrl,
+                managementUrl,
                 attachable,
                 ha.nativeId().isEmpty() ? null : ha.nativeId(),
                 flag(a, "artemis.backup").orElse(false),
@@ -687,9 +690,9 @@ public class TopologyDiscovery {
         return attributes.raw(name).map(v -> (Boolean) v);
     }
 
-    private static String seedHost(String jolokiaUrl) {
+    private static String seedHost(String managementUrl) {
         try {
-            return URI.create(jolokiaUrl).getHost();
+            return URI.create(managementUrl).getHost();
         } catch (RuntimeException _) {
             return null;
         }
@@ -699,13 +702,13 @@ public class TopologyDiscovery {
         return ManagementUrlPattern.connectorHost(connector);
     }
 
-    private static String seedName(String jolokiaUrl) {
+    private static String seedName(String managementUrl) {
         try {
-            URI u = URI.create(jolokiaUrl);
+            URI u = URI.create(managementUrl);
             int port = u.getPort();
             return port > 0 ? u.getHost() + ":" + port : u.getHost();
         } catch (RuntimeException _) {
-            return jolokiaUrl;
+            return managementUrl;
         }
     }
 }

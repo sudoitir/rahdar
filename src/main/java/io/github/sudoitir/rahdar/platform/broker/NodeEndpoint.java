@@ -10,21 +10,21 @@ import java.util.UUID;
  *
  * @param manageable whether Rahdar has a Jolokia URL for this endpoint and can
  *     therefore act on it. A discovered endpoint with only a broker-to-broker
- *     {@code coreUrl} is known but not yet manageable — the common containerised
+ *     {@code dataUrl} is known but not yet manageable — the common containerised
  *     case (Phase 0), presented as a next step, not an error.
  * @param lastErrorKind the class of {@code lastError}, so a rejected credential is not read as an
  *     unreachable broker
  * @param urlSource where the management URL came from; {@code null} while there is none
  * @param urlProblem why there is no management URL, once an attempt to derive one has failed
- * @param coreUrlManual whether an operator set the Core URL, so discovery must leave it alone
+ * @param dataUrlManual whether an operator set the data URL, so discovery must leave it alone
  */
 public record NodeEndpoint(
         UUID id,
         String name,
-        String artemisNodeId,
-        String jolokiaUrl,
-        String coreUrl,
-        String haRole,
+        String nativeNodeId,
+        String managementUrl,
+        String dataUrl,
+        String haDesignation,
         String state,
         boolean active,
         Boolean replicaSync,
@@ -35,11 +35,11 @@ public record NodeEndpoint(
         Instant lastSeenAt,
         ManagementUrlSource urlSource,
         ManagementUrlProblem urlProblem,
-        boolean coreUrlManual,
+        boolean dataUrlManual,
         boolean manageable) {
 
     public boolean isBackup() {
-        return "BACKUP".equals(haRole);
+        return "BACKUP".equals(haDesignation);
     }
 
     public boolean isStarted() {

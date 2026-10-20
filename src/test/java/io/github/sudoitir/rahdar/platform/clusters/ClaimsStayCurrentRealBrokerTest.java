@@ -102,7 +102,7 @@ class ClaimsStayCurrentRealBrokerTest extends PostgresIntegrationTest {
     /** The seed's row: the one node of the cluster with a management URL. */
     private BrokerNodeEntity seedNode(UUID cluster) {
         return nodes.findByClusterIdOrderByNameAsc(cluster).stream()
-                .filter(n -> n.getJolokiaUrl() != null)
+                .filter(n -> n.getManagementUrl() != null)
                 .findFirst()
                 .orElseThrow();
     }
@@ -115,7 +115,7 @@ class ClaimsStayCurrentRealBrokerTest extends PostgresIntegrationTest {
     void anOverriddenUrlMovesTheClaimOfANodeKnownByItsUrl() {
         UUID first = registered("first", ArtemisIntegrationTest.jolokiaUrl());
         // A broker that reports no NodeID is known by its management URL alone.
-        jdbc.sql("UPDATE broker_node SET artemis_node_id = NULL WHERE cluster_id = ?")
+        jdbc.sql("UPDATE broker_node SET native_node_id = NULL WHERE cluster_id = ?")
                 .param(first)
                 .update();
         new TransactionTemplate(transactions).executeWithoutResult(status -> clusterClaims.sync(first));
@@ -132,15 +132,16 @@ class ClaimsStayCurrentRealBrokerTest extends PostgresIntegrationTest {
     @Test
     void aClaimNoNodeBacksAnyMoreIsReleasedByTheNextRegistration() {
         UUID first = registered("first", ArtemisIntegrationTest.jolokiaUrl());
-        String nodeId = seedNode(first).getArtemisNodeId();
+        String nodeId = seedNode(first).getNativeNodeId();
         assertThat(claimsOf(first)).contains(ClusterIdentity.NODE_ID + ":" + nodeId);
         // The first cluster's nodes no longer carry the broker (its journal replaced, its URL moved), but its
         // claim was left behind: the state a claim from before claims followed their nodes would be in.
+        jdbc.sql("UPDATE broker_node SET native_node_id = 'replaced-' || id WHERE cluster_id = ?")
+                .param(first)
+                .update();
         jdbc.sql("""
-                        UPDATE broker_node SET artemis_node_id = 'replaced-' || id,
-                               jolokia_url = CASE WHEN jolokia_url IS NULL THEN NULL
-                                                  ELSE 'http://elsewhere.invalid:8161/console/jolokia' END
-                        WHERE cluster_id = ?
+                        UPDATE broker_node_endpoint SET url = 'http://elsewhere.invalid:8161/console/jolokia'
+                        WHERE plane = 'MANAGEMENT' AND node_id IN (SELECT id FROM broker_node WHERE cluster_id = ?)
                         """).param(first).update();
 
         UUID second = registered("second", ArtemisIntegrationTest.jolokiaUrl());

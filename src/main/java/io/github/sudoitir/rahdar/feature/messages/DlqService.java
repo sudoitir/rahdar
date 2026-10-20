@@ -50,7 +50,7 @@ public class DlqService {
         ResourceFilter readableQueues = permissions.filter(clusterId, ResourceKind.QUEUE);
         ResourceFilter readableAddresses = permissions.filter(clusterId, ResourceKind.ADDRESS);
         ClusterNode manageable = brokerNodes.nodes(clusterId).stream()
-                .filter(n -> n.getJolokiaUrl() != null)
+                .filter(n -> n.getManagementUrl() != null)
                 .findFirst()
                 .orElseThrow(() -> new BrokerConnectionException(
                         BrokerConnectionException.Kind.UNREACHABLE,

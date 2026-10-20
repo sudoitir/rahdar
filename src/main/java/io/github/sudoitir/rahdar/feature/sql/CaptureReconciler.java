@@ -365,7 +365,7 @@ public class CaptureReconciler {
         try {
             // Checked before anything is created: a tap nobody can drain copies production
             // payload into a queue that only fills.
-            if (node.getCoreUrl() == null) {
+            if (node.getDataUrl() == null) {
                 throw new CaptureRefusedException(
                         "This node has no Core URL registered, and capture is drained over the Core protocol. "
                                 + "Add one to the cluster's connection and capture starts on the next pass.",
@@ -418,7 +418,7 @@ public class CaptureReconciler {
     private static String fingerprint(Desired desired, ClusterNode node) {
         MessageIndexSubscriptionEntity s = desired.subscription();
         return s.getRingSize() + "|" + s.getFilterString() + "|" + s.getBodyCapBytes() + "|" + s.getMaxRate() + "|"
-                + node.getCoreUrl() + "|" + node.getJolokiaUrl();
+                + node.getDataUrl() + "|" + node.getManagementUrl();
     }
 
     private void startDraining(UUID clusterId, ClusterNode node, Desired desired) {

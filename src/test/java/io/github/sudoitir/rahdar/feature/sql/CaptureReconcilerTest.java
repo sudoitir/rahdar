@@ -237,8 +237,8 @@ class CaptureReconcilerTest {
         BrokerNodeEntity second = mock(BrokerNodeEntity.class);
         when(second.getId()).thenReturn(UUID.randomUUID());
         when(second.getName()).thenReturn("second");
-        when(second.getJolokiaUrl()).thenReturn("http://second:8161/console/jolokia");
-        when(second.getCoreUrl()).thenReturn("tcp://second:61616");
+        when(second.getManagementUrl()).thenReturn("http://second:8161/console/jolokia");
+        when(second.getDataUrl()).thenReturn("tcp://second:61616");
         when(second.getActive()).thenReturn(true);
         when(second.getClusterId()).thenReturn(CLUSTER);
         when(nodeEntity.getClusterId()).thenReturn(CLUSTER);
@@ -319,7 +319,7 @@ class CaptureReconcilerTest {
         UUID goneId = UUID.randomUUID();
         when(gone.getId()).thenReturn(goneId);
         when(gone.getName()).thenReturn("old-primary");
-        when(gone.getJolokiaUrl()).thenReturn("http://old:8161/console/jolokia");
+        when(gone.getManagementUrl()).thenReturn("http://old:8161/console/jolokia");
         when(gone.getActive()).thenReturn(false);
         when(gone.getLastError()).thenReturn("unreachable");
         when(nodes.nodes(CLUSTER)).thenReturn(List.of(nodeEntity, gone));
@@ -339,8 +339,8 @@ class CaptureReconcilerTest {
         BrokerNodeEntity entity = mock(BrokerNodeEntity.class);
         when(entity.getId()).thenReturn(NODE);
         when(entity.getName()).thenReturn("primary");
-        when(entity.getJolokiaUrl()).thenReturn("http://primary:8161/console/jolokia");
-        when(entity.getCoreUrl()).thenReturn("tcp://primary:61616");
+        when(entity.getManagementUrl()).thenReturn("http://primary:8161/console/jolokia");
+        when(entity.getDataUrl()).thenReturn("tcp://primary:61616");
         when(entity.getActive()).thenReturn(true);
         return entity;
     }

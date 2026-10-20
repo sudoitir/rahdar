@@ -42,7 +42,7 @@ class QueueLocatorBrokerTest extends ArtemisIntegrationTest {
         ClusterNode node = mock(ClusterNode.class);
         UUID nodeId = UUID.randomUUID();
         when(node.getId()).thenReturn(nodeId);
-        when(node.getJolokiaUrl()).thenReturn(jolokiaUrl());
+        when(node.getManagementUrl()).thenReturn(jolokiaUrl());
         when(node.getActive()).thenReturn(true);
         ClusterDirectory clusters = mock(ClusterDirectory.class);
         when(clusters.nodes(clusterId)).thenReturn(List.of(node));

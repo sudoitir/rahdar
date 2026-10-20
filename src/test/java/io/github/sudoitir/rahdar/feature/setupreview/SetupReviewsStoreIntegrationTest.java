@@ -29,7 +29,9 @@ class SetupReviewsStoreIntegrationTest extends PostgresIntegrationTest {
     @BeforeEach
     void seed() {
         clusterId = jdbc.queryForObject(
-                "INSERT INTO cluster (name) VALUES (?) RETURNING id", UUID.class, "hist-" + UUID.randomUUID());
+                "INSERT INTO cluster (name, system) VALUES (?, 'artemis') RETURNING id",
+                UUID.class,
+                "hist-" + UUID.randomUUID());
         jdbc.update(
                 "INSERT INTO setup_review (reviewed_at, duration_ms, nodes_total, nodes_reviewed, nodes,"
                         + " not_assessed, cluster_id, cluster_evaluated) VALUES (" + OLD

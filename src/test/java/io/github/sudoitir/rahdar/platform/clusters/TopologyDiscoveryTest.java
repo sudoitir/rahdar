@@ -164,19 +164,19 @@ class TopologyDiscoveryTest extends PostgresIntegrationTest {
         BrokerNodeEntity backup = backup(clusterId);
 
         // The seed's management URL is attached to the primary side, and is a seed.
-        assertThat(primary.getJolokiaUrl()).isEqualTo(SEED_URL);
+        assertThat(primary.getManagementUrl()).isEqualTo(SEED_URL);
         assertThat(primary.getUrlSource()).isEqualTo(ManagementUrlSource.SEED);
-        assertThat(primary.getHaRole()).isEqualTo("PRIMARY");
+        assertThat(primary.getHaDesignation()).isEqualTo("PRIMARY");
 
         // The backup's URL is derived from the pattern with its connector host, and proved by its NodeID.
-        assertThat(backup.getJolokiaUrl()).isEqualTo(BACKUP_URL);
+        assertThat(backup.getManagementUrl()).isEqualTo(BACKUP_URL);
         assertThat(backup.getUrlSource()).isEqualTo(ManagementUrlSource.DERIVED);
         assertThat(backup.getUrlProblem()).isNull();
-        assertThat(backup.getCoreUrl()).isEqualTo("artemis-backup:61616");
-        assertThat(backup.getHaRole()).isEqualTo("BACKUP");
+        assertThat(backup.getDataUrl()).isEqualTo("tcp://artemis-backup:61616");
+        assertThat(backup.getHaDesignation()).isEqualTo("BACKUP");
 
         // Both sides share the NodeID → one logical node.
-        assertThat(primary.getArtemisNodeId()).isEqualTo(backup.getArtemisNodeId());
+        assertThat(primary.getNativeNodeId()).isEqualTo(backup.getNativeNodeId());
         assertThat(topology.nodes()).hasSize(1);
         assertThat(topology.nodes().get(0).endpoints()).hasSize(2);
         assertThat(topology.unmanaged()).isEmpty();
@@ -190,7 +190,7 @@ class TopologyDiscoveryTest extends PostgresIntegrationTest {
         ClusterTopology topology = discovery.discover(clusterId, List.of(seed("topology.json")), derivation(PATTERN));
 
         BrokerNodeEntity backup = backup(clusterId);
-        assertThat(backup.getJolokiaUrl()).isNull();
+        assertThat(backup.getManagementUrl()).isNull();
         assertThat(backup.getUrlSource()).isNull();
         assertThat(backup.getUrlProblem()).isEqualTo(ManagementUrlProblem.OTHER_BROKER);
         assertThat(topology.unmanaged()).extracting(NodeEndpoint::name).containsExactly("artemis-backup:61616");
@@ -214,7 +214,7 @@ class TopologyDiscoveryTest extends PostgresIntegrationTest {
         discovery.discover(clusterId, List.of(seed("topology.json")), derivation(PATTERN));
 
         BrokerNodeEntity backup = backup(clusterId);
-        assertThat(backup.getJolokiaUrl()).isNull();
+        assertThat(backup.getManagementUrl()).isNull();
         assertThat(backup.getUrlProblem()).isEqualTo(ManagementUrlProblem.UNREACHABLE);
     }
 
@@ -246,7 +246,7 @@ class TopologyDiscoveryTest extends PostgresIntegrationTest {
 
         verify(session, times(2)).node(BACKUP_URL);
         BrokerNodeEntity after = backup(clusterId);
-        assertThat(after.getJolokiaUrl()).isEqualTo(BACKUP_URL);
+        assertThat(after.getManagementUrl()).isEqualTo(BACKUP_URL);
         assertThat(after.getUrlProblem()).isNull();
     }
 
@@ -285,7 +285,7 @@ class TopologyDiscoveryTest extends PostgresIntegrationTest {
 
         discovery.discover(clusterId, List.of(seed("topology.json")), derivation(PATTERN));
 
-        assertThat(backup(clusterId).getJolokiaUrl()).isEqualTo(BACKUP_URL);
+        assertThat(backup(clusterId).getManagementUrl()).isEqualTo(BACKUP_URL);
     }
 
     @Test
@@ -310,7 +310,7 @@ class TopologyDiscoveryTest extends PostgresIntegrationTest {
         discovery.discover(clusterId, List.of(seed("topology.json")), derivation(PATTERN));
 
         BrokerNodeEntity after = backup(clusterId);
-        assertThat(after.getJolokiaUrl()).isEqualTo("http://localhost:8261/console/jolokia");
+        assertThat(after.getManagementUrl()).isEqualTo("http://localhost:8261/console/jolokia");
         assertThat(after.getUrlSource()).isEqualTo(ManagementUrlSource.MANUAL);
         verify(session, never()).node(any());
     }
@@ -320,14 +320,14 @@ class TopologyDiscoveryTest extends PostgresIntegrationTest {
         UUID clusterId = newCluster();
         discovery.discover(clusterId, List.of(seed("topology.json")), derivation(null));
         BrokerNodeEntity backup = backup(clusterId);
-        backup.applyManualCoreUrl("tcp://core.example:61617");
+        backup.applyManualDataUrl("tcp://core.example:61617");
         nodes.saveAndFlush(backup);
 
         discovery.discover(clusterId, List.of(seed("topology.json")), derivation(null));
 
         BrokerNodeEntity after = backup(clusterId);
-        assertThat(after.getCoreUrl()).isEqualTo("tcp://core.example:61617");
-        assertThat(after.isCoreUrlManual()).isTrue();
+        assertThat(after.getDataUrl()).isEqualTo("tcp://core.example:61617");
+        assertThat(after.isDataUrlManual()).isTrue();
     }
 
     @Test
@@ -339,7 +339,7 @@ class TopologyDiscoveryTest extends PostgresIntegrationTest {
         discovery.discover(clusterId, List.of(seed("topology.json")), derivation(PATTERN));
 
         verify(session, Mockito.times(1)).node(any());
-        assertThat(backup(clusterId).getJolokiaUrl()).isEqualTo(BACKUP_URL);
+        assertThat(backup(clusterId).getManagementUrl()).isEqualTo(BACKUP_URL);
     }
 
     @Test
@@ -352,11 +352,11 @@ class TopologyDiscoveryTest extends PostgresIntegrationTest {
         derivedAnswers(moved, json("search-broker.json"), json("ha-read-backup.json"));
         discovery.discover(clusterId, List.of(seed("topology.json")), derivation("http://{host}:9161/console/jolokia"));
 
-        assertThat(backup(clusterId).getJolokiaUrl()).isEqualTo(moved);
+        assertThat(backup(clusterId).getManagementUrl()).isEqualTo(moved);
         assertThat(backup(clusterId).getUrlSource()).isEqualTo(ManagementUrlSource.DERIVED);
         assertThat(nodes.findByClusterIdAndName(clusterId, "artemis-primary:61616")
                         .orElseThrow()
-                        .getJolokiaUrl())
+                        .getManagementUrl())
                 .isEqualTo(SEED_URL);
     }
 
@@ -371,7 +371,7 @@ class TopologyDiscoveryTest extends PostgresIntegrationTest {
         discovery.discover(clusterId, List.of(seed("topology.json")), derivation("http://{host}:9161/console/jolokia"));
 
         BrokerNodeEntity backup = backup(clusterId);
-        assertThat(backup.getJolokiaUrl()).isNull();
+        assertThat(backup.getManagementUrl()).isNull();
         assertThat(backup.getUrlProblem()).isEqualTo(ManagementUrlProblem.UNREACHABLE);
     }
 
@@ -381,10 +381,10 @@ class TopologyDiscoveryTest extends PostgresIntegrationTest {
         ProbedSeed read = seed("topology.json");
 
         discovery.discover(
-                clusterId, List.of(new ProbedSeed(read.jolokiaUrl(), read.target(), false)), derivation(null));
+                clusterId, List.of(new ProbedSeed(read.managementUrl(), read.target(), false)), derivation(null));
 
         assertThat(nodes.findByClusterIdOrderByNameAsc(clusterId))
-                .extracting(BrokerNodeEntity::getName, BrokerNodeEntity::getJolokiaUrl)
+                .extracting(BrokerNodeEntity::getName, BrokerNodeEntity::getManagementUrl)
                 .containsExactlyInAnyOrder(tuple("artemis-primary:61616", null), tuple("artemis-backup:61616", null));
     }
 
@@ -400,7 +400,7 @@ class TopologyDiscoveryTest extends PostgresIntegrationTest {
 
         List<BrokerNodeEntity> rows = nodes.findByClusterIdOrderByNameAsc(clusterId);
         assertThat(rows).extracting(BrokerNodeEntity::getName).hasSize(2);
-        assertThat(rows).extracting(BrokerNodeEntity::getJolokiaUrl).containsExactlyInAnyOrder(SEED_URL, null);
+        assertThat(rows).extracting(BrokerNodeEntity::getManagementUrl).containsExactlyInAnyOrder(SEED_URL, null);
         assertThat(discovery
                         .preview(
                                 discovery.survey(List.of(
@@ -411,7 +411,7 @@ class TopologyDiscoveryTest extends PostgresIntegrationTest {
                         .nodes()
                         .stream()
                         .flatMap(n -> n.endpoints().stream())
-                        .map(NodeEndpoint::jolokiaUrl))
+                        .map(NodeEndpoint::managementUrl))
                 .containsExactlyInAnyOrder(SEED_URL, null);
     }
 
@@ -427,7 +427,7 @@ class TopologyDiscoveryTest extends PostgresIntegrationTest {
                 .flatMap(n -> n.endpoints().stream())
                 .toList();
         assertThat(endpoints)
-                .extracting(NodeEndpoint::name, NodeEndpoint::jolokiaUrl, NodeEndpoint::urlSource)
+                .extracting(NodeEndpoint::name, NodeEndpoint::managementUrl, NodeEndpoint::urlSource)
                 .containsExactlyInAnyOrder(
                         tuple("artemis-primary:61616", SEED_URL, ManagementUrlSource.SEED),
                         tuple("artemis-backup:61616", BACKUP_URL, ManagementUrlSource.DERIVED));
@@ -496,7 +496,10 @@ class TopologyDiscoveryTest extends PostgresIntegrationTest {
 
         List<BrokerNodeEntity> rows = nodes.findByClusterIdOrderByNameAsc(clusterId);
         assertThat(rows)
-                .extracting(BrokerNodeEntity::getName, BrokerNodeEntity::getJolokiaUrl, BrokerNodeEntity::getHaRole)
+                .extracting(
+                        BrokerNodeEntity::getName,
+                        BrokerNodeEntity::getManagementUrl,
+                        BrokerNodeEntity::getHaDesignation)
                 .containsExactly(
                         tuple("artemis-secondary-backup:61616", backupUrl, "PRIMARY"),
                         tuple("artemis-secondary:61616", primaryUrl, "BACKUP"));
@@ -513,7 +516,7 @@ class TopologyDiscoveryTest extends PostgresIntegrationTest {
 
         BrokerNodeEntity primary =
                 nodes.findByClusterIdAndName(clusterId, "artemis-primary:61616").orElseThrow();
-        assertThat(primary.getJolokiaUrl()).isEqualTo(SEED_URL);
+        assertThat(primary.getManagementUrl()).isEqualTo(SEED_URL);
         assertThat(nodes.findByClusterIdOrderByNameAsc(clusterId)).hasSize(2);
     }
 

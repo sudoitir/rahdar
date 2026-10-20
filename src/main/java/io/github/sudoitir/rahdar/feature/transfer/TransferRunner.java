@@ -677,8 +677,8 @@ class TransferRunner {
             return waitForCapacity(s, verdict.waitReason());
         }
         // One permit on each node per batch, on top of the management calls the transports charge.
-        limiter.acquire(s.source.getJolokiaUrl(), 1, TOPIC);
-        limiter.acquire(s.target.getJolokiaUrl(), 1, TOPIC);
+        limiter.acquire(s.source.getManagementUrl(), 1, TOPIC);
+        limiter.acquire(s.target.getManagementUrl(), 1, TOPIC);
         return null;
     }
 
@@ -814,7 +814,7 @@ class TransferRunner {
         private String key;
 
         RelayLink to(Segment s, RelayLink.Route route) {
-            String now = s.source.getCoreUrl() + "|" + s.target.getCoreUrl();
+            String now = s.source.getDataUrl() + "|" + s.target.getDataUrl();
             if (!now.equals(key)) {
                 close();
                 open = relay.link(nodes.core(s.source), nodes.core(s.target), route);

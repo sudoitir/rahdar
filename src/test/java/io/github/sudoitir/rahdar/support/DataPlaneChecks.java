@@ -18,7 +18,7 @@ public final class DataPlaneChecks {
             List<NodeEndpoint> endpoints = invocation.getArgument(0);
             return new DataPlaneCheck.Result(
                     endpoints.stream()
-                            .map(e -> DataPlaneCheck.asked(e) ? byCoreUrl.apply(e.coreUrl()) : AccountResult.NOT_TRIED)
+                            .map(e -> DataPlaneCheck.asked(e) ? byCoreUrl.apply(e.dataUrl()) : AccountResult.NOT_TRIED)
                             .toList(),
                     new SubscriptionVerdict.NotAttempted());
         };

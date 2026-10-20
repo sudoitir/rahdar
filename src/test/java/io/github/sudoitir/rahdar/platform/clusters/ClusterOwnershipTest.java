@@ -94,7 +94,7 @@ class ClusterOwnershipTest extends PostgresIntegrationTest {
             UUID id = UUID.randomUUID();
             UUID wanted = REPLICA_IDS.get(created.size() % REPLICA_IDS.size());
             if (wanted.equals(ClusterOwnership.ownerOf(id, Set.copyOf(REPLICA_IDS)))) {
-                jdbc.update("INSERT INTO cluster (id, name) VALUES (?, ?)", id, "ownership-" + id);
+                jdbc.update("INSERT INTO cluster (id, name, system) VALUES (?, ?, 'artemis')", id, "ownership-" + id);
                 created.add(id);
                 clusters.add(id);
             }

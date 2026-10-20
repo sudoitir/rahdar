@@ -45,7 +45,7 @@ class SetupReviewControllerTest extends PostgresIntegrationTest {
                 .getId();
         // No management URL: the review must say it could not read the node, not pass it.
         nodes.save(BrokerNodeEntity.fromSeed(
-                clusterId, "node-a", "STANDALONE", UUID.randomUUID().toString()));
+                clusterId, "node-a", "NONE", UUID.randomUUID().toString()));
     }
 
     @AfterEach

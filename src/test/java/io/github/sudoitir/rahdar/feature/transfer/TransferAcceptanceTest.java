@@ -69,7 +69,7 @@ class TransferAcceptanceTest extends TransferTestSupport {
         // What Rahdar last read of the target node: it has become the backup of its pair.
         BrokerNodeEntity node = brokerNodes.findById(clusterD.node()).orElseThrow();
         node.applyHaState(
-                new HaObservation(false, "STARTED", "BACKUP", true, null, node.getArtemisNodeId()), 1L, Instant.now());
+                new HaObservation(false, "STARTED", "BACKUP", true, null, node.getNativeNodeId()), 1L, Instant.now());
         brokerNodes.save(node);
         refusal(preview(TransferMode.COPY, src, all(), queue(d, "accept.backup")), "target-backup");
 

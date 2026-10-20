@@ -64,8 +64,8 @@ public class ScrapeCycle {
 
         Map<String, List<NodeEndpoint>> byNodeId = new LinkedHashMap<>();
         for (NodeEndpoint e : endpoints) {
-            if (e.artemisNodeId() != null) {
-                byNodeId.computeIfAbsent(e.artemisNodeId(), k -> new ArrayList<>())
+            if (e.nativeNodeId() != null) {
+                byNodeId.computeIfAbsent(e.nativeNodeId(), k -> new ArrayList<>())
                         .add(e);
             }
         }

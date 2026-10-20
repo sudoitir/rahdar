@@ -6,14 +6,14 @@ import java.util.Optional;
 
 /**
  * One logical Artemis node — a primary and its backup share a NodeID, so they are
- * one identity with a reflection, not two nodes. {@code artemisNodeId} is the
+ * one identity with a reflection, not two nodes. {@code nativeNodeId} is the
  * pair key; {@code endpoints} holds one entry (standalone) or two (a pair).
  *
  * @param splitBrain corroborated per ADR-0012
  * @param replicationBehind a backup endpoint reports {@code ReplicaSync=false}
  */
 public record LogicalNode(
-        String artemisNodeId, List<NodeEndpoint> endpoints, SplitBrainStatus splitBrain, boolean replicationBehind) {
+        String nativeNodeId, List<NodeEndpoint> endpoints, SplitBrainStatus splitBrain, boolean replicationBehind) {
 
     /** Endpoints actually serving traffic now. Two of these is the split-brain shape. */
     public List<NodeEndpoint> serving() {

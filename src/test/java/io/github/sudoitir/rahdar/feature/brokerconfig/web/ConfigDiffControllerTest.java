@@ -82,7 +82,7 @@ class ConfigDiffControllerTest extends PostgresIntegrationTest {
                 .getId();
         aId = node("node-a", "PRIMARY", A_URL);
         bId = node("node-b", "BACKUP", B_URL);
-        node("node-c", "STANDALONE", C_URL);
+        node("node-c", "NONE", C_URL);
     }
 
     private UUID node(String name, String role, String url) {
@@ -122,7 +122,7 @@ class ConfigDiffControllerTest extends PostgresIntegrationTest {
     /** The id of the node registered with this Jolokia URL. */
     private UUID at(String url) {
         return nodes.findByClusterIdOrderByNameAsc(clusterId).stream()
-                .filter(n -> url.equals(n.getJolokiaUrl()))
+                .filter(n -> url.equals(n.getManagementUrl()))
                 .findFirst()
                 .orElseThrow()
                 .getId();

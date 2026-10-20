@@ -142,7 +142,7 @@ public class TransferService {
         ClusterNode source = nodes.node(clusterId, request.sourceNodeId());
         ClusterNode target = nodes.node(request.targetClusterId(), request.targetNodeId());
         for (ClusterNode node : List.of(source, target)) {
-            if (node.getArtemisNodeId() == null || node.getJolokiaUrl() == null) {
+            if (node.getNativeNodeId() == null || node.getManagementUrl() == null) {
                 throw new TransferRefusedException(
                         HttpStatus.UNPROCESSABLE_ENTITY,
                         "transfer-node-unmanaged",
@@ -156,7 +156,7 @@ public class TransferService {
         String targetAddress = authorisedTargetAddress(request, to);
         String targetRoutingType = to.map(QueueLocation::routingType).orElse(ANYCAST);
         boolean sameCluster = clusterId.equals(request.targetClusterId());
-        boolean sameNode = sameCluster && source.getArtemisNodeId().equals(target.getArtemisNodeId());
+        boolean sameNode = sameCluster && source.getNativeNodeId().equals(target.getNativeNodeId());
         Instant t0 = Instant.now();
 
         ArtemisNode sourceClient = nodes.client(source);
@@ -200,14 +200,14 @@ public class TransferService {
                 .sourceClusterId(clusterId)
                 .sourceNodeId(source.getId())
                 .sourceNodeName(source.getName())
-                .sourceArtemisNodeId(source.getArtemisNodeId())
+                .sourceArtemisNodeId(source.getNativeNodeId())
                 .sourceQueue(from.queueName())
                 .sourceAddress(from.address())
                 .sourceRoutingType(from.routingType())
                 .targetClusterId(request.targetClusterId())
                 .targetNodeId(target.getId())
                 .targetNodeName(target.getName())
-                .targetArtemisNodeId(target.getArtemisNodeId())
+                .targetArtemisNodeId(target.getNativeNodeId())
                 .targetQueue(request.targetQueue())
                 .targetAddress(targetAddress)
                 .targetRoutingType(targetRoutingType)
@@ -268,7 +268,7 @@ public class TransferService {
     /** The queue's copy on this node, or on another endpoint of the same broker node. */
     private Optional<QueueLocation> locate(UUID clusterId, String queue, ClusterNode node) {
         List<UUID> sameBroker = directory.nodes(clusterId).stream()
-                .filter(n -> node.getArtemisNodeId().equals(n.getArtemisNodeId()))
+                .filter(n -> node.getNativeNodeId().equals(n.getNativeNodeId()))
                 .map(ClusterNode::getId)
                 .toList();
         List<QueueLocation> found = locator.locate(clusterId, queue);
@@ -382,7 +382,7 @@ public class TransferService {
 
     private static void coreFindings(List<ClusterNode> nodes, ClusterNode source, List<Finding> out) {
         for (ClusterNode node : nodes) {
-            if (node.getCoreUrl() == null) {
+            if (node.getDataUrl() == null) {
                 out.add(new Finding(
                         FindingKind.REFUSE,
                         node == source ? "source-no-core" : "target-no-core",
@@ -442,10 +442,10 @@ public class TransferService {
                     "\n",
                     mode.name(),
                     source.getClusterId().toString(),
-                    source.getArtemisNodeId(),
+                    source.getNativeNodeId(),
                     sourceQueue,
                     target.getClusterId().toString(),
-                    target.getArtemisNodeId(),
+                    target.getNativeNodeId(),
                     targetQueue,
                     targetAddress,
                     selection.kind().name(),

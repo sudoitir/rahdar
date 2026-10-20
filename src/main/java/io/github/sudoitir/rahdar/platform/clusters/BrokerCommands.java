@@ -369,10 +369,10 @@ public class BrokerCommands {
     private List<Target> targets(UUID clusterId) {
         Map<String, List<ClusterNode>> logical = new LinkedHashMap<>();
         for (ClusterNode node : directory.nodes(clusterId)) {
-            if (node.getJolokiaUrl() == null) {
+            if (node.getManagementUrl() == null) {
                 continue;
             }
-            String key = node.getArtemisNodeId() != null ? node.getArtemisNodeId() : "id:" + node.getId();
+            String key = node.getNativeNodeId() != null ? node.getNativeNodeId() : "id:" + node.getId();
             logical.computeIfAbsent(key, k -> new ArrayList<>()).add(node);
         }
         List<Target> targets = new ArrayList<>();

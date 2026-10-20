@@ -54,8 +54,7 @@ class ClusterServiceNodeOverrideTest {
         ReflectionTestUtils.setField(node, "id", nodeId);
         when(clusters.findById(CLUSTER)).thenReturn(Optional.of(mock(ClusterEntity.class)));
         when(nodes.findById(nodeId)).thenReturn(Optional.of(node));
-        when(nodes.existsByClusterIdAndJolokiaUrlAndIdNot(CLUSTER, TAKEN, nodeId))
-                .thenReturn(true);
+        when(nodes.existsManagementUrlElsewhere(CLUSTER, TAKEN, nodeId)).thenReturn(true);
 
         NodeOverrideRequest request = new NodeOverrideRequest(TAKEN, null);
         assertThatThrownBy(() -> service.overrideNodeUrl(CLUSTER, nodeId, request))

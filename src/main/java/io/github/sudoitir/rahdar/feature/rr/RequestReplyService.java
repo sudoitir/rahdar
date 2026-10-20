@@ -293,7 +293,7 @@ public class RequestReplyService {
 
         List<ClusterNode> clusterNodes = nodes.nodes(clusterId);
         int withCore =
-                (int) clusterNodes.stream().filter(n -> n.getCoreUrl() != null).count();
+                (int) clusterNodes.stream().filter(n -> n.getDataUrl() != null).count();
         long sampleIntervalMs = settings.duration(RrSettings.SAMPLE_INTERVAL).toMillis();
         List<RrExpectationEntity> declared = readableExpectations(clusterId);
 

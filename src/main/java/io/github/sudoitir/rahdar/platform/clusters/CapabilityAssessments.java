@@ -142,7 +142,7 @@ public class CapabilityAssessments {
 
     static Optional<BrokerNodeEntity> chooseManageable(List<BrokerNodeEntity> nodes) {
         List<BrokerNodeEntity> manageable =
-                nodes.stream().filter(n -> n.getJolokiaUrl() != null).toList();
+                nodes.stream().filter(n -> n.getManagementUrl() != null).toList();
         return manageable.stream()
                 .filter(n -> Boolean.TRUE.equals(n.getActive()) && n.getLastError() == null)
                 .findFirst()

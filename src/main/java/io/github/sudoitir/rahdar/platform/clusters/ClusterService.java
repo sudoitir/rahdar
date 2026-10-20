@@ -173,10 +173,10 @@ public class ClusterService {
     record ClusterDeleteParams(UUID clusterId) {}
 
     /** What the gate holds of a node's URL override: the URLs it sets, either of which may be absent. */
-    record NodeOverrideParams(UUID clusterId, UUID nodeId, String jolokiaUrl, String coreUrl) {
+    record NodeOverrideParams(UUID clusterId, UUID nodeId, String managementUrl, String dataUrl) {
 
         NodeOverrideRequest toRequest() {
-            return new NodeOverrideRequest(jolokiaUrl, coreUrl);
+            return new NodeOverrideRequest(managementUrl, dataUrl);
         }
     }
 
@@ -308,10 +308,10 @@ public class ClusterService {
             NodeEndpoint e = endpoints.get(i);
             rows.add(new NodeProbeView(
                     e.name(),
-                    e.haRole(),
-                    e.artemisNodeId(),
+                    e.haDesignation(),
+                    e.nativeNodeId(),
                     e.version(),
-                    e.jolokiaUrl(),
+                    e.managementUrl(),
                     e.urlSource(),
                     e.urlProblem(),
                     management.getOrDefault(e.name(), AccountResult.NOT_TRIED),
@@ -323,8 +323,8 @@ public class ClusterService {
     /** What adopting the running configuration would declare, read from the live nodes the check reached. */
     private AdoptionPreviewView adoptionPreview(List<NodeEndpoint> endpoints, ProbeSession session) {
         return adoption.flatMap(adopter -> adopter.preview(endpoints.stream()
-                        .filter(e -> e.active() && e.jolokiaUrl() != null)
-                        .map(e -> new RegistrationAdoption.LiveNode(e.name(), session.node(e.jolokiaUrl())))
+                        .filter(e -> e.active() && e.managementUrl() != null)
+                        .map(e -> new RegistrationAdoption.LiveNode(e.name(), session.node(e.managementUrl())))
                         .toList()))
                 .map(p -> new AdoptionPreviewView(
                         new AdoptionCountsView(
@@ -410,8 +410,8 @@ public class ClusterService {
     private RegistrationAdoption.Reading readAdoption(TopologyDiscovery.Preview found, ProbeSession session) {
         return adoption.orElseThrow()
                 .read(endpoints(found.topology()).stream()
-                        .filter(e -> e.active() && e.jolokiaUrl() != null)
-                        .map(e -> new RegistrationAdoption.LiveNode(e.name(), session.node(e.jolokiaUrl())))
+                        .filter(e -> e.active() && e.managementUrl() != null)
+                        .map(e -> new RegistrationAdoption.LiveNode(e.name(), session.node(e.managementUrl())))
                         .toList())
                 .orElseThrow(() -> new ConflictException(
                         "no-live-node", "No live node could be read, so there is nothing to adopt."));
@@ -534,9 +534,9 @@ public class ClusterService {
 
     /** The registered cluster holding any of these brokers, by NodeID or by a management URL's normal form. */
     private Optional<ClusterIdentity.Overlap> registeredOverlap(ClusterIdentity identity) {
-        List<BrokerNodeEntity> candidates = new ArrayList<>(nodes.findByJolokiaUrlIsNotNull());
+        List<BrokerNodeEntity> candidates = new ArrayList<>(nodes.findManaged());
         if (!identity.nodeIds().isEmpty()) {
-            candidates.addAll(nodes.findByArtemisNodeIdIn(identity.nodeIds()));
+            candidates.addAll(nodes.findByNativeNodeIdIn(identity.nodeIds()));
         }
         Map<UUID, String> names = new HashMap<>();
         clusters.findAllById(candidates.stream()
@@ -627,7 +627,7 @@ public class ClusterService {
     private ClusterConnectionDetail connectionView(UUID clusterId, ClusterEntity cluster) {
         List<String> seeds = nodes.findByClusterIdOrderByNameAsc(clusterId).stream()
                 .filter(n -> n.getUrlSource() == ManagementUrlSource.SEED)
-                .map(BrokerNodeEntity::getJolokiaUrl)
+                .map(BrokerNodeEntity::getManagementUrl)
                 .toList();
         BrokerTlsEntity tls = tlsRepository.findByClusterId(clusterId).orElse(null);
         return new ClusterConnectionDetail(
@@ -747,8 +747,8 @@ public class ClusterService {
             List<ProbedSeed> seeds = new ArrayList<>();
             Set<String> seen = new HashSet<>();
             for (BrokerNodeEntity node : nodes.findByClusterIdOrderByNameAsc(clusterId)) {
-                if (node.getJolokiaUrl() != null && seen.add(node.getJolokiaUrl())) {
-                    seeds.add(new ProbedSeed(node.getJolokiaUrl(), session.node(node.getJolokiaUrl())));
+                if (node.getManagementUrl() != null && seen.add(node.getManagementUrl())) {
+                    seeds.add(new ProbedSeed(node.getManagementUrl(), session.node(node.getManagementUrl())));
                 }
             }
             for (SeedExpander.Seed seed : extraSeeds) {
@@ -774,8 +774,7 @@ public class ClusterService {
         clusterAccess.requireCluster(clusterId, ClusterPermissions.CLUSTER_WRITE);
         requireCluster(clusterId);
         BrokerNodeEntity node = requireNode(clusterId, nodeId);
-        if (request.hasJolokiaUrl()
-                && nodes.existsByClusterIdAndJolokiaUrlAndIdNot(clusterId, request.jolokiaUrl(), nodeId)) {
+        if (request.hasJolokiaUrl() && nodes.existsManagementUrlElsewhere(clusterId, request.jolokiaUrl(), nodeId)) {
             throw new ConflictException(
                     "duplicate-node-url", "Another node of this cluster already uses " + request.jolokiaUrl() + ".");
         }
@@ -824,7 +823,7 @@ public class ClusterService {
                     node.applyManualUrl(request.jolokiaUrl());
                 }
                 if (request.hasCoreUrl()) {
-                    node.applyManualCoreUrl(request.coreUrl());
+                    node.applyManualDataUrl(request.coreUrl());
                 }
                 BrokerNodeEntity result = nodes.save(node);
                 // A node known only by its URL is claimed by it: the old URL is released, the new one claimed.
@@ -905,7 +904,8 @@ public class ClusterService {
         for (int i = 0; i < stored.size(); i++) {
             rows.add(storedRow(stored.get(i), derivation, core.get(i)));
         }
-        Set<String> known = stored.stream().map(BrokerNodeEntity::getJolokiaUrl).collect(Collectors.toSet());
+        Set<String> known =
+                stored.stream().map(BrokerNodeEntity::getManagementUrl).collect(Collectors.toSet());
         Set<String> knownHosts = knownHostPorts(stored);
         for (String url : edited.seedUrls()) {
             if (!known.contains(url)) {
@@ -922,18 +922,18 @@ public class ClusterService {
      * again with the new account; a derived one, or none, is derived afresh from the pattern, as discovery would.
      */
     private NodeProbeView storedRow(BrokerNodeEntity node, UrlDerivation derivation, AccountResult core) {
-        boolean fixed = node.getJolokiaUrl() != null && node.getUrlSource() != ManagementUrlSource.DERIVED;
+        boolean fixed = node.getManagementUrl() != null && node.getUrlSource() != ManagementUrlSource.DERIVED;
         TopologyDiscovery.UrlProof proof = fixed
-                ? topologyDiscovery.probe(derivation.settings(), node.getJolokiaUrl(), node.getArtemisNodeId())
-                : topologyDiscovery.prove(derivation, node.getName(), node.getArtemisNodeId());
+                ? topologyDiscovery.probe(derivation.settings(), node.getManagementUrl(), node.getNativeNodeId())
+                : topologyDiscovery.prove(derivation, node.getName(), node.getNativeNodeId());
         boolean derived = !fixed && proof.url() != null;
         ManagementUrlSource source = derived ? ManagementUrlSource.DERIVED : null;
         return new NodeProbeView(
                 node.getName(),
-                node.getHaRole(),
-                node.getArtemisNodeId(),
+                node.getHaDesignation(),
+                node.getNativeNodeId(),
                 proof.version() != null ? proof.version() : node.getVersion(),
-                fixed ? node.getJolokiaUrl() : proof.url(),
+                fixed ? node.getManagementUrl() : proof.url(),
                 fixed ? node.getUrlSource() : source,
                 fixed || derived ? null : proof.problem(),
                 proof.management(),
@@ -945,7 +945,7 @@ public class ClusterService {
         TopologyDiscovery.UrlProof proof = topologyDiscovery.probe(management, url, null);
         return new NodeProbeView(
                 hostOf(url),
-                proof.haRole() != null ? proof.haRole() : "STANDALONE",
+                proof.haDesignation() != null ? proof.haDesignation() : "NONE",
                 proof.nodeId(),
                 proof.version(),
                 url,
@@ -1096,7 +1096,7 @@ public class ClusterService {
         }
         return storedNodes.stream()
                 .filter(n -> n.getUrlSource() == ManagementUrlSource.SEED)
-                .map(BrokerNodeEntity::getJolokiaUrl)
+                .map(BrokerNodeEntity::getManagementUrl)
                 .toList();
     }
 
@@ -1171,7 +1171,7 @@ public class ClusterService {
     /** The {@code host:port} of every management URL the cluster's nodes already have. */
     private static Set<String> knownHostPorts(List<BrokerNodeEntity> storedNodes) {
         return storedNodes.stream()
-                .map(BrokerNodeEntity::getJolokiaUrl)
+                .map(BrokerNodeEntity::getManagementUrl)
                 .filter(Objects::nonNull)
                 .map(ClusterService::hostPort)
                 .collect(Collectors.toSet());
@@ -1278,7 +1278,7 @@ public class ClusterService {
     /** A seed the operator no longer lists stops being one: its node keeps no URL until one is derived for it. */
     private void releaseDroppedSeeds(UUID clusterId, List<String> seedUrls) {
         for (BrokerNodeEntity node : nodes.findByClusterIdOrderByNameAsc(clusterId)) {
-            if (node.getUrlSource() == ManagementUrlSource.SEED && !seedUrls.contains(node.getJolokiaUrl())) {
+            if (node.getUrlSource() == ManagementUrlSource.SEED && !seedUrls.contains(node.getManagementUrl())) {
                 node.releaseSeedUrl();
             }
         }

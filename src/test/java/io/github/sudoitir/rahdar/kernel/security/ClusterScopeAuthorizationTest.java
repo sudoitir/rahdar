@@ -138,7 +138,7 @@ class ClusterScopeAuthorizationTest extends PostgresIntegrationTest {
         // which is exactly the control this needs.
         visibleNode = brokerNodes
                 .save(BrokerNodeEntity.fromSeed(
-                        visible, "node-a", "STANDALONE", UUID.randomUUID().toString()))
+                        visible, "node-a", "NONE", UUID.randomUUID().toString()))
                 .getId();
 
         MockMvc mvc = MockMvcBuilders.webAppContextSetup(webContext)

@@ -63,7 +63,7 @@ public class DataPlaneCheck {
             NodeEndpoint e = endpoints.get(i);
             if (asked(e)) {
                 nodes.add(new NodeSpec(
-                        idOf(i), List.of(new Endpoint(Plane.DATA, BrokerGateway.CORE, CoreUrl.dialable(e.coreUrl())))));
+                        idOf(i), List.of(new Endpoint(Plane.DATA, BrokerGateway.CORE, CoreUrl.dialable(e.dataUrl())))));
             }
         }
         List<AccountResult> accounts = new ArrayList<>(
@@ -90,7 +90,7 @@ public class DataPlaneCheck {
      * data-plane acceptor, so asking it would only report a refusal that means nothing.
      */
     public static boolean asked(NodeEndpoint node) {
-        return CoreUrl.dialable(node.coreUrl()) != null && !(node.isBackup() && !node.active());
+        return CoreUrl.dialable(node.dataUrl()) != null && !(node.isBackup() && !node.active());
     }
 
     /** Each node's stream once it is established or has failed, or as it stands when time runs out. */

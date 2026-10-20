@@ -242,7 +242,7 @@ public class QueryPlanner {
     }
 
     private static String logicalKey(ClusterNode node) {
-        return node.getArtemisNodeId() != null ? node.getArtemisNodeId() : "id:" + node.getId();
+        return node.getNativeNodeId() != null ? node.getNativeNodeId() : "id:" + node.getId();
     }
 
     // ---- source ---------------------------------------------------------

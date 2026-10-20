@@ -186,9 +186,9 @@ class BrokerConfigApplyEngineTest {
         when(node.getId()).thenReturn(id);
         when(node.getName()).thenReturn(name);
         when(node.getActive()).thenReturn(active);
-        when(node.getArtemisNodeId()).thenReturn("artemis-" + name);
+        when(node.getNativeNodeId()).thenReturn("artemis-" + name);
         when(node.getSplitBrain()).thenReturn(SplitBrainStatus.NONE);
-        when(node.getJolokiaUrl()).thenReturn("http://" + name + ":8161/console/jolokia");
+        when(node.getManagementUrl()).thenReturn("http://" + name + ":8161/console/jolokia");
         return node;
     }
 

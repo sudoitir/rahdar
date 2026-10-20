@@ -1,5 +1,6 @@
 package io.github.sudoitir.rahdar.platform.clusters.internal.persistence;
 
+import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
 import io.github.sudoitir.rahdar.platform.clusters.RegisteredCluster;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -44,6 +45,10 @@ public class ClusterEntity implements RegisteredCluster {
     /** {@code scheme://{host}:port/path}: how a node's management URL is built from its connector host (ADR-0175). */
     @Column(name = "management_url_pattern")
     private String managementUrlPattern;
+
+    /** The broker system the cluster runs, as the broker SDK names it; registration offers one until a second driver arrives. */
+    @Column(name = "system", nullable = false, updatable = false)
+    private String system = BrokerGateway.SYSTEM;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;

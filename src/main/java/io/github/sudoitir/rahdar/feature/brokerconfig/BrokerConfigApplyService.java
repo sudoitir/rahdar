@@ -643,7 +643,7 @@ public class BrokerConfigApplyService {
                             + ", which is no longer live. The cluster moved since the preview; preview again.");
         }
         List<String> unstable = p.nodes.values().stream()
-                .filter(n -> n.getArtemisNodeId() != null)
+                .filter(n -> n.getNativeNodeId() != null)
                 .filter(n -> n.getSplitBrain() != SplitBrainStatus.NONE)
                 .map(ClusterNode::getName)
                 .distinct()

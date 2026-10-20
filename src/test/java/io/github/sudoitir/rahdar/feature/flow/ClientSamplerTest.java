@@ -183,8 +183,8 @@ class ClientSamplerTest {
         ClusterNode node = mock(ClusterNode.class);
         when(node.getId()).thenReturn(id);
         when(node.getName()).thenReturn(name);
-        when(node.getJolokiaUrl()).thenReturn(jolokiaUrl);
-        when(node.getArtemisNodeId()).thenReturn(artemisNodeId);
+        when(node.getManagementUrl()).thenReturn(jolokiaUrl);
+        when(node.getNativeNodeId()).thenReturn(artemisNodeId);
         when(node.getActive()).thenReturn(active);
         return node;
     }

@@ -265,7 +265,7 @@ public class ConnectionControlService {
     /** The node an id was issued by. A node with no management URL cannot be asked. */
     private ClusterNode manageableNode(UUID clusterId, UUID nodeId) {
         return brokerNodes.nodes(clusterId).stream()
-                .filter(n -> n.getId().equals(nodeId) && n.getJolokiaUrl() != null)
+                .filter(n -> n.getId().equals(nodeId) && n.getManagementUrl() != null)
                 .findFirst()
                 .orElseThrow(() -> new NotFoundException("node", nodeId));
     }

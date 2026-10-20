@@ -121,7 +121,8 @@ class SecretRotationTest extends PostgresIntegrationTest {
         jdbc.update("UPDATE secret_key_state SET current_kek_version = 1");
         vault.refreshCurrentVersion();
         ReflectionTestUtils.setField(rotations, "counts", null);
-        jdbc.update("INSERT INTO cluster (id, name) VALUES (?, ?)", clusterId, "rotation-" + clusterId);
+        jdbc.update(
+                "INSERT INTO cluster (id, name, system) VALUES (?, ?, 'artemis')", clusterId, "rotation-" + clusterId);
     }
 
     @AfterEach

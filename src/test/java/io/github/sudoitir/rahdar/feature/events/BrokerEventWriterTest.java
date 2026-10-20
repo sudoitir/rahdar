@@ -65,7 +65,7 @@ class BrokerEventWriterTest extends PostgresIntegrationTest {
     @BeforeEach
     void seedCluster() {
         jdbc.update(
-                "INSERT INTO cluster (id, name) VALUES (:id, :name)",
+                "INSERT INTO cluster (id, name, system) VALUES (:id, :name, 'artemis')",
                 Map.of("id", clusterId, "name", "writer-" + clusterId));
         writer = new BrokerEventWriter(jdbc, mapper, publisher, transactions, partitions, properties);
     }

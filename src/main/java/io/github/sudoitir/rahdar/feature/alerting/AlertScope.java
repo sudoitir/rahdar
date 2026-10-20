@@ -53,8 +53,8 @@ public record AlertScope(String addressPattern, String queuePattern, String node
         return matches(subjectPattern, subject);
     }
 
-    public boolean matchesNode(String artemisNodeId) {
-        return node == null || node.isBlank() || node.equals(artemisNodeId);
+    public boolean matchesNode(String nativeNodeId) {
+        return node == null || node.isBlank() || node.equals(nativeNodeId);
     }
 
     private static boolean matches(String pattern, String value) {

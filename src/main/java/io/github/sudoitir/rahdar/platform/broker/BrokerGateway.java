@@ -7,10 +7,8 @@ import io.github.sudoitir.openbroker.ConnectOptions;
 import io.github.sudoitir.openbroker.ConnectRequest;
 import io.github.sudoitir.openbroker.CredentialSource;
 import io.github.sudoitir.openbroker.Credentials;
-import io.github.sudoitir.openbroker.Endpoint;
 import io.github.sudoitir.openbroker.NodeId;
 import io.github.sudoitir.openbroker.NodeSpec;
-import io.github.sudoitir.openbroker.Plane;
 import io.github.sudoitir.openbroker.TlsProvider;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -44,7 +42,7 @@ import org.springframework.stereotype.Component;
 @Component
 public class BrokerGateway implements DisposableBean {
 
-    /** Every cluster is Artemis until a second driver arrives. */
+    /** The system a new cluster is registered with, and a seed is probed as, until registration offers a choice. */
     public static final String SYSTEM = "artemis";
 
     /** The protocol names of the Artemis driver's endpoints. */
@@ -162,15 +160,7 @@ public class BrokerGateway implements DisposableBean {
             if (!Objects.equals(n.clusterId(), clusterId)) {
                 continue;
             }
-            List<Endpoint> endpoints = new ArrayList<>();
-            if (n.jolokiaUrl() != null) {
-                endpoints.add(new Endpoint(Plane.MANAGEMENT, JOLOKIA, n.jolokiaUrl()));
-            }
-            String core = CoreUrl.dialable(n.coreUrl());
-            if (core != null) {
-                endpoints.add(new Endpoint(Plane.DATA, CORE, core));
-            }
-            nodes.add(new NodeSpec(idOf(n.id()), endpoints));
+            nodes.add(new NodeSpec(idOf(n.id()), n.endpoints()));
         }
         return ClusterSpec.ofNodes(nodes);
     }
@@ -187,7 +177,10 @@ public class BrokerGateway implements DisposableBean {
             }
         };
         return new ConnectRequest(
-                SYSTEM, spec, credentials, options(tls.forCluster(settings.jolokiaSettings(clusterId))));
+                directory.system(clusterId),
+                spec,
+                credentials,
+                options(tls.forCluster(settings.jolokiaSettings(clusterId))));
     }
 
     private ConnectOptions options(TlsProvider clusterTls) {

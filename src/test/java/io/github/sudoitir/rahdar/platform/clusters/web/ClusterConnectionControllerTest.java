@@ -231,7 +231,7 @@ class ClusterConnectionControllerTest extends PostgresIntegrationTest {
         assertThat(cluster.getName()).startsWith("c-");
         assertThat(cluster.getManagementUrlPattern()).isEqualTo(PATTERN);
         assertThat(nodes.findByClusterIdOrderByNameAsc(clusterId))
-                .extracting(BrokerNodeEntity::getJolokiaUrl)
+                .extracting(BrokerNodeEntity::getManagementUrl)
                 .containsExactly(BACKUP_URL, PRIMARY_URL);
     }
 
@@ -306,11 +306,11 @@ class ClusterConnectionControllerTest extends PostgresIntegrationTest {
 
         assertThat(nodes.findByClusterIdAndName(clusterId, "artemis-backup:61616")
                         .orElseThrow()
-                        .getJolokiaUrl())
+                        .getManagementUrl())
                 .isEqualTo(moved);
         assertThat(nodes.findByClusterIdAndName(clusterId, "artemis-primary:61616")
                         .orElseThrow()
-                        .getJolokiaUrl())
+                        .getManagementUrl())
                 .isEqualTo(PRIMARY_URL);
     }
 
@@ -408,7 +408,7 @@ class ClusterConnectionControllerTest extends PostgresIntegrationTest {
         BrokerNodeEntity after =
                 nodes.findByClusterIdAndName(clusterId, "artemis-backup:61616").orElseThrow();
         assertThat(after.getUrlProblem()).isNull();
-        assertThat(after.getJolokiaUrl()).isEqualTo(moved);
+        assertThat(after.getManagementUrl()).isEqualTo(moved);
     }
 
     /** Makes every connection the factory hands out note whether a database transaction was open when it was asked for. */

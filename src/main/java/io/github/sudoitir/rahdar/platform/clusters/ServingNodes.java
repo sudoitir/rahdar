@@ -20,10 +20,10 @@ public final class ServingNodes {
     public static <N extends ClusterNode> List<N> from(Collection<N> nodes) {
         Map<String, N> perNodeId = new LinkedHashMap<>();
         for (N node : nodes) {
-            if (node.getJolokiaUrl() == null) {
+            if (node.getManagementUrl() == null) {
                 continue;
             }
-            String key = node.getArtemisNodeId() != null ? node.getArtemisNodeId() : "id:" + node.getId();
+            String key = node.getNativeNodeId() != null ? node.getNativeNodeId() : "id:" + node.getId();
             perNodeId.merge(
                     key, node, (kept, candidate) -> Boolean.TRUE.equals(candidate.getActive()) ? candidate : kept);
         }

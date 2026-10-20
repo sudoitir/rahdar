@@ -83,17 +83,17 @@ public class ClockOffsetRegistry {
      * @param t0 Rahdar's clock immediately before the request, from {@link #now()}
      * @param t1 Rahdar's clock immediately after the response
      */
-    public void recordReading(String jolokiaUrl, long brokerEpochSeconds, long t0, long t1) {
-        if (jolokiaUrl == null || brokerEpochSeconds <= 0 || t1 < t0) {
+    public void recordReading(String managementUrl, long brokerEpochSeconds, long t0, long t1) {
+        if (managementUrl == null || brokerEpochSeconds <= 0 || t1 < t0) {
             return;
         }
         long rtt = t1 - t0;
         long offset = brokerEpochSeconds * 1_000L - (t0 + rtt / 2);
-        byUrl.computeIfAbsent(jolokiaUrl, k -> new NodeOffset()).accept(offset, rtt, clock.instant());
+        byUrl.computeIfAbsent(managementUrl, k -> new NodeOffset()).accept(offset, rtt, clock.instant());
     }
 
-    public Optional<ClockOffset> offsetFor(String jolokiaUrl) {
-        NodeOffset node = jolokiaUrl == null ? null : byUrl.get(jolokiaUrl);
+    public Optional<ClockOffset> offsetFor(String managementUrl) {
+        NodeOffset node = managementUrl == null ? null : byUrl.get(managementUrl);
         return node == null ? Optional.empty() : node.snapshot();
     }
 

@@ -36,7 +36,8 @@ class BrokersHealthIndicator extends AbstractHealthIndicator {
         boolean failing = false;
         for (NodeDirectory.KnownNode node : nodes.nodes()) {
             clusters.add(node.clusterId());
-            Optional<Calls> latest = node.jolokiaUrl() == null ? Optional.empty() : calls.calls(node.jolokiaUrl());
+            Optional<Calls> latest =
+                    node.managementUrl() == null ? Optional.empty() : calls.calls(node.managementUrl());
             Map<String, Object> detail = new LinkedHashMap<>();
             detail.put("name", node.name());
             detail.put("clusterId", node.clusterId());
@@ -45,9 +46,9 @@ class BrokersHealthIndicator extends AbstractHealthIndicator {
             detail.put("lastError", latest.map(Calls::lastError).orElse(null));
             detail.put(
                     "rateLimitWaitMs",
-                    node.jolokiaUrl() == null
+                    node.managementUrl() == null
                             ? 0L
-                            : limiter.lastWait(node.jolokiaUrl()).toMillis());
+                            : limiter.lastWait(node.managementUrl()).toMillis());
             failing |= latest.map(Calls::failing).orElse(false);
             perNode.put(node.id().toString(), detail);
         }

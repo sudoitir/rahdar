@@ -132,11 +132,11 @@ public class SetupReviewService {
         List<NodeRead> reads = new ArrayList<>();
         for (ClusterNode node : clusters.nodes(clusterId)) {
             boolean live = Boolean.TRUE.equals(node.getActive());
-            if (node.getJolokiaUrl() == null) {
+            if (node.getManagementUrl() == null) {
                 reads.add(NodeRead.unreadable(
                         node.getId(),
                         node.getName(),
-                        node.getArtemisNodeId(),
+                        node.getNativeNodeId(),
                         live,
                         false,
                         "Rahdar has no management URL for this node."));

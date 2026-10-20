@@ -45,8 +45,8 @@ class BrokerCommandsVersionGateTest {
         ClusterNode n = mock(ClusterNode.class);
         when(n.getId()).thenReturn(UUID.randomUUID());
         when(n.getName()).thenReturn(name);
-        when(n.getArtemisNodeId()).thenReturn(name);
-        when(n.getJolokiaUrl()).thenReturn("http://" + name + ":8161/console/jolokia");
+        when(n.getNativeNodeId()).thenReturn(name);
+        when(n.getManagementUrl()).thenReturn("http://" + name + ":8161/console/jolokia");
         when(n.getActive()).thenReturn(true);
         when(n.getVersion()).thenReturn(version);
         return n;

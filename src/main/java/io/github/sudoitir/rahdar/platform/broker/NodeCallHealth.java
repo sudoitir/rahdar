@@ -25,20 +25,21 @@ public class NodeCallHealth {
 
     private final Map<String, Calls> byUrl = new ConcurrentHashMap<>();
 
-    public void succeeded(String jolokiaUrl) {
+    public void succeeded(String managementUrl) {
         Instant now = Instant.now();
         byUrl.merge(
-                jolokiaUrl,
+                managementUrl,
                 new Calls(now, null, null),
                 (old, fresh) -> new Calls(now, old.lastFailure(), old.lastError()));
     }
 
-    public void failed(String jolokiaUrl, String error) {
+    public void failed(String managementUrl, String error) {
         Instant now = Instant.now();
-        byUrl.merge(jolokiaUrl, new Calls(null, now, error), (old, fresh) -> new Calls(old.lastSuccess(), now, error));
+        byUrl.merge(
+                managementUrl, new Calls(null, now, error), (old, fresh) -> new Calls(old.lastSuccess(), now, error));
     }
 
-    public Optional<Calls> calls(String jolokiaUrl) {
-        return Optional.ofNullable(byUrl.get(jolokiaUrl));
+    public Optional<Calls> calls(String managementUrl) {
+        return Optional.ofNullable(byUrl.get(managementUrl));
     }
 }

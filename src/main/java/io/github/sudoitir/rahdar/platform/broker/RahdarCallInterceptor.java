@@ -156,8 +156,8 @@ public class RahdarCallInterceptor implements CallInterceptor {
                 NodeDirectory nodes = directory.getIfAvailable();
                 if (nodes != null) {
                     nodes.nodes().stream()
-                            .filter(n -> n.jolokiaUrl() != null)
-                            .forEach(n -> byNode.put(n.id().toString(), n.jolokiaUrl()));
+                            .filter(n -> n.managementUrl() != null)
+                            .forEach(n -> byNode.put(n.id().toString(), n.managementUrl()));
                 }
                 current = new Snapshot(byNode, now);
             } catch (RuntimeException e) {

@@ -160,8 +160,8 @@ class MessageServiceTest {
         ClusterNode node = mock(ClusterNode.class);
         when(node.getId()).thenReturn(id);
         when(node.getName()).thenReturn(name);
-        when(node.getJolokiaUrl()).thenReturn(jolokia);
-        when(node.getCoreUrl()).thenReturn(core);
+        when(node.getManagementUrl()).thenReturn(jolokia);
+        when(node.getDataUrl()).thenReturn(core);
         when(node.getActive()).thenReturn(active);
         return node;
     }

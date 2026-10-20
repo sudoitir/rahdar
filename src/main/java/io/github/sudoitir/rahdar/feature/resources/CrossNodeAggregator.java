@@ -120,7 +120,7 @@ public class CrossNodeAggregator {
     }
 
     private static String logicalKey(ClusterNode n) {
-        return n.getArtemisNodeId() != null ? n.getArtemisNodeId() : "id:" + n.getId();
+        return n.getNativeNodeId() != null ? n.getNativeNodeId() : "id:" + n.getId();
     }
 
     private static Comparator<QueueView> comparatorFor(String field) {

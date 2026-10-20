@@ -70,7 +70,7 @@ class AlertEvaluatorIntegrationTest extends PostgresIntegrationTest {
     void aSustainedBreachFiresAfterTheDebounceAndResolvesWhenItClears() {
         ClusterEntity cluster = clusters.save(new ClusterEntity("c-" + UUID.randomUUID(), null, null));
         clusterId = cluster.getId();
-        BrokerNodeEntity node = nodes.save(BrokerNodeEntity.fromSeed(clusterId, "n1", "STANDALONE", "node-1"));
+        BrokerNodeEntity node = nodes.save(BrokerNodeEntity.fromSeed(clusterId, "n1", "NONE", "node-1"));
 
         AlertRuleEntity rule = rules.save(AlertRuleEntity.threshold(
                 clusterId, "Deep queue", new Condition("openbroker.backlog", "GT", 100.0), 0, "WARNING", null));
@@ -95,7 +95,7 @@ class AlertEvaluatorIntegrationTest extends PostgresIntegrationTest {
     void aDisabledRuleNeverEvaluates() {
         ClusterEntity cluster = clusters.save(new ClusterEntity("c-" + UUID.randomUUID(), null, null));
         clusterId = cluster.getId();
-        BrokerNodeEntity node = nodes.save(BrokerNodeEntity.fromSeed(clusterId, "n1", "STANDALONE", "node-1"));
+        BrokerNodeEntity node = nodes.save(BrokerNodeEntity.fromSeed(clusterId, "n1", "NONE", "node-1"));
 
         AlertRuleEntity rule = rules.save(AlertRuleEntity.threshold(
                 clusterId, "Deep queue", new Condition("openbroker.backlog", "GT", 100.0), 0, "WARNING", null));

@@ -37,7 +37,7 @@ class SetupReaderTest {
         when(node.getId()).thenReturn(NODE_ID);
         when(node.getName()).thenReturn("node-a");
         when(node.getActive()).thenReturn(active);
-        when(node.getArtemisNodeId()).thenReturn(artemisNodeId);
+        when(node.getNativeNodeId()).thenReturn(artemisNodeId);
         return node;
     }
 

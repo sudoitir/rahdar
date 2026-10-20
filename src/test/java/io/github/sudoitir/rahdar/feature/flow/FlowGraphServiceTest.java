@@ -348,7 +348,7 @@ class FlowGraphServiceTest {
         ClusterNode b = mock(ClusterNode.class);
         when(b.getId()).thenReturn(nodeB);
         when(b.getName()).thenReturn("node-b");
-        when(b.getArtemisNodeId()).thenReturn("abc-123");
+        when(b.getNativeNodeId()).thenReturn("abc-123");
         when(directory.nodes(clusterId)).thenReturn(List.of(a, b));
         route(
                 nodeA,
@@ -386,12 +386,12 @@ class FlowGraphServiceTest {
         ClusterNode serving = mock(ClusterNode.class);
         when(serving.getId()).thenReturn(nodeA);
         when(serving.getName()).thenReturn("artemis-secondary");
-        when(serving.getArtemisNodeId()).thenReturn("pair-2");
+        when(serving.getNativeNodeId()).thenReturn("pair-2");
         when(serving.getActive()).thenReturn(true);
         ClusterNode standby = mock(ClusterNode.class);
         when(standby.getId()).thenReturn(nodeB);
         when(standby.getName()).thenReturn("artemis-secondary-backup");
-        when(standby.getArtemisNodeId()).thenReturn("pair-2");
+        when(standby.getNativeNodeId()).thenReturn("pair-2");
         when(standby.getActive()).thenReturn(false);
         // The standby sorts after its serving endpoint, which is exactly how the directory lists them.
         when(directory.nodes(clusterId)).thenReturn(List.of(serving, standby));

@@ -345,7 +345,7 @@ public class ScrapeScheduler implements DisposableBean {
 
     private List<ClusterNode> manageableNodes(UUID clusterId) {
         return clusters.nodes(clusterId).stream()
-                .filter(n -> n.getJolokiaUrl() != null)
+                .filter(n -> n.getManagementUrl() != null)
                 .toList();
     }
 
@@ -376,7 +376,7 @@ public class ScrapeScheduler implements DisposableBean {
             Throwable root = NestedExceptionUtils.getMostSpecificCause(e);
             String why = root == e ? e.toString() : e + ", caused by " + root;
             if (!why.equals(lastFailures.put(key, why))) {
-                log.warn("The {} of {} ({}) failed: {}", jobName, node.getName(), node.getJolokiaUrl(), why);
+                log.warn("The {} of {} ({}) failed: {}", jobName, node.getName(), node.getManagementUrl(), why);
             }
         }
     }

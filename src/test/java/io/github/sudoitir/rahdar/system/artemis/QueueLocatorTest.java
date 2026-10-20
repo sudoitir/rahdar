@@ -52,7 +52,7 @@ class QueueLocatorTest {
     private static ClusterNode node() {
         ClusterNode node = mock(ClusterNode.class);
         when(node.getId()).thenReturn(UUID.randomUUID());
-        when(node.getJolokiaUrl()).thenReturn("http://broker:8161/console/jolokia");
+        when(node.getManagementUrl()).thenReturn("http://broker:8161/console/jolokia");
         when(node.getActive()).thenReturn(true);
         return node;
     }
