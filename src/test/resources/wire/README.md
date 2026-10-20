@@ -31,4 +31,6 @@ The bodies differ in these ways, each deliberate:
 - **A filtered browse may run over Core** as a browse-only consumer, with the count from `countMessages`; the
   driver chooses the channel.
 - **Classes that moved:** the Core transport, notification and TLS tests moved into OpenBroker with the Core
-  code; `BrokerAccountRolesBrokerTest` and `TransferPrimitivesTest` moved to `system.artemis`.
+  code; `BrokerAccountRolesBrokerTest` and `TransferPrimitivesTest` moved to `system.artemis`, and the relay's
+  cases moved from `TransferPrimitivesTest` to `BrokerRelayTest`, recorded here since, with two cases it lacked
+  before: a run stopped before the target commits, and a full target.

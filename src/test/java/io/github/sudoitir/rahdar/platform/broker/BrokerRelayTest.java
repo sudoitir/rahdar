@@ -12,6 +12,7 @@ import io.github.sudoitir.rahdar.platform.broker.RelayLink.Outcome;
 import io.github.sudoitir.rahdar.platform.broker.RelayedMessages.Provenance;
 import io.github.sudoitir.rahdar.support.ArtemisIntegrationTest;
 import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
+import io.github.sudoitir.rahdar.system.artemis.ManagementResponse;
 import jakarta.jms.BytesMessage;
 import jakarta.jms.Connection;
 import jakarta.jms.Message;
@@ -133,6 +134,75 @@ class BrokerRelayTest extends ArtemisIntegrationTest {
         assertThat(duplicates).isEqualTo(3);
         assertThat(drain(target)).hasSize(3);
         assertThat(drain(source)).isEmpty();
+    }
+
+    @Test
+    void aRunKilledBeforeTheTargetCommitsLeavesNothingOnTheTargetAndLosesNothing() throws Exception {
+        String source = "relay.kill.src." + suffix;
+        String target = "relay.kill.dst." + suffix;
+        createQueue(source);
+        createQueue(target);
+        produce(source, 3);
+        UUID run = UUID.randomUUID();
+
+        // First pass: the batch is sent, then Rahdar "dies" before the target commits it.
+        try (RelayLink link = relay.link(node, node, staged(source, target, run))) {
+            assertThatThrownBy(() -> link.relay(10, new Hooks() {
+                        @Override
+                        public void beforeTargetCommit(List<Long> sourceIds) {
+                            throw new IllegalStateException("stopped in the middle of the batch");
+                        }
+                    }))
+                    .isInstanceOf(IllegalStateException.class);
+        }
+
+        // Second pass: nothing reached the target, so every message is delivered once, none a duplicate.
+        int delivered = 0;
+        int duplicates = 0;
+        try (RelayLink link = relay.link(node, node, staged(source, target, run))) {
+            for (int pass = 0; pass < 4; pass++) {
+                Batch b = link.relay(10, new Hooks() {});
+                if (b.outcome() == Outcome.EMPTY) {
+                    break;
+                }
+                delivered += b.delivered();
+                duplicates += b.duplicates();
+            }
+        }
+
+        assertThat(delivered).isEqualTo(3);
+        assertThat(duplicates).isZero();
+        assertThat(drain(target)).hasSize(3);
+        assertThat(drain(source)).isEmpty();
+    }
+
+    @Test
+    void aFullTargetRefusesTheBatchAndTheSourceKeepsIt() throws Exception {
+        String source = "relay.full.src." + suffix;
+        String target = "relay.full.dst." + suffix;
+        createQueue(source);
+        createQueue(target);
+        ManagementResponse limited = client.execOnBroker(
+                "addAddressSettings(java.lang.String,java.lang.String)",
+                target,
+                "{\"maxSizeBytes\":1024,\"pageSizeBytes\":512,\"addressFullMessagePolicy\":\"FAIL\"}");
+        assertThat(limited.ok()).as("%s", limited).isTrue();
+        try {
+            // The target takes one large message while it is empty, and is full from then on.
+            produceTextAndLarge(target, new byte[8192]);
+            produce(source, 3);
+
+            Batch batch;
+            try (RelayLink link = relay.link(node, node, staged(source, target, UUID.randomUUID()))) {
+                batch = link.relay(10, new Hooks() {});
+            }
+
+            assertThat(batch.outcome()).isEqualTo(Outcome.ADDRESS_FULL);
+            assertThat(batch.delivered()).isZero();
+            assertThat(drain(source)).hasSize(3);
+        } finally {
+            client.execOnBroker("removeAddressSettings(java.lang.String)", target);
+        }
     }
 
     @Test
