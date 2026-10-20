@@ -95,6 +95,8 @@ Any HTTP load balancer works if it:
 - does not buffer `GET /api/v1/stream` (Server-Sent Events): `proxy_buffering off` in nginx; HAProxy and
   Traefik work as they are;
 - keeps idle connections open for longer than 20 s, the stream's keep-alive interval;
+- passes `%2F` and `%25` in a path through unchanged, as a resource id needs them (see
+  [Behind a reverse proxy](./quickstart.md#behind-a-reverse-proxy));
 - needs no session affinity.
 
 `deploy/compose/ha/haproxy.cfg` is a working example.

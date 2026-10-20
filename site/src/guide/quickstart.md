@@ -125,6 +125,16 @@ front of Rahdar **must not buffer it**:
 Without this the topology graph and the queue grid only update on the 5-second
 poll, which looks like a product that is barely alive.
 
+A resource is addressed by its id in one URL segment, so a name that holds a slash
+or a percent sign arrives as `%2F` or `%25`
+(`/api/v1/clusters/…/resources/artemis.queue/orders%252Feu`). The proxy must pass
+those through as they came, or such a resource cannot be reached:
+
+- nginx — `proxy_pass` **without** a URI part (`proxy_pass http://rahdar:8080;`, not
+  `http://rahdar:8080/`), which forwards the request line unchanged
+- Apache — `AllowEncodedSlashes NoDecode` and `ProxyPass … nocanon`
+- HAProxy and Traefik — work as they are
+
 ## Try it against throwaway brokers
 
 If you want to see it working before pointing it at anything real, the
