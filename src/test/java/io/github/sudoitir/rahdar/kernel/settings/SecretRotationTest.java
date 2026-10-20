@@ -163,7 +163,7 @@ class SecretRotationTest extends PostgresIntegrationTest {
                 UUID.randomUUID(),
                 vault.seal("message|" + clusterId, "message-original"));
         jdbc.update(
-                "INSERT INTO rr_flow (id, reply_kind, state, cluster_id) VALUES (?, 'SHARED_QUEUE', 'COMPLETED', ?)",
+                "INSERT INTO rr_flow (id, reply_kind, state, cluster_id) VALUES (?, 'SHARED', 'COMPLETED', ?)",
                 flowId,
                 clusterId);
         String eventAad = "rr|" + flowId;

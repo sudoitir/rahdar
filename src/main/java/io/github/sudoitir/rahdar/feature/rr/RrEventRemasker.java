@@ -54,7 +54,7 @@ class RrEventRemasker implements StoredContentRemasker {
     public int remask(int version, int limit) {
         List<Stale> rows = jdbc.query(
                 "SELECT e.seq, e.flow_id, e.kind, e.ts, e.detail::text AS detail, f.cluster_id,"
-                        + " CASE WHEN e.kind = 'REQUEST_SEEN' THEN f.request_address ELSE f.reply_destination END"
+                        + " CASE WHEN e.kind = 'REQUEST_SEEN' THEN f.request_destination ELSE f.reply_destination END"
                         + " AS address "
                         + STALE
                         + " LIMIT ? FOR UPDATE OF e SKIP LOCKED",

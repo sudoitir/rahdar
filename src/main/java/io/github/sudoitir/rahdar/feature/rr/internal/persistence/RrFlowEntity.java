@@ -40,7 +40,7 @@ public class RrFlowEntity {
     private UUID nodeId;
 
     /** Null only for a flow created directly in {@code ORPHANED_REPLY} — the request side was never observed. */
-    @Column(name = "request_address", updatable = false)
+    @Column(name = "request_destination", updatable = false)
     private String requestAddress;
 
     @Column(name = "reply_destination")

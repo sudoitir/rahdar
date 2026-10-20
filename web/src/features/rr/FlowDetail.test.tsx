@@ -14,7 +14,7 @@ function flow(over: Record<string, unknown> = {}) {
     nodeId: null,
     requestAddress: 'orders.request',
     replyDestination: null,
-    replyKind: 'SHARED_QUEUE',
+    replyKind: 'SHARED',
     state: 'AWAITING_REPLY',
     correlationId: null,
     requestedAt: '2026-09-04T10:00:00.000Z',
@@ -49,7 +49,7 @@ describe('FlowDetail', () => {
     serve(
       flow({
         state: 'COMPLETED',
-        replyKind: 'TEMP_QUEUE',
+        replyKind: 'TEMPORARY',
         correlationId: 'corr-1',
         replyDestination: 'reply.tmp',
         deadlineAt: '2026-09-04T10:00:30.000Z',

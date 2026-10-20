@@ -51,7 +51,7 @@ class RrDeadlineSweepTest extends PostgresIntegrationTest {
                 null,
                 "rr.request",
                 null,
-                "SHARED_QUEUE",
+                "SHARED",
                 "corr-sweep",
                 "m-" + UUID.randomUUID(),
                 past,
@@ -88,15 +88,7 @@ class RrDeadlineSweepTest extends PostgresIntegrationTest {
         cluster();
         Instant now = Instant.now();
         RrFlowEntity flow = flows.save(new RrFlowEntity(new RrFlowEntity.Awaiting(
-                clusterId,
-                null,
-                "rr.request",
-                null,
-                "SHARED_QUEUE",
-                "corr-future",
-                "m-future",
-                now,
-                now.plusSeconds(300))));
+                clusterId, null, "rr.request", null, "SHARED", "corr-future", "m-future", now, now.plusSeconds(300))));
 
         sweep.sweep();
 

@@ -148,7 +148,7 @@ public class RrCorrelator implements RrObservationSink {
         }
 
         RrExpectationEntity expectation = expectationFor(r.clusterId(), r.requestAddress());
-        String replyKind = r.replyTo() != null ? "TEMP_QUEUE" : "SHARED_QUEUE";
+        String replyKind = r.replyTo() != null ? "TEMPORARY" : "SHARED";
         // A shared-queue flow is stamped with its reply destination only when it is
         // knowable in advance — one resolved literal. Under a pattern the stamp would
         // be a guess and wrong most of the time, so the joining reply fills it in
@@ -203,7 +203,7 @@ public class RrCorrelator implements RrObservationSink {
         List<RrFlowEntity> matches =
                 flows.findOpenMatches(r.clusterId(), r.replyDestination(), r.correlationId(), PageRequest.of(0, 1));
         if (matches.isEmpty()) {
-            String replyKind = r.correlationId() != null ? "SHARED_QUEUE" : "TEMP_QUEUE";
+            String replyKind = r.correlationId() != null ? "SHARED" : "TEMPORARY";
             RrFlowEntity orphan = RrFlowEntity.orphanedReply(
                     r.clusterId(), r.nodeId(), r.replyDestination(), replyKind, r.correlationId(), r.at());
             flows.save(orphan);

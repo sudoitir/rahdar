@@ -51,7 +51,7 @@ function flow(over: Record<string, unknown> = {}) {
     nodeId: null,
     requestAddress: 'orders.request',
     replyDestination: null,
-    replyKind: 'SHARED_QUEUE',
+    replyKind: 'SHARED',
     state: 'AWAITING_REPLY',
     correlationId: 'corr-1',
     requestedAt: '2026-09-04T10:00:00.000Z',

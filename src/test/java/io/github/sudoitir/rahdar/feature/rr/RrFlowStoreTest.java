@@ -54,8 +54,8 @@ class RrFlowStoreTest extends PostgresIntegrationTest {
         TestPartitions.ensure(plain, "rr_event", LocalDate.now(ZoneOffset.UTC).minusDays(ageDays));
         UUID id = UUID.randomUUID();
         jdbc.update("""
-                INSERT INTO rr_flow (id, requested_at, request_address, reply_kind, state, cluster_id)
-                VALUES (:id, now() - make_interval(days => :age), 'rr.store', 'SHARED_QUEUE', 'COMPLETED', :c)
+                INSERT INTO rr_flow (id, requested_at, request_destination, reply_kind, state, cluster_id)
+                VALUES (:id, now() - make_interval(days => :age), 'rr.store', 'SHARED', 'COMPLETED', :c)
                 """, Map.of("id", id, "age", ageDays, "c", clusterId));
         jdbc.update("""
                 INSERT INTO rr_event (ts, kind, detail, flow_id)
