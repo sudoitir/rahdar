@@ -2,11 +2,7 @@ package io.github.sudoitir.rahdar.feature.diagnostics.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
-import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
-import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -23,6 +19,7 @@ import io.github.sudoitir.rahdar.kernel.security.Grant;
 import io.github.sudoitir.rahdar.kernel.security.Permissions;
 import io.github.sudoitir.rahdar.kernel.security.RahdarPrincipal;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
+import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
 import io.github.sudoitir.rahdar.platform.broker.QueueRow;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterSecrets;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNodeEntity;
@@ -31,12 +28,10 @@ import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterE
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterRepository;
 import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshotUpsert;
 import io.github.sudoitir.rahdar.support.AdminAuthenticationExtension;
+import io.github.sudoitir.rahdar.support.FakeArtemis;
 import io.github.sudoitir.rahdar.support.FixtureJolokia;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
-import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
-import io.github.sudoitir.rahdar.system.artemis.ArtemisNodes;
 import java.io.ByteArrayInputStream;
-import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -53,7 +48,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.env.Environment;
-import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.MediaType;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -71,9 +65,6 @@ class DiagnosticsControllerTest extends PostgresIntegrationTest {
 
     private static final String URL = "http://diag:8161/console/jolokia";
     private static final String Q = "DIAG.Q";
-    private static final String SEARCH =
-            "{\"value\":[\"org.apache.activemq.artemis:broker=\\\"primary\\\"\"],\"status\":200}";
-
     private final JsonMapper json = new JsonMapper();
 
     MockMvc mvc;
@@ -106,9 +97,10 @@ class DiagnosticsControllerTest extends PostgresIntegrationTest {
     BrokerConnections connections;
 
     @MockitoBean
-    ArtemisNodes artemisNodes;
+    BrokerGateway gateway;
 
     private UUID clusterId;
+    private UUID nodeId;
 
     @BeforeEach
     void setUp() {
@@ -118,7 +110,7 @@ class DiagnosticsControllerTest extends PostgresIntegrationTest {
         BrokerNodeEntity node = BrokerNodeEntity.fromSeed(
                 clusterId, "node-a", "PRIMARY", UUID.randomUUID().toString());
         node.attachSeedUrl(URL);
-        UUID nodeId = nodes.save(node).getId();
+        nodeId = nodes.save(node).getId();
         upsert.upsertBatch(List.of(
                 new QueueRow(clusterId, nodeId, Q, Q, "ANYCAST", true, 0, 0, 0, 0, 0, 0, 0, false, "artemis.queue")));
     }
@@ -137,7 +129,8 @@ class DiagnosticsControllerTest extends PostgresIntegrationTest {
         LoggerFactory.getLogger(DiagnosticsControllerTest.class)
                 .warn("broker login failed password={} for tcp://bob:{}@broker:61616", loggedPassword, loggedPassword);
         secrets.store(clusterId, "diag", "bob", storedPassword);
-        when(artemisNodes.on(eq(clusterId), any(UUID.class))).thenReturn(client(SEARCH, fixture("send-message.json")));
+        FakeArtemis broker = new FakeArtemis().queue(Q).operation("sendMessage", "ID:1");
+        when(gateway.cluster(clusterId)).thenReturn(FixtureJolokia.cluster(Map.of(nodeId, broker.agent())));
         mvc.perform(post("/api/v1/clusters/{c}/queues/{q}/messages", clusterId, Q)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"kind\":\"TEXT\",\"durable\":true,\"body\":\"%s\",\"properties\":{\"k\":\"%s\"}}"
@@ -267,17 +260,5 @@ class DiagnosticsControllerTest extends PostgresIntegrationTest {
         SecurityContextHolder.getContext()
                 .setAuthentication(
                         UsernamePasswordAuthenticationToken.authenticated(principal, null, principal.getAuthorities()));
-    }
-
-    private ArtemisNode client(String... bodies) {
-        FixtureJolokia server = new FixtureJolokia();
-        for (String b : bodies) {
-            server.expect(requestTo(URL)).andRespond(withSuccess(b, MediaType.APPLICATION_JSON));
-        }
-        return server.node();
-    }
-
-    private static String fixture(String name) throws IOException {
-        return new String(new ClassPathResource("jolokia/" + name).getContentAsByteArray(), StandardCharsets.UTF_8);
     }
 }
