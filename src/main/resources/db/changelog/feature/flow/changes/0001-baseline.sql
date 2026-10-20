@@ -15,8 +15,8 @@ CREATE TABLE flow_client_edge (
     user_name text DEFAULT ''::text NOT NULL,
     remote_host text DEFAULT ''::text NOT NULL,
     protocol text DEFAULT ''::text NOT NULL,
-    address text DEFAULT ''::text NOT NULL,
-    queue_name text DEFAULT ''::text NOT NULL,
+    destination text DEFAULT ''::text NOT NULL,
+    subscription text DEFAULT ''::text NOT NULL,
     node_id uuid NOT NULL,
     cluster_id uuid NOT NULL,
     stalled boolean DEFAULT false NOT NULL,
@@ -47,7 +47,8 @@ CREATE TABLE flow_route (
     sampled_at timestamp with time zone NOT NULL,
     rate double precision,
     counter bigint DEFAULT 0 NOT NULL,
-    kind text NOT NULL,
+    route_class text NOT NULL,
+    native_kind text NOT NULL,
     name text NOT NULL,
     source text DEFAULT ''::text NOT NULL,
     target text DEFAULT ''::text NOT NULL,
@@ -57,12 +58,12 @@ CREATE TABLE flow_route (
     cluster_id uuid NOT NULL,
     exclusive boolean DEFAULT false NOT NULL,
     connected boolean DEFAULT true NOT NULL,
-    CONSTRAINT ck_flow_route_kind CHECK ((kind = ANY (ARRAY['DIVERT'::text, 'BRIDGE'::text, 'STORE_AND_FORWARD'::text, 'TEMPORARY_QUEUE'::text, 'QUEUE_FILTER'::text, 'DEAD_LETTER'::text, 'EXPIRY'::text])))
+    CONSTRAINT ck_flow_route_class CHECK ((route_class = ANY (ARRAY['BINDING'::text, 'FORWARD'::text, 'LINK'::text])))
 )
 WITH (fillfactor='70', autovacuum_vacuum_scale_factor='0.02', autovacuum_analyze_scale_factor='0.02', autovacuum_vacuum_cost_delay='2');
 
 ALTER TABLE ONLY flow_client_edge
-    ADD CONSTRAINT pk_flow_client_edge PRIMARY KEY (node_id, kind, client_id, user_name, remote_host, protocol, address, queue_name);
+    ADD CONSTRAINT pk_flow_client_edge PRIMARY KEY (node_id, kind, client_id, user_name, remote_host, protocol, destination, subscription);
 
 ALTER TABLE ONLY flow_demand
     ADD CONSTRAINT pk_flow_demand PRIMARY KEY (cluster_id);
@@ -71,7 +72,7 @@ ALTER TABLE ONLY flow_node_sample
     ADD CONSTRAINT pk_flow_node_sample PRIMARY KEY (node_id);
 
 ALTER TABLE ONLY flow_route
-    ADD CONSTRAINT pk_flow_route PRIMARY KEY (node_id, kind, name, source, target);
+    ADD CONSTRAINT pk_flow_route PRIMARY KEY (node_id, native_kind, name, source, target);
 
 CREATE INDEX ix_flow_client_edge_cluster ON flow_client_edge USING btree (cluster_id);
 

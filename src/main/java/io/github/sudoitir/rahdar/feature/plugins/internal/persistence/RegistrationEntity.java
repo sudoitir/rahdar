@@ -35,7 +35,7 @@ public class RegistrationEntity {
     @Column(name = "cluster_id", nullable = false)
     private UUID clusterId;
 
-    @Column(name = "queue_name", nullable = false)
+    @Column(name = "subscription", nullable = false)
     private String queue;
 
     @Enumerated(EnumType.STRING)

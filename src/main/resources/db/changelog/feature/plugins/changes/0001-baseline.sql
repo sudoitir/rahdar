@@ -11,7 +11,7 @@ CREATE TABLE plugin_message_registration (
     concurrency integer DEFAULT 1 NOT NULL,
     plugin_id text NOT NULL,
     reg_key text NOT NULL,
-    queue_name text NOT NULL,
+    subscription text NOT NULL,
     mode text NOT NULL,
     id uuid DEFAULT uuidv7() NOT NULL,
     cluster_id uuid NOT NULL,

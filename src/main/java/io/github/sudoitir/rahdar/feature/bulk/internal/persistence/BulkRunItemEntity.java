@@ -37,7 +37,7 @@ public class BulkRunItemEntity {
     @Column(name = "ordinal", nullable = false, updatable = false)
     private int ordinal;
 
-    @Column(name = "queue_name", nullable = false, updatable = false)
+    @Column(name = "subscription", nullable = false, updatable = false)
     private String queueName;
 
     @Enumerated(EnumType.STRING)

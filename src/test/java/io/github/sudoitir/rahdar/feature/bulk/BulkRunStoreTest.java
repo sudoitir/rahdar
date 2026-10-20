@@ -59,7 +59,7 @@ class BulkRunStoreTest extends PostgresIntegrationTest {
                 VALUES (?, ?, 'PAUSE', ?, 'test', 'h', '{}'::jsonb, '{}'::jsonb, 1, true,
                         now() - ?::interval, now() - ?::interval, now() + ?::interval)""", id, clusterId, status, createdAgo, finishedAgo, expiresIn);
         jdbc.update(
-                "INSERT INTO bulk_run_item (id, run_id, ordinal, queue_name, status, estimate)"
+                "INSERT INTO bulk_run_item (id, run_id, ordinal, subscription, status, estimate)"
                         + " VALUES (?, ?, 0, 'q', 'SUCCEEDED', '{}'::jsonb)",
                 UUID.randomUUID(),
                 id);
