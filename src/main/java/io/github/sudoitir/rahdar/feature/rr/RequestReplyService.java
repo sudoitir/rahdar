@@ -30,8 +30,8 @@ import io.github.sudoitir.rahdar.kernel.security.Permissions;
 import io.github.sudoitir.rahdar.kernel.security.ResourceFilter;
 import io.github.sudoitir.rahdar.kernel.security.ResourceRef;
 import io.github.sudoitir.rahdar.kernel.settings.SettingsService;
+import io.github.sudoitir.rahdar.platform.broker.BrokerNotifications;
 import io.github.sudoitir.rahdar.platform.broker.ClockOffsetService;
-import io.github.sudoitir.rahdar.platform.broker.CoreSubscriptionManager;
 import io.github.sudoitir.rahdar.platform.broker.SubscriptionVerdict;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
@@ -77,7 +77,7 @@ public class RequestReplyService {
     private final ReplyAddressResolver replyAddresses;
     private final ClusterDirectory nodes;
     private final RrSamplerHealth samplerHealth;
-    private final CoreSubscriptionManager subscriptions;
+    private final BrokerNotifications subscriptions;
     private final ClockOffsetService clocks;
     private final SettingsService settings;
     private final PermissionResolver permissions;

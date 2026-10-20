@@ -264,15 +264,15 @@ capability ledger + `broker.xml` advice).
 
 ### Event path (push)
 
-The Core client (`artemis-jakarta-client`) subscribes to `activemq.notifications`
-on every *serving* node of a cluster (ADR-0026). `CoreSubscriptionManager`
-reconciles the subscription set against the live topology at the end of each
-tier-A scrape, so a failover is followed — a subscription moves to the survivor,
-not to a configured node. The subscriber polls `receive(timeout)` on a virtual
-thread (a `MessageListener` deadlocks against `close()` on the pinned client),
-and Rahdar drives its own reconnect with backoff (the broker advertises
-connector hosts a client often cannot resolve). Each notification is normalised
-to a `BrokerEvent` and handed to every `BrokerEventSink`. The events feature's
+`BrokerNotifications` keeps one notification stream from the broker SDK on every
+*serving* node of a cluster (ADR-0026, ADR-0203). It reconciles the streams against the
+live topology at the end of each tier-A scrape, so a failover is followed — a stream
+moves to the survivor, not to a configured node. The SDK reconnects a stream with
+backoff and reports what it may have missed as a gap; for Artemis the driver
+subscribes to `activemq.notifications` over Core. Each event arrives in the SDK's
+standard terms (`openbroker.consumer.attached`, with its destination, subscription and
+consumer named under standard keys), becomes a `BrokerEvent`, and is handed to every
+`BrokerEventSink`. The events feature's
 buffered writer (ADR-0028) batch-inserts into `broker_event`; the buffer is bounded
 and overflow increments a per-cluster `dropped` counter the events API surfaces. A
 reaper trims past a retention window (default 72h, a `rahdar_setting`).
@@ -366,8 +366,8 @@ Both patterns are handled by one correlator:
   join on `JMSCorrelationID` / `_AMQ_CORRELATION_ID`, compute latency. No reply
   past the deadline → `TIMED_OUT`; reply with no request → `ORPHANED_REPLY`.
 - **Temporary reply queues** — invisible to browsing; reconstructed from the
-  notification lifecycle (`BINDING_ADDED` → `CONSUMER_CREATED` → … →
-  `CONSUMER_CLOSED` / `BINDING_REMOVED`):
+  event lifecycle (`openbroker.resource.created` → `openbroker.consumer.attached` → … →
+  `openbroker.consumer.detached` / `openbroker.resource.deleted`):
 
   | Observed | State |
   |---|---|

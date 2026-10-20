@@ -15,7 +15,7 @@ class BrokerShutdownSteps {
     }
 
     @Bean
-    ShutdownStep subscriptionsShutdown(CoreSubscriptionManager subscriptions) {
+    ShutdownStep subscriptionsShutdown(BrokerNotifications subscriptions) {
         return new ShutdownStep("subscriptions", ShutdownPhases.SUBSCRIPTIONS, subscriptions::closeAll);
     }
 

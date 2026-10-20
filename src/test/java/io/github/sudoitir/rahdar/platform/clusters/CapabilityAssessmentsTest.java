@@ -15,8 +15,8 @@ import io.github.sudoitir.rahdar.platform.broker.BrokerCapabilities.CapabilityAs
 import io.github.sudoitir.rahdar.platform.broker.BrokerCapabilityProbe;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
 import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
+import io.github.sudoitir.rahdar.platform.broker.BrokerNotifications;
 import io.github.sudoitir.rahdar.platform.broker.BrokerTarget;
-import io.github.sudoitir.rahdar.platform.broker.CoreSubscriptionManager;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNodeEntity;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNodeRepository;
 import java.time.Duration;
@@ -44,7 +44,7 @@ class CapabilityAssessmentsTest {
     private final BrokerCapabilityProbe probe = mock(BrokerCapabilityProbe.class);
     private final RahdarBus bus = mock(RahdarBus.class);
     private final CapabilityAssessments assessments = new CapabilityAssessments(
-            nodes, gateway, probe, mock(CapabilityLedger.class), mock(CoreSubscriptionManager.class), bus);
+            nodes, gateway, probe, mock(CapabilityLedger.class), mock(BrokerNotifications.class), bus);
     private final BrokerCapabilities result = new BrokerCapabilities(
             CapabilityAssessment.available("read"),
             CapabilityAssessment.unknown("write", null),

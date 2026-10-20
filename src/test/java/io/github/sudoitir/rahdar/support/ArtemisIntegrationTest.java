@@ -115,13 +115,18 @@ public abstract class ArtemisIntegrationTest {
      * for it, for code that reaches a cluster through the gateway.
      */
     public static ClusterConnection cluster(UUID nodeId) {
+        return cluster(nodeId, coreUrl());
+    }
+
+    /** As {@link #cluster(UUID)}, with the node's data plane at the given address. */
+    public static ClusterConnection cluster(UUID nodeId, String core) {
         return DRIVERS.connect(new ConnectRequest(
                 BrokerGateway.SYSTEM,
                 ClusterSpec.ofNodes(List.of(new NodeSpec(
                         BrokerGateway.idOf(nodeId),
                         List.of(
                                 new Endpoint(Plane.MANAGEMENT, BrokerGateway.JOLOKIA, jolokiaUrl()),
-                                new Endpoint(Plane.DATA, BrokerGateway.CORE, coreUrl()))))),
+                                new Endpoint(Plane.DATA, BrokerGateway.CORE, core))))),
                 CredentialSource.of(Credentials.of(BROKER_USER, BROKER_PASSWORD)),
                 ConnectOptions.defaults()));
     }

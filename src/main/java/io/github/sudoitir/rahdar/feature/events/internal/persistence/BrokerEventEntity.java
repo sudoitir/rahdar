@@ -43,30 +43,30 @@ public class BrokerEventEntity {
     @Column(name = "type", nullable = false, updatable = false)
     private String type;
 
-    @Column(name = "address", updatable = false)
-    private String address;
+    @Column(name = "destination", updatable = false)
+    private String destination;
 
-    @Column(name = "routing_name", updatable = false)
-    private String routingName;
+    @Column(name = "subscription", updatable = false)
+    private String subscription;
 
-    @Column(name = "consumer_name", updatable = false)
-    private String consumerName;
+    @Column(name = "consumer", updatable = false)
+    private String consumer;
 
-    @Column(name = "session_name", updatable = false)
-    private String sessionName;
+    @Column(name = "channel", updatable = false)
+    private String channel;
 
-    @Column(name = "connection_name", updatable = false)
-    private String connectionName;
+    @Column(name = "connection", updatable = false)
+    private String connection;
 
     @Column(name = "remote_address", updatable = false)
     private String remoteAddress;
 
-    @Column(name = "username", updatable = false)
-    private String username;
+    @Column(name = "principal", updatable = false)
+    private String principal;
 
     @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "props", updatable = false)
-    private String props;
+    @Column(name = "data", updatable = false)
+    private String data;
 
     @Column(name = "cluster_id", nullable = false, updatable = false)
     private UUID clusterId;

@@ -13,18 +13,19 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class BrokerSessions {
 
-    private final CoreSubscriptionManager subscriptions;
+    private final BrokerNotifications subscriptions;
     private final CorePool pool;
     private final CoreRelay relay;
+    private final BrokerGateway gateway;
 
     /**
-     * Release a removed cluster's Core connections and drop its in-memory subscription state,
-     * so it is not retried.
+     * Release a removed cluster's connections and notification streams, so they are not retried.
      */
     public void release(UUID clusterId) {
         subscriptions.forget(clusterId);
         pool.forget(clusterId);
         relay.forget(clusterId);
+        gateway.forget(clusterId);
     }
 
     /**
@@ -35,6 +36,7 @@ public class BrokerSessions {
         Set<UUID> gone = new HashSet<>(subscriptions.clusterIds());
         gone.addAll(pool.clusterIds());
         gone.addAll(relay.clusterIds());
+        gone.addAll(gateway.clusterIds());
         gone.removeAll(existing);
         gone.forEach(this::release);
     }

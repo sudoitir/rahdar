@@ -9,8 +9,8 @@ import io.github.sudoitir.rahdar.platform.broker.BrokerCapabilities;
 import io.github.sudoitir.rahdar.platform.broker.BrokerCapabilityProbe;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
 import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
+import io.github.sudoitir.rahdar.platform.broker.BrokerNotifications;
 import io.github.sudoitir.rahdar.platform.broker.BrokerTarget;
-import io.github.sudoitir.rahdar.platform.broker.CoreSubscriptionManager;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNodeEntity;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNodeRepository;
 import java.time.Duration;
@@ -58,7 +58,7 @@ public class CapabilityAssessments {
     private final BrokerGateway gateway;
     private final BrokerCapabilityProbe probe;
     private final CapabilityLedger ledger;
-    private final CoreSubscriptionManager coreSubscriptions;
+    private final BrokerNotifications coreSubscriptions;
     private final RahdarBus bus;
 
     private final AsyncCache<UUID, Outcome> cache;
@@ -68,7 +68,7 @@ public class CapabilityAssessments {
             BrokerGateway gateway,
             BrokerCapabilityProbe probe,
             CapabilityLedger ledger,
-            CoreSubscriptionManager coreSubscriptions,
+            BrokerNotifications coreSubscriptions,
             RahdarBus bus) {
         this.nodes = nodes;
         this.gateway = gateway;

@@ -2,10 +2,9 @@ package io.github.sudoitir.rahdar.feature.metrics;
 
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
 import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
+import io.github.sudoitir.rahdar.platform.broker.BrokerNotifications;
 import io.github.sudoitir.rahdar.platform.broker.BrokerSessions;
-import io.github.sudoitir.rahdar.platform.broker.CoreAccountCheck;
-import io.github.sudoitir.rahdar.platform.broker.CoreSubscriptionCheck;
-import io.github.sudoitir.rahdar.platform.broker.CoreSubscriptionManager;
+import io.github.sudoitir.rahdar.platform.broker.DataPlaneCheck;
 import io.github.sudoitir.rahdar.platform.broker.NodeCallLimiter;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.NodeStateRecorder;
@@ -38,13 +37,10 @@ class MetricsModuleTest extends ModuleIntegrationTest {
     BrokerSessions sessions;
 
     @MockitoBean
-    CoreAccountCheck coreAccountCheck;
+    DataPlaneCheck dataPlaneCheck;
 
     @MockitoBean
-    CoreSubscriptionCheck coreSubscriptionCheck;
-
-    @MockitoBean
-    CoreSubscriptionManager coreSubscriptions;
+    BrokerNotifications coreSubscriptions;
 
     @MockitoBean
     NodeCallLimiter limiter;

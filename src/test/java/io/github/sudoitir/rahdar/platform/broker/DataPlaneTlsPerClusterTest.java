@@ -2,14 +2,16 @@ package io.github.sudoitir.rahdar.platform.broker;
 
 import static io.github.sudoitir.rahdar.support.ArtemisIntegrationTest.BROKER_PASSWORD;
 import static io.github.sudoitir.rahdar.support.ArtemisIntegrationTest.BROKER_USER;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
 
+import io.github.sudoitir.openbroker.BrokerDrivers;
 import io.github.sudoitir.rahdar.support.ArtemisIntegrationTest;
-import jakarta.jms.Connection;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -26,11 +28,11 @@ import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.utility.MountableFile;
 
 /**
- * Two brokers whose certificates chain to two different authorities, connected at the same time
- * (ADR-0098, core-transport spec). The authorities are generated with {@code keytool} for each run,
- * so no key material is checked in.
+ * Two brokers whose certificates chain to two different authorities, reached over Core at the same
+ * time, each with its own cluster's TLS bundle (ADR-0098, core-transport spec). The authorities are
+ * generated with {@code keytool} for each run, so no key material is checked in.
  */
-class CoreTlsPerClusterTest {
+class DataPlaneTlsPerClusterTest {
 
     private static final String STORE_PASSWORD = "changeit";
     private static final String OVERRIDE = "/var/lib/artemis-instance/etc-override/";
@@ -41,7 +43,7 @@ class CoreTlsPerClusterTest {
     private static final List<GenericContainer<?>> brokers = new ArrayList<>();
     private static GenericContainer<?> brokerA;
     private static GenericContainer<?> brokerB;
-    private static CoreConnectionFactory factory;
+    private static DataPlaneCheck check;
 
     @BeforeAll
     static void start() throws Exception {
@@ -61,10 +63,13 @@ class CoreTlsPerClusterTest {
         DefaultSslBundleRegistry bundles = new DefaultSslBundleRegistry();
         bundles.registerBundle("ca-a", trusting(caA));
         bundles.registerBundle("ca-b", trusting(caB));
-        factory = new CoreConnectionFactory(
-                new BrokerProperties(Duration.ofSeconds(5), Duration.ofSeconds(10), 2_000),
-                bundles,
-                BrokerCallGuard.OFF);
+        check = new DataPlaneCheck(new BrokerGateway(
+                BrokerDrivers.load(),
+                mock(NodeDirectory.class),
+                mock(ConnectionSettingsSource.class),
+                new BrokerTls(bundles),
+                mock(RahdarCallInterceptor.class),
+                new BrokerTimeouts(new BrokerProperties(Duration.ofSeconds(5), Duration.ofSeconds(10), 2_000))));
     }
 
     @AfterAll
@@ -73,41 +78,53 @@ class CoreTlsPerClusterTest {
     }
 
     @Test
-    void bothClustersConnectAtOnceEachTrustingOnlyItsOwnAuthority() throws Exception {
-        try (Connection a = connect(brokerA, "ca-a");
-                Connection b = connect(brokerB, "ca-b")) {
-            a.start();
-            b.start();
-            // A connection opened after the other cluster's must still trust its own authority.
-            try (Connection again = connect(brokerA, "ca-a")) {
-                again.start();
-            }
-        }
-        assertThatThrownBy(() -> openAndClose(brokerB, "ca-a"))
+    void bothClustersConnectAtOnceEachTrustingOnlyItsOwnAuthority() {
+        assertThat(check(brokerA, "ca-a").accounts()).containsExactly(AccountResult.ACCEPTED);
+        assertThat(check(brokerB, "ca-b").accounts()).containsExactly(AccountResult.ACCEPTED);
+        // A connection opened after the other cluster's must still trust its own authority.
+        assertThat(check(brokerA, "ca-a").accounts()).containsExactly(AccountResult.ACCEPTED);
+
+        DataPlaneCheck.Result wrong = check(brokerB, "ca-a");
+        assertThat(wrong.accounts())
                 .as("broker B's certificate is not signed by authority A")
-                .isInstanceOf(Exception.class);
+                .containsExactly(AccountResult.UNREACHABLE);
+        // The client reports a refused handshake as a failed connect, without the TLS cause.
+        assertThat(wrong.verdict()).isInstanceOf(SubscriptionVerdict.Failed.class);
     }
 
     @Test
-    void anUndefinedBundleFailsOnlyItsOwnClusterAndNamesTheBundle() throws Exception {
-        assertThatThrownBy(() -> connect(brokerB, "no-such-bundle"))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("no-such-bundle");
-        try (Connection a = connect(brokerA, "ca-a")) {
-            a.start();
-        }
+    void anUndefinedBundleFailsOnlyItsOwnClusterAndNamesTheBundle() {
+        assertThat(check(brokerB, "no-such-bundle").verdict())
+                .isInstanceOfSatisfying(
+                        SubscriptionVerdict.Failed.class,
+                        f -> assertThat(f.reason()).contains("no-such-bundle"));
+        assertThat(check(brokerA, "ca-a").accounts()).containsExactly(AccountResult.ACCEPTED);
     }
 
-    /** Opens a connection and closes it again: the handshake is what is under test. */
-    private static void openAndClose(GenericContainer<?> broker, String bundle) throws Exception {
-        connect(broker, bundle).close();
-    }
-
-    private static Connection connect(GenericContainer<?> broker, String bundle) throws Exception {
-        CoreConnectionSettings settings =
-                new CoreConnectionSettings(UUID.randomUUID(), BROKER_USER, BROKER_PASSWORD, bundle, false);
+    private static DataPlaneCheck.Result check(GenericContainer<?> broker, String bundle) {
         String url = "tcp://%s:%d".formatted(broker.getHost(), broker.getMappedPort(61616));
-        return factory.build(settings, url).createConnection(BROKER_USER, BROKER_PASSWORD);
+        NodeEndpoint node = new NodeEndpoint(
+                UUID.randomUUID(),
+                "n",
+                "n",
+                null,
+                url,
+                "PRIMARY",
+                "STARTED",
+                true,
+                null,
+                1L,
+                "2.44.0",
+                null,
+                null,
+                Instant.now(),
+                null,
+                null,
+                false,
+                true);
+        return check.check(
+                List.of(node),
+                new CoreConnectionSettings(UUID.randomUUID(), BROKER_USER, BROKER_PASSWORD, bundle, false));
     }
 
     private static SslBundle trusting(String caPem) {

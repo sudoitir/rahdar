@@ -25,13 +25,11 @@ import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionSettings;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
 import io.github.sudoitir.rahdar.platform.broker.BrokerFailures;
 import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
+import io.github.sudoitir.rahdar.platform.broker.BrokerNotifications;
 import io.github.sudoitir.rahdar.platform.broker.BrokerTarget;
 import io.github.sudoitir.rahdar.platform.broker.BrokerVersion;
-import io.github.sudoitir.rahdar.platform.broker.CoreAccountCheck;
 import io.github.sudoitir.rahdar.platform.broker.CoreConnectionSettings;
-import io.github.sudoitir.rahdar.platform.broker.CoreEventClient;
-import io.github.sudoitir.rahdar.platform.broker.CoreSubscriptionCheck;
-import io.github.sudoitir.rahdar.platform.broker.CoreSubscriptionManager;
+import io.github.sudoitir.rahdar.platform.broker.DataPlaneCheck;
 import io.github.sudoitir.rahdar.platform.broker.ManagementUrlSource;
 import io.github.sudoitir.rahdar.platform.broker.NodeEndpoint;
 import io.github.sudoitir.rahdar.platform.broker.ProbeSession;
@@ -78,10 +76,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.UUID;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -128,9 +122,8 @@ public class ClusterService {
     private final CapabilityAssessments capabilityAssessments;
     private final TopologyDiscovery topologyDiscovery;
     private final HaStateEvaluator evaluator;
-    private final CoreSubscriptionManager coreSubscriptions;
-    private final CoreSubscriptionCheck coreSubscriptionCheck;
-    private final CoreAccountCheck coreAccountCheck;
+    private final BrokerNotifications coreSubscriptions;
+    private final DataPlaneCheck dataPlaneCheck;
     private final SeedExpander seedExpander;
     private final Optional<RegistrationAdoption> adoption;
     private final EnvironmentRepository environments;
@@ -245,14 +238,11 @@ public class ClusterService {
         TopologyDiscovery.Preview found = topologyDiscovery.preview(survey, inputs.derivation());
         ClusterTopology preview = found.topology();
         List<NodeEndpoint> endpoints = endpoints(preview);
-        List<AccountResult> coreResults = checkCore(endpoints, inputs.core());
-
-        // Actually open a Core subscription rather than reporting NotAttempted. A
-        // check that stays silent about the Core channel is how a wrong Core account
-        // — or a management account the broker reserves as its <cluster-user> —
-        // reaches a registered cluster and fails there instead, where the operator
-        // has no obvious way back.
-        SubscriptionVerdict coreVerdict = coreSubscriptionCheck.probe(endpoints, inputs.core());
+        // One subscription per node rather than reporting NotAttempted: it says both whether the broker lets the
+        // Core account in on each node and whether it may subscribe to notifications.
+        DataPlaneCheck.Result dataPlane = dataPlaneCheck.check(endpoints, inputs.core());
+        List<AccountResult> coreResults = dataPlane.accounts();
+        SubscriptionVerdict coreVerdict = dataPlane.verdict();
         BrokerCapabilities capabilities = capabilityProbe.probe(reachable.get(0).target(), coreVerdict);
         int nodeCount =
                 (int) endpoints.stream().map(NodeEndpoint::name).distinct().count();
@@ -309,35 +299,6 @@ public class ClusterService {
         return core == null
                 ? new CoreConnectionSettings(null, null, null, request.tlsBundle(), true)
                 : new CoreConnectionSettings(null, core.username(), core.password(), request.tlsBundle(), true);
-    }
-
-    /** One Core session per node that takes Core connections, concurrently: a dead address must not queue the rest. */
-    private List<AccountResult> checkCore(List<NodeEndpoint> endpoints, CoreConnectionSettings core) {
-        try (ExecutorService pool = Executors.newVirtualThreadPerTaskExecutor()) {
-            List<Future<AccountResult>> results = endpoints.stream()
-                    .map(e -> pool.submit(() -> coreResult(e, core)))
-                    .toList();
-            return results.stream().map(ClusterService::resultOf).toList();
-        }
-    }
-
-    /** A passive backup opens no Core acceptor, so asking it would only report a refusal that means nothing. */
-    private AccountResult coreResult(NodeEndpoint node, CoreConnectionSettings core) {
-        if (node.coreUrl() == null || (node.isBackup() && !node.active())) {
-            return AccountResult.NOT_TRIED;
-        }
-        return coreAccountCheck.check(node.coreUrl(), core);
-    }
-
-    private static AccountResult resultOf(Future<AccountResult> result) {
-        try {
-            return result.get();
-        } catch (InterruptedException _) {
-            Thread.currentThread().interrupt();
-            return AccountResult.UNREACHABLE;
-        } catch (ExecutionException _) {
-            return AccountResult.UNREACHABLE;
-        }
     }
 
     private static List<NodeProbeView> probeRows(
@@ -688,12 +649,12 @@ public class ClusterService {
      * its last scrape; a Core one is held by this replica's subscriptions, so another replica does not see it.
      */
     private ClusterHealth healthOf(UUID clusterId, List<LogicalNode> logical) {
-        Map<UUID, CoreEventClient.State> states = coreSubscriptions.nodeStates();
+        Map<UUID, SubscriptionVerdict.NodeState> states = coreSubscriptions.nodeStates();
         Set<UUID> coreRejected = logical.stream()
                 .flatMap(n -> n.endpoints().stream())
                 .map(NodeEndpoint::id)
-                .filter(id -> states.get(id) instanceof CoreEventClient.State.Failed failed
-                        && failed.kind() == CoreEventClient.Kind.UNAUTHORIZED)
+                .filter(id -> states.get(id) instanceof SubscriptionVerdict.NodeState.Failed failed
+                        && failed.kind() == SubscriptionVerdict.Kind.UNAUTHORIZED)
                 .collect(Collectors.toSet());
         return evaluator.toHealth(clusterId, logical, coreRejected);
     }
@@ -937,7 +898,8 @@ public class ClusterService {
         UrlDerivation derivation = new UrlDerivation(edited.pattern(), management);
         List<BrokerNodeEntity> stored = nodes.findByClusterIdOrderByNameAsc(clusterId);
         List<NodeEndpoint> endpoints = nodeMapper.toEndpoints(stored);
-        List<AccountResult> core = checkCore(endpoints, edited.coreSettings(clusterId));
+        List<AccountResult> core =
+                dataPlaneCheck.check(endpoints, edited.coreSettings(clusterId)).accounts();
 
         List<NodeProbeView> rows = new ArrayList<>();
         for (int i = 0; i < stored.size(); i++) {

@@ -1,5 +1,6 @@
 package io.github.sudoitir.rahdar.feature.events;
 
+import io.github.sudoitir.openbroker.notification.EventTypes;
 import io.github.sudoitir.rahdar.feature.events.internal.persistence.BrokerEventEntity;
 import io.github.sudoitir.rahdar.feature.events.internal.persistence.BrokerEventRepository;
 import io.github.sudoitir.rahdar.kernel.replica.BusEvents;
@@ -98,12 +99,12 @@ public class EventStreamPublisher implements BrokerEventPublisher {
         }
         return switch (type) {
             // CONSUMER_SLOW is the broker's own slow-consumer verdict (ADR-0044) and is
-            // authoritative over Rahdar's derived rule. It carries _AMQ_ConsumerName, so
-            // unlike the derived rule it attributes to a named consumer.
-            case "CONSUMER_CREATED", "CONSUMER_CLOSED", "CONSUMER_SLOW" -> "consumers";
-            case "SESSION_CREATED", "SESSION_CLOSED" -> "sessions";
-            case "CONNECTION_CREATED", "CONNECTION_DESTROYED" -> "connections";
-            case "BINDING_ADDED", "BINDING_REMOVED", "ADDRESS_ADDED", "ADDRESS_REMOVED" -> "queues";
+            // authoritative over Rahdar's derived rule. It names the consumer, so unlike
+            // the derived rule it attributes to a named consumer.
+            case EventTypes.CONSUMER_ATTACHED, EventTypes.CONSUMER_DETACHED, EventTypes.CONSUMER_SLOW -> "consumers";
+            case EventTypes.CHANNEL_OPENED, EventTypes.CHANNEL_CLOSED -> "sessions";
+            case EventTypes.CLIENT_CONNECTED, EventTypes.CLIENT_DISCONNECTED -> "connections";
+            case EventTypes.RESOURCE_CREATED, EventTypes.RESOURCE_DELETED -> "queues";
             default -> null;
         };
     }

@@ -25,7 +25,7 @@ import io.github.sudoitir.rahdar.platform.broker.AccountResult;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionSettings;
 import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
 import io.github.sudoitir.rahdar.platform.broker.BrokerTarget;
-import io.github.sudoitir.rahdar.platform.broker.CoreAccountCheck;
+import io.github.sudoitir.rahdar.platform.broker.DataPlaneCheck;
 import io.github.sudoitir.rahdar.platform.broker.ManagementUrlProblem;
 import io.github.sudoitir.rahdar.platform.broker.ProbeSession;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerCredentialEntity;
@@ -35,6 +35,7 @@ import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNo
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterEntity;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterRepository;
 import io.github.sudoitir.rahdar.support.AdminAuthenticationExtension;
+import io.github.sudoitir.rahdar.support.DataPlaneChecks;
 import io.github.sudoitir.rahdar.support.FixtureJolokia;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
 import java.io.IOException;
@@ -111,7 +112,7 @@ class ClusterConnectionControllerTest extends PostgresIntegrationTest {
     private final ProbeSession newSecretSession = mock(ProbeSession.class);
 
     @MockitoBean
-    CoreAccountCheck coreAccountCheck;
+    DataPlaneCheck dataPlaneCheck;
 
     private UUID clusterId;
 
@@ -140,7 +141,7 @@ class ClusterConnectionControllerTest extends PostgresIntegrationTest {
         seal(JOLOKIA_BASIC, "old-user", OLD_SECRET);
         seal(CORE, "core-user", CORE_SECRET);
 
-        when(coreAccountCheck.check(any(), any())).thenReturn(AccountResult.ACCEPTED);
+        when(dataPlaneCheck.check(any(), any())).thenAnswer(DataPlaneChecks.answering(url -> AccountResult.ACCEPTED));
         // Every discovery tick: each manageable node answers search, HA read and topology.
         when(session.node(any())).thenAnswer(inv -> {
             String url = inv.getArgument(0);

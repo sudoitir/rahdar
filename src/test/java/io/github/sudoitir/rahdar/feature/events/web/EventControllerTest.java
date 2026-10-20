@@ -47,9 +47,9 @@ class EventControllerTest extends PostgresIntegrationTest {
         clusterId = clusters.save(new ClusterEntity("c-" + UUID.randomUUID(), null, null))
                 .getId();
 
-        event("CONSUMER_CREATED", "orders", 3);
-        event("CONSUMER_CLOSED", "orders", 2);
-        event("SESSION_CREATED", "payments", 1);
+        event("openbroker.consumer.attached", "orders", 3);
+        event("openbroker.consumer.detached", "orders", 2);
+        event("openbroker.channel.opened", "payments", 1);
     }
 
     @AfterEach
@@ -60,7 +60,7 @@ class EventControllerTest extends PostgresIntegrationTest {
 
     private void event(String type, String address, int ageMinutes) {
         jdbc.update("""
-                INSERT INTO broker_event (occurred_at, type, address, cluster_id)
+                INSERT INTO broker_event (occurred_at, type, destination, cluster_id)
                 VALUES (now() - make_interval(mins => :age), :type, :addr, :c)
                 """, Map.of("age", ageMinutes, "type", type, "addr", address, "c", clusterId));
     }
@@ -71,7 +71,7 @@ class EventControllerTest extends PostgresIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.count").value(3))
                 .andExpect(jsonPath("$.data.length()").value(3))
-                .andExpect(jsonPath("$.data[0].type").value("SESSION_CREATED"))
+                .andExpect(jsonPath("$.data[0].type").value("openbroker.channel.opened"))
                 .andExpect(jsonPath("$.dropped").value(0));
     }
 
@@ -95,16 +95,16 @@ class EventControllerTest extends PostgresIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.count").doesNotExist())
                 .andExpect(jsonPath("$.data.length()").value(1))
-                .andExpect(jsonPath("$.data[0].type").value("CONSUMER_CREATED"))
+                .andExpect(jsonPath("$.data[0].type").value("openbroker.consumer.attached"))
                 .andExpect(jsonPath("$.hasNext").value(false));
     }
 
     @Test
     void filtersByType() throws Exception {
-        mvc.perform(get("/api/v1/clusters/{c}/events", clusterId).param("type", "CONSUMER_CREATED"))
+        mvc.perform(get("/api/v1/clusters/{c}/events", clusterId).param("type", "openbroker.consumer.attached"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.count").value(1))
-                .andExpect(jsonPath("$.data[0].type").value("CONSUMER_CREATED"));
+                .andExpect(jsonPath("$.data[0].type").value("openbroker.consumer.attached"));
     }
 
     @Test

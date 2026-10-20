@@ -10,7 +10,7 @@ import io.github.sudoitir.rahdar.kernel.settings.SettingsService;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
 import io.github.sudoitir.rahdar.platform.broker.BrokerFailures;
 import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
-import io.github.sudoitir.rahdar.platform.broker.CoreSubscriptionManager;
+import io.github.sudoitir.rahdar.platform.broker.BrokerNotifications;
 import io.github.sudoitir.rahdar.platform.broker.NodeEndpoint;
 import io.github.sudoitir.rahdar.platform.broker.QueueRow;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
@@ -104,7 +104,7 @@ public class ScrapeScheduler implements DisposableBean {
     private final QueueSnapshotUpsert upsert;
     private final MetricSampleWriter metrics;
     private final StreamSignals streamSignals;
-    private final CoreSubscriptionManager coreSubscriptions;
+    private final BrokerNotifications coreSubscriptions;
     private final ApplicationEventPublisher eventPublisher;
 
     private record QueuesPage(List<QueueRow> rows, Optional<String> next) {}

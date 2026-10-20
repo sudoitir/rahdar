@@ -271,8 +271,8 @@ class ConsumerHealthServiceTest extends PostgresIntegrationTest {
         p.put("c", clusterId);
         p.put("n", nodeId);
         jdbc.update("""
-                INSERT INTO broker_event (occurred_at, type, address, consumer_name, cluster_id, node_id)
-                VALUES (:ts, 'CONSUMER_SLOW', :address, :consumer, :c, :n)
+                INSERT INTO broker_event (occurred_at, type, destination, consumer, cluster_id, node_id)
+                VALUES (:ts, 'openbroker.consumer.slow', :address, :consumer, :c, :n)
                 """, p);
     }
 

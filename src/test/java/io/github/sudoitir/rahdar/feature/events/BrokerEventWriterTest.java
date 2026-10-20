@@ -102,14 +102,14 @@ class BrokerEventWriterTest extends PostgresIntegrationTest {
 
     @Test
     void flushPersistsTheBufferedBatch() {
-        writer.accept(event("CONSUMER_CREATED"));
-        writer.accept(event("SESSION_CREATED"));
+        writer.accept(event("openbroker.consumer.attached"));
+        writer.accept(event("openbroker.channel.opened"));
 
         writer.flush();
 
         assertThat(persisted()).isEqualTo(2);
         String storedProps = jdbc.queryForObject(
-                "SELECT props::text FROM broker_event WHERE cluster_id = :c AND type = 'CONSUMER_CREATED'",
+                "SELECT data::text FROM broker_event WHERE cluster_id = :c AND type = 'openbroker.consumer.attached'",
                 Map.of("c", clusterId),
                 String.class);
         assertThat(storedProps).contains("_AMQ_Address");
@@ -128,8 +128,8 @@ class BrokerEventWriterTest extends PostgresIntegrationTest {
                         ArgumentMatchers.any(String[].class));
         BrokerEventWriter flaky =
                 new BrokerEventWriter(failingOnce, mapper, publisher, transactions, partitions, properties);
-        flaky.accept(event("CONSUMER_CREATED"));
-        flaky.accept(event("SESSION_CREATED"));
+        flaky.accept(event("openbroker.consumer.attached"));
+        flaky.accept(event("openbroker.channel.opened"));
 
         Assertions.assertThatThrownBy(flaky::flush).hasMessageContaining("database down");
         assertThat(persisted()).isZero();
@@ -142,7 +142,7 @@ class BrokerEventWriterTest extends PostgresIntegrationTest {
                         "SELECT type FROM broker_event WHERE cluster_id = :c ORDER BY seq",
                         Map.of("c", clusterId),
                         String.class))
-                .containsExactly("CONSUMER_CREATED", "SESSION_CREATED");
+                .containsExactly("openbroker.consumer.attached", "openbroker.channel.opened");
     }
 
     @Test
@@ -190,8 +190,8 @@ class BrokerEventWriterTest extends PostgresIntegrationTest {
         BrokerEventWriter capturingWriter =
                 new BrokerEventWriter(jdbc, mapper, capturing, transactions, partitions, properties);
         TransactionTemplate tx = new TransactionTemplate(transactions);
-        capturingWriter.accept(event("CONSUMER_CREATED"));
-        capturingWriter.accept(event("SESSION_CREATED"));
+        capturingWriter.accept(event("openbroker.consumer.attached"));
+        capturingWriter.accept(event("openbroker.channel.opened"));
 
         tx.executeWithoutResult(status -> {
             capturingWriter.flush();
@@ -200,15 +200,15 @@ class BrokerEventWriterTest extends PostgresIntegrationTest {
             writer.flush();
         });
 
-        assertThat(published).containsExactly("CONSUMER_CREATED", "SESSION_CREATED");
+        assertThat(published).containsExactly("openbroker.consumer.attached", "openbroker.channel.opened");
     }
 
     @Test
     void overflowIsDroppedAndCountedNotBlocked() {
         writer.setCapacity(1);
-        writer.accept(event("CONSUMER_CREATED")); // fills the soft cap
-        writer.accept(event("CONSUMER_CLOSED")); // dropped
-        writer.accept(event("SESSION_CREATED")); // dropped
+        writer.accept(event("openbroker.consumer.attached")); // fills the soft cap
+        writer.accept(event("openbroker.consumer.detached")); // dropped
+        writer.accept(event("openbroker.channel.opened")); // dropped
 
         assertThat(writer.droppedFor(clusterId)).isEqualTo(2);
 
@@ -219,18 +219,18 @@ class BrokerEventWriterTest extends PostgresIntegrationTest {
     @Test
     void anIntegrityViolatingBatchDoesNotBlockTheEventsBehindIt() {
         UUID deleted = UUID.randomUUID();
-        writer.accept(event(deleted, "CONSUMER_CREATED"));
-        writer.accept(event("SESSION_CREATED"));
+        writer.accept(event(deleted, "openbroker.consumer.attached"));
+        writer.accept(event("openbroker.channel.opened"));
 
         writer.flush();
-        writer.accept(event("CONSUMER_CLOSED"));
+        writer.accept(event("openbroker.consumer.detached"));
         writer.flush();
 
         assertThat(jdbc.queryForList(
                         "SELECT type FROM broker_event WHERE cluster_id = :c ORDER BY seq",
                         Map.of("c", clusterId),
                         String.class))
-                .containsExactly("SESSION_CREATED", "CONSUMER_CLOSED");
+                .containsExactly("openbroker.channel.opened", "openbroker.consumer.detached");
         // A deleted cluster has no total to report, and a counter made for it now would outlive its deletion signal.
         assertThat(writer.droppedFor(deleted)).isZero();
         assertThat(writer.droppedFor(clusterId)).isZero();
@@ -239,8 +239,8 @@ class BrokerEventWriterTest extends PostgresIntegrationTest {
     @Test
     void aDeletedClustersBufferedEventsArePurged() {
         UUID deleted = UUID.randomUUID();
-        writer.accept(event(deleted, "CONSUMER_CREATED"));
-        writer.accept(event("SESSION_CREATED"));
+        writer.accept(event(deleted, "openbroker.consumer.attached"));
+        writer.accept(event("openbroker.channel.opened"));
 
         writer.onClusterDeleted(new ReplicaSignal("cluster-deleted", deleted.toString()));
         writer.flush();

@@ -1,5 +1,7 @@
 package io.github.sudoitir.rahdar.feature.rr;
 
+import io.github.sudoitir.openbroker.model.StandardAttributes;
+import io.github.sudoitir.openbroker.notification.EventTypes;
 import io.github.sudoitir.rahdar.platform.broker.BrokerEvent;
 import io.github.sudoitir.rahdar.platform.broker.BrokerEventSink;
 import java.util.Map;
@@ -7,107 +9,97 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 /**
- * Maps {@code activemq.notifications} events to lifecycle {@link Observation}s
- * for {@link RrCorrelator} (design.md D2): responder presence and temp-queue
- * teardown. Notifications about {@code activemq.notifications} itself — a
- * subscriber's own non-durable queue — are filtered out (Phase 5 spike,
- * docs/broker-management-notes.md §13): they are Rahdar's own plumbing, never
- * request-reply traffic.
+ * Maps broker events to lifecycle {@link Observation}s for {@link RrCorrelator} (design.md D2):
+ * responder presence and temp-queue teardown. The broker SDK leaves out events about its own
+ * notification plumbing, so what arrives here happened on the broker.
  *
- * <p>{@code activemq.notifications} fires consumer/binding/delivery events for
- * <em>every</em> address on the broker, not just traced ones — every branch
- * below checks relevance against the correlator before forwarding, otherwise
- * ordinary broker-wide traffic would flood {@code rr_flow} with irrelevant rows
- * and the in-memory responder tracker with entries for addresses nobody asked
- * Rahdar to trace.
+ * <p>The broker reports consumer, binding and delivery events for <em>every</em> destination, not just
+ * traced ones — every branch below checks relevance against the correlator before forwarding,
+ * otherwise ordinary broker-wide traffic would flood {@code rr_flow} with irrelevant rows and the
+ * in-memory responder tracker with entries for destinations nobody asked Rahdar to trace.
  *
- * <p>{@code MESSAGE_DELIVERED} on a temp-queue address closes the loop for the
- * temporary-reply-queue pattern: the sampler never polls a per-request temp
- * queue (it has no fixed name to poll), so a delivery to it is the only signal
- * a reply arrived. The destination alone identifies the flow — the temp queue
- * is 1:1 per request — so no correlation id is needed for that observation.
+ * <p>A delivery on a temp queue closes the loop for the temporary-reply-queue pattern: the sampler
+ * never polls a per-request temp queue (it has no fixed name to poll), so a delivery to it is the only
+ * signal a reply arrived. The subscription alone identifies the flow — the temp queue is 1:1 per
+ * request — so no correlation id is needed for that observation.
  *
- * <p>A delivery on a <em>resolved reply address</em> is forwarded too (design.md
- * D6). The shared-queue pattern is otherwise sampled-only, and the sampler browses
- * page 1 every few seconds, so a reply consumed in milliseconds is never there when
- * it looks. This observation carries no correlation id, so it completes a flow only
- * where sampling already supplied the correlation identity — an improvement in
- * coverage, not a replacement for browsing.
+ * <p>A delivery on a <em>resolved reply address</em> is forwarded too (design.md D6). The shared-queue
+ * pattern is otherwise sampled-only, and the sampler browses page 1 every few seconds, so a reply
+ * consumed in milliseconds is never there when it looks. This observation carries no correlation id,
+ * so it completes a flow only where sampling already supplied the correlation identity — an
+ * improvement in coverage, not a replacement for browsing.
  */
 @Component
 @RequiredArgsConstructor
 public class RrNotificationObserver implements BrokerEventSink {
 
-    private static final String NOTIFICATIONS_ADDRESS = "activemq.notifications";
-
     private final RrCorrelator correlator;
 
     @Override
     public void accept(BrokerEvent event) {
-        if (NOTIFICATIONS_ADDRESS.equals(event.address())) {
-            return;
-        }
         switch (event.type()) {
-            case "CONSUMER_CREATED" -> {
-                if (correlator.isTracedRequestAddress(event.clusterId(), event.address())) {
+            case EventTypes.CONSUMER_ATTACHED -> {
+                if (correlator.isTracedRequestAddress(event.clusterId(), event.destination())) {
                     correlator.accept(new Observation.ResponderUp(
                             event.clusterId(),
                             event.nodeId(),
                             event.occurredAt(),
-                            event.address(),
-                            event.consumerName()));
+                            event.destination(),
+                            event.consumer()));
                 }
             }
-            case "CONSUMER_CLOSED" -> {
-                if (correlator.isTracedRequestAddress(event.clusterId(), event.address())) {
+            case EventTypes.CONSUMER_DETACHED -> {
+                if (correlator.isTracedRequestAddress(event.clusterId(), event.destination())) {
                     correlator.accept(new Observation.ResponderDown(
                             event.clusterId(),
                             event.nodeId(),
                             event.occurredAt(),
-                            event.address(),
-                            event.consumerName(),
+                            event.destination(),
+                            event.consumer(),
                             consumerCount(event)));
                 }
             }
-            case "BINDING_REMOVED" -> {
-                if (correlator.hasOpenTempQueueFlow(event.clusterId(), event.routingName())) {
+            case EventTypes.RESOURCE_DELETED -> {
+                // A subscription going away; a destination going away names none.
+                if (event.subscription() != null
+                        && correlator.hasOpenTempQueueFlow(event.clusterId(), event.subscription())) {
                     correlator.accept(new Observation.TempQueueUnbound(
-                            event.clusterId(), event.nodeId(), event.occurredAt(), event.routingName()));
+                            event.clusterId(), event.nodeId(), event.occurredAt(), event.subscription()));
                 }
             }
-            case "MESSAGE_DELIVERED" -> {
+            case EventTypes.MESSAGE_DELIVERED -> {
                 // Two ways a delivery is a reply: it closes a temp-queue flow, or it
                 // landed on an address some expectation's reply patterns cover.
-                if (correlator.hasOpenTempQueueFlow(event.clusterId(), event.routingName())
-                        || correlator.isTracedReplyAddress(event.clusterId(), event.address())
-                        || correlator.isTracedReplyAddress(event.clusterId(), event.routingName())) {
+                if (correlator.hasOpenTempQueueFlow(event.clusterId(), event.subscription())
+                        || correlator.isTracedReplyAddress(event.clusterId(), event.destination())
+                        || correlator.isTracedReplyAddress(event.clusterId(), event.subscription())) {
                     correlator.accept(new Observation.ReplySeen(
                             event.clusterId(),
                             event.nodeId(),
                             event.occurredAt(),
-                            event.routingName(),
+                            event.subscription(),
                             messageId(event),
                             null,
                             null,
                             Map.of()));
                 }
             }
-            case "MESSAGE_EXPIRED" ->
+            case EventTypes.MESSAGE_EXPIRED ->
                 correlator.accept(new Observation.MessageExpired(
-                        event.clusterId(), event.nodeId(), event.occurredAt(), event.address(), messageId(event)));
+                        event.clusterId(), event.nodeId(), event.occurredAt(), event.destination(), messageId(event)));
             default -> {
-                // Every other notification type is retained by BrokerEventWriter but carries no rr_flow signal.
+                // Every other event is retained by BrokerEventWriter but carries no rr_flow signal.
             }
         }
     }
 
     private static int consumerCount(BrokerEvent event) {
-        Object v = event.props().get("_AMQ_ConsumerCount");
+        Object v = event.data().get(StandardAttributes.CONSUMER_COUNT.name());
         return v instanceof Number n ? n.intValue() : 0;
     }
 
     private static String messageId(BrokerEvent event) {
-        Object v = event.props().get("_AMQ_Message_ID");
+        Object v = event.data().get(StandardAttributes.MESSAGE_ID.name());
         return v == null ? null : v.toString();
     }
 }

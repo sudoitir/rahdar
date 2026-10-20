@@ -808,7 +808,7 @@ class ResourceEnforcementIntegrationTest extends PostgresIntegrationTest {
 
     private void event(String address, String routingName) {
         jdbc.update(
-                "INSERT INTO broker_event (occurred_at, type, address, routing_name, cluster_id) VALUES (now(), 'CONSUMER_SLOW', ?, ?, ?)",
+                "INSERT INTO broker_event (occurred_at, type, destination, subscription, cluster_id) VALUES (now(), 'openbroker.consumer.slow', ?, ?, ?)",
                 address,
                 routingName,
                 cluster);

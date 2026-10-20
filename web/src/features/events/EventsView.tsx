@@ -35,20 +35,19 @@ const PAGE_SIZE = 100;
 
 const eventKey = (e: BrokerEventView) => String(e.seq);
 
-/** Notification classes seen against the dev pair (broker-management-notes §7). */
+/** The broker SDK's standard event types; a broker's own types are namespaced, and filtered by typing them. */
 const TYPES = [
-  'BINDING_ADDED',
-  'BINDING_REMOVED',
-  'CONSUMER_CREATED',
-  'CONSUMER_CLOSED',
-  'CONNECTION_CREATED',
-  'CONNECTION_DESTROYED',
-  'SESSION_CREATED',
-  'SESSION_CLOSED',
-  'ADDRESS_ADDED',
-  'ADDRESS_REMOVED',
-  'MESSAGE_DELIVERED',
-  'MESSAGE_EXPIRED',
+  { value: 'openbroker.resource.created', label: 'Resource created' },
+  { value: 'openbroker.resource.deleted', label: 'Resource deleted' },
+  { value: 'openbroker.consumer.attached', label: 'Consumer attached' },
+  { value: 'openbroker.consumer.detached', label: 'Consumer detached' },
+  { value: 'openbroker.consumer.slow', label: 'Consumer slow' },
+  { value: 'openbroker.client.connected', label: 'Client connected' },
+  { value: 'openbroker.client.disconnected', label: 'Client disconnected' },
+  { value: 'openbroker.channel.opened', label: 'Channel opened' },
+  { value: 'openbroker.channel.closed', label: 'Channel closed' },
+  { value: 'openbroker.message.delivered', label: 'Message delivered' },
+  { value: 'openbroker.message.expired', label: 'Message expired' },
 ];
 
 function CopyEventLink({ clusterId, seq }: Readonly<{ clusterId: string; seq: number }>) {

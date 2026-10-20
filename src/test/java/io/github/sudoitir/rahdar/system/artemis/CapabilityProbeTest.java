@@ -9,7 +9,6 @@ import io.github.sudoitir.rahdar.platform.broker.BrokerCapabilities;
 import io.github.sudoitir.rahdar.platform.broker.BrokerCapabilities.CapabilityAssessment;
 import io.github.sudoitir.rahdar.platform.broker.BrokerCapabilities.CapabilityStatus;
 import io.github.sudoitir.rahdar.platform.broker.BrokerTarget;
-import io.github.sudoitir.rahdar.platform.broker.CoreEventClient;
 import io.github.sudoitir.rahdar.platform.broker.SubscriptionVerdict;
 import io.github.sudoitir.rahdar.support.FixtureJolokia;
 import java.io.IOException;
@@ -219,7 +218,7 @@ class CapabilityProbeTest {
                 "address-settings.json");
 
         BrokerCapabilities caps = probe.probe(
-                f.client(), new SubscriptionVerdict.Failed(CoreEventClient.Kind.PERMISSION_DENIED, "AMQ229213"));
+                f.client(), new SubscriptionVerdict.Failed(SubscriptionVerdict.Kind.PERMISSION_DENIED, "AMQ229213"));
 
         assertThat(caps.notifications().status()).isEqualTo(CapabilityStatus.UNAVAILABLE);
         assertThat(caps.notifications().brokerXmlSnippet()).contains("consume").contains("createNonDurableQueue");
@@ -236,7 +235,7 @@ class CapabilityProbeTest {
                 "address-settings.json");
 
         BrokerCapabilities caps =
-                probe.probe(f.client(), new SubscriptionVerdict.Failed(CoreEventClient.Kind.NO_CORE_URL, "no url"));
+                probe.probe(f.client(), new SubscriptionVerdict.Failed(SubscriptionVerdict.Kind.NO_ENDPOINT, "no url"));
 
         assertThat(caps.notifications().status()).isEqualTo(CapabilityStatus.UNAVAILABLE);
         assertThat(caps.notifications().brokerXmlSnippet()).contains("acceptor");

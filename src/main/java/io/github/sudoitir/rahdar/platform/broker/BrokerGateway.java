@@ -17,6 +17,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.UnaryOperator;
@@ -97,12 +98,29 @@ public class BrokerGateway implements DisposableBean {
                 spec -> drivers.connect(new ConnectRequest(SYSTEM, spec, credentials, options(tls.forCluster(with)))));
     }
 
+    /**
+     * Data-plane addresses checked with an account given for the check, before the cluster exists or
+     * before an edit of its account is saved. Close it when the check ends.
+     */
+    public ClusterConnection dataPlane(List<NodeSpec> nodes, CoreConnectionSettings with) {
+        CredentialSource credentials =
+                plane -> with.hasCredentials() ? Credentials.of(with.username(), with.password()) : Credentials.none();
+        TlsProvider dataTls = tls.forCluster(new BrokerConnectionSettings(
+                with.clusterId(), with.username(), with.password(), with.tlsBundle(), with.verifyHostname()));
+        return drivers.connect(new ConnectRequest(SYSTEM, ClusterSpec.ofNodes(nodes), credentials, options(dataTls)));
+    }
+
     /** A registered node, through its cluster's connection. */
     public BrokerTarget node(UUID clusterId, UUID nodeId) {
         return new BrokerTarget(cluster(clusterId), idOf(nodeId));
     }
 
-    /** Closes a cluster's connection: it was removed, or this replica no longer owns it. */
+    /** The clusters this holds a connection for. */
+    Set<UUID> clusterIds() {
+        return Set.copyOf(clusters.keySet());
+    }
+
+    /** Closes a cluster's connection: it was removed. */
     public void forget(UUID clusterId) {
         Held held = clusters.remove(clusterId);
         if (held != null) {

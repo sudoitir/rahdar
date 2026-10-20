@@ -45,7 +45,7 @@ import io.github.sudoitir.rahdar.kernel.stream.SseHub;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
 import io.github.sudoitir.rahdar.platform.broker.BrokerFailures;
 import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
-import io.github.sudoitir.rahdar.platform.broker.CoreSubscriptionManager;
+import io.github.sudoitir.rahdar.platform.broker.BrokerNotifications;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDutyAcquired;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDutyReleased;
@@ -110,7 +110,7 @@ class ScrapeSchedulerTest {
     MetricSampleWriter metrics;
 
     @Mock
-    CoreSubscriptionManager coreSubscriptions;
+    BrokerNotifications coreSubscriptions;
 
     @Mock
     SettingsService settings;

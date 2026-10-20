@@ -144,7 +144,7 @@ public class CapabilityProbe implements BrokerCapabilityProbe {
                                 + NOTIFICATIONS_ADDRESS + "; Artemis matches the single most-specific"
                                 + " security-setting, so that block must restate every permission. " + preconditions,
                         BrokerXmlSnippets.NOTIFICATIONS_SECURITY_SETTING);
-            case NO_CORE_URL, UNREACHABLE ->
+            case NO_ENDPOINT, UNREACHABLE ->
                 CapabilityAssessment.unavailable(
                         "No reachable Core URL for a live node. Discovery stores the broker-advertised"
                                 + " connector, which is often unresolvable from where Rahdar runs; set a manual"

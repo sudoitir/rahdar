@@ -1,5 +1,6 @@
 package io.github.sudoitir.rahdar.feature.triage;
 
+import io.github.sudoitir.openbroker.notification.EventTypes;
 import io.github.sudoitir.rahdar.feature.events.BrokerEventService;
 import io.github.sudoitir.rahdar.feature.events.web.EventViews.BrokerEventView;
 import io.github.sudoitir.rahdar.feature.resources.CrossNodeAggregator;
@@ -52,7 +53,7 @@ public class ConsumerHealthService {
     private static final String DEPTH = "messageCount";
     private static final String ADDED = "messagesAdded";
     private static final String ACKED = "messagesAcked";
-    private static final String BROKER_SLOW_EVENT = "CONSUMER_SLOW";
+    private static final String BROKER_SLOW_EVENT = EventTypes.CONSUMER_SLOW;
 
     /** How many broker slow-consumer notifications to consider. Bounded; the newest win. */
     private static final int BROKER_SLOW_CAP = 200;

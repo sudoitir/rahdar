@@ -3,7 +3,7 @@ package io.github.sudoitir.rahdar.feature.bulk;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
 import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
 import io.github.sudoitir.rahdar.platform.broker.BrokerMessages;
-import io.github.sudoitir.rahdar.platform.broker.CoreSubscriptionManager;
+import io.github.sudoitir.rahdar.platform.broker.BrokerNotifications;
 import io.github.sudoitir.rahdar.platform.clusters.BrokerCommands;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterEnvironmentIndex;
@@ -74,7 +74,7 @@ class BulkModuleTest extends ModuleIntegrationTest {
 
     /** Bulk's run tracks its own Core consumers for the DLQ view through this manager directly. */
     @MockitoBean
-    CoreSubscriptionManager coreSubscriptionManager;
+    BrokerNotifications coreSubscriptionManager;
 
     /**
      * The kernel's permission checks walk the scope hierarchy. Mocked as the clusters module's

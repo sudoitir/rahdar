@@ -2,7 +2,7 @@ package io.github.sudoitir.rahdar.platform.clusters.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -30,11 +30,9 @@ import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
 import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
 import io.github.sudoitir.rahdar.platform.broker.BrokerTarget;
 import io.github.sudoitir.rahdar.platform.broker.BrokerVersion;
-import io.github.sudoitir.rahdar.platform.broker.CoreAccountCheck;
-import io.github.sudoitir.rahdar.platform.broker.CoreSubscriptionCheck;
+import io.github.sudoitir.rahdar.platform.broker.DataPlaneCheck;
 import io.github.sudoitir.rahdar.platform.broker.ManagementUrlSource;
 import io.github.sudoitir.rahdar.platform.broker.ProbeSession;
-import io.github.sudoitir.rahdar.platform.broker.SubscriptionVerdict;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterPermissions;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterService;
 import io.github.sudoitir.rahdar.platform.clusters.RegistrationAdoption;
@@ -42,6 +40,7 @@ import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerCr
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNodeRepository;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterRepository;
 import io.github.sudoitir.rahdar.support.AdminAuthenticationExtension;
+import io.github.sudoitir.rahdar.support.DataPlaneChecks;
 import io.github.sudoitir.rahdar.support.FixtureJolokia;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
 import java.io.IOException;
@@ -110,10 +109,7 @@ class ClusterControllerTest extends PostgresIntegrationTest {
     BrokerConnections connections;
 
     @MockitoBean
-    CoreAccountCheck coreAccountCheck;
-
-    @MockitoBean
-    CoreSubscriptionCheck coreSubscriptionCheck;
+    DataPlaneCheck dataPlaneCheck;
 
     @MockitoBean
     RegistrationAdoption adoption;
@@ -131,8 +127,7 @@ class ClusterControllerTest extends PostgresIntegrationTest {
         // The backup answers where the seed's pattern puts it, as its own NodeID's broker.
         when(session.node(BACKUP_URL))
                 .thenAnswer(inv -> client(BACKUP_URL, "search-broker.json", "ha-read-backup.json"));
-        when(coreAccountCheck.check(any(), any())).thenReturn(AccountResult.ACCEPTED);
-        when(coreSubscriptionCheck.probe(any(), any())).thenReturn(new SubscriptionVerdict.NotAttempted());
+        when(dataPlaneCheck.check(any(), any())).thenAnswer(DataPlaneChecks.answering(url -> AccountResult.ACCEPTED));
     }
 
     /** A client whose mock server answers the given fixtures at {@link #SEED}, in order. */
@@ -259,7 +254,10 @@ class ClusterControllerTest extends PostgresIntegrationTest {
     @Test
     void aCoreAccountTheBrokerRefusesDoesNotHideTheManagementAccountItAccepted() throws Exception {
         when(session.node(SEED)).thenReturn(client(SEED, registerSequence()));
-        when(coreAccountCheck.check(eq("artemis-primary:61616"), any())).thenReturn(AccountResult.REJECTED);
+        doAnswer(DataPlaneChecks.answering(
+                        url -> "artemis-primary:61616".equals(url) ? AccountResult.REJECTED : AccountResult.ACCEPTED))
+                .when(dataPlaneCheck)
+                .check(any(), any());
 
         mvc.perform(post("/api/v1/clusters")
                         .param("dryRun", "true")

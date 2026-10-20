@@ -1,8 +1,8 @@
 package io.github.sudoitir.rahdar.feature.rr;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatCode;
 
+import io.github.sudoitir.openbroker.notification.EventTypes;
 import io.github.sudoitir.rahdar.feature.rr.internal.persistence.RrExpectationEntity;
 import io.github.sudoitir.rahdar.feature.rr.internal.persistence.RrExpectationRepository;
 import io.github.sudoitir.rahdar.feature.rr.internal.persistence.RrFlowEntity;
@@ -57,27 +57,28 @@ class RrNotificationObserverTest extends PostgresIntegrationTest {
     }
 
     private BrokerEvent event(
-            UUID clusterId, String type, String address, String routingName, Map<String, Object> props) {
+            UUID clusterId, String type, String destination, String subscription, Map<String, Object> data) {
         return new BrokerEvent(
                 clusterId,
                 null,
                 type,
                 Instant.now(),
-                address,
-                routingName,
+                destination,
+                subscription,
                 "consumer-1",
                 "s1",
                 "c1",
                 "10.0.0.1:1",
                 "u",
-                props);
+                data);
     }
 
     @Test
     void unrelatedConsumerActivityIsIgnored() {
         cluster();
         // No expectation declared for "some.other.address" — must not be tracked.
-        observer.accept(event(clusterId, "CONSUMER_CREATED", "some.other.address", "some.other.address", Map.of()));
+        observer.accept(
+                event(clusterId, EventTypes.CONSUMER_ATTACHED, "some.other.address", "some.other.address", Map.of()));
 
         assertThat(correlator.isTracedRequestAddress(clusterId, "some.other.address"))
                 .isFalse();
@@ -91,8 +92,12 @@ class RrNotificationObserverTest extends PostgresIntegrationTest {
                 clusterId, null, t0, "rr.request", "m1", "corr-1", null, 0L, null, Map.of()));
 
         // No expectation declared for "rr.request" — isTracedRequestAddress is false, so this must be ignored.
-        observer.accept(
-                event(clusterId, "CONSUMER_CLOSED", "rr.request", "rr.request", Map.of("_AMQ_ConsumerCount", 0)));
+        observer.accept(event(
+                clusterId,
+                EventTypes.CONSUMER_DETACHED,
+                "rr.request",
+                "rr.request",
+                Map.of("openbroker.consumer_count", 0)));
 
         RrFlowEntity flow = flows.findByClusterIdAndRequestAddressAndRequestMessageId(clusterId, "rr.request", "m1")
                 .orElseThrow();
@@ -107,7 +112,12 @@ class RrNotificationObserverTest extends PostgresIntegrationTest {
         correlator.accept(new Observation.RequestSeen(
                 clusterId, null, t0, "rr.traced", "m2", "corr-1", null, 0L, null, Map.of()));
 
-        observer.accept(event(clusterId, "CONSUMER_CLOSED", "rr.traced", "rr.traced", Map.of("_AMQ_ConsumerCount", 0)));
+        observer.accept(event(
+                clusterId,
+                EventTypes.CONSUMER_DETACHED,
+                "rr.traced",
+                "rr.traced",
+                Map.of("openbroker.consumer_count", 0)));
 
         RrFlowEntity flow = flows.findByClusterIdAndRequestAddressAndRequestMessageId(clusterId, "rr.traced", "m2")
                 .orElseThrow();
@@ -125,7 +135,7 @@ class RrNotificationObserverTest extends PostgresIntegrationTest {
         correlator.accept(new Observation.RequestSeen(
                 clusterId, null, t0, "rr.traced", "m1", "corr-drained", null, 0L, null, Map.of()));
 
-        observer.accept(event(clusterId, "MESSAGE_DELIVERED", "rr.traced.reply", "rr.traced.reply", Map.of()));
+        observer.accept(event(clusterId, EventTypes.MESSAGE_DELIVERED, "rr.traced.reply", "rr.traced.reply", Map.of()));
 
         RrFlowEntity flow = flows.findByClusterIdAndRequestAddressAndRequestMessageId(clusterId, "rr.traced", "m1")
                 .orElseThrow();
@@ -144,7 +154,7 @@ class RrNotificationObserverTest extends PostgresIntegrationTest {
 
         assertThat(correlator.isTracedReplyAddress(clusterId, "something.else")).isFalse();
 
-        observer.accept(event(clusterId, "MESSAGE_DELIVERED", "something.else", "something.else", Map.of()));
+        observer.accept(event(clusterId, EventTypes.MESSAGE_DELIVERED, "something.else", "something.else", Map.of()));
 
         // Broker-wide delivery chatter must not manufacture orphaned-reply rows.
         assertThat(flows.findByClusterIdAndReplyDestinationAndState(
@@ -174,7 +184,11 @@ class RrNotificationObserverTest extends PostgresIntegrationTest {
                 clusterId, null, t0, "rr.request", "m1", "corr-2", "temp-queue-xyz", 0L, null, Map.of()));
 
         observer.accept(event(
-                clusterId, "MESSAGE_DELIVERED", "temp-queue-xyz", "temp-queue-xyz", Map.of("_AMQ_Message_ID", "42")));
+                clusterId,
+                EventTypes.MESSAGE_DELIVERED,
+                "temp-queue-xyz",
+                "temp-queue-xyz",
+                Map.of("openbroker.message_id", "42")));
 
         RrFlowEntity flow = flows.findByClusterIdAndRequestAddressAndRequestMessageId(clusterId, "rr.request", "m1")
                 .orElseThrow();
@@ -185,19 +199,14 @@ class RrNotificationObserverTest extends PostgresIntegrationTest {
     void messageDeliveredOnAnUnrelatedAddressCreatesNoFlow() {
         cluster();
         observer.accept(event(
-                clusterId, "MESSAGE_DELIVERED", "unrelated.queue", "unrelated.queue", Map.of("_AMQ_Message_ID", "99")));
+                clusterId,
+                EventTypes.MESSAGE_DELIVERED,
+                "unrelated.queue",
+                "unrelated.queue",
+                Map.of("openbroker.message_id", "99")));
 
         assertThat(flows.findByClusterIdAndRequestAddressAndState(
                         clusterId, "unrelated.queue", RrState.ORPHANED_REPLY.name()))
                 .isEmpty();
-    }
-
-    @Test
-    void notificationsAboutTheNotificationAddressItselfAreIgnored() {
-        cluster();
-
-        assertThatCode(() -> observer.accept(
-                        event(clusterId, "CONSUMER_CREATED", "activemq.notifications", "some-uuid", Map.of())))
-                .doesNotThrowAnyException();
     }
 }
