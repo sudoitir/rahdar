@@ -509,6 +509,31 @@ jobs:
           docker run --rm -v "$PWD:/repo" -w /repo \
             rhysd/actionlint:1.7.12@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667 -color
 
+  # Rahdar builds on released OpenBroker artifacts only (ADR-0203). A -SNAPSHOT exists only in the
+  # ~/.m2 of whoever built it, so a pull request that pins one could never be built again from main.
+  openbroker-release:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: The broker SDK is a released version
+        run: |
+          version=$(sed -n 's:.*<openbroker.version>\(.*\)</openbroker.version>.*:\1:p' pom.xml)
+          echo "openbroker.version is $version"
+          if [ -z "$version" ]; then
+            echo "::error file=pom.xml::No <openbroker.version> property in pom.xml."
+            exit 1
+          fi
+          case "$version" in
+            *-SNAPSHOT)
+              echo "::error file=pom.xml::openbroker.version is $version. Release OpenBroker and pin that version: a SNAPSHOT is not on Maven Central, so main could not be built from it."
+              exit 1
+              ;;
+          esac
+
   # The shipped alert rules are valid and the dashboard is JSON. That their metric names exist is
   # ObservabilityAssetsIntegrationTest, in the backend job.
   observability:
@@ -658,7 +683,7 @@ jobs:
   # or cancelled one does not. Requiring this instead of each job keeps path filtering safe.
   ci-ok:
     if: always()
-    needs: [changes, backend, coverage, frontend, sonar, api-compat, client-java, plugin-template, image, site, osv, osv-gate, actionlint, observability]
+    needs: [changes, backend, coverage, frontend, sonar, api-compat, client-java, plugin-template, image, site, osv, osv-gate, actionlint, observability, openbroker-release]
     runs-on: ubuntu-26.04
     timeout-minutes: 5
     steps:

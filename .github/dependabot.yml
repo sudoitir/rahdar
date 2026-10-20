@@ -23,6 +23,9 @@ updates:
     commit-message:
       prefix: "build(deps)"
     groups:
+      # The broker SDK's modules are released together and must move together.
+      openbroker:
+        patterns: ["io.github.sudoitir:openbroker-*"]
       maven-minor-patch:
         update-types: ["minor", "patch"]
     ignore:
@@ -36,8 +39,6 @@ updates:
       - dependency-name: "org.postgresql:postgresql"
         update-types: ["version-update:semver-major"]
       - dependency-name: "org.liquibase:*"
-        update-types: ["version-update:semver-major"]
-      - dependency-name: "org.apache.artemis:*"
         update-types: ["version-update:semver-major"]
       # Pinned to the version the Spring Boot BOM's OpenTelemetry SDK or Spring Security's
       # webauthn4j-core uses; they move with Boot and Spring Security, never alone.
