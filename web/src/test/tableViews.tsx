@@ -852,7 +852,17 @@ export const VIEWS: TableView_[] = [
     rows: (f) => ROWS.map((i) => health(f, i)),
     rowKey: (r) => r.subscription,
     identifiers: ['subscription', 'destination'],
-    visible1280: ['verdict', 'subscription', 'destination', 'depth', 'consumers', 'delivering', 'ackRate', 'trend'],
+    visible1280: [
+      'verdict',
+      'subscription',
+      'kind',
+      'destination',
+      'depth',
+      'consumers',
+      'delivering',
+      'ackRate',
+      'trend',
+    ],
   }),
   view({
     name: 'sql results',
@@ -880,7 +890,7 @@ export const VIEWS: TableView_[] = [
     rowKey: (r) => r.subscription,
     height: { maxRows: 12 },
     identifiers: [],
-    visible1280: ['subscription', 'status', 'affected', 'note'],
+    visible1280: ['subscription', 'kind', 'status', 'affected', 'note'],
   }),
   view({
     name: 'bulk preview',
@@ -890,7 +900,7 @@ export const VIEWS: TableView_[] = [
     rowKey: (r) => r.subscription,
     height: { maxRows: 8 },
     identifiers: ['subscription'],
-    visible1280: ['subscription', 'messages', 'nodes', 'plan', 'note'],
+    visible1280: ['subscription', 'kind', 'messages', 'nodes', 'plan', 'note'],
   }),
   view({
     name: 'storage health',
