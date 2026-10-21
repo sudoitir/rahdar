@@ -2,6 +2,8 @@ import { useCallback, useMemo, useState } from 'react';
 import { Button, ColorInput, Modal, NumberInput, Stack, TextInput } from '@mantine/core';
 import { useForm } from '@mantine/form';
 
+import { ApiError } from '../../kernel/api/request.ts';
+import { useCan } from '../../kernel/auth/useCan.ts';
 import { ConfirmDialog } from '../../ui/ConfirmDialog.tsx';
 import { EmptyState } from '../../ui/EmptyState.tsx';
 import { ErrorState } from '../../ui/ErrorState.tsx';
@@ -32,6 +34,9 @@ function editorTitle(editing: EnvironmentView | 'new' | null): string {
 export function EnvironmentsPanel() {
   const environments = useEnvironments();
   const remove = useDeleteEnvironment();
+  // Without the permission the list is never requested, so it would stay pending: say why instead of loading.
+  const { can, loading: grantsLoading } = useCan();
+  const mayRead = grantsLoading || can('environment:read');
 
   const [editing, setEditing] = useState<EnvironmentView | 'new' | null>(null);
   const [deleting, setDeleting] = useState<EnvironmentView | null>(null);
@@ -72,11 +77,15 @@ export function EnvironmentsPanel() {
         data={rows}
         rowKey={(e) => e.id}
         height={{ maxRows: 12 }}
-        loading={environments.isPending}
+        loading={mayRead && environments.isPending}
         error={
-          environments.isError ? (
-            <ErrorState error={environments.error} onRetry={() => void environments.refetch()} />
-          ) : undefined
+          mayRead ? (
+            environments.isError && (
+              <ErrorState error={environments.error} onRetry={() => void environments.refetch()} />
+            )
+          ) : (
+            <ErrorState error={new ApiError(403, { permission: 'environment:read' })} />
+          )
         }
         empty={
           <EmptyState
