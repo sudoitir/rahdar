@@ -3,6 +3,7 @@ import { delay, http, HttpResponse } from 'msw';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
+import { IconSitemap } from '@tabler/icons-react';
 import { createRoute } from '@tanstack/react-router';
 
 import { CONTRACT, defineFeature } from '../../kernel/feature.ts';
@@ -46,6 +47,31 @@ const QUEUES = defineFeature({
       }),
     ],
   },
+});
+
+/** A view for one system only, as the Artemis configuration is. */
+const ARTEMIS_ONLY = defineFeature({
+  contract: CONTRACT,
+  id: 'brokerconfig',
+  routes: {
+    cluster: [
+      createRoute({
+        getParentRoute: () => clusterRoute,
+        path: 'artemis/configuration',
+        component: () => <p>An Artemis cluster's configuration</p>,
+      }),
+    ],
+  },
+  nav: [
+    {
+      group: 'observe',
+      order: 10,
+      label: 'Configuration',
+      icon: IconSitemap,
+      path: 'artemis/configuration',
+      system: 'artemis',
+    },
+  ],
 });
 
 const SMALL = [
@@ -154,6 +180,39 @@ describe('ClusterSwitcher', () => {
     );
   });
 
+  it('leads to the estate from "All clusters"', async () => {
+    mockApi();
+    const user = userEvent.setup();
+    const { router } = renderAppAt('/clusters/c1/subscriptions', [QUEUES]);
+    await user.click(await screen.findByRole('button', { name: /prod-emea/ }));
+
+    await user.click(await option('All clusters'));
+
+    await waitFor(() => expect(router.state.location.pathname).toBe('/'));
+  });
+
+  it("falls back to a cluster's home when its system lacks the system-only view being kept", async () => {
+    mockApi([cluster('c1', 'prod-emea'), cluster('c5', 'other-one', { system: { id: 'other', name: 'Other' } })]);
+    const user = userEvent.setup();
+    const { router } = renderAppAt('/clusters/c1/artemis/configuration', [ARTEMIS_ONLY]);
+    await user.click(await screen.findByRole('button', { name: /prod-emea/ }));
+
+    await user.click(await option(/other-one/));
+
+    await waitFor(() => expect(router.state.location.pathname).toBe('/clusters/c5'));
+  });
+
+  it('keeps a system-only view when the other cluster runs the same system', async () => {
+    mockApi([cluster('c1', 'prod-emea'), cluster('c2', 'prod-apac')]);
+    const user = userEvent.setup();
+    const { router } = renderAppAt('/clusters/c1/artemis/configuration', [ARTEMIS_ONLY]);
+    await user.click(await screen.findByRole('button', { name: /prod-emea/ }));
+
+    await user.click(await option(/prod-apac/));
+
+    await waitFor(() => expect(router.state.location.pathname).toBe('/clusters/c2/artemis/configuration'));
+  });
+
   it('is operated by keyboard alone: arrows open it, the search takes focus, Enter chooses, Escape returns focus', async () => {
     mockApi();
     const user = userEvent.setup();
@@ -200,7 +259,7 @@ describe('ClusterSwitcher', () => {
     await user.click(await screen.findByRole('button', { name: /cluster-00/ }));
 
     const list = await screen.findByRole('listbox', { name: 'Clusters' });
-    expect(within(list).getAllByRole('option')).toHaveLength(41);
+    expect(within(list).getAllByRole('option')).toHaveLength(42);
 
     fireEvent.change(screen.getByRole('textbox', { name: 'Search clusters' }), {
       target: { value: 'cluster-3' },

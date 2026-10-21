@@ -120,7 +120,7 @@ describe('ClusterSwitcher', () => {
     await settle(() => `${list.getBoundingClientRect().height}`);
 
     expect(heightOf(face)).toBeCloseTo(closed, 1);
-    expect(screen.getAllByRole('option')).toHaveLength(31);
+    expect(screen.getAllByRole('option')).toHaveLength(32);
     // The dropdown is bounded (24rem) and scrolls; 30 rows do not make it 30 rows tall.
     let scroller = list.parentElement!;
     while (getComputedStyle(scroller).overflowY !== 'auto') scroller = scroller.parentElement!;

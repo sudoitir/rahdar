@@ -185,6 +185,14 @@ button.face:focus-visible {
   min-inline-size: 0;
 }
 
+.all {
+  display: flex;
+  align-items: center;
+  gap: var(--mantine-spacing-xs);
+  margin-block-start: var(--mantine-spacing-xs);
+  font-weight: 600;
+}
+
 .register {
   position: sticky;
   inset-block-end: calc(var(--combobox-padding) * -1);
