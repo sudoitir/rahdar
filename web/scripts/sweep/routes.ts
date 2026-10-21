@@ -131,7 +131,13 @@ const heldList = (path: string): DataCall => ({ path, empty: { items: [], next: 
 
 export const ROUTES: RouteSpec[] = [
   // The shell
-  { area: 'shell', id: 'home', path: '/', data: [paged('/clusters')] },
+  {
+    area: 'shell',
+    id: 'home',
+    path: '/',
+    data: [paged('/clusters'), paged('/subscriptions')],
+    filter: `?q=${NO_MATCH}`,
+  },
   stateless('shell', 'login', '/login', { auth: 'none', expectedStatus: [401] }),
   {
     area: 'shell',
@@ -177,11 +183,12 @@ export const ROUTES: RouteSpec[] = [
     path: cluster('topology'),
     data: [{ path: cluster('topology'), empty: { clusterId: ':cluster', nodes: [] } }, { path: cluster('health') }],
   },
-  listing('queues', 'queues', 'queues', 'subscriptions'),
+  listing('subscriptions', 'subscriptions', 'subscriptions'),
+  listing('triage', 'consumer-health', 'consumer-health'),
   {
     area: 'messages',
     id: 'messages-dlq-queue',
-    path: cluster('queues/DLQ/messages'),
+    path: cluster('subscriptions/DLQ/messages'),
     data: [
       {
         path: cluster('resources/artemis.queue/*/messages'),
@@ -192,7 +199,7 @@ export const ROUTES: RouteSpec[] = [
   {
     area: 'messages',
     id: 'messages-long-name',
-    path: cluster(`queues/${LONG_ADDRESS}/messages`),
+    path: cluster(`subscriptions/${LONG_ADDRESS}/messages`),
     data: [
       {
         path: cluster('resources/artemis.queue/*/messages'),
@@ -202,8 +209,8 @@ export const ROUTES: RouteSpec[] = [
   },
   {
     area: 'messages',
-    id: 'dlq',
-    path: cluster('dlq'),
+    id: 'dead-letters',
+    path: cluster('dead-letters'),
     data: [{ path: cluster('dead-letters'), empty: { destinations: [], settingsAvailable: true } }],
   },
   {
@@ -270,21 +277,21 @@ export const ROUTES: RouteSpec[] = [
     expectedStatus: [404],
   },
   { area: 'sql', id: 'sql', path: cluster('sql'), data: [paged(cluster('sql/index'))] },
-  listing('resources', 'addresses', 'addresses', 'destinations'),
+  listing('resources', 'destinations', 'destinations'),
   listing('resources', 'consumers', 'consumers'),
-  listing('resources', 'sessions', 'sessions', 'channels'),
+  listing('resources', 'channels', 'channels'),
   listing('resources', 'connections', 'connections'),
   listing('resources', 'producers', 'producers'),
   {
-    area: 'routing',
-    id: 'routing',
-    path: cluster('routing'),
+    area: 'routes',
+    id: 'routes',
+    path: cluster('routes'),
     data: [paged(cluster('routes')), { path: cluster('artemis/config') }],
   },
   {
     area: 'setupreview',
     id: 'setup-review',
-    path: cluster('setup-review'),
+    path: cluster('artemis/setup-review'),
     data: [{ path: cluster('artemis/setup-review') }],
   },
   ...(
@@ -301,13 +308,13 @@ export const ROUTES: RouteSpec[] = [
   ).map((tab): RouteSpec => ({
     area: 'brokerconfig',
     id: `configuration-${tab}`,
-    path: cluster(`configuration?tab=${tab}`),
+    path: cluster(`artemis/configuration?tab=${tab}`),
     data: [{ path: cluster('artemis/config') }, paged(cluster('artemis/config/revisions'))],
   })),
   {
     area: 'brokerconfig',
     id: 'config-diff',
-    path: cluster('config-diff'),
+    path: cluster('artemis/config-diff'),
     data: [{ path: cluster('artemis/config-diff') }],
   },
   ...SETTINGS_TABS.map((tab): RouteSpec => ({
@@ -365,13 +372,13 @@ export const ROUTES: RouteSpec[] = [
   {
     area: 'approvals',
     id: 'held-toast',
-    path: cluster(`queues/${HELD_QUEUE}/messages`),
+    path: cluster(`subscriptions/${HELD_QUEUE}/messages`),
     auth: 'requester',
     scenes: HELD_TOAST_SCENES,
   },
   { area: 'approvals', id: 'inbox-requester', path: '/inbox', auth: 'requester', scenes: BELL_SCENES },
   // Run with `rahdar.gate.break-glass` set in Rahdar's environment: every page shows the banner.
-  { area: 'breakglass', id: 'break-glass-admin', path: cluster('queues') },
+  { area: 'breakglass', id: 'break-glass-admin', path: cluster('subscriptions') },
   { area: 'breakglass', id: 'break-glass-requester', path: '/approvals?tab=mine', auth: 'requester' },
   {
     area: 'approvals',
