@@ -36,7 +36,7 @@ export interface SlotProps {
   /** In the sidebar, above the open cluster's views: how the operator moves between clusters. */
   'shell.navbar': { collapsed: boolean };
   /** The landing page, when no cluster is open. */
-  'home.empty': object;
+  'home.estate': object;
   /** Above every view of a cluster: what identifies it, and what needs saying about its state. */
   'cluster.header': { clusterId: string };
   /** Below a passing registration check: what the enabled features added to it, by feature id. */

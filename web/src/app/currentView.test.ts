@@ -27,6 +27,12 @@ describe('sameViewOn', () => {
     expect(sameViewOn('c2', matchView('/clusters/c1/subscriptions', FEATURES))).toBe('/clusters/c2/subscriptions');
   });
 
+  it('keeps a system-only view only on a cluster of that system', () => {
+    const view = matchView('/clusters/c1/artemis/configuration', FEATURES);
+    expect(sameViewOn('c2', view, 'artemis')).toBe('/clusters/c2/artemis/configuration');
+    expect(sameViewOn('c2', view, 'other')).toBe('/clusters/c2');
+  });
+
   it("opens the cluster's landing page when there is no view to keep", () => {
     expect(sameViewOn('c2', null)).toBe('/clusters/c2');
   });
