@@ -201,15 +201,15 @@ function Legend() {
       <span className={styles.legendItem}>
         <span className={styles.legendAxis} aria-hidden="true" />
         {/* The flex gap spaces the mark from its label. */}
-        shared NodeID — serving above, standby below
+        <span>shared NodeID — serving above, standby below</span>
       </span>
       <span className={styles.legendItem}>
         <span className={styles.legendBox} data-offset aria-hidden="true" />
-        box set off to the side: replication behind
+        <span>box set off to the side: replication behind</span>
       </span>
       <span className={styles.legendItem}>
         <span className={styles.legendBox} data-kind="unmanaged" aria-hidden="true" />
-        dashed box: no management URL
+        <span>dashed box: no management URL</span>
       </span>
     </div>
   );
