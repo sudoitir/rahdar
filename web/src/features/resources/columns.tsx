@@ -90,7 +90,7 @@ export const resourceColumns = {
       id: 'delivery',
       header: 'Delivery',
       description: 'To one consumer, to every subscription, or both',
-      accessor: (r) => r.delivery.map((mode) => DELIVERY[mode]).join(', '),
+      accessor: (r) => r.delivery.map((mode) => DELIVERY[mode]).join(', ') || '—',
       kind: 'status',
       priority: 'low',
     },

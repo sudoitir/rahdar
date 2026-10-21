@@ -57,8 +57,15 @@ function DeadLettersEmpty({ destinations, available }: Readonly<{ destinations: 
       title="No dead-lettered messages"
       description={
         <>
-          The broker's dead-letter destination is <code>{destinations.join(', ') || '—'}</code>, but no subscription on
-          it currently holds messages. A message lands there when a consumer keeps rejecting it or it expires.
+          {destinations.length > 0 ? (
+            <>
+              The broker's dead-letter destination is <code>{destinations.join(', ')}</code>, but no subscription on it
+              currently holds messages.
+            </>
+          ) : (
+            <>The broker names no dead-letter or expiry destination, so nothing is dead-lettered.</>
+          )}{' '}
+          A message lands there when a consumer keeps rejecting it or it expires.
         </>
       }
     />
