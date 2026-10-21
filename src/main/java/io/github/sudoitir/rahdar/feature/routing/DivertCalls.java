@@ -31,7 +31,7 @@ final class DivertCalls {
                 .putRaw(
                         DivertRoute.ROUTING_NAME,
                         req.routingName() == null || req.routingName().isBlank() ? req.name() : req.routingName())
-                .putRaw(DivertRoute.EXCLUSIVE, req.exclusive());
+                .putRaw(DivertRoute.EXCLUSIVE_ATTRIBUTE, req.exclusive());
         if (req.filter() != null && !req.filter().isBlank()) {
             attributes.put(StandardAttributes.FILTER, req.filter());
         }

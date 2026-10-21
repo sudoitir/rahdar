@@ -37,7 +37,7 @@ public final class ResourceIds {
     public static ResourceId parse(String kind, String path) {
         try {
             return ResourceId.parse(kind + "/" + path);
-        } catch (RuntimeException e) {
+        } catch (RuntimeException _) {
             throw new InvalidResourceIdException("'" + kind + "/" + path + "' is not a resource id.");
         }
     }

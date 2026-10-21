@@ -61,7 +61,7 @@ public final class MessageRequests {
         static long number(String position) {
             try {
                 return Long.parseLong(position.trim());
-            } catch (NumberFormatException e) {
+            } catch (NumberFormatException _) {
                 throw new IllegalArgumentException("'" + position + "' is not a message position.");
             }
         }

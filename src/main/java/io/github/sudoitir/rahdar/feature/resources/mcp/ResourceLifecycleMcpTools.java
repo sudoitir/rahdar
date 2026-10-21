@@ -33,6 +33,8 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class ResourceLifecycleMcpTools {
 
+    private static final String RESOURCE = "resource";
+
     private final QueueLifecycleService lifecycle;
     private final McpResources resources;
 
@@ -72,6 +74,8 @@ public class ResourceLifecycleMcpTools {
                             // makes retrying after a partial fan-out safe (D2).
                             idempotentHint = true,
                             openWorldHint = false))
+    // One parameter per tool argument: the MCP schema is the parameter list.
+    @SuppressWarnings("java:S107")
     public McpSchema.CallToolResult resourceLifecycle(
             @McpToolParam(required = true) String clusterId,
             @McpToolParam(required = true) String kind,
@@ -114,15 +118,15 @@ public class ResourceLifecycleMcpTools {
     /** The resource the kind acts on: one that exists, or for a create the id of the one to make. */
     private ResourceId target(UUID clusterId, LifecycleKind op, String resource) {
         return switch (op) {
-            case CREATE_SUBSCRIPTION -> resources.newId(clusterId, "resource", resource, ResourceClass.SUBSCRIPTION);
-            case CREATE_DESTINATION -> resources.newId(clusterId, "resource", resource, ResourceClass.DESTINATION);
+            case CREATE_SUBSCRIPTION -> resources.newId(clusterId, RESOURCE, resource, ResourceClass.SUBSCRIPTION);
+            case CREATE_DESTINATION -> resources.newId(clusterId, RESOURCE, resource, ResourceClass.DESTINATION);
             case DELETE_DESTINATION ->
                 resources
-                        .require(clusterId, "resource", resource, ResourceClass.DESTINATION)
+                        .require(clusterId, RESOURCE, resource, ResourceClass.DESTINATION)
                         .id();
             case UPDATE_RESOURCE, DELETE_SUBSCRIPTION, PAUSE_SUBSCRIPTION, RESUME_SUBSCRIPTION, RESET_COUNTERS ->
                 resources
-                        .require(clusterId, "resource", resource, ResourceClass.SUBSCRIPTION)
+                        .require(clusterId, RESOURCE, resource, ResourceClass.SUBSCRIPTION)
                         .id();
         };
     }

@@ -8,7 +8,7 @@ const UNRESERVED_EXTRA = /[!'()*]/g;
 
 /** One segment of an id, percent-encoded as the server does, which also encodes `!'()*`. */
 function encodeSegment(value: string): string {
-  return encodeURIComponent(value).replace(UNRESERVED_EXTRA, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`);
+  return encodeURIComponent(value).replace(UNRESERVED_EXTRA, (c) => `%${c.codePointAt(0).toString(16).toUpperCase()}`);
 }
 
 /** The canonical id of the resource of this kind with this path, outermost segment first. */

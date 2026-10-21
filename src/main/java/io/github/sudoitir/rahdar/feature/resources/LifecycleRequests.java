@@ -185,7 +185,7 @@ public final class LifecycleRequests {
             }
             try {
                 return Long.valueOf(value.toString());
-            } catch (NumberFormatException e) {
+            } catch (NumberFormatException _) {
                 throw new IllegalArgumentException(key + " must be a number.");
             }
         }

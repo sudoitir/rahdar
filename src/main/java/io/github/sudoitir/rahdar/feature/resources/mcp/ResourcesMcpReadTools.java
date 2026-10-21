@@ -2,7 +2,6 @@ package io.github.sudoitir.rahdar.feature.resources.mcp;
 
 import io.github.sudoitir.rahdar.feature.resources.CrossNodeAggregator;
 import io.github.sudoitir.rahdar.feature.resources.PagedListService;
-import io.github.sudoitir.rahdar.feature.resources.web.ResourceViews;
 import io.github.sudoitir.rahdar.kernel.core.ResourceQuery;
 import io.github.sudoitir.rahdar.platform.broker.ResourceIds;
 import io.github.sudoitir.rahdar.platform.mcp.McpArgs;
@@ -11,7 +10,6 @@ import io.github.sudoitir.rahdar.platform.mcp.McpProperties;
 import io.github.sudoitir.rahdar.platform.mcp.McpRouteRows;
 import io.github.sudoitir.rahdar.platform.mcp.McpViews;
 import io.modelcontextprotocol.spec.McpSchema;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -81,114 +79,107 @@ public class ResourcesMcpReadTools {
         // to the rows, so the window it is applied to is the widest one.
         boolean ofKind = kind != null && !kind.isBlank();
         ResourceQuery query = ResourceQuery.of(filter, 1, ofKind ? ResourceQuery.MAX_SIZE : limit + 1, null);
-        List<McpViews.ResourceRow> rows = new ArrayList<>();
-        String orderedBy;
-        switch (role) {
-            case SUBSCRIPTION -> {
-                orderedBy = "name";
-                // Subscriptions keep their own snapshot-backed path — they are aggregated from
-                // subscription_snapshot, not fanned out live, and that is the cheap read.
-                for (ResourceViews.SubscriptionView q :
-                        subscriptions.subscriptions(clusterId, query).data()) {
-                    rows.add(new McpViews.ResourceRow(
-                            q.id(),
-                            q.kind(),
-                            q.kindLabel(),
-                            q.name(),
-                            q.nodesPresent() + "/" + q.nodesTotal() + " nodes",
-                            null,
-                            "destination=" + q.destination() + " consumers=" + q.totalConsumerCount(),
-                            q.totalMessageCount()));
-                }
-            }
-            case DESTINATION -> {
-                orderedBy = "name";
-                for (ResourceViews.DestinationView a :
-                        lists.destinations(clusterId, query).data()) {
-                    rows.add(new McpViews.ResourceRow(
-                            a.id(),
-                            a.kind(),
-                            a.kindLabel(),
-                            a.name(),
-                            a.nodeName(),
-                            a.nodeId(),
-                            "subscriptions=" + a.subscriptionCount(),
-                            a.messageCount()));
-                }
-            }
-            case ROUTE -> {
-                orderedBy = "source";
-                McpRouteRows routes = routeRows.getIfAvailable();
-                if (routes != null) {
-                    rows.addAll(routes.rows(clusterId, query));
-                }
-            }
-            case CONSUMER -> {
-                orderedBy = "subscription";
-                for (ResourceViews.ConsumerView c :
-                        lists.consumers(clusterId, query).data()) {
-                    rows.add(new McpViews.ResourceRow(
-                            c.id(),
-                            c.kind(),
-                            c.kindLabel(),
-                            ResourceIds.nameOf(c.id()),
-                            c.nodeName(),
-                            c.nodeId(),
-                            "subscription=" + c.subscription() + " " + PROTOCOL_LABEL + c.protocol() + " acked="
-                                    + c.messagesAcknowledged(),
-                            c.messagesDelivered()));
-                }
-            }
-            case CHANNEL -> {
-                orderedBy = "id";
-                for (ResourceViews.ChannelView x :
-                        lists.channels(clusterId, query).data()) {
-                    rows.add(new McpViews.ResourceRow(
-                            x.id(),
-                            x.kind(),
-                            x.kindLabel(),
-                            ResourceIds.nameOf(x.id()),
-                            x.nodeName(),
-                            x.nodeId(),
-                            "user=" + x.user() + " producers=" + x.producerCount(),
-                            x.consumerCount()));
-                }
-            }
-            case CONNECTION -> {
-                orderedBy = "remoteAddress";
-                for (ResourceViews.ConnectionView x :
-                        lists.connections(clusterId, query).data()) {
-                    rows.add(new McpViews.ResourceRow(
-                            x.id(),
-                            x.kind(),
-                            x.kindLabel(),
-                            ResourceIds.nameOf(x.id()),
-                            x.nodeName(),
-                            x.nodeId(),
-                            "remote=" + x.remoteAddress() + " " + PROTOCOL_LABEL + x.protocol() + " client="
-                                    + x.clientId(),
-                            x.channelCount()));
-                }
-            }
-            case PRODUCER -> {
-                orderedBy = "destination";
-                for (ResourceViews.ProducerView x :
-                        lists.producers(clusterId, query).data()) {
-                    rows.add(new McpViews.ResourceRow(
-                            x.id(),
-                            x.kind(),
-                            x.kindLabel(),
-                            ResourceIds.nameOf(x.id()),
-                            x.nodeName(),
-                            x.nodeId(),
-                            "destination=" + x.destination() + " " + PROTOCOL_LABEL + x.protocol(),
-                            x.messagesSent()));
-                }
-            }
-            default -> throw McpErrors.invalidParams("unsupported role");
-        }
+        List<McpViews.ResourceRow> rows = rowsOf(clusterId, role, query);
         List<McpViews.ResourceRow> wanted =
                 ofKind ? rows.stream().filter(r -> kind.trim().equals(r.kind())).toList() : rows;
-        return McpViews.Page.of(wanted, limit, orderedBy);
+        return McpViews.Page.of(wanted, limit, orderedBy(role));
+    }
+
+    private static String orderedBy(ListRole role) {
+        return switch (role) {
+            case SUBSCRIPTION, DESTINATION -> "name";
+            case ROUTE -> "source";
+            case CONSUMER -> "subscription";
+            case CHANNEL -> "id";
+            case CONNECTION -> "remoteAddress";
+            case PRODUCER -> "destination";
+            default -> throw McpErrors.invalidParams("unsupported role");
+        };
+    }
+
+    private List<McpViews.ResourceRow> rowsOf(UUID clusterId, ListRole role, ResourceQuery query) {
+        return switch (role) {
+            // Subscriptions keep their own snapshot-backed path — they are aggregated from
+            // subscription_snapshot, not fanned out live, and that is the cheap read.
+            case SUBSCRIPTION ->
+                subscriptions.subscriptions(clusterId, query).data().stream()
+                        .map(q -> new McpViews.ResourceRow(
+                                q.id(),
+                                q.kind(),
+                                q.kindLabel(),
+                                q.name(),
+                                q.nodesPresent() + "/" + q.nodesTotal() + " nodes",
+                                null,
+                                "destination=" + q.destination() + " consumers=" + q.totalConsumerCount(),
+                                q.totalMessageCount()))
+                        .toList();
+            case DESTINATION ->
+                lists.destinations(clusterId, query).data().stream()
+                        .map(a -> new McpViews.ResourceRow(
+                                a.id(),
+                                a.kind(),
+                                a.kindLabel(),
+                                a.name(),
+                                a.nodeName(),
+                                a.nodeId(),
+                                "subscriptions=" + a.subscriptionCount(),
+                                a.messageCount()))
+                        .toList();
+            case ROUTE -> {
+                McpRouteRows routes = routeRows.getIfAvailable();
+                yield routes == null ? List.of() : routes.rows(clusterId, query);
+            }
+            case CONSUMER ->
+                lists.consumers(clusterId, query).data().stream()
+                        .map(c -> new McpViews.ResourceRow(
+                                c.id(),
+                                c.kind(),
+                                c.kindLabel(),
+                                ResourceIds.nameOf(c.id()),
+                                c.nodeName(),
+                                c.nodeId(),
+                                "subscription=" + c.subscription() + " " + PROTOCOL_LABEL + c.protocol() + " acked="
+                                        + c.messagesAcknowledged(),
+                                c.messagesDelivered()))
+                        .toList();
+            case CHANNEL ->
+                lists.channels(clusterId, query).data().stream()
+                        .map(x -> new McpViews.ResourceRow(
+                                x.id(),
+                                x.kind(),
+                                x.kindLabel(),
+                                ResourceIds.nameOf(x.id()),
+                                x.nodeName(),
+                                x.nodeId(),
+                                "user=" + x.user() + " producers=" + x.producerCount(),
+                                x.consumerCount()))
+                        .toList();
+            case CONNECTION ->
+                lists.connections(clusterId, query).data().stream()
+                        .map(x -> new McpViews.ResourceRow(
+                                x.id(),
+                                x.kind(),
+                                x.kindLabel(),
+                                ResourceIds.nameOf(x.id()),
+                                x.nodeName(),
+                                x.nodeId(),
+                                "remote=" + x.remoteAddress() + " " + PROTOCOL_LABEL + x.protocol() + " client="
+                                        + x.clientId(),
+                                x.channelCount()))
+                        .toList();
+            case PRODUCER ->
+                lists.producers(clusterId, query).data().stream()
+                        .map(x -> new McpViews.ResourceRow(
+                                x.id(),
+                                x.kind(),
+                                x.kindLabel(),
+                                ResourceIds.nameOf(x.id()),
+                                x.nodeName(),
+                                x.nodeId(),
+                                "destination=" + x.destination() + " " + PROTOCOL_LABEL + x.protocol(),
+                                x.messagesSent()))
+                        .toList();
+            default -> throw McpErrors.invalidParams("unsupported role");
+        };
     }
 }

@@ -53,7 +53,7 @@ public class ResourceTargets {
         KindId id;
         try {
             id = KindId.of(kind);
-        } catch (RuntimeException e) {
+        } catch (RuntimeException _) {
             throw new InvalidResourceIdException("'" + kind + "' is not a resource kind.");
         }
         boolean matches = gateway.cluster(clusterId).resources().kinds().stream()

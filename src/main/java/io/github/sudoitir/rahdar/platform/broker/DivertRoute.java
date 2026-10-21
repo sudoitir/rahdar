@@ -33,7 +33,7 @@ public record DivertRoute(
     /** Attribute names of a divert beyond the standard ones. */
     public static final String ROUTING_NAME = "artemis.routing_name";
 
-    public static final String EXCLUSIVE = "artemis.exclusive";
+    public static final String EXCLUSIVE_ATTRIBUTE = "artemis.exclusive";
     public static final String ROUTING_TYPE = "artemis.routing_type";
     public static final String TRANSFORMER_CLASS = "artemis.transformer_class";
 
@@ -65,7 +65,7 @@ public record DivertRoute(
                 text(r, ROUTING_TYPE),
                 text(r, TRANSFORMER_CLASS),
                 r.attributes()
-                        .raw(EXCLUSIVE)
+                        .raw(EXCLUSIVE_ATTRIBUTE)
                         .map(v -> Boolean.parseBoolean(String.valueOf(v)))
                         .orElse(false));
     }

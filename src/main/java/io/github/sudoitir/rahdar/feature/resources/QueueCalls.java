@@ -177,7 +177,7 @@ final class QueueCalls {
         return switch (count) {
             case Count.Exact(var e) -> e;
             case Count.Estimate(var e) -> e;
-            case Count.Unavailable(var u) -> 0L;
+            case Count.Unavailable _ -> 0L;
         };
     }
 }

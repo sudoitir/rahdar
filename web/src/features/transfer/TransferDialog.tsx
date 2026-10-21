@@ -373,6 +373,15 @@ function FindingsPanel({
   );
 }
 
+/** A cluster's name from the list, else the fallback, else its id. */
+function nameOfCluster(
+  list: readonly { id: string; name: string }[] | undefined,
+  id: string,
+  fallback?: string,
+): string {
+  return list?.find((c) => c.id === id)?.name ?? fallback ?? id;
+}
+
 /**
  * Destination → preview → confirm for one message transfer (ADR-0097). Nothing touches a broker
  * until the frozen plan is confirmed: the preview states the blast radius and every acceptance
@@ -431,7 +440,7 @@ export function TransferDialog({
   const targetIds = useRoleIds(redistribute ? clusterId : targetClusterId);
   const sourceEndpoints = endpointsOf(source.data?.topology);
   const sourceNode = sourceEndpoints.find((e) => e.id === node) ?? sourceEndpoints.find(serving);
-  const clusterName = (id: string) => clusters.data?.find((c) => c.id === id)?.name ?? source.data?.name ?? id;
+  const clusterName = (id: string) => nameOfCluster(clusters.data, id, source.data?.name);
 
   const close = () => {
     preview.reset();

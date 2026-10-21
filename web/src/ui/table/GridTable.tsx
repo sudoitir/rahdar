@@ -453,6 +453,9 @@ function withEdgeColumns(ids: readonly string[], selectable: boolean, hasMenu: b
   return [...(selectable ? [SELECT_ID] : []), ...ids, ...(hasMenu ? [ACTIONS_ID] : [])];
 }
 
+/** No rows and nothing on the way: the grid is only its header. */
+const isEmptyAndIdle = (rows: number, loading: boolean): boolean => rows === 0 && !loading;
+
 /**
  * The interactive renderer of `DataTable`: one CSS grid track list, declared once and shared by the
  * header row and every body row, row-virtualised with `@tanstack/react-virtual` (ADR-0020).
@@ -929,7 +932,7 @@ export function GridTable<T>({
         className={classes.scroll}
         data-overflow={model.overflow || undefined}
         data-capped={model.maxRows === undefined ? undefined : true}
-        data-empty={rowCount === 0 && !model.loading ? true : undefined}
+        data-empty={isEmptyAndIdle(rowCount, model.loading) || undefined}
         style={scrollStyle(model, selectable, hasMenu)}
         onScroll={(e) => {
           if (performance.now() > quietScrollUntil.current) {

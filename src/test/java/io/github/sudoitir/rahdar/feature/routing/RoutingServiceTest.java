@@ -104,7 +104,7 @@ class RoutingServiceTest extends PostgresIntegrationTest {
         System.arraycopy(held, 0, all, 0, held.length);
         all[held.length] = Targets.address("AUDIT.IN");
         Targets.holding(target, all);
-        when(gateway.node(eq(clusterId), eq(node))).thenReturn(target);
+        when(gateway.node(clusterId, node)).thenReturn(target);
     }
 
     private UUID node(String name, String url) {

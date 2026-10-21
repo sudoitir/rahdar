@@ -11,6 +11,8 @@ import java.util.List;
 /** Message browse, send, move and delete; dead letters. Module descriptor (ADR-0070). */
 public final class MessagesModule {
 
+    private static final String SUBSCRIPTION = "subscription";
+
     public static final FeatureDescriptor DESCRIPTOR = FeatureDescriptor.builder()
             .id("messages")
             .title("Messages")
@@ -47,7 +49,7 @@ public final class MessagesModule {
                     "Message headers on a subscription, or the full body of one message.",
                     List.of(
                             McpToolDef.Param.note(
-                                    "subscription",
+                                    SUBSCRIPTION,
                                     "The subscription's id from list_resources, such as artemis.queue/orders."),
                             McpToolDef.Param.note(
                                     "position",
@@ -60,7 +62,7 @@ public final class MessagesModule {
                     "Move, retry, delete, expire or purge messages on a subscription.",
                     List.of(
                             McpToolDef.Param.note(
-                                    "subscription",
+                                    SUBSCRIPTION,
                                     "The subscription's id from list_resources, such as artemis.queue/orders. "
                                             + "confirm must equal its name."),
                             McpToolDef.Param.enumValues("action", MessageAction.values(), "purge is also accepted."),
@@ -77,7 +79,7 @@ public final class MessagesModule {
                     "Enqueue one message on a subscription. Adds, never removes.",
                     List.of(
                             McpToolDef.Param.note(
-                                    "subscription",
+                                    SUBSCRIPTION,
                                     "The subscription's id from list_resources, such as artemis.queue/orders."),
                             McpToolDef.Param.enumValues(
                                     "kind", MessageKind.values(), "Default TEXT. BYTES: body is base64."),

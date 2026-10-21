@@ -51,7 +51,7 @@ class SystemNamespaceInterceptor implements HandlerInterceptor {
     private static UUID clusterId(Map<String, String> variables) {
         try {
             return variables == null ? null : UUID.fromString(variables.get("clusterId"));
-        } catch (IllegalArgumentException e) {
+        } catch (IllegalArgumentException _) {
             return null;
         }
     }

@@ -27,7 +27,8 @@ const plural = (noun: string): string => {
 /** Why a kind cannot take a verb, built from its system and its label: "Artemis addresses cannot be purged." */
 export function verbRefusal(systemName: string, kindLabel: string, verb: string): string {
   const subject = `${systemName} ${plural(kindLabel.toLowerCase())}`;
-  return `${REFUSALS[verb]?.(subject) ?? `${subject} do not support ${verb}`}.`;
+  const reason = REFUSALS[verb]?.(subject) ?? `${subject} do not support ${verb}`;
+  return `${reason}.`;
 }
 
 /**

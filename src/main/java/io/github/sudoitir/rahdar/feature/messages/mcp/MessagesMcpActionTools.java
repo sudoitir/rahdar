@@ -36,6 +36,8 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class MessagesMcpActionTools {
 
+    private static final String SUBSCRIPTION = "subscription";
+
     private final MessageService messages;
     private final McpResources resources;
 
@@ -65,6 +67,8 @@ public class MessagesMcpActionTools {
                             destructiveHint = true,
                             idempotentHint = false,
                             openWorldHint = false))
+    // One parameter per tool argument: the MCP schema is the parameter list.
+    @SuppressWarnings("java:S107")
     public McpSchema.CallToolResult messageAction(
             @McpToolParam(required = true) String clusterId,
             @McpToolParam(required = true) String subscription,
@@ -76,13 +80,13 @@ public class MessagesMcpActionTools {
             @McpToolParam(required = false) String confirm,
             @McpToolParam(required = false) Boolean override) {
         UUID id = McpArgs.uuid("clusterId", clusterId);
-        McpArgs.required("subscription", subscription);
+        McpArgs.required(SUBSCRIPTION, subscription);
         SubscriptionActionKind kind = McpArgs.enumOf(SubscriptionActionKind.class, "action", action, null);
         boolean dry = McpArgs.flag(dryRun, true);
         boolean over = McpArgs.flag(override, false);
         return McpErrors.guard(() -> {
             String q = resources
-                    .require(id, "subscription", subscription, ResourceClass.SUBSCRIPTION)
+                    .require(id, SUBSCRIPTION, subscription, ResourceClass.SUBSCRIPTION)
                     .name();
             if (!dry) {
                 McpArgs.confirm(q, confirm);
@@ -129,13 +133,13 @@ public class MessagesMcpActionTools {
             @McpToolParam(required = false) Boolean durable,
             @McpToolParam(required = false) Boolean dryRun) {
         UUID id = McpArgs.uuid("clusterId", clusterId);
-        McpArgs.required("subscription", subscription);
+        McpArgs.required(SUBSCRIPTION, subscription);
         String payload = McpArgs.required("body", body);
         MessageKind messageKind = McpArgs.enumOf(MessageKind.class, "kind", kind, MessageKind.TEXT);
         boolean dry = McpArgs.flag(dryRun, true);
         return McpErrors.guard(() -> {
             String q = resources
-                    .require(id, "subscription", subscription, ResourceClass.SUBSCRIPTION)
+                    .require(id, SUBSCRIPTION, subscription, ResourceClass.SUBSCRIPTION)
                     .name();
             Attempt<Outcome> attempt = messages.send(
                     id,
