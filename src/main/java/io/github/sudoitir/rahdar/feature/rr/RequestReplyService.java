@@ -379,13 +379,13 @@ public class RequestReplyService {
         if (declared.isEmpty()) {
             out.add(new TracingReasonView(
                     "NOTHING_DECLARED",
-                    "No request address is declared, so nothing on this cluster is being traced.",
-                    "Add the request address on the Requests tab."));
+                    "No request destination is declared, so nothing on this cluster is being traced.",
+                    "Add a request destination on the Expectations tab."));
             return out;
         }
         if (declared.stream().noneMatch(RrExpectationEntity::isEnabled)) {
             out.add(new TracingReasonView(
-                    "ALL_DISABLED", "Every declared address is disabled.", "Enable one on the Requests tab."));
+                    "ALL_DISABLED", "Every declared destination is disabled.", "Enable one on the Expectations tab."));
             return out;
         }
         if (nodesWithCore == 0) {
@@ -401,8 +401,8 @@ public class RequestReplyService {
                         "NODES_SKIPPED",
                         "Some nodes were not sampled for '" + h.requestDestination() + "': "
                                 + String.join("; ", h.skipped()),
-                        "An address with no queue in the last scrape is not browsable yet; "
-                                + "check the address name and the routing type.")));
+                        "A destination with no subscription in the last scrape is not browsable yet; "
+                                + "check the destination name and how it delivers.")));
         if (health.stream().anyMatch(ExpectationDiagnosticsView::rateExceedsInterval)) {
             out.add(new TracingReasonView(
                     "RATE_ABOVE_FLOOR",
@@ -424,7 +424,7 @@ public class RequestReplyService {
                 "CONSUMED_FASTER_THAN_SAMPLED",
                 "Tracing browses every " + sampleIntervalMs
                         + "ms, so a request consumed faster than that is never seen. On a healthy "
-                        + "request-reply address that is most of the traffic.",
+                        + "request-reply destination that is most of the traffic.",
                 "Raise samples per minute and lower rr.sample-interval, or read the numbers as a "
                         + "sample rather than a census — the Latency tab states the coverage."));
         return List.copyOf(out);
