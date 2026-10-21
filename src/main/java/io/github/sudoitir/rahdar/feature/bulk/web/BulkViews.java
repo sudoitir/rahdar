@@ -90,6 +90,12 @@ public final class BulkViews {
             @Schema(requiredMode = REQUIRED, description = "The subscription's id.")
             String subscription,
 
+            @Schema(requiredMode = REQUIRED, description = "The id of the subscription's kind, such as artemis.queue.")
+            String kind,
+
+            @Schema(requiredMode = REQUIRED, description = "The kind's name for people, such as Queue.")
+            String kindLabel,
+
             @Schema(requiredMode = REQUIRED) BulkItemStatus status,
             @Schema(nullable = true) String error,
             @Schema(nullable = true) String warning,

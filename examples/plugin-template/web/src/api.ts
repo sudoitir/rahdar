@@ -5,7 +5,7 @@ export const ID = 'acme-notes';
 
 export interface Note {
   id: string;
-  queue: string;
+  subscription: string;
   author: string;
   body: string;
   createdAt: string;
@@ -24,7 +24,7 @@ export function useRecentNotes(clusterId: string) {
 export function useSubscriptionNotes(clusterId: string, subscription: string) {
   return useQuery({
     queryKey: notesKey(clusterId, 'subscription', subscription),
-    queryFn: () => request<Note[]>(pluginApi(ID, `queues/${encodeURIComponent(subscription)}/notes`, clusterId)),
+    queryFn: () => request<Note[]>(pluginApi(ID, `subscriptions/${encodeURIComponent(subscription)}/notes`, clusterId)),
   });
 }
 
@@ -32,7 +32,7 @@ export function useAddNote(clusterId: string, subscription: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (body: string) =>
-      request<Note>(pluginApi(ID, `queues/${encodeURIComponent(subscription)}/notes`, clusterId), {
+      request<Note>(pluginApi(ID, `subscriptions/${encodeURIComponent(subscription)}/notes`, clusterId), {
         method: 'POST',
         body: JSON.stringify({ body }),
       }),

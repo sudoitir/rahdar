@@ -62,9 +62,9 @@ public class StreamSignals {
             }
         }
         if (first) {
-            hub.publish(clusterId, "queues");
+            hub.publish(clusterId, "subscriptions");
         } else if (!moved.isEmpty()) {
-            hub.publishAbout(clusterId, "queues", moved, List.of());
+            hub.publishAbout(clusterId, "subscriptions", moved, List.of());
         }
     }
 

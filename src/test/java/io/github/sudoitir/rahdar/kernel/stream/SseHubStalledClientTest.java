@@ -63,14 +63,14 @@ class SseHubStalledClientTest extends PostgresIntegrationTest {
                 .when(stalled)
                 .send(any(SseEmitter.SseEventBuilder.class));
         SseEmitter healthy = mock(SseEmitter.class);
-        hub[0].register(clusterId, new Subscriber(stalled, Set.of("queues"), null, null, null));
-        hub[0].register(clusterId, new Subscriber(healthy, Set.of("queues"), null, null, null));
+        hub[0].register(clusterId, new Subscriber(stalled, Set.of("subscriptions"), null, null, null));
+        hub[0].register(clusterId, new Subscriber(healthy, Set.of("subscriptions"), null, null, null));
         bus.start();
         try {
             await().atMost(Duration.ofSeconds(10)).until(bus::isListening);
 
-            hub[0].publishAbout(clusterId, "queues", List.of("orders.a"), List.of());
-            hub[0].publishAbout(clusterId, "queues", List.of("orders.b"), List.of());
+            hub[0].publishAbout(clusterId, "subscriptions", List.of("orders.a"), List.of());
+            hub[0].publishAbout(clusterId, "subscriptions", List.of("orders.b"), List.of());
             bus.publish(new ReplicaSignal("settings", "after"));
 
             await().atMost(Duration.ofSeconds(5)).until(() -> !signals.isEmpty());

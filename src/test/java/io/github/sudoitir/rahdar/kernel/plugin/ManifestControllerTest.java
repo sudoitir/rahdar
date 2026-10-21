@@ -50,7 +50,7 @@ class ManifestControllerTest {
                                 .title("Queues")
                                 .kind(Kind.FEATURE)
                                 .permission(PermissionDef.cluster("subscription:create", "Create queues"))
-                                .streamTopic(TopicDef.signal("queues"))
+                                .streamTopic(TopicDef.signal("subscriptions"))
                                 .build(),
                         FeatureDescriptor.builder()
                                 .id("sql")
@@ -70,7 +70,7 @@ class ManifestControllerTest {
                 .andExpect(jsonPath("$.features[0].id").value("queues"))
                 .andExpect(jsonPath("$.features[0].enabled").value(true))
                 .andExpect(jsonPath("$.features[0].origin").value("BUILTIN"))
-                .andExpect(jsonPath("$.features[0].topics[0]").value("queues"))
+                .andExpect(jsonPath("$.features[0].topics[0]").value("subscriptions"))
                 .andExpect(jsonPath("$.features[1].id").value("sql"))
                 .andExpect(jsonPath("$.features[1].enabled").value(false))
                 .andExpect(jsonPath("$.features[1].enabledProperty").value("rahdar.features.sql.enabled"))

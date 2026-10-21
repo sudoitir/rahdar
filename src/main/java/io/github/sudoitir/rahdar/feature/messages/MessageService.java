@@ -661,11 +661,11 @@ public class MessageService {
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override
                 public void afterCommit() {
-                    sseHub.publishAbout(clusterId, "queues", List.of(queueName), List.of());
+                    sseHub.publishAbout(clusterId, "subscriptions", List.of(queueName), List.of());
                 }
             });
         } else {
-            sseHub.publishAbout(clusterId, "queues", List.of(queueName), List.of());
+            sseHub.publishAbout(clusterId, "subscriptions", List.of(queueName), List.of());
         }
     }
 

@@ -1,7 +1,7 @@
 import { createElement } from 'react';
 
 import { nameOf } from '../../kernel/api/resourceId.ts';
-import type { Column } from '../../ui/table/index.ts';
+import { kindColumn, type Column } from '../../ui/table/index.ts';
 import type { ConsumerHealthView } from './api.ts';
 import { SubscriptionLink } from './cells.tsx';
 import { HealthVerdict } from './HealthVerdict.tsx';
@@ -36,6 +36,7 @@ export function consumerHealthColumns(): Column<ConsumerHealthView>[] {
       priority: 'essential',
       sortKey: 'subscription',
     },
+    kindColumn<ConsumerHealthView>(),
     {
       id: 'destination',
       header: 'Destination',

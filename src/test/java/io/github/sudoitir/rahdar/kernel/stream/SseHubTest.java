@@ -58,10 +58,10 @@ class SseHubTest {
         UUID clusterId = UUID.randomUUID();
         SseEmitter queuesEmitter = mock(SseEmitter.class);
         SseEmitter topologyEmitter = mock(SseEmitter.class);
-        hub.register(clusterId, new Subscriber(queuesEmitter, Set.of("queues"), null, null, null));
+        hub.register(clusterId, new Subscriber(queuesEmitter, Set.of("subscriptions"), null, null, null));
         hub.register(clusterId, new Subscriber(topologyEmitter, Set.of("topology"), null, null, null));
 
-        hub.publish(clusterId, "queues");
+        hub.publish(clusterId, "subscriptions");
 
         verify(queuesEmitter, timeout(2_000)).send(any(SseEmitter.SseEventBuilder.class));
         verify(topologyEmitter, after(200).never()).send(any(SseEmitter.SseEventBuilder.class));
@@ -73,10 +73,10 @@ class SseHubTest {
         UUID clusterId = UUID.randomUUID();
         SseEmitter dead = mock(SseEmitter.class);
         doThrow(new IOException("client gone")).when(dead).send(any(SseEmitter.SseEventBuilder.class));
-        hub.register(clusterId, new Subscriber(dead, Set.of("queues"), null, null, null));
+        hub.register(clusterId, new Subscriber(dead, Set.of("subscriptions"), null, null, null));
         assertThat(hub.subscriberCount(clusterId)).isEqualTo(1);
 
-        hub.publish(clusterId, "queues");
+        hub.publish(clusterId, "subscriptions");
 
         verify(dead, timeout(2_000)).completeWithError(any());
         assertThat(hub.subscriberCount(clusterId)).isZero();
@@ -87,7 +87,7 @@ class SseHubTest {
         loopback();
         UUID clusterId = UUID.randomUUID();
 
-        assertThatCode(() -> hub.publish(clusterId, "queues")).doesNotThrowAnyException();
+        assertThatCode(() -> hub.publish(clusterId, "subscriptions")).doesNotThrowAnyException();
 
         assertThat(hub.subscriberCount(clusterId)).isZero();
     }
@@ -114,7 +114,7 @@ class SseHubTest {
     void aNewSubscriberIsGreetedWithAPingSoItsClientSeesTheStreamOpenAtOnce() throws IOException {
         SseEmitter emitter = mock(SseEmitter.class);
 
-        hub.greet(new Subscriber(emitter, Set.of("queues"), null, null, null));
+        hub.greet(new Subscriber(emitter, Set.of("subscriptions"), null, null, null));
 
         ArgumentCaptor<SseEmitter.SseEventBuilder> frame = ArgumentCaptor.forClass(SseEmitter.SseEventBuilder.class);
         verify(emitter).send(frame.capture());
@@ -126,7 +126,7 @@ class SseHubTest {
         UUID clusterId = UUID.randomUUID();
         SseEmitter dead = mock(SseEmitter.class);
         doThrow(new IOException("client gone")).when(dead).send(any(SseEmitter.SseEventBuilder.class));
-        hub.register(clusterId, new Subscriber(dead, Set.of("queues"), null, null, null));
+        hub.register(clusterId, new Subscriber(dead, Set.of("subscriptions"), null, null, null));
 
         hub.heartbeat();
 
@@ -149,9 +149,9 @@ class SseHubTest {
     void aSignalIsBroadcastWithoutData() {
         UUID clusterId = UUID.randomUUID();
 
-        hub.publish(clusterId, "queues");
+        hub.publish(clusterId, "subscriptions");
 
-        verify(bus).publish(new BusFrame(clusterId, "queues", null, null));
+        verify(bus).publish(new BusFrame(clusterId, "subscriptions", null, null));
     }
 
     @Test
@@ -162,8 +162,8 @@ class SseHubTest {
                 .publish(any(BusMessage.class));
 
         assertThatCode(() -> {
-                    hub.publish(clusterId, "queues");
-                    hub.publish(clusterId, "queues");
+                    hub.publish(clusterId, "subscriptions");
+                    hub.publish(clusterId, "subscriptions");
                     hub.publish(clusterId, "events", Map.of("seq", 7), "7");
                 })
                 .doesNotThrowAnyException();
@@ -177,7 +177,7 @@ class SseHubTest {
         SseEmitter wants = mock(SseEmitter.class);
         SseEmitter other = mock(SseEmitter.class);
         hub.register(clusterId, new Subscriber(wants, Set.of("events"), null, null, null));
-        hub.register(clusterId, new Subscriber(other, Set.of("queues"), null, null, null));
+        hub.register(clusterId, new Subscriber(other, Set.of("subscriptions"), null, null, null));
 
         hub.onFrame(new BusFrame(clusterId, "events", mapper.readTree("{\"seq\":7}"), "7"));
 
@@ -191,14 +191,14 @@ class SseHubTest {
     void aBufferingSubscriberGetsLiveFramesAfterTheReplayAndNoRepeat() throws IOException {
         UUID clusterId = UUID.randomUUID();
         SseEmitter emitter = mock(SseEmitter.class);
-        Subscriber subscriber = new Subscriber(emitter, Set.of("events", "queues"), null, null, null);
+        Subscriber subscriber = new Subscriber(emitter, Set.of("events", "subscriptions"), null, null, null);
         subscriber.buffer();
         hub.register(clusterId, subscriber);
         hub.replayTo(clusterId, subscriber, "events", "replayed", "11");
         hub.replayTo(clusterId, subscriber, "events", "replayed", "12");
 
         hub.onFrame(new BusFrame(clusterId, "events", mapper.readTree("12"), "12"));
-        hub.onFrame(new BusFrame(clusterId, "queues", null, null));
+        hub.onFrame(new BusFrame(clusterId, "subscriptions", null, null));
         hub.onFrame(new BusFrame(clusterId, "events", mapper.readTree("13"), "13"));
         verify(emitter, times(2)).send(any(SseEmitter.SseEventBuilder.class));
 
@@ -211,7 +211,7 @@ class SseHubTest {
                 .satisfiesExactly(
                         a -> assertThat(a).contains("id:11"),
                         a -> assertThat(a).contains("id:12"),
-                        a -> assertThat(a).contains("event:queues"),
+                        a -> assertThat(a).contains("event:subscriptions"),
                         a -> assertThat(a).contains("id:13"),
                         a -> assertThat(a).contains("id:14"));
     }
@@ -257,12 +257,12 @@ class SseHubTest {
                 .when(stalled)
                 .send(any(SseEmitter.SseEventBuilder.class));
         SseEmitter healthy = mock(SseEmitter.class);
-        hub.register(clusterId, new Subscriber(stalled, Set.of("queues"), null, null, null));
-        hub.register(clusterId, new Subscriber(healthy, Set.of("queues"), null, null, null));
+        hub.register(clusterId, new Subscriber(stalled, Set.of("subscriptions"), null, null, null));
+        hub.register(clusterId, new Subscriber(healthy, Set.of("subscriptions"), null, null, null));
 
         long start = System.nanoTime();
         for (int i = 0; i < 3; i++) {
-            hub.onFrame(new BusFrame(clusterId, "queues", null, null, BusFrame.About.queue("orders." + i)));
+            hub.onFrame(new BusFrame(clusterId, "subscriptions", null, null, BusFrame.About.queue("orders." + i)));
         }
 
         assertThat(Duration.ofNanos(System.nanoTime() - start)).as("dispatch").isLessThan(Duration.ofSeconds(1));
@@ -367,11 +367,11 @@ class SseHubTest {
                 .publish(any(BusMessage.class));
         UUID clusterId = UUID.randomUUID();
         SseEmitter emitter = mock(SseEmitter.class);
-        trimming.register(clusterId, new Subscriber(emitter, Set.of("queues"), null, null, null));
+        trimming.register(clusterId, new Subscriber(emitter, Set.of("subscriptions"), null, null, null));
 
-        trimming.publishAbout(clusterId, "queues", List.of("billing.in"), List.of());
-        trimming.publish(clusterId, "queues");
-        trimming.publishAbout(clusterId, "queues", List.of("orders.in", "billing.in"), List.of());
+        trimming.publishAbout(clusterId, "subscriptions", List.of("billing.in"), List.of());
+        trimming.publish(clusterId, "subscriptions");
+        trimming.publishAbout(clusterId, "subscriptions", List.of("orders.in", "billing.in"), List.of());
 
         ArgumentCaptor<SseEmitter.SseEventBuilder> sent = ArgumentCaptor.forClass(SseEmitter.SseEventBuilder.class);
         verify(emitter, timeout(2_000)).send(sent.capture());

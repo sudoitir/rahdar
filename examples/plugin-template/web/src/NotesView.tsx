@@ -15,12 +15,12 @@ export function NotesView() {
       {
         id: 'subscription',
         header: 'Subscription',
-        accessor: (n) => n.queue,
+        accessor: (n) => n.subscription,
         kind: 'identifier',
         priority: 'essential',
         cell: (n) => (
-          <Anchor component={Link} to={`/clusters/${clusterId}/subscriptions`} search={{ subscription: n.queue } as never}>
-            {n.queue}
+          <Anchor component={Link} to={`/clusters/${clusterId}/subscriptions`} search={{ subscription: n.subscription } as never}>
+            {n.subscription}
           </Anchor>
         ),
       },

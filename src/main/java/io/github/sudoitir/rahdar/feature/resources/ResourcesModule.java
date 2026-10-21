@@ -74,7 +74,7 @@ public final class ResourcesModule {
             .apiPrefix("/api/v1/clusters/{clusterId}/resources")
             .apiPrefix("/api/v1/subscriptions")
             .streamTopic(TopicDef.signal("consumers", ResourcePermissions.CONNECTION_READ))
-            .streamTopic(TopicDef.signal("sessions", ResourcePermissions.CONNECTION_READ))
+            .streamTopic(TopicDef.signal("channels", ResourcePermissions.CONNECTION_READ))
             .streamTopic(TopicDef.signal("connections", ResourcePermissions.CONNECTION_READ))
             .mcpTool(new McpToolDef(
                     "list_resources",

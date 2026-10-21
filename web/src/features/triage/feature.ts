@@ -45,6 +45,6 @@ export const triageFeature = defineFeature({
   },
   streamTopics: {
     // A verdict is derived from the sweep, so it changes when the sweep lands.
-    queues: ({ clusterId, invalidate }) => invalidate(keys.topic(clusterId)),
+    subscriptions: ({ clusterId, invalidate }) => invalidate(keys.topic(clusterId)),
   },
 });

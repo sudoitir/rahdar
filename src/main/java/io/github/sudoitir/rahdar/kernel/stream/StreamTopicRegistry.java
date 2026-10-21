@@ -23,7 +23,7 @@ import org.springframework.stereotype.Component;
 @Component
 public class StreamTopicRegistry {
 
-    private static final Set<String> DEFAULT_TOPICS = Set.of("topology", "health", "queues");
+    private static final Set<String> DEFAULT_TOPICS = Set.of("topology", "health", "subscriptions");
 
     private final Map<String, TopicDef> builtinDefs;
     private final Set<String> builtinTopics;

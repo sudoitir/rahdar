@@ -68,7 +68,7 @@ public class QueueLifecycleService {
 
     private static final String ADDRESS = "address";
     private static final String DURABLE = "durable";
-    private static final String QUEUES_TOPIC = "queues";
+    private static final String QUEUES_TOPIC = "subscriptions";
 
     private final QueueLocator queueLocator;
     private final QueueSnapshotUpsert snapshotWriter;

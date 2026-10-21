@@ -49,6 +49,16 @@ public final class ResourceIds {
         return local.isEmpty() ? local : Character.toUpperCase(local.charAt(0)) + local.substring(1);
     }
 
+    /** The id of the kind a canonical id text names, or {@code null} for no id. */
+    public static String kindOf(String id) {
+        return id == null ? null : ResourceId.parse(id).kind().value();
+    }
+
+    /** The kind's name for people, of the kind a canonical id text names, or {@code null} for no id. */
+    public static String kindLabelOf(String id) {
+        return id == null ? null : label(ResourceId.parse(id).kind());
+    }
+
     /** The name of the resource a canonical id text names, or {@code null} for no id. */
     public static String nameOf(String id) {
         return id == null ? null : ResourceId.parse(id).name();

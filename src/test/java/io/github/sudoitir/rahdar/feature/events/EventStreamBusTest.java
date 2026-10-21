@@ -78,13 +78,13 @@ class EventStreamBusTest extends PostgresIntegrationTest {
 
     @Test
     void aFramePublishedOnOneReplicaReachesTheClientsOfBothOnce() throws Exception {
-        SseEmitter onA = subscribe(hubA, "queues");
-        SseEmitter onB = subscribe(hubB, "queues");
+        SseEmitter onA = subscribe(hubA, "subscriptions");
+        SseEmitter onB = subscribe(hubB, "subscriptions");
 
-        hubA.publish(clusterId, "queues");
+        hubA.publish(clusterId, "subscriptions");
 
-        assertThat(frames(onA, "queues", 1)).singleElement().asString().contains("event:queues");
-        assertThat(frames(onB, "queues", 1)).singleElement().asString().contains("event:queues");
+        assertThat(frames(onA, "subscriptions", 1)).singleElement().asString().contains("event:subscriptions");
+        assertThat(frames(onB, "subscriptions", 1)).singleElement().asString().contains("event:subscriptions");
     }
 
     @Test

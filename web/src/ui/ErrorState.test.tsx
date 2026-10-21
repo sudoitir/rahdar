@@ -55,9 +55,9 @@ describe('ErrorState', () => {
   });
 
   it('names the missing permission on 403 when the problem says it', () => {
-    renderWithProviders(<ErrorState error={apiError(403, { permission: 'queues:delete' })} />);
-    expect(screen.getByText('Your role does not include the queues:delete permission.')).toBeInTheDocument();
-    expect(screen.getByText('Ask an administrator to grant queues:delete.')).toBeInTheDocument();
+    renderWithProviders(<ErrorState error={apiError(403, { permission: 'subscription:delete' })} />);
+    expect(screen.getByText('Your role does not include the subscription:delete permission.')).toBeInTheDocument();
+    expect(screen.getByText('Ask an administrator to grant subscription:delete.')).toBeInTheDocument();
   });
 
   it('still explains a 403 that names no permission', () => {

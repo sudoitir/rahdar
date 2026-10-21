@@ -77,7 +77,8 @@ class PermissionStreamAccessTest {
                 access,
                 new TeamIndex(mock(TeamRepository.class), patterns, shares, mock(RolePermissionRepository.class)),
                 features);
-        when(topics.definition("queues")).thenReturn(TopicDef.signal("queues", Permissions.SUBSCRIPTION_READ));
+        when(topics.definition("subscriptions"))
+                .thenReturn(TopicDef.signal("subscriptions", Permissions.SUBSCRIPTION_READ));
         when(topics.definition("alerts")).thenReturn(TopicDef.signal("alerts", AlertPermissions.ALERT_READ));
         when(topics.definition("health")).thenReturn(TopicDef.signal("health"));
         @SuppressWarnings("unchecked")
@@ -107,15 +108,15 @@ class PermissionStreamAccessTest {
     void aTeamMemberDoesNotReceiveAnEventAboutAnotherTeamsQueue() {
         teamMember();
 
-        assertThat(shown("queues", BusFrame.About.queue("billing.in"))).isNull();
-        assertThat(shown("queues", BusFrame.About.queue("orders.in"))).isNotNull();
+        assertThat(shown("subscriptions", BusFrame.About.queue("billing.in"))).isNull();
+        assertThat(shown("subscriptions", BusFrame.About.queue("orders.in"))).isNotNull();
     }
 
     @Test
     void anEventListingSeveralQueuesIsTrimmedToThoseTheSubscriberMayRead() {
         teamMember();
 
-        Subscriber.Held held = shown("queues", BusFrame.About.of(List.of("orders.in", "billing.in"), List.of()));
+        Subscriber.Held held = shown("subscriptions", BusFrame.About.of(List.of("orders.in", "billing.in"), List.of()));
 
         assertThat(held.about().queues()).containsExactly("orders.in");
     }
@@ -123,11 +124,11 @@ class PermissionStreamAccessTest {
     @Test
     void anEventAboutNoSingleResourceNeedsTheClusterPermission() {
         teamMember();
-        assertThat(shown("queues", null)).isNull();
+        assertThat(shown("subscriptions", null)).isNull();
 
         grant(Permissions.SUBSCRIPTION_READ);
-        assertThat(shown("queues", null)).isNotNull();
-        assertThat(shown("queues", BusFrame.About.queue("billing.in"))).isNotNull();
+        assertThat(shown("subscriptions", null)).isNotNull();
+        assertThat(shown("subscriptions", BusFrame.About.queue("billing.in"))).isNotNull();
     }
 
     @Test
@@ -151,8 +152,8 @@ class PermissionStreamAccessTest {
     @Test
     void revokedAccessAppliesToTheNextFrameOfAnOpenStream() {
         teamMember();
-        Subscriber subscriber = new Subscriber(null, Set.of("queues"), null, null, principal);
-        Subscriber.Held frame = new Subscriber.Held("queues", null, null, BusFrame.About.queue("orders.in"));
+        Subscriber subscriber = new Subscriber(null, Set.of("subscriptions"), null, null, principal);
+        Subscriber.Held frame = new Subscriber.Held("subscriptions", null, null, BusFrame.About.queue("orders.in"));
         assertThat(streamAccess.narrow(subscriber, clusterId, frame)).isNotNull();
 
         when(access.of(userId)).thenReturn(new AccessSnapshot(Set.of(), Map.of()));

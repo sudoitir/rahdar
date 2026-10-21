@@ -458,6 +458,8 @@ const transfer = (f: Fixture, i: number): TransferRunView => ({
 const health = (f: Fixture, i: number): ConsumerHealthView => ({
   destination: resourceId('artemis.address', address(f, i)),
   subscription: resourceId('artemis.queue', name(f, 'orders', i)),
+  kind: 'artemis.queue',
+  kindLabel: 'Queue',
   verdict: ['NO_CONSUMERS', 'STALLED', 'FALLING_BEHIND', 'DRAINING', 'HEALTHY', 'INSUFFICIENT_DATA'][i],
   severity: 6 - i,
   cause: 'cause',
@@ -529,6 +531,8 @@ const runRow = (f: Fixture, i: number): BulkRunView => ({
 const bulkItem = (f: Fixture, i: number): BulkItemView => ({
   ordinal: i,
   subscription: resourceId('artemis.queue', name(f, 'orders', i)),
+  kind: 'artemis.queue',
+  kindLabel: 'Queue',
   status: (['SUCCEEDED', 'FAILED', 'REFUSED', 'PENDING', 'RUNNING', 'SKIPPED'] as const)[i],
   error:
     i === 1 || i === 2

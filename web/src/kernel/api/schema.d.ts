@@ -4996,6 +4996,10 @@ export interface components {
             ordinal: number;
             /** @description The subscription's id. */
             subscription: string;
+            /** @description The id of the subscription's kind, such as artemis.queue. */
+            kind: string;
+            /** @description The kind's name for people, such as Queue. */
+            kindLabel: string;
             /** @enum {string} */
             status: "PENDING" | "REFUSED" | "RUNNING" | "SUCCEEDED" | "PARTIAL" | "FAILED" | "SKIPPED" | "CANCELLED" | "UNKNOWN";
             error?: string | null;
@@ -7415,6 +7419,10 @@ export interface components {
             destination: string;
             /** @description The subscription's id. */
             subscription: string;
+            /** @description The id of the subscription's kind, such as artemis.queue. */
+            kind: string;
+            /** @description The kind's name for people, such as Queue. */
+            kindLabel: string;
             /** @description One of INSUFFICIENT_DATA, PAUSED, NO_CONSUMERS, BROKER_SLOW, STALLED, STARVED, FALLING_BEHIND, DRAINING, HEALTHY. */
             verdict: string;
             /**

@@ -272,7 +272,7 @@ public class ConnectionControlService {
 
     private void publishTopics(UUID clusterId) {
         sseHub.publish(clusterId, "connections");
-        sseHub.publish(clusterId, "sessions");
+        sseHub.publish(clusterId, "channels");
         sseHub.publish(clusterId, "consumers");
     }
 

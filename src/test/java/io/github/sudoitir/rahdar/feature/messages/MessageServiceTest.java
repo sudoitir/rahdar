@@ -468,7 +468,7 @@ class MessageServiceTest {
         assertThat(sent.getValue().headers().correlationId()).contains("c-1");
         assertThat(sent.getValue().body().bytes().orElseThrow().toByteArray()).isEqualTo("{}".getBytes());
         verify(audit).succeed(event, 1);
-        verify(hub).publishAbout(eq(CLUSTER), eq("queues"), anyCollection(), anyCollection());
+        verify(hub).publishAbout(eq(CLUSTER), eq("subscriptions"), anyCollection(), anyCollection());
     }
 
     @Test
@@ -493,7 +493,7 @@ class MessageServiceTest {
 
         verify(hub, never()).publishAbout(any(UUID.class), anyString(), anyCollection(), anyCollection());
         TransactionSynchronizationManager.getSynchronizations().forEach(TransactionSynchronization::afterCommit);
-        verify(hub).publishAbout(eq(CLUSTER), eq("queues"), anyCollection(), anyCollection());
+        verify(hub).publishAbout(eq(CLUSTER), eq("subscriptions"), anyCollection(), anyCollection());
     }
 
     // ---- move, retry, delete, expire ----------------------------------------------------------
@@ -609,7 +609,7 @@ class MessageServiceTest {
                 .isInstanceOfSatisfying(
                         Attempt.Ok.class, ok -> assertThat(ok.value()).isEqualTo(new Outcome.Affected(12, NODE_B)));
         verify(audit).succeed(event, 12);
-        verify(hub).publishAbout(eq(CLUSTER), eq("queues"), anyCollection(), anyCollection());
+        verify(hub).publishAbout(eq(CLUSTER), eq("subscriptions"), anyCollection(), anyCollection());
     }
 
     @Test
@@ -693,7 +693,7 @@ class MessageServiceTest {
                                 .isEqualTo(new Outcome.Partial(1, List.of(2L, 3L), "connection reset", NODE_B)));
         verify(audit).failPartial(event, 1, "Stopped after 1 of 3: connection reset");
         verify(audit, never()).succeed(any(), anyLong());
-        verify(hub).publishAbout(eq(CLUSTER), eq("queues"), anyCollection(), anyCollection());
+        verify(hub).publishAbout(eq(CLUSTER), eq("subscriptions"), anyCollection(), anyCollection());
     }
 
     @Test
@@ -780,7 +780,7 @@ class MessageServiceTest {
         assertThat(service.purge(CLUSTER, "orders", null, false, true))
                 .isInstanceOfSatisfying(
                         Attempt.Ok.class, ok -> assertThat(ok.value()).isEqualTo(new Outcome.Affected(150, NODE_B)));
-        verify(hub).publishAbout(eq(CLUSTER), eq("queues"), anyCollection(), anyCollection());
+        verify(hub).publishAbout(eq(CLUSTER), eq("subscriptions"), anyCollection(), anyCollection());
     }
 
     @Test
