@@ -76,6 +76,15 @@ docker compose -f compose.prod.yaml logs rahdar | grep -A4 'Created administrato
 
 否则拓扑图和队列表格只会在 5 秒轮询时更新，看起来就像一个半死不活的产品。
 
+资源在一个 URL 段中以其 id 寻址，因此包含斜杠或百分号的名称会以 `%2F` 或 `%25` 到达
+（`/api/v1/clusters/…/resources/artemis.queue/orders%252Feu`）。代理必须原样转发这些内容，
+否则无法访问这类资源：
+
+- nginx —— `proxy_pass` **不带** URI 部分（`proxy_pass http://rahdar:8080;`，而不是
+  `http://rahdar:8080/`），这样请求行会原样转发
+- Apache —— `AllowEncodedSlashes NoDecode` 与 `ProxyPass … nocanon`
+- HAProxy 与 Traefik —— 无需改动即可工作
+
 ## 先拿一次性的 Broker 试试
 
 如果你想在把它接到任何真实系统之前先看看效果，仓库自带一套开发栈：从源码构建 Rahdar，启动两对真实的 Artemis 主备节点，并灌入看起来像真实生产环境的流量——包括一个没有消费者、堆积持续增长的地址，一份真实的死信积压，以及一个被停掉的节点。
