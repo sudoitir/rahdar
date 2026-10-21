@@ -30,7 +30,8 @@ Rahdar's surface is broker-neutral, and its estate view was built to hold more t
   - hanging transactions;
   - brokers and the controller quorum.
 - MCP tools for the Kafka operations, held for approval like their shared counterparts.
-- A Kafka cluster in the dev stack and the demo, with traffic.
+- Plugins can consume Kafka subscriptions through the existing plugin messaging contract.
+- A Kafka cluster in the dev stack and a three-broker cluster in the demo, with traffic.
 
 ## Capabilities
 ### New Capabilities
@@ -41,6 +42,7 @@ Rahdar's surface is broker-neutral, and its estate view was built to hold more t
 - `estate-view`: native labels come from the SDK's kinds, and lag is shown as an estimate with its breakdown.
 - `message-operations`: browsing by partition, offset and time; purge and truncate state their reach on a partitioned log.
 - `mcp-server`: Kafka tools.
+- `plugin-messaging`: a plugin can consume a partitioned log, and where a system counts every delivery a release is counted and disclosed.
 
 ## Out of scope
 - Kafka Streams, Connect and schema registries (schema detection is a later change).

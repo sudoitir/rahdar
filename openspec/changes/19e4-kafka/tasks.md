@@ -6,7 +6,7 @@ Rules:
 Order: unit 1 first; units 2 and 3 in parallel (one backend and one web implementer, against D4); unit 4 after 3; unit 5 last.
 
 ## 1. Driver, registration and labels
-- [ ] 1.1 Raise `openbroker.version` to the release with `openbroker-kafka` and add the driver. Check: `BrokerDrivers` lists `kafka` in a unit test
+- [ ] 1.1 Raise `openbroker.version` to the release with `openbroker-kafka` (`0.3.0`) and add the driver. Migrate its breaks: `Credentials.usernamePassword(...)` at every call site, plugin drains re-checked against the default retry resolution, and kind labels. Check: `BrokerDrivers` lists `kafka` in a unit test, and the plugin messaging tests pass unchanged
 - [ ] 1.2 Per-system registration request (D1), the Kafka form, and a dry run through `verify`. Check: registration tests against a Kafka Testcontainer, including the 3.9 refusal
 - [ ] 1.3 Kind labels from the SDK replace `ResourceIds.label` in the API and the web (D2). Check: cluster view tests and the web unit tests for kind names
 - [ ] 1.4 Estate health and lag estimates for Kafka clusters. Check: estate view tests with an Artemis and a Kafka cluster
@@ -23,9 +23,10 @@ Order: unit 1 first; units 2 and 3 in parallel (one backend and one web implemen
 - [ ] 3.3 Topic configuration, ACLs, transactions and brokers screens. Check: browser tests per screen
 - [ ] 3.4 Shared screens: the browse partition and start picker, purge and truncate reach previews, disabled per-message actions, and the lag breakdown drawer. Check: browser tests on a Kafka fixture
 
-## 4. MCP, dev stack and demo
+## 4. Plugin messaging, MCP, dev stack and demo
+- [ ] 4.0 Plugin consume registrations on Kafka consumer-group and share-group subscriptions, with release, reject and key ordering as the spec states and the counted-release disclosure. Check: plugin messaging tests against a Kafka Testcontainer
 - [ ] 4.1 Kafka MCP tools with previews and approval holding; raise the tool budget with a comment. Check: `McpSystemToolsTest`, `McpToolSchemaBudgetTest`
-- [ ] 4.2 Kafka in the dev and demo compose, and in `scripts/demo-seed.sh` traffic (groups, lag, a share group). Check: `just demo` brings up both systems and the estate shows both
+- [ ] 4.2 Kafka in the dev compose (one broker) and a three-broker KRaft cluster in the demo compose, and in `scripts/demo-seed.sh` traffic (groups, lag, a share group). Check: `just demo` brings up both systems and the estate shows both
 
 ## 5. Docs, screenshots and finish
 - [ ] 5.1 ADRs (D9), the docs pages for Kafka clusters, and the glossary terms. Check: the docs build
@@ -35,3 +36,4 @@ Order: unit 1 first; units 2 and 3 in parallel (one backend and one web implemen
 
 ## Workflow follow-up
 - Merge, `/opsx:archive`, stop the stacks the session started.
+- The merge releases Rahdar (CalVer). Ask a maintainer to run `publish-central.yml` for that release, because changes that build against Rahdar from Maven Central need it there.

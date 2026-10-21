@@ -23,11 +23,15 @@ The groups screen SHALL list every group with its type (classic, consumer, share
 - **THEN** it explains that groups appear when applications consume, and shows no empty table
 
 ### Requirement: Offsets are reset only on an empty group, after a preview
-An operator with the subscription write permission SHALL reset a group's offsets on one topic or all of its topics to the earliest, the latest, a time or a given offset. The preview SHALL show each partition's current and new offset, and the records that will be skipped or re-read. If the group has active members, the preview SHALL name them and the reset SHALL be refused.
+An operator with the subscription write permission SHALL reset a consumer group's or share group's offsets on one topic or all of its topics to the earliest, the latest, a time or a given offset. The preview SHALL show each partition's current and new offset, and the records that will be skipped or re-read. If the group has active members, the preview SHALL name them and the reset SHALL be refused.
 
 #### Scenario: Reset to a time
 - **WHEN** an operator previews resetting an empty group to yesterday 09:00 and confirms
 - **THEN** each partition's offset becomes the first at or after that time, and the audit records the offsets before and after
+
+#### Scenario: Resetting a share group
+- **WHEN** an operator resets an empty share group to the latest offset
+- **THEN** its start offsets move to the end, and the audit records them before and after
 
 #### Scenario: A group with members
 - **WHEN** an operator previews a reset of a group with two running members
