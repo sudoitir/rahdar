@@ -160,10 +160,10 @@ public class ConsumerHealthService {
             return b.verdict(
                     Verdict.INSUFFICIENT_DATA,
                     "Not enough samples yet to measure throughput. A rate needs two sweeps of this"
-                            + " queue; one more sweep will settle it.");
+                            + " subscription; one more sweep will settle it.");
         }
 
-        // 2. Paused. Ahead of every consumer verdict: a paused queue holds a backlog with
+        // 2. Paused. Ahead of every consumer verdict: a paused subscription holds a backlog with
         //    no acknowledgements by design, which is indistinguishable from a stall by
         //    signal alone and entirely different in what the operator should do.
         if (row.paused()) {
@@ -180,7 +180,7 @@ public class ConsumerHealthService {
         if (row.totalConsumerCount() == 0 && backlog) {
             return b.verdict(
                     Verdict.NO_CONSUMERS,
-                    "No consumers are attached, so nothing is draining this queue. Start or fix the"
+                    "No consumers are attached, so nothing is draining this subscription. Start or fix the"
                             + " consuming application.");
         }
 
@@ -189,7 +189,7 @@ public class ConsumerHealthService {
             return b.broker(slow.consumerName())
                     .verdict(
                             Verdict.BROKER_SLOW,
-                            "The broker's own slow-consumer detection fired for this address"
+                            "The broker's own slow-consumer detection fired for this subscription"
                                     + (slow.consumerName() == null ? "" : " (consumer " + slow.consumerName() + ")")
                                     + ". Its threshold is authoritative; check that consumer.");
         }
