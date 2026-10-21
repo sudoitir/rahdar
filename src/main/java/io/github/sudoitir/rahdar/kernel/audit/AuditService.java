@@ -116,7 +116,7 @@ public class AuditService {
             }
         }
         String paramsJson = (written == null || written.isEmpty()) ? null : mapper.writeValueAsString(written);
-        Actor a = actor == null ? Actor.system() : actor;
+        Actor a = actor == null ? Actor.ofSystem() : actor;
         AuditEventEntity entity = new AuditEventEntity(
                 action,
                 a,

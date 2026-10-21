@@ -232,23 +232,24 @@ describe('MessageDetailPanel', () => {
   });
 
   it('states why the message could not be read, with a retry that reads it again', async () => {
-    let attempts = 0;
+    // The read fails until Retry is pressed, however often it is attempted before that, so the
+    // test does not depend on how many reads the panel makes while it mounts.
+    let retried = false;
     server.use(
-      http.get('*/api/v1/clusters/:c/resources/artemis.queue/:q/messages/:id', () => {
-        attempts += 1;
-        return attempts === 1
-          ? HttpResponse.json({ title: 'Cluster unreachable', detail: 'No node answered.' }, { status: 502 })
-          : HttpResponse.json(detail());
-      }),
+      http.get('*/api/v1/clusters/:c/resources/artemis.queue/:q/messages/:id', () =>
+        retried
+          ? HttpResponse.json(detail())
+          : HttpResponse.json({ title: 'Cluster unreachable', detail: 'No node answered.' }, { status: 502 }),
+      ),
     );
     const user = userEvent.setup();
     renderWithProviders(<MessageDetailPanel {...base} messageId="146" />);
 
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent('Rahdar failed to complete the request');
+    retried = true;
     await user.click(within(alert).getByRole('button', { name: 'Retry' }));
 
     expect(await screen.findByRole('heading', { level: 3, name: 'Headers' })).toBeInTheDocument();
-    expect(attempts).toBe(2);
   });
 });

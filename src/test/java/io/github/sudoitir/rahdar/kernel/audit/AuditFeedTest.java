@@ -92,7 +92,7 @@ class AuditFeedTest extends PostgresIntegrationTest {
 
     @Test
     void aRefusalCanStillBeRecounted() {
-        AuditEvent event = audit.refused(Actor.system(), unique(), "QUEUE", "orders", null, Map.of(), "no");
+        AuditEvent event = audit.refused(Actor.ofSystem(), unique(), "QUEUE", "orders", null, Map.of(), "no");
         long id = event.getId();
 
         audit.recount(event, 5);
@@ -122,7 +122,7 @@ class AuditFeedTest extends PostgresIntegrationTest {
     }
 
     private AuditEvent begin(String action) {
-        return audit.begin(Actor.system(), action, "QUEUE", "orders", null, null, Map.of(), false);
+        return audit.begin(Actor.ofSystem(), action, "QUEUE", "orders", null, null, Map.of(), false);
     }
 
     private AuditPosition position(Long id) {

@@ -59,16 +59,17 @@
   min-inline-size: 0;
 }
 
-/* The brand is the way home: the product's mark and name, one link. */
+/* The brand is the way to the last place: the product's mark and name, one link that looks like the text it is. */
 .brand {
   display: flex;
   align-items: center;
   gap: var(--mantine-spacing-xs);
+  min-inline-size: 0;
   padding-block: calc(var(--mantine-spacing-xs) / 2);
   padding-inline: var(--mantine-spacing-xs);
   margin-inline-start: calc(var(--mantine-spacing-xs) * -1);
   border-radius: var(--mantine-radius-sm);
-  color: var(--as-text);
+  color: inherit;
   text-decoration: none;
   transition: background-color var(--as-duration-fast) var(--as-ease);
 }
@@ -99,24 +100,10 @@
   gap: var(--mantine-spacing-sm);
 }
 
-/* The brand is the way to the last place: it looks like the text it is, not like a link. */
-.brand {
-  display: flex;
-  align-items: center;
-  gap: var(--mantine-spacing-xs);
-  min-inline-size: 0;
-  color: inherit;
-  text-decoration: none;
-}
-
 /* The strip above a page outside any cluster, level with that page's own padding. */
 .global {
   padding-inline: var(--mantine-spacing-lg);
   padding-block-start: var(--mantine-spacing-xs);
-}
-
-.headerStart > .brand {
-  flex: 0 1 auto;
 }
 
 /* The palette's trigger reads as a search field, at the height of every other header control (28px,

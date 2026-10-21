@@ -153,11 +153,11 @@ class AuditControllerTest extends PostgresIntegrationTest {
 
     @Test
     void aChildNamesItsParentAndTheParentFilterListsTheChildren() throws Exception {
-        AuditEvent parent =
-                auditService.begin(Actor.system(), "bulk.pause", "QUEUE", "3 queues", clusterId, null, Map.of(), false);
+        AuditEvent parent = auditService.begin(
+                Actor.ofSystem(), "bulk.pause", "QUEUE", "3 queues", clusterId, null, Map.of(), false);
         ScopedValue.where(AuditScope.PARENT, parent.getId())
                 .run(() -> auditService.begin(
-                        Actor.system(), "PAUSE_QUEUE", "QUEUE", "orders", clusterId, null, Map.of(), false));
+                        Actor.ofSystem(), "PAUSE_QUEUE", "QUEUE", "orders", clusterId, null, Map.of(), false));
 
         mvc.perform(get("/api/v1/clusters/{c}/audit", clusterId)
                         .param("parentId", parent.getId().toString()))

@@ -382,6 +382,43 @@ function nameOfCluster(
   return list?.find((c) => c.id === id)?.name ?? fallback ?? id;
 }
 
+/** The clusters the operator may send to; one they may not is listed, disabled, with the reason. */
+function sendOptions(
+  list: readonly { id: string; name: string }[] | undefined,
+  maySend: (clusterId: string) => boolean,
+) {
+  return (list ?? []).map((c) => {
+    const allowed = maySend(c.id);
+    return {
+      value: c.id,
+      label: allowed ? c.name : `${c.name}: you do not have the "Send messages" permission here`,
+      disabled: !allowed,
+    };
+  });
+}
+
+/** What the preview, once taken, asks of the operator: its findings, the warnings left to acknowledge, how it is armed. */
+function previewSummary(data: TransferRunView | undefined, acked: ReadonlySet<string>) {
+  const findings = data?.findings ?? [];
+  const warnings = findings.filter((f) => f.kind === 'WARN');
+  return {
+    findings,
+    warnings,
+    refused: findings.some((f) => f.kind === 'REFUSE'),
+    unacked: warnings.filter((f) => !acked.has(f.code)).length,
+    typed: data ? data.mode === 'MOVE' || data.overCap : false,
+    confirmLabel: data ? confirmWords(data) : '',
+  };
+}
+
+/** The acknowledged codes with one added or removed. */
+function withAck(acked: ReadonlySet<string>, code: string, on: boolean): Set<string> {
+  const next = new Set(acked);
+  if (on) next.add(code);
+  else next.delete(code);
+  return next;
+}
+
 /**
  * Destination → preview → confirm for one message transfer (ADR-0097). Nothing touches a broker
  * until the frozen plan is confirmed: the preview states the blast radius and every acceptance
@@ -491,12 +528,7 @@ export function TransferDialog({
   }, focusFirstInvalid(form.getInputNode));
 
   const data = preview.data;
-  const findings = data?.findings ?? [];
-  const refused = findings.some((f) => f.kind === 'REFUSE');
-  const warnings = findings.filter((f) => f.kind === 'WARN');
-  const unacked = warnings.filter((f) => !acked.has(f.code)).length;
-  const typed = data ? data.mode === 'MOVE' || data.overCap : false;
-  const confirmLabel = data ? confirmWords(data) : '';
+  const { findings, warnings, refused, unacked, typed, confirmLabel } = previewSummary(data, acked);
 
   const start = () => {
     if (!data) return;
@@ -522,14 +554,7 @@ export function TransferDialog({
     );
   };
 
-  const clusterOptions = (clusters.data ?? []).map((c) => {
-    const allowed = loading || canAnywhere('message:send', c.id);
-    return {
-      value: c.id,
-      label: allowed ? c.name : `${c.name}: you do not have the "Send messages" permission here`,
-      disabled: !allowed,
-    };
-  });
+  const clusterOptions = sendOptions(clusters.data, (id) => loading || canAnywhere('message:send', id));
 
   const title = redistribute
     ? `Redistribute from ${subscriptionName} to another node`
@@ -588,14 +613,7 @@ export function TransferDialog({
             typed={typed}
             confirmLabel={confirmLabel}
             acked={acked}
-            onAck={(code, on) =>
-              setAcked((prev) => {
-                const next = new Set(prev);
-                if (on) next.add(code);
-                else next.delete(code);
-                return next;
-              })
-            }
+            onAck={(code, on) => setAcked((prev) => withAck(prev, code, on))}
             execute={execute}
             onPreviewAgain={() => takePreview()}
             onStart={start}

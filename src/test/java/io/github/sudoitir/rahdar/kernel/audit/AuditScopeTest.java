@@ -33,7 +33,7 @@ class AuditScopeTest extends PostgresIntegrationTest {
     }
 
     private AuditEvent begin(String action) {
-        return audit.begin(Actor.system(), action, "QUEUE", "orders", null, null, Map.of(), false);
+        return audit.begin(Actor.ofSystem(), action, "QUEUE", "orders", null, null, Map.of(), false);
     }
 
     private Long parentOf(AuditEvent event) {

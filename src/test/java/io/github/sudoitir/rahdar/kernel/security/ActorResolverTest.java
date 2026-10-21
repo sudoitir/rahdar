@@ -57,7 +57,7 @@ class ActorResolverTest {
     @Test
     void systemActorForTheScheduler() {
         assertThat(resolver.system().username()).isEqualTo("system");
-        assertThat(Actor.system().username()).isEqualTo("system");
+        assertThat(Actor.ofSystem().username()).isEqualTo("system");
     }
 
     @Test

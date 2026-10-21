@@ -8,7 +8,7 @@ import java.util.UUID;
  * {@code username} is the authenticated principal's username or the literal
  * {@code "anonymous"}; {@code userId} is that principal's id when one is
  * authenticated, else {@code null}. Scheduler-originated actions use
- * {@link #system()}.
+ * {@link #ofSystem()}.
  */
 @PluginApi
 public record Actor(String username, String sourceIp, String requestId, UUID userId, String tokenName) {
@@ -20,7 +20,7 @@ public record Actor(String username, String sourceIp, String requestId, UUID use
         this(username, sourceIp, requestId, userId, null);
     }
 
-    public static Actor system() {
+    public static Actor ofSystem() {
         return new Actor(SYSTEM, null, null, null, null);
     }
 
