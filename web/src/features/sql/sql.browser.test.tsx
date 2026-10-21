@@ -40,8 +40,8 @@ const BAD = 'SELECT * FROM "ORDER.IN" JOIN "ORDER.OUT"';
 const target = (nodeId: string, nodeName: string) => ({
   nodeId,
   nodeName,
-  queueName: 'ORDER.IN',
-  address: 'ORDER.IN',
+  subscription: 'artemis.queue/ORDER.IN',
+  destination: 'artemis.address/ORDER.IN',
   messageCount: 1200,
 });
 
@@ -62,8 +62,8 @@ const plan = (over: Record<string, unknown> = {}) => ({
 const row = (messageId: number, source = 'BROKER') => ({
   nodeId: `n${(messageId % 2) + 1}`,
   nodeName: `broker-${(messageId % 2) + 1}`,
-  queueName: 'ORDER.IN',
-  address: 'ORDER.IN',
+  subscription: 'artemis.queue/ORDER.IN',
+  destination: 'artemis.address/ORDER.IN',
   messageId,
   messageType: 3,
   durable: true,
@@ -82,7 +82,7 @@ const row = (messageId: number, source = 'BROKER') => ({
 const node = (nodeId: string, nodeName: string, over: Record<string, unknown> = {}) => ({
   nodeId,
   nodeName,
-  queueName: 'ORDER.IN',
+  subscription: 'artemis.queue/ORDER.IN',
   status: 'ANSWERED',
   examined: 500,
   matched: 1,
@@ -248,7 +248,7 @@ describe.each(SCHEMES)('SQL Console in the %s scheme at 1280 px', (scheme) => {
       const { container } = mount(scheme, seeded(ADMIN), SCAN);
       await settled(container);
       expect(
-        await screen.findByText('Rahdar reads and examines about 2,400,000 messages on 1 queue across 2 nodes.'),
+        await screen.findByText('Rahdar reads and examines about 2,400,000 messages on 1 subscription across 2 nodes.'),
       ).toBeVisible();
       await check(container);
     });
@@ -267,7 +267,7 @@ describe.each(SCHEMES)('SQL Console in the %s scheme at 1280 px', (scheme) => {
     });
 
     it('says why it cannot estimate or run when messages cannot be read', async () => {
-      const { container } = mount(scheme, seeded(['queue:read']));
+      const { container } = mount(scheme, seeded(['subscription:read']));
       await settled(container);
       expect(await screen.findByText('This console cannot read messages here')).toBeVisible();
       expect(screen.getByRole('button', { name: 'Run' })).toBeDisabled();
@@ -291,7 +291,7 @@ describe.each(SCHEMES)('SQL Console in the %s scheme at 1280 px', (scheme) => {
           emit('done', done());
         },
       ],
-      ['done, with no queue matched', () => emit('done', done({ nodes: [], plan: plan({ targets: [] }) }))],
+      ['done, with no subscription matched', () => emit('done', done({ nodes: [], plan: plan({ targets: [] }) }))],
       [
         'done, with a node that did not answer',
         () => emit('done', done({ nodes: [node('n1', 'broker-1', { status: 'FAILED', detail: 'timed out' })] })),

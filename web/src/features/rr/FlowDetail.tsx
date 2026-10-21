@@ -125,7 +125,9 @@ function FlowContent({ f }: Readonly<{ f: Flow }>) {
     <Stack gap="lg">
       <Group gap="xs">
         <FlowStateBadge state={f.state} />
-        <StatusBadge>{f.replyKind === 'TEMPORARY' ? 'temp reply queue' : 'shared reply queue'}</StatusBadge>
+        <StatusBadge>
+          {f.replyKind === 'TEMPORARY' ? 'temp reply subscription' : 'shared reply subscription'}
+        </StatusBadge>
       </Group>
 
       <FlowFacts f={f} />
@@ -164,7 +166,7 @@ export function FlowDetail({
       position="right"
       size="lg"
       closeButtonProps={{ 'aria-label': 'Close the flow' }}
-      title={f ? `Flow on ${f.requestAddress}` : 'Flow'}
+      title={f ? `Flow on ${f.requestDestination}` : 'Flow'}
     >
       {flowNotice(detail) ?? (f ? <FlowContent f={f} /> : null)}
     </Drawer>

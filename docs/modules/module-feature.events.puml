@@ -37,6 +37,7 @@ Rel(RahdarApplication.RahdarApplication.Brokerconnectivity, RahdarApplication.Ra
 Rel(RahdarApplication.RahdarApplication.Brokerconnectivity, RahdarApplication.RahdarApplication.Replicas, "listens to", $techn="", $tags="", $link="")
 Rel(RahdarApplication.RahdarApplication.Brokerconnectivity, RahdarApplication.RahdarApplication.Replicas, "uses", $techn="", $tags="", $link="")
 Rel(RahdarApplication.RahdarApplication.Brokerconnectivity, RahdarApplication.RahdarApplication.Scheduledjobs, "uses", $techn="", $tags="", $link="")
+Rel(RahdarApplication.RahdarApplication.Brokerconnectivity, RahdarApplication.RahdarApplication.Security, "depends on", $techn="", $tags="", $link="")
 Rel(RahdarApplication.RahdarApplication.Brokerconnectivity, RahdarApplication.RahdarApplication.Settings, "depends on", $techn="", $tags="", $link="")
 Rel(RahdarApplication.RahdarApplication.Brokerevents, RahdarApplication.RahdarApplication.Brokerconnectivity, "depends on", $techn="", $tags="", $link="")
 Rel(RahdarApplication.RahdarApplication.Brokerevents, RahdarApplication.RahdarApplication.Core, "uses", $techn="", $tags="", $link="")

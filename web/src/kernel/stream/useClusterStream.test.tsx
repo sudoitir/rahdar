@@ -251,10 +251,10 @@ describe('useClusterStream resuming and refetching', () => {
 describe('useClusterStream topic dispatch', () => {
   it("hands each frame to the handler its feature contributes, and none to a disabled feature's", async () => {
     server.use(manifestHandler(['rr']));
-    const queues = vi.fn<TopicHandler>();
+    const subscriptions = vi.fn<TopicHandler>();
     const rr = vi.fn<TopicHandler>();
     const features = [
-      defineFeature({ contract: CONTRACT, id: 'queues', streamTopics: { queues } }),
+      defineFeature({ contract: CONTRACT, id: 'resources', streamTopics: { subscriptions } }),
       defineFeature({ contract: CONTRACT, id: 'rr', streamTopics: { rr } }),
     ];
     const qc = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
@@ -263,16 +263,16 @@ describe('useClusterStream topic dispatch', () => {
         <FeatureProvider features={features}>{children}</FeatureProvider>
       </QueryClientProvider>
     );
-    renderHook(() => useClusterStream('c1', ['queues', 'rr']), { wrapper });
+    renderHook(() => useClusterStream('c1', ['subscriptions', 'rr']), { wrapper });
     // The manifest disabling rr has to arrive before the frames do.
     await vi.waitFor(() => expect(qc.getQueryData(['manifest'])).toBeDefined());
 
     await act(async () => {
-      EventSourceStub.emit('queues', { topic: 'queues', clusterId: 'c1' });
+      EventSourceStub.emit('subscriptions', { topic: 'subscriptions', clusterId: 'c1' });
       EventSourceStub.emit('rr', { topic: 'rr', clusterId: 'c1' });
     });
 
-    expect(queues).toHaveBeenCalledWith(expect.objectContaining({ clusterId: 'c1' }));
+    expect(subscriptions).toHaveBeenCalledWith(expect.objectContaining({ clusterId: 'c1' }));
     expect(rr).not.toHaveBeenCalled();
   });
 });

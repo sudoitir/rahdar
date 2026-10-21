@@ -15,7 +15,7 @@ describe('navGroups', () => {
       defineFeature({ contract: CONTRACT, id: 'events', nav: [view('activity', 10, 'Events')] }),
       defineFeature({
         contract: CONTRACT,
-        id: 'queues',
+        id: 'resources',
         nav: [view('messaging', 20, 'Later'), view('messaging', 10, 'Queues')],
       }),
     ]);

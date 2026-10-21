@@ -17,7 +17,7 @@ export const keys = {
 export function useSetupReview(clusterId: string): UseQueryResult<SetupReviewView, ApiError> {
   return useQuery({
     queryKey: keys.review(clusterId),
-    queryFn: () => request<SetupReviewView>(`/clusters/${clusterId}/setup-review`),
+    queryFn: () => request<SetupReviewView>(`/clusters/${clusterId}/artemis/setup-review`),
     refetchInterval: 60_000,
   });
 }
@@ -26,7 +26,7 @@ export function useSetupReview(clusterId: string): UseQueryResult<SetupReviewVie
 export function useRunSetupReview(clusterId: string) {
   const qc = useQueryClient();
   return useMutation<SetupReviewView, ApiError, void>({
-    mutationFn: () => request<SetupReviewView>(`/clusters/${clusterId}/setup-review/run`, { method: 'POST' }),
+    mutationFn: () => request<SetupReviewView>(`/clusters/${clusterId}/artemis/setup-review/run`, { method: 'POST' }),
     onSuccess: (view) => qc.setQueryData(keys.review(clusterId), view),
   });
 }
@@ -35,7 +35,7 @@ export function useAcceptRisk(clusterId: string) {
   const qc = useQueryClient();
   return useMutation<SetupReviewView, ApiError, AcceptRiskRequest>({
     mutationFn: (body) =>
-      request<SetupReviewView>(`/clusters/${clusterId}/setup-review/acceptances`, {
+      request<SetupReviewView>(`/clusters/${clusterId}/artemis/setup-review/acceptances`, {
         method: 'POST',
         body: JSON.stringify(body),
       }),
@@ -48,7 +48,7 @@ export function useRevokeRisk(clusterId: string) {
   return useMutation<SetupReviewView, ApiError, { code: string; subject: string }>({
     mutationFn: ({ code, subject }) =>
       request<SetupReviewView>(
-        `/clusters/${clusterId}/setup-review/acceptances?code=${encodeURIComponent(code)}&subject=${encodeURIComponent(subject)}`,
+        `/clusters/${clusterId}/artemis/setup-review/acceptances?code=${encodeURIComponent(code)}&subject=${encodeURIComponent(subject)}`,
         { method: 'DELETE' },
       ),
     onSuccess: (view) => qc.setQueryData(keys.review(clusterId), view),

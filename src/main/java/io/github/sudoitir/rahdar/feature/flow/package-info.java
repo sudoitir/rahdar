@@ -5,7 +5,7 @@
 @ApplicationModule(
         displayName = "Flow",
         allowedDependencies = {
-            "feature.queues",
+            "feature.resources",
             "kernel.core",
             "kernel.jobs",
             "kernel.plugin",
@@ -14,8 +14,7 @@
             "kernel.stream",
             "platform.broker",
             "platform.clusters",
-            "platform.scrape",
-            "system.artemis"
+            "platform.scrape"
         })
 package io.github.sudoitir.rahdar.feature.flow;
 

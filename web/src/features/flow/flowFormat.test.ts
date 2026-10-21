@@ -13,8 +13,8 @@ describe('flow formatting', () => {
   });
 
   it('names a slow-tier rate as an average', () => {
-    expect(rateSourceLabel({ rateSource: 'QUEUE_METRIC', averagedOverSeconds: 300 })).toBe(
-      'queue metrics, ~5 min average',
+    expect(rateSourceLabel({ rateSource: 'SUBSCRIPTION_METRIC', averagedOverSeconds: 300 })).toBe(
+      'subscription metrics, ~5 min average',
     );
   });
 
@@ -31,7 +31,7 @@ describe('routing edge text', () => {
   it('says what a divert does, where it is missing, and that the broker does not count it', () => {
     expect(
       edgeText({
-        kind: 'DIVERT',
+        kind: 'FORWARD',
         exclusive: true,
         filter: "color='red'",
         rateSource: 'NONE',
@@ -48,27 +48,27 @@ describe('routing edge text', () => {
   it('names a bridge that is down, a bypassed route and a wildcard match in words', () => {
     expect(
       edgeText({
-        kind: 'BRIDGE',
+        kind: 'LINK',
         rate: 5,
         rateSource: 'SAMPLER',
         stale: false,
         bypassed: false,
         rahdar: false,
-        faults: ['BRIDGE_DOWN'],
+        faults: ['LINK_DOWN'],
       }),
-    ).toBe('bridge · 5 msg/s · not connected');
+    ).toBe('link · 5 msg/s · not connected');
     expect(
       edgeText({
         kind: 'ROUTE',
         delivery: 'SHARED',
-        rateSource: 'QUEUE_METRIC',
+        rateSource: 'SUBSCRIPTION_METRIC',
         rate: 2,
         stale: false,
         bypassed: true,
         rahdar: false,
         faults: [],
       }),
-    ).toBe('shared · bypassed by an exclusive divert · 2 msg/s');
+    ).toBe('shared · bypassed by an exclusive forward · 2 msg/s');
     expect(
       edgeText({ kind: 'WILDCARD', rateSource: 'NONE', stale: false, bypassed: false, rahdar: false, faults: [] }),
     ).toBe('matches');
@@ -79,27 +79,27 @@ describe('flow search', () => {
   it('keeps only valid, non-default values', () => {
     expect(
       validateFlowSearch({
-        focus: 'queue:ORDERS.inbound',
+        focus: 'subscription:ORDERS.inbound',
         rank: 'IN',
         limit: '100',
         groupBy: 'HOST',
         hops: '9',
         sort: 'bad sort',
       }),
-    ).toEqual({ focus: 'queue:ORDERS.inbound', limit: 100, groupBy: 'HOST' });
+    ).toEqual({ focus: 'subscription:ORDERS.inbound', limit: 100, groupBy: 'HOST' });
     expect(validateFlowSearch({ focus: 'orders' })).toEqual({});
   });
 
   it('keeps the default layers out of the URL and says NONE for no layers', () => {
-    expect(parseLayers(undefined)).toEqual(['BRIDGES', 'CLUSTER', 'DIVERTS']);
-    expect(layersParam(['DIVERTS', 'CLUSTER', 'BRIDGES'])).toBeUndefined();
+    expect(parseLayers(undefined)).toEqual(['CLUSTER', 'ROUTES']);
+    expect(layersParam(['ROUTES', 'CLUSTER'])).toBeUndefined();
     expect(layersParam([])).toBe('NONE');
     expect(parseLayers('NONE')).toEqual([]);
-    expect(validateFlowSearch({ layers: 'dead_letter,diverts,bogus' })).toEqual({ layers: 'DEAD_LETTER,DIVERTS' });
+    expect(validateFlowSearch({ layers: 'dead_letter,routes,bogus' })).toEqual({ layers: 'DEAD_LETTER,ROUTES' });
   });
 
   it('parses a focus with a colon in its name', () => {
-    expect(parseFocus('address:jms.topic:prices')).toEqual({ kind: 'address', name: 'jms.topic:prices' });
+    expect(parseFocus('destination:jms.topic:prices')).toEqual({ kind: 'destination', name: 'jms.topic:prices' });
   });
 
   it('always sends the bound and ranking the server should apply', () => {
@@ -112,9 +112,9 @@ describe('flow search', () => {
   });
 
   it('keeps the layout, the selection and a non-default range', () => {
-    expect(validateFlowSearch({ tab: 'split', node: 'queue:ORDERS.inbound', range: '6h' })).toEqual({
+    expect(validateFlowSearch({ tab: 'split', node: 'subscription:ORDERS.inbound', range: '6h' })).toEqual({
       tab: 'split',
-      node: 'queue:ORDERS.inbound',
+      node: 'subscription:ORDERS.inbound',
       range: '6h',
     });
     expect(validateFlowSearch({ tab: 'graph', range: '1h', node: '' })).toEqual({});

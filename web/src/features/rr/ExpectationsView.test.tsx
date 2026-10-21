@@ -18,10 +18,10 @@ vi.mock('@tanstack/react-router', async (importOriginal) => ({
 function expectation(over: Record<string, unknown> = {}) {
   return {
     id: 'e1',
-    requestAddress: 'orders.request',
-    replyAddresses: ['orders.reply'],
-    resolvedReplyAddresses: ['orders.reply'],
-    replyAddressesCapped: false,
+    requestDestination: 'orders.request',
+    replyDestinations: ['orders.reply'],
+    resolvedReplyDestinations: ['orders.reply'],
+    replyDestinationsCapped: false,
     correlationProperty: null,
     deadlineMs: 30_000,
     samplePerMin: 10,
@@ -61,7 +61,7 @@ describe('ExpectationsView', () => {
     server.use(http.get('*/api/v1/clusters/c1/rr/expectations', () => HttpResponse.json(paged([]))));
     renderWithProviders(<ExpectationsView clusterId="c1" />);
 
-    expect(await screen.findByText(/No addresses declared yet/)).toBeInTheDocument();
+    expect(await screen.findByText(/No destinations declared yet/)).toBeInTheDocument();
   });
 
   it('creates a new expectation from the form', async () => {
@@ -77,22 +77,24 @@ describe('ExpectationsView', () => {
     const user = userEvent.setup();
     renderWithProviders(<ExpectationsView clusterId="c1" />);
 
-    await screen.findByText(/No addresses declared yet/);
-    await user.type(screen.getByLabelText('Request address'), 'orders.request');
+    await screen.findByText(/No destinations declared yet/);
+    await user.type(screen.getByLabelText('Request destination'), 'orders.request');
     await user.click(screen.getByRole('button', { name: 'Add' }));
 
     expect(await screen.findByRole('rowheader', { name: 'orders.request' })).toBeInTheDocument();
   });
 
-  it('sends every reply address pattern the operator entered', async () => {
-    const sent: { replyAddresses?: string[] }[] = [];
+  it('sends every reply destination pattern the operator entered', async () => {
+    const sent: { replyDestinations?: string[] }[] = [];
     let created = false;
     server.use(
       writer,
-      http.get('*/api/v1/clusters/c1/queues', () => HttpResponse.json({ data: [], page: 1, size: 300, total: 0 })),
+      http.get('*/api/v1/clusters/c1/subscriptions', () =>
+        HttpResponse.json({ data: [], page: 1, size: 300, total: 0 }),
+      ),
       http.get('*/api/v1/clusters/c1/rr/expectations', () => HttpResponse.json(paged(created ? [expectation()] : []))),
       http.post('*/api/v1/clusters/c1/rr/expectations', async ({ request }) => {
-        sent.push((await request.json()) as { replyAddresses?: string[] });
+        sent.push((await request.json()) as { replyDestinations?: string[] });
         created = true;
         return HttpResponse.json(expectation(), { status: 201 });
       }),
@@ -100,41 +102,41 @@ describe('ExpectationsView', () => {
     const user = userEvent.setup();
     renderWithProviders(<ExpectationsView clusterId="c1" />);
 
-    await screen.findByText(/No addresses declared yet/);
-    await user.type(screen.getByLabelText('Request address'), 'orders.request');
+    await screen.findByText(/No destinations declared yet/);
+    await user.type(screen.getByLabelText('Request destination'), 'orders.request');
 
     // The label is associated with three nodes: the option listbox, the hidden
     // input carrying the value, and the visible one that takes typing.
     const replies = screen
-      .getAllByLabelText('Reply addresses')
+      .getAllByLabelText('Reply destinations')
       .find((el): el is HTMLInputElement => el.tagName === 'INPUT' && (el as HTMLInputElement).type !== 'hidden')!;
     await user.type(replies, 'orders.reply.a{enter}');
     await user.type(replies, 'orders.reply.*{enter}');
     await user.click(screen.getByRole('button', { name: 'Add' }));
 
     await screen.findByRole('rowheader', { name: 'orders.request' });
-    expect(sent[0]?.replyAddresses).toEqual(['orders.reply.a', 'orders.reply.*']);
+    expect(sent[0]?.replyDestinations).toEqual(['orders.reply.a', 'orders.reply.*']);
   });
 
-  it('explains what leaving the reply addresses empty means', async () => {
-    // Conflating "I meant temporary queues" with "I have not filled this in" is
+  it('explains what leaving the reply destinations empty means', async () => {
+    // Conflating "I meant temporary subscriptions" with "I have not filled this in" is
     // what produced an expectation that could never be joined.
     server.use(http.get('*/api/v1/clusters/c1/rr/expectations', () => HttpResponse.json(paged([]))));
     renderWithProviders(<ExpectationsView clusterId="c1" />);
 
-    expect(await screen.findByText(/temporary queue/)).toBeInTheDocument();
+    expect(await screen.findByText(/temporary subscription/)).toBeInTheDocument();
   });
 
-  it('keeps the reply-address help out of the control row', async () => {
+  it('keeps the reply-destination help out of the control row', async () => {
     // The help is four lines of prose. Inside a bottom-aligned row it was what sat
     // on the baseline, so the field it belongs to floated above every other control
     // on the form. It renders below the row now, and this is the regression guard.
     server.use(http.get('*/api/v1/clusters/c1/rr/expectations', () => HttpResponse.json(paged([]))));
     renderWithProviders(<ExpectationsView clusterId="c1" />);
 
-    const help = await screen.findByText(/temporary queue/);
+    const help = await screen.findByText(/temporary subscription/);
     const field = screen
-      .getAllByLabelText('Reply addresses')
+      .getAllByLabelText('Reply destinations')
       .find((el): el is HTMLInputElement => el.tagName === 'INPUT' && (el as HTMLInputElement).type !== 'hidden')!;
     // The nearest common ancestor is the form grid, never the field's own wrapper.
     expect(field.closest('.mantine-TagsInput-root')?.contains(help)).toBe(false);
@@ -143,12 +145,14 @@ describe('ExpectationsView', () => {
   it('says when a declared pattern matches nothing on the cluster yet', async () => {
     server.use(
       http.get('*/api/v1/clusters/c1/rr/expectations', () =>
-        HttpResponse.json(paged([expectation({ replyAddresses: ['orders.reply.*'], resolvedReplyAddresses: [] })])),
+        HttpResponse.json(
+          paged([expectation({ replyDestinations: ['orders.reply.*'], resolvedReplyDestinations: [] })]),
+        ),
       ),
     );
     renderWithProviders(<ExpectationsView clusterId="c1" />);
 
-    expect(await screen.findByText('no matching queue yet')).toBeInTheDocument();
+    expect(await screen.findByText('no matching subscription yet')).toBeInTheDocument();
   });
 
   it('flags an over-broad pattern rather than silently tracing a subset', async () => {
@@ -157,9 +161,9 @@ describe('ExpectationsView', () => {
         HttpResponse.json(
           paged([
             expectation({
-              replyAddresses: ['*'],
-              resolvedReplyAddresses: Array.from({ length: 32 }, (_, i) => `a.${i}`),
-              replyAddressesCapped: true,
+              replyDestinations: ['*'],
+              resolvedReplyDestinations: Array.from({ length: 32 }, (_, i) => `a.${i}`),
+              replyDestinationsCapped: true,
             }),
           ]),
         ),
@@ -170,7 +174,7 @@ describe('ExpectationsView', () => {
     expect(await screen.findByText(/too broad/)).toBeInTheDocument();
   });
 
-  it('names traced addresses that are only sampled, and hides the hint once they are captured', async () => {
+  it('names traced destinations that are only sampled, and hides the hint once they are captured', async () => {
     let captured = false;
     server.use(
       http.get('*/api/v1/clusters/c1/rr/expectations', () => HttpResponse.json(paged([expectation()]))),
@@ -178,8 +182,8 @@ describe('ExpectationsView', () => {
         HttpResponse.json(
           paged(
             captured
-              ? [{ id: 's1', queuePattern: 'orders.#', mode: 'CAPTURE', enabled: true, nodes: [] }]
-              : [{ id: 's1', queuePattern: 'orders.request', mode: 'SAMPLE', enabled: true, nodes: [] }],
+              ? [{ id: 's1', subscriptionPattern: 'orders.#', mode: 'CAPTURE', enabled: true, nodes: [] }]
+              : [{ id: 's1', subscriptionPattern: 'orders.request', mode: 'SAMPLE', enabled: true, nodes: [] }],
           ),
         ),
       ),
@@ -196,11 +200,11 @@ describe('ExpectationsView', () => {
     expect(screen.queryByText(/are not captured/)).not.toBeInTheDocument();
   });
 
-  it('names every enabled switch by its address, so a reader hears which one it is', async () => {
+  it('names every enabled switch by its destination, so a reader hears which one it is', async () => {
     server.use(
       writer,
       http.get('*/api/v1/clusters/c1/rr/expectations', () =>
-        HttpResponse.json(paged([expectation(), expectation({ id: 'e2', requestAddress: 'billing.request' })])),
+        HttpResponse.json(paged([expectation(), expectation({ id: 'e2', requestDestination: 'billing.request' })])),
       ),
     );
     renderWithProviders(<ExpectationsView clusterId="c1" />);
@@ -260,7 +264,7 @@ describe('ExpectationsView', () => {
     expect(screen.getByRole('switch', { name: 'Trace orders.request' })).toBeChecked();
   });
 
-  it('asks for the address to be typed before it stops tracing, and only then deletes', async () => {
+  it('asks for the destination to be typed before it stops tracing, and only then deletes', async () => {
     let deleted = 0;
     server.use(
       writer,
@@ -276,7 +280,7 @@ describe('ExpectationsView', () => {
     const remove = await screen.findByRole('button', { name: 'Remove orders.request' });
     await user.click(remove);
 
-    const dialog = await screen.findByRole('dialog', { name: 'Stop tracing this address' });
+    const dialog = await screen.findByRole('dialog', { name: 'Stop tracing this destination' });
     expect(within(dialog).getByText(/Flows already recorded stay/)).toBeInTheDocument();
     const confirm = within(dialog).getByRole('button', { name: 'Stop tracing' });
     expect(deleted).toBe(0);
@@ -297,7 +301,7 @@ describe('ExpectationsView', () => {
 
     const remove = await screen.findByRole('button', { name: 'Remove orders.request' });
     await user.click(remove);
-    await screen.findByRole('dialog', { name: 'Stop tracing this address' });
+    await screen.findByRole('dialog', { name: 'Stop tracing this destination' });
     await user.keyboard('{Escape}');
 
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
@@ -332,7 +336,7 @@ describe('ExpectationsView', () => {
     expect(screen.queryByText(/cluster:write/)).not.toBeInTheDocument();
   });
 
-  it('says what is missing when Add is pressed without a request address, and sends nothing', async () => {
+  it('says what is missing when Add is pressed without a request destination, and sends nothing', async () => {
     let posted = 0;
     server.use(
       writer,
@@ -345,11 +349,11 @@ describe('ExpectationsView', () => {
     const user = userEvent.setup();
     renderWithProviders(<ExpectationsView clusterId="c1" />);
 
-    await screen.findByText(/No addresses declared yet/);
+    await screen.findByText(/No destinations declared yet/);
     await user.click(screen.getByRole('button', { name: 'Add' }));
 
-    expect(await screen.findByText(/Enter the request address to trace/)).toBeInTheDocument();
-    expect(screen.getByLabelText('Request address')).toHaveFocus();
+    expect(await screen.findByText(/Enter the request destination to trace/)).toBeInTheDocument();
+    expect(screen.getByLabelText('Request destination')).toHaveFocus();
     expect(posted).toBe(0);
   });
 
@@ -366,8 +370,8 @@ describe('ExpectationsView', () => {
     const user = userEvent.setup();
     renderWithProviders(<ExpectationsView clusterId="c1" />);
 
-    await screen.findByText(/No addresses declared yet/);
-    await user.type(screen.getByLabelText('Request address'), 'orders.request');
+    await screen.findByText(/No destinations declared yet/);
+    await user.type(screen.getByLabelText('Request destination'), 'orders.request');
     await user.clear(screen.getByLabelText('Samples/min'));
     await user.click(screen.getByRole('button', { name: 'Add' }));
 
@@ -376,7 +380,7 @@ describe('ExpectationsView', () => {
     expect(posted).toBe(0);
   });
 
-  it('states the cause and offers a retry when the declared addresses cannot be read', async () => {
+  it('states the cause and offers a retry when the declared destinations cannot be read', async () => {
     server.use(
       http.get('*/api/v1/clusters/c1/rr/expectations', () => HttpResponse.json({ title: 'Down' }, { status: 503 })),
     );
@@ -385,14 +389,14 @@ describe('ExpectationsView', () => {
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent('Rahdar failed to complete the request');
     expect(within(alert).getByRole('button', { name: 'Retry' })).toBeInTheDocument();
-    expect(screen.queryByText(/No addresses declared yet/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/No destinations declared yet/)).not.toBeInTheDocument();
   });
 
   it('is a section with its own headings and no heading above level two', async () => {
     server.use(http.get('*/api/v1/clusters/c1/rr/expectations', () => HttpResponse.json(paged([]))));
     renderWithProviders(<ExpectationsView clusterId="c1" />);
 
-    expect(await screen.findByRole('heading', { level: 2, name: 'Traced addresses' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 2, name: 'Traced destinations' })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { level: 1 })).not.toBeInTheDocument();
   });
 });

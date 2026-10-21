@@ -38,7 +38,7 @@ const firing = (over: Partial<AlertFiringView> = {}): AlertFiringView =>
     ruleId: 'r1',
     clusterId: null,
     ruleName: LONG,
-    subjectKey: `queue:${LONG}`,
+    subjectKey: `subscription:${LONG}`,
     severity: 'WARNING',
     startedAt: '2026-09-11T10:00:00Z',
     resolvedAt: null,

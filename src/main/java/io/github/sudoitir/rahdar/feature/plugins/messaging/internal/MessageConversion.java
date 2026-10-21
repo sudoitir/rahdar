@@ -4,7 +4,9 @@ import io.github.sudoitir.openbroker.messaging.JmsExtension;
 import io.github.sudoitir.openbroker.messaging.Message;
 import io.github.sudoitir.openbroker.messaging.MessageHeaders;
 import io.github.sudoitir.openbroker.messaging.PropertyValue;
+import io.github.sudoitir.rahdar.feature.plugins.messaging.MessageRef;
 import io.github.sudoitir.rahdar.feature.plugins.messaging.PluginMessage;
+import io.github.sudoitir.rahdar.kernel.security.ResourceRef;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
@@ -42,8 +44,8 @@ final class MessageConversion {
         return new PluginMessage(
                 key,
                 clusterId,
-                nodeId,
-                queue,
+                ResourceRef.subscription(queue),
+                new MessageRef(nodeId, m.ref().position()),
                 body(m),
                 JmsExtension.messageType(m).orElse(JmsExtension.GENERIC) == JmsExtension.TEXT,
                 Collections.unmodifiableMap(headers),

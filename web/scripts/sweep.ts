@@ -2,7 +2,7 @@
  * Photograph and check every route of a running, seeded Rahdar, in every colour scheme, width and state.
  *
  *   RAHDAR=http://127.0.0.1:18080 npm --prefix web run sweep -- --label before
- *   … run sweep -- --label after --only queues,admin --states default,error --widths 1280,zoom
+ *   … run sweep -- --label after --only subscriptions,admin --states default,error --widths 1280,zoom
  *
  * Needs the sessions `just qa-up` saved to `web/.sweep/auth` and the content `scripts/qa-seed.sh` made. Writes
  * `web/.sweep/<label>/<area>/<id>/<width>-<scheme>-<state>.png` and `web/.sweep/<label>/report.json`, one entry

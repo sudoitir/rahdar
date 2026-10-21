@@ -3,6 +3,7 @@ package io.github.sudoitir.rahdar.feature.sql;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -17,6 +18,8 @@ import io.github.sudoitir.rahdar.kernel.lifecycle.LifecycleRegistry;
 import io.github.sudoitir.rahdar.kernel.security.ActorResolver;
 import io.github.sudoitir.rahdar.kernel.security.ClusterAccessGuard;
 import io.github.sudoitir.rahdar.kernel.settings.RahdarInstance;
+import io.github.sudoitir.rahdar.platform.broker.MessageTaps;
+import io.github.sudoitir.rahdar.platform.broker.SystemExtensions;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
 import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshots;
@@ -35,7 +38,6 @@ import org.springframework.jdbc.core.RowMapper;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.util.unit.DataSize;
-import tools.jackson.databind.ObjectMapper;
 
 /** The capture dry run resolves what a subscription would do, and does none of it. */
 class MessageIndexServicePreviewTest {
@@ -88,7 +90,7 @@ class MessageIndexServicePreviewTest {
                 addresses,
                 mock(CaptureConsumer.class),
                 reconciler,
-                new CaptureTap(null, null, properties, new ObjectMapper()),
+                new CaptureTap(extensions(), properties),
                 properties,
                 instance,
                 lifecycle(),
@@ -106,7 +108,7 @@ class MessageIndexServicePreviewTest {
 
         MessageIndexService.Preview preview = service("rahdar").preview(CLUSTER, spec("ORDER.IN", 50_000L));
 
-        assertThat(preview.addresses()).containsExactly("ORDER.IN");
+        assertThat(preview.destinations()).containsExactly("ORDER.IN");
         assertThat(preview.nodes()).containsExactly("primary");
         assertThat(preview.ringMessages()).isEqualTo(50_000L);
         assertThat(preview.ringBytes()).isEqualTo(DataSize.ofMegabytes(64).toBytes());
@@ -133,7 +135,7 @@ class MessageIndexServicePreviewTest {
 
         MessageIndexService.Preview preview = service("rahdar").preview(CLUSTER, spec("NOTHING.*", null));
 
-        assertThat(preview.addresses()).isEmpty();
+        assertThat(preview.destinations()).isEmpty();
         assertThat(preview.refusal()).contains("matches no address");
     }
 
@@ -166,7 +168,7 @@ class MessageIndexServicePreviewTest {
         UUID id = UUID.randomUUID();
         entity.setId(id);
         entity.setClusterId(CLUSTER);
-        entity.setQueuePattern("ORDER.IN");
+        entity.setSubscriptionPattern("ORDER.IN");
         entity.setMode(CaptureMode.CAPTURE);
         entity.setRetentionDays(7);
         when(subscriptions.findById(id)).thenReturn(Optional.of(entity));
@@ -199,7 +201,7 @@ class MessageIndexServicePreviewTest {
                 addresses,
                 consumers,
                 reconciler,
-                new CaptureTap(null, null, properties, new ObjectMapper()),
+                new CaptureTap(extensions(), properties),
                 properties,
                 mock(RahdarInstance.class),
                 lifecycle(),
@@ -220,7 +222,7 @@ class MessageIndexServicePreviewTest {
         UUID id = UUID.randomUUID();
         entity.setId(id);
         entity.setClusterId(CLUSTER);
-        entity.setQueuePattern("ORDER.IN");
+        entity.setSubscriptionPattern("ORDER.IN");
         entity.setMode(CaptureMode.CAPTURE);
         entity.setEnabled(true);
         entity.setRetentionDays(7);
@@ -251,5 +253,15 @@ class MessageIndexServicePreviewTest {
         assertThatThrownBy(() -> service.preview(CLUSTER, spec))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("cannot be captured");
+    }
+
+    /** A system whose tap would add the bounds to the broker's configuration. */
+    private static SystemExtensions extensions() {
+        MessageTaps taps = mock(MessageTaps.class);
+        when(taps.settingsSnippet(any()))
+                .thenReturn("<address-setting><max-size-bytes>1</max-size-bytes></address-setting>");
+        SystemExtensions extensions = mock(SystemExtensions.class);
+        when(extensions.require(any(), eq(MessageTaps.class))).thenReturn(taps);
+        return extensions;
     }
 }

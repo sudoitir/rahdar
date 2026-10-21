@@ -14,8 +14,8 @@ public final class FlowViews {
 
     public enum NodeKind {
         PRODUCER,
-        ADDRESS,
-        QUEUE,
+        DESTINATION,
+        SUBSCRIPTION,
         CONSUMER,
         /** Outside what the graph's columns hold: another cluster node, or a bridge's remote target. */
         REMOTE
@@ -35,18 +35,18 @@ public final class FlowViews {
         EXPIRY,
         /** A broker node of this cluster, reached through store-and-forward. */
         CLUSTER_NODE,
-        /** A bridge target that is not an address of this cluster. */
-        BRIDGE_TARGET
+        /** A link target that is not a destination of this cluster. */
+        LINK_TARGET
     }
 
     public enum EdgeKind {
         PRODUCE,
         ROUTE,
         CONSUME,
-        /** An address's messages taken (exclusive) or copied to another address. Not counted by the broker. */
-        DIVERT,
-        /** A queue forwarded to an address, locally or on another broker. */
-        BRIDGE,
+        /** A destination's messages taken (exclusive) or copied to another destination. Not counted by the broker. */
+        FORWARD,
+        /** A subscription forwarded to a destination, locally or on another broker. */
+        LINK,
         /** Messages a node moves to another node of the cluster. */
         CLUSTER_HOP,
         /** A concrete address whose messages also reach a wildcard address's queues. */
@@ -58,7 +58,7 @@ public final class FlowViews {
     /** Where an edge's rate came from. {@code NONE}: the broker keeps no count for it. */
     public enum RateSource {
         SAMPLER,
-        QUEUE_METRIC,
+        SUBSCRIPTION_METRIC,
         NONE
     }
 
@@ -75,9 +75,9 @@ public final class FlowViews {
         NO_CONSUMER,
         /** Unacknowledged messages outstanding and nothing acknowledged for two sweeps. */
         STALLED,
-        /** A bridge that is not connected to its target on every node it is deployed on. */
-        BRIDGE_DOWN,
-        /** A divert or bridge deployed on only some of the sampled nodes. */
+        /** A link that is not connected to its target on every node it is deployed on. */
+        LINK_DOWN,
+        /** A forward or link deployed on only some of the sampled nodes. */
         PARTIAL_PRESENCE
     }
 

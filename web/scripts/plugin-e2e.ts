@@ -177,12 +177,12 @@ async function main() {
   step("use the plugin's own API");
   const cluster = randomUUID();
   await expectStatus(
-    await call(api, 'POST', `/clusters/${cluster}/p/${ID}/queues/orders/notes`, { body: 'owned by payments' }),
+    await call(api, 'POST', `/clusters/${cluster}/p/${ID}/subscriptions/orders/notes`, { body: 'owned by payments' }),
     201,
     'add a note',
   );
   const notes = (await expectStatus(
-    await call(api, 'GET', `/clusters/${cluster}/p/${ID}/queues/orders/notes`),
+    await call(api, 'GET', `/clusters/${cluster}/p/${ID}/subscriptions/orders/notes`),
     200,
     'list notes',
   )) as unknown[];
@@ -223,8 +223,8 @@ async function main() {
   await editor.waitFor({ state: 'hidden' });
   const roles = await list<{ id: string; name: string; permissions: string[] }>(api, '/roles');
   const role = roles.find((r) => r.name === roleName);
-  // The editor adds what the plugin's permissions require (`queue:read`), so a role is never saved half-usable.
-  if (!role || [...role.permissions].sort().join() !== `${ID}:read,${ID}:write,queue:read`) {
+  // The editor adds what the plugin's permissions require (`subscription:read`), so a role is never saved half-usable.
+  if (!role || [...role.permissions].sort().join() !== `${ID}:read,${ID}:write,subscription:read`) {
     throw new Error(`role saved with ${JSON.stringify(role?.permissions)}`);
   }
   await browser.close();
@@ -237,7 +237,7 @@ async function main() {
   await expectStatus(await call(api, 'POST', `/admin/plugins/${ID}/rollback`), 202, 'rollback');
   await awaitPlugin(api, { status: 'active', version: '1.0.0' });
   const kept = (await expectStatus(
-    await call(api, 'GET', `/clusters/${cluster}/p/${ID}/queues/orders/notes`),
+    await call(api, 'GET', `/clusters/${cluster}/p/${ID}/subscriptions/orders/notes`),
     200,
     'notes after rollback',
   )) as unknown[];
@@ -246,7 +246,7 @@ async function main() {
   step('disable: its API is gone');
   await fresh(api, password);
   await expectStatus(await call(api, 'POST', `/admin/plugins/${ID}/disable`), 204, 'disable');
-  const gone = await call(api, 'GET', `/clusters/${cluster}/p/${ID}/queues/orders/notes`);
+  const gone = await call(api, 'GET', `/clusters/${cluster}/p/${ID}/subscriptions/orders/notes`);
   if (gone.status !== 404) throw new Error(`disabled plugin answered ${gone.status}`);
 
   step('disabled: its permissions leave the catalogue and the role keeps them');

@@ -79,7 +79,7 @@ class OperatorHandoffTest extends PostgresIntegrationTest {
         Thread.ofVirtual()
                 .start(() -> handoff.runAs(operator, () -> {
                     actor.set(actors.resolve());
-                    can.set(perm.can(null, "queue:delete"));
+                    can.set(perm.can(null, "subscription:delete"));
                 }))
                 .join();
 
@@ -91,23 +91,23 @@ class OperatorHandoffTest extends PostgresIntegrationTest {
     @Test
     void aWithdrawnGrantIsNoLongerHeld() {
         Operator operator = handoff.capture();
-        assertThat(handoff.stillHolds(operator, null, "queue:delete")).isTrue();
+        assertThat(handoff.stillHolds(operator, null, "subscription:delete")).isTrue();
 
         OperatorFixture.revokeAll(userRoles, accessChanges, userId);
 
-        assertThat(handoff.stillHolds(operator, null, "queue:delete")).isFalse();
+        assertThat(handoff.stillHolds(operator, null, "subscription:delete")).isFalse();
     }
 
     @Test
     void aWithdrawnGrantIsNoLongerHeldOnAQueueEither() {
         Operator operator = handoff.capture();
-        ResourceRef queue = ResourceRef.queue("orders.in");
-        assertThat(handoff.stillHolds(operator, UUID.randomUUID(), queue, "queue:purge"))
+        ResourceRef queue = ResourceRef.subscription("orders.in");
+        assertThat(handoff.stillHolds(operator, UUID.randomUUID(), queue, "subscription:purge"))
                 .isTrue();
 
         OperatorFixture.revokeAll(userRoles, accessChanges, userId);
 
-        assertThat(handoff.stillHolds(operator, UUID.randomUUID(), queue, "queue:purge"))
+        assertThat(handoff.stillHolds(operator, UUID.randomUUID(), queue, "subscription:purge"))
                 .isFalse();
     }
 
@@ -116,7 +116,7 @@ class OperatorHandoffTest extends PostgresIntegrationTest {
         Operator operator = handoff.forUser(userId).orElseThrow();
 
         assertThat(operator.actor().userId()).isEqualTo(userId);
-        assertThat(handoff.stillHolds(operator, null, "queue:delete")).isTrue();
+        assertThat(handoff.stillHolds(operator, null, "subscription:delete")).isTrue();
 
         OperatorFixture.revokeAll(userRoles, accessChanges, userId);
 

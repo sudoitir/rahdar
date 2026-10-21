@@ -253,7 +253,7 @@ describe('RoutingTab', () => {
     let saved: { document: { diverts: ConfigDivertView[] } } | null = null;
     const d = routed();
     server.use(
-      http.put('*/api/v1/clusters/c1/config', async ({ request }) => {
+      http.put('*/api/v1/clusters/c1/artemis/config', async ({ request }) => {
         saved = (await request.json()) as typeof saved;
         return HttpResponse.json(d);
       }),
@@ -288,13 +288,13 @@ describe('RoutingTab', () => {
     let saved: { document: { bridges: ConfigBridgeView[] } } | null = null;
     const d = routed();
     server.use(
-      http.get('*/api/v1/clusters/c1/config/connectors', () =>
+      http.get('*/api/v1/clusters/c1/artemis/config/connectors', () =>
         HttpResponse.json(
           paged([{ nodeId: 'n-a', nodeName: 'broker-1', names: ['dr-connector'], known: true, reason: null }]),
         ),
       ),
-      http.get('*/api/v1/clusters/c1/config/bridge-credentials', () => HttpResponse.json(paged([]))),
-      http.put('*/api/v1/clusters/c1/config', async ({ request }) => {
+      http.get('*/api/v1/clusters/c1/artemis/config/bridge-credentials', () => HttpResponse.json(paged([]))),
+      http.put('*/api/v1/clusters/c1/artemis/config', async ({ request }) => {
         saved = (await request.json()) as typeof saved;
         return HttpResponse.json(d);
       }),

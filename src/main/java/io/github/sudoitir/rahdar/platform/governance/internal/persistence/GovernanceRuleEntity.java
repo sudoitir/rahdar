@@ -37,7 +37,7 @@ public class GovernanceRuleEntity {
     private Instant updatedAt;
 
     @Column(name = "destination_pattern")
-    private String addressPattern;
+    private String destinationPattern;
 
     @Column(name = "target", nullable = false)
     private String target;
@@ -61,8 +61,13 @@ public class GovernanceRuleEntity {
     private boolean exception;
 
     public GovernanceRuleEntity(
-            String addressPattern, String target, String selector, String dataClass, String action, boolean exception) {
-        this.addressPattern = addressPattern;
+            String destinationPattern,
+            String target,
+            String selector,
+            String dataClass,
+            String action,
+            boolean exception) {
+        this.destinationPattern = destinationPattern;
         this.target = target;
         this.selector = selector;
         this.dataClass = dataClass;

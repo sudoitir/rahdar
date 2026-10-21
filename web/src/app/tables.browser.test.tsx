@@ -304,14 +304,14 @@ describe.each(VIEWS)('the $name table', (view) => {
   });
 });
 
-describe('the queues table in a 1280 px window', () => {
-  const view = VIEWS.find((v) => v.name === 'queues')!;
+describe('the subscriptions table in a 1280 px window', () => {
+  const view = VIEWS.find((v) => v.name === 'subscriptions')!;
   // Two operators' screens differ by a scroll bar or a wider figure; the table is sized to hold both with room over.
   const SPARE = 16;
 
-  it('shows every column, whole, with 16 px to spare', async () => {
+  it('shows every column but the lowest-priority ones, whole, with 16 px to spare', async () => {
     const m = await mount(view, 'normal', contentWidth(1280) - SPARE);
-    expect(visibleIds(view, m.grid)).toEqual(ALL(view));
+    expect(visibleIds(view, m.grid)).toEqual(view.visible1280);
     expect(overflows(m.scroller), `scrollWidth ${m.scroller.scrollWidth} > clientWidth ${m.scroller.clientWidth}`).toBe(
       false,
     );

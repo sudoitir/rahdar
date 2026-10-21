@@ -32,7 +32,7 @@ public sealed interface Observation {
             UUID clusterId,
             UUID nodeId,
             Instant at,
-            String requestAddress,
+            String requestDestination,
             String messageId,
             String correlationId,
             String replyTo,
@@ -47,7 +47,7 @@ public sealed interface Observation {
                 UUID clusterId,
                 UUID nodeId,
                 Instant at,
-                String requestAddress,
+                String requestDestination,
                 String messageId,
                 String correlationId,
                 String replyTo,
@@ -58,7 +58,7 @@ public sealed interface Observation {
                     clusterId,
                     nodeId,
                     at,
-                    requestAddress,
+                    requestDestination,
                     messageId,
                     correlationId,
                     replyTo,
@@ -97,12 +97,17 @@ public sealed interface Observation {
     }
 
     /** A consumer attached to a traced request address. */
-    record ResponderUp(UUID clusterId, UUID nodeId, Instant at, String requestAddress, String consumerName)
+    record ResponderUp(UUID clusterId, UUID nodeId, Instant at, String requestDestination, String consumerName)
             implements Observation {}
 
     /** A consumer on a traced request address closed; {@code remainingConsumers} is the count left. */
     record ResponderDown(
-            UUID clusterId, UUID nodeId, Instant at, String requestAddress, String consumerName, int remainingConsumers)
+            UUID clusterId,
+            UUID nodeId,
+            Instant at,
+            String requestDestination,
+            String consumerName,
+            int remainingConsumers)
             implements Observation {}
 
     /** A temporary reply queue's binding was removed (deleted, or its owning connection closed). */

@@ -53,8 +53,8 @@ const apply = (id: number, over: Partial<ConfigApplyHistoryView> = {}): ConfigAp
 
 function serve(revisions: ConfigRevisionView[], applies: ConfigApplyHistoryView[]) {
   server.use(
-    http.get('*/api/v1/clusters/c1/config/revisions', () => HttpResponse.json(paged(revisions))),
-    http.get('*/api/v1/clusters/c1/config/applies', () => HttpResponse.json(paged(applies))),
+    http.get('*/api/v1/clusters/c1/artemis/config/revisions', () => HttpResponse.json(paged(revisions))),
+    http.get('*/api/v1/clusters/c1/artemis/config/applies', () => HttpResponse.json(paged(applies))),
   );
 }
 
@@ -196,7 +196,7 @@ describe('HistoryTab applies', () => {
   it('opens an apply as the same result the operator confirmed, and closes it again', async () => {
     const detail = halted();
     server.use(
-      http.get('*/api/v1/clusters/c1/config/applies/3', () =>
+      http.get('*/api/v1/clusters/c1/artemis/config/applies/3', () =>
         HttpResponse.json({
           apply: apply(3, { outcome: 'HALTED', summary: detail.summary }),
           plan: detail.plan,
@@ -224,7 +224,7 @@ describe('HistoryTab applies', () => {
   it('opens a previewed apply without a summary as an empty one', async () => {
     const p = plan();
     server.use(
-      http.get('*/api/v1/clusters/c1/config/applies/9', () =>
+      http.get('*/api/v1/clusters/c1/artemis/config/applies/9', () =>
         HttpResponse.json({
           apply: apply(9, { outcome: 'DRY_RUN', dryRun: true, summary: null, auditEventId: null }),
           plan: p.plan,
@@ -262,11 +262,11 @@ describe('HistoryTab states', () => {
 
   it('says what is loading, then draws both lists at once so the section below does not move', async () => {
     server.use(
-      http.get('*/api/v1/clusters/c1/config/revisions', async () => {
+      http.get('*/api/v1/clusters/c1/artemis/config/revisions', async () => {
         await new Promise((r) => setTimeout(r, 100));
         return HttpResponse.json(paged([revision(3)]));
       }),
-      http.get('*/api/v1/clusters/c1/config/applies', () => HttpResponse.json(paged([apply(1)]))),
+      http.get('*/api/v1/clusters/c1/artemis/config/applies', () => HttpResponse.json(paged([apply(1)]))),
     );
     renderWithProviders(<HistoryTab declaration={declaration()} />);
 
@@ -280,13 +280,13 @@ describe('HistoryTab states', () => {
   it('states why the revisions could not be listed and lists them again on retry', async () => {
     let attempts = 0;
     server.use(
-      http.get('*/api/v1/clusters/c1/config/revisions', () => {
+      http.get('*/api/v1/clusters/c1/artemis/config/revisions', () => {
         attempts += 1;
         return attempts === 1
           ? HttpResponse.json({ title: 'Down', detail: 'The history is not answering.' }, { status: 503 })
           : HttpResponse.json(paged([revision(3)]));
       }),
-      http.get('*/api/v1/clusters/c1/config/applies', () => HttpResponse.json(paged([]))),
+      http.get('*/api/v1/clusters/c1/artemis/config/applies', () => HttpResponse.json(paged([]))),
     );
     const user = userEvent.setup();
     renderWithProviders(<HistoryTab declaration={declaration()} />);
@@ -299,7 +299,7 @@ describe('HistoryTab states', () => {
 
   it('says why an apply could not be opened instead of showing nothing', async () => {
     server.use(
-      http.get('*/api/v1/clusters/c1/config/applies/3', () =>
+      http.get('*/api/v1/clusters/c1/artemis/config/applies/3', () =>
         HttpResponse.json({ title: 'Gone', detail: 'That apply is no longer recorded.' }, { status: 404 }),
       ),
     );

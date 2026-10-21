@@ -147,10 +147,10 @@ class BuiltInRolesCoverageTest extends PostgresIntegrationTest {
         Map<String, Set<String>> builtIns = builtIns();
 
         for (String role : Set.of("OPERATOR", "TEAM_OPERATOR", "TEAM_ADMIN")) {
-            assertThat(builtIns.get(role)).as(role).contains("queue:delete", "address:delete");
+            assertThat(builtIns.get(role)).as(role).contains("subscription:delete", "destination:delete");
         }
         for (String role : Set.of("VIEWER", "TEAM_VIEWER")) {
-            assertThat(builtIns.get(role)).as(role).doesNotContain("address:delete");
+            assertThat(builtIns.get(role)).as(role).doesNotContain("destination:delete");
         }
     }
 }

@@ -86,8 +86,8 @@ class HealthVerdictConditionTest extends PostgresIntegrationTest {
 
         Evaluation result = condition.evaluate(clusterId, rule("GTE", 3));
 
-        assertThat(result.universe()).contains("queue:broken");
-        assertThat(result.active()).containsEntry("queue:broken", 4.0);
+        assertThat(result.universe()).contains("subscription:broken");
+        assertThat(result.active()).containsEntry("subscription:broken", 4.0);
     }
 
     @Test
@@ -99,8 +99,8 @@ class HealthVerdictConditionTest extends PostgresIntegrationTest {
         Evaluation result = condition.evaluate(clusterId, rule("GTE", 3));
 
         // Present, so a firing on it resolves; not active, so it does not fire.
-        assertThat(result.universe()).contains("queue:fine");
-        assertThat(result.active()).doesNotContainKey("queue:fine");
+        assertThat(result.universe()).contains("subscription:fine");
+        assertThat(result.active()).doesNotContainKey("subscription:fine");
     }
 
     @Test
@@ -112,8 +112,8 @@ class HealthVerdictConditionTest extends PostgresIntegrationTest {
         Evaluation result = condition.evaluate(clusterId, rule("GTE", 3));
 
         // PAUSED ranks 1: in the universe, below the threshold, so it never fires.
-        assertThat(result.universe()).contains("queue:maintenance");
-        assertThat(result.active()).doesNotContainKey("queue:maintenance");
+        assertThat(result.universe()).contains("subscription:maintenance");
+        assertThat(result.active()).doesNotContainKey("subscription:maintenance");
     }
 
     @Test
@@ -125,8 +125,8 @@ class HealthVerdictConditionTest extends PostgresIntegrationTest {
 
         Evaluation result = condition.evaluate(clusterId, rule("GTE", 3));
 
-        assertThat(result.universe()).doesNotContain("queue:new-queue");
-        assertThat(result.active()).doesNotContainKey("queue:new-queue");
+        assertThat(result.universe()).doesNotContain("subscription:new-queue");
+        assertThat(result.active()).doesNotContainKey("subscription:new-queue");
     }
 
     // ---- helpers ----------------------------------------------------------

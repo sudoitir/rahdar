@@ -34,30 +34,30 @@ public final class TransferViews {
 
     /**
      * A transfer to preview. The path's cluster is the source. Node ids are Rahdar's node ids, as the
-     * cluster's node list gives them; {@code targetAddress} defaults to the target queue's own address,
-     * or its name for a queue that does not exist yet.
+     * cluster's node list gives them. {@code source} is a subscription id. {@code target} is a subscription
+     * id, taken at its own destination or, for one that does not exist yet, created at the destination of
+     * its name, or a destination id, where the subscription of its name takes the messages.
      */
     public record TransferPreviewRequest(
             @Schema(requiredMode = REQUIRED) @NotNull TransferMode mode,
-            @Schema(requiredMode = REQUIRED) @NotBlank String sourceQueue,
+            @Schema(requiredMode = REQUIRED) @NotBlank String source,
             @Schema(requiredMode = REQUIRED) @NotNull UUID sourceNodeId,
             @Schema(requiredMode = REQUIRED) @NotNull @Valid TransferSelection selection,
             @Schema(requiredMode = REQUIRED) @NotNull UUID targetClusterId,
             @Schema(requiredMode = REQUIRED) @NotNull UUID targetNodeId,
-            @Schema(requiredMode = REQUIRED) @NotBlank String targetQueue,
-            @Schema(nullable = true) String targetAddress) {}
+            @Schema(requiredMode = REQUIRED) @NotBlank String target) {}
 
     /**
      * @param planHash the preview's {@code planHash}, echoed to prove this is the plan being confirmed
      * @param override run a selection over the bulk cap
      * @param acknowledged the codes of every warning the preview raised
-     * @param confirmQueue a move only: the source queue's name, typed by the operator
+     * @param confirmSubscription a move only: the source subscription's name, typed by the operator
      */
     public record TransferExecuteRequest(
             @Schema(requiredMode = REQUIRED) @NotNull String planHash,
             boolean override,
             @Schema(nullable = true) List<String> acknowledged,
-            @Schema(nullable = true) String confirmQueue) {}
+            @Schema(nullable = true) String confirmSubscription) {}
 
     public enum FindingKind {
         /** The transfer cannot run: the target would drop, or could not take, the messages. */
@@ -80,13 +80,13 @@ public final class TransferViews {
             @Schema(requiredMode = REQUIRED) String words,
             @Schema(nullable = true) String snippet) {}
 
-    /** One side of a transfer. {@code address} is the queue's address. */
+    /** One side of a transfer: a subscription and its destination, by id. */
     public record TransferEnd(
             @Schema(requiredMode = REQUIRED) UUID clusterId,
             @Schema(requiredMode = REQUIRED) UUID nodeId,
             @Schema(requiredMode = REQUIRED) String nodeName,
-            @Schema(requiredMode = REQUIRED) String queue,
-            @Schema(requiredMode = REQUIRED) String address) {}
+            @Schema(requiredMode = REQUIRED) String subscription,
+            @Schema(requiredMode = REQUIRED) String destination) {}
 
     /**
      * A run. Counts are cumulative over every segment (execute, resumes).
@@ -163,11 +163,11 @@ public final class TransferViews {
             @Schema(requiredMode = REQUIRED) String stagingQueue,
             @Schema(nullable = true) Long depth) {}
 
-    /** Put an orphaned staging queue's messages on {@code targetQueue} of the same node, then remove it. */
+    /** Put an orphaned staging queue's messages on the {@code target} subscription of the same node, then remove it. */
     public record OrphanReturnRequest(
             @Schema(requiredMode = REQUIRED) @NotNull UUID nodeId,
             @Schema(requiredMode = REQUIRED) @NotBlank String stagingQueue,
-            @Schema(requiredMode = REQUIRED) @NotBlank String targetQueue) {}
+            @Schema(requiredMode = REQUIRED) @NotBlank String target) {}
 
     /** What an orphan return did: {@code remaining} messages are still in staging when it could not finish. */
     public record OrphanReturnView(

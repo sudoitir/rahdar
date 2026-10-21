@@ -5,7 +5,7 @@
         displayName = "Broker configuration",
         allowedDependencies = {
             "feature.alerting",
-            "feature.queues",
+            "feature.resources",
             "kernel.audit",
             "kernel.core",
             "kernel.jobs",

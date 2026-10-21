@@ -25,6 +25,13 @@ describe('EnvironmentsPanel', () => {
     expect(screen.getByText(/^1 environment\./)).toBeInTheDocument();
   });
 
+  it('says the permission is missing instead of loading forever', async () => {
+    server.use(holding('cluster:read'));
+    renderWithProviders(<EnvironmentsPanel />);
+
+    expect(await screen.findByText(/does not include the environment:read permission/)).toBeInTheDocument();
+  });
+
   it('shows a count for zero environments', async () => {
     server.use(http.get('*/api/v1/environments', () => HttpResponse.json(paged([]))));
     renderWithProviders(<EnvironmentsPanel />);

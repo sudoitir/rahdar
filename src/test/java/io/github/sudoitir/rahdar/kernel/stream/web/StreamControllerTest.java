@@ -80,12 +80,12 @@ class StreamControllerTest extends PostgresIntegrationTest {
 
         mvc.perform(get("/api/v1/stream")
                         .param("clusterId", clusterId.toString())
-                        .param("topics", "queues,health"))
+                        .param("topics", "subscriptions,health"))
                 .andExpect(request().asyncStarted());
 
         ArgumentCaptor<Subscriber> captor = ArgumentCaptor.forClass(Subscriber.class);
         verify(hub).register(eq(clusterId), captor.capture());
-        assertThat(captor.getValue().topics()).containsExactlyInAnyOrder("queues", "health");
+        assertThat(captor.getValue().topics()).containsExactlyInAnyOrder("subscriptions", "health");
     }
 
     @Test
@@ -125,7 +125,7 @@ class StreamControllerTest extends PostgresIntegrationTest {
 
         ArgumentCaptor<Subscriber> captor = ArgumentCaptor.forClass(Subscriber.class);
         verify(hub).register(eq(clusterId), captor.capture());
-        assertThat(captor.getValue().topics()).containsExactlyInAnyOrder("topology", "health", "queues");
+        assertThat(captor.getValue().topics()).containsExactlyInAnyOrder("topology", "health", "subscriptions");
     }
 
     @Test
@@ -223,7 +223,7 @@ class StreamControllerTest extends PostgresIntegrationTest {
 
             assertThatThrownBy(() -> controller.stream(
                             UUID.randomUUID(),
-                            "queues",
+                            "subscriptions",
                             null,
                             null,
                             new MockHttpServletRequest(),

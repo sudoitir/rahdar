@@ -130,7 +130,7 @@ public class MessageService {
 
     public MessagePageView browse(
             UUID clusterId, String queueName, UUID nodeId, String filter, int page, int requestedSize) {
-        clusterAccess.requireResource(clusterId, ResourceRef.queue(queueName), MessagePermissions.MESSAGE_READ);
+        clusterAccess.requireResource(clusterId, ResourceRef.subscription(queueName), MessagePermissions.MESSAGE_READ);
         ResolvedQueue resolved = resolve(clusterId, queueName, nodeId);
         // The broker serves at most BROKER_PAGE_CAP rows; the page size reported and used for hasNext is that one.
         int size = Math.min(requestedSize, BROKER_PAGE_CAP);
@@ -144,7 +144,7 @@ public class MessageService {
         for (int i = 0; i < browsed.size(); i++) {
             rows.add(toSummary(browsed.get(i), governed.get(i)));
         }
-        clearViews.recordClear(context, "QUEUE", queueName, governed);
+        clearViews.recordClear(context, "SUBSCRIPTION", queueName, governed);
         Long total = result.total();
         // ponytail: with no broker count, a full page is taken to have a successor; the last page can be a false yes
         boolean hasNext = total != null ? (long) page * size < total : rows.size() == size;
@@ -158,8 +158,18 @@ public class MessageService {
                 resolved.node().getId());
     }
 
+    /** An action request that moves into the queue of this name, for a caller that holds names rather than ids. */
+    public MessageActionRequest actionRequest(UUID clusterId, List<Long> ids, String filter, String targetQueue) {
+        return new MessageActionRequest(
+                ids.stream().map(String::valueOf).toList(),
+                filter,
+                targetQueue == null
+                        ? null
+                        : messages.queueId(clusterId, targetQueue).format());
+    }
+
     public MessageDetailView detail(UUID clusterId, String queueName, long messageId, UUID nodeId, String filter) {
-        clusterAccess.requireResource(clusterId, ResourceRef.queue(queueName), MessagePermissions.MESSAGE_READ);
+        clusterAccess.requireResource(clusterId, ResourceRef.subscription(queueName), MessagePermissions.MESSAGE_READ);
         ResolvedQueue resolved = resolve(clusterId, queueName, nodeId);
         BrowsePage result = messages.browse(clusterId, resolved.node().getId(), queueName, 1, BROKER_PAGE_CAP, filter);
         BrowsedMessage message = result.messages().stream()
@@ -178,13 +188,13 @@ public class MessageService {
             UUID clusterId, String queueName, UUID nodeId, SendMessageRequest req, boolean dryRun) {
         // A message is sent to the address the queue is bound to; a queue whose address the caller may not
         // use is, to them, a queue that is not there.
-        clusterAccess.requireResource(clusterId, ResourceRef.queue(queueName), Permissions.QUEUE_READ);
+        clusterAccess.requireResource(clusterId, ResourceRef.subscription(queueName), Permissions.SUBSCRIPTION_READ);
         SendNames.validate(req.headers(), req.properties());
         requireDecodableBody(req);
         ResolvedQueue resolved = resolve(clusterId, queueName, nodeId);
         try {
             clusterAccess.requireResource(
-                    clusterId, ResourceRef.address(resolved.address()), MessagePermissions.MESSAGE_SEND);
+                    clusterId, ResourceRef.destination(resolved.address()), MessagePermissions.MESSAGE_SEND);
         } catch (NotFoundException _) {
             throw new NotFoundException("queue", queueName);
         }
@@ -204,10 +214,10 @@ public class MessageService {
                     resolved.node().getId()));
         }
         try {
-            messages.send(
+            messages.sendTo(
                     clusterId,
                     resolved.node().getId(),
-                    resolved.address(),
+                    ResourceRef.destination(resolved.address()),
                     SentMessages.of(req.kind(), req.durable(), req.body(), req.headers(), req.properties()));
             audit.succeed(event, 1);
             publishQueuesAfterCommit(clusterId, queueName);
@@ -295,7 +305,8 @@ public class MessageService {
 
     /** What a purge would remove now, read as {@link #reach} reads an action. */
     public Reach reachOfPurge(UUID clusterId, String queueName, UUID nodeId) {
-        clusterAccess.requireResource(clusterId, ResourceRef.queue(queueName), MessagePermissions.QUEUE_PURGE);
+        clusterAccess.requireResource(
+                clusterId, ResourceRef.subscription(queueName), MessagePermissions.SUBSCRIPTION_PURGE);
         ResolvedQueue resolved = resolve(clusterId, queueName, nodeId);
         return new Reach(
                 messages.count(clusterId, resolved.node().getId(), queueName, null),
@@ -416,16 +427,17 @@ public class MessageService {
 
     // ---- purge (Slice 7) ---------------------------------------------
 
-    /** Purges a queue. A dry run is never gated; a real one passes the approval gate as {@code queue.purge}. */
+    /** Purges a queue. A dry run is never gated; a real one passes the approval gate as {@code subscription.purge}. */
     public Attempt<Outcome> purge(UUID clusterId, String queueName, UUID nodeId, boolean dryRun, boolean override) {
-        clusterAccess.requireResource(clusterId, ResourceRef.queue(queueName), MessagePermissions.QUEUE_PURGE);
+        clusterAccess.requireResource(
+                clusterId, ResourceRef.subscription(queueName), MessagePermissions.SUBSCRIPTION_PURGE);
         if (dryRun) {
             return runPurge(clusterId, queueName, nodeId, true, override);
         }
         return gatedPurge(new QueuePurgeParams(clusterId, queueName, nodeId, override));
     }
 
-    @Gated("queue.purge")
+    @Gated("subscription.purge")
     private Attempt<Outcome> gatedPurge(QueuePurgeParams p) {
         return gate.run(Operation.of(p), () -> runPurge(p.clusterId(), p.queue(), p.nodeId(), false, p.override()));
     }
@@ -465,14 +477,14 @@ public class MessageService {
      */
     private void requireAllowed(UUID clusterId, String queueName, MessageAction action, MessageActionRequest req) {
         List<Requirement> needs = new ArrayList<>();
-        needs.add(new Requirement(ResourceRef.queue(queueName), permissionFor(action)));
+        needs.add(new Requirement(ResourceRef.subscription(queueName), permissionFor(action)));
         if (action == MessageAction.MOVE
                 && req.targetQueue() != null
                 && !req.targetQueue().isBlank()) {
             // Messages go into the target queue, so it is read and sent to through the address it is bound to.
-            needs.add(new Requirement(ResourceRef.queue(req.targetQueue()), Permissions.QUEUE_READ));
+            needs.add(new Requirement(ResourceRef.subscription(req.targetQueue()), Permissions.SUBSCRIPTION_READ));
             needs.add(new Requirement(
-                    ResourceRef.address(addressOf(clusterId, req.targetQueue())), MessagePermissions.MESSAGE_SEND));
+                    ResourceRef.destination(addressOf(clusterId, req.targetQueue())), MessagePermissions.MESSAGE_SEND));
         }
         clusterAccess.requireAll(clusterId, needs);
     }
@@ -507,7 +519,7 @@ public class MessageService {
         clusterAccess.requireAll(
                 clusterId,
                 origins.stream()
-                        .map(a -> new Requirement(ResourceRef.address(a), MessagePermissions.MESSAGE_SEND))
+                        .map(a -> new Requirement(ResourceRef.destination(a), MessagePermissions.MESSAGE_SEND))
                         .toList());
         return new RetryScope(true, origins);
     }
@@ -640,7 +652,7 @@ public class MessageService {
     private AuditEvent begin(
             String action, String queueName, UUID clusterId, UUID node, Map<String, ?> params, boolean dryRun) {
         Actor actor = actorResolver.resolve();
-        return audit.begin(actor, action, "QUEUE", queueName, clusterId, node, params, dryRun);
+        return audit.begin(actor, action, "SUBSCRIPTION", queueName, clusterId, node, params, dryRun);
     }
 
     /** Tells the subscribers who read the queue that it changed, once the transaction commits. */
@@ -649,11 +661,11 @@ public class MessageService {
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override
                 public void afterCommit() {
-                    sseHub.publishAbout(clusterId, "queues", List.of(queueName), List.of());
+                    sseHub.publishAbout(clusterId, "subscriptions", List.of(queueName), List.of());
                 }
             });
         } else {
-            sseHub.publishAbout(clusterId, "queues", List.of(queueName), List.of());
+            sseHub.publishAbout(clusterId, "subscriptions", List.of(queueName), List.of());
         }
     }
 
@@ -717,7 +729,7 @@ public class MessageService {
     private static MessageSummaryView toSummary(BrowsedMessage m, GovernedMessage g) {
         String body = g.body();
         return new MessageSummaryView(
-                m.messageId(),
+                String.valueOf(m.messageId()),
                 m.type(),
                 m.durable(),
                 m.priority(),
@@ -756,7 +768,7 @@ public class MessageService {
             }
         });
         return new MessageDetailView(
-                m.messageId(),
+                String.valueOf(m.messageId()),
                 m.type(),
                 m.durable(),
                 m.priority(),

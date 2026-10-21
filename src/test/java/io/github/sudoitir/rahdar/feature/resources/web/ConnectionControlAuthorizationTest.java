@@ -7,7 +7,6 @@ import static org.springframework.security.test.web.servlet.setup.SecurityMockMv
 import static org.springframework.test.web.servlet.setup.MockMvcBuilders.webAppContextSetup;
 
 import io.github.sudoitir.rahdar.feature.messages.MessagePermissions;
-import io.github.sudoitir.rahdar.feature.queues.QueuePermissions;
 import io.github.sudoitir.rahdar.feature.resources.ResourcePermissions;
 import io.github.sudoitir.rahdar.kernel.security.Grant;
 import io.github.sudoitir.rahdar.kernel.security.Permissions;
@@ -84,18 +83,18 @@ class ConnectionControlAuthorizationTest extends PostgresIntegrationTest {
                         MessagePermissions.MESSAGE_SEND,
                         MessagePermissions.MESSAGE_MOVE,
                         MessagePermissions.MESSAGE_DELETE,
-                        MessagePermissions.QUEUE_PURGE))
+                        MessagePermissions.SUBSCRIPTION_PURGE))
                 .isEqualTo(404);
     }
 
     @Test
     void theQueueLifecyclePermissionsDoNotGrantACloseEither() throws Exception {
         assertThat(status(
-                        "/api/v1/clusters/" + clusterId + "/addresses/orders/consumers/close?dryRun=true",
+                        "/api/v1/clusters/" + clusterId + "/resources/artemis.address/orders:close?dryRun=true",
                         Permissions.CLUSTER_READ,
-                        QueuePermissions.QUEUE_CREATE,
-                        QueuePermissions.QUEUE_DELETE,
-                        QueuePermissions.QUEUE_PAUSE))
+                        ResourcePermissions.SUBSCRIPTION_CREATE,
+                        ResourcePermissions.SUBSCRIPTION_DELETE,
+                        ResourcePermissions.SUBSCRIPTION_PAUSE))
                 .isEqualTo(404);
     }
 
@@ -108,7 +107,7 @@ class ConnectionControlAuthorizationTest extends PostgresIntegrationTest {
      */
     @Test
     void theGrantIsWhatMakesTheDifference() throws Exception {
-        String path = "/api/v1/clusters/" + clusterId + "/addresses/orders/consumers/close?dryRun=true";
+        String path = "/api/v1/clusters/" + clusterId + "/resources/artemis.address/orders:close?dryRun=true";
 
         assertThat(status(path, Permissions.CLUSTER_READ)).isEqualTo(404);
         assertThat(status(path, Permissions.CLUSTER_READ, ResourcePermissions.CONNECTION_CLOSE))

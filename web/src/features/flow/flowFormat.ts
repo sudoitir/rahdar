@@ -36,10 +36,10 @@ export function rateSourceLabel(edge: Pick<FlowEdgeView, 'rateSource' | 'average
   switch (edge.rateSource) {
     case 'SAMPLER':
       return 'sampled clients';
-    case 'QUEUE_METRIC':
+    case 'SUBSCRIPTION_METRIC':
       return edge.averagedOverSeconds
-        ? `queue metrics, ~${Math.round(edge.averagedOverSeconds / 60)} min average`
-        : 'queue metrics';
+        ? `subscription metrics, ~${Math.round(edge.averagedOverSeconds / 60)} min average`
+        : 'subscription metrics';
     default:
       return 'broker keeps no count';
   }
@@ -48,7 +48,7 @@ export function rateSourceLabel(edge: Pick<FlowEdgeView, 'rateSource' | 'average
 export const FAULT_LABELS: Record<string, string> = {
   NO_CONSUMER: 'no consumer',
   STALLED: 'stalled',
-  BRIDGE_DOWN: 'not connected',
+  LINK_DOWN: 'not connected',
   PARTIAL_PRESENCE: 'partly deployed',
 };
 
@@ -57,8 +57,8 @@ export const RELATION: Record<string, string> = {
   PRODUCE: 'produces to',
   ROUTE: 'routes to',
   CONSUME: 'consumed by',
-  DIVERT: 'diverts to',
-  BRIDGE: 'bridges to',
+  FORWARD: 'forwards to',
+  LINK: 'links to',
   CLUSTER_HOP: 'redistributes to',
   WILDCARD: 'also reaches',
   DEAD_LETTER: 'dead-letters to',
@@ -99,12 +99,12 @@ function routeParts(view: FlowEdgeView): string[] {
   const parts: string[] = [];
   if (view.delivery) parts.push(view.delivery === 'COPY' ? 'copy' : 'shared');
   if (view.filter) parts.push('filtered');
-  if (view.bypassed) parts.push('bypassed by an exclusive divert');
+  if (view.bypassed) parts.push('bypassed by an exclusive forward');
   parts.push(rateLabel(view));
   return parts;
 }
 
-function divertParts(view: FlowEdgeView): string[] {
+function forwardParts(view: FlowEdgeView): string[] {
   const parts = [view.exclusive ? 'reroutes' : 'copies'];
   if (view.filter) parts.push('filtered');
   if (view.transformer) parts.push('transformed');
@@ -119,11 +119,11 @@ function kindParts(view: FlowEdgeView): string[] {
     case 'ROUTE':
       parts.push(...routeParts(view));
       break;
-    case 'DIVERT':
-      parts.push(...divertParts(view));
+    case 'FORWARD':
+      parts.push(...forwardParts(view));
       break;
-    case 'BRIDGE':
-      parts.push('bridge', rateLabel(view));
+    case 'LINK':
+      parts.push('link', rateLabel(view));
       break;
     case 'CLUSTER_HOP':
       parts.push('redistributes', rateLabel(view));

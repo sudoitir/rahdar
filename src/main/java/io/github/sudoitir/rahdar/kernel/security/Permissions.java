@@ -1,6 +1,6 @@
 package io.github.sudoitir.rahdar.kernel.security;
 
-import io.github.sudoitir.rahdar.kernel.plugin.ResourceKind;
+import io.github.sudoitir.rahdar.kernel.plugin.ResourceType;
 
 /**
  * The permission strings the security kernel itself checks (ADR-0038). Every other
@@ -27,14 +27,14 @@ public final class Permissions {
      * Seeing a queue, and the read every permission that acts on a queue requires. Declared with the
      * queue permissions, named here because modules other than the queues' own require it.
      */
-    public static final String QUEUE_READ = "queue:read";
+    public static final String SUBSCRIPTION_READ = "subscription:read";
 
     /** Seeing an address, and the read every permission that acts on an address requires. */
-    public static final String ADDRESS_READ = "address:read";
+    public static final String DESTINATION_READ = "destination:read";
 
     /** The read permission of a kind of resource: what seeing one requires. */
-    public static String readOf(ResourceKind kind) {
-        return kind == ResourceKind.QUEUE ? QUEUE_READ : ADDRESS_READ;
+    public static String readOf(ResourceType kind) {
+        return kind == ResourceType.SUBSCRIPTION ? SUBSCRIPTION_READ : DESTINATION_READ;
     }
 
     private Permissions() {}

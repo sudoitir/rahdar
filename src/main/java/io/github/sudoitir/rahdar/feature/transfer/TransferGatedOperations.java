@@ -94,7 +94,8 @@ class TransferGatedOperations {
                 transfers.execute(
                         p.clusterId(),
                         p.runId(),
-                        new TransferExecuteRequest(p.planHash(), p.override(), p.acknowledged(), p.confirmQueue()));
+                        new TransferExecuteRequest(
+                                p.planHash(), p.override(), p.acknowledged(), p.confirmSubscription()));
             }
         };
     }

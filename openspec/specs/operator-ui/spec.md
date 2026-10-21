@@ -334,14 +334,22 @@ underlying requirement forbids dismissal.
 
 ### Requirement: A control disabled by capability or permission explains itself from the keyboard
 
-Every control the console disables because a capability or a permission is missing SHALL
+Every control the console disables because the resource's kind lacks the verb, a capability is missing, or a permission is missing SHALL
 carry its reason on something that takes keyboard focus. A disabled control takes no focus,
-so the explanation SHALL hang off an element that does.
+so the explanation SHALL hang off an element that does. When more than one reason applies, the
+reason shown SHALL be the first of these: the kind lacks the verb (for example, that an
+Artemis address cannot be purged), a capability is unavailable (its stated reason), a permission
+is missing (naming the permission).
 
 #### Scenario: The reason for a disabled control is reachable by keyboard
 
 - **WHEN** an operator using only the keyboard reaches a control the console has disabled
 - **THEN** the reason it is disabled is reachable and readable without a pointer
+
+#### Scenario: The kind's missing verb is the first reason
+
+- **WHEN** an operator without the purge permission reaches Purge on a resource whose kind cannot be purged
+- **THEN** the reason names the kind that lacks the verb, not the missing permission
 
 ### Requirement: A view that accumulates rows indefinitely states its bound
 
@@ -545,18 +553,18 @@ next reconciliation. After the deletion, it SHALL show the per-node removal outc
 Wherever a sampled subscription is chosen or listed, the UI SHALL say briefly that it is only
 sampling and that a message consumed between two polls is not recorded.
 
-Where request-reply tracing depends on addresses that no enabled capture subscription covers,
-the UI SHALL show a short hint naming those addresses and where capture is turned on. The hint
-SHALL disappear once every such address is captured.
+Where request-reply tracing depends on destinations that no enabled capture subscription covers,
+the UI SHALL show a short hint naming those destinations and where capture is turned on. The hint
+SHALL disappear once every such destination is captured.
 
-#### Scenario: A traced address that is only sampled gets a hint
+#### Scenario: A traced destination that is only sampled gets a hint
 
-- **WHEN** an operator traces a request address and a reply address, and neither is captured
+- **WHEN** an operator traces a request destination and a reply destination, and neither is captured
 - **THEN** the tracing screen names both as only sampled and points to where capture is turned on
 
-#### Scenario: The hint goes away once capture covers the addresses
+#### Scenario: The hint goes away once capture covers the destinations
 
-- **WHEN** an enabled capture-everything subscription covers every traced address
+- **WHEN** an enabled capture-everything subscription covers every traced destination
 - **THEN** no capture hint is shown
 
 #### Scenario: A sampled subscription says it is only sampling
@@ -602,12 +610,12 @@ view stays near-monochrome.
 
 #### Scenario: A healthy cluster is quiet
 
-- **WHEN** every queue in a cluster is healthy
+- **WHEN** every subscription in a cluster is healthy
 - **THEN** the view carries no warning or danger colour
 
 #### Scenario: An uncomputed verdict is distinguishable from a healthy one
 
-- **WHEN** a queue's verdict could not be computed
+- **WHEN** a subscription's verdict could not be computed
 - **THEN** the row states that, and is visually distinct from a row reporting health
 
 ### Requirement: A graph that can be edited is operable without a pointer and has a non-graph equivalent
@@ -663,44 +671,44 @@ when the underlying state has moved.
 - **THEN** a preview is computed and confirmed separately, and its inputs cannot be edited
   while it is shown
 
-### Requirement: Queues can be selected individually or by filter
+### Requirement: Subscriptions can be selected individually or by filter
 
-The queues screen SHALL let an operator select queues row by row, and select every queue
-on the page. When the page does not show every queue matching the current filter, it
-SHALL offer to select all of them, stating how many that is. Once all matching queues
+The subscriptions screen SHALL let an operator select subscriptions row by row, and select every subscription
+on the page. When the page does not show every subscription matching the current filter, it
+SHALL offer to select all of them, stating how many that is. Once all matching subscriptions
 are selected, the screen SHALL say so, and SHALL offer to clear the selection.
 
-When queues are selected, the screen SHALL show the number selected and the bulk actions
+When subscriptions are selected, the screen SHALL show the number selected and the bulk actions
 available for them.
 
-Each bulk action SHALL be gated on the permission of the single-queue operation it
+Each bulk action SHALL be gated on the permission of the single-subscription operation it
 applies. An action the operator may not take SHALL be shown disabled, with the reason
 reachable from the keyboard. While permissions are still loading, the actions SHALL be
 offered.
 
-#### Scenario: Selecting all queues matching a filter
+#### Scenario: Selecting all subscriptions matching a filter
 
-- **WHEN** an operator filters the queues screen to `orders`, which matches 140 queues
+- **WHEN** an operator filters the subscriptions screen to `orders`, which matches 140 subscriptions
   across three pages, and selects the page
-- **THEN** the screen offers to select all 140 matching queues, and after they accept it states
-  that all 140 queues matching `orders` are selected
+- **THEN** the screen offers to select all 140 matching subscriptions, and after they accept it states
+  that all 140 subscriptions matching `orders` are selected
 
 ### Requirement: A bulk run is confirmed against its preview and states its blast radius
 
 Choosing a bulk action SHALL show its preview before the action can be confirmed. The
 preview SHALL state, in words:
 - the operation;
-- the number of queues;
+- the number of subscriptions;
 - the number of nodes;
 - for purge and delete, the messages that will be destroyed, or that the figure is
   unavailable.
 
-It SHALL list every queue with its per-queue figures. It SHALL list refused queues and
-their reasons. It SHALL offer to show only the queues with a refusal or a warning.
+It SHALL list every subscription with its per-subscription figures. It SHALL list refused subscriptions and
+their reasons. It SHALL offer to show only the subscriptions with a refusal or a warning.
 
 A purge or delete SHALL be confirmed by pressing and holding a button that names the
-action and the count, e.g. `Delete 37 queues`; a run over exactly one queue names that
-queue. A pause or resume SHALL be confirmed once. The option to override
+action and the count, e.g. `Delete 37 subscriptions`; a run over exactly one subscription names that
+subscription. A pause or resume SHALL be confirmed once. The option to override
 the message cap SHALL be shown only when the run is over the cap and the operator may
 override it. The option to continue past failures SHALL be off by default.
 
@@ -710,13 +718,13 @@ run's progress view.
 
 #### Scenario: A destructive bulk run is confirmed by a hold
 
-- **WHEN** an operator previews a delete of 37 queues
-- **THEN** the preview states the queues, the nodes, and the messages destroyed, and the
-  delete is confirmed only by holding `Delete 37 queues`
+- **WHEN** an operator previews a delete of 37 subscriptions
+- **THEN** the preview states the subscriptions, the nodes, and the messages destroyed, and the
+  delete is confirmed only by holding `Delete 37 subscriptions`
 
-#### Scenario: A one-queue purge names the queue
+#### Scenario: A one-subscription purge names the subscription
 
-- **WHEN** an operator previews a purge of the one queue `orders`
+- **WHEN** an operator previews a purge of the one subscription `orders`
 - **THEN** the purge button names `orders` and is confirmed only by a hold
 
 #### Scenario: A keyboard-only operator can complete and abandon the flow
@@ -730,9 +738,9 @@ run's progress view.
 A bulk run SHALL have a view at its own address. The view SHALL show:
 - the run's status in words;
 - its progress;
-- the count of queues in each outcome;
-- each queue's outcome, expandable to its per-node detail in the same form as a
-  single-queue outcome.
+- the count of subscriptions in each outcome;
+- each subscription's outcome, expandable to its per-node detail in the same form as a
+  single-subscription outcome.
 
 It SHALL update live while the run executes. It SHALL offer to stop a running run, and
 SHALL link to the run's audit event.
@@ -741,13 +749,13 @@ When the run finishes, the outcome SHALL be announced to assistive technology, a
 SHALL be stated in words as succeeded, partial, failed, stopped, or interrupted.
 
 Past bulk runs on a cluster SHALL be listed, newest first, each with its operation,
-queue count, who ran it, when, and its outcome.
+subscription count, who ran it, when, and its outcome.
 
 Progress motion SHALL honour the operator's reduced-motion preference.
 
 #### Scenario: A partial run is stated as partial
 
-- **WHEN** a run finishes with 8 queues succeeded and 2 failed
+- **WHEN** a run finishes with 8 subscriptions succeeded and 2 failed
 - **THEN** the view states the run was partial, shows 8 succeeded and 2 failed, and
   announces that outcome
 
@@ -838,17 +846,17 @@ An action SHALL open the same previewed, confirmed flow as the screen that owns 
 outcome SHALL remain visible after the row leaves the grid. On dismissal, focus SHALL
 return to the row's Actions control, or to the grid when the row is gone.
 
-#### Scenario: Deleting a queue from the keyboard
+#### Scenario: Deleting a subscription from the keyboard
 
-- **WHEN** an operator tabs into the queues grid, moves to the row `orders`, presses
-  Shift+F10, chooses "Delete queue…" and presses Escape in the dialog
+- **WHEN** an operator tabs into the subscriptions grid, moves to the row `orders`, presses
+  Shift+F10, chooses "Delete subscription…" and presses Escape in the dialog
 - **THEN** the menu opens naming `orders`, the delete dialog opens with its preview, and
   focus returns to the Actions control of `orders`
 
 #### Scenario: A blocked action explains itself
 
-- **WHEN** an operator without the delete permission opens a queue's menu
-- **THEN** "Delete queue…" is listed as unavailable with its reason, can be reached with
+- **WHEN** an operator without the delete permission opens a subscription's menu
+- **THEN** "Delete subscription…" is listed as unavailable with its reason, can be reached with
   the arrow keys, and activating it shows the full reason
 
 #### Scenario: The outcome survives the row
@@ -878,10 +886,10 @@ Focus SHALL NOT be lost when the grid refreshes, re-sorts or scrolls. A focused 
 value is clipped SHALL show its full value. Its value SHALL be copyable from the keyboard,
 and the copy SHALL be announced.
 
-#### Scenario: Opening a queue without a pointer
+#### Scenario: Opening a subscription without a pointer
 
-- **WHEN** an operator tabs into the queues grid, presses Down twice and Enter
-- **THEN** the second queue's detail opens
+- **WHEN** an operator tabs into the subscriptions grid, presses Down twice and Enter
+- **THEN** the second subscription's detail opens
 
 #### Scenario: One press leaves the grid
 
@@ -895,15 +903,15 @@ and the copy SHALL be announced.
 
 ### Requirement: Related resources link to each other
 
-Wherever a view names a queue, address, session or connection that another view
+Wherever a view names a subscription, destination, channel or connection that another view
 presents, the name SHALL be a link to that resource. The link SHALL open the exact
 resource, not a list filtered by its name, even when the resource is not on the first page.
 When the feature presenting the resource is disabled, the name SHALL be plain text.
 
-#### Scenario: From a consumer to its queue
+#### Scenario: From a consumer to its subscription
 
-- **WHEN** an operator activates the queue name on a consumer row
-- **THEN** the queue's detail opens
+- **WHEN** an operator activates the subscription name on a consumer row
+- **THEN** the subscription's detail opens
 
 ### Requirement: The console states where the operator is
 
@@ -914,36 +922,36 @@ as the current page.
 
 #### Scenario: A tab says what it holds
 
-- **WHEN** an operator opens the queue `orders` on the Queues view of cluster `prod-eu`
-- **THEN** the document title reads `orders · Queues · prod-eu · <product>`
+- **WHEN** an operator opens the subscription `orders` on the Subscriptions view of cluster `prod-eu`
+- **THEN** the document title reads `orders · Subscriptions · prod-eu · <product>`
 
 ### Requirement: Switching cluster keeps the current view
 
 Choosing another cluster SHALL open the same view on that cluster, without the current
 view's filters and open resource.
 
-#### Scenario: Comparing queues across clusters
+#### Scenario: Comparing subscriptions across clusters
 
-- **WHEN** an operator on the Queues view of `prod-eu` chooses `prod-us`
-- **THEN** the Queues view of `prod-us` opens
+- **WHEN** an operator on the Subscriptions view of `prod-eu` chooses `prod-us`
+- **THEN** the Subscriptions view of `prod-us` opens
 
 ### Requirement: The command palette finds resources without loading the brokers
 
 The command palette SHALL:
 - be openable from a visible control;
-- search queues as the operator types, opening the chosen queue itself;
-- offer to search the live-read resources (connections, consumers, sessions, producers,
-  addresses) for the typed text, by navigating to their view;
+- search subscriptions as the operator types, opening the chosen subscription itself;
+- offer to search the live-read resources (connections, consumers, channels, producers,
+  destinations) for the typed text, by navigating to their view;
 - list the views the operator recently opened.
 
 It SHALL NOT read from any broker to answer a keystroke, and SHALL NOT fetch while it is
 closed. A view the operator lacks permission for SHALL be listed as unavailable, with the
 reason.
 
-#### Scenario: Jumping to a queue
+#### Scenario: Jumping to a subscription
 
 - **WHEN** an operator opens the palette and types `ord`
-- **THEN** queues matching `ord` are listed, and choosing one opens that queue
+- **THEN** subscriptions matching `ord` are listed, and choosing one opens that subscription
 
 #### Scenario: A closed palette is silent
 
@@ -995,11 +1003,11 @@ Every column SHALL be resizable:
 A width the operator set SHALL be kept exactly; fitting SHALL NOT shrink it. Widths, the columns the operator hid or showed, and column order SHALL be remembered per viewer and per table in browser storage when the table names a storage key. They SHALL fall back to fitting when storage is empty, unavailable or out of date, and SHALL NOT be written to the URL.
 
 #### Scenario: Long names are not cut by default
-- **WHEN** a queues table lists a queue whose name is 300 pixels wide, in a window with room for it
+- **WHEN** a subscriptions table lists a subscription whose name is 300 pixels wide, in a window with room for it
 - **THEN** the name column is at least that wide and the name shows without being shortened
 
 #### Scenario: A table fits a 1280-pixel window
-- **WHEN** the queues table shows typical queues in a 1280 by 800 window with the navigation expanded
+- **WHEN** the subscriptions table shows typical subscriptions in a 1280 by 800 window with the navigation expanded
 - **THEN** the table has no horizontal scroll bar and every column is visible
 
 #### Scenario: Columns that do not fit are hidden and named
@@ -1019,7 +1027,7 @@ A width the operator set SHALL be kept exactly; fitting SHALL NOT shrink it. Wid
 - **THEN** every header cell stays above its column's cells
 
 #### Scenario: Identifiers that share a prefix stay distinguishable
-- **WHEN** two queue names differ only in their last characters and both are shortened
+- **WHEN** two subscription names differ only in their last characters and both are shortened
 - **THEN** the shortened names show those last characters
 
 #### Scenario: A live table does not reflow under the reader
@@ -1027,7 +1035,7 @@ A width the operator set SHALL be kept exactly; fitting SHALL NOT shrink it. Wid
 - **THEN** the column widths do not change until the operator returns to the top or leaves the table
 
 #### Scenario: Resizing without a pointer
-- **WHEN** an operator focuses the Queue header cell and presses Ctrl+Shift+Right twice
+- **WHEN** an operator focuses the Subscription header cell and presses Ctrl+Shift+Right twice
 - **THEN** the column is 32 pixels wider, the new width is announced, and pressing Tab leaves the table
 
 #### Scenario: A width survives a reload
@@ -1130,7 +1138,7 @@ The users view SHALL offer each user's effective permissions, grouped by scope, 
 The console SHALL offer two table densities, compact and comfortable, chosen by the viewer from the user menu, from any table's column menu and from the command palette. The choice SHALL apply to every table, be remembered in that browser, take effect before the first paint of the next page load, and SHALL NOT be written to the URL. Interactive controls in a compact table SHALL keep a target of at least 24 by 24 CSS pixels.
 
 #### Scenario: Density applies everywhere
-- **WHEN** an operator switches to the comfortable density on the queues page and opens the audit page
+- **WHEN** an operator switches to the comfortable density on the subscriptions page and opens the audit page
 - **THEN** the audit table uses the comfortable density too
 
 #### Scenario: Density survives a reload without a jump
@@ -1154,8 +1162,8 @@ The console SHALL be laid out for desktop windows 1280 pixels wide and wider, an
 Every page SHALL have exactly one top-level heading that names the view, and its section headings SHALL follow it without skipping a level. The cluster a page belongs to SHALL be stated next to that heading, not as a second top-level heading.
 
 #### Scenario: A cluster page has one top-level heading
-- **WHEN** an operator opens the queues page of a cluster
-- **THEN** the page's only top-level heading is "Queues", and the cluster's name and environment are shown beside it
+- **WHEN** an operator opens the subscriptions page of a cluster
+- **THEN** the page's only top-level heading is "Subscriptions", and the cluster's name and environment are shown beside it
 
 ### Requirement: The console's typefaces ship with Rahdar
 
@@ -1180,7 +1188,7 @@ visibility and order chosen from its column menu. Escape SHALL keep moving focus
 editor when the results are not maximised.
 
 #### Scenario: Cost before running
-- **WHEN** an operator writes a query that scans a large queue
+- **WHEN** an operator writes a query that scans a large subscription
 - **THEN** the console states the estimated cost before the query is run
 
 #### Scenario: Cancel a running query from the keyboard
@@ -1213,14 +1221,14 @@ The Topology view SHALL show, for every broker node, its high-availability role,
 
 ### Requirement: A long name never collapses its column
 
-A name a broker supplies (a queue, an address, a match pattern, a role) SHALL be shown on one
+A name a broker supplies (a subscription, a destination, a match pattern, a role) SHALL be shown on one
 line in tables and lists, shortened in the middle when it does not fit and readable in full on
 demand, and copyable. Such a column SHALL keep a minimum width that fits a readable name, so
 that no layout ever breaks a name into one word or a few characters per line. Names MAY wrap
 only in a detail view that has the whole width for them.
 
-#### Scenario: A 200-character queue name in the configuration view
-- **WHEN** the configuration view lists a queue whose name is 200 characters with no spaces
+#### Scenario: A 200-character subscription name in the configuration view
+- **WHEN** the configuration view lists a subscription whose name is 200 characters with no spaces
 - **THEN** the name occupies one line, shortened in the middle, the full name is available on demand, and no other cell in the row wraps character by character
 
 ### Requirement: A plugin page is never covered by the host
@@ -1310,8 +1318,8 @@ the filters they left, and says where they are; with no previous view it SHALL o
 
 #### Scenario: Returning from Administration
 
-- **WHEN** an operator opens Administration from a cluster's Queues view
-- **THEN** one click on the line above the page returns to those Queues
+- **WHEN** an operator opens Administration from a cluster's Subscriptions view
+- **THEN** one click on the line above the page returns to those Subscriptions
 
 ### Requirement: Paired fields clear together
 
@@ -1349,7 +1357,7 @@ A grid that renders only visible rows SHALL provide its own find, which searches
 Views that read the same kind of value from many resources SHALL request them in batches of at most 200 rather than one call per resource, within the existing rate limits. Broker calls SHALL be counted in a metric by kind.
 
 #### Scenario: A large cluster view loads
-- **WHEN** a view covers 1,000 queues
+- **WHEN** a view covers 1,000 subscriptions
 - **THEN** it makes five batched calls of at most 200, not 1,000 calls
 
 #### Scenario: Calls are visible

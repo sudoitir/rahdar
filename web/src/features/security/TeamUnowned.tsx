@@ -13,7 +13,7 @@ import { UNOWNED_PAGE_SIZE, useUnowned, type PatternKind, type UnownedView } fro
 import { useTeamAccess } from './teamAccess.ts';
 import { unownedColumns } from './teamColumns.tsx';
 
-type Kind = 'QUEUE' | 'ADDRESS';
+type Kind = 'SUBSCRIPTION' | 'DESTINATION';
 
 const rowKey = (u: UnownedView) => u.name;
 
@@ -24,8 +24,8 @@ function pageCount(data: PagedView<UnownedView> | undefined, page: number): numb
 }
 
 /**
- * The queues or addresses of a cluster that no team's pattern covers, reachable only through role grants. Each can
- * be assigned to this team as a queue, address or both pattern, which pre-fills the pattern form with its exact name.
+ * The subscriptions or destinations of a cluster that no team's pattern covers, reachable only through role grants. Each can
+ * be assigned to this team as a subscription, destination or both pattern, which pre-fills the pattern form with its exact name.
  */
 export function TeamUnowned({
   onAssign,
@@ -33,12 +33,12 @@ export function TeamUnowned({
   const clusters = useClusters();
   const { userAdmin } = useTeamAccess();
   const [clusterId, setClusterId] = useState<string | null>(null);
-  const [kind, setKind] = useState<Kind>('QUEUE');
+  const [kind, setKind] = useState<Kind>('SUBSCRIPTION');
   const [page, setPage] = useState(1);
   const unowned = useUnowned(clusterId, kind, page, userAdmin);
   const cluster = clusters.data?.find((c) => c.id === clusterId)?.name;
   const pages = pageCount(unowned.data, page);
-  const [one, many] = kind === 'QUEUE' ? ['queue', 'queues'] : ['address', 'addresses'];
+  const [one, many] = kind === 'SUBSCRIPTION' ? ['subscription', 'subscriptions'] : ['destination', 'destinations'];
   const count = unowned.data?.count;
   const error = unowned.isError ? (
     <ErrorState error={unowned.error} onRetry={() => void unowned.refetch()} />
@@ -63,7 +63,7 @@ export function TeamUnowned({
     <Section
       title="Unowned resources"
       headingLevel={3}
-      description="Queues and addresses that no team's pattern covers. Only role grants reach them, so a team member sees none of them."
+      description="Subscriptions and destinations that no team's pattern covers. Only role grants reach them, so a team member sees none of them."
     >
       {userAdmin ? null : (
         <Notice title="Needs user:admin">
@@ -89,8 +89,8 @@ export function TeamUnowned({
         <SegmentedControl
           aria-label="Unowned kind"
           data={[
-            { value: 'QUEUE', label: 'Queues' },
-            { value: 'ADDRESS', label: 'Addresses' },
+            { value: 'SUBSCRIPTION', label: 'Subscriptions' },
+            { value: 'DESTINATION', label: 'Destinations' },
           ]}
           value={kind}
           onChange={(next) => {

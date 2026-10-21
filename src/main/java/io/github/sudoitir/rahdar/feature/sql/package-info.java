@@ -5,7 +5,7 @@
         displayName = "SQL console",
         allowedDependencies = {
             "feature.messages",
-            "feature.queues",
+            "feature.resources",
             "feature.routing",
             "kernel.audit",
             "kernel.core",
@@ -19,8 +19,7 @@
             "platform.broker",
             "platform.clusters",
             "platform.governance",
-            "platform.scrape",
-            "system.artemis"
+            "platform.scrape"
         })
 package io.github.sudoitir.rahdar.feature.sql;
 

@@ -128,11 +128,14 @@ class ClusterResourceControllerTest extends PostgresIntegrationTest {
     @Test
     void queuesAggregatesTheSnapshotCacheAcrossNodes() throws Exception {
         upsert.upsertBatch(List.of(row(nodeAId, "ORDERS", 10), row(nodeBId, "ORDERS", 5)));
+        serving(client(), client());
 
-        mvc.perform(get("/api/v1/clusters/{id}/queues", clusterId))
+        mvc.perform(get("/api/v1/clusters/{id}/subscriptions", clusterId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.count").value(1))
-                .andExpect(jsonPath("$.data[0].queueName").value("ORDERS"))
+                .andExpect(jsonPath("$.data[0].name").value("ORDERS"))
+                .andExpect(jsonPath("$.data[0].id").value("artemis.queue/ORDERS"))
+                .andExpect(jsonPath("$.data[0].kindLabel").value("Queue"))
                 .andExpect(jsonPath("$.data[0].totalMessageCount").value(15))
                 .andExpect(jsonPath("$.data[0].nodesPresent").value(2));
     }
@@ -147,14 +150,14 @@ class ClusterResourceControllerTest extends PostgresIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.count").value(2))
                 .andExpect(jsonPath("$.data[0].nodeName").value(Matchers.startsWith("node-")))
-                .andExpect(jsonPath("$.data[0].queueName").value("SPIKE.A.q000"));
+                .andExpect(jsonPath("$.data[0].subscription").value("artemis.queue/SPIKE.A.q000"));
     }
 
     @Test
     void aClusterWithNoReadableNodeSurfacesAClassifiedProblem() throws Exception {
         serving(unauthorized(), unauthorized());
 
-        mvc.perform(get("/api/v1/clusters/{id}/sessions", clusterId))
+        mvc.perform(get("/api/v1/clusters/{id}/channels", clusterId))
                 .andExpect(status().is4xxClientError())
                 .andExpect(jsonPath("$.brokerErrorKind").value("CREDENTIALS_REJECTED"));
     }

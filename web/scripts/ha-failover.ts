@@ -292,10 +292,15 @@ async function writeLoop(cluster: string, running: () => boolean) {
     const started = Date.now();
     const name = `ha.failover.${started}.${i}`;
     sent.writes++;
-    const created = await call('POST', `/clusters/${cluster}/queues`, { address: name, name, routingType: 'ANYCAST' });
+    const created = await call('POST', `/clusters/${cluster}/subscriptions`, {
+      kind: 'artemis.queue',
+      name,
+      destination: `artemis.address/${encodeURIComponent(name)}`,
+      attributes: { routingType: 'ANYCAST' },
+    });
     if (created.status !== 200) failures.push({ at: started, what: `create queue: ${created.status}` });
     else {
-      const deleted = await call('DELETE', `/clusters/${cluster}/queues/${name}`);
+      const deleted = await call('DELETE', `/clusters/${cluster}/resources/artemis.queue/${encodeURIComponent(name)}`);
       if (deleted.status !== 200) failures.push({ at: Date.now(), what: `delete queue: ${deleted.status}` });
     }
     await sleep(Math.max(0, 500 - (Date.now() - started)));

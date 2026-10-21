@@ -23,7 +23,7 @@ function trimTrailingSlashes(path: string): string {
 
 /**
  * Which cluster view an address is under (ADR-0109): the navigation entry whose path is the longest
- * prefix of the path after `/clusters/<id>/`, so a queue's message browser is under Queues and a
+ * prefix of the path after `/clusters/<id>/`, so a subscription's message browser is under Subscriptions and a
  * bulk run under Bulk runs. Null outside any cluster.
  */
 export function matchView(pathname: string, features: RahdarFeature[]): CurrentView | null {
@@ -47,9 +47,12 @@ export function useCurrentView(): CurrentView | null {
 
 /**
  * The address of the same view on another cluster (ADR-0109): an operator comparing two clusters
- * stays on Queues. The view's search is not carried — its filter and its open resource name things
- * that may not exist there. Without a current view, the cluster's landing page.
+ * stays on Subscriptions. The view's search is not carried — its filter and its open resource name things
+ * that may not exist there. Without a current view, or when the view is for one system and the cluster runs
+ * another (`system`), the cluster's landing page.
  */
-export function sameViewOn(clusterId: string, view: CurrentView | null): string {
-  return view?.item ? `/clusters/${clusterId}/${view.item.path}` : `/clusters/${clusterId}`;
+export function sameViewOn(clusterId: string, view: CurrentView | null, system?: string): string {
+  const item = view?.item;
+  if (!item || (item.system && item.system !== system)) return `/clusters/${clusterId}`;
+  return `/clusters/${clusterId}/${item.path}`;
 }

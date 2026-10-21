@@ -14,8 +14,8 @@ import io.github.sudoitir.rahdar.feature.bulk.web.BulkViews.BulkRunView;
 import io.github.sudoitir.rahdar.feature.bulk.web.BulkViews.BulkSelection;
 import io.github.sudoitir.rahdar.feature.bulk.web.BulkViews.NodeFigure;
 import io.github.sudoitir.rahdar.feature.resources.CrossNodeAggregator;
-import io.github.sudoitir.rahdar.feature.resources.web.ResourceViews.QueueNodeCell;
-import io.github.sudoitir.rahdar.feature.resources.web.ResourceViews.QueueView;
+import io.github.sudoitir.rahdar.feature.resources.web.ResourceViews.SubscriptionNodeCell;
+import io.github.sudoitir.rahdar.feature.resources.web.ResourceViews.SubscriptionView;
 import io.github.sudoitir.rahdar.kernel.audit.AuditEvent;
 import io.github.sudoitir.rahdar.kernel.audit.AuditService;
 import io.github.sudoitir.rahdar.kernel.core.ConflictException;
@@ -32,6 +32,8 @@ import io.github.sudoitir.rahdar.kernel.security.ClusterAccessGuard.Requirement;
 import io.github.sudoitir.rahdar.kernel.security.OperatorHandoff;
 import io.github.sudoitir.rahdar.kernel.security.OperatorHandoff.Operator;
 import io.github.sudoitir.rahdar.kernel.security.Permissions;
+import io.github.sudoitir.rahdar.kernel.security.ResourceIdTexts;
+import io.github.sudoitir.rahdar.kernel.security.ResourceIdTexts.Of;
 import io.github.sudoitir.rahdar.kernel.security.ResourceRef;
 import io.github.sudoitir.rahdar.kernel.settings.SettingsService;
 import io.github.sudoitir.rahdar.platform.broker.BrokerSettings;
@@ -81,6 +83,7 @@ public class BulkService {
     private final ObjectMapper json;
     private final ReplicaRegistry replicas;
     private final OperationGate gate;
+    private final ResourceIdTexts ids;
 
     /**
      * What the gate holds of a bulk run: the run, the plan it was previewed with (its hash, operation and queue
@@ -105,24 +108,26 @@ public class BulkService {
     public BulkRunDetailView preview(UUID clusterId, BulkPreviewRequest request) {
         BulkOperation operation = Objects.requireNonNull(request.operation(), "operation");
         clusterAccess.requireVisible(clusterId);
-        Map<String, QueueView> byName = new LinkedHashMap<>();
-        queues.allQueues(clusterId).forEach(q -> byName.putIfAbsent(q.queueName(), q));
+        Map<String, SubscriptionView> byName = new LinkedHashMap<>();
+        queues.allQueues(clusterId).forEach(q -> byName.putIfAbsent(q.name(), q));
 
         List<String> names = resolve(request, byName);
         // Every queue of the plan, before anything is stored: one the caller may not read is not found,
         // one they may read and not change is refused, and the run is not planned at all.
         clusterAccess.requireAll(clusterId, requirements(names, operation.permission()));
-        int queueCap = settings.intValue(BrokerSettings.BULK_QUEUE_CAP);
+        int subscriptionCap = settings.intValue(BrokerSettings.BULK_SUBSCRIPTION_CAP);
         if (names.isEmpty()) {
             throw new BulkRefusedException(
-                    HttpStatus.UNPROCESSABLE_ENTITY, "bulk-nothing-selected", "No queue matches this selection.");
+                    HttpStatus.UNPROCESSABLE_ENTITY,
+                    "bulk-nothing-selected",
+                    "No subscription matches this selection.");
         }
-        if (names.size() > queueCap) {
+        if (names.size() > subscriptionCap) {
             throw new BulkRefusedException(
                     HttpStatus.UNPROCESSABLE_ENTITY,
-                    "bulk-queue-cap-exceeded",
-                    "%d queues matched; a bulk run is capped at %d queues (safety.bulk-queue-cap). Narrow the selection."
-                            .formatted(names.size(), queueCap));
+                    "bulk-subscription-cap-exceeded",
+                    "%d subscriptions matched; a bulk run is capped at %d subscriptions (safety.bulk-subscription-cap). Narrow the selection."
+                            .formatted(names.size(), subscriptionCap));
         }
 
         List<Planned> plan = names.stream()
@@ -171,20 +176,21 @@ public class BulkService {
 
     private record Planned(String name, String refusal, ItemEstimate figures) {}
 
-    private static List<String> resolve(BulkPreviewRequest request, Map<String, QueueView> byName) {
+    private static List<String> resolve(BulkPreviewRequest request, Map<String, SubscriptionView> byName) {
         if (request.names() != null) {
             return List.copyOf(new LinkedHashSet<>(request.names()));
         }
         ResourceQuery query = ResourceQuery.of(request.q(), 1, 1, null);
         return byName.values().stream()
-                .filter(q -> query.matches(q.queueName()) || query.matches(q.address()))
-                .map(QueueView::queueName)
+                .filter(q -> query.matches(q.name()) || query.matches(q.destinationName()))
+                .map(SubscriptionView::name)
                 .sorted(String.CASE_INSENSITIVE_ORDER)
                 .toList();
     }
 
     /** One queue's figures, refusal and warning, by the rules the single-queue preflight applies. */
-    private static Planned plan(BulkOperation operation, boolean disconnectConsumers, String name, QueueView queue) {
+    private static Planned plan(
+            BulkOperation operation, boolean disconnectConsumers, String name, SubscriptionView queue) {
         if (queue == null) {
             return new Planned(
                     name, "No queue with this name exists on the cluster.", new ItemEstimate(List.of(), null));
@@ -235,7 +241,7 @@ public class BulkService {
     }
 
     /** A node that has not answered within the freshness window has unknown figures, never zero. */
-    private static NodeFigure figure(QueueNodeCell cell) {
+    private static NodeFigure figure(SubscriptionNodeCell cell) {
         return new NodeFigure(
                 cell.nodeId(),
                 cell.nodeName(),
@@ -360,8 +366,8 @@ public class BulkService {
         AuditEvent event = audit.begin(
                 operator.actor(),
                 operation.auditAction(),
-                "QUEUE",
-                run.getTotalItems() + " queues",
+                "SUBSCRIPTION",
+                run.getTotalItems() + " subscriptions",
                 clusterId,
                 null,
                 auditParams(run),
@@ -409,7 +415,7 @@ public class BulkService {
     public BulkRunDetailView get(UUID clusterId, UUID runId) {
         clusterAccess.requireVisible(clusterId);
         BulkRunEntity run = load(clusterId, runId);
-        requireOnRun(clusterId, run, Permissions.QUEUE_READ);
+        requireOnRun(clusterId, run, Permissions.SUBSCRIPTION_READ);
         return detail(run);
     }
 
@@ -419,7 +425,7 @@ public class BulkService {
      */
     public PagedView<BulkRunView> history(UUID clusterId, ResourceQuery query) {
         clusterAccess.requireVisible(clusterId);
-        if (clusterAccess.holds(clusterId, Permissions.QUEUE_READ)) {
+        if (clusterAccess.holds(clusterId, Permissions.SUBSCRIPTION_READ)) {
             return PagedView.of(
                     runs.findByClusterIdAndStatusNotOrderByCreatedAtDesc(
                             clusterId, BulkRunStatus.PREVIEWED, PageRequest.of(query.page() - 1, query.size())),
@@ -429,7 +435,7 @@ public class BulkService {
                 .findByClusterIdAndStatusNotOrderByCreatedAtDesc(
                         clusterId, BulkRunStatus.PREVIEWED, PageRequest.of(0, HISTORY_SCAN))
                 .stream()
-                .filter(run -> clusterAccess.mayAll(clusterId, requirements(run, Permissions.QUEUE_READ)))
+                .filter(run -> clusterAccess.mayAll(clusterId, requirements(run, Permissions.SUBSCRIPTION_READ)))
                 .map(this::view)
                 .toList();
         return query.paginate(readable, null);
@@ -450,7 +456,7 @@ public class BulkService {
     /** What acting on {@code names} with the permission needs: the permission on each queue. */
     private static List<Requirement> requirements(List<String> names, String permission) {
         return names.stream()
-                .map(name -> new Requirement(ResourceRef.queue(name), permission))
+                .map(name -> new Requirement(ResourceRef.subscription(name), permission))
                 .toList();
     }
 
@@ -458,7 +464,7 @@ public class BulkService {
     private List<Requirement> requirements(BulkRunEntity run, String permission) {
         return requirements(
                 items.findByRunIdOrderByOrdinal(run.getId()).stream()
-                        .map(BulkRunItemEntity::getQueueName)
+                        .map(BulkRunItemEntity::getSubscription)
                         .toList(),
                 permission);
     }
@@ -468,8 +474,9 @@ public class BulkService {
     }
 
     private BulkRunDetailView detail(BulkRunEntity run) {
+        Of idTexts = ids.of(run.getClusterId());
         List<BulkItemView> rows = items.findByRunIdOrderByOrdinal(run.getId()).stream()
-                .map(this::view)
+                .map(item -> view(idTexts, item))
                 .toList();
         return new BulkRunDetailView(view(run), rows);
     }
@@ -482,11 +489,15 @@ public class BulkService {
                 options(run));
     }
 
-    private BulkItemView view(BulkRunItemEntity item) {
+    private BulkItemView view(Of idTexts, BulkRunItemEntity item) {
         List<NodeOutcome> outcome = item.getOutcome() == null
                 ? null
                 : json.readValue(item.getOutcome(), new TypeReference<List<NodeOutcome>>() {});
-        return views.toView(item, json.readValue(item.getEstimate(), ItemEstimate.class), outcome);
+        return views.toView(
+                item,
+                idTexts.subscription(item.getSubscription()),
+                json.readValue(item.getEstimate(), ItemEstimate.class),
+                outcome);
     }
 
     private RunOptions options(BulkRunEntity run) {

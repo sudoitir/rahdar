@@ -278,19 +278,19 @@ describe('TransferRunView figures', () => {
   it('shows the cause and the snippet that fixes it, and every note', async () => {
     show({
       state: 'FAILED',
-      lastError: 'node-b refused the batch: its address is full.',
+      lastError: 'node-b refused the batch: its destination is full.',
       errorSnippet: '<address-full-policy>PAGE</address-full-policy>',
-      notes: ['Messages keep their order within a queue.', 'Scheduled messages are not taken.'],
+      notes: ['Messages keep their order within a subscription.', 'Scheduled messages are not taken.'],
     });
 
     expect(await screen.findByText(/Add this to/)).toBeInTheDocument();
     expect(screen.getByText('<address-full-policy>PAGE</address-full-policy>')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Good to know' })).toBeInTheDocument();
-    expect(screen.getByText('Messages keep their order within a queue.')).toBeInTheDocument();
+    expect(screen.getByText('Messages keep their order within a subscription.')).toBeInTheDocument();
     expect(screen.getByText('Scheduled messages are not taken.')).toBeInTheDocument();
     // The failing node's row carries the same reason in the summary.
     const summary = screen.getAllByRole('status').find((el) => el.textContent?.includes('Failed'));
-    expect(summary).toHaveTextContent('node-b refused the batch: its address is full.');
+    expect(summary).toHaveTextContent('node-b refused the batch: its destination is full.');
   });
 
   it('says a failure with no snippet has no config to add', async () => {

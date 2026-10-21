@@ -6,6 +6,7 @@ import { useMetrics, type MetricSeries } from './api.ts';
 import dayjs from 'dayjs';
 import duration from 'dayjs/plugin/duration';
 
+import { useRoleIds } from '../clusters/index.ts';
 import { elapsedLabel, useServerNow } from '../../kernel/time/time.ts';
 import { rangeSpec, type MetricRange } from './ranges.ts';
 import { RangePicker } from './RangePicker.tsx';
@@ -27,12 +28,12 @@ import { Toolbar } from '../../ui/Toolbar.tsx';
 
 const METRICS = ['openbroker.backlog', 'openbroker.consumer.count', 'openbroker.enqueued', 'openbroker.acknowledged'];
 
-/** The controls for a queue-scoped view: the way back to the cluster, and the per-node split. */
-function QueueScope({ split }: Readonly<{ split: boolean }>) {
+/** The controls for a subscription-scoped view: the way back to the cluster, and the per-node split. */
+function SubscriptionScope({ split }: Readonly<{ split: boolean }>) {
   const navigate = useNavigate();
   return (
     <Toolbar
-      label="Queue scope"
+      label="Subscription scope"
       start={
         <>
           <Button
@@ -91,7 +92,7 @@ function formatCell(name: string, value: number): string {
 }
 
 /**
- * Cluster-wide (or queue-scoped) historical metrics: depth, throughput and consumers,
+ * Cluster-wide (or subscription-scoped) historical metrics: depth, throughput and consumers,
  * sharing one crosshair, then whatever the enabled features add (`metrics.panels`),
  * such as request-reply latency.
  *
@@ -115,7 +116,7 @@ export function MetricsView() {
   const range = search.range ?? '1h';
   const spec = rangeSpec(range);
   const subject = search.subject;
-  // The split is per queue only (ADR-0110): a cluster total has no node series to add up to it.
+  // The split is per subscription only (ADR-0110): a cluster total has no node series to add up to it.
   const split = Boolean(subject) && search.split === 'node';
 
   // Ticks at the bucket width, not at a second: the window can only move when a
@@ -132,18 +133,19 @@ export function MetricsView() {
     };
   }, [live, tick, spec.stepMs, spec.windowMs, search.from, search.to]);
 
+  const ids = useRoleIds(clusterId);
   const metrics = useMetrics(
     clusterId,
     {
       metrics: METRICS,
-      subjectType: subject ? 'QUEUE' : 'CLUSTER',
-      subject,
+      resource: subject && ids.loaded ? ids.subscription(subject) : undefined,
       from,
       to,
       step: live ? spec.step : undefined,
       splitBy: split ? 'NODE' : undefined,
     },
     live ? Math.max(15_000, spec.stepMs) : false,
+    ids.loaded,
   );
 
   const byName = (name: string): MetricSeries | undefined => metrics.data?.series.find((s) => s.metric === name);
@@ -164,7 +166,7 @@ export function MetricsView() {
   const isPending = metrics.isPending && !metrics.data;
   const error = metrics.isError ? metrics.error : null;
   const empty = (s: MetricSeries | undefined) => !error && !isPending && !s?.points?.length;
-  const scope = subject ? `queue ${subject}` : 'this cluster';
+  const scope = subject ? `subscription ${subject}` : 'this cluster';
 
   const figures: Figure[] = [
     { label: 'Depth', unit: 'messages', value: latest(depth), since: earliest(depth), format: formatCount },
@@ -205,7 +207,7 @@ export function MetricsView() {
         meta={subject ? <StatusBadge tone="info">{subject}</StatusBadge> : undefined}
       />
 
-      {subject ? <QueueScope split={split} /> : null}
+      {subject ? <SubscriptionScope split={split} /> : null}
 
       <Toolbar
         label="Metrics window"
@@ -225,7 +227,7 @@ export function MetricsView() {
         isPending={isPending}
         error={error}
         isEmpty={empty(depth)}
-        emptyLabel={`No depth samples for ${scope} in this window. Depth is recorded on the queue sweep, so a cluster registered within the last few minutes has none yet.`}
+        emptyLabel={`No depth samples for ${scope} in this window. Depth is recorded on the subscription sweep, so a cluster registered within the last few minutes has none yet.`}
       >
         <DepthChart series={depth} range={range} from={fromMs} to={toMs} syncId={syncId} total={!subject} />
       </ChartPanel>

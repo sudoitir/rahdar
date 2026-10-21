@@ -16,7 +16,7 @@ import java.util.List;
  */
 public record QueryAst(
         Source source,
-        String queuePattern,
+        String subscriptionPattern,
         List<Column> projection,
         Predicate where,
         List<Order> orderBy,

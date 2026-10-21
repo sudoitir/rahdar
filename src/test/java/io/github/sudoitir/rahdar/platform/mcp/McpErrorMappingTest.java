@@ -109,11 +109,11 @@ class McpErrorMappingTest extends PostgresIntegrationTest {
                 mvc,
                 key,
                 "list_resources",
-                Map.of("clusterId", UUID.randomUUID().toString(), "kind", "sprockets"));
+                Map.of("clusterId", UUID.randomUUID().toString(), "role", "sprockets"));
         assertThat(response.path("error").path("code").asInt()).isEqualTo(-32602);
         assertThat(response.path("error").path("message").asString())
                 .describedAs("the rejection is where the valid values live — they are not in the schema")
-                .contains("queues");
+                .contains("subscription");
     }
 
     @Test

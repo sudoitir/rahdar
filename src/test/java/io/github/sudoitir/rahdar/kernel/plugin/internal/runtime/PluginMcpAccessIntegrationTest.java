@@ -123,7 +123,7 @@ class PluginMcpAccessIntegrationTest extends PostgresIntegrationTest {
     @Test
     void aResourceToolForAClusterTheKeyCannotSeeHidesTheClusterAndNeverRuns() throws Exception {
         String id = activate(accessJar(newId()));
-        var key = key(Grant.ScopeType.CLUSTER, UUID.randomUUID(), Set.of(id + ":peek", "queue:read"));
+        var key = key(Grant.ScopeType.CLUSTER, UUID.randomUUID(), Set.of(id + ":peek", "subscription:read"));
 
         JsonNode called = McpFixture.callTool(
                 mvc,
@@ -154,12 +154,12 @@ class PluginMcpAccessIntegrationTest extends PostgresIntegrationTest {
     void aResourceToolForAQueueTheKeyMayReadButNotUseNamesThePermissionAndNeverRuns() throws Exception {
         String id = activate(accessJar(newId()));
         UUID cluster = UUID.randomUUID();
-        var key = key(Grant.ScopeType.CLUSTER, cluster, Set.of("queue:read"));
+        var key = key(Grant.ScopeType.CLUSTER, cluster, Set.of("subscription:read"));
 
         JsonNode called = McpFixture.callTool(
                 mvc, key, snake(id) + "_queue", Map.of("clusterId", cluster.toString(), "queue", "orders.in"));
 
-        assertThat(text(called)).contains(id + ":peek").contains("queue orders.in");
+        assertThat(text(called)).contains(id + ":peek").contains("subscription orders.in");
         assertThat(System.getProperty(CALLS)).isEqualTo("0");
     }
 
@@ -167,7 +167,7 @@ class PluginMcpAccessIntegrationTest extends PostgresIntegrationTest {
     void aResourceToolWithTheRightOnTheQueueReachesThePlugin() throws Exception {
         String id = activate(accessJar(newId()));
         UUID cluster = UUID.randomUUID();
-        var key = key(Grant.ScopeType.CLUSTER, cluster, Set.of("queue:read", id + ":peek"));
+        var key = key(Grant.ScopeType.CLUSTER, cluster, Set.of("subscription:read", id + ":peek"));
 
         JsonNode called = McpFixture.callTool(
                 mvc, key, snake(id) + "_queue", Map.of("clusterId", cluster.toString(), "queue", "orders.in"));
@@ -180,7 +180,7 @@ class PluginMcpAccessIntegrationTest extends PostgresIntegrationTest {
     void aResourceToolWithoutAResourceNeverRuns() throws Exception {
         String id = activate(accessJar(newId()));
         UUID cluster = UUID.randomUUID();
-        var key = key(Grant.ScopeType.GLOBAL, null, Set.of("queue:read", id + ":peek"));
+        var key = key(Grant.ScopeType.GLOBAL, null, Set.of("subscription:read", id + ":peek"));
 
         // The schema refuses a missing argument before Rahdar's check; a blank one reaches the check.
         JsonNode missing = McpFixture.callTool(mvc, key, snake(id) + "_queue", Map.of("clusterId", cluster.toString()));
@@ -358,8 +358,8 @@ class PluginMcpAccessIntegrationTest extends PostgresIntegrationTest {
                 id + ":peek",
                 "resourceArg",
                 resourceArg,
-                "resourceKind",
-                "queue",
+                "resourceType",
+                "subscription",
                 "description",
                 "Reads one queue.");
     }
@@ -384,10 +384,10 @@ class PluginMcpAccessIntegrationTest extends PostgresIntegrationTest {
                                         id + ":peek",
                                         "scope",
                                         "resource",
-                                        "resourceKinds",
-                                        List.of("queue"),
+                                        "resourceTypes",
+                                        List.of("subscription"),
                                         "requires",
-                                        List.of("queue:read"))))
+                                        List.of("subscription:read"))))
                 .descriptorField(
                         "mcpTools",
                         List.of(

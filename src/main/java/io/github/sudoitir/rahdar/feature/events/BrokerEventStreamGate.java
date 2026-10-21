@@ -28,18 +28,21 @@ class BrokerEventStreamGate implements StreamGate {
 
     @Override
     public boolean mayRead(RahdarPrincipal principal, UUID clusterId, JsonNode data) {
-        String address = text(data, "address");
-        boolean readsAddress = address == null
+        String destination = text(data, "destination");
+        boolean readsDestination = destination == null
                 ? permissions.can(principal, clusterId, Permissions.CLUSTER_READ)
-                : permissions.can(principal, clusterId, ResourceRef.address(address), Permissions.ADDRESS_READ);
-        if (!readsAddress) {
+                : permissions.can(
+                        principal, clusterId, ResourceRef.destination(destination), Permissions.DESTINATION_READ);
+        if (!readsDestination) {
             return false;
         }
         String routingName = text(data, "routingName");
         return routingName == null
-                || permissions.can(principal, clusterId, Permissions.ADDRESS_READ)
-                || permissions.can(principal, clusterId, ResourceRef.queue(routingName), Permissions.QUEUE_READ)
-                || permissions.can(principal, clusterId, ResourceRef.address(routingName), Permissions.ADDRESS_READ);
+                || permissions.can(principal, clusterId, Permissions.DESTINATION_READ)
+                || permissions.can(
+                        principal, clusterId, ResourceRef.subscription(routingName), Permissions.SUBSCRIPTION_READ)
+                || permissions.can(
+                        principal, clusterId, ResourceRef.destination(routingName), Permissions.DESTINATION_READ);
     }
 
     private static String text(JsonNode data, String field) {

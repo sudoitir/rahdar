@@ -2,15 +2,14 @@ package io.github.sudoitir.rahdar.feature.resources.web;
 
 import io.github.sudoitir.rahdar.feature.resources.CrossNodeAggregator;
 import io.github.sudoitir.rahdar.feature.resources.PagedListService;
-import io.github.sudoitir.rahdar.feature.resources.web.ResourceViews.AddressView;
+import io.github.sudoitir.rahdar.feature.resources.web.ResourceViews.ChannelView;
 import io.github.sudoitir.rahdar.feature.resources.web.ResourceViews.ConnectionView;
 import io.github.sudoitir.rahdar.feature.resources.web.ResourceViews.ConsumerView;
+import io.github.sudoitir.rahdar.feature.resources.web.ResourceViews.DestinationView;
 import io.github.sudoitir.rahdar.feature.resources.web.ResourceViews.ProducerView;
-import io.github.sudoitir.rahdar.feature.resources.web.ResourceViews.QueueView;
-import io.github.sudoitir.rahdar.feature.resources.web.ResourceViews.SessionView;
+import io.github.sudoitir.rahdar.feature.resources.web.ResourceViews.SubscriptionView;
 import io.github.sudoitir.rahdar.kernel.core.PagedView;
 import io.github.sudoitir.rahdar.kernel.core.ResourceQuery;
-import io.github.sudoitir.rahdar.kernel.core.web.ApiExceptionHandler;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -21,11 +20,11 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * The cross-node resource views (ADR-0017). {@code queues} is aggregated from the
+ * The cross-node resource views (ADR-0017), one list per role. {@code subscriptions} is aggregated from the
  * {@code subscription_snapshot} cache; the rest are live-through fan-outs. All share the
  * {@code ?q=&page=&size=&sort=} envelope. A cluster with no reachable management
  * endpoint surfaces the classified {@code BrokerConnectionException} through
- * {@link ApiExceptionHandler}.
+ * {@link io.github.sudoitir.rahdar.kernel.core.web.ApiExceptionHandler}.
  */
 @RestController
 @RequestMapping("/clusters/{clusterId}")
@@ -35,14 +34,14 @@ public class ClusterResourceController {
     private final CrossNodeAggregator aggregator;
     private final PagedListService pagedList;
 
-    @GetMapping("/queues")
-    public PagedView<QueueView> queues(@PathVariable UUID clusterId, ResourceQuery query) {
-        return aggregator.queues(clusterId, query);
+    @GetMapping("/subscriptions")
+    public PagedView<SubscriptionView> subscriptions(@PathVariable UUID clusterId, ResourceQuery query) {
+        return aggregator.subscriptions(clusterId, query);
     }
 
-    @GetMapping("/addresses")
-    public PagedView<AddressView> addresses(@PathVariable UUID clusterId, ResourceQuery query) {
-        return pagedList.addresses(clusterId, query);
+    @GetMapping("/destinations")
+    public PagedView<DestinationView> destinations(@PathVariable UUID clusterId, ResourceQuery query) {
+        return pagedList.destinations(clusterId, query);
     }
 
     @GetMapping("/consumers")
@@ -50,9 +49,9 @@ public class ClusterResourceController {
         return pagedList.consumers(clusterId, query);
     }
 
-    @GetMapping("/sessions")
-    public PagedView<SessionView> sessions(@PathVariable UUID clusterId, ResourceQuery query) {
-        return pagedList.sessions(clusterId, query);
+    @GetMapping("/channels")
+    public PagedView<ChannelView> channels(@PathVariable UUID clusterId, ResourceQuery query) {
+        return pagedList.channels(clusterId, query);
     }
 
     @GetMapping("/connections")

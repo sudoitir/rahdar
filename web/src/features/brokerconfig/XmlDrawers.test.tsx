@@ -14,7 +14,7 @@ const EMPTY = { version: 1, addresses: [], addressSettings: [], securitySettings
 
 function adoptReplies(onRead: () => void) {
   server.use(
-    http.post('*/api/v1/clusters/c1/config/adopt', () => {
+    http.post('*/api/v1/clusters/c1/artemis/config/adopt', () => {
       onRead();
       return HttpResponse.json({ document: EMPTY, notes: [], disagreements: [], closes: [] });
     }),
@@ -44,7 +44,7 @@ describe('AdoptDrawer', () => {
   it('states why the read failed and offers it again, and holds the save back until something was read', async () => {
     let attempts = 0;
     server.use(
-      http.post('*/api/v1/clusters/c1/config/adopt', () => {
+      http.post('*/api/v1/clusters/c1/artemis/config/adopt', () => {
         attempts += 1;
         return attempts === 1
           ? HttpResponse.json({ title: 'Down', detail: 'No live node answered.' }, { status: 503 })
@@ -67,7 +67,7 @@ describe('AdoptDrawer', () => {
 describe('ImportXmlDrawer', () => {
   it('lists the errors of a pasted document as fields and holds the save until they are fixed', async () => {
     server.use(
-      http.post('*/api/v1/clusters/c1/config/import-xml', () =>
+      http.post('*/api/v1/clusters/c1/artemis/config/import-xml', () =>
         HttpResponse.json({
           document: EMPTY,
           unsupported: [],
@@ -99,7 +99,7 @@ describe('ImportXmlDrawer', () => {
 describe('ExportXmlDrawer', () => {
   it('shows the fragment, and announces the copy', async () => {
     server.use(
-      http.get('*/api/v1/clusters/c1/config/export-xml', () => HttpResponse.text('<core><addresses/></core>')),
+      http.get('*/api/v1/clusters/c1/artemis/config/export-xml', () => HttpResponse.text('<core><addresses/></core>')),
     );
     const succeeded = vi.spyOn(notify, 'succeeded');
     const user = userEvent.setup();
@@ -116,7 +116,7 @@ describe('ExportXmlDrawer', () => {
 
   it('states a failed render with its cause and offers it again', async () => {
     server.use(
-      http.get('*/api/v1/clusters/c1/config/export-xml', () =>
+      http.get('*/api/v1/clusters/c1/artemis/config/export-xml', () =>
         HttpResponse.json({ title: 'Down', detail: 'The renderer is not answering.' }, { status: 503 }),
       ),
     );

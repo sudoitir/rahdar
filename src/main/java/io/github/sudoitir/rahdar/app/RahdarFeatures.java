@@ -24,8 +24,6 @@ import io.github.sudoitir.rahdar.feature.metrics.MetricsFeature;
 import io.github.sudoitir.rahdar.feature.metrics.MetricsModule;
 import io.github.sudoitir.rahdar.feature.plugins.PluginsFeature;
 import io.github.sudoitir.rahdar.feature.plugins.PluginsModule;
-import io.github.sudoitir.rahdar.feature.queues.QueuesFeature;
-import io.github.sudoitir.rahdar.feature.queues.QueuesModule;
 import io.github.sudoitir.rahdar.feature.resources.ResourcesFeature;
 import io.github.sudoitir.rahdar.feature.resources.ResourcesModule;
 import io.github.sudoitir.rahdar.feature.routing.RoutingFeature;
@@ -68,7 +66,6 @@ import org.springframework.context.annotation.Import;
  */
 @Configuration(proxyBeanMethods = false)
 @Import({
-    QueuesFeature.class,
     ResourcesFeature.class,
     MessagesFeature.class,
     RoutingFeature.class,
@@ -108,7 +105,6 @@ public class RahdarFeatures {
                 ScrapeModule.DESCRIPTOR,
                 ArtemisModule.DESCRIPTOR,
                 McpModule.DESCRIPTOR,
-                QueuesModule.DESCRIPTOR,
                 ResourcesModule.DESCRIPTOR,
                 MessagesModule.DESCRIPTOR,
                 RoutingModule.DESCRIPTOR,

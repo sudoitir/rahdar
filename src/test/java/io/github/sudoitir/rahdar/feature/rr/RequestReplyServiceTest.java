@@ -57,8 +57,8 @@ class RequestReplyServiceTest extends PostgresIntegrationTest {
                 clusterId, new CreateExpectationRequest("rr.request", List.of("rr.reply"), null, 30_000, 10, false));
 
         assertThat(created.enabled()).isTrue();
-        assertThat(created.requestAddress()).isEqualTo("rr.request");
-        assertThat(created.replyAddresses()).containsExactly("rr.reply");
+        assertThat(created.requestDestination()).isEqualTo("rr.request");
+        assertThat(created.replyDestinations()).containsExactly("rr.reply");
 
         List<AuditEventEntity> events = audits.findByClusterIdOrderByTsDesc(clusterId);
         assertThat(events).hasSize(1);
@@ -94,7 +94,7 @@ class RequestReplyServiceTest extends PostgresIntegrationTest {
                 clusterId,
                 created.id(),
                 new UpdateExpectationRequest(
-                        created.replyAddresses(),
+                        created.replyDestinations(),
                         created.correlationProperty(),
                         created.deadlineMs(),
                         created.samplePerMin(),
@@ -102,7 +102,7 @@ class RequestReplyServiceTest extends PostgresIntegrationTest {
                         false));
 
         assertThat(disabled.enabled()).isFalse();
-        assertThat(disabled.requestAddress()).isEqualTo("rr.request");
+        assertThat(disabled.requestDestination()).isEqualTo("rr.request");
         assertThat(disabled.samplePerMin()).isEqualTo(5);
         assertThat(disabled.capturePayload()).isTrue();
 
@@ -112,7 +112,7 @@ class RequestReplyServiceTest extends PostgresIntegrationTest {
     }
 
     @Test
-    void replyAddressesRoundTripWithBlanksAndDuplicatesRemoved() {
+    void replyDestinationsRoundTripWithBlanksAndDuplicatesRemoved() {
         cluster();
         ExpectationView created = service.create(
                 clusterId,
@@ -126,22 +126,22 @@ class RequestReplyServiceTest extends PostgresIntegrationTest {
                         10,
                         false));
 
-        assertThat(created.replyAddresses()).containsExactly("rr.reply.a", "rr.reply.*", "rr.reply.b");
+        assertThat(created.replyDestinations()).containsExactly("rr.reply.a", "rr.reply.*", "rr.reply.b");
 
         ExpectationView reread = service.list(clusterId).getFirst();
-        assertThat(reread.replyAddresses()).containsExactly("rr.reply.a", "rr.reply.*", "rr.reply.b");
+        assertThat(reread.replyDestinations()).containsExactly("rr.reply.a", "rr.reply.*", "rr.reply.b");
     }
 
     @Test
-    void anEmptyReplyAddressSetIsStoredRatherThanRejected() {
+    void anEmptyReplyDestinationSetIsStoredRatherThanRejected() {
         cluster();
         // An empty set is the temporary-reply-queue pattern (design.md D3), not an omission.
         ExpectationView created =
                 service.create(clusterId, new CreateExpectationRequest("rr.temp", List.of(), null, null, 10, false));
 
-        assertThat(created.replyAddresses()).isEmpty();
-        assertThat(created.resolvedReplyAddresses()).isEmpty();
-        assertThat(created.replyAddressesCapped()).isFalse();
+        assertThat(created.replyDestinations()).isEmpty();
+        assertThat(created.resolvedReplyDestinations()).isEmpty();
+        assertThat(created.replyDestinationsCapped()).isFalse();
     }
 
     @Test

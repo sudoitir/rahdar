@@ -12,7 +12,7 @@ export const VERBS: Record<MessageActionKind | 'send' | 'purge', ActionVerb> = {
   purge: { verb: 'Purge', past: 'Purged', progressive: 'Purging' },
 };
 
-/** Whether the operation destroys messages, which is confirmed by typing the queue's name. */
+/** Whether the operation destroys messages, which is confirmed by typing the subscription's name. */
 export const destroys = (action: MessageActionKind): boolean => action === 'delete' || action === 'expire';
 
 export const messageCount = (n: number): string => `${n.toLocaleString()} message${n === 1 ? '' : 's'}`;
@@ -24,7 +24,7 @@ export const messageCount = (n: number): string => `${n.toLocaleString()} messag
  */
 export function announceResult(
   kind: MessageActionKind | 'purge',
-  queueName: string,
+  subscriptionName: string,
   result: AffectedView | DryRunView | PartialView,
   requested: number,
 ): void {
@@ -33,12 +33,15 @@ export function announceResult(
     notify.partial({
       action: VERBS[kind],
       subject: `${result.affectedCount.toLocaleString()} of ${messageCount(requested)}`,
-      reached: `queue "${queueName}"`,
+      reached: `subscription "${subscriptionName}"`,
       next: `${result.error} Not ${VERBS[kind].past.toLowerCase()}: ${result.notDone.join(', ')}. Select them again to retry.`,
     });
     return;
   }
-  notify.succeeded({ action: VERBS[kind], subject: `${messageCount(result.affectedCount)} in queue "${queueName}"` });
+  notify.succeeded({
+    action: VERBS[kind],
+    subject: `${messageCount(result.affectedCount)} in subscription "${subscriptionName}"`,
+  });
 }
 
 /** Announces that an operation did not happen, with its cause and what to do next. */

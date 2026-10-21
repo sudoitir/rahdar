@@ -7,6 +7,7 @@ import { PluginUnavailable } from '../plugins/PluginUnavailable.tsx';
 import { ClusterLayout } from '../shell/ClusterLayout.tsx';
 import { FeatureGate } from '../shell/FeatureGate.tsx';
 import { HomeView } from '../shell/HomeView.tsx';
+import { validateResourceSearch, type ResourceSearch } from './search.ts';
 import { RootLayout } from '../shell/RootLayout.tsx';
 
 /** The root every page renders inside: the shell. A feature's `routes.root` are its children. */
@@ -19,7 +20,16 @@ export const clusterRoute = createRoute({
   component: ClusterLayout,
 });
 
-const indexRoute = createRoute({ getParentRoute: () => rootRoute, path: '/', component: HomeView });
+/** The estate's subscriptions filter on a name and a cluster, sort and page; the URL owns them. */
+const indexRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/',
+  component: HomeView,
+  validateSearch: (raw: Record<string, unknown>): ResourceSearch & { cluster?: string } => ({
+    ...validateResourceSearch(raw),
+    ...(typeof raw.cluster === 'string' && raw.cluster ? { cluster: raw.cluster } : {}),
+  }),
+});
 
 const loginRoute = createRoute({ getParentRoute: () => rootRoute, path: 'login', component: LoginView });
 

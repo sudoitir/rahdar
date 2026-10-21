@@ -2,6 +2,7 @@ import { UnstyledButton } from '@mantine/core';
 import { Link } from '@tanstack/react-router';
 
 import linkClasses from '../../ui/InlineLink.module.css';
+import { nameOf } from '../../kernel/api/resourceId.ts';
 import { absoluteLabel } from '../../kernel/time/time.ts';
 import { StatusBadge } from '../../ui/StatusBadge.tsx';
 import { MiddleTruncate } from '../../ui/table/MiddleTruncate.tsx';
@@ -23,21 +24,24 @@ export function RunOutcome({ run }: Readonly<{ run: BulkRunView }>) {
   return <StatusBadge tone={tone}>{text}</StatusBadge>;
 }
 
-/** A queue as a real button, so its node detail is reachable from the keyboard. */
-export function QueueButton({ item, onOpen }: Readonly<{ item: BulkItemView; onOpen: (queueName: string) => void }>) {
+/** A subscription as a real button, so its node detail is reachable from the keyboard. */
+export function SubscriptionButton({
+  item,
+  onOpen,
+}: Readonly<{ item: BulkItemView; onOpen: (subscription: string) => void }>) {
   return (
     <UnstyledButton
       className={linkClasses.link}
       maw="100%"
-      aria-label={`Show node detail for ${item.queueName}`}
-      onClick={() => onOpen(item.queueName)}
+      aria-label={`Show node detail for ${nameOf(item.subscription)}`}
+      onClick={() => onOpen(item.subscription)}
     >
-      <MiddleTruncate text={item.queueName} />
+      <MiddleTruncate text={nameOf(item.subscription)} />
     </UnstyledButton>
   );
 }
 
-/** The queue's outcome in words; colour only emphasises one that was refused, failed or is unknown. */
+/** The subscription's outcome in words; colour only emphasises one that was refused, failed or is unknown. */
 export function ItemOutcome({ item }: Readonly<{ item: BulkItemView }>) {
   const { text, tone } = itemStatus(item.status);
   return <StatusBadge tone={tone}>{text}</StatusBadge>;

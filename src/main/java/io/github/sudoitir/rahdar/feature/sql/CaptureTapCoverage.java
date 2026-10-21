@@ -1,6 +1,6 @@
 package io.github.sudoitir.rahdar.feature.sql;
 
-import io.github.sudoitir.rahdar.feature.queues.CaptureTaps;
+import io.github.sudoitir.rahdar.feature.resources.CaptureTaps;
 import io.github.sudoitir.rahdar.feature.sql.internal.persistence.MessageIndexSubscriptionRepository;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -25,7 +25,7 @@ class CaptureTapCoverage implements CaptureTaps {
                         .findById(id)
                         .map(s -> addresses.targets(clusterId, s).stream()
                                 .anyMatch(t -> address.equals(CaptureAddresses.addressOf(t))
-                                        && !queueName.equals(t.queueName())))
+                                        && !queueName.equals(t.subscription())))
                         .orElse(false);
     }
 }

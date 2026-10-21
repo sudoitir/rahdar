@@ -21,7 +21,7 @@ import io.github.sudoitir.rahdar.kernel.audit.AuditService;
 import io.github.sudoitir.rahdar.kernel.core.ConflictException;
 import io.github.sudoitir.rahdar.kernel.core.NotFoundException;
 import io.github.sudoitir.rahdar.kernel.core.PagedView;
-import io.github.sudoitir.rahdar.kernel.plugin.ResourceKind;
+import io.github.sudoitir.rahdar.kernel.plugin.ResourceType;
 import io.github.sudoitir.rahdar.kernel.security.ActorResolver;
 import io.github.sudoitir.rahdar.kernel.security.ClusterAccessGuard;
 import io.github.sudoitir.rahdar.kernel.security.ClusterAccessGuard.Requirement;
@@ -74,7 +74,7 @@ public class RequestReplyService {
     private final ActorResolver actorResolver;
     private final ObjectMapper mapper;
     private final ClusterAccessGuard clusterAccess;
-    private final ReplyAddressResolver replyAddresses;
+    private final ReplyDestinationResolver replyDestinations;
     private final ClusterDirectory nodes;
     private final RrSamplerHealth samplerHealth;
     private final BrokerNotifications subscriptions;
@@ -94,9 +94,9 @@ public class RequestReplyService {
 
     /** The cluster's expectations whose request and reply addresses the caller may all read. */
     private List<RrExpectationEntity> readableExpectations(UUID clusterId) {
-        ResourceFilter addresses = permissions.filter(clusterId, ResourceKind.ADDRESS);
-        return expectations.findByClusterIdOrderByRequestAddress(clusterId).stream()
-                .filter(e -> readable(addresses, e.getRequestAddress(), e.getReplyAddresses()))
+        ResourceFilter addresses = permissions.filter(clusterId, ResourceType.DESTINATION);
+        return expectations.findByClusterIdOrderByRequestDestination(clusterId).stream()
+                .filter(e -> readable(addresses, e.getRequestDestination(), e.getReplyDestinations()))
                 .toList();
     }
 
@@ -108,40 +108,41 @@ public class RequestReplyService {
      * Tracing an address needs {@code rr:write} on the cluster and read access to the request address and
      * every reply address it names: a trace reports what crosses them.
      */
-    private void requireMayTrace(UUID clusterId, String requestAddress, List<String> replyAddresses) {
+    private void requireMayTrace(UUID clusterId, String requestDestination, List<String> replyDestinations) {
         clusterAccess.requireCluster(clusterId, RrPermissions.RR_WRITE);
         clusterAccess.requireAll(
                 clusterId,
-                Stream.concat(Stream.of(requestAddress), replyAddresses.stream())
-                        .map(a -> new Requirement(ResourceRef.address(a), Permissions.ADDRESS_READ))
+                Stream.concat(Stream.of(requestDestination), replyDestinations.stream())
+                        .map(a -> new Requirement(ResourceRef.destination(a), Permissions.DESTINATION_READ))
                         .toList());
     }
 
     @Transactional
     public ExpectationView create(UUID clusterId, CreateExpectationRequest request) {
-        requireMayTrace(clusterId, request.requestAddress(), normaliseReplyAddresses(request.replyAddresses()));
+        requireMayTrace(
+                clusterId, request.requestDestination(), normaliseReplyDestinations(request.replyDestinations()));
         // Checked before the audit row is opened: letting the unique constraint fire
         // instead would mark the transaction rollback-only, discarding the audit row
         // with it, and surface as an unmapped 500 the operator cannot act on.
-        if (expectations.existsByClusterIdAndRequestAddress(clusterId, request.requestAddress())) {
+        if (expectations.existsByClusterIdAndRequestDestination(clusterId, request.requestDestination())) {
             throw new ConflictException(
                     "duplicate-rr-expectation",
-                    "'" + request.requestAddress()
+                    "'" + request.requestDestination()
                             + "' is already traced on this cluster. Edit the existing expectation instead.");
         }
         AuditEvent audited = audit.begin(
                 actorResolver.resolve(),
                 "CREATE_RR_EXPECTATION",
                 AUDIT_TARGET,
-                request.requestAddress(),
+                request.requestDestination(),
                 clusterId,
                 null,
-                Map.of("requestAddress", request.requestAddress()),
+                Map.of("requestDestination", request.requestDestination()),
                 false);
         RrExpectationEntity entity = expectations.save(new RrExpectationEntity(
                 clusterId,
-                request.requestAddress(),
-                normaliseReplyAddresses(request.replyAddresses()),
+                request.requestDestination(),
+                normaliseReplyDestinations(request.replyDestinations()),
                 blankToNull(request.correlationProperty()),
                 request.deadlineMs(),
                 request.samplePerMin() > 0 ? request.samplePerMin() : 10,
@@ -153,19 +154,20 @@ public class RequestReplyService {
     @Transactional
     public ExpectationView update(UUID clusterId, UUID expectationId, UpdateExpectationRequest request) {
         RrExpectationEntity entity = writable(clusterId, expectationId);
-        requireMayTrace(clusterId, entity.getRequestAddress(), normaliseReplyAddresses(request.replyAddresses()));
+        requireMayTrace(
+                clusterId, entity.getRequestDestination(), normaliseReplyDestinations(request.replyDestinations()));
 
         AuditEvent audited = audit.begin(
                 actorResolver.resolve(),
                 "UPDATE_RR_EXPECTATION",
                 AUDIT_TARGET,
-                entity.getRequestAddress(),
+                entity.getRequestDestination(),
                 clusterId,
                 null,
                 Map.of("enabled", request.enabled()),
                 false);
 
-        entity.setReplyAddresses(normaliseReplyAddresses(request.replyAddresses()));
+        entity.setReplyDestinations(normaliseReplyDestinations(request.replyDestinations()));
         entity.setCorrelationProperty(blankToNull(request.correlationProperty()));
         entity.setDeadlineMs(request.deadlineMs());
         entity.setSamplePerMin(request.samplePerMin() > 0 ? request.samplePerMin() : entity.getSamplePerMin());
@@ -179,13 +181,13 @@ public class RequestReplyService {
     @Transactional
     public void delete(UUID clusterId, UUID expectationId) {
         RrExpectationEntity entity = writable(clusterId, expectationId);
-        requireMayTrace(clusterId, entity.getRequestAddress(), entity.getReplyAddresses());
+        requireMayTrace(clusterId, entity.getRequestDestination(), entity.getReplyDestinations());
 
         AuditEvent audited = audit.begin(
                 actorResolver.resolve(),
                 "DELETE_RR_EXPECTATION",
                 AUDIT_TARGET,
-                entity.getRequestAddress(),
+                entity.getRequestDestination(),
                 clusterId,
                 null,
                 Map.of(),
@@ -197,11 +199,11 @@ public class RequestReplyService {
     /** The expectation, when the caller may read the addresses it traces: otherwise it is not there for them. */
     private RrExpectationEntity writable(UUID clusterId, UUID expectationId) {
         clusterAccess.requireCluster(clusterId, RrPermissions.RR_WRITE);
-        ResourceFilter addresses = permissions.filter(clusterId, ResourceKind.ADDRESS);
+        ResourceFilter addresses = permissions.filter(clusterId, ResourceType.DESTINATION);
         return expectations
                 .findById(expectationId)
                 .filter(e -> e.getClusterId().equals(clusterId))
-                .filter(e -> readable(addresses, e.getRequestAddress(), e.getReplyAddresses()))
+                .filter(e -> readable(addresses, e.getRequestDestination(), e.getReplyDestinations()))
                 .orElseThrow(() -> new NotFoundException("Request-reply expectation", expectationId));
     }
 
@@ -211,7 +213,7 @@ public class RequestReplyService {
      * pattern, and keeping two spellings of one state would force every reader to
      * handle both (design.md, D3).
      */
-    static List<String> normaliseReplyAddresses(List<String> declared) {
+    static List<String> normaliseReplyDestinations(List<String> declared) {
         if (declared == null) {
             return List.of();
         }
@@ -224,11 +226,11 @@ public class RequestReplyService {
     }
 
     private ExpectationView toView(RrExpectationEntity e) {
-        ReplyAddressResolver.Resolution resolved = replyAddresses.resolve(e.getClusterId(), e);
+        ReplyDestinationResolver.Resolution resolved = replyDestinations.resolve(e.getClusterId(), e);
         return new ExpectationView(
                 e.getId(),
-                e.getRequestAddress(),
-                e.getReplyAddresses(),
+                e.getRequestDestination(),
+                e.getReplyDestinations(),
                 resolved.addresses(),
                 resolved.capped(),
                 e.getCorrelationProperty(),
@@ -243,11 +245,11 @@ public class RequestReplyService {
     @Transactional(readOnly = true)
     public PagedView<FlowView> flowPage(UUID clusterId, FlowQuery query) {
         clusterAccess.requireVisible(clusterId);
-        ResourceFilter addresses = permissions.filter(clusterId, ResourceKind.ADDRESS);
+        ResourceFilter addresses = permissions.filter(clusterId, ResourceType.DESTINATION);
         // Filtered in the query, before paging, so a total never counts a flow on an address the caller cannot read.
         List<String> readable = addresses.everything()
                 ? List.of("")
-                : flows.findDistinctRequestAddressByClusterId(clusterId).stream()
+                : flows.findDistinctRequestDestinationByClusterId(clusterId).stream()
                         .filter(addresses::readable)
                         .toList();
         if (readable.isEmpty()) {
@@ -260,7 +262,7 @@ public class RequestReplyService {
                 addresses.everything(),
                 readable,
                 blankToNull(query.state()),
-                blankToNull(query.address()),
+                blankToNull(query.destination()),
                 blankToNull(query.correlationId()),
                 query.from() != null ? query.from() : Instant.EPOCH,
                 query.to() != null ? query.to() : Instant.parse("9999-12-31T23:59:59Z"),
@@ -271,10 +273,10 @@ public class RequestReplyService {
     @Transactional(readOnly = true)
     public FlowView flow(UUID clusterId, UUID flowId) {
         clusterAccess.requireVisible(clusterId);
-        ResourceFilter addresses = permissions.filter(clusterId, ResourceKind.ADDRESS);
+        ResourceFilter addresses = permissions.filter(clusterId, ResourceType.DESTINATION);
         RrFlowEntity entity = flows.findById(flowId)
                 .filter(f -> f.getClusterId().equals(clusterId))
-                .filter(f -> addresses.readable(f.getRequestAddress()))
+                .filter(f -> addresses.readable(f.getRequestDestination()))
                 .orElseThrow(() -> new NotFoundException("Request-reply flow", flowId));
         return toFlowView(entity, true);
     }
@@ -321,7 +323,7 @@ public class RequestReplyService {
         boolean rateExceedsInterval = 60_000L / Math.max(1, e.getSamplePerMin()) < sampleIntervalMs;
         return new ExpectationDiagnosticsView(
                 e.getId(),
-                e.getRequestAddress(),
+                e.getRequestDestination(),
                 e.isEnabled(),
                 health == null ? null : health.lastAttemptAt(),
                 health == null ? null : health.lastSuccessAt(),
@@ -377,13 +379,13 @@ public class RequestReplyService {
         if (declared.isEmpty()) {
             out.add(new TracingReasonView(
                     "NOTHING_DECLARED",
-                    "No request address is declared, so nothing on this cluster is being traced.",
-                    "Add the request address on the Requests tab."));
+                    "No request destination is declared, so nothing on this cluster is being traced.",
+                    "Add a request destination on the Expectations tab."));
             return out;
         }
         if (declared.stream().noneMatch(RrExpectationEntity::isEnabled)) {
             out.add(new TracingReasonView(
-                    "ALL_DISABLED", "Every declared address is disabled.", "Enable one on the Requests tab."));
+                    "ALL_DISABLED", "Every declared destination is disabled.", "Enable one on the Expectations tab."));
             return out;
         }
         if (nodesWithCore == 0) {
@@ -397,10 +399,10 @@ public class RequestReplyService {
                 .findFirst()
                 .ifPresent(h -> out.add(new TracingReasonView(
                         "NODES_SKIPPED",
-                        "Some nodes were not sampled for '" + h.requestAddress() + "': "
+                        "Some nodes were not sampled for '" + h.requestDestination() + "': "
                                 + String.join("; ", h.skipped()),
-                        "An address with no queue in the last scrape is not browsable yet; "
-                                + "check the address name and the routing type.")));
+                        "A destination with no subscription in the last scrape is not browsable yet; "
+                                + "check the destination name and how it delivers.")));
         if (health.stream().anyMatch(ExpectationDiagnosticsView::rateExceedsInterval)) {
             out.add(new TracingReasonView(
                     "RATE_ABOVE_FLOOR",
@@ -422,7 +424,7 @@ public class RequestReplyService {
                 "CONSUMED_FASTER_THAN_SAMPLED",
                 "Tracing browses every " + sampleIntervalMs
                         + "ms, so a request consumed faster than that is never seen. On a healthy "
-                        + "request-reply address that is most of the traffic.",
+                        + "request-reply destination that is most of the traffic.",
                 "Raise samples per minute and lower rr.sample-interval, or read the numbers as a "
                         + "sample rather than a census — the Latency tab states the coverage."));
         return List.copyOf(out);
@@ -433,7 +435,7 @@ public class RequestReplyService {
                 f.getId(),
                 f.getClusterId(),
                 f.getNodeId(),
-                f.getRequestAddress(),
+                f.getRequestDestination(),
                 f.getReplyDestination(),
                 f.getReplyKind(),
                 f.getState(),
@@ -464,7 +466,7 @@ public class RequestReplyService {
                 .map(e -> toEventView(flow, e, payloadsReadable, clearAccess, served))
                 .toList();
         clearViews.recordClear(
-                new GovernContext(clusterId, flow.getRequestAddress(), clearAccess),
+                new GovernContext(clusterId, flow.getRequestDestination(), clearAccess),
                 "RR_FLOW",
                 flow.getId().toString(),
                 served);
@@ -486,7 +488,7 @@ public class RequestReplyService {
                                 + " cluster.");
             } else {
                 String address =
-                        "REQUEST_SEEN".equals(e.getKind()) ? flow.getRequestAddress() : flow.getReplyDestination();
+                        "REQUEST_SEEN".equals(e.getKind()) ? flow.getRequestDestination() : flow.getReplyDestination();
                 RrPayloads.Viewed viewed = payloads.view(
                         flow.getClusterId(), address, flow.getId(), e.getKind(), e.getTs(), detail, clearAccess);
                 served.add(viewed.governed());

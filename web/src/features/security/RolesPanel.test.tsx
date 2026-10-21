@@ -13,21 +13,21 @@ import { holdButton } from '../../test/hold.ts';
 
 const CATALOGUE: PermissionView[] = [
   {
-    action: 'queue:create',
-    label: 'Create queues',
-    featureId: 'queues',
-    featureTitle: 'Queues',
+    action: 'subscription:create',
+    label: 'Create subscriptions',
+    featureId: 'subscriptions',
+    featureTitle: 'Subscriptions',
     scope: 'CLUSTER',
-    resourceKinds: [],
+    resourceTypes: [],
     requires: [],
   },
   {
-    action: 'queue:delete',
-    label: 'Destroy queues',
-    featureId: 'queues',
-    featureTitle: 'Queues',
+    action: 'subscription:delete',
+    label: 'Destroy subscriptions',
+    featureId: 'subscriptions',
+    featureTitle: 'Subscriptions',
     scope: 'CLUSTER',
-    resourceKinds: [],
+    resourceTypes: [],
     requires: [],
   },
 ];
@@ -36,25 +36,25 @@ const ROLES: RoleView[] = [
   { id: 'r-admin', name: 'ADMIN', builtin: true, permissions: ['*'], requiresMfa: true, teamAssignable: false },
   {
     id: 'r-1',
-    name: 'queue-operator',
+    name: 'subscription-operator',
     builtin: false,
-    permissions: ['queue:create', 'queue:delete'],
+    permissions: ['subscription:create', 'subscription:delete'],
     requiresMfa: false,
     teamAssignable: false,
   },
   {
     id: 'r-2',
-    name: 'queue-creator',
+    name: 'subscription-creator',
     builtin: false,
-    permissions: ['queue:create'],
+    permissions: ['subscription:create'],
     requiresMfa: false,
     teamAssignable: false,
   },
   {
     id: 'r-3',
-    name: 'queue-clone',
+    name: 'subscription-clone',
     builtin: false,
-    permissions: ['queue:create', 'queue:delete'],
+    permissions: ['subscription:create', 'subscription:delete'],
     requiresMfa: false,
     teamAssignable: false,
   },
@@ -91,10 +91,10 @@ describe('RolesPanel list', () => {
     // A built-in role can still change whether it requires two-step verification, but is never deleted.
     expect(within(builtin).getByRole('button', { name: 'Edit ADMIN' })).toBeInTheDocument();
     expect(within(builtin).queryByRole('button', { name: 'Delete ADMIN' })).toBeNull();
-    const custom = screen.getByRole('row', { name: /queue-operator/ });
-    expect(custom).toHaveTextContent('queue:create, queue:delete');
-    expect(within(custom).getByRole('button', { name: 'Edit queue-operator' })).toBeInTheDocument();
-    expect(within(custom).getByRole('button', { name: 'Delete queue-operator' })).toBeInTheDocument();
+    const custom = screen.getByRole('row', { name: /subscription-operator/ });
+    expect(custom).toHaveTextContent('subscription:create, subscription:delete');
+    expect(within(custom).getByRole('button', { name: 'Edit subscription-operator' })).toBeInTheDocument();
+    expect(within(custom).getByRole('button', { name: 'Delete subscription-operator' })).toBeInTheDocument();
   });
 
   it('counts a single role in the singular', async () => {
@@ -115,14 +115,14 @@ describe('RolesPanel list', () => {
     const user = userEvent.setup();
     renderRoles();
 
-    await user.click(await screen.findByRole('button', { name: 'Delete queue-creator' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Delete "queue-creator"' });
+    await user.click(await screen.findByRole('button', { name: 'Delete subscription-creator' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Delete "subscription-creator"' });
     expect(dialog).toHaveTextContent('1 permission');
     const confirm = within(dialog).getByRole('button', { name: 'Delete role' });
     await holdButton(confirm);
 
     await waitFor(() => expect(deleted).toBe('r-2'));
-    expect(await screen.findByRole('status')).toHaveTextContent('Deleted role "queue-creator"');
+    expect(await screen.findByRole('status')).toHaveTextContent('Deleted role "subscription-creator"');
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
   });
 
@@ -136,12 +136,12 @@ describe('RolesPanel list', () => {
     const user = userEvent.setup();
     renderRoles();
 
-    await user.click(await screen.findByRole('button', { name: 'Delete queue-creator' }));
+    await user.click(await screen.findByRole('button', { name: 'Delete subscription-creator' }));
     const dialog = await screen.findByRole('dialog');
     await holdButton(within(dialog).getByRole('button', { name: 'Delete role' }));
 
     const alert = await screen.findByRole('alert');
-    expect(alert).toHaveTextContent('Could not delete role "queue-creator"');
+    expect(alert).toHaveTextContent('Could not delete role "subscription-creator"');
     expect(alert).toHaveTextContent(
       'The role is still granted to 2 users. Remove it from the users who hold it, then delete it.',
     );
@@ -160,7 +160,7 @@ describe('RolesPanel editor', () => {
           id: 'r-9',
           name: 'new-role',
           builtin: false,
-          permissions: ['queue:create', 'queue:delete'],
+          permissions: ['subscription:create', 'subscription:delete'],
         });
       }),
     );
@@ -170,13 +170,13 @@ describe('RolesPanel editor', () => {
     await user.click(await screen.findByRole('button', { name: 'New role' }));
     const dialog = await screen.findByRole('dialog', { name: 'New role' });
     await user.type(within(dialog).getByRole('textbox', { name: /Name/ }), 'new-role');
-    await user.click(await within(dialog).findByRole('checkbox', { name: 'Select all in Queues' }));
+    await user.click(await within(dialog).findByRole('checkbox', { name: 'Select all in Subscriptions' }));
     await user.click(within(dialog).getByRole('button', { name: 'Create role' }));
 
     await waitFor(() =>
       expect(body).toEqual({
         name: 'new-role',
-        permissions: ['queue:create', 'queue:delete'],
+        permissions: ['subscription:create', 'subscription:delete'],
         requiresMfa: false,
         teamAssignable: false,
       }),
@@ -188,12 +188,12 @@ describe('RolesPanel editor', () => {
     const mixed: PermissionView[] = [
       ...CATALOGUE,
       {
-        action: 'queue:read',
-        label: 'Read queues',
-        featureId: 'queues',
-        featureTitle: 'Queues',
+        action: 'subscription:read',
+        label: 'Read subscriptions',
+        featureId: 'subscriptions',
+        featureTitle: 'Subscriptions',
         scope: 'RESOURCE',
-        resourceKinds: ['QUEUE'],
+        resourceTypes: ['SUBSCRIPTION'],
         requires: [],
       },
     ];
@@ -210,18 +210,18 @@ describe('RolesPanel editor', () => {
 
     await user.click(await screen.findByRole('button', { name: 'New role' }));
     const dialog = await screen.findByRole('dialog', { name: 'New role' });
-    expect(await within(dialog).findByRole('button', { name: /Queues, 0 of 3 selected/ })).toBeInTheDocument();
+    expect(await within(dialog).findByRole('button', { name: /Subscriptions, 0 of 3 selected/ })).toBeInTheDocument();
     await user.type(within(dialog).getByRole('textbox', { name: /Name/ }), 'orders-reader');
     await user.click(within(dialog).getByRole('switch', { name: /Team role/ }));
 
-    expect(await within(dialog).findByRole('button', { name: /Queues, 0 of 1 selected/ })).toBeInTheDocument();
-    await user.click(within(dialog).getByRole('checkbox', { name: 'Select all in Queues' }));
+    expect(await within(dialog).findByRole('button', { name: /Subscriptions, 0 of 1 selected/ })).toBeInTheDocument();
+    await user.click(within(dialog).getByRole('checkbox', { name: 'Select all in Subscriptions' }));
     await user.click(within(dialog).getByRole('button', { name: 'Create role' }));
 
     await waitFor(() =>
       expect(body).toEqual({
         name: 'orders-reader',
-        permissions: ['queue:read'],
+        permissions: ['subscription:read'],
         requiresMfa: false,
         teamAssignable: true,
       }),
@@ -252,19 +252,24 @@ describe('RolesPanel editor', () => {
     const user = userEvent.setup();
     renderRoles();
 
-    await user.click(await screen.findByRole('button', { name: 'Edit queue-creator' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Edit "queue-creator"' });
+    await user.click(await screen.findByRole('button', { name: 'Edit subscription-creator' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Edit "subscription-creator"' });
     const name = within(dialog).getByRole('textbox', { name: /Name/ });
-    expect(name).toHaveValue('queue-creator');
-    expect(await within(dialog).findByRole('button', { name: /Queues, 1 of 2 selected/ })).toBeInTheDocument();
+    expect(name).toHaveValue('subscription-creator');
+    expect(await within(dialog).findByRole('button', { name: /Subscriptions, 1 of 2 selected/ })).toBeInTheDocument();
     await user.clear(name);
-    await user.type(name, 'queue-maker');
+    await user.type(name, 'subscription-maker');
     await user.click(within(dialog).getByRole('button', { name: 'Save role' }));
 
     await waitFor(() =>
       expect(put).toEqual({
         url: '/api/v1/roles/r-2',
-        body: { name: 'queue-maker', permissions: ['queue:create'], requiresMfa: false, teamAssignable: false },
+        body: {
+          name: 'subscription-maker',
+          permissions: ['subscription:create'],
+          requiresMfa: false,
+          teamAssignable: false,
+        },
       }),
     );
   });
@@ -274,13 +279,13 @@ describe('RolesPanel editor', () => {
     const user = userEvent.setup();
     renderRoles();
 
-    await user.click(await screen.findByRole('button', { name: 'Edit queue-operator' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Edit "queue-operator"' });
+    await user.click(await screen.findByRole('button', { name: 'Edit subscription-operator' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Edit "subscription-operator"' });
     expect(within(dialog).queryByRole('status', { name: 'Permission changes' })).not.toBeInTheDocument();
-    await user.click(await within(dialog).findByRole('checkbox', { name: /queue:delete/ }));
+    await user.click(await within(dialog).findByRole('checkbox', { name: /subscription:delete/ }));
 
     const diff = within(dialog).getByRole('status', { name: 'Permission changes' });
-    expect(diff).toHaveTextContent('−1 removed: queue:delete');
+    expect(diff).toHaveTextContent('−1 removed: subscription:delete');
     expect(diff).not.toHaveTextContent('added');
   });
 
@@ -310,8 +315,8 @@ describe('RolesPanel editor', () => {
     await user.keyboard('{Escape}');
     await user.click(within(dialog).getByRole('button', { name: 'Discard changes' }));
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'New role' })).toBeNull());
-    await user.click(screen.getByRole('button', { name: 'Edit queue-creator' }));
-    dialog = await screen.findByRole('dialog', { name: 'Edit "queue-creator"' });
+    await user.click(screen.getByRole('button', { name: 'Edit subscription-creator' }));
+    dialog = await screen.findByRole('dialog', { name: 'Edit "subscription-creator"' });
     await user.click(within(dialog).getByRole('button', { name: 'Save role' }));
     await waitFor(() =>
       expect(screen.getAllByRole('alert').map((a) => a.textContent)).toContainEqual(
@@ -345,7 +350,7 @@ describe('RolesPanel editor', () => {
 
     serve(ROLES, CATALOGUE);
     await user.click(within(alert).getByRole('button', { name: 'Retry' }));
-    expect(await screen.findByRole('checkbox', { name: 'Select all in Queues' })).toBeInTheDocument();
+    expect(await screen.findByRole('checkbox', { name: 'Select all in Subscriptions' })).toBeInTheDocument();
   });
 
   it('says the permissions are loading while the catalogue has not arrived', async () => {
@@ -382,7 +387,7 @@ describe('RolesPanel compare', () => {
     expect(
       within(dialog).getByText('Pick two roles to see the permissions only one of them holds.'),
     ).toBeInTheDocument();
-    await pick('First role', 'queue-operator');
+    await pick('First role', 'subscription-operator');
     expect(
       within(dialog).getByText('Pick two roles to see the permissions only one of them holds.'),
     ).toBeInTheDocument();
@@ -392,12 +397,14 @@ describe('RolesPanel compare', () => {
     serve();
     const { dialog, pick } = await openCompare();
 
-    await pick('First role', 'queue-operator');
-    await pick('Second role', 'queue-creator');
+    await pick('First role', 'subscription-operator');
+    await pick('Second role', 'subscription-creator');
 
-    expect(within(dialog).getByText('Only in queue-operator (1)')).toBeInTheDocument();
-    expect(within(dialog).getByRole('list', { name: 'Only in queue-operator' })).toHaveTextContent('queue:delete');
-    expect(within(dialog).getByText('Only in queue-creator (0)')).toBeInTheDocument();
+    expect(within(dialog).getByText('Only in subscription-operator (1)')).toBeInTheDocument();
+    expect(within(dialog).getByRole('list', { name: 'Only in subscription-operator' })).toHaveTextContent(
+      'subscription:delete',
+    );
+    expect(within(dialog).getByText('Only in subscription-creator (0)')).toBeInTheDocument();
     expect(within(dialog).getByText('Nothing')).toBeInTheDocument();
   });
 
@@ -405,11 +412,11 @@ describe('RolesPanel compare', () => {
     serve();
     const { dialog, pick } = await openCompare();
 
-    await pick('First role', 'queue-operator');
-    await pick('Second role', 'queue-clone');
+    await pick('First role', 'subscription-operator');
+    await pick('Second role', 'subscription-clone');
 
     expect(within(dialog).getByRole('status')).toHaveTextContent(
-      'queue-operator and queue-clone hold the same permissions.',
+      'subscription-operator and subscription-clone hold the same permissions.',
     );
   });
 });

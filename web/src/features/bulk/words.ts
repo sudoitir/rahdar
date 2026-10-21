@@ -2,7 +2,7 @@ import type { BulkItemView, BulkOperation, BulkRunView } from './api.ts';
 
 type Tone = 'warning' | 'danger' | undefined;
 
-/** Each operation's names, and the single-queue permission it is gated on (ADR-0093 D8). */
+/** Each operation's names, and the single-subscription permission it is gated on (ADR-0093 D8). */
 export const OPERATIONS: Record<
   BulkOperation,
   { verb: string; gerund: string; permission: string; permissionLabel: string; destructive: boolean }
@@ -10,29 +10,29 @@ export const OPERATIONS: Record<
   PAUSE: {
     verb: 'Pause',
     gerund: 'pausing',
-    permission: 'queue:pause',
-    permissionLabel: 'Pause and resume queues',
+    permission: 'subscription:pause',
+    permissionLabel: 'Pause and resume subscriptions',
     destructive: false,
   },
   RESUME: {
     verb: 'Resume',
     gerund: 'resuming',
-    permission: 'queue:pause',
-    permissionLabel: 'Pause and resume queues',
+    permission: 'subscription:pause',
+    permissionLabel: 'Pause and resume subscriptions',
     destructive: false,
   },
   PURGE: {
     verb: 'Purge',
     gerund: 'purging',
-    permission: 'queue:purge',
-    permissionLabel: 'Purge queues',
+    permission: 'subscription:purge',
+    permissionLabel: 'Purge subscriptions',
     destructive: true,
   },
   DELETE: {
     verb: 'Delete',
     gerund: 'deleting',
-    permission: 'queue:delete',
-    permissionLabel: 'Destroy queues and addresses',
+    permission: 'subscription:delete',
+    permissionLabel: 'Destroy subscriptions and destinations',
     destructive: true,
   },
 };
@@ -49,9 +49,9 @@ export function runStatus(status: BulkRunView['status']): { text: string; tone: 
     case 'SUCCEEDED':
       return { text: 'Succeeded', tone: undefined };
     case 'PARTIAL':
-      return { text: 'Partial: some queues succeeded and some did not', tone: 'warning' };
+      return { text: 'Partial: some subscriptions succeeded and some did not', tone: 'warning' };
     case 'FAILED':
-      return { text: 'Failed: no queue succeeded', tone: 'danger' };
+      return { text: 'Failed: no subscription succeeded', tone: 'danger' };
     case 'STOPPED':
       return { text: 'Stopped by an operator', tone: 'warning' };
     case 'INTERRUPTED':

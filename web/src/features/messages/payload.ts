@@ -92,7 +92,7 @@ const CONTENT_TYPE_KEYS = ['_AMQ_CONTENT_TYPE', 'contentType', 'content_type'];
 /**
  * Magic bytes for the container kinds a broker operator actually meets. A general
  * file-type library covers neither Java serialization nor Avro, which are the two
- * that matter most on a queue.
+ * that matter most on a subscription.
  */
 const MAGIC: ReadonlyArray<{ bytes: number[]; format: PayloadFormat; label: string }> = [
   { bytes: [0x1f, 0x8b], format: 'gzip', label: 'binary · gzip' },

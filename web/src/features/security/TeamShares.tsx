@@ -142,7 +142,7 @@ function AddShare({ team }: Readonly<{ team: TeamView }>) {
     pattern: string;
     roleId: string | null;
   }>({
-    initialValues: { targetTeamId: null, clusterId: null, kind: 'QUEUE', pattern: '', roleId: null },
+    initialValues: { targetTeamId: null, clusterId: null, kind: 'SUBSCRIPTION', pattern: '', roleId: null },
     validateInputOnBlur: true,
     validate: {
       targetTeamId: (v) => (v ? null : 'Choose the team to share with.'),

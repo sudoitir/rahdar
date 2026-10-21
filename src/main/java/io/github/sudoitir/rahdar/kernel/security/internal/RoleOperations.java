@@ -64,7 +64,7 @@ class RoleOperations {
 
             @Override
             public Effect estimate(CreateRole p) {
-                return new Effect(1, "role", stateKey(p.name()), null);
+                return new Effect(1, "role", etag(p.name()), null);
             }
 
             @Override
@@ -110,7 +110,7 @@ class RoleOperations {
                 return new Effect(
                         1,
                         "role",
-                        stateKey(
+                        etag(
                                 p.roleId(),
                                 now.getName(),
                                 permissionsOf(p.roleId()),
@@ -149,7 +149,7 @@ class RoleOperations {
 
             @Override
             public Effect estimate(DeleteRole p) {
-                return new Effect(1, "role", stateKey(p.roleId(), permissionsOf(p.roleId())), null);
+                return new Effect(1, "role", etag(p.roleId(), permissionsOf(p.roleId())), null);
             }
 
             @Override

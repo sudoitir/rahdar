@@ -1,6 +1,7 @@
 package io.github.sudoitir.rahdar.system.artemis;
 
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
+import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
 import io.github.sudoitir.rahdar.platform.broker.DeadLetterDestinations;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -14,6 +15,11 @@ import tools.jackson.databind.JsonNode;
 @Component
 @RequiredArgsConstructor
 class ArtemisDeadLetterDestinations implements DeadLetterDestinations {
+
+    @Override
+    public String system() {
+        return BrokerGateway.SYSTEM;
+    }
 
     private final ArtemisNodes nodes;
 

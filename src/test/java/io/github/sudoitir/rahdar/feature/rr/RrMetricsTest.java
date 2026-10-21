@@ -2,7 +2,7 @@ package io.github.sudoitir.rahdar.feature.rr;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import io.github.sudoitir.rahdar.feature.rr.web.RrViews.AddressStatsView;
+import io.github.sudoitir.rahdar.feature.rr.web.RrViews.DestinationStatsView;
 import io.github.sudoitir.rahdar.feature.rr.web.RrViews.StatsResponse;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterEntity;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterRepository;
@@ -55,8 +55,8 @@ class RrMetricsTest extends PostgresIntegrationTest {
                 new Observation.ReplySeen(clusterId, null, t0.plusSeconds(1), null, "m2", "corr-1", null, Map.of()));
 
         StatsResponse stats = metrics.stats(clusterId, Duration.ofMinutes(15));
-        AddressStatsView address = stats.addresses().stream()
-                .filter(a -> a.address().equals("rr.request"))
+        DestinationStatsView address = stats.destinations().stream()
+                .filter(a -> a.destination().equals("rr.request"))
                 .findFirst()
                 .orElseThrow();
 
@@ -74,8 +74,8 @@ class RrMetricsTest extends PostgresIntegrationTest {
                 clusterId, null, t0, "rr.pending", "m1", "corr-1", null, 0L, null, Map.of()));
 
         StatsResponse stats = metrics.stats(clusterId, Duration.ofMinutes(15));
-        AddressStatsView address = stats.addresses().stream()
-                .filter(a -> a.address().equals("rr.pending"))
+        DestinationStatsView address = stats.destinations().stream()
+                .filter(a -> a.destination().equals("rr.pending"))
                 .findFirst()
                 .orElseThrow();
 

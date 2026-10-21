@@ -8,13 +8,13 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
-import io.github.sudoitir.rahdar.feature.resources.web.ResourceViews.AddressView;
+import io.github.sudoitir.rahdar.feature.resources.web.ResourceViews.ChannelView;
 import io.github.sudoitir.rahdar.feature.resources.web.ResourceViews.ConnectionView;
 import io.github.sudoitir.rahdar.feature.resources.web.ResourceViews.ConsumerView;
-import io.github.sudoitir.rahdar.feature.resources.web.ResourceViews.SessionView;
+import io.github.sudoitir.rahdar.feature.resources.web.ResourceViews.DestinationView;
 import io.github.sudoitir.rahdar.kernel.core.PagedView;
 import io.github.sudoitir.rahdar.kernel.core.ResourceQuery;
-import io.github.sudoitir.rahdar.kernel.plugin.ResourceKind;
+import io.github.sudoitir.rahdar.kernel.plugin.ResourceType;
 import io.github.sudoitir.rahdar.kernel.security.ClusterAccessGuard;
 import io.github.sudoitir.rahdar.kernel.security.PermissionResolver;
 import io.github.sudoitir.rahdar.kernel.security.ResourceFilter;
@@ -23,6 +23,7 @@ import io.github.sudoitir.rahdar.kernel.security.TeamIndex;
 import io.github.sudoitir.rahdar.kernel.security.TeamRef;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
 import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
+import io.github.sudoitir.rahdar.platform.broker.ResourceIds;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNodeEntity;
 import io.github.sudoitir.rahdar.support.FixtureJolokia;
@@ -140,13 +141,14 @@ class PagedListServiceTest {
     void anAddressRowNamesTheTeamThatOwnsIt() {
         UUID clusterId = oneNodeServing("search-broker.json", "list-addresses.json");
         TeamRef orders = new TeamRef(UUID.randomUUID(), "Orders");
-        when(teams.ownerTeamOf(clusterId, ResourceRef.address("orders.in"))).thenReturn(Optional.of(orders));
-        when(teams.ownerTeamOf(clusterId, ResourceRef.address("billing.in"))).thenReturn(Optional.empty());
+        when(teams.ownerTeamOf(clusterId, ResourceRef.destination("orders.in"))).thenReturn(Optional.of(orders));
+        when(teams.ownerTeamOf(clusterId, ResourceRef.destination("billing.in")))
+                .thenReturn(Optional.empty());
 
-        PagedView<AddressView> page = service.addresses(clusterId, ResourceQuery.of(null, 1, 50, null));
+        PagedView<DestinationView> page = service.destinations(clusterId, ResourceQuery.of(null, 1, 50, null));
 
         assertThat(page.data())
-                .extracting(AddressView::name, AddressView::ownerTeam)
+                .extracting(DestinationView::name, DestinationView::ownerTeam)
                 .containsExactlyInAnyOrder(Tuple.tuple("orders.in", orders), Tuple.tuple("billing.in", null));
     }
 
@@ -164,7 +166,7 @@ class PagedListServiceTest {
 
         assertThat(page.data()).hasSize(1);
         assertThat(page.data().get(0).nodeName()).isEqualTo("node-b");
-        assertThat(page.data().get(0).queueName()).isEqualTo("SPIKE.A.q000");
+        assertThat(page.data().get(0).subscriptionName()).isEqualTo("SPIKE.A.q000");
     }
 
     @Test
@@ -181,7 +183,7 @@ class PagedListServiceTest {
         PagedView<ConsumerView> byQueue = service.consumers(clusterId, ResourceQuery.of("spike.a.q000", 1, 50, null));
         PagedView<ConsumerView> neither = service.consumers(clusterId, ResourceQuery.of("no-such-thing", 1, 50, null));
 
-        assertThat(bySession.data()).extracting(ConsumerView::queueName).containsExactly("SPIKE.A.q000");
+        assertThat(bySession.data()).extracting(ConsumerView::subscriptionName).containsExactly("SPIKE.A.q000");
         assertThat(byQueue.data()).hasSize(1);
         assertThat(neither.data()).isEmpty();
     }
@@ -258,8 +260,8 @@ class PagedListServiceTest {
     private void readable(UUID clusterId, String[] queues, String[] addresses) {
         ResourceFilter readableQueues = reading(queues);
         ResourceFilter readableAddresses = reading(addresses);
-        when(permissions.filter(clusterId, ResourceKind.QUEUE)).thenReturn(readableQueues);
-        when(permissions.filter(clusterId, ResourceKind.ADDRESS)).thenReturn(readableAddresses);
+        when(permissions.filter(clusterId, ResourceType.SUBSCRIPTION)).thenReturn(readableQueues);
+        when(permissions.filter(clusterId, ResourceType.DESTINATION)).thenReturn(readableAddresses);
     }
 
     private static ResourceFilter reading(String... names) {
@@ -296,12 +298,12 @@ class PagedListServiceTest {
         // The queue of the one consumer is readable; the address of the one producer is not.
         readable(clusterId, new String[] {QUEUE}, new String[] {});
 
-        PagedView<SessionView> page = service.sessions(clusterId, ResourceQuery.of(null, 1, 50, null));
+        PagedView<ChannelView> page = service.channels(clusterId, ResourceQuery.of(null, 1, 50, null));
 
         assertThat(page.data()).hasSize(1);
         assertThat(page.count()).isEqualTo(1);
-        SessionView seen = page.data().get(0);
-        assertThat(seen.sessionId()).startsWith("dbb33b79");
+        ChannelView seen = page.data().get(0);
+        assertThat(ResourceIds.nameOf(seen.id())).startsWith("dbb33b79");
         assertThat(seen.consumerCount()).isEqualTo(1);
         assertThat(seen.producerCount()).isZero();
     }
@@ -318,8 +320,8 @@ class PagedListServiceTest {
 
         PagedView<ConnectionView> page = service.connections(clusterId, ResourceQuery.of(null, 1, 50, null));
 
-        assertThat(page.data()).extracting(ConnectionView::connectionId).containsExactly("c1db1ea7");
-        assertThat(page.data().get(0).sessionCount()).isEqualTo(1);
+        assertThat(page.data()).extracting(c -> ResourceIds.nameOf(c.id())).containsExactly("c1db1ea7");
+        assertThat(page.data().get(0).channelCount()).isEqualTo(1);
         assertThat(page.count()).isEqualTo(1);
     }
 
@@ -330,7 +332,7 @@ class PagedListServiceTest {
         when(permissions.can(clusterId, ResourcePermissions.CONNECTION_CLOSE)).thenReturn(true);
 
         PagedView<ConnectionView> connectionsPage = service.connections(clusterId, ResourceQuery.of(null, 1, 50, null));
-        PagedView<SessionView> sessionsPage = service.sessions(clusterId, ResourceQuery.of(null, 1, 50, null));
+        PagedView<ChannelView> sessionsPage = service.channels(clusterId, ResourceQuery.of(null, 1, 50, null));
 
         assertThat(connectionsPage.data()).hasSize(5);
         assertThat(connectionsPage.data())

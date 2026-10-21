@@ -6,7 +6,7 @@ import { clusterRoute } from '../../kernel/routing/roots.ts';
 import { lazyFeatureView } from '../../kernel/routing/lazy.tsx';
 import { keys } from './api.ts';
 import { TransferActions } from './TransferActions.tsx';
-import { TransferQueueMessages } from './rowActions.tsx';
+import { TransferSubscriptionMessages } from './rowActions.tsx';
 
 const runsRoute = createRoute({
   getParentRoute: () => clusterRoute,
@@ -20,7 +20,7 @@ const runRoute = createRoute({
   component: lazyFeatureView('transfer', () => import('./TransferRunView.tsx'), 'TransferRunView'),
 });
 
-/** Move or copy messages to a queue on another node or another cluster, as a resumable run (ADR-0097). */
+/** Move or copy messages to a subscription on another node or another cluster, as a resumable run (ADR-0097). */
 export const transferFeature = defineFeature({
   contract: CONTRACT,
   id: 'transfer',
@@ -37,7 +37,9 @@ export const transferFeature = defineFeature({
     },
   ],
   slots: {
-    'queue.actions': [{ id: 'transfer.queue', order: 30, section: 'operate', Component: TransferQueueMessages }],
+    'subscription.actions': [
+      { id: 'transfer.subscription', order: 30, section: 'operate', Component: TransferSubscriptionMessages },
+    ],
     'messages.selection': [{ id: 'transfer-actions', order: 10, Component: TransferActions }],
   },
   streamTopics: {

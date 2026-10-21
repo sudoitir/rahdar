@@ -14,7 +14,6 @@ import { lifecycleFeature } from '../features/lifecycle/feature.ts';
 import { pluginsFeature } from '../features/plugins/feature.ts';
 import { messagesFeature } from '../features/messages/feature.ts';
 import { metricsFeature } from '../features/metrics/feature.ts';
-import { queuesFeature } from '../features/queues/feature.ts';
 import { resourcesFeature } from '../features/resources/feature.ts';
 import { routingFeature } from '../features/routing/feature.ts';
 import { rrFeature } from '../features/rr/feature.ts';
@@ -38,7 +37,6 @@ export const FEATURES: RahdarFeature[] = [
   flowFeature,
   triageFeature,
   rrFeature,
-  queuesFeature,
   messagesFeature,
   bulkFeature,
   transferFeature,

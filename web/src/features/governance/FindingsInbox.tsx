@@ -56,7 +56,7 @@ export function FindingsInbox() {
 
   function act(f: FindingView, decision: 'confirm' | 'dismiss') {
     const action = decision === 'confirm' ? CONFIRM : DISMISS;
-    const subject = `the finding for ${fieldOf(f)} on ${f.address} (${f.dataClassLabel})`;
+    const subject = `the finding for ${fieldOf(f)} on ${f.destination} (${f.dataClassLabel})`;
     setPending(f.id);
     decide.mutate(
       { findingId: f.id, decision },

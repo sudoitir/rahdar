@@ -89,7 +89,7 @@ class PermissionDeclarations implements PluginBridge {
                 .filter(e -> e.description() == null || e.description().isBlank())
                 .forEach(e -> found.add(describe(e) + " has no description"));
         catalogue.values().forEach(e -> {
-            if (e.scope() == PermissionScope.RESOURCE && e.resourceKinds().isEmpty()) {
+            if (e.scope() == PermissionScope.RESOURCE && e.resourceTypes().isEmpty()) {
                 found.add(describe(e) + " acts on a resource but names no kind");
             }
             e.requires().stream()

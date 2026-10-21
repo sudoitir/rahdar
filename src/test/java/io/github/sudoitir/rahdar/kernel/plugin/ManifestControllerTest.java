@@ -49,8 +49,8 @@ class ManifestControllerTest {
                                 .id("queues")
                                 .title("Queues")
                                 .kind(Kind.FEATURE)
-                                .permission(PermissionDef.cluster("queue:create", "Create queues"))
-                                .streamTopic(TopicDef.signal("queues"))
+                                .permission(PermissionDef.cluster("subscription:create", "Create queues"))
+                                .streamTopic(TopicDef.signal("subscriptions"))
                                 .build(),
                         FeatureDescriptor.builder()
                                 .id("sql")
@@ -70,13 +70,13 @@ class ManifestControllerTest {
                 .andExpect(jsonPath("$.features[0].id").value("queues"))
                 .andExpect(jsonPath("$.features[0].enabled").value(true))
                 .andExpect(jsonPath("$.features[0].origin").value("BUILTIN"))
-                .andExpect(jsonPath("$.features[0].topics[0]").value("queues"))
+                .andExpect(jsonPath("$.features[0].topics[0]").value("subscriptions"))
                 .andExpect(jsonPath("$.features[1].id").value("sql"))
                 .andExpect(jsonPath("$.features[1].enabled").value(false))
                 .andExpect(jsonPath("$.features[1].enabledProperty").value("rahdar.features.sql.enabled"))
                 .andExpect(jsonPath("$.features[1].permissions[0]").value("capture:write"))
                 .andExpect(jsonPath("$.permissionCatalogue.length()").value(1))
-                .andExpect(jsonPath("$.permissionCatalogue[0].action").value("queue:create"))
+                .andExpect(jsonPath("$.permissionCatalogue[0].action").value("subscription:create"))
                 .andExpect(jsonPath("$.permissionCatalogue[0].featureId").value("queues"))
                 .andExpect(jsonPath("$.identityProviders.length()").value(0));
     }

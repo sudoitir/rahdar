@@ -9,7 +9,7 @@ import type { MemberView, PatternKind, PatternView, ShareView, TeamSummary, Unow
 import classes from './Security.module.css';
 import { KIND_OPTIONS, KIND_WORDS } from './teamWords.ts';
 
-/** A team's patterns, one line per cluster: `prod: orders.# (queues), billing.* (addresses)`. */
+/** A team's patterns, one line per cluster: `prod: orders.# (subscriptions), billing.* (destinations)`. */
 export function ownedByCluster(patterns: PatternView[], clusterName: (clusterId: string) => string): string[] {
   const lines = new Map<string, string[]>();
   for (const p of patterns) {
@@ -281,7 +281,7 @@ export interface UnownedRows {
   onAssign: (name: string, kind: PatternKind) => void;
 }
 
-/** The names no team owns, each with the way to give it to this team as queues, addresses or both. */
+/** The names no team owns, each with the way to give it to this team as subscriptions, destinations or both. */
 export function unownedColumns({ editable, onAssign }: UnownedRows): Column<UnownedView>[] {
   return [
     { id: 'name', header: 'Name', accessor: (u) => u.name, kind: 'identifier', priority: 'essential' },

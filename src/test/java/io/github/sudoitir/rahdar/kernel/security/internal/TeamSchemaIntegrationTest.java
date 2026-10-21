@@ -62,13 +62,13 @@ class TeamSchemaIntegrationTest extends PostgresIntegrationTest {
     void aPatternKindIsQueueAddressOrBoth() {
         UUID team = team("kinds");
         UUID cluster = UUID.randomUUID();
-        pattern(team, cluster, "QUEUE", "a.#");
-        pattern(team, cluster, "ADDRESS", "a.#");
-        pattern(team, cluster, "BOTH", "b.#");
+        pattern(team, cluster, "SUBSCRIPTION", "a.#");
+        pattern(team, cluster, "DESTINATION", "a.#");
+        pattern(team, cluster, "ANY", "b.#");
 
         assertThatThrownBy(() -> pattern(team, cluster, "TOPIC", "c.#"))
                 .isInstanceOf(DataIntegrityViolationException.class);
-        assertThatThrownBy(() -> pattern(team, cluster, "QUEUE", "a.#"))
+        assertThatThrownBy(() -> pattern(team, cluster, "SUBSCRIPTION", "a.#"))
                 .as("the same pattern twice")
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
@@ -108,7 +108,7 @@ class TeamSchemaIntegrationTest extends PostgresIntegrationTest {
         UUID owner = team("owner");
         UUID role = roles.findByName("TEAM_VIEWER").orElseThrow().getId();
         String share = "INSERT INTO team_share (owner_team_id, target_team_id, cluster_id, kind, pattern, role_id)"
-                + " VALUES (?, ?, ?, 'BOTH', 'a.#', ?)";
+                + " VALUES (?, ?, ?, 'ANY', 'a.#', ?)";
 
         jdbc.update(share, owner, team("target"), UUID.randomUUID(), role);
 
@@ -123,14 +123,14 @@ class TeamSchemaIntegrationTest extends PostgresIntegrationTest {
         UUID other = team("other");
         UUID cluster = UUID.randomUUID();
         UUID role = roles.findByName("TEAM_OPERATOR").orElseThrow().getId();
-        pattern(team, cluster, "BOTH", "orders.#");
+        pattern(team, cluster, "ANY", "orders.#");
         jdbc.update(
                 "INSERT INTO team_member (principal_type, provider_id, group_name, team_id, role_id)"
                         + " VALUES ('GROUP', 'ldap', 'orders', ?, ?)",
                 team,
                 role);
         String share = "INSERT INTO team_share (owner_team_id, target_team_id, cluster_id, kind, pattern, role_id)"
-                + " VALUES (?, ?, ?, 'BOTH', 'orders.in', ?)";
+                + " VALUES (?, ?, ?, 'ANY', 'orders.in', ?)";
         jdbc.update(share, team, other, cluster, role);
         jdbc.update(share, other, team, cluster, role);
 
@@ -166,10 +166,10 @@ class TeamSchemaIntegrationTest extends PostgresIntegrationTest {
         UUID gone = UUID.randomUUID();
         UUID kept = UUID.randomUUID();
         UUID role = roles.findByName("TEAM_VIEWER").orElseThrow().getId();
-        pattern(team, gone, "BOTH", "a.#");
-        pattern(team, kept, "BOTH", "a.#");
+        pattern(team, gone, "ANY", "a.#");
+        pattern(team, kept, "ANY", "a.#");
         String share = "INSERT INTO team_share (owner_team_id, target_team_id, cluster_id, kind, pattern, role_id)"
-                + " VALUES (?, ?, ?, 'BOTH', 'a.b', ?)";
+                + " VALUES (?, ?, ?, 'ANY', 'a.b', ?)";
         jdbc.update(share, team, other, gone, role);
         jdbc.update(share, team, other, kept, role);
 
@@ -185,7 +185,7 @@ class TeamSchemaIntegrationTest extends PostgresIntegrationTest {
     void revokingAnEnvironmentLeavesTeamRowsAlone() {
         UUID team = team("env");
         UUID id = UUID.randomUUID();
-        pattern(team, id, "BOTH", "a.#");
+        pattern(team, id, "ANY", "a.#");
 
         scopedGrants.revoke("ENVIRONMENT", id);
 

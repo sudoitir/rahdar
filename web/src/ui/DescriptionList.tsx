@@ -17,7 +17,7 @@ export type DescriptionItem = Readonly<{
  * two term and value pairs side by side for a short list in a wide space. A `label` names the list
  * for assistive technology.
  *
- * `oneLine` is for terms and values that are names a broker supplies (a queue, an address, a role), in
+ * `oneLine` is for terms and values that are names a broker supplies (a subscription, an address, a role), in
  * a cell with a width of its own: each stays on one line, shortened in the middle when it does not fit
  * and named in full on hover and focus, and neither track shrinks below a readable width, so a long
  * name never squeezes its neighbour into a column of characters. A value that is not a string shortens

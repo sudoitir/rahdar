@@ -192,7 +192,7 @@ describe('request() held operations', () => {
     outcome: 'held',
     heldOperation: {
       id: 'h-1',
-      summary: 'Purge queue "orders"',
+      summary: 'Purge subscription "orders"',
       expiresAt: '2026-10-08T12:00:00Z',
       link: '/api/v1/held-operations/h-1',
     },
@@ -207,7 +207,7 @@ describe('request() held operations', () => {
 
     expect(error).toBeInstanceOf(OperationHeldError);
     expect((error as OperationHeldError).heldOperation).toEqual(held.heldOperation);
-    expect((error as OperationHeldError).message).toBe('Sent for approval: Purge queue "orders"');
+    expect((error as OperationHeldError).message).toBe('Sent for approval: Purge subscription "orders"');
   });
 
   it('names the request by the header even when the body lost it', async () => {

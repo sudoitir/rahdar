@@ -11,7 +11,7 @@ public final class MessagePermissions {
 
     public static final String MESSAGE_DELETE = "message:delete";
 
-    public static final String QUEUE_PURGE = "queue:purge";
+    public static final String SUBSCRIPTION_PURGE = "subscription:purge";
 
     private MessagePermissions() {}
 }

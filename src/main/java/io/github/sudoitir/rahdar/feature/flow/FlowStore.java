@@ -305,8 +305,8 @@ public class FlowStore {
                 .addValue("userName", e.user())
                 .addValue("remoteHost", e.remoteHost())
                 .addValue("protocol", e.protocol())
-                .addValue("address", e.address())
-                .addValue("queueName", e.queue())
+                .addValue("address", e.destination())
+                .addValue("queueName", e.subscription())
                 .addValue(NODE_ID, s.nodeId())
                 .addValue(CLUSTER_ID, s.clusterId())
                 .addValue("stalled", e.stalled());

@@ -88,8 +88,8 @@ class MessagePredicateTest {
 
     @Test
     void andOrNotCombineTheirParts() {
-        var yes = eq(col(Column.QUEUE), new Literal.Str("ORDERS"));
-        var no = eq(col(Column.QUEUE), new Literal.Str("OTHER"));
+        var yes = eq(col(Column.SUBSCRIPTION), new Literal.Str("ORDERS"));
+        var no = eq(col(Column.SUBSCRIPTION), new Literal.Str("OTHER"));
 
         assertThat(matches(new Predicate.And(List.of(yes, yes)), message("x"))).isTrue();
         assertThat(matches(new Predicate.And(List.of(yes, no)), message("x"))).isFalse();
@@ -256,8 +256,8 @@ class MessagePredicateTest {
         BrowsedMessage m = message("the-body");
 
         assertThat(predicate.resolve(col(Column.MESSAGE_ID), m, CONTEXT)).isEqualTo("42");
-        assertThat(predicate.resolve(col(Column.QUEUE), m, CONTEXT)).isEqualTo("ORDERS");
-        assertThat(predicate.resolve(col(Column.ADDRESS), m, CONTEXT)).isEqualTo("orders.addr");
+        assertThat(predicate.resolve(col(Column.SUBSCRIPTION), m, CONTEXT)).isEqualTo("ORDERS");
+        assertThat(predicate.resolve(col(Column.DESTINATION), m, CONTEXT)).isEqualTo("orders.addr");
         assertThat(predicate.resolve(col(Column.NODE), m, CONTEXT)).isEqualTo("node-a");
         assertThat(predicate.resolve(col(Column.PRIORITY), m, CONTEXT)).isEqualTo(4L);
         assertThat(predicate.resolve(col(Column.DURABLE), m, CONTEXT)).isEqualTo(true);
@@ -279,7 +279,7 @@ class MessagePredicateTest {
                 Column.OBSERVED_AT,
                 Column.LAST_SEEN_AT,
                 Column.ORIGIN,
-                Column.ORIG_ADDRESS,
+                Column.ORIG_DESTINATION,
                 Column.SOURCE_MESSAGE_ID)) {
             assertThat(predicate.resolve(col(column), message("x"), CONTEXT)).isNull();
         }

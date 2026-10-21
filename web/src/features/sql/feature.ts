@@ -21,7 +21,7 @@ export interface SqlSearch {
 function validateSqlSearch(raw: Record<string, unknown>): SqlSearch {
   const out: SqlSearch = {};
   if (typeof raw.q === 'string' && raw.q) out.q = raw.q;
-  // Only the true case is carried, so an idle console has a clean address.
+  // Only the true case is carried, so an idle console has a clea destination.
   if (raw.live === true || raw.live === 'true') out.live = true;
   return out;
 }

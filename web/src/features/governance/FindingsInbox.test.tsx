@@ -11,7 +11,7 @@ import { paged } from '../../kernel/api/paging.ts';
 
 const FINDING = {
   id: 'f1',
-  address: 'orders.eu',
+  destination: 'orders.eu',
   location: 'PROPERTY',
   fieldPath: 'contact',
   dataClass: 'EMAIL',

@@ -13,7 +13,7 @@ vi.mock('./useFlowLayout.ts', () => ({ useFlowLayout: () => layout.state }));
 const { FlowCanvas } = await import('./FlowCanvas.tsx');
 
 const graph = {
-  nodes: [{ id: 'queue:orders', kind: 'QUEUE', label: 'orders', faults: [] }],
+  nodes: [{ id: 'subscription:orders', kind: 'SUBSCRIPTION', label: 'orders', faults: [] }],
   edges: [],
   measuring: false,
   sampleIntervalSeconds: 15,

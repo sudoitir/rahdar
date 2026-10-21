@@ -26,7 +26,7 @@ afterAll(() => onlineManager.setOnline(true));
 
 const subscription = (over: Record<string, unknown> = {}) => ({
   id: 's1',
-  queuePattern: 'ORDER.IN',
+  subscriptionPattern: 'ORDER.IN',
   retentionDays: 7,
   intervalMs: 5000,
   captureFrom: '2026-09-01T09:00:00Z',
@@ -44,7 +44,7 @@ const SUBSCRIPTIONS = [
   subscription(),
   subscription({
     id: 's2',
-    queuePattern: 'PAYMENT.#',
+    subscriptionPattern: 'PAYMENT.#',
     mode: 'CAPTURE',
     enabled: false,
     maxBytes: 536_870_912,
@@ -130,7 +130,7 @@ describe.each(SCHEMES)('Index subscriptions in the %s scheme at 1280 px', (schem
 
     const dialog = await screen.findByRole('dialog', { name: 'Delete index subscription PAYMENT.#' });
     await settle(() => getComputedStyle(dialog).opacity);
-    expect(screen.getByText(/It also removes the divert, the capture queue/)).toBeVisible();
+    expect(screen.getByText(/It also removes the divert, the capture subscription/)).toBeVisible();
     expect(await axeViolations(dialog)).toEqual([]);
   });
 });

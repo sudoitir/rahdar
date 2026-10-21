@@ -8,14 +8,14 @@ import {
   ExpectationRemove,
   ExpectationStatus,
   FlowStateBadge,
-  ReplyAddressesCell,
+  ReplyDestinationsCell,
   type ExpectationControls,
 } from './cells.tsx';
 import { stateLabel } from './rrState.ts';
-import { replyAddressesText, statusText } from './words.ts';
+import { replyDestinationsText, statusText } from './words.ts';
 
 /**
- * The flows grid's columns. The state and the request address identify a flow and are never hidden;
+ * The flows grid's columns. The state and the request destination identify a flow and are never hidden;
  * the age and the latency go next, and the correlation id is the first to be hidden when the table is
  * narrow. `now` ages the flow, so a view builds its columns again when it ticks.
  */
@@ -31,9 +31,9 @@ export function flowColumns(now: number): Column<FlowView>[] {
       priority: 'essential',
     },
     {
-      id: 'address',
-      header: 'Address',
-      accessor: (f) => f.requestAddress,
+      id: 'destination',
+      header: 'Destination',
+      accessor: (f) => f.requestDestination,
       kind: 'identifier',
       priority: 'essential',
     },
@@ -61,7 +61,7 @@ export function flowColumns(now: number): Column<FlowView>[] {
   ];
 }
 
-/** What a traced address's table needs from its view: the clock, each address's last tick and what its two controls may do. */
+/** What a traced destination's table needs from its view: the clock, each destination's last tick and what its two controls may do. */
 export interface ExpectationRows {
   now: number;
   statusOf: (id: string) => ExpectationDiagnosticsView | undefined;
@@ -69,24 +69,24 @@ export interface ExpectationRows {
 }
 
 /**
- * The traced addresses' columns. The request address identifies a row, and the two controls (the
+ * The traced destinations' columns. The request destination identifies a row, and the two controls (the
  * switch and Remove) are never hidden, so a row can always be switched or removed; the reply
- * addresses and the sampler's last tick wrap, and the plain settings go first when the table is narrow.
+ * destinations and the sampler's last tick wrap, and the plain settings go first when the table is narrow.
  */
 export function expectationColumns({ now, statusOf, controls }: ExpectationRows): Column<ExpectationView>[] {
   return [
     {
-      id: 'requestAddress',
-      header: 'Request address',
-      accessor: (e) => e.requestAddress,
+      id: 'requestDestination',
+      header: 'Request destination',
+      accessor: (e) => e.requestDestination,
       kind: 'identifier',
       priority: 'essential',
     },
     {
-      id: 'replyAddresses',
-      header: 'Reply addresses',
-      accessor: replyAddressesText,
-      cell: (e) => createElement(ReplyAddressesCell, { expectation: e }),
+      id: 'replyDestinations',
+      header: 'Reply destinations',
+      accessor: replyDestinationsText,
+      cell: (e) => createElement(ReplyDestinationsCell, { expectation: e }),
       kind: 'text',
       wrap: true,
       priority: 'high',
@@ -126,7 +126,7 @@ export function expectationColumns({ now, statusOf, controls }: ExpectationRows)
     {
       id: 'remove',
       header: 'Remove',
-      accessor: (e) => `Remove ${e.requestAddress}`,
+      accessor: (e) => `Remove ${e.requestDestination}`,
       cell: (e) => createElement(ExpectationRemove, { expectation: e, controls }),
       kind: 'status',
       priority: 'essential',
@@ -134,13 +134,13 @@ export function expectationColumns({ now, statusOf, controls }: ExpectationRows)
   ];
 }
 
-/** The diagnostics table's columns: what the sampler did for each traced address. */
+/** The diagnostics table's columns: what the sampler did for each traced destination. */
 export function diagnosticsColumns(now: number): Column<ExpectationDiagnosticsView>[] {
   return [
     {
-      id: 'requestAddress',
-      header: 'Request address',
-      accessor: (e) => e.requestAddress,
+      id: 'requestDestination',
+      header: 'Request destination',
+      accessor: (e) => e.requestDestination,
       kind: 'identifier',
       priority: 'essential',
     },

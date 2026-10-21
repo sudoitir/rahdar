@@ -98,7 +98,7 @@ tick=${LOAD_TIER_C%s}
 tries=$((tick * 2 / 3 + 40))
 for id in "${cluster_ids[@]}"; do
   for _ in $(seq 1 "$tries"); do
-    have=$(api GET "/clusters/$id/queues?size=1" | json 'd["count"]' 2>/dev/null || echo 0)
+    have=$(api GET "/clusters/$id/subscriptions?size=1" | json 'd["count"]' 2>/dev/null || echo 0)
     [ "$have" -ge "$want" ] && break
     sleep 3
   done
@@ -110,13 +110,13 @@ say "writing $LOAD_AUDIT_ROWS audit records through the API"
 n=0
 while [ "$n" -lt "$LOAD_AUDIT_ROWS" ]; do
   id=${cluster_ids[$((n % LOAD_CLUSTERS))]}
-  api POST "/clusters/$id/queues" -o /dev/null \
-    -d "{\"address\":\"load.audit.$n\",\"name\":\"load.audit.$n\",\"routingType\":\"ANYCAST\",\"durable\":true,\"autoCreateAddress\":true}" || true
+  api POST "/clusters/$id/subscriptions" -o /dev/null \
+    -d "{\"kind\":\"artemis.queue\",\"name\":\"load.audit.$n\",\"destination\":\"artemis.address/load.audit.$n\",\"attributes\":{\"routingType\":\"ANYCAST\",\"durable\":true,\"autoCreateAddress\":true}}" || true
   n=$((n + 1))
 done
 
 say "creating $LOAD_ACCOUNTS accounts and the flood account"
-role=$(api POST /roles -d '{"name":"LOAD","requiresMfa":false,"teamAssignable":false,"permissions":["cluster:read","queue:read","address:read","message:read","connection:read","alert:read","audit:export","data:read"]}' | json 'd["id"]')
+role=$(api POST /roles -d '{"name":"LOAD","requiresMfa":false,"teamAssignable":false,"permissions":["cluster:read","subscription:read","destination:read","message:read","connection:read","alert:read","audit:export","data:read"]}' | json 'd["id"]')
 printf 'username,password\n' > "$SEED_DIR/users.csv"
 printf 'username,password\n' > "$SEED_DIR/flood.csv"
 make_account() { # username file

@@ -15,31 +15,40 @@ import java.util.Locale;
  * @param params the detail the schema deliberately leaves out
  * @param access what a plugin tool requires, which Rahdar checks before it runs (ADR-0114); absent
  *     for built-in tools, whose services check their own permissions
+ * @param system the broker system the tool exists for (ADR-0207), such as {@code artemis}; absent for a
+ *     tool that applies to every system. It is offered only to a caller who can read a cluster of that
+ *     system, and a call naming a cluster of another system is a tool error
  */
 public record McpToolDef(
         String name,
         Posture posture,
         String summary,
         List<Param> params,
-        @JsonInclude(JsonInclude.Include.NON_NULL) Access access) {
+        @JsonInclude(JsonInclude.Include.NON_NULL) Access access,
+        @JsonInclude(JsonInclude.Include.NON_NULL) String system) {
 
     public McpToolDef(String name, Posture posture, String summary, List<Param> params) {
-        this(name, posture, summary, params, null);
+        this(name, posture, summary, params, null, null);
+    }
+
+    /** This tool as one that exists for the clusters of {@code systemId} only. */
+    public McpToolDef forSystem(String systemId) {
+        return new McpToolDef(name, posture, summary, params, access, systemId);
     }
 
     /**
      * @param permission the permission action the caller needs
-     * @param scope {@code resource} when it is checked on the queue or address the tool's
+     * @param scope {@code resource} when it is checked on the subscription or destination the tool's
      *     {@code resourceArg} names, on the tool's {@code clusterId}; {@code cluster} when it is checked
      *     on that cluster; {@code global} otherwise
-     * @param resourceArg a {@code resource} tool's argument holding the queue or address name
-     * @param resourceKind {@code queue} or {@code address}
+     * @param resourceArg a {@code resource} tool's argument holding the subscription or destination name
+     * @param resourceType {@code subscription} or {@code destination}
      */
     public record Access(
             String permission,
             String scope,
             @JsonInclude(JsonInclude.Include.NON_NULL) String resourceArg,
-            @JsonInclude(JsonInclude.Include.NON_NULL) String resourceKind) {}
+            @JsonInclude(JsonInclude.Include.NON_NULL) String resourceType) {}
 
     /** The {@code dryRun} note every mutating tool shares. */
     public static final String DRY_RUN = "Defaults to true. A dry run reports the affected count and changes nothing.";

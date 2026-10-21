@@ -110,17 +110,17 @@ public final class TeamViews {
             @Schema(requiredMode = REQUIRED) PatternKind kind,
             @Schema(requiredMode = REQUIRED) String pattern,
 
-            @Schema(requiredMode = REQUIRED, description = "Queues on the cluster the pattern matches.")
-            int queueMatches,
+            @Schema(requiredMode = REQUIRED, description = "Subscriptions on the cluster the pattern matches.")
+            int subscriptionMatches,
 
-            @Schema(requiredMode = REQUIRED, description = "Addresses on the cluster the pattern matches.")
-            int addressMatches,
+            @Schema(requiredMode = REQUIRED, description = "Destinations on the cluster the pattern matches.")
+            int destinationMatches,
 
-            @Schema(requiredMode = REQUIRED, description = "Up to 20 matching queue names.")
-            List<String> queueExamples,
+            @Schema(requiredMode = REQUIRED, description = "Up to 20 matching subscription names.")
+            List<String> subscriptionExamples,
 
-            @Schema(requiredMode = REQUIRED, description = "Up to 20 matching address names.")
-            List<String> addressExamples,
+            @Schema(requiredMode = REQUIRED, description = "Up to 20 matching destination names.")
+            List<String> destinationExamples,
 
             @Schema(requiredMode = REQUIRED) List<PatternConflict> conflicts) {}
 
@@ -145,8 +145,9 @@ public final class TeamViews {
     }
 
     @Schema(
-            description = "One team role that reaches a queue or address, and how many members hold it: a role of "
-                    + "the owning team, or the role a share gives another team.")
+            description =
+                    "One team role that reaches a subscription or destination, and how many members hold it: a role of "
+                            + "the owning team, or the role a share gives another team.")
     public record ResourceTeamGrant(
             @Schema(requiredMode = REQUIRED) UUID teamId,
             @Schema(requiredMode = REQUIRED) String teamName,
@@ -165,7 +166,7 @@ public final class TeamViews {
                             + "team.")
             int memberCount) {}
 
-    @Schema(description = "Who has access to one queue or address through teams: its owner and every share.")
+    @Schema(description = "Who has access to one subscription or destination through teams: its owner and every share.")
     public record ResourceAccessView(
             @Schema(nullable = true, description = "The team whose patterns own the name; null when none does.")
             TeamRef ownerTeam,

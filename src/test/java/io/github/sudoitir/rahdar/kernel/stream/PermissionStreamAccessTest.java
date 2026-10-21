@@ -47,7 +47,7 @@ import tools.jackson.databind.json.JsonMapper;
 class PermissionStreamAccessTest {
 
     private static final Set<String> TEAM_VIEWER =
-            Set.of(Permissions.QUEUE_READ, Permissions.ADDRESS_READ, MessagePermissions.MESSAGE_READ);
+            Set.of(Permissions.SUBSCRIPTION_READ, Permissions.DESTINATION_READ, MessagePermissions.MESSAGE_READ);
 
     private final UUID clusterId = UUID.randomUUID();
     private final UUID userId = UUID.randomUUID();
@@ -63,7 +63,7 @@ class PermissionStreamAccessTest {
         Map<String, CatalogueEntry> catalogue = RahdarFeatures.descriptors().stream()
                 .flatMap(d -> d.permissions().stream()
                         .map(p -> new CatalogueEntry(
-                                p.action(), p.label(), d.id(), d.title(), p.scope(), p.resourceKinds(), p.requires())))
+                                p.action(), p.label(), d.id(), d.title(), p.scope(), p.resourceTypes(), p.requires())))
                 .collect(Collectors.toMap(CatalogueEntry::action, e -> e));
         FeatureRegistry features = mock(FeatureRegistry.class);
         when(features.permission(anyString()))
@@ -77,7 +77,8 @@ class PermissionStreamAccessTest {
                 access,
                 new TeamIndex(mock(TeamRepository.class), patterns, shares, mock(RolePermissionRepository.class)),
                 features);
-        when(topics.definition("queues")).thenReturn(TopicDef.signal("queues", Permissions.QUEUE_READ));
+        when(topics.definition("subscriptions"))
+                .thenReturn(TopicDef.signal("subscriptions", Permissions.SUBSCRIPTION_READ));
         when(topics.definition("alerts")).thenReturn(TopicDef.signal("alerts", AlertPermissions.ALERT_READ));
         when(topics.definition("health")).thenReturn(TopicDef.signal("health"));
         @SuppressWarnings("unchecked")
@@ -85,7 +86,7 @@ class PermissionStreamAccessTest {
         when(gates.orderedStream()).thenAnswer(i -> Stream.<StreamGate>empty());
         streamAccess = new PermissionStreamAccess(
                 resolver, topics, JsonMapper.builder().build(), gates);
-        ownedRows.add(new TeamPatternEntity(orders, clusterId, "QUEUE", "orders.#"));
+        ownedRows.add(new TeamPatternEntity(orders, clusterId, "SUBSCRIPTION", "orders.#"));
     }
 
     private void teamMember() {
@@ -107,15 +108,15 @@ class PermissionStreamAccessTest {
     void aTeamMemberDoesNotReceiveAnEventAboutAnotherTeamsQueue() {
         teamMember();
 
-        assertThat(shown("queues", BusFrame.About.queue("billing.in"))).isNull();
-        assertThat(shown("queues", BusFrame.About.queue("orders.in"))).isNotNull();
+        assertThat(shown("subscriptions", BusFrame.About.queue("billing.in"))).isNull();
+        assertThat(shown("subscriptions", BusFrame.About.queue("orders.in"))).isNotNull();
     }
 
     @Test
     void anEventListingSeveralQueuesIsTrimmedToThoseTheSubscriberMayRead() {
         teamMember();
 
-        Subscriber.Held held = shown("queues", BusFrame.About.of(List.of("orders.in", "billing.in"), List.of()));
+        Subscriber.Held held = shown("subscriptions", BusFrame.About.of(List.of("orders.in", "billing.in"), List.of()));
 
         assertThat(held.about().queues()).containsExactly("orders.in");
     }
@@ -123,11 +124,11 @@ class PermissionStreamAccessTest {
     @Test
     void anEventAboutNoSingleResourceNeedsTheClusterPermission() {
         teamMember();
-        assertThat(shown("queues", null)).isNull();
+        assertThat(shown("subscriptions", null)).isNull();
 
-        grant(Permissions.QUEUE_READ);
-        assertThat(shown("queues", null)).isNotNull();
-        assertThat(shown("queues", BusFrame.About.queue("billing.in"))).isNotNull();
+        grant(Permissions.SUBSCRIPTION_READ);
+        assertThat(shown("subscriptions", null)).isNotNull();
+        assertThat(shown("subscriptions", BusFrame.About.queue("billing.in"))).isNotNull();
     }
 
     @Test
@@ -151,8 +152,8 @@ class PermissionStreamAccessTest {
     @Test
     void revokedAccessAppliesToTheNextFrameOfAnOpenStream() {
         teamMember();
-        Subscriber subscriber = new Subscriber(null, Set.of("queues"), null, null, principal);
-        Subscriber.Held frame = new Subscriber.Held("queues", null, null, BusFrame.About.queue("orders.in"));
+        Subscriber subscriber = new Subscriber(null, Set.of("subscriptions"), null, null, principal);
+        Subscriber.Held frame = new Subscriber.Held("subscriptions", null, null, BusFrame.About.queue("orders.in"));
         assertThat(streamAccess.narrow(subscriber, clusterId, frame)).isNotNull();
 
         when(access.of(userId)).thenReturn(new AccessSnapshot(Set.of(), Map.of()));

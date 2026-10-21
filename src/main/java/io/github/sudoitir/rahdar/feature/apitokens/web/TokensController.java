@@ -11,7 +11,7 @@ import io.github.sudoitir.rahdar.feature.apitokens.web.TokenViews.UsageView;
 import io.github.sudoitir.rahdar.kernel.core.PagedView;
 import io.github.sudoitir.rahdar.kernel.core.ResourceQuery;
 import io.github.sudoitir.rahdar.kernel.gate.HeldResponse;
-import io.github.sudoitir.rahdar.kernel.plugin.ResourceKind;
+import io.github.sudoitir.rahdar.kernel.plugin.ResourceType;
 import io.github.sudoitir.rahdar.kernel.security.Grant;
 import io.github.sudoitir.rahdar.kernel.security.RahdarPrincipal;
 import io.github.sudoitir.rahdar.kernel.security.ResourcePattern;
@@ -125,7 +125,7 @@ public class TokensController {
     static TokenGrant toGrant(TokenGrantRequest g) {
         Grant.ScopeType scope = Grant.ScopeType.valueOf(g.scopeType());
         UUID scopeId = g.scopeId() != null ? g.scopeId() : ScopeIds.GLOBAL;
-        boolean hasKind = g.resourceKind() != null && !g.resourceKind().isBlank();
+        boolean hasKind = g.resourceType() != null && !g.resourceType().isBlank();
         boolean hasPattern = g.resourcePattern() != null && !g.resourcePattern().isBlank();
         if (hasKind != hasPattern) {
             throw new IllegalArgumentException("Give both the kind and the pattern a grant is limited to, or neither.");
@@ -137,7 +137,7 @@ public class TokensController {
                 scope,
                 scopeId,
                 g.action(),
-                ResourceKind.valueOf(g.resourceKind().toUpperCase(Locale.ROOT)),
+                ResourceType.valueOf(g.resourceType().toUpperCase(Locale.ROOT)),
                 ResourcePattern.parse(g.resourcePattern()));
     }
 

@@ -1,16 +1,17 @@
 import { createElement } from 'react';
 
+import { nameOf } from '../../kernel/api/resourceId.ts';
 import { absoluteLabel } from '../../kernel/time/time.ts';
 import { AUTO, localZone } from '../../kernel/time/timezone.ts';
-import type { Column } from '../../ui/table/index.ts';
+import { kindColumn, type Column } from '../../ui/table/index.ts';
 import type { BulkItemView, BulkRunView } from './api.ts';
-import { ItemOutcome, QueueButton, RunLink, RunOutcome } from './cells.tsx';
+import { ItemOutcome, SubscriptionButton, RunLink, RunOutcome } from './cells.tsx';
 import { itemStatus, OPERATIONS, runStatus } from './words.ts';
 
 /** An unknown figure is stated, never shown as zero. */
 const messagesOf = (i: BulkItemView) => (i.affected == null ? 'unknown' : i.affected.toLocaleString());
 
-/** How many messages a destroy would take from each queue; only a destroy has the column. */
+/** How many messages a destroy would take from each subscription; only a destroy has the column. */
 const messagesColumn = (id: string): Column<BulkItemView> => ({
   id,
   header: 'Messages',
@@ -49,7 +50,7 @@ export function runColumns({ clusterId, zone }: RunColumnDeps): Column<BulkRunVi
       kind: 'status',
       priority: 'high',
     },
-    { id: 'queues', header: 'Queues', accessor: (r) => r.total, kind: 'number', priority: 'high' },
+    { id: 'subscriptions', header: 'Subscriptions', accessor: (r) => r.total, kind: 'number', priority: 'high' },
     { id: 'user', header: 'Run by', accessor: (r) => r.username, kind: 'text', priority: 'low' },
     {
       id: 'outcome',
@@ -63,20 +64,21 @@ export function runColumns({ clusterId, zone }: RunColumnDeps): Column<BulkRunVi
 }
 
 /**
- * The columns of one run's queues. The queue identifies a row and is never hidden; its outcome and,
+ * The columns of one run's subscriptions. The subscription identifies a row and is never hidden; its outcome and,
  * for a destroy, how many messages it held go next, and the reason is the first to be hidden when the
  * table is narrow. Building them again is needed only when the operation or the handler changes.
  */
-export function itemColumns(destructive: boolean, onOpen: (queueName: string) => void): Column<BulkItemView>[] {
+export function itemColumns(destructive: boolean, onOpen: (subscription: string) => void): Column<BulkItemView>[] {
   return [
     {
-      id: 'queue',
-      header: 'Queue',
-      accessor: (i) => i.queueName,
-      cell: (i) => createElement(QueueButton, { item: i, onOpen }),
+      id: 'subscription',
+      header: 'Subscription',
+      accessor: (i) => nameOf(i.subscription),
+      cell: (i) => createElement(SubscriptionButton, { item: i, onOpen }),
       kind: 'identifier',
       priority: 'essential',
     },
+    kindColumn<BulkItemView>(),
     {
       id: 'status',
       header: 'Outcome',
@@ -92,13 +94,20 @@ export function itemColumns(destructive: boolean, onOpen: (queueName: string) =>
 }
 
 /**
- * The columns of the preview's frozen queue set. The queue identifies a row and is never hidden; the
+ * The columns of the preview's frozen subscription set. The subscription identifies a row and is never hidden; the
  * plan and, for a destroy, how many messages it holds go next, then the reason or warning, and the
  * node count is the first to be hidden when the table is narrow.
  */
 export function previewColumns(destructive: boolean): Column<BulkItemView>[] {
   return [
-    { id: 'queue', header: 'Queue', accessor: (i) => i.queueName, kind: 'identifier', priority: 'essential' },
+    {
+      id: 'subscription',
+      header: 'Subscription',
+      accessor: (i) => nameOf(i.subscription),
+      kind: 'identifier',
+      priority: 'essential',
+    },
+    kindColumn<BulkItemView>(),
     ...(destructive ? [messagesColumn('messages')] : []),
     { id: 'nodes', header: 'Nodes', accessor: (i) => i.nodes.length, kind: 'number', priority: 'low' },
     {

@@ -3,7 +3,7 @@ package io.github.sudoitir.rahdar.feature.apitokens;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import io.github.sudoitir.rahdar.feature.messages.MessagePermissions;
-import io.github.sudoitir.rahdar.kernel.plugin.ResourceKind;
+import io.github.sudoitir.rahdar.kernel.plugin.ResourceType;
 import io.github.sudoitir.rahdar.kernel.security.Grant;
 import io.github.sudoitir.rahdar.kernel.security.PermissionResolver;
 import io.github.sudoitir.rahdar.kernel.security.Permissions;
@@ -156,7 +156,7 @@ class ApiTokenScopeIntersectionTest extends PostgresIntegrationTest {
         UUID user = owner(Grant.ScopeType.GLOBAL, null, Permissions.CLUSTER_READ);
 
         RahdarPrincipal principal = authenticateKeyFor(
-                user, TokenGrant.of(Grant.ScopeType.CLUSTER, cluster, MessagePermissions.QUEUE_PURGE));
+                user, TokenGrant.of(Grant.ScopeType.CLUSTER, cluster, MessagePermissions.SUBSCRIPTION_PURGE));
 
         assertThat(perm.grantsOf(principal))
                 .describedAs("the scope walk widens the scope, never the permission set")
@@ -174,7 +174,7 @@ class ApiTokenScopeIntersectionTest extends PostgresIntegrationTest {
                 Grant.ScopeType.CLUSTER,
                 cluster,
                 MessagePermissions.MESSAGE_READ,
-                ResourceKind.QUEUE,
+                ResourceType.SUBSCRIPTION,
                 ResourcePattern.parse("orders.#"));
 
         var minted = tokens.mint(

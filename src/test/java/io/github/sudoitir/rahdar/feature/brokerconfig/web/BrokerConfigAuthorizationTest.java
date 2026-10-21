@@ -71,7 +71,7 @@ class BrokerConfigAuthorizationTest extends PostgresIntegrationTest {
 
     @Test
     void readingTheDeclarationNeedsOnlyClusterRead() throws Exception {
-        assertThat(status(MockMvcRequestBuilders.get("/api/v1/clusters/" + clusterId + "/config")
+        assertThat(status(MockMvcRequestBuilders.get("/api/v1/clusters/" + clusterId + "/artemis/config")
                         .with(authentication(callerWith(Permissions.CLUSTER_READ)))))
                 .isEqualTo(200);
     }
@@ -82,7 +82,7 @@ class BrokerConfigAuthorizationTest extends PostgresIntegrationTest {
      */
     @Test
     void theDeclarationCarriesTheDriftCadenceItIsEvaluatedOn() throws Exception {
-        mvc.perform(MockMvcRequestBuilders.get("/api/v1/clusters/" + clusterId + "/config")
+        mvc.perform(MockMvcRequestBuilders.get("/api/v1/clusters/" + clusterId + "/artemis/config")
                         .with(authentication(callerWith(Permissions.CLUSTER_READ))))
                 .andExpect(
                         MockMvcResultMatchers.jsonPath("$.driftIntervalSeconds").value(300));
@@ -90,13 +90,13 @@ class BrokerConfigAuthorizationTest extends PostgresIntegrationTest {
 
     @Test
     void savingNeedsConfigWrite() throws Exception {
-        assertThat(status(MockMvcRequestBuilders.put("/api/v1/clusters/" + clusterId + "/config")
+        assertThat(status(MockMvcRequestBuilders.put("/api/v1/clusters/" + clusterId + "/artemis/config")
                         .with(csrf())
                         .with(authentication(callerWith(Permissions.CLUSTER_READ)))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(SAVE_BODY)))
                 .isEqualTo(404);
-        assertThat(status(MockMvcRequestBuilders.put("/api/v1/clusters/" + clusterId + "/config")
+        assertThat(status(MockMvcRequestBuilders.put("/api/v1/clusters/" + clusterId + "/artemis/config")
                         .with(csrf())
                         .with(authentication(
                                 callerWith(Permissions.CLUSTER_READ, BrokerConfigPermissions.CONFIG_WRITE)))
@@ -108,7 +108,8 @@ class BrokerConfigAuthorizationTest extends PostgresIntegrationTest {
     @Test
     void writeDoesNotImplyApply() throws Exception {
         // A declaration is harmless until something applies it; the authorities differ.
-        assertThat(status(MockMvcRequestBuilders.post("/api/v1/clusters/" + clusterId + "/config/apply?dryRun=true")
+        assertThat(status(MockMvcRequestBuilders.post(
+                                "/api/v1/clusters/" + clusterId + "/artemis/config/apply?dryRun=true")
                         .with(csrf())
                         .with(authentication(
                                 callerWith(Permissions.CLUSTER_READ, BrokerConfigPermissions.CONFIG_WRITE)))))
@@ -117,7 +118,7 @@ class BrokerConfigAuthorizationTest extends PostgresIntegrationTest {
 
     @Test
     void applyDoesNotImplyWrite() throws Exception {
-        assertThat(status(MockMvcRequestBuilders.put("/api/v1/clusters/" + clusterId + "/config")
+        assertThat(status(MockMvcRequestBuilders.put("/api/v1/clusters/" + clusterId + "/artemis/config")
                         .with(csrf())
                         .with(authentication(
                                 callerWith(Permissions.CLUSTER_READ, BrokerConfigPermissions.CONFIG_APPLY)))
@@ -128,13 +129,13 @@ class BrokerConfigAuthorizationTest extends PostgresIntegrationTest {
 
     @Test
     void importAndAdoptNeedConfigWrite() throws Exception {
-        assertThat(status(MockMvcRequestBuilders.post("/api/v1/clusters/" + clusterId + "/config/import-xml")
+        assertThat(status(MockMvcRequestBuilders.post("/api/v1/clusters/" + clusterId + "/artemis/config/import-xml")
                         .with(csrf())
                         .with(authentication(callerWith(Permissions.CLUSTER_READ)))
                         .contentType(MediaType.APPLICATION_XML)
                         .content("<core/>")))
                 .isEqualTo(404);
-        assertThat(status(MockMvcRequestBuilders.post("/api/v1/clusters/" + clusterId + "/config/adopt")
+        assertThat(status(MockMvcRequestBuilders.post("/api/v1/clusters/" + clusterId + "/artemis/config/adopt")
                         .with(csrf())
                         .with(authentication(callerWith(Permissions.CLUSTER_READ)))))
                 .isEqualTo(404);
@@ -143,13 +144,14 @@ class BrokerConfigAuthorizationTest extends PostgresIntegrationTest {
     @Test
     void aCallerWithoutTheGrantCannotTellARealClusterFromAnInventedOne() throws Exception {
         var caller = callerWith(Permissions.CLUSTER_READ);
-        int real = status(MockMvcRequestBuilders.post("/api/v1/clusters/" + clusterId + "/config/apply?dryRun=true")
-                .with(csrf())
-                .with(authentication(caller)));
-        int fake = status(
-                MockMvcRequestBuilders.post("/api/v1/clusters/" + UUID.randomUUID() + "/config/apply?dryRun=true")
+        int real = status(
+                MockMvcRequestBuilders.post("/api/v1/clusters/" + clusterId + "/artemis/config/apply?dryRun=true")
                         .with(csrf())
                         .with(authentication(caller)));
+        int fake = status(MockMvcRequestBuilders.post(
+                        "/api/v1/clusters/" + UUID.randomUUID() + "/artemis/config/apply?dryRun=true")
+                .with(csrf())
+                .with(authentication(caller)));
         assertThat(real).isEqualTo(404);
         assertThat(fake).isEqualTo(real);
     }
@@ -158,18 +160,18 @@ class BrokerConfigAuthorizationTest extends PostgresIntegrationTest {
     void declaringTheRecommendationsNeedsConfigWrite() throws Exception {
         // Reading them is a read; turning them into a revision is an edit. A caller
         // who can only read must not be able to move the declaration.
-        assertThat(status(
-                        MockMvcRequestBuilders.post("/api/v1/clusters/" + clusterId + "/config/recommendations/declare")
-                                .with(csrf())
-                                .with(authentication(callerWith(Permissions.CLUSTER_READ)))
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content("{}")))
+        assertThat(status(MockMvcRequestBuilders.post(
+                                "/api/v1/clusters/" + clusterId + "/artemis/config/recommendations/declare")
+                        .with(csrf())
+                        .with(authentication(callerWith(Permissions.CLUSTER_READ)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}")))
                 .isEqualTo(404);
     }
 
     @Test
     void anInvalidDeclarationIsRefusedWithTheFieldNamed() throws Exception {
-        var result = mvc.perform(MockMvcRequestBuilders.put("/api/v1/clusters/" + clusterId + "/config")
+        var result = mvc.perform(MockMvcRequestBuilders.put("/api/v1/clusters/" + clusterId + "/artemis/config")
                         .with(csrf())
                         .with(authentication(
                                 callerWith(Permissions.CLUSTER_READ, BrokerConfigPermissions.CONFIG_WRITE)))

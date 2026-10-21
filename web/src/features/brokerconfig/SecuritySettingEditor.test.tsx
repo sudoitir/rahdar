@@ -15,7 +15,7 @@ const ORDERS = DECLARED.document.securitySettings[0]!;
 function captureSave() {
   const saved = vi.fn();
   server.use(
-    http.put('*/api/v1/clusters/c1/config', async ({ request }) => {
+    http.put('*/api/v1/clusters/c1/artemis/config', async ({ request }) => {
       saved(await request.json());
       return HttpResponse.json(DECLARED);
     }),

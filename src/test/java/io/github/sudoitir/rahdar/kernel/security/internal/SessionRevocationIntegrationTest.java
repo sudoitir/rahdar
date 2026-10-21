@@ -116,18 +116,18 @@ class SessionRevocationIntegrationTest extends PostgresIntegrationTest {
     @Test
     void changingARolesPermissionsLeavesItsMembersSessionsOpenBecauseTheChangeAppliesAtOnce() {
         AppUserEntity first = newUser("revoke-role-a");
-        var role = roleService.create(
-                new RoleRequest("revoke-role", List.of("cluster:read", "queue:read", "queue:purge"), false, false));
+        var role = roleService.create(new RoleRequest(
+                "revoke-role", List.of("cluster:read", "subscription:read", "subscription:purge"), false, false));
         userService.addGrant(first.getId(), new GrantRequest(role.id(), "GLOBAL", null));
         openSession(first.getUsername());
 
         roleService.update(
-                role.id(), new RoleRequest("revoke-role", List.of("cluster:read", "queue:read"), false, false));
+                role.id(), new RoleRequest("revoke-role", List.of("cluster:read", "subscription:read"), false, false));
 
         assertThat(sessions.findByPrincipalName(first.getUsername())).hasSize(1);
         assertThat(access.of(first.getId()).grants())
                 .flatExtracting(Grant::permissions)
-                .containsExactlyInAnyOrder("cluster:read", "queue:read");
+                .containsExactlyInAnyOrder("cluster:read", "subscription:read");
     }
 
     @Test
@@ -182,7 +182,7 @@ class SessionRevocationIntegrationTest extends PostgresIntegrationTest {
     void addingAMemberToATeamRoleThatRequiresMfaEndsTheirSessionsAndRequiresOne() {
         AppUserEntity user = newUser("revoke-team-mfa");
         UUID team = teams.create("mfa-" + UUID.randomUUID()).id();
-        var role = roleService.create(new RoleRequest("team-mfa-role", List.of("queue:read"), true, true));
+        var role = roleService.create(new RoleRequest("team-mfa-role", List.of("subscription:read"), true, true));
         openSession(user.getUsername());
         assertThat(accounts.holdsMfaRole(user.getId())).isFalse();
 
@@ -197,14 +197,14 @@ class SessionRevocationIntegrationTest extends PostgresIntegrationTest {
         AppUserEntity user = newUser("revoke-group-mfa");
         userGroups.save(new UserGroupEntity(user.getId(), "dir", "eng"));
         UUID team = teams.create("group-mfa-" + UUID.randomUUID()).id();
-        var role = roleService.create(new RoleRequest("group-mfa-role", List.of("queue:read"), true, true));
+        var role = roleService.create(new RoleRequest("group-mfa-role", List.of("subscription:read"), true, true));
         openSession(user.getUsername());
 
         teamMembers.save(TeamMemberEntity.ofGroup(team, "dir", "eng", role.id()));
 
         assertThat(accounts.holdsMfaRole(user.getId())).isTrue();
         // The role is what requires the factor, so the requirement ends with it.
-        roleService.update(role.id(), new RoleRequest("group-mfa-role", List.of("queue:read"), false, true));
+        roleService.update(role.id(), new RoleRequest("group-mfa-role", List.of("subscription:read"), false, true));
         assertThat(accounts.holdsMfaRole(user.getId())).isFalse();
     }
 
@@ -214,13 +214,13 @@ class SessionRevocationIntegrationTest extends PostgresIntegrationTest {
         AppUserEntity viaGroup = newUser("revoke-team-switch-group");
         userGroups.save(new UserGroupEntity(viaGroup.getId(), "dir", "ops"));
         UUID team = teams.create("switch-" + UUID.randomUUID()).id();
-        var role = roleService.create(new RoleRequest("team-switch-role", List.of("queue:read"), false, true));
+        var role = roleService.create(new RoleRequest("team-switch-role", List.of("subscription:read"), false, true));
         teams.addMember(team, new MemberRequest(PrincipalType.USER, direct.getId(), null, null, role.id()));
         teamMembers.save(TeamMemberEntity.ofGroup(team, "dir", "ops", role.id()));
         openSession(direct.getUsername());
         openSession(viaGroup.getUsername());
 
-        roleService.update(role.id(), new RoleRequest("team-switch-role", List.of("queue:read"), true, true));
+        roleService.update(role.id(), new RoleRequest("team-switch-role", List.of("subscription:read"), true, true));
 
         assertThat(sessions.findByPrincipalName(direct.getUsername())).isEmpty();
         assertThat(sessions.findByPrincipalName(viaGroup.getUsername())).isEmpty();

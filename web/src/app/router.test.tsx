@@ -39,7 +39,9 @@ function mockShell() {
         },
       }),
     ),
-    http.get('*/api/v1/clusters/c1/queues', () => HttpResponse.json({ data: [], count: 0, page: 1, pageSize: 50 })),
+    http.get('*/api/v1/clusters/c1/subscriptions', () =>
+      HttpResponse.json({ data: [], count: 0, page: 1, pageSize: 50 }),
+    ),
   );
 }
 

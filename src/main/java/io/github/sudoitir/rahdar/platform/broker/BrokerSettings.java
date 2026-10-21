@@ -19,7 +19,7 @@ public class BrokerSettings implements SettingsContribution {
     /** Server-enforced ceiling on one destructive message operation (ADR-0022). */
     public static final String BULK_CAP = "safety.bulk-cap";
     /** Most queues one bulk run may act on; there is no override (ADR-0093). */
-    public static final String BULK_QUEUE_CAP = "safety.bulk-queue-cap";
+    public static final String BULK_SUBSCRIPTION_CAP = "safety.bulk-subscription-cap";
 
     private final RateLimitProperties rateLimit;
     private final BrokerProperties broker;
@@ -68,12 +68,12 @@ public class BrokerSettings implements SettingsContribution {
                         () -> Integer.toString(safety.bulkCap()),
                         null),
                 new SettingDef(
-                        BULK_QUEUE_CAP,
+                        BULK_SUBSCRIPTION_CAP,
                         "Safety",
                         "Bulk run queue cap",
                         "Most queues one bulk run may act on. There is no override: narrow the selection instead.",
                         Kind.INT,
-                        () -> Integer.toString(safety.bulkQueueCap()),
+                        () -> Integer.toString(safety.bulkSubscriptionCap()),
                         null));
     }
 

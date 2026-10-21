@@ -11,6 +11,7 @@ import io.github.sudoitir.rahdar.kernel.gate.OperationGate;
 import io.github.sudoitir.rahdar.kernel.lifecycle.partition.PartitionDrops;
 import io.github.sudoitir.rahdar.kernel.plugin.FeatureDescriptor;
 import io.github.sudoitir.rahdar.kernel.plugin.InstalledFeatures;
+import io.github.sudoitir.rahdar.kernel.security.ResourceIdTexts;
 import io.github.sudoitir.rahdar.kernel.security.ResourceNames;
 import io.github.sudoitir.rahdar.platform.broker.BrokerCapabilityProbe;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterOwnership;
@@ -70,6 +71,10 @@ public abstract class ModuleIntegrationTest {
 
     @MockitoBean
     ResourceNames resourceNames;
+
+    /** Implemented by the clusters module, which a module test boots only when it depends on it. */
+    @MockitoBean
+    ResourceIdTexts resourceIdTexts;
 
     /** Background scraping would call mocked broker beans; no module test relies on it. */
     @MockitoBean

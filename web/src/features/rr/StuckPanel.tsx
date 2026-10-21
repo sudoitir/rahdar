@@ -19,7 +19,7 @@ function stuckWords(pending: boolean, failed: boolean, count: number): string {
  * deadline, plus every terminal non-completed state, oldest first. One query
  * over every flow, filtered client-side — simpler than one hook per state and
  * the flow volume this screen deals with is small by construction (Phase 5
- * traces a handful of declared addresses, not a whole broker's traffic).
+ * traces a handful of declared destinations, not a whole broker's traffic).
  */
 export function StuckPanel({
   clusterId,

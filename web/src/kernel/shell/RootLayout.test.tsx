@@ -11,7 +11,7 @@ import { paged } from '../api/paging.ts';
 
 const navigate = vi.fn();
 // Where the mocked router says the address is; a cluster's view unless a test moves it.
-const place = vi.hoisted(() => ({ pathname: '/clusters/c1/queues', clusterId: 'c1' as string | undefined }));
+const place = vi.hoisted(() => ({ pathname: '/clusters/c1/subscriptions', clusterId: 'c1' as string | undefined }));
 
 vi.mock('@tanstack/react-router', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@tanstack/react-router')>()),
@@ -40,11 +40,13 @@ vi.mock('@tanstack/react-router', async (importOriginal) => ({
 
 const { RootLayout } = await import('./RootLayout.tsx');
 
-// CommandPalette (mounted by RootLayout) always queries a queues endpoint,
+// CommandPalette (mounted by RootLayout) always queries a subscriptions endpoint,
 // even with no active cluster — a pre-existing behavior, not introduced here.
-function mockEmptyQueues() {
+function mockEmptySubscriptions() {
   server.use(
-    http.get(/\/api\/v1\/clusters\/.*\/queues/, () => HttpResponse.json({ data: [], count: 0, page: 1, pageSize: 50 })),
+    http.get(/\/api\/v1\/clusters\/.*\/subscriptions/, () =>
+      HttpResponse.json({ data: [], count: 0, page: 1, pageSize: 50 }),
+    ),
     http.get('*/api/v1/alerts/firing', () => HttpResponse.json(paged([]))),
     // The cluster switcher groups clusters by environment (authorization spec).
     http.get('*/api/v1/environments', () => HttpResponse.json(paged([]))),
@@ -72,7 +74,7 @@ describe('RootLayout sidebar collapse', () => {
 
   it('persists the collapse toggle to localStorage and restores it on remount without a flash', async () => {
     mockAuthenticated();
-    mockEmptyQueues();
+    mockEmptySubscriptions();
     server.use(http.get('*/api/v1/clusters', () => HttpResponse.json(paged([]))));
     const user = userEvent.setup();
     localStorage.removeItem('as:nav:collapsed');
@@ -90,7 +92,7 @@ describe('RootLayout sidebar collapse', () => {
 
   it('keeps the collapsed cluster switcher reachable by name for a screen reader', async () => {
     mockAuthenticated();
-    mockEmptyQueues();
+    mockEmptySubscriptions();
     server.use(
       http.get('*/api/v1/clusters', () =>
         HttpResponse.json(paged([{ id: 'c1', name: 'prod-emea', health: 'OK', nodeCount: 3 }])),
@@ -121,7 +123,7 @@ describe('RootLayout in a narrow window', () => {
 
   it('shows the icon rail whatever was chosen, and says why the toggle does nothing', async () => {
     mockAuthenticated();
-    mockEmptyQueues();
+    mockEmptySubscriptions();
     server.use(
       http.get('*/api/v1/clusters', () =>
         HttpResponse.json(paged([{ id: 'c1', name: 'prod-emea', health: 'OK', nodeCount: 3 }])),
@@ -150,7 +152,7 @@ describe('RootLayout user menu', () => {
 
   it('shows the username, an Administration link for an admin, and logs out', async () => {
     mockAuthenticated();
-    mockEmptyQueues();
+    mockEmptySubscriptions();
     server.use(
       http.get('*/api/v1/clusters', () => HttpResponse.json(paged([]))),
       http.post('*/api/v1/auth/logout', () => new HttpResponse(null, { status: 204 })),
@@ -178,7 +180,7 @@ describe('RootLayout user menu', () => {
         }),
       ),
     );
-    mockEmptyQueues();
+    mockEmptySubscriptions();
     server.use(http.get('*/api/v1/clusters', () => HttpResponse.json(paged([]))));
     const user = userEvent.setup();
     renderWithProviders(<RootLayout />);
@@ -208,7 +210,7 @@ describe('RootLayout second-factor enrolment', () => {
 
   it('sends a session whose role requires a second factor to enrol one, and shows no shell', async () => {
     meWith({ secondFactorEnrolmentRequired: true });
-    mockEmptyQueues();
+    mockEmptySubscriptions();
     renderWithProviders(<RootLayout />);
 
     await vi.waitFor(() => expect(navigate).toHaveBeenCalledWith({ to: '/enrol-second-factor' }));
@@ -217,7 +219,7 @@ describe('RootLayout second-factor enrolment', () => {
 
   it('asks for the new password first when both are due', async () => {
     meWith({ secondFactorEnrolmentRequired: true, mustChangePassword: true });
-    mockEmptyQueues();
+    mockEmptySubscriptions();
     renderWithProviders(<RootLayout />);
 
     await vi.waitFor(() => expect(navigate).toHaveBeenCalledWith({ to: '/change-password' }));
@@ -228,7 +230,7 @@ describe('RootLayout second-factor enrolment', () => {
 describe('RootLayout break-glass banner', () => {
   it('says in words, on every page, that approval checks are bypassed while break-glass is on', async () => {
     mockAuthenticated();
-    mockEmptyQueues();
+    mockEmptySubscriptions();
     server.use(
       http.get('*/api/v1/clusters', () => HttpResponse.json(paged([]))),
       http.get('*/api/v1/gate/status', () =>
@@ -247,7 +249,7 @@ describe('RootLayout break-glass banner', () => {
 
   it('shows no banner while break-glass is off', async () => {
     mockAuthenticated();
-    mockEmptyQueues();
+    mockEmptySubscriptions();
     server.use(http.get('*/api/v1/clusters', () => HttpResponse.json(paged([]))));
     renderWithProviders(<RootLayout />);
 
@@ -258,7 +260,7 @@ describe('RootLayout break-glass banner', () => {
 
 describe('RootLayout outside any cluster', () => {
   afterEach(() => {
-    place.pathname = '/clusters/c1/queues';
+    place.pathname = '/clusters/c1/subscriptions';
     place.clusterId = 'c1';
     localStorage.removeItem('as:last-place');
   });
@@ -267,7 +269,7 @@ describe('RootLayout outside any cluster', () => {
     place.pathname = pathname;
     place.clusterId = undefined;
     mockAuthenticated();
-    mockEmptyQueues();
+    mockEmptySubscriptions();
     server.use(http.get('*/api/v1/clusters', () => HttpResponse.json(paged([]))));
   }
 
@@ -288,21 +290,21 @@ describe('RootLayout outside any cluster', () => {
       JSON.stringify({
         clusterId: 'c1',
         clusterName: 'prod-emea',
-        label: 'Queues',
-        to: '/clusters/c1/queues',
+        label: 'Subscriptions',
+        to: '/clusters/c1/subscriptions',
         search: {},
       }),
     );
     outside('/admin');
     renderWithProviders(<RootLayout />);
 
-    const back = await screen.findByRole('link', { name: 'Back to prod-emea · Queues' });
-    expect(back).toHaveAttribute('href', '/clusters/c1/queues');
+    const back = await screen.findByRole('link', { name: 'Back to prod-emea · Subscriptions' });
+    expect(back).toHaveAttribute('href', '/clusters/c1/subscriptions');
   });
 
   it('keeps the sidebar on a cluster page, with no line above it', async () => {
     mockAuthenticated();
-    mockEmptyQueues();
+    mockEmptySubscriptions();
     server.use(http.get('*/api/v1/clusters', () => HttpResponse.json(paged([]))));
     renderWithProviders(<RootLayout />);
 

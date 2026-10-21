@@ -29,16 +29,16 @@ export const COLUMNS: CatalogueColumn[] = [
     description: 'The broker-assigned message id. Node-local.',
   },
   {
-    name: 'queue',
+    name: 'subscription',
     type: 'string',
     evaluation: 'TARGET',
-    description: 'The queue the message is on.',
+    description: 'The subscription the message is on.',
   },
   {
-    name: 'address',
+    name: 'destination',
     type: 'string',
     evaluation: 'TARGET',
-    description: 'The address the queue is bound to.',
+    description: 'The destination the subscription is bound to.',
   },
   {
     name: 'node',
@@ -130,7 +130,7 @@ export const COLUMNS: CatalogueColumn[] = [
     type: 'timestamp',
     evaluation: 'SCAN',
     indexOnly: true,
-    description: 'When the index last still saw it on its queue.',
+    description: 'When the index last still saw it on its subscription.',
   },
   {
     name: 'origin',
@@ -138,21 +138,21 @@ export const COLUMNS: CatalogueColumn[] = [
     evaluation: 'SCAN',
     indexOnly: true,
     description:
-      'SAMPLED or CAPTURED. A sampled row says a poll saw the message; a captured one says the address routed it.',
+      'SAMPLED or CAPTURED. A sampled row says a poll saw the message; a captured one says the destination routed it.',
   },
   {
-    name: 'origAddress',
+    name: 'orig_destination',
     type: 'string',
     evaluation: 'SCAN',
     indexOnly: true,
-    description: 'The address the broker said a captured copy came from, when it said so.',
+    description: 'The destination the broker said a captured copy came from, when it said so.',
   },
   {
     name: 'sourceMessageId',
     type: 'string',
     evaluation: 'SCAN',
     indexOnly: true,
-    description: "A captured message's id on its source queue. Null when the broker did not copy it.",
+    description: "A captured message's id on its source subscription. Null when the broker did not copy it.",
   },
 ];
 
@@ -173,7 +173,7 @@ export const FULL_TEXT = {
 
 /** How each evaluation class reads to an operator, in words rather than a colour. */
 export const EVALUATION_WORDS: Record<Evaluation, string> = {
-  TARGET: 'chooses the queues — costs nothing',
+  TARGET: 'chooses the subscriptions — costs nothing',
   PUSHDOWN: 'the broker filters — costs nothing',
   SCAN: 'Rahdar examines every message returned',
 };
@@ -190,7 +190,7 @@ export interface Example {
  */
 export const EXAMPLES: Example[] = [
   {
-    title: 'Everything on one queue',
+    title: 'Everything on one subscription',
     sql: 'SELECT * FROM "ORDER.IN"\nORDER BY timestamp DESC\nLIMIT 100',
     note: 'No predicate at all — the broker returns its head pages and nothing is examined.',
   },
@@ -232,6 +232,6 @@ export const EXAMPLES: Example[] = [
   {
     title: 'Force the historical index',
     sql: 'SELECT * FROM index."ORDER.IN"\nWHERE observedAt > now() - interval \'1 day\'\nLIMIT 500',
-    note: 'The index still holds messages that have since been consumed. It only covers queues with a subscription.',
+    note: 'The index still holds messages that have since been consumed. It only covers subscriptions with a subscription.',
   },
 ];

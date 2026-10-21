@@ -22,7 +22,7 @@ export const keys = {
 
 const base = (clusterId: string) => `/clusters/${clusterId}/bulk`;
 
-/** Freezes the queue set and states its blast radius. Persists a PREVIEWED run; acts on nothing. */
+/** Freezes the subscription set and states its blast radius. Persists a PREVIEWED run; acts on nothing. */
 export function useBulkPreview(clusterId: string) {
   return useMutation<BulkRunDetailView, ApiError, BulkPreviewRequest>({
     mutationFn: (body) =>
@@ -47,7 +47,7 @@ export function useBulkStop(clusterId: string, runId: string) {
   });
 }
 
-/** Kept current by the `bulk` stream topic, which invalidates it per queue acted on. */
+/** Kept current by the `bulk` stream topic, which invalidates it per subscription acted on. */
 export function useBulkRun(clusterId: string, runId: string): UseQueryResult<BulkRunDetailView, ApiError> {
   return useQuery({
     queryKey: keys.run(clusterId, runId),

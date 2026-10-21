@@ -79,7 +79,7 @@ export function useEffectivePermissions(userId: string | null): UseQueryResult<E
 /** Every catalogue permission for a user here, with each source that allows it. `name` needs a cluster. */
 export function useAccessCheck(
   userId: string | null,
-  where: { clusterId: string | null; kind: 'QUEUE' | 'ADDRESS'; name: string },
+  where: { clusterId: string | null; kind: 'SUBSCRIPTION' | 'DESTINATION'; name: string },
 ): UseQueryResult<AccessCheckView[], ApiError> {
   const name = where.clusterId ? where.name.trim() : '';
   return useQuery({
@@ -88,7 +88,7 @@ export function useAccessCheck(
       const qs = new URLSearchParams();
       if (where.clusterId) qs.set('clusterId', where.clusterId);
       if (name) {
-        qs.set('kind', where.kind);
+        qs.set('type', where.kind);
         qs.set('name', name);
       }
       const query = qs.size > 0 ? `?${qs}` : '';
@@ -445,10 +445,10 @@ export function useRemoveShare(teamId: string) {
 
 export const UNOWNED_PAGE_SIZE = 100;
 
-/** The queue or address names of a cluster that no team's pattern covers, one page at a time. */
+/** The subscription or destination names of a cluster that no team's pattern covers, one page at a time. */
 export function useUnowned(
   clusterId: string | null,
-  kind: 'QUEUE' | 'ADDRESS',
+  kind: 'SUBSCRIPTION' | 'DESTINATION',
   page: number,
   enabled: boolean,
 ): UseQueryResult<PagedView<UnownedView>, ApiError> {
@@ -456,23 +456,25 @@ export function useUnowned(
     queryKey: keys.unowned(clusterId ?? '', kind, page),
     queryFn: () =>
       request<PagedView<UnownedView>>(
-        `/clusters/${clusterId}/unowned?${new URLSearchParams({ kind, page: String(page), size: String(UNOWNED_PAGE_SIZE) })}`,
+        `/clusters/${clusterId}/unowned?${new URLSearchParams({ type: kind, page: String(page), size: String(UNOWNED_PAGE_SIZE) })}`,
       ),
     enabled: enabled && clusterId !== null,
   });
 }
 
-/** The owner and every share of one queue or address: which teams and roles may act on it. */
+/** The owner and every share of one subscription or destination: which teams and roles may act on it. */
 export function useResourceAccess(
   clusterId: string,
-  kind: 'QUEUE' | 'ADDRESS',
+  kind: 'SUBSCRIPTION' | 'DESTINATION',
   name: string,
   enabled: boolean,
 ): UseQueryResult<ResourceAccessView, ApiError> {
   return useQuery({
     queryKey: keys.resourceAccess(clusterId, kind, name),
     queryFn: () =>
-      request<ResourceAccessView>(`/clusters/${clusterId}/resource-access?${new URLSearchParams({ kind, name })}`),
+      request<ResourceAccessView>(
+        `/clusters/${clusterId}/resource-access?${new URLSearchParams({ type: kind, name })}`,
+      ),
     enabled,
     retry: false,
   });

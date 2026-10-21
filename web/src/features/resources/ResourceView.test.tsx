@@ -1,3 +1,4 @@
+import { destinationIdentity } from '../../test/wire.ts';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { delay, http, HttpResponse } from 'msw';
 import { screen, within } from '@testing-library/react';
@@ -43,10 +44,12 @@ function consumer(id: string) {
   return {
     nodeId: 'n1',
     nodeName: 'node-a',
-    consumerId: id,
-    queueName: 'orders',
-    address: 'orders',
-    sessionId: 's1',
+    id: `artemis.consumer/s1/${id}`,
+    kind: 'artemis.consumer',
+    kindLabel: 'Consumer',
+    channel: 'artemis.session/s1',
+    subscription: 'artemis.queue/orders',
+    destination: 'artemis.address/orders',
     protocol: 'CORE',
     messagesDelivered: 7,
     messagesAcknowledged: 5,
@@ -82,7 +85,7 @@ function serve({
   );
 }
 
-/** What the last navigate() call does to the address it starts from. */
+/** What the last navigate() call does to the destination it starts from. */
 function nextSearch(prev: Record<string, unknown> = {}) {
   const call = navigate.mock.lastCall![0] as { search: (p: Record<string, unknown>) => Record<string, unknown> };
   return call.search(prev);
@@ -102,15 +105,15 @@ describe('ResourceView', () => {
     expect(await screen.findByText('1–1 of 1 consumers')).toBeInTheDocument();
   });
 
-  it('puts the sort in the address and starts again at the first page', async () => {
+  it('puts the sort in the destination and starts again at the first page', async () => {
     serve({ consumers: [consumer('c-1')] });
     const user = userEvent.setup();
     renderWithProviders(<ResourceView kind="consumers" />);
 
     await screen.findByText('node-a');
-    await user.click(within(screen.getByRole('columnheader', { name: /Queue/ })).getByRole('button'));
+    await user.click(within(screen.getByRole('columnheader', { name: /Subscription/ })).getByRole('button'));
 
-    expect(nextSearch({ page: 3, q: 'x' })).toEqual({ page: undefined, q: 'x', sort: 'queue' });
+    expect(nextSearch({ page: 3, q: 'x' })).toEqual({ page: undefined, q: 'x', sort: 'subscription' });
   });
 
   it('teaches what a consumer is when there is none', async () => {
@@ -118,10 +121,10 @@ describe('ResourceView', () => {
     renderWithProviders(<ResourceView kind="consumers" />);
 
     expect(await screen.findByText('No consumers right now')).toBeInTheDocument();
-    expect(screen.getByText(/A consumer is a client subscribed to a queue/)).toBeInTheDocument();
+    expect(screen.getByText(/A consumer is a client attached to a subscription/)).toBeInTheDocument();
   });
 
-  it('says the filter emptied it, and clears the filter from the address', async () => {
+  it('says the filter emptied it, and clears the filter from the destination', async () => {
     search = { q: 'zzz' };
     serve();
     const user = userEvent.setup();
@@ -156,24 +159,24 @@ describe('ResourceView', () => {
   });
 });
 
-describe('ResourceView addresses of teams', () => {
-  function address(name: string, ownerTeam?: { id: string; name: string }) {
+describe('ResourceView destinations of teams', () => {
+  function destination(name: string, ownerTeam?: { id: string; name: string }) {
     return {
       nodeId: 'n1',
       nodeName: 'node-a',
-      name,
+      ...destinationIdentity(name),
       delivery: ['POINT_TO_POINT'],
-      queueCount: 1,
+      subscriptionCount: 1,
       messageCount: 3,
-      allowedActions: ['address:read'],
+      allowedActions: ['destination:read'],
       ...(ownerTeam ? { ownerTeam } : {}),
     };
   }
 
-  function serveAddresses(rows: object[], access: { permissions: string[]; anywhere: string[] }) {
+  function serveDestinations(rows: object[], access: { permissions: string[]; anywhere: string[] }) {
     serve();
     server.use(
-      http.get('*/api/v1/clusters/c1/addresses', () =>
+      http.get('*/api/v1/clusters/c1/destinations', () =>
         HttpResponse.json({ data: rows, count: rows.length, page: 1, pageSize: 200, hasNext: false }),
       ),
       http.get('*/api/v1/me/access', ({ request }) => {
@@ -182,34 +185,34 @@ describe('ResourceView addresses of teams', () => {
           ...access,
           canSeeCluster: clusterId ? true : null,
           teams: [],
-          createPatterns: { queue: [], address: [] },
+          createPatterns: { subscription: [], destination: [] },
         });
       }),
     );
   }
 
-  it('shows the team that owns each address, and says when none does', async () => {
-    serveAddresses([address('orders.in', { id: 't1', name: 'Orders' }), address('legacy.in')], {
-      permissions: ['address:read', 'user:admin'],
+  it('shows the team that owns each destination, and says when none does', async () => {
+    serveDestinations([destination('orders.in', { id: 't1', name: 'Orders' }), destination('legacy.in')], {
+      permissions: ['destination:read', 'user:admin'],
       anywhere: [],
     });
-    renderWithProviders(<ResourceView kind="addresses" />);
+    renderWithProviders(<ResourceView kind="destinations" />);
 
-    const grid = await screen.findByRole('grid', { name: 'Addresses' });
+    const grid = await screen.findByRole('grid', { name: 'Destinations' });
     expect(await within(grid).findByRole('link', { name: 'Owner: team Orders' })).toBeInTheDocument();
     expect(within(grid).getByText('No owner')).toBeInTheDocument();
   });
 
-  it("says there are no addresses in the caller's teams when they reach addresses only through a team", async () => {
-    serveAddresses([], { permissions: [], anywhere: ['address:read'] });
-    renderWithProviders(<ResourceView kind="addresses" />);
+  it("says there are no destinations in the caller's teams when they reach destinations only through a team", async () => {
+    serveDestinations([], { permissions: [], anywhere: ['destination:read'] });
+    renderWithProviders(<ResourceView kind="destinations" />);
 
-    expect(await screen.findByText('No addresses in your teams on this cluster')).toBeInTheDocument();
+    expect(await screen.findByText('No destinations in your teams on this cluster')).toBeInTheDocument();
   });
 
   it('says the caller is in no team on the cluster, and whom to ask, when they reach nothing', async () => {
-    serveAddresses([], { permissions: [], anywhere: [] });
-    renderWithProviders(<ResourceView kind="addresses" />);
+    serveDestinations([], { permissions: [], anywhere: [] });
+    renderWithProviders(<ResourceView kind="destinations" />);
 
     expect(await screen.findByText("You're not in any team on this cluster")).toBeInTheDocument();
     expect(screen.getByText(/Ask a platform administrator to add you to a team/)).toBeInTheDocument();
@@ -218,9 +221,9 @@ describe('ResourceView addresses of teams', () => {
 
 describe('ResourceView page structure', () => {
   it.each([
-    ['addresses', 'Addresses'],
+    ['destinations', 'Destinations'],
     ['consumers', 'Consumers'],
-    ['sessions', 'Sessions'],
+    ['channels', 'Channels'],
     ['connections', 'Connections'],
     ['producers', 'Producers'],
   ] as const)('is one page whose single h1 names the %s', async (kind, title) => {

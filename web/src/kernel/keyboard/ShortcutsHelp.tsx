@@ -128,7 +128,7 @@ export function ShortcutsHelp() {
                       ['⌘', 'K'],
                       ['Ctrl', 'K'],
                     ],
-                    what: 'Search views, clusters and queues',
+                    what: 'Search views, clusters and subscriptions',
                   },
                   {
                     keys: [

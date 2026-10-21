@@ -11,7 +11,7 @@ import io.github.sudoitir.rahdar.kernel.core.NotFoundException;
 import io.github.sudoitir.rahdar.kernel.gate.Gated;
 import io.github.sudoitir.rahdar.kernel.gate.Operation;
 import io.github.sudoitir.rahdar.kernel.gate.OperationGate;
-import io.github.sudoitir.rahdar.kernel.plugin.ResourceKind;
+import io.github.sudoitir.rahdar.kernel.plugin.ResourceType;
 import io.github.sudoitir.rahdar.kernel.replica.RahdarBus;
 import io.github.sudoitir.rahdar.kernel.replica.ReplicaSignal;
 import io.github.sudoitir.rahdar.kernel.security.Actor;
@@ -237,7 +237,7 @@ public class ApiTokenService implements PersonalTokens {
                 Grant.ScopeType.valueOf(row.getScopeType()),
                 row.getScopeId(),
                 row.getAction(),
-                limited ? ResourceKind.valueOf(row.getResourceKind()) : null,
+                limited ? ResourceType.valueOf(row.getResourceType()) : null,
                 limited ? ResourcePattern.parse(row.getResourcePattern()) : null);
     }
 

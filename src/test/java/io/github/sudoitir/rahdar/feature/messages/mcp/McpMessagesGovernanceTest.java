@@ -153,13 +153,19 @@ class McpMessagesGovernanceTest extends PostgresIntegrationTest {
                 tokens,
                 Grant.ScopeType.GLOBAL,
                 null,
-                Set.of(Permissions.CLUSTER_READ, Permissions.QUEUE_READ, "message:read"));
+                Set.of(Permissions.CLUSTER_READ, Permissions.SUBSCRIPTION_READ, "message:read"));
 
         JsonNode response = McpFixture.callTool(
                 mvc,
                 key,
                 "browse_messages",
-                Map.of("clusterId", clusterId.toString(), "queue", "PHASE3.SRC", "messageId", "501"));
+                Map.of(
+                        "clusterId",
+                        clusterId.toString(),
+                        "subscription",
+                        "artemis.queue/PHASE3.SRC",
+                        "position",
+                        "501"));
 
         String text = response.toString();
         assertThat(response.path("result").path("isError").asBoolean(false))

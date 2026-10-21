@@ -50,26 +50,28 @@ class DetectorsTest {
     }
 
     @Test
-    void addressPatternsFollowArtemisWildcards() {
-        var orders = AddressPattern.compile("orders.#");
+    void destinationPatternsFollowArtemisWildcards() {
+        var orders = DestinationPattern.compile("orders.#");
         assertThat(orders.matcher("orders").matches()).isTrue();
         assertThat(orders.matcher("orders.eu.north").matches()).isTrue();
         assertThat(orders.matcher("billing.eu").matches()).isFalse();
-        var one = AddressPattern.compile("orders.*");
+        var one = DestinationPattern.compile("orders.*");
         assertThat(one.matcher("orders.eu").matches()).isTrue();
         assertThat(one.matcher("orders.eu.north").matches()).isFalse();
-        assertThat(AddressPattern.compile("#.dlq").matcher("orders.eu.dlq").matches())
+        assertThat(DestinationPattern.compile("#.dlq").matcher("orders.eu.dlq").matches())
                 .isTrue();
-        assertThat(AddressPattern.compile("#.dlq").matcher("dlq").matches()).isTrue();
+        assertThat(DestinationPattern.compile("#.dlq").matcher("dlq").matches()).isTrue();
     }
 
     @Test
     void namesAreCaseInsensitiveGlobs() {
-        assertThat(AddressPattern.glob("*token*").matcher("X-Auth-TOKEN-Id").matches())
+        assertThat(DestinationPattern.glob("*token*").matcher("X-Auth-TOKEN-Id").matches())
                 .isTrue();
-        assertThat(AddressPattern.glob("authorization").matcher("Authorization").matches())
+        assertThat(DestinationPattern.glob("authorization")
+                        .matcher("Authorization")
+                        .matches())
                 .isTrue();
-        assertThat(AddressPattern.glob("authorization")
+        assertThat(DestinationPattern.glob("authorization")
                         .matcher("authorizationId")
                         .matches())
                 .isFalse();

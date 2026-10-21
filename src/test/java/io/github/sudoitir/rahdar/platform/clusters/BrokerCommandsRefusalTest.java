@@ -51,8 +51,8 @@ class BrokerCommandsRefusalTest {
     private Command command() {
         return Command.builder()
                 .clusterId(CLUSTER)
-                .permission("queue:purge")
-                .resources(List.of(ResourceRef.queue("orders.in")))
+                .permission("subscription:purge")
+                .resources(List.of(ResourceRef.subscription("orders.in")))
                 .auditAction("PURGE_QUEUE")
                 .targetType("QUEUE")
                 .targetName("orders.in")
@@ -64,7 +64,7 @@ class BrokerCommandsRefusalTest {
     void aForbiddenCommandIsAuditedRefusedAndNeverReachesABroker() {
         when(audit.begin(any(), any(), any(), any(), any(), any(), any(), eq(false)))
                 .thenReturn(event);
-        doThrow(new AccessDeniedException("no queue:purge")).when(guard).requireAll(eq(CLUSTER), any());
+        doThrow(new AccessDeniedException("no subscription:purge")).when(guard).requireAll(eq(CLUSTER), any());
 
         var command = command();
         assertThatThrownBy(() -> commands.run(command)).isInstanceOf(AccessDeniedException.class);
@@ -73,7 +73,7 @@ class BrokerCommandsRefusalTest {
         order.verify(audit)
                 .begin(any(), eq("PURGE_QUEUE"), eq("QUEUE"), eq("orders.in"), any(), any(), any(), eq(false));
         order.verify(guard).requireAll(eq(CLUSTER), any());
-        order.verify(audit).refuse(event, "no queue:purge");
+        order.verify(audit).refuse(event, "no subscription:purge");
         verify(audit, never()).fail(any(), any());
         verify(gateway, never()).node(any(UUID.class), any(UUID.class));
     }

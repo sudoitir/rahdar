@@ -23,7 +23,7 @@ import org.springframework.stereotype.Component;
  * ways tracing could produce nothing and explain nothing.
  *
  * <p>Resolution reads {@code subscription_snapshot}, which the scrape loop already fills,
- * so this costs no broker call — the same trade {@link ReplyAddressResolver}
+ * so this costs no broker call — the same trade {@link ReplyDestinationResolver}
  * makes, and the same consequence: a queue created since the last scrape is
  * invisible until the next one.
  */
@@ -31,7 +31,7 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class QueueTargetResolver {
 
-    /** Matches {@link ReplyAddressResolver}: the sampler asks once per address per tick. */
+    /** Matches {@link ReplyDestinationResolver}: the sampler asks once per address per tick. */
     private static final Duration CACHE_TTL = Duration.ofSeconds(30);
 
     /**

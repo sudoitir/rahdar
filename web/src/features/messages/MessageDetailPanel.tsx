@@ -78,7 +78,7 @@ function MessageBody({
   contentType?: string | null;
   bodyTruncated: boolean;
   stringProperties: Record<string, string>;
-  messageId: number;
+  messageId: string;
   redactions: Redactions;
   withheld: MessageDetailView['withheld'];
 }>) {
@@ -175,7 +175,7 @@ function parsedJson(detected: ReturnType<typeof detectPayload>): unknown {
 }
 
 /** A binary body is handed over as its bytes, not as the base64 that carried it. */
-function downloadMessageBody(messageId: number, bodyEncoding: string, raw: string, format: string): void {
+function downloadMessageBody(messageId: string, bodyEncoding: string, raw: string, format: string): void {
   if (bodyEncoding === 'BASE64') {
     download(`message-${messageId}.bin`, new Blob([base64Bytes(raw)]));
   } else {
@@ -274,7 +274,7 @@ function MessageDetailContent({ m }: Readonly<{ m: MessageDetailView }>) {
         contentType={m.contentType}
         bodyTruncated={m.bodyTruncated}
         stringProperties={m.stringProperties}
-        messageId={m.messageId}
+        messageId={m.position}
         redactions={m.redactions}
         withheld={m.withheld}
       />
@@ -286,20 +286,20 @@ function MessageDetailContent({ m }: Readonly<{ m: MessageDetailView }>) {
 
 export function MessageDetailPanel({
   clusterId,
-  queueName,
+  subscriptionName,
   messageId,
   node,
   filter,
   onClose,
 }: Readonly<{
   clusterId: string;
-  queueName: string;
+  subscriptionName: string;
   messageId: string | null;
   node?: string;
   filter?: string;
   onClose: () => void;
 }>) {
-  const detail = useMessageDetail(clusterId, queueName, messageId, node, filter);
+  const detail = useMessageDetail(clusterId, subscriptionName, messageId, node, filter);
   const m = detail.data;
   // Absolute timestamps here read the display zone from module state, so this
   // subscribes the view to a zone change (`app/timezone.ts`).

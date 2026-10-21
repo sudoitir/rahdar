@@ -28,7 +28,7 @@ public final class McpViews {
     public record FiringAlert(String rule, String subject, String severity, Double value, Instant since) {}
 
     /**
-     * {@code diagnose} with no queue — the five-second answer. Everything a triage step
+     * {@code diagnose} with no subscription — the five-second answer. Everything a triage step
      * needs and nothing it does not: who is live, is the cluster split-brained, is
      * replication behind, what is firing.
      *
@@ -118,8 +118,19 @@ public final class McpViews {
         }
     }
 
-    /** A row of {@code list_resources}, flattened across every {@code ResourceKind}. */
-    public record ResourceRow(String kind, String name, String node, String detail, Long count) {}
+    /**
+     * A row of {@code list_resources}, flattened across every role. {@code id} is the canonical id the other
+     * tools take; {@code nodeId} is null for a row rolled up across nodes.
+     */
+    public record ResourceRow(
+            String id,
+            String kind,
+            String kindLabel,
+            String name,
+            String node,
+            UUID nodeId,
+            String detail,
+            Long count) {}
 
     /** One bucket of {@code metric_series}. */
     public record MetricPoint(Instant at, double value) {}
@@ -129,7 +140,7 @@ public final class McpViews {
             UUID clusterId, String metric, String subject, String window, List<MetricPoint> points) {}
 
     /**
-     * {@code diagnose} with a queue — one queue, end to end, replacing four screens.
+     * {@code diagnose} with a subscription — one subscription, end to end, replacing four screens.
      *
      * <p>The verdict and every number under it come from the shared consumer-health
      * evaluation (ADR-0089), so this agrees with the console by construction rather
@@ -139,10 +150,10 @@ public final class McpViews {
      * available" — a distinct fact from zero, and one a model must not flatten into
      * "no throughput".
      */
-    public record QueueDiagnosis(
+    public record SubscriptionDiagnosis(
             UUID clusterId,
-            String queue,
-            String address,
+            String subscription,
+            String destination,
             String verdict,
             int severity,
             String cause,
@@ -184,7 +195,7 @@ public final class McpViews {
     /** A node that could not be read, with the classified reason. */
     public record ConfigUnavailable(String node, String kind, String reason) {}
 
-    /** {@code config_diff} result: every node against the majority, drift keys only. */
+    /** {@code artemis_config_diff} result: every node against the majority, drift keys only. */
     public record ConfigDiff(
             UUID clusterId,
             List<String> nodes,
@@ -197,8 +208,8 @@ public final class McpViews {
 
     /** A message header row from {@code browse_messages}; bodies are a separate, explicit call. */
     public record MessageHeader(
-            String messageId,
-            String queue,
+            String position,
+            String subscription,
             String node,
             Instant timestamp,
             Long size,
@@ -256,13 +267,13 @@ public final class McpViews {
     /** One request-reply flow. */
     public record FlowRow(
             String correlationId,
-            String requestQueue,
-            String replyQueue,
+            String requestDestination,
+            String replyDestination,
             Instant startedAt,
             Long latencyMs,
             String state) {}
 
-    // ---- broker_config ----------------------------------------------------
+    // ---- artemis_config ----------------------------------------------------
 
     /** A cluster's declaration, as a model reads it: the header and the document itself. */
     public record ConfigDeclaration(

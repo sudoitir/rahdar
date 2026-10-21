@@ -25,8 +25,8 @@ function target(nodeId: string, nodeName: string) {
   return {
     nodeId,
     nodeName,
-    queueName: 'ORDER.IN',
-    address: 'ORDER.IN',
+    subscription: 'artemis.queue/ORDER.IN',
+    destination: 'artemis.address/ORDER.IN',
     messageCount: 1200,
   };
 }
@@ -50,7 +50,7 @@ function answered(overrides: Record<string, unknown> = {}) {
   return {
     nodeId: 'n1',
     nodeName: 'primary',
-    queueName: 'ORDER.IN',
+    subscription: 'artemis.queue/ORDER.IN',
     status: 'ANSWERED',
     examined: 500,
     matched: 0,
@@ -59,7 +59,7 @@ function answered(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function mockCluster(over: { permissions?: string[]; messageIo?: object; queues?: object[] } = {}) {
+function mockCluster(over: { permissions?: string[]; messageIo?: object; subscriptions?: object[] } = {}) {
   server.use(
     http.get('*/api/v1/clusters/c1', () =>
       HttpResponse.json({
@@ -89,8 +89,13 @@ function mockCluster(over: { permissions?: string[]; messageIo?: object; queues?
         },
       }),
     ),
-    http.get('*/api/v1/clusters/c1/queues', () =>
-      HttpResponse.json({ data: over.queues ?? [], count: (over.queues ?? []).length, page: 1, pageSize: 500 }),
+    http.get('*/api/v1/clusters/c1/subscriptions', () =>
+      HttpResponse.json({
+        data: over.subscriptions ?? [],
+        count: (over.subscriptions ?? []).length,
+        page: 1,
+        pageSize: 500,
+      }),
     ),
     http.get('*/api/v1/auth/me', () =>
       HttpResponse.json({
@@ -140,7 +145,7 @@ describe('SqlConsoleView', () => {
     renderWithProviders(<SqlConsoleView />);
 
     expect(
-      await screen.findByText('The brokers filter; Rahdar examines at most 100 messages from 1 queue.'),
+      await screen.findByText('The brokers filter; Rahdar examines at most 100 messages from 1 subscription.'),
     ).toBeInTheDocument();
     expect(screen.getByText('Broker-filtered')).toBeInTheDocument();
     expect(screen.getByText(/pushed down:/i)).toBeInTheDocument();
@@ -159,7 +164,7 @@ describe('SqlConsoleView', () => {
     renderWithProviders(<SqlConsoleView />);
 
     expect(
-      await screen.findByText('Rahdar reads and examines about 12,400 messages on 1 queue across 1 node.'),
+      await screen.findByText('Rahdar reads and examines about 12,400 messages on 1 subscription across 1 node.'),
     ).toBeInTheDocument();
     expect(screen.getByText('Scan')).toBeInTheDocument();
     expect(screen.getByText(/scanned by rahdar:/i)).toBeInTheDocument();
@@ -241,8 +246,8 @@ describe('SqlConsoleView', () => {
     const row = (nodeId: string, nodeName: string, messageId: number, body: string) => ({
       nodeId,
       nodeName,
-      queueName: 'ORDER.IN',
-      address: 'ORDER.IN',
+      subscription: 'artemis.queue/ORDER.IN',
+      destination: 'artemis.address/ORDER.IN',
       messageId,
       messageType: 3,
       durable: true,
@@ -280,7 +285,7 @@ describe('SqlConsoleView', () => {
     expect(dataRows.filter((r) => r.textContent?.includes('primary'))).toHaveLength(2);
   });
 
-  it('distinguishes no-queue-matched from an empty queue', async () => {
+  it('distinguishes no-subscription-matched from an empty subscription', async () => {
     mockCluster();
     mockPlan(plan({ targets: [] }));
     const user = userEvent.setup();
@@ -295,7 +300,7 @@ describe('SqlConsoleView', () => {
       plan: plan({ targets: [] }),
     });
 
-    expect(await screen.findByText('No queue matched')).toBeInTheDocument();
+    expect(await screen.findByText('No subscription matched')).toBeInTheDocument();
   });
 
   it('refuses an over-budget query with its estimate and how to narrow it', async () => {
@@ -430,8 +435,8 @@ describe('SqlConsoleView', () => {
     emit('row', {
       nodeId: 'n1',
       nodeName: 'primary',
-      queueName: 'ORDER.IN',
-      address: 'ORDER.IN',
+      subscription: 'artemis.queue/ORDER.IN',
+      destination: 'artemis.address/ORDER.IN',
       messageId: 42,
       messageType: 3,
       durable: true,
@@ -505,8 +510,8 @@ describe('SqlConsoleView', () => {
 const messageRow = (messageId: number, body = `order ${messageId}`) => ({
   nodeId: 'n1',
   nodeName: 'primary',
-  queueName: 'ORDER.IN',
-  address: 'ORDER.IN',
+  subscription: 'artemis.queue/ORDER.IN',
+  destination: 'artemis.address/ORDER.IN',
   messageId,
   messageType: 3,
   durable: true,
@@ -531,7 +536,7 @@ const doneFrame = (over: Record<string, unknown> = {}) => ({
   ...over,
 });
 
-/** What the last navigate() call writes to the address. */
+/** What the last navigate() call writes to the destination. */
 function writtenSearch() {
   const call = navigate.mock.lastCall![0] as { search: () => unknown };
   return call.search();
@@ -582,7 +587,7 @@ describe('SqlConsoleView result outcomes', () => {
     expect(await screen.findAllByText('Running query')).not.toHaveLength(0);
   });
 
-  it('says nothing matched, and not that a queue is empty, when every target answered', async () => {
+  it('says nothing matched, and not that a subscription is empty, when every target answered', async () => {
     mockCluster();
     mockPlan();
     const user = userEvent.setup();
@@ -645,7 +650,7 @@ describe('SqlConsoleView running a query', () => {
     navigate.mockReset();
   });
 
-  it('writes the query into the address when it is run, and never on a keystroke', async () => {
+  it('writes the query into the destination when it is run, and never on a keystroke', async () => {
     search.current = { q: 'SELECT * FROM "A.B"' };
     mockCluster();
     mockPlan();
@@ -660,7 +665,7 @@ describe('SqlConsoleView running a query', () => {
     search.current = {};
   });
 
-  it('reopens a running query in the other mode when the tail is switched, and writes it to the address', async () => {
+  it('reopens a running query in the other mode when the tail is switched, and writes it to the destination', async () => {
     mockCluster();
     mockPlan();
     const user = userEvent.setup();
@@ -673,7 +678,7 @@ describe('SqlConsoleView running a query', () => {
     expect(writtenSearch()).toEqual({ q: expect.stringContaining('SELECT'), live: true });
   });
 
-  it('drops the tail from the address when it is stopped', async () => {
+  it('drops the tail from the destination when it is stopped', async () => {
     mockCluster();
     mockPlan();
     const user = userEvent.setup();
@@ -722,7 +727,7 @@ describe('SqlConsoleView permission and capability', () => {
   });
 
   it('keeps Run and Live tail visible but disabled, and says what is missing', async () => {
-    mockCluster({ permissions: ['queue:read'] });
+    mockCluster({ permissions: ['subscription:read'] });
     mockPlan();
     renderWithProviders(<SqlConsoleView />);
 
@@ -743,14 +748,14 @@ describe('SqlConsoleView permission and capability', () => {
     expect(screen.getByRole('button', { name: 'Run' })).toBeEnabled();
   });
 
-  it('says completion is capped when the cluster has more queues than it lists', async () => {
-    const queues = Array.from({ length: 500 }, (_, i) => ({ queueName: `Q.${i}` }));
-    mockCluster({ queues });
+  it('says completion is capped when the cluster has more subscriptions than it lists', async () => {
+    const subscriptions = Array.from({ length: 500 }, (_, i) => ({ subscriptionName: `Q.${i}` }));
+    mockCluster({ subscriptions });
     mockPlan();
     renderWithProviders(<SqlConsoleView />);
 
     expect(
-      await screen.findByText(/completion lists the first 500 queues on this cluster, not all of them/),
+      await screen.findByText(/completion lists the first 500 subscriptions on this cluster, not all of them/),
     ).toBeInTheDocument();
   });
 });
@@ -845,11 +850,11 @@ describe('SqlConsoleView result columns and export', () => {
 
   const headers = () => screen.getAllByRole('columnheader').map((header) => header.textContent);
 
-  it('leads with the message, then the queue and the node, as the table’s own columns', async () => {
+  it('leads with the message, then the subscription and the node, as the table’s own columns', async () => {
     await withRows();
     expect(headers().map((h) => h?.replace(/\s+/g, ' ').trim())).toEqual([
       'Message ID',
-      'Queue',
+      'Subscription',
       'Node',
       'Source',
       'Enqueued',
@@ -871,11 +876,11 @@ describe('SqlConsoleView result columns and export', () => {
     expect(JSON.parse(window.localStorage.getItem('as.table.sql.results')!)).toMatchObject({ hidden: ['priority'] });
 
     await user.click(screen.getByRole('button', { name: 'Move Node earlier' }));
-    expect(headers().slice(0, 3)).toEqual(['Message ID', 'Node', 'Queue']);
+    expect(headers().slice(0, 3)).toEqual(['Message ID', 'Node', 'Subscription']);
     expect(JSON.parse(window.localStorage.getItem('as.table.sql.results')!).order.slice(0, 3)).toEqual([
       'messageId',
       'node',
-      'queue',
+      'subscription',
     ]);
     // The message identifies the row and stays first.
     expect(screen.getByRole('button', { name: 'Move Message ID later' })).toBeDisabled();
@@ -917,11 +922,11 @@ describe('SqlConsoleView result columns and export', () => {
 
     expect(files.map((f) => f.name)).toEqual(['sql-console.csv', 'sql-console.json']);
     const csv = await files[0].blob.text();
-    expect(csv.split('\r\n')[0]).toContain('queue,address,messageId');
+    expect(csv.split('\r\n')[0]).toContain('subscription,destination,messageId');
     expect(csv).toContain('"order, ""4471"""');
     const json = JSON.parse(await files[1].blob.text());
     expect(json).toHaveLength(1);
-    expect(json[0]).toMatchObject({ queue: 'ORDER.IN', messageId: 11, body: 'order, "4471"' });
+    expect(json[0]).toMatchObject({ subscription: 'ORDER.IN', messageId: 11, body: 'order, "4471"' });
     vi.restoreAllMocks();
   });
 });
@@ -1015,7 +1020,7 @@ describe('SqlConsoleView other panels', () => {
     mockCluster();
     mockPlan();
     server.use(
-      http.get('*/api/v1/clusters/c1/queues/ORDER.IN/messages/11', () =>
+      http.get('*/api/v1/clusters/c1/resources/artemis.queue/ORDER.IN/messages/11', () =>
         HttpResponse.json({ title: 'Message gone', detail: 'It was consumed.' }, { status: 404 }),
       ),
     );
@@ -1112,7 +1117,7 @@ describe('SqlConsoleView cancelling, Escape and the cost line', () => {
     expect(screen.getByRole('button', { name: 'Run' })).toHaveFocus();
   });
 
-  it('stops a tail from its Cancel button and takes it out of the address', async () => {
+  it('stops a tail from its Cancel button and takes it out of the destination', async () => {
     mockCluster();
     mockPlan();
     const user = userEvent.setup();
@@ -1134,7 +1139,9 @@ describe('SqlConsoleView cancelling, Escape and the cost line', () => {
     mockPlan();
     renderWithProviders(<SqlConsoleView />);
 
-    const cost = await screen.findByText('The brokers filter; Rahdar examines at most 100 messages from 1 queue.');
+    const cost = await screen.findByText(
+      'The brokers filter; Rahdar examines at most 100 messages from 1 subscription.',
+    );
     const line = cost.closest('[id]') as HTMLElement;
     expect(screen.getByRole('textbox', { name: 'Query' })).toHaveAttribute('aria-describedby', line.id);
     expect(screen.getByRole('button', { name: 'Run' })).toHaveAttribute('aria-describedby', line.id);
@@ -1146,7 +1153,7 @@ describe('SqlConsoleView cancelling, Escape and the cost line', () => {
     mockPlan();
     const user = userEvent.setup();
     renderWithProviders(<SqlConsoleView />);
-    await screen.findByText('The brokers filter; Rahdar examines at most 100 messages from 1 queue.');
+    await screen.findByText('The brokers filter; Rahdar examines at most 100 messages from 1 subscription.');
 
     await user.click(screen.getByRole('textbox', { name: 'Query' }));
     await user.keyboard('{Control>}a{/Control}{Backspace}');

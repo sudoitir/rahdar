@@ -6,7 +6,7 @@ import io.github.sudoitir.rahdar.feature.brokerconfig.BrokerConfigDocument.Bridg
 import io.github.sudoitir.rahdar.feature.brokerconfig.BrokerConfigDocument.DivertDecl;
 import io.github.sudoitir.rahdar.feature.brokerconfig.BrokerConfigDocument.QueueDecl;
 import io.github.sudoitir.rahdar.feature.brokerconfig.BrokerConfigDocument.SecuritySettingDecl;
-import io.github.sudoitir.rahdar.feature.queues.LifecycleRequests;
+import io.github.sudoitir.rahdar.feature.resources.LifecycleRequests;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.HashSet;

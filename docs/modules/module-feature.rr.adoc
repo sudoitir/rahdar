@@ -17,7 +17,7 @@ _Others_
 
 * `i.g.s.r.f.r.CaptureRrSink`
 * `i.g.s.r.f.r.QueueTargetResolver`
-* `i.g.s.r.f.r.ReplyAddressResolver`
+* `i.g.s.r.f.r.ReplyDestinationResolver`
 * `i.g.s.r.f.r.RrDeadlineSweep`
 * `i.g.s.r.f.r.RrFeature`
 * `i.g.s.r.f.r.RrNotificationObserver`
@@ -44,4 +44,5 @@ _Others_
 * `i.g.s.r.p.c.ClusterOwnership` (in Clusters)
 * `i.g.s.r.p.b.BrokerMessages` (in Broker connectivity)
 * `i.g.s.r.p.m.McpProperties` (in MCP server)
+* `i.g.s.r.p.m.McpResources` (in MCP server)
 |===

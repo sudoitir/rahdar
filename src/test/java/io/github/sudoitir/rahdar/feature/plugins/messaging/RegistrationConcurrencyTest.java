@@ -11,6 +11,7 @@ import io.github.sudoitir.rahdar.feature.plugins.messaging.internal.PluginDrains
 import io.github.sudoitir.rahdar.feature.plugins.messaging.internal.PluginMessagingReconciler;
 import io.github.sudoitir.rahdar.kernel.audit.AuditService;
 import io.github.sudoitir.rahdar.kernel.security.ActorResolver;
+import io.github.sudoitir.rahdar.kernel.security.ResourceRef;
 import io.github.sudoitir.rahdar.platform.broker.BrokerMessages;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import java.time.Clock;
@@ -46,8 +47,8 @@ class RegistrationConcurrencyTest {
         "TAP, 0, 'its concurrency is 1, not 0'"
     })
     void anOutOfRangeConcurrencyIsRefusedWithTheReason(RegistrationMode mode, int concurrency, String reason) {
-        RegistrationSpec spec =
-                new RegistrationSpec("work", UUID.randomUUID(), "ORDERS", mode, concurrency, UUID.randomUUID());
+        RegistrationSpec spec = new RegistrationSpec(
+                "work", UUID.randomUUID(), ResourceRef.subscription("ORDERS"), mode, concurrency, UUID.randomUUID());
         assertThatThrownBy(() -> service.register("acme-x", spec))
                 .isInstanceOf(RegistrationRefusedException.class)
                 .hasMessageContaining(reason);

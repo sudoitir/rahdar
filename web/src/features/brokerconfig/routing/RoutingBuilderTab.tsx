@@ -20,7 +20,7 @@ interface BuilderSearch {
 
 /**
  * The routing builder as the Routing screen's Builder tab (ADR-0094), contributed through the
- * `routing.tabs` slot. It brings what the Configuration screen used to hand it: the declaration,
+ * `routes.tabs` slot. It brings what the Configuration screen used to hand it: the declaration,
  * the write and apply gates, its URL state, and the review drawer — the same one, so the builder
  * still has one plan and one apply (ADR-0090 D1).
  */

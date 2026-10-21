@@ -12,7 +12,7 @@ import { holdButton } from '../../test/hold.ts';
 
 const BUILT_IN = {
   id: 'b1',
-  addressPattern: null,
+  destinationPattern: null,
   target: 'PROPERTY',
   selector: 'authorization',
   dataClass: 'CREDENTIAL',
@@ -28,7 +28,7 @@ const BUILT_IN = {
 const CUSTOM = {
   ...BUILT_IN,
   id: 'c1',
-  addressPattern: 'orders.#',
+  destinationPattern: 'orders.#',
   selector: 'customerEmail',
   dataClass: 'EMAIL',
   dataClassLabel: 'email',
@@ -111,11 +111,11 @@ describe('RulesPanel', () => {
     expect(await screen.findByText(/Enter the name the rule matches/)).toBeInTheDocument();
 
     await user.type(name, 'customerName');
-    await user.type(screen.getByRole('textbox', { name: /Addresses/ }), 'orders.#');
+    await user.type(screen.getByRole('textbox', { name: /Destinations/ }), 'orders.#');
     await user.click(screen.getByRole('button', { name: 'Save rule' }));
 
     await waitFor(() => expect(posted).not.toBeNull());
-    expect(posted).toMatchObject({ selector: 'customerName', addressPattern: 'orders.#', target: 'PROPERTY' });
+    expect(posted).toMatchObject({ selector: 'customerName', destinationPattern: 'orders.#', target: 'PROPERTY' });
     expect(await screen.findByText('Saved the rule for customerName')).toBeInTheDocument();
   });
 

@@ -147,9 +147,9 @@ class RrSamplerTest {
         ObjectProvider<RrObservationSink> provider = mock(ObjectProvider.class);
         when(provider.getIfAvailable()).thenReturn((RrObservationSink) seen::add);
 
-        ReplyAddressResolver resolver = mock(ReplyAddressResolver.class);
+        ReplyDestinationResolver resolver = mock(ReplyDestinationResolver.class);
         when(resolver.resolve(eq(CLUSTER), any()))
-                .thenReturn(new ReplyAddressResolver.Resolution(expectation.getReplyAddresses(), false, false));
+                .thenReturn(new ReplyDestinationResolver.Resolution(expectation.getReplyDestinations(), false, false));
 
         ClockOffsetService clocks = mock(ClockOffsetService.class);
         when(clocks.brokerTime()).thenReturn(BrokerTime.identity());
@@ -210,7 +210,7 @@ class RrSamplerTest {
     }
 
     @Test
-    void everyServingNodeIsBrowsedForEveryResolvedReplyAddress() {
+    void everyServingNodeIsBrowsedForEveryResolvedReplyDestination() {
         RrExpectationEntity expectation = saved(new RrExpectationEntity(
                 CLUSTER, "rr.request", List.of("rr.reply.a", "rr.reply.b"), null, null, 10, false));
 

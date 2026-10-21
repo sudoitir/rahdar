@@ -3,6 +3,8 @@ package io.github.sudoitir.rahdar.feature.triage.web;
 import static io.swagger.v3.oas.annotations.media.Schema.RequiredMode.REQUIRED;
 
 import io.github.sudoitir.rahdar.feature.triage.ConsumerHealth;
+import io.github.sudoitir.rahdar.kernel.security.ResourceIdTexts.Of;
+import io.github.sudoitir.rahdar.platform.broker.ResourceIds;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
 
@@ -13,7 +15,7 @@ import java.time.Instant;
  *
  * <p>Every rate is nullable on purpose. A null is "not computable from the samples
  * available", which the UI must render as such; serialising it as {@code 0} would turn
- * "we have not measured this queue" into "this queue has no throughput", which are
+ * "we have not measured this subscription" into "this subscription has no throughput", which are
  * opposite operational facts.
  */
 public final class TriageViews {
@@ -21,8 +23,17 @@ public final class TriageViews {
     private TriageViews() {}
 
     public record ConsumerHealthView(
-            @Schema(requiredMode = REQUIRED) String address,
-            @Schema(requiredMode = REQUIRED) String queueName,
+            @Schema(requiredMode = REQUIRED, description = "The destination's id.")
+            String destination,
+
+            @Schema(requiredMode = REQUIRED, description = "The subscription's id.")
+            String subscription,
+
+            @Schema(requiredMode = REQUIRED, description = "The id of the subscription's kind, such as artemis.queue.")
+            String kind,
+
+            @Schema(requiredMode = REQUIRED, description = "The kind's name for people, such as Queue.")
+            String kindLabel,
 
             @Schema(
                     requiredMode = REQUIRED,
@@ -67,10 +78,13 @@ public final class TriageViews {
             @Schema(requiredMode = REQUIRED) int nodesPresent,
             @Schema(requiredMode = REQUIRED) int nodesTotal) {
 
-        public static ConsumerHealthView of(ConsumerHealth h) {
+        public static ConsumerHealthView of(Of ids, ConsumerHealth h) {
+            String subscription = ids.subscription(h.subscription());
             return new ConsumerHealthView(
-                    h.address(),
-                    h.queueName(),
+                    ids.destination(h.destination()),
+                    subscription,
+                    ResourceIds.kindOf(subscription),
+                    ResourceIds.kindLabelOf(subscription),
                     h.verdict().name(),
                     h.verdict().severity(),
                     h.cause(),

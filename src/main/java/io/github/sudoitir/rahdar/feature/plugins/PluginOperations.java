@@ -92,7 +92,7 @@ class PluginOperations {
 
             @Override
             public Effect estimate(ActivateUpload p) {
-                return new Effect(1, UNIT_PLUGIN, stateKey(pluginOf(p), shaOf(pluginOf(p)), p.sha256()), null);
+                return new Effect(1, UNIT_PLUGIN, etag(pluginOf(p), shaOf(pluginOf(p)), p.sha256()), null);
             }
 
             @Override
@@ -123,7 +123,7 @@ class PluginOperations {
 
             @Override
             public Effect estimate(EnablePlugin p) {
-                return new Effect(1, UNIT_PLUGIN, stateKey(p.id(), shaOf(p.id()), statusOf(p.id())), null);
+                return new Effect(1, UNIT_PLUGIN, etag(p.id(), shaOf(p.id()), statusOf(p.id())), null);
             }
 
             @Override
@@ -154,7 +154,7 @@ class PluginOperations {
 
             @Override
             public Effect estimate(RollbackPlugin p) {
-                return new Effect(1, UNIT_PLUGIN, stateKey(p.id(), shaOf(p.id())), null);
+                return new Effect(1, UNIT_PLUGIN, etag(p.id(), shaOf(p.id())), null);
             }
 
             @Override
@@ -187,7 +187,7 @@ class PluginOperations {
 
             @Override
             public Effect estimate(DisablePlugin p) {
-                return new Effect(1, UNIT_PLUGIN, stateKey(p.id(), shaOf(p.id()), statusOf(p.id())), null);
+                return new Effect(1, UNIT_PLUGIN, etag(p.id(), shaOf(p.id()), statusOf(p.id())), null);
             }
 
             @Override
@@ -219,7 +219,7 @@ class PluginOperations {
 
             @Override
             public Effect estimate(UninstallPlugin p) {
-                return new Effect(1, UNIT_PLUGIN, stateKey(p.id(), shaOf(p.id()), statusOf(p.id())), null);
+                return new Effect(1, UNIT_PLUGIN, etag(p.id(), shaOf(p.id()), statusOf(p.id())), null);
             }
 
             @Override
@@ -254,10 +254,7 @@ class PluginOperations {
             @Override
             public Effect estimate(PurgePlugin p) {
                 return new Effect(
-                        1,
-                        UNIT_PLUGIN,
-                        stateKey(p.id(), shaOf(p.id()), statusOf(p.id())),
-                        "Drops the plugin's schema.");
+                        1, UNIT_PLUGIN, etag(p.id(), shaOf(p.id()), statusOf(p.id())), "Drops the plugin's schema.");
             }
 
             @Override
@@ -290,7 +287,7 @@ class PluginOperations {
 
             @Override
             public Effect estimate(PutLicense p) {
-                return new Effect(1, "license", stateKey(p.id(), p.sha256()), null);
+                return new Effect(1, "license", etag(p.id(), p.sha256()), null);
             }
 
             @Override
@@ -315,7 +312,7 @@ class PluginOperations {
 
             @Override
             public Effect estimate(DeleteLicense p) {
-                return new Effect(1, "license", stateKey(p.id()), null);
+                return new Effect(1, "license", etag(p.id()), null);
             }
 
             @Override
@@ -345,7 +342,7 @@ class PluginOperations {
 
             @Override
             public Effect estimate(GrantInstaller p) {
-                return new Effect(1, "installer", stateKey(p.username()), null);
+                return new Effect(1, "installer", etag(p.username()), null);
             }
 
             @Override
@@ -375,7 +372,7 @@ class PluginOperations {
 
             @Override
             public Effect estimate(RevokeInstaller p) {
-                return new Effect(1, "installer", stateKey(p.userId()), null);
+                return new Effect(1, "installer", etag(p.userId()), null);
             }
 
             @Override
@@ -407,7 +404,7 @@ class PluginOperations {
 
             @Override
             public Effect estimate(AddTrustKey p) {
-                return new Effect(1, "key", stateKey(p.name(), p.uploadSha256(), p.pem()), null);
+                return new Effect(1, "key", etag(p.name(), p.uploadSha256(), p.pem()), null);
             }
 
             @Override
@@ -437,7 +434,7 @@ class PluginOperations {
 
             @Override
             public Effect estimate(RemoveTrustKey p) {
-                return new Effect(1, "key", stateKey(p.fingerprint()), null);
+                return new Effect(1, "key", etag(p.fingerprint()), null);
             }
 
             @Override
@@ -470,7 +467,7 @@ class PluginOperations {
 
             @Override
             public Effect estimate(SetTrustPolicy p) {
-                return new Effect(1, "policy", stateKey("trust-policy"), null);
+                return new Effect(1, "policy", etag("trust-policy"), null);
             }
 
             @Override

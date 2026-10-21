@@ -11,8 +11,8 @@ import classes from './FlowCanvas.module.css';
 const KIND_WORD: Record<string, string> = {
   PRODUCER: 'Producing client',
   CONSUMER: 'Consuming client',
-  ADDRESS: 'Address',
-  QUEUE: 'Queue',
+  DESTINATION: 'Destination',
+  SUBSCRIPTION: 'Subscription',
   REMOTE: 'Remote',
 };
 
@@ -23,7 +23,7 @@ function faultWords(view: FlowNodeView): string[] {
 /** The sentence a screen reader hears for a node: what it is, its figures, and what is wrong. */
 function nodeSentence(view: FlowNodeView): string {
   const parts = [`${KIND_WORD[view.kind ?? ''] ?? 'Node'} ${view.label}`];
-  if (view.kind === 'QUEUE') {
+  if (view.kind === 'SUBSCRIPTION') {
     parts.push(
       view.messageCount === null || view.messageCount === undefined
         ? 'not swept yet'
@@ -157,24 +157,24 @@ export const ClientNode = memo(function ClientNode({ id, data }: NodeProps) {
 });
 
 const ADDRESS_ROLE: Record<string, string> = {
-  ANONYMOUS: 'no address named — chosen per message',
-  DEAD_LETTER: 'dead-letter address',
-  EXPIRY: 'expiry address',
+  ANONYMOUS: 'no destination named — chosen per message',
+  DEAD_LETTER: 'dead-letter destination',
+  EXPIRY: 'expiry destination',
   CAPTURE: "Rahdar's message capture",
 };
 
 const QUEUE_ROLE: Record<string, string> = {
   STORE_AND_FORWARD: 'cluster redistribution',
-  TEMPORARY: 'short-lived reply queues',
+  TEMPORARY: 'short-lived reply subscriptions',
   CAPTURE: "Rahdar's message capture",
 };
 
 const DELIVERY: Record<string, string> = {
-  MULTICAST: 'multicast · every queue gets a copy',
-  ANYCAST: 'anycast · queues share',
+  MULTICAST: 'multicast · every subscription gets a copy',
+  ANYCAST: 'anycast · subscriptions share',
 };
 
-export const AddressNode = memo(function AddressNode({ id, data, width, height }: NodeProps) {
+export const DestinationNode = memo(function DestinationNode({ id, data, width, height }: NodeProps) {
   const d = data as FlowNodeData;
   const v = d.view;
   const routing = (v.routingTypes ?? []).map((t) => DELIVERY[t] ?? t.toLowerCase());
@@ -186,12 +186,12 @@ export const AddressNode = memo(function AddressNode({ id, data, width, height }
           {v.label}
         </span>
       </div>
-      <span className={classes.meta}>{role ?? (routing.length ? routing.join(' / ') : 'no queue bound')}</span>
+      <span className={classes.meta}>{role ?? (routing.length ? routing.join(' / ') : 'no subscription bound')}</span>
     </Frame>
   );
 });
 
-export const QueueNode = memo(function QueueNode({ id, data }: NodeProps) {
+export const SubscriptionNode = memo(function SubscriptionNode({ id, data }: NodeProps) {
   const d = data as FlowNodeData;
   const v = d.view;
   const swept = v.messageCount !== null && v.messageCount !== undefined;

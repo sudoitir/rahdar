@@ -1,12 +1,14 @@
 import { useMutation, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
 import { ApiError, clusterKey, request } from '../../kernel/api/request.ts';
+import { resourcePath } from '../../kernel/api/resourceId.ts';
+import { useRoleIds } from '../clusters/index.ts';
 import type { components } from '../../kernel/api/schema.d.ts';
 
 type Schemas = components['schemas'];
 
 export type AffectedView = Schemas['AffectedView'];
-export type DlqQueue = Schemas['DlqQueue'];
-export type DlqView = Schemas['DlqView'];
+export type DeadLetterSubscription = Schemas['DeadLetterSubscription'];
+export type DeadLetterView = Schemas['DeadLetterView'];
 export type DryRunView = Schemas['DryRunView'];
 export type MessageActionRequest = Schemas['MessageActionRequest'];
 export type MessageDetailView = Schemas['MessageDetailView'];
@@ -18,10 +20,10 @@ export type SendMessageRequest = Schemas['SendMessageRequest'];
 export type MessageActionKind = 'move' | 'retry' | 'delete' | 'expire';
 
 export const keys = {
-  message: (id: string, queueName: string, messageId: string, node?: string, filter?: string) =>
-    clusterKey(id, 'queues', queueName, 'messages', messageId, { node, filter }),
-  messages: (id: string, queueName: string, params: MessageBrowseParams = {}) =>
-    clusterKey(id, 'queues', queueName, 'messages', params),
+  message: (id: string, subscriptionName: string, messageId: string, node?: string, filter?: string) =>
+    clusterKey(id, 'subscriptions', subscriptionName, 'messages', messageId, { node, filter }),
+  messages: (id: string, subscriptionName: string, params: MessageBrowseParams = {}) =>
+    clusterKey(id, 'subscriptions', subscriptionName, 'messages', params),
   topic: (id: string, topic: string) => clusterKey(id, topic),
 };
 
@@ -44,19 +46,21 @@ function messageSearch(params: MessageBrowseParams): string {
 
 export function useMessages(
   clusterId: string,
-  queueName: string,
+  subscriptionName: string,
   params: MessageBrowseParams = {},
 ): UseQueryResult<MessagePageView, ApiError> {
+  const ids = useRoleIds(clusterId);
   return useQuery({
-    queryKey: keys.messages(clusterId, queueName, params),
+    queryKey: keys.messages(clusterId, subscriptionName, params),
     queryFn: () =>
       request<MessagePageView>(
-        `/clusters/${clusterId}/queues/${encodeURIComponent(queueName)}/messages${messageSearch(params)}`,
+        `${messagesBase(clusterId, ids.subscription(subscriptionName))}${messageSearch(params)}`,
       ),
-    // A queue is not a document: messages arrive and are consumed while the
+    // A subscription is not a document: messages arrive and are consumed while the
     // screen is open, and a browse that never refreshes shows an arrangement of
-    // the queue that stopped being true the moment it was drawn. One bounded
+    // the subscription that stopped being true the moment it was drawn. One bounded
     // page read per interval, pausable with every other poll (ADR-0052).
+    enabled: ids.loaded,
     refetchInterval: 10_000,
     placeholderData: (prev) => prev,
   });
@@ -64,13 +68,14 @@ export function useMessages(
 
 export function useMessageDetail(
   clusterId: string,
-  queueName: string,
+  subscriptionName: string,
   messageId: string | null,
   node?: string,
   filter?: string,
 ): UseQueryResult<MessageDetailView, ApiError> {
+  const ids = useRoleIds(clusterId);
   return useQuery({
-    queryKey: keys.message(clusterId, queueName, messageId ?? 'none', node, filter),
+    queryKey: keys.message(clusterId, subscriptionName, messageId ?? 'none', node, filter),
     queryFn: () => {
       const sp = new URLSearchParams();
       if (node) sp.set('node', node);
@@ -78,10 +83,10 @@ export function useMessageDetail(
       const qs = sp.toString();
       const query = qs ? `?${qs}` : '';
       return request<MessageDetailView>(
-        `/clusters/${clusterId}/queues/${encodeURIComponent(queueName)}/messages/${messageId}${query}`,
+        `${messagesBase(clusterId, ids.subscription(subscriptionName))}/${encodeURIComponent(messageId ?? '')}${query}`,
       );
     },
-    enabled: messageId !== null,
+    enabled: messageId !== null && ids.loaded,
   });
 }
 
@@ -91,8 +96,12 @@ export interface BulkCapProblem {
   cap: number;
 }
 
-function messagesBase(clusterId: string, queueName: string) {
-  return `/clusters/${clusterId}/queues/${encodeURIComponent(queueName)}/messages`;
+function resourceBase(clusterId: string, subscription: string) {
+  return `/clusters/${clusterId}${resourcePath(subscription)}`;
+}
+
+function messagesBase(clusterId: string, subscription: string) {
+  return `${resourceBase(clusterId, subscription)}/messages`;
 }
 
 function mutationQuery(node?: string, dryRun?: boolean, override?: boolean): string {
@@ -110,19 +119,20 @@ export interface SendVars {
   dryRun?: boolean;
 }
 
-export function useSendMessage(clusterId: string, queueName: string) {
+export function useSendMessage(clusterId: string, subscriptionName: string) {
+  const ids = useRoleIds(clusterId);
   const qc = useQueryClient();
   return useMutation<AffectedView | DryRunView, ApiError, SendVars>({
     mutationFn: ({ body, node, dryRun }) =>
-      request(`${messagesBase(clusterId, queueName)}${mutationQuery(node, dryRun)}`, {
+      request(`${messagesBase(clusterId, ids.subscription(subscriptionName))}${mutationQuery(node, dryRun)}`, {
         method: 'POST',
         body: JSON.stringify(body),
       }),
     onSuccess: (result) => {
       // DryRunView carries `cap`; AffectedView does not. Only a real run changes state.
       if ('cap' in result) return;
-      void qc.invalidateQueries({ queryKey: keys.messages(clusterId, queueName) });
-      void qc.invalidateQueries({ queryKey: keys.topic(clusterId, 'queues') });
+      void qc.invalidateQueries({ queryKey: keys.messages(clusterId, subscriptionName) });
+      void qc.invalidateQueries({ queryKey: keys.topic(clusterId, 'subscriptions') });
     },
   });
 }
@@ -135,19 +145,23 @@ export interface ActionVars {
   override?: boolean;
 }
 
-export function useMessageAction(clusterId: string, queueName: string) {
+export function useMessageAction(clusterId: string, subscriptionName: string) {
+  const ids = useRoleIds(clusterId);
   const qc = useQueryClient();
   return useMutation<AffectedView | DryRunView | PartialView, ApiError, ActionVars>({
     mutationFn: ({ action, body, node, dryRun, override }) =>
-      request(`${messagesBase(clusterId, queueName)}/actions/${action}${mutationQuery(node, dryRun, override)}`, {
-        method: 'POST',
-        body: JSON.stringify(body),
-      }),
+      request(
+        `${resourceBase(clusterId, ids.subscription(subscriptionName))}/messages:${action}${mutationQuery(node, dryRun, override)}`,
+        {
+          method: 'POST',
+          body: JSON.stringify(body),
+        },
+      ),
     onSuccess: (result) => {
       // DryRunView carries `cap`; AffectedView does not. Only a real run changes state.
       if ('cap' in result) return;
-      void qc.invalidateQueries({ queryKey: keys.messages(clusterId, queueName) });
-      void qc.invalidateQueries({ queryKey: keys.topic(clusterId, 'queues') });
+      void qc.invalidateQueries({ queryKey: keys.messages(clusterId, subscriptionName) });
+      void qc.invalidateQueries({ queryKey: keys.topic(clusterId, 'subscriptions') });
     },
   });
 }
@@ -158,26 +172,30 @@ export interface PurgeVars {
   override?: boolean;
 }
 
-export function usePurgeQueue(clusterId: string, queueName: string) {
+export function usePurgeSubscription(clusterId: string, subscriptionName: string) {
+  const ids = useRoleIds(clusterId);
   const qc = useQueryClient();
   return useMutation<AffectedView | DryRunView, ApiError, PurgeVars>({
     mutationFn: ({ node, dryRun, override }) =>
-      request(`${messagesBase(clusterId, queueName)}${mutationQuery(node, dryRun, override)}`, {
-        method: 'DELETE',
-      }),
+      request(
+        `${resourceBase(clusterId, ids.subscription(subscriptionName))}:purge${mutationQuery(node, dryRun, override)}`,
+        {
+          method: 'POST',
+        },
+      ),
     onSuccess: (result) => {
       // DryRunView carries `cap`; AffectedView does not. Only a real run changes state.
       if ('cap' in result) return;
-      void qc.invalidateQueries({ queryKey: keys.messages(clusterId, queueName) });
-      void qc.invalidateQueries({ queryKey: keys.topic(clusterId, 'queues') });
+      void qc.invalidateQueries({ queryKey: keys.messages(clusterId, subscriptionName) });
+      void qc.invalidateQueries({ queryKey: keys.topic(clusterId, 'subscriptions') });
     },
   });
 }
 
-export function useDlq(clusterId: string): UseQueryResult<DlqView, ApiError> {
+export function useDeadLetters(clusterId: string): UseQueryResult<DeadLetterView, ApiError> {
   return useQuery({
-    queryKey: ['clusters', clusterId, 'dlq'],
-    queryFn: () => request<DlqView>(`/clusters/${clusterId}/dlq`),
+    queryKey: ['clusters', clusterId, 'dead-letters'],
+    queryFn: () => request<DeadLetterView>(`/clusters/${clusterId}/dead-letters`),
     refetchInterval: 10_000,
   });
 }

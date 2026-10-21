@@ -68,7 +68,7 @@ class UserOperations {
 
             @Override
             public Effect estimate(CreateUser p) {
-                return new Effect(1, "user", stateKey(p.username().toLowerCase()), null);
+                return new Effect(1, "user", etag(p.username().toLowerCase()), null);
             }
 
             @Override
@@ -100,8 +100,7 @@ class UserOperations {
 
             @Override
             public Effect estimate(DisableUser p) {
-                return new Effect(
-                        1, "user", stateKey(p.userId(), user(p.userId()).isDisabled()), "Ends their sessions.");
+                return new Effect(1, "user", etag(p.userId(), user(p.userId()).isDisabled()), "Ends their sessions.");
             }
 
             @Override
@@ -133,8 +132,7 @@ class UserOperations {
 
             @Override
             public Effect estimate(EnableUser p) {
-                return new Effect(
-                        1, "user", stateKey(p.userId(), user(p.userId()).isDisabled()), null);
+                return new Effect(1, "user", etag(p.userId(), user(p.userId()).isDisabled()), null);
             }
 
             @Override
@@ -159,7 +157,7 @@ class UserOperations {
 
             @Override
             public Effect estimate(UnlockUser p) {
-                return new Effect(1, "user", stateKey(p.userId()), null);
+                return new Effect(1, "user", etag(p.userId()), null);
             }
 
             @Override
@@ -187,7 +185,7 @@ class UserOperations {
                 return new Effect(
                         1,
                         "user",
-                        stateKey(p.userId()),
+                        etag(p.userId()),
                         "Removes their authenticator, passkeys, recovery codes and trusted devices, revokes their API"
                                 + " tokens and ends their sessions.");
             }
@@ -222,7 +220,7 @@ class UserOperations {
 
             @Override
             public Effect estimate(GrantRole p) {
-                return new Effect(1, "grant", stateKey(p.userId(), p.roleId(), p.scopeType(), p.scopeId()), null);
+                return new Effect(1, "grant", etag(p.userId(), p.roleId(), p.scopeType(), p.scopeId()), null);
             }
 
             @Override
@@ -256,7 +254,7 @@ class UserOperations {
 
             @Override
             public Effect estimate(RevokeRole p) {
-                return new Effect(1, "grant", stateKey(p.userId(), p.roleId(), p.scopeType(), p.scopeId()), null);
+                return new Effect(1, "grant", etag(p.userId(), p.roleId(), p.scopeType(), p.scopeId()), null);
             }
 
             @Override

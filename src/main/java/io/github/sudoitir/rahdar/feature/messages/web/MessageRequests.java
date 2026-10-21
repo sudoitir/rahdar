@@ -1,6 +1,7 @@
 package io.github.sudoitir.rahdar.feature.messages.web;
 
 import io.github.sudoitir.rahdar.platform.broker.MessageKind;
+import io.github.sudoitir.rahdar.platform.broker.ResourceIds;
 import jakarta.validation.constraints.NotNull;
 import java.util.List;
 import java.util.Map;
@@ -35,18 +36,34 @@ public final class MessageRequests {
     }
 
     /**
-     * Move / retry / delete / expire, either by explicit ids or by a selector.
-     * Exactly one of {@code messageIds} / {@code filter} is set; {@code targetQueue}
-     * is required only for {@code MOVE}.
+     * Move / retry / delete / expire, either by explicit positions or by a selector.
+     * Exactly one of {@code positions} / {@code filter} is set; {@code target}, the id of the
+     * subscription to move into, is required only for {@code MOVE}.
      */
-    public record MessageActionRequest(List<Long> messageIds, String filter, String targetQueue) {
+    public record MessageActionRequest(List<String> positions, String filter, String target) {
 
         public boolean byFilter() {
             return filter != null && !filter.isBlank();
         }
 
+        /** The positions as the numbers this system's brokers issue; any other is a 400. */
         public List<Long> ids() {
-            return messageIds == null ? List.of() : messageIds;
+            return positions == null
+                    ? List.of()
+                    : positions.stream().map(MessageActionRequest::number).toList();
+        }
+
+        /** The name of the subscription to move into, which the broker calls take. */
+        public String targetQueue() {
+            return ResourceIds.nameOf(target);
+        }
+
+        static long number(String position) {
+            try {
+                return Long.parseLong(position.trim());
+            } catch (NumberFormatException _) {
+                throw new IllegalArgumentException("'" + position + "' is not a message position.");
+            }
         }
     }
 }

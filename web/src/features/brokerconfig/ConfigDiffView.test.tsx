@@ -29,7 +29,9 @@ vi.mock('@tanstack/react-router', async (importOriginal) => ({
 const { ConfigDiffView } = await import('./ConfigDiffView.tsx');
 
 function serve(d: Diff | Response = diff()) {
-  server.use(http.get('*/api/v1/clusters/c1/config-diff', () => (d instanceof Response ? d : HttpResponse.json(d))));
+  server.use(
+    http.get('*/api/v1/clusters/c1/artemis/config-diff', () => (d instanceof Response ? d : HttpResponse.json(d))),
+  );
 }
 
 /** What the last navigation asked the search to become, from the empty one. */
@@ -250,7 +252,7 @@ describe('ConfigDiffView', () => {
     renderWithProviders(<ConfigDiffView />);
 
     const link = await screen.findByRole('link', { name: 'declared configuration' });
-    expect(link).toHaveAttribute('href', '/clusters/c1/configuration');
+    expect(link).toHaveAttribute('href', '/clusters/c1/artemis/configuration');
     expect(link.parentElement).toHaveTextContent('compares the nodes with each other');
     expect(link.parentElement).toHaveTextContent('every live node against what you declared');
   });

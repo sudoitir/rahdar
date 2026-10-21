@@ -45,7 +45,7 @@ under that system's name.
 - Reading a native attribute means a JSON lookup; Rahdar reads only the routing type this way, and
   only where it addresses an Artemis queue.
 - REST field names, MCP arguments, permission identifiers (`queue:*`, `address:*`), the plugin
-  contract's `ResourceKind` (QUEUE, ADDRESS) and the kinds stored with team patterns, shares and API
+  contract's `ResourceType` (QUEUE, ADDRESS) and the kinds stored with team patterns, shares and API
   token grants keep Artemis's nouns for now. They are one public vocabulary and are renamed together in
   roadmap change 19d, so the stored kinds stay aligned with the permissions they scope.
 - Operators recreate the database for this release.

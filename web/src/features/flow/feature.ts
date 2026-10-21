@@ -6,12 +6,12 @@ import { clusterRoute } from '../../kernel/routing/roots.ts';
 import { lazyFeatureView } from '../../kernel/routing/lazy.tsx';
 import { validateFlowSearch } from './flowSearch.ts';
 import {
-  AddressInFlow,
+  DestinationInFlow,
   ClientConnections,
   ConnectionInFlow,
-  DivertInFlow,
+  RouteInFlow,
   FocusClient,
-  QueueInFlow,
+  SubscriptionInFlow,
 } from './rowActions.tsx';
 
 const flowRoute = createRoute({
@@ -38,10 +38,10 @@ export const flowFeature = defineFeature({
     },
   ],
   slots: {
-    'queue.actions': [{ id: 'flow.queue', order: 40, section: 'open', Component: QueueInFlow }],
-    'address.actions': [{ id: 'flow.address', order: 40, section: 'open', Component: AddressInFlow }],
+    'subscription.actions': [{ id: 'flow.subscription', order: 40, section: 'open', Component: SubscriptionInFlow }],
+    'destination.actions': [{ id: 'flow.destination', order: 40, section: 'open', Component: DestinationInFlow }],
     'connection.actions': [{ id: 'flow.connection', order: 40, section: 'open', Component: ConnectionInFlow }],
-    'divert.actions': [{ id: 'flow.divert', order: 40, section: 'open', Component: DivertInFlow }],
+    'route.actions': [{ id: 'flow.route', order: 40, section: 'open', Component: RouteInFlow }],
     'client.actions': [
       { id: 'flow.client.focus', order: 10, section: 'open', Component: FocusClient },
       { id: 'flow.client.connections', order: 20, section: 'open', Component: ClientConnections },

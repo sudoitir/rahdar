@@ -127,10 +127,10 @@ export function baseHandlers(d: ConfigDeclarationView = declaration(), permissio
   return [
     meHandler(permissions),
     http.get('*/api/v1/clusters/c1', () => HttpResponse.json(cluster())),
-    http.get('*/api/v1/clusters/c1/config', () => HttpResponse.json(d)),
-    http.get('*/api/v1/clusters/c1/config/catalogue', () => HttpResponse.json(CATALOGUE)),
-    http.get('*/api/v1/clusters/c1/config/revisions', () => HttpResponse.json(paged([]))),
-    http.get('*/api/v1/clusters/c1/config/applies', () => HttpResponse.json(paged([]))),
+    http.get('*/api/v1/clusters/c1/artemis/config', () => HttpResponse.json(d)),
+    http.get('*/api/v1/clusters/c1/artemis/config/catalogue', () => HttpResponse.json(CATALOGUE)),
+    http.get('*/api/v1/clusters/c1/artemis/config/revisions', () => HttpResponse.json(paged([]))),
+    http.get('*/api/v1/clusters/c1/artemis/config/applies', () => HttpResponse.json(paged([]))),
   ];
 }
 

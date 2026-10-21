@@ -111,27 +111,37 @@ say "building production routing: fan-out, wildcard, filters, diverts, capture, 
 # through Rahdar's own audited API; creating something that already exists (a second run) is
 # reported by Rahdar and is not a failure here. The bridge uses the broker's own management
 # operations, because Rahdar shows bridges and never changes them.
+dest_id() { # name: a destination's canonical id, its name percent-encoded
+  python3 -c 'import sys, urllib.parse as u; print("artemis.address/" + u.quote(sys.argv[1], safe="-_.~"))' "$1"
+}
+new_queue() { # address name routing-type [extra attributes, as JSON members]
+  printf '{"kind":"artemis.queue","name":"%s","destination":"%s","attributes":{"routingType":"%s","durable":true%s}}' \
+    "$2" "$(dest_id "$1")" "$3" "${4:+,$4}"
+}
+new_address() { # name routing-types
+  printf '{"kind":"artemis.address","name":"%s","attributes":{"routingTypes":"%s"}}' "$1" "$2"
+}
 routing() { # label path body
   local code
   code=$(api POST "/clusters/$cluster$2" -d "$3" -o /dev/null -w '%{http_code}') || true
   echo "  $1: HTTP $code"
 }
-routing "fan-out address"        /addresses '{"name":"ORDERS.events","routingTypes":"MULTICAST"}'
+routing "fan-out address"        /destinations "$(new_address ORDERS.events MULTICAST)"
 for q in billing analytics audit; do
-  routing "fan-out queue $q"     /queues "{\"address\":\"ORDERS.events\",\"name\":\"ORDERS.events.$q\",\"routingType\":\"MULTICAST\",\"durable\":true}"
+  routing "fan-out queue $q"     /subscriptions "$(new_queue ORDERS.events "ORDERS.events.$q" MULTICAST)"
 done
 # Orders parked for manual review: nothing consumes them, so the SQL Console always has JSON
 # bodies to search, however long the demo has been running.
-routing "held orders address"    /addresses '{"name":"ORDERS.held","routingTypes":"ANYCAST"}'
-routing "held orders queue"      /queues '{"address":"ORDERS.held","name":"ORDERS.held","routingType":"ANYCAST","durable":true}'
-routing "wildcard address"       /addresses '{"name":"ORDERS.#","routingTypes":"MULTICAST"}'
-routing "wildcard queue"         /queues '{"address":"ORDERS.#","name":"ORDERS.all.monitor","routingType":"MULTICAST","durable":true}'
-routing "filtered queue"         /queues '{"address":"SHIPPING.events","name":"SHIPPING.express","routingType":"ANYCAST","durable":true,"filter":"express = true"}'
-routing "legacy address"         /addresses '{"name":"LEGACY.orders","routingTypes":"ANYCAST"}'
-routing "exclusive divert"       /diverts '{"name":"legacy-erp-reroute","address":"LEGACY.orders","forwardingAddress":"ORDERS.inbound","exclusive":true,"routingType":"ANYCAST"}'
-routing "copy divert"            /diverts '{"name":"orders-audit-copy","address":"ORDERS.inbound","forwardingAddress":"AUDIT.trail","exclusive":false,"routingType":"ANYCAST"}'
-routing "priority address"       /queues '{"address":"SHIPPING.priority","name":"SHIPPING.priority","routingType":"ANYCAST","durable":true,"autoCreateAddress":true}'
-routing "filtered copy divert"   /diverts '{"name":"shipping-priority-copy","address":"SHIPPING.events","forwardingAddress":"SHIPPING.priority","exclusive":false,"filter":"priority > 6","routingType":"ANYCAST"}'
+routing "held orders address"    /destinations "$(new_address ORDERS.held ANYCAST)"
+routing "held orders queue"      /subscriptions "$(new_queue ORDERS.held ORDERS.held ANYCAST)"
+routing "wildcard address"       /destinations "$(new_address 'ORDERS.#' MULTICAST)"
+routing "wildcard queue"         /subscriptions "$(new_queue 'ORDERS.#' ORDERS.all.monitor MULTICAST)"
+routing "filtered queue"         /subscriptions "$(new_queue SHIPPING.events SHIPPING.express ANYCAST '"filter":"express = true"')"
+routing "legacy address"         /destinations "$(new_address LEGACY.orders ANYCAST)"
+routing "exclusive divert"       /artemis/diverts '{"name":"legacy-erp-reroute","address":"LEGACY.orders","forwardingAddress":"ORDERS.inbound","exclusive":true,"routingType":"ANYCAST"}'
+routing "copy divert"            /artemis/diverts '{"name":"orders-audit-copy","address":"ORDERS.inbound","forwardingAddress":"AUDIT.trail","exclusive":false,"routingType":"ANYCAST"}'
+routing "priority address"       /subscriptions "$(new_queue SHIPPING.priority SHIPPING.priority ANYCAST '"autoCreateAddress":true')"
+routing "filtered copy divert"   /artemis/diverts '{"name":"shipping-priority-copy","address":"SHIPPING.events","forwardingAddress":"SHIPPING.priority","exclusive":false,"filter":"priority > 6","routingType":"ANYCAST"}'
 routing "capture subscription"   /sql/index '{"queuePattern":"PAYMENTS.capture","mode":"CAPTURE","retentionDays":1,"ringSize":10000}'
 
 # A bridge from the primary pair to the secondary one: audit records archived in the other
@@ -204,7 +214,7 @@ say "sending a few JSON orders, so the SQL Console has a body to search"
 # `body->>'orderId' = ...`, has something real to find.
 for id in 4471 4472 4473 4474 4475 4476 4477 4478; do
   tenant=$([ $((id % 2)) -eq 0 ] && echo acme || echo globex)
-  api POST "/clusters/$cluster/queues/ORDERS.held/messages" -d "{
+  api POST "/clusters/$cluster/resources/artemis.queue/ORDERS.held/messages" -d "{
     \"kind\": \"TEXT\",
     \"durable\": true,
     \"body\": \"{\\\"orderId\\\": \\\"$id\\\", \\\"tenant\\\": \\\"$tenant\\\", \\\"total\\\": $((id % 97 + 12)).50, \\\"currency\\\": \\\"EUR\\\"}\",
@@ -231,13 +241,13 @@ reader=$(ensure /roles name READER '{
   "name": "READER",
   "requiresMfa": false,
   "teamAssignable": false,
-  "permissions": ["cluster:read", "queue:read", "message:read"]
+  "permissions": ["cluster:read", "subscription:read", "message:read"]
 }')
 operator=$(ensure /roles name OPERATOR '{
   "name": "OPERATOR",
   "requiresMfa": false,
   "teamAssignable": false,
-  "permissions": ["cluster:read", "queue:read", "queue:pause", "message:read", "message:move"]
+  "permissions": ["cluster:read", "subscription:read", "subscription:pause", "message:read", "message:move"]
 }')
 
 # A random password per run, printed nowhere: these accounts exist to populate the

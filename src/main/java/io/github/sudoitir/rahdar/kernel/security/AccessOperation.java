@@ -68,7 +68,7 @@ public abstract class AccessOperation<P extends Record> implements GatedOperatio
     }
 
     /** A precondition key: the same parts give the same key, any other state a different one. */
-    public static String stateKey(Object... parts) {
+    public static String etag(Object... parts) {
         StringBuilder joined = new StringBuilder();
         for (Object part : parts) {
             joined.append(part).append('\u001f');

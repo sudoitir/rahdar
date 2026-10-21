@@ -13,7 +13,7 @@ import io.github.sudoitir.rahdar.feature.bulk.web.BulkViews.BulkExecuteRequest;
 import io.github.sudoitir.rahdar.feature.bulk.web.BulkViews.BulkItemView;
 import io.github.sudoitir.rahdar.feature.bulk.web.BulkViews.BulkRunDetailView;
 import io.github.sudoitir.rahdar.feature.messages.MessageService;
-import io.github.sudoitir.rahdar.feature.queues.QueueLifecycleService;
+import io.github.sudoitir.rahdar.feature.resources.QueueLifecycleService;
 import io.github.sudoitir.rahdar.kernel.audit.AuditScope;
 import io.github.sudoitir.rahdar.kernel.core.ConflictException;
 import io.github.sudoitir.rahdar.kernel.jobs.BackgroundRuns;
@@ -242,7 +242,7 @@ class BulkRunTest extends BulkTestSupport {
         assertThat(statuses(run))
                 .containsExactly(
                         BulkItemStatus.SUCCEEDED, BulkItemStatus.FAILED, BulkItemStatus.FAILED, BulkItemStatus.FAILED);
-        assertThat(run.items().get(3).error()).contains("queue:pause").contains("no longer");
+        assertThat(run.items().get(3).error()).contains("subscription:pause").contains("no longer");
         assertThat(seen).containsExactly("orders.1");
     }
 

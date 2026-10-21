@@ -7,7 +7,7 @@ description: Rahdar 支持 Model Context Protocol，让助手在与人完全相�
 
 Rahdar 支持 [Model Context Protocol](https://modelcontextprotocol.io)，因此助手可以针对你真实的集群回答*"为什么 `ORDERS.DLQ` 堆积了"*，而不是靠猜。
 
-它暴露的是十六个**意图化**工具——`diagnose`、`message_action`、`broker_config_change`——而不是 REST API 的镜像。镜像会把模型的上下文耗在管道细节上，再把诊断工作丢回给它；这里的工具是按问题的形状设计的（[ADR-0045](/reference/adr/0045-mcp-server-is-a-capability-surface)，英文）。
+它暴露的是十六个**意图化**工具——`diagnose`、`message_action`、`artemis_config_change`——而不是 REST API 的镜像。镜像会把模型的上下文耗在管道细节上，再把诊断工作丢回给它；这里的工具是按问题的形状设计的（[ADR-0045](/reference/adr/0045-mcp-server-is-a-capability-surface)，英文）。
 
 ## 获取密钥
 
@@ -50,30 +50,38 @@ curl -s https://rahdar.example.com/mcp \
 | 类型 | 名称 | 用途 |
 |---|---|---|
 | Tool | `rahdar_help` | 目录本身：每个工具、它的姿态与参数 |
-| Tool | `diagnose` | 一个集群（每个节点的 HA 角色、脑裂、复制延迟、正在触发的告警）或一个队列的全链路 |
-| Tool | `list_resources` | 队列、地址、消费者、会话、连接、生产者、divert、bridge |
+| Tool | `diagnose` | 一个集群（每个节点的 HA 角色、脑裂、复制延迟、正在触发的告警）或一个订阅的全链路 |
+| Tool | `list_resources` | 按 `role` 列出目的地、订阅、路由、连接、通道、消费者与生产者，每行带有 id 与 kind |
 | Tool | `metric_series` | 单个指标的分桶时间序列 |
-| Tool | `config_diff` | 每个节点的配置与多数值的比较：发生漂移的键和与多数不同的节点 |
-| Tool | `broker_config` | 集群的声明、每个节点的漂移、`broker.xml` 片段，或历史应用 |
-| Tool | `browse_messages` | 消息头，或按 id 取单条消息体 |
+| Tool | `artemis_config_diff` | 每个节点的配置与多数值的比较：发生漂移的键和与多数不同的节点 |
+| Tool | `artemis_config` | 集群的声明、每个节点的漂移、`broker.xml` 片段，或历史应用 |
+| Tool | `browse_messages` | 订阅的消息头，或按 id 取单条消息体 |
 | Tool | `trace_request_reply` | 流、延迟与超时统计、已配置的预期 |
 | Tool | `activity_log` | Broker 事件，或 Rahdar 自身的审计链路 |
 | Tool | `message_action` | 移动 / 重投 / 删除 / 过期 / 清空 |
-| Tool | `queue_lifecycle` | 创建、更新、暂停、恢复或销毁队列、地址或 divert |
-| Tool | `broker_config_change` | 声明一份配置，或以金丝雀优先、按 id 确认危害的方式应用它 |
-| Tool | `connection_action` | 关闭连接、会话、消费者或某个地址的全部消费者 |
+| Tool | `resource_lifecycle` | 创建、更新、暂停、恢复或销毁订阅或目的地 |
+| Tool | `artemis_divert_lifecycle` | 创建或删除 divert |
+| Tool | `artemis_config_change` | 声明一份配置，或以金丝雀优先、按 id 确认危害的方式应用它 |
+| Tool | `connection_action` | 关闭连接、通道、消费者或某个目的地的全部消费者 |
 | Tool | `send_message` | 投递一条消息 |
+| Tool | `setup_review` | 集群最近一次的配置评审 |
 | Tool | `alert_rule` / `rahdar_setting` | 告警规则；运维设置 |
 | Resource | `rahdar://clusters`、`rahdar://permissions`、`rahdar://tools` | 这把密钥能看到什么、能做什么 |
 | Resource | `cluster://{id}/topology`、`cluster://{id}/capabilities`、`cluster://{id}/nodes/{nodeId}/settings` | 节点；连接支持什么，以及启用其余部分所需的 `broker.xml`；单个节点的生效设置 |
-| Prompt | `triage_cluster`、`investigate_queue`、`before_you_purge`、`tune_scrape_load` | 运行手册 |
+| Prompt | `triage_cluster`、`investigate_subscription`、`before_you_purge`、`tune_scrape_load` | 运行手册 |
+
+## 资源、角色与系统
+
+工具用资源的**规范 id** 指代资源，例如 `artemis.queue/orders`，也就是 `list_resources` 在每一行返回的 `id`，连同系统给它的 `kind` 与 `kindLabel`。参数按资源的角色命名：`subscription`、`destination`、`resource`（生命周期的目标）和 `target`。`list_resources` 接受要列出的 `role`——`destination`、`subscription`、`route`、`connection`、`channel`、`consumer` 或 `producer`——以及可选的某个 `kind`。
+
+只为某一个 Broker 系统存在的工具以该系统的 id 为前缀：`artemis_config`、`artemis_config_change`、`artemis_config_diff`、`artemis_divert_lifecycle`，以及 `setup_review`。只有能读取该系统某个集群的密钥才会被提供这些工具；对其他系统的集群调用，会得到一个说明该集群运行哪个系统的工具错误。
 
 ## 安全契约
 
 一个握有管理 API 的助手，正是安全模型必须写得枯燥而明确的地方。这里就是：
 
 - **密钥永远不会超过它的所有者。** 每次调用都会与所有者*当下*的授权取交集，所以收紧一个人的权限会立刻收紧他的所有密钥（[ADR-0046](/reference/adr/0046-mcp-authenticates-with-existing-api-tokens)，英文）。
-- **变更默认 dry-run。** 真正的破坏性执行还额外要求 `confirm` 等于队列自身的名称——这与批量上限的 `override` 是两个不同的问题，`confirm` 永远无法满足 `override`。
+- **变更默认 dry-run。** 真正的破坏性执行还额外要求 `confirm` 等于订阅或目的地自身的名称——这与批量上限的 `override` 是两个不同的问题，`confirm` 永远无法满足 `override`。
 - **每次调用都会被审计**，读取也不例外：以 `MCP_TOOL_CALL` 记在所有者名下并附上密钥名称（`ada [token: laptop-agent]`），写明工具、集群和结果。变更写下的审计行（包括 dry run）都挂在它下面（[ADR-0137](/reference/adr/0137-one-gate-on-the-mcp-transport)，英文）。
 - **整个安装可以设为只读。** *Settings → MCP server → Read-only* 会对所有密钥隐藏并拒绝一切变更类工具，无论 `confirm` 为何。单把只读密钥就是只被授予读权限的密钥。
 - **对于密钥没有授权的集群**，返回的是*"不存在这样的集群，或这把密钥对它没有授权"*——既不点名缺了哪项权限，也不确认这个 id 是否存在。

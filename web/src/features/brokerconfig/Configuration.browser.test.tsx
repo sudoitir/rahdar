@@ -187,42 +187,42 @@ const PAGES = [
   {
     name: 'Configuration, addresses and queues',
     view: ConfigurationView,
-    path: '/clusters/$clusterId/configuration',
+    path: '/clusters/$clusterId/artemis/configuration',
     search: '',
     ready: 'Addresses and queues',
   },
   {
     name: 'Configuration, address settings',
     view: ConfigurationView,
-    path: '/clusters/$clusterId/configuration',
+    path: '/clusters/$clusterId/artemis/configuration',
     search: '?tab=addressSettings',
     ready: 'Address settings',
   },
   {
     name: 'Configuration, live nodes',
     view: ConfigurationView,
-    path: '/clusters/$clusterId/configuration',
+    path: '/clusters/$clusterId/artemis/configuration',
     search: '?tab=nodes',
     ready: 'Nodes',
   },
   {
     name: 'Configuration, history',
     view: ConfigurationView,
-    path: '/clusters/$clusterId/configuration',
+    path: '/clusters/$clusterId/artemis/configuration',
     search: '?tab=history',
     ready: 'Revisions',
   },
   {
     name: 'Configuration, recommended',
     view: ConfigurationView,
-    path: '/clusters/$clusterId/configuration',
+    path: '/clusters/$clusterId/artemis/configuration',
     search: '?tab=recommended',
     ready: 'These still need a broker.xml edit',
   },
   {
     name: 'Config diff',
     view: ConfigDiffView,
-    path: '/clusters/$clusterId/config-diff',
+    path: '/clusters/$clusterId/artemis/config-diff',
     search: '',
     ready: 'Configuration keys',
     role: 'grid',
@@ -263,7 +263,9 @@ describe('inline links in the nodes section', () => {
       renderThemed(
         <QueryClientProvider client={seeded()}>
           <Frame width={contentWidth(1280)} height={3200}>
-            <RouterProvider router={page(ConfigurationView, '/clusters/$clusterId/configuration', '?tab=nodes')} />
+            <RouterProvider
+              router={page(ConfigurationView, '/clusters/$clusterId/artemis/configuration', '?tab=nodes')}
+            />
           </Frame>
         </QueryClientProvider>,
         scheme,
@@ -282,7 +284,9 @@ describe('at 200% zoom, where a long line of broker.xml no longer fits', () => {
     const { container } = renderThemed(
       <QueryClientProvider client={seeded()}>
         <Frame width={560} height={3200}>
-          <RouterProvider router={page(ConfigurationView, '/clusters/$clusterId/configuration', '?tab=recommended')} />
+          <RouterProvider
+            router={page(ConfigurationView, '/clusters/$clusterId/artemis/configuration', '?tab=recommended')}
+          />
         </Frame>
       </QueryClientProvider>,
       scheme,

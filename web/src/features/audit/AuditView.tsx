@@ -76,7 +76,7 @@ const ACTIONS = [
   { value: 'RETRY_MESSAGES', label: 'Retry messages' },
   { value: 'DELETE_MESSAGES', label: 'Delete messages' },
   { value: 'EXPIRE_MESSAGES', label: 'Expire messages' },
-  { value: 'PURGE_QUEUE', label: 'Purge queue' },
+  { value: 'PURGE_QUEUE', label: 'Purge subscription' },
   { value: 'REGISTER_CLUSTER', label: 'Register cluster' },
   { value: 'REDISCOVER_CLUSTER', label: 'Rediscover cluster' },
   { value: 'DELETE_CLUSTER', label: 'Delete cluster' },
@@ -297,7 +297,7 @@ function AuditEventDetail({
                 void setParam({ parentId: selected.id, event: undefined });
               }}
             >
-              Show the event for each queue in this run
+              Show the event for each subscription in this run
             </Button>
           ) : null}
         </Group>
@@ -430,7 +430,7 @@ export function AuditView() {
       {search.parentId != null ? (
         <Group gap="xs">
           <Text size="sm">
-            Showing the events that belong to audit event {search.parentId}, such as each queue of a bulk run.
+            Showing the events that belong to audit event {search.parentId}, such as each subscription of a bulk run.
           </Text>
           <Button size="xs" variant="subtle" onClick={() => setParam({ parentId: undefined })}>
             Show every event

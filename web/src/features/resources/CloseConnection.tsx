@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Button, Stack, Text } from '@mantine/core';
 
 import {
-  useCloseAddressConsumers,
+  useCloseDestinationConsumers,
   useCloseNodeTarget,
   type ConnectionCloseKind,
   type ConnectionCloseView,
@@ -15,17 +15,17 @@ import { NodeOutcomeSummary } from '../../ui/NodeOutcomeSummary.tsx';
 import { Notice } from '../../ui/Notice.tsx';
 import { elapsedLabel, toServerMs, useServerNow } from '../../kernel/time/time.ts';
 import { focusBack } from '../../kernel/actions/focusBack.ts';
-import { useCloseAddressGate, useCloseGate } from './closeGates.ts';
+import { useCloseDestinationGate, useCloseGate } from './closeGates.ts';
 import { useActionHost } from '../../kernel/actions/hostContext.ts';
 
 /** What "already gone" is called in the outcome rows, instead of the lifecycle wording. */
 const ALREADY_GONE = 'already gone';
 
-type NodeKind = Exclude<ConnectionCloseKind, 'address-consumers'>;
+type NodeKind = Exclude<ConnectionCloseKind, 'destination-consumers'>;
 
 const NOUN: Record<NodeKind, string> = {
   connection: 'connection',
-  session: 'session',
+  channel: 'channel',
   consumer: "consumer's connection",
 };
 
@@ -33,7 +33,7 @@ const NOUN: Record<NodeKind, string> = {
  * The preview → result state both close dialogs share: a dry run when the dialog opens, then the
  * result, cleared on dismiss.
  */
-function useClosePreview(close: ReturnType<typeof useCloseAddressConsumers>, opened: boolean, onClose: () => void) {
+function useClosePreview(close: ReturnType<typeof useCloseDestinationConsumers>, opened: boolean, onClose: () => void) {
   const [preview, setPreview] = useState<ConnectionCloseView | null>(null);
   const [result, setResult] = useState<ConnectionCloseView | null>(null);
   const [previewFailed, setPreviewFailed] = useState<Error | null>(null);
@@ -63,13 +63,13 @@ function useClosePreview(close: ReturnType<typeof useCloseAddressConsumers>, ope
 }
 
 /**
- * The row action on the connections, sessions and consumers views (ADR-0057).
+ * The row action on the connections, channels and consumers views (ADR-0057).
  *
  * <p>The finding and the verb it implies sit on the same row: a consumer the
  * broker has marked slow is one click from the disconnect, rather than a change
  * of tool. What is closed is stated before the confirmation can be armed, and it
  * is confirmed against a name a human recognises — the client id, or the remote
- * address — never the opaque connection id an operator cannot check.
+ * destination — never the opaque connection id an operator cannot check.
  */
 export function CloseConnectionAction({
   clusterId,
@@ -146,7 +146,7 @@ export function CloseDialog({
   opened: boolean;
   onClose: () => void;
 }>) {
-  const close = useCloseNodeTarget(clusterId, kind, nodeId, targetId);
+  const close = useCloseNodeTarget(clusterId, nodeId, targetId);
   const now = useServerNow();
 
   const { preview, result, setResult, previewFailed, dismiss } = useClosePreview(close, opened, onClose);
@@ -242,24 +242,25 @@ function TargetSummary({
           { term: 'User', value: target.user || 'none' },
           { term: 'Protocol', value: target.protocol || 'unknown' },
           { term: 'Node', value: nodeName },
-          { term: 'Sessions closed with it', value: target.sessionCount.toLocaleString() },
+          { term: 'Channels closed with it', value: target.sessionCount.toLocaleString() },
           { term: 'Consumers closed with it', value: target.consumerCount.toLocaleString() },
         ]}
       />
 
       {/* Stated before the confirmation, never discovered afterwards from a DLQ. */}
-      <Notice tone="info" title="Messages in flight return to their queue">
+      <Notice tone="info" title="Messages in flight return to their subscription">
         {target.messagesInTransit == null ? (
           <>
             This broker did not report how many messages this client is holding. Any that are in flight return to their
-            queue with an increased delivery count, which can push a message past its maximum delivery attempts and into
-            the dead-letter queue.
+            subscription with an increased delivery count, which can push a message past its maximum delivery attempts
+            and into the dead letters.
           </>
         ) : (
           <>
             {target.messagesInTransit.toLocaleString()} in-flight message
-            {target.messagesInTransit === 1 ? '' : 's'} will return to their queue with an increased delivery count. A
-            message already near its maximum delivery attempts can be moved to the dead-letter queue by that increase.
+            {target.messagesInTransit === 1 ? '' : 's'} will return to their subscription with an increased delivery
+            count. A message already near its maximum delivery attempts can be moved to the dead letters by that
+            increase.
           </>
         )}
       </Notice>
@@ -267,20 +268,24 @@ function TargetSummary({
   );
 }
 
-/** The addresses view's row action: the trigger and its gate, around the dialog below. */
-export function CloseAddressConsumersAction({ clusterId, address }: Readonly<{ clusterId: string; address: string }>) {
-  const gate = useCloseAddressGate(clusterId);
+/** The destinations view's row action: the trigger and its gate, around the dialog below. */
+export function CloseDestinationConsumersAction({
+  clusterId,
+  destination,
+  resourceKind,
+}: Readonly<{ clusterId: string; destination: string; resourceKind?: string }>) {
+  const gate = useCloseDestinationGate(clusterId, resourceKind);
   const host = useActionHost();
 
   return (
-    <CapabilityGate verdict={gate} what={`closing every consumer on ${address}`}>
+    <CapabilityGate verdict={gate} what={`closing every consumer on ${destination}`}>
       <Button
         size="compact-xs"
         variant="default"
         disabled={gate.kind === 'blocked'}
-        aria-label={`Close consumers on ${address}`}
+        aria-label={`Close consumers on ${destination}`}
         onClick={(e) =>
-          host.open(CloseAddressConsumers, { clusterId, address }, { restoreFocus: focusBack(e.currentTarget) })
+          host.open(CloseDestinationConsumers, { clusterId, destination }, { restoreFocus: focusBack(e.currentTarget) })
         }
       >
         Close consumers
@@ -290,35 +295,35 @@ export function CloseAddressConsumersAction({ clusterId, address }: Readonly<{ c
 }
 
 /**
- * Closing every consumer connection bound to an address, across the cluster.
+ * Closing every consumer connection bound to an destination, across the cluster.
  *
  * <p>The one close with an unbounded blast radius, so it is previewed per node
  * and checked against the bulk cap before it can be armed — a disconnect is not
  * exempt from the cap because nothing is deleted: every consumer it closes hands
- * its in-flight messages back to a queue.
+ * its in-flight messages back to a subscription.
  */
-export function CloseAddressConsumers({
+export function CloseDestinationConsumers({
   clusterId,
-  address,
+  destination,
   opened,
   onClose,
 }: Readonly<{
   clusterId: string;
-  address: string;
+  destination: string;
   opened: boolean;
   onClose: () => void;
 }>) {
-  const close = useCloseAddressConsumers(clusterId, address);
+  const close = useCloseDestinationConsumers(clusterId, destination);
   const { preview, result, setResult, previewFailed, dismiss } = useClosePreview(close, opened, onClose);
 
   const overCap = preview?.outcome.overCap ?? false;
-  const title = `Close every consumer on ${address}`;
+  const title = `Close every consumer on ${destination}`;
 
   return (
     <ConfirmDialog
       opened={opened}
       onClose={dismiss}
-      title={result ? `Result of closing the consumers on ${address}` : title}
+      title={result ? `Result of closing the consumers on ${destination}` : title}
       tone="danger"
       confirmLabel={overCap ? 'Close them anyway, over the cap' : 'Close these consumers'}
       // Also locked while the count is being taken, so the typed name cannot arm a close that has
@@ -339,8 +344,8 @@ export function CloseAddressConsumers({
       }
       consequence={
         result ? null : (
-          <AddressConsequence
-            address={address}
+          <DestinationConsequence
+            destination={destination}
             pending={close.isPending}
             preview={preview}
             previewFailed={previewFailed}
@@ -352,15 +357,15 @@ export function CloseAddressConsumers({
   );
 }
 
-/** What closing every consumer on an address does, as the confirmation states it: the count, the cap and any failure. */
-function AddressConsequence({
-  address,
+/** What closing every consumer on an destination does, as the confirmation states it: the count, the cap and any failure. */
+function DestinationConsequence({
+  destination,
   pending,
   preview,
   previewFailed,
   closeError,
 }: Readonly<{
-  address: string;
+  destination: string;
   pending: boolean;
   preview: ConnectionCloseView | null;
   previewFailed: Error | null;
@@ -369,8 +374,8 @@ function AddressConsequence({
   return (
     <Stack gap="md">
       <Text size="sm">
-        This disconnects every application consuming from {address}, on every live node. The messages those consumers
-        hold return to their queues with an increased delivery count.
+        This disconnects every application consuming from {destination}, on every live node. The messages those
+        consumers hold return to their subscriptions with an increased delivery count.
       </Text>
 
       <div aria-live="polite">

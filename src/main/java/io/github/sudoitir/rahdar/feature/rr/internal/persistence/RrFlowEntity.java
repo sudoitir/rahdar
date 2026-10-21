@@ -41,7 +41,7 @@ public class RrFlowEntity {
 
     /** Null only for a flow created directly in {@code ORPHANED_REPLY} — the request side was never observed. */
     @Column(name = "request_destination", updatable = false)
-    private String requestAddress;
+    private String requestDestination;
 
     @Column(name = "reply_destination")
     private String replyDestination;
@@ -120,7 +120,7 @@ public class RrFlowEntity {
     public record Awaiting(
             UUID clusterId,
             UUID nodeId,
-            String requestAddress,
+            String requestDestination,
             String replyDestination,
             String replyKind,
             String correlationId,
@@ -131,7 +131,7 @@ public class RrFlowEntity {
     public RrFlowEntity(Awaiting awaiting) {
         this.clusterId = awaiting.clusterId();
         this.nodeId = awaiting.nodeId();
-        this.requestAddress = awaiting.requestAddress();
+        this.requestDestination = awaiting.requestDestination();
         this.replyDestination = awaiting.replyDestination();
         this.replyKind = awaiting.replyKind();
         this.state = RrState.AWAITING_REPLY.name();
@@ -153,7 +153,7 @@ public class RrFlowEntity {
         RrFlowEntity e = new RrFlowEntity();
         e.clusterId = clusterId;
         e.nodeId = nodeId;
-        e.requestAddress = null;
+        e.requestDestination = null;
         e.replyDestination = replyDestination;
         e.replyKind = replyKind;
         e.state = RrState.ORPHANED_REPLY.name();

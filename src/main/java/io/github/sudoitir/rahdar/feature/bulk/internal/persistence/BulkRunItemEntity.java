@@ -17,7 +17,7 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.UuidGenerator;
 import org.hibernate.type.SqlTypes;
 
-/** One queue in a bulk run: its figures at preview, and what acting on it did. */
+/** One subscription in a bulk run: its figures at preview, and what acting on it did. */
 @Entity
 @Table(name = "bulk_run_item")
 @Getter
@@ -38,7 +38,7 @@ public class BulkRunItemEntity {
     private int ordinal;
 
     @Column(name = "subscription", nullable = false, updatable = false)
-    private String queueName;
+    private String subscription;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
@@ -66,10 +66,10 @@ public class BulkRunItemEntity {
     @Column(name = "finished_at")
     private Instant finishedAt;
 
-    public BulkRunItemEntity(UUID runId, int ordinal, String queueName, String refusal, String estimate) {
+    public BulkRunItemEntity(UUID runId, int ordinal, String subscription, String refusal, String estimate) {
         this.runId = runId;
         this.ordinal = ordinal;
-        this.queueName = queueName;
+        this.subscription = subscription;
         this.status = refusal == null ? BulkItemStatus.PENDING : BulkItemStatus.REFUSED;
         this.error = refusal;
         this.estimate = estimate;

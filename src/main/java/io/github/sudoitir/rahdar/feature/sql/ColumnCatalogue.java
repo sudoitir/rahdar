@@ -53,8 +53,15 @@ public final class ColumnCatalogue {
     public enum Column {
         MESSAGE_ID(
                 "messageId", Type.STRING, Evaluation.SCAN, null, false, "The broker-assigned message id. Node-local."),
-        QUEUE("queue", Type.STRING, Evaluation.TARGET, null, false, "The queue the message is on."),
-        ADDRESS("address", Type.STRING, Evaluation.TARGET, null, false, "The address the queue is bound to."),
+        SUBSCRIPTION(
+                "subscription", Type.STRING, Evaluation.TARGET, null, false, "The subscription the message is on."),
+        DESTINATION(
+                "destination",
+                Type.STRING,
+                Evaluation.TARGET,
+                null,
+                false,
+                "The destination the subscription is bound to."),
         NODE("node", Type.STRING, Evaluation.TARGET, null, false, "The broker node holding the message."),
         PRIORITY("priority", Type.NUMBER, Evaluation.PUSHDOWN, "JMSPriority", false, "JMS priority, 0-9."),
         DURABLE(
@@ -112,7 +119,7 @@ public final class ColumnCatalogue {
                 Evaluation.SCAN,
                 null,
                 true,
-                "When the index last still saw it on its queue."),
+                "When the index last still saw it on its subscription."),
         ORIGIN(
                 "origin",
                 Type.STRING,
@@ -120,21 +127,21 @@ public final class ColumnCatalogue {
                 null,
                 true,
                 "SAMPLED or CAPTURED. A sampled row says a poll saw the message; a captured one says"
-                        + " the address routed it."),
-        ORIG_ADDRESS(
-                "origAddress",
+                        + " the destination routed it."),
+        ORIG_DESTINATION(
+                "orig_destination",
                 Type.STRING,
                 Evaluation.SCAN,
                 null,
                 true,
-                "The address the broker said a captured copy came from, when it said so."),
+                "The destination the broker said a captured copy came from, when it said so."),
         SOURCE_MESSAGE_ID(
                 "sourceMessageId",
                 Type.STRING,
                 Evaluation.SCAN,
                 null,
                 true,
-                "A captured message's id on its source queue. Null when the broker did not copy it.");
+                "A captured message's id on its source subscription. Null when the broker did not copy it.");
 
         private final String sqlName;
         private final Type type;

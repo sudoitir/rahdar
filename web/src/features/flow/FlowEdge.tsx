@@ -55,8 +55,8 @@ export const FlowEdge = memo(function FlowEdge({
   const [path, labelX, labelY] = getBezierPath({ sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition });
   const fault = (view.faults?.length ?? 0) > 0;
   const width = widthPx(view.rate);
-  const double = view.kind === 'BRIDGE' || view.kind === 'CLUSTER_HOP';
-  // The double line of a bridge or hop keeps its proportions: the canvas-coloured inner stroke is a
+  const double = view.kind === 'LINK' || view.kind === 'CLUSTER_HOP';
+  // The double line of a link or hop keeps its proportions: the canvas-coloured inner stroke is a
   // fixed fraction of the outer one (FlowCanvas.module.css), two px wider so the gap stays visible.
   const lineStyle = { '--edge-width': `${double ? width + 2 : width}px` } as CSSProperties;
 

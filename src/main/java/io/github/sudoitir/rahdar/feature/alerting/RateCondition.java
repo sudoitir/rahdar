@@ -50,10 +50,10 @@ public class RateCondition implements AlertCondition {
         Set<String> universe = new HashSet<>();
         Map<String, Double> active = new HashMap<>();
         ratesByQueue.forEach((queueName, rate) -> {
-            if (!scope.matchesQueue(queueName)) {
+            if (!scope.matchesSubscription(queueName)) {
                 return;
             }
-            String key = "queue:" + queueName;
+            String key = "subscription:" + queueName;
             universe.add(key);
             if (Comparators.test(rule.comparator(), rate, rule.threshold())) {
                 active.put(key, rate);

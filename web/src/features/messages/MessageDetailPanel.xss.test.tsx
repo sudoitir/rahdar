@@ -16,9 +16,9 @@ const MARKUP = 'script, img, iframe, [onerror], [onload], [srcdoc]';
 describe('a message that carries markup', () => {
   it('renders its body, and its headers as text, never as elements', async () => {
     server.use(
-      http.get('*/api/v1/clusters/:c/queues/:q/messages/:id', () =>
+      http.get('*/api/v1/clusters/:c/resources/artemis.queue/:q/messages/:id', () =>
         HttpResponse.json({
-          messageId: 146,
+          position: '146',
           type: 3,
           durable: true,
           priority: 0,
@@ -46,7 +46,7 @@ describe('a message that carries markup', () => {
     );
 
     const { container } = renderWithProviders(
-      <MessageDetailPanel clusterId="c1" queueName="PHASE3.SRC" messageId="146" onClose={() => {}} />,
+      <MessageDetailPanel clusterId="c1" subscriptionName="PHASE3.SRC" messageId="146" onClose={() => {}} />,
     );
 
     expect(await screen.findByText(HEADER_VALUE)).toBeInTheDocument();

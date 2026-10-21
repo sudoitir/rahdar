@@ -1,6 +1,8 @@
 package io.github.sudoitir.rahdar.platform.mcp;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 
 import io.github.sudoitir.rahdar.feature.apitokens.ApiTokenService;
@@ -17,8 +19,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
@@ -59,17 +63,33 @@ class McpToolSchemaBudgetTest extends PostgresIntegrationTest {
      * The average a tool may cost across the whole listing (ADR-0050). A tool that
      * needs more than this must move its detail into {@link McpToolCatalog}, where a
      * model pays for it only once it has chosen that tool.
+     *
+     * <p>Raised from 136 for the role vocabulary (19d): {@code list_resources} gained {@code kind}, which
+     * keeps the rows of one kind of a role and has no other way to be asked for, and five tools now name
+     * {@code subscription} where they named {@code queue}, a longer name spelled in every schema.
      */
-    private static final int AVERAGE_TOKEN_BUDGET_PER_TOOL = 136;
+    private static final int AVERAGE_TOKEN_BUDGET_PER_TOOL = 137;
 
     /**
      * A tool that needs more than this is describing too much; split it or collapse it.
-     * Raised from 175 for {@code broker_config_change}, whose apply gate legitimately
+     * Raised from 175 for {@code artemis_config_change}, whose apply gate legitimately
      * needs the acknowledgement list and the plan hash as separate parameters: they
      * answer different questions ("I saw these hazards" / "I saw this plan") and
      * folding them into one string would hide which one a refusal is about.
      */
     private static final int PER_TOOL_TOKEN_BUDGET = 190;
+
+    /**
+     * A tool of one broker system is offered only to a caller who can read a cluster of it (ADR-0207), and the
+     * database is shared with the other tests of the run, so whether one exists would decide the listing.
+     */
+    @MockitoBean
+    McpSystems systems;
+
+    @BeforeEach
+    void everySystemHasAReadableCluster() {
+        when(systems.readsAny(anyString())).thenReturn(true);
+    }
 
     @Autowired
     WebApplicationContext webContext;

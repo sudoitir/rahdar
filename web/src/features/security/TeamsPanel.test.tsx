@@ -35,7 +35,7 @@ describe('the Teams tab', () => {
 
     const row = await screen.findByRole('row', { name: /Orders/ });
     // What it owns is named per cluster, with each pattern's kind.
-    await waitFor(() => expect(row).toHaveTextContent('prod: orders.# (queues)'));
+    await waitFor(() => expect(row).toHaveTextContent('prod: orders.# (subscriptions)'));
     expect(screen.getByText('1 team')).toBeInTheDocument();
 
     // A link, so it opens in a new tab and with a middle click like any other.
@@ -256,14 +256,14 @@ describe('the Unowned section', () => {
     await person.click(await screen.findByRole('option', { name: 'prod', hidden: true }));
 
     expect(await screen.findByRole('row', { name: /legacy\.inbox/ })).toBeInTheDocument();
-    expect(asked).toContain('kind=QUEUE');
+    expect(asked).toContain('type=SUBSCRIPTION');
 
     await person.click(screen.getByRole('button', { name: 'Assign legacy.inbox to this team' }));
-    await person.click(await screen.findByRole('menuitem', { name: 'Queues and addresses' }));
+    await person.click(await screen.findByRole('menuitem', { name: 'Subscriptions and destinations' }));
 
     expect(await screen.findByRole('tab', { name: /^Patterns/ })).toHaveAttribute('aria-selected', 'true');
     expect(await screen.findByRole('textbox', { name: /^Pattern/ })).toHaveValue('legacy.inbox');
-    expect(screen.getByRole('radio', { name: 'Queues and addresses' })).toBeChecked();
+    expect(screen.getByRole('radio', { name: 'Subscriptions and destinations' })).toBeChecked();
   });
 
   it('says every name is owned when none is left', async () => {
@@ -275,7 +275,7 @@ describe('the Unowned section', () => {
     await person.click(await screen.findByRole('combobox', { name: 'Cluster' }));
     await person.click(await screen.findByRole('option', { name: 'prod', hidden: true }));
 
-    expect(await screen.findByText('Every queue on prod is owned')).toBeInTheDocument();
+    expect(await screen.findByText('Every subscription on prod is owned')).toBeInTheDocument();
   });
 
   it('is withheld from a team admin with the reason, and asks the server nothing', async () => {

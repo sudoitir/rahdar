@@ -116,6 +116,7 @@ public class ClusterService {
     private final ClusterIdentityClaims clusterClaims;
 
     private final BrokerGateway gateway;
+    private final ClusterKinds clusterKinds;
     private final BrokerConnections connections;
     private final List<RegistrationCheckContributor> checkContributors;
     private final BrokerCapabilityProbe capabilityProbe;
@@ -490,7 +491,9 @@ public class ClusterService {
                 viewMapper.capabilities(capabilities, VersionGate.assessAll(endpoints(topology))),
                 viewMapper.health(healthOf(clusterId, topology.nodes())),
                 cluster.getEnvironmentId(),
-                connectionView(clusterId, cluster)));
+                connectionView(clusterId, cluster),
+                clusterKinds.systemOf(clusterId),
+                clusterKinds.kindsOf(clusterId)));
     }
 
     // ---- one registration per set of brokers (ADR-0167) ---------------------
@@ -592,7 +595,9 @@ public class ClusterService {
                     health.level(),
                     rows.size(),
                     c.getUpdatedAt(),
-                    c.getEnvironmentId()));
+                    c.getEnvironmentId(),
+                    clusterKinds.systemOf(c.getId()),
+                    clusterKinds.kindsOf(c.getId())));
         }
         return out;
     }
@@ -616,7 +621,9 @@ public class ClusterService {
                     cluster.getEnvironmentId(),
                     clusterAccess.holds(clusterId, Permissions.CLUSTER_READ)
                             ? connectionView(clusterId, cluster)
-                            : null);
+                            : null,
+                    clusterKinds.systemOf(clusterId),
+                    clusterKinds.kindsOf(clusterId));
         });
     }
 

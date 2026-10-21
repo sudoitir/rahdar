@@ -8,7 +8,7 @@ import java.util.UUID;
  * Where a cluster's undeliverable and expired messages go by default, as its brokers are configured.
  * Systems keep this in different places, so each system's module provides it.
  */
-public interface DeadLetterDestinations {
+public interface DeadLetterDestinations extends SystemExtension {
 
     /**
      * The default dead-letter and expiry destinations, each named with its kind ({@code dead-letter} or

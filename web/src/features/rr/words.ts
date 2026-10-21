@@ -2,19 +2,19 @@ import { elapsedLabel } from '../../kernel/time/time.ts';
 import type { ExpectationDiagnosticsView, ExpectationView } from './api.ts';
 
 export function resolutionWords(capped: boolean, resolved: number): string {
-  if (capped) return `too broad — only the first ${resolved} addresses are traced`;
-  return resolved === 0 ? 'no matching queue yet' : `${resolved} matching now`;
+  if (capped) return `too broad — only the first ${resolved} destinations are traced`;
+  return resolved === 0 ? 'no matching subscription yet' : `${resolved} matching now`;
 }
 
-/** The plain text of an expectation's reply addresses, as a cell copies and measures it. */
-export function replyAddressesText(e: ExpectationView): string {
-  if (e.replyAddresses.length === 0) return 'temporary queues';
-  const patterns = e.replyAddresses.some((a) => a.includes('*'));
+/** The plain text of an expectation's reply destinations, as a cell copies and measures it. */
+export function replyDestinationsText(e: ExpectationView): string {
+  if (e.replyDestinations.length === 0) return 'temporary subscriptions';
+  const patterns = e.replyDestinations.some((a) => a.includes('*'));
   const resolution =
-    patterns || e.replyAddressesCapped
-      ? ` · ${resolutionWords(e.replyAddressesCapped, e.resolvedReplyAddresses.length)}`
+    patterns || e.replyDestinationsCapped
+      ? ` · ${resolutionWords(e.replyDestinationsCapped, e.resolvedReplyDestinations.length)}`
       : '';
-  return `${e.replyAddresses.join(', ')}${resolution}`;
+  return `${e.replyDestinations.join(', ')}${resolution}`;
 }
 
 /** `4s ago`, `3m ago` — the shared duration label, plus the word. */

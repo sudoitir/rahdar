@@ -61,7 +61,7 @@ to named MCP tools, chosen from the tools the user can use.
 ### Requirement: A token's grants cannot exceed its owner's grants
 
 The system SHALL allow a token to be narrowed to a subset of its owner's permissions and scopes at
-creation, optionally limited to a queue or address name pattern on a cluster, and SHALL evaluate
+creation, optionally limited to a subscription or destination name pattern on a cluster, and SHALL evaluate
 every request made with a token against the intersection of the token's configured grants and its
 owner's current access (grants, teams and shares), so that narrowing or disabling the owner's
 access immediately narrows or disables the token's access. A wildcard in a token grant SHALL allow
@@ -92,8 +92,13 @@ cluster SHALL be removed when that environment or cluster is deleted.
 
 #### Scenario: A token limited to a pattern
 
-- **WHEN** a token is limited to `message:read` on queues matching `orders.#`
+- **WHEN** a token is limited to `message:read` on subscriptions matching `orders.#`
 - **THEN** it may browse `orders.in` and receives not found for `orders2.in` even when its owner may read it
+
+#### Scenario: A token's pattern kind is a role
+
+- **WHEN** a token is limited to a pattern
+- **THEN** the pattern names its resource type as subscription or destination, never as one system's word for it
 
 #### Scenario: Deleting a cluster removes its token grants
 

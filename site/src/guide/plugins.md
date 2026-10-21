@@ -308,7 +308,7 @@ and each plugin starts on its own, within a time limit.
 
 Start from the template:
 [`examples/plugin-template`](https://github.com/sudoitir/rahdar/tree/main/examples/plugin-template).
-It is a complete plugin, **Notes**, notes operators leave on queues, with every kind of contribution:
+It is a complete plugin, **Notes**, notes operators leave on subscriptions, with every kind of contribution:
 
 - an entity in its own schema, with a reversible changelog
 - an audited service
@@ -316,7 +316,7 @@ It is a complete plugin, **Notes**, notes operators leave on queues, with every 
 - an assistant tool
 - a setting and a background job
 - a metric with a default alert rule
-- a page in every cluster, a navigation entry, a panel in every queue's details, and live updates
+- a page in every cluster, a navigation entry, a panel in every subscription's details, and live updates
 
 ```bash
 mvn verify
@@ -368,7 +368,7 @@ A plugin's `@McpTool` beans join Rahdar's MCP endpoint while it runs. Declare ea
     "posture": "read",
     "scope": "cluster",
     "permission": "acme-notes:read",
-    "description": "Lists the notes on a queue.",
+    "description": "Lists the notes on a subscription.",
     "params": [{ "name": "order", "values": ["newest", "oldest"], "note": "Defaults to newest." }]
   }
 ]
@@ -377,10 +377,10 @@ A plugin's `@McpTool` beans join Rahdar's MCP endpoint while it runs. Declare ea
 - **`permission`** is one of the plugin's own permissions. It is checked against the API key's
   owner, as it is for every other call.
 - **`scope`** is the scope of the permission, and Rahdar refuses a tool whose scope differs.
-  **`scope: resource`** checks it on the queue or address named by the argument `resourceArg` (a
-  required string the tool takes), of the kind `resourceKind` (`queue` or `address`), on the cluster
-  named by the required string `clusterId`. A caller who may not read that queue or address is told
-  *No such queue or address, or this key has no grant on it*, whether or not it exists, and one who
+  **`scope: resource`** checks it on the subscription or destination named by the argument `resourceArg` (a
+  required string the tool takes), of the kind `resourceType` (`subscription` or `destination`), on the cluster
+  named by the required string `clusterId`. A caller who may not read that subscription or destination is told
+  *No such subscription or destination, or this key has no grant on it*, whether or not it exists, and one who
   may read it and may not use it is told which permission is missing.
   **`scope: cluster`** checks it on the cluster named by the tool's `clusterId` argument, which the
   tool must take as a required string. A caller without the grant is told *No such cluster, or this
@@ -425,24 +425,24 @@ class Orders implements PluginMessageHandler {
 }
 ```
 
-- **`TAP`** delivers a copy of every message routed to the queue. Existing consumers and producers
+- **`TAP`** delivers a copy of every message routed to the subscription. Existing consumers and producers
   are untouched. If the plugin falls behind, the oldest copies are dropped, and
   `registration(key).droppedCopies()` says how many. It needs the acting user to hold
-  `message:read` on the queue, and Rahdar's broker role to be set
+  `message:read` on the subscription, and Rahdar's broker role to be set
   (`rahdar.capture.broker-role`, as for capture).
-- **`CONSUME`** makes the plugin one of the queue's consumers. `ACCEPT` removes the message.
+- **`CONSUME`** makes the plugin one of the subscription's consumers. `ACCEPT` removes the message.
   `REJECT`, an exception, or the plugin stopping first leaves it for redelivery, within the broker's
-  `max-delivery-attempts`. `RELEASE` also leaves it on the queue, but without spending a delivery
+  `max-delivery-attempts`. `RELEASE` also leaves it on the subscription, but without spending a delivery
   attempt: return it when the message is not the problem (the service your handler calls is down)
   and you are stopping the registration until it recovers. The broker offers a released message
   again at once, so releasing in a loop that keeps receiving only spins. It needs `message:read`
-  and `queue:purge` on the queue.
+  and `subscription:purge` on the subscription.
 - **`send(OutboundMessage)`** sends a body, headers and properties to an address. It needs
   `message:send` on the address.
 - **`checkSend(clusterId, address, actingUserId)`** answers why such a send would be refused (a
   reserved address, an unknown cluster, a missing `message:send`) without sending, so a plugin can
   reject a bad target when a user configures it. `send` still checks every message.
-- **Every registration acts for a user**, whose rights on the queue or address (through a role, a
+- **Every registration acts for a user**, whose rights on the subscription or destination (through a role, a
   team or a share) are checked when it is made and on every pass after
   (`rahdar.plugins.messaging.reconcile-interval`, 10 s by default). If the user loses
   a permission, the registration is `SUSPENDED` and says why. It resumes when the permission
@@ -453,18 +453,18 @@ class Orders implements PluginMessageHandler {
 - **Flow control.** A `CONSUME` registration's consumers have no prefetch window (the Core client's
   `consumerWindowSize=0`): the broker hands a consumer its next message only once the last one is
   settled. At most `concurrency` messages per node are delivered and unsettled, the rest stay on the
-  queue for any other consumer, and a slow handler is simply handed fewer messages. Nothing
+  subscription for any other consumer, and a slow handler is simply handed fewer messages. Nothing
   buffers in Rahdar or in the plugin.
 - **Order.** With a concurrency above 1, messages are handled in parallel, so their order is not
   kept, except within a message group. Producers that set the same `JMSXGroupID` (`_AMQ_GROUP_ID`
   in Core) on related messages get them handled one at a time, in order, on each node: the broker
   hands every group to one consumer. For an order across a broker cluster's nodes, configure the
-  broker's grouping handler. A concurrency of 1 keeps the queue's order on each node.
+  broker's grouping handler. A concurrency of 1 keeps the subscription's order on each node.
 - **Threads.** Rahdar calls the handler on a virtual thread of its own for each unit of the
   registration's `concurrency` on each node. A handler that blocks holds only that thread and its
   own consumer, never a thread message capture or an operator's session needs. Keep it bounded all
   the same: a blocked handler takes no further message on its slot.
-- Queues under Rahdar's own prefixes and the broker's management addresses are refused.
+- Subscriptions under Rahdar's own prefixes and the broker's management addresses are refused.
 
 **`PluginSecrets`** stores named values encrypted with Rahdar's secret key: `put`, `get`, `delete`
 and `list` (names and dates only). No Rahdar interface returns a value, and a plugin should keep it
@@ -479,11 +479,11 @@ charts, Prometheus and the alert rules. Nothing parallel is needed on either sid
 
 ```json
 "metrics": [
-  { "name": "acme-notes:notes", "description": "Notes per queue.", "unit": "count",
-    "subject": "queue", "permission": "acme-notes:read" }
+  { "name": "acme-notes:notes", "description": "Notes per subscription.", "unit": "count",
+    "subject": "subscription", "permission": "acme-notes:read" }
 ],
 "alertRules": [
-  { "key": "many-notes", "name": "Many notes on a queue", "metric": "acme-notes:notes",
+  { "key": "many-notes", "name": "Many notes on a subscription", "metric": "acme-notes:notes",
     "comparator": "GT", "threshold": 50, "forSeconds": 0, "severity": "INFO" }
 ]
 ```
@@ -502,7 +502,7 @@ class NoteCounts implements PluginMetricSource {
   throws or takes longer than two seconds is skipped for that scrape, so answer from what the
   plugin already holds rather than from a slow query.
 - **Where it goes.**
-  - The values are stored with the queue metrics and share their retention.
+  - The values are stored with the subscription metrics and share their retention.
   - Prometheus shows them as `rahdar_plugin_metric{plugin, metric, cluster, subject}`.
   - Each value is per Rahdar instance.
 - **Rules.** Threshold rules can watch the metric, with Rahdar's comparators, durations,
@@ -713,22 +713,23 @@ or in an update, is activated only after they acknowledge `audit-access-added`.
 
 ### Reading metric history
 
-A plugin that wants the history of Rahdar's queue metrics, or of metrics plugins publish, injects
+A plugin that wants the history of Rahdar's subscription metrics, or of metrics plugins publish, injects
 **`MetricHistory`** and names the user it acts for. The read runs as that user's account as it stands
 now, so the cluster check, the permission a plugin metric declares, the retention limit and the
 point cap are exactly those of the metrics API:
 
 ```java
 @Component
-class QueueTrend {
+class SubscriptionTrend {
     private final ObjectProvider<MetricHistory> history;
 
-    MetricSeriesResponse depth(UUID actingUserId, UUID clusterId, String queue) {
+    MetricSeriesResponse depth(UUID actingUserId, UUID clusterId, String subscription) {
         MetricHistory metrics = history.getIfAvailable();
         if (metrics == null) return null; // the metrics feature is switched off
         Instant now = Instant.now();
         return metrics.read(actingUserId, clusterId, new MetricQuery(
-                List.of("openbroker.backlog"), "QUEUE", queue, now.minus(Duration.ofHours(6)), now, null, null));
+                List.of("openbroker.backlog"), ResourceRef.subscription(subscription), now.minus(Duration.ofHours(6)), now,
+                null, null));
     }
 }
 ```
@@ -837,6 +838,36 @@ React, Mantine and the SDK's components work as they are. A library of your own 
 (a rich-text editor, a Markdown renderer) is what to check: it stops working here. Pick one that renders
 through React, or show the text as text.
 
+### Moving a plugin from contract 16 to 17
+
+Contract 17 names what a plugin reads, writes and guards by the role it plays (destination,
+subscription, route, channel) instead of by Artemis words. Rahdar refuses a plugin built for contract 16,
+so rebuild it and set `<rahdar.contract>17</rahdar.contract>` in its `pom.xml`:
+
+- **Messaging.** `RegistrationSpec.queue` and `MessageRegistration.queue` are `source`, a `ResourceRef`
+  naming a subscription. `PluginMessage.queue` is `source` too, and `PluginMessage.nodeId` moved into
+  `message`, a `MessageRef(nodeId, position)`. `OutboundMessage.address` is `target`, a `ResourceRef`: a
+  destination routes the message, a subscription receives it directly where the system supports that.
+  The `address::queue` form is gone.
+- **The approval gate.** `Effect.stateKey` is `Effect.etag`.
+- **Resource types.** `ResourceKind` is `ResourceType`. In `plugin.json`, `resourceKinds` is
+  `resourceTypes` and a tool's `resourceKind` is `resourceType`.
+- **Permission ids.** `queue:*` is `subscription:*`, `address:*` is `destination:*` and `divert:write` is
+  `route:write`. Update the permissions a manifest or a tool names, and any team pattern.
+- **Gate types.** Held operations are typed `subscription.delete`, `destination.delete` and
+  `subscription.purge`.
+- **TypeScript.** `ActionTargets` is keyed by role, and every target carries the resource's `id`, `kind`
+  and `name`. Use `DestinationTarget`, `SubscriptionTarget`, `RouteTarget`, `ChannelTarget` and
+  `ResourceRef` in place of `AddressTarget`, `QueueTarget`, `DivertTarget` and `SessionTarget`. The slots
+  follow: `subscription.actions`, `subscription.link`, `subscription.detail.panels`,
+  `subscriptions.selection`, `destination.actions`, `destination.link`, `route.actions`,
+  `channel.actions`, `channel.link` and `routes.tabs`. Live topics are named by role as well:
+  `subscriptions` and `channels` replace `queues` and `sessions`.
+- **Assistant tools.** Rahdar's own tools were renamed (`queue_lifecycle` is `resource_lifecycle`,
+  `divert_lifecycle` is `artemis_divert_lifecycle`, `broker_config` is `artemis_config`) and take
+  canonical resource ids such as `artemis.queue/orders`. A plugin's own tool names are its own and do
+  not change.
+
 ### Moving a plugin from contract 15 to 16
 
 Contract 16 moves Rahdar onto a broker-neutral SDK. Rahdar refuses a plugin built for contract 15, so
@@ -900,7 +931,7 @@ Rahdar refuses a plugin built for contract 12 with "built for extension contract
 - **Destructive confirmations are held, not typed.** `ConfirmByTyping` and `ConfirmDialog`'s `typedName` are
   gone from the SDK. A `ConfirmDialog` with `tone="danger"` is confirmed by pressing and holding its button,
   and `HoldToConfirm` is exported for a confirmation outside a dialog. Name the action and its count in the
-  label (`Delete 37 queues`). A UI test holds the button (mouse down, wait the hold, mouse up) instead of
+  label (`Delete 37 subscriptions`). A UI test holds the button (mouse down, wait the hold, mouse up) instead of
   typing a name.
 - **Administration and Settings are links, not tabs.** A section is `role="link"` with
   `aria-current="page"` in a navigation named after the page, and its content is a group named by the
@@ -941,7 +972,7 @@ extension contract 10", so rebuild it and set `<rahdar.contract>11</rahdar.contr
 
 - An assistant tool's `scope` must be the scope of its permission (`resource`, `cluster` or `global`),
   and a `resource` tool names `resourceArg`, the string argument that holds the queue or address, and
-  `resourceKind`. A tool whose scope differs from its permission's, or a resource tool without them, is
+  `resourceType`. A tool whose scope differs from its permission's, or a resource tool without them, is
   refused when the plugin is activated.
 - A permission you check against a queue or address should be `resource`, and be checked with
   `ClusterAccessGuard.requireResource` rather than `@PreAuthorize("@perm.can(#clusterId, …)")`, which
@@ -951,7 +982,7 @@ extension contract 10", so rebuild it and set `<rahdar.contract>11</rahdar.contr
 - Scheduled work that acts for a user is published as `OwnerWork`, naming the permissions and resources
   it needs. Rahdar refuses the publish naming each missing one, checks again before every run, and
   suspends the work with the reason when the owner loses one.
-- In the UI, `useCan().can(permission, { clusterId, kind, name })` answers for one queue or address, and
+- In the UI, `useCan().can(permission, { clusterId, type, name })` answers for one subscription or destination, and
   adding the row's `allowedActions` answers with no request.
 
 ### Moving a plugin from contract 9 to 10
@@ -960,7 +991,7 @@ Contract 10 makes permissions resource-scoped. Rahdar refuses a plugin built for
 rebuild it against the new API and set `<rahdar.contract>10</rahdar.contract>` in its `pom.xml`:
 
 - In `plugin.json`, each permission declares `scope` (`global`, `cluster` or `resource`) in place of
-  `globalOnly`; a `resource` permission also lists `resourceKinds` (`queue`, `address`). A manifest
+  `globalOnly`; a `resource` permission also lists `resourceTypes` (`subscription`, `destination`). A manifest
   that still says `globalOnly` is refused at install.
 - `PermissionResolver`'s constructor changed (a plugin receives it as a bean and never builds it),
   and `RahdarPrincipal.grants()` is gone: ask `PermissionResolver.can(...)` instead of reading
@@ -999,14 +1030,14 @@ name, or through a share. Check it the way Rahdar does, so your answers are exac
   resources before anything is done.
 - **`PermissionResolver.can(clusterId, ResourceRef, action)`** answers for the current user, and
   `can(principal, clusterId, ResourceRef, action)` for another, such as the owner of work that runs later.
-- **`PermissionResolver.filter(clusterId, ResourceKind.QUEUE)`** returns a `ResourceFilter` for a list: call
+- **`PermissionResolver.filter(clusterId, ResourceType.QUEUE)`** returns a `ResourceFilter` for a list: call
   `readable(name)` for each row, and `allowedActions(name)` for the actions the caller holds on it, yours
   included. Filter before you sort, page and count, so a total never counts what the caller cannot see.
   `everything()` is true for a caller who reads the whole cluster, so they pay nothing for it.
 
-In the UI, `useCan().can('acme-notes:write', { clusterId, kind: 'queue', name })` answers for one queue or
-address, and `allowedActions` on a row you already fetched answers with no request:
-`can('acme-notes:write', { clusterId, kind: 'queue', name, allowedActions: row.allowedActions })`.
+In the UI, `useCan().can('acme-notes:write', { clusterId, type: 'subscription', name })` answers for one
+subscription or destination, and `allowedActions` on a row you already fetched answers with no request:
+`can('acme-notes:write', { clusterId, type: 'subscription', name, allowedActions: row.allowedActions })`.
 `can(permission, clusterId)` is about the cluster as a whole, which a team's rights never reach.
 
 ### Work that runs later as its owner

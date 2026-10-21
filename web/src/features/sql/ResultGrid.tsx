@@ -12,7 +12,7 @@ import classes from './ResultGrid.module.css';
  * other tabular view.
  *
  * <p>Which columns show, and in what order, is the table's own Columns menu, remembered per browser.
- * The message identifies a row, so it leads; where the row came from follows the queue and the node, because
+ * The message identifies a row, so it leads; where the row came from follows the subscription and the node, because
  * a live row and an indexed row mean different things and which one an operator is looking at has to be
  * answerable without opening it.
  */

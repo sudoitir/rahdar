@@ -16,6 +16,6 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.RUNTIME)
 public @interface Gated {
 
-    /** The operation type, such as {@code queue.purge}. */
+    /** The operation type, such as {@code subscription.purge}. */
     String value();
 }

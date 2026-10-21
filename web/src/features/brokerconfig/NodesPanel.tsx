@@ -58,7 +58,7 @@ export function NodesPanel({
       title="Nodes"
       description={
         <>
-          <Link to={`/clusters/${declaration.clusterId}/config-diff`} className={linkClasses.link}>
+          <Link to={`/clusters/${declaration.clusterId}/artemis/config-diff`} className={linkClasses.link}>
             Config diff
           </Link>{' '}
           sets every node against the majority of the others; this screen compares every node with the declaration.
@@ -108,7 +108,7 @@ function SyncEvidence({ node, clusterId }: Readonly<{ node: ConfigNodeStateView;
     OBSERVED_MATCH: 'Observed to match; Rahdar has not written to this node',
   }[node.basis];
   return (
-    <Link to={`/clusters/${clusterId}/configuration?tab=history`} className={linkClasses.link}>
+    <Link to={`/clusters/${clusterId}/artemis/configuration?tab=history`} className={linkClasses.link}>
       {words}
     </Link>
   );

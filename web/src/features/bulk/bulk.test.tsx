@@ -7,7 +7,7 @@ import { http, HttpResponse } from 'msw';
 
 import { renderWithProviders } from '../../test/render.tsx';
 import { server } from '../../test/setup.ts';
-import type { QueueSelection } from '../../kernel/slots.ts';
+import type { SubscriptionSelection } from '../../kernel/slots.ts';
 import type { BulkItemView, BulkOperation, BulkRunDetailView, BulkRunView } from './api.ts';
 
 const AVAILABLE = { status: 'AVAILABLE', reason: 'ok', brokerXmlSnippet: null };
@@ -80,7 +80,9 @@ const nodeB = { nodeId: 'n2', nodeName: 'node-b', paused: false };
 function item(over: Partial<BulkItemView> = {}): BulkItemView {
   return {
     ordinal: 0,
-    queueName: 'orders.a',
+    subscription: 'artemis.queue/orders.a',
+    kind: 'artemis.queue',
+    kindLabel: 'Queue',
     status: 'PENDING',
     error: null,
     warning: null,
@@ -96,7 +98,7 @@ function item(over: Partial<BulkItemView> = {}): BulkItemView {
   };
 }
 
-/** A delete of three queues: one known, one with an unknown figure, one refused. */
+/** A delete of three subscriptions: one known, one with an unknown figure, one refused. */
 function deletePreview(): BulkRunDetailView {
   return {
     run: run(),
@@ -104,14 +106,14 @@ function deletePreview(): BulkRunDetailView {
       item(),
       item({
         ordinal: 1,
-        queueName: 'orders.b',
+        subscription: 'artemis.queue/orders.b',
         affected: null,
         warning: 'node-b has not answered recently, so its message count is unknown',
         nodes: [{ ...nodeB, messageCount: null, consumerCount: null }],
       }),
       item({
         ordinal: 2,
-        queueName: 'orders.c',
+        subscription: 'artemis.queue/orders.c',
         status: 'REFUSED',
         error: 'It has consumers attached',
         affected: 5,
@@ -137,9 +139,9 @@ vi.mock('@tanstack/react-router', async (importOriginal) => ({
 const { BulkActionBar } = await import('./BulkActionBar.tsx');
 const { BulkRunView } = await import('./BulkRunView.tsx');
 
-const THREE: QueueSelection = { kind: 'names', names: ['orders.a', 'orders.b', 'orders.c'] };
+const THREE: SubscriptionSelection = { kind: 'names', names: ['orders.a', 'orders.b', 'orders.c'] };
 
-function Bar({ selection = THREE, count = 3 }: { selection?: QueueSelection; count?: number }) {
+function Bar({ selection = THREE, count = 3 }: { selection?: SubscriptionSelection; count?: number }) {
   return <BulkActionBar clusterId="c1" selection={selection} count={count} clear={() => {}} />;
 }
 
@@ -164,15 +166,15 @@ async function openPreview(user: ReturnType<typeof userEvent.setup>, label = 'De
 
 describe('BulkActionBar', () => {
   it('keeps an action the operator may not take visible, disabled, with a reachable reason', async () => {
-    server.use(meHandler(['queue:pause', 'cluster:read']), clusterHandler());
+    server.use(meHandler(['subscription:pause', 'cluster:read']), clusterHandler());
     const user = userEvent.setup();
     renderWithProviders(<Bar />);
 
     await waitFor(() => expect(screen.getByRole('button', { name: 'Delete…' })).toBeDisabled());
     expect(screen.getByRole('button', { name: 'Pause' })).toBeEnabled();
 
-    await user.click(screen.getByRole('button', { name: 'Why deleting these queues is unavailable' }));
-    expect(await screen.findByText(/Destroy queues and addresses/)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Why deleting these subscriptions is unavailable' }));
+    expect(await screen.findByText(/Destroy subscriptions and destinations/)).toBeInTheDocument();
   });
 
   it('offers every action disabled while nothing is selected', async () => {
@@ -264,9 +266,9 @@ describe('BulkPreviewDialog', () => {
       http.post('*/api/v1/clusters/c1/bulk/preview', () =>
         problem(
           422,
-          'bulk-queue-cap-exceeded',
+          'bulk-subscription-cap-exceeded',
           'Bulk run refused',
-          '140 queues matched; a bulk run is capped at 100 queues (safety.bulk-queue-cap). Narrow the selection.',
+          '140 subscriptions matched; a bulk run is capped at 100 subscriptions (safety.bulk-subscription-cap). Narrow the selection.',
         ),
       ),
     );
@@ -276,7 +278,7 @@ describe('BulkPreviewDialog', () => {
     const dialog = await openPreview(user);
     const alert = await within(dialog).findByRole('alert');
     expect(alert).toHaveTextContent('Bulk run refused');
-    expect(alert).toHaveTextContent('140 queues matched; a bulk run is capped at 100 queues');
+    expect(alert).toHaveTextContent('140 subscriptions matched; a bulk run is capped at 100 subscriptions');
     expect(alert).toHaveTextContent('Narrow the selection.');
     expect(within(dialog).getByRole('button', { name: 'Preview again' })).toBeInTheDocument();
   });
@@ -301,7 +303,7 @@ describe('BulkPreviewDialog', () => {
     renderWithProviders(<Bar />);
 
     const dialog = await openPreview(user, 'Pause');
-    await user.click(await within(dialog).findByRole('button', { name: 'Pause 2 queues' }));
+    await user.click(await within(dialog).findByRole('button', { name: 'Pause 2 subscriptions' }));
 
     const alert = await within(dialog).findByRole('alert');
     expect(alert).toHaveTextContent('This is not the plan that was previewed.');
@@ -309,7 +311,7 @@ describe('BulkPreviewDialog', () => {
     expect(within(dialog).getByRole('button', { name: 'Preview again' })).toBeInTheDocument();
   });
 
-  it('states the blast radius, says what is unknown, and lists the refused queue', async () => {
+  it('states the blast radius, says what is unknown, and lists the refused subscription', async () => {
     server.use(
       meHandler(),
       clusterHandler(),
@@ -322,11 +324,11 @@ describe('BulkPreviewDialog', () => {
     await user.click(screen.getByRole('button', { name: 'Delete…' }));
     const dialog = await screen.findByRole('dialog');
 
-    expect(await within(dialog).findByText(/Delete 2 queues on 2 nodes/)).toBeInTheDocument();
+    expect(await within(dialog).findByText(/Delete 2 subscriptions on 2 nodes/)).toBeInTheDocument();
     // An incomplete estimate is a floor, and the gap is stated rather than read as zero.
     expect(within(dialog).getByText(/at least 40 messages/)).toBeInTheDocument();
-    expect(within(dialog).getByText(/1 queue has a figure Rahdar does not know/)).toBeInTheDocument();
-    expect(within(dialog).getByText(/1 queue is refused and will not be touched/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/1 subscription has a figure Rahdar does not know/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/1 subscription is refused and will not be touched/)).toBeInTheDocument();
     expect(within(dialog).getByText('It has consumers attached')).toBeInTheDocument();
     expect(within(dialog).getAllByText('unknown').length).toBeGreaterThan(0);
   });
@@ -348,10 +350,10 @@ describe('BulkPreviewDialog', () => {
     await waitFor(() => expect(screen.getByRole('button', { name: 'Delete…' })).toBeEnabled());
     await user.click(screen.getByRole('button', { name: 'Delete…' }));
     const dialog = await screen.findByRole('dialog');
-    await within(dialog).findByText(/Delete 2 queues on 2 nodes/);
+    await within(dialog).findByText(/Delete 2 subscriptions on 2 nodes/);
 
     // A press that is let go too early does nothing; the full hold runs it.
-    const confirm = within(dialog).getByRole('button', { name: 'Delete 2 queues' });
+    const confirm = within(dialog).getByRole('button', { name: 'Delete 2 subscriptions' });
     fireEvent.mouseDown(confirm);
     fireEvent.mouseUp(confirm);
     expect(executed).toBeNull();
@@ -388,7 +390,10 @@ const RUNNING = () =>
   http.get('*/api/v1/clusters/c1/bulk/runs/r1', () =>
     HttpResponse.json({
       run: run({ status: 'RUNNING', total: 3, succeeded: 1, startedAt: '2026-09-21T10:01:00Z' }),
-      items: [item({ status: 'SUCCEEDED' }), item({ ordinal: 1, queueName: 'orders.b', status: 'RUNNING' })],
+      items: [
+        item({ status: 'SUCCEEDED' }),
+        item({ ordinal: 1, subscription: 'artemis.queue/orders.b', status: 'RUNNING' }),
+      ],
     }),
   );
 
@@ -397,10 +402,10 @@ describe('BulkRunView', () => {
     server.use(meHandler(), RUNNING());
     renderWithProviders(<BulkRunView />);
 
-    expect(await screen.findByRole('heading', { level: 1, name: 'Delete 3 queues' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 1, name: 'Delete 3 subscriptions' })).toBeInTheDocument();
     expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
     expect(screen.getByRole('heading', { level: 2, name: 'Outcome' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { level: 2, name: 'Queues' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: 'Subscriptions' })).toBeInTheDocument();
   });
 
   it('holds the page header while the run loads, then says why it could not be read, with a retry', async () => {
@@ -438,7 +443,7 @@ describe('BulkRunView', () => {
     renderWithProviders(<BulkRunView />);
 
     await user.click(await screen.findByRole('button', { name: 'Retry' }));
-    expect(await screen.findByRole('heading', { level: 1, name: 'Delete 1 queue' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 1, name: 'Delete 1 subscription' })).toBeInTheDocument();
   });
 
   it('confirms before stopping a run, keeps the control busy, and announces the outcome', async () => {
@@ -465,7 +470,7 @@ describe('BulkRunView', () => {
     await user.keyboard('{Enter}');
 
     const dialog = await screen.findByRole('dialog', { name: 'Stop this run?' });
-    expect(dialog).toHaveTextContent('every queue after it is cancelled');
+    expect(dialog).toHaveTextContent('every subscription after it is cancelled');
     expect(stopped).toBe(0);
 
     // Escape dismisses it, and focus returns to the control that opened it.
@@ -513,7 +518,12 @@ describe('BulkRunView', () => {
           run: run({ status: 'PARTIAL', total: 10, succeeded: 8, failed: 2, finishedAt: '2026-09-21T10:02:00Z' }),
           items: [
             item({ status: 'SUCCEEDED' }),
-            item({ ordinal: 1, queueName: 'orders.b', status: 'FAILED', error: 'node-b refused the delete' }),
+            item({
+              ordinal: 1,
+              subscription: 'artemis.queue/orders.b',
+              status: 'FAILED',
+              error: 'node-b refused the delete',
+            }),
           ],
         }),
       ),
@@ -527,7 +537,7 @@ describe('BulkRunView', () => {
     expect(screen.getByRole('link', { name: /audit/i })).toHaveAttribute('href', '/clusters/c1/audit?parentId=7');
   });
 
-  it('expands a queue to its per-node detail', async () => {
+  it('expands a subscription to its per-node detail', async () => {
     server.use(
       meHandler(),
       http.get('*/api/v1/clusters/c1/bulk/runs/r1', () =>

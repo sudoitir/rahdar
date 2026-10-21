@@ -28,11 +28,12 @@ import io.github.sudoitir.rahdar.feature.flow.web.FlowViews.NodeRole;
 import io.github.sudoitir.rahdar.feature.flow.web.FlowViews.NodeSampleState;
 import io.github.sudoitir.rahdar.feature.flow.web.FlowViews.RateSource;
 import io.github.sudoitir.rahdar.kernel.core.HeavyRequests;
-import io.github.sudoitir.rahdar.kernel.plugin.ResourceKind;
+import io.github.sudoitir.rahdar.kernel.plugin.ResourceType;
 import io.github.sudoitir.rahdar.kernel.security.ClusterAccessGuard;
 import io.github.sudoitir.rahdar.kernel.security.PermissionResolver;
 import io.github.sudoitir.rahdar.kernel.security.ResourceFilter;
 import io.github.sudoitir.rahdar.kernel.settings.SettingsService;
+import io.github.sudoitir.rahdar.platform.broker.RahdarNames;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
 import io.github.sudoitir.rahdar.platform.scrape.MetricSamples;
@@ -40,7 +41,6 @@ import io.github.sudoitir.rahdar.platform.scrape.MetricSamples.SubjectRate;
 import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshot;
 import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshots;
 import io.github.sudoitir.rahdar.platform.scrape.ScrapeSettings;
-import io.github.sudoitir.rahdar.system.artemis.DivertOperations;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -112,7 +112,8 @@ public class FlowGraphService {
         access.requireVisible(clusterId);
         demand.renew(clusterId);
         Readable readable = new Readable(
-                permissions.filter(clusterId, ResourceKind.QUEUE), permissions.filter(clusterId, ResourceKind.ADDRESS));
+                permissions.filter(clusterId, ResourceType.SUBSCRIPTION),
+                permissions.filter(clusterId, ResourceType.DESTINATION));
 
         Instant now = clock.instant();
         Duration sampleInterval = FlowSettings.sampleInterval(settings);
@@ -225,7 +226,9 @@ public class FlowGraphService {
     private record Readable(ResourceFilter queues, ResourceFilter addresses) {
 
         boolean sees(Edge edge) {
-            return edge.kind() == Kind.PRODUCE ? addresses.readable(edge.address()) : queues.readable(edge.queue());
+            return edge.kind() == Kind.PRODUCE
+                    ? addresses.readable(edge.destination())
+                    : queues.readable(edge.subscription());
         }
 
         boolean sees(Route route) {
@@ -317,9 +320,9 @@ public class FlowGraphService {
         for (StoredEdge stored : store.edges(clusterId)) {
             Edge e = stored.edge();
             boolean hidden = !readable.sees(e)
-                    || internal(e.address())
-                    || internal(e.queue())
-                    || ((captureOwned(e.queue()) || captureOwned(e.address())) && !capture);
+                    || internal(e.destination())
+                    || internal(e.subscription())
+                    || ((captureOwned(e.subscription()) || captureOwned(e.destination())) && !capture);
             if (!hidden) {
                 addClient(stored, query, nodeNames.get(stored.nodeId()), temporaryQueues, picture);
             }
@@ -331,8 +334,8 @@ public class FlowGraphService {
         Edge e = stored.edge();
         String label = label(e, query.groupBy());
         if (e.kind() == Kind.PRODUCE) {
-            picture.producers().computeIfAbsent(label, ClientAgg::new).add(stored, nodeName, e.address());
-        } else if (temporaryQueues.contains(e.queue())) {
+            picture.producers().computeIfAbsent(label, ClientAgg::new).add(stored, nodeName, e.destination());
+        } else if (temporaryQueues.contains(e.subscription())) {
             if (query.layers().contains(Layer.TEMPORARY)) {
                 // One node per client for all its temporary queues: each is short-lived and uniquely
                 // named, and drawn one by one they would bury the paths an operator came for.
@@ -340,14 +343,14 @@ public class FlowGraphService {
                 picture.queues()
                         .computeIfAbsent(collapsed, name -> new QueueAgg(name, null, NodeRole.TEMPORARY))
                         .temporary
-                        .add(e.queue());
+                        .add(e.subscription());
                 picture.consumers().computeIfAbsent(label, ClientAgg::new).add(stored, nodeName, collapsed);
             }
         } else {
-            picture.consumers().computeIfAbsent(label, ClientAgg::new).add(stored, nodeName, e.queue());
-            if (!e.queue().isEmpty()) {
+            picture.consumers().computeIfAbsent(label, ClientAgg::new).add(stored, nodeName, e.subscription());
+            if (!e.subscription().isEmpty()) {
                 // A queue can be consumed before the slow queue sweep has seen it.
-                picture.queues().computeIfAbsent(e.queue(), name -> new QueueAgg(name, e.address()));
+                picture.queues().computeIfAbsent(e.subscription(), name -> new QueueAgg(name, e.destination()));
             }
         }
     }
@@ -455,8 +458,8 @@ public class FlowGraphService {
     private static boolean focused(
             Focus focus, Path p, Map<String, ClientAgg> producers, Map<String, ClientAgg> consumers) {
         return switch (focus.kind()) {
-            case QUEUE -> focus.name().equals(p.queue());
-            case ADDRESS -> focus.name().equals(p.address());
+            case SUBSCRIPTION -> focus.name().equals(p.queue());
+            case DESTINATION -> focus.name().equals(p.address());
             case CLIENT -> touches(producers.get(focus.name()), consumers.get(focus.name()), p);
         };
     }
@@ -556,8 +559,8 @@ public class FlowGraphService {
         QueueAgg q = picture.queues().get(name);
         NodeRole role = q.role != null ? q.role : captureRole(name);
         drawing.node(new FlowNodeView(
-                queueId(name),
-                NodeKind.QUEUE,
+                subscriptionId(name),
+                NodeKind.SUBSCRIPTION,
                 role,
                 queueLabel(q),
                 q.role == NodeRole.TEMPORARY ? q.temporary.size() : null,
@@ -583,10 +586,10 @@ public class FlowGraphService {
         return new FlowEdgeView(
                 "route:" + q.address + "->" + q.name,
                 EdgeKind.ROUTE,
-                addressId(q.address),
-                queueId(q.name),
+                destinationId(q.address),
+                subscriptionId(q.name),
                 rate(rate),
-                RateSource.QUEUE_METRIC,
+                RateSource.SUBSCRIPTION_METRIC,
                 rate == null ? null : rate.asOf(),
                 rate != null && rate.span().compareTo(fresh.sampleInterval().multipliedBy(2)) > 0
                         ? rate.span().toSeconds()
@@ -615,8 +618,8 @@ public class FlowGraphService {
         });
         boolean anonymous = ANONYMOUS.equals(address);
         drawing.node(new FlowNodeView(
-                addressId(address),
-                NodeKind.ADDRESS,
+                destinationId(address),
+                NodeKind.DESTINATION,
                 anonymous ? NodeRole.ANONYMOUS : captureRole(address),
                 anonymous ? "anonymous producers — address chosen per message" : address,
                 null,
@@ -675,7 +678,7 @@ public class FlowGraphService {
 
     private static FlowEdgeView clientEdge(
             ClientAgg c, String clientId, boolean producing, String key, TargetAgg agg, Fresh fresh) {
-        String target = producing ? addressId(key) : queueId(key);
+        String target = producing ? destinationId(key) : subscriptionId(key);
         return new FlowEdgeView(
                 (producing ? "produce:" : "consume:") + c.label + "->" + key,
                 producing ? EdgeKind.PRODUCE : EdgeKind.CONSUME,
@@ -721,10 +724,10 @@ public class FlowGraphService {
         Route r = d.route;
         List<Fault> faults = d.nodes.size() < sampledNodes ? List.of(Fault.PARTIAL_PRESENCE) : List.of();
         return new FlowEdgeView(
-                "divert:" + r.name() + ":" + r.source() + "->" + r.target(),
-                EdgeKind.DIVERT,
-                addressId(r.source()),
-                addressId(r.target()),
+                "forward:" + r.name() + ":" + r.source() + "->" + r.target(),
+                EdgeKind.FORWARD,
+                destinationId(r.source()),
+                destinationId(r.target()),
                 null,
                 RateSource.NONE,
                 d.asOf,
@@ -745,7 +748,7 @@ public class FlowGraphService {
     private static void bypassRoutesFrom(String address, Drawing drawing) {
         for (String edgeId : List.copyOf(drawing.edges.keySet())) {
             FlowEdgeView e = drawing.edges.get(edgeId);
-            if (e.kind() == EdgeKind.ROUTE && e.source().equals(addressId(address))) {
+            if (e.kind() == EdgeKind.ROUTE && e.source().equals(destinationId(address))) {
                 drawing.edges.put(edgeId, bypassed(e));
             }
         }
@@ -764,10 +767,10 @@ public class FlowGraphService {
             }
             String target;
             if (knownAddresses.contains(r.target())) {
-                target = addressId(r.target());
+                target = destinationId(r.target());
                 drawing.node(new FlowNodeView(
                         target,
-                        NodeKind.ADDRESS,
+                        NodeKind.DESTINATION,
                         null,
                         r.target(),
                         null,
@@ -780,11 +783,11 @@ public class FlowGraphService {
                         List.of(),
                         List.of()));
             } else {
-                target = "remote:bridge:" + r.target();
+                target = "remote:link:" + r.target();
                 drawing.node(new FlowNodeView(
                         target,
                         NodeKind.REMOTE,
-                        NodeRole.BRIDGE_TARGET,
+                        NodeRole.LINK_TARGET,
                         r.target(),
                         null,
                         null,
@@ -798,15 +801,15 @@ public class FlowGraphService {
             }
             List<Fault> faults = new ArrayList<>();
             if (b.connectedOn < b.nodes.size()) {
-                faults.add(Fault.BRIDGE_DOWN);
+                faults.add(Fault.LINK_DOWN);
             }
             if (b.nodes.size() < sampledNodes) {
                 faults.add(Fault.PARTIAL_PRESENCE);
             }
             drawing.edge(new FlowEdgeView(
-                    "bridge:" + r.name(),
-                    EdgeKind.BRIDGE,
-                    queueId(r.source()),
+                    "link:" + r.name(),
+                    EdgeKind.LINK,
+                    subscriptionId(r.source()),
                     target,
                     b.rate,
                     RateSource.SAMPLER,
@@ -851,7 +854,7 @@ public class FlowGraphService {
             drawing.edge(new FlowEdgeView(
                     "hop:" + hop.queue,
                     EdgeKind.CLUSTER_HOP,
-                    queueId(hop.queue),
+                    subscriptionId(hop.queue),
                     target,
                     hop.rate,
                     RateSource.SAMPLER,
@@ -885,8 +888,8 @@ public class FlowGraphService {
                     drawing.edge(new FlowEdgeView(
                             "wildcard:" + address + "->" + wildcard,
                             EdgeKind.WILDCARD,
-                            addressId(address),
-                            addressId(wildcard),
+                            destinationId(address),
+                            destinationId(wildcard),
                             null,
                             RateSource.NONE,
                             null,
@@ -923,10 +926,10 @@ public class FlowGraphService {
         if (sources.isEmpty()) {
             return;
         }
-        drawing.nodes.remove(addressId(address));
+        drawing.nodes.remove(destinationId(address));
         drawing.node(new FlowNodeView(
-                addressId(address),
-                NodeKind.ADDRESS,
+                destinationId(address),
+                NodeKind.DESTINATION,
                 role,
                 address,
                 null,
@@ -942,8 +945,8 @@ public class FlowGraphService {
             drawing.edge(new FlowEdgeView(
                     kind.name().toLowerCase(Locale.ROOT) + ":" + name,
                     kind,
-                    queueId(name),
-                    addressId(address),
+                    subscriptionId(name),
+                    destinationId(address),
                     null,
                     RateSource.NONE,
                     null,
@@ -1100,7 +1103,7 @@ public class FlowGraphService {
 
     /** A divert, address or queue Rahdar's message capture owns (ADR-0079). */
     static boolean captureOwned(String name) {
-        return name != null && name.startsWith(DivertOperations.CAPTURE_PREFIX);
+        return name != null && name.startsWith(RahdarNames.CAPTURE_PREFIX);
     }
 
     private static Delivery delivery(String routingType) {
@@ -1118,12 +1121,12 @@ public class FlowGraphService {
         return id.length() > 8 ? id.substring(0, 8) : id;
     }
 
-    private static String addressId(String address) {
-        return "address:" + address;
+    private static String destinationId(String address) {
+        return "destination:" + address;
     }
 
-    private static String queueId(String queue) {
-        return "queue:" + queue;
+    private static String subscriptionId(String queue) {
+        return "subscription:" + queue;
     }
 
     private static Map<String, SubjectRate> summed(Map<String, Map<UUID, SubjectRate>> byNode) {
@@ -1214,12 +1217,12 @@ public class FlowGraphService {
         }
 
         FlowNodeView node(FlowNodeView n, Map<String, QueueAgg> queues) {
-            if (n.kind() == NodeKind.QUEUE && n.role() != NodeRole.TEMPORARY) {
-                QueueAgg q = queues.get(n.id().substring("queue:".length()));
+            if (n.kind() == NodeKind.SUBSCRIPTION && n.role() != NodeRole.TEMPORARY) {
+                QueueAgg q = queues.get(n.id().substring("subscription:".length()));
                 return q == null || q.perNode.isEmpty() ? n : n.withByNode(shares(List.of(q)));
             }
-            if (n.kind() == NodeKind.ADDRESS && n.role() == null) {
-                String address = n.id().substring("address:".length());
+            if (n.kind() == NodeKind.DESTINATION && n.role() == null) {
+                String address = n.id().substring("destination:".length());
                 List<QueueAgg> bound = queues.values().stream()
                         .filter(q -> address.equals(q.address) && q.role == null)
                         .toList();
@@ -1329,7 +1332,7 @@ public class FlowGraphService {
 
         private void addDivert(StoredRoute stored, Set<Layer> layers, boolean capture) {
             Route r = stored.route();
-            if (layers.contains(Layer.DIVERTS) && (capture || !captureOwned(r.name()))) {
+            if (layers.contains(Layer.ROUTES) && (capture || !captureOwned(r.name()))) {
                 diverts.computeIfAbsent(
                                 List.of(r.name(), r.source(), r.target(), r.exclusive(), String.valueOf(r.filter())),
                                 k -> new RoutingAgg(r))
@@ -1339,7 +1342,7 @@ public class FlowGraphService {
 
         private void addBridge(StoredRoute stored, Set<Layer> layers) {
             Route r = stored.route();
-            if (layers.contains(Layer.BRIDGES)) {
+            if (layers.contains(Layer.ROUTES)) {
                 bridges.computeIfAbsent(List.of(r.name(), r.source(), r.target()), k -> new RoutingAgg(r))
                         .add(r, stored.sampledAt(), stored.nodeId());
             }

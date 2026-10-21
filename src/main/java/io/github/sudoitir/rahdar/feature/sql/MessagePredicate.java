@@ -33,7 +33,7 @@ public class MessagePredicate {
      * What a residual predicate can see beyond the message itself: the target it was
      * read from, and the broker-time "now" a relative window resolves against.
      */
-    public record EvalContext(String queue, String address, String node, Instant now) {}
+    public record EvalContext(String subscription, String destination, String node, Instant now) {}
 
     public java.util.function.Predicate<BrowsedMessage> compile(Predicate predicate, EvalContext context) {
         if (predicate == null) {
@@ -171,8 +171,8 @@ public class MessagePredicate {
     private Object column(Column column, BrowsedMessage message, EvalContext context) {
         return switch (column) {
             case MESSAGE_ID -> Long.toString(message.messageId());
-            case QUEUE -> context.queue();
-            case ADDRESS -> context.address();
+            case SUBSCRIPTION -> context.subscription();
+            case DESTINATION -> context.destination();
             case NODE -> context.node();
             case PRIORITY -> (long) message.priority();
             case DURABLE -> message.durable();
@@ -188,7 +188,7 @@ public class MessagePredicate {
             case BODY -> message.body();
             // An observation column has no meaning against a live broker; the planner
             // rejects the query before it gets here, so this is a backstop.
-            case OBSERVED_AT, LAST_SEEN_AT, ORIGIN, ORIG_ADDRESS, SOURCE_MESSAGE_ID -> null;
+            case OBSERVED_AT, LAST_SEEN_AT, ORIGIN, ORIG_DESTINATION, SOURCE_MESSAGE_ID -> null;
         };
     }
 

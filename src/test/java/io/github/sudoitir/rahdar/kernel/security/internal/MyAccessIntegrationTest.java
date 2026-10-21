@@ -2,7 +2,7 @@ package io.github.sudoitir.rahdar.kernel.security.internal;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import io.github.sudoitir.rahdar.kernel.plugin.ResourceKind;
+import io.github.sudoitir.rahdar.kernel.plugin.ResourceType;
 import io.github.sudoitir.rahdar.kernel.security.AccessChanges;
 import io.github.sudoitir.rahdar.kernel.security.Grant;
 import io.github.sudoitir.rahdar.kernel.security.PatternKind;
@@ -138,14 +138,14 @@ class MyAccessIntegrationTest extends PostgresIntegrationTest {
         UUID inLive = cluster(live);
         UUID elsewhere = cluster(null);
         var reader = roleService.create(new UserViews.RoleRequest(
-                "env-reader-" + UUID.randomUUID(), List.of("queue:read", "cluster:read"), false, false));
+                "env-reader-" + UUID.randomUUID(), List.of("subscription:read", "cluster:read"), false, false));
         UUID someone = user();
         userRoles.save(new UserRoleEntity(someone, reader.id(), Grant.ScopeType.ENVIRONMENT.name(), live));
         accessChanges.changedFor(someone);
 
         asUser(someone);
 
-        assertThat(myAccess.of(inLive).permissions()).contains("queue:read", "cluster:read");
+        assertThat(myAccess.of(inLive).permissions()).contains("subscription:read", "cluster:read");
         assertThat(myAccess.of(inLive).canSeeCluster()).isTrue();
         assertThat(myAccess.of(elsewhere).permissions()).isEmpty();
         assertThat(myAccess.of(elsewhere).canSeeCluster()).isFalse();
@@ -157,7 +157,7 @@ class MyAccessIntegrationTest extends PostgresIntegrationTest {
         UUID prod = cluster(null);
         UUID staging = cluster(null);
         UUID orders = team("orders");
-        teams.addPattern(orders, new PatternRequest(prod, PatternKind.QUEUE, "orders.#"));
+        teams.addPattern(orders, new PatternRequest(prod, PatternKind.SUBSCRIPTION, "orders.#"));
         UUID operator = user();
         teams.addMember(orders, new MemberRequest(PrincipalType.USER, operator, null, null, role("TEAM_OPERATOR")));
 
@@ -165,8 +165,8 @@ class MyAccessIntegrationTest extends PostgresIntegrationTest {
         AccessSummary onProd = myAccess.of(prod);
         AccessSummary onStaging = myAccess.of(staging);
 
-        assertThat(onProd.permissions()).doesNotContain("queue:read", "queue:purge", "cluster:read");
-        assertThat(onProd.anywhere()).contains("queue:read", "queue:purge");
+        assertThat(onProd.permissions()).doesNotContain("subscription:read", "subscription:purge", "cluster:read");
+        assertThat(onProd.anywhere()).contains("subscription:read", "subscription:purge");
         assertThat(onProd.canSeeCluster()).isTrue();
         assertThat(onStaging.anywhere()).isEmpty();
         assertThat(onStaging.canSeeCluster()).isFalse();
@@ -178,11 +178,12 @@ class MyAccessIntegrationTest extends PostgresIntegrationTest {
         UUID staging = cluster(null);
         UUID orders = team("orders");
         UUID billing = team("billing");
-        teams.addPattern(orders, new PatternRequest(prod, PatternKind.QUEUE, "orders.#"));
-        teams.addPattern(orders, new PatternRequest(prod, PatternKind.ADDRESS, "orders.#"));
-        teams.addPattern(billing, new PatternRequest(prod, PatternKind.BOTH, "billing.#"));
+        teams.addPattern(orders, new PatternRequest(prod, PatternKind.SUBSCRIPTION, "orders.#"));
+        teams.addPattern(orders, new PatternRequest(prod, PatternKind.DESTINATION, "orders.#"));
+        teams.addPattern(billing, new PatternRequest(prod, PatternKind.ANY, "billing.#"));
         teams.addShare(
-                billing, new ShareRequest(orders, prod, PatternKind.QUEUE, "billing.shared.#", role("TEAM_OPERATOR")));
+                billing,
+                new ShareRequest(orders, prod, PatternKind.SUBSCRIPTION, "billing.shared.#", role("TEAM_OPERATOR")));
         UUID operator = user();
         teams.addMember(orders, new MemberRequest(PrincipalType.USER, operator, null, null, role("TEAM_OPERATOR")));
         UUID viewer = user();
@@ -195,14 +196,14 @@ class MyAccessIntegrationTest extends PostgresIntegrationTest {
         asUser(viewer);
         AccessSummary asViewer = myAccess.of(prod);
 
-        assertThat(onProd.createPatterns().queue()).containsExactly("billing.shared.#", "orders.#");
-        assertThat(onProd.createPatterns().address()).containsExactly("orders.#");
-        assertThat(onStaging.createPatterns().queue()).isEmpty();
-        assertThat(onStaging.createPatterns().address()).isEmpty();
-        assertThat(noCluster.createPatterns().queue()).isEmpty();
-        assertThat(noCluster.createPatterns().address()).isEmpty();
+        assertThat(onProd.createPatterns().subscription()).containsExactly("billing.shared.#", "orders.#");
+        assertThat(onProd.createPatterns().destination()).containsExactly("orders.#");
+        assertThat(onStaging.createPatterns().subscription()).isEmpty();
+        assertThat(onStaging.createPatterns().destination()).isEmpty();
+        assertThat(noCluster.createPatterns().subscription()).isEmpty();
+        assertThat(noCluster.createPatterns().destination()).isEmpty();
         // A viewer cannot create under their team's own patterns, but a share gives its role to every member.
-        assertThat(asViewer.createPatterns().queue()).containsExactly("billing.shared.#");
+        assertThat(asViewer.createPatterns().subscription()).containsExactly("billing.shared.#");
     }
 
     @Test
@@ -225,18 +226,21 @@ class MyAccessIntegrationTest extends PostgresIntegrationTest {
     void theActionsOnAResourceAreThoseTheCallersTeamGivesThereAndNothingForOneTheyCannotRead() {
         UUID prod = cluster(null);
         UUID orders = team("orders");
-        teams.addPattern(orders, new PatternRequest(prod, PatternKind.QUEUE, "orders.#"));
+        teams.addPattern(orders, new PatternRequest(prod, PatternKind.SUBSCRIPTION, "orders.#"));
         UUID viewer = user();
         teams.addMember(orders, new MemberRequest(PrincipalType.USER, viewer, null, null, role("TEAM_VIEWER")));
 
         asUser(viewer);
 
-        assertThat(myAccess.onResource(prod, ResourceKind.QUEUE, "orders.in").actions())
-                .contains("queue:read")
-                .doesNotContain("queue:purge");
-        assertThat(myAccess.onResource(prod, ResourceKind.QUEUE, "billing.in").actions())
+        assertThat(myAccess.onResource(prod, ResourceType.SUBSCRIPTION, "orders.in")
+                        .actions())
+                .contains("subscription:read")
+                .doesNotContain("subscription:purge");
+        assertThat(myAccess.onResource(prod, ResourceType.SUBSCRIPTION, "billing.in")
+                        .actions())
                 .isEmpty();
-        assertThat(myAccess.onResource(prod, ResourceKind.ADDRESS, "orders.in").actions())
+        assertThat(myAccess.onResource(prod, ResourceType.DESTINATION, "orders.in")
+                        .actions())
                 .isEmpty();
     }
 }

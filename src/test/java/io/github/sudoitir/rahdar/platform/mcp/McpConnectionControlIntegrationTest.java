@@ -121,6 +121,7 @@ class McpConnectionControlIntegrationTest extends PostgresIntegrationTest {
 
         client = Targets.target();
         when(gateway.node(eq(clusterId), any(UUID.class))).thenReturn(client);
+        when(gateway.cluster(clusterId)).thenReturn(client.connection());
 
         key = McpFixture.mintKey(
                 users,
@@ -146,7 +147,7 @@ class McpConnectionControlIntegrationTest extends PostgresIntegrationTest {
                 "kind",
                 "connection",
                 "target",
-                CONNECTION,
+                "artemis.connection/" + CONNECTION,
                 "nodeId",
                 nodeId.toString()));
         for (int i = 0; i < extra.length; i += 2) {
@@ -233,7 +234,7 @@ class McpConnectionControlIntegrationTest extends PostgresIntegrationTest {
                         MessagePermissions.MESSAGE_SEND,
                         MessagePermissions.MESSAGE_MOVE,
                         MessagePermissions.MESSAGE_DELETE,
-                        MessagePermissions.QUEUE_PURGE));
+                        MessagePermissions.SUBSCRIPTION_PURGE));
 
         JsonNode response = McpFixture.callTool(mvc, messageOnly, "connection_action", args());
 

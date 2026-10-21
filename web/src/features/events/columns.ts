@@ -12,15 +12,18 @@ export function subjectOf(e: BrokerEventView): string {
   return e.consumerName ?? e.sessionName ?? e.connectionName ?? e.routingName ?? '—';
 }
 
-/** The word for what an event is about, from its type's prefix, so the grid can be read by family. */
+/** What an event is about, from the middle of its `openbroker.<family>.<verb>` type, so the grid can be read by family. */
+const FAMILIES: Record<string, string> = {
+  consumer: 'consumer',
+  channel: 'channel',
+  client: 'connection',
+  resource: 'resource',
+  message: 'message',
+  route: 'route',
+};
+
 export function family(type: string): string {
-  if (type.startsWith('CONSUMER')) return 'consumer';
-  if (type.startsWith('SESSION')) return 'session';
-  if (type.startsWith('CONNECTION')) return 'connection';
-  if (type.startsWith('BINDING') || type.startsWith('ADDRESS')) return 'binding';
-  if (type.startsWith('MESSAGE')) return 'message';
-  if (type.startsWith('UNKNOWN')) return 'unknown';
-  return 'other';
+  return FAMILIES[type.split('.')[1] ?? ''] ?? 'other';
 }
 
 /**
@@ -41,7 +44,13 @@ export function eventColumns(zone: string): Column<BrokerEventView>[] {
     },
     { id: 'type', header: 'Type', accessor: (e) => e.type, kind: 'code', priority: 'high' },
     { id: 'family', header: 'Family', accessor: (e) => family(e.type), kind: 'status', priority: 'low' },
-    { id: 'address', header: 'Address', accessor: (e) => e.address ?? '—', kind: 'identifier', priority: 'high' },
+    {
+      id: 'destination',
+      header: 'Destination',
+      accessor: (e) => e.destination ?? '—',
+      kind: 'identifier',
+      priority: 'high',
+    },
     { id: 'subject', header: 'Subject', accessor: subjectOf, kind: 'identifier', priority: 'high' },
     { id: 'remote', header: 'Remote', accessor: (e) => e.remoteAddress ?? '—', kind: 'code', priority: 'low' },
   ];

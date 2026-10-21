@@ -2,21 +2,22 @@ package io.github.sudoitir.rahdar.feature.routing;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import io.github.sudoitir.rahdar.feature.queues.LifecycleRequests.CreateDivertRequest;
-import io.github.sudoitir.rahdar.feature.queues.QueueLifecycleService;
-import io.github.sudoitir.rahdar.feature.routing.web.RoutingViews.DivertView;
-import io.github.sudoitir.rahdar.feature.routing.web.RoutingViews.NodeRef;
+import io.github.sudoitir.openbroker.ClusterConnection;
+import io.github.sudoitir.openbroker.model.Resource;
+import io.github.sudoitir.rahdar.feature.routing.web.RoutingViews.RouteNodeCell;
+import io.github.sudoitir.rahdar.feature.routing.web.RoutingViews.RouteView;
 import io.github.sudoitir.rahdar.kernel.core.PagedView;
 import io.github.sudoitir.rahdar.kernel.core.ResourceQuery;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
 import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
 import io.github.sudoitir.rahdar.platform.broker.BrokerTarget;
-import io.github.sudoitir.rahdar.platform.clusters.LifecycleOutcome;
+import io.github.sudoitir.rahdar.platform.broker.DivertSettings;
+import io.github.sudoitir.rahdar.platform.broker.RahdarNames;
+import io.github.sudoitir.rahdar.platform.broker.SystemExtensions;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNodeEntity;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNodeEntity.HaObservation;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNodeRepository;
@@ -25,13 +26,11 @@ import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterR
 import io.github.sudoitir.rahdar.support.AdminAuthenticationExtension;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
 import io.github.sudoitir.rahdar.support.Targets;
-import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
-import io.github.sudoitir.rahdar.system.artemis.ArtemisNodes;
-import io.github.sudoitir.rahdar.system.artemis.DivertOperations;
-import io.github.sudoitir.rahdar.system.artemis.DivertRow;
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -57,7 +56,7 @@ class RoutingServiceTest extends PostgresIntegrationTest {
     RoutingService routing;
 
     @Autowired
-    QueueLifecycleService lifecycle;
+    DivertLifecycleService lifecycle;
 
     @Autowired
     ClusterRepository clusters;
@@ -69,13 +68,12 @@ class RoutingServiceTest extends PostgresIntegrationTest {
     BrokerConnections connections;
 
     @MockitoBean
-    ArtemisNodes artemisNodes;
-
-    @MockitoBean
     BrokerGateway gateway;
 
     @MockitoBean
-    DivertOperations divertOps;
+    SystemExtensions extensions;
+
+    private final DivertSettings settings = mock(DivertSettings.class);
 
     private UUID clusterId;
     private UUID nodeA;
@@ -88,14 +86,25 @@ class RoutingServiceTest extends PostgresIntegrationTest {
         nodeA = node("node-a", NODE_A_URL);
         nodeB = node("node-b", NODE_B_URL);
 
-        ArtemisNode client = mock(ArtemisNode.class);
-        when(client.resolveBrokerObjectName()).thenReturn("org.apache.activemq.artemis:broker=\"b\"");
-        when(artemisNodes.on(eq(clusterId), any(UUID.class))).thenReturn(client);
-        when(artemisNodes.on(any(BrokerTarget.class))).thenReturn(client);
-        BrokerTarget anyNode = Targets.target();
-        when(gateway.node(any(UUID.class), any(UUID.class))).thenReturn(anyNode);
-        when(divertOps.addressAvailable(any(), any(), any())).thenReturn(true);
-        when(divertOps.createVerified(any(), any(), any())).thenReturn(LifecycleOutcome.NodeStatus.APPLIED);
+        when(extensions.require(any(), eq(DivertSettings.class))).thenReturn(settings);
+        when(extensions.forCluster(any(), eq(DivertSettings.class))).thenReturn(Optional.of(settings));
+        ClusterConnection connection = Targets.target().connection();
+        when(gateway.cluster(any())).thenReturn(connection);
+        when(settings.addressAvailable(any(), any())).thenReturn(true);
+        nodeHolds(nodeA);
+        nodeHolds(nodeB);
+    }
+
+    /** What each node reports. The forwarding address of a divert Rahdar creates is there on both. */
+    private final Map<UUID, BrokerTarget> targets = new HashMap<>();
+
+    private void nodeHolds(UUID node, Resource... held) {
+        BrokerTarget target = targets.computeIfAbsent(node, n -> Targets.target());
+        Resource[] all = new Resource[held.length + 1];
+        System.arraycopy(held, 0, all, 0, held.length);
+        all[held.length] = Targets.address("AUDIT.IN");
+        Targets.holding(target, all);
+        when(gateway.node(clusterId, node)).thenReturn(target);
     }
 
     private UUID node(String name, String url) {
@@ -113,27 +122,25 @@ class RoutingServiceTest extends PostgresIntegrationTest {
         }
     }
 
-    private static DivertRow divert(UUID nodeId, String nodeName, String name, String from, String to) {
-        return new DivertRow(nodeId, nodeName, name, name, from, to, null, "STRIP", null, Map.of(), false, false);
+    private static Resource divert(String name, String from, String to) {
+        return Targets.divert(name, from, to);
     }
 
-    private PagedView<DivertView> diverts() {
-        return routing.diverts(clusterId, ResourceQuery.of(null, null, null, null));
+    private PagedView<RouteView> diverts() {
+        return routing.routes(clusterId, ResourceQuery.of(null, null, null, null));
     }
 
     @Test
     void oneDivertOnEveryNodeIsOneRowAttributedToBoth() {
-        when(divertOps.listDiverts(any(), eq(nodeA), anyString()))
-                .thenReturn(List.of(divert(nodeA, "node-a", "audit", "ORDER.IN", "AUDIT.IN")));
-        when(divertOps.listDiverts(any(), eq(nodeB), anyString()))
-                .thenReturn(List.of(divert(nodeB, "node-b", "audit", "ORDER.IN", "AUDIT.IN")));
+        nodeHolds(nodeA, divert("audit", "ORDER.IN", "AUDIT.IN"));
+        nodeHolds(nodeB, divert("audit", "ORDER.IN", "AUDIT.IN"));
 
-        List<DivertView> rows = diverts().data();
+        List<RouteView> rows = diverts().data();
 
         assertThat(rows).hasSize(1);
         assertThat(rows.get(0).nodesPresent()).isEqualTo(2);
         assertThat(rows.get(0).nodesTotal()).isEqualTo(2);
-        assertThat(rows.get(0).perNode()).extracting(NodeRef::nodeName).containsExactly("node-a", "node-b");
+        assertThat(rows.get(0).perNode()).extracting(RouteNodeCell::nodeName).containsExactly("node-a", "node-b");
     }
 
     /**
@@ -143,18 +150,18 @@ class RoutingServiceTest extends PostgresIntegrationTest {
      */
     @Test
     void theSameNameRoutingDifferentlyOnTwoNodesIsTwoRows() {
-        when(divertOps.listDiverts(any(), eq(nodeA), anyString()))
-                .thenReturn(List.of(divert(nodeA, "node-a", "audit", "ORDER.IN", "AUDIT.IN")));
-        when(divertOps.listDiverts(any(), eq(nodeB), anyString()))
-                .thenReturn(List.of(divert(nodeB, "node-b", "audit", "ORDER.IN", "ELSEWHERE.IN")));
+        nodeHolds(nodeA, divert("audit", "ORDER.IN", "AUDIT.IN"));
+        nodeHolds(nodeB, divert("audit", "ORDER.IN", "ELSEWHERE.IN"));
 
-        List<DivertView> rows = diverts().data();
+        List<RouteView> rows = diverts().data();
 
         assertThat(rows)
                 .hasSize(2)
                 .allMatch(r -> r.nodesPresent() == 1 && r.nodesTotal() == 2)
-                .extracting(DivertView::forwardingAddress)
-                .containsExactlyInAnyOrder("AUDIT.IN", "ELSEWHERE.IN");
+                .extracting(RouteView::target)
+                .containsExactlyInAnyOrder(
+                        Targets.id("artemis.address", "AUDIT.IN").format(),
+                        Targets.id("artemis.address", "ELSEWHERE.IN").format());
     }
 
     /**
@@ -164,9 +171,8 @@ class RoutingServiceTest extends PostgresIntegrationTest {
      */
     @Test
     void aDivertRahdarDidNotCreateCarriesNoOriginClaim() {
-        when(divertOps.listDiverts(any(), eq(nodeA), anyString()))
-                .thenReturn(List.of(divert(nodeA, "node-a", "someone-elses", "A", "B")));
-        when(divertOps.listDiverts(any(), eq(nodeB), anyString())).thenReturn(List.of());
+        nodeHolds(nodeA, divert("someone-elses", "A", "B"));
+        nodeHolds(nodeB);
 
         assertThat(diverts().data().get(0).owner()).isNull();
     }
@@ -178,10 +184,8 @@ class RoutingServiceTest extends PostgresIntegrationTest {
                 new CreateDivertRequest("mine", null, "ORDER.IN", "AUDIT.IN", false, null, null, null),
                 false);
 
-        when(divertOps.listDiverts(any(), eq(nodeA), anyString()))
-                .thenReturn(List.of(divert(nodeA, "node-a", "mine", "ORDER.IN", "AUDIT.IN")));
-        when(divertOps.listDiverts(any(), eq(nodeB), anyString()))
-                .thenReturn(List.of(divert(nodeB, "node-b", "mine", "ORDER.IN", "AUDIT.IN")));
+        nodeHolds(nodeA, divert("mine", "ORDER.IN", "AUDIT.IN"));
+        nodeHolds(nodeB, divert("mine", "ORDER.IN", "AUDIT.IN"));
 
         assertThat(diverts().data().get(0).owner()).isEqualTo("OPERATOR");
     }
@@ -193,9 +197,8 @@ class RoutingServiceTest extends PostgresIntegrationTest {
         lifecycle.createDivert(clusterId, request, false);
         lifecycle.deleteDivert(clusterId, "mine", false);
 
-        when(divertOps.listDiverts(any(), eq(nodeA), anyString()))
-                .thenReturn(List.of(divert(nodeA, "node-a", "mine", "ORDER.IN", "AUDIT.IN")));
-        when(divertOps.listDiverts(any(), eq(nodeB), anyString())).thenReturn(List.of());
+        nodeHolds(nodeA, divert("mine", "ORDER.IN", "AUDIT.IN"));
+        nodeHolds(nodeB);
 
         assertThat(diverts().data().get(0).owner()).isNull();
     }
@@ -204,29 +207,28 @@ class RoutingServiceTest extends PostgresIntegrationTest {
     @Test
     void aCaptureDivertIsAttributedToCaptureAndNamesItsSubscription() {
         UUID subscription = UUID.randomUUID();
-        String name = DivertOperations.CAPTURE_PREFIX + "instance." + subscription;
-        when(divertOps.listDiverts(any(), eq(nodeA), anyString()))
-                .thenReturn(List.of(divert(nodeA, "node-a", name, "ORDER.IN", "cap")));
-        when(divertOps.listDiverts(any(), eq(nodeB), anyString())).thenReturn(List.of());
+        String name = RahdarNames.CAPTURE_PREFIX + "instance." + subscription;
+        nodeHolds(nodeA, divert(name, "ORDER.IN", "cap"));
+        nodeHolds(nodeB);
 
-        DivertView row = diverts().data().get(0);
+        RouteView row = diverts().data().get(0);
         assertThat(row.owner()).isEqualTo("MESSAGE_CAPTURE");
-        assertThat(row.captureSubscriptionId()).isEqualTo(subscription);
+        assertThat(row.nativeAttributes()).containsEntry("captureSubscriptionId", subscription.toString());
     }
 
     /** "What touches this address" has to match either end, not only the name. */
     @Test
     void filteringMatchesEitherEndOfTheDivert() {
-        when(divertOps.listDiverts(any(), eq(nodeA), anyString()))
-                .thenReturn(List.of(
-                        divert(nodeA, "node-a", "one", "ORDER.IN", "AUDIT.IN"),
-                        divert(nodeA, "node-a", "two", "PAYMENT.IN", "ORDER.IN"),
-                        divert(nodeA, "node-a", "three", "PAYMENT.IN", "AUDIT.IN")));
-        when(divertOps.listDiverts(any(), eq(nodeB), anyString())).thenReturn(List.of());
+        nodeHolds(
+                nodeA,
+                divert("one", "ORDER.IN", "AUDIT.IN"),
+                divert("two", "PAYMENT.IN", "ORDER.IN"),
+                divert("three", "PAYMENT.IN", "AUDIT.IN"));
+        nodeHolds(nodeB);
 
-        List<DivertView> rows = routing.diverts(clusterId, ResourceQuery.of("ORDER.IN", null, null, null))
+        List<RouteView> rows = routing.routes(clusterId, ResourceQuery.of("ORDER.IN", null, null, null))
                 .data();
 
-        assertThat(rows).extracting(DivertView::name).containsExactlyInAnyOrder("one", "two");
+        assertThat(rows).extracting(RouteView::name).containsExactlyInAnyOrder("one", "two");
     }
 }

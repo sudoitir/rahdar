@@ -7,8 +7,9 @@ import { Notifications, notifications } from '@mantine/notifications';
 import { renderWithProviders } from '../../test/render.tsx';
 import { server } from '../../test/setup.ts';
 import { holdButton } from '../../test/hold.ts';
+import { ARTEMIS_KINDS } from '../../test/wire.ts';
 
-// The address is state here, as it is in the app: the open message lives in it (`?message=`).
+// The destination is state here, as it is in the app: the open message lives in it (`?message=`).
 let searchState: Record<string, unknown> = {};
 const searchListeners = new Set<() => void>();
 afterEach(() => {
@@ -20,7 +21,7 @@ vi.mock('@tanstack/react-router', async (importOriginal) => {
   const { useSyncExternalStore } = await import('react');
   return {
     ...(await importOriginal<typeof import('@tanstack/react-router')>()),
-    useParams: () => ({ clusterId: 'c1', queueName: 'PHASE3.SRC' }),
+    useParams: () => ({ clusterId: 'c1', subscriptionName: 'PHASE3.SRC' }),
     useSearch: () =>
       useSyncExternalStore(
         (listener) => {
@@ -89,6 +90,7 @@ function mockCluster(endpoints: ReturnType<typeof endpoint>[]) {
           clusterId: 'c1',
           nodes: [{ artemisNodeId: 'NID', splitBrain: 'NONE', replicationBehind: false, endpoints }],
         },
+        kinds: ARTEMIS_KINDS,
         capabilities: {
           managementRead: AVAILABLE,
           managementWrite: AVAILABLE,
@@ -105,7 +107,7 @@ function mockCluster(endpoints: ReturnType<typeof endpoint>[]) {
         },
       }),
     ),
-    http.get('*/api/v1/clusters/c1/queues/PHASE3.SRC/messages', () =>
+    http.get('*/api/v1/clusters/c1/resources/artemis.queue/PHASE3.SRC/messages', () =>
       HttpResponse.json({ data: [], count: 0, page: 1, pageSize: 200, node: endpoints[0].id }),
     ),
   );
@@ -113,14 +115,14 @@ function mockCluster(endpoints: ReturnType<typeof endpoint>[]) {
 
 describe('MessagesView', () => {
   it('keeps the page current on its own, without an operator pressing refresh', async () => {
-    // A queue changes under the operator: a browse that only ever loads once
-    // shows an arrangement of the queue that stopped being true when it drew.
+    // A subscription changes under the operator: a browse that only ever loads once
+    // shows an arrangement of the subscription that stopped being true when it drew.
     vi.useFakeTimers({ shouldAdvanceTime: true });
     let browses = 0;
     try {
       mockCluster([endpoint('n1', 'primary')]);
       server.use(
-        http.get('*/api/v1/clusters/c1/queues/PHASE3.SRC/messages', () => {
+        http.get('*/api/v1/clusters/c1/resources/artemis.queue/PHASE3.SRC/messages', () => {
           browses += 1;
           return HttpResponse.json({ data: [], count: 0, page: 1, pageSize: 200, node: 'n1' });
         }),
@@ -136,14 +138,14 @@ describe('MessagesView', () => {
     }
   });
 
-  it('is one page named Messages, with the queue beside its title and the way back to all queues', async () => {
+  it('is one page named Messages, with the subscription beside its title and the way back to all subscriptions', async () => {
     mockCluster([endpoint('n1', 'primary')]);
     renderWithProviders(<MessagesView />);
 
     expect(await screen.findByRole('heading', { level: 1, name: 'Messages' })).toBeInTheDocument();
     expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
     expect(screen.getByText('PHASE3.SRC')).toBeInTheDocument();
-    expect(screen.getByText('All queues')).toBeInTheDocument();
+    expect(screen.getByText('All subscriptions')).toBeInTheDocument();
   });
 
   it('says message operations are not available, and keeps Send and Purge visible, disabled, with the reason', async () => {
@@ -155,6 +157,7 @@ describe('MessagesView', () => {
           name: 'prod',
           description: null,
           topology: { clusterId: 'c1', nodes: [] },
+          kinds: ARTEMIS_KINDS,
           capabilities: {
             managementRead: AVAILABLE,
             managementWrite: AVAILABLE,
@@ -177,12 +180,12 @@ describe('MessagesView', () => {
     renderWithProviders(<MessagesView />);
 
     expect(await screen.findByText('Message operations are not available here')).toBeInTheDocument();
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Purge queue' })).toBeDisabled());
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Purge subscription' })).toBeDisabled());
     expect(screen.getByRole('button', { name: 'Send' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Why sending a message is unavailable' })).toBeInTheDocument();
   });
 
-  it('hides the node selector when the queue is served by a single endpoint', async () => {
+  it('hides the node selector when the subscription is served by a single endpoint', async () => {
     mockCluster([endpoint('n1', 'primary')]);
     renderWithProviders(<MessagesView />);
 
@@ -201,7 +204,7 @@ describe('MessagesView', () => {
   it('states an unavailable total instead of showing zero', async () => {
     mockCluster([endpoint('n1', 'primary')]);
     server.use(
-      http.get('*/api/v1/clusters/c1/queues/PHASE3.SRC/messages', () =>
+      http.get('*/api/v1/clusters/c1/resources/artemis.queue/PHASE3.SRC/messages', () =>
         HttpResponse.json({
           data: [],
           count: null,
@@ -221,11 +224,11 @@ describe('MessagesView', () => {
     expect(screen.queryByText(/^0 messages/)).not.toBeInTheDocument();
   });
 
-  it('teaches what a queue is when it has no messages, and clears the selector when one emptied it', async () => {
+  it('teaches what a subscription is when it has no messages, and clears the selector when one emptied it', async () => {
     mockCluster([endpoint('n1', 'primary')]);
     const { unmount } = renderWithProviders(<MessagesView />);
-    expect(await screen.findByText('This queue has no messages')).toBeInTheDocument();
-    expect(screen.getByText(/Messages wait in a queue until a consumer takes them/)).toBeInTheDocument();
+    expect(await screen.findByText('This subscription has no messages')).toBeInTheDocument();
+    expect(screen.getByText(/Messages wait in a subscription until a consumer takes them/)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Clear filters' })).not.toBeInTheDocument();
     unmount();
 
@@ -237,7 +240,7 @@ describe('MessagesView', () => {
     await vi.waitFor(() => expect(searchState).toMatchObject({ filter: undefined, page: undefined }));
   });
 
-  it('names a node that did not answer instead of presenting an empty queue', async () => {
+  it('names a node that did not answer instead of presenting an empty subscription', async () => {
     mockCluster([endpoint('n1', 'primary', 'connection refused')]);
     renderWithProviders(<MessagesView />);
 
@@ -250,7 +253,7 @@ describe('MessagesView', () => {
   it('states why the page could not be read, with a retry, in place of the rows', async () => {
     mockCluster([endpoint('n1', 'primary')]);
     server.use(
-      http.get('*/api/v1/clusters/c1/queues/PHASE3.SRC/messages', () =>
+      http.get('*/api/v1/clusters/c1/resources/artemis.queue/PHASE3.SRC/messages', () =>
         HttpResponse.json({ title: 'Cluster unreachable', detail: 'No node answered.' }, { status: 502 }),
       ),
     );
@@ -259,7 +262,7 @@ describe('MessagesView', () => {
     const alert = await screen.findByRole('alert');
     expect(within(alert).getByText('Rahdar failed to complete the request')).toBeInTheDocument();
     expect(within(alert).getByRole('button', { name: 'Retry' })).toBeInTheDocument();
-    expect(screen.queryByText('This queue has no messages')).not.toBeInTheDocument();
+    expect(screen.queryByText('This subscription has no messages')).not.toBeInTheDocument();
   });
 
   it('keeps Send and Purge visible but disabled, with the reason, for an operator who may only read', async () => {
@@ -269,11 +272,11 @@ describe('MessagesView', () => {
     renderWithProviders(<MessagesView />);
 
     // The gate wraps the button once the grants say no, so it is looked up again rather than held.
-    await vi.waitFor(() => expect(screen.getByRole('button', { name: 'Purge queue' })).toBeDisabled());
+    await vi.waitFor(() => expect(screen.getByRole('button', { name: 'Purge subscription' })).toBeDisabled());
     expect(screen.getByRole('button', { name: 'Send' })).toBeDisabled();
 
-    await user.click(screen.getByRole('button', { name: 'Why purging this queue is unavailable' }));
-    expect(await screen.findByText(/You do not have the "Purge queues" permission/)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Why purging this subscription is unavailable' }));
+    expect(await screen.findByText(/You do not have the "Purge subscriptions" permission/)).toBeInTheDocument();
     await user.keyboard('{Escape}');
     await user.click(screen.getByRole('button', { name: 'Why sending a message is unavailable' }));
     expect(await screen.findByText(/You do not have the "Send messages" permission/)).toBeInTheDocument();
@@ -281,7 +284,7 @@ describe('MessagesView', () => {
 
   it('renders every message of a populated page and opens the one clicked', async () => {
     const summary = (messageId: number, body: string, truncated = false) => ({
-      messageId,
+      position: String(messageId),
       type: 3,
       durable: true,
       priority: 4,
@@ -297,7 +300,7 @@ describe('MessagesView', () => {
     });
     mockCluster([endpoint('n1', 'primary'), endpoint('n2', 'secondary')]);
     server.use(
-      http.get('*/api/v1/clusters/c1/queues/PHASE3.SRC/messages', () =>
+      http.get('*/api/v1/clusters/c1/resources/artemis.queue/PHASE3.SRC/messages', () =>
         HttpResponse.json({
           data: [summary(101, 'order A-1'), summary(102, 'order A-2', true), summary(103, 'order A-3')],
           count: 3,
@@ -307,7 +310,7 @@ describe('MessagesView', () => {
           node: 'n2',
         }),
       ),
-      http.get('*/api/v1/clusters/c1/queues/PHASE3.SRC/messages/102', () =>
+      http.get('*/api/v1/clusters/c1/resources/artemis.queue/PHASE3.SRC/messages/102', () =>
         HttpResponse.json({
           ...summary(102, 'order A-2', true),
           userId: null,
@@ -337,7 +340,7 @@ describe('MessagesView', () => {
     expect(within(rows[2]).getByText('order A-2')).toBeInTheDocument();
     expect(within(rows[2]).getByText('truncated')).toBeInTheDocument();
     expect(within(rows[3]).getByText('order A-3')).toBeInTheDocument();
-    expect(screen.queryByText('This queue has no messages')).not.toBeInTheDocument();
+    expect(screen.queryByText('This subscription has no messages')).not.toBeInTheDocument();
 
     await user.click(within(rows[2]).getByText('order A-2'));
 
@@ -350,7 +353,7 @@ describe('the purge estimate', () => {
   it('states an estimate that could not be taken, and still lets the purge be armed', async () => {
     mockCluster([endpoint('n1', 'primary')]);
     server.use(
-      http.delete('*/api/v1/clusters/c1/queues/PHASE3.SRC/messages', () =>
+      http.post('*/api/v1/clusters/c1/resources/artemis.queue/PHASE3.SRC:purge', () =>
         HttpResponse.json(
           { title: 'The broker did not answer', detail: 'The node timed out after 5s.' },
           { status: 504 },
@@ -360,7 +363,7 @@ describe('the purge estimate', () => {
     const user = userEvent.setup();
     renderWithProviders(<MessagesView />);
 
-    await user.click(await screen.findByRole('button', { name: 'Purge queue' }));
+    await user.click(await screen.findByRole('button', { name: 'Purge subscription' }));
     const dialog = await screen.findByRole('dialog');
 
     // An absent number reads as zero — the failure is stated instead.
@@ -368,7 +371,7 @@ describe('the purge estimate', () => {
     expect(within(dialog).queryByText(/Estimating current depth/)).not.toBeInTheDocument();
 
     // And the confirmation is not left disabled with no reason given.
-    await vi.waitFor(() => expect(within(dialog).getByRole('button', { name: 'Purge queue' })).toBeEnabled());
+    await vi.waitFor(() => expect(within(dialog).getByRole('button', { name: 'Purge subscription' })).toBeEnabled());
   });
 });
 
@@ -377,7 +380,7 @@ describe('the purge and the bulk safety cap', () => {
     mockCluster([endpoint('n1', 'primary')]);
     const urls: string[] = [];
     server.use(
-      http.delete('*/api/v1/clusters/c1/queues/PHASE3.SRC/messages', ({ request }) => {
+      http.post('*/api/v1/clusters/c1/resources/artemis.queue/PHASE3.SRC:purge', ({ request }) => {
         const url = new URL(request.url);
         urls.push(url.search);
         if (url.searchParams.get('dryRun') === 'true') {
@@ -392,11 +395,11 @@ describe('the purge and the bulk safety cap', () => {
     const user = userEvent.setup();
     renderWithProviders(<MessagesView />);
 
-    await user.click(await screen.findByRole('button', { name: 'Purge queue' }));
+    await user.click(await screen.findByRole('button', { name: 'Purge subscription' }));
     const dialog = await screen.findByRole('dialog');
     expect(await within(dialog).findByText(/The node timed out after 5s\./)).toBeInTheDocument();
 
-    await holdButton(within(dialog).getByRole('button', { name: 'Purge queue' }));
+    await holdButton(within(dialog).getByRole('button', { name: 'Purge subscription' }));
 
     await vi.waitFor(() => expect(urls).toHaveLength(2));
     // The server's cap is the only guard left when Rahdar cannot state a blast radius.
@@ -407,7 +410,7 @@ describe('the purge and the bulk safety cap', () => {
     mockCluster([endpoint('n1', 'primary')]);
     const urls: string[] = [];
     server.use(
-      http.delete('*/api/v1/clusters/c1/queues/PHASE3.SRC/messages', ({ request }) => {
+      http.post('*/api/v1/clusters/c1/resources/artemis.queue/PHASE3.SRC:purge', ({ request }) => {
         const url = new URL(request.url);
         urls.push(url.search);
         if (url.searchParams.get('dryRun') === 'true') {
@@ -419,7 +422,7 @@ describe('the purge and the bulk safety cap', () => {
     const user = userEvent.setup();
     renderWithProviders(<MessagesView />);
 
-    await user.click(await screen.findByRole('button', { name: 'Purge queue' }));
+    await user.click(await screen.findByRole('button', { name: 'Purge subscription' }));
     const dialog = await screen.findByRole('dialog');
     expect(await within(dialog).findByText(/over the cap of 1,000/)).toBeInTheDocument();
 
@@ -433,7 +436,7 @@ describe('the purge and the bulk safety cap', () => {
 describe('one message, from its row (ADR-0107)', () => {
   it('deletes a single message only once its id is typed, and states the outcome', async () => {
     const summary = {
-      messageId: 205,
+      position: '205',
       type: 3,
       durable: true,
       priority: 4,
@@ -458,7 +461,7 @@ describe('one message, from its row (ADR-0107)', () => {
           grants: [{ scopeType: 'GLOBAL', scopeId: null, permissions: ['*'] }],
         }),
       ),
-      http.get('*/api/v1/clusters/c1/queues/PHASE3.SRC/messages', () =>
+      http.get('*/api/v1/clusters/c1/resources/artemis.queue/PHASE3.SRC/messages', () =>
         HttpResponse.json({
           data: [summary],
           count: 1,
@@ -468,7 +471,7 @@ describe('one message, from its row (ADR-0107)', () => {
           node: 'n1',
         }),
       ),
-      http.post('*/api/v1/clusters/c1/queues/PHASE3.SRC/messages/actions/delete', async ({ request }) => {
+      http.post('*/api/v1/clusters/c1/resources/artemis.queue/PHASE3.SRC/messages:delete', async ({ request }) => {
         bodies.push(await request.json());
         return HttpResponse.json({ affectedCount: 1 });
       }),
@@ -490,14 +493,14 @@ describe('one message, from its row (ADR-0107)', () => {
     await holdButton(confirm);
 
     // The outcome is announced, politely, and the dialog is out of the way.
-    expect(await screen.findByText('Deleted message 205 in queue "PHASE3.SRC"')).toBeInTheDocument();
+    expect(await screen.findByText('Deleted message 205 in subscription "PHASE3.SRC"')).toBeInTheDocument();
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Delete message 205' })).not.toBeInTheDocument());
-    expect(bodies).toEqual([{ messageIds: [205] }]);
+    expect(bodies).toEqual([{ positions: ['205'] }]);
   });
 
-  it('asks for the target queue on the field when a single message is moved without one', async () => {
+  it('asks for the target subscription on the field when a single message is moved without one', async () => {
     const summary = {
-      messageId: 206,
+      position: '206',
       type: 3,
       durable: true,
       priority: 4,
@@ -514,10 +517,10 @@ describe('one message, from its row (ADR-0107)', () => {
     const posts: unknown[] = [];
     mockCluster([endpoint('n1', 'primary')]);
     server.use(
-      http.get('*/api/v1/clusters/c1/queues/PHASE3.SRC/messages', () =>
+      http.get('*/api/v1/clusters/c1/resources/artemis.queue/PHASE3.SRC/messages', () =>
         HttpResponse.json({ data: [summary], count: 1, countUnavailable: null, page: 1, pageSize: 200, node: 'n1' }),
       ),
-      http.post('*/api/v1/clusters/c1/queues/PHASE3.SRC/messages/actions/move', async ({ request }) => {
+      http.post('*/api/v1/clusters/c1/resources/artemis.queue/PHASE3.SRC/messages:move', async ({ request }) => {
         posts.push(await request.json());
         return HttpResponse.json({ affectedCount: 1 });
       }),
@@ -536,15 +539,15 @@ describe('one message, from its row (ADR-0107)', () => {
 
     const dialog = await screen.findByRole('dialog', { name: 'Move message 206' });
     await user.click(within(dialog).getByRole('button', { name: 'Move message' }));
-    const target = within(dialog).getByLabelText('Target queue');
+    const target = within(dialog).getByLabelText('Target subscription');
     expect(target).toBeInvalid();
-    expect(within(dialog).getByText('Name the target queue to move the message.')).toBeInTheDocument();
+    expect(within(dialog).getByText('Name the target subscription to move the message.')).toBeInTheDocument();
     expect(target).toHaveFocus();
     expect(posts).toHaveLength(0);
 
     await user.type(target, 'ARCHIVE');
     await user.click(within(dialog).getByRole('button', { name: 'Move message' }));
-    expect(await screen.findByText('Moved message 206 in queue "PHASE3.SRC"')).toBeInTheDocument();
-    expect(posts).toEqual([{ messageIds: [206], targetQueue: 'ARCHIVE' }]);
+    expect(await screen.findByText('Moved message 206 in subscription "PHASE3.SRC"')).toBeInTheDocument();
+    expect(posts).toEqual([{ positions: ['206'], target: 'artemis.queue/ARCHIVE' }]);
   });
 });

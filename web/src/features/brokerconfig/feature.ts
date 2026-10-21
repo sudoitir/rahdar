@@ -70,17 +70,20 @@ export function validateConfigDiffSearch(raw: Record<string, unknown>): ConfigDi
   return out;
 }
 
+/** The broker system these views are for; another system's cluster has neither the views nor the endpoints. */
+const ARTEMIS = 'artemis';
+
 const configDiffRoute = createRoute({
   getParentRoute: () => clusterRoute,
-  path: 'config-diff',
-  component: lazyFeatureView('brokerconfig', () => import('./ConfigDiffView.tsx'), 'ConfigDiffView'),
+  path: 'artemis/config-diff',
+  component: lazyFeatureView('brokerconfig', () => import('./ConfigDiffView.tsx'), 'ConfigDiffView', ARTEMIS),
   validateSearch: validateConfigDiffSearch,
 });
 
 const configurationRoute = createRoute({
   getParentRoute: () => clusterRoute,
-  path: 'configuration',
-  component: lazyFeatureView('brokerconfig', () => import('./ConfigurationView.tsx'), 'ConfigurationView'),
+  path: 'artemis/configuration',
+  component: lazyFeatureView('brokerconfig', () => import('./ConfigurationView.tsx'), 'ConfigurationView', ARTEMIS),
   validateSearch: validateConfigurationSearch,
 });
 
@@ -95,7 +98,8 @@ export const brokerconfigFeature = defineFeature({
       order: 10,
       label: 'Configuration',
       icon: IconAdjustmentsHorizontal,
-      path: 'configuration',
+      system: ARTEMIS,
+      path: 'artemis/configuration',
       hotkey: 'k',
       permission: 'cluster:read',
     },
@@ -104,7 +108,8 @@ export const brokerconfigFeature = defineFeature({
       order: 20,
       label: 'Config diff',
       icon: IconGitCompare,
-      path: 'config-diff',
+      system: ARTEMIS,
+      path: 'artemis/config-diff',
       permission: 'cluster:read',
     },
   ],
@@ -112,11 +117,12 @@ export const brokerconfigFeature = defineFeature({
     'cluster.registration.afterProbe': [
       { id: 'brokerconfig-recommendations', order: 10, Component: RegistrationRecommendations },
     ],
-    // The routing builder edits this module's declaration, and is hosted by the Routing screen
+    // The routing builder edits this module's declaration, and is hosted by the Routes screen
     // (ADR-0094). Its id is the tab's `?tab=`.
-    'routing.tabs': [
+    'routes.tabs': [
       {
         id: 'builder',
+        system: ARTEMIS,
         order: 10,
         title: 'Builder',
         Component: lazySlot(() => import('./routing/RoutingBuilderTab.tsx'), 'RoutingBuilderTab'),

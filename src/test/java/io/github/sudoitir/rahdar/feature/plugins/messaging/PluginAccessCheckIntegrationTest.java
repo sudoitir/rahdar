@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import io.github.sudoitir.rahdar.feature.plugins.messaging.internal.AccessCheck;
 import io.github.sudoitir.rahdar.kernel.security.PatternKind;
 import io.github.sudoitir.rahdar.kernel.security.ResourceNames;
+import io.github.sudoitir.rahdar.kernel.security.ResourceRef;
 import io.github.sudoitir.rahdar.kernel.security.internal.TeamService;
 import io.github.sudoitir.rahdar.kernel.security.internal.persistence.AppUserEntity;
 import io.github.sudoitir.rahdar.kernel.security.internal.persistence.AppUserRepository;
@@ -56,7 +57,7 @@ class PluginAccessCheckIntegrationTest extends PostgresIntegrationTest {
         cluster = clusters.save(new ClusterEntity("msg-" + UUID.randomUUID(), null, null))
                 .getId();
         UUID orders = teams.create("orders-" + UUID.randomUUID()).id();
-        teams.addPattern(orders, new PatternRequest(cluster, PatternKind.BOTH, "orders.#"));
+        teams.addPattern(orders, new PatternRequest(cluster, PatternKind.ANY, "orders.#"));
         AppUserEntity user = AppUserEntity.local("op-" + UUID.randomUUID(), null, "{noop}x");
         user.setMustChangePassword(false);
         operator = users.save(user).getId();
@@ -79,7 +80,7 @@ class PluginAccessCheckIntegrationTest extends PostgresIntegrationTest {
                 .get()
                 .asString()
                 .contains("message:read")
-                .contains("queue billing.in");
+                .contains("subscription billing.in");
     }
 
     @Test
@@ -88,28 +89,29 @@ class PluginAccessCheckIntegrationTest extends PostgresIntegrationTest {
                 .isEmpty();
         assertThat(AccessCheck.needsOf(RegistrationMode.CONSUME, "orders.in"))
                 .extracting(AccessCheck.Need::permission)
-                .containsExactly("message:read", "queue:purge");
+                .containsExactly("message:read", "subscription:purge");
     }
 
     @Test
     void aSendIsAllowedToATeamsAddressAndRefusedToAnother() {
-        assertThat(access.denial(operator, cluster, AccessCheck.sendNeeds("orders.out")))
+        assertThat(access.denial(operator, cluster, AccessCheck.sendNeeds(ResourceRef.destination("orders.out"))))
                 .isEmpty();
 
-        assertThat(access.denial(operator, cluster, AccessCheck.sendNeeds("billing.in")))
+        assertThat(access.denial(operator, cluster, AccessCheck.sendNeeds(ResourceRef.destination("billing.in"))))
                 .get()
                 .asString()
                 .contains("message:send")
-                .contains("address billing.in");
+                .contains("destination billing.in");
     }
 
     @Test
     void aDisabledOrUnknownUserIsRefused() {
-        assertThat(access.denial(UUID.randomUUID(), cluster, AccessCheck.sendNeeds("orders.out")))
+        assertThat(access.denial(
+                        UUID.randomUUID(), cluster, AccessCheck.sendNeeds(ResourceRef.destination("orders.out"))))
                 .get()
                 .asString()
                 .contains("no longer exists");
-        assertThat(access.denial(null, cluster, AccessCheck.sendNeeds("orders.out")))
+        assertThat(access.denial(null, cluster, AccessCheck.sendNeeds(ResourceRef.destination("orders.out"))))
                 .isPresent();
     }
 }

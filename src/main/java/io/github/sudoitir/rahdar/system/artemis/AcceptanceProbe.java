@@ -1,6 +1,7 @@
 package io.github.sudoitir.rahdar.system.artemis;
 
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
+import io.github.sudoitir.rahdar.platform.broker.TransferAcceptance.AcceptanceFacts;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Function;
@@ -42,7 +43,16 @@ public class AcceptanceProbe {
             Integer maxDiskUsage,
             Integer addressMemoryUsagePercentage,
             Integer idCacheSize,
-            Boolean persistIdCache) {
+            Boolean persistIdCache)
+            implements AcceptanceFacts {
+
+        /** How many messages the broker looks at to count a filter; Artemis defaults it to 200. */
+        @Override
+        public int filterCountLimit() {
+            return addressSettings == null
+                    ? 200
+                    : addressSettings.path("managementBrowsePageSize").asInt(200);
+        }
 
         static Facts unknown() {
             return new Facts(

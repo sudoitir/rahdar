@@ -3,25 +3,26 @@ import type { ComponentType } from 'react';
 import type {
   ActionProps,
   ActionSection,
-  AddressTarget,
+  ChannelTarget,
   ClientTarget,
   ConnectionTarget,
   ConsumerTarget,
-  DivertTarget,
+  DestinationTarget,
   LinkProps,
   MessageTarget,
   ProducerTarget,
-  QueueTarget,
-  SessionTarget,
+  ResourceRef,
+  RouteTarget,
+  SubscriptionTarget,
 } from './actions/types.ts';
 import type { HeldOperationDetail } from './approvals/api.ts';
 import { useFeatures } from './features.ts';
 import type { MetricRange } from './time/ranges.ts';
 
-/** Queues picked by name, or every queue matching the queues screen's filter (`q`, blank for all). */
-export type QueueSelection = { kind: 'names'; names: string[] } | { kind: 'filter'; q: string; total: number };
+/** Subscriptions picked by name, or every subscription matching the subscriptions screen's filter (`q`, blank for all). */
+export type SubscriptionSelection = { kind: 'names'; names: string[] } | { kind: 'filter'; q: string; total: number };
 
-/** Messages picked by id, every message matching the messages screen's selector, or the whole queue. */
+/** Messages picked by id, every message matching the messages screen's selector, or the whole subscription. */
 export type MessageSelection = { kind: 'ids'; ids: number[] } | { kind: 'filter'; filter: string } | { kind: 'all' };
 
 /**
@@ -35,19 +36,24 @@ export interface SlotProps {
   /** In the sidebar, above the open cluster's views: how the operator moves between clusters. */
   'shell.navbar': { collapsed: boolean };
   /** The landing page, when no cluster is open. */
-  'home.empty': object;
+  'home.estate': object;
   /** Above every view of a cluster: what identifies it, and what needs saying about its state. */
   'cluster.header': { clusterId: string };
   /** Below a passing registration check: what the enabled features added to it, by feature id. */
   'cluster.registration.afterProbe': { contributions: Record<string, unknown> };
-  /** In a queue's detail drawer, below its per-node breakdown. `onClose` closes the drawer before navigating. */
-  'queue.detail.panels': { clusterId: string; queueName: string; onClose: () => void };
+  /** In a subscription's detail drawer, below its per-node breakdown. `onClose` closes the drawer before navigating. */
+  'subscription.detail.panels': { clusterId: string; subscription: ResourceRef; onClose: () => void };
   /**
-   * Beside the queues screen's selection: what can be done to the selected queues. `count` is how
+   * Beside the subscriptions screen's selection: what can be done to the selected subscriptions. `count` is how
    * many are selected, and may be zero: an action then stays visible and disabled. `clear` empties
    * the selection.
    */
-  'queues.selection': { clusterId: string; selection: QueueSelection; count: number; clear: () => void };
+  'subscriptions.selection': {
+    clusterId: string;
+    selection: SubscriptionSelection;
+    count: number;
+    clear: () => void;
+  };
   /**
    * Beside the messages screen's selection: what can be done to the selected messages elsewhere.
    * `node` is the Rahdar node being browsed, absent for the live node; `total` is how many messages
@@ -55,7 +61,7 @@ export interface SlotProps {
    */
   'messages.selection': {
     clusterId: string;
-    queueName: string;
+    subscription: ResourceRef;
     node?: string;
     selection: MessageSelection;
     total: number | null;
@@ -63,14 +69,14 @@ export interface SlotProps {
   };
   /** At the foot of a cluster's metrics view. */
   'metrics.panels': { clusterId: string };
-  /** In the flow view's monitoring pane, when a queue is selected: its history over `range`, per node. */
-  'flow.selection.panels': { clusterId: string; queueName: string; range: MetricRange };
+  /** In the flow view's monitoring pane, when a subscription is selected: its history over `range`, per node. */
+  'flow.selection.panels': { clusterId: string; subscription: ResourceRef; range: MetricRange };
   /** Inside a box on the topology graph, after its name. `nodeIds` are the broker endpoints the box stands for. */
   'topology.node.marks': { clusterId: string; nodeIds: string[] };
   /** A section of a cluster's Settings page, under the contribution's title. */
   'settings.sections': { clusterId: string };
-  /** A tab of a cluster's Routing page, after Diverts and Bridges, labelled with the contribution's title; its id is the tab's `?tab=`. */
-  'routing.tabs': { clusterId: string };
+  /** A tab of a cluster's Routes page, after Routes, labelled with the contribution's title; its id is the tab's `?tab=`. */
+  'routes.tabs': { clusterId: string };
   /**
    * A tab of the Administration page, labelled with the contribution's title and listed under its
    * `group`; its id is the tab's `?tab=`.
@@ -95,24 +101,24 @@ export interface SlotProps {
    * contribution names its `section`, renders `ActionMenuItem`s, and opens its dialogs through
    * `host`, never in the row. In `navigate` mode it offers nothing that changes the broker.
    */
-  'queue.actions': ActionProps<QueueTarget>;
-  'address.actions': ActionProps<AddressTarget>;
+  'subscription.actions': ActionProps<SubscriptionTarget>;
+  'destination.actions': ActionProps<DestinationTarget>;
   'connection.actions': ActionProps<ConnectionTarget>;
-  'session.actions': ActionProps<SessionTarget>;
+  'channel.actions': ActionProps<ChannelTarget>;
   'consumer.actions': ActionProps<ConsumerTarget>;
   'producer.actions': ActionProps<ProducerTarget>;
   'message.actions': ActionProps<MessageTarget>;
-  'divert.actions': ActionProps<DivertTarget>;
+  'route.actions': ActionProps<RouteTarget>;
   'client.actions': ActionProps<ClientTarget>;
 
   /*
    * Links (ADR-0107): the owning feature's link to one resource, wrapping its name. Built-in only —
    * a plugin may not decide where Rahdar's own resource links lead.
    */
-  'queue.link': LinkProps<QueueTarget>;
-  'address.link': LinkProps<AddressTarget>;
+  'subscription.link': LinkProps<SubscriptionTarget>;
+  'destination.link': LinkProps<DestinationTarget>;
   'connection.link': LinkProps<ConnectionTarget>;
-  'session.link': LinkProps<SessionTarget>;
+  'channel.link': LinkProps<ChannelTarget>;
 }
 
 export type SlotName = keyof SlotProps;
@@ -158,6 +164,11 @@ export interface SlotContribution<P> {
    * (listed under Plugins without one), and an `AdminGroupId`, required, for `admin.tabs`.
    */
   group?: string;
+  /**
+   * `routes.tabs` only: the id of the broker system the tab is for (`artemis`). The tab is listed only on a
+   * cluster that runs that system.
+   */
+  system?: string;
   /** `*.actions` only: the menu section the item is listed under. */
   section?: ActionSection;
   Component: ComponentType<P>;

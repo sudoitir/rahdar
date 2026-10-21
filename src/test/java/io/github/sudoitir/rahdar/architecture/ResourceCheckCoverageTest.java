@@ -37,7 +37,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.stereotype.Service;
 
 /**
- * An operation that takes the name of a queue or an address decides, somewhere on its way, whether the caller
+ * An operation that takes the name of a subscription or a destination decides, somewhere on its way, whether the caller
  * may do it to that resource (resource-permissions spec): it calls a resource check ({@code
  * ClusterAccessGuard.requireResource} and its kin, {@code PermissionResolver.can} on a {@code ResourceRef}, a
  * {@code ResourceFilter}), or a method that does. A public method of a service, controller or tool that takes
@@ -51,16 +51,16 @@ class ResourceCheckCoverageTest {
 
     private static final String BASE = "io.github.sudoitir.rahdar.";
 
-    /** A parameter that names a queue or an address. */
-    private static final Pattern NAMES_A_RESOURCE =
-            Pattern.compile("(?i)(.*queue(name|pattern)?|.*address(name|pattern)?|source|target)");
+    /** A parameter that names a queue or an address, or a subscription or a destination. */
+    private static final Pattern NAMES_A_RESOURCE = Pattern.compile(
+            "(?i)(.*queue(name|pattern)?|.*address(name|pattern)?|.*subscription(name|pattern)?|.*destination(name|pattern)?|source|target)");
 
     /** What a request body is called. */
     private static final Pattern REQUEST_BODY = Pattern.compile(".*(Request|Spec|Query)");
 
     /** A list parameter that names several of them. */
-    private static final Pattern NAMES_SOME_RESOURCES =
-            Pattern.compile("(?i)(names|.*queues|.*queuenames|.*addresses|.*addressnames)");
+    private static final Pattern NAMES_SOME_RESOURCES = Pattern.compile(
+            "(?i)(names|.*queues|.*queuenames|.*addresses|.*addressnames|.*subscriptions|.*destinations)");
 
     private static final Set<String> STEREOTYPES = Set.of(
             "org.springframework.stereotype.Service",
@@ -89,6 +89,9 @@ class ResourceCheckCoverageTest {
      * why. They are the broker primitives a checked service calls, work Rahdar does for itself, and text.
      */
     private static final Map<String, String> EXEMPT = Map.ofEntries(
+            Map.entry(
+                    "feature.messages.MessageService.actionRequest",
+                    "writes a request body from names for the MCP tool; execute checks the queues it names"),
             Map.entry(
                     "system.artemis.QueueLifecycleOperations",
                     "broker primitives; QueueLifecycleService checks before it calls them"),
@@ -124,12 +127,28 @@ class ResourceCheckCoverageTest {
                     "system.artemis.ArtemisQueueCounters",
                     "broker primitive behind QueueCounters; QueueLifecycleService checks before it calls it"),
             Map.entry(
+                    "system.artemis.ArtemisDivertSettings",
+                    "broker primitive behind DivertSettings; the divert and routing services check before they call it"),
+            Map.entry(
+                    "system.artemis.ArtemisQueueSettings",
+                    "broker primitive behind QueueSettings; SubscriptionConfigurationReader checks before it calls it"),
+            Map.entry(
+                    "system.artemis.ArtemisTaps",
+                    "broker primitive behind MessageTaps; the capture and plugin messaging services check before they"
+                            + " call it"),
+            Map.entry(
+                    "system.artemis.ArtemisTransferAcceptance",
+                    "broker primitive behind TransferAcceptance; the transfer services check before they call it"),
+            Map.entry(
+                    "system.artemis.ArtemisTransferStaging",
+                    "broker primitive behind TransferStaging; the transfer services check before they call it"),
+            Map.entry(
                     "platform.scrape.QueueSnapshotUpsert",
                     "the scrape's own bookkeeping, driven by the broker and no caller"),
             Map.entry(
                     "feature.rr.QueueTargetResolver",
                     "the request-reply sampler's own lookup; no caller names a queue"),
-            Map.entry("feature.rr.ReplyAddressResolver", "matches a declared reply pattern for the sampler"),
+            Map.entry("feature.rr.ReplyDestinationResolver", "matches a declared reply pattern for the sampler"),
             Map.entry("feature.rr.RrMetrics.recordCompletion", "records a latency the sampler observed"),
             Map.entry("feature.rr.RrSamplerHealth", "the sampler's own health record"),
             Map.entry(
@@ -145,9 +164,6 @@ class ResourceCheckCoverageTest {
             Map.entry(
                     "platform.governance.ContentPolicy.governForStorage",
                     "masks a message for storage, which is masked for everyone"),
-            Map.entry(
-                    "platform.mcp.McpRunbookPrompts",
-                    "returns a fixed procedure that repeats the name it was given; it reads nothing"),
             Map.entry("system.artemis.BridgeOperations", "broker primitive; RoutingService checks before it calls it"),
             Map.entry(
                     "feature.sql.CaptureConsumer",
@@ -182,16 +198,13 @@ class ResourceCheckCoverageTest {
                     "'source' names the module or plugin that posted the notice, not a queue"),
             Map.entry(
                     "feature.plugins.messaging.internal.AccessCheck.needsOf",
-                    "only lists the needs of a registration; AccessCheck.denial checks them for the acting user"),
-            Map.entry(
-                    "feature.plugins.messaging.internal.AccessCheck.sendNeeds",
-                    "only lists the needs of a send; AccessCheck.denial checks them for the acting user"));
+                    "only lists the needs of a registration; AccessCheck.denial checks them for the acting user"));
 
     /** What a scan found: the methods it looked at, each with how it fares, and how many check call sites it reaches. */
     private record Subject(String id, boolean checked, boolean composite, boolean coversEachName, int sites) {}
 
     @Test
-    void everyMethodThatTakesAQueueOrAddressNameReachesAResourceCheck() {
+    void everyMethodThatTakesASubscriptionOrDestinationNameReachesAResourceCheck() {
         JavaClasses classes = new ClassFileImporter()
                 .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
                 .importPackages("io.github.sudoitir.rahdar");
@@ -233,7 +246,7 @@ class ResourceCheckCoverageTest {
                 .contains(
                         "feature.messages.MessageService.purge",
                         "feature.messages.MessageService.execute",
-                        "feature.queues.QueueLifecycleService.deleteQueue",
+                        "feature.resources.QueueLifecycleService.deleteQueue",
                         "feature.transfer.TransferService.preview",
                         "feature.sql.MessageIndexService.create");
         assertThat(subjects)
@@ -276,12 +289,12 @@ class ResourceCheckCoverageTest {
         private ClusterAccessGuard guard;
 
         public void purge(UUID cluster, String queueName) {
-            guard.requireResource(cluster, ResourceRef.queue(queueName), "queue:purge");
+            guard.requireResource(cluster, ResourceRef.subscription(queueName), "subscription:purge");
         }
 
         /** Two names, one check: the second is never looked at. */
         public void copy(UUID cluster, String sourceQueue, String targetQueue) {
-            guard.requireResource(cluster, ResourceRef.queue(sourceQueue), "queue:read");
+            guard.requireResource(cluster, ResourceRef.subscription(sourceQueue), "subscription:read");
             Objects.requireNonNull(targetQueue, "named, and used, but never checked");
         }
     }

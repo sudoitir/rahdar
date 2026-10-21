@@ -2,7 +2,7 @@ package io.github.sudoitir.rahdar.feature.resources;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import io.github.sudoitir.rahdar.feature.resources.web.ResourceViews.QueueView;
+import io.github.sudoitir.rahdar.feature.resources.web.ResourceViews.SubscriptionView;
 import io.github.sudoitir.rahdar.kernel.core.ResourceQuery;
 import io.github.sudoitir.rahdar.kernel.security.AccessChanges;
 import io.github.sudoitir.rahdar.kernel.security.TeamRef;
@@ -105,12 +105,12 @@ class CrossNodeAggregatorTest extends PostgresIntegrationTest {
         Fixture f = pairPlusStandalone();
         upsert.upsertBatch(List.of(row(f.nodeA(), "ORDERS", "ORDERS", 10), row(f.nodeB(), "ORDERS", "ORDERS", 5)));
 
-        List<QueueView> rows = aggregator
-                .queues(clusterId, ResourceQuery.of(null, 1, 50, null))
+        List<SubscriptionView> rows = aggregator
+                .subscriptions(clusterId, ResourceQuery.of(null, 1, 50, null))
                 .data();
 
         assertThat(rows).hasSize(1);
-        QueueView orders = rows.get(0);
+        SubscriptionView orders = rows.get(0);
         assertThat(orders.perNode()).hasSize(2);
         assertThat(orders.totalMessageCount()).isEqualTo(15);
         assertThat(orders.totalConsumerCount()).isEqualTo(2);
@@ -123,8 +123,8 @@ class CrossNodeAggregatorTest extends PostgresIntegrationTest {
         Fixture f = pairPlusStandalone();
         upsert.upsertBatch(List.of(row(f.nodeA(), "ORDERS", "ORDERS", 3)));
 
-        QueueView orders = aggregator
-                .queues(clusterId, ResourceQuery.of(null, 1, 50, null))
+        SubscriptionView orders = aggregator
+                .subscriptions(clusterId, ResourceQuery.of(null, 1, 50, null))
                 .data()
                 .get(0);
 
@@ -141,8 +141,8 @@ class CrossNodeAggregatorTest extends PostgresIntegrationTest {
                 "UPDATE subscription_snapshot SET ts = now() - interval '30 minutes' WHERE node_id = :n",
                 Map.of("n", f.nodeA()));
 
-        QueueView orders = aggregator
-                .queues(clusterId, ResourceQuery.of(null, 1, 50, null))
+        SubscriptionView orders = aggregator
+                .subscriptions(clusterId, ResourceQuery.of(null, 1, 50, null))
                 .data()
                 .get(0);
 
@@ -157,15 +157,15 @@ class CrossNodeAggregatorTest extends PostgresIntegrationTest {
         upsert.upsertBatch(List.of(
                 row(f.nodeA(), "A", "alpha", 1), row(f.nodeA(), "B", "beta", 99), row(f.nodeA(), "C", "gamma", 50)));
 
-        List<QueueView> byDepthDesc = aggregator
-                .queues(clusterId, ResourceQuery.of(null, 1, 50, "-depth"))
+        List<SubscriptionView> byDepthDesc = aggregator
+                .subscriptions(clusterId, ResourceQuery.of(null, 1, 50, "-depth"))
                 .data();
-        assertThat(byDepthDesc).extracting(QueueView::queueName).containsExactly("beta", "gamma", "alpha");
+        assertThat(byDepthDesc).extracting(SubscriptionView::name).containsExactly("beta", "gamma", "alpha");
 
-        List<QueueView> filtered = aggregator
-                .queues(clusterId, ResourceQuery.of("bet", 1, 50, null))
+        List<SubscriptionView> filtered = aggregator
+                .subscriptions(clusterId, ResourceQuery.of("bet", 1, 50, null))
                 .data();
-        assertThat(filtered).extracting(QueueView::queueName).containsExactly("beta");
+        assertThat(filtered).extracting(SubscriptionView::name).containsExactly("beta");
     }
 
     @Test
@@ -173,15 +173,15 @@ class CrossNodeAggregatorTest extends PostgresIntegrationTest {
         Fixture f = pairPlusStandalone();
         upsert.upsertBatch(List.of(row(f.nodeA(), "ORDERS", "orders.in", 1), row(f.nodeA(), "OTHER", "other", 1)));
         TeamEntity team = teams.save(new TeamEntity("owner-" + UUID.randomUUID()));
-        teamPatterns.save(new TeamPatternEntity(team.getId(), clusterId, "QUEUE", "orders.#"));
+        teamPatterns.save(new TeamPatternEntity(team.getId(), clusterId, "SUBSCRIPTION", "orders.#"));
         accessChanges.changed();
 
         try {
-            List<QueueView> rows = aggregator
-                    .queues(clusterId, ResourceQuery.of(null, 1, 50, "name"))
+            List<SubscriptionView> rows = aggregator
+                    .subscriptions(clusterId, ResourceQuery.of(null, 1, 50, "name"))
                     .data();
 
-            assertThat(rows).extracting(QueueView::queueName).containsExactly("orders.in", "other");
+            assertThat(rows).extracting(SubscriptionView::name).containsExactly("orders.in", "other");
             assertThat(rows.get(0).ownerTeam()).isEqualTo(new TeamRef(team.getId(), team.getName()));
             assertThat(rows.get(1).ownerTeam()).isNull();
         } finally {

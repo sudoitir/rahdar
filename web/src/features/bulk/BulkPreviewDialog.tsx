@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Button, Checkbox, Group, Modal, Stack, Switch, Text } from '@mantine/core';
 import { useNavigate } from '@tanstack/react-router';
 
-import type { QueueSelection } from '../../kernel/slots.ts';
+import type { SubscriptionSelection } from '../../kernel/slots.ts';
 import { HoldToConfirm } from '../../ui/HoldToConfirm.tsx';
 import { EmptyState } from '../../ui/EmptyState.tsx';
 import { ErrorState } from '../../ui/ErrorState.tsx';
@@ -22,7 +22,7 @@ import { OPERATIONS, plural } from './words.ts';
 
 const hasProblem = (i: BulkItemView) => i.status === 'REFUSED' || Boolean(i.warning);
 
-const rowKey = (i: BulkItemView) => i.queueName;
+const rowKey = (i: BulkItemView) => i.subscription;
 
 const START = { verb: 'Start', past: 'Started', progressive: 'Starting' } as const;
 
@@ -32,7 +32,7 @@ function blastRadius(operation: BulkOperation, preview: BulkRunDetailView): stri
   const op = OPERATIONS[operation];
   const acting = items.filter((i) => i.status !== 'REFUSED');
   const nodes = new Set(acting.flatMap((i) => i.nodes.map((n) => n.nodeId))).size;
-  const scope = `${op.verb} ${plural(acting.length, 'queue')} on ${plural(nodes, 'node')}`;
+  const scope = `${op.verb} ${plural(acting.length, 'subscription')} on ${plural(nodes, 'node')}`;
   if (!op.destructive) return `${scope}.`;
   if (run.estimate == null || (acting.length > 0 && acting.every((i) => i.affected == null))) {
     return `${scope}. How many messages that destroys is unavailable. This cannot be undone.`;
@@ -60,7 +60,7 @@ function PreviewStatus({
   const data = preview.data;
   return (
     <div aria-live="polite">
-      {preview.isPending ? <LoadingState label="Reading what these queues hold" blockSize="6rem" /> : null}
+      {preview.isPending ? <LoadingState label="Reading what these subscriptions hold" blockSize="6rem" /> : null}
       {preview.isError ? (
         <ErrorState
           error={preview.error}
@@ -78,14 +78,14 @@ function PreviewStatus({
           </Text>
           {unknown > 0 ? (
             <Text size="sm">
-              {plural(unknown, 'queue')} {unknown === 1 ? 'has a figure' : 'have figures'} Rahdar does not know, because
-              a node has not answered recently; the total is a floor.
+              {plural(unknown, 'subscription')} {unknown === 1 ? 'has a figure' : 'have figures'} Rahdar does not know,
+              because a node has not answered recently; the total is a floor.
             </Text>
           ) : null}
           {refused > 0 ? (
             <Text size="sm">
-              {plural(refused, 'queue')} {refused === 1 ? 'is' : 'are'} refused and will not be touched. The reason is
-              beside each one below.
+              {plural(refused, 'subscription')} {refused === 1 ? 'is' : 'are'} refused and will not be touched. The
+              reason is beside each one below.
             </Text>
           ) : null}
         </Stack>
@@ -122,8 +122,8 @@ function RunControls({
         label="Continue past failures"
         description={
           continueOnFailure
-            ? 'Every queue is attempted, whatever happens to the ones before it.'
-            : 'The run stops at the first queue that fails, and the queues after it are skipped.'
+            ? 'Every subscription is attempted, whatever happens to the ones before it.'
+            : 'The run stops at the first subscription that fails, and the subscriptions after it are skipped.'
         }
         checked={continueOnFailure}
         onChange={(e) => onContinueOnFailure(e.currentTarget.checked)}
@@ -132,7 +132,7 @@ function RunControls({
       {execute.isError ? (
         <ErrorState
           error={execute.error}
-          next="Nothing was run. Preview again to confirm the queues as they are now."
+          next="Nothing was run. Preview again to confirm the subscriptions as they are now."
           actions={
             <Button size="xs" variant="default" onClick={onRetry}>
               Preview again
@@ -159,8 +159,8 @@ function RunControls({
   );
 }
 
-/** The frozen queue set, optionally narrowed to the ones with a refusal or warning. */
-function QueuesInRun({
+/** The frozen subscription set, optionally narrowed to the ones with a refusal or warning. */
+function SubscriptionsInRun({
   destructive,
   shown,
   onlyProblems,
@@ -174,19 +174,19 @@ function QueuesInRun({
   const columns = useMemo(() => previewColumns(destructive), [destructive]);
   return (
     <Section
-      title="The queues in this run"
+      title="The subscriptions in this run"
       headingLevel={3}
       actions={
         <Switch
           size="xs"
-          label="Only queues with a refusal or warning"
+          label="Only subscriptions with a refusal or warning"
           checked={onlyProblems}
           onChange={(e) => onOnlyProblems(e.currentTarget.checked)}
         />
       }
     >
       <DataTable
-        label="Queues in this run"
+        label="Subscriptions in this run"
         storageKey="bulk.preview"
         height={{ maxRows: 8 }}
         columns={columns}
@@ -196,15 +196,15 @@ function QueuesInRun({
           onlyProblems ? (
             <EmptyState
               kind="filtered"
-              title="No queue has a refusal or a warning"
-              description="Every queue in this run will act without a warning. Clear the filter to review the whole set."
+              title="No subscription has a refusal or a warning"
+              description="Every subscription in this run will act without a warning. Clear the filter to review the whole set."
               onClearFilters={() => onOnlyProblems(false)}
             />
           ) : (
             <EmptyState
               kind="empty"
-              title="No queue matched the selection"
-              description="A run acts on the queues the selection matched when this preview was taken. None matched, so there is nothing to run. Close this and change the selection."
+              title="No subscription matched the selection"
+              description="A run acts on the subscriptions the selection matched when this preview was taken. None matched, so there is nothing to run. Close this and change the selection."
             />
           )
         }
@@ -214,7 +214,7 @@ function QueuesInRun({
 }
 
 /**
- * Preview → confirm → execute for one bulk operation (ADR-0093). The preview freezes the queue set
+ * Preview → confirm → execute for one bulk operation (ADR-0093). The preview freezes the subscription set
  * and states the blast radius; only that frozen plan can be confirmed, and a destroy is armed by
  * typing the action and the count. Once the run is accepted the operator is taken to it.
  */
@@ -228,7 +228,7 @@ export function BulkPreviewDialog({
 }: Readonly<{
   clusterId: string;
   operation: BulkOperation;
-  selection: QueueSelection;
+  selection: SubscriptionSelection;
   opened: boolean;
   onClose: () => void;
   onStarted: () => void;
@@ -247,7 +247,7 @@ export function BulkPreviewDialog({
       operation,
       names: selection.kind === 'names' ? selection.names : null,
       q: selection.kind === 'filter' ? selection.q : null,
-      // A bulk delete refuses a queue with consumers; closing them is not offered in bulk yet.
+      // A bulk delete refuses a subscription with consumers; closing them is not offered in bulk yet.
       disconnectConsumers: false,
     });
   };
@@ -267,7 +267,7 @@ export function BulkPreviewDialog({
   const unknown = op.destructive ? acting.filter((i) => i.affected == null).length : 0;
   const overCap = data?.run.overCap ?? false;
   const shown = onlyProblems ? (data?.items.filter(hasProblem) ?? []) : (data?.items ?? []);
-  const confirmLabel = `${op.verb} ${plural(acting.length, 'queue')}`;
+  const confirmLabel = `${op.verb} ${plural(acting.length, 'subscription')}`;
 
   const start = () => {
     if (!data) return;
@@ -276,7 +276,10 @@ export function BulkPreviewDialog({
       {
         onSuccess: (run) => {
           close();
-          notify.succeeded({ action: START, subject: `the ${op.verb.toLowerCase()} of ${plural(run.total, 'queue')}` });
+          notify.succeeded({
+            action: START,
+            subject: `the ${op.verb.toLowerCase()} of ${plural(run.total, 'subscription')}`,
+          });
           void navigate({ to: `/clusters/${clusterId}/bulk/${run.id}` });
           onStarted();
         },
@@ -289,7 +292,7 @@ export function BulkPreviewDialog({
       opened={opened}
       onClose={close}
       onEnterTransitionEnd={takePreview}
-      title={`${op.verb} the selected queues`}
+      title={`${op.verb} the selected subscriptions`}
       size="xl"
     >
       <Stack gap="md">
@@ -334,12 +337,12 @@ export function BulkPreviewDialog({
 
         {data && acting.length === 0 ? (
           <Text size="sm">
-            Every selected queue is refused, so there is nothing to run. Close this and change the selection.
+            Every selected subscription is refused, so there is nothing to run. Close this and change the selection.
           </Text>
         ) : null}
 
         {data ? (
-          <QueuesInRun
+          <SubscriptionsInRun
             destructive={op.destructive}
             shown={shown}
             onlyProblems={onlyProblems}

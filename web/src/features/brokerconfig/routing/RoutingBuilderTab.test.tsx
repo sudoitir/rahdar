@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { ARTEMIS_KINDS, ARTEMIS_SYSTEM } from '../../../test/wire.ts';
 import { http, HttpResponse } from 'msw';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -12,7 +13,7 @@ import { paged } from '../../../kernel/api/paging.ts';
 
 /**
  * The routing builder where an operator reaches it (ADR-0094): Routing, then its Builder tab —
- * contributed by brokerconfig through the `routing.tabs` slot, so it is driven through the real
+ * contributed by brokerconfig through the `routes.tabs` slot, so it is driven through the real
  * router and the composed feature list rather than rendered on its own.
  */
 
@@ -26,12 +27,18 @@ function shell() {
     ),
     http.get('*/api/v1/environments', () => HttpResponse.json(paged([]))),
     http.get('*/api/v1/alerts/firing', () => HttpResponse.json(paged([]))),
-    http.get('*/api/v1/clusters/c1/queues', () => HttpResponse.json({ data: [], count: 0, page: 1, pageSize: 50 })),
-    http.get('*/api/v1/clusters/c1/dlq', () => HttpResponse.json({ settingsAvailable: true, addresses: [] })),
-    http.get('*/api/v1/clusters/c1/diverts', () => HttpResponse.json({ data: [], count: 0, page: 1, pageSize: 200 })),
-    http.get('*/api/v1/clusters/c1/bridges', () => HttpResponse.json({ data: [], count: 0, page: 1, pageSize: 200 })),
+    http.get('*/api/v1/clusters/c1/subscriptions', () =>
+      HttpResponse.json({ data: [], count: 0, page: 1, pageSize: 50 }),
+    ),
+    http.get('*/api/v1/clusters/c1/dead-letters', () =>
+      HttpResponse.json({ settingsAvailable: true, destinations: [] }),
+    ),
+    http.get('*/api/v1/clusters/c1/routes', () => HttpResponse.json({ data: [], count: 0, page: 1, pageSize: 200 })),
+    http.get('*/api/v1/clusters/c1/routes', () => HttpResponse.json({ data: [], count: 0, page: 1, pageSize: 200 })),
     http.get('*/api/v1/clusters/c1', () =>
       HttpResponse.json({
+        system: ARTEMIS_SYSTEM,
+        kinds: ARTEMIS_KINDS,
         id: 'c1',
         name: 'prod',
         description: null,
@@ -70,12 +77,11 @@ const routed = declaration({
 describe('the Routing screen’s Builder tab', () => {
   it('is a tab of Routing, draws the declaration, and offers the apply with how far it has got', async () => {
     server.use(...shell(), ...baseHandlers(routed));
-    renderAppAt('/clusters/c1/routing?tab=builder');
+    renderAppAt('/clusters/c1/routes?tab=builder');
 
     const tab = await screen.findByRole('tab', { name: 'Builder' });
     expect(tab).toHaveAttribute('aria-selected', 'true');
-    expect(screen.getByRole('tab', { name: 'Diverts' })).toBeInTheDocument();
-    expect(screen.getByRole('tab', { name: 'Bridges' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Routes' })).toBeInTheDocument();
 
     // Laid out by ELK in a worker; the first layout of a run is the slow one.
     expect(
@@ -91,7 +97,7 @@ describe('the Routing screen’s Builder tab', () => {
   it('reaches the builder from Routing in one more click, and the old Configuration tab is gone', async () => {
     server.use(...shell(), ...baseHandlers(routed));
     const user = userEvent.setup();
-    const { router } = renderAppAt('/clusters/c1/routing');
+    const { router } = renderAppAt('/clusters/c1/routes');
 
     await user.click(await screen.findByRole('tab', { name: 'Builder' }));
     expect(await screen.findByRole('button', { name: /^Address orders\.request\./ })).toBeInTheDocument();
@@ -100,10 +106,10 @@ describe('the Routing screen’s Builder tab', () => {
 
   it('is absent, not disabled, when the configuration feature is', async () => {
     server.use(...shell(), ...baseHandlers(routed), manifestHandler(['brokerconfig']));
-    renderAppAt('/clusters/c1/routing?tab=builder');
+    renderAppAt('/clusters/c1/routes?tab=builder');
 
-    // An unknown tab id falls back to Diverts rather than to an empty panel.
-    await waitFor(() => expect(screen.getByRole('tab', { name: 'Diverts' })).toHaveAttribute('aria-selected', 'true'));
+    // An unknown tab id falls back to Routes rather than to an empty panel.
+    await waitFor(() => expect(screen.getByRole('tab', { name: 'Routes' })).toHaveAttribute('aria-selected', 'true'));
     expect(screen.queryByRole('tab', { name: 'Builder' })).toBeNull();
   });
 
@@ -112,8 +118,8 @@ describe('the Routing screen’s Builder tab', () => {
     let saved: { document: ConfigDocumentView; expectedRevision: number; note: string } | null = null;
     // The first matching handler wins, so the stateful declaration goes ahead of the fixtures'.
     server.use(
-      http.get('*/api/v1/clusters/c1/config', () => HttpResponse.json(current)),
-      http.put('*/api/v1/clusters/c1/config', async ({ request }) => {
+      http.get('*/api/v1/clusters/c1/artemis/config', () => HttpResponse.json(current)),
+      http.put('*/api/v1/clusters/c1/artemis/config', async ({ request }) => {
         saved = (await request.json()) as typeof saved;
         current = { ...current, revision: current.revision + 1, document: saved!.document };
         return HttpResponse.json(current);
@@ -123,7 +129,7 @@ describe('the Routing screen’s Builder tab', () => {
     );
     const user = userEvent.setup();
     // A new divert's editor, opened by its address — the canvas is not the only way in (ADR-0090 D4).
-    renderAppAt('/clusters/c1/routing?tab=builder&section=diverts');
+    renderAppAt('/clusters/c1/routes?tab=builder&section=diverts');
 
     const drawer = await screen.findByRole('dialog', { name: 'New divert' });
     const to = await within(drawer).findByRole('combobox', { name: /To address/ });
@@ -195,7 +201,7 @@ describe('the Routing screen’s Builder tab', () => {
   it('states why the declaration could not be read, says what the builder needs, and reads it again on retry', async () => {
     let attempts = 0;
     server.use(
-      http.get('*/api/v1/clusters/c1/config', () => {
+      http.get('*/api/v1/clusters/c1/artemis/config', () => {
         attempts += 1;
         return attempts === 1
           ? HttpResponse.json({ title: 'Down', detail: 'The configuration store is not answering.' }, { status: 503 })
@@ -205,7 +211,7 @@ describe('the Routing screen’s Builder tab', () => {
       ...baseHandlers(routed),
     );
     const user = userEvent.setup();
-    renderAppAt('/clusters/c1/routing?tab=builder');
+    renderAppAt('/clusters/c1/routes?tab=builder');
 
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent('The configuration store is not answering.');

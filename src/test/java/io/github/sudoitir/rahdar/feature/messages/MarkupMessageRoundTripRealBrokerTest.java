@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.setup.MockMvcBuilders.webAppContextSetup;
 
+import io.github.sudoitir.openbroker.model.ResourceId;
 import io.github.sudoitir.rahdar.kernel.audit.internal.persistence.AuditEventRepository;
 import io.github.sudoitir.rahdar.kernel.security.Grant;
 import io.github.sudoitir.rahdar.kernel.security.Permissions;
@@ -138,8 +139,14 @@ class MarkupMessageRoundTripRealBrokerTest extends PostgresIntegrationTest {
         return UsernamePasswordAuthenticationToken.authenticated(principal, null, principal.getAuthorities());
     }
 
-    /** The queue's name goes in as a URI variable, so it is encoded into the path the way a browser does. */
-    private static final String MESSAGES = "/api/v1/clusters/{cluster}/queues/{queue}/messages";
+    /** The queue's id goes in as a URI variable, so it is encoded into the path the way a browser does. */
+    private static final String MESSAGES = "/api/v1/clusters/{cluster}/resources/artemis.queue/{queue}/messages";
+
+    /** The queue's id without its kind, which the route takes as one segment, to be encoded once more. */
+    private String segment() {
+        String id = ResourceId.of("artemis.queue", queue).format();
+        return id.substring(id.indexOf('/') + 1);
+    }
 
     private JsonNode ok(RequestBuilder request) throws Exception {
         var response = mvc.perform(request).andReturn().getResponse();
@@ -158,7 +165,7 @@ class MarkupMessageRoundTripRealBrokerTest extends PostgresIntegrationTest {
             request.put("body", body);
             request.put(
                     "properties", Map.of("note", "<img src=x onerror=alert(2)> & \"quoted\"", "html", "<b>&amp;</b>"));
-            ok(post(MESSAGES, clusterId, queue)
+            ok(post(MESSAGES, clusterId, segment())
                     .with(csrf())
                     .with(authentication(admin()))
                     .contentType(MediaType.APPLICATION_JSON)
@@ -168,7 +175,7 @@ class MarkupMessageRoundTripRealBrokerTest extends PostgresIntegrationTest {
         // A send is acknowledged before every broker version lists the message in a browse, so wait for all of them.
         JsonNode page = await().atMost(Duration.ofSeconds(10))
                 .until(
-                        () -> ok(get(MESSAGES, clusterId, queue).with(authentication(admin()))),
+                        () -> ok(get(MESSAGES, clusterId, segment()).with(authentication(admin()))),
                         listed -> listed.path("data").size() == BODIES.size());
 
         List<String> seen = new ArrayList<>();
@@ -176,8 +183,8 @@ class MarkupMessageRoundTripRealBrokerTest extends PostgresIntegrationTest {
             JsonNode detail = ok(get(
                             MESSAGES + "/{id}",
                             clusterId,
-                            queue,
-                            row.path("messageId").asLong())
+                            segment(),
+                            row.path("position").asString())
                     .with(authentication(admin())));
             seen.add(detail.path("body").asString());
             assertThat(detail.path("stringProperties").path("note").asString())

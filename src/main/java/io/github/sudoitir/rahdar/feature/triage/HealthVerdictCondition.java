@@ -61,12 +61,12 @@ public class HealthVerdictCondition implements AlertCondition {
         Map<String, Double> active = new HashMap<>();
         for (ConsumerHealth health : consumerHealth.evaluate(clusterId)) {
             // No verdict this tick is not healthy, and not a resolution either.
-            if (!scope.matchesAddress(health.address())
-                    || !scope.matchesQueue(health.queueName())
+            if (!scope.matchesDestination(health.destination())
+                    || !scope.matchesSubscription(health.subscription())
                     || !health.verdict().known()) {
                 continue;
             }
-            String key = "queue:" + health.queueName();
+            String key = "subscription:" + health.subscription();
             universe.add(key);
             double severity = health.verdict().severity();
             if (Comparators.test(rule.comparator(), severity, rule.threshold())) {

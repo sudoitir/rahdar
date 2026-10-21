@@ -1,6 +1,6 @@
 package io.github.sudoitir.rahdar.kernel.security;
 
-import io.github.sudoitir.rahdar.kernel.plugin.ResourceKind;
+import io.github.sudoitir.rahdar.kernel.plugin.ResourceType;
 import io.github.sudoitir.rahdar.kernel.security.internal.persistence.RolePermissionEntity;
 import io.github.sudoitir.rahdar.kernel.security.internal.persistence.RolePermissionRepository;
 import io.github.sudoitir.rahdar.kernel.security.internal.persistence.TeamEntity;
@@ -37,13 +37,13 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class TeamIndex {
 
-    /** A pattern a team owns, for the kinds in {@code kinds}. */
-    public record Owned(ResourcePattern pattern, Set<ResourceKind> kinds, UUID teamId) {}
+    /** A pattern a team owns, for the types in {@code types}. */
+    public record Owned(ResourcePattern pattern, Set<ResourceType> types, UUID teamId) {}
 
-    /** A shared pattern as it takes effect: the kinds still covered by the owner, the role and its permissions. */
+    /** A shared pattern as it takes effect: the types still covered by the owner, the role and its permissions. */
     public record Shared(
             ResourcePattern pattern,
-            Set<ResourceKind> kinds,
+            Set<ResourceType> types,
             UUID ownerTeamId,
             UUID targetTeamId,
             UUID roleId,
@@ -74,7 +74,7 @@ public class TeamIndex {
 
     private static Optional<UUID> ownerOf(ClusterTeams cluster, ResourceRef ref) {
         return cluster.owned().stream()
-                .filter(o -> o.kinds().contains(ref.kind()) && o.pattern().matches(ref.name()))
+                .filter(o -> o.types().contains(ref.type()) && o.pattern().matches(ref.name()))
                 .map(Owned::teamId)
                 .findFirst();
     }
@@ -90,7 +90,7 @@ public class TeamIndex {
     /** The shares that cover the name on the cluster. */
     public List<Shared> sharesCovering(UUID clusterId, ResourceRef ref) {
         return of(clusterId).shared().stream()
-                .filter(s -> s.kinds().contains(ref.kind()) && s.pattern().matches(ref.name()))
+                .filter(s -> s.types().contains(ref.type()) && s.pattern().matches(ref.name()))
                 .toList();
     }
 
@@ -105,9 +105,9 @@ public class TeamIndex {
     }
 
     /** The names of {@code names} that no team owns on the cluster, for the kind. */
-    public List<String> unowned(UUID clusterId, ResourceKind kind, List<String> names) {
+    public List<String> unowned(UUID clusterId, ResourceType kind, List<String> names) {
         List<Owned> owned = of(clusterId).owned().stream()
-                .filter(o -> o.kinds().contains(kind))
+                .filter(o -> o.types().contains(kind))
                 .toList();
         return names.stream()
                 .filter(name -> owned.stream().noneMatch(o -> o.pattern().matches(name)))
@@ -150,7 +150,7 @@ public class TeamIndex {
         for (TeamPatternEntity p : patterns.findAll()) {
             Owned entry = new Owned(
                     ResourcePattern.parse(p.getPattern()),
-                    PatternKind.valueOf(p.getKind()).kinds(),
+                    PatternKind.valueOf(p.getKind()).types(),
                     p.getTeamId());
             owned.computeIfAbsent(p.getClusterId(), c -> new ArrayList<>()).add(entry);
             byTeamAndCluster
@@ -163,10 +163,10 @@ public class TeamIndex {
             ResourcePattern pattern = ResourcePattern.parse(s.getPattern());
             List<Owned> ownersPatterns =
                     byTeamAndCluster.getOrDefault(s.getOwnerTeamId() + "|" + s.getClusterId(), List.of());
-            Set<ResourceKind> covered = EnumSet.noneOf(ResourceKind.class);
-            for (ResourceKind kind : PatternKind.valueOf(s.getKind()).kinds()) {
+            Set<ResourceType> covered = EnumSet.noneOf(ResourceType.class);
+            for (ResourceType kind : PatternKind.valueOf(s.getKind()).types()) {
                 if (ownersPatterns.stream()
-                        .anyMatch(o -> o.kinds().contains(kind) && ResourcePattern.covers(o.pattern(), pattern))) {
+                        .anyMatch(o -> o.types().contains(kind) && ResourcePattern.covers(o.pattern(), pattern))) {
                     covered.add(kind);
                 }
             }

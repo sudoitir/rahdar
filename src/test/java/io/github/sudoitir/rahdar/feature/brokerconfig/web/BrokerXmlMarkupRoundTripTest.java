@@ -103,7 +103,7 @@ class BrokerXmlMarkupRoundTripTest extends PostgresIntegrationTest {
 
     @Test
     void markupInABrokerXmlFragmentSurvivesImportSaveAndExportUnchanged() throws Exception {
-        String base = "/api/v1/clusters/" + clusterId + "/config";
+        String base = "/api/v1/clusters/" + clusterId + "/artemis/config";
 
         JsonNode imported = json.readTree(body(
                 post(base + "/import-xml")

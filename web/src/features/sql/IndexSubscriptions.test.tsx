@@ -19,7 +19,7 @@ const { IndexSubscriptions } = await import('./IndexSubscriptions.tsx');
 function subscription(over: Record<string, unknown> = {}) {
   return {
     id: 's1',
-    queuePattern: 'ORDER.IN',
+    subscriptionPattern: 'ORDER.IN',
     retentionDays: 7,
     intervalMs: 5000,
     captureFrom: '2026-09-01T09:00:00Z',
@@ -54,7 +54,7 @@ describe('IndexSubscriptions', () => {
     const user = userEvent.setup();
     renderWithProviders(<IndexSubscriptions />);
 
-    await user.type(await screen.findByLabelText('Queue or pattern'), 'ORDER.IN');
+    await user.type(await screen.findByLabelText('Subscription or pattern'), 'ORDER.IN');
 
     // The disclosure is on the form, not behind a link: this is the last screen
     // before Rahdar starts keeping a copy of application payload.
@@ -69,13 +69,13 @@ describe('IndexSubscriptions', () => {
     renderWithProviders(<IndexSubscriptions />);
 
     expect(await screen.findByRole('heading', { level: 3, name: 'Subscriptions' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { level: 3, name: 'Index a queue' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 3, name: 'Index a subscription' })).toBeInTheDocument();
     const table = screen.getByRole('table', { name: 'Index subscriptions' });
     expect(
       within(table)
         .getAllByRole('columnheader')
         .map((header) => header.textContent),
-    ).toEqual(['Queues', 'Mode', 'Held', 'Retention', 'State', 'Delete']);
+    ).toEqual(['Subscriptions', 'Mode', 'Held', 'Retention', 'State', 'Delete']);
     expect(within(table).getByText('Sample')).toBeInTheDocument();
     expect(within(table).getByText('7 days')).toBeInTheDocument();
   });
@@ -126,14 +126,14 @@ describe('IndexSubscriptions', () => {
     const user = userEvent.setup();
     renderWithProviders(<IndexSubscriptions />);
 
-    await user.type(await screen.findByLabelText('Queue or pattern'), 'ORDER.IN');
+    await user.type(await screen.findByLabelText('Subscription or pattern'), 'ORDER.IN');
     await user.click(screen.getByRole('radio', { name: /capture everything/i }));
 
     // Every object Rahdar will create on the broker, named, before the button that
     // creates them can be pressed.
     expect(screen.getByText(/changes routing on every live node/i)).toBeInTheDocument();
     expect(screen.getByText(/non-exclusive divert/i)).toBeInTheDocument();
-    expect(screen.getByText(/ring-bounded, non-durable queue/i)).toBeInTheDocument();
+    expect(screen.getByText(/ring-bounded, non-durable subscription/i)).toBeInTheDocument();
     expect(screen.getByText(/security setting/i)).toBeInTheDocument();
     // ADR-0065: nothing here is temporary, and the screen must not imply otherwise.
     expect(screen.getByText(/None of those objects disappears when the broker restarts/i)).toBeInTheDocument();
@@ -223,7 +223,7 @@ describe('IndexSubscriptions', () => {
       http.post('*/api/v1/clusters/c1/sql/index', ({ request }) => {
         if (new URL(request.url).searchParams.get('dryRun') === 'true') {
           return HttpResponse.json({
-            addresses: ['ORDER.IN'],
+            destinations: ['artemis.address/ORDER.IN'],
             nodes: ['primary'],
             ringMessages: 10000,
             ringBytes: 67_108_864,
@@ -239,7 +239,7 @@ describe('IndexSubscriptions', () => {
     const user = userEvent.setup();
     renderWithProviders(<IndexSubscriptions />);
 
-    const pattern = await screen.findByLabelText('Queue or pattern');
+    const pattern = await screen.findByLabelText('Subscription or pattern');
     pattern.focus();
     await user.keyboard('ORDER.IN');
 
@@ -256,7 +256,7 @@ describe('IndexSubscriptions', () => {
     // What will be created, where, and how big, before anything can be armed.
     expect(await screen.findByText(/Installed on 1 live node: primary/i)).toBeInTheDocument();
     expect(screen.getByText(/64 MB, whichever is reached first/)).toBeInTheDocument();
-    expect(screen.getByLabelText('Queue or pattern')).toHaveAttribute('readonly');
+    expect(screen.getByLabelText('Subscription or pattern')).toHaveAttribute('readonly');
 
     const start = screen.getByRole('button', { name: /Start capturing/i });
     expect(start).toBeEnabled();
@@ -270,25 +270,25 @@ describe('IndexSubscriptions', () => {
       http.get('*/api/v1/clusters/c1/sql/index', () => HttpResponse.json(paged([]))),
       http.post('*/api/v1/clusters/c1/sql/index', () =>
         HttpResponse.json({
-          addresses: [],
+          destinations: [],
           nodes: ['primary'],
           ringMessages: 10000,
           ringBytes: 1024,
           brokerObjects: [],
           brokerXml: '',
-          refusal: 'The pattern matches no address on this cluster.',
+          refusal: 'The pattern matches no destination on this cluster.',
         }),
       ),
     );
     const user = userEvent.setup();
     renderWithProviders(<IndexSubscriptions />);
 
-    await user.type(await screen.findByLabelText('Queue or pattern'), 'NOTHING.*');
+    await user.type(await screen.findByLabelText('Subscription or pattern'), 'NOTHING.*');
     await user.click(screen.getByRole('radio', { name: /capture everything/i }));
     await user.click(screen.getByRole('button', { name: /Preview capture/i }));
 
     expect(await screen.findByText(/Capture would be refused/)).toBeInTheDocument();
-    expect(screen.getByText(/matches no address/i)).toBeInTheDocument();
+    expect(screen.getByText(/matches no destination/i)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Start capturing/i })).not.toBeInTheDocument();
   });
 
@@ -298,7 +298,7 @@ describe('IndexSubscriptions', () => {
     const user = userEvent.setup();
     renderWithProviders(<IndexSubscriptions />);
 
-    await user.type(await screen.findByLabelText('Queue or pattern'), 'ORDER.IN');
+    await user.type(await screen.findByLabelText('Subscription or pattern'), 'ORDER.IN');
     await user.click(screen.getByRole('radio', { name: /capture everything/i }));
     await user.click(screen.getByRole('button', { name: /Capture bounds/i }));
     await user.type(screen.getByLabelText(/Ring size/i), '5');
@@ -350,7 +350,7 @@ describe('IndexSubscriptions loading and failure', () => {
 
     expect(await screen.findByText('You are not allowed to do this')).toBeInTheDocument();
     expect(screen.getByText('Your role does not allow it.')).toBeInTheDocument();
-    expect(screen.queryByLabelText('Queue or pattern')).toBeNull();
+    expect(screen.queryByLabelText('Subscription or pattern')).toBeNull();
   });
 
   it('shows nothing of the form while the subscriptions are on their way', () => {
@@ -358,7 +358,7 @@ describe('IndexSubscriptions loading and failure', () => {
     server.use(http.get('*/api/v1/clusters/c1/sql/index', () => new Promise(() => {})));
     renderWithProviders(<IndexSubscriptions />);
 
-    expect(screen.queryByLabelText('Queue or pattern')).toBeNull();
+    expect(screen.queryByLabelText('Subscription or pattern')).toBeNull();
     expect(screen.queryByText(/Nothing is being indexed/)).toBeNull();
   });
 });
@@ -414,11 +414,15 @@ describe('IndexSubscriptions rows', () => {
 
   it('says what is not being recorded and that the backlog is still being indexed', async () => {
     mockMe();
-    listing([subscription({ notCapturing: 'the queue does not exist on any node.', backlogInProgress: true })]);
+    listing([subscription({ notCapturing: 'the subscription does not exist on any node.', backlogInProgress: true })]);
     renderWithProviders(<IndexSubscriptions />);
 
-    expect(await screen.findByText('Recording nothing — the queue does not exist on any node.')).toBeInTheDocument();
-    expect(screen.getByText(/Still indexing the messages that were already on these queues/)).toBeInTheDocument();
+    expect(
+      await screen.findByText('Recording nothing — the subscription does not exist on any node.'),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/Still indexing the messages that were already on these subscriptions/),
+    ).toBeInTheDocument();
   });
 
   it('says one day, one message and a small payload in the singular and in bytes', async () => {
@@ -463,7 +467,7 @@ describe('IndexSubscriptions rows', () => {
   it('keeps the switch and delete visible but disabled without the permission the subscription needs', async () => {
     // Sampling is settings:write; capture is its own authority, capture:write.
     grants(['capture:write']);
-    listing([subscription(), subscription({ id: 's2', queuePattern: 'PAY.IN', mode: 'CAPTURE', nodes: [] })]);
+    listing([subscription(), subscription({ id: 's2', subscriptionPattern: 'PAY.IN', mode: 'CAPTURE', nodes: [] })]);
     renderWithProviders(<IndexSubscriptions />);
 
     const sampled = (await screen.findByText('ORDER.IN')).closest('tr')!;
@@ -487,7 +491,7 @@ describe('IndexSubscriptions deleting', () => {
 
     await user.click(await screen.findByRole('button', { name: 'Delete' }));
     expect(await screen.findByText(/1,284 captured messages/)).toBeInTheDocument();
-    expect(screen.queryByText(/removes the divert, the capture queue/)).toBeNull();
+    expect(screen.queryByText(/removes the divert, the capture subscription/)).toBeNull();
     await holdButton(screen.getByRole('button', { name: /Delete and destroy captured messages/ }));
 
     await waitFor(() =>
@@ -510,7 +514,7 @@ describe('IndexSubscriptions deleting', () => {
     await user.click(await screen.findByRole('button', { name: 'Delete' }));
     expect(await screen.findByText(/1 captured message it holds/)).toBeInTheDocument();
     expect(
-      screen.getByText(/removes the divert, the capture queue, the address setting and the security setting/),
+      screen.getByText(/removes the divert, the capture subscription, the address setting and the security setting/),
     ).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Cancel' }));
@@ -573,13 +577,13 @@ describe('IndexSubscriptions sampling form', () => {
     const user = userEvent.setup();
     renderWithProviders(<IndexSubscriptions />);
 
-    const pattern = await screen.findByLabelText('Queue or pattern');
+    const pattern = await screen.findByLabelText('Subscription or pattern');
     await user.type(pattern, '  ORDER.IN ');
     await user.click(screen.getByRole('button', { name: 'Start sampling' }));
 
     await waitFor(() => expect(bodies).toHaveLength(1));
     expect(bodies[0]).toEqual({
-      queuePattern: 'ORDER.IN',
+      subscriptionPattern: 'ORDER.IN',
       retentionDays: 7,
       intervalMs: 5000,
       enabled: true,
@@ -603,7 +607,7 @@ describe('IndexSubscriptions sampling form', () => {
     const user = userEvent.setup();
     renderWithProviders(<IndexSubscriptions />);
 
-    await user.type(await screen.findByLabelText('Queue or pattern'), 'ORDER.IN');
+    await user.type(await screen.findByLabelText('Subscription or pattern'), 'ORDER.IN');
     await user.click(screen.getByRole('button', { name: 'Start sampling' }));
 
     const alert = (await screen.findByText('This conflicts with the current state')).closest('[role="alert"]');
@@ -616,14 +620,14 @@ describe('IndexSubscriptions sampling form', () => {
     listing([]);
     const first = renderWithProviders(<IndexSubscriptions />);
 
-    expect(await screen.findByText('Enter a queue or pattern first.')).toBeInTheDocument();
+    expect(await screen.findByText('Enter a subscription or pattern first.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Start sampling' })).toBeDisabled();
     first.unmount();
 
     grants(['cluster:read']);
     const user = userEvent.setup();
     renderWithProviders(<IndexSubscriptions />);
-    await user.type(await screen.findByLabelText('Queue or pattern'), 'ORDER.IN');
+    await user.type(await screen.findByLabelText('Subscription or pattern'), 'ORDER.IN');
     expect(await screen.findByText('Creating a subscription needs the settings write permission.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Start sampling' })).toBeDisabled();
 
@@ -638,7 +642,7 @@ describe('IndexSubscriptions sampling form', () => {
     const user = userEvent.setup();
     renderWithProviders(<IndexSubscriptions />);
 
-    await user.type(await screen.findByLabelText('Queue or pattern'), 'ORDER.IN');
+    await user.type(await screen.findByLabelText('Subscription or pattern'), 'ORDER.IN');
     const days = screen.getByLabelText('Keep for (days)');
     await user.clear(days);
     await user.type(days, '1');
@@ -665,7 +669,7 @@ describe('IndexSubscriptions sampling form', () => {
 
 describe('IndexSubscriptions capture form', () => {
   const previewBody = {
-    addresses: ['ORDER.IN', 'ORDER.OUT'],
+    destinations: ['artemis.address/ORDER.IN', 'artemis.address/ORDER.OUT'],
     nodes: ['primary', 'backup'],
     ringMessages: 10000,
     ringBytes: 500,
@@ -675,7 +679,7 @@ describe('IndexSubscriptions capture form', () => {
   };
 
   async function fillCapture(user: ReturnType<typeof userEvent.setup>) {
-    await user.type(await screen.findByLabelText('Queue or pattern'), 'ORDER.#');
+    await user.type(await screen.findByLabelText('Subscription or pattern'), 'ORDER.#');
     await user.click(screen.getByRole('radio', { name: /capture everything/i }));
     await user.type(screen.getByLabelText(/Capture filter/), " tenant = 'acme' ");
     await user.click(screen.getByRole('button', { name: /Capture bounds/ }));
@@ -704,7 +708,7 @@ describe('IndexSubscriptions capture form', () => {
 
     await waitFor(() => expect(bodies).toHaveLength(1));
     expect(bodies[0]).toEqual({
-      queuePattern: 'ORDER.#',
+      subscriptionPattern: 'ORDER.#',
       retentionDays: 7,
       intervalMs: 5000,
       enabled: true,
@@ -715,7 +719,7 @@ describe('IndexSubscriptions capture form', () => {
       maxRate: 50,
       bodyCapBytes: 4 * 1024,
     });
-    expect(await screen.findByText('Covers 2 addresses: ORDER.IN, ORDER.OUT')).toBeInTheDocument();
+    expect(await screen.findByText('Covers 2 destinations: ORDER.IN, ORDER.OUT')).toBeInTheDocument();
     expect(screen.getByText('Installed on 2 live nodes: primary, backup')).toBeInTheDocument();
     expect(screen.getByText(/at most 10,000 messages or 500 B, whichever is reached first/)).toBeInTheDocument();
     expect(screen.getByText('divert rahdar.capture.abc.ORDER.IN.s1')).toBeInTheDocument();
@@ -725,8 +729,8 @@ describe('IndexSubscriptions capture form', () => {
     expect(screen.getByLabelText(/Ring size/)).toHaveAttribute('readonly');
 
     await user.click(screen.getByRole('button', { name: 'Edit' }));
-    expect(screen.queryByText(/Covers 2 addresses/)).toBeNull();
-    expect(screen.getByLabelText('Queue or pattern')).not.toHaveAttribute('readonly');
+    expect(screen.queryByText(/Covers 2 destinations/)).toBeNull();
+    expect(screen.getByLabelText('Subscription or pattern')).not.toHaveAttribute('readonly');
     expect(screen.getByRole('button', { name: 'Preview capture' })).toBeEnabled();
   });
 
@@ -737,25 +741,30 @@ describe('IndexSubscriptions capture form', () => {
     server.use(
       http.post('*/api/v1/clusters/c1/sql/index', async ({ request }) => {
         bodies.push(await request.json());
-        return HttpResponse.json({ ...previewBody, addresses: ['ORDER.IN'], nodes: ['primary'], brokerXml: null });
+        return HttpResponse.json({
+          ...previewBody,
+          destinations: ['artemis.address/ORDER.IN'],
+          nodes: ['primary'],
+          brokerXml: null,
+        });
       }),
     );
     const user = userEvent.setup();
     renderWithProviders(<IndexSubscriptions />);
 
-    await user.type(await screen.findByLabelText('Queue or pattern'), 'ORDER.IN');
+    await user.type(await screen.findByLabelText('Subscription or pattern'), 'ORDER.IN');
     await user.click(screen.getByRole('radio', { name: /capture everything/i }));
     await user.click(screen.getByRole('button', { name: 'Preview capture' }));
 
     await waitFor(() => expect(bodies).toHaveLength(1));
     expect(bodies[0]).toEqual({
-      queuePattern: 'ORDER.IN',
+      subscriptionPattern: 'ORDER.IN',
       retentionDays: 7,
       intervalMs: 5000,
       enabled: true,
       mode: 'CAPTURE',
     });
-    expect(await screen.findByText('Covers 1 address: ORDER.IN')).toBeInTheDocument();
+    expect(await screen.findByText('Covers 1 destination: ORDER.IN')).toBeInTheDocument();
     expect(screen.getByText('Installed on 1 live node: primary')).toBeInTheDocument();
     expect(screen.queryByText('The equivalent broker.xml')).toBeNull();
   });
@@ -771,7 +780,7 @@ describe('IndexSubscriptions capture form', () => {
     const user = userEvent.setup();
     renderWithProviders(<IndexSubscriptions />);
 
-    await user.type(await screen.findByLabelText('Queue or pattern'), 'ORDER.IN');
+    await user.type(await screen.findByLabelText('Subscription or pattern'), 'ORDER.IN');
     await user.click(screen.getByRole('radio', { name: /capture everything/i }));
     await user.click(screen.getByRole('button', { name: 'Preview capture' }));
 
@@ -780,15 +789,15 @@ describe('IndexSubscriptions capture form', () => {
     expect(alert).toHaveTextContent('No node of this cluster is live.');
   });
 
-  it('names the queues when no pattern is typed yet, and says capture records everything up to its bounds', async () => {
+  it('names the subscriptions when no pattern is typed yet, and says capture records everything up to its bounds', async () => {
     mockMe();
     listing([]);
     const user = userEvent.setup();
     renderWithProviders(<IndexSubscriptions />);
 
     await user.click(await screen.findByRole('radio', { name: /capture everything/i }));
-    expect(screen.getByText(/On each live node Rahdar will create a/)).toHaveTextContent('from these queues');
-    expect(screen.getByText(/Capture records everything the address routed, up to its bounds/)).toBeInTheDocument();
+    expect(screen.getByText(/On each live node Rahdar will create a/)).toHaveTextContent('from these subscriptions');
+    expect(screen.getByText(/Capture records everything the destination routed, up to its bounds/)).toBeInTheDocument();
     expect(screen.getByText(/for 7 days or until the size bound is reached/)).toBeInTheDocument();
 
     await user.click(screen.getByRole('radio', { name: /^sample$/i }));

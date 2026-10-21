@@ -6,7 +6,7 @@ import java.util.Set;
 
 /**
  * Declares one gated operation type: one bean per type. Rahdar's types are named like {@code
- * queue.purge}; a plugin's are {@code <pluginId>:<name>}. Every method but {@link #replay} must be
+ * subscription.purge}; a plugin's are {@code <pluginId>:<name>}. Every method but {@link #replay} must be
  * cheap and free of side effects, because the gate calls them on every request.
  *
  * @param <P> the parameters, a record that {@link CanonicalJson} can write

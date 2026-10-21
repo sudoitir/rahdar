@@ -1,6 +1,7 @@
 package io.github.sudoitir.rahdar.feature.plugins.messaging;
 
 import io.github.sudoitir.rahdar.kernel.plugin.PluginApi;
+import io.github.sudoitir.rahdar.kernel.security.ResourceRef;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Map;
@@ -11,6 +12,8 @@ import java.util.UUID;
  * A message delivered to a plugin.
  *
  * @param registrationKey the registration it was delivered for
+ * @param source the subscription it was received from
+ * @param message where the message is: the serving node that delivered it and its position there
  * @param body the body's bytes; a text message's are its UTF-8 encoding, and a message with no
  *     readable body (map, stream, object) has none
  * @param text whether it was sent as a text message
@@ -25,8 +28,8 @@ import java.util.UUID;
 public record PluginMessage(
         String registrationKey,
         UUID clusterId,
-        UUID nodeId,
-        String queue,
+        ResourceRef source,
+        MessageRef message,
         byte[] body,
         boolean text,
         Map<String, Object> headers,
@@ -46,8 +49,8 @@ public record PluginMessage(
                         PluginMessage(
                                 var otherRegistrationKey,
                                 var otherClusterId,
-                                var otherNodeId,
-                                var otherQueue,
+                                var otherSource,
+                                var otherMessage,
                                 var otherBody,
                                 var otherText,
                                 var otherHeaders,
@@ -55,8 +58,8 @@ public record PluginMessage(
                                 var otherDeliveryCount)
                 && Objects.equals(registrationKey, otherRegistrationKey)
                 && Objects.equals(clusterId, otherClusterId)
-                && Objects.equals(nodeId, otherNodeId)
-                && Objects.equals(queue, otherQueue)
+                && Objects.equals(source, otherSource)
+                && Objects.equals(message, otherMessage)
                 && Arrays.equals(body, otherBody)
                 && text == otherText
                 && Objects.equals(headers, otherHeaders)
@@ -69,8 +72,8 @@ public record PluginMessage(
         return Objects.hash(
                 registrationKey,
                 clusterId,
-                nodeId,
-                queue,
+                source,
+                message,
                 Arrays.hashCode(body),
                 text,
                 headers,
@@ -81,8 +84,9 @@ public record PluginMessage(
     /** The body is reported by length only, so a message's content never lands in a log line. */
     @Override
     public String toString() {
-        return "PluginMessage[registrationKey=" + registrationKey + ", clusterId=" + clusterId + ", nodeId=" + nodeId
-                + ", queue=" + queue + ", body=" + (body == null ? "null" : body.length + " bytes") + ", text=" + text
+        return "PluginMessage[registrationKey=" + registrationKey + ", clusterId=" + clusterId + ", source=" + source
+                + ", message=" + message + ", body=" + (body == null ? "null" : body.length + " bytes") + ", text="
+                + text
                 + ", headers=" + headers + ", properties=" + properties + ", deliveryCount=" + deliveryCount + "]";
     }
 }

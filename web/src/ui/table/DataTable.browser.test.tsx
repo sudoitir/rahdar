@@ -94,6 +94,11 @@ const bodyCell = (grid: HTMLElement, row: number, col: string | undefined) =>
   grid.querySelector<HTMLElement>(`[data-grid-row="${row}"] > [data-grid-col="${col}"]`)!;
 
 describe('DataTable column widths in a real browser', () => {
+  it('is only its header when it has no rows, so the empty message sits under it without a blank frame', async () => {
+    const { scroller, heads } = await mount([nameColumn, depth], []);
+    expect(scroller.getBoundingClientRect().height).toBeLessThanOrEqual(heads()[0]!.getBoundingClientRect().height * 2);
+  });
+
   it('widens a fixed column whose value needs more than its header does', async () => {
     const type: Column<Q> = { id: 'type', header: 'T', accessor: (r) => r.type, kind: 'status', priority: 'high' };
     const { grid, scroller, heads } = await mount([nameColumn, type], rows);

@@ -1,7 +1,7 @@
 package io.github.sudoitir.rahdar.kernel.stream;
 
 import io.github.sudoitir.rahdar.kernel.plugin.PluginApi;
-import io.github.sudoitir.rahdar.kernel.plugin.ResourceKind;
+import io.github.sudoitir.rahdar.kernel.plugin.ResourceType;
 import io.github.sudoitir.rahdar.kernel.replica.BusFrame;
 import io.github.sudoitir.rahdar.kernel.replica.BusResumed;
 import io.github.sudoitir.rahdar.kernel.replica.RahdarBus;
@@ -137,12 +137,16 @@ public class SseHub {
 
     /** {@link #publishAbout(UUID, String, Collection, Collection)} for resources named by reference. */
     public void publishAbout(UUID clusterId, String topic, Collection<ResourceRef> resources) {
-        publishAbout(clusterId, topic, names(resources, ResourceKind.QUEUE), names(resources, ResourceKind.ADDRESS));
+        publishAbout(
+                clusterId,
+                topic,
+                names(resources, ResourceType.SUBSCRIPTION),
+                names(resources, ResourceType.DESTINATION));
     }
 
-    private static List<String> names(Collection<ResourceRef> resources, ResourceKind kind) {
+    private static List<String> names(Collection<ResourceRef> resources, ResourceType kind) {
         return resources.stream()
-                .filter(r -> r.kind() == kind)
+                .filter(r -> r.type() == kind)
                 .map(ResourceRef::name)
                 .toList();
     }
@@ -284,10 +288,10 @@ public class SseHub {
         envelope.put("ts", Instant.now().toEpochMilli());
         if (frame.about() != null) {
             if (!frame.about().queues().isEmpty()) {
-                envelope.put("queues", frame.about().queues());
+                envelope.put("subscriptions", frame.about().queues());
             }
             if (!frame.about().addresses().isEmpty()) {
-                envelope.put("addresses", frame.about().addresses());
+                envelope.put("destinations", frame.about().addresses());
             }
         }
         return envelope;

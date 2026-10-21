@@ -15,8 +15,8 @@ import org.springframework.data.repository.query.Param;
 public interface RrFlowRepository extends JpaRepository<RrFlowEntity, UUID> {
 
     /** Dedupes across sample ticks (the same head message seen repeatedly is one flow). */
-    Optional<RrFlowEntity> findByClusterIdAndRequestAddressAndRequestMessageId(
-            UUID clusterId, String requestAddress, String requestMessageId);
+    Optional<RrFlowEntity> findByClusterIdAndRequestDestinationAndRequestMessageId(
+            UUID clusterId, String requestDestination, String requestMessageId);
 
     /**
      * The reply join (design.md D3): a reply matches an awaiting-reply flow by its
@@ -44,7 +44,8 @@ public interface RrFlowRepository extends JpaRepository<RrFlowEntity, UUID> {
     List<RrFlowEntity> findByStateAndDeadlineAtBefore(String state, Instant deadline);
 
     /** The only responder for a request address disappearing (design.md, RESPONDER_DROPPED). */
-    List<RrFlowEntity> findByClusterIdAndRequestAddressAndState(UUID clusterId, String requestAddress, String state);
+    List<RrFlowEntity> findByClusterIdAndRequestDestinationAndState(
+            UUID clusterId, String requestDestination, String state);
 
     /** A temp reply queue's binding removed while a flow is still awaiting reply on it. */
     List<RrFlowEntity> findByClusterIdAndReplyDestinationAndState(
@@ -54,8 +55,8 @@ public interface RrFlowRepository extends JpaRepository<RrFlowEntity, UUID> {
             select f from RrFlowEntity f
             where f.clusterId = :clusterId
               and (:state is null or f.state = :state)
-              and (:everything = true or f.requestAddress in :readable)
-              and (:address is null or f.requestAddress = :address)
+              and (:everything = true or f.requestDestination in :readable)
+              and (:address is null or f.requestDestination = :address)
               and (:correlationId is null or f.correlationId = :correlationId)
               and f.requestedAt >= :from
               and f.requestedAt <= :to
@@ -72,15 +73,15 @@ public interface RrFlowRepository extends JpaRepository<RrFlowEntity, UUID> {
             @Param("to") Instant to,
             Pageable pageable);
 
-    long countByClusterIdAndRequestAddressAndState(UUID clusterId, String requestAddress, String state);
+    long countByClusterIdAndRequestDestinationAndState(UUID clusterId, String requestDestination, String state);
 
-    Optional<RrFlowEntity> findFirstByClusterIdAndRequestAddressAndStateOrderByRequestedAtAsc(
-            UUID clusterId, String requestAddress, String state);
+    Optional<RrFlowEntity> findFirstByClusterIdAndRequestDestinationAndStateOrderByRequestedAtAsc(
+            UUID clusterId, String requestDestination, String state);
 
     @Query(
-            "select distinct f.requestAddress from RrFlowEntity f where f.clusterId = :clusterId and f.requestAddress is not null")
-    List<String> findDistinctRequestAddressByClusterId(@Param("clusterId") UUID clusterId);
+            "select distinct f.requestDestination from RrFlowEntity f where f.clusterId = :clusterId and f.requestDestination is not null")
+    List<String> findDistinctRequestDestinationByClusterId(@Param("clusterId") UUID clusterId);
 
-    long countByClusterIdAndRequestAddressAndStateAndRequestedAtAfter(
-            UUID clusterId, String requestAddress, String state, Instant since);
+    long countByClusterIdAndRequestDestinationAndStateAndRequestedAtAfter(
+            UUID clusterId, String requestDestination, String state, Instant since);
 }

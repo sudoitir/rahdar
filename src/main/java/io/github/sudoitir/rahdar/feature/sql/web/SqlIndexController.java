@@ -11,6 +11,7 @@ import io.github.sudoitir.rahdar.feature.sql.web.SqlViews.IndexSubscriptionReque
 import io.github.sudoitir.rahdar.feature.sql.web.SqlViews.IndexSubscriptionView;
 import io.github.sudoitir.rahdar.kernel.core.PagedView;
 import io.github.sudoitir.rahdar.kernel.core.ResourceQuery;
+import io.github.sudoitir.rahdar.kernel.security.ResourceIdTexts;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
 import java.util.UUID;
@@ -39,6 +40,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class SqlIndexController {
 
     private final MessageIndexService index;
+    private final ResourceIdTexts ids;
 
     @GetMapping
     public PagedView<IndexSubscriptionView> list(
@@ -67,7 +69,9 @@ public class SqlIndexController {
     public CapturePreviewView preview(@PathVariable UUID clusterId, @RequestBody IndexSubscriptionRequest request) {
         MessageIndexService.Preview p = index.preview(clusterId, toSpec(request));
         return new CapturePreviewView(
-                p.addresses(),
+                p.destinations().stream()
+                        .map(d -> ids.destination(clusterId, d))
+                        .toList(),
                 p.nodes(),
                 p.ringMessages(),
                 p.ringBytes(),
@@ -97,7 +101,7 @@ public class SqlIndexController {
 
     private static MessageIndexService.Spec toSpec(IndexSubscriptionRequest request) {
         return new MessageIndexService.Spec(
-                request.queuePattern(),
+                request.subscriptionPattern(),
                 request.intervalMs(),
                 request.retentionDays(),
                 request.enabled(),
@@ -115,7 +119,7 @@ public class SqlIndexController {
         MessageIndexSubscriptionEntity entity = subscription.entity();
         return new IndexSubscriptionView(
                 entity.getId(),
-                entity.getQueuePattern(),
+                entity.getSubscriptionPattern(),
                 entity.getRetentionDays(),
                 entity.getIntervalMs(),
                 iso(entity.getCaptureFrom()),

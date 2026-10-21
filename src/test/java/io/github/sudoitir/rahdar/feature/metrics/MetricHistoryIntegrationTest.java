@@ -14,6 +14,7 @@ import io.github.sudoitir.rahdar.kernel.plugin.support.PluginJarBuilder;
 import io.github.sudoitir.rahdar.kernel.security.AccessChanges;
 import io.github.sudoitir.rahdar.kernel.security.GrantLoader;
 import io.github.sudoitir.rahdar.kernel.security.Permissions;
+import io.github.sudoitir.rahdar.kernel.security.ResourceRef;
 import io.github.sudoitir.rahdar.kernel.security.internal.persistence.AppUserRepository;
 import io.github.sudoitir.rahdar.kernel.security.internal.persistence.RolePermissionRepository;
 import io.github.sudoitir.rahdar.kernel.security.internal.persistence.RoleRepository;
@@ -124,7 +125,7 @@ class MetricHistoryIntegrationTest extends PostgresIntegrationTest {
 
     @Test
     void aUserWithQueueReadReadsAQueuesDepth() {
-        UUID user = userWith(Permissions.CLUSTER_READ, Permissions.QUEUE_READ);
+        UUID user = userWith(Permissions.CLUSTER_READ, Permissions.SUBSCRIPTION_READ);
 
         MetricSeriesResponse series = history.read(user, clusterId, depthQuery(now.minusSeconds(900)));
 
@@ -191,7 +192,7 @@ class MetricHistoryIntegrationTest extends PostgresIntegrationTest {
 
     @Test
     void aRangeOlderThanRetentionIsClampedAndSaysSo() {
-        UUID user = userWith(Permissions.CLUSTER_READ, Permissions.QUEUE_READ);
+        UUID user = userWith(Permissions.CLUSTER_READ, Permissions.SUBSCRIPTION_READ);
 
         MetricSeriesResponse series = history.read(user, clusterId, depthQuery(now.minus(Duration.ofDays(5 * 365))));
 
@@ -201,7 +202,7 @@ class MetricHistoryIntegrationTest extends PostgresIntegrationTest {
 
     @Test
     void aGrantRemovedBetweenTwoReadsTurnsTheSecondIntoNotFound() {
-        UUID user = userWith(Permissions.CLUSTER_READ, Permissions.QUEUE_READ);
+        UUID user = userWith(Permissions.CLUSTER_READ, Permissions.SUBSCRIPTION_READ);
         var query = depthQuery(now.minusSeconds(900));
         assertThat(history.read(user, clusterId, query).series()).isNotEmpty();
 
@@ -216,7 +217,8 @@ class MetricHistoryIntegrationTest extends PostgresIntegrationTest {
     }
 
     private MetricQuery depthQuery(Instant from) {
-        return new MetricQuery(List.of("openbroker.backlog"), "QUEUE", "orders", from, now, null, null);
+        return new MetricQuery(
+                List.of("openbroker.backlog"), ResourceRef.subscription("orders"), from, now, null, null);
     }
 
     /** A user holding {@code permissions} on this cluster only; nobody is left signed in. */

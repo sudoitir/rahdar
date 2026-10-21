@@ -22,7 +22,7 @@ const flow = (id: string, state: string) => ({
   id,
   clusterId: 'c1',
   nodeId: null,
-  requestAddress: 'orders.request',
+  requestDestination: 'orders.request',
   replyDestination: null,
   replyKind: 'SHARED',
   state,
@@ -37,10 +37,10 @@ const FLOWS = [flow('f1', 'AWAITING_REPLY'), flow('f2', 'COMPLETED'), flow('f3',
 
 const EXPECTATION = {
   id: 'e1',
-  requestAddress: 'orders.request',
-  replyAddresses: ['orders.reply.*'],
-  resolvedReplyAddresses: ['orders.reply.a'],
-  replyAddressesCapped: false,
+  requestDestination: 'orders.request',
+  replyDestinations: ['orders.reply.*'],
+  resolvedReplyDestinations: ['orders.reply.a'],
+  replyDestinationsCapped: false,
   correlationProperty: null,
   deadlineMs: 30_000,
   samplePerMin: 10,
@@ -69,7 +69,7 @@ function bodyFor(path: string): unknown {
   if (path.endsWith('/rr/flows')) return paged(FLOWS);
   if (path.endsWith('/rr/expectations')) return paged([EXPECTATION]);
   if (path.endsWith('/rr/stats')) {
-    return { addresses: [{ address: 'orders.request', p50Ms: 20, p95Ms: 80, p99Ms: 120, coverageRatio: 0.5 }] };
+    return { destinations: [{ destination: 'orders.request', p50Ms: 20, p95Ms: 80, p99Ms: 120, coverageRatio: 0.5 }] };
   }
   if (path.endsWith('/rr/diagnostics')) return { expectations: [], reasons: [] };
   if (/\/clusters\/c1$/.test(path)) return CLUSTER;
@@ -114,7 +114,7 @@ const TABS = [
   { name: 'Stuck', search: '?tab=stuck', ready: 'Stuck flows', row: /^timed out$/ },
   { name: 'Latency', search: '?tab=latency', ready: 'Latency', row: /Sampled, not exhaustive/ },
   { name: 'Flows', search: '', ready: 'Flows', row: /^timed out$/ },
-  { name: 'Expectations', search: '?tab=expectations', ready: 'Traced addresses', row: /^or\s*ders\.request$/ },
+  { name: 'Expectations', search: '?tab=expectations', ready: 'Traced destinations', row: /^or\s*ders\.request$/ },
 ] as const;
 
 const WIDTHS = [

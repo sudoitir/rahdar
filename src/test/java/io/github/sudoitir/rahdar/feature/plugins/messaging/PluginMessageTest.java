@@ -2,6 +2,7 @@ package io.github.sudoitir.rahdar.feature.plugins.messaging;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import io.github.sudoitir.rahdar.kernel.security.ResourceRef;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.UUID;
@@ -11,9 +12,11 @@ class PluginMessageTest {
 
     private static final UUID CLUSTER = UUID.randomUUID();
     private static final UUID NODE = UUID.randomUUID();
+    private static final ResourceRef SOURCE = ResourceRef.subscription("q");
 
     private static PluginMessage message(byte[] body) {
-        return new PluginMessage("k", CLUSTER, NODE, "q", body, true, Map.of("h", 1), Map.of("p", "v"), 1);
+        return new PluginMessage(
+                "k", CLUSTER, SOURCE, new MessageRef(NODE, "1"), body, true, Map.of("h", 1), Map.of("p", "v"), 1);
     }
 
     @Test
@@ -30,30 +33,86 @@ class PluginMessageTest {
                 .isEqualTo(message(new byte[] {1}))
                 .isNotEqualTo("not a message")
                 .isNotEqualTo(new PluginMessage(
-                        "x", CLUSTER, NODE, "q", new byte[] {1}, true, Map.of("h", 1), Map.of("p", "v"), 1))
-                .isNotEqualTo(new PluginMessage(
-                        "k", UUID.randomUUID(), NODE, "q", new byte[] {1}, true, Map.of("h", 1), Map.of("p", "v"), 1))
-                .isNotEqualTo(new PluginMessage(
-                        "k",
+                        "x",
                         CLUSTER,
-                        UUID.randomUUID(),
-                        "q",
+                        SOURCE,
+                        new MessageRef(NODE, "1"),
                         new byte[] {1},
                         true,
                         Map.of("h", 1),
                         Map.of("p", "v"),
                         1))
                 .isNotEqualTo(new PluginMessage(
-                        "k", CLUSTER, NODE, "other", new byte[] {1}, true, Map.of("h", 1), Map.of("p", "v"), 1))
+                        "k",
+                        UUID.randomUUID(),
+                        SOURCE,
+                        new MessageRef(NODE, "1"),
+                        new byte[] {1},
+                        true,
+                        Map.of("h", 1),
+                        Map.of("p", "v"),
+                        1))
+                .isNotEqualTo(new PluginMessage(
+                        "k",
+                        CLUSTER,
+                        SOURCE,
+                        new MessageRef(UUID.randomUUID(), "1"),
+                        new byte[] {1},
+                        true,
+                        Map.of("h", 1),
+                        Map.of("p", "v"),
+                        1))
+                .isNotEqualTo(new PluginMessage(
+                        "k",
+                        CLUSTER,
+                        ResourceRef.subscription("other"),
+                        new MessageRef(NODE, "1"),
+                        new byte[] {1},
+                        true,
+                        Map.of("h", 1),
+                        Map.of("p", "v"),
+                        1))
                 .isNotEqualTo(message(new byte[] {2}))
                 .isNotEqualTo(new PluginMessage(
-                        "k", CLUSTER, NODE, "q", new byte[] {1}, false, Map.of("h", 1), Map.of("p", "v"), 1))
+                        "k",
+                        CLUSTER,
+                        SOURCE,
+                        new MessageRef(NODE, "1"),
+                        new byte[] {1},
+                        false,
+                        Map.of("h", 1),
+                        Map.of("p", "v"),
+                        1))
                 .isNotEqualTo(new PluginMessage(
-                        "k", CLUSTER, NODE, "q", new byte[] {1}, true, Map.of("h", 2), Map.of("p", "v"), 1))
+                        "k",
+                        CLUSTER,
+                        SOURCE,
+                        new MessageRef(NODE, "1"),
+                        new byte[] {1},
+                        true,
+                        Map.of("h", 2),
+                        Map.of("p", "v"),
+                        1))
                 .isNotEqualTo(new PluginMessage(
-                        "k", CLUSTER, NODE, "q", new byte[] {1}, true, Map.of("h", 1), Map.of("p", "w"), 1))
+                        "k",
+                        CLUSTER,
+                        SOURCE,
+                        new MessageRef(NODE, "1"),
+                        new byte[] {1},
+                        true,
+                        Map.of("h", 1),
+                        Map.of("p", "w"),
+                        1))
                 .isNotEqualTo(new PluginMessage(
-                        "k", CLUSTER, NODE, "q", new byte[] {1}, true, Map.of("h", 1), Map.of("p", "v"), 2));
+                        "k",
+                        CLUSTER,
+                        SOURCE,
+                        new MessageRef(NODE, "1"),
+                        new byte[] {1},
+                        true,
+                        Map.of("h", 1),
+                        Map.of("p", "v"),
+                        2));
     }
 
     @Test

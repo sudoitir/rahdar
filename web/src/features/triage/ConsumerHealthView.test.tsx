@@ -13,7 +13,7 @@ vi.mock('@tanstack/react-router', async (importOriginal) => ({
   useParams: () => ({ clusterId: 'c1' }),
   useSearch: () => currentSearch,
   useNavigate: () => navigateSpy,
-  // Queue names are links (ADR-0107); this view is rendered without a router here.
+  // Subscription names are links (ADR-0107); this view is rendered without a router here.
   Link: ({ children, ...rest }: { children: React.ReactNode }) => <a {...(rest as object)}>{children}</a>,
 }));
 
@@ -21,8 +21,8 @@ const { ConsumerHealthView } = await import('./ConsumerHealthView.tsx');
 
 function row(over: Record<string, unknown> = {}) {
   return {
-    address: 'orders',
-    queueName: 'orders',
+    destination: 'artemis.address/orders',
+    subscription: 'artemis.queue/orders',
     verdict: 'HEALTHY',
     severity: 0,
     cause: 'Keeping up with what arrives.',
@@ -64,8 +64,14 @@ describe('ConsumerHealthView', () => {
       http.get('*/api/v1/clusters/c1/consumer-health', () =>
         HttpResponse.json(
           page([
-            row({ queueName: 'broken', verdict: 'NO_CONSUMERS', severity: 4, consumers: 0, depth: 9000 }),
-            row({ queueName: 'stuck', verdict: 'STALLED', severity: 4, delivering: 30, depth: 5000 }),
+            row({
+              subscription: 'artemis.queue/broken',
+              verdict: 'NO_CONSUMERS',
+              severity: 4,
+              consumers: 0,
+              depth: 9000,
+            }),
+            row({ subscription: 'artemis.queue/stuck', verdict: 'STALLED', severity: 4, delivering: 30, depth: 5000 }),
           ]),
         ),
       ),
@@ -81,25 +87,33 @@ describe('ConsumerHealthView', () => {
     currentSearch = {};
     withCluster();
     server.use(
-      http.get('*/api/v1/clusters/c1/consumer-health', () => HttpResponse.json(page([row({ queueName: 'quiet' })]))),
+      http.get('*/api/v1/clusters/c1/consumer-health', () =>
+        HttpResponse.json(page([row({ subscription: 'artemis.queue/quiet' })])),
+      ),
     );
 
     renderWithProviders(<ConsumerHealthView />);
 
     expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
     expect(screen.getByRole('heading', { level: 1, name: 'Consumer health' })).toBeInTheDocument();
-    expect(screen.getByText('Reading queue health…')).toBeInTheDocument();
+    expect(screen.getByText('Reading subscription health…')).toBeInTheDocument();
     expect(await screen.findByText('Nothing on this page needs attention')).toBeInTheDocument();
   });
 
-  it('distinguishes an unmeasured queue from a healthy one', async () => {
+  it('distinguishes an unmeasured subscription from a healthy one', async () => {
     currentSearch = {};
     withCluster();
     server.use(
       http.get('*/api/v1/clusters/c1/consumer-health', () =>
         HttpResponse.json(
           page([
-            row({ queueName: 'new-queue', verdict: 'INSUFFICIENT_DATA', severity: 0, ackRate: null, addRate: null }),
+            row({
+              subscription: 'artemis.queue/new-subscription',
+              verdict: 'INSUFFICIENT_DATA',
+              severity: 0,
+              ackRate: null,
+              addRate: null,
+            }),
           ]),
         ),
       ),
@@ -117,7 +131,9 @@ describe('ConsumerHealthView', () => {
     withCluster();
     server.use(
       http.get('*/api/v1/clusters/c1/consumer-health', () =>
-        HttpResponse.json(page([row({ queueName: 'quiet', ackRate: null, depthSlopePerSecond: null })])),
+        HttpResponse.json(
+          page([row({ subscription: 'artemis.queue/quiet', ackRate: null, depthSlopePerSecond: null })]),
+        ),
       ),
     );
 
@@ -160,7 +176,7 @@ describe('ConsumerHealthView', () => {
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent('Rahdar failed to complete the request');
     expect(within(alert).getByRole('button', { name: 'Retry' })).toBeInTheDocument();
-    expect(screen.queryByText('No queues to report on yet')).not.toBeInTheDocument();
+    expect(screen.queryByText('No subscriptions to report on yet')).not.toBeInTheDocument();
   });
 
   it('offers to clear a filter that matched nothing', async () => {
@@ -170,6 +186,6 @@ describe('ConsumerHealthView', () => {
 
     renderWithProviders(<ConsumerHealthView />);
 
-    expect(await screen.findByText(/No queue matches "nope"/)).toBeInTheDocument();
+    expect(await screen.findByText(/No subscription matches "nope"/)).toBeInTheDocument();
   });
 });

@@ -247,14 +247,14 @@ class TransferRunStoreTest extends PostgresIntegrationTest {
     @Test
     void refusesAnExecuteMissingAPrimitive() throws Exception {
         execute(source, preview(TransferMode.COPY, "orders"), """
-                        {"planHash":"hash","acknowledged":[],"confirmQueue":null}
+                        {"planHash":"hash","acknowledged":[],"confirmSubscription":null}
                         """).andExpect(status().isBadRequest());
     }
 
     @Test
     void refusesAPlanThatWasNotPreviewed() throws Exception {
         execute(source, preview(TransferMode.COPY, "orders"), """
-                        {"planHash":"other","override":false,"acknowledged":[],"confirmQueue":null}
+                        {"planHash":"other","override":false,"acknowledged":[],"confirmSubscription":null}
                         """)
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.type").value(endsWith("transfer-plan-mismatch")));
@@ -266,7 +266,7 @@ class TransferRunStoreTest extends PostgresIntegrationTest {
                 preview(TransferMode.COPY, "orders", NO_WARNINGS, Instant.now().minusSeconds(1));
 
         execute(source, run, """
-                        {"planHash":"hash","override":false,"acknowledged":[],"confirmQueue":null}
+                        {"planHash":"hash","override":false,"acknowledged":[],"confirmSubscription":null}
                         """)
                 .andExpect(status().isGone())
                 .andExpect(jsonPath("$.type").value(endsWith("transfer-preview-expired")));
@@ -281,7 +281,7 @@ class TransferRunStoreTest extends PostgresIntegrationTest {
                 Instant.now().plusSeconds(600));
 
         execute(source, run, """
-                        {"planHash":"hash","override":false,"acknowledged":[],"confirmQueue":null}
+                        {"planHash":"hash","override":false,"acknowledged":[],"confirmSubscription":null}
                         """)
                 .andExpect(status().isUnprocessableContent())
                 .andExpect(jsonPath("$.type").value(endsWith("transfer-refused")));
@@ -297,7 +297,7 @@ class TransferRunStoreTest extends PostgresIntegrationTest {
                 Instant.now().plusSeconds(600));
 
         execute(source, run, """
-                        {"planHash":"hash","override":false,"acknowledged":[],"confirmQueue":null}
+                        {"planHash":"hash","override":false,"acknowledged":[],"confirmSubscription":null}
                         """)
                 .andExpect(status().isUnprocessableContent())
                 .andExpect(jsonPath("$.type").value(endsWith("transfer-unacknowledged")))
@@ -307,7 +307,7 @@ class TransferRunStoreTest extends PostgresIntegrationTest {
     @Test
     void refusesAnUnconfirmedMove() throws Exception {
         execute(source, preview(TransferMode.MOVE, "orders"), """
-                        {"planHash":"hash","override":false,"acknowledged":[],"confirmQueue":"order"}
+                        {"planHash":"hash","override":false,"acknowledged":[],"confirmSubscription":"order"}
                         """)
                 .andExpect(status().isUnprocessableContent())
                 .andExpect(jsonPath("$.type").value(endsWith("transfer-confirmation-mismatch")));
@@ -320,7 +320,7 @@ class TransferRunStoreTest extends PostgresIntegrationTest {
                 preview(TransferMode.COPY, "busy").getId(), Set.of(TransferState.PREVIEWED), TransferState.RUNNING);
 
         execute(source, preview(TransferMode.MOVE, "orders"), """
-                        {"planHash":"hash","override":false,"acknowledged":[],"confirmQueue":"orders"}
+                        {"planHash":"hash","override":false,"acknowledged":[],"confirmSubscription":"orders"}
                         """)
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.type").value(endsWith("transfer-concurrency-limit")));

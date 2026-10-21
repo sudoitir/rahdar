@@ -162,7 +162,7 @@ export function FindingCard({
 
         <div className={classes.controls}>
           {f.appliable ? (
-            <Link to={`/clusters/${clusterId}/configuration`} className={linkClasses.link}>
+            <Link to={`/clusters/${clusterId}/artemis/configuration`} className={linkClasses.link}>
               Apply it in Broker configuration
             </Link>
           ) : null}

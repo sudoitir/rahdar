@@ -62,7 +62,7 @@ class GateTestKit {
 
     /** What the estimate reports, so a test can change the state key or count between request and run. */
     static final class TestState {
-        volatile String stateKey = "state-1";
+        volatile String etag = "state-1";
         volatile long count = 7;
         volatile int purgeVersion = 1;
     }
@@ -279,7 +279,7 @@ class GateTestKit {
 
             @Override
             public Effect estimate(PurgeParams params) {
-                return new Effect(state.count, "messages", state.stateKey + ":" + params.queue(), null);
+                return new Effect(state.count, "messages", state.etag + ":" + params.queue(), null);
             }
 
             @Override

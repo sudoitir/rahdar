@@ -26,7 +26,7 @@ const flow = (id: string, state: string, over: Record<string, unknown> = {}) => 
   id,
   clusterId: 'c1',
   nodeId: null,
-  requestAddress: 'orders.request',
+  requestDestination: 'orders.request',
   replyDestination: null,
   replyKind: 'SHARED',
   state,
@@ -46,10 +46,10 @@ const FLOWS = [
 
 const EXPECTATION = {
   id: 'e1',
-  requestAddress: 'orders.request',
-  replyAddresses: ['orders.reply.*'],
-  resolvedReplyAddresses: [],
-  replyAddressesCapped: false,
+  requestDestination: 'orders.request',
+  replyDestinations: ['orders.reply.*'],
+  resolvedReplyDestinations: [],
+  replyDestinationsCapped: false,
   correlationProperty: null,
   deadlineMs: 30_000,
   samplePerMin: 10,
@@ -74,13 +74,13 @@ const DIAGNOSTICS = {
   expectations: [
     {
       expectationId: 'e1',
-      requestAddress: 'orders.request',
+      requestDestination: 'orders.request',
       enabled: true,
       lastAttemptAt: '2026-09-06T12:00:00Z',
       lastSuccessAt: '2026-09-06T12:00:00Z',
       nodesSampled: 1,
       nodesTotal: 2,
-      skipped: ["broker-2: no queue for address 'orders.request' in the last scrape"],
+      skipped: ["broker-2: no subscription for destination 'orders.request' in the last scrape"],
       messagesBrowsed: 4,
       observations: 1,
       lastError: null,
@@ -120,13 +120,13 @@ function seeded(flows: readonly unknown[]): QueryClient {
     ...flow('f2', 'COMPLETED', { latencyMs: 42, latencySource: 'OBSERVED', latencyBoundMs: 100, requestSkewMs: 1500 }),
     events: [
       { seq: 1, ts: '2026-09-04T10:00:00.000Z', kind: 'REQUEST_SEEN', nodeId: null, detail: null },
-      { seq: 2, ts: '2026-09-04T10:00:01.000Z', kind: 'REPLY_SEEN', nodeId: null, detail: { queue: 'reply.q' } },
+      { seq: 2, ts: '2026-09-04T10:00:01.000Z', kind: 'REPLY_SEEN', nodeId: null, detail: { subscription: 'reply.q' } },
     ],
   });
   client.setQueryData(['clusters', 'c1', 'rr', 'expectations'], [EXPECTATION]);
   client.setQueryData(['clusters', 'c1', 'rr', 'diagnostics'], DIAGNOSTICS);
   client.setQueryData(['clusters', 'c1', 'rr', 'stats', 'PT15M'], {
-    addresses: [{ address: 'orders.request', p50Ms: 20, p95Ms: 80, p99Ms: 120, coverageRatio: 0.5 }],
+    destinations: [{ destination: 'orders.request', p50Ms: 20, p95Ms: 80, p99Ms: 120, coverageRatio: 0.5 }],
   });
   return client;
 }
@@ -145,7 +145,7 @@ const TABS = [
   { name: 'Flows, with none yet', search: '', ready: 'No flows to show — here is what Rahdar did', flows: [] },
   { name: 'Stuck', search: '?tab=stuck', ready: 'Stuck flows', flows: FLOWS },
   { name: 'Latency', search: '?tab=latency', ready: 'Latency', flows: FLOWS },
-  { name: 'Expectations', search: '?tab=expectations', ready: 'Traced addresses', flows: FLOWS },
+  { name: 'Expectations', search: '?tab=expectations', ready: 'Traced destinations', flows: FLOWS },
 ] as const;
 
 describe.each(TABS)('Request-reply tracing, $name', ({ search, ready, flows }) => {
@@ -195,7 +195,7 @@ describe.each(SCHEMES)('Request-reply tracing dialogs in the %s scheme', (scheme
     expect(await axeViolations(drawer)).toEqual([]);
   });
 
-  it('asks for the address to be typed before stopping tracing, with no accessibility violations', async () => {
+  it('asks for the destination to be typed before stopping tracing, with no accessibility violations', async () => {
     renderThemed(
       <QueryClientProvider client={seeded(FLOWS)}>
         <Frame width={contentWidth(1280)} height={1200}>
@@ -205,7 +205,7 @@ describe.each(SCHEMES)('Request-reply tracing dialogs in the %s scheme', (scheme
       scheme,
     );
     await userEvent.click(await screen.findByRole('button', { name: 'Remove orders.request' }));
-    const dialog = await opened('Stop tracing this address');
+    const dialog = await opened('Stop tracing this destination');
 
     expect(await axeViolations(dialog)).toEqual([]);
   });

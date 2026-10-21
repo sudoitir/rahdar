@@ -223,7 +223,7 @@ export function RuleForm({
             allowDeselect={false}
             disabled={installation}
           />
-          <TextInput label="Name" placeholder="Deep order queue" {...form.getInputProps('name')} />
+          <TextInput label="Name" placeholder="Deep order backlog" {...form.getInputProps('name')} />
 
           {kind === 'METRIC_THRESHOLD' ? (
             <>
@@ -272,7 +272,7 @@ export function RuleForm({
           ) : null}
           {kind === 'METRIC_THRESHOLD' && pluginMetric ? (
             <Text size="xs" c="dimmed" className={`${classes.wide} ${classes.help}`}>
-              {pluginMetric.description} Published by the {pluginMetric.plugin} plugin and sampled on every queue
+              {pluginMetric.description} Published by the {pluginMetric.plugin} plugin and sampled on every subscription
               scrape; the rule fires per {pluginMetric.subject}.
             </Text>
           ) : null}

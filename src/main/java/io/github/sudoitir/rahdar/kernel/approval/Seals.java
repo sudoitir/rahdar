@@ -40,7 +40,7 @@ class Seals {
             AuthKind authKind,
             UUID tokenId,
             String policyDigest,
-            String stateKey) {}
+            String etag) {}
 
     /** What the decision seal binds. {@code decidedAt} is ISO-8601, as the database stores it. */
     record Decision(UUID approverId, Vote vote, String decidedAt) {}

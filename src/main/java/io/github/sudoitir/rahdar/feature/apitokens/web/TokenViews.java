@@ -23,12 +23,12 @@ public final class TokenViews {
             @Schema(nullable = true) UUID scopeId,
 
             @Schema(
-                    description = "QUEUE or ADDRESS: limits the grant to names matching resourcePattern",
+                    description = "SUBSCRIPTION or DESTINATION: limits the grant to names matching resourcePattern",
                     nullable = true)
-            String resourceKind,
+            String resourceType,
 
             @Schema(
-                    description = "An Artemis wildcard pattern, with resourceKind; absent for the whole scope",
+                    description = "An Artemis wildcard pattern, with resourceType; absent for the whole scope",
                     nullable = true)
             String resourcePattern) {}
 
@@ -44,7 +44,7 @@ public final class TokenViews {
             @Schema(requiredMode = REQUIRED) String action,
             @Schema(requiredMode = REQUIRED) String scopeType,
             @Schema(requiredMode = REQUIRED) UUID scopeId,
-            @Schema(nullable = true) String resourceKind,
+            @Schema(nullable = true) String resourceType,
             @Schema(nullable = true) String resourcePattern) {}
 
     /**

@@ -20,7 +20,7 @@ import org.springframework.web.bind.annotation.RestController;
  * least two chosen nodes.
  */
 @RestController
-@RequestMapping("/clusters/{clusterId}/config-diff")
+@RequestMapping("/clusters/{clusterId}/artemis/config-diff")
 @RequiredArgsConstructor
 public class ConfigDiffController {
 

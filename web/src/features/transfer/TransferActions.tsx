@@ -12,7 +12,7 @@ import { TransferDialog } from './TransferDialog.tsx';
 /** An empty selection is one more reason a control cannot act, explained like the others. */
 function withSelection(gate: GateVerdict, total: number | null): GateVerdict {
   return gate.kind === 'allowed' && total === 0
-    ? { kind: 'blocked', reason: 'There are no messages to transfer: the queue is empty.' }
+    ? { kind: 'blocked', reason: 'There are no messages to transfer: the subscription is empty.' }
     : gate;
 }
 
@@ -23,7 +23,7 @@ function withSelection(gate: GateVerdict, total: number | null): GateVerdict {
  */
 export function TransferActions({
   clusterId,
-  queueName,
+  subscription,
   node,
   selection,
   total,
@@ -64,7 +64,7 @@ export function TransferActions({
   const dialog = (redistribute: boolean) => (
     <TransferDialog
       clusterId={clusterId}
-      queueName={queueName}
+      subscriptionName={subscription.name}
       node={node}
       selection={selection}
       total={total}

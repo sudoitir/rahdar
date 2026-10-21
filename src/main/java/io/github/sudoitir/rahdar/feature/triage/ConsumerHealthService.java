@@ -5,13 +5,13 @@ import io.github.sudoitir.openbroker.notification.EventTypes;
 import io.github.sudoitir.rahdar.feature.events.BrokerEventService;
 import io.github.sudoitir.rahdar.feature.events.web.EventViews.BrokerEventView;
 import io.github.sudoitir.rahdar.feature.resources.CrossNodeAggregator;
-import io.github.sudoitir.rahdar.feature.resources.web.ResourceViews.QueueNodeCell;
-import io.github.sudoitir.rahdar.feature.resources.web.ResourceViews.QueueView;
+import io.github.sudoitir.rahdar.feature.resources.web.ResourceViews.SubscriptionNodeCell;
+import io.github.sudoitir.rahdar.feature.resources.web.ResourceViews.SubscriptionView;
 import io.github.sudoitir.rahdar.feature.triage.ConsumerHealth.Source;
 import io.github.sudoitir.rahdar.feature.triage.ConsumerHealth.Verdict;
 import io.github.sudoitir.rahdar.kernel.core.PagedView;
 import io.github.sudoitir.rahdar.kernel.core.ResourceQuery;
-import io.github.sudoitir.rahdar.kernel.plugin.ResourceKind;
+import io.github.sudoitir.rahdar.kernel.plugin.ResourceType;
 import io.github.sudoitir.rahdar.kernel.security.ClusterAccessGuard;
 import io.github.sudoitir.rahdar.kernel.security.PermissionResolver;
 import io.github.sudoitir.rahdar.kernel.security.Permissions;
@@ -74,11 +74,11 @@ public class ConsumerHealthService {
     @Transactional(readOnly = true)
     public PagedView<ConsumerHealth> page(UUID clusterId, ResourceQuery query) {
         clusterAccess.requireVisible(clusterId);
-        ResourceFilter readable = permissions.filter(clusterId, ResourceKind.QUEUE);
+        ResourceFilter readable = permissions.filter(clusterId, ResourceType.SUBSCRIPTION);
         List<ConsumerHealth> rows = evaluated(clusterId);
         List<ConsumerHealth> matched = rows.stream()
-                .filter(h -> readable.readable(h.queueName()))
-                .filter(h -> query.matches(h.queueName()) || query.matches(h.address()))
+                .filter(h -> readable.readable(h.subscription()))
+                .filter(h -> query.matches(h.subscription()) || query.matches(h.destination()))
                 .toList();
         if (query.sortField() == null) {
             // Worst first, then the biggest backlog, then by name so the order is stable
@@ -91,10 +91,10 @@ public class ConsumerHealthService {
 
     /** One queue's verdict, for the drawer panel and the {@code diagnose} tool. */
     @Transactional(readOnly = true)
-    public Optional<ConsumerHealth> forQueue(UUID clusterId, String queueName) {
-        clusterAccess.requireResource(clusterId, ResourceRef.queue(queueName), Permissions.QUEUE_READ);
+    public Optional<ConsumerHealth> forSubscription(UUID clusterId, String queueName) {
+        clusterAccess.requireResource(clusterId, ResourceRef.subscription(queueName), Permissions.SUBSCRIPTION_READ);
         return evaluated(clusterId).stream()
-                .filter(h -> h.queueName().equals(queueName))
+                .filter(h -> h.subscription().equals(queueName))
                 .findFirst();
     }
 
@@ -114,10 +114,10 @@ public class ConsumerHealthService {
         // Unguarded on purpose: this is also the scheduler's path. The alert evaluator
         // runs on a scrape thread with no authenticated principal, so a permission check
         // here protects nothing and fails as a 404 about a cluster that plainly exists.
-        // The guard belongs at the request boundary — page() and forQueue() apply it —
+        // The guard belongs at the request boundary — page() and forSubscription() apply it —
         // which is the same split the other alert conditions make by reading
         // subscription_snapshot directly.
-        List<QueueView> rows = queues.rollUp(clusterId);
+        List<SubscriptionView> rows = queues.rollUp(clusterId);
 
         Instant to = Instant.now();
         Instant from = to.minus(scrape.tierBInterval().multipliedBy(2));
@@ -133,19 +133,18 @@ public class ConsumerHealthService {
     }
 
     private ConsumerHealth classify(
-            QueueView row,
+            SubscriptionView row,
             Map<String, SubjectRate> addRates,
             Map<String, SubjectRate> ackRates,
             Map<String, Double> slopes,
             Map<String, BrokerEventView> brokerSlow) {
 
-        Builder b = new Builder(
-                row, addRates.get(row.queueName()), ackRates.get(row.queueName()), slopes.get(row.queueName()));
+        Builder b = new Builder(row, addRates.get(row.name()), ackRates.get(row.name()), slopes.get(row.name()));
 
         boolean backlog = row.totalMessageCount() >= properties.minBacklog();
         boolean acking = b.ackRate != null && b.ackRate > properties.idleAckRate();
 
-        ConsumerHealth verdict = unmeasuredOrUnattended(b, backlog, brokerSlow.get(row.address()));
+        ConsumerHealth verdict = unmeasuredOrUnattended(b, backlog, brokerSlow.get(row.destinationName()));
         if (verdict == null) {
             verdict = notAcknowledging(b, backlog, acking);
         }
@@ -154,21 +153,21 @@ public class ConsumerHealthService {
 
     /** Rungs 1-4 of the ladder: no rate to reason from, paused, nobody attached, or the broker's own word. */
     private static ConsumerHealth unmeasuredOrUnattended(Builder b, boolean backlog, BrokerEventView slow) {
-        QueueView row = b.row;
+        SubscriptionView row = b.row;
         // 1. No computable rate. Checked first: every verdict below reasons about rates,
         //    and guessing from a depth alone is how "looks healthy" happens.
         if (b.ackRate == null && b.addRate == null) {
             return b.verdict(
                     Verdict.INSUFFICIENT_DATA,
                     "Not enough samples yet to measure throughput. A rate needs two sweeps of this"
-                            + " queue; one more sweep will settle it.");
+                            + " subscription; one more sweep will settle it.");
         }
 
-        // 2. Paused. Ahead of every consumer verdict: a paused queue holds a backlog with
+        // 2. Paused. Ahead of every consumer verdict: a paused subscription holds a backlog with
         //    no acknowledgements by design, which is indistinguishable from a stall by
         //    signal alone and entirely different in what the operator should do.
         if (row.paused()) {
-            boolean everywhere = row.perNode().stream().allMatch(QueueNodeCell::paused);
+            boolean everywhere = row.perNode().stream().allMatch(SubscriptionNodeCell::paused);
             return b.verdict(
                     Verdict.PAUSED,
                     everywhere
@@ -181,7 +180,7 @@ public class ConsumerHealthService {
         if (row.totalConsumerCount() == 0 && backlog) {
             return b.verdict(
                     Verdict.NO_CONSUMERS,
-                    "No consumers are attached, so nothing is draining this queue. Start or fix the"
+                    "No consumers are attached, so nothing is draining this subscription. Start or fix the"
                             + " consuming application.");
         }
 
@@ -190,7 +189,7 @@ public class ConsumerHealthService {
             return b.broker(slow.consumerName())
                     .verdict(
                             Verdict.BROKER_SLOW,
-                            "The broker's own slow-consumer detection fired for this address"
+                            "The broker's own slow-consumer detection fired for this subscription"
                                     + (slow.consumerName() == null ? "" : " (consumer " + slow.consumerName() + ")")
                                     + ". Its threshold is authoritative; check that consumer.");
         }
@@ -203,7 +202,7 @@ public class ConsumerHealthService {
      * to opposite investigations.
      */
     private static ConsumerHealth notAcknowledging(Builder b, boolean backlog, boolean acking) {
-        QueueView row = b.row;
+        SubscriptionView row = b.row;
         if (row.totalConsumerCount() > 0 && backlog && !acking) {
             if (row.totalDeliveringCount() > 0) {
                 return b.verdict(
@@ -266,10 +265,11 @@ public class ConsumerHealthService {
         List<BrokerEventView> recent = brokerEvents.recentOfType(
                 clusterId, BROKER_SLOW_EVENT, now.minus(properties.brokerSlowWindow()), now, BROKER_SLOW_CAP);
         for (BrokerEventView e : recent) {
-            if (e.address() == null) {
+            if (e.destination() == null) {
                 continue;
             }
-            byAddress.merge(e.address(), e, (a, bEvent) -> a.occurredAt().isAfter(bEvent.occurredAt()) ? a : bEvent);
+            byAddress.merge(
+                    e.destination(), e, (a, bEvent) -> a.occurredAt().isAfter(bEvent.occurredAt()) ? a : bEvent);
         }
         return byAddress;
     }
@@ -299,13 +299,13 @@ public class ConsumerHealthService {
         return Comparator.<ConsumerHealth>comparingInt(h -> -h.verdict().severity())
                 .thenComparing(h -> h.verdict() == Verdict.INSUFFICIENT_DATA ? 0 : 1)
                 .thenComparing(Comparator.comparingLong(ConsumerHealth::depth).reversed())
-                .thenComparing(ConsumerHealth::queueName);
+                .thenComparing(ConsumerHealth::subscription);
     }
 
     private static Comparator<ConsumerHealth> comparatorFor(String field) {
         return switch (field) {
-            case "queueName" -> Comparator.comparing(ConsumerHealth::queueName);
-            case "address" -> Comparator.comparing(ConsumerHealth::address);
+            case "subscription" -> Comparator.comparing(ConsumerHealth::subscription);
+            case "destination" -> Comparator.comparing(ConsumerHealth::destination);
             case "depth" -> Comparator.comparingLong(ConsumerHealth::depth);
             case "consumers" -> Comparator.comparingLong(ConsumerHealth::consumers);
             case "delivering" -> Comparator.comparingLong(ConsumerHealth::delivering);
@@ -320,7 +320,7 @@ public class ConsumerHealthService {
      * arguments, and the ladder — the part worth reading — disappears into them.
      */
     private static final class Builder {
-        private final QueueView row;
+        private final SubscriptionView row;
         private final Double addRate;
         private final Double ackRate;
         private final Double netRate;
@@ -332,7 +332,7 @@ public class ConsumerHealthService {
         private String brokerConsumerName;
         private Duration eta;
 
-        private Builder(QueueView row, SubjectRate add, SubjectRate ack, Double slope) {
+        private Builder(SubscriptionView row, SubjectRate add, SubjectRate ack, Double slope) {
             this.row = row;
             this.addRate = add == null ? null : add.rate();
             this.ackRate = ack == null ? null : ack.rate();
@@ -344,7 +344,7 @@ public class ConsumerHealthService {
             // freshest thing the verdict rests on, not of an arbitrary one of the two.
             this.asOf = newest(add, ack);
             this.span = longestSpan(add, ack);
-            this.stale = row.perNode().stream().anyMatch(QueueNodeCell::stale);
+            this.stale = row.perNode().stream().anyMatch(SubscriptionNodeCell::stale);
         }
 
         private static Instant newest(SubjectRate a, SubjectRate b) {
@@ -379,8 +379,8 @@ public class ConsumerHealthService {
 
         private ConsumerHealth verdict(Verdict verdict, String cause) {
             return new ConsumerHealth(
-                    row.address(),
-                    row.queueName(),
+                    row.destinationName(),
+                    row.name(),
                     verdict,
                     cause,
                     verdict == Verdict.BROKER_SLOW ? Source.BROKER : Source.DERIVED,

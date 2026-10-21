@@ -7,7 +7,7 @@ import type { NavGroupId } from './nav/groups.ts';
 import type { SlotContributions } from './slots.ts';
 
 /** The extension contract version, shared with the backend's `Contract.VERSION` (ADR-0070). */
-export const CONTRACT = 16;
+export const CONTRACT = 17;
 
 /** The module ids the backend manifest reports. A frontend feature uses the same id as its backend module. */
 export const FEATURE_IDS = [
@@ -25,7 +25,6 @@ export const FEATURE_IDS = [
   'scrape',
   'artemis',
   'mcp',
-  'queues',
   'resources',
   'messages',
   'routing',
@@ -79,6 +78,12 @@ export interface NavContribution {
   icon: Icon;
   /** The view's path below `/clusters/$clusterId/`. */
   path: string;
+  /**
+   * The id of the broker system the view is for (`artemis`). Without it the view applies to every system; with
+   * it, the navigation lists the view only for a cluster that runs that system, and its route is under
+   * `/clusters/$clusterId/<system>/`, which another system's cluster answers with the not-found page.
+   */
+  system?: string;
   /**
    * The permission the view reads with. Without it the entry stays visible and disabled,
    * and says why; the server enforces it regardless.

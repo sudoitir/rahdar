@@ -11,9 +11,9 @@ import { focusFirstInvalid } from '../../ui/formErrors.ts';
 import { notify, type ActionVerb } from '../../ui/notify.ts';
 import { Section } from '../../ui/Section.tsx';
 import { DataTable } from '../../ui/table/index.ts';
-import { AddressPicker } from '../queues/index.ts';
+import { DestinationPicker } from '../resources/index.ts';
 import { CaptureHint } from '../sql/index.ts';
-import { ReplyAddressesHelp, ReplyAddressesInput } from './ReplyAddressesInput.tsx';
+import { ReplyDestinationsHelp, ReplyDestinationsInput } from './ReplyDestinationsInput.tsx';
 import {
   useCreateRrExpectation,
   useDeleteRrExpectation,
@@ -50,7 +50,7 @@ function samplesProblem(samplePerMin: Figure): string | null {
   return isWhole(samplePerMin) && samplePerMin >= 1 ? null : 'Enter how many samples to take a minute, 1 or more.';
 }
 
-/** Which request addresses are traced, and how (request-reply-tracing spec). */
+/** Which request destinations are traced, and how (request-reply-tracing spec). */
 export function ExpectationsView({ clusterId }: Readonly<{ clusterId: string }>) {
   const expectations = useRrExpectations(clusterId);
   // What the sampler actually did, so "tracing is on" and "tracing is working" stop
@@ -70,34 +70,34 @@ export function ExpectationsView({ clusterId }: Readonly<{ clusterId: string }>)
   const [removeOpen, setRemoveOpen] = useState(false);
 
   const form = useForm<{
-    requestAddress: string;
-    replyAddresses: string[];
+    requestDestination: string;
+    replyDestinations: string[];
     deadlineMs: Figure;
     samplePerMin: Figure;
     capturePayload: boolean;
   }>({
     initialValues: {
-      requestAddress: '',
-      replyAddresses: [],
+      requestDestination: '',
+      replyDestinations: [],
       deadlineMs: '',
       samplePerMin: DEFAULT_SAMPLES,
       capturePayload: false,
     },
     validateInputOnBlur: true,
     validate: {
-      requestAddress: (v) => (v.trim() ? null : 'Enter the request address to trace, such as orders.request.'),
+      requestDestination: (v) => (v.trim() ? null : 'Enter the request destination to trace, such as orders.request.'),
       deadlineMs: deadlineProblem,
       samplePerMin: samplesProblem,
     },
   });
 
   const submit = form.onSubmit((values) => {
-    const address = values.requestAddress.trim();
-    const subject = `traced address ${address}`;
+    const destination = values.requestDestination.trim();
+    const subject = `traced destination ${destination}`;
     create.mutate(
       {
-        requestAddress: address,
-        replyAddresses: values.replyAddresses,
+        requestDestination: destination,
+        replyDestinations: values.replyDestinations,
         correlationProperty: undefined,
         deadlineMs: isWhole(values.deadlineMs) ? values.deadlineMs : undefined,
         samplePerMin: isWhole(values.samplePerMin) ? values.samplePerMin : DEFAULT_SAMPLES,
@@ -113,7 +113,7 @@ export function ExpectationsView({ clusterId }: Readonly<{ clusterId: string }>)
             action: ADD,
             subject,
             cause: error.message,
-            next: 'Nothing was added. Check the address and try again.',
+            next: 'Nothing was added. Check the destination and try again.',
           }),
       },
     );
@@ -121,12 +121,12 @@ export function ExpectationsView({ clusterId }: Readonly<{ clusterId: string }>)
 
   const toggle = (e: ExpectationView, enabled: boolean) => {
     const action = enabled ? ENABLE : DISABLE;
-    const subject = `tracing of ${e.requestAddress}`;
+    const subject = `tracing of ${e.requestDestination}`;
     update.mutate(
       {
         id: e.id,
         body: {
-          replyAddresses: e.replyAddresses,
+          replyDestinations: e.replyDestinations,
           correlationProperty: e.correlationProperty ?? undefined,
           deadlineMs: e.deadlineMs ?? undefined,
           samplePerMin: e.samplePerMin,
@@ -151,11 +151,11 @@ export function ExpectationsView({ clusterId }: Readonly<{ clusterId: string }>)
 
   const confirmRemove = (e: ExpectationView) =>
     remove.mutate(e.id, {
-      onSuccess: () => notify.succeeded({ action: REMOVE, subject: `traced address ${e.requestAddress}` }),
+      onSuccess: () => notify.succeeded({ action: REMOVE, subject: `traced destination ${e.requestDestination}` }),
       onError: (error) =>
         notify.settle(error, {
           action: REMOVE,
-          subject: `traced address ${e.requestAddress}`,
+          subject: `traced destination ${e.requestDestination}`,
           cause: error.message,
           next: 'It is still listed; reload to see its current state.',
         }),
@@ -181,8 +181,8 @@ export function ExpectationsView({ clusterId }: Readonly<{ clusterId: string }>)
 
   return (
     <Section
-      title="Traced addresses"
-      description="Declare which request-reply addresses Rahdar should reconstruct flows for. Tracing is sampled — see the Latency tab for what that means for reported numbers."
+      title="Traced destinations"
+      description="Declare which request-reply destinations Rahdar should reconstruct flows for. Tracing is sampled — see the Latency tab for what that means for reported numbers."
     >
       {denied ? (
         <Text size="sm" role="status">
@@ -190,21 +190,21 @@ export function ExpectationsView({ clusterId }: Readonly<{ clusterId: string }>)
         </Text>
       ) : null}
 
-      <Section headingLevel={3} title="Add an address">
+      <Section headingLevel={3} title="Add a destination">
         <form className={classes.form} noValidate onSubmit={submit}>
-          <AddressPicker
+          <DestinationPicker
             clusterId={clusterId}
-            label="Request address"
+            label="Request destination"
             placeholder="orders.request"
-            {...form.getInputProps('requestAddress')}
-            value={form.values.requestAddress}
-            unknownHint="No address on this cluster has that name yet."
+            {...form.getInputProps('requestDestination')}
+            value={form.values.requestDestination}
+            unknownHint="No destination on this cluster has that name yet."
             w="100%"
           />
-          <ReplyAddressesInput
+          <ReplyDestinationsInput
             clusterId={clusterId}
-            value={form.values.replyAddresses}
-            onChange={(next) => form.setFieldValue('replyAddresses', next)}
+            value={form.values.replyDestinations}
+            onChange={(next) => form.setFieldValue('replyDestinations', next)}
             w="100%"
           />
           <NumberInput
@@ -222,7 +222,7 @@ export function ExpectationsView({ clusterId }: Readonly<{ clusterId: string }>)
             </Button>
           </div>
           <div className={classes.help}>
-            <ReplyAddressesHelp clusterId={clusterId} value={form.values.replyAddresses} />
+            <ReplyDestinationsHelp clusterId={clusterId} value={form.values.replyDestinations} />
           </div>
         </form>
       </Section>
@@ -230,16 +230,16 @@ export function ExpectationsView({ clusterId }: Readonly<{ clusterId: string }>)
       <CaptureHint
         clusterId={clusterId}
         purpose="request-reply tracing"
-        addresses={(expectations.data ?? [])
+        destinations={(expectations.data ?? [])
           .filter((e) => e.enabled)
-          .flatMap((e) => [e.requestAddress, ...e.resolvedReplyAddresses])}
+          .flatMap((e) => [e.requestDestination, ...e.resolvedReplyDestinations])}
       />
 
-      <Section headingLevel={3} title="Declared addresses">
+      <Section headingLevel={3} title="Declared destinations">
         <Stack gap="sm">
           <DataTable
             variant="static"
-            label="Traced addresses"
+            label="Traced destinations"
             storageKey="rr.expectations"
             columns={columns}
             data={expectations.data ?? []}
@@ -253,8 +253,8 @@ export function ExpectationsView({ clusterId }: Readonly<{ clusterId: string }>)
             empty={
               <EmptyState
                 kind="empty"
-                title="No addresses declared yet"
-                description="Traffic on this cluster is not being traced. A declared address is a request address Rahdar reconstructs request-reply flows for; add one with the form above."
+                title="No destinations declared yet"
+                description="Traffic on this cluster is not being traced. A declared destination is a request destination Rahdar reconstructs request-reply flows for; add one with the form above."
               />
             }
           />
@@ -264,16 +264,16 @@ export function ExpectationsView({ clusterId }: Readonly<{ clusterId: string }>)
       <ConfirmDialog
         opened={removeOpen}
         onClose={() => setRemoveOpen(false)}
-        title="Stop tracing this address"
+        title="Stop tracing this destination"
         tone="danger"
         pending={remove.isPending}
         confirmLabel="Stop tracing"
         consequence={
           removing ? (
             <>
-              Rahdar stops reconstructing request-reply flows for <strong>{removing.requestAddress}</strong>. Its
-              settings (reply addresses, deadline, sample rate and payload capture) are deleted and cannot be restored.
-              Flows already recorded stay.
+              Rahdar stops reconstructing request-reply flows for <strong>{removing.requestDestination}</strong>. Its
+              settings (reply destinations, deadline, sample rate and payload capture) are deleted and cannot be
+              restored. Flows already recorded stay.
             </>
           ) : null
         }

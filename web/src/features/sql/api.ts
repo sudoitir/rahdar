@@ -46,7 +46,7 @@ export function useSqlPlan(clusterId: string, sql: string): UseQueryResult<SqlPl
 }
 
 /**
- * Ask the broker whether one indexed row is still on its queue.
+ * Ask the broker whether one indexed row is still on its subscription.
  *
  * <p>A mutation rather than a query, because it costs a broker read and answers
  * about a moment rather than about a resource: caching the verdict would be
@@ -59,9 +59,9 @@ export function useVerifyOnBroker(clusterId: string) {
         method: 'POST',
         body: JSON.stringify({
           nodeId: row.nodeId,
-          queueName: row.queueName,
+          subscription: row.subscription,
           // A captured row's own messageId belongs to the diverted copy, which never
-          // existed on the source queue. The id to ask the broker about is the source
+          // existed on the source subscription. The id to ask the broker about is the source
           // one the divert copied across (ADR-0062 D2).
           messageId: row.origin === 'CAPTURED' ? row.sourceMessageId : row.messageId,
           timestamp: row.timestamp,

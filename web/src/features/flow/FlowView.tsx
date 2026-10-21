@@ -38,22 +38,21 @@ import { FlowTable } from './FlowTable.tsx';
 import classes from './FlowView.module.css';
 
 const LAYER_LABELS: Record<string, string> = {
-  DIVERTS: 'Diverts',
-  BRIDGES: 'Bridges',
+  ROUTES: 'Routes',
   CLUSTER: 'Cluster hops',
   DEAD_LETTER: 'Dead letter & expiry',
-  TEMPORARY: 'Temporary queues',
+  TEMPORARY: 'Temporary subscriptions',
   CAPTURE: 'Rahdar capture',
 };
 
 const FIND_GROUPS: Array<{ group: string; kinds: string[] }> = [
   { group: 'Clients', kinds: ['PRODUCER', 'CONSUMER'] },
-  { group: 'Addresses', kinds: ['ADDRESS'] },
-  { group: 'Queues', kinds: ['QUEUE'] },
+  { group: 'Destinations', kinds: ['DESTINATION'] },
+  { group: 'Subscriptions', kinds: ['SUBSCRIPTION'] },
 ];
 
 /**
- * Flow: which clients produce to which addresses, how those route into queues, and who consumes
+ * Flow: which clients produce to which destinations, how those route into subscriptions, and who consumes
  * them — bounded to the busiest paths, focusable on any one resource, with every rate's source and
  * age stated (flow-visualization spec). Everything that describes the view lives in the URL; what is
  * hovered, selected or paused is local to this visit.
@@ -75,7 +74,7 @@ export function FlowView() {
     <Page>
       <PageHeader
         title="Flow"
-        description="Who produces to which address, how it routes into queues, and who consumes it."
+        description="Who produces to which destination, how it routes into subscriptions, and who consumes it."
       />
 
       <Toolbar
@@ -208,7 +207,7 @@ function validSplit(sizes: unknown): sizes is number[] {
   );
 }
 
-/** Values are focus strings, unique by construction: an address and its queue commonly share a name. */
+/** Values are focus strings, unique by construction: a destination and its subscription commonly share a name. */
 function findGroups(nodes: FlowNodeView[]) {
   return FIND_GROUPS.map(({ group, kinds }) => {
     const seen = new Map<string, string>();
@@ -299,7 +298,7 @@ function FlowBody({
         </Text>
         {(totals.shown ?? 0) < (totals.paths ?? 0) && !data.focus ? (
           <Text size="xs" c="dimmed">
-            Raise the limit, or focus a client, address or queue to reach the rest.
+            Raise the limit, or focus a client, destination or subscription to reach the rest.
           </Text>
         ) : null}
         {totals.clamped ? (
@@ -353,7 +352,7 @@ function FlowMain({
       <EmptyState
         kind="filtered"
         title={`Nothing matches the focus ${data.focus.kind} ${data.focus.name}`}
-        description="It may have been deleted, or its clients disconnected since the address was shared. Clear the focus to see the busiest paths again."
+        description="It may have been deleted, or its clients disconnected since the link was shared. Clear the focus to see the busiest paths again."
         onClearFilters={() => setSearch({ focus: undefined, hops: undefined })}
       />
     );
@@ -381,7 +380,7 @@ function EmptyFlow({ unreachable }: Readonly<{ unreachable: string[] }>) {
       <EmptyState
         kind="unreachable"
         title="No flow to show, and some nodes did not answer"
-        description="Flow draws the clients producing to each address, the queues those addresses route into, and the clients consuming them. These nodes did not answer the last sweep, so this is an incomplete view rather than a cluster with no flow."
+        description="Flow draws the clients producing to each destination, the subscriptions those destinations route into, and the clients consuming them. These nodes did not answer the last sweep, so this is an incomplete view rather than a cluster with no flow."
         nodes={unreachable}
       />
     );
@@ -392,10 +391,10 @@ function EmptyFlow({ unreachable }: Readonly<{ unreachable: string[] }>) {
       title="No flow to show yet"
       description={
         <>
-          Flow draws the clients producing to each address, the queues those addresses route into, and the clients
-          consuming them. This cluster has no queues Rahdar has seen and no connected producers or consumers. Clients
-          appear here within one sampling interval of attaching, and new queues appear once the queue sweep has read
-          them.
+          Flow draws the clients producing to each destination, the subscriptions those destinations route into, and the
+          clients consuming them. This cluster has no subscriptions Rahdar has seen and no connected producers or
+          consumers. Clients appear here within one sampling interval of attaching, and new subscriptions appear once
+          the subscription sweep has read them.
         </>
       }
     />
@@ -446,7 +445,7 @@ function FlowViews({
             />
             <Select
               label="Find in this view"
-              placeholder="Client, address or queue"
+              placeholder="Client, destination or subscription"
               size="xs"
               w="16.25rem"
               searchable

@@ -5,11 +5,12 @@ import { AUTO, localZone } from '../../kernel/time/timezone.ts';
 import type { Column } from '../../ui/table/index.ts';
 import type { SqlRowView } from './api.ts';
 import { BodyCell, SourceBadge, VerifyCell } from './cells.tsx';
+import { nameOf } from '../../kernel/api/resourceId.ts';
 import { COLUMN_LABELS, sourceOf } from './resultColumns.ts';
 
 /**
  * Every column the result grid can show, in its default order. The message identifies the row and is its
- * row header; the queue and the node it came from are never hidden either. Where it came from, when and what
+ * row header; the subscription and the node it came from are never hidden either. Where it came from, when and what
  * it held go next, and the figures and the check on the broker are the first to be hidden when the table is
  * narrow. The time is written in the display zone `zone`, which the header states, so a view builds the
  * columns again when the zone changes.
@@ -24,9 +25,9 @@ export function resultColumns(clusterId: string, zone: string): Column<SqlRowVie
       priority: 'essential',
     },
     {
-      id: 'queue',
-      header: COLUMN_LABELS.queue,
-      accessor: (r) => r.queueName ?? '',
+      id: 'subscription',
+      header: COLUMN_LABELS.subscription,
+      accessor: (r) => nameOf(r.subscription),
       kind: 'identifier',
       priority: 'essential',
     },

@@ -291,12 +291,12 @@ compares every node with the declaration. The two link to each other.
 `config:apply` is a create-and-update authority: it never implies deleting a
 queue or an address. The built-in administrator role holds every permission;
 grant the two `config:*` permissions to an operator role as you would
-`queue:create` or `divert:write`.
+`subscription:create` or `route:write`.
 
 ## Over MCP
 
-`broker_config` reads the declaration, the drift, the XML fragment or the apply
-history. `broker_config_change` declares (from a document or from XML) or
+`artemis_config` reads the declaration, the drift, the XML fragment or the apply
+history. `artemis_config_change` declares (from a document or from XML) or
 applies: the dry run — the default — returns the plan with its hazards and the
 exact `acknowledge` ids; a real run needs `confirm` to equal the cluster's name
 and `expectedPlanHash` to equal what was previewed, and halts exactly as the UI

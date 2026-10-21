@@ -7,9 +7,10 @@ import {
   useCreateDivert,
   useDeleteDivert,
   type DivertMutationView,
-  type DivertView,
+  type RouteView,
   type LifecycleOutcomeView,
 } from './api.ts';
+import { nameOf } from '../../kernel/api/resourceId.ts';
 import { useCan } from '../../kernel/auth/useCan.ts';
 import { CapabilityGate } from '../../ui/CapabilityGate.tsx';
 import { gateFor } from '../../ui/capabilityGate.ts';
@@ -214,7 +215,7 @@ export function CreateDivertAction({ clusterId }: Readonly<{ clusterId: string }
   const { can, loading } = useCan();
   const cluster = useCluster(clusterId);
   const write = cluster.data?.capabilities.managementWrite;
-  const gate = gateFor(can('divert:write', clusterId), PERMISSION_LABEL, write, loading || cluster.isPending);
+  const gate = gateFor(can('route:write', clusterId), PERMISSION_LABEL, write, loading || cluster.isPending);
 
   const [open, setOpen] = useState(false);
   const [preview, setPreview] = useState<DivertMutationView | null>(null);
@@ -339,7 +340,7 @@ export function CreateDivertAction({ clusterId }: Readonly<{ clusterId: string }
  * its next pass, so the deletion would appear to succeed and then silently undo
  * itself; the operator is sent to the capture subscription that owns it instead.
  */
-export function DeleteDivertAction({ clusterId, divert }: Readonly<{ clusterId: string; divert: DivertView }>) {
+export function DeleteDivertAction({ clusterId, divert }: Readonly<{ clusterId: string; divert: RouteView }>) {
   const gate = useDivertWriteGate(clusterId);
   const host = useActionHost();
 
@@ -380,11 +381,13 @@ export function DeleteDivertDialog({
   divert,
   opened,
   onClose,
-}: HostedDialogProps & { clusterId: string; divert: DivertView }) {
+}: HostedDialogProps & { clusterId: string; divert: RouteView }) {
   const [preview, setPreview] = useState<LifecycleOutcomeView | null>(null);
   const [result, setResult] = useState<LifecycleOutcomeView | null>(null);
   const [previewFailed, setPreviewFailed] = useState<Error | null>(null);
   const remove = useDeleteDivert(clusterId, divert.name);
+  const from = nameOf(divert.source);
+  const to = nameOf(divert.target);
   const { mutate } = remove;
 
   const takePreview = useCallback(() => {
@@ -427,9 +430,9 @@ export function DeleteDivertDialog({
       consequence={
         <Stack gap="sm">
           <Text size="sm">
-            {divert.exclusive
-              ? `Messages on ${divert.address} stop going to ${divert.forwardingAddress} and resume reaching their original destinations.`
-              : `${divert.forwardingAddress} stops receiving a copy of the messages on ${divert.address}. Traffic on ${divert.address} itself is unaffected.`}
+            {divert.nativeAttributes.exclusive === 'true'
+              ? `Messages on ${from} stop going to ${to} and resume reaching their original destinations.`
+              : `${to} stops receiving a copy of the messages on ${from}. Traffic on ${from} itself is unaffected.`}
           </Text>
           <div aria-live="polite">
             {previewFailed ? (

@@ -9,10 +9,13 @@ export interface NavGroup {
 
 /**
  * The features' views under the kernel's groups (ADR-0070): groups in their fixed order, views in
- * their declared order, and a group none of the features contributes to left out.
+ * their declared order, and a group none of the features contributes to left out. A system-only view is
+ * listed only for a cluster that runs that system (`systemId`).
  */
-export function navGroups(features: RahdarFeature[]): NavGroup[] {
-  const items = features.flatMap((feature) => feature.nav ?? []);
+export function navGroups(features: RahdarFeature[], systemId?: string): NavGroup[] {
+  const items = features
+    .flatMap((feature) => feature.nav ?? [])
+    .filter((item) => !item.system || item.system === systemId);
   return NAV_GROUPS.map((group) => ({
     id: group.id,
     label: group.label,

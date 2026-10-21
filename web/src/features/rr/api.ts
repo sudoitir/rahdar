@@ -67,7 +67,7 @@ export function useDeleteRrExpectation(clusterId: string) {
 
 export interface RrFlowFilter {
   state?: string;
-  address?: string;
+  destination?: string;
   correlationId?: string;
   from?: string;
   to?: string;

@@ -498,7 +498,7 @@ public class SettingsService {
      * A hash of the effective values of {@code keys} and whether each is overridden, so an approved change set
      * runs only against the state it was approved for.
      */
-    public String stateKey(List<String> keys) {
+    public String etag(List<String> keys) {
         MessageDigest sha;
         try {
             sha = MessageDigest.getInstance("SHA-256");

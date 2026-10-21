@@ -388,7 +388,7 @@ class GateEngine implements OperationGate, PluginScopedBeans {
                         requester.authKind(),
                         requester.tokenId(),
                         Seals.policyDigest(hold.policy()),
-                        built.effect().stateKey()));
+                        built.effect().etag()));
         Map<String, Object> auditParams = new LinkedHashMap<>();
         auditParams.put("heldOperation", id.toString());
         auditParams.put("type", type);

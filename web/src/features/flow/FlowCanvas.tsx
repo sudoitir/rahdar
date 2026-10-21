@@ -36,11 +36,17 @@ import { DENSE_NODES, layoutSignature, pathThrough, reuseUnchanged, toReactFlow 
 import { FlowLegend } from './FlowLegend.tsx';
 import { hasActions } from './flowSearch.ts';
 import { FlowNodeActions } from './rowActions.tsx';
-import { AddressNode, ClientNode, LaneNode, QueueNode, RemoteNode } from './FlowNodes.tsx';
+import { DestinationNode, ClientNode, LaneNode, SubscriptionNode, RemoteNode } from './FlowNodes.tsx';
 import { useFlowLayout } from './useFlowLayout.ts';
 import classes from './FlowCanvas.module.css';
 
-const nodeTypes = { client: ClientNode, address: AddressNode, queue: QueueNode, remote: RemoteNode, lane: LaneNode };
+const nodeTypes = {
+  client: ClientNode,
+  destination: DestinationNode,
+  subscription: SubscriptionNode,
+  remote: RemoteNode,
+  lane: LaneNode,
+};
 const edgeTypes = { flow: FlowEdge };
 
 /** Labels and dots below this zoom would be unreadable specks; widths still carry the rate. */

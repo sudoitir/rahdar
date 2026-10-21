@@ -10,13 +10,16 @@ would not accept them.
 
 ### Requirement: A transfer names a source, a target, a mode and a selection
 
-The system SHALL let an operator transfer messages from a source queue on one node to
-a target queue on another node, in the same cluster or in another registered
+The system SHALL let an operator transfer messages from a source subscription on one node to
+a target subscription on another node, in the same cluster or in another registered
 cluster. The mode SHALL be **move** (messages leave the source) or **copy** (the
 source is unchanged). The selection SHALL be a list of message ids, a filter, or the
-whole queue. A transfer whose source and target are the same queue on the same node
-SHALL be refused. A transfer between two queues on the same node SHALL be carried
-out by the broker itself, without leaving it.
+whole subscription. A transfer whose source and target are the same subscription on the same node
+SHALL be refused. A transfer between two subscriptions on the same node SHALL be carried
+out by the broker itself, without leaving it. The source SHALL be named by a
+subscription's canonical resource id, and the target by the id of a subscription or of
+a destination, as the cluster's system allows; a target of a kind the system cannot
+receive transferred messages on SHALL be refused with the reason.
 
 #### Scenario: Cross-cluster move by filter
 
@@ -26,36 +29,41 @@ out by the broker itself, without leaving it.
 #### Scenario: Copy leaves the source unchanged
 
 - **WHEN** an operator copies a selection to another node
-- **THEN** the source queue's messages and depth are unchanged and the target holds one copy of each selected message
+- **THEN** the source subscription's messages and depth are unchanged and the target holds one copy of each selected message
 
-#### Scenario: Same queue on the same node is refused
+#### Scenario: A destination as the target
 
-- **WHEN** the target is the source queue on the source node
+- **WHEN** an operator names a destination as the target of a transfer
+- **THEN** the messages are sent to that destination, and the preview says so
+
+#### Scenario: Same subscription on the same node is refused
+
+- **WHEN** the target is the source subscription on the source node
 - **THEN** the preview refuses the transfer and says why
 
 ### Requirement: Forced redistribution targets another node of the same cluster
 
-The system SHALL offer, from a queue on one node, to redistribute selected messages
-to the same queue on another live node of the same cluster. The messages SHALL land
-on that node's own queue, not be routed onward by the cluster at the moment they
+The system SHALL offer, from a subscription on one node, to redistribute selected messages
+to the same subscription on another live node of the same cluster. The messages SHALL land
+on that node's own subscription, not be routed onward by the cluster at the moment they
 arrive. When the target node has no consumers and the cluster may redistribute them
 again, the preview SHALL say so.
 
 #### Scenario: Specific messages land on the chosen node
 
 - **WHEN** an operator redistributes three messages by id from `orders` on node 1 to node 2
-- **THEN** those three messages are on node 2's `orders` queue
+- **THEN** those three messages are on node 2's `orders` subscription
 
 #### Scenario: Re-redistribution is warned
 
-- **WHEN** the target node's queue has no consumers and redistribution is enabled for its address
+- **WHEN** the target node's subscription has no consumers and redistribution is enabled for its destination
 - **THEN** the preview warns that the broker may move the messages again
 
 ### Requirement: The selection is frozen when the run starts
 
-A filter or whole-queue selection SHALL cover only messages whose timestamp is not
+A filter or whole-subscription selection SHALL cover only messages whose timestamp is not
 later than the run's start, so that messages produced during the run are not
-transferred and a run against a live queue terminates. A filter SHALL be parsed before
+transferred and a run against a live subscription terminates. A filter SHALL be parsed before
 the run and SHALL be refused unless it is one complete expression, so it cannot escape
 the time bound it is combined with. An id selection SHALL cover exactly the listed ids.
 Selected messages that cannot be taken — being delivered to a consumer, or scheduled
@@ -76,24 +84,24 @@ for later delivery — SHALL be counted and reported, never silently left.
 - **WHEN** a transfer is requested with the filter `a=1) OR (1=1`
 - **THEN** it is refused as an invalid filter before any message moves
 
-### Requirement: Transfers work on queues of any size
+### Requirement: Transfers work on subscriptions of any size
 
 The system SHALL take the selection from the source in bounded chunks and SHALL never
 hold the whole selection in one broker call or in Rahdar's memory. For a move, the
-number of messages parked outside the source queue at any moment SHALL be bounded.
+number of messages parked outside the source subscription at any moment SHALL be bounded.
 Throughput SHALL be limited by a configurable messages-per-second rate and batch
 size, and every management call SHALL go through the per-node rate limiter of both
 nodes.
 
-#### Scenario: A large queue
+#### Scenario: A large subscription
 
-- **WHEN** an operator moves a queue of 100,000 messages
+- **WHEN** an operator moves a subscription of 100,000 messages
 - **THEN** the run completes, the target holds all 100,000, and the number of messages parked at any moment never exceeded the bound
 
 ### Requirement: No message is lost or duplicated by an interruption
 
-A move SHALL first take the selection off the source queue into a Rahdar-owned
-staging queue on the source broker and SHALL relay from there. A message SHALL be
+A move SHALL first take the selection off the source subscription into a Rahdar-owned
+staging subscription on the source broker and SHALL relay from there. A message SHALL be
 acknowledged on the source only after the target has committed it, so that at every
 moment each message exists on a broker. Every transferred message SHALL carry a
 duplicate-detection id derived from the run and the source message. A copy SHALL
@@ -108,7 +116,7 @@ them again.
 #### Scenario: The target becomes unreachable mid-run
 
 - **WHEN** the target node stops answering during a move
-- **THEN** the run stops as failed, every message not yet delivered is held in the staging queue, and nothing is lost
+- **THEN** the run stops as failed, every message not yet delivered is held in the staging subscription, and nothing is lost
 
 #### Scenario: A resumed copy
 
@@ -122,12 +130,12 @@ them again.
 
 ### Requirement: The target is checked before a transfer and before every batch
 
-The preview SHALL check whether the target can accept the selection and SHALL classify each finding as a refusal, a warning, or unknown. It SHALL refuse when:
+The preview SHALL check whether the target can accept the selection and SHALL classify each finding as a refusal, a warning, or unknown. The checks are the cluster's system's own acceptance rules, with stable finding codes named by role (`same-subscription`, `subscription-missing`, `subscription-unknown`, `transfer-target-destination`). For an Artemis target it SHALL refuse when:
 
 - the target node is not live, is a backup, or is in split-brain;
-- the target queue does not exist and the broker would not create it;
-- the target queue has a filter, since the broker silently drops non-matching messages;
-- the target address's full or page-full policy is `DROP`;
+- the target subscription does not exist and the broker would not create it;
+- the target subscription has a filter, since the broker silently drops non-matching messages;
+- the target destination's full or page-full policy is `DROP`;
 - the target is a ring queue smaller than the selection;
 - the projected size exceeds the target's remaining capacity under a `FAIL` or `BLOCK` policy;
 - the target's disk is at its limit.
@@ -142,17 +150,17 @@ A check that could not be made SHALL be shown as unknown and SHALL NOT count as 
 
 #### Scenario: Silent-drop policy is refused
 
-- **WHEN** the target address's full policy is `DROP`
+- **WHEN** the target Artemis destination's full policy is `DROP`
 - **THEN** the preview refuses the transfer and names the policy and the address setting to change
 
 #### Scenario: Not enough room
 
-- **WHEN** the target address uses `FAIL` with 10 MB of headroom and the selection is estimated at 84 MB
+- **WHEN** the target destination uses `FAIL` with 10 MB of headroom and the selection is estimated at 84 MB
 - **THEN** the preview refuses the transfer and states both figures
 
 #### Scenario: Target fills during the run
 
-- **WHEN** the target address crosses the capacity threshold mid-run and a consumer later drains it
+- **WHEN** the target destination crosses the capacity threshold mid-run and a consumer later drains it
 - **THEN** the run shows that it is waiting for capacity, then continues without operator action
 
 #### Scenario: Capacity never returns
@@ -165,12 +173,17 @@ A check that could not be made SHALL be shown as unknown and SHALL NOT count as 
 - **WHEN** the target node does not answer the preview's checks
 - **THEN** the affected checks are shown as unknown and the preview does not claim the target can accept the selection
 
+#### Scenario: A finding code is a role
+
+- **WHEN** the source and target are the same subscription
+- **THEN** the finding carries the code `same-subscription`
+
 ### Requirement: Messages arrive faithfully and carry their provenance
 
 A transferred message SHALL keep its body byte-for-byte for every body type, including large messages, and SHALL keep its durability, priority, timestamp, message id, group, correlation id, reply-to, last-value key and application properties. A copied message SHALL keep its expiration. A moved message SHALL arrive without an expiration, as the broker's own move leaves it, and the preview of a move SHALL say so. The broker's routing bookkeeping from the source SHALL NOT be carried. Each transferred message SHALL carry provenance naming:
 
 - the run;
-- the source cluster, node and queue;
+- the source cluster, node and subscription;
 - the source message id.
 
 The preview SHALL state that messages published over a non-Core protocol arrive as their Core form.
@@ -183,7 +196,7 @@ The preview SHALL state that messages published over a non-Core protocol arrive 
 #### Scenario: Provenance is readable downstream
 
 - **WHEN** a consumer on the target reads a transferred message
-- **THEN** its properties name the transfer run, the source queue and the source message id, and do not include the source's original-address bookkeeping
+- **THEN** its properties name the transfer run, the source subscription and the source message id, and do not include the source's original-destination bookkeeping
 
 ### Requirement: A transfer is previewed, confirmed, audited and authorised on both clusters
 
@@ -191,9 +204,9 @@ The preview SHALL cause no state change on either broker. It SHALL state:
 
 - the mode;
 - the number of messages and their estimated size, or that either is unavailable;
-- the source and target cluster, node and queue.
+- the source and target cluster, node and subscription.
 
-A selection over the bulk cap SHALL need an explicit, typed override. A move SHALL be confirmed by typing the source queue name. Starting a run SHALL require the preview's plan, unexpired and unchanged.
+A selection over the bulk cap SHALL need an explicit, typed override. A move SHALL be confirmed by typing the source subscription name. Starting a run SHALL require the preview's plan, unexpired and unchanged.
 
 A move SHALL require `message:move` on the source cluster, and a copy `message:read` there. Both SHALL require `message:send` on the target cluster. Permissions SHALL be re-checked during the run, and the run SHALL stop with the reason when a grant is withdrawn. A target cluster the operator has no access to SHALL be indistinguishable from one that does not exist.
 
@@ -202,7 +215,7 @@ The run SHALL be audited on the source cluster before the first broker call, wit
 #### Scenario: Preview has no side effect
 
 - **WHEN** an operator previews a move
-- **THEN** no staging queue is created and no message is moved, sent or acknowledged
+- **THEN** no staging subscription is created and no message is moved, sent or acknowledged
 
 #### Scenario: No send grant on the target
 
@@ -228,34 +241,34 @@ A run SHALL be persisted and observable live. It SHALL be one of these states:
 - failed;
 - returned.
 
-It SHALL report the counts selected, held in staging, delivered, and not transferred, together with its rate. Stop SHALL finish the batch in flight and then halt. A stopped, interrupted or failed run SHALL offer resume, and a move SHALL also offer return to source, which puts every message still held back on the source queue.
+It SHALL report the counts selected, held in staging, delivered, and not transferred, together with its rate. Stop SHALL finish the batch in flight and then halt. A stopped, interrupted or failed run SHALL offer resume, and a move SHALL also offer return to source, which puts every message still held back on the source subscription.
 
-A run holding messages SHALL NOT be discarded. A Rahdar restart SHALL mark running runs interrupted without losing their messages. Only one active run SHALL exist per source queue. A staging queue that belongs to no run SHALL be listed as orphaned, with a way to return its messages.
+A run holding messages SHALL NOT be discarded. A Rahdar restart SHALL mark running runs interrupted without losing their messages. Only one active run SHALL exist per source subscription. A staging subscription that belongs to no run SHALL be listed as orphaned, with a way to return its messages.
 
 #### Scenario: Return to source
 
 - **WHEN** an operator returns a stopped move with 4,000 messages still held
-- **THEN** those 4,000 messages are back on the source queue, the staging queue is removed, and the run is returned
+- **THEN** those 4,000 messages are back on the source subscription, the staging subscription is removed, and the run is returned
 
 #### Scenario: Restart mid-run
 
 - **WHEN** Rahdar restarts while a move is running
 - **THEN** the run is interrupted, its held messages are intact, and resuming completes it
 
-#### Scenario: A second run on the same source queue
+#### Scenario: A second run on the same source subscription
 
-- **WHEN** a run is active on a source queue and another is started on it
+- **WHEN** a run is active on a source subscription and another is started on it
 - **THEN** the second is refused with a conflict
 
 #### Scenario: Orphaned staging
 
-- **WHEN** a staging queue exists on a broker with no run recorded for it
-- **THEN** the transfers list shows it as orphaned with its depth and offers to return its messages to a queue
+- **WHEN** a staging subscription exists on a broker with no run recorded for it
+- **THEN** the transfers list shows it as orphaned with its depth and offers to return its messages to a subscription
 
 ### Requirement: Unavailable transfers explain themselves
 
 When a transfer is impossible because a node lacks Core connectivity, management write
-access, or broker rights on the staging queue namespace, the control SHALL remain
+access, or broker rights on the staging subscription namespace, the control SHALL remain
 visible and disabled with the reason and the `broker.xml` snippet that enables it. A
 capability not yet established SHALL leave the control enabled with the uncertainty
 stated.
@@ -267,5 +280,5 @@ stated.
 
 #### Scenario: Staging rights missing
 
-- **WHEN** the source broker refuses to create the staging queue
+- **WHEN** the source broker refuses to create the staging subscription
 - **THEN** the run fails before moving anything and shows the security-setting snippet for the staging namespace

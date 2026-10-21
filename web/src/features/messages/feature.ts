@@ -5,7 +5,7 @@ import { CONTRACT, defineFeature } from '../../kernel/feature.ts';
 import { clusterRoute } from '../../kernel/routing/roots.ts';
 import { lazyFeatureView } from '../../kernel/routing/lazy.tsx';
 import {
-  BrowseQueueMessages,
+  BrowseSubscriptionMessages,
   CopyMessage,
   DeleteMessage,
   MoveMessage,
@@ -36,35 +36,37 @@ function validateMessagesSearch(raw: Record<string, unknown>): MessagesSearch {
 
 const messagesRoute = createRoute({
   getParentRoute: () => clusterRoute,
-  path: 'queues/$queueName/messages',
+  path: 'subscriptions/$subscriptionName/messages',
   component: lazyFeatureView('messages', () => import('./MessagesView.tsx'), 'MessagesView'),
   validateSearch: validateMessagesSearch,
 });
 
-const dlqRoute = createRoute({
+const deadLettersRoute = createRoute({
   getParentRoute: () => clusterRoute,
-  path: 'dlq',
-  component: lazyFeatureView('messages', () => import('./DlqView.tsx'), 'DlqView'),
+  path: 'dead-letters',
+  component: lazyFeatureView('messages', () => import('./DeadLettersView.tsx'), 'DeadLettersView'),
 });
 
 /** Browsing, sending, moving and deleting messages, and the dead-letter view. */
 export const messagesFeature = defineFeature({
   contract: CONTRACT,
   id: 'messages',
-  routes: { cluster: [messagesRoute, dlqRoute] },
+  routes: { cluster: [messagesRoute, deadLettersRoute] },
   nav: [
     {
       group: 'messaging',
       order: 20,
-      label: 'DLQ',
+      label: 'Dead letters',
       icon: IconAlertTriangle,
-      path: 'dlq',
+      path: 'dead-letters',
       hotkey: 'd',
       permission: 'message:read',
     },
   ],
   slots: {
-    'queue.actions': [{ id: 'messages.browse', order: 20, section: 'open', Component: BrowseQueueMessages }],
+    'subscription.actions': [
+      { id: 'messages.browse', order: 20, section: 'open', Component: BrowseSubscriptionMessages },
+    ],
     'message.actions': [
       { id: 'messages.open', order: 10, section: 'open', Component: OpenMessage },
       { id: 'messages.copy', order: 10, section: 'copy', Component: CopyMessage },

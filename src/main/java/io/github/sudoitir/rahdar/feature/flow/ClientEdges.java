@@ -7,7 +7,7 @@ import java.util.Map;
 
 /**
  * Aggregates one node's sampled producers or consumers into client edges keyed by identity,
- * address and queue (ADR-0081). All identity parts are kept so a reader can regroup by client
+ * destination and subscription (ADR-0081). All identity parts are kept so a reader can regroup by client
  * id, user or host without another sweep.
  */
 final class ClientEdges {
@@ -24,8 +24,8 @@ final class ClientEdges {
             String user,
             String remoteAddress,
             String protocol,
-            String address,
-            String queue,
+            String destination,
+            String subscription,
             Double rate,
             long unacked,
             boolean stalled) {}
@@ -40,8 +40,8 @@ final class ClientEdges {
             String user,
             String remoteHost,
             String protocol,
-            String address,
-            String queue,
+            String destination,
+            String subscription,
             Double rate,
             long unacked,
             int memberCount,
@@ -53,8 +53,8 @@ final class ClientEdges {
             String user,
             String remoteHost,
             String protocol,
-            String address,
-            String queue) {}
+            String destination,
+            String subscription) {}
 
     private ClientEdges() {}
 
@@ -67,8 +67,8 @@ final class ClientEdges {
                     blank(m.user()),
                     host(m.remoteAddress()),
                     blank(m.protocol()),
-                    blank(m.address()),
-                    blank(m.queue()));
+                    blank(m.destination()),
+                    blank(m.subscription()));
             groups.computeIfAbsent(key, k -> new ArrayList<>()).add(m);
         }
         List<Edge> out = new ArrayList<>(groups.size());
@@ -89,8 +89,8 @@ final class ClientEdges {
                     k.user(),
                     k.remoteHost(),
                     k.protocol(),
-                    k.address(),
-                    k.queue(),
+                    k.destination(),
+                    k.subscription(),
                     rate,
                     unacked,
                     list.size(),

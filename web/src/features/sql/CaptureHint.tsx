@@ -2,27 +2,27 @@ import { Anchor, Text } from '@mantine/core';
 import { Link } from '@tanstack/react-router';
 
 import { useIndexSubscriptions } from './api.ts';
-import { uncapturedAddresses } from './captureCoverage.ts';
+import { uncapturedDestinations } from './captureCoverage.ts';
 import { Notice } from '../../ui/Notice.tsx';
 
 /**
- * A short nudge where something depends on seeing every message: which of these addresses
+ * A short nudge where something depends on seeing every message: which of these destinations
  * are only sampled, and where capture is turned on. Renders nothing once every one of them
  * is captured, and nothing when subscriptions cannot be read — it is advice, not a state.
  */
-export function CaptureHint(props: { clusterId: string; addresses: string[]; purpose: string }) {
+export function CaptureHint(props: { clusterId: string; destinations: string[]; purpose: string }) {
   // Nothing to check means nothing to fetch.
-  return props.addresses.length === 0 ? null : <CoverageHint {...props} />;
+  return props.destinations.length === 0 ? null : <CoverageHint {...props} />;
 }
 
 function CoverageHint({
   clusterId,
-  addresses,
+  destinations,
   purpose,
-}: Readonly<{ clusterId: string; addresses: string[]; purpose: string }>) {
+}: Readonly<{ clusterId: string; destinations: string[]; purpose: string }>) {
   const subscriptions = useIndexSubscriptions(clusterId);
   if (!subscriptions.data) return null;
-  const missing = uncapturedAddresses(subscriptions.data, addresses);
+  const missing = uncapturedDestinations(subscriptions.data, destinations);
   if (missing.length === 0) return null;
   return (
     <Notice title="Only sampled">

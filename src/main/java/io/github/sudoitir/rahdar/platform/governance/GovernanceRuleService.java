@@ -51,7 +51,7 @@ public class GovernanceRuleService {
     public RuleView create(RuleRequest request) {
         AuditEvent event = begin("CREATE_GOVERNANCE_RULE", request.selector(), describe(request));
         GovernanceRuleEntity entity = new GovernanceRuleEntity(
-                blankToNull(request.addressPattern()),
+                blankToNull(request.destinationPattern()),
                 request.target(),
                 request.selector().trim(),
                 request.dataClass(),
@@ -78,7 +78,7 @@ public class GovernanceRuleService {
         String action = updateAction(entity.isEnabled(), request.enabled());
         AuditEvent event = begin(action, entity.getSelector(), params);
         if (!entity.isBuiltin()) {
-            entity.setAddressPattern(blankToNull(request.addressPattern()));
+            entity.setDestinationPattern(blankToNull(request.destinationPattern()));
             entity.setTarget(request.target());
             entity.setSelector(request.selector().trim());
             entity.setDataClass(request.dataClass());
@@ -139,7 +139,7 @@ public class GovernanceRuleService {
     }
 
     private static boolean sameFacts(GovernanceRuleEntity e, RuleRequest r) {
-        return Objects.equals(e.getAddressPattern(), blankToNull(r.addressPattern()))
+        return Objects.equals(e.getDestinationPattern(), blankToNull(r.destinationPattern()))
                 && e.getTarget().equals(r.target())
                 && e.getSelector().equals(r.selector().trim())
                 && e.getDataClass().equals(r.dataClass())
@@ -151,8 +151,8 @@ public class GovernanceRuleService {
         params.put("target", r.target());
         params.put("dataClass", r.dataClass());
         params.put("enabled", r.enabled());
-        if (r.addressPattern() != null) {
-            params.put("addressPattern", r.addressPattern());
+        if (r.destinationPattern() != null) {
+            params.put("destinationPattern", r.destinationPattern());
         }
         if (r.action() != null) {
             params.put("action", r.action());
@@ -164,7 +164,7 @@ public class GovernanceRuleService {
         DataClass dataClass = DataClass.valueOf(e.getDataClass());
         return new RuleView(
                 e.getId(),
-                e.getAddressPattern(),
+                e.getDestinationPattern(),
                 e.getTarget(),
                 e.getSelector(),
                 dataClass.name(),

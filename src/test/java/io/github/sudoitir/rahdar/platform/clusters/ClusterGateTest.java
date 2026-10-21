@@ -220,7 +220,7 @@ class ClusterGateTest extends PostgresIntegrationTest {
 
         assertThat(effect.count()).isEqualTo(1);
         assertThat(effect.unit()).isEqualTo("clusters");
-        assertThat(effect.stateKey()).isEqualTo(env.id().toString());
+        assertThat(effect.etag()).isEqualTo(env.id().toString());
         assertThat(environmentDeleteOperation.traits(new EnvironmentDeleteParams(env.id())))
                 .isEqualTo(Set.of(Trait.ACCESS_CONTROL, Trait.DESTRUCTIVE));
     }
@@ -281,7 +281,7 @@ class ClusterGateTest extends PostgresIntegrationTest {
     void aClusterDeleteIsAccessControlAndDestructiveAndPinnedToTheClusterAsRegistered() {
         Effect effect = clusterDeleteOperation.estimate(new ClusterDeleteParams(clusterId));
 
-        assertThat(effect.stateKey()).startsWith(clusterId + "|");
+        assertThat(effect.etag()).startsWith(clusterId + "|");
         assertThat(clusterDeleteOperation.traits(new ClusterDeleteParams(clusterId)))
                 .isEqualTo(Set.of(Trait.ACCESS_CONTROL, Trait.DESTRUCTIVE));
         assertThat(clusterDeleteOperation.summary(new ClusterDeleteParams(clusterId)))
@@ -317,14 +317,14 @@ class ClusterGateTest extends PostgresIntegrationTest {
         assertThat(clusterNodeOverrideOperation.traits(params)).isEqualTo(Set.of(Trait.ACCESS_CONTROL));
         assertThat(clusterNodeOverrideOperation.display(params))
                 .contains(new DisplayRow("Data URL", seeded.getDataUrl(), "tcp://a-core:61616"));
-        String before = clusterNodeOverrideOperation.estimate(params).stateKey();
+        String before = clusterNodeOverrideOperation.estimate(params).etag();
         Mockito.reset(gate);
 
         allows();
         clusterNodeOverrideOperation.replay(params);
 
         assertThat(nodes.findById(nodeId).orElseThrow().getDataUrl()).isEqualTo("tcp://a-core:61616");
-        assertThat(clusterNodeOverrideOperation.estimate(params).stateKey())
+        assertThat(clusterNodeOverrideOperation.estimate(params).etag())
                 .as("a node pointed elsewhere since the request is a different target")
                 .isNotEqualTo(before);
         verify(gate).run(any(), any());
@@ -350,8 +350,7 @@ class ClusterGateTest extends PostgresIntegrationTest {
                 .containsExactlyInAnyOrder("/credentials/password", "/coreCredentials/password");
         assertThat(clusterRegisterOperation.summary(request)).isEqualTo("Register cluster prod-eu");
         assertThat(clusterRegisterOperation.traits(request)).isEqualTo(Set.of(Trait.ACCESS_CONTROL));
-        assertThat(clusterRegisterOperation.estimate(request).stateKey())
-                .isEqualTo("seeds:http://a:8161/console/jolokia");
+        assertThat(clusterRegisterOperation.estimate(request).etag()).isEqualTo("seeds:http://a:8161/console/jolokia");
     }
 
     @Test

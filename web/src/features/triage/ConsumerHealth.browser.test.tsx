@@ -13,16 +13,16 @@ import { ActionHostProvider } from '../../kernel/actions/ActionHost.tsx';
 import { FeatureProvider } from '../../kernel/FeatureProvider.tsx';
 import { axeViolations, contentWidth, Frame, renderThemed, SCHEMES, settle } from '../../test/browser.tsx';
 import { ConsumerHealthView } from './ConsumerHealthView.tsx';
-import { QueueHealthPanel } from './QueueHealthPanel.tsx';
+import { SubscriptionHealthPanel } from './SubscriptionHealthPanel.tsx';
 
 /**
  * Consumer health in a real browser: one h1, no accessibility violations in either colour scheme, and no
  * layout shift when the rows replace the loading state (the sweep holds every route to 0.01). The data
  * arrives after a delay, as it does from the server.
  */
-const row = (queueName: string, verdict: string, severity: number, over: Record<string, unknown> = {}) => ({
-  address: queueName,
-  queueName,
+const row = (subscriptionName: string, verdict: string, severity: number, over: Record<string, unknown> = {}) => ({
+  destination: `artemis.address/${subscriptionName}`,
+  subscription: `artemis.queue/${subscriptionName}`,
   verdict,
   severity,
   cause: 'The consumer is blocked, or a message it cannot process is being redelivered.',
@@ -51,7 +51,7 @@ const ROWS = [
   row('orders.inbound', 'STALLED', 4),
   row('orders.retry.with.a.long.name.that.is.shortened', 'FALLING_BEHIND', 2, { stale: true }),
   row('billing', 'HEALTHY', 0, { ackRate: 8 }),
-  row('new-queue', 'INSUFFICIENT_DATA', 0, { ackRate: null, addRate: null }),
+  row('new-subscription', 'INSUFFICIENT_DATA', 0, { ackRate: null, addRate: null }),
 ];
 
 const ME = {
@@ -66,7 +66,7 @@ const CLUSTER = { id: 'c1', name: 'prod', topology: { nodes: [] }, capabilities:
 function bodyFor(path: string, query: string): unknown {
   if (path.endsWith('/auth/me')) return ME;
   if (path.endsWith('/consumer-health')) {
-    let rows = query.includes('queue=') ? ROWS.slice(0, 1) : ROWS;
+    let rows = query.includes('subscription=') ? ROWS.slice(0, 1) : ROWS;
     if (query.includes('q=nope')) rows = [];
     return { data: rows, count: rows.length, page: 1, pageSize: 200 };
   }
@@ -182,7 +182,7 @@ describe('Consumer health, filtered to nothing', () => {
         'dark',
       );
       await screen.findByRole('heading', { level: 1, name: 'Consumer health' });
-      await screen.findByText(/No queue matches "nope"/, undefined, { timeout: 5000 });
+      await screen.findByText(/No subscription matches "nope"/, undefined, { timeout: 5000 });
       await settle(() => `${container.scrollHeight}`);
       await new Promise((resolve) => setTimeout(resolve, 500));
 
@@ -191,13 +191,16 @@ describe('Consumer health, filtered to nothing', () => {
   });
 });
 
-describe('Consumer health in a queue drawer', () => {
+describe('Consumer health in a subscription drawer', () => {
   describe.each(SCHEMES)('in the %s scheme', (scheme) => {
     it('has no accessibility violations once the verdict is read', async () => {
       const { container } = renderThemed(
         <Providers>
           <Frame width={420} height={420}>
-            <QueueHealthPanel clusterId="c1" queueName="orders.inbound" />
+            <SubscriptionHealthPanel
+              clusterId="c1"
+              subscription={{ id: 'artemis.queue/orders.inbound', kind: 'artemis.queue', name: 'orders.inbound' }}
+            />
           </Frame>
         </Providers>,
         scheme,

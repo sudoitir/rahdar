@@ -3,6 +3,7 @@ import { delay, http, HttpResponse } from 'msw';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
+import { IconSitemap } from '@tabler/icons-react';
 import { createRoute } from '@tanstack/react-router';
 
 import { CONTRACT, defineFeature } from '../../kernel/feature.ts';
@@ -20,18 +21,57 @@ const ENVIRONMENTS: EnvironmentView[] = [
 ];
 
 function cluster(id: string, name: string, over: Partial<ClusterSummary> = {}): ClusterSummary {
-  return { id, name, health: 'OK', nodeCount: 2, updatedAt: '2026-01-01T00:00:00Z', environmentId: null, ...over };
+  return {
+    id,
+    name,
+    health: 'OK',
+    nodeCount: 2,
+    updatedAt: '2026-01-01T00:00:00Z',
+    environmentId: null,
+    system: { id: 'artemis', name: 'Apache ActiveMQ Artemis' },
+    kinds: [],
+    ...over,
+  };
 }
 
-/** A cheap view of a cluster, at the path of the real Queues view, so what is under test is the switcher and not a screen. */
+/** A cheap view of a cluster, at the path of the real Subscriptions view, so what is under test is the switcher and not a screen. */
 const QUEUES = defineFeature({
   contract: CONTRACT,
-  id: 'queues',
+  id: 'resources',
   routes: {
     cluster: [
-      createRoute({ getParentRoute: () => clusterRoute, path: 'queues', component: () => <p>A cluster's queues</p> }),
+      createRoute({
+        getParentRoute: () => clusterRoute,
+        path: 'subscriptions',
+        component: () => <p>A cluster's subscriptions</p>,
+      }),
     ],
   },
+});
+
+/** A view for one system only, as the Artemis configuration is. */
+const ARTEMIS_ONLY = defineFeature({
+  contract: CONTRACT,
+  id: 'brokerconfig',
+  routes: {
+    cluster: [
+      createRoute({
+        getParentRoute: () => clusterRoute,
+        path: 'artemis/configuration',
+        component: () => <p>An Artemis cluster's configuration</p>,
+      }),
+    ],
+  },
+  nav: [
+    {
+      group: 'observe',
+      order: 10,
+      label: 'Configuration',
+      icon: IconSitemap,
+      path: 'artemis/configuration',
+      system: 'artemis',
+    },
+  ],
 });
 
 const SMALL = [
@@ -79,7 +119,7 @@ describe('ClusterSwitcher', () => {
 
   it('shows the open cluster with its environment, its health in words and its node count', async () => {
     mockApi();
-    renderAppAt('/clusters/c1/queues', [QUEUES]);
+    renderAppAt('/clusters/c1/subscriptions', [QUEUES]);
 
     // The clusters and the environments are two requests, answered in either order: the trigger shows the cluster
     // as soon as the clusters arrive, and its environment once the environments do.
@@ -91,7 +131,7 @@ describe('ClusterSwitcher', () => {
 
   it('holds the place of the cluster at its final size while the clusters load', async () => {
     mockApi(SMALL, { latency: 150 });
-    renderAppAt('/clusters/c1/queues', [QUEUES]);
+    renderAppAt('/clusters/c1/subscriptions', [QUEUES]);
 
     const placeholder = (await screen.findByText('Loading clusters')).closest('output');
     const faceClass = placeholder?.className;
@@ -105,7 +145,7 @@ describe('ClusterSwitcher', () => {
   it('lists every cluster grouped by environment, each with its environment and health, and registration last', async () => {
     mockApi();
     const user = userEvent.setup();
-    renderAppAt('/clusters/c1/queues', [QUEUES]);
+    renderAppAt('/clusters/c1/subscriptions', [QUEUES]);
     await user.click(await screen.findByRole('button', { name: /prod-emea/ }));
 
     const list = await screen.findByRole('listbox', { name: 'Clusters' });
@@ -127,23 +167,56 @@ describe('ClusterSwitcher', () => {
     mockApi();
     const error = vi.spyOn(console, 'error');
     const user = userEvent.setup();
-    const { router } = renderAppAt('/clusters/c1/queues', [QUEUES]);
+    const { router } = renderAppAt('/clusters/c1/subscriptions', [QUEUES]);
     await user.click(await screen.findByRole('button', { name: /prod-emea/ }));
 
     await user.click(await option(/stage-eu/));
 
     await screen.findByRole('button', { name: /stage-eu/ });
-    expect(router.state.location.pathname).toBe('/clusters/c3/queues');
+    expect(router.state.location.pathname).toBe('/clusters/c3/subscriptions');
     // Opening a cluster builds its queries while the shell is on screen: that must not update the shell mid-render.
     expect(error.mock.calls.map((call) => String(call[0]))).not.toContainEqual(
       expect.stringContaining('Cannot update a component'),
     );
   });
 
+  it('leads to the estate from "All clusters"', async () => {
+    mockApi();
+    const user = userEvent.setup();
+    const { router } = renderAppAt('/clusters/c1/subscriptions', [QUEUES]);
+    await user.click(await screen.findByRole('button', { name: /prod-emea/ }));
+
+    await user.click(await option('All clusters'));
+
+    await waitFor(() => expect(router.state.location.pathname).toBe('/'));
+  });
+
+  it("falls back to a cluster's home when its system lacks the system-only view being kept", async () => {
+    mockApi([cluster('c1', 'prod-emea'), cluster('c5', 'other-one', { system: { id: 'other', name: 'Other' } })]);
+    const user = userEvent.setup();
+    const { router } = renderAppAt('/clusters/c1/artemis/configuration', [ARTEMIS_ONLY]);
+    await user.click(await screen.findByRole('button', { name: /prod-emea/ }));
+
+    await user.click(await option(/other-one/));
+
+    await waitFor(() => expect(router.state.location.pathname).toBe('/clusters/c5'));
+  });
+
+  it('keeps a system-only view when the other cluster runs the same system', async () => {
+    mockApi([cluster('c1', 'prod-emea'), cluster('c2', 'prod-apac')]);
+    const user = userEvent.setup();
+    const { router } = renderAppAt('/clusters/c1/artemis/configuration', [ARTEMIS_ONLY]);
+    await user.click(await screen.findByRole('button', { name: /prod-emea/ }));
+
+    await user.click(await option(/prod-apac/));
+
+    await waitFor(() => expect(router.state.location.pathname).toBe('/clusters/c2/artemis/configuration'));
+  });
+
   it('is operated by keyboard alone: arrows open it, the search takes focus, Enter chooses, Escape returns focus', async () => {
     mockApi();
     const user = userEvent.setup();
-    const { router } = renderAppAt('/clusters/c1/queues', [QUEUES]);
+    const { router } = renderAppAt('/clusters/c1/subscriptions', [QUEUES]);
     const trigger = await screen.findByRole('button', { name: /prod-emea/ });
 
     trigger.focus();
@@ -156,7 +229,7 @@ describe('ClusterSwitcher', () => {
     await user.keyboard('{Enter}');
 
     await screen.findByRole('button', { name: /prod-apac/ });
-    expect(router.state.location.pathname).toBe('/clusters/c2/queues');
+    expect(router.state.location.pathname).toBe('/clusters/c2/subscriptions');
 
     await user.keyboard('{ArrowDown}{Escape}');
     await waitFor(() => expect(screen.getByRole('button', { name: /prod-apac/ })).toHaveFocus());
@@ -166,7 +239,7 @@ describe('ClusterSwitcher', () => {
   it('says so when no cluster matches the search', async () => {
     mockApi();
     const user = userEvent.setup();
-    renderAppAt('/clusters/c1/queues', [QUEUES]);
+    renderAppAt('/clusters/c1/subscriptions', [QUEUES]);
     await user.click(await screen.findByRole('button', { name: /prod-emea/ }));
 
     fireEvent.change(await screen.findByRole('textbox', { name: 'Search clusters' }), {
@@ -182,11 +255,11 @@ describe('ClusterSwitcher', () => {
     );
     mockApi(many);
     const user = userEvent.setup();
-    renderAppAt('/clusters/m0/queues', [QUEUES]);
+    renderAppAt('/clusters/m0/subscriptions', [QUEUES]);
     await user.click(await screen.findByRole('button', { name: /cluster-00/ }));
 
     const list = await screen.findByRole('listbox', { name: 'Clusters' });
-    expect(within(list).getAllByRole('option')).toHaveLength(41);
+    expect(within(list).getAllByRole('option')).toHaveLength(42);
 
     fireEvent.change(screen.getByRole('textbox', { name: 'Search clusters' }), {
       target: { value: 'cluster-3' },
@@ -197,7 +270,7 @@ describe('ClusterSwitcher', () => {
   it('opens registration from the end of the list', async () => {
     mockApi();
     const user = userEvent.setup();
-    renderAppAt('/clusters/c1/queues', [QUEUES]);
+    renderAppAt('/clusters/c1/subscriptions', [QUEUES]);
     await user.click(await screen.findByRole('button', { name: /prod-emea/ }));
 
     await user.click(await option('Register cluster'));
@@ -211,7 +284,7 @@ describe('ClusterSwitcher', () => {
   it('in the collapsed rail is the cluster monogram, named by the cluster and its environment', async () => {
     window.localStorage.setItem('as:nav:collapsed', 'true');
     mockApi();
-    renderAppAt('/clusters/c1/queues', [QUEUES]);
+    renderAppAt('/clusters/c1/subscriptions', [QUEUES]);
 
     const trigger = await screen.findByRole('button', {
       name: 'PR, Switch cluster, now prod-emea, Production, Degraded',

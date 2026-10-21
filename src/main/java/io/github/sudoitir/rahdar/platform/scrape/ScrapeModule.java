@@ -16,7 +16,7 @@ public final class ScrapeModule {
             .settingKey(ScrapeSettings.TIER_B)
             .settingKey(ScrapeSettings.TIER_C)
             .settingKey(ScrapeSettings.DISCOVERY)
-            .streamTopic(TopicDef.signal("queues", Permissions.QUEUE_READ))
+            .streamTopic(TopicDef.signal("subscriptions", Permissions.SUBSCRIPTION_READ))
             .build();
 
     private ScrapeModule() {}

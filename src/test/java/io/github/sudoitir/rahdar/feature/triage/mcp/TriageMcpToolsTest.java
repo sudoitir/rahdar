@@ -38,6 +38,7 @@ import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.NodeEndpoint
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.TopologyView;
 import io.github.sudoitir.rahdar.platform.mcp.McpErrors;
 import io.github.sudoitir.rahdar.platform.mcp.McpProperties;
+import io.github.sudoitir.rahdar.platform.mcp.McpResourcesFixture;
 import io.github.sudoitir.rahdar.platform.mcp.McpViews;
 import io.modelcontextprotocol.spec.McpError;
 import io.modelcontextprotocol.spec.McpSchema;
@@ -94,7 +95,8 @@ class TriageMcpToolsTest {
                 clusterRepo,
                 alerts,
                 perm,
-                clocks);
+                clocks,
+                McpResourcesFixture.resolving());
 
         RegisteredCluster registered = mock(RegisteredCluster.class);
         when(registered.getName()).thenReturn("prod");
@@ -270,7 +272,7 @@ class TriageMcpToolsTest {
 
     @Test
     void diagnoseOfAQueueReadsTheSharedVerdictAndCarriesItsFindings() {
-        when(consumerHealth.forQueue(CLUSTER, "ORDERS.DLQ"))
+        when(consumerHealth.forSubscription(CLUSTER, "ORDERS.DLQ"))
                 .thenReturn(
                         Optional.of(health("orders", 3, true, 1, 2, Duration.ofSeconds(90), Duration.ofSeconds(30))));
         when(brokerEvents.page(eq(CLUSTER), any()))
@@ -298,10 +300,10 @@ class TriageMcpToolsTest {
                         0,
                         null));
 
-        McpViews.QueueDiagnosis d = (McpViews.QueueDiagnosis)
-                tools.diagnose(CLUSTER.toString(), " ORDERS.DLQ ").structuredContent();
+        McpViews.SubscriptionDiagnosis d = (McpViews.SubscriptionDiagnosis)
+                tools.diagnose(CLUSTER.toString(), "artemis.queue/ORDERS.DLQ").structuredContent();
 
-        assertThat(d.queue()).isEqualTo("ORDERS.DLQ");
+        assertThat(d.subscription()).isEqualTo("ORDERS.DLQ");
         assertThat(d.verdict()).isEqualTo("STALLED");
         assertThat(d.severity()).isEqualTo(4);
         assertThat(d.source()).isEqualTo("DERIVED");
@@ -322,19 +324,19 @@ class TriageMcpToolsTest {
         });
         ArgumentCaptor<BrokerEventQuery> query = ArgumentCaptor.forClass(BrokerEventQuery.class);
         verify(brokerEvents).page(eq(CLUSTER), query.capture());
-        assertThat(query.getValue().address()).isEqualTo("orders");
+        assertThat(query.getValue().destination()).isEqualTo("orders");
         assertThat(query.getValue().size()).isEqualTo(10);
     }
 
     @Test
     void aHealthyFullyReportedQueueHasNoFindingsAndNoDeadLetterHint() {
-        when(consumerHealth.forQueue(CLUSTER, "ORDERS"))
+        when(consumerHealth.forSubscription(CLUSTER, "ORDERS"))
                 .thenReturn(Optional.of(health("orders", 0, false, 2, 2, null, null)));
         when(brokerEvents.page(eq(CLUSTER), any()))
                 .thenReturn(new BrokerEventPageView(List.of(), 1, 10, 0L, false, null, false, 0, null));
 
-        McpViews.QueueDiagnosis d = (McpViews.QueueDiagnosis)
-                tools.diagnose(CLUSTER.toString(), "ORDERS").structuredContent();
+        McpViews.SubscriptionDiagnosis d = (McpViews.SubscriptionDiagnosis)
+                tools.diagnose(CLUSTER.toString(), "artemis.queue/ORDERS").structuredContent();
 
         assertThat(d.findings()).isEmpty();
         assertThat(d.dlq()).isNull();
@@ -348,11 +350,11 @@ class TriageMcpToolsTest {
         when(brokerEvents.page(eq(CLUSTER), any()))
                 .thenReturn(new BrokerEventPageView(List.of(), 1, 10, 0L, false, null, false, 0, null));
         for (String name : List.of("DLQ", "orders.DLQ", "orders.dlq")) {
-            when(consumerHealth.forQueue(CLUSTER, name))
+            when(consumerHealth.forSubscription(CLUSTER, name))
                     .thenReturn(Optional.of(health("a", 0, false, 1, 1, null, null)));
 
-            McpViews.QueueDiagnosis d = (McpViews.QueueDiagnosis)
-                    tools.diagnose(CLUSTER.toString(), name).structuredContent();
+            McpViews.SubscriptionDiagnosis d = (McpViews.SubscriptionDiagnosis)
+                    tools.diagnose(CLUSTER.toString(), "artemis.queue/" + name).structuredContent();
 
             assertThat(d.dlq()).as(name).isNotNull();
         }
@@ -360,9 +362,9 @@ class TriageMcpToolsTest {
 
     @Test
     void anUnknownQueueIsTheHiddenDenial() {
-        when(consumerHealth.forQueue(CLUSTER, "nope")).thenReturn(Optional.empty());
+        when(consumerHealth.forSubscription(CLUSTER, "nope")).thenReturn(Optional.empty());
 
-        McpSchema.CallToolResult result = tools.diagnose(CLUSTER.toString(), "nope");
+        McpSchema.CallToolResult result = tools.diagnose(CLUSTER.toString(), "artemis.queue/nope");
 
         assertThat(result.isError()).isTrue();
     }
@@ -402,7 +404,7 @@ class TriageMcpToolsTest {
         verify(brokerEvents).page(eq(CLUSTER), query.capture());
         // one more than the default limit, so truncation can be reported
         assertThat(query.getValue().size()).isEqualTo(26);
-        assertThat(query.getValue().address()).isEqualTo("addr");
+        assertThat(query.getValue().destination()).isEqualTo("addr");
     }
 
     @Test

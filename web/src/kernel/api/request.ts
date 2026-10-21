@@ -38,7 +38,7 @@ export class ApiError extends Error {
 /** What the server says about an operation it held for approval instead of running. */
 export interface HeldOperation {
   id: string;
-  /** What the operation would do, in words, such as `Purge queue "orders" on prod`. */
+  /** What the operation would do, in words, such as `Purge subscription "orders" on prod`. */
   summary: string;
   /** When the request lapses unless someone decides it, as an ISO instant. */
   expiresAt: string;
@@ -205,10 +205,11 @@ export interface LifecycleVars {
   override?: boolean;
 }
 
-export function lifecycleQuery(dryRun?: boolean, override?: boolean): string {
+export function lifecycleQuery(dryRun?: boolean, override?: boolean, node?: string): string {
   const params = new URLSearchParams();
   if (dryRun !== undefined) params.set('dryRun', String(dryRun));
   if (override) params.set('override', 'true');
+  if (node) params.set('node', node);
   const q = params.toString();
   return q ? `?${q}` : '';
 }

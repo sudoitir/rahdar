@@ -21,7 +21,7 @@ export type ActionVerb = Readonly<{
 
 type Notice = Readonly<{
   action: ActionVerb;
-  /** What the action acts on, such as `queue "orders"`. */
+  /** What the action acts on, such as `subscription "orders"`. */
   subject: string;
 }>;
 

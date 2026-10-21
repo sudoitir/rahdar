@@ -11,6 +11,7 @@ import io.github.sudoitir.rahdar.feature.sql.web.SqlViews.RowView;
 import io.github.sudoitir.rahdar.feature.sql.web.SqlViews.SqlNodeOutcomeView;
 import io.github.sudoitir.rahdar.feature.sql.web.SqlViews.TailStatusView;
 import io.github.sudoitir.rahdar.feature.sql.web.SqlViews.TargetView;
+import io.github.sudoitir.rahdar.kernel.security.ResourceIdTexts.Of;
 import io.github.sudoitir.rahdar.platform.governance.GovernanceViews;
 import io.github.sudoitir.rahdar.platform.governance.GovernedMessage;
 import java.time.Instant;
@@ -25,12 +26,16 @@ import org.springframework.stereotype.Component;
 @Component
 public class SqlViewMapper {
 
-    public PlanView toView(QueryPlan plan) {
+    public PlanView toView(Of ids, QueryPlan plan) {
         return new PlanView(
                 plan.resolvedSource().name(),
                 plan.targets().stream()
-                        .map(t ->
-                                new TargetView(t.nodeId(), t.nodeName(), t.queueName(), t.address(), t.messageCount()))
+                        .map(t -> new TargetView(
+                                t.nodeId(),
+                                t.nodeName(),
+                                ids.subscription(t.subscription()),
+                                ids.destination(t.destination()),
+                                t.messageCount()))
                         .toList(),
                 plan.selector(),
                 plan.requiresScan(),
@@ -42,24 +47,24 @@ public class SqlViewMapper {
                 notices(plan.notices()));
     }
 
-    public ResultView toView(QueryResult result, QueryPlan plan) {
+    public ResultView toView(Of ids, QueryResult result, QueryPlan plan) {
         return new ResultView(
-                result.nodes().stream().map(this::toView).toList(),
+                result.nodes().stream().map(n -> toView(ids, n)).toList(),
                 result.boundsReached().stream()
                         .map(b -> new BoundView(b.kind().name(), b.value()))
                         .toList(),
                 notices(result.notices()),
                 result.isPartial(),
-                toView(plan));
+                toView(ids, plan));
     }
 
     /** A row as the caller may see it: every header, property and body value from the governed message. */
-    public RowView toView(QueryResult.Row row, GovernedMessage governed) {
+    public RowView toView(Of ids, QueryResult.Row row, GovernedMessage governed) {
         return new RowView(
                 row.nodeId(),
                 row.nodeName(),
-                row.queueName(),
-                row.address(),
+                ids.subscription(row.subscription()),
+                ids.destination(row.destination()),
                 row.messageId(),
                 row.messageType(),
                 row.durable(),
@@ -84,11 +89,11 @@ public class SqlViewMapper {
                 GovernanceViews.withheld(governed));
     }
 
-    public SqlNodeOutcomeView toView(QueryResult.NodeOutcome outcome) {
+    public SqlNodeOutcomeView toView(Of ids, QueryResult.NodeOutcome outcome) {
         return new SqlNodeOutcomeView(
                 outcome.nodeId(),
                 outcome.nodeName(),
-                outcome.queueName(),
+                ids.subscription(outcome.subscription()),
                 outcome.status().name(),
                 outcome.examined(),
                 outcome.matched(),

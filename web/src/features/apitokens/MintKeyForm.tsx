@@ -37,10 +37,10 @@ function defaultLifetime(options: string[]): string | null {
   return options.at(-1) ?? null;
 }
 
-type Limit = { kind: 'QUEUE' | 'ADDRESS'; pattern: string };
+type Limit = { kind: 'SUBSCRIPTION' | 'DESTINATION'; pattern: string };
 
 /**
- * One grant per permission. A limit applies to the permissions that act on queues or addresses of its kind,
+ * One grant per permission. A limit applies to the permissions that act on subscriptions or destinations of its kind,
  * and the others, which have no names to match, stay on the whole scope.
  */
 function grantsFor(
@@ -53,12 +53,12 @@ function grantsFor(
   return chosen.map((action) => {
     const limited =
       limit !== null &&
-      catalogue.some((p) => p.action === action && p.scope === 'RESOURCE' && p.resourceKinds.includes(limit.kind));
+      catalogue.some((p) => p.action === action && p.scope === 'RESOURCE' && p.resourceTypes.includes(limit.kind));
     return {
       action,
       scopeType: global ? GLOBAL : 'CLUSTER',
       scopeId: global ? null : scope,
-      ...(limited ? { resourceKind: limit.kind, resourcePattern: limit.pattern } : {}),
+      ...(limited ? { resourceType: limit.kind, resourcePattern: limit.pattern } : {}),
     };
   });
 }
@@ -192,13 +192,13 @@ export function MintKeyForm({
         </div>
         <Select
           label="Limit to"
-          description="Names a key may act on. Permissions that act on queues or addresses follow it; the others do not."
+          description="Names a key may act on. Permissions that act on subscriptions or destinations follow it; the others do not."
           {...form.getInputProps('limitKind')}
           allowDeselect={false}
           data={[
             { value: NO_LIMIT, label: 'Everything in the scope' },
-            { value: 'QUEUE', label: 'Queues whose names match a pattern' },
-            { value: 'ADDRESS', label: 'Addresses whose names match a pattern' },
+            { value: 'SUBSCRIPTION', label: 'Subscriptions whose names match a pattern' },
+            { value: 'DESTINATION', label: 'Destinations whose names match a pattern' },
           ]}
         />
         {limitKind === NO_LIMIT ? null : (

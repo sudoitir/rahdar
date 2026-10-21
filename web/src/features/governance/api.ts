@@ -80,7 +80,7 @@ export function useDeleteRule() {
 /** The request that keeps a rule as it is except for `enabled` — all a built-in rule accepts. */
 export function withEnabled(rule: RuleView, enabled: boolean): RuleRequest {
   return {
-    addressPattern: rule.addressPattern ?? null,
+    destinationPattern: rule.destinationPattern ?? null,
     target: rule.target,
     selector: rule.selector,
     dataClass: rule.dataClass,

@@ -124,7 +124,7 @@ class FlowSamplerIntegrationTest extends PostgresIntegrationTest {
                         sampler.sweep(clusterId);
 
                         List<StoredEdge> edges = store.edges(clusterId).stream()
-                                .filter(e -> queue.equals(e.edge().address()))
+                                .filter(e -> queue.equals(e.edge().destination()))
                                 .toList();
                         assertThat(edges)
                                 .extracting(e -> e.edge().kind())

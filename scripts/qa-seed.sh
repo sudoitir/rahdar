@@ -111,15 +111,15 @@ fi
 
 say "creating 60 queues"
 queue() { # address name routing-type
-  post "queue $2" "/clusters/$cluster/queues" \
-    "{\"address\":\"$1\",\"name\":\"$2\",\"routingType\":\"$3\",\"durable\":true,\"autoCreateAddress\":true}"
+  post "queue $2" "/clusters/$cluster/subscriptions" \
+    "{\"kind\":\"artemis.queue\",\"name\":\"$2\",\"destination\":\"artemis.address/$1\",\"attributes\":{\"routingType\":\"$3\",\"durable\":true,\"autoCreateAddress\":true}}"
 }
 # 1 on a 200-character address, 3 with names past 120 characters.
 queue "$LONG_ADDRESS" "$LONG_ADDRESS" ANYCAST
 for name in "${LONG_QUEUES[@]}"; do queue "$name" "$name" ANYCAST; done
 # 18 multicast subscribers: six fan-out addresses with three queues each.
 for n in 1 2 3 4 5 6; do
-  post "address qa.fanout.$n" "/clusters/$cluster/addresses" "{\"name\":\"qa.fanout.$n\",\"routingTypes\":\"MULTICAST\"}"
+  post "address qa.fanout.$n" "/clusters/$cluster/destinations" "{\"kind\":\"artemis.address\",\"name\":\"qa.fanout.$n\",\"attributes\":{\"routingTypes\":\"MULTICAST\"}}"
   for sub in a b c; do queue "qa.fanout.$n" "qa.fanout.$n.sub-$sub" MULTICAST; done
 done
 # The DLQ family and the expiry family: DLQ and ExpiryQueue come with the brokers' configuration.
@@ -137,7 +137,7 @@ done
 say "sending long messages to the dead-letter and expiry queues"
 # 12 dead-lettered and 6 expired, each with a body of about 16 KB, headers and properties of hundreds of characters.
 long_message() { # queue n
-  python3 - "$1" "$2" <<'PY' | api POST "/clusters/$cluster/queues/$1/messages" --data-binary @- -o /dev/null -w '%{http_code}' | grep -q '^2' \
+  python3 - "$1" "$2" <<'PY' | api POST "/clusters/$cluster/resources/artemis.queue/$1/messages" --data-binary @- -o /dev/null -w '%{http_code}' | grep -q '^2' \
     || { echo "  message $2 to $1 was refused" >&2; failed=$((failed + 1)); }
 import json, sys
 queue, n = sys.argv[1], int(sys.argv[2])
@@ -160,7 +160,7 @@ for n in $(seq 1 6); do long_message ExpiryQueue "$n"; done
 
 say "sending 250 small messages to one queue, for a query with many rows"
 for n in $(seq 1 250); do
-  code=$(api POST "/clusters/$cluster/queues/qa.orders.eu-central.001/messages" -o /dev/null -w '%{http_code}' \
+  code=$(api POST "/clusters/$cluster/resources/artemis.queue/qa.orders.eu-central.001/messages" -o /dev/null -w '%{http_code}' \
     -d "{\"kind\":\"TEXT\",\"durable\":true,\"body\":\"{\\\"orderId\\\":\\\"ORD-$n\\\",\\\"amount\\\":$((n * 7 % 500))}\",\"properties\":{\"seq\":$n}}") || code=000
   case $code in 2??) ;; *) failed=$((failed + 1)) ;; esac
 done
@@ -199,7 +199,7 @@ for n in 1 2 3; do
 done
 
 say "creating a role and users"
-reader=$(ensure /roles name READER '{"name":"READER","requiresMfa":false,"teamAssignable":false,"permissions":["cluster:read","queue:read","message:read"]}')
+reader=$(ensure /roles name READER '{"name":"READER","requiresMfa":false,"teamAssignable":false,"permissions":["cluster:read","subscription:read","message:read"]}')
 long_role="qa-role-with-a-name-that-keeps-going-$(repeat 'and-going-' 8)"
 long_role_id=$(ensure /roles name "$long_role" "{\"name\":\"$long_role\",\"requiresMfa\":false,\"teamAssignable\":false,\"permissions\":[\"cluster:read\"]}")
 long_user="qa-operator-with-an-unreasonably-long-username-$(repeat 'abcdefghij' 4)"
@@ -232,12 +232,12 @@ orders=$(ensure /teams name qa-orders '{"name":"qa-orders"}')
 long_team="qa-team-for-the-regional-compliance-and-$(repeat 'onboarding-' 5)desk"
 long_team_id=$(ensure /teams name "$long_team" "{\"name\":\"$long_team\"}")
 ensure /teams name qa-team-empty '{"name":"qa-team-empty"}' >/dev/null
-post "orders: reconciliation queues" "/teams/$orders/patterns" "{\"clusterId\":\"$cluster\",\"kind\":\"QUEUE\",\"pattern\":\"qa.reconciliation.#\"}"
-post "orders: long address" "/teams/$orders/patterns" "{\"clusterId\":\"$cluster\",\"kind\":\"BOTH\",\"pattern\":\"qa.long-address.#\"}"
-post "long team: onboarding" "/teams/$long_team_id/patterns" "{\"clusterId\":\"$cluster\",\"kind\":\"QUEUE\",\"pattern\":\"qa.customer-onboarding.#\"}"
+post "orders: reconciliation queues" "/teams/$orders/patterns" "{\"clusterId\":\"$cluster\",\"kind\":\"SUBSCRIPTION\",\"pattern\":\"qa.reconciliation.#\"}"
+post "orders: long address" "/teams/$orders/patterns" "{\"clusterId\":\"$cluster\",\"kind\":\"ANY\",\"pattern\":\"qa.long-address.#\"}"
+post "long team: onboarding" "/teams/$long_team_id/patterns" "{\"clusterId\":\"$cluster\",\"kind\":\"SUBSCRIPTION\",\"pattern\":\"qa.customer-onboarding.#\"}"
 post "orders: member $long_user" "/teams/$orders/members" "{\"principalType\":\"USER\",\"userId\":\"$long_user_id\",\"roleId\":\"$team_operator\"}"
 post "orders: member qa-reader" "/teams/$orders/members" "{\"principalType\":\"USER\",\"userId\":\"$reader_id\",\"roleId\":\"$team_operator\"}"
-post "orders shares with the long team" "/teams/$orders/shares" "{\"targetTeamId\":\"$long_team_id\",\"clusterId\":\"$cluster\",\"kind\":\"QUEUE\",\"pattern\":\"qa.reconciliation.nightly-settlement-batch.#\",\"roleId\":\"$team_operator\"}" optional
+post "orders shares with the long team" "/teams/$orders/shares" "{\"targetTeamId\":\"$long_team_id\",\"clusterId\":\"$cluster\",\"kind\":\"SUBSCRIPTION\",\"pattern\":\"qa.reconciliation.nightly-settlement-batch.#\",\"roleId\":\"$team_operator\"}" optional
 
 if [ "$failed" -gt 0 ]; then
   say "$failed required step(s) failed; the content above is incomplete"

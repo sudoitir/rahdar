@@ -83,7 +83,7 @@ public class RoleService {
                         e.featureId(),
                         e.featureTitle(),
                         e.scope(),
-                        e.resourceKinds().stream().sorted().toList(),
+                        e.resourceTypes().stream().sorted().toList(),
                         e.requires().stream().sorted().toList()))
                 .toList();
     }

@@ -74,7 +74,7 @@ class GroupMappingOperations {
                 return new Effect(
                         1,
                         "mapping",
-                        stateKey(p.providerId(), p.groupName(), p.roleId(), p.scopeType(), p.scopeId()),
+                        etag(p.providerId(), p.groupName(), p.roleId(), p.scopeType(), p.scopeId()),
                         null);
             }
 
@@ -115,7 +115,7 @@ class GroupMappingOperations {
                 return new Effect(
                         1,
                         "mapping",
-                        stateKey(p.providerId(), p.mappingId(), mapping.getGroupName(), mapping.getRoleId()),
+                        etag(p.providerId(), p.mappingId(), mapping.getGroupName(), mapping.getRoleId()),
                         null);
             }
 
@@ -155,7 +155,7 @@ class GroupMappingOperations {
 
             @Override
             public Effect estimate(SetDefaultRole p) {
-                return new Effect(1, "default role", stateKey(p.providerId(), currentDefault(p.providerId())), null);
+                return new Effect(1, "default role", etag(p.providerId(), currentDefault(p.providerId())), null);
             }
 
             @Override

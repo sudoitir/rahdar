@@ -1,6 +1,7 @@
 package io.github.sudoitir.rahdar.feature.triage;
 
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
+import io.github.sudoitir.rahdar.platform.broker.QueueCounters;
 import io.github.sudoitir.rahdar.platform.clusters.BrokerCommands;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterEnvironmentIndex;
@@ -49,4 +50,8 @@ class TriageModuleTest extends ModuleIntegrationTest {
 
     @MockitoBean
     ArtemisNodes artemisNodes;
+
+    /** Queue lifecycle, in a direct dependency, resets counters through the system module, which is not started. */
+    @MockitoBean
+    QueueCounters queueCounters;
 }

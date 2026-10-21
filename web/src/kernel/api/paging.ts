@@ -58,15 +58,19 @@ export function resourceSearch(params: ResourceParams): string {
   return s ? `?${s}` : '';
 }
 
-/** One page of a cluster-wide listing (queues, addresses, consumers, …), refetched on the usual interval. */
+/**
+ * One page of a cluster-wide listing (subscriptions, destinations, consumers, …), refetched on the usual interval.
+ * `topic` names the stream topic that invalidates it; `path` is the route when that is another word.
+ */
 export function useResource<T>(
   id: string,
-  kind: string,
+  topic: string,
   params: ResourceParams,
+  path: string = topic,
 ): UseQueryResult<PagedView<T>, ApiError> {
   return useQuery({
-    queryKey: clusterKey(id, kind, params),
-    queryFn: () => request<PagedView<T>>(`/clusters/${id}/${kind}${resourceSearch(params)}`),
+    queryKey: clusterKey(id, topic, params),
+    queryFn: () => request<PagedView<T>>(`/clusters/${id}/${path}${resourceSearch(params)}`),
     refetchInterval: 5_000,
     placeholderData: (prev) => prev,
   });

@@ -28,6 +28,7 @@ import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.csrf.CsrfFilter;
 import org.springframework.security.web.csrf.CsrfTokenRepository;
 import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
+import org.springframework.security.web.firewall.StrictHttpFirewall;
 import org.springframework.security.web.header.writers.CrossOriginOpenerPolicyHeaderWriter.CrossOriginOpenerPolicy;
 import org.springframework.security.web.header.writers.CrossOriginResourcePolicyHeaderWriter.CrossOriginResourcePolicy;
 import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter.ReferrerPolicy;
@@ -96,6 +97,19 @@ public class SecurityConfig {
     @Bean
     AuthorizationEventPublisher authorizationEventPublisher(ApplicationEventPublisher events) {
         return new SpringAuthorizationEventPublisher(events);
+    }
+
+    /**
+     * A resource id is one URL segment, so a name that holds a slash or a percent sign arrives as
+     * {@code %2F} or {@code %25} (design of the resource routes). The strict firewall refuses both
+     * by default; the embedded Tomcat is told to pass them through ({@code EncodedSolidusConfig}).
+     */
+    @Bean
+    StrictHttpFirewall httpFirewall() {
+        StrictHttpFirewall firewall = new StrictHttpFirewall();
+        firewall.setAllowUrlEncodedSlash(true);
+        firewall.setAllowUrlEncodedPercent(true);
+        return firewall;
     }
 
     @Bean

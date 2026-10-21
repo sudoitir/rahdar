@@ -69,11 +69,12 @@ class PermissionStreamAccess implements StreamAccess {
             return null;
         }
         List<String> queues = about.queues().stream()
-                .filter(name -> permissions.can(principal, clusterId, ResourceRef.queue(name), Permissions.QUEUE_READ))
+                .filter(name -> permissions.can(
+                        principal, clusterId, ResourceRef.subscription(name), Permissions.SUBSCRIPTION_READ))
                 .toList();
         List<String> addresses = about.addresses().stream()
-                .filter(name ->
-                        permissions.can(principal, clusterId, ResourceRef.address(name), Permissions.ADDRESS_READ))
+                .filter(name -> permissions.can(
+                        principal, clusterId, ResourceRef.destination(name), Permissions.DESTINATION_READ))
                 .toList();
         if (queues.isEmpty() && addresses.isEmpty()) {
             return null;

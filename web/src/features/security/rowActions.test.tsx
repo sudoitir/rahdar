@@ -7,7 +7,7 @@ import { ActionHostProvider } from '../../kernel/actions/ActionHost.tsx';
 import type { ActionHost } from '../../kernel/actions/types.ts';
 import { renderWithProviders } from '../../test/render.tsx';
 import { server } from '../../test/setup.ts';
-import { AddressAccess } from './rowActions.tsx';
+import { DestinationAccess } from './rowActions.tsx';
 
 const HOST: ActionHost = { open: () => {}, explain: () => {}, copy: () => {} };
 
@@ -16,7 +16,12 @@ function renderItem() {
     <ActionHostProvider>
       <Menu opened>
         <Menu.Dropdown>
-          <AddressAccess clusterId="c1" target={{ address: 'orders.addr' }} host={HOST} mode="act" />
+          <DestinationAccess
+            clusterId="c1"
+            target={{ id: 'artemis.address/orders.addr', kind: 'artemis.address', name: 'orders.addr' }}
+            host={HOST}
+            mode="act"
+          />
         </Menu.Dropdown>
       </Menu>
     </ActionHostProvider>,
@@ -36,7 +41,7 @@ function signInWith(permissions: string[]) {
   );
 }
 
-describe('AddressAccess', () => {
+describe('DestinationAccess', () => {
   it('offers who has access to an administrator', async () => {
     signInWith(['user:admin']);
     renderItem();
@@ -45,7 +50,7 @@ describe('AddressAccess', () => {
   });
 
   it('leaves it out for someone who administers nothing', async () => {
-    signInWith(['address:read']);
+    signInWith(['destination:read']);
     renderItem();
 
     await new Promise((resolve) => setTimeout(resolve, 100));

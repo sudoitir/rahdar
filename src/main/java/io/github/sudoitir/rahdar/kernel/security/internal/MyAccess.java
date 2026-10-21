@@ -3,7 +3,7 @@ package io.github.sudoitir.rahdar.kernel.security.internal;
 import io.github.sudoitir.rahdar.kernel.plugin.CatalogueEntry;
 import io.github.sudoitir.rahdar.kernel.plugin.FeatureRegistry;
 import io.github.sudoitir.rahdar.kernel.plugin.PermissionScope;
-import io.github.sudoitir.rahdar.kernel.plugin.ResourceKind;
+import io.github.sudoitir.rahdar.kernel.plugin.ResourceType;
 import io.github.sudoitir.rahdar.kernel.security.Grant;
 import io.github.sudoitir.rahdar.kernel.security.PermissionResolver;
 import io.github.sudoitir.rahdar.kernel.security.Permissions;
@@ -43,9 +43,9 @@ import org.springframework.transaction.annotation.Transactional;
 public class MyAccess {
 
     /** Catalogued by the queues feature; the kernel only asks where the caller holds them. */
-    private static final String QUEUE_CREATE = "queue:create";
+    private static final String SUBSCRIPTION_CREATE = "subscription:create";
 
-    private static final String ADDRESS_CREATE = "address:create";
+    private static final String DESTINATION_CREATE = "destination:create";
 
     private final PermissionResolver perm;
     private final FeatureRegistry features;
@@ -77,8 +77,8 @@ public class MyAccess {
         CreatePatterns createPatterns = clusterId == null
                 ? new CreatePatterns(List.of(), List.of())
                 : new CreatePatterns(
-                        perm.patternsHolding(clusterId, ResourceKind.QUEUE, QUEUE_CREATE),
-                        perm.patternsHolding(clusterId, ResourceKind.ADDRESS, ADDRESS_CREATE));
+                        perm.patternsHolding(clusterId, ResourceType.SUBSCRIPTION, SUBSCRIPTION_CREATE),
+                        perm.patternsHolding(clusterId, ResourceType.DESTINATION, DESTINATION_CREATE));
         return new AccessSummary(
                 held, anywhere, clusterId == null ? null : perm.canSeeCluster(clusterId), teams(), createPatterns);
     }
@@ -87,7 +87,7 @@ public class MyAccess {
      * The actions the caller holds on one queue or address. A resource they may not read has none, whether or
      * not it exists.
      */
-    public MyResourceAccess onResource(UUID clusterId, ResourceKind kind, String name) {
+    public MyResourceAccess onResource(UUID clusterId, ResourceType kind, String name) {
         ResourceFilter filter = perm.filter(clusterId, kind);
         return new MyResourceAccess(filter.readable(name) ? filter.allowedActions(name) : List.of());
     }

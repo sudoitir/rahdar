@@ -28,6 +28,33 @@ public final class ClusterViews {
 
     private ClusterViews() {}
 
+    /** The broker system a cluster runs. */
+    public record SystemView(
+            @Schema(requiredMode = REQUIRED, description = "The system's id, such as artemis.")
+            String id,
+
+            @Schema(requiredMode = REQUIRED, description = "The system's name for people.")
+            String name) {}
+
+    /** One kind of resource the cluster's system has, and what can be done to it. */
+    public record KindView(
+            @Schema(requiredMode = REQUIRED, description = "The kind's id, such as artemis.queue.")
+            String id,
+
+            @Schema(
+                    requiredMode = REQUIRED,
+                    description = "The role the kind plays: SUBSCRIPTION, DESTINATION, ROUTE, CONSUMER and so on.")
+            String resourceClass,
+
+            @Schema(requiredMode = REQUIRED, description = "The kind's name for people, such as Queue.")
+            String label,
+
+            @Schema(
+                    requiredMode = REQUIRED,
+                    description = "What the system can do to this kind (create, delete, pause, purge, ...), plus"
+                            + " what Rahdar adds when the system provides it (reset-counters, expire).")
+            List<String> verbs) {}
+
     /** One row in the cluster rail: rolled-up health, no detail. */
     public record ClusterSummary(
             @Schema(requiredMode = REQUIRED) UUID id,
@@ -36,7 +63,9 @@ public final class ClusterViews {
             @Schema(requiredMode = REQUIRED) ClusterHealth.Level health,
             @Schema(requiredMode = REQUIRED) int nodeCount,
             @Schema(requiredMode = REQUIRED) Instant updatedAt,
-            @Schema(nullable = true) UUID environmentId) {}
+            @Schema(nullable = true) UUID environmentId,
+            @Schema(requiredMode = REQUIRED) SystemView system,
+            @Schema(requiredMode = REQUIRED) List<KindView> kinds) {}
 
     /** The full cluster screen payload. */
     public record ClusterDetail(
@@ -51,8 +80,11 @@ public final class ClusterViews {
             @Schema(
                     nullable = true,
                     description = "How Rahdar reaches the cluster. Absent for a caller who sees the cluster only"
-                            + " through a team's queues")
-            ClusterConnectionDetail connection) {}
+                            + " through a team's subscriptions")
+            ClusterConnectionDetail connection,
+
+            @Schema(requiredMode = REQUIRED) SystemView system,
+            @Schema(requiredMode = REQUIRED) List<KindView> kinds) {}
 
     /** {@code PATCH /clusters/{id}}: the cluster as the edit left it. */
     public record ClusterConnectionView(

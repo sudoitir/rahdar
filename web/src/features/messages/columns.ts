@@ -2,9 +2,9 @@ import { createElement } from 'react';
 
 import { absoluteLabel } from '../../kernel/time/time.ts';
 import { AUTO, localZone } from '../../kernel/time/timezone.ts';
-import type { Column } from '../../ui/table/index.ts';
-import type { DlqQueue, MessageSummaryView } from './api.ts';
-import { BodyPreview, QueueLink } from './cells.tsx';
+import { kindColumn, type Column } from '../../ui/table/index.ts';
+import type { DeadLetterSubscription, MessageSummaryView } from './api.ts';
+import { BodyPreview, SubscriptionLink } from './cells.tsx';
 
 /**
  * The columns of the message browser. The enqueue time is written in the display zone `zone`, which
@@ -13,9 +13,9 @@ import { BodyPreview, QueueLink } from './cells.tsx';
 export function messageColumns(zone: string): Column<MessageSummaryView>[] {
   return [
     {
-      id: 'messageId',
+      id: 'position',
       header: 'Message ID',
-      accessor: (m) => m.messageId,
+      accessor: (m) => m.position,
       kind: 'identifier',
       priority: 'essential',
     },
@@ -48,33 +48,34 @@ export function messageColumns(zone: string): Column<MessageSummaryView>[] {
   ];
 }
 
-/** One dead-letter queue as a row: the queue, the address it is dead-lettered from, and its depth. */
-export interface DlqRow {
-  address: string;
+/** One dead-letter subscription as a row: the subscription, the destination it is dead-lettered from, and its depth. */
+export interface DeadLetterRow {
+  destination: string;
   kind: string;
-  queue: DlqQueue;
+  subscription: DeadLetterSubscription;
 }
 
-/** The dead-letter grid's columns. The queue identifies a row and is never hidden. */
-export function dlqColumns(clusterId: string): Column<DlqRow>[] {
+/** The dead-letter grid's columns. The subscription identifies a row and is never hidden. */
+export function deadLetterColumns(clusterId: string): Column<DeadLetterRow>[] {
   return [
     {
-      id: 'queue',
-      header: 'Queue',
-      accessor: (r) => r.queue.queueName,
-      cell: (r) => createElement(QueueLink, { clusterId, queueName: r.queue.queueName }),
+      id: 'subscription',
+      header: 'Subscription',
+      accessor: (r) => r.subscription.name,
+      cell: (r) => createElement(SubscriptionLink, { clusterId, subscriptionName: r.subscription.name }),
       kind: 'identifier',
       priority: 'essential',
     },
-    { id: 'address', header: 'Address', accessor: (r) => r.address, kind: 'identifier', priority: 'high' },
-    { id: 'kind', header: 'Kind', accessor: (r) => r.kind, kind: 'status', priority: 'low' },
+    { id: 'destination', header: 'Destination', accessor: (r) => r.destination, kind: 'identifier', priority: 'high' },
+    kindColumn<DeadLetterRow>((r) => r.subscription.kindLabel),
+    { id: 'purpose', header: 'Purpose', accessor: (r) => r.kind, kind: 'status', priority: 'low' },
     {
       id: 'depth',
       header: 'Messages',
-      accessor: (r) => r.queue.totalDepth,
+      accessor: (r) => r.subscription.totalDepth,
       kind: 'number',
       priority: 'essential',
     },
-    { id: 'nodes', header: 'Nodes', accessor: (r) => r.queue.perNode.length, kind: 'number', priority: 'high' },
+    { id: 'nodes', header: 'Nodes', accessor: (r) => r.subscription.perNode.length, kind: 'number', priority: 'high' },
   ];
 }

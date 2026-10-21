@@ -12,8 +12,10 @@ import io.github.sudoitir.rahdar.kernel.audit.AuditEvent;
 import io.github.sudoitir.rahdar.kernel.audit.AuditService;
 import io.github.sudoitir.rahdar.kernel.plugin.PluginPurged;
 import io.github.sudoitir.rahdar.kernel.plugin.PluginScopedBeans;
+import io.github.sudoitir.rahdar.kernel.plugin.ResourceType;
 import io.github.sudoitir.rahdar.kernel.security.Actor;
 import io.github.sudoitir.rahdar.kernel.security.ActorResolver;
+import io.github.sudoitir.rahdar.kernel.security.ResourceRef;
 import io.github.sudoitir.rahdar.platform.broker.BrokerMessages;
 import io.github.sudoitir.rahdar.platform.broker.MessageKind;
 import io.github.sudoitir.rahdar.platform.broker.SendNames;
@@ -70,7 +72,10 @@ public class PluginMessagingService implements PluginScopedBeans {
 
     MessageRegistration register(String pluginId, RegistrationSpec spec) {
         validate(spec);
-        access.denial(spec.actingUserId(), spec.clusterId(), AccessCheck.needsOf(spec.mode(), spec.queue()))
+        access.denial(
+                        spec.actingUserId(),
+                        spec.clusterId(),
+                        AccessCheck.needsOf(spec.mode(), spec.source().name()))
                 .ifPresent(why -> {
                     throw new RegistrationRefusedException(why);
                 });
@@ -84,8 +89,8 @@ public class PluginMessagingService implements PluginScopedBeans {
                 Map.of(
                         PLUGIN,
                         pluginId,
-                        "queue",
-                        spec.queue(),
+                        "source",
+                        spec.source().name(),
                         "mode",
                         spec.mode().name(),
                         "concurrency",
@@ -97,7 +102,7 @@ public class PluginMessagingService implements PluginScopedBeans {
             if (existing.isPresent()) {
                 RegistrationEntity e = existing.get();
                 boolean sameTarget = e.getClusterId().equals(spec.clusterId())
-                        && e.getQueue().equals(spec.queue())
+                        && e.getSubscription().equals(spec.source().name())
                         && e.getMode() == spec.mode();
                 if (sameTarget) {
                     // A changed concurrency is converged by the pass below, which restarts the drains.
@@ -117,7 +122,7 @@ public class PluginMessagingService implements PluginScopedBeans {
             row.setPluginId(pluginId);
             row.setKey(spec.key());
             row.setClusterId(spec.clusterId());
-            row.setQueue(spec.queue());
+            row.setSubscription(spec.source().name());
             row.setMode(spec.mode());
             row.setConcurrency(spec.concurrency());
             row.setActingUserId(spec.actingUserId());
@@ -150,8 +155,8 @@ public class PluginMessagingService implements PluginScopedBeans {
                 Map.of(
                         PLUGIN,
                         pluginId,
-                        "queue",
-                        reg.getQueue(),
+                        "source",
+                        reg.getSubscription(),
                         "mode",
                         reg.getMode().name()),
                 false);
@@ -172,29 +177,29 @@ public class PluginMessagingService implements PluginScopedBeans {
                 .toList();
     }
 
-    /** Why a send to {@code address} as {@code actingUserId} would be refused, or empty when it would be allowed. */
-    Optional<String> sendDenial(UUID clusterId, String address, UUID actingUserId) {
-        if (clusterId == null || blank(address)) {
-            return Optional.of("A message needs a cluster and an address.");
+    /** Why a send to {@code target} as {@code actingUserId} would be refused, or empty when it would be allowed. */
+    Optional<String> sendDenial(UUID clusterId, ResourceRef target, UUID actingUserId) {
+        if (clusterId == null || target == null || target.type() == null || blank(target.name())) {
+            return Optional.of("A message needs a cluster and a target.");
         }
-        if (address.length() > MAX_NAME) {
-            return Optional.of("The address is longer than " + MAX_NAME + " characters.");
+        if (target.name().length() > MAX_NAME) {
+            return Optional.of("The target's name is longer than " + MAX_NAME + " characters.");
         }
-        String reserved = Reservations.reason(address);
+        String reserved = Reservations.reason(target.name());
         if (reserved != null) {
             return Optional.of(reserved);
         }
         if (clusters.cluster(clusterId).isEmpty()) {
             return Optional.of("The cluster " + clusterId + " is not registered.");
         }
-        return access.denial(actingUserId, clusterId, AccessCheck.sendNeeds(address));
+        return access.denial(actingUserId, clusterId, AccessCheck.sendNeeds(target));
     }
 
     void send(String pluginId, OutboundMessage message) {
         if (message == null) {
-            throw new RegistrationRefusedException("A message needs a cluster and an address.");
+            throw new RegistrationRefusedException("A message needs a cluster and a target.");
         }
-        sendDenial(message.clusterId(), message.address(), message.actingUserId())
+        sendDenial(message.clusterId(), message.target(), message.actingUserId())
                 .ifPresent(why -> {
                     throw new RegistrationRefusedException(why);
                 });
@@ -216,17 +221,17 @@ public class PluginMessagingService implements PluginScopedBeans {
         AuditEvent event = audit.begin(
                 actor(pluginId, message.actingUserId()),
                 "PLUGIN_MESSAGE_SEND",
-                "ADDRESS",
-                message.address(),
+                message.target().type().name(),
+                message.target().name(),
                 message.clusterId(),
                 node.getId(),
                 Map.of(PLUGIN, pluginId, "bytes", body.length),
                 false);
         try {
-            messages.send(
+            messages.sendTo(
                     message.clusterId(),
                     node.getId(),
-                    message.address(),
+                    message.target(),
                     SentMessages.of(
                             message.text() ? MessageKind.TEXT : MessageKind.BYTES,
                             message.durable(),
@@ -274,13 +279,14 @@ public class PluginMessagingService implements PluginScopedBeans {
         if (spec.clusterId() == null || clusters.cluster(spec.clusterId()).isEmpty()) {
             throw new RegistrationRefusedException("The cluster " + spec.clusterId() + " is not registered.");
         }
-        if (blank(spec.queue())
-                || spec.queue().length() > MAX_NAME
-                || spec.queue().contains("::")) {
+        if (spec.source() == null
+                || spec.source().type() != ResourceType.SUBSCRIPTION
+                || blank(spec.source().name())
+                || spec.source().name().length() > MAX_NAME) {
             throw new RegistrationRefusedException(
-                    "A registration names one queue, by its name alone, in at most " + MAX_NAME + " characters.");
+                    "A registration names one subscription, by its name, in at most " + MAX_NAME + " characters.");
         }
-        String reserved = Reservations.reason(spec.queue());
+        String reserved = Reservations.reason(spec.source().name());
         if (reserved != null) {
             throw new RegistrationRefusedException(reserved);
         }
@@ -327,7 +333,7 @@ public class PluginMessagingService implements PluginScopedBeans {
         return new MessageRegistration(
                 reg.getKey(),
                 reg.getClusterId(),
-                reg.getQueue(),
+                ResourceRef.subscription(reg.getSubscription()),
                 reg.getMode(),
                 reg.getConcurrency(),
                 reg.getActingUserId(),

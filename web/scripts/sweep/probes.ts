@@ -64,6 +64,8 @@ export const MEASURE = `(() => {
   const root = document.documentElement;
   const scrollers = [];
   for (const el of document.querySelectorAll('[role="grid"], table, [class*="scroller" i], [data-table-scroller]')) {
+    // A focusable, labelled box (a code block) scrolls sideways on purpose; a keyboard reaches it.
+    if (el.matches('section[tabindex="0"][aria-label]:not([role])')) continue;
     if (el.scrollWidth > el.clientWidth + 1) {
       scrollers.push({
         tag: el.tagName.toLowerCase(),

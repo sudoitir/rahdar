@@ -1,3 +1,4 @@
+import { subscriptionIdentity } from '../../test/wire.ts';
 import { describe, expect, it, vi } from 'vitest';
 import { http, HttpResponse } from 'msw';
 import { screen } from '@testing-library/react';
@@ -20,10 +21,10 @@ vi.mock('@tanstack/react-router', async (importOriginal) => ({
 // Imported after the mock is registered.
 const { CommandPalette } = await import('./CommandPalette.tsx');
 
-const queueRequests: string[] = [];
+const subscriptionRequests: string[] = [];
 
 function mockApi(permissions: string[] = ['*']) {
-  queueRequests.length = 0;
+  subscriptionRequests.length = 0;
   server.use(
     manifestHandler(),
     http.get('*/api/v1/auth/me', () =>
@@ -48,14 +49,12 @@ function mockApi(permissions: string[] = ['*']) {
         ]),
       ),
     ),
-    http.get('*/api/v1/clusters/c1/queues', ({ request }) => {
-      queueRequests.push(new URL(request.url).search);
+    http.get('*/api/v1/clusters/c1/subscriptions', ({ request }) => {
+      subscriptionRequests.push(new URL(request.url).search);
       return HttpResponse.json({
         data: [
           {
-            address: 'ORDERS',
-            queueName: 'ORDERS',
-            routingType: 'ANYCAST',
+            ...subscriptionIdentity('ORDERS', 'ORDERS'),
             durable: true,
             totalMessageCount: 7,
             totalConsumerCount: 1,
@@ -93,7 +92,7 @@ describe('CommandPalette', () => {
     expect(navigate).toHaveBeenCalledWith({ to: '/clusters/c1/topology' });
   });
 
-  it('searches queues only once the palette is open and two characters are typed, and opens the queue', async () => {
+  it('searches subscriptions only once the palette is open and two characters are typed, and opens the subscription', async () => {
     navigate.mockClear();
     mockApi();
     const user = userEvent.setup();
@@ -101,20 +100,20 @@ describe('CommandPalette', () => {
 
     // Closed, the palette reads nothing.
     await new Promise((r) => setTimeout(r, 300));
-    expect(queueRequests).toEqual([]);
+    expect(subscriptionRequests).toEqual([]);
 
     await user.keyboard('{Control>}k{/Control}');
     const search = await screen.findByPlaceholderText(/jump to a cluster/i);
     await user.type(search, 'O');
     await new Promise((r) => setTimeout(r, 300));
-    expect(queueRequests).toEqual([]);
+    expect(subscriptionRequests).toEqual([]);
     await user.type(search, 'RDERS');
 
     const action = await screen.findByRole('button', { name: /^ORDERS/ });
     await user.click(action);
 
-    expect(queueRequests.every((q) => q.includes('q=ORDERS'))).toBe(true);
-    expect(navigate).toHaveBeenCalledWith({ to: '/clusters/c1/queues', search: { queue: 'ORDERS' } });
+    expect(subscriptionRequests.every((q) => q.includes('q=ORDERS'))).toBe(true);
+    expect(navigate).toHaveBeenCalledWith({ to: '/clusters/c1/subscriptions', search: { subscription: 'ORDERS' } });
   });
 
   it('offers to search the live views without reading them', async () => {

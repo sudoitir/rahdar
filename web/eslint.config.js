@@ -11,10 +11,10 @@ const featureEdges = {
   apitokens: ['security'],
   audit: ['security'],
   brokerconfig: ['messages'],
-  messages: ['queues'],
-  rr: ['queues', 'sql'],
-  sql: ['messages', 'queues'],
-  transfer: ['queues'],
+  messages: ['resources'],
+  rr: ['resources', 'sql'],
+  sql: ['messages', 'resources'],
+  transfer: ['resources'],
 };
 
 export default tseslint.config(

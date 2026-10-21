@@ -124,11 +124,9 @@ class BoundaryRulesTest {
     }
 
     /**
-     * The features that reach Artemis's own mechanics through the Artemis module. Broker configuration,
-     * setup review and routing exist only for Artemis. The others are shared features that still set up
-     * Artemis-only machinery (diverts, taps, staging queues, routes sampled from MBeans); the broker
-     * SDK's operations and Rahdar's system interfaces replace that one feature at a time, and this list
-     * only ever shrinks.
+     * The features that reach Artemis's own mechanics through the Artemis module. Broker configuration and
+     * setup review exist only for Artemis. Every other feature goes through the broker SDK's operations and
+     * Rahdar's system interfaces, and this list only ever shrinks.
      */
     private static final String[] REACH_ARTEMIS = {
         ROOT + ".system.artemis..",
@@ -136,12 +134,6 @@ class BoundaryRulesTest {
         ROOT + ".app..",
         ROOT + ".feature.brokerconfig..",
         ROOT + ".feature.setupreview..",
-        ROOT + ".feature.routing..",
-        ROOT + ".feature.queues..",
-        ROOT + ".feature.sql..",
-        ROOT + ".feature.plugins..",
-        ROOT + ".feature.transfer..",
-        ROOT + ".feature.flow..",
     };
 
     @Test

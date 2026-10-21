@@ -68,7 +68,7 @@ class EffectiveAccessIntegrationTest extends PostgresIntegrationTest {
         signInWith(Permissions.USER_ADMIN);
         AppUserEntity user = newUser();
         var role = roleService.create(new RoleRequest(
-                "effective-" + UUID.randomUUID(), List.of("queue:*", Permissions.USER_ADMIN), false, false));
+                "effective-" + UUID.randomUUID(), List.of("subscription:*", Permissions.USER_ADMIN), false, false));
         UUID clusterId = UUID.randomUUID();
         userRoles.save(new UserRoleEntity(user.getId(), role.id(), "CLUSTER", clusterId));
 
@@ -80,10 +80,10 @@ class EffectiveAccessIntegrationTest extends PostgresIntegrationTest {
             assertThat(v.roleName()).isEqualTo(role.name());
         });
         assertThat(result)
-                .filteredOn(v -> v.via().equals("queue:*"))
+                .filteredOn(v -> v.via().equals("subscription:*"))
                 .extracting(EffectivePermissionView::action)
-                .contains("queue:create", "queue:delete")
-                .allMatch(a -> a.startsWith("queue:"));
+                .contains("subscription:create", "subscription:delete")
+                .allMatch(a -> a.startsWith("subscription:"));
         assertThat(result)
                 .filteredOn(v -> v.action().equals(Permissions.USER_ADMIN))
                 .singleElement()

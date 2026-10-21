@@ -221,7 +221,7 @@ class ApprovalGateIntegrationTest extends PostgresIntegrationTest {
     @BeforeEach
     void armTheGate() {
         provider.reset();
-        state.stateKey = "state-1";
+        state.etag = "state-1";
         state.count = 7;
         state.purgeVersion = 1;
         service.purged.clear();
@@ -994,7 +994,7 @@ class ApprovalGateIntegrationTest extends PostgresIntegrationTest {
         Person bob = approver();
         approversAre(bob);
         UUID id = hold(alice, "orders");
-        state.stateKey = "state-2";
+        state.etag = "state-2";
 
         decide(bob, id, Vote.APPROVE, null);
 

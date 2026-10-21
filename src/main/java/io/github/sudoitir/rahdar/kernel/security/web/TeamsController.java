@@ -3,7 +3,7 @@ package io.github.sudoitir.rahdar.kernel.security.web;
 import io.github.sudoitir.rahdar.kernel.core.PagedView;
 import io.github.sudoitir.rahdar.kernel.core.ResourceQuery;
 import io.github.sudoitir.rahdar.kernel.gate.HeldResponse;
-import io.github.sudoitir.rahdar.kernel.plugin.ResourceKind;
+import io.github.sudoitir.rahdar.kernel.plugin.ResourceType;
 import io.github.sudoitir.rahdar.kernel.security.PatternKind;
 import io.github.sudoitir.rahdar.kernel.security.ResourceRef;
 import io.github.sudoitir.rahdar.kernel.security.internal.ResourceAccessReport;
@@ -165,12 +165,12 @@ public class TeamsController {
     @GetMapping("/clusters/{clusterId}/unowned")
     public PagedView<UnownedView> unowned(
             @PathVariable UUID clusterId,
-            @RequestParam ResourceKind kind,
+            @RequestParam ResourceType type,
             @RequestParam(required = false) Integer page,
             @RequestParam(required = false) Integer size) {
         return ResourceQuery.ofPage(page, size)
                 .paginate(
-                        teams.unowned(clusterId, kind).stream()
+                        teams.unowned(clusterId, type).stream()
                                 .map(UnownedView::new)
                                 .toList(),
                         null);
@@ -179,7 +179,7 @@ public class TeamsController {
     /** The owner and every share of one queue or address, for a user administrator or a team administrator. */
     @GetMapping("/clusters/{clusterId}/resource-access")
     public ResourceAccessView resourceAccess(
-            @PathVariable UUID clusterId, @RequestParam ResourceKind kind, @RequestParam String name) {
-        return resourceAccess.of(clusterId, new ResourceRef(kind, name));
+            @PathVariable UUID clusterId, @RequestParam ResourceType type, @RequestParam String name) {
+        return resourceAccess.of(clusterId, new ResourceRef(type, name));
     }
 }

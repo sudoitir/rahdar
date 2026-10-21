@@ -6,7 +6,7 @@ import io.github.sudoitir.rahdar.kernel.gate.Gated;
 import io.github.sudoitir.rahdar.kernel.gate.Operation;
 import io.github.sudoitir.rahdar.kernel.gate.OperationGate;
 import io.github.sudoitir.rahdar.kernel.plugin.FeatureRegistry;
-import io.github.sudoitir.rahdar.kernel.plugin.ResourceKind;
+import io.github.sudoitir.rahdar.kernel.plugin.ResourceType;
 import io.github.sudoitir.rahdar.kernel.security.AccessChanges;
 import io.github.sudoitir.rahdar.kernel.security.AccessLoader;
 import io.github.sudoitir.rahdar.kernel.security.AccessSnapshot;
@@ -243,7 +243,7 @@ public class TeamService {
                         e.featureId(),
                         e.featureTitle(),
                         e.scope(),
-                        e.resourceKinds().stream().sorted().toList(),
+                        e.resourceTypes().stream().sorted().toList(),
                         e.requires().stream().sorted().toList()))
                 .toList();
         return new TeamRoleLookup(views, entries);
@@ -356,10 +356,12 @@ public class TeamService {
         requireTeam(teamId);
         ResourcePattern pattern = ResourcePattern.parse(text.strip());
         requireCluster(clusterId);
-        List<String> queues =
-                kind.kinds().contains(ResourceKind.QUEUE) ? matching(pattern, names.queues(clusterId)) : List.of();
-        List<String> addresses =
-                kind.kinds().contains(ResourceKind.ADDRESS) ? matching(pattern, names.addresses(clusterId)) : List.of();
+        List<String> queues = kind.types().contains(ResourceType.SUBSCRIPTION)
+                ? matching(pattern, names.queues(clusterId))
+                : List.of();
+        List<String> addresses = kind.types().contains(ResourceType.DESTINATION)
+                ? matching(pattern, names.addresses(clusterId))
+                : List.of();
         return new PatternPreview(
                 clusterId,
                 kind,
@@ -374,9 +376,9 @@ public class TeamService {
     /** The queue or address names of the cluster that no team owns: reachable only through platform grants. */
     @PreAuthorize(USER_ADMIN)
     @Transactional(readOnly = true)
-    public List<String> unowned(UUID clusterId, ResourceKind kind) {
+    public List<String> unowned(UUID clusterId, ResourceType kind) {
         requireCluster(clusterId);
-        List<String> known = kind == ResourceKind.QUEUE ? names.queues(clusterId) : names.addresses(clusterId);
+        List<String> known = kind == ResourceType.SUBSCRIPTION ? names.queues(clusterId) : names.addresses(clusterId);
         return index.unowned(clusterId, kind, known);
     }
 
@@ -631,7 +633,7 @@ public class TeamService {
         for (TeamPatternEntity other : patterns.findByClusterId(clusterId)) {
             PatternKind otherKind = PatternKind.valueOf(other.getKind());
             if (!other.getTeamId().equals(team)
-                    && !Collections.disjoint(kind.kinds(), otherKind.kinds())
+                    && !Collections.disjoint(kind.types(), otherKind.types())
                     && ResourcePattern.overlaps(pattern, ResourcePattern.parse(other.getPattern()))) {
                 found.add(new PatternConflict(
                         other.getTeamId(),
@@ -658,9 +660,9 @@ public class TeamService {
         List<TeamPatternEntity> owned = patterns.findByTeamId(ownerTeamId).stream()
                 .filter(p -> p.getClusterId().equals(clusterId))
                 .toList();
-        return kind.kinds().stream()
+        return kind.types().stream()
                 .allMatch(k -> owned.stream()
-                        .filter(p -> PatternKind.valueOf(p.getKind()).kinds().contains(k))
+                        .filter(p -> PatternKind.valueOf(p.getKind()).types().contains(k))
                         .anyMatch(p -> ResourcePattern.covers(ResourcePattern.parse(p.getPattern()), pattern)));
     }
 

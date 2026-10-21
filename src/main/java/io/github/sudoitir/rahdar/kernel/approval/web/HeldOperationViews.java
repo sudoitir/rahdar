@@ -53,7 +53,7 @@ public final class HeldOperationViews {
     public record HeldOperationSummaryView(
             @Schema(requiredMode = REQUIRED) UUID id,
 
-            @Schema(requiredMode = REQUIRED, description = "The operation type, such as queue.purge.")
+            @Schema(requiredMode = REQUIRED, description = "The operation type, such as subscription.purge.")
             String type,
 
             @Schema(

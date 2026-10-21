@@ -3,18 +3,19 @@ import { Link, useNavigate } from '@tanstack/react-router';
 
 import type {
   ActionProps,
-  AddressTarget,
+  ChannelTarget,
   ConnectionTarget,
   ConsumerTarget,
+  DestinationTarget,
   LinkProps,
   ProducerTarget,
-  SessionTarget,
 } from '../../kernel/actions/types.ts';
+import { nameOf } from '../../kernel/api/resourceId.ts';
 import { clusterHref } from '../../kernel/routing/href.ts';
 import { ActionMenuItem } from '../../ui/ActionMenuItem.tsx';
 import linkClasses from '../../ui/InlineLink.module.css';
-import { CloseAddressConsumers, CloseDialog } from './CloseConnection.tsx';
-import { useCloseAddressGate, useCloseGate } from './closeGates.ts';
+import { CloseDestinationConsumers, CloseDialog } from './CloseConnection.tsx';
+import { useCloseDestinationGate, useCloseGate } from './closeGates.ts';
 
 /*
  * Row actions and links for the live resource views (ADR-0107). A view links to a live resource
@@ -22,7 +23,7 @@ import { useCloseAddressGate, useCloseGate } from './closeGates.ts';
  * with (cross-node-resource-views), so the filtered listing shows exactly that resource.
  */
 
-type View = 'addresses' | 'connections' | 'sessions' | 'consumers' | 'producers';
+type View = 'destinations' | 'connections' | 'channels' | 'consumers' | 'producers';
 
 /** An "Open …" item: a link to a live listing filtered to one identifier. */
 function OpenIn({
@@ -79,13 +80,13 @@ function Copy({
 }
 
 // ── Connections ──────────────────────────────────────────────────────────────
-export function ConnectionOpenSessions({ clusterId, target }: Readonly<ActionProps<ConnectionTarget>>) {
+export function ConnectionOpenChannels({ clusterId, target }: Readonly<ActionProps<ConnectionTarget>>) {
   return (
     <OpenIn
       clusterId={clusterId}
-      view="sessions"
-      q={target.connectionId}
-      label="Open its sessions"
+      view="channels"
+      q={target.name}
+      label="Open its channels"
       icon={<IconPlugConnected size={16} aria-hidden />}
     />
   );
@@ -96,13 +97,13 @@ export function ConnectionCopy({ target, host }: Readonly<ActionProps<Connection
     <>
       <Copy value={target.snapshot?.remoteAddress} what="remote address" host={host} />
       <Copy value={target.snapshot?.clientId} what="client id" host={host} />
-      <Copy value={target.connectionId} what="connection id" host={host} />
+      <Copy value={target.name} what="connection id" host={host} />
     </>
   );
 }
 
 export function ConnectionClose({ clusterId, target, host }: Readonly<ActionProps<ConnectionTarget>>) {
-  const gate = useCloseGate(clusterId, 'connection', target.connectionId);
+  const gate = useCloseGate(clusterId, 'connection', target.id);
   return (
     <ActionMenuItem
       label="Close connection…"
@@ -116,7 +117,7 @@ export function ConnectionClose({ clusterId, target, host }: Readonly<ActionProp
           kind: 'connection',
           nodeId: target.nodeId,
           nodeName: target.nodeName,
-          targetId: target.connectionId,
+          targetId: target.id,
           fetchedAt: null,
         })
       }
@@ -124,28 +125,28 @@ export function ConnectionClose({ clusterId, target, host }: Readonly<ActionProp
   );
 }
 
-// ── Sessions ─────────────────────────────────────────────────────────────────
-export function SessionOpenRelated({ clusterId, target }: Readonly<ActionProps<SessionTarget>>) {
+// ── Channels ─────────────────────────────────────────────────────────────────
+export function ChannelOpenRelated({ clusterId, target }: Readonly<ActionProps<ChannelTarget>>) {
   return (
     <>
       <OpenIn
         clusterId={clusterId}
         view="connections"
-        q={target.connectionId}
+        q={target.connection}
         label="Open its connection"
         icon={<IconPlugConnected size={16} aria-hidden />}
       />
       <OpenIn
         clusterId={clusterId}
         view="consumers"
-        q={target.sessionId}
+        q={target.name}
         label="Open its consumers"
         icon={<IconUsers size={16} aria-hidden />}
       />
       <OpenIn
         clusterId={clusterId}
         view="producers"
-        q={target.sessionId}
+        q={target.name}
         label="Open its producers"
         icon={<IconUsers size={16} aria-hidden />}
       />
@@ -153,26 +154,26 @@ export function SessionOpenRelated({ clusterId, target }: Readonly<ActionProps<S
   );
 }
 
-export function SessionCopy({ target, host }: Readonly<ActionProps<SessionTarget>>) {
-  return <Copy value={target.sessionId} what="session id" host={host} />;
+export function ChannelCopy({ target, host }: Readonly<ActionProps<ChannelTarget>>) {
+  return <Copy value={target.name} what="channel id" host={host} />;
 }
 
-export function SessionClose({ clusterId, target, host }: Readonly<ActionProps<SessionTarget>>) {
-  const gate = useCloseGate(clusterId, 'session', target.sessionId);
+export function ChannelClose({ clusterId, target, host }: Readonly<ActionProps<ChannelTarget>>) {
+  const gate = useCloseGate(clusterId, 'channel', target.id);
   return (
     <ActionMenuItem
-      label="Close session…"
+      label="Close channel…"
       icon={<IconPlugConnectedX size={16} aria-hidden />}
       tone="danger"
       verdict={gate}
-      onExplain={(verdict) => host.explain(verdict, 'closing this session')}
+      onExplain={(verdict) => host.explain(verdict, 'closing this channel')}
       onSelect={() =>
         host.open(CloseDialog, {
           clusterId,
-          kind: 'session',
+          kind: 'channel',
           nodeId: target.nodeId,
           nodeName: target.nodeName,
-          targetId: target.sessionId,
+          targetId: target.id,
           fetchedAt: null,
         })
       }
@@ -181,27 +182,27 @@ export function SessionClose({ clusterId, target, host }: Readonly<ActionProps<S
 }
 
 // ── Consumers ────────────────────────────────────────────────────────────────
-/** Open the session a consumer or producer belongs to, in the sessions view filtered to it. */
-function OpenItsSession({ clusterId, target }: Readonly<{ clusterId: string; target: { sessionId?: string | null } }>) {
+/** Open the channel a consumer or producer belongs to, in the channels view filtered to it. */
+function OpenItsChannel({ clusterId, target }: Readonly<{ clusterId: string; target: { channel?: string | null } }>) {
   return (
     <OpenIn
       clusterId={clusterId}
-      view="sessions"
-      q={target.sessionId}
-      label="Open its session"
+      view="channels"
+      q={target.channel}
+      label="Open its channel"
       icon={<IconPlugConnected size={16} aria-hidden />}
     />
   );
 }
 
-export const ConsumerOpenSession = OpenItsSession;
+export const ConsumerOpenChannel = OpenItsChannel;
 
 export function ConsumerCopy({ target, host }: Readonly<ActionProps<ConsumerTarget>>) {
-  return <Copy value={target.consumerId} what="consumer id" host={host} />;
+  return <Copy value={target.name} what="consumer id" host={host} />;
 }
 
 export function ConsumerClose({ clusterId, target, host }: Readonly<ActionProps<ConsumerTarget>>) {
-  const gate = useCloseGate(clusterId, 'consumer', target.consumerId);
+  const gate = useCloseGate(clusterId, 'consumer', target.id);
   return (
     <ActionMenuItem
       label="Close its connection…"
@@ -215,7 +216,7 @@ export function ConsumerClose({ clusterId, target, host }: Readonly<ActionProps<
           kind: 'consumer',
           nodeId: target.nodeId,
           nodeName: target.nodeName,
-          targetId: target.consumerId,
+          targetId: target.id,
           fetchedAt: null,
         })
       }
@@ -224,46 +225,46 @@ export function ConsumerClose({ clusterId, target, host }: Readonly<ActionProps<
 }
 
 // ── Producers ────────────────────────────────────────────────────────────────
-export const ProducerOpenSession = OpenItsSession;
+export const ProducerOpenChannel = OpenItsChannel;
 
 export function ProducerCopy({ target, host }: Readonly<ActionProps<ProducerTarget>>) {
   return (
     <>
-      <Copy value={target.address} what="address" host={host} />
-      <Copy value={target.producerId} what="producer id" host={host} />
+      <Copy value={nameOf(target.destination)} what="destination" host={host} />
+      <Copy value={target.name} what="producer id" host={host} />
     </>
   );
 }
 
-// ── Addresses ────────────────────────────────────────────────────────────────
-export function AddressOpenConsumers({ clusterId, target }: Readonly<ActionProps<AddressTarget>>) {
-  // Consumers are listed by queue; on an address whose queues share its name — the common case —
+// ── Destinations ────────────────────────────────────────────────────────────────
+export function DestinationOpenConsumers({ clusterId, target }: Readonly<ActionProps<DestinationTarget>>) {
+  // Consumers are listed by subscription; on an destination whose subscriptions share its name — the common case —
   // this is its consumers, and otherwise the listing states what it matched.
   return (
     <OpenIn
       clusterId={clusterId}
       view="consumers"
-      q={target.address}
+      q={target.name}
       label="Open its consumers"
       icon={<IconUsers size={16} aria-hidden />}
     />
   );
 }
 
-export function AddressCopy({ target, host }: Readonly<ActionProps<AddressTarget>>) {
-  return <Copy value={target.address} what="address name" host={host} />;
+export function DestinationCopy({ target, host }: Readonly<ActionProps<DestinationTarget>>) {
+  return <Copy value={target.name} what="destination name" host={host} />;
 }
 
-export function AddressCloseConsumers({ clusterId, target, host }: Readonly<ActionProps<AddressTarget>>) {
-  const gate = useCloseAddressGate(clusterId);
+export function DestinationCloseConsumers({ clusterId, target, host }: Readonly<ActionProps<DestinationTarget>>) {
+  const gate = useCloseDestinationGate(clusterId, target.kind);
   return (
     <ActionMenuItem
       label="Close every consumer…"
       icon={<IconUsersMinus size={16} aria-hidden />}
       tone="danger"
       verdict={gate}
-      onExplain={(verdict) => host.explain(verdict, "closing this address's consumers")}
-      onSelect={() => host.open(CloseAddressConsumers, { clusterId, address: target.address })}
+      onExplain={(verdict) => host.explain(verdict, "closing this destination's consumers")}
+      onSelect={() => host.open(CloseDestinationConsumers, { clusterId, destination: target.name })}
     />
   );
 }
@@ -288,8 +289,8 @@ function FilteredLink({
 }
 
 export function ConnectionLink({ clusterId, target, children }: LinkProps<ConnectionTarget>) {
-  return target.connectionId ? (
-    <FilteredLink clusterId={clusterId} view="connections" q={target.connectionId}>
+  return target.name ? (
+    <FilteredLink clusterId={clusterId} view="connections" q={target.name}>
       {children}
     </FilteredLink>
   ) : (
@@ -297,9 +298,9 @@ export function ConnectionLink({ clusterId, target, children }: LinkProps<Connec
   );
 }
 
-export function SessionLink({ clusterId, target, children }: LinkProps<SessionTarget>) {
-  return target.sessionId ? (
-    <FilteredLink clusterId={clusterId} view="sessions" q={target.sessionId}>
+export function ChannelLink({ clusterId, target, children }: LinkProps<ChannelTarget>) {
+  return target.name ? (
+    <FilteredLink clusterId={clusterId} view="channels" q={target.name}>
       {children}
     </FilteredLink>
   ) : (
@@ -307,9 +308,9 @@ export function SessionLink({ clusterId, target, children }: LinkProps<SessionTa
   );
 }
 
-export function AddressLink({ clusterId, target, children }: Readonly<LinkProps<AddressTarget>>) {
+export function DestinationLink({ clusterId, target, children }: Readonly<LinkProps<DestinationTarget>>) {
   return (
-    <FilteredLink clusterId={clusterId} view="addresses" q={target.address}>
+    <FilteredLink clusterId={clusterId} view="destinations" q={target.name}>
       {children}
     </FilteredLink>
   );

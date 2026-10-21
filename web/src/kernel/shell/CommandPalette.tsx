@@ -8,6 +8,7 @@ import { isPollingPaused, setPollingPaused, usePollingPaused } from '../api/poll
 import { useCan } from '../auth/useCan.ts';
 import type { ModuleId, PaletteSource } from '../feature.ts';
 import { useFeatures } from '../features.ts';
+import { useClusterSystem } from './useClusterSystem.ts';
 import { navGroups } from '../registry.ts';
 import { densityToggleLabel, useDensity } from '../../ui/table/density.ts';
 import { useColorSchemeToggle } from './useColorSchemeToggle.ts';
@@ -36,7 +37,7 @@ function Source({
 }
 
 /**
- * ⌘K navigation across the console: jump to a view, a recent place, a cluster, or a queue by name, or
+ * ⌘K navigation across the console: jump to a view, a recent place, a cluster, or a subscription by name, or
  * search a live view (ADR-0109). Mounted once in the root layout; the shortcut is registered by
  * {@link Spotlight}, and the header's Search button opens it too.
  *
@@ -57,6 +58,7 @@ export function CommandPalette() {
   const scheme = useColorSchemeToggle();
   const [density, setDensity] = useDensity();
   const features = useFeatures();
+  const systemId = useClusterSystem(clusterId);
   const { canAnywhere, loading: grantsLoading } = useCan();
   const [query, setQuery] = useState('');
   const [debounced] = useDebouncedValue(query.trim(), 200);
@@ -111,7 +113,7 @@ export function CommandPalette() {
 
     // The views under the rail's own groups, so a view is found where the rail shows it.
     if (clusterId) {
-      for (const navGroup of navGroups(features)) {
+      for (const navGroup of navGroups(features, systemId)) {
         out.push({
           group: navGroup.label,
           actions: navGroup.items.map((item): SpotlightActionData => {
@@ -140,6 +142,7 @@ export function CommandPalette() {
     density,
     setDensity,
     features,
+    systemId,
     contributed,
     recents,
     canAnywhere,
@@ -170,8 +173,8 @@ export function CommandPalette() {
         onSpotlightClose={() => setOpened(false)}
         nothingFound={
           debounced.length > 0 && debounced.length < 2
-            ? 'Type one more character to search queues'
-            : 'Nothing matches. Queues are searched by name; live views are offered as searches.'
+            ? 'Type one more character to search subscriptions'
+            : 'Nothing matches. Subscriptions are searched by name; live views are offered as searches.'
         }
         highlightQuery
         // Opened by ⌘K all day: it is there at once, not animated in.
@@ -179,8 +182,8 @@ export function CommandPalette() {
         scrollable
         maxHeight={480}
         searchProps={{
-          placeholder: 'Jump to a cluster, view, or queue…',
-          'aria-label': 'Search views, clusters and queues',
+          placeholder: 'Jump to a cluster, view, or subscription…',
+          'aria-label': 'Search views, clusters and subscriptions',
           leftSection: <IconSearch size={16} aria-hidden />,
         }}
       />

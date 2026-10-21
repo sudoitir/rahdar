@@ -17,7 +17,7 @@ export function valueText(value: string | null | undefined, absent: string): str
 }
 
 /**
- * Whether the rows only name what the request acts on (a queue, a user) rather than change values: every row
+ * Whether the rows only name what the request acts on (a subscription, a user) rather than change values: every row
  * lacks a current value. Those read as a list of facts; rows with a current value read as a change table.
  */
 export const namesTargets = (rows: readonly HeldDisplayRow[]) =>

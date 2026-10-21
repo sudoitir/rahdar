@@ -31,15 +31,15 @@ public record QueryPlan(
         List<Notice> notices) {
 
     /**
-     * One queue on one node. {@code brokerNow} is Rahdar's now shifted onto that
+     * One subscription on one node. {@code brokerNow} is Rahdar's now shifted onto that
      * node's clock, so a relative window is expressed in the time the broker stamped
      * its own messages with (ADR-0053).
      */
     public record Target(
             UUID nodeId,
             String nodeName,
-            String queueName,
-            String address,
+            String subscription,
+            String destination,
             String routingType,
             long messageCount,
             Instant brokerNow,
@@ -51,19 +51,19 @@ public record QueryPlan(
      */
     public record Notice(Kind kind, String detail) {
         public enum Kind {
-            /** The FROM pattern matched no queue at all — distinct from an empty result. */
-            NO_QUEUE_MATCHED,
+            /** The FROM pattern matched no subscription at all — distinct from an empty result. */
+            NO_SUBSCRIPTION_MATCHED,
             /**
-             * The pattern matched more queues than the target cap allows, so only
-             * some of them were read. The opposite of NO_QUEUE_MATCHED: there were
+             * The pattern matched more subscriptions than the target cap allows, so only
+             * some of them were read. The opposite of NO_SUBSCRIPTION_MATCHED: there were
              * too many, not none, and conflating the two inverts the fix.
              */
             TARGET_CAPPED,
-            /** A queue matched the pattern but the caller cannot read it. */
+            /** A subscription matched the pattern but the caller cannot read it. */
             EXCLUDED_BY_PERMISSION,
             /** A relative window could not be normalised for a node's clock. */
             CLOCK_OFFSET_UNKNOWN,
-            /** The index cannot answer for part of the requested window or queue set. */
+            /** The index cannot answer for part of the requested window or subscription set. */
             INDEX_COVERAGE_GAP,
             /** The query asks the live broker for a column only the index has. */
             INDEX_ONLY_COLUMN,
@@ -80,7 +80,7 @@ public record QueryPlan(
              * multicast fan-out (ADR-0062 D3). They are what the address routed; which
              * of its bound queues received them is not recorded and cannot be.
              */
-            ADDRESS_SCOPED_CAPTURE,
+            DESTINATION_SCOPED_CAPTURE,
             /**
              * Capture is not running on every node this query reads from, so the
              * result is complete for some nodes and sampled — or absent — for others.

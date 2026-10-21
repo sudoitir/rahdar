@@ -6,7 +6,7 @@ import io.github.sudoitir.rahdar.feature.metrics.web.MetricViews.MetricPoint;
 import io.github.sudoitir.rahdar.feature.metrics.web.MetricViews.MetricSeries;
 import io.github.sudoitir.rahdar.feature.metrics.web.MetricViews.MetricSeriesResponse;
 import io.github.sudoitir.rahdar.kernel.lifecycle.LifecycleRegistry;
-import io.github.sudoitir.rahdar.kernel.plugin.ResourceKind;
+import io.github.sudoitir.rahdar.kernel.plugin.ResourceType;
 import io.github.sudoitir.rahdar.kernel.security.ClusterAccessGuard;
 import io.github.sudoitir.rahdar.kernel.security.Permissions;
 import io.github.sudoitir.rahdar.kernel.security.ResourceRef;
@@ -49,7 +49,6 @@ public class MetricQueryService {
 
     private static final int MAX_POINTS = 500;
 
-    private static final String QUEUE_SUBJECT = ResourceKind.QUEUE.name();
     private static final String GAUGE = "GAUGE";
 
     /** A split by node draws at most this many nodes (ADR-0110). */
@@ -87,8 +86,8 @@ public class MetricQueryService {
         // Before input validation, so a caller with no grant cannot use the
         // difference between a 400 and a 404 to probe which clusters exist.
         requireReadable(clusterId, query);
-        requireValid(metrics, query.subjectType(), query.subject(), splitBy);
-        String subjectName = QUEUE_SUBJECT.equals(query.subjectType()) ? query.subject() : null;
+        requireValid(metrics, query.resource(), splitBy);
+        String subjectName = query.resource() == null ? null : query.resource().name();
 
         Window requested = window(query.from(), to, query.requestedStep());
         List<ClusterNode> nodes = splitBy == null ? List.of() : directory.nodes(clusterId);
@@ -117,16 +116,14 @@ public class MetricQueryService {
      * read only by a caller who may read every queue of the cluster.
      */
     private void requireReadable(UUID clusterId, MetricQuery query) {
-        if (QUEUE_SUBJECT.equals(query.subjectType())
-                && query.subject() != null
-                && !query.subject().isBlank()) {
-            clusterAccess.requireResource(clusterId, ResourceRef.queue(query.subject()), Permissions.QUEUE_READ);
+        if (query.resource() != null) {
+            clusterAccess.requireResource(clusterId, query.resource(), Permissions.SUBSCRIPTION_READ);
         } else {
-            clusterAccess.requireOnAll(clusterId, ResourceKind.QUEUE, "#", Permissions.QUEUE_READ);
+            clusterAccess.requireOnAll(clusterId, ResourceType.SUBSCRIPTION, "#", Permissions.SUBSCRIPTION_READ);
         }
     }
 
-    private static void requireValid(List<String> metrics, String subjectType, String subject, String splitBy) {
+    private static void requireValid(List<String> metrics, ResourceRef resource, String splitBy) {
         if (metrics.isEmpty() || metrics.size() > 4) {
             throw new IllegalArgumentException("metric must list between 1 and 4 metric names");
         }
@@ -135,17 +132,15 @@ public class MetricQueryService {
                 throw new IllegalArgumentException("unknown metric: " + m);
             }
         }
-        boolean queue = QUEUE_SUBJECT.equals(subjectType);
-        boolean subjectMissing = subject == null || subject.isBlank();
-        if (queue && subjectMissing) {
-            throw new IllegalArgumentException("subject is required when subjectType=QUEUE");
+        if (resource != null && resource.type() != ResourceType.SUBSCRIPTION) {
+            throw new IllegalArgumentException("resource must be a subscription");
         }
         if (splitBy != null && !SPLIT_BY_NODE.equals(splitBy)) {
             throw new IllegalArgumentException("splitBy must be NODE");
         }
         // The per-node read is per queue (ADR-0110); a cluster-wide split per node is not built.
-        if (splitBy != null && !queue) {
-            throw new IllegalArgumentException("a split by node needs one queue: subjectType=QUEUE and a subject");
+        if (splitBy != null && resource == null) {
+            throw new IllegalArgumentException("a split by node needs one subscription: name it as the resource");
         }
     }
 

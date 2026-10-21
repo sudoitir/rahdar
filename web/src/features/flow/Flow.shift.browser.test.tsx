@@ -20,10 +20,10 @@ import { FlowView } from './FlowView.tsx';
  */
 const GRAPH = {
   nodes: [
-    { id: 'address:orders', kind: 'ADDRESS', label: 'orders', routingTypes: ['ANYCAST'], faults: [] },
+    { id: 'destination:orders', kind: 'DESTINATION', label: 'orders', routingTypes: ['ANYCAST'], faults: [] },
     {
-      id: 'queue:ORDERS.inbound',
-      kind: 'QUEUE',
+      id: 'subscription:ORDERS.inbound',
+      kind: 'SUBSCRIPTION',
       label: 'ORDERS.inbound',
       messageCount: 1200,
       consumerCount: 1,
@@ -35,10 +35,10 @@ const GRAPH = {
     {
       id: 'route',
       kind: 'ROUTE',
-      source: 'address:orders',
-      target: 'queue:ORDERS.inbound',
+      source: 'destination:orders',
+      target: 'subscription:ORDERS.inbound',
       rate: 42,
-      rateSource: 'QUEUE_METRIC',
+      rateSource: 'SUBSCRIPTION_METRIC',
       asOf: '2026-09-14T10:00:00Z',
       stale: false,
       delivery: 'SHARED',
@@ -48,7 +48,7 @@ const GRAPH = {
       id: 'produce',
       kind: 'PRODUCE',
       source: 'producer:order-svc',
-      target: 'address:orders',
+      target: 'destination:orders',
       rateSource: 'SAMPLER',
       stale: false,
       members: 2,

@@ -96,7 +96,8 @@ class RrCorrelatorTest extends PostgresIntegrationTest {
         correlator.accept(new Observation.RequestSeen(
                 clusterId, nodeId, seenAt, "rr.skewed", "m-skew", "corr-skew", null, expiration, null, Map.of()));
 
-        RrFlowEntity flow = flows.findByClusterIdAndRequestAddressAndRequestMessageId(clusterId, "rr.skewed", "m-skew")
+        RrFlowEntity flow = flows.findByClusterIdAndRequestDestinationAndRequestMessageId(
+                        clusterId, "rr.skewed", "m-skew")
                 .orElseThrow();
         // Thirty seconds from now, not ten and a half minutes.
         assertThat(flow.getDeadlineAt()).isCloseTo(seenAt.plusSeconds(30), within(2, ChronoUnit.SECONDS));
@@ -113,8 +114,8 @@ class RrCorrelatorTest extends PostgresIntegrationTest {
         correlator.accept(new Observation.RequestSeen(
                 clusterId, null, t0, "rr.request", "m1", "corr-1", null, 0L, null, Map.of()));
 
-        List<RrFlowEntity> created =
-                flows.findByClusterIdAndRequestAddressAndState(clusterId, "rr.request", RrState.AWAITING_REPLY.name());
+        List<RrFlowEntity> created = flows.findByClusterIdAndRequestDestinationAndState(
+                clusterId, "rr.request", RrState.AWAITING_REPLY.name());
         assertThat(created).hasSize(1);
         assertThat(created.getFirst().getReplyKind()).isEqualTo("SHARED");
 
@@ -129,7 +130,7 @@ class RrCorrelatorTest extends PostgresIntegrationTest {
     }
 
     @Test
-    void aReplyOnTheSecondOfSeveralReplyAddressesCompletesTheFlowAndRecordsThatAddress() {
+    void aReplyOnTheSecondOfSeveralReplyDestinationsCompletesTheFlowAndRecordsThatAddress() {
         cluster();
         // Three declared reply addresses, so no destination is knowable at request
         // time and the flow takes it from whichever responder answers (design.md D5).
@@ -140,7 +141,8 @@ class RrCorrelatorTest extends PostgresIntegrationTest {
         correlator.accept(new Observation.RequestSeen(
                 clusterId, null, t0, "rr.request", "m1", "corr-multi", null, 0L, null, Map.of()));
 
-        RrFlowEntity awaiting = flows.findByClusterIdAndRequestAddressAndRequestMessageId(clusterId, "rr.request", "m1")
+        RrFlowEntity awaiting = flows.findByClusterIdAndRequestDestinationAndRequestMessageId(
+                        clusterId, "rr.request", "m1")
                 .orElseThrow();
         assertThat(awaiting.getReplyKind()).isEqualTo("SHARED");
         assertThat(awaiting.getReplyDestination()).isNull();
@@ -155,7 +157,7 @@ class RrCorrelatorTest extends PostgresIntegrationTest {
     }
 
     @Test
-    void aSingleLiteralReplyAddressIsStampedAtRequestTime() {
+    void aSingleLiteralReplyDestinationIsStampedAtRequestTime() {
         cluster();
         expectations.save(
                 new RrExpectationEntity(clusterId, "rr.single", List.of("rr.reply.only"), null, 99_000, 10, false));
@@ -163,7 +165,7 @@ class RrCorrelatorTest extends PostgresIntegrationTest {
         correlator.accept(new Observation.RequestSeen(
                 clusterId, null, Instant.now(), "rr.single", "m1", "corr-one", null, 0L, null, Map.of()));
 
-        RrFlowEntity flow = flows.findByClusterIdAndRequestAddressAndRequestMessageId(clusterId, "rr.single", "m1")
+        RrFlowEntity flow = flows.findByClusterIdAndRequestDestinationAndRequestMessageId(clusterId, "rr.single", "m1")
                 .orElseThrow();
         // Known in advance, so the "awaiting a reply on this queue" reading is preserved.
         assertThat(flow.getReplyDestination()).isEqualTo("rr.reply.only");
@@ -180,7 +182,7 @@ class RrCorrelatorTest extends PostgresIntegrationTest {
         correlator.accept(new Observation.ReplySeen(
                 clusterId, null, t0.plusMillis(500), "temp-queue-abc", "m2", null, null, Map.of()));
 
-        RrFlowEntity flow = flows.findByClusterIdAndRequestAddressAndState(
+        RrFlowEntity flow = flows.findByClusterIdAndRequestDestinationAndState(
                         clusterId, "rr.request", RrState.COMPLETED.name())
                 .getFirst();
         assertThat(flow.getReplyKind()).isEqualTo("TEMPORARY");
@@ -206,7 +208,7 @@ class RrCorrelatorTest extends PostgresIntegrationTest {
                         PageRequest.of(0, 10))
                 .getContent();
         assertThat(all).hasSize(1);
-        assertThat(all.getFirst().getRequestAddress()).isNull();
+        assertThat(all.getFirst().getRequestDestination()).isNull();
     }
 
     @Test
@@ -220,7 +222,7 @@ class RrCorrelatorTest extends PostgresIntegrationTest {
         correlator.accept(
                 new Observation.ResponderDown(clusterId, null, t0.plusMillis(20), "rr.request", "consumer-1", 0));
 
-        RrFlowEntity flow = flows.findByClusterIdAndRequestAddressAndState(
+        RrFlowEntity flow = flows.findByClusterIdAndRequestDestinationAndState(
                         clusterId, "rr.request", RrState.RESPONDER_DROPPED.name())
                 .getFirst();
         assertThat(flow.getCorrelationId()).isEqualTo("corr-2");
@@ -236,7 +238,7 @@ class RrCorrelatorTest extends PostgresIntegrationTest {
         correlator.accept(new Observation.RequestSeen(
                 clusterId, null, t0, "rr.request", "m-deadline", "corr-3", null, expirationEpochMs, null, Map.of()));
 
-        RrFlowEntity flow = flows.findByClusterIdAndRequestAddressAndRequestMessageId(
+        RrFlowEntity flow = flows.findByClusterIdAndRequestDestinationAndRequestMessageId(
                         clusterId, "rr.request", "m-deadline")
                 .orElseThrow();
         assertThat(flow.getDeadlineAt().toEpochMilli()).isEqualTo(expirationEpochMs);
@@ -256,7 +258,7 @@ class RrCorrelatorTest extends PostgresIntegrationTest {
         correlator.accept(
                 new Observation.ResponderUp(clusterId, null, t0.plusSeconds(1), "rr.request", "consumer-late"));
 
-        RrFlowEntity flow = flows.findByClusterIdAndRequestAddressAndRequestMessageId(
+        RrFlowEntity flow = flows.findByClusterIdAndRequestDestinationAndRequestMessageId(
                         clusterId, "rr.request", "m-late-responder")
                 .orElseThrow();
         assertThat(flow.getResponderConsumer()).isEqualTo("consumer-late");

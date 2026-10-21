@@ -1,20 +1,20 @@
+import { nameOf, refOf } from '../../kernel/api/resourceId.ts';
 import { useEffect, useMemo, useState, useRef } from 'react';
-import { plural } from './plural.ts';
 import { TextInput } from '@mantine/core';
 import { useNavigate, useParams, useSearch } from '@tanstack/react-router';
 import { useDebouncedValue } from '@mantine/hooks';
 
 import {
-  useAddresses,
+  useDestinations,
   useConnections,
   useConsumers,
   useProducers,
-  useSessions,
-  type AddressView,
+  useChannels,
+  type DestinationView,
   type ConnectionView,
   type ConsumerView,
   type ProducerView,
-  type SessionView,
+  type ChannelView,
 } from './api.ts';
 import { type PagedView, type ResourceParams } from '../../kernel/api/paging.ts';
 import { DataTable, type Column } from '../../ui/table/index.ts';
@@ -35,7 +35,10 @@ import { useFilterShortcut } from '../../kernel/keyboard/filterShortcut.ts';
 
 const PAGE_SIZE = 200;
 
-type Kind = 'addresses' | 'consumers' | 'sessions' | 'connections' | 'producers';
+/** A view row's reference: the view carries the id and kind, and its name is the id's last segment. */
+const refOfView = (r: { id: string }) => refOf(r.id);
+
+type Kind = 'destinations' | 'consumers' | 'channels' | 'connections' | 'producers';
 
 interface KindConfig<T> {
   hook: (id: string, p: ResourceParams) => UseQueryResult<PagedView<T>, ApiError>;
@@ -59,74 +62,74 @@ interface RowMenuConfig<T> {
 }
 
 const CONFIG: {
-  addresses: KindConfig<AddressView>;
+  destinations: KindConfig<DestinationView>;
   consumers: KindConfig<ConsumerView>;
-  sessions: KindConfig<SessionView>;
+  channels: KindConfig<ChannelView>;
   connections: KindConfig<ConnectionView>;
   producers: KindConfig<ProducerView>;
 } = {
-  addresses: {
-    hook: useAddresses,
-    columns: resourceColumns.addresses,
+  destinations: {
+    hook: useDestinations,
+    columns: resourceColumns.destinations,
     rowKey: (r) => `${r.nodeId}:${r.name}`,
-    filter: 'Address name',
-    noun: 'address',
-    summary: 'Every address on the cluster, with its queues and messages, read live from each node.',
+    filter: 'Destination name',
+    noun: 'destination',
+    summary: 'Every destination on the cluster, with its subscriptions and messages, read live from each node.',
     about:
-      'An address is a named destination that producers send to; the broker routes each message to the queues bound to it. One appears when a queue is created or a producer first sends to it.',
+      'A destination is a named place that producers send to; the broker routes each message to the subscriptions bound to it. One appears when a subscription is created or a producer first sends to it.',
     menu: {
-      kind: 'address',
-      target: (r) => ({ address: r.name, snapshot: r }),
+      kind: 'destination',
+      target: (r) => ({ ...refOfView(r), snapshot: r }),
       label: (r) => r.name,
     },
   },
   consumers: {
     hook: useConsumers,
     columns: resourceColumns.consumers,
-    rowKey: (r) => `${r.nodeId}:${r.consumerId}`,
-    filter: 'Queue name or session id',
+    rowKey: (r) => `${r.nodeId}:${r.id}`,
+    filter: 'Subscription name or channel id',
     noun: 'consumer',
-    summary: 'Every consumer attached to a queue, read live from each node.',
+    summary: 'Every consumer attached to a subscription, read live from each node.',
     about:
-      'A consumer is a client subscribed to a queue and receiving its messages. There are none while no client is subscribed; one appears as soon as a client subscribes.',
+      'A consumer is a client attached to a subscription and receiving its messages. There are none while no client is attached; one appears as soon as a client attaches.',
     menu: {
       kind: 'consumer',
       target: (r) => ({
+        ...refOfView(r),
         nodeId: r.nodeId,
         nodeName: r.nodeName,
-        consumerId: r.consumerId ?? '',
-        queueName: r.queueName,
-        sessionId: r.sessionId,
+        subscription: r.subscription,
+        channel: nameOf(r.channel),
         snapshot: r,
       }),
-      label: (r) => `${r.queueName ?? 'consumer'} (${r.consumerId ?? 'no id'})`,
+      label: (r) => `${nameOf(r.subscription) || 'consumer'} (${nameOf(r.id) || 'no id'})`,
     },
   },
-  sessions: {
-    hook: useSessions,
-    columns: resourceColumns.sessions,
-    rowKey: (r) => `${r.nodeId}:${r.sessionId}`,
-    filter: 'Session id, connection id or user',
-    noun: 'session',
-    summary: 'Every client session, read live from each node.',
+  channels: {
+    hook: useChannels,
+    columns: resourceColumns.channels,
+    rowKey: (r) => `${r.nodeId}:${r.id}`,
+    filter: 'Channel id, connection id or user',
+    noun: 'channel',
+    summary: 'Every client channel, read live from each node.',
     about:
-      "A session is a client's unit of work on a connection; it owns that client's producers and consumers. There are none while no client is connected; one appears when a client opens a session.",
+      "A channel is a client's unit of work on a connection; it owns that client's producers and consumers. There are none while no client is connected; one appears when a client opens a channel.",
     menu: {
-      kind: 'session',
+      kind: 'channel',
       target: (r) => ({
+        ...refOfView(r),
         nodeId: r.nodeId,
         nodeName: r.nodeName,
-        sessionId: r.sessionId ?? '',
-        connectionId: r.connectionId,
+        connection: nameOf(r.connection),
         snapshot: r,
       }),
-      label: (r) => r.sessionId ?? 'session',
+      label: (r) => nameOf(r.id) || 'channel',
     },
   },
   connections: {
     hook: useConnections,
     columns: resourceColumns.connections,
-    rowKey: (r) => `${r.nodeId}:${r.connectionId}`,
+    rowKey: (r) => `${r.nodeId}:${r.id}`,
     filter: 'Remote address, client id or connection id',
     noun: 'connection',
     summary: 'Every client connection, read live from each node.',
@@ -134,30 +137,35 @@ const CONFIG: {
       "A connection is a client's network link to a broker node. There are none while no client is connected; one appears when a client connects to a node's acceptor.",
     menu: {
       kind: 'connection',
-      target: (r) => ({ nodeId: r.nodeId, nodeName: r.nodeName, connectionId: r.connectionId ?? '', snapshot: r }),
-      label: (r) => r.clientId || r.remoteAddress || r.connectionId || 'connection',
+      target: (r) => ({
+        ...refOfView(r),
+        nodeId: r.nodeId,
+        nodeName: r.nodeName,
+        snapshot: r,
+      }),
+      label: (r) => r.clientId || r.remoteAddress || nameOf(r.id) || 'connection',
     },
   },
   producers: {
     hook: useProducers,
     columns: resourceColumns.producers,
-    rowKey: (r) => `${r.nodeId}:${r.producerId}`,
-    filter: 'Address, producer name or session id',
+    rowKey: (r) => `${r.nodeId}:${r.id}`,
+    filter: 'Destination, producer name or channel id',
     noun: 'producer',
-    summary: 'Every producer sending to an address, read live from each node.',
+    summary: 'Every producer sending to a destination, read live from each node.',
     about:
-      "A producer is a client's sender to an address. There are none while no client holds one open; one appears when a client creates a producer on a session.",
+      "A producer is a client's sender to a destination. There are none while no client holds one open; one appears when a client creates a producer on a channel.",
     menu: {
       kind: 'producer',
       target: (r) => ({
+        ...refOfView(r),
         nodeId: r.nodeId,
         nodeName: r.nodeName,
-        producerId: r.producerId ?? '',
-        address: r.address,
-        sessionId: r.sessionId,
+        destination: r.destination,
+        channel: nameOf(r.channel),
         snapshot: r,
       }),
-      label: (r) => r.clientId || r.address || r.producerId || 'producer',
+      label: (r) => r.clientId || nameOf(r.destination) || nameOf(r.id) || 'producer',
     },
   },
 };
@@ -184,11 +192,11 @@ function ResourceEmpty({
   about: string;
   filterText: string;
   unreachable: string[];
-  /** How the caller reaches this resource on the cluster; only addresses are owned by teams. */
+  /** How the caller reaches this resource on the cluster; only destinations are owned by teams. */
   reach: 'grant' | 'teams' | 'none' | 'unknown';
   onClearFilter: () => void;
 }>) {
-  const nouns = plural(noun);
+  const nouns = `${noun}s`;
   if (filterText) {
     return (
       <EmptyState
@@ -316,9 +324,9 @@ export function ResourceView({ kind }: Readonly<{ kind: Kind }>) {
         onSortChange={setSort}
         rowKey={config.rowKey}
         toolbar={{
-          // Not before the first page lands: "No addresses" while loading would claim there are none.
+          // Not before the first page lands: "No destinations" while loading would claim there are none.
           end: query.data ? (
-            <Pager page={page} pageSize={PAGE_SIZE} total={total} onChange={setPage} label={plural(config.noun)} />
+            <Pager page={page} pageSize={PAGE_SIZE} total={total} onChange={setPage} label={`${config.noun}s`} />
           ) : undefined,
         }}
         rowMenu={{
@@ -338,7 +346,7 @@ export function ResourceView({ kind }: Readonly<{ kind: Kind }>) {
             about={config.about}
             filterText={search.q ?? ''}
             unreachable={unreachable}
-            reach={kind === 'addresses' ? reach('address:read', clusterId) : 'grant'}
+            reach={kind === 'destinations' ? reach('destination:read', clusterId) : 'grant'}
             onClearFilter={() => {
               setFilter('');
               void navigate({

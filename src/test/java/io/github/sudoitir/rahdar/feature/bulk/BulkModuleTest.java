@@ -4,13 +4,17 @@ import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
 import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
 import io.github.sudoitir.rahdar.platform.broker.BrokerMessages;
 import io.github.sudoitir.rahdar.platform.broker.BrokerNotifications;
+import io.github.sudoitir.rahdar.platform.broker.SystemExtensions;
 import io.github.sudoitir.rahdar.platform.clusters.BrokerCommands;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterEnvironmentIndex;
+import io.github.sudoitir.rahdar.platform.clusters.ClusterKinds;
 import io.github.sudoitir.rahdar.platform.clusters.NodeStateRecorder;
+import io.github.sudoitir.rahdar.platform.clusters.ResourceTargets;
 import io.github.sudoitir.rahdar.platform.governance.ClearViewAudit;
 import io.github.sudoitir.rahdar.platform.governance.ContentPolicy;
 import io.github.sudoitir.rahdar.platform.mcp.McpProperties;
+import io.github.sudoitir.rahdar.platform.mcp.McpResources;
 import io.github.sudoitir.rahdar.platform.scrape.QueueLocator;
 import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshotUpsert;
 import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshots;
@@ -31,6 +35,10 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
  */
 @ApplicationModuleTest(mode = BootstrapMode.DIRECT_DEPENDENCIES, extraIncludes = "system.artemis")
 class BulkModuleTest extends ModuleIntegrationTest {
+
+    /** Queue configuration, in a direct dependency, finds the cluster's system extension through the broker module. */
+    @MockitoBean
+    SystemExtensions systemExtensions;
 
     /** Queue lifecycle, a direct dependency, locates queues through the scrape module. */
     @MockitoBean
@@ -97,6 +105,10 @@ class BulkModuleTest extends ModuleIntegrationTest {
     @MockitoBean
     McpProperties mcpProperties;
 
+    /** ...and resolve a tool argument's resource through it. */
+    @MockitoBean
+    McpResources mcpResources;
+
     /** Message bodies reach a response only through the content policy. */
     @MockitoBean
     ContentPolicy contentPolicy;
@@ -107,4 +119,12 @@ class BulkModuleTest extends ModuleIntegrationTest {
 
     @MockitoBean
     ArtemisNodes artemisNodes;
+
+    /** The estate's subscriptions, in a direct dependency, name each one's kind through the clusters module. */
+    @MockitoBean
+    ClusterKinds clusterKinds;
+
+    /** The resource controllers, in a direct dependency, resolve a target's nodes through the clusters module. */
+    @MockitoBean
+    ResourceTargets resourceTargets;
 }

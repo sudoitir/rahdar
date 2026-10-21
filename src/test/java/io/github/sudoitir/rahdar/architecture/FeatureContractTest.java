@@ -84,12 +84,12 @@ class FeatureContractTest {
         assertThatThrownBy(() -> registry(
                         env,
                         feature("a")
-                                .permission(PermissionDef.cluster("queue:create", "x"))
+                                .permission(PermissionDef.cluster("subscription:create", "x"))
                                 .build(),
                         feature("b")
-                                .permission(PermissionDef.cluster("queue:create", "y"))
+                                .permission(PermissionDef.cluster("subscription:create", "y"))
                                 .build()))
-                .hasMessageContaining("permission 'queue:create' is declared by both 'a' and 'b'");
+                .hasMessageContaining("permission 'subscription:create' is declared by both 'a' and 'b'");
         assertThatThrownBy(() -> registry(
                         env,
                         feature("a").settingKey("rr.sweep-interval").build(),

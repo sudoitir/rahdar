@@ -253,7 +253,7 @@ rahdar:
     # typed confirmation).
     bulk-cap: 1000
     # Most queues one bulk run may act on (ADR-0093). No override.
-    bulk-queue-cap: 200
+    bulk-subscription-cap: 200
   transfer:
     # Cross-broker message transfer (ADR-0097), all overridable at runtime in Settings.
     # A move parks at most 2 x batch-size messages in its staging queue at any moment.

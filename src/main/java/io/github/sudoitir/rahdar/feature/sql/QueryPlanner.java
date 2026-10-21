@@ -137,7 +137,7 @@ public class QueryPlanner {
 
     private String narrowingHint(QueryPlan plan) {
         if (plan.requiresScan() && plan.targets().size() > 1) {
-            return "Name one queue instead of a wildcard, or add a header or property predicate "
+            return "Name one subscription instead of a wildcard, or add a header or property predicate "
                     + "the broker can filter on before the body has to be read.";
         }
         if (plan.requiresScan()) {
@@ -161,13 +161,13 @@ public class QueryPlanner {
         nodes.nodes(clusterId).forEach(n -> nodesById.put(n.getId(), n));
 
         List<QueueLocation> matched = snapshots.forCluster(clusterId).stream()
-                .filter(s -> QueueNamePattern.matches(ast.queuePattern(), s.queueName()))
+                .filter(s -> QueueNamePattern.matches(ast.subscriptionPattern(), s.queueName()))
                 .map(s -> new QueueLocation(s.nodeId(), s.queueName(), s.address(), s.routingType(), s.messageCount()))
                 .toList();
-        if (matched.isEmpty() && !QueueNamePattern.isPattern(ast.queuePattern())) {
+        if (matched.isEmpty() && !QueueNamePattern.isPattern(ast.subscriptionPattern())) {
             // A queue named outright that the scrape has not reached yet — created a moment
             // ago — is looked up live, rather than reported as not existing.
-            matched = locator.locate(clusterId, ast.queuePattern());
+            matched = locator.locate(clusterId, ast.subscriptionPattern());
         }
 
         if (matched.isEmpty()) {
@@ -175,7 +175,8 @@ public class QueryPlanner {
             // "there is no such queue" and "that queue holds nothing" is the whole
             // answer to the question the operator asked.
             notices.add(new Notice(
-                    Notice.Kind.NO_QUEUE_MATCHED, "No queue on this cluster matches " + ast.queuePattern() + "."));
+                    Notice.Kind.NO_SUBSCRIPTION_MATCHED,
+                    "No subscription on this cluster matches " + ast.subscriptionPattern() + "."));
             return List.of();
         }
 
@@ -204,7 +205,7 @@ public class QueryPlanner {
 
         List<Target> filtered = targets.stream()
                 .filter(t -> split.target() == null || TargetPredicateEvaluator.matches(split.target(), t))
-                .sorted(Comparator.comparing(Target::queueName).thenComparing(Target::nodeName))
+                .sorted(Comparator.comparing(Target::subscription).thenComparing(Target::nodeName))
                 .limit(properties.maxTargets())
                 .toList();
 

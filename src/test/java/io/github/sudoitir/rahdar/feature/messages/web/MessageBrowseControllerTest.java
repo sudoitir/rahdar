@@ -1,5 +1,6 @@
 package io.github.sudoitir.rahdar.feature.messages.web;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
@@ -38,7 +39,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.context.WebApplicationContext;
 
-/** {@code GET .../queues/{q}/messages} — page shape, single-message detail + 404, node echo, bad filter, capability path. */
+/** {@code GET .../resources/artemis.queue/{q}/messages} — page shape, single-message detail + 404, node echo, bad filter, capability path. */
 @ExtendWith(AdminAuthenticationExtension.class)
 class MessageBrowseControllerTest extends PostgresIntegrationTest {
 
@@ -70,6 +71,8 @@ class MessageBrowseControllerTest extends PostgresIntegrationTest {
     @BeforeEach
     void setUp() {
         mvc = webAppContextSetup(webContext).build();
+        when(gateway.cluster(any()))
+                .thenReturn(FixtureJolokia.cluster(Map.of(UUID.randomUUID(), new FixtureJolokia())));
         clusterId = clusters.save(new ClusterEntity("c-" + UUID.randomUUID(), null, null))
                 .getId();
         BrokerNodeEntity a = BrokerNodeEntity.fromSeed(
@@ -139,11 +142,11 @@ class MessageBrowseControllerTest extends PostgresIntegrationTest {
     void browseReturnsAPageAndEchoesTheNode() throws Exception {
         serving(nodeAId, "PHASE3.SRC", batch("browse.json", 4));
 
-        mvc.perform(get("/api/v1/clusters/{c}/queues/{q}/messages", clusterId, "PHASE3.SRC"))
+        mvc.perform(get("/api/v1/clusters/{c}/resources/artemis.queue/{q}/messages", clusterId, "PHASE3.SRC"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.count").value(4))
                 .andExpect(jsonPath("$.data.length()").value(4))
-                .andExpect(jsonPath("$.data[0].messageId").value(127))
+                .andExpect(jsonPath("$.data[0].position").value("127"))
                 .andExpect(jsonPath("$.data[3].bodyTruncated").value(true))
                 .andExpect(jsonPath("$.node").value(nodeAId.toString()));
     }
@@ -152,9 +155,9 @@ class MessageBrowseControllerTest extends PostgresIntegrationTest {
     void detailFindsOneMessageById() throws Exception {
         serving(nodeAId, "PHASE3.SRC", batch("browse.json", 4));
 
-        mvc.perform(get("/api/v1/clusters/{c}/queues/{q}/messages/{id}", clusterId, "PHASE3.SRC", 133))
+        mvc.perform(get("/api/v1/clusters/{c}/resources/artemis.queue/{q}/messages/{id}", clusterId, "PHASE3.SRC", 133))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.messageId").value(133))
+                .andExpect(jsonPath("$.position").value("133"))
                 .andExpect(jsonPath("$.stringProperties.orderId").value("A-2"))
                 .andExpect(jsonPath("$.node").value(nodeAId.toString()));
     }
@@ -163,7 +166,11 @@ class MessageBrowseControllerTest extends PostgresIntegrationTest {
     void detailIsA404WhenTheIdIsNotInRange() throws Exception {
         serving(nodeAId, "PHASE3.SRC", batch("browse.json", 4));
 
-        mvc.perform(get("/api/v1/clusters/{c}/queues/{q}/messages/{id}", clusterId, "PHASE3.SRC", 999999))
+        mvc.perform(get(
+                        "/api/v1/clusters/{c}/resources/artemis.queue/{q}/messages/{id}",
+                        clusterId,
+                        "PHASE3.SRC",
+                        999999))
                 .andExpect(status().isNotFound());
     }
 
@@ -171,7 +178,7 @@ class MessageBrowseControllerTest extends PostgresIntegrationTest {
     void anInvalidFilterIsA400() throws Exception {
         serving(nodeAId, "PHASE3.SRC", batch("browse.json", 4));
 
-        mvc.perform(get("/api/v1/clusters/{c}/queues/{q}/messages", clusterId, "PHASE3.SRC")
+        mvc.perform(get("/api/v1/clusters/{c}/resources/artemis.queue/{q}/messages", clusterId, "PHASE3.SRC")
                         .param("filter", "this is not a filter =="))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.title").value("Invalid value"));
@@ -181,7 +188,7 @@ class MessageBrowseControllerTest extends PostgresIntegrationTest {
     void aBrokerThatRefusesTheReadSurfacesAClassifiedProblem() throws Exception {
         unauthorized();
 
-        mvc.perform(get("/api/v1/clusters/{c}/queues/{q}/messages", clusterId, "PHASE3.SRC"))
+        mvc.perform(get("/api/v1/clusters/{c}/resources/artemis.queue/{q}/messages", clusterId, "PHASE3.SRC"))
                 .andExpect(status().is4xxClientError())
                 .andExpect(jsonPath("$.brokerErrorKind").value("CREDENTIALS_REJECTED"));
     }
@@ -238,7 +245,7 @@ class MessageBrowseControllerTest extends PostgresIntegrationTest {
 
         serving(nodeBId, "SPLIT", batch("browse.json", 4));
 
-        mvc.perform(get("/api/v1/clusters/{c}/queues/{q}/messages", clusterId, "SPLIT"))
+        mvc.perform(get("/api/v1/clusters/{c}/resources/artemis.queue/{q}/messages", clusterId, "SPLIT"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.node").value(nodeBId.toString()))
                 .andExpect(jsonPath("$.count").value(4))
@@ -266,7 +273,7 @@ class MessageBrowseControllerTest extends PostgresIntegrationTest {
         server.expect().andRespond(withSuccess(batch("browse.json", 4), MediaType.APPLICATION_JSON));
         when(gateway.cluster(clusterId)).thenReturn(FixtureJolokia.cluster(Map.of(nodeAId, server)));
 
-        mvc.perform(get("/api/v1/clusters/{c}/queues/{q}/messages", clusterId, "FRESH"))
+        mvc.perform(get("/api/v1/clusters/{c}/resources/artemis.queue/{q}/messages", clusterId, "FRESH"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.node").value(nodeAId.toString()))
                 .andExpect(jsonPath("$.data.length()").value(4));
@@ -275,7 +282,7 @@ class MessageBrowseControllerTest extends PostgresIntegrationTest {
 
     @Test
     void anUnknownQueueIsA404() throws Exception {
-        mvc.perform(get("/api/v1/clusters/{c}/queues/{q}/messages", clusterId, "NOPE"))
+        mvc.perform(get("/api/v1/clusters/{c}/resources/artemis.queue/{q}/messages", clusterId, "NOPE"))
                 .andExpect(status().isNotFound());
     }
 }

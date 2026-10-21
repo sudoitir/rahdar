@@ -60,7 +60,7 @@ class FlowStoreTest extends PostgresIntegrationTest {
 
         var edges = store.edges(clusterId);
         assertThat(edges).singleElement().satisfies(e -> {
-            assertThat(e.edge().queue()).isEqualTo("orders");
+            assertThat(e.edge().subscription()).isEqualTo("orders");
             assertThat(e.edge().rate()).isEqualTo(20.0);
             assertThat(e.sampledAt()).isEqualTo(t0.plusSeconds(15));
         });

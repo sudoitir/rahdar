@@ -1,6 +1,7 @@
 package io.github.sudoitir.rahdar.feature.setupreview;
 
 import io.github.sudoitir.rahdar.platform.clusters.ClusterEnvironmentIndex;
+import io.github.sudoitir.rahdar.platform.mcp.McpResources;
 import io.github.sudoitir.rahdar.platform.scrape.QueueLocator;
 import io.github.sudoitir.rahdar.support.ModuleIntegrationTest;
 import org.springframework.modulith.test.ApplicationModuleTest;
@@ -20,4 +21,8 @@ class SetupReviewModuleTest extends ModuleIntegrationTest {
 
     @MockitoBean
     QueueLocator queueLocator;
+
+    /** The resources module's MCP tools resolve a tool argument's resource through the MCP module. */
+    @MockitoBean
+    McpResources mcpResources;
 }

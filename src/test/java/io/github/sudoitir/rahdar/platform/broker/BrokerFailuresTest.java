@@ -51,7 +51,11 @@ class BrokerFailuresTest {
         return Stream.of(
                 Arguments.of(ErrorReasons.RESOURCE_GONE, Map.of(), ManagementRefusal.Kind.ALREADY),
                 Arguments.of(ErrorReasons.RESOURCE_EXISTS, Map.of(), ManagementRefusal.Kind.ALREADY),
-                Arguments.of(ErrorReasons.HAS_CHILDREN, Map.of(), ManagementRefusal.Kind.BOUND_QUEUES),
+                Arguments.of(
+                        ErrorReasons.RESOURCE_EXISTS,
+                        Map.of("differing", "address,routing-type"),
+                        ManagementRefusal.Kind.ARGUMENT),
+                Arguments.of(ErrorReasons.HAS_CHILDREN, Map.of(), ManagementRefusal.Kind.BOUND_SUBSCRIPTIONS),
                 Arguments.of(ErrorReasons.HAS_CONSUMERS, Map.of(), ManagementRefusal.Kind.HAS_CONSUMERS),
                 Arguments.of(ErrorReasons.IMMUTABLE_FIELD, Map.of(), ManagementRefusal.Kind.ARGUMENT),
                 Arguments.of(ErrorReasons.INVALID_FILTER, Map.of(), ManagementRefusal.Kind.ARGUMENT),

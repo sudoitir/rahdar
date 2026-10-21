@@ -52,7 +52,7 @@ function event(over: Record<string, unknown> = {}) {
     occurredAt: '2026-09-04T10:00:00.000Z',
     receivedAt: '2026-09-04T10:00:00.000Z',
     type: 'openbroker.consumer.attached',
-    address: 'orders',
+    destination: 'orders',
     routingName: 'orders',
     consumerName: 'c-42',
     sessionName: 's-1',
@@ -87,7 +87,7 @@ describe('EventsView', () => {
     expect(screen.getByRole('switch', { name: 'Live' })).toBeChecked();
   });
 
-  it('lists events and a click on a row puts it in the address', async () => {
+  it('lists events and a click on a row puts it in the destination', async () => {
     server.use(
       http.get('*/api/v1/clusters/c1', () => HttpResponse.json(cluster('AVAILABLE'))),
       http.get('*/api/v1/clusters/c1/events', () =>
@@ -111,7 +111,7 @@ describe('EventsView', () => {
     expect(update({})).toEqual({ event: 1 });
   });
 
-  it('shows the raw props of the event the address names', async () => {
+  it('shows the raw props of the event the destination names', async () => {
     search = { event: 1 };
     server.use(
       http.get('*/api/v1/clusters/c1', () => HttpResponse.json(cluster('AVAILABLE'))),
@@ -230,7 +230,7 @@ describe('EventsView', () => {
     expect(await within(grid).findByText('10.9.9.9:1')).toBeInTheDocument();
   });
 
-  it('says a filter excludes every event, and clearing it drops the filters from the address', async () => {
+  it('says a filter excludes every event, and clearing it drops the filters from the destination', async () => {
     search = { type: 'openbroker.channel.closed' };
     server.use(
       http.get('*/api/v1/clusters/c1', () => HttpResponse.json(cluster('AVAILABLE'))),
@@ -244,7 +244,7 @@ describe('EventsView', () => {
     const update = navigate.mock.calls.at(-1)![0].search as (prev: object) => object;
     expect(update({ type: 'openbroker.channel.closed' })).toEqual({
       type: undefined,
-      address: undefined,
+      destination: undefined,
       page: undefined,
     });
   });

@@ -5,7 +5,7 @@ import { DataTable, EmptyState, ErrorState, Page, PageHeader, type Column } from
 
 import { useRecentNotes, type Note } from './api.ts';
 
-/** The plugin's page in a cluster: the latest notes across its queues. */
+/** The plugin's page in a cluster: the latest notes across its subscriptions. */
 export function NotesView() {
   const { clusterId } = useParams({ strict: false }) as { clusterId: string };
   const notes = useRecentNotes(clusterId);
@@ -13,14 +13,14 @@ export function NotesView() {
   const columns = useMemo<Column<Note>[]>(
     () => [
       {
-        id: 'queue',
-        header: 'Queue',
-        accessor: (n) => n.queue,
+        id: 'subscription',
+        header: 'Subscription',
+        accessor: (n) => n.subscription,
         kind: 'identifier',
         priority: 'essential',
         cell: (n) => (
-          <Anchor component={Link} to={`/clusters/${clusterId}/queues`} search={{ queue: n.queue } as never}>
-            {n.queue}
+          <Anchor component={Link} to={`/clusters/${clusterId}/subscriptions`} search={{ subscription: n.subscription } as never}>
+            {n.subscription}
           </Anchor>
         ),
       },
@@ -32,7 +32,7 @@ export function NotesView() {
 
   return (
     <Page fill>
-      <PageHeader title="Notes" description="The latest notes operators left on the queues of this cluster." />
+      <PageHeader title="Notes" description="The latest notes operators left on the subscriptions of this cluster." />
       <DataTable
         variant="static"
         label="Recent notes"
@@ -44,7 +44,7 @@ export function NotesView() {
           <EmptyState
             kind="empty"
             title="No notes on this cluster"
-            description="Open a queue and add one from its details."
+            description="Open a subscription and add one from its details."
           />
         }
         error={notes.isError ? <ErrorState error={notes.error} onRetry={() => void notes.refetch()} /> : undefined}

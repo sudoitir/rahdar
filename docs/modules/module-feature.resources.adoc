@@ -7,19 +7,23 @@
 
 * `i.g.s.r.f.r.web.ClusterResourceController`
 * `i.g.s.r.f.r.web.ConnectionControlController`
+* `i.g.s.r.f.r.web.EstateSubscriptionController`
+* `i.g.s.r.f.r.web.ResourceLifecycleController`
 
 _Services_
 
 * `i.g.s.r.f.r.ConnectionControlService`
 * `i.g.s.r.f.r.CrossNodeAggregator`
+* `i.g.s.r.f.r.EstateSubscriptions`
 * `i.g.s.r.f.r.PagedListService`
+* `i.g.s.r.f.r.QueueLifecycleService`
 
 _Others_
 
 * `i.g.s.r.f.r.ConnectionOperations`
-* `i.g.s.r.f.r.QueueViewMapper`
 * `i.g.s.r.f.r.ResourceViewMapper`
 * `i.g.s.r.f.r.ResourcesFeature`
+* `i.g.s.r.f.r.SubscriptionConfigurationReader`
 |Bean references
 |* `i.g.s.r.p.c.ClusterDirectory` (in Clusters)
 * `i.g.s.r.k.a.AuditService` (in Audit log)
@@ -32,5 +36,14 @@ _Others_
 * `i.g.s.r.p.s.ScrapeProperties` (in Scraping)
 * `i.g.s.r.k.s.PermissionResolver` (in Security)
 * `i.g.s.r.k.s.TeamIndex` (in Security)
+* `i.g.s.r.p.c.ClusterKinds` (in Clusters)
+* `i.g.s.r.p.s.QueueLocator` (in Scraping)
+* `i.g.s.r.p.s.QueueSnapshotUpsert` (in Scraping)
+* `i.g.s.r.k.g.OperationGate` (in Approval gate contract)
+* `i.g.s.r.p.b.BrokerMessages` (in Broker connectivity)
+* `i.g.s.r.p.b.QueueCounters` (in Broker connectivity)
+* `i.g.s.r.p.b.SystemExtensions` (in Broker connectivity)
+* `i.g.s.r.p.m.McpResources` (in MCP server)
 * `i.g.s.r.p.m.McpProperties` (in MCP server)
+* `i.g.s.r.p.c.ResourceTargets` (in Clusters)
 |===

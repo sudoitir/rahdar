@@ -20,7 +20,7 @@ import org.springframework.ai.mcp.annotation.McpToolParam;
 import org.springframework.stereotype.Component;
 
 /**
- * The {@code broker_config} and {@code config_diff} MCP tools. *
+ * The {@code artemis_config} and {@code artemis_config_diff} MCP tools. *
  * <p>Reads only: nothing here needs the dry-run/confirm contract, which is the review
  * boundary ADR-0045 draws between read and mutating tool classes. Every method is a thin
  * adapter over the services the REST layer already uses.
@@ -46,7 +46,7 @@ public class BrokerConfigMcpReadTools {
      * fragment, or the apply history — one tool, one {@code kind}.
      */
     @McpTool(
-            name = "broker_config",
+            name = "artemis_config",
             description =
                     "A cluster's declared broker configuration: declaration, drift per node, XML fragment, or applies.",
             annotations =
@@ -55,7 +55,7 @@ public class BrokerConfigMcpReadTools {
                             destructiveHint = false,
                             idempotentHint = true,
                             openWorldHint = false))
-    public McpSchema.CallToolResult brokerConfig(
+    public McpSchema.CallToolResult artemisConfig(
             @McpToolParam(required = true) String clusterId, @McpToolParam(required = false) String kind) {
         UUID id = McpArgs.uuid("clusterId", clusterId);
         ConfigReadKind what = McpArgs.enumOf(ConfigReadKind.class, "kind", kind, ConfigReadKind.DECLARATION);
@@ -101,7 +101,7 @@ public class BrokerConfigMcpReadTools {
     }
 
     @McpTool(
-            name = "config_diff",
+            name = "artemis_config_diff",
             description = "Every node's broker configuration against the majority: the keys that drift, per node.",
             annotations =
                     @McpTool.McpAnnotations(
@@ -109,7 +109,7 @@ public class BrokerConfigMcpReadTools {
                             destructiveHint = false,
                             idempotentHint = true,
                             openWorldHint = false))
-    public McpSchema.CallToolResult configDiff(
+    public McpSchema.CallToolResult artemisConfigDiff(
             @McpToolParam(required = true) String clusterId, @McpToolParam(required = false) String nodes) {
         UUID id = McpArgs.uuid("clusterId", clusterId);
         Set<UUID> only = new LinkedHashSet<>();

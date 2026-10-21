@@ -1,8 +1,5 @@
 package io.github.sudoitir.rahdar.feature.flow;
 
-import static io.github.sudoitir.rahdar.system.artemis.ListRows.num;
-import static io.github.sudoitir.rahdar.system.artemis.ListRows.str;
-
 import io.github.sudoitir.rahdar.feature.flow.ClientEdges.Edge;
 import io.github.sudoitir.rahdar.feature.flow.ClientEdges.Kind;
 import io.github.sudoitir.rahdar.feature.flow.ClientEdges.Member;
@@ -15,18 +12,15 @@ import io.github.sudoitir.rahdar.kernel.settings.SettingsService;
 import io.github.sudoitir.rahdar.kernel.stream.SseHub;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
+import io.github.sudoitir.rahdar.platform.broker.FlowSampler;
+import io.github.sudoitir.rahdar.platform.broker.FlowSampler.FlowMember;
+import io.github.sudoitir.rahdar.platform.broker.FlowSampler.FlowRoute;
+import io.github.sudoitir.rahdar.platform.broker.FlowSampler.FlowSample;
+import io.github.sudoitir.rahdar.platform.broker.SystemExtensions;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterLock;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterOwnership;
-import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
-import io.github.sudoitir.rahdar.system.artemis.ArtemisNodes;
-import io.github.sudoitir.rahdar.system.artemis.BridgeRow;
-import io.github.sudoitir.rahdar.system.artemis.DivertRow;
-import io.github.sudoitir.rahdar.system.artemis.ListRows;
-import io.github.sudoitir.rahdar.system.artemis.MBeanNames;
-import io.github.sudoitir.rahdar.system.artemis.ManagementRequest;
-import io.github.sudoitir.rahdar.system.artemis.ManagementResponse;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import java.time.Clock;
@@ -36,7 +30,6 @@ import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -48,7 +41,6 @@ import java.util.concurrent.Future;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
-import tools.jackson.databind.JsonNode;
 
 /**
  * Samples producers, consumers and the routing between them for the clusters whose flow is observed
@@ -65,25 +57,6 @@ import tools.jackson.databind.JsonNode;
 @Slf4j
 public class ClientSampler {
 
-    static final String LIST_PRODUCERS = "listProducers(java.lang.String,int,int)";
-    static final String LIST_CONSUMERS = "listConsumers(java.lang.String,int,int)";
-    static final String LIST_QUEUES = "listQueues(java.lang.String,int,int)";
-    static final String ADDRESS_SETTINGS = "getAddressSettingsAsJSON(java.lang.String)";
-
-    /** Queues a cluster connection creates to move messages to another node, named for that node. */
-    static final String STORE_AND_FORWARD_PREFIX = "$.artemis.internal.sf.";
-
-    private static final String STORE_AND_FORWARD_QUEUES =
-            "{\"field\":\"name\",\"operation\":\"CONTAINS\",\"value\":\"" + STORE_AND_FORWARD_PREFIX + "\"}";
-    private static final String TEMPORARY_QUEUES =
-            "{\"field\":\"temporary\",\"operation\":\"EQUALS\",\"value\":\"true\"}";
-    private static final String FILTERED_QUEUES = "{\"field\":\"filter\",\"operation\":\"NOT_EQUALS\",\"value\":\"\"}";
-
-    private static final String ADDRESS = "address";
-    private static final String BAD_RESPONSE = "BAD_RESPONSE";
-    private static final String ROUTING_UNAVAILABLE = "ROUTING_UNAVAILABLE";
-    private static final String COUNTER_UNAVAILABLE = "COUNTER_UNAVAILABLE";
-
     private final FlowStore store;
     private final ClusterDirectory directory;
     private final BrokerConnections connections;
@@ -93,7 +66,7 @@ public class ClientSampler {
     private final SseHub hub;
     private final MeterRegistry meters;
     private final Clock clock;
-    private final ArtemisNodes artemisNodes;
+    private final SystemExtensions extensions;
 
     /** Per cluster, per node and kind: the previous sweep's counters. Held only while this instance samples. */
     private final Map<UUID, Map<String, MemberDeltas>> deltas = new ConcurrentHashMap<>();
@@ -174,8 +147,8 @@ public class ClientSampler {
                             e.clientId(),
                             e.user(),
                             e.remoteHost(),
-                            e.address(),
-                            e.queue(),
+                            e.destination(),
+                            e.subscription(),
                             e.memberCount(),
                             rounded(e.rate()),
                             e.stalled())));
@@ -198,244 +171,64 @@ public class ClientSampler {
         log.debug("Flow sweep of cluster {}: {} node(s)", clusterId, nodes.size());
     }
 
-    /** Everything flow reads from one node, in one POST. Broker I/O only; nothing here touches the database. */
+    /** Everything flow reads from one node. Broker I/O only; nothing here touches the database. */
     NodeResult sampleNode(UUID clusterId, ClusterNode node, int cap) {
         Instant at = clock.instant();
         try {
-            ArtemisNode client = artemisNodes.on(clusterId, node.getId());
-            String mbean = client.resolveBrokerObjectName();
-            List<ManagementResponse> entries = client.batch(List.of(
-                    ManagementRequest.exec(mbean, LIST_PRODUCERS, ListRows.ALL, 1, cap),
-                    ManagementRequest.exec(mbean, LIST_CONSUMERS, ListRows.ALL, 1, cap),
-                    ManagementRequest.readAll(MBeanNames.divertsPattern(mbean)),
-                    ManagementRequest.readAll(MBeanNames.bridgesPattern(mbean)),
-                    ManagementRequest.exec(mbean, LIST_QUEUES, STORE_AND_FORWARD_QUEUES, 1, cap),
-                    ManagementRequest.exec(mbean, LIST_QUEUES, TEMPORARY_QUEUES, 1, cap),
-                    ManagementRequest.exec(mbean, LIST_QUEUES, FILTERED_QUEUES, 1, cap),
-                    ManagementRequest.exec(mbean, ADDRESS_SETTINGS, "#")));
-            if (entries.size() != 8) {
-                return failed(clusterId, node, at, BAD_RESPONSE, "The broker returned an incomplete response.");
-            }
-            if (lacksNotEquals(entries.get(6))) {
-                // An older broker has no NOT_EQUALS filter (ADR-0142): read the queues unfiltered and keep
-                // the filtered ones here, as the route parse below already does.
-                // ponytail: the cap now counts every queue, so a node with more queues than the cap can
-                // miss filtered ones; page through them if a broker that old runs that many.
-                entries = new ArrayList<>(entries);
-                entries.set(6, client.single(ManagementRequest.exec(mbean, LIST_QUEUES, ListRows.ALL, 1, cap)));
-            }
-
-            Listing producers = listing(client, entries.get(0));
-            Listing consumers = listing(client, entries.get(1));
+            FlowSample sampled =
+                    extensions.require(clusterId, FlowSampler.class).sample(clusterId, node.getId(), cap);
             List<Member> members = new ArrayList<>();
             List<Reading> producerReadings = new ArrayList<>();
             List<Reading> consumerReadings = new ArrayList<>();
-            boolean counterMissing = false;
-            for (JsonNode row : producers.rows()) {
-                counterMissing |= !row.has("msgSent");
-                producerReadings.add(new Reading(memberId(row), num(row, "msgSent"), 0));
-                members.add(member(Kind.PRODUCE, row, str(row, ADDRESS), null));
+            for (FlowMember producer : sampled.producers()) {
+                producerReadings.add(new Reading(producer.memberId(), producer.counter(), 0));
+                members.add(member(Kind.PRODUCE, producer));
             }
-            for (JsonNode row : consumers.rows()) {
-                counterMissing |= !row.has("messagesAcknowledged");
-                consumerReadings.add(
-                        new Reading(memberId(row), num(row, "messagesAcknowledged"), num(row, "messagesInTransit")));
-                members.add(member(Kind.CONSUME, row, str(row, ADDRESS), str(row, "queue")));
+            for (FlowMember consumer : sampled.consumers()) {
+                consumerReadings.add(new Reading(consumer.memberId(), consumer.counter(), consumer.unacked()));
+                members.add(member(Kind.CONSUME, consumer));
             }
+            List<Route> routes =
+                    sampled.routes().stream().map(ClientSampler::route).toList();
 
-            List<String> routingErrors = new ArrayList<>();
-            List<Route> routes = routes(client, node, entries, routingErrors);
-
-            String errorKind = errorKind(producers, consumers, counterMissing, routingErrors);
-            String error = error(producers, consumers, routingErrors);
+            String errorKind = sampled.errorKind();
             NodeSample sample = new NodeSample(
                     node.getId(),
                     clusterId,
                     at,
-                    producers.rows().size(),
-                    (int) Math.min(Integer.MAX_VALUE, producers.total()),
-                    consumers.rows().size(),
-                    (int) Math.min(Integer.MAX_VALUE, consumers.total()),
-                    error,
+                    sampled.producers().size(),
+                    (int) Math.min(Integer.MAX_VALUE, sampled.producersTotal()),
+                    sampled.consumers().size(),
+                    (int) Math.min(Integer.MAX_VALUE, sampled.consumersTotal()),
+                    sampled.error(),
                     errorKind);
             boolean partial = errorKind == null
-                    || COUNTER_UNAVAILABLE.equals(errorKind)
-                    || ROUTING_UNAVAILABLE.equals(errorKind)
-                    || !producers.rows().isEmpty()
-                    || !consumers.rows().isEmpty();
-            boolean truncated = producers.total() > producers.rows().size()
-                    || consumers.total() > consumers.rows().size();
+                    || FlowSampler.COUNTER_UNAVAILABLE.equals(errorKind)
+                    || FlowSampler.ROUTING_UNAVAILABLE.equals(errorKind)
+                    || !sampled.producers().isEmpty()
+                    || !sampled.consumers().isEmpty();
+            boolean truncated = sampled.producersTotal() > sampled.producers().size()
+                    || sampled.consumersTotal() > sampled.consumers().size();
             return new NodeResult(sample, members, producerReadings, consumerReadings, routes, partial, truncated);
         } catch (BrokerConnectionException e) {
             return failed(clusterId, node, at, e.kind().name(), e.getMessage());
         } catch (RuntimeException e) {
-            return failed(clusterId, node, at, BAD_RESPONSE, e.getMessage());
+            return failed(clusterId, node, at, FlowSampler.BAD_RESPONSE, e.getMessage());
         }
     }
 
-    /** Artemis before NOT_EQUALS rejects the filter by name; nothing else answers this way. */
-    static boolean lacksNotEquals(ManagementResponse res) {
-        return !res.ok()
-                && res.error() != null
-                && res.error().contains("No enum constant")
-                && res.error().contains("NOT_EQUALS");
-    }
-
-    private static String errorKind(
-            Listing producers, Listing consumers, boolean counterMissing, List<String> routingErrors) {
-        if (producers.error() != null) {
-            return producers.errorKind();
-        }
-        if (consumers.error() != null) {
-            return consumers.errorKind();
-        }
-        if (counterMissing) {
-            return COUNTER_UNAVAILABLE;
-        }
-        return routingErrors.isEmpty() ? null : ROUTING_UNAVAILABLE;
-    }
-
-    private static String error(Listing producers, Listing consumers, List<String> routingErrors) {
-        if (producers.error() != null) {
-            return producers.error();
-        }
-        if (consumers.error() != null) {
-            return consumers.error();
-        }
-        return routingErrors.isEmpty() ? null : routingErrors.getFirst();
-    }
-
-    /** The routing entries of a node's POST, each read on its own: one failing entry loses only itself. */
-    private static List<Route> routes(
-            ArtemisNode client, ClusterNode node, List<ManagementResponse> entries, List<String> errors) {
-        List<Route> routes = new ArrayList<>();
-        for (JsonNode attrs : patternRead(entries.get(2), errors)) {
-            DivertRow d = DivertRow.parse(attrs, node.getId(), node.getName());
-            routes.add(new Route(
-                    RouteKind.DIVERT,
-                    d.uniqueName(),
-                    d.address(),
-                    d.forwardingAddress(),
-                    d.filter(),
-                    d.transformerClassName(),
-                    d.exclusive(),
-                    true,
-                    0,
-                    null));
-        }
-        for (JsonNode attrs : patternRead(entries.get(3), errors)) {
-            BridgeRow b = BridgeRow.parse(attrs, node.getId(), node.getName());
-            routes.add(new Route(
-                    RouteKind.BRIDGE,
-                    b.name(),
-                    b.queueName(),
-                    b.forwardingAddress(),
-                    b.filterString(),
-                    b.transformerClassName(),
-                    false,
-                    b.connected(),
-                    b.messagesAcknowledged(),
-                    null));
-        }
-        for (JsonNode row : queueRows(client, entries.get(4), errors)) {
-            String name = str(row, "name");
-            if (name != null && name.startsWith(STORE_AND_FORWARD_PREFIX)) {
-                routes.add(new Route(
-                        RouteKind.STORE_AND_FORWARD,
-                        name,
-                        str(row, ADDRESS),
-                        receivingNodeId(name),
-                        null,
-                        null,
-                        false,
-                        true,
-                        num(row, "messagesAdded"),
-                        null));
-            }
-        }
-        queueRows(client, entries.get(5), errors).stream()
-                .map(row -> new Route(
-                        RouteKind.TEMPORARY_QUEUE,
-                        str(row, "name"),
-                        str(row, ADDRESS),
-                        str(row, "name"),
-                        null,
-                        null,
-                        false,
-                        true,
-                        0,
-                        null))
-                .forEach(routes::add);
-        for (JsonNode row : queueRows(client, entries.get(6), errors)) {
-            String filter = str(row, "filter");
-            if (filter != null && !filter.isBlank()) {
-                routes.add(new Route(
-                        RouteKind.QUEUE_FILTER,
-                        str(row, "name"),
-                        str(row, ADDRESS),
-                        str(row, "name"),
-                        filter,
-                        null,
-                        false,
-                        true,
-                        0,
-                        null));
-            }
-        }
-        ManagementResponse settings = entries.get(7);
-        if (settings.ok()) {
-            JsonNode parsed = client.parsed(settings);
-            addressRoute(routes, RouteKind.DEAD_LETTER, str(parsed, "deadLetterAddress"));
-            addressRoute(routes, RouteKind.EXPIRY, str(parsed, "expiryAddress"));
-        } else {
-            errors.add(entryError(settings));
-        }
-        return routes;
-    }
-
-    private static void addressRoute(List<Route> routes, RouteKind kind, String address) {
-        if (address != null && !address.isBlank()) {
-            routes.add(new Route(kind, "#", "#", address, null, null, false, true, 0, null));
-        }
-    }
-
-    /**
-     * The attribute maps of a Jolokia pattern read. A pattern that matches nothing answers 404 for that
-     * entry alone, which means "none of these on this node", not a failure.
-     */
-    private static List<JsonNode> patternRead(ManagementResponse entry, List<String> errors) {
-        if (entry.status() == 404) {
-            return List.of();
-        }
-        if (!entry.ok()) {
-            errors.add(entryError(entry));
-            return List.of();
-        }
-        JsonNode value = entry.value();
-        List<JsonNode> out = new ArrayList<>();
-        if (value != null && value.isObject()) {
-            for (String objectName : value.propertyNames()) {
-                JsonNode attrs = value.get(objectName);
-                if (attrs != null && attrs.isObject()) {
-                    out.add(attrs);
-                }
-            }
-        }
-        return out;
-    }
-
-    private static List<JsonNode> queueRows(ArtemisNode client, ManagementResponse entry, List<String> errors) {
-        Listing listing = listing(client, entry);
-        if (listing.error() != null) {
-            errors.add(listing.error());
-        }
-        return listing.rows();
-    }
-
-    /** {@code $.artemis.internal.sf.<cluster-connection>.<nodeID>}: the node id is the last segment. */
-    static String receivingNodeId(String storeAndForwardQueue) {
-        int dot = storeAndForwardQueue.lastIndexOf('.');
-        return dot < 0 ? storeAndForwardQueue : storeAndForwardQueue.substring(dot + 1);
+    private static Route route(FlowRoute r) {
+        return new Route(
+                RouteKind.valueOf(r.kind()),
+                r.name(),
+                r.source(),
+                r.target(),
+                r.filter(),
+                r.transformer(),
+                r.exclusive(),
+                r.connected(),
+                r.counter(),
+                null);
     }
 
     private List<Edge> edges(Map<String, MemberDeltas> clusterDeltas, UUID nodeId, NodeResult result) {
@@ -460,8 +253,8 @@ public class ClientSampler {
                     m.user(),
                     m.remoteAddress(),
                     m.protocol(),
-                    m.address(),
-                    m.queue(),
+                    m.destination(),
+                    m.subscription(),
                     rate == null ? null : rate.rate(),
                     reading.unacked(),
                     rate != null && rate.stalled()));
@@ -502,46 +295,18 @@ public class ClientSampler {
         return r.kind() == RouteKind.BRIDGE || r.kind() == RouteKind.STORE_AND_FORWARD;
     }
 
-    private static Member member(Kind kind, JsonNode row, String address, String queue) {
+    private static Member member(Kind kind, FlowMember m) {
         return new Member(
                 kind,
-                str(row, "clientID"),
-                firstNonBlank(str(row, "validatedUser"), str(row, "user")),
-                str(row, "remoteAddress"),
-                str(row, "protocol"),
-                address,
-                queue,
+                m.clientId(),
+                m.user(),
+                m.remoteAddress(),
+                m.protocol(),
+                m.destination(),
+                m.subscription(),
                 null,
                 0,
                 false);
-    }
-
-    /** Broker ids are unique per node; the session is added so a reused id in a new session is a new member. */
-    private static String memberId(JsonNode row) {
-        return str(row, "id") + "@" + str(row, "session");
-    }
-
-    private static Listing listing(ArtemisNode client, ManagementResponse entry) {
-        if (!entry.ok()) {
-            String error = entryError(entry);
-            String lower = error.toLowerCase(Locale.ROOT);
-            String kind = entry.status() == 403 || lower.contains("permission") || lower.contains("security")
-                    ? "PERMISSION_DENIED"
-                    : BAD_RESPONSE;
-            return new Listing(List.of(), 0, error, kind);
-        }
-        JsonNode env = client.parsed(entry);
-        JsonNode data = env == null ? null : env.get("data");
-        List<JsonNode> rows = new ArrayList<>();
-        if (data != null && data.isArray()) {
-            data.forEach(rows::add);
-        }
-        long total = env == null ? 0L : env.path("count").asLong(rows.size());
-        return new Listing(rows, total, null, null);
-    }
-
-    private static String entryError(ManagementResponse entry) {
-        return entry.error() != null ? entry.error() : "status " + entry.status();
     }
 
     private static NodeResult failed(UUID clusterId, ClusterNode node, Instant at, String kind, String error) {
@@ -575,12 +340,6 @@ public class ClientSampler {
     private static long rounded(Double rate) {
         return rate == null ? -1L : Math.round(rate * 10);
     }
-
-    private static String firstNonBlank(String a, String b) {
-        return a != null && !a.isBlank() ? a : b;
-    }
-
-    private record Listing(List<JsonNode> rows, long total, String error, String errorKind) {}
 
     record NodeResult(
             NodeSample sample,

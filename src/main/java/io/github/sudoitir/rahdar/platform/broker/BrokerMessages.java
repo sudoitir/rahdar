@@ -24,6 +24,7 @@ import io.github.sudoitir.openbroker.model.ResourceId;
 import io.github.sudoitir.openbroker.model.Scope;
 import io.github.sudoitir.openbroker.model.Shard;
 import io.github.sudoitir.openbroker.operation.Operation;
+import io.github.sudoitir.rahdar.kernel.security.ResourceRef;
 import java.time.Instant;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -106,15 +107,15 @@ public class BrokerMessages {
         });
     }
 
-    /** Sends one message to an address through a node; returns its id, when the system gives one. */
-    public Optional<String> send(UUID clusterId, UUID nodeId, String address, OutboundMessage message) {
+    /**
+     * Sends one message through a node to a destination, which routes it, or straight to a subscription;
+     * returns its id, when the system gives one.
+     */
+    public Optional<String> sendTo(UUID clusterId, UUID nodeId, ResourceRef target, OutboundMessage message) {
         return translated(() -> {
             ClusterConnection c = gateway.cluster(clusterId);
-            SendReceipt receipt = c.messages()
-                    .send(
-                            SendTarget.destination(ResourceIds.of(c, ResourceClass.DESTINATION, address)),
-                            Scope.node(BrokerGateway.idOf(nodeId)),
-                            message);
+            SendReceipt receipt =
+                    c.messages().send(sendTarget(c, target), Scope.node(BrokerGateway.idOf(nodeId)), message);
             return receipt.messageId();
         });
     }
@@ -251,6 +252,13 @@ public class BrokerMessages {
         List<String> dialects = c.system().filterDialects();
         String dialect = dialects.isEmpty() ? MessageFilter.PORTABLE : dialects.getFirst();
         return Optional.of(new MessageFilter(dialect, expression));
+    }
+
+    private static SendTarget sendTarget(ClusterConnection c, ResourceRef target) {
+        return switch (target.type()) {
+            case DESTINATION -> SendTarget.destination(ResourceIds.of(c, ResourceClass.DESTINATION, target.name()));
+            case SUBSCRIPTION -> SendTarget.subscription(ResourceIds.of(c, ResourceClass.SUBSCRIPTION, target.name()));
+        };
     }
 
     private static ResourceId queueId(ClusterConnection c, String queue) {

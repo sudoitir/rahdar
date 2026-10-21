@@ -1,7 +1,7 @@
 package io.github.sudoitir.rahdar.feature.transfer;
 
 import io.github.sudoitir.rahdar.feature.messages.MessagePermissions;
-import io.github.sudoitir.rahdar.feature.queues.QueuePermissions;
+import io.github.sudoitir.rahdar.feature.resources.ResourcePermissions;
 import io.github.sudoitir.rahdar.feature.transfer.TransferRunMapper.Derived;
 import io.github.sudoitir.rahdar.feature.transfer.internal.persistence.TransferRunEntity;
 import io.github.sudoitir.rahdar.feature.transfer.internal.persistence.TransferRunRepository;
@@ -25,6 +25,7 @@ import io.github.sudoitir.rahdar.kernel.gate.Gated;
 import io.github.sudoitir.rahdar.kernel.gate.Operation;
 import io.github.sudoitir.rahdar.kernel.gate.OperationGate;
 import io.github.sudoitir.rahdar.kernel.gate.OperationHeldException;
+import io.github.sudoitir.rahdar.kernel.plugin.ResourceType;
 import io.github.sudoitir.rahdar.kernel.replica.ReplicaRegistry;
 import io.github.sudoitir.rahdar.kernel.security.ClusterAccessGuard;
 import io.github.sudoitir.rahdar.kernel.security.ClusterAccessGuard.Requirement;
@@ -32,6 +33,7 @@ import io.github.sudoitir.rahdar.kernel.security.OperatorHandoff;
 import io.github.sudoitir.rahdar.kernel.security.OperatorHandoff.Operator;
 import io.github.sudoitir.rahdar.kernel.security.PermissionResolver;
 import io.github.sudoitir.rahdar.kernel.security.Permissions;
+import io.github.sudoitir.rahdar.kernel.security.ResourceIdTexts;
 import io.github.sudoitir.rahdar.kernel.security.ResourceRef;
 import io.github.sudoitir.rahdar.kernel.settings.SettingsService;
 import io.github.sudoitir.rahdar.platform.broker.BrokerCapabilities;
@@ -39,6 +41,14 @@ import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
 import io.github.sudoitir.rahdar.platform.broker.BrokerSettings;
 import io.github.sudoitir.rahdar.platform.broker.BrokerXmlSnippets;
 import io.github.sudoitir.rahdar.platform.broker.BulkCapExceededException;
+import io.github.sudoitir.rahdar.platform.broker.RahdarNames;
+import io.github.sudoitir.rahdar.platform.broker.ResourceIds;
+import io.github.sudoitir.rahdar.platform.broker.TransferAcceptance;
+import io.github.sudoitir.rahdar.platform.broker.TransferAcceptance.AcceptanceFacts;
+import io.github.sudoitir.rahdar.platform.broker.TransferAcceptance.AcceptanceFinding;
+import io.github.sudoitir.rahdar.platform.broker.TransferAcceptance.AcceptanceInput;
+import io.github.sudoitir.rahdar.platform.broker.TransferStaging;
+import io.github.sudoitir.rahdar.platform.broker.TransferStaging.TransferSource;
 import io.github.sudoitir.rahdar.platform.clusters.CapabilityLedger;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
@@ -46,13 +56,6 @@ import io.github.sudoitir.rahdar.platform.clusters.ServingNodes;
 import io.github.sudoitir.rahdar.platform.clusters.SplitBrainStatus;
 import io.github.sudoitir.rahdar.platform.scrape.QueueLocator;
 import io.github.sudoitir.rahdar.platform.scrape.QueueLocator.QueueLocation;
-import io.github.sudoitir.rahdar.system.artemis.AcceptanceProbe;
-import io.github.sudoitir.rahdar.system.artemis.AcceptanceProbe.Facts;
-import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
-import io.github.sudoitir.rahdar.system.artemis.ArtemisSelectors;
-import io.github.sudoitir.rahdar.system.artemis.MBeanNames;
-import io.github.sudoitir.rahdar.system.artemis.MessageOperations;
-import io.github.sudoitir.rahdar.system.artemis.StagingQueues;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -87,7 +90,7 @@ public class TransferService {
 
     static final Duration PREVIEW_LIFETIME = Duration.ofMinutes(10);
     static final String AUDIT_ACTION = "message.transfer";
-    private static final String AUDIT_QUEUE = "QUEUE";
+    private static final String AUDIT_QUEUE = "SUBSCRIPTION";
     private static final String RUN_ID = "runId";
     private static final String ANYCAST = "ANYCAST";
     private static final int HISTORY = 100;
@@ -99,9 +102,6 @@ public class TransferService {
     private final ClusterDirectory directory;
     private final CapabilityLedger capabilities;
     private final QueueLocator locator;
-    private final MessageOperations messages;
-    private final AcceptanceProbe probe;
-    private final StagingQueues staging;
     private final ClusterAccessGuard access;
     private final PermissionResolver permissions;
     private final OperatorHandoff handoff;
@@ -110,6 +110,7 @@ public class TransferService {
     private final ObjectMapper json;
     private final ReplicaRegistry replicas;
     private final OperationGate gate;
+    private final ResourceIdTexts ids;
 
     /**
      * What the gate holds of a transfer: the run, the plan it was previewed with (its hash, mode and ends, so an
@@ -125,7 +126,7 @@ public class TransferService {
             String targetQueue,
             boolean override,
             List<String> acknowledged,
-            String confirmQueue) {}
+            String confirmSubscription) {}
 
     // ---- preview -----------------------------------------------------------
 
@@ -135,9 +136,12 @@ public class TransferService {
      */
     public TransferRunView preview(UUID clusterId, TransferPreviewRequest request) {
         TransferMode mode = request.mode();
-        access.requireResource(clusterId, ResourceRef.queue(request.sourceQueue()), mode.sourcePermission());
+        String sourceName = ResourceIds.nameOf(request.source());
+        access.requireResource(clusterId, ResourceRef.subscription(sourceName), mode.sourcePermission());
         access.requireVisible(request.targetClusterId());
-        TransferSelection selection = normalise(request.selection());
+        requireSubscription(clusterId, request.source());
+        Target named = targetOf(request);
+        TransferSelection selection = normalise(request.selection(), nodes.staging(clusterId));
 
         ClusterNode source = nodes.node(clusterId, request.sourceNodeId());
         ClusterNode target = nodes.node(request.targetClusterId(), request.targetNodeId());
@@ -150,38 +154,48 @@ public class TransferService {
                                 .formatted(node.getName()));
             }
         }
-        QueueLocation from = locate(clusterId, request.sourceQueue(), source)
-                .orElseThrow(() -> new NotFoundException("queue", request.sourceQueue()));
-        Optional<QueueLocation> to = locate(request.targetClusterId(), request.targetQueue(), target);
-        String targetAddress = authorisedTargetAddress(request, to);
+        QueueLocation from = locate(clusterId, sourceName, source)
+                .orElseThrow(() -> new NotFoundException("subscription", request.source()));
+        Optional<QueueLocation> to = locate(request.targetClusterId(), named.name(), target);
+        String targetAddress = authorisedTargetAddress(request.targetClusterId(), named, to);
         String targetRoutingType = to.map(QueueLocation::routingType).orElse(ANYCAST);
         boolean sameCluster = clusterId.equals(request.targetClusterId());
         boolean sameNode = sameCluster && source.getNativeNodeId().equals(target.getNativeNodeId());
         Instant t0 = Instant.now();
 
-        ArtemisNode sourceClient = nodes.client(source);
-        Facts sourceFacts = probe.read(sourceClient, from.address(), from.queueName(), from.routingType());
-        Long count = estimate(sourceClient, from, selection, t0, sourceFacts);
+        TransferAcceptance acceptance = nodes.acceptance(source);
+        TransferSource fromQueue = new TransferSource(from.address(), from.queueName(), from.routingType());
+        AcceptanceFacts sourceFacts = acceptance.read(source.getClusterId(), source.getId(), fromQueue);
+        Long count = estimate(source, fromQueue, selection, t0, sourceFacts);
         Long bytes = projectedBytes(count, sourceFacts);
 
         boolean targetLive = TransferNodes.live(target);
-        Facts targetFacts = targetLive
-                ? probe.read(nodes.client(target), targetAddress, request.targetQueue(), targetRoutingType)
+        AcceptanceFacts targetFacts = targetLive
+                ? nodes.acceptance(target)
+                        .read(
+                                target.getClusterId(),
+                                target.getId(),
+                                new TransferSource(targetAddress, named.name(), targetRoutingType))
                 : null;
         int threshold = settings.intValue(TransferSettings.CAPACITY_THRESHOLD_PERCENT);
-        List<Finding> findings = new ArrayList<>(TargetAcceptance.evaluate(
-                new TargetAcceptance.Input(
+        List<Finding> findings = new ArrayList<>(nodes
+                .acceptance(target)
+                .evaluate(
                         targetFacts,
-                        count,
-                        bytes,
-                        sameNode && from.queueName().equals(request.targetQueue()),
-                        sameCluster,
-                        targetLive,
-                        TransferNodes.backup(target),
-                        target.getSplitBrain() == SplitBrainStatus.CRITICAL,
-                        threshold),
-                targetAddress,
-                request.targetQueue()));
+                        new AcceptanceInput(
+                                count,
+                                bytes,
+                                sameNode && from.queueName().equals(named.name()),
+                                sameCluster,
+                                targetLive,
+                                TransferNodes.backup(target),
+                                target.getSplitBrain() == SplitBrainStatus.CRITICAL,
+                                threshold),
+                        targetAddress,
+                        named.name())
+                .stream()
+                .map(TransferService::finding)
+                .toList());
         findings.addAll(capabilityFindings(mode, clusterId, source, target, sameNode));
         if (count == null && sourceFacts.messageCount() != null) {
             findings.add(new Finding(
@@ -190,7 +204,7 @@ public class TransferService {
                     ("Queue %s holds %d messages, more than the %d the broker looks at to count a filter"
                                     + " (management-browse-page-size), so how many match is not known until the run"
                                     + " counts them. Running it needs the safety-cap override.")
-                            .formatted(from.queueName(), sourceFacts.messageCount(), browsePageSize(sourceFacts)),
+                            .formatted(from.queueName(), sourceFacts.messageCount(), sourceFacts.filterCountLimit()),
                     null));
         }
 
@@ -208,22 +222,14 @@ public class TransferService {
                 .targetNodeId(target.getId())
                 .targetNodeName(target.getName())
                 .targetNativeNodeId(target.getNativeNodeId())
-                .targetQueue(request.targetQueue())
+                .targetQueue(named.name())
                 .targetAddress(targetAddress)
                 .targetRoutingType(targetRoutingType)
                 .sameNode(sameNode)
                 .selection(json.writeValueAsString(selection))
                 .findings(json.writeValueAsString(findings))
                 .t0(t0)
-                .planHash(new Plan(
-                                mode,
-                                source,
-                                target,
-                                from.queueName(),
-                                request.targetQueue(),
-                                targetAddress,
-                                selection,
-                                t0)
+                .planHash(new Plan(mode, source, target, from.queueName(), named.name(), targetAddress, selection, t0)
                         .hash())
                 .estimate(count)
                 .estimateBytes(bytes)
@@ -234,7 +240,7 @@ public class TransferService {
         return view(run);
     }
 
-    private static TransferSelection normalise(TransferSelection selection) {
+    private static TransferSelection normalise(TransferSelection selection, TransferStaging staging) {
         return switch (selection.kind()) {
             case IDS -> {
                 if (selection.ids() == null || selection.ids().isEmpty()) {
@@ -250,7 +256,7 @@ public class TransferService {
                             "transfer-nothing-selected",
                             "A filter selection needs a filter. Choose the whole queue instead to take everything.");
                 }
-                if (!ArtemisSelectors.isCompleteExpression(selection.filter())) {
+                if (!staging.isCompleteFilter(selection.filter())) {
                     throw new TransferRefusedException(
                             HttpStatus.UNPROCESSABLE_ENTITY,
                             "transfer-invalid-filter",
@@ -280,40 +286,68 @@ public class TransferService {
                         .findFirst());
     }
 
+    /** A transfer's target: the subscription that takes the messages, and the destination the operator named, if any. */
+    record Target(String name, String destination) {}
+
+    /** The target a request names: a subscription is taken as it is; a destination is the one its subscription of that name sits at. */
+    Target targetOf(TransferPreviewRequest request) {
+        ResourceType type = ids.typeOf(request.targetClusterId(), request.target())
+                .orElseThrow(() -> new TransferRefusedException(
+                        HttpStatus.UNPROCESSABLE_ENTITY,
+                        "transfer-target-unknown",
+                        "%s is not a subscription or a destination of the target cluster."
+                                .formatted(request.target())));
+        String name = ResourceIds.nameOf(request.target());
+        return switch (type) {
+            case SUBSCRIPTION -> new Target(name, null);
+            case DESTINATION -> new Target(name, name);
+        };
+    }
+
+    /** Refuses an id that does not name a subscription of the cluster. */
+    private void requireSubscription(UUID clusterId, String id) {
+        if (ids.typeOf(clusterId, id)
+                .filter(t -> t == ResourceType.SUBSCRIPTION)
+                .isEmpty()) {
+            throw new TransferRefusedException(
+                    HttpStatus.UNPROCESSABLE_ENTITY,
+                    "transfer-not-a-subscription",
+                    "%s is not a subscription of this cluster.".formatted(id));
+        }
+    }
+
     /**
-     * The address a transfer sends to, and whether the caller may send there. Messages go to the target
-     * queue, so the address is the one that queue is bound to, never one the caller names: a queue
-     * that exists is read and sent to through its own address, and naming another address is refused.
-     * A queue the broker would create is checked as a creation, under the address named (default: the
-     * queue's own name). The not-found of a target the caller cannot read names neither the queue nor the address.
+     * The destination a transfer sends to, and whether the caller may send there. Messages go to the target
+     * subscription, so the destination is the one that subscription is bound to, never one the caller names: a
+     * subscription that exists is read and sent to through its own destination, and naming another destination is
+     * refused. A subscription the broker would create is checked as a creation, under the destination named
+     * (default: the subscription's own name). The not-found of a target the caller cannot read names neither the
+     * subscription nor the destination.
      */
-    String authorisedTargetAddress(TransferPreviewRequest request, Optional<QueueLocation> to) {
-        UUID cluster = request.targetClusterId();
-        String supplied =
-                request.targetAddress() == null || request.targetAddress().isBlank()
-                        ? null
-                        : request.targetAddress().strip();
+    String authorisedTargetAddress(UUID cluster, Target target, Optional<QueueLocation> to) {
+        String supplied = target.destination();
         if (to.isPresent()) {
             String bound = to.get().address();
             access.requireAll(
                     cluster,
                     List.of(
-                            new Requirement(ResourceRef.queue(request.targetQueue()), Permissions.QUEUE_READ),
-                            new Requirement(ResourceRef.address(bound), MessagePermissions.MESSAGE_SEND)));
+                            new Requirement(ResourceRef.subscription(target.name()), Permissions.SUBSCRIPTION_READ),
+                            new Requirement(ResourceRef.destination(bound), MessagePermissions.MESSAGE_SEND)));
             if (supplied != null && !supplied.equals(bound)) {
                 throw new TransferRefusedException(
                         HttpStatus.UNPROCESSABLE_ENTITY,
-                        "transfer-target-address",
-                        "Queue %s is bound to address %s, not %s. Leave the address out to send to the queue's own."
-                                .formatted(request.targetQueue(), bound, supplied));
+                        "transfer-target-destination",
+                        "Subscription %s is bound to destination %s, not %s. Name the subscription to send to its own."
+                                .formatted(target.name(), bound, supplied));
             }
             return bound;
         }
-        String address = supplied != null ? supplied : request.targetQueue();
-        access.requireCreate(cluster, ResourceRef.queue(request.targetQueue()), QueuePermissions.QUEUE_CREATE);
+        String destination = supplied != null ? supplied : target.name();
+        access.requireCreate(cluster, ResourceRef.subscription(target.name()), ResourcePermissions.SUBSCRIPTION_CREATE);
         access.requireAll(
-                cluster, List.of(new Requirement(ResourceRef.address(address), MessagePermissions.MESSAGE_SEND)));
-        return address;
+                cluster,
+                List.of(new Requirement(ResourceRef.destination(destination), MessagePermissions.MESSAGE_SEND)));
+        return destination;
     }
 
     /**
@@ -323,18 +357,17 @@ public class TransferService {
      * so the size is then unknown.
      */
     private Long estimate(
-            ArtemisNode client, QueueLocation from, TransferSelection selection, Instant t0, Facts source) {
+            ClusterNode node, TransferSource from, TransferSelection selection, Instant t0, AcceptanceFacts source) {
         return switch (selection.kind()) {
             case IDS -> (long) selection.ids().size();
             case ALL -> source.messageCount();
             case FILTER -> {
-                if (source.messageCount() == null || source.messageCount() > browsePageSize(source)) {
+                if (source.messageCount() == null || source.messageCount() > source.filterCountLimit()) {
                     yield null;
                 }
                 try {
-                    String mbean = MBeanNames.queue(
-                            client.resolveBrokerObjectName(), from.address(), from.queueName(), from.routingType());
-                    yield messages.countMessages(client, mbean, ArtemisSelectors.frozen(selection.filter(), t0));
+                    yield nodes.staging(node)
+                            .countSelected(node.getClusterId(), node.getId(), from, selection.filter(), t0);
                 } catch (BrokerConnectionException _) {
                     yield null;
                 }
@@ -342,15 +375,8 @@ public class TransferService {
         };
     }
 
-    /** How many messages the broker looks at to count a filter; Artemis defaults it to 200. */
-    static int browsePageSize(Facts source) {
-        return source.addressSettings() == null
-                ? 200
-                : source.addressSettings().path("managementBrowsePageSize").asInt(200);
-    }
-
     /** The count times the source queue's mean persistent message size; null when either is unknown. */
-    static Long projectedBytes(Long count, Facts source) {
+    static Long projectedBytes(Long count, AcceptanceFacts source) {
         if (count == null
                 || source.persistentSize() == null
                 || source.messageCount() == null
@@ -418,7 +444,7 @@ public class TransferService {
                     FindingKind.UNKNOWN,
                     "staging-rights",
                     "A move parks its messages in a queue named %s<run> on the source broker. Whether Rahdar's"
-                                    .formatted(StagingQueues.PREFIX)
+                                    .formatted(RahdarNames.TRANSFER_PREFIX)
                             + " broker user may create and consume it is known only when the run starts; it"
                             + " fails then, before moving anything, if it may not.",
                     BrokerXmlSnippets.STAGING_SECURITY_SETTING));
@@ -509,11 +535,11 @@ public class TransferService {
                     "Acknowledge every warning the preview raised before running it: " + String.join(", ", missing)
                             + ".");
         }
-        if (run.getMode() == TransferMode.MOVE && !run.getSourceQueue().equals(request.confirmQueue())) {
+        if (run.getMode() == TransferMode.MOVE && !run.getSourceQueue().equals(request.confirmSubscription())) {
             throw new TransferRefusedException(
                     HttpStatus.UNPROCESSABLE_ENTITY,
                     "transfer-confirmation-mismatch",
-                    "Send the source queue's name, %s, as confirmQueue to confirm the move."
+                    "Send the source subscription's name, %s, as confirmSubscription to confirm the move."
                             .formatted(run.getSourceQueue()));
         }
         long cap = settings.intValue(BrokerSettings.BULK_CAP);
@@ -539,7 +565,7 @@ public class TransferService {
                         run.getTargetQueue(),
                         request.override(),
                         request.acknowledged() == null ? List.of() : List.copyOf(request.acknowledged()),
-                        request.confirmQueue()),
+                        request.confirmSubscription()),
                 run,
                 request);
     }
@@ -653,7 +679,7 @@ public class TransferService {
                 loaded,
                 () -> access.requireResource(
                         loaded.getSourceClusterId(),
-                        ResourceRef.queue(loaded.getSourceQueue()),
+                        ResourceRef.subscription(loaded.getSourceQueue()),
                         MessagePermissions.MESSAGE_MOVE));
         TransferRunEntity run = loaded;
         requireReadable(run);
@@ -684,7 +710,7 @@ public class TransferService {
                         returning.getSourceQueue(),
                         returning.getSourceClusterId(),
                         returning.getSourceNodeId(),
-                        Map.of(RUN_ID, runId.toString(), "stagingQueue", StagingQueues.queueName(runId)),
+                        Map.of(RUN_ID, runId.toString(), "stagingQueue", RahdarNames.stagingQueue(runId)),
                         false));
         run.attachAudit(event.getId(), null);
         run = runs.save(run);
@@ -786,11 +812,13 @@ public class TransferService {
         access.requireVisible(clusterId);
         return runs.history(clusterId, Limit.of(HISTORY)).stream()
                 .filter(r -> permissions.can(
-                                r.getSourceClusterId(), ResourceRef.queue(r.getSourceQueue()), Permissions.QUEUE_READ)
+                                r.getSourceClusterId(),
+                                ResourceRef.subscription(r.getSourceQueue()),
+                                Permissions.SUBSCRIPTION_READ)
                         && permissions.can(
                                 r.getTargetClusterId(),
-                                ResourceRef.address(r.getTargetAddress()),
-                                Permissions.ADDRESS_READ))
+                                ResourceRef.destination(r.getTargetAddress()),
+                                Permissions.DESTINATION_READ))
                 .map(this::view)
                 .toList();
     }
@@ -806,13 +834,12 @@ public class TransferService {
                 continue;
             }
             try {
-                ArtemisNode client = nodes.client(node);
-                for (String queue : staging.list(client)) {
+                for (String queue : nodes.staging(node).list(node.getClusterId(), node.getId())) {
                     UUID runId = runIdOf(queue);
                     if (runId != null && runs.existsById(runId)) {
                         continue;
                     }
-                    out.add(new OrphanView(node.getId(), node.getName(), queue, depth(client, queue)));
+                    out.add(new OrphanView(node.getId(), node.getName(), queue, depth(node, queue)));
                 }
             } catch (BrokerConnectionException _) {
                 // A node that cannot be read shows none; its orphans are still there for the next look.
@@ -826,19 +853,22 @@ public class TransferService {
         // A staging queue is named by no team's pattern, so only a grant that reaches the cluster passes; the queue the
         // messages go back into is read and sent to through its own address, as in a transfer.
         access.requireVisible(clusterId);
-        String returnAddress = locator.locate(clusterId, request.targetQueue()).stream()
+        String target = ResourceIds.nameOf(request.target());
+        requireSubscription(clusterId, request.target());
+        String returnAddress = locator.locate(clusterId, target).stream()
                 .findFirst()
                 .map(QueueLocation::address)
                 .orElseThrow(() -> access.unreadableAmongSeveral(clusterId));
         access.requireAll(
                 clusterId,
                 List.of(
-                        new Requirement(ResourceRef.queue(request.stagingQueue()), MessagePermissions.MESSAGE_MOVE),
-                        new Requirement(ResourceRef.queue(request.targetQueue()), Permissions.QUEUE_READ),
-                        new Requirement(ResourceRef.address(returnAddress), MessagePermissions.MESSAGE_SEND)));
+                        new Requirement(
+                                ResourceRef.subscription(request.stagingQueue()), MessagePermissions.MESSAGE_MOVE),
+                        new Requirement(ResourceRef.subscription(target), Permissions.SUBSCRIPTION_READ),
+                        new Requirement(ResourceRef.destination(returnAddress), MessagePermissions.MESSAGE_SEND)));
         ClusterNode node = nodes.node(clusterId, request.nodeId());
         String queue = request.stagingQueue();
-        if (!queue.startsWith(StagingQueues.PREFIX)) {
+        if (!queue.startsWith(RahdarNames.TRANSFER_PREFIX)) {
             throw new IllegalArgumentException(queue + " is not a Rahdar staging queue.");
         }
         UUID runId = runIdOf(queue);
@@ -856,20 +886,19 @@ public class TransferService {
                 queue,
                 clusterId,
                 node.getId(),
-                Map.of("stagingQueue", queue, "target", request.targetQueue()),
+                Map.of("stagingQueue", queue, "target", target),
                 false);
         long returned = 0;
         try {
-            ArtemisNode client = nodes.client(node);
-            String mbean = MBeanNames.queue(client.resolveBrokerObjectName(), queue, queue, ANYCAST);
+            TransferStaging broker = nodes.staging(node);
             int chunk = settings.intValue(TransferSettings.BATCH_SIZE);
             long moved;
             do {
-                moved = messages.moveMessages(client, mbean, chunk, "", request.targetQueue(), false, chunk);
+                moved = broker.moveStaged(clusterId, node.getId(), queue, chunk, target);
                 returned += moved;
             } while (moved >= chunk);
-            boolean removed = staging.destroyIfEmpty(client, queue);
-            Long left = removed ? Long.valueOf(0) : depth(client, queue);
+            boolean removed = broker.destroyIfEmpty(clusterId, node.getId(), queue);
+            Long left = removed ? Long.valueOf(0) : depth(node, queue);
             long remaining = left == null ? 0 : left;
             if (removed) {
                 audit.succeed(event, returned);
@@ -891,10 +920,9 @@ public class TransferService {
         }
     }
 
-    private Long depth(ArtemisNode client, String queue) {
+    private Long depth(ClusterNode node, String queue) {
         try {
-            return messages.messageCount(
-                    client, MBeanNames.queue(client.resolveBrokerObjectName(), queue, queue, ANYCAST));
+            return nodes.staging(node).stagedCount(node.getClusterId(), node.getId(), queue);
         } catch (BrokerConnectionException _) {
             return null;
         }
@@ -902,13 +930,17 @@ public class TransferService {
 
     private static UUID runIdOf(String stagingQueue) {
         try {
-            return UUID.fromString(stagingQueue.substring(StagingQueues.PREFIX.length()));
+            return UUID.fromString(stagingQueue.substring(RahdarNames.TRANSFER_PREFIX.length()));
         } catch (IllegalArgumentException | IndexOutOfBoundsException _) {
             return null;
         }
     }
 
     // ---- plumbing -------------------------------------------------------------
+
+    private static Finding finding(AcceptanceFinding f) {
+        return new Finding(FindingKind.valueOf(f.kind().name()), f.code(), f.words(), f.snippet());
+    }
 
     /** A run this cluster is the source or target of; 404 otherwise. */
     private TransferRunEntity load(UUID clusterId, UUID runId) {
@@ -927,14 +959,15 @@ public class TransferService {
         asRun(run, () -> {
             access.requireResource(
                     run.getSourceClusterId(),
-                    ResourceRef.queue(run.getSourceQueue()),
+                    ResourceRef.subscription(run.getSourceQueue()),
                     run.getMode().sourcePermission());
             access.requireAll(
                     run.getTargetClusterId(),
                     List.of(
-                            new Requirement(ResourceRef.queue(run.getTargetQueue()), Permissions.QUEUE_READ),
                             new Requirement(
-                                    ResourceRef.address(run.getTargetAddress()), MessagePermissions.MESSAGE_SEND)));
+                                    ResourceRef.subscription(run.getTargetQueue()), Permissions.SUBSCRIPTION_READ),
+                            new Requirement(
+                                    ResourceRef.destination(run.getTargetAddress()), MessagePermissions.MESSAGE_SEND)));
         });
     }
 
@@ -954,9 +987,13 @@ public class TransferService {
     private void requireReadable(TransferRunEntity run) {
         asRun(run, () -> {
             access.requireResource(
-                    run.getSourceClusterId(), ResourceRef.queue(run.getSourceQueue()), Permissions.QUEUE_READ);
+                    run.getSourceClusterId(),
+                    ResourceRef.subscription(run.getSourceQueue()),
+                    Permissions.SUBSCRIPTION_READ);
             access.requireResource(
-                    run.getTargetClusterId(), ResourceRef.address(run.getTargetAddress()), Permissions.ADDRESS_READ);
+                    run.getTargetClusterId(),
+                    ResourceRef.destination(run.getTargetAddress()),
+                    Permissions.DESTINATION_READ);
         });
     }
 
@@ -996,21 +1033,21 @@ public class TransferService {
                         run.getSourceClusterId(),
                         run.getSourceNodeId(),
                         run.getSourceNodeName(),
-                        run.getSourceQueue(),
-                        run.getSourceAddress()),
+                        ids.subscription(run.getSourceClusterId(), run.getSourceQueue()),
+                        ids.destination(run.getSourceClusterId(), run.getSourceAddress())),
                 new TransferEnd(
                         run.getTargetClusterId(),
                         run.getTargetNodeId(),
                         run.getTargetNodeName(),
-                        run.getTargetQueue(),
-                        run.getTargetAddress()),
+                        ids.subscription(run.getTargetClusterId(), run.getTargetQueue()),
+                        ids.destination(run.getTargetClusterId(), run.getTargetAddress())),
                 selection,
                 findings(run),
                 new Derived(
                         notes,
                         held,
                         rate,
-                        staged ? StagingQueues.queueName(run.getId()) : null,
+                        staged ? RahdarNames.stagingQueue(run.getId()) : null,
                         cap,
                         run.getEstimate() == null || run.getEstimate() > cap,
                         run.getState().resumable(),

@@ -38,7 +38,7 @@ class SubscriberTest {
     private final CountDownLatch started = new CountDownLatch(1);
 
     private Subscriber subscriber() {
-        Subscriber s = new Subscriber(new SseEmitter(0L), Set.of("queues", "events"), null, null, null);
+        Subscriber s = new Subscriber(new SseEmitter(0L), Set.of("subscriptions", "events"), null, null, null);
         s.nanos = clock::get;
         return s;
     }
@@ -73,11 +73,11 @@ class SubscriberTest {
     void aQueuedSignalIsReplacedByANewerOneAboutTheSameThing() throws Exception {
         Subscriber s = subscriber();
         drainBlocked(s);
-        s.enqueue(signal("queues", "block")); // taken by the writer, which blocks on it
+        s.enqueue(signal("subscriptions", "block")); // taken by the writer, which blocks on it
         assertThat(started.await(2, TimeUnit.SECONDS)).isTrue();
         for (int i = 0; i < 50; i++) {
-            s.enqueue(signal("queues", "orders"));
-            s.enqueue(signal("queues", "payments"));
+            s.enqueue(signal("subscriptions", "orders"));
+            s.enqueue(signal("subscriptions", "payments"));
         }
         release.countDown();
 

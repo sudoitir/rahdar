@@ -16,7 +16,7 @@ const NOW = new Date().toISOString();
 const INFO = {
   name: 'acme-notes',
   title: 'Notes',
-  description: 'Shared notes on queues.',
+  description: 'Shared notes on subscriptions.',
   vendor: { name: 'Acme', url: 'https://acme.example', email: 'support@acme.example' },
   license: 'Apache-2.0',
   changeNotes: 'Fixed the search index.',
@@ -110,7 +110,7 @@ describe('PluginDrawer: overview', () => {
 
     expect(await screen.findByRole('dialog', { name: 'Notes 1.0.0' })).toBeInTheDocument();
     expect(screen.getByText('Active')).toBeInTheDocument();
-    expect(screen.getByText('Shared notes on queues.')).toBeInTheDocument();
+    expect(screen.getByText('Shared notes on subscriptions.')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'https://acme.example' })).toHaveAttribute('rel', 'noopener noreferrer');
     expect(screen.getByText('support@acme.example')).toBeInTheDocument();
     expect(screen.getByText('2026.01.0 and later')).toBeInTheDocument();

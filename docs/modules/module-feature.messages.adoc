@@ -18,6 +18,7 @@ _Others_
 * `i.g.s.r.k.s.ClusterAccessGuard` (in Security)
 * `i.g.s.r.k.s.PermissionResolver` (in Security)
 * `i.g.s.r.p.b.DeadLetterDestinations` (in Broker connectivity)
+* `i.g.s.r.p.b.BrokerGateway` (in Broker connectivity)
 * `i.g.s.r.p.s.QueueLocator` (in Scraping)
 * `i.g.s.r.p.b.BrokerMessages` (in Broker connectivity)
 * `i.g.s.r.p.b.MessageExpiry` (in Broker connectivity)
@@ -28,5 +29,7 @@ _Others_
 * `i.g.s.r.p.g.ContentPolicy` (in Data governance)
 * `i.g.s.r.p.g.ClearViewAudit` (in Data governance)
 * `i.g.s.r.k.g.OperationGate` (in Approval gate contract)
+* `i.g.s.r.p.m.McpResources` (in MCP server)
 * `i.g.s.r.p.m.McpProperties` (in MCP server)
+* `i.g.s.r.p.c.ResourceTargets` (in Clusters)
 |===

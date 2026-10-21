@@ -1,7 +1,9 @@
+import { useMemo } from 'react';
 import { useMutation, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
-import { requestAll } from '../../kernel/api/paging.ts';
+import { requestAll, type PagedView } from '../../kernel/api/paging.ts';
 import { useCan } from '../../kernel/auth/useCan.ts';
 import { ApiError, clusterKey, request } from '../../kernel/api/request.ts';
+import { destinationId, subscriptionId } from '../../kernel/api/resourceId.ts';
 import type { components } from '../../kernel/api/schema.d.ts';
 
 type Schemas = components['schemas'];
@@ -29,6 +31,7 @@ export type UpdateClusterRequest = Omit<Schemas['UpdateClusterRequest'], 'core'>
   core?: Schemas['AccountUpdate'] | null;
 };
 export type TopologyView = Schemas['TopologyView'];
+export type EstateSubscription = Schemas['EstateSubscriptionView'];
 
 /** String enums the backend serialises as bare strings; narrowed here for the UI. */
 export type CapabilityStatus = 'AVAILABLE' | 'UNAVAILABLE' | 'UNKNOWN';
@@ -48,6 +51,31 @@ export function useClusters(): UseQueryResult<ClusterSummary[], ApiError> {
     queryKey: keys.all,
     queryFn: () => requestAll<ClusterSummary>('/clusters'),
     refetchInterval: 5_000,
+  });
+}
+
+export interface EstateParams {
+  q?: string;
+  cluster?: string;
+  sort?: string;
+  page?: number;
+  size?: number;
+}
+
+/** The subscriptions of every cluster the caller may read, one page of the estate-wide list. */
+export function useEstateSubscriptions(params: EstateParams): UseQueryResult<PagedView<EstateSubscription>, ApiError> {
+  const search = new URLSearchParams();
+  if (params.q) search.set('q', params.q);
+  if (params.cluster) search.set('cluster', params.cluster);
+  if (params.sort) search.set('sort', params.sort);
+  if (params.page && params.page > 1) search.set('page', String(params.page));
+  if (params.size) search.set('size', String(params.size));
+  const query = search.size > 0 ? `?${search}` : '';
+  return useQuery({
+    queryKey: ['estate', 'subscriptions', params],
+    queryFn: () => request<PagedView<EstateSubscription>>(`/subscriptions${query}`),
+    refetchInterval: 5_000,
+    placeholderData: (prev) => prev,
   });
 }
 
@@ -194,4 +222,20 @@ export function useAssignClusterEnvironment(clusterId: string) {
       }),
     onSuccess: () => qc.invalidateQueries({ queryKey: keys.all }),
   });
+}
+
+/**
+ * Builders for the ids of a subscription or a destination named only by its name (a URL param, a picker),
+ * with the kind the cluster's system gives each role. They throw until the cluster has loaded.
+ */
+export function useRoleIds(clusterId: string) {
+  const kinds = useCluster(clusterId === '' ? null : clusterId).data?.kinds;
+  return useMemo(
+    () => ({
+      subscription: (name: string) => subscriptionId(kinds, name),
+      destination: (name: string) => destinationId(kinds, name),
+      loaded: kinds !== undefined,
+    }),
+    [kinds],
+  );
 }

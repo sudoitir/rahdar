@@ -18,13 +18,13 @@ public final class TriageModule {
             .mcpTool(new McpToolDef(
                     "diagnose",
                     McpToolDef.Posture.READ,
-                    "Health of a cluster, or of one queue end to end. Start here.",
+                    "Health of a cluster, or of one subscription end to end. Start here.",
                     List.of(McpToolDef.Param.note(
-                            "queue",
+                            "subscription",
                             "Omit for the cluster: HA role per node, who is live, split-brain, replication "
-                                    + "lag, clock skew and firing alerts. Give a queue name for that queue: its "
-                                    + "consumer-health verdict with the depth, trend, enqueue and acknowledge "
-                                    + "rates behind it, plus DLQ hints and recent events."))))
+                                    + "lag, clock skew and firing alerts. Give a subscription's id from "
+                                    + "list_resources for that subscription: its consumer-health verdict with the depth, trend, enqueue and acknowledge "
+                                    + "rates behind it, plus dead-letter hints and recent events."))))
             .mcpTool(new McpToolDef(
                     "activity_log",
                     McpToolDef.Posture.READ,

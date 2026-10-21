@@ -13,8 +13,8 @@ import org.hibernate.annotations.UuidGenerator;
 
 /**
  * Maps {@code team_share} (changeset kernel-security 0010): a pattern inside what the owner team owns,
- * shared with the target team at a team role. {@code kind} is {@code QUEUE}, {@code ADDRESS} or
- * {@code BOTH}.
+ * shared with the target team at a team role. {@code kind} is {@code SUBSCRIPTION}, {@code DESTINATION} or
+ * {@code ANY}.
  */
 @Entity
 @Table(name = "team_share")

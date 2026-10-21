@@ -12,12 +12,12 @@ package io.github.sudoitir.rahdar.feature.resources;
 public enum ConnectionCloseKind {
     /** Close one connection, and with it every session and consumer it carries. */
     CONNECTION("CLOSE_CONNECTION", "CONNECTION"),
-    /** Close one session within a connection. */
-    SESSION("CLOSE_SESSION", "SESSION"),
+    /** Close one channel within a connection. */
+    CHANNEL("CLOSE_SESSION", "CHANNEL"),
     /** Close the connection behind one consumer, found from the consumer's own id. */
     CONSUMER("CLOSE_CONSUMER_CONNECTION", "CONSUMER"),
-    /** Close every consumer connection bound to an address, on every live node. */
-    ADDRESS_CONSUMERS("CLOSE_ADDRESS_CONSUMERS", "ADDRESS");
+    /** Close every consumer connection bound to a destination, on every live node. */
+    DESTINATION("CLOSE_DESTINATION", "DESTINATION");
 
     private final String auditName;
     private final String targetType;
@@ -45,11 +45,11 @@ public enum ConnectionCloseKind {
      * mutating operation in Rahdar that is not a cluster-wide fan-out (D1).
      */
     public boolean nodeScoped() {
-        return this != ADDRESS_CONSUMERS;
+        return this != DESTINATION;
     }
 
     /** Whether this kind affects an unbounded number of connections, and so is capped (D6). */
     public boolean capped() {
-        return this == ADDRESS_CONSUMERS;
+        return this == DESTINATION;
     }
 }

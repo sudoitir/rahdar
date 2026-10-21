@@ -4,7 +4,7 @@ import { screen } from '@testing-library/react';
 import { axeViolations, Frame, renderThemed, SCHEMES } from '../test/browser.tsx';
 import { ErrorState } from './ErrorState.tsx';
 
-const forbidden = { status: 403, problem: { permission: 'queue:purge' } };
+const forbidden = { status: 403, problem: { permission: 'subscription:purge' } };
 const invalid = { status: 422, fieldErrors: [{ field: 'name', message: 'must not be blank' }] };
 const broker = {
   status: 502,

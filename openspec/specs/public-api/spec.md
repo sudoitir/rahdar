@@ -119,8 +119,55 @@ Each release SHALL publish a TypeScript client (`@rahdar/client` on npm) generat
 - **THEN** the Java client of that version is available there, with the plugin API when the backend changed since the newest version on Central
 
 ### Requirement: Contract tests keep implementation and document aligned
-The build SHALL validate every JSON response produced in the API tests against the document's schema for that operation and status, and SHALL treat an undocumented property as a failure.
+The build SHALL validate every JSON response produced in the API tests against the document's schema for that operation and status, and SHALL treat an undocumented property as a failure. The document SHALL be checked against a committed snapshot, and that snapshot SHALL hold only broker-neutral paths, fields, enum values and error codes outside the system namespaces.
 
 #### Scenario: Drift
 - **WHEN** an endpoint returns a field the document lacks
 - **THEN** the contract tests fail
+
+#### Scenario: A system word enters a shared path
+- **WHEN** a shared route, field, enum value or error code in the document names a concept of one broker system
+- **THEN** the contract tests fail, naming it
+
+### Requirement: The API speaks the SDK's vocabulary
+Shared REST resources SHALL be addressed by role, by kind and by the SDK's canonical resource name. Operations SHALL be custom methods on a resource. No shared route, field, enum value or error code SHALL name a concept of one broker system. System-only routes SHALL live under that system's namespace and SHALL exist only for clusters of that system.
+
+#### Scenario: Listing subscriptions on two systems
+- **WHEN** a client lists subscriptions on an Artemis cluster and on another system's cluster
+- **THEN** both answers have the same shape, with each item's native kind and canonical name
+
+#### Scenario: An Artemis-only route on another system
+- **WHEN** a client calls the broker.xml configuration route for a cluster that is not Artemis
+- **THEN** the route answers not found, and the cluster's capabilities never offered it
+
+### Requirement: A resource is addressed by kind and path
+A single resource SHALL be addressed as `/clusters/{cluster}/resources/{kind}/{path}`, where `{kind}` is the resource's kind and `{path}` is its canonical path percent-encoded into one segment. Names containing `/` or `%` SHALL be reachable. A path that is not a valid resource id SHALL receive a problem answer of type `invalid-resource-id`.
+
+#### Scenario: A name containing a slash is reachable
+- **WHEN** a client reads a subscription whose name contains `/`
+- **THEN** the resource is returned, where it was unreachable before
+
+#### Scenario: A malformed resource id
+- **WHEN** a client addresses a resource with a path that is not a valid canonical id
+- **THEN** the response is a problem of type `invalid-resource-id`
+
+### Requirement: Operations beyond create, read, update and delete are custom methods
+A verb beyond create, read, update and delete SHALL be a custom method written as a literal `:verb` suffix on the resource's segment (`:pause`, `:resume`, `:purge`, `:close`, `:reset-counters`), and a message operation SHALL be `…/messages:{action}`. Dry runs, overrides and node selection SHALL stay query parameters.
+
+#### Scenario: Purging is a custom method
+- **WHEN** a client purges a subscription
+- **THEN** it posts to the resource's `:purge` method, and a dry run is the same request with `dryRun`
+
+### Requirement: A cluster states its system and the kinds it offers
+A cluster's summary and detail SHALL state its system by id and name, and the kinds it offers with each kind's role, label and verbs, including the verbs Rahdar adds for that system. Clients SHALL decide what to offer from this and from the cluster's capabilities, not from a system's name.
+
+#### Scenario: Verbs per kind
+- **WHEN** a client reads a cluster's detail
+- **THEN** each kind lists the verbs it supports, so a client can tell that an Artemis address cannot be purged
+
+### Requirement: Estate-wide subscriptions are listed in one call
+The API SHALL offer one list of subscriptions across every cluster the caller may read, filterable by text and cluster, sortable and paged as other lists are, each row naming its cluster and system. It SHALL include only the clusters and names the caller may read.
+
+#### Scenario: Subscriptions across clusters
+- **WHEN** a client lists subscriptions without naming a cluster
+- **THEN** rows from every readable cluster are returned, each with its cluster and system, and nothing from a cluster or name the caller may not read

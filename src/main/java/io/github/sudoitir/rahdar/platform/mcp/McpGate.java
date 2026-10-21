@@ -57,8 +57,11 @@ class McpGate {
     private static final Set<String> AUDITED = Set.of(
             "clusterId",
             "nodeId",
-            "queue",
-            "address",
+            "resource",
+            "subscription",
+            "destination",
+            "target",
+            "role",
             "name",
             "op",
             "action",
@@ -70,7 +73,7 @@ class McpGate {
             "id",
             "ruleId",
             "connectionId",
-            "messageIds",
+            "positions",
             "metric",
             "window",
             "from",
@@ -168,6 +171,12 @@ class McpGate {
                     McpErrors.error("The agent surface is read-only on this installation, and " + tool
                             + " changes state. An administrator can turn read-only mode off in Settings → MCP server."),
                     null);
+        }
+        UUID cluster = clusterId(arguments);
+        String otherSystem = catalog.refusedOnCluster(tool, cluster);
+        if (otherSystem != null) {
+            audit.fail(event, otherSystem);
+            return new JSONRPCResponse(McpSchema.JSONRPC_VERSION, request.id(), McpErrors.error(otherSystem), null);
         }
         try {
             // Every tool call is an agent's, whatever the token behind it: the approval gate holds it as one.

@@ -10,7 +10,7 @@ import * as downloads from '../../ui/download.ts';
 
 function detail(over: Record<string, unknown> = {}) {
   return {
-    messageId: 146,
+    position: '146',
     type: 3,
     durable: true,
     priority: 0,
@@ -38,13 +38,13 @@ function detail(over: Record<string, unknown> = {}) {
 }
 
 function mockDetail(body: Record<string, unknown>) {
-  server.use(http.get('*/api/v1/clusters/:c/queues/:q/messages/:id', () => HttpResponse.json(body)));
+  server.use(http.get('*/api/v1/clusters/:c/resources/artemis.queue/:q/messages/:id', () => HttpResponse.json(body)));
 }
 
 describe('MessageDetailPanel', () => {
   const base = {
     clusterId: 'c1',
-    queueName: 'PHASE3.SRC',
+    subscriptionName: 'PHASE3.SRC',
     onClose: () => {},
   };
 
@@ -221,7 +221,7 @@ describe('MessageDetailPanel', () => {
 
   it('holds the drawer open at its final size with a labelled status while the message loads', async () => {
     server.use(
-      http.get('*/api/v1/clusters/:c/queues/:q/messages/:id', async () => {
+      http.get('*/api/v1/clusters/:c/resources/artemis.queue/:q/messages/:id', async () => {
         await new Promise(() => {});
       }),
     );
@@ -234,7 +234,7 @@ describe('MessageDetailPanel', () => {
   it('states why the message could not be read, with a retry that reads it again', async () => {
     let attempts = 0;
     server.use(
-      http.get('*/api/v1/clusters/:c/queues/:q/messages/:id', () => {
+      http.get('*/api/v1/clusters/:c/resources/artemis.queue/:q/messages/:id', () => {
         attempts += 1;
         return attempts === 1
           ? HttpResponse.json({ title: 'Cluster unreachable', detail: 'No node answered.' }, { status: 502 })

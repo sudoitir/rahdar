@@ -1,11 +1,12 @@
 /**
- * Cross-node live views and connection control.
+ * Cross-node live views, connection control, and queue and address lifecycle.
  */
 @ApplicationModule(
         displayName = "Resources",
         allowedDependencies = {
             "kernel.audit",
             "kernel.core",
+            "kernel.gate",
             "kernel.plugin",
             "kernel.security",
             "kernel.stream",

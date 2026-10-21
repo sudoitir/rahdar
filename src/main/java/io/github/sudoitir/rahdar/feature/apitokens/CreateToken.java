@@ -1,6 +1,6 @@
 package io.github.sudoitir.rahdar.feature.apitokens;
 
-import io.github.sudoitir.rahdar.kernel.plugin.ResourceKind;
+import io.github.sudoitir.rahdar.kernel.plugin.ResourceType;
 import io.github.sudoitir.rahdar.kernel.security.ResourcePattern;
 import io.github.sudoitir.rahdar.kernel.security.TokenGrant;
 import java.time.Instant;
@@ -27,10 +27,10 @@ public record CreateToken(
     /**
      * A permission the token is narrowed to, as plain strings.
      *
-     * @param resourceKind {@code null} for the whole scope
-     * @param resourcePattern {@code null} exactly when {@code resourceKind} is
+     * @param resourceType {@code null} for the whole scope
+     * @param resourcePattern {@code null} exactly when {@code resourceType} is
      */
-    public record Grant(String scopeType, UUID scopeId, String action, String resourceKind, String resourcePattern) {
+    public record Grant(String scopeType, UUID scopeId, String action, String resourceType, String resourcePattern) {
 
         static Grant of(TokenGrant grant) {
             return new Grant(
@@ -44,13 +44,13 @@ public record CreateToken(
         TokenGrant toGrant() {
             io.github.sudoitir.rahdar.kernel.security.Grant.ScopeType scope =
                     io.github.sudoitir.rahdar.kernel.security.Grant.ScopeType.valueOf(scopeType);
-            return resourceKind == null
+            return resourceType == null
                     ? TokenGrant.of(scope, scopeId, action)
                     : new TokenGrant(
                             scope,
                             scopeId,
                             action,
-                            ResourceKind.valueOf(resourceKind),
+                            ResourceType.valueOf(resourceType),
                             ResourcePattern.parse(resourcePattern));
         }
     }

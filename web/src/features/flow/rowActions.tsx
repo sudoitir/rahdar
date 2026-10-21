@@ -3,15 +3,17 @@ import { useNavigate } from '@tanstack/react-router';
 
 import type {
   ActionProps,
-  AddressTarget,
+  DestinationTarget,
   ClientTarget,
   ConnectionTarget,
-  DivertTarget,
-  QueueTarget,
+  RouteTarget,
+  SubscriptionTarget,
 } from '../../kernel/actions/types.ts';
 import { ResourceActions } from '../../kernel/actions/ResourceActions.tsx';
+import { nameOf, refOf } from '../../kernel/api/resourceId.ts';
 import { clusterHref } from '../../kernel/routing/href.ts';
 import { ActionMenuItem } from '../../ui/ActionMenuItem.tsx';
+import { useRoleIds } from '../clusters/index.ts';
 import type { FlowNodeView } from './api.ts';
 
 /** "Show in Flow": the flow view focused on one resource, its upstream and downstream. */
@@ -32,12 +34,12 @@ function ShowInFlow({
   );
 }
 
-export function QueueInFlow({ clusterId, target }: Readonly<ActionProps<QueueTarget>>) {
-  return <ShowInFlow clusterId={clusterId} focus={`queue:${target.queueName}`} />;
+export function SubscriptionInFlow({ clusterId, target }: Readonly<ActionProps<SubscriptionTarget>>) {
+  return <ShowInFlow clusterId={clusterId} focus={`subscription:${target.name}`} />;
 }
 
-export function AddressInFlow({ clusterId, target }: Readonly<ActionProps<AddressTarget>>) {
-  return <ShowInFlow clusterId={clusterId} focus={`address:${target.address}`} />;
+export function DestinationInFlow({ clusterId, target }: Readonly<ActionProps<DestinationTarget>>) {
+  return <ShowInFlow clusterId={clusterId} focus={`destination:${target.name}`} />;
 }
 
 export function ConnectionInFlow({ clusterId, target }: Readonly<ActionProps<ConnectionTarget>>) {
@@ -52,9 +54,11 @@ export function ConnectionInFlow({ clusterId, target }: Readonly<ActionProps<Con
   );
 }
 
-export function DivertInFlow({ clusterId, target }: Readonly<ActionProps<DivertTarget>>) {
-  const address = target.snapshot?.address;
-  return <ShowInFlow clusterId={clusterId} focus={address ? `address:${address}` : null} />;
+export function RouteInFlow({ clusterId, target }: Readonly<ActionProps<RouteTarget>>) {
+  // A link reads from a subscription; every other route reads from a destination.
+  const source = target.snapshot?.source;
+  const role = target.snapshot?.routeClass === 'LINK' ? 'subscription' : 'destination';
+  return <ShowInFlow clusterId={clusterId} focus={source ? `${role}:${nameOf(source)}` : null} />;
 }
 
 /** A flow client: focus the view on it. */
@@ -97,24 +101,26 @@ export function FlowNodeActions({
   node: FlowNodeView;
   restoreFocus?: () => void;
 }>) {
+  const ids = useRoleIds(clusterId);
   const label = node.label ?? '';
+  if (!ids.loaded && (node.kind === 'SUBSCRIPTION' || node.kind === 'DESTINATION')) return null;
   switch (node.kind) {
-    case 'QUEUE':
+    case 'SUBSCRIPTION':
       return (
         <ResourceActions
-          kind="queue"
+          kind="subscription"
           clusterId={clusterId}
-          target={{ queueName: label }}
+          target={refOf(ids.subscription(label))}
           mode="navigate"
           restoreFocus={restoreFocus}
         />
       );
-    case 'ADDRESS':
+    case 'DESTINATION':
       return (
         <ResourceActions
-          kind="address"
+          kind="destination"
           clusterId={clusterId}
-          target={{ address: label }}
+          target={refOf(ids.destination(label))}
           mode="navigate"
           restoreFocus={restoreFocus}
         />

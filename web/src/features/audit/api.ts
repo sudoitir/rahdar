@@ -12,7 +12,7 @@ export interface AuditFilter {
   user?: string;
   action?: string;
   outcome?: string;
-  /** Only the events that belong to this one, such as the queues of a bulk run. */
+  /** Only the events that belong to this one, such as the subscriptions of a bulk run. */
   parentId?: number;
   from?: string;
   to?: string;

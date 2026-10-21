@@ -55,12 +55,12 @@ class SetupReviewControllerTest extends PostgresIntegrationTest {
 
     @Test
     void neverReviewedThenAnUnreadableNodeIsStatedAndASecondRunIsTooSoon() throws Exception {
-        mvc.perform(get("/api/v1/clusters/{id}/setup-review", clusterId))
+        mvc.perform(get("/api/v1/clusters/{id}/artemis/setup-review", clusterId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.reviewedAt").doesNotExist())
                 .andExpect(jsonPath("$.rulesInCatalogue").value(22));
 
-        mvc.perform(post("/api/v1/clusters/{id}/setup-review/run", clusterId))
+        mvc.perform(post("/api/v1/clusters/{id}/artemis/setup-review/run", clusterId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.reviewedAt").exists())
                 .andExpect(jsonPath("$.nodesTotal").value(1))
@@ -70,19 +70,19 @@ class SetupReviewControllerTest extends PostgresIntegrationTest {
                 .andExpect(jsonPath("$.nodes[0].reason").isNotEmpty())
                 .andExpect(jsonPath("$.notice").doesNotExist());
 
-        mvc.perform(post("/api/v1/clusters/{id}/setup-review/run", clusterId))
+        mvc.perform(post("/api/v1/clusters/{id}/artemis/setup-review/run", clusterId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.notice").isNotEmpty());
     }
 
     @Test
     void acceptingAFindingThatDoesNotExistIs404AndAReasonIsRequired() throws Exception {
-        mvc.perform(post("/api/v1/clusters/{id}/setup-review/acceptances", clusterId)
+        mvc.perform(post("/api/v1/clusters/{id}/artemis/setup-review/acceptances", clusterId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"code":"HA_SINGLE_PAIR_QUORUM","subject":"cluster","reason":"dev only","expiresAt":null}"""))
                 .andExpect(status().isNotFound());
-        mvc.perform(post("/api/v1/clusters/{id}/setup-review/acceptances", clusterId)
+        mvc.perform(post("/api/v1/clusters/{id}/artemis/setup-review/acceptances", clusterId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"code":"HA_SINGLE_PAIR_QUORUM","subject":"cluster","reason":"","expiresAt":null}"""))

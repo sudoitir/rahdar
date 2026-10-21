@@ -19,7 +19,7 @@ export const TEAM_VIEWER: RoleView = {
   id: 'r-tv',
   name: 'Team Viewer',
   builtin: true,
-  permissions: ['queue:read'],
+  permissions: ['subscription:read'],
   requiresMfa: false,
   teamAssignable: true,
 };
@@ -27,7 +27,7 @@ export const TEAM_OPERATOR: RoleView = {
   id: 'r-to',
   name: 'Team Operator',
   builtin: true,
-  permissions: ['queue:read', 'queue:purge'],
+  permissions: ['subscription:read', 'subscription:purge'],
   requiresMfa: false,
   teamAssignable: true,
 };
@@ -35,7 +35,7 @@ export const OPERATOR: RoleView = {
   id: 'r-op',
   name: 'Operator',
   builtin: true,
-  permissions: ['queue:*'],
+  permissions: ['subscription:*'],
   requiresMfa: false,
   teamAssignable: false,
 };
@@ -46,7 +46,7 @@ export function team(over: Partial<TeamView> = {}): TeamView {
     id: 't-orders',
     name: 'Orders',
     createdAt: '2026-10-01T00:00:00Z',
-    patterns: [{ id: 'p1', clusterId: CLUSTER.id, kind: 'QUEUE', pattern: 'orders.#' }],
+    patterns: [{ id: 'p1', clusterId: CLUSTER.id, kind: 'SUBSCRIPTION', pattern: 'orders.#' }],
     members: [
       {
         id: 'm1',
@@ -84,12 +84,12 @@ export const summary = (t: TeamView): TeamSummary => ({
 export function preview(over: Partial<PatternPreview> = {}): PatternPreview {
   return {
     clusterId: CLUSTER.id,
-    kind: 'QUEUE',
+    kind: 'SUBSCRIPTION',
     pattern: 'orders.#',
-    queueMatches: 12,
-    addressMatches: 0,
-    queueExamples: ['orders.in', 'orders.out', 'orders.dlq'],
-    addressExamples: [],
+    subscriptionMatches: 12,
+    destinationMatches: 0,
+    subscriptionExamples: ['orders.in', 'orders.out', 'orders.dlq'],
+    destinationExamples: [],
     conflicts: [],
     ...over,
   };

@@ -6,6 +6,7 @@ import {
   IconCheck,
   IconCircleCheck,
   IconHelpCircle,
+  IconLayoutList,
   IconPlus,
   IconSelector,
 } from '@tabler/icons-react';
@@ -13,21 +14,23 @@ import { useNavigate } from '@tanstack/react-router';
 
 import { sameViewOn, useCurrentView } from '../../kernel/nav/currentView.ts';
 import { useClusters, useEnvironments, type ClusterSummary, type EnvironmentView } from './api.ts';
+import { HEALTH_WORD } from './clusterHealth.ts';
 import { RegisterClusterDialog } from './RegisterClusterButton.tsx';
 import styles from './ClusterSwitcher.module.css';
 
 const REGISTER = 'register';
 const RETRY = 'retry';
+const ALL = 'all';
 
 /** Health in words, with an icon that says it again; colour only emphasises a fault. */
 const HEALTH: Record<
   ClusterSummary['health'],
   { word: string; Icon: ComponentType<{ className?: string; 'aria-hidden'?: boolean }>; tone?: 'warning' | 'danger' }
 > = {
-  OK: { word: 'Healthy', Icon: IconCircleCheck },
-  DEGRADED: { word: 'Degraded', Icon: IconAlertTriangle, tone: 'warning' },
-  CRITICAL: { word: 'Critical', Icon: IconAlertOctagon, tone: 'danger' },
-  UNKNOWN: { word: 'Unknown', Icon: IconHelpCircle },
+  OK: { word: HEALTH_WORD.OK, Icon: IconCircleCheck },
+  DEGRADED: { word: HEALTH_WORD.DEGRADED, Icon: IconAlertTriangle, tone: 'warning' },
+  CRITICAL: { word: HEALTH_WORD.CRITICAL, Icon: IconAlertOctagon, tone: 'danger' },
+  UNKNOWN: { word: HEALTH_WORD.UNKNOWN, Icon: IconHelpCircle },
 };
 
 interface Entry {
@@ -155,7 +158,7 @@ function Face({
  * The way between clusters (`shell.navbar`): one row of constant height showing the cluster the address
  * is under, opening a searchable list of every cluster, grouped by environment, with registration at its
  * end. Outside a cluster it says "Choose a cluster". Choosing one keeps the view (ADR-0109): comparing
- * Queues on two clusters is a choice and a click.
+ * Subscriptions on two clusters is a choice and a click.
  *
  * Collapsed to the rail it is the cluster's monogram, bordered in its environment's colour.
  */
@@ -208,7 +211,8 @@ export function ClusterSwitcher({ collapsed }: Readonly<{ collapsed: boolean }>)
     combobox.targetRef.current?.focus();
     if (value === REGISTER) setRegistering(true);
     else if (value === RETRY) void clusters.refetch();
-    else void navigate({ to: sameViewOn(value, view) });
+    else if (value === ALL) void navigate({ to: '/' });
+    else void navigate({ to: sameViewOn(value, view, all.find((c) => c.id === value)?.system.id) });
   }
 
   let empty: string | null = null;
@@ -282,6 +286,12 @@ export function ClusterSwitcher({ collapsed }: Readonly<{ collapsed: boolean }>)
                 ))}
               </Combobox.Group>
             ))}
+            {search.trim() === '' ? (
+              <Combobox.Option value={ALL} className={styles.all}>
+                <IconLayoutList className={styles.icon} aria-hidden />
+                All clusters
+              </Combobox.Option>
+            ) : null}
             {empty ? <Combobox.Empty>{empty}</Combobox.Empty> : null}
             {clusters.isError ? <Combobox.Option value={RETRY}>Try again</Combobox.Option> : null}
             <Combobox.Option value={REGISTER} className={styles.register}>

@@ -200,7 +200,7 @@ class SettingsAndTokenGatingIntegrationTest extends PostgresIntegrationTest {
         jdbc.update(
                 "DELETE FROM rahdar_setting WHERE key IN (?, ?, ?)",
                 BrokerSettings.BULK_CAP,
-                BrokerSettings.BULK_QUEUE_CAP,
+                BrokerSettings.BULK_SUBSCRIPTION_CAP,
                 GATE_KEY);
         settings.applyRuntime();
     }
@@ -304,11 +304,11 @@ class SettingsAndTokenGatingIntegrationTest extends PostgresIntegrationTest {
             signIn(settingsAdmin());
             settings.apply(List.of(
                     SettingChange.set(BrokerSettings.BULK_CAP, "3"),
-                    SettingChange.set(BrokerSettings.BULK_QUEUE_CAP, "2")));
+                    SettingChange.set(BrokerSettings.BULK_SUBSCRIPTION_CAP, "2")));
         });
 
         assertThat(settings.intValue(BrokerSettings.BULK_CAP)).isEqualTo(3);
-        assertThat(settings.intValue(BrokerSettings.BULK_QUEUE_CAP)).isEqualTo(2);
+        assertThat(settings.intValue(BrokerSettings.BULK_SUBSCRIPTION_CAP)).isEqualTo(2);
         assertThat(provider.decisions.get()).isZero();
     }
 
@@ -318,10 +318,10 @@ class SettingsAndTokenGatingIntegrationTest extends PostgresIntegrationTest {
 
         assertThatThrownBy(() -> settings.apply(List.of(
                         SettingChange.set(BrokerSettings.BULK_CAP, "3"),
-                        SettingChange.set(BrokerSettings.BULK_QUEUE_CAP, "0"))))
+                        SettingChange.set(BrokerSettings.BULK_SUBSCRIPTION_CAP, "0"))))
                 .isInstanceOfSatisfying(
                         SettingsInvalidException.class,
-                        e -> assertThat(e.fieldErrors()).containsOnlyKeys(BrokerSettings.BULK_QUEUE_CAP));
+                        e -> assertThat(e.fieldErrors()).containsOnlyKeys(BrokerSettings.BULK_SUBSCRIPTION_CAP));
 
         assertThat(provider.decisions.get()).isZero();
         assertThat(jdbc.queryForObject(
@@ -360,14 +360,15 @@ class SettingsAndTokenGatingIntegrationTest extends PostgresIntegrationTest {
         approversAre(approver());
         signIn(alice);
         settings.effective();
-        whileDisarmed(() -> settings.put(BrokerSettings.BULK_QUEUE_CAP, "2"));
+        whileDisarmed(() -> settings.put(BrokerSettings.BULK_SUBSCRIPTION_CAP, "2"));
 
         UUID id = held(() -> settings.apply(List.of(
-                SettingChange.set(BrokerSettings.BULK_CAP, "3"), SettingChange.reset(BrokerSettings.BULK_QUEUE_CAP))));
+                SettingChange.set(BrokerSettings.BULK_CAP, "3"),
+                SettingChange.reset(BrokerSettings.BULK_SUBSCRIPTION_CAP))));
 
         assertThat(settings.effective().get(BrokerSettings.BULK_CAP).overridden())
                 .isFalse();
-        assertThat(settings.intValue(BrokerSettings.BULK_QUEUE_CAP)).isEqualTo(2);
+        assertThat(settings.intValue(BrokerSettings.BULK_SUBSCRIPTION_CAP)).isEqualTo(2);
         GateRequest request = lastRequest();
         assertThat(request.type()).isEqualTo("settings.apply");
         assertThat(request.traits()).containsExactly(Trait.SETTINGS);
@@ -378,7 +379,7 @@ class SettingsAndTokenGatingIntegrationTest extends PostgresIntegrationTest {
                         Assertions.tuple(
                                 "2",
                                 "default ("
-                                        + settings.definition(BrokerSettings.BULK_QUEUE_CAP)
+                                        + settings.definition(BrokerSettings.BULK_SUBSCRIPTION_CAP)
                                                 .defaultValue()
                                                 .get() + ")"));
         var cap = settings.effective().get(BrokerSettings.BULK_CAP).pending().stream()
@@ -391,7 +392,7 @@ class SettingsAndTokenGatingIntegrationTest extends PostgresIntegrationTest {
             assertThat(pending.requester()).isEqualTo(alice.username());
             assertThat(pending.requestedAt()).isNotNull();
         });
-        assertThat(settings.effective().get(BrokerSettings.BULK_QUEUE_CAP).pending().stream()
+        assertThat(settings.effective().get(BrokerSettings.BULK_SUBSCRIPTION_CAP).pending().stream()
                         .filter(pending -> pending.heldId().equals(id))
                         .toList())
                 .singleElement()
@@ -409,13 +410,13 @@ class SettingsAndTokenGatingIntegrationTest extends PostgresIntegrationTest {
         signIn(alice);
         UUID id = held(() -> settings.apply(List.of(
                 SettingChange.set(BrokerSettings.BULK_CAP, "3"),
-                SettingChange.set(BrokerSettings.BULK_QUEUE_CAP, "2"))));
+                SettingChange.set(BrokerSettings.BULK_SUBSCRIPTION_CAP, "2"))));
 
         approve(bob, id);
 
         awaitState(id, HeldState.SUCCEEDED);
         assertThat(settings.intValue(BrokerSettings.BULK_CAP)).isEqualTo(3);
-        assertThat(settings.intValue(BrokerSettings.BULK_QUEUE_CAP)).isEqualTo(2);
+        assertThat(settings.intValue(BrokerSettings.BULK_SUBSCRIPTION_CAP)).isEqualTo(2);
         signIn(alice);
         assertThat(settings.effective().get(BrokerSettings.BULK_CAP).pending())
                 .extracting(PendingChange::heldId)
@@ -435,8 +436,8 @@ class SettingsAndTokenGatingIntegrationTest extends PostgresIntegrationTest {
         signIn(alice);
         UUID id = held(() -> settings.apply(List.of(
                 SettingChange.set(BrokerSettings.BULK_CAP, "3"),
-                SettingChange.set(BrokerSettings.BULK_QUEUE_CAP, "2"))));
-        whileDisarmed(() -> settings.put(BrokerSettings.BULK_QUEUE_CAP, "5"));
+                SettingChange.set(BrokerSettings.BULK_SUBSCRIPTION_CAP, "2"))));
+        whileDisarmed(() -> settings.put(BrokerSettings.BULK_SUBSCRIPTION_CAP, "5"));
 
         approve(bob, id);
 
@@ -444,7 +445,7 @@ class SettingsAndTokenGatingIntegrationTest extends PostgresIntegrationTest {
         signIn(alice);
         assertThat(settings.effective().get(BrokerSettings.BULK_CAP).overridden())
                 .isFalse();
-        assertThat(settings.intValue(BrokerSettings.BULK_QUEUE_CAP)).isEqualTo(5);
+        assertThat(settings.intValue(BrokerSettings.BULK_SUBSCRIPTION_CAP)).isEqualTo(5);
     }
 
     @Test

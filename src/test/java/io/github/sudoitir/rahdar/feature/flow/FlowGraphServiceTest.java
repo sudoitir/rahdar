@@ -125,14 +125,15 @@ class FlowGraphServiceTest {
 
         assertThat(graph.nodes())
                 .extracting(FlowNodeView::id)
-                .containsExactlyInAnyOrder("address:orders", "queue:orders", "producer:order-svc", "consumer:billing");
+                .containsExactlyInAnyOrder(
+                        "destination:orders", "subscription:orders", "producer:order-svc", "consumer:billing");
         FlowEdgeView route = edge(graph, EdgeKind.ROUTE);
         assertThat(route.delivery()).isEqualTo(Delivery.SHARED);
         assertThat(route.rate()).isEqualTo(42.0);
         assertThat(route.averagedOverSeconds()).isNull();
         assertThat(edge(graph, EdgeKind.CONSUME).members()).isEqualTo(3);
-        assertThat(edge(graph, EdgeKind.CONSUME).source()).isEqualTo("queue:orders");
-        assertThat(edge(graph, EdgeKind.PRODUCE).target()).isEqualTo("address:orders");
+        assertThat(edge(graph, EdgeKind.CONSUME).source()).isEqualTo("subscription:orders");
+        assertThat(edge(graph, EdgeKind.PRODUCE).target()).isEqualTo("destination:orders");
         assertThat(graph.measuring()).isFalse();
     }
 
@@ -145,11 +146,11 @@ class FlowGraphServiceTest {
         FlowGraphView graph = service.graph(clusterId, query(null, 40));
 
         FlowEdgeView orders = graph.edges().stream()
-                .filter(e -> e.target().equals("queue:orders"))
+                .filter(e -> e.target().equals("subscription:orders"))
                 .findFirst()
                 .orElseThrow();
         FlowEdgeView audit = graph.edges().stream()
-                .filter(e -> e.target().equals("queue:audit"))
+                .filter(e -> e.target().equals("subscription:audit"))
                 .findFirst()
                 .orElseThrow();
         assertThat(orders.rate()).isNull();
@@ -191,7 +192,7 @@ class FlowGraphServiceTest {
         FlowGraphView graph = service.graph(clusterId, query(null, 40));
 
         assertThat(graph.nodes())
-                .filteredOn(n -> n.kind() == NodeKind.QUEUE)
+                .filteredOn(n -> n.kind() == NodeKind.SUBSCRIPTION)
                 .singleElement()
                 .satisfies(n -> assertThat(n.faults()).containsExactly(Fault.NO_CONSUMER));
         assertThat(graph.kpis().faults()).isEqualTo(1);
@@ -215,13 +216,13 @@ class FlowGraphServiceTest {
         edge(Kind.CONSUME, "billing", "orders", "orders", 1.0, 1, false);
         edge(Kind.CONSUME, "billing", "refunds", "refunds", 1.0, 1, false);
 
-        FlowGraphView one = service.graph(clusterId, query("queue:orders", 40));
+        FlowGraphView one = service.graph(clusterId, query("subscription:orders", 40));
         FlowGraphView two =
-                service.graph(clusterId, FlowQuery.of("queue:orders", 2, Rank.IN, 40, GroupBy.CLIENT_ID, null));
-        FlowGraphView none = service.graph(clusterId, query("queue:gone", 40));
+                service.graph(clusterId, FlowQuery.of("subscription:orders", 2, Rank.IN, 40, GroupBy.CLIENT_ID, null));
+        FlowGraphView none = service.graph(clusterId, query("subscription:gone", 40));
 
-        assertThat(one.nodes()).isNotEmpty().extracting(FlowNodeView::id).doesNotContain("queue:refunds");
-        assertThat(two.nodes()).extracting(FlowNodeView::id).contains("queue:refunds");
+        assertThat(one.nodes()).isNotEmpty().extracting(FlowNodeView::id).doesNotContain("subscription:refunds");
+        assertThat(two.nodes()).extracting(FlowNodeView::id).contains("subscription:refunds");
         assertThat(none.focus().matched()).isFalse();
         assertThat(none.nodes()).isEmpty();
     }
@@ -282,9 +283,9 @@ class FlowGraphServiceTest {
 
         FlowGraphView graph = service.graph(clusterId, query(null, 40));
 
-        assertThat(graph.nodes()).extracting(FlowNodeView::id).contains("queue:fresh", "consumer:billing");
+        assertThat(graph.nodes()).extracting(FlowNodeView::id).contains("subscription:fresh", "consumer:billing");
         assertThat(graph.nodes())
-                .filteredOn(n -> n.id().equals("queue:fresh"))
+                .filteredOn(n -> n.id().equals("subscription:fresh"))
                 .singleElement()
                 .satisfies(n -> assertThat(n.messageCount()).isNull());
     }
@@ -309,9 +310,9 @@ class FlowGraphServiceTest {
 
         FlowGraphView graph = service.graph(clusterId, query(null, 40));
 
-        FlowEdgeView divert = edge(graph, EdgeKind.DIVERT);
-        assertThat(divert.source()).isEqualTo("address:ORDERS");
-        assertThat(divert.target()).isEqualTo("address:AUDIT");
+        FlowEdgeView divert = edge(graph, EdgeKind.FORWARD);
+        assertThat(divert.source()).isEqualTo("destination:ORDERS");
+        assertThat(divert.target()).isEqualTo("destination:AUDIT");
         assertThat(divert.exclusive()).isTrue();
         assertThat(divert.rateSource()).isEqualTo(RateSource.NONE);
         assertThat(divert.rate()).isNull();
@@ -330,14 +331,14 @@ class FlowGraphServiceTest {
 
         FlowGraphView graph = service.graph(clusterId, query(null, 40));
 
-        FlowEdgeView bridge = edge(graph, EdgeKind.BRIDGE);
-        assertThat(bridge.target()).isEqualTo("remote:bridge:dc2.orders");
+        FlowEdgeView bridge = edge(graph, EdgeKind.LINK);
+        assertThat(bridge.target()).isEqualTo("remote:link:dc2.orders");
         assertThat(bridge.rate()).isEqualTo(5.0);
-        assertThat(bridge.faults()).containsExactly(Fault.BRIDGE_DOWN);
+        assertThat(bridge.faults()).containsExactly(Fault.LINK_DOWN);
         assertThat(graph.nodes())
                 .filteredOn(n -> n.kind() == NodeKind.REMOTE)
                 .singleElement()
-                .satisfies(n -> assertThat(n.role()).isEqualTo(NodeRole.BRIDGE_TARGET));
+                .satisfies(n -> assertThat(n.role()).isEqualTo(NodeRole.LINK_TARGET));
     }
 
     @Test
@@ -363,7 +364,7 @@ class FlowGraphServiceTest {
 
         FlowGraphView graph = service.graph(clusterId, query(null, 40));
         FlowGraphView without =
-                service.graph(clusterId, FlowQuery.of(null, 1, Rank.IN, 40, GroupBy.CLIENT_ID, "DIVERTS"));
+                service.graph(clusterId, FlowQuery.of(null, 1, Rank.IN, 40, GroupBy.CLIENT_ID, "ROUTES"));
 
         FlowEdgeView hop = edge(graph, EdgeKind.CLUSTER_HOP);
         assertThat(hop.rate()).isEqualTo(7.0);
@@ -427,7 +428,7 @@ class FlowGraphServiceTest {
 
         assertThat(hidden.nodes()).isEmpty();
         assertThat(shown.nodes())
-                .filteredOn(n -> n.kind() == NodeKind.QUEUE)
+                .filteredOn(n -> n.kind() == NodeKind.SUBSCRIPTION)
                 .singleElement()
                 .satisfies(n -> {
                     assertThat(n.label()).isEqualTo("temporary queues ×2");
@@ -444,8 +445,8 @@ class FlowGraphServiceTest {
         FlowGraphView graph = service.graph(clusterId, query(null, 40));
 
         FlowEdgeView wildcard = edge(graph, EdgeKind.WILDCARD);
-        assertThat(wildcard.source()).isEqualTo("address:orders.eu");
-        assertThat(wildcard.target()).isEqualTo("address:orders.#");
+        assertThat(wildcard.source()).isEqualTo("destination:orders.eu");
+        assertThat(wildcard.target()).isEqualTo("destination:orders.#");
         assertThat(graph.assumptions()).containsExactly(FlowGraphService.WILDCARD_ASSUMPTION);
     }
 
@@ -456,7 +457,7 @@ class FlowGraphServiceTest {
         FlowGraphView graph = service.graph(clusterId, query(null, 40));
 
         assertThat(graph.nodes())
-                .filteredOn(n -> n.kind() == NodeKind.ADDRESS)
+                .filteredOn(n -> n.kind() == NodeKind.DESTINATION)
                 .singleElement()
                 .satisfies(n -> {
                     assertThat(n.role()).isEqualTo(NodeRole.ANONYMOUS);
@@ -482,11 +483,11 @@ class FlowGraphServiceTest {
 
         FlowGraphView hidden = service.graph(clusterId, query(null, 40));
         FlowGraphView shown =
-                service.graph(clusterId, FlowQuery.of(null, 1, Rank.IN, 40, GroupBy.CLIENT_ID, "DIVERTS,CAPTURE"));
+                service.graph(clusterId, FlowQuery.of(null, 1, Rank.IN, 40, GroupBy.CLIENT_ID, "ROUTES,CAPTURE"));
 
         assertThat(hidden.nodes()).noneMatch(n -> n.label().startsWith("rahdar.capture"));
-        assertThat(hidden.edges()).noneMatch(e -> e.kind() == EdgeKind.DIVERT);
-        assertThat(edge(shown, EdgeKind.DIVERT).rahdar()).isTrue();
+        assertThat(hidden.edges()).noneMatch(e -> e.kind() == EdgeKind.FORWARD);
+        assertThat(edge(shown, EdgeKind.FORWARD).rahdar()).isTrue();
     }
 
     @Test
@@ -519,16 +520,16 @@ class FlowGraphServiceTest {
 
         assertThat(hidden.edges()).noneMatch(e -> e.kind() == EdgeKind.DEAD_LETTER);
         FlowEdgeView dla = edge(shown, EdgeKind.DEAD_LETTER);
-        assertThat(dla.target()).isEqualTo("address:DLQ");
+        assertThat(dla.target()).isEqualTo("destination:DLQ");
         assertThat(shown.nodes())
-                .filteredOn(n -> n.id().equals("address:DLQ"))
+                .filteredOn(n -> n.id().equals("destination:DLQ"))
                 .singleElement()
                 .satisfies(n -> assertThat(n.role()).isEqualTo(NodeRole.DEAD_LETTER));
     }
 
     @Test
     void anUnknownLayerIsRefusedAndBlankMeansTheDefaults() {
-        assertThatThrownBy(() -> FlowQuery.of(null, 1, Rank.IN, 40, GroupBy.CLIENT_ID, "diverts,bogus"))
+        assertThatThrownBy(() -> FlowQuery.of(null, 1, Rank.IN, 40, GroupBy.CLIENT_ID, "routes,bogus"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("bogus");
         assertThat(FlowQuery.of(null, 1, Rank.IN, 40, GroupBy.CLIENT_ID, " ").layers())
@@ -611,7 +612,7 @@ class FlowGraphServiceTest {
         FlowGraphView graph = service.graph(clusterId, query(null, 40).withByNode(true));
 
         FlowNodeView queue = graph.nodes().stream()
-                .filter(n -> n.id().equals("queue:orders"))
+                .filter(n -> n.id().equals("subscription:orders"))
                 .findFirst()
                 .orElseThrow();
         assertThat(queue.byNode())
@@ -621,7 +622,7 @@ class FlowGraphServiceTest {
         // The totals are the sum of the parts, derived from the same per-node read.
         assertThat(edge(graph, EdgeKind.ROUTE).rate()).isEqualTo(30.0);
         assertThat(graph.nodes().stream()
-                        .filter(n -> n.id().equals("address:orders"))
+                        .filter(n -> n.id().equals("destination:orders"))
                         .findFirst()
                         .orElseThrow()
                         .byNode())
@@ -680,7 +681,7 @@ class FlowGraphServiceTest {
 
     private static List<String> queueIds(FlowGraphView graph) {
         return graph.nodes().stream()
-                .filter(n -> n.kind() == NodeKind.QUEUE)
+                .filter(n -> n.kind() == NodeKind.SUBSCRIPTION)
                 .map(FlowNodeView::id)
                 .toList();
     }
@@ -693,9 +694,9 @@ class FlowGraphServiceTest {
         rate(added, "busy-in", 1000.0, Duration.ofSeconds(15));
         rate(acked, "busy-out", 1000.0, Duration.ofSeconds(15));
 
-        assertThat(queueIds(service.graph(clusterId, ranked(Rank.IN, 1)))).containsExactly("queue:busy-in");
-        assertThat(queueIds(service.graph(clusterId, ranked(Rank.OUT, 1)))).containsExactly("queue:busy-out");
-        assertThat(queueIds(service.graph(clusterId, ranked(Rank.BACKLOG, 1)))).containsExactly("queue:deep");
+        assertThat(queueIds(service.graph(clusterId, ranked(Rank.IN, 1)))).containsExactly("subscription:busy-in");
+        assertThat(queueIds(service.graph(clusterId, ranked(Rank.OUT, 1)))).containsExactly("subscription:busy-out");
+        assertThat(queueIds(service.graph(clusterId, ranked(Rank.BACKLOG, 1)))).containsExactly("subscription:deep");
     }
 
     @Test
@@ -703,7 +704,7 @@ class FlowGraphServiceTest {
         queue("known", "a1", "ANYCAST", 5, 1);
         edge(Kind.CONSUME, "billing", "fresh", "fresh", 1.0, 1, false);
 
-        assertThat(queueIds(service.graph(clusterId, ranked(Rank.BACKLOG, 1)))).containsExactly("queue:known");
+        assertThat(queueIds(service.graph(clusterId, ranked(Rank.BACKLOG, 1)))).containsExactly("subscription:known");
     }
 
     @Test
@@ -715,11 +716,11 @@ class FlowGraphServiceTest {
         FlowGraphView byIn = service.graph(clusterId, ranked(Rank.IN, 1));
         assertThat(byIn.nodes())
                 .extracting(FlowNodeView::id)
-                .contains("address:lonely")
-                .doesNotContain("queue:orders");
+                .contains("destination:lonely")
+                .doesNotContain("subscription:orders");
 
         FlowGraphView byBacklog = service.graph(clusterId, ranked(Rank.BACKLOG, 1));
-        assertThat(byBacklog.nodes()).extracting(FlowNodeView::id).contains("queue:orders");
+        assertThat(byBacklog.nodes()).extracting(FlowNodeView::id).contains("subscription:orders");
     }
 
     @Test
@@ -755,15 +756,15 @@ class FlowGraphServiceTest {
         edge(Kind.CONSUME, "billing", "refunds", "refunds", 1.0, 1, false);
         edge(Kind.CONSUME, "auditor", "audit", "audit", 1.0, 1, false);
 
-        FlowGraphView address = service.graph(clusterId, query("address:orders", 40));
-        assertThat(queueIds(address)).containsExactly("queue:orders");
+        FlowGraphView address = service.graph(clusterId, query("destination:orders", 40));
+        assertThat(queueIds(address)).containsExactly("subscription:orders");
 
         FlowGraphView client = service.graph(clusterId, query("client:shop", 40));
-        assertThat(queueIds(client)).containsExactlyInAnyOrder("queue:orders", "queue:refunds");
+        assertThat(queueIds(client)).containsExactlyInAnyOrder("subscription:orders", "subscription:refunds");
 
         FlowGraphView widened =
                 service.graph(clusterId, FlowQuery.of("client:shop", 2, Rank.IN, 40, GroupBy.CLIENT_ID, null));
-        assertThat(queueIds(widened)).containsExactlyInAnyOrder("queue:orders", "queue:refunds");
+        assertThat(queueIds(widened)).containsExactlyInAnyOrder("subscription:orders", "subscription:refunds");
         assertThat(widened.nodes())
                 .extracting(FlowNodeView::id)
                 .contains("consumer:billing")
@@ -781,12 +782,12 @@ class FlowGraphServiceTest {
         edge(Kind.CONSUME, "billing", "other", "other", 1.0, 1, false);
         edge(Kind.PRODUCE, "shop", "other", "", 1.0, 1, false);
 
-        FlowGraphView narrow = service.graph(clusterId, query("queue:orders", 40));
+        FlowGraphView narrow = service.graph(clusterId, query("subscription:orders", 40));
         FlowGraphView wide =
-                service.graph(clusterId, FlowQuery.of("queue:orders", 2, Rank.IN, 40, GroupBy.CLIENT_ID, null));
+                service.graph(clusterId, FlowQuery.of("subscription:orders", 2, Rank.IN, 40, GroupBy.CLIENT_ID, null));
 
-        assertThat(queueIds(narrow)).containsExactly("queue:orders");
-        assertThat(queueIds(wide)).containsExactlyInAnyOrder("queue:orders", "queue:other");
+        assertThat(queueIds(narrow)).containsExactly("subscription:orders");
+        assertThat(queueIds(wide)).containsExactlyInAnyOrder("subscription:orders", "subscription:other");
     }
 
     // ---- client grouping and hiding -----------------------------------------------------------------
@@ -851,12 +852,12 @@ class FlowGraphServiceTest {
         FlowGraphView graph = service.graph(clusterId, query(null, 40));
 
         assertThat(graph.edges())
-                .filteredOn(e -> e.kind() == EdgeKind.DIVERT)
+                .filteredOn(e -> e.kind() == EdgeKind.FORWARD)
                 .extracting(FlowEdgeView::target)
-                .containsExactlyInAnyOrder("address:AUDIT", "address:COPY");
+                .containsExactlyInAnyOrder("destination:AUDIT", "destination:COPY");
         assertThat(edge(graph, EdgeKind.ROUTE).bypassed()).isFalse();
         assertThat(graph.edges())
-                .filteredOn(e -> e.kind() == EdgeKind.DIVERT)
+                .filteredOn(e -> e.kind() == EdgeKind.FORWARD)
                 .allSatisfy(e -> assertThat(e.faults()).isEmpty());
     }
 
@@ -866,7 +867,7 @@ class FlowGraphServiceTest {
         route(nodeA, FlowStore.RouteKind.BRIDGE, "hidden", "not.shown", "dc2", null, false, true, 1.0);
         samples.add(sample(null, 1, 1));
 
-        assertThat(service.graph(clusterId, query(null, 40)).edges()).noneMatch(e -> e.kind() == EdgeKind.BRIDGE);
+        assertThat(service.graph(clusterId, query(null, 40)).edges()).noneMatch(e -> e.kind() == EdgeKind.LINK);
     }
 
     @Test
@@ -878,8 +879,8 @@ class FlowGraphServiceTest {
 
         FlowGraphView graph = service.graph(clusterId, query(null, 40));
 
-        FlowEdgeView bridge = edge(graph, EdgeKind.BRIDGE);
-        assertThat(bridge.target()).isEqualTo("address:MIRROR");
+        FlowEdgeView bridge = edge(graph, EdgeKind.LINK);
+        assertThat(bridge.target()).isEqualTo("destination:MIRROR");
         assertThat(bridge.faults()).isEmpty();
         assertThat(graph.nodes()).noneMatch(n -> n.kind() == NodeKind.REMOTE);
     }
@@ -893,7 +894,7 @@ class FlowGraphServiceTest {
 
         FlowGraphView graph = service.graph(clusterId, query(null, 40));
 
-        assertThat(edge(graph, EdgeKind.BRIDGE).faults()).containsExactly(Fault.PARTIAL_PRESENCE);
+        assertThat(edge(graph, EdgeKind.LINK).faults()).containsExactly(Fault.PARTIAL_PRESENCE);
         assertThat(graph.kpis().faults()).isEqualTo(1);
     }
 
@@ -936,11 +937,11 @@ class FlowGraphServiceTest {
 
         FlowGraphView graph = service.graph(clusterId, expiry);
         assertThat(graph.edges())
-                .filteredOn(e -> e.target().equals("address:Expired"))
+                .filteredOn(e -> e.target().equals("destination:Expired"))
                 .hasSize(1);
 
         FlowGraphView blank = service.graph(clusterId, query(null, 40));
-        assertThat(blank.edges()).noneMatch(e -> e.target().equals("address:Expired"));
+        assertThat(blank.edges()).noneMatch(e -> e.target().equals("destination:Expired"));
 
         queues.clear();
         assertThat(service.graph(clusterId, expiry).edges()).isEmpty();
@@ -1016,7 +1017,7 @@ class FlowGraphServiceTest {
         FlowGraphView graph = service.graph(clusterId, query(null, 40).withByNode(true));
 
         FlowNodeView address = graph.nodes().stream()
-                .filter(n -> n.id().equals("address:orders"))
+                .filter(n -> n.id().equals("destination:orders"))
                 .findFirst()
                 .orElseThrow();
         assertThat(address.byNode())
@@ -1042,7 +1043,7 @@ class FlowGraphServiceTest {
         FlowGraphView graph = service.graph(clusterId, query);
 
         assertThat(graph.nodes())
-                .filteredOn(n -> n.role() == NodeRole.TEMPORARY || n.id().equals("queue:fresh"))
+                .filteredOn(n -> n.role() == NodeRole.TEMPORARY || n.id().equals("subscription:fresh"))
                 .isNotEmpty()
                 .allSatisfy(n -> assertThat(n.byNode()).isNullOrEmpty());
     }

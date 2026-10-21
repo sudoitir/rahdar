@@ -44,12 +44,13 @@ public class NotesService {
     }
 
     @Transactional(readOnly = true)
-    public List<Note> list(UUID clusterId, String queue) {
+    public List<Note> list(UUID clusterId, String subscription) {
         return em.createQuery(
-                        "SELECT n FROM Note n WHERE n.clusterId = :cluster AND n.queue = :queue ORDER BY n.createdAt DESC",
+                        "SELECT n FROM Note n WHERE n.clusterId = :cluster AND n.subscription = :subscription"
+                                + " ORDER BY n.createdAt DESC",
                         Note.class)
                 .setParameter("cluster", clusterId)
-                .setParameter("queue", queue)
+                .setParameter("subscription", subscription)
                 .setMaxResults(500)
                 .getResultList();
     }
@@ -63,24 +64,25 @@ public class NotesService {
                 .getResultList();
     }
 
-    /** The queue a note is on, or empty when there is no such note on the cluster. */
+    /** The subscription a note is on, or empty when there is no such note on the cluster. */
     @Transactional(readOnly = true)
-    public Optional<String> queueOf(UUID clusterId, UUID noteId) {
+    public Optional<String> subscriptionOf(UUID clusterId, UUID noteId) {
         Note note = em.find(Note.class, noteId);
         return note == null || !note.getClusterId().equals(clusterId)
                 ? Optional.empty()
-                : Optional.of(note.getQueue());
+                : Optional.of(note.getSubscription());
     }
 
     @Transactional
-    public Note add(UUID clusterId, String queue, String body) {
+    public Note add(UUID clusterId, String subscription, String body) {
         int max = settings.intValue("acme-notes.max-length");
         if (body.isBlank() || body.length() > max) {
             throw new IllegalArgumentException("A note is 1 to " + max + " characters.");
         }
         var actor = actors.resolve();
-        AuditEvent event = audit.begin(actor, "ACME_NOTES_ADD", "queue", queue, clusterId, null, Map.of(), false);
-        Note note = new Note(clusterId, queue, actor.username(), body, clock.instant());
+        AuditEvent event =
+                audit.begin(actor, "ACME_NOTES_ADD", "subscription", subscription, clusterId, null, Map.of(), false);
+        Note note = new Note(clusterId, subscription, actor.username(), body, clock.instant());
         em.persist(note);
         audit.succeed(event, 1);
         stream.publish(clusterId, TOPIC);
@@ -94,7 +96,14 @@ public class NotesService {
             return;
         }
         AuditEvent event = audit.begin(
-                actors.resolve(), "ACME_NOTES_DELETE", "queue", note.getQueue(), clusterId, null, Map.of(), false);
+                actors.resolve(),
+                "ACME_NOTES_DELETE",
+                "subscription",
+                note.getSubscription(),
+                clusterId,
+                null,
+                Map.of(),
+                false);
         em.remove(note);
         audit.succeed(event, 1);
         stream.publish(clusterId, TOPIC);

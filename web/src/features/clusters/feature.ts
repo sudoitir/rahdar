@@ -48,8 +48,8 @@ export const clustersFeature = defineFeature({
   palette: ClusterPalette,
   slots: {
     'shell.navbar': [{ id: 'clusters-switcher', order: 10, Component: ClusterSwitcher }],
-    'home.empty': [
-      { id: 'clusters-home', order: 10, Component: lazySlot(() => import('./ClusterHome.tsx'), 'ClusterHome') },
+    'home.estate': [
+      { id: 'clusters-estate', order: 10, Component: lazySlot(() => import('./EstateView.tsx'), 'EstateView') },
     ],
     'cluster.header': [{ id: 'clusters-header', order: 10, Component: ClusterHeader }],
     'settings.sections': [

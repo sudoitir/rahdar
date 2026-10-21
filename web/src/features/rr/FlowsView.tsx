@@ -56,7 +56,7 @@ function FlowsResult({
           <EmptyState
             kind="filtered"
             title="No flow matches these filters"
-            description="Request-reply flows are being traced on this cluster, but none has this state or address. Clear the filters to see them all."
+            description="Request-reply flows are being traced on this cluster, but none has this state or destination. Clear the filters to see them all."
             onClearFilters={onClearFilters}
           />
         ) : (
@@ -82,7 +82,7 @@ export function FlowsView() {
   const search = useSearch({ strict: false }) as {
     tab?: string;
     state?: string;
-    address?: string;
+    destination?: string;
     page?: number;
   };
   const navigate = useNavigate();
@@ -91,8 +91,8 @@ export function FlowsView() {
   const notificationsCap = cluster.data?.capabilities.notifications;
 
   const [selectedFlow, setSelectedFlow] = useState<string | null>(null);
-  const [address, setAddress] = useState(search.address ?? '');
-  const [debouncedAddress] = useDebouncedValue(address, 250);
+  const [destination, setDestination] = useState(search.destination ?? '');
+  const [debouncedDestination] = useDebouncedValue(destination, 250);
 
   const tab = search.tab ?? 'flows';
   const setTab = (v: string | null) =>
@@ -107,7 +107,7 @@ export function FlowsView() {
 
   const flows = useRrFlows(clusterId, {
     state: search.state,
-    address: debouncedAddress || undefined,
+    destination: debouncedDestination || undefined,
     page,
     size: PAGE_SIZE,
   });
@@ -115,7 +115,7 @@ export function FlowsView() {
   const header = (
     <PageHeader
       title="Request-reply tracing"
-      description="Which requests were answered, which are still waiting and which were never answered, reconstructed from the traffic on the addresses you trace."
+      description="Which requests were answered, which are still waiting and which were never answered, reconstructed from the traffic on the destinations you trace."
     />
   );
 
@@ -132,12 +132,17 @@ export function FlowsView() {
     );
   }
 
-  const filtered = Boolean(search.state || debouncedAddress);
+  const filtered = Boolean(search.state || debouncedDestination);
   const clearFilters = () => {
-    setAddress('');
+    setDestination('');
     void navigate({
       to: '.',
-      search: (prev: Record<string, unknown>) => ({ ...prev, state: undefined, address: undefined, page: undefined }),
+      search: (prev: Record<string, unknown>) => ({
+        ...prev,
+        state: undefined,
+        destination: undefined,
+        page: undefined,
+      }),
     });
   };
 
@@ -160,11 +165,11 @@ export function FlowsView() {
               start={
                 <>
                   <TextInput
-                    label="Filter by address"
+                    label="Filter by destination"
                     placeholder="orders.request"
-                    value={address}
+                    value={destination}
                     onChange={(e) => {
-                      setAddress(e.currentTarget.value);
+                      setDestination(e.currentTarget.value);
                       // A filter change invalidates the position: page 4 of the old
                       // result is page 4 of nothing.
                       if (page > 1) void setPage(1);

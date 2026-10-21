@@ -45,7 +45,7 @@ interface DataTableBaseProps<T> {
   columns: Column<T>[];
   data: T[];
   rowKey: (row: T) => string;
-  /** What the table lists, as its accessible name: "Queues", "Connections". */
+  /** What the table lists, as its accessible name: "Subscriptions", "Connections". */
   label: string;
   /** Shown in place of the rows when there are none: an `EmptyState`. */
   empty: ReactNode;

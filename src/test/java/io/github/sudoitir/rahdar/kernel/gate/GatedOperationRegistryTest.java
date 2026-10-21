@@ -99,10 +99,10 @@ class GatedOperationRegistryTest {
 
     @Test
     void rahdarAndPluginOperationsAreFoundByTypeAndByParameters() throws Exception {
-        var registry = registry(new Op<>("queue.purge", Purge.class));
+        var registry = registry(new Op<>("subscription.purge", Purge.class));
         registry.attach(plugin("acme-notes", new Op<>("acme-notes:rename", Rename.class)));
 
-        assertThat(registry.forType("queue.purge")).isPresent();
+        assertThat(registry.forType("subscription.purge")).isPresent();
         assertThat(registry.forType("acme-notes:rename")).isPresent();
         assertThat(registry.forParams(Rename.class))
                 .get()
@@ -116,7 +116,7 @@ class GatedOperationRegistryTest {
     void aPluginTypeOutsideItsNamespaceFailsTheAttach() throws Exception {
         var registry = registry();
 
-        PluginHandle rahdarType = plugin("acme-notes", new Op<>("queue.purge", Purge.class));
+        PluginHandle rahdarType = plugin("acme-notes", new Op<>("subscription.purge", Purge.class));
         PluginHandle otherNamespace = plugin("acme-notes", new Op<>("other-plugin:x", Purge.class));
 
         assertThatThrownBy(() -> registry.attach(rahdarType))
@@ -135,7 +135,7 @@ class GatedOperationRegistryTest {
 
     @Test
     void aDuplicateTypeOrParametersFailsTheAttachAndChangesNothing() throws Exception {
-        var registry = registry(new Op<>("queue.purge", Purge.class));
+        var registry = registry(new Op<>("subscription.purge", Purge.class));
 
         PluginHandle sharesParameters =
                 plugin("acme-notes", new Op<>("acme-notes:a", Rename.class), new Op<>("acme-notes:b", Purge.class));

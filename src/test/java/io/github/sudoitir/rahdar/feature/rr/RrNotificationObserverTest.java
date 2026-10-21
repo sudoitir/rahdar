@@ -80,7 +80,7 @@ class RrNotificationObserverTest extends PostgresIntegrationTest {
         observer.accept(
                 event(clusterId, EventTypes.CONSUMER_ATTACHED, "some.other.address", "some.other.address", Map.of()));
 
-        assertThat(correlator.isTracedRequestAddress(clusterId, "some.other.address"))
+        assertThat(correlator.isTracedRequestDestination(clusterId, "some.other.address"))
                 .isFalse();
     }
 
@@ -91,7 +91,7 @@ class RrNotificationObserverTest extends PostgresIntegrationTest {
         correlator.accept(new Observation.RequestSeen(
                 clusterId, null, t0, "rr.request", "m1", "corr-1", null, 0L, null, Map.of()));
 
-        // No expectation declared for "rr.request" — isTracedRequestAddress is false, so this must be ignored.
+        // No expectation declared for "rr.request" — isTracedRequestDestination is false, so this must be ignored.
         observer.accept(event(
                 clusterId,
                 EventTypes.CONSUMER_DETACHED,
@@ -99,7 +99,7 @@ class RrNotificationObserverTest extends PostgresIntegrationTest {
                 "rr.request",
                 Map.of("openbroker.consumer_count", 0)));
 
-        RrFlowEntity flow = flows.findByClusterIdAndRequestAddressAndRequestMessageId(clusterId, "rr.request", "m1")
+        RrFlowEntity flow = flows.findByClusterIdAndRequestDestinationAndRequestMessageId(clusterId, "rr.request", "m1")
                 .orElseThrow();
         assertThat(flow.getState()).isEqualTo(RrState.AWAITING_REPLY.name());
     }
@@ -119,13 +119,13 @@ class RrNotificationObserverTest extends PostgresIntegrationTest {
                 "rr.traced",
                 Map.of("openbroker.consumer_count", 0)));
 
-        RrFlowEntity flow = flows.findByClusterIdAndRequestAddressAndRequestMessageId(clusterId, "rr.traced", "m2")
+        RrFlowEntity flow = flows.findByClusterIdAndRequestDestinationAndRequestMessageId(clusterId, "rr.traced", "m2")
                 .orElseThrow();
         assertThat(flow.getState()).isEqualTo(RrState.RESPONDER_DROPPED.name());
     }
 
     @Test
-    void messageDeliveredOnAResolvedReplyAddressIsForwardedAsAReply() {
+    void messageDeliveredOnAResolvedReplyDestinationIsForwardedAsAReply() {
         cluster();
         expectations.save(
                 new RrExpectationEntity(clusterId, "rr.traced", List.of("rr.traced.reply"), null, null, 10, false));
@@ -137,11 +137,11 @@ class RrNotificationObserverTest extends PostgresIntegrationTest {
 
         observer.accept(event(clusterId, EventTypes.MESSAGE_DELIVERED, "rr.traced.reply", "rr.traced.reply", Map.of()));
 
-        RrFlowEntity flow = flows.findByClusterIdAndRequestAddressAndRequestMessageId(clusterId, "rr.traced", "m1")
+        RrFlowEntity flow = flows.findByClusterIdAndRequestDestinationAndRequestMessageId(clusterId, "rr.traced", "m1")
                 .orElseThrow();
         // No correlation id on the notification, so this cannot join by identity — it
         // is recorded as a reply observation, and the flow it cannot join stays open.
-        assertThat(correlator.isTracedReplyAddress(clusterId, "rr.traced.reply"))
+        assertThat(correlator.isTracedReplyDestination(clusterId, "rr.traced.reply"))
                 .isTrue();
         assertThat(flow).isNotNull();
     }
@@ -152,7 +152,8 @@ class RrNotificationObserverTest extends PostgresIntegrationTest {
         expectations.save(
                 new RrExpectationEntity(clusterId, "rr.traced", List.of("rr.traced.reply"), null, null, 10, false));
 
-        assertThat(correlator.isTracedReplyAddress(clusterId, "something.else")).isFalse();
+        assertThat(correlator.isTracedReplyDestination(clusterId, "something.else"))
+                .isFalse();
 
         observer.accept(event(clusterId, EventTypes.MESSAGE_DELIVERED, "something.else", "something.else", Map.of()));
 
@@ -170,9 +171,9 @@ class RrNotificationObserverTest extends PostgresIntegrationTest {
 
         // matches() reads the declaration, not the snapshot, so a reply queue created
         // since the last scrape is still recognised.
-        assertThat(correlator.isTracedReplyAddress(clusterId, "rr.traced.reply.host-9"))
+        assertThat(correlator.isTracedReplyDestination(clusterId, "rr.traced.reply.host-9"))
                 .isTrue();
-        assertThat(correlator.isTracedReplyAddress(clusterId, "other.reply.host-9"))
+        assertThat(correlator.isTracedReplyDestination(clusterId, "other.reply.host-9"))
                 .isFalse();
     }
 
@@ -190,7 +191,7 @@ class RrNotificationObserverTest extends PostgresIntegrationTest {
                 "temp-queue-xyz",
                 Map.of("openbroker.message_id", "42")));
 
-        RrFlowEntity flow = flows.findByClusterIdAndRequestAddressAndRequestMessageId(clusterId, "rr.request", "m1")
+        RrFlowEntity flow = flows.findByClusterIdAndRequestDestinationAndRequestMessageId(clusterId, "rr.request", "m1")
                 .orElseThrow();
         assertThat(flow.getState()).isEqualTo(RrState.COMPLETED.name());
     }
@@ -205,7 +206,7 @@ class RrNotificationObserverTest extends PostgresIntegrationTest {
                 "unrelated.queue",
                 Map.of("openbroker.message_id", "99")));
 
-        assertThat(flows.findByClusterIdAndRequestAddressAndState(
+        assertThat(flows.findByClusterIdAndRequestDestinationAndState(
                         clusterId, "unrelated.queue", RrState.ORPHANED_REPLY.name()))
                 .isEmpty();
     }

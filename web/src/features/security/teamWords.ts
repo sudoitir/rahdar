@@ -7,9 +7,9 @@ export function countOf(count: number, noun: string, plural = `${noun}s`): strin
 }
 
 export const KIND_WORDS: Record<PatternKind, string> = {
-  QUEUE: 'Queues',
-  ADDRESS: 'Addresses',
-  BOTH: 'Queues and addresses',
+  SUBSCRIPTION: 'Subscriptions',
+  DESTINATION: 'Destinations',
+  ANY: 'Subscriptions and destinations',
 };
 
 export const KIND_OPTIONS = (Object.keys(KIND_WORDS) as PatternKind[]).map((value) => ({

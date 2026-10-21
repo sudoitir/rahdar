@@ -22,7 +22,7 @@ public final class GovernanceRuleViews {
      */
     public record RuleView(
             @Schema(requiredMode = REQUIRED) UUID id,
-            @Schema(nullable = true) String addressPattern,
+            @Schema(nullable = true) String destinationPattern,
             @Schema(requiredMode = REQUIRED) String target,
             @Schema(requiredMode = REQUIRED) String selector,
             @Schema(requiredMode = REQUIRED) String dataClass,
@@ -36,7 +36,7 @@ public final class GovernanceRuleViews {
 
     /** Create or replace a rule. A built-in rule accepts only {@code enabled}; its other fields are facts. */
     public record RuleRequest(
-            @Schema(nullable = true) @Size(max = 255) @Pattern(regexp = "[^\\s]*", message = "must not contain spaces") String addressPattern,
+            @Schema(nullable = true) @Size(max = 255) @Pattern(regexp = "[^\\s]*", message = "must not contain spaces") String destinationPattern,
 
             @Schema(requiredMode = REQUIRED) @NotNull @Pattern(regexp = "HEADER|PROPERTY|BODY_PATH") String target,
 

@@ -8,7 +8,7 @@ import { ChartPanel } from './ChartPanel.tsx';
 function panel(over: Partial<Parameters<typeof ChartPanel>[0]> = {}) {
   return renderWithProviders(
     <ChartPanel
-      title="Queue depth"
+      title="Subscription depth"
       unit="messages"
       isPending={false}
       error={null}
@@ -24,7 +24,7 @@ function panel(over: Partial<Parameters<typeof ChartPanel>[0]> = {}) {
 describe('ChartPanel', () => {
   it('shows the plot, titled, when there is something to plot', () => {
     panel();
-    expect(screen.getByText('Queue depth')).toBeInTheDocument();
+    expect(screen.getByText('Subscription depth')).toBeInTheDocument();
     expect(screen.getByText('messages')).toBeInTheDocument();
     expect(screen.getByText('the plot')).toBeInTheDocument();
   });
@@ -37,7 +37,7 @@ describe('ChartPanel', () => {
 
   it('holds the plot’s place, named, while loading', () => {
     panel({ isPending: true });
-    expect(screen.getByRole('status')).toHaveTextContent('Loading Queue depth');
+    expect(screen.getByRole('status')).toHaveTextContent('Loading Subscription depth');
     expect(screen.queryByText('the plot')).not.toBeInTheDocument();
   });
 

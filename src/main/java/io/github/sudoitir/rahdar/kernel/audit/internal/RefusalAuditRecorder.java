@@ -91,7 +91,7 @@ class RefusalAuditRecorder {
         record(
                 refused.permission(),
                 refused.clusterId(),
-                resource == null ? "CLUSTER" : resource.kind().name(),
+                resource == null ? "CLUSTER" : resource.type().name(),
                 resource == null ? null : resource.name(),
                 refused.hidden());
     }

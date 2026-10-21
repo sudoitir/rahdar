@@ -5,7 +5,7 @@
   "title": "Notes",
   "version": "${project.version}",
   "vendor": { "name": "Acme", "url": "https://acme.example" },
-  "description": "Notes on queues, shared with everyone who operates the cluster.",
+  "description": "Notes on subscriptions, shared with everyone who operates the cluster.",
   "license": "Apache-2.0",
   "changeNotes": "First release.",
   "basePackage": "com.acme.notes",
@@ -17,16 +17,16 @@
   "permissions": [
     {
       "action": "acme-notes:read",
-      "description": "Read the notes on a queue",
+      "description": "Read the notes on a subscription",
       "scope": "resource",
-      "resourceKinds": ["queue"],
-      "requires": ["queue:read"]
+      "resourceTypes": ["subscription"],
+      "requires": ["subscription:read"]
     },
     {
       "action": "acme-notes:write",
-      "description": "Write and delete the notes on a queue",
+      "description": "Write and delete the notes on a subscription",
       "scope": "resource",
-      "resourceKinds": ["queue"],
+      "resourceTypes": ["subscription"],
       "requires": ["acme-notes:read"]
     }
   ],
@@ -38,24 +38,24 @@
       "posture": "read",
       "scope": "resource",
       "permission": "acme-notes:read",
-      "resourceArg": "queue",
-      "resourceKind": "queue",
-      "description": "Lists the notes on a queue."
+      "resourceArg": "subscription",
+      "resourceType": "subscription",
+      "description": "Lists the notes on a subscription."
     }
   ],
   "metrics": [
     {
       "name": "acme-notes:notes",
-      "description": "Notes left on each queue.",
+      "description": "Notes left on each subscription.",
       "unit": "count",
-      "subject": "queue",
+      "subject": "subscription",
       "permission": "acme-notes:read"
     }
   ],
   "alertRules": [
     {
       "key": "many-notes",
-      "name": "Many notes on a queue",
+      "name": "Many notes on a subscription",
       "metric": "acme-notes:notes",
       "comparator": "GT",
       "threshold": 50,

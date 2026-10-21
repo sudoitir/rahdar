@@ -228,7 +228,7 @@ public class OwnerWorkService implements PluginScopedBeans {
         StringBuilder text = new StringBuilder(need.permission());
         if (need.resource() != null) {
             text.append(" on ")
-                    .append(need.resource().kind().name().toLowerCase(Locale.ROOT))
+                    .append(need.resource().type().name().toLowerCase(Locale.ROOT))
                     .append(' ')
                     .append(need.resource().name());
         }

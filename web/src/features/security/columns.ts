@@ -243,7 +243,7 @@ export function accessColumns({ scopeLabel }: Readonly<{ scopeLabel: ScopeLabel 
   ];
 }
 
-/** The teams and roles that reach one queue or address. The team and the role are never hidden. */
+/** The teams and roles that reach one subscription or destination. The team and the role are never hidden. */
 export function resourceGrantColumns(): Column<ResourceTeamGrant>[] {
   return [
     { id: 'team', header: 'Team', accessor: (g) => g.teamName, kind: 'identifier', priority: 'essential' },

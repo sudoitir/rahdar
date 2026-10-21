@@ -52,14 +52,14 @@ public class RrNotificationObserver implements BrokerEventSink {
     }
 
     private void responderUp(BrokerEvent event) {
-        if (correlator.isTracedRequestAddress(event.clusterId(), event.destination())) {
+        if (correlator.isTracedRequestDestination(event.clusterId(), event.destination())) {
             correlator.accept(new Observation.ResponderUp(
                     event.clusterId(), event.nodeId(), event.occurredAt(), event.destination(), event.consumer()));
         }
     }
 
     private void responderDown(BrokerEvent event) {
-        if (correlator.isTracedRequestAddress(event.clusterId(), event.destination())) {
+        if (correlator.isTracedRequestDestination(event.clusterId(), event.destination())) {
             correlator.accept(new Observation.ResponderDown(
                     event.clusterId(),
                     event.nodeId(),
@@ -84,8 +84,8 @@ public class RrNotificationObserver implements BrokerEventSink {
      */
     private void delivered(BrokerEvent event) {
         if (correlator.hasOpenTempQueueFlow(event.clusterId(), event.subscription())
-                || correlator.isTracedReplyAddress(event.clusterId(), event.destination())
-                || correlator.isTracedReplyAddress(event.clusterId(), event.subscription())) {
+                || correlator.isTracedReplyDestination(event.clusterId(), event.destination())
+                || correlator.isTracedReplyDestination(event.clusterId(), event.subscription())) {
             correlator.accept(new Observation.ReplySeen(
                     event.clusterId(),
                     event.nodeId(),

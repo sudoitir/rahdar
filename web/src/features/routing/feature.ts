@@ -5,15 +5,15 @@ import { CONTRACT, defineFeature } from '../../kernel/feature.ts';
 import { clusterRoute } from '../../kernel/routing/roots.ts';
 import { lazyFeatureView } from '../../kernel/routing/lazy.tsx';
 import { validateResourceSearch, type ResourceSearch } from '../../kernel/routing/search.ts';
-import { CopyDivertName, DeleteDivert } from './rowActions.tsx';
+import { CopyRouteName, DeleteDivert } from './rowActions.tsx';
 
 /**
- * Routing's navigable state: the listing's filter, sort and page; which tab is open — Diverts,
- * Bridges or a `routing.tabs` contribution's id; and the string keys a contributed tab keeps in the
+ * The routes view's navigable state: the listing's filter, sort and page; which tab is open — the
+ * routes or a `routes.tabs` contribution's id; and the string keys a contributed tab keeps in the
  * URL (the builder's open editor, its region anchor and its selection). A contribution narrows
  * those to what it accepts; this route only carries them, because it cannot know them.
  */
-export interface RoutingSearch extends ResourceSearch {
+export interface RoutesSearch extends ResourceSearch {
   tab?: string;
   section?: string;
   item?: string;
@@ -23,8 +23,8 @@ export interface RoutingSearch extends ResourceSearch {
 
 const PASSED_THROUGH = ['tab', 'section', 'item', 'anchor', 'selected'] as const;
 
-export function validateRoutingSearch(raw: Record<string, unknown>): RoutingSearch {
-  const out: RoutingSearch = validateResourceSearch(raw);
+export function validateRoutesSearch(raw: Record<string, unknown>): RoutesSearch {
+  const out: RoutesSearch = validateResourceSearch(raw);
   for (const key of PASSED_THROUGH) {
     const value = raw[key];
     if (typeof value === 'string' && value) out[key] = value;
@@ -32,32 +32,32 @@ export function validateRoutingSearch(raw: Record<string, unknown>): RoutingSear
   return out;
 }
 
-const routingRoute = createRoute({
+const routesRoute = createRoute({
   getParentRoute: () => clusterRoute,
-  path: 'routing',
-  component: lazyFeatureView('routing', () => import('./RoutingView.tsx'), 'RoutingView'),
-  validateSearch: validateRoutingSearch,
+  path: 'routes',
+  component: lazyFeatureView('routing', () => import('./RoutesView.tsx'), 'RoutesView'),
+  validateSearch: validateRoutesSearch,
 });
 
-/** Diverts and bridges across the cluster, and whatever other features contribute as a tab. */
+/** The routes across the cluster, and whatever other features contribute as a tab. */
 export const routingFeature = defineFeature({
   contract: CONTRACT,
   id: 'routing',
-  routes: { cluster: [routingRoute] },
+  routes: { cluster: [routesRoute] },
   nav: [
     {
       group: 'resources',
       order: 60,
-      label: 'Routing',
+      label: 'Routes',
       icon: IconRoute,
-      path: 'routing',
+      path: 'routes',
       hotkey: 'o',
       permission: 'cluster:read',
     },
   ],
   slots: {
-    'divert.actions': [
-      { id: 'routing.divert.copy', order: 10, section: 'copy', Component: CopyDivertName },
+    'route.actions': [
+      { id: 'routing.route.copy', order: 10, section: 'copy', Component: CopyRouteName },
       { id: 'routing.divert.delete', order: 10, section: 'destroy', Component: DeleteDivert },
     ],
   },

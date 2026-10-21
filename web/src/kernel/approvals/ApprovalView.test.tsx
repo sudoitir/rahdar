@@ -72,7 +72,7 @@ describe('ApprovalView', () => {
     serve(detail());
     renderPage();
     expect(
-      await screen.findByRole('heading', { level: 1, name: 'Purge queue orders.dlq on prod-eu' }),
+      await screen.findByRole('heading', { level: 1, name: 'Purge subscription orders.dlq on prod-eu' }),
     ).toBeInTheDocument();
     expect(screen.getByText('Waiting for approval')).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 2, name: 'What will happen' })).toBeInTheDocument();
@@ -172,13 +172,13 @@ describe('ApprovalView', () => {
   it('shows a request refused at run time as an alert with its cause', async () => {
     serve(
       detail(
-        { canDecide: false, outcomeDetail: 'The queue changed since it was requested.' },
+        { canDecide: false, outcomeDetail: 'The subscription changed since it was requested.' },
         { state: 'REFUSED', approverUsername: 'bob' },
       ),
     );
     renderPage();
     const alert = await screen.findByRole('alert');
-    expect(alert).toHaveTextContent('The queue changed since it was requested.');
+    expect(alert).toHaveTextContent('The subscription changed since it was requested.');
     expect(alert).toHaveTextContent('Nothing was changed');
     expect(screen.getByRole('heading', { level: 2, name: 'What it asked for' })).toBeInTheDocument();
   });
@@ -249,7 +249,7 @@ describe('ApprovalView', () => {
     const trigger = await screen.findByRole('button', { name: 'Approve…' });
     await user.click(trigger);
     const dialog = await screen.findByRole('dialog', { name: 'Approve this request?' });
-    expect(dialog).toHaveTextContent('Purge queue orders.dlq on prod-eu');
+    expect(dialog).toHaveTextContent('Purge subscription orders.dlq on prod-eu');
     expect(dialog).toHaveTextContent('1,204 messages');
     // Keyboard: focus starts inside the dialog, Escape dismisses it, and focus returns to the trigger.
     expect(dialog).toContainElement(document.activeElement as HTMLElement);
@@ -347,7 +347,9 @@ describe('ApprovalView', () => {
   it('shows a refused vote in the dialog with its reason', async () => {
     serve(detail());
     server.use(
-      http.post(`${PATH}/decision`, () => problem('vote-refused', 403, 'You approved a change to this queue today.')),
+      http.post(`${PATH}/decision`, () =>
+        problem('vote-refused', 403, 'You approved a change to this subscription today.'),
+      ),
     );
     renderPage();
     const user = userEvent.setup();
@@ -355,7 +357,7 @@ describe('ApprovalView', () => {
     const dialog = await screen.findByRole('dialog');
     await holdButton(within(dialog).getByRole('button', { name: 'Approve' }));
     expect(
-      await within(dialog).findByText('You approved a change to this queue today.', { exact: false }),
+      await within(dialog).findByText('You approved a change to this subscription today.', { exact: false }),
     ).toBeVisible();
   });
 
@@ -374,7 +376,7 @@ describe('ApprovalView', () => {
     await user.click(await screen.findByRole('button', { name: 'Cancel request' }));
     const dialog = await screen.findByRole('dialog', { name: 'Cancel this request?' });
     expect(dialog).toHaveTextContent('It will not run, and its approvers are told it was cancelled.');
-    expect(dialog).toHaveTextContent('Purge queue orders.dlq on prod-eu');
+    expect(dialog).toHaveTextContent('Purge subscription orders.dlq on prod-eu');
     await user.click(within(dialog).getByRole('button', { name: 'Cancel request' }));
     await waitFor(() => expect(cancelled).toBe(1));
     expect(await screen.findByText('alice cancelled it.')).toBeInTheDocument();
@@ -397,7 +399,7 @@ describe('ApprovalView', () => {
       },
     });
     renderPage([provider]);
-    expect(await screen.findByText('Policy check for Purge queue orders.dlq on prod-eu')).toBeInTheDocument();
+    expect(await screen.findByText('Policy check for Purge subscription orders.dlq on prod-eu')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Approve…' })).toBeInTheDocument();
   });
 });

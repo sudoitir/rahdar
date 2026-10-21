@@ -16,7 +16,7 @@ describe('ShortcutsHelp', () => {
 
     await userEvent.click(button);
     const popover = await screen.findByRole('dialog', { name: 'Keyboard shortcuts' });
-    expect(popover).toHaveTextContent('Search views, clusters and queues');
+    expect(popover).toHaveTextContent('Search views, clusters and subscriptions');
     const toggle = within(popover).getByLabelText(/Single-key shortcuts/);
     expect(toggle).toBeChecked();
     // Focus moves into the popover, onto its one control.
@@ -39,7 +39,7 @@ describe('ShortcutsHelp', () => {
     expect(within(topology).getByText('First or last node').nextElementSibling).toHaveTextContent('HomeorEnd');
     expect(within(popover).queryByRole('table')).not.toBeInTheDocument();
     const everywhere = within(popover).getByRole('region', { name: 'Everywhere' });
-    const term = within(everywhere).getByText('Search views, clusters and queues');
+    const term = within(everywhere).getByText('Search views, clusters and subscriptions');
     expect(term.tagName).toBe('DT');
     expect(term.nextElementSibling).toHaveTextContent('⌘KorCtrlK');
   });

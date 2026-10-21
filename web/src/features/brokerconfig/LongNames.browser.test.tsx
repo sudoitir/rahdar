@@ -144,12 +144,12 @@ function page(search: string, view: () => ReactElement = ConfigurationView) {
   const root = createRootRoute();
   const route = createRoute({
     getParentRoute: () => root,
-    path: '/clusters/$clusterId/configuration',
+    path: '/clusters/$clusterId/artemis/configuration',
     component: view,
   });
   return createRouter({
     routeTree: root.addChildren([route]),
-    history: createMemoryHistory({ initialEntries: [`/clusters/c1/configuration${search}`] }),
+    history: createMemoryHistory({ initialEntries: [`/clusters/c1/artemis/configuration${search}`] }),
   });
 }
 

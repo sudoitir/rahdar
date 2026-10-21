@@ -24,8 +24,12 @@ function shell() {
       }),
     ),
     http.get('*/api/v1/alerts/firing', () => HttpResponse.json(paged([]))),
-    http.get('*/api/v1/clusters/c1/queues', () => HttpResponse.json({ data: [], count: 0, page: 1, pageSize: 50 })),
-    http.get('*/api/v1/clusters/c1/dlq', () => HttpResponse.json({ settingsAvailable: true, addresses: [] })),
+    http.get('*/api/v1/clusters/c1/subscriptions', () =>
+      HttpResponse.json({ data: [], count: 0, page: 1, pageSize: 50 }),
+    ),
+    http.get('*/api/v1/clusters/c1/dead-letters', () =>
+      HttpResponse.json({ settingsAvailable: true, destinations: [] }),
+    ),
     http.get('*/api/v1/clusters/c1', () =>
       HttpResponse.json({
         id: 'c1',
@@ -44,7 +48,7 @@ function shell() {
   ];
 }
 
-describe('the consumer health address', () => {
+describe('the consumer health destination', () => {
   it('reaches the ranked view, worst first', async () => {
     server.use(
       ...shell(),
@@ -52,8 +56,8 @@ describe('the consumer health address', () => {
         HttpResponse.json({
           data: [
             {
-              address: 'orders',
-              queueName: 'orders',
+              destination: 'artemis.address/orders',
+              subscription: 'artemis.queue/orders',
               verdict: 'NO_CONSUMERS',
               severity: 4,
               cause: 'No consumers are attached.',
@@ -86,8 +90,8 @@ describe('the consumer health address', () => {
 
     renderAppAt('/clusters/c1/consumer-health');
 
-    // The real router resolves the address to the feature's view.
+    // The real router resolves the destination to the feature's view.
     expect(await screen.findByText('No consumers')).toBeInTheDocument();
-    expect(await screen.findByRole('textbox', { name: 'Filter queues' })).toBeInTheDocument();
+    expect(await screen.findByRole('textbox', { name: 'Filter subscriptions' })).toBeInTheDocument();
   });
 });

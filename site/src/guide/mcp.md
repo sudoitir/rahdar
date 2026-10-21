@@ -10,7 +10,7 @@ an assistant can answer *"why is `ORDERS.DLQ` backed up"* against your real
 clusters instead of guessing.
 
 The surface is sixteen **intent-shaped** tools — `diagnose`,
-`message_action`, `broker_config_change` — not a mirror of the REST API. A mirror would
+`message_action`, `artemis_config_change` — not a mirror of the REST API. A mirror would
 spend the model's context on plumbing and leave it to assemble the diagnosis;
 the tools are shaped like the questions instead
 ([ADR-0045](/reference/adr/0045-mcp-server-is-a-capability-surface)).
@@ -77,23 +77,40 @@ can be run again.
 | Kind | Name | For |
 |---|---|---|
 | Tool | `rahdar_help` | the catalogue itself: every tool, its posture and its parameters |
-| Tool | `diagnose` | a cluster (HA role per node, split-brain, replication lag, firing alerts) or one queue end to end |
-| Tool | `list_resources` | queues, addresses, consumers, sessions, connections, producers, diverts, bridges |
+| Tool | `diagnose` | a cluster (HA role per node, split-brain, replication lag, firing alerts) or one subscription end to end |
+| Tool | `list_resources` | destinations, subscriptions, routes, connections, channels, consumers and producers, by `role`, each with its id and kind |
 | Tool | `metric_series` | a bucketed timeseries for one metric |
-| Tool | `config_diff` | every node's configuration against the majority: the keys that drift and the nodes that differ |
-| Tool | `broker_config` | the cluster's declaration, its drift per node, the `broker.xml` fragment, or past applies |
-| Tool | `browse_messages` | headers, or one body by id |
+| Tool | `artemis_config_diff` | every node's configuration against the majority: the keys that drift and the nodes that differ |
+| Tool | `artemis_config` | the cluster's declaration, its drift per node, the `broker.xml` fragment, or past applies |
+| Tool | `browse_messages` | headers of a subscription, or one body by id |
 | Tool | `trace_request_reply` | flows, latency and timeout statistics, configured expectations |
 | Tool | `activity_log` | broker events, or Rahdar's own audit trail |
 | Tool | `message_action` | move / retry / delete / expire / purge |
-| Tool | `queue_lifecycle` | create, update, pause, resume or destroy a queue, address or divert |
-| Tool | `broker_config_change` | declare a configuration, or apply it canary-first with hazards acknowledged by id |
-| Tool | `connection_action` | close a connection, session, consumer or an address's consumers |
+| Tool | `resource_lifecycle` | create, update, pause, resume or destroy a subscription or destination |
+| Tool | `artemis_divert_lifecycle` | create or delete a divert |
+| Tool | `artemis_config_change` | declare a configuration, or apply it canary-first with hazards acknowledged by id |
+| Tool | `connection_action` | close a connection, channel, consumer or a destination's consumers |
 | Tool | `send_message` | enqueue one message |
+| Tool | `setup_review` | the latest configuration review of a cluster |
 | Tool | `alert_rule` / `rahdar_setting` | alert rules; operational settings |
 | Resource | `rahdar://clusters`, `rahdar://permissions`, `rahdar://tools` | what this key can see and do |
 | Resource | `cluster://{id}/topology`, `cluster://{id}/capabilities`, `cluster://{id}/nodes/{nodeId}/settings` | nodes; what the connection supports, with the `broker.xml` to enable what it does not; one node's effective settings |
-| Prompt | `triage_cluster`, `investigate_queue`, `before_you_purge`, `tune_scrape_load` | runbooks |
+| Prompt | `triage_cluster`, `investigate_subscription`, `before_you_purge`, `tune_scrape_load` | runbooks |
+
+## Resources, roles and systems
+
+A tool names a resource by its **canonical id**, such as `artemis.queue/orders`, the
+`id` that `list_resources` returns on every row, with the `kind` and `kindLabel` the
+system gives it. The arguments are named for what the resource is: `subscription`,
+`destination`, `resource` (a lifecycle target) and `target`. `list_resources` takes the
+`role` to list, one of `destination`, `subscription`, `route`, `connection`, `channel`,
+`consumer` and `producer`, and optionally one `kind` of it.
+
+A tool that exists for one broker system carries that system's id as a prefix:
+`artemis_config`, `artemis_config_change`, `artemis_config_diff`,
+`artemis_divert_lifecycle`, and `setup_review`. It is offered only to a key that can read
+a cluster of that system, and a call that names a cluster of another system is a tool
+error that says which system the cluster runs.
 
 ## The safety contract
 
@@ -104,7 +121,7 @@ boring and explicit. This one is:
   *live* grants on every call, so narrowing a person narrows their keys at once
   ([ADR-0046](/reference/adr/0046-mcp-authenticates-with-existing-api-tokens)).
 - **Mutations dry-run by default.** A real destructive run additionally requires
-  `confirm` to equal the queue's own name — separate from the bulk-cap
+  `confirm` to equal the subscription's or destination's own name — separate from the bulk-cap
   `override`, which answers a different question and is never satisfied by
   `confirm`.
 - **A configuration apply is the same contract at cluster scale.** The dry run

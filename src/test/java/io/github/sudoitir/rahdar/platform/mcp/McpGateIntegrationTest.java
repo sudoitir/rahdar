@@ -14,18 +14,22 @@ import io.github.sudoitir.rahdar.kernel.security.internal.persistence.RolePermis
 import io.github.sudoitir.rahdar.kernel.security.internal.persistence.RoleRepository;
 import io.github.sudoitir.rahdar.kernel.security.internal.persistence.UserRoleRepository;
 import io.github.sudoitir.rahdar.kernel.settings.SettingsService;
+import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterEntity;
+import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterRepository;
 import io.github.sudoitir.rahdar.support.McpFixture;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
@@ -61,6 +65,9 @@ class McpGateIntegrationTest extends PostgresIntegrationTest {
     @Autowired
     SettingsService settings;
 
+    @Autowired
+    ClusterRepository clusters;
+
     private MockMvc mvc;
 
     @BeforeEach
@@ -84,7 +91,7 @@ class McpGateIntegrationTest extends PostgresIntegrationTest {
 
         JsonNode help = McpFixture.callTool(mvc, key, McpToolCatalog.HELP_TOOL, Map.of());
         String index = help.path("result").path("content").get(0).path("text").asString();
-        assertThat(index).contains("list_resources").doesNotContain("queue_lifecycle", "diagnose");
+        assertThat(index).contains("list_resources").doesNotContain("resource_lifecycle", "diagnose");
 
         JsonNode init = McpFixture.rpc(
                 mvc,
@@ -99,7 +106,7 @@ class McpGateIntegrationTest extends PostgresIntegrationTest {
                         Map.of("name", "test", "version", "1")));
         assertThat(init.path("result").path("instructions").asString())
                 .contains("list_resources")
-                .doesNotContain("queue_lifecycle", "diagnose");
+                .doesNotContain("resource_lifecycle", "diagnose");
     }
 
     @Test
@@ -134,18 +141,55 @@ class McpGateIntegrationTest extends PostgresIntegrationTest {
         McpFixture.Key key = key(List.of());
         asAdmin(() -> settings.put(McpSettings.READ_ONLY, "true"));
 
-        assertThat(listedTools(key)).contains("list_resources").doesNotContain("queue_lifecycle", "message_action");
+        assertThat(listedTools(key)).contains("list_resources").doesNotContain("resource_lifecycle", "message_action");
 
         JsonNode refused = McpFixture.callTool(
                 mvc,
                 key,
-                "queue_lifecycle",
-                Map.of("clusterId", "x", "queue", "Q", "action", "purge", "dryRun", false, "confirm", "Q"));
+                "resource_lifecycle",
+                Map.of(
+                        "clusterId",
+                        "x",
+                        "resource",
+                        "artemis.queue/Q",
+                        "kind",
+                        "delete_subscription",
+                        "dryRun",
+                        false,
+                        "confirm",
+                        "Q"));
 
         assertThat(refused.path("result").path("isError").asBoolean()).isTrue();
         assertThat(refused.path("result").path("content").get(0).path("text").asString())
                 .contains("read-only");
-        assertThat(toolCalls("queue_lifecycle").getFirst().getOutcome()).isEqualTo("FAILURE");
+        assertThat(toolCalls("resource_lifecycle").getFirst().getOutcome()).isEqualTo("FAILURE");
+    }
+
+    @Test
+    void aSystemToolOnAClusterOfAnotherSystemIsAToolErrorAndIsAudited() throws Exception {
+        ClusterEntity entity = new ClusterEntity("gate-other-system", null, null);
+        ReflectionTestUtils.setField(entity, "system", "other");
+        UUID cluster = clusters.save(entity).getId();
+        try {
+            McpFixture.Key key = key(List.of());
+
+            JsonNode response =
+                    McpFixture.callTool(mvc, key, "artemis_config", Map.of("clusterId", cluster.toString()));
+
+            assertThat(response.path("result").path("isError").asBoolean())
+                    .describedAs("%s", response)
+                    .isTrue();
+            assertThat(response.path("result")
+                            .path("content")
+                            .get(0)
+                            .path("text")
+                            .asString())
+                    .isEqualTo("artemis_config applies to Artemis clusters; gate-other-system runs other.");
+            assertThat(toolCalls("artemis_config").getFirst().getOutcome()).isEqualTo("FAILURE");
+        } finally {
+            auditEvents.deleteAll();
+            clusters.deleteById(cluster);
+        }
     }
 
     private McpFixture.Key key(List<String> tools) {

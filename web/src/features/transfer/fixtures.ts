@@ -5,6 +5,13 @@ import { paged } from '../../kernel/api/paging.ts';
 
 /** Test fixtures for the transfer screens. Placeholder names only. */
 
+const SYSTEM = { id: 'artemis', name: 'Artemis' };
+
+const KINDS = [
+  { id: 'artemis.queue', resourceClass: 'SUBSCRIPTION', label: 'Queue', verbs: ['move-messages', 'retry-messages'] },
+  { id: 'artemis.address', resourceClass: 'DESTINATION', label: 'Address', verbs: [] },
+];
+
 export const AVAILABLE = { status: 'AVAILABLE', reason: 'ok', brokerXmlSnippet: null };
 
 export function endpoint(id: string, name: string, over: Record<string, unknown> = {}) {
@@ -56,6 +63,8 @@ export function clusterHandlers(
     name,
     description: null,
     topology: topologyOf(id),
+    system: SYSTEM,
+    kinds: KINDS,
     capabilities: {
       managementRead: AVAILABLE,
       managementWrite: AVAILABLE,
@@ -79,7 +88,7 @@ export function clusterHandlers(
         ]),
       ),
     ),
-    http.get('*/api/v1/clusters/:id/queues', () => HttpResponse.json({ items: [], total: 0 })),
+    http.get('*/api/v1/clusters/:id/subscriptions', () => HttpResponse.json({ items: [], total: 0 })),
   ];
 }
 
@@ -94,12 +103,12 @@ export function meHandler(permissions: string[] = ['*']) {
   );
 }
 
-export const END = (clusterId: string, nodeId: string, nodeName: string, queue: string) => ({
+export const END = (clusterId: string, nodeId: string, nodeName: string, subscription: string) => ({
   clusterId,
   nodeId,
   nodeName,
-  queue,
-  address: queue,
+  subscription: `artemis.queue/${subscription}`,
+  destination: `artemis.address/${subscription}`,
 });
 
 export function run(over: Partial<TransferRunView> = {}): TransferRunView {

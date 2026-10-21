@@ -6,7 +6,7 @@ import userEvent from '@testing-library/user-event';
 
 import { renderWithProviders } from '../../test/render.tsx';
 import { server } from '../../test/setup.ts';
-import type { CapabilityView, DivertView } from './api.ts';
+import type { CapabilityView, RouteView } from './api.ts';
 import { CreateDivertAction, DeleteDivertAction } from './DivertActions.tsx';
 
 const AVAILABLE: CapabilityView = { status: 'AVAILABLE', reason: 'ok', brokerXmlSnippet: null };
@@ -64,18 +64,16 @@ function outcome(dryRun: boolean) {
 
 const BROKER_XML = '<diverts>\n  <divert name="audit-copy">\n  </divert>\n</diverts>\n';
 
-const DIVERT: DivertView = {
+const DIVERT: RouteView = {
+  id: 'artemis.divert/audit-copy',
+  kind: 'artemis.divert',
+  kindLabel: 'Divert',
   name: 'audit-copy',
-  routingName: 'audit-copy',
-  address: 'ORDER.IN',
-  forwardingAddress: 'AUDIT.IN',
-  filter: null,
-  routingType: null,
-  transformerClassName: null,
-  exclusive: false,
-  retroactiveResource: false,
+  routeClass: 'FORWARD',
+  source: 'artemis.address/ORDER.IN',
+  target: 'artemis.address/AUDIT.IN',
+  nativeAttributes: { exclusive: 'false' },
   owner: 'OPERATOR',
-  captureSubscriptionId: null,
   nodesPresent: 1,
   nodesTotal: 1,
   perNode: [{ nodeId: 'n1', nodeName: 'node-a' }],
@@ -86,7 +84,7 @@ describe('creating a divert', () => {
     server.use(
       clusterHandler(),
       meHandler(),
-      http.post('*/api/v1/clusters/c1/diverts', () =>
+      http.post('*/api/v1/clusters/c1/artemis/diverts', () =>
         HttpResponse.json({ outcome: outcome(true), brokerXml: BROKER_XML }),
       ),
     );
@@ -130,7 +128,7 @@ describe('the divert form', () => {
     server.use(
       clusterHandler(),
       meHandler(),
-      http.post('*/api/v1/clusters/c1/diverts', () =>
+      http.post('*/api/v1/clusters/c1/artemis/diverts', () =>
         HttpResponse.json(
           {
             type: 'validation',
@@ -162,7 +160,7 @@ describe('the divert form', () => {
     server.use(
       clusterHandler(),
       meHandler(),
-      http.post('*/api/v1/clusters/c1/diverts', () =>
+      http.post('*/api/v1/clusters/c1/artemis/diverts', () =>
         HttpResponse.json({
           outcome: {
             ...outcome(true),
@@ -228,7 +226,7 @@ describe('deleting a divert', () => {
     server.use(
       clusterHandler(),
       meHandler(),
-      http.delete('*/api/v1/clusters/c1/diverts/audit-copy', ({ request }) =>
+      http.delete('*/api/v1/clusters/c1/artemis/diverts/audit-copy', ({ request }) =>
         HttpResponse.json(outcome(new URL(request.url).searchParams.get('dryRun') === 'true')),
       ),
     );
@@ -246,7 +244,7 @@ describe('deleting a divert', () => {
     server.use(
       clusterHandler(),
       meHandler(),
-      http.delete('*/api/v1/clusters/c1/diverts/audit-copy', () => HttpResponse.json(outcome(true))),
+      http.delete('*/api/v1/clusters/c1/artemis/diverts/audit-copy', () => HttpResponse.json(outcome(true))),
     );
     const user = userEvent.setup();
     renderWithProviders(<DeleteDivertAction clusterId="c1" divert={DIVERT} />);
@@ -267,7 +265,7 @@ describe('a divert delete that could not be previewed', () => {
     server.use(
       clusterHandler(),
       meHandler(),
-      http.delete('*/api/v1/clusters/c1/diverts/audit-copy', () =>
+      http.delete('*/api/v1/clusters/c1/artemis/diverts/audit-copy', () =>
         HttpResponse.json({ title: 'Preview failed', detail: 'node-a did not answer.' }, { status: 502 }),
       ),
     );
@@ -291,7 +289,7 @@ describe('a divert delete that could not be previewed', () => {
     server.use(
       clusterHandler(),
       meHandler(),
-      http.delete('*/api/v1/clusters/c1/diverts/audit-copy', ({ request }) =>
+      http.delete('*/api/v1/clusters/c1/artemis/diverts/audit-copy', ({ request }) =>
         HttpResponse.json(outcome(new URL(request.url).searchParams.get('dryRun') === 'true')),
       ),
     );

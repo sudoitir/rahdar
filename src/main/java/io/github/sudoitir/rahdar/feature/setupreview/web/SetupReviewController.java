@@ -17,7 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 /** A cluster's setup review (cluster-setup-review spec, ADR-0106). */
 @RestController
-@RequestMapping("/clusters/{clusterId}/setup-review")
+@RequestMapping("/clusters/{clusterId}/artemis/setup-review")
 @RequiredArgsConstructor
 public class SetupReviewController {
 
