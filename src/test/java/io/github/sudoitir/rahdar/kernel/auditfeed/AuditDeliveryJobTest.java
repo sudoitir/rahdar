@@ -90,7 +90,7 @@ class AuditDeliveryJobTest extends PostgresIntegrationTest {
     }
 
     private AuditEvent write(String name) {
-        AuditEvent event = audit.begin(Actor.system(), prefix + name, "TEST", name, null, null, Map.of(), false);
+        AuditEvent event = audit.begin(Actor.ofSystem(), prefix + name, "TEST", name, null, null, Map.of(), false);
         audit.succeed(event, 1);
         return event;
     }

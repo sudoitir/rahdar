@@ -83,7 +83,7 @@ class AuditServiceTransactionTest extends PostgresIntegrationTest {
     }
 
     private AuditEvent begin() {
-        return audit.begin(Actor.system(), "DELETE_MESSAGES", "QUEUE", "orders", null, null, Map.of(), false);
+        return audit.begin(Actor.ofSystem(), "DELETE_MESSAGES", "QUEUE", "orders", null, null, Map.of(), false);
     }
 
     private String outcome(Long id) {

@@ -345,7 +345,7 @@ public class CaptureReconciler {
 
     private void install(UUID clusterId, ClusterNode node, Desired desired) {
         AuditEvent event = audit.begin(
-                Actor.system(),
+                Actor.ofSystem(),
                 "INSTALL_CAPTURE",
                 "CAPTURE",
                 desired.name(),
@@ -433,7 +433,7 @@ public class CaptureReconciler {
     /** Whether the tap is gone from the node. A failure is audited and retried on the next pass. */
     private boolean removeOrphan(UUID clusterId, ClusterNode node, String name) {
         AuditEvent event = audit.begin(
-                Actor.system(), "REMOVE_CAPTURE", "CAPTURE", name, clusterId, node.getId(), Map.of(), false);
+                Actor.ofSystem(), "REMOVE_CAPTURE", "CAPTURE", name, clusterId, node.getId(), Map.of(), false);
         try {
             consumers.stop(node.getId(), name);
             tap.remove(clusterId, node.getId(), instance.id(), name);

@@ -375,7 +375,7 @@ class Executions {
     private void refuse(HeldRow row, String why) {
         ScopedValue.where(AuditScope.PARENT, row.requestAuditId())
                 .run(() -> audit.refused(
-                        Actor.system(),
+                        Actor.ofSystem(),
                         "HELD_OPERATION_REFUSED",
                         "HELD_OPERATION",
                         row.summary(),

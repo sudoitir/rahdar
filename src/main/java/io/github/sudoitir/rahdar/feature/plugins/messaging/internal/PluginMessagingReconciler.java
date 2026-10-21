@@ -242,7 +242,7 @@ public class PluginMessagingReconciler {
                     null);
         }
         AuditEvent event = audit.begin(
-                Actor.system(),
+                Actor.ofSystem(),
                 "INSTALL_PLUGIN_TAP",
                 "PLUGIN_TAP",
                 name,
@@ -328,7 +328,7 @@ public class PluginMessagingReconciler {
 
     private void removeTap(UUID clusterId, ClusterNode node, String name) {
         AuditEvent event = audit.begin(
-                Actor.system(), "REMOVE_PLUGIN_TAP", "PLUGIN_TAP", name, clusterId, node.getId(), Map.of(), false);
+                Actor.ofSystem(), "REMOVE_PLUGIN_TAP", "PLUGIN_TAP", name, clusterId, node.getId(), Map.of(), false);
         try {
             UUID registrationId = TapNames.registrationOf(name);
             if (registrationId != null) {

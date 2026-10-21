@@ -39,7 +39,7 @@ public class ActorResolver {
 
     /** For scheduler-originated audit rows. */
     public Actor system() {
-        return Actor.system();
+        return Actor.ofSystem();
     }
 
     private static RahdarPrincipal currentPrincipal() {

@@ -39,7 +39,7 @@ public class PluginIdentityRevalidation {
     /** One pass over every attached, verified provider; a provider or an account that fails is skipped until the next. */
     public void run() {
         // ponytail: one call per provider with every enabled subject; batch the subjects if one ever times out.
-        ScopedValue.where(ActorResolver.ON_BEHALF_OF, Actor.system()).run(() -> {
+        ScopedValue.where(ActorResolver.ON_BEHALF_OF, Actor.ofSystem()).run(() -> {
             for (PluginSignIn.Provider provider : signIn.verified()) {
                 revalidate(provider);
             }

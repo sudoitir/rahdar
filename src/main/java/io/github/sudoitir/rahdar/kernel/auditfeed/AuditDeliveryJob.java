@@ -240,7 +240,7 @@ class AuditDeliveryJob {
         AuditEvent event;
         try {
             event = audit.begin(
-                    Actor.system(),
+                    Actor.ofSystem(),
                     "AUDIT_GAP",
                     "PLUGIN",
                     gap.pluginId(),

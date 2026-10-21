@@ -52,7 +52,7 @@ public class Housekeeper {
         Instant now = clock.instant();
         Instant cutoff = now.minus(retention);
         AuditEvent event = audit.begin(
-                Actor.system(),
+                Actor.ofSystem(),
                 "PURGE_STORE",
                 "STORE",
                 store.id(),

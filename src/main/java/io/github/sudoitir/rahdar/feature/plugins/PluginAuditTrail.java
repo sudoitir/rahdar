@@ -63,7 +63,7 @@ class PluginAuditTrail implements PluginLifecycleListener {
         if (Actor.SYSTEM.equals(actor)) {
             // Boot: nobody asked, so the row is begun and finished here.
             AuditEvent boot = audit.begin(
-                    Actor.system(),
+                    Actor.ofSystem(),
                     "PLUGIN_" + step.toUpperCase(Locale.ROOT).replace('-', '_'),
                     "plugin",
                     pluginId,
