@@ -4,6 +4,7 @@ import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
 import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
 import io.github.sudoitir.rahdar.platform.broker.BrokerNotifications;
 import io.github.sudoitir.rahdar.platform.broker.BrokerSessions;
+import io.github.sudoitir.rahdar.platform.broker.BrokerSystems;
 import io.github.sudoitir.rahdar.platform.broker.DataPlaneCheck;
 import io.github.sudoitir.rahdar.platform.broker.NodeCallLimiter;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
@@ -52,4 +53,8 @@ class MetricsModuleTest extends ModuleIntegrationTest {
     /** The clusters module, a direct dependency, names each cluster's kinds. */
     @MockitoBean
     ClusterKinds clusterKinds;
+
+    /** The MCP module, a direct dependency, names the systems the broker module knows. */
+    @MockitoBean
+    BrokerSystems brokerSystems;
 }

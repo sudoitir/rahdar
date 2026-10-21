@@ -14,6 +14,7 @@ import io.github.sudoitir.rahdar.platform.clusters.ResourceTargets;
 import io.github.sudoitir.rahdar.platform.governance.ClearViewAudit;
 import io.github.sudoitir.rahdar.platform.governance.ContentPolicy;
 import io.github.sudoitir.rahdar.platform.mcp.McpProperties;
+import io.github.sudoitir.rahdar.platform.mcp.McpResources;
 import io.github.sudoitir.rahdar.platform.scrape.QueueLocator;
 import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshotUpsert;
 import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshots;
@@ -103,6 +104,10 @@ class BulkModuleTest extends ModuleIntegrationTest {
     /** The resources module's MCP tools read the MCP module's own settings. */
     @MockitoBean
     McpProperties mcpProperties;
+
+    /** ...and resolve a tool argument's resource through it. */
+    @MockitoBean
+    McpResources mcpResources;
 
     /** Message bodies reach a response only through the content policy. */
     @MockitoBean
