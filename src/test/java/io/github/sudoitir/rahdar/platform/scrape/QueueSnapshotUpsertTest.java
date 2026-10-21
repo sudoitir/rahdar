@@ -91,7 +91,7 @@ class QueueSnapshotUpsertTest extends PostgresIntegrationTest {
     }
 
     @Test
-    void reapStaleDeletesOnlyRowsOlderThanTheSweepStartForThatNode() throws Exception {
+    void reapStaleDeletesOnlyRowsOlderThanTheSweepStartForThatNode() {
         givenClusterAndNode();
 
         upsert.upsertBatch(List.of(row("OLD", 1)));
