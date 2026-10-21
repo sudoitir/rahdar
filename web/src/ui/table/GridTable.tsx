@@ -929,6 +929,7 @@ export function GridTable<T>({
         className={classes.scroll}
         data-overflow={model.overflow || undefined}
         data-capped={model.maxRows === undefined ? undefined : true}
+        data-empty={rowCount === 0 && !model.loading ? true : undefined}
         style={scrollStyle(model, selectable, hasMenu)}
         onScroll={(e) => {
           if (performance.now() > quietScrollUntil.current) {

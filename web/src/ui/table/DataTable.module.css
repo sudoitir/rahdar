@@ -123,6 +123,12 @@
   font-size: var(--mantine-font-size-sm);
 }
 
+/* No rows and nothing loading: the grid is only its header, so the empty message below it sits in the
+   table's body area instead of under a blank frame. */
+.scroll[data-empty] {
+  flex: 0 0 auto;
+}
+
 .scroll[data-capped] {
   flex: 0 1 auto;
   max-block-size: calc(var(--as-row-h) * (var(--as-max-rows) + 1));
