@@ -96,6 +96,7 @@
     "adm-zip": "0.6.1",
     "@module-federation/dts-plugin": {
       "undici": "7.29.1"
-    }
+    },
+    "handlebars": "4.7.10"
   }
 }
