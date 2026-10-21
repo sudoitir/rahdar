@@ -61,9 +61,8 @@ export function PluginsIntro() {
 function updatesSummary(checked: PluginUpdateView[]): string {
   if (checked.length === 0) return 'No installed plugin names an update URL to check.';
   const available = checked.filter((u) => u.availableVersion).length;
-  return available === 0
-    ? 'Every plugin with an update URL is up to date.'
-    : `${available} ${available === 1 ? 'update is' : 'updates are'} available.`;
+  if (available === 0) return 'Every plugin with an update URL is up to date.';
+  return `${available} ${available === 1 ? 'update is' : 'updates are'} available.`;
 }
 
 /**
