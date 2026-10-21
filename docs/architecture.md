@@ -13,7 +13,7 @@ startup toggle and the manifest entry.
 
 ```
                  ┌─────────────────────────── features ────────────────────────────┐
-                 │ queues  resources  messages  routing  metrics  alerting  events │
+                 │ resources          messages  routing  metrics  alerting  events │
                  │ rr  sql  brokerconfig  triage   apitokens  identity-local  -oidc │
                  └───────────────┬───────────────────────────────┬─────────────────┘
                                  │ api / events / SPI beans      │
@@ -132,12 +132,12 @@ a kernel root, navigation entries in one of the kernel's fixed groups (observe,
 messaging, resources, configuration, activity), palette groups, stream topic
 handlers, and slot contributions. Slots are kernel-owned places another feature's
 component appears: `shell.header`, `shell.navbar`, `home.empty`, `cluster.header`,
-`cluster.registration.afterProbe`, `queue.detail.panels`, `queues.selection`,
+`cluster.registration.afterProbe`, `subscription.detail.panels`, `subscriptions.selection`,
 `messages.selection`, `metrics.panels`, `flow.selection.panels`, `topology.node.marks`,
-`settings.sections`, `routing.tabs`, `admin.tabs`, `account.sections`. Row menus and links
-are slots too (ADR-0107): `<kind>.actions` for queue, address, connection, session,
-consumer, producer, message, divert and client, each item naming its section (Open, Copy,
-Operate, Destroy); and `<kind>.link` for queue, address, connection and session, which
+`settings.sections`, `routes.tabs`, `admin.tabs`, `account.sections`. Row menus and links
+are slots too (ADR-0107): `<kind>.actions` for subscription, destination, connection, channel,
+consumer, producer, message, route and client, each item naming its section (Open, Copy,
+Operate, Destroy); and `<kind>.link` for subscription, destination, connection and channel, which
 plugins may not contribute. Two tab slots list their tabs under fixed, kernel-owned group
 headings: `settings.sections` under `SETTINGS_GROUPS` (a plugin's always under Plugins), and
 `admin.tabs` under `ADMIN_GROUPS` (Access, Installation, Governance, Support), where every
@@ -260,7 +260,7 @@ A primary and its synced backup share one `NodeID` and are **one logical node**
 `(address, queueName, routingType)`: each row carries a per-node cell, rolled-up
 cluster totals, and `nodesPresent / nodesTotal`. A node whose last sweep is stale
 keeps its last numbers, flagged — never dropped. The other five views
-(addresses, consumers, sessions, connections, producers) are **live-through**:
+(destinations, consumers, channels, connections, producers) are **live-through**:
 one batched POST per serving node on demand, rows tagged with their logical node,
 merged / filtered / sorted / paged in memory. A node that errors contributes
 nothing; only when *every* node fails is the classified error surfaced (the
@@ -298,7 +298,7 @@ One SSE endpoint, `GET /api/v1/stream?clusterId=&topics=…`, multiplexes named
 events on a Spring MVC `SseEmitter` (ADR-0018; ADR-0010 removed WebFlux). Each
 module declares its topics in its descriptor; the endpoint drops a topic that is
 unknown or belongs to a disabled feature. Signal topics (`topology`, `health`,
-`queues`, `consumers`, `sessions`, `connections`, `alerts`, `rr`, `config`) carry
+`subscriptions`, `consumers`, `channels`, `connections`, `alerts`, `rr`, `config`) carry
 change *signals*, not data — the handler the owning frontend feature contributes
 invalidates the matching TanStack Query keys. The `events` topic is the exception
 (ADR-0027): it carries the `BrokerEvent` payload and an `id:` line (the
@@ -478,7 +478,7 @@ browser would not be a cap.
 security settings, diverts, bridges and queues live in the brokerconfig module's
 tables, versioned on every save. The screen is one desired-vs-live view (ADR-0087)
 whose tabs are Declared, History and Recommended. The routing builder (ADR-0090) is the
-Routing screen's Builder tab, contributed by brokerconfig through the `routing.tabs` slot
+Routing screen's Builder tab, contributed by brokerconfig through the `routes.tabs` slot
 (ADR-0094): it draws the declared and observed routing as an ELK-laid graph and edits the
 same document the Declared tab does, authoring a revision rather than writing to a broker,
 so both open the same editors and neither can drift from the other. Its apply is canary-first: a plan is computed per live node
