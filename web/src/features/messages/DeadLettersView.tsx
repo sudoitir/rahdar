@@ -98,7 +98,7 @@ export function DeadLettersView() {
   return (
     <Page fill>
       <PageHeader
-        title="Dead-letter subscriptions"
+        title="Dead letters"
         description="Subscriptions on the broker's dead-letter and expiry destinations that hold messages, with how many on each node."
       />
 

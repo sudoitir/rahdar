@@ -68,7 +68,7 @@ const QUEUE = {
 };
 
 describe('DeadLettersView', () => {
-  it('is one page named Dead-letter subscriptions, listing each subscription with its depth as a link to its messages', async () => {
+  it('is one page named Dead letters, listing each subscription with its depth as a link to its messages', async () => {
     signedInWith(['*']);
     dlq({
       settingsAvailable: true,
@@ -76,7 +76,7 @@ describe('DeadLettersView', () => {
     });
     renderWithProviders(<DeadLettersView />);
 
-    expect(await screen.findByRole('heading', { level: 1, name: 'Dead-letter subscriptions' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 1, name: 'Dead letters' })).toBeInTheDocument();
     expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
     const grid = await screen.findByRole('grid', { name: 'Dead-letter subscriptions' });
     expect(await within(grid).findByRole('link', { name: 'DLQ.orders' })).toHaveAttribute(
