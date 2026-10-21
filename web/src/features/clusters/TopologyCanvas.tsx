@@ -259,6 +259,13 @@ function moveTo(columns: string[][], key: string, id: string): string | null {
   return ids[row] ?? null;
 }
 
+/** Whether a box present in both position signatures (see {@link positionsOf}) is at a different place in the second. */
+function anyBoxMoved(beforeSignature: string, afterSignature: string): boolean {
+  const before = new Map<string, string>(JSON.parse(beforeSignature) as [string, string][]);
+  const after = JSON.parse(afterSignature) as [string, string][];
+  return after.some(([id, at]) => before.has(id) && before.get(id) !== at);
+}
+
 /**
  * The boxes and arrows, in React Flow's pane, with the canvas's own keyboard model. It is one tab stop:
  * arrow keys move between the boxes in their columns, Home and End go to the first and the last, Enter and
@@ -350,12 +357,10 @@ function Flow({
   // glide and fade back when the boxes arrive.
   const previousPositions = useRef(positions);
   useLayoutEffect(() => {
-    const before = new Map<string, string>(JSON.parse(previousPositions.current) as [string, string][]);
+    const before = previousPositions.current;
     previousPositions.current = positions;
     const frame = wrapper.current;
-    if (!frame || !settled || reducedMotion) return;
-    const after = JSON.parse(positions) as [string, string][];
-    if (!after.some(([id, at]) => before.has(id) && before.get(id) !== at)) return;
+    if (!frame || !settled || reducedMotion || !anyBoxMoved(before, positions)) return;
     frame.dataset.moving = '';
     const timer = setTimeout(() => delete frame.dataset.moving, motion.slow);
     return () => {
