@@ -177,12 +177,12 @@ async function main() {
   step("use the plugin's own API");
   const cluster = randomUUID();
   await expectStatus(
-    await call(api, 'POST', `/clusters/${cluster}/p/${ID}/queues/orders/notes`, { body: 'owned by payments' }),
+    await call(api, 'POST', `/clusters/${cluster}/p/${ID}/subscriptions/orders/notes`, { body: 'owned by payments' }),
     201,
     'add a note',
   );
   const notes = (await expectStatus(
-    await call(api, 'GET', `/clusters/${cluster}/p/${ID}/queues/orders/notes`),
+    await call(api, 'GET', `/clusters/${cluster}/p/${ID}/subscriptions/orders/notes`),
     200,
     'list notes',
   )) as unknown[];
@@ -237,7 +237,7 @@ async function main() {
   await expectStatus(await call(api, 'POST', `/admin/plugins/${ID}/rollback`), 202, 'rollback');
   await awaitPlugin(api, { status: 'active', version: '1.0.0' });
   const kept = (await expectStatus(
-    await call(api, 'GET', `/clusters/${cluster}/p/${ID}/queues/orders/notes`),
+    await call(api, 'GET', `/clusters/${cluster}/p/${ID}/subscriptions/orders/notes`),
     200,
     'notes after rollback',
   )) as unknown[];
@@ -246,7 +246,7 @@ async function main() {
   step('disable: its API is gone');
   await fresh(api, password);
   await expectStatus(await call(api, 'POST', `/admin/plugins/${ID}/disable`), 204, 'disable');
-  const gone = await call(api, 'GET', `/clusters/${cluster}/p/${ID}/queues/orders/notes`);
+  const gone = await call(api, 'GET', `/clusters/${cluster}/p/${ID}/subscriptions/orders/notes`);
   if (gone.status !== 404) throw new Error(`disabled plugin answered ${gone.status}`);
 
   step('disabled: its permissions leave the catalogue and the role keeps them');
