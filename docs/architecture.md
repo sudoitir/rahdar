@@ -131,7 +131,7 @@ A feature's `feature.ts` calls `defineFeature` with what it contributes: routes 
 a kernel root, navigation entries in one of the kernel's fixed groups (observe,
 messaging, resources, configuration, activity), palette groups, stream topic
 handlers, and slot contributions. Slots are kernel-owned places another feature's
-component appears: `shell.header`, `shell.navbar`, `home.empty`, `cluster.header`,
+component appears: `shell.header`, `shell.navbar`, `home.estate`, `cluster.header`,
 `cluster.registration.afterProbe`, `subscription.detail.panels`, `subscriptions.selection`,
 `messages.selection`, `metrics.panels`, `flow.selection.panels`, `topology.node.marks`,
 `settings.sections`, `routes.tabs`, `admin.tabs`, `account.sections`. Row menus and links
