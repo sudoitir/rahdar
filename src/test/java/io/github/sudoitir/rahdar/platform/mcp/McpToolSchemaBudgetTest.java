@@ -1,6 +1,8 @@
 package io.github.sudoitir.rahdar.platform.mcp;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 
 import io.github.sudoitir.rahdar.feature.apitokens.ApiTokenService;
@@ -17,8 +19,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
@@ -74,6 +78,18 @@ class McpToolSchemaBudgetTest extends PostgresIntegrationTest {
      * folding them into one string would hide which one a refusal is about.
      */
     private static final int PER_TOOL_TOKEN_BUDGET = 190;
+
+    /**
+     * A tool of one broker system is offered only to a caller who can read a cluster of it (ADR-0207), and the
+     * database is shared with the other tests of the run, so whether one exists would decide the listing.
+     */
+    @MockitoBean
+    McpSystems systems;
+
+    @BeforeEach
+    void everySystemHasAReadableCluster() {
+        when(systems.readsAny(anyString())).thenReturn(true);
+    }
 
     @Autowired
     WebApplicationContext webContext;
