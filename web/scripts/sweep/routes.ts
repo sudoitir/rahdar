@@ -96,6 +96,7 @@ const listing = (area: string, id: string, resource: string, api: string = resou
   path: cluster(resource),
   data: [paged(cluster(api))],
   filter: `?q=${NO_MATCH}`,
+  forbidden: true,
 });
 
 const ADMIN_TABS: { tab: string; data: DataCall[] }[] = [
