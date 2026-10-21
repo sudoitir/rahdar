@@ -10,7 +10,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Publishes {@code acme-notes:notes}, the notes left on each queue, which Rahdar samples on every
+ * Publishes {@code acme-notes:notes}, the notes left on each subscription, which Rahdar samples on every
  * scrape into its metrics, Prometheus and alert rules. The query reads an indexed column of a
  * small table; a source over anything slower would keep its counts in memory instead.
  */
@@ -30,7 +30,8 @@ public class NoteCounts implements PluginMetricSource {
     public Map<String, Double> sample(UUID clusterId) {
         Map<String, Double> counts = new HashMap<>();
         em.createQuery(
-                        "SELECT n.queue, count(n) FROM Note n WHERE n.clusterId = :cluster GROUP BY n.queue",
+                        "SELECT n.subscription, count(n) FROM Note n WHERE n.clusterId = :cluster"
+                                + " GROUP BY n.subscription",
                         Object[].class)
                 .setParameter("cluster", clusterId)
                 .getResultList()
@@ -44,5 +45,5 @@ public class NoteCounts implements PluginMetricSource {
     // as they stand now, and answers like an unknown cluster when they have none:
     //
     //   MetricSeriesResponse series = metricHistory.readPluginMetric(
-    //           actingUserId, clusterId, "acme-notes:notes", queue, from, to, null);
+    //           actingUserId, clusterId, "acme-notes:notes", subscription, from, to, null);
 }

@@ -26,7 +26,7 @@ class NotesStore implements HousekeepingContributor, ManagedStore {
     private static final String OLDER = "created_at < ?";
     private static final StoreDef DEF = new StoreDef(
             "notes",
-            "Queue notes",
+            "Subscription notes",
             List.of(TABLE),
             StoreDef.QuotaUnit.ROWS,
             Duration.ofDays(365),

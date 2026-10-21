@@ -7,7 +7,7 @@ import jakarta.persistence.Table;
 import java.time.Instant;
 import java.util.UUID;
 
-/** A note on a queue: {@code note} in the plugin's own schema (see db/changelog). */
+/** A note on a subscription: {@code note} in the plugin's own schema (see db/changelog). */
 @Entity
 @Table(name = "note")
 public class Note {
@@ -19,7 +19,7 @@ public class Note {
     private UUID clusterId;
 
     @Column(nullable = false)
-    private String queue;
+    private String subscription;
 
     @Column(nullable = false)
     private String author;
@@ -32,10 +32,10 @@ public class Note {
 
     protected Note() {}
 
-    Note(UUID clusterId, String queue, String author, String body, Instant createdAt) {
+    Note(UUID clusterId, String subscription, String author, String body, Instant createdAt) {
         this.id = UUID.randomUUID();
         this.clusterId = clusterId;
-        this.queue = queue;
+        this.subscription = subscription;
         this.author = author;
         this.body = body;
         this.createdAt = createdAt;
@@ -49,8 +49,8 @@ public class Note {
         return clusterId;
     }
 
-    public String getQueue() {
-        return queue;
+    public String getSubscription() {
+        return subscription;
     }
 
     public String getAuthor() {
