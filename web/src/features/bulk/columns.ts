@@ -3,7 +3,7 @@ import { createElement } from 'react';
 import { nameOf } from '../../kernel/api/resourceId.ts';
 import { absoluteLabel } from '../../kernel/time/time.ts';
 import { AUTO, localZone } from '../../kernel/time/timezone.ts';
-import type { Column } from '../../ui/table/index.ts';
+import { kindColumn, type Column } from '../../ui/table/index.ts';
 import type { BulkItemView, BulkRunView } from './api.ts';
 import { ItemOutcome, SubscriptionButton, RunLink, RunOutcome } from './cells.tsx';
 import { itemStatus, OPERATIONS, runStatus } from './words.ts';
@@ -78,6 +78,7 @@ export function itemColumns(destructive: boolean, onOpen: (subscription: string)
       kind: 'identifier',
       priority: 'essential',
     },
+    kindColumn<BulkItemView>(),
     {
       id: 'status',
       header: 'Outcome',
@@ -106,6 +107,7 @@ export function previewColumns(destructive: boolean): Column<BulkItemView>[] {
       kind: 'identifier',
       priority: 'essential',
     },
+    kindColumn<BulkItemView>(),
     ...(destructive ? [messagesColumn('messages')] : []),
     { id: 'nodes', header: 'Nodes', accessor: (i) => i.nodes.length, kind: 'number', priority: 'low' },
     {

@@ -30105,6 +30105,14 @@
             "type" : "string",
             "description" : "The subscription's id."
           },
+          "kind" : {
+            "type" : "string",
+            "description" : "The id of the subscription's kind, such as artemis.queue."
+          },
+          "kindLabel" : {
+            "type" : "string",
+            "description" : "The kind's name for people, such as Queue."
+          },
           "status" : {
             "type" : "string",
             "enum" : [ "PENDING", "REFUSED", "RUNNING", "SUCCEEDED", "PARTIAL", "FAILED", "SKIPPED", "CANCELLED", "UNKNOWN" ]
@@ -30140,7 +30148,7 @@
             "format" : "date-time"
           }
         },
-        "required" : [ "nodes", "ordinal", "status", "subscription" ]
+        "required" : [ "kind", "kindLabel", "nodes", "ordinal", "status", "subscription" ]
       },
       "BulkRunDetailView" : {
         "type" : "object",
@@ -35979,6 +35987,14 @@
             "type" : "string",
             "description" : "The subscription's id."
           },
+          "kind" : {
+            "type" : "string",
+            "description" : "The id of the subscription's kind, such as artemis.queue."
+          },
+          "kindLabel" : {
+            "type" : "string",
+            "description" : "The kind's name for people, such as Queue."
+          },
           "verdict" : {
             "type" : "string",
             "description" : "One of INSUFFICIENT_DATA, PAUSED, NO_CONSUMERS, BROKER_SLOW, STALLED, STARVED, FALLING_BEHIND, DRAINING, HEALTHY."
@@ -36066,7 +36082,7 @@
             "format" : "int32"
           }
         },
-        "required" : [ "cause", "consumers", "delivering", "depth", "destination", "nodesPresent", "nodesTotal", "paused", "scheduled", "severity", "source", "stale", "subscription", "verdict" ]
+        "required" : [ "cause", "consumers", "delivering", "depth", "destination", "kind", "kindLabel", "nodesPresent", "nodesTotal", "paused", "scheduled", "severity", "source", "stale", "subscription", "verdict" ]
       },
       "PagedViewConsumerHealthView" : {
         "type" : "object",

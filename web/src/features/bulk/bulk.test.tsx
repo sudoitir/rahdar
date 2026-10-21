@@ -81,6 +81,8 @@ function item(over: Partial<BulkItemView> = {}): BulkItemView {
   return {
     ordinal: 0,
     subscription: 'artemis.queue/orders.a',
+    kind: 'artemis.queue',
+    kindLabel: 'Queue',
     status: 'PENDING',
     error: null,
     warning: null,

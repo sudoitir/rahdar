@@ -4,6 +4,7 @@ import static io.swagger.v3.oas.annotations.media.Schema.RequiredMode.REQUIRED;
 
 import io.github.sudoitir.rahdar.feature.triage.ConsumerHealth;
 import io.github.sudoitir.rahdar.kernel.security.ResourceIdTexts.Of;
+import io.github.sudoitir.rahdar.platform.broker.ResourceIds;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
 
@@ -27,6 +28,12 @@ public final class TriageViews {
 
             @Schema(requiredMode = REQUIRED, description = "The subscription's id.")
             String subscription,
+
+            @Schema(requiredMode = REQUIRED, description = "The id of the subscription's kind, such as artemis.queue.")
+            String kind,
+
+            @Schema(requiredMode = REQUIRED, description = "The kind's name for people, such as Queue.")
+            String kindLabel,
 
             @Schema(
                     requiredMode = REQUIRED,
@@ -72,9 +79,12 @@ public final class TriageViews {
             @Schema(requiredMode = REQUIRED) int nodesTotal) {
 
         public static ConsumerHealthView of(Of ids, ConsumerHealth h) {
+            String subscription = ids.subscription(h.subscription());
             return new ConsumerHealthView(
                     ids.destination(h.destination()),
-                    ids.subscription(h.subscription()),
+                    subscription,
+                    ResourceIds.kindOf(subscription),
+                    ResourceIds.kindLabelOf(subscription),
                     h.verdict().name(),
                     h.verdict().severity(),
                     h.cause(),
