@@ -92,20 +92,24 @@ class GateCoverageTest extends PostgresIntegrationTest {
             Map.entry(
                     "feature.plugins.web.PluginAdminController.upload",
                     "stores a pending upload; plugin.activate-upload installs it"),
-            Map.entry("feature.resources.web.QueueLifecycleController.createAddress", "creates and removes nothing"),
-            Map.entry("feature.resources.web.QueueLifecycleController.createQueue", "creates and removes nothing"),
             Map.entry(
-                    "feature.resources.web.QueueLifecycleController.pauseQueue",
-                    "loses no message; pausing many queues at once is bulk.execute"),
+                    "feature.resources.web.ResourceLifecycleController.createDestination",
+                    "creates and removes nothing"),
             Map.entry(
-                    "feature.resources.web.QueueLifecycleController.resumeQueue",
-                    "loses no message; resuming many queues at once is bulk.execute"),
+                    "feature.resources.web.ResourceLifecycleController.createSubscription",
+                    "creates and removes nothing"),
             Map.entry(
-                    "feature.resources.web.QueueLifecycleController.resetCounter",
+                    "feature.resources.web.ResourceLifecycleController.pause",
+                    "loses no message; pausing many subscriptions at once is bulk.execute"),
+            Map.entry(
+                    "feature.resources.web.ResourceLifecycleController.resume",
+                    "loses no message; resuming many subscriptions at once is bulk.execute"),
+            Map.entry(
+                    "feature.resources.web.ResourceLifecycleController.resetCounters",
                     "resets a statistic and touches no message"),
             Map.entry(
-                    "feature.resources.web.QueueLifecycleController.updateQueue",
-                    "changes a queue's attributes and loses no message"),
+                    "feature.resources.web.ResourceLifecycleController.update",
+                    "changes a subscription's attributes and loses no message"),
             Map.entry(
                     "feature.routing.web.DivertController.createDivert",
                     "routing is outside the catalogue; a divert copies or moves messages and deletes none"),

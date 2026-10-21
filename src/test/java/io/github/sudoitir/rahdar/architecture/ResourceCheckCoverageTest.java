@@ -37,7 +37,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.stereotype.Service;
 
 /**
- * An operation that takes the name of a queue or an address decides, somewhere on its way, whether the caller
+ * An operation that takes the name of a subscription or a destination decides, somewhere on its way, whether the caller
  * may do it to that resource (resource-permissions spec): it calls a resource check ({@code
  * ClusterAccessGuard.requireResource} and its kin, {@code PermissionResolver.can} on a {@code ResourceRef}, a
  * {@code ResourceFilter}), or a method that does. A public method of a service, controller or tool that takes
@@ -164,9 +164,6 @@ class ResourceCheckCoverageTest {
             Map.entry(
                     "platform.governance.ContentPolicy.governForStorage",
                     "masks a message for storage, which is masked for everyone"),
-            Map.entry(
-                    "platform.mcp.McpRunbookPrompts",
-                    "returns a fixed procedure that repeats the name it was given; it reads nothing"),
             Map.entry("system.artemis.BridgeOperations", "broker primitive; RoutingService checks before it calls it"),
             Map.entry(
                     "feature.sql.CaptureConsumer",
@@ -207,7 +204,7 @@ class ResourceCheckCoverageTest {
     private record Subject(String id, boolean checked, boolean composite, boolean coversEachName, int sites) {}
 
     @Test
-    void everyMethodThatTakesAQueueOrAddressNameReachesAResourceCheck() {
+    void everyMethodThatTakesASubscriptionOrDestinationNameReachesAResourceCheck() {
         JavaClasses classes = new ClassFileImporter()
                 .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
                 .importPackages("io.github.sudoitir.rahdar");
