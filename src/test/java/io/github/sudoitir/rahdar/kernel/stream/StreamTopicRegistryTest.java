@@ -16,10 +16,10 @@ class StreamTopicRegistryTest {
 
     private static final FeatureRegistry BUILTIN_FEATURES = new FeatureRegistry(
             new InstalledFeatures(List.of(FeatureDescriptor.builder()
-                    .id("queues")
+                    .id("subscriptions")
                     .title("Queues")
                     .kind(FeatureDescriptor.Kind.FEATURE)
-                    .streamTopic(TopicDef.signal("queues"))
+                    .streamTopic(TopicDef.signal("subscriptions"))
                     .build())),
             new MockEnvironment(),
             event -> {});
@@ -34,18 +34,18 @@ class StreamTopicRegistryTest {
     @Test
     void addPluginAddsItsTopicsAndReplaysAndRemovePluginTakesThemBackOut() {
         StreamTopicRegistry registry = new StreamTopicRegistry(BUILTIN_FEATURES, List.of());
-        assertThat(registry.known()).containsExactly("queues");
+        assertThat(registry.known()).containsExactly("subscriptions");
 
         registry.addPlugin("acme-notes", List.of("acme-notes"), List.of(new FixedReplay("acme-notes")));
 
-        assertThat(registry.known()).containsExactlyInAnyOrder("queues", "acme-notes");
+        assertThat(registry.known()).containsExactlyInAnyOrder("subscriptions", "acme-notes");
         assertThat(registry.replays()).containsKey("acme-notes");
         // The built-in default subscription (no ?topics=) never silently picks up a plugin topic.
         assertThat(registry.defaultTopics()).doesNotContain("acme-notes");
 
         registry.removePlugin("acme-notes");
 
-        assertThat(registry.known()).containsExactly("queues");
+        assertThat(registry.known()).containsExactly("subscriptions");
         assertThat(registry.replays()).doesNotContainKey("acme-notes");
     }
 
@@ -53,6 +53,6 @@ class StreamTopicRegistryTest {
     void removingAPluginThatNeverAttachedIsANoOp() {
         StreamTopicRegistry registry = new StreamTopicRegistry(BUILTIN_FEATURES, List.of());
         registry.removePlugin("never-attached");
-        assertThat(registry.known()).containsExactly("queues");
+        assertThat(registry.known()).containsExactly("subscriptions");
     }
 }

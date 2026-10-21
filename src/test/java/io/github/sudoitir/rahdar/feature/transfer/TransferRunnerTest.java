@@ -365,8 +365,8 @@ class TransferRunnerTest {
         verify(sse, Mockito.atLeastOnce())
                 .publishAbout(eq(SRC_CLUSTER), eq("transfer"), progress.capture(), anyCollection(), anyCollection());
         assertThat(progress.getAllValues().getLast().delivered()).isEqualTo(5);
-        verify(sse).publishAbout(eq(SRC_CLUSTER), eq("queues"), anyCollection(), anyCollection());
-        verify(sse).publishAbout(eq(TGT_CLUSTER), eq("queues"), anyCollection(), anyCollection());
+        verify(sse).publishAbout(eq(SRC_CLUSTER), eq("subscriptions"), anyCollection(), anyCollection());
+        verify(sse).publishAbout(eq(TGT_CLUSTER), eq("subscriptions"), anyCollection(), anyCollection());
     }
 
     @Test
@@ -721,7 +721,7 @@ class TransferRunnerTest {
 
         assertThat(run.getState()).isEqualTo(TransferState.SUCCEEDED);
         assertThat(run.getDelivered()).isEqualTo(3);
-        verify(sse, times(1)).publishAbout(eq(SRC_CLUSTER), eq("queues"), anyCollection(), anyCollection());
+        verify(sse, times(1)).publishAbout(eq(SRC_CLUSTER), eq("subscriptions"), anyCollection(), anyCollection());
         verify(relay, never()).link(any(), any(), any());
     }
 
@@ -1121,8 +1121,8 @@ class TransferRunnerTest {
 
         execute();
 
-        verify(sse, times(1)).publishAbout(eq(SRC_CLUSTER), eq("queues"), anyCollection(), anyCollection());
-        verify(sse, never()).publishAbout(eq(TGT_CLUSTER), eq("queues"), anyCollection(), anyCollection());
+        verify(sse, times(1)).publishAbout(eq(SRC_CLUSTER), eq("subscriptions"), anyCollection(), anyCollection());
+        verify(sse, never()).publishAbout(eq(TGT_CLUSTER), eq("subscriptions"), anyCollection(), anyCollection());
     }
 
     @Test

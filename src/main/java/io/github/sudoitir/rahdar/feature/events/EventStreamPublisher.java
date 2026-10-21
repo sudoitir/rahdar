@@ -102,9 +102,9 @@ public class EventStreamPublisher implements BrokerEventPublisher {
             // authoritative over Rahdar's derived rule. It names the consumer, so unlike
             // the derived rule it attributes to a named consumer.
             case EventTypes.CONSUMER_ATTACHED, EventTypes.CONSUMER_DETACHED, EventTypes.CONSUMER_SLOW -> "consumers";
-            case EventTypes.CHANNEL_OPENED, EventTypes.CHANNEL_CLOSED -> "sessions";
+            case EventTypes.CHANNEL_OPENED, EventTypes.CHANNEL_CLOSED -> "channels";
             case EventTypes.CLIENT_CONNECTED, EventTypes.CLIENT_DISCONNECTED -> "connections";
-            case EventTypes.RESOURCE_CREATED, EventTypes.RESOURCE_DELETED -> "queues";
+            case EventTypes.RESOURCE_CREATED, EventTypes.RESOURCE_DELETED -> "subscriptions";
             default -> null;
         };
     }

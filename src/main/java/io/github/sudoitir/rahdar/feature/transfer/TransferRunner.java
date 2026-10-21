@@ -931,10 +931,13 @@ class TransferRunner {
             run.finish(end.state(), end.error(), end.snippet(), Instant.now());
             save(s);
             publish(s);
-            sse.publishAbout(run.getSourceClusterId(), "queues", sourceQueues(run), targetAddresses(run, true));
+            sse.publishAbout(run.getSourceClusterId(), "subscriptions", sourceQueues(run), targetAddresses(run, true));
             if (!run.getTargetClusterId().equals(run.getSourceClusterId())) {
                 sse.publishAbout(
-                        run.getTargetClusterId(), "queues", named(run.getTargetQueue()), targetAddresses(run, false));
+                        run.getTargetClusterId(),
+                        "subscriptions",
+                        named(run.getTargetQueue()),
+                        targetAddresses(run, false));
             }
         } catch (RunLost e) {
             lost = true;

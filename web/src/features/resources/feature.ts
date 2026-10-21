@@ -161,9 +161,9 @@ export const resourcesFeature = defineFeature({
   slots: resourceSlots,
   // The stream's topics keep the server's names; each invalidates the views of the role it concerns.
   streamTopics: {
-    queues: ({ clusterId, invalidate }) => invalidate(keys.topic(clusterId, 'subscriptions')),
+    subscriptions: ({ clusterId, invalidate }) => invalidate(keys.topic(clusterId, 'subscriptions')),
     consumers: ({ clusterId, invalidate }) => invalidate(keys.topic(clusterId, 'consumers')),
-    sessions: ({ clusterId, invalidate }) => invalidate(keys.topic(clusterId, 'channels')),
+    channels: ({ clusterId, invalidate }) => invalidate(keys.topic(clusterId, 'channels')),
     connections: ({ clusterId, invalidate }) => invalidate(keys.topic(clusterId, 'connections')),
   },
 });

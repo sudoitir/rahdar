@@ -45,7 +45,7 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class DivertLifecycleService {
 
-    private static final String QUEUES_TOPIC = "queues";
+    private static final String QUEUES_TOPIC = "subscriptions";
 
     private final SseHub sseHub;
     private final BrokerCommands commands;

@@ -288,10 +288,10 @@ public class SseHub {
         envelope.put("ts", Instant.now().toEpochMilli());
         if (frame.about() != null) {
             if (!frame.about().queues().isEmpty()) {
-                envelope.put("queues", frame.about().queues());
+                envelope.put("subscriptions", frame.about().queues());
             }
             if (!frame.about().addresses().isEmpty()) {
-                envelope.put("addresses", frame.about().addresses());
+                envelope.put("destinations", frame.about().addresses());
             }
         }
         return envelope;
