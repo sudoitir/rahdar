@@ -59,7 +59,7 @@ export function HoldToConfirm({
   const [holdMs] = useState(readHoldMs);
   const [hint, setHint] = useState<Hint>('idle');
   const [announce, setAnnounce] = useState('');
-  const keyTimer = useRef<number>(-1);
+  const keyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const keyHeld = useRef<string | null>(null);
   const inactive = disabled || loading;
 
@@ -86,8 +86,8 @@ export function HoldToConfirm({
   });
 
   const stopKey = () => {
-    window.clearTimeout(keyTimer.current);
-    keyTimer.current = -1;
+    if (keyTimer.current) globalThis.clearTimeout(keyTimer.current);
+    keyTimer.current = null;
     keyHeld.current = null;
   };
   useEffect(() => stopKey, []);
@@ -102,7 +102,7 @@ export function HoldToConfirm({
     if (inactive || event.repeat || keyHeld.current) return;
     keyHeld.current = event.key;
     begin();
-    keyTimer.current = window.setTimeout(() => {
+    keyTimer.current = globalThis.setTimeout(() => {
       keyHeld.current = null;
       confirm();
     }, holdMs);
