@@ -16,7 +16,6 @@ import { Toolbar } from '../../ui/Toolbar.tsx';
 import { useFlowGraph, type FlowGraphView, type FlowNodeView } from './api.ts';
 import { BrokerNodeNotices } from './BrokerNodeNotices.tsx';
 import { FlowCanvas } from './FlowCanvas.tsx';
-import { FlowInspector } from './FlowInspector.tsx';
 import { FlowKpis } from './FlowKpis.tsx';
 import { FlowMonitorPane } from './FlowMonitorPane.tsx';
 import { GROUP_LABELS, RANK_LABELS, totalRateLabel, unreachableNodes } from './flowFormat.ts';
@@ -610,15 +609,7 @@ function FlowPane({
         onSelect={onSelect}
         paused={paused}
         viewKey={viewKeyOf(search)}
-        inspector={(nodeId) => (
-          <FlowInspector
-            graph={data}
-            nodeId={nodeId}
-            clusterId={clusterId}
-            onClose={onCloseInspector}
-            onFocus={onFocusOn}
-          />
-        )}
+        inspector={{ onClose: onCloseInspector, onFocus: onFocusOn }}
       />
     );
   }

@@ -5,7 +5,6 @@ import {
   useMemo,
   useRef,
   useState,
-  type ReactNode,
   type RefObject,
 } from 'react';
 import {
@@ -30,6 +29,7 @@ import { ViewControls } from '../../ui/graph/ViewControls.tsx';
 import type { MenuAnchor } from '../../ui/table/menuAnchor.ts';
 import type { FlowGraphView } from './api.ts';
 import { FlowCanvasContext, type FlowCanvasState } from './canvasContext.ts';
+import { FlowInspector } from './FlowInspector.tsx';
 import { allocateDots } from './edgeEncoding.ts';
 import { FlowEdge } from './FlowEdge.tsx';
 import { DENSE_NODES, layoutSignature, pathThrough, reuseUnchanged, toReactFlow } from './flowLayout.ts';
@@ -253,8 +253,8 @@ export function FlowCanvas({
   paused: boolean;
   /** What the operator asked to see (focus, bound, ranking, layers); a change refits the next layout. */
   viewKey?: string;
-  /** Draws the inspector for a node. */
-  inspector?: (id: string) => ReactNode;
+  /** Shows the inspector over the canvas, with what it does when closed and when asked to focus on a node. */
+  inspector?: { onClose: () => void; onFocus: (focus: string) => void };
 }>) {
   const layout = useFlowLayout(graph);
   const wrapper = useRef<HTMLDivElement>(null);
@@ -456,7 +456,15 @@ export function FlowCanvas({
           >
             {(style) => (
               <div ref={covering} className={classes.inspector} style={style}>
-                {inspected ? inspector(inspected) : null}
+                {inspected ? (
+                  <FlowInspector
+                    graph={graph}
+                    nodeId={inspected}
+                    clusterId={clusterId}
+                    onClose={inspector.onClose}
+                    onFocus={inspector.onFocus}
+                  />
+                ) : null}
               </div>
             )}
           </Transition>
