@@ -20,6 +20,11 @@ cp deploy/compose/.env.example .env      # set DB_*, SECRET_KEY
 docker compose -f deploy/compose/compose.ha.yaml --env-file .env up -d
 ```
 
+Postgres and HAProxy read the files the stack mounts (`deploy/postgres/*`, `deploy/compose/ha/haproxy.cfg`)
+as their own users. A clone made under a strict umask (`077`) leaves them owner-only, and both then refuse to
+start with `Permission denied`, so every replica fails its database calls and nothing answers on port 8080.
+Make them readable with `chmod a+r deploy/postgres/* deploy/compose/ha/haproxy.cfg`; `just up` does this for you.
+
 `just up` runs this stack from a clone, with generated secrets. Rahdar is on `http://127.0.0.1:8080` (set `RAHDAR_BIND` to change it); Postgres is not published to the host. `just ha-failover` builds the image and runs the same failover test CI runs:
 it kills the replica that owns a cluster, then stops the other gracefully, and checks that no
 request fails during the graceful stop and no stream event is lost. The second replica starts after
