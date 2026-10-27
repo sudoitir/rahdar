@@ -25,6 +25,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.UnaryOperator;
 import java.util.stream.Stream;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.DisposableBean;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
@@ -39,6 +40,7 @@ import org.springframework.stereotype.Component;
  * <p>{@link #probe} is for addresses that are not registered nodes yet: a seed during registration or
  * discovery. Close what it returns.
  */
+@Slf4j
 @Component
 public class BrokerGateway implements DisposableBean {
 
@@ -62,9 +64,11 @@ public class BrokerGateway implements DisposableBean {
     private final BrokerTls tls;
     private final RahdarCallInterceptor interceptor;
     private final BrokerTimeouts timeouts;
+    private final BrokerTelemetry telemetry;
     private final Map<UUID, Held> clusters = new ConcurrentHashMap<>();
 
-    private record Held(ClusterConnection connection, ClusterSpec spec) {}
+    /** A cluster's connection, and the watch on its transport's links, closed with it. */
+    private record Held(ClusterConnection connection, ClusterSpec spec, AutoCloseable watch) {}
 
     public BrokerGateway(
             BrokerDrivers drivers,
@@ -72,13 +76,15 @@ public class BrokerGateway implements DisposableBean {
             ConnectionSettingsSource settings,
             BrokerTls tls,
             RahdarCallInterceptor interceptor,
-            BrokerTimeouts timeouts) {
+            BrokerTimeouts timeouts,
+            BrokerTelemetry telemetry) {
         this.drivers = drivers;
         this.directory = directory;
         this.settings = settings;
         this.tls = tls;
         this.interceptor = interceptor;
         this.timeouts = timeouts;
+        this.telemetry = telemetry;
     }
 
     /** The cluster's connection, following its registered nodes. */
@@ -86,11 +92,16 @@ public class BrokerGateway implements DisposableBean {
         ClusterSpec spec = specFor(clusterId);
         Held held = clusters.compute(clusterId, (id, existing) -> {
             if (existing == null) {
-                return new Held(drivers.connect(request(id, spec)), spec);
+                ClusterConnection connection = drivers.connect(request(id, spec));
+                AutoCloseable watch = connection
+                        .transport()
+                        .map(t -> t.watch(telemetry.listener(id)))
+                        .orElse(() -> {});
+                return new Held(connection, spec, watch);
             }
             if (!existing.spec().equals(spec)) {
                 existing.connection().reconfigure(spec);
-                return new Held(existing.connection(), spec);
+                return new Held(existing.connection(), spec, existing.watch());
             }
             return existing;
         });
@@ -104,8 +115,9 @@ public class BrokerGateway implements DisposableBean {
 
     /** Addresses reached with credentials and TLS given before the cluster exists. */
     public ProbeSession probe(BrokerConnectionSettings with) {
-        CredentialSource credentials =
-                plane -> with.hasCredentials() ? Credentials.of(with.username(), with.password()) : Credentials.none();
+        CredentialSource credentials = plane -> with.hasCredentials()
+                ? Credentials.usernamePassword(with.username(), with.password())
+                : new Credentials.None();
         return new ProbeSession(
                 spec -> drivers.connect(new ConnectRequest(SYSTEM, spec, credentials, options(tls.forCluster(with)))));
     }
@@ -115,8 +127,9 @@ public class BrokerGateway implements DisposableBean {
      * before an edit of its account is saved. Close it when the check ends.
      */
     public ClusterConnection dataPlane(List<NodeSpec> nodes, CoreConnectionSettings with) {
-        CredentialSource credentials =
-                plane -> with.hasCredentials() ? Credentials.of(with.username(), with.password()) : Credentials.none();
+        CredentialSource credentials = plane -> with.hasCredentials()
+                ? Credentials.usernamePassword(with.username(), with.password())
+                : new Credentials.None();
         TlsProvider dataTls = tls.forCluster(new BrokerConnectionSettings(
                 with.clusterId(), with.username(), with.password(), with.tlsBundle(), with.verifyHostname()));
         return drivers.connect(new ConnectRequest(SYSTEM, ClusterSpec.ofNodes(nodes), credentials, options(dataTls)));
@@ -125,6 +138,11 @@ public class BrokerGateway implements DisposableBean {
     /** A registered node, through its cluster's connection. */
     public BrokerTarget node(UUID clusterId, UUID nodeId) {
         return new BrokerTarget(cluster(clusterId), idOf(nodeId));
+    }
+
+    /** Names what a broker link is for, as diagnostics shows it (ADR-0211). */
+    public void label(String linkId, String owner) {
+        telemetry.label(linkId, owner);
     }
 
     /** The clusters this holds a connection for. */
@@ -136,6 +154,11 @@ public class BrokerGateway implements DisposableBean {
     public void forget(UUID clusterId) {
         Held held = clusters.remove(clusterId);
         if (held != null) {
+            try {
+                held.watch().close();
+            } catch (Exception e) {
+                log.debug("Closing the link watch of cluster {} failed: {}", clusterId, e.toString());
+            }
             held.connection().close();
         }
     }
@@ -169,11 +192,15 @@ public class BrokerGateway implements DisposableBean {
         CredentialSource credentials = plane -> switch (plane) {
             case MANAGEMENT -> {
                 BrokerConnectionSettings s = settings.jolokiaSettings(clusterId);
-                yield s.hasCredentials() ? Credentials.of(s.username(), s.password()) : Credentials.none();
+                yield s.hasCredentials()
+                        ? Credentials.usernamePassword(s.username(), s.password())
+                        : new Credentials.None();
             }
             case DATA -> {
                 CoreConnectionSettings s = settings.coreSettings(clusterId);
-                yield s.hasCredentials() ? Credentials.of(s.username(), s.password()) : Credentials.none();
+                yield s.hasCredentials()
+                        ? Credentials.usernamePassword(s.username(), s.password())
+                        : new Credentials.None();
             }
         };
         return new ConnectRequest(
@@ -190,7 +217,8 @@ public class BrokerGateway implements DisposableBean {
                 .withClock(Clock.systemUTC())
                 .withContextPropagation(UnaryOperator.identity())
                 .withSpoolDirectory(SPOOL)
-                .withTimeouts(timeouts);
+                .withTimeouts(timeouts)
+                .withObserver(telemetry.observer());
     }
 
     /** Spool files left by a Rahdar that stopped mid-relay are useless now. */

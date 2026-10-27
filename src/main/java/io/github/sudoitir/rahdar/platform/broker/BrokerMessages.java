@@ -10,15 +10,19 @@ import io.github.sudoitir.openbroker.messaging.Count;
 import io.github.sudoitir.openbroker.messaging.MessageAction;
 import io.github.sudoitir.openbroker.messaging.MessageField;
 import io.github.sudoitir.openbroker.messaging.MessageFilter;
+import io.github.sudoitir.openbroker.messaging.MessageHandler;
 import io.github.sudoitir.openbroker.messaging.MessageRef;
 import io.github.sudoitir.openbroker.messaging.OutboundMessage;
 import io.github.sudoitir.openbroker.messaging.Position;
-import io.github.sudoitir.openbroker.messaging.ReceiveOptions;
+import io.github.sudoitir.openbroker.messaging.Processor;
+import io.github.sudoitir.openbroker.messaging.ProcessorOptions;
 import io.github.sudoitir.openbroker.messaging.Receiver;
+import io.github.sudoitir.openbroker.messaging.ReceiverOptions;
 import io.github.sudoitir.openbroker.messaging.Selection;
 import io.github.sudoitir.openbroker.messaging.SendReceipt;
 import io.github.sudoitir.openbroker.messaging.SendTarget;
 import io.github.sudoitir.openbroker.messaging.Total;
+import io.github.sudoitir.openbroker.messaging.Transport;
 import io.github.sudoitir.openbroker.model.ResourceClass;
 import io.github.sudoitir.openbroker.model.ResourceId;
 import io.github.sudoitir.openbroker.model.Scope;
@@ -226,17 +230,38 @@ public class BrokerMessages {
     }
 
     /**
-     * A receiver on the queue on the node, for a drain that takes messages off it. The caller owns it
-     * and closes it. Its failures, opening it included, are the SDK's own {@link BrokerException}: a
-     * drain tells a lost connection from a queue that admits no more consumers by their reason.
+     * A receiver on the queue on the node, for a drain that takes messages off it, named {@code owner}
+     * in diagnostics. The caller owns it and closes it. Its failures, opening it included, are the
+     * SDK's own {@link BrokerException}: a drain tells a lost connection from a queue that admits no
+     * more consumers by their reason.
      */
-    public Receiver receiver(UUID clusterId, UUID nodeId, String queue, ReceiveOptions options) {
+    public Receiver receiver(UUID clusterId, UUID nodeId, String queue, ReceiverOptions options, String owner) {
         ClusterConnection c = gateway.cluster(clusterId);
+        Receiver receiver = transport(c, "receive messages over")
+                .receiver(queueId(c, queue), Scope.node(BrokerGateway.idOf(nodeId)), options);
+        gateway.label(receiver.id(), owner);
+        return receiver;
+    }
+
+    /**
+     * Runs {@code handler} on the queue's messages on the node, in the options' lanes, until the
+     * returned processor is closed; named {@code owner} in diagnostics. Failures, opening included,
+     * are the SDK's own {@link BrokerException}, as for {@link #receiver}.
+     */
+    public Processor process(
+            UUID clusterId, UUID nodeId, String queue, ProcessorOptions options, MessageHandler handler, String owner) {
+        ClusterConnection c = gateway.cluster(clusterId);
+        Processor processor = transport(c, "receive messages over")
+                .process(queueId(c, queue), Scope.node(BrokerGateway.idOf(nodeId)), options, handler);
+        gateway.label(processor.id(), owner);
+        return processor;
+    }
+
+    private static Transport transport(ClusterConnection c, String purpose) {
         return c.transport()
                 .orElseThrow(() -> new BrokerConnectionException(
                         BrokerConnectionException.Kind.UNREACHABLE,
-                        "This cluster has no data-plane connection to receive messages over."))
-                .receiver(queueId(c, queue), Scope.node(BrokerGateway.idOf(nodeId)), options);
+                        "This cluster has no data-plane connection to " + purpose + "."));
     }
 
     /** A move or copy's target: the queue of that name on the same system. */

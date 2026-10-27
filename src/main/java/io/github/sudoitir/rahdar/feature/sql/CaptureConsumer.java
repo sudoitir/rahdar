@@ -1,9 +1,14 @@
 package io.github.sudoitir.rahdar.feature.sql;
 
+import io.github.sudoitir.openbroker.BrokerException;
+import io.github.sudoitir.openbroker.Dispatch;
+import io.github.sudoitir.openbroker.ErrorReasons;
+import io.github.sudoitir.openbroker.Status;
 import io.github.sudoitir.openbroker.messaging.Disposition;
+import io.github.sudoitir.openbroker.messaging.Guarantee;
 import io.github.sudoitir.openbroker.messaging.Message;
-import io.github.sudoitir.openbroker.messaging.ReceiveOptions;
 import io.github.sudoitir.openbroker.messaging.Receiver;
+import io.github.sudoitir.openbroker.messaging.ReceiverOptions;
 import io.github.sudoitir.rahdar.feature.sql.QueryAst.Source;
 import io.github.sudoitir.rahdar.feature.sql.QueryResult.Row;
 import io.github.sudoitir.rahdar.platform.broker.BodyEncoding;
@@ -156,7 +161,8 @@ public class CaptureConsumer {
                 spec.clusterId(),
                 spec.nodeId(),
                 spec.captureQueue(),
-                ReceiveOptions.consume().asTransacted());
+                ReceiverOptions.consume().withGuarantee(Guarantee.TRANSACTED),
+                "capture " + spec.name());
         Drain drain = new Drain(spec, receiver);
         running.put(key, drain);
         drain.thread.set(Thread.ofVirtual().name("capture-" + spec.name()).start(drain::run));
@@ -260,10 +266,11 @@ public class CaptureConsumer {
         }
 
         /**
-         * Receive, store and commit until stopped; then store and commit what is held. A receiver
-         * that fails has lost its connection: the drain is forgotten, so the next reconcile pass
-         * installs it again and records the gap (message-capture spec), and what it held
-         * uncommitted is redelivered to the drain that replaces it.
+         * Receive, store and commit until stopped; then store and commit what is held. The broker
+         * SDK recovers a lost link on its own (ADR-0211), and receives nothing meanwhile. A receiver
+         * that fails anyway has lost its connection for good: the drain is forgotten, so the next
+         * reconcile pass installs it again and records the gap (message-capture spec), and what it
+         * held uncommitted is redelivered to the drain that replaces it.
          */
         void run() {
             try {
@@ -312,7 +319,15 @@ public class CaptureConsumer {
                     return;
                 }
             }
-            receiver.settle(message, Disposition.accept());
+            try {
+                receiver.settle(message, Disposition.accept());
+            } catch (BrokerException e) {
+                if (!ErrorReasons.DELIVERY_STALE.equals(e.reason())) {
+                    throw e;
+                }
+                // Received before the link recovered: the broker delivers it again.
+                return;
+            }
             batch.add(captured);
             bus.publish(new CaptureBus.Captured(
                     spec.clusterId(),
@@ -342,8 +357,21 @@ public class CaptureConsumer {
                 return false;
             }
             // Stored but not committed, should the commit fail: the broker redelivers, and the
-            // writer's redelivery guard stops the batch being stored twice.
-            receiver.commit();
+            // writer's redelivery guard stops the batch being stored twice. A commit the link's
+            // recovery aborted, or one left in doubt, is that same case, and the drain goes on.
+            try {
+                receiver.commit();
+            } catch (BrokerException e) {
+                if (e.status() != Status.ABORTED && e.dispatch() != Dispatch.IN_DOUBT) {
+                    throw e;
+                }
+                log.info(
+                        "Capture of {} on {}: the broker link recovered under a commit of {} message(s); the broker"
+                                + " redelivers whatever it did not take, and nothing is stored twice",
+                        spec.sourceAddress(),
+                        spec.nodeName(),
+                        batch.size());
+            }
             batch.clear();
             storeFailures = 0;
             return true;

@@ -2,8 +2,9 @@ package io.github.sudoitir.rahdar.platform.broker;
 
 import io.github.sudoitir.openbroker.BrokerException;
 import io.github.sudoitir.openbroker.ClusterConnection;
-import io.github.sudoitir.openbroker.messaging.ReceiveOptions;
+import io.github.sudoitir.openbroker.messaging.Guarantee;
 import io.github.sudoitir.openbroker.messaging.Receiver;
+import io.github.sudoitir.openbroker.messaging.ReceiverOptions;
 import io.github.sudoitir.openbroker.messaging.SendTarget;
 import io.github.sudoitir.openbroker.messaging.Sender;
 import io.github.sudoitir.openbroker.messaging.SenderOptions;
@@ -40,18 +41,26 @@ public class BrokerRelay {
         try {
             ClusterConnection from = gateway.cluster(source.clusterId());
             ClusterConnection to = gateway.cluster(target.clusterId());
-            ReceiveOptions options = route.staged() ? ReceiveOptions.consume().asTransacted() : browse(from, route);
-            Supplier<Receiver> receivers = () -> transport(from)
-                    .receiver(
-                            ResourceIds.of(from, ResourceClass.SUBSCRIPTION, route.sourceQueue()),
-                            Scope.node(BrokerGateway.idOf(source.nodeId())),
-                            options);
+            ReceiverOptions options = route.staged()
+                    ? ReceiverOptions.consume().withGuarantee(Guarantee.TRANSACTED)
+                    : browse(from, route);
+            String owner = "relay " + route.sourceQueue() + " to " + route.targetQueue();
+            Supplier<Receiver> receivers = () -> {
+                Receiver receiver = transport(from)
+                        .receiver(
+                                ResourceIds.of(from, ResourceClass.SUBSCRIPTION, route.sourceQueue()),
+                                Scope.node(BrokerGateway.idOf(source.nodeId())),
+                                options);
+                gateway.label(receiver.id(), owner);
+                return receiver;
+            };
             Sender sender = transport(to)
                     .sender(
                             SendTarget.subscription(
                                     ResourceIds.of(to, ResourceClass.SUBSCRIPTION, route.targetQueue())),
                             Scope.node(BrokerGateway.idOf(target.nodeId())),
-                            new SenderOptions(true));
+                            SenderOptions.defaults().withGuarantee(Guarantee.TRANSACTED));
+            gateway.label(sender.id(), owner);
             return new RelayLink(receivers, sender, route);
         } catch (BrokerException e) {
             throw new BrokerConnectionException(
@@ -59,8 +68,8 @@ public class BrokerRelay {
         }
     }
 
-    private static ReceiveOptions browse(ClusterConnection from, RelayLink.Route route) {
-        ReceiveOptions browse = ReceiveOptions.browse(BrokerMessages.filter(from, route.browseFilter()));
+    private static ReceiverOptions browse(ClusterConnection from, RelayLink.Route route) {
+        ReceiverOptions browse = ReceiverOptions.browse(BrokerMessages.filter(from, route.browseFilter()));
         return route.producedAtOrBefore().map(browse::producedAtOrBefore).orElse(browse);
     }
 

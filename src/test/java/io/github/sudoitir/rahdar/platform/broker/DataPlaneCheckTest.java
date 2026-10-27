@@ -25,7 +25,8 @@ class DataPlaneCheckTest extends ArtemisIntegrationTest {
             mock(ConnectionSettingsSource.class),
             new BrokerTls(mock(SslBundles.class)),
             mock(RahdarCallInterceptor.class),
-            new BrokerTimeouts(new BrokerProperties(Duration.ofSeconds(3), Duration.ofSeconds(10), 2_000))));
+            new BrokerTimeouts(new BrokerProperties(Duration.ofSeconds(3), Duration.ofSeconds(10), 2_000)),
+            BrokerTelemetry.none()));
 
     private static NodeEndpoint node(String core, String role, boolean active) {
         return new NodeEndpoint(

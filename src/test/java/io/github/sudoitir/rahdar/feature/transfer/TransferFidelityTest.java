@@ -111,7 +111,8 @@ class TransferFidelityTest extends TransferTestSupport {
             assertThat(m.getJMSTimestamp()).isEqualTo(s.timestamp());
             assertThat(m.getJMSExpiration()).isEqualTo(moved ? 0 : s.expiration());
             assertThat(m.getJMSPriority()).isEqualTo(s.priority());
-            assertThat(m.getJMSDeliveryMode()).isEqualTo(s.deliveryMode());
+            // A relay commits on the target, and a transacted message is durable: a non-durable one arrives durable.
+            assertThat(m.getJMSDeliveryMode()).isEqualTo(DeliveryMode.PERSISTENT);
             assertThat(m.getJMSCorrelationID()).isEqualTo("corr-" + i);
             assertThat(m.getJMSType()).isEqualTo("type-" + i);
             assertThat(m.getJMSReplyTo()).hasToString("ActiveMQQueue[replies." + sfx + "]");
