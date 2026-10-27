@@ -9,4 +9,4 @@ Rules: narrow tests only (`systemd-run --user --scope -q -p MemoryMax=3G -p Memo
 - [x] 2.3 Remove `WithoutPropagation`; `BrokerTelemetry` keeps the `BrokerLinks` listener joined with the starter's. `application.yml` sets `openbroker.tracing.inject-context: false` and `openbroker.spring-connections.enabled: false`, and the spool directory. Check: the telemetry test (a send is a span, the message is untouched, the meters are tagged with the cluster) and a context test that `spring.kafka.bootstrap-servers` creates no connection
 
 ## 3. Documents
-- [ ] 3.1 ADR-0212, the stale Jolokia wording of the broker timeouts in `BrokerProperties`, `application.yml` and Settings, and the `19e4-kafka` proposal's dependencies. Check: `openspec validate 19e2b-rahdar-on-the-openbroker-starter --strict`
+- [x] 3.1 ADR-0212, the stale Jolokia wording of the broker timeouts in `BrokerProperties`, `application.yml` and Settings, and the `19e4-kafka` proposal's dependencies. Check: `openspec validate 19e2b-rahdar-on-the-openbroker-starter --strict`
