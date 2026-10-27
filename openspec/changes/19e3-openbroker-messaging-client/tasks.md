@@ -3,22 +3,19 @@ Rules:
 - Read narrowly. Run only the tests a step touches; CI runs the rest.
 
 ## 1. Dependency raise
-- [ ] 1.1 Raise `openbroker.version` to `0.2.0` and fix compilation at every call site in the design's table. Check: `./mvnw -q -DskipTests compile`
+- [x] 1.1 Raise `openbroker.version` to `0.3.0`, add `openbroker-opentelemetry`, and migrate every call site in the design's table. Check: `BrokerRelayTest`, `RelayedMessagesTest`, `CaptureConsumerTest`, `BrokerMessagesTest`, `TimestampSelectorBrokerTest`, `DataPlaneCheckTest`, `DataPlaneTlsPerClusterTest`
 
 ## 2. Plugin consumers on processors
-- [ ] 2.1 `PluginDrains` opens SDK processors (lanes, group ordering, one unsettled message per lane, system retry). Check: the plugin messaging test classes pass unchanged
+- [x] 2.1 `PluginDrains` opens SDK processors (lanes, group ordering, one unsettled message per lane, system retry, counted release for a rejection) and stops without waiting on itself. Check: the plugin messaging test classes pass unchanged, plus a self-stop test that fails without the guard
 
-## 3. Relay, capture, sampling and sends
-- [ ] 3.1 `BrokerRelay` and `CaptureConsumer` on the transacted guarantee with the joined sender. Check: the relay and capture tests
-- [ ] 3.2 `RrSampler`, `BrokerMessages` and `MessageService` on the new receiver and sender options; in-doubt and resent receipts surface to callers and audit. Check: the message send and browse tests, plus a new in-doubt test
+## 3. Relay, capture and sends
+- [x] 3.1 `BrokerRelay` and `CaptureConsumer` on the transacted guarantee; capture carries on through an aborted or in-doubt commit. Check: the relay and capture tests
+- [x] 3.2 An unconfirmed send is in doubt in REST (202), the console, MCP, the plugin API and the audit (`IN_DOUBT`). Check: `BrokerMessagesInDoubtTest`, `MessageServiceTest`, `PluginSendInDoubtTest`, `AuditServiceTransactionTest`, `MessageMutationControllerTest`, the web send-dialog and audit tests, the OpenAPI snapshot
 
 ## 4. Recovery and telemetry
-- [ ] 4.1 A link listener records state changes with the serving node in diagnostics and metrics. Check: a test that restarts the test broker under a plugin consumer
-- [ ] 4.2 The SDK's OpenTelemetry observer when telemetry export is on. Check: the telemetry export test asserts messaging spans
+- [x] 4.1 `BrokerLinks` records link state with the node and owner as health, metrics and logs. Check: `BrokerLinksRecoveryTest` cuts the connection under a processor
+- [x] 4.2 The SDK's OpenTelemetry observer, never writing into a message. Check: `BrokerTelemetryTest`
 
 ## 5. Finish
-- [ ] 5.1 The ADR, and the docs pages that describe plugin consumer behaviour and diagnostics. Check: the docs build
-- [ ] 5.2 Push; CI green and the Sonar list empty. Check: the PR's checks
-
-## Workflow follow-up
-- Merge, `/opsx:archive`.
+- [x] 5.1 ADR-0211; the plugin, diagnostics and observability guides; the glossary. Check: `openspec validate --strict`
+- [x] 5.2 Push; CI green and the Sonar list empty. Check: the PR's checks

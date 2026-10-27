@@ -48,10 +48,15 @@ A trace follows an HTTP request or a background job run through everything it ca
 - each **Core** call (`core browse`, `core send`, and `core receiver.open`, `core sender.open`,
   `core receiver.commit` / `core sender.commit` for a drain or a transfer), tagged with the node and
   the operation;
+- each **messaging** operation of a long-lived broker link (a plugin consumer, a capture, a relay): a
+  send, a receive, a handler's processing and a settlement, named and tagged by the OpenTelemetry
+  messaging conventions (`messaging.system`, `messaging.destination.name`, `messaging.operation.type`);
 - each **job** run (`job <id>`), so a scrape tick is a root span with its Jolokia calls beneath it;
 - each **database** query, with its statement text and never its parameter values.
 
-Tracing inside the broker is out of scope: a span ends at Rahdar's side of the call.
+Tracing inside the broker is out of scope: a span ends at Rahdar's side of the call. Rahdar never
+writes trace context (`traceparent`) into a message: a message it sends, moves, retries or relays keeps
+exactly the properties its producer gave it, and a producer's own trace context is never overwritten.
 
 ## Nothing secret is exported
 
@@ -84,6 +89,8 @@ the same names. `node` is always the broker's `host:port`, never its URL.
 | `rahdar_broker_permit_wait_seconds_{count,sum,max}{node}` | Time requests waited for that node's rate ceiling. |
 | `rahdar_broker_permit_timeouts_total{node}` | Requests refused because the ceiling stayed full for 5 seconds. |
 | `rahdar_broker_core_seconds_{count,sum,max}{node,operation,error}` | Core transport calls. |
+| `rahdar_broker_links{state}` | Broker links (plugin consumers, captures, relays) by state: `open`, `recovering` or `failed`. A link that stays `recovering` has lost its node. |
+| `rahdar_broker_link_transitions_total{state}` | Broker link state changes, by the state entered. A rising `recovering` count is a flapping connection. |
 | `rahdar_rr_latency_seconds{cluster,address}` | Request-reply latency, with 0.5, 0.95 and 0.99 quantiles. |
 | `rahdar_stream_clients` | Event stream clients connected to this instance. |
 | `hikaricp_connections_{active,idle,max,pending}` | Rahdar's database pool. |

@@ -438,7 +438,10 @@ class Orders implements PluginMessageHandler {
   again at once, so releasing in a loop that keeps receiving only spins. It needs `message:read`
   and `subscription:purge` on the subscription.
 - **`send(OutboundMessage)`** sends a body, headers and properties to an address. It needs
-  `message:send` on the address.
+  `message:send` on the address. When the connection to the broker is lost after the message left and
+  before the broker confirmed it, `send` throws `MessageInDoubtException`: the message may or may not be
+  on the broker, and sending it again may deliver it twice. Give messages an id your consumers
+  recognise, or look for the message before sending it again.
 - **`checkSend(clusterId, address, actingUserId)`** answers why such a send would be refused (a
   reserved address, an unknown cluster, a missing `message:send`) without sending, so a plugin can
   reject a bad target when a user configures it. `send` still checks every message.
@@ -448,11 +451,11 @@ class Orders implements PluginMessageHandler {
   a permission, the registration is `SUSPENDED` and says why. It resumes when the permission
   returns.
 - **Concurrency.** A registration's `concurrency` is how many messages the handler gets at once on
-  each serving node: 1 to 32 for `CONSUME`, exactly 1 for `TAP`. Rahdar opens that many consumers
-  per node. Any other value is refused, with the reason.
-- **Flow control.** A `CONSUME` registration's consumers have no prefetch window (the Core client's
-  `consumerWindowSize=0`): the broker hands a consumer its next message only once the last one is
-  settled. At most `concurrency` messages per node are delivered and unsettled, the rest stay on the
+  each serving node: 1 to 32 for `CONSUME`, exactly 1 for `TAP`. Rahdar runs the registration as one
+  OpenBroker processor per node with that many lanes, each its own consumer. Any other value is refused,
+  with the reason.
+- **Flow control.** A `CONSUME` registration's lanes read nothing ahead and hold one unsettled message
+  each: the broker hands a lane its next message only once the last one is settled. At most `concurrency` messages per node are delivered and unsettled, the rest stay on the
   subscription for any other consumer, and a slow handler is simply handed fewer messages. Nothing
   buffers in Rahdar or in the plugin.
 - **Order.** With a concurrency above 1, messages are handled in parallel, so their order is not
@@ -463,7 +466,12 @@ class Orders implements PluginMessageHandler {
 - **Threads.** Rahdar calls the handler on a virtual thread of its own for each unit of the
   registration's `concurrency` on each node. A handler that blocks holds only that thread and its
   own consumer, never a thread message capture or an operator's session needs. Keep it bounded all
-  the same: a blocked handler takes no further message on its slot.
+  the same: a blocked handler takes no further message on its lane. A handler may unregister its own
+  registration; the stop does not wait for the handler that asked for it.
+- **A lost connection.** When the connection to a node is lost, Rahdar reconnects on its own, to the
+  node or to the member of its HA pair now serving it, and delivery goes on. A message the handler had
+  not settled when the connection was lost is delivered again, so handlers may see a message twice.
+  Diagnostics shows each consumer's link, its state and the node serving it.
 - Subscriptions under Rahdar's own prefixes and the broker's management addresses are refused.
 
 **`PluginSecrets`** stores named values encrypted with Rahdar's secret key: `put`, `get`, `delete`
