@@ -46,7 +46,7 @@ class BrokerMessagesInDoubtTest {
     void anUnconfirmedSendIsInDoubt() {
         sendFails(Dispatch.IN_DOUBT);
 
-        assertThatThrownBy(() -> send())
+        assertThatThrownBy(this::send)
                 .isInstanceOf(SendInDoubtException.class)
                 .hasMessageContaining("may or may not be on the broker");
     }
@@ -55,7 +55,7 @@ class BrokerMessagesInDoubtTest {
     void aSendThatNeverLeftIsAConnectionFailure() {
         sendFails(Dispatch.NOT_SENT);
 
-        assertThatThrownBy(() -> send()).isInstanceOf(BrokerConnectionException.class);
+        assertThatThrownBy(this::send).isInstanceOf(BrokerConnectionException.class);
     }
 
     private void send() {

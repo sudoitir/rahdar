@@ -65,7 +65,7 @@ class BrokerLinksRecoveryTest extends ArtemisIntegrationTest {
     }
 
     @Test
-    void aLostLinkIsRecordedRecoveringThenOpenOnItsNodeAndTheUnsettledMessageComesAgain() throws Exception {
+    void aLostLinkIsRecordedRecoveringThenOpenOnItsNodeAndTheUnsettledMessageComesAgain() {
         List<String> handled = new CopyOnWriteArrayList<>();
         ProcessorOptions options = new ProcessorOptions(
                 ReceiverOptions.consume().withFlow(FlowControl.none()),
