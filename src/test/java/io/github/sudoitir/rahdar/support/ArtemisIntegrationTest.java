@@ -105,7 +105,7 @@ public abstract class ArtemisIntegrationTest {
                 "artemis",
                 ClusterSpec.ofNodes(
                         List.of(new NodeSpec(NodeId.of(url), List.of(new Endpoint(Plane.MANAGEMENT, "jolokia", url))))),
-                CredentialSource.of(Credentials.of(BROKER_USER, BROKER_PASSWORD)),
+                CredentialSource.of(Credentials.usernamePassword(BROKER_USER, BROKER_PASSWORD)),
                 ConnectOptions.defaults()));
         return new BrokerTarget(connection, NodeId.of(url));
     }
@@ -127,7 +127,7 @@ public abstract class ArtemisIntegrationTest {
                         List.of(
                                 new Endpoint(Plane.MANAGEMENT, BrokerGateway.JOLOKIA, jolokiaUrl()),
                                 new Endpoint(Plane.DATA, BrokerGateway.CORE, core))))),
-                CredentialSource.of(Credentials.of(BROKER_USER, BROKER_PASSWORD)),
+                CredentialSource.of(Credentials.usernamePassword(BROKER_USER, BROKER_PASSWORD)),
                 ConnectOptions.defaults()));
     }
 

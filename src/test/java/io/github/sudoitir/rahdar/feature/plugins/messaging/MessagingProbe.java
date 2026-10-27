@@ -18,6 +18,8 @@ public final class MessagingProbe {
     public static final Map<String, Disposition> ANSWER = new ConcurrentHashMap<>();
     /** When present, a delivery waits for a permit before answering: a plugin that has stopped keeping up. */
     public static final Map<String, Semaphore> GATE = new ConcurrentHashMap<>();
+    /** When present, runs inside the handler before it answers, such as the plugin stopping its own registration. */
+    public static final Map<String, Runnable> ON_RECEIVE = new ConcurrentHashMap<>();
 
     public static final Map<String, PluginMessaging> MESSAGING = new ConcurrentHashMap<>();
     public static final Map<String, PluginSecrets> SECRETS = new ConcurrentHashMap<>();
@@ -33,6 +35,10 @@ public final class MessagingProbe {
         if (gate != null) {
             gate.acquireUninterruptibly();
         }
+        Runnable then = ON_RECEIVE.get(pluginId);
+        if (then != null) {
+            then.run();
+        }
         return answer;
     }
 
@@ -43,6 +49,7 @@ public final class MessagingProbe {
     public static void forget(String pluginId) {
         INBOX.remove(pluginId);
         ANSWER.remove(pluginId);
+        ON_RECEIVE.remove(pluginId);
         Semaphore gate = GATE.remove(pluginId);
         if (gate != null) {
             gate.release(10_000);

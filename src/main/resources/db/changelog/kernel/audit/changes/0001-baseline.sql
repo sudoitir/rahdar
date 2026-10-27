@@ -27,7 +27,7 @@ CREATE TABLE audit_event (
     cluster_id uuid,
     node_id uuid,
     dry_run boolean DEFAULT false NOT NULL,
-    CONSTRAINT ck_audit_event_outcome CHECK ((outcome = ANY (ARRAY['PENDING'::text, 'SUCCESS'::text, 'FAILURE'::text, 'REFUSED'::text])))
+    CONSTRAINT ck_audit_event_outcome CHECK ((outcome = ANY (ARRAY['PENDING'::text, 'SUCCESS'::text, 'FAILURE'::text, 'REFUSED'::text, 'IN_DOUBT'::text])))
 )
 PARTITION BY RANGE (ts);
 

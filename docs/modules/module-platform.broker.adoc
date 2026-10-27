@@ -22,11 +22,13 @@ _Others_
 
 * `i.g.s.r.p.b.BrokerCallGuard`
 * `i.g.s.r.p.b.BrokerConnections`
+* `i.g.s.r.p.b.BrokerLinks`
 * `i.g.s.r.p.b.BrokerMessages`
 * `i.g.s.r.p.b.BrokerNotifications`
 * `i.g.s.r.p.b.BrokerRelay`
 * `i.g.s.r.p.b.BrokerSettings`
 * `i.g.s.r.p.b.BrokerSystems`
+* `i.g.s.r.p.b.BrokerTelemetry`
 * `i.g.s.r.p.b.BrokerTimeouts`
 * `i.g.s.r.p.b.BrokerTls`
 * `i.g.s.r.p.b.ClockOffsetRegistry`

@@ -15,6 +15,7 @@ import io.github.sudoitir.openbroker.model.AttributeSchema;
 import io.github.sudoitir.openbroker.model.Attributes;
 import io.github.sudoitir.openbroker.model.Kind;
 import io.github.sudoitir.openbroker.model.KindId;
+import io.github.sudoitir.openbroker.model.KindLabel;
 import io.github.sudoitir.openbroker.model.MetricKeys;
 import io.github.sudoitir.openbroker.model.MetricValue;
 import io.github.sudoitir.openbroker.model.Resource;
@@ -164,6 +165,12 @@ public final class Targets {
 
     private static Kind kind(String id, ResourceClass resourceClass) {
         return new Kind(
-                KindId.of(id), resourceClass, Set.of(), Optional.empty(), new AttributeSchema(List.of()), Set.of());
+                KindId.of(id),
+                KindLabel.of(id, id + "s"),
+                resourceClass,
+                Set.of(),
+                Optional.empty(),
+                new AttributeSchema(List.of()),
+                Set.of());
     }
 }

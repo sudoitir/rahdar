@@ -70,12 +70,18 @@ export function SendMessage({
     send.mutate(
       { body: { kind, durable, body, headers: {}, properties }, node },
       {
-        onSuccess: () => {
-          notify.succeeded({ action: VERBS.send, subject: `a message to subscription "${subscriptionName}"` });
+        onSuccess: (result) => {
+          const subject = `a message to subscription "${subscriptionName}"`;
+          onClose();
+          if ('inDoubt' in result) {
+            // The message may or may not be there: keep what was typed, so sending it again after a look is one step.
+            notify.inDoubt({ action: VERBS.send, subject, detail: result.detail });
+            return;
+          }
+          notify.succeeded({ action: VERBS.send, subject });
           form.setFieldValue('body', '');
           form.setFieldValue('props', []);
           form.clearErrors();
-          onClose();
         },
         onError: (e) => announceFailure('send', `a message to subscription "${subscriptionName}"`, e),
       },

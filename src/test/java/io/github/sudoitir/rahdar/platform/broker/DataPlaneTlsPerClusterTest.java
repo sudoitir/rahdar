@@ -69,7 +69,8 @@ class DataPlaneTlsPerClusterTest {
                 mock(ConnectionSettingsSource.class),
                 new BrokerTls(bundles),
                 mock(RahdarCallInterceptor.class),
-                new BrokerTimeouts(new BrokerProperties(Duration.ofSeconds(5), Duration.ofSeconds(10), 2_000))));
+                new BrokerTimeouts(new BrokerProperties(Duration.ofSeconds(5), Duration.ofSeconds(10), 2_000)),
+                BrokerTelemetry.none()));
     }
 
     @AfterAll

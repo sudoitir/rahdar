@@ -6,12 +6,13 @@ import type { AuditEventView } from './api.ts';
 
 /**
  * The outcome in a word, and how much attention it needs: a failure is marked, and so is what is unfinished or
- * was refused for lack of a permission.
+ * was refused for lack of a permission, or in doubt because the broker's confirmation never came back.
  */
 export function outcome(o: string): { word: string; tone: 'neutral' | 'warning' | 'danger' } {
   if (o === 'SUCCESS') return { word: 'success', tone: 'neutral' };
   if (o === 'FAILURE') return { word: 'failure', tone: 'danger' };
   if (o === 'REFUSED') return { word: 'refused', tone: 'warning' };
+  if (o === 'IN_DOUBT') return { word: 'in doubt', tone: 'warning' };
   return { word: 'pending', tone: 'warning' };
 }
 

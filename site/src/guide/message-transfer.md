@@ -106,9 +106,10 @@ Nothing strands silently.
 ## What the target receives
 
 The body is copied verbatim, whatever its type, and a large message streams through disk rather
-than memory. Durability, priority, expiration, timestamp, user id, group id, correlation id,
-reply-to and every application property come across. Broker bookkeeping (`_AMQ_ORIG_*`,
-routing and delivery-count headers) does not.
+than memory. Priority, expiration, timestamp, user id, group id, correlation id, reply-to and every
+application property come across. Broker bookkeeping (`_AMQ_ORIG_*`, routing and delivery-count
+headers) does not. Every message arrives durable, a non-durable one included: it reaches the target in
+a transaction, and a transaction's messages survive a broker restart.
 
 Five properties are added, so a message can be traced back:
 `_rahdar_transfer_run`, `_rahdar_orig_message_id`, `_rahdar_orig_cluster`,

@@ -47,6 +47,11 @@ public class AuditRowWriter {
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void inDoubt(Long id, String reason) {
+        pending(id).ifPresent(row -> row.markInDoubt(reason));
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void failPartial(Long id, long affectedCount, String error) {
         pending(id).ifPresent(row -> row.markFailure(error, affectedCount));
     }

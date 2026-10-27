@@ -66,6 +66,8 @@ public final class PluginMessaging {
      * Send a message through a serving node of the cluster.
      *
      * @throws RegistrationRefusedException when the acting user lacks {@code message:send} on the target
+     * @throws MessageInDoubtException when the broker's confirmation never came back, so the message may
+     *     or may not have been delivered
      */
     public void send(OutboundMessage message) {
         service.send(pluginId, message);

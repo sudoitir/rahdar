@@ -35,7 +35,7 @@ holds.
 | --- | --- | --- |
 | About | `about.json` | Rahdar version, plugin contract, Java, OS, CPUs, memory, uptime, database, and the registered clusters (name, health, node count) |
 | Settings | `settings.json` | Every effective setting, and the secret-key status (provider, versions). Never a secret value |
-| Health | `health.json` | Every health check with its details |
+| Health | `health.json` | Every health check with its details, including `brokerLinks`: each broker link (a plugin consumer, a capture, a relay) that is not open, with its node, the node serving it and why it was lost, and the last 100 link state changes |
 | Features and plugins | `plugins.json` | Built-in features (enabled or not) and installed plugins with version, status and signature |
 | Thread dump | `threads.txt` | What every thread is doing |
 | Logs | `logs.txt` | The most recent log lines since Rahdar started, at most 5 000. Older lines are in the container log (`docker logs`) |

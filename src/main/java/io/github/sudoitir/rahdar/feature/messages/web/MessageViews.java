@@ -100,6 +100,18 @@ public final class MessageViews {
 
             @Schema(requiredMode = REQUIRED) UUID node) {}
 
+    /**
+     * A send whose outcome is unknown (HTTP 202): the message left, and the broker's confirmation never came
+     * back, so it may or may not be on the broker. Look for it before sending it again (ADR-0211).
+     *
+     * @param inDoubt always true, so a client can tell this from an affected count
+     * @param detail what happened and what to do next
+     */
+    public record InDoubtView(
+            @Schema(requiredMode = REQUIRED) boolean inDoubt,
+            @Schema(requiredMode = REQUIRED) String detail,
+            @Schema(requiredMode = REQUIRED) UUID node) {}
+
     /** The result of a mutation: the broker's own affected count (not a dry-run estimate). */
     public record AffectedView(
             @Schema(requiredMode = REQUIRED) long affectedCount,

@@ -4918,6 +4918,12 @@ export interface components {
                 [key: string]: unknown;
             };
         };
+        InDoubtView: {
+            inDoubt: boolean;
+            detail: string;
+            /** Format: uuid */
+            node: string;
+        };
         MessageActionRequest: {
             positions?: string[];
             filter?: string;
@@ -13509,6 +13515,15 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["AffectedView"] | components["schemas"]["DryRunView"] | components["schemas"]["PartialView"];
+                };
+            };
+            /** @description The message was sent, but the broker's confirmation never came back: it may or may not be on the broker. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["InDoubtView"];
                 };
             };
             /** @description Too many requests. Wait for Retry-After seconds. */

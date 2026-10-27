@@ -7,6 +7,7 @@ import type { components } from '../../kernel/api/schema.d.ts';
 type Schemas = components['schemas'];
 
 export type AffectedView = Schemas['AffectedView'];
+export type InDoubtView = Schemas['InDoubtView'];
 export type DeadLetterSubscription = Schemas['DeadLetterSubscription'];
 export type DeadLetterView = Schemas['DeadLetterView'];
 export type DryRunView = Schemas['DryRunView'];
@@ -122,7 +123,8 @@ export interface SendVars {
 export function useSendMessage(clusterId: string, subscriptionName: string) {
   const ids = useRoleIds(clusterId);
   const qc = useQueryClient();
-  return useMutation<AffectedView | DryRunView, ApiError, SendVars>({
+  // An InDoubtView (HTTP 202) is a send the broker never confirmed: it may be on the queue, so it refreshes too.
+  return useMutation<AffectedView | DryRunView | InDoubtView, ApiError, SendVars>({
     mutationFn: ({ body, node, dryRun }) =>
       request(`${messagesBase(clusterId, ids.subscription(subscriptionName))}${mutationQuery(node, dryRun)}`, {
         method: 'POST',

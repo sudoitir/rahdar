@@ -41,6 +41,7 @@ import io.github.sudoitir.rahdar.platform.broker.BulkCapExceededException;
 import io.github.sudoitir.rahdar.platform.broker.BulkResult;
 import io.github.sudoitir.rahdar.platform.broker.MessageExpiry;
 import io.github.sudoitir.rahdar.platform.broker.MessageKind;
+import io.github.sudoitir.rahdar.platform.broker.SendInDoubtException;
 import io.github.sudoitir.rahdar.platform.broker.SendNames;
 import io.github.sudoitir.rahdar.platform.broker.SentMessages;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
@@ -124,6 +125,12 @@ public class MessageService {
          * {@code notDone} holds every id that was not — refused, or never sent after {@code error}.
          */
         record Partial(long count, List<Long> notDone, String error, UUID node) implements Outcome {}
+
+        /**
+         * A send whose confirmation never came back: the message may or may not be on the broker, so it
+         * is neither a success nor a failure, and sending it again may duplicate it (ADR-0211).
+         */
+        record InDoubt(String detail, UUID node) implements Outcome {}
     }
 
     // ---- browse -----------------------------------------------------------
@@ -222,6 +229,11 @@ public class MessageService {
             audit.succeed(event, 1);
             publishQueuesAfterCommit(clusterId, queueName);
             return new Attempt.Ok<>(new Outcome.Affected(1, resolved.node().getId()));
+        } catch (SendInDoubtException e) {
+            audit.inDoubt(event, e.getMessage());
+            publishQueuesAfterCommit(clusterId, queueName);
+            return new Attempt.Ok<>(
+                    new Outcome.InDoubt(e.getMessage(), resolved.node().getId()));
         } catch (BrokerConnectionException e) {
             audit.fail(event, e.getMessage());
             return new Attempt.Failed<>(e.kind(), e.getMessage());

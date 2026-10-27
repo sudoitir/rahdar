@@ -21,7 +21,7 @@ Rahdar runs OpenBroker `0.1.0`, whose transport was incubating. `0.2.0` is OpenB
 Rahdar still runs its own receive loops for plugin consumers and relays on the old API. Adopting `0.2.0` now, before any new system arrives, means every later driver gets Rahdar's messaging features through the SDK's contract, not through Rahdar code written for Artemis.
 
 ## What Changes
-- Rahdar builds against OpenBroker `0.2.0`.
+- Rahdar builds against OpenBroker `0.3.0`, which includes `0.2.0`'s messaging client (the Kafka work needs `0.3.0` anyway).
 - Plugin consumers run as SDK processors. Their concurrency becomes processor lanes, their flow control the processor's credit, and their message-group ordering the SDK's group ordering scope. Plugin messaging's contract and behaviour are unchanged.
 - The relay, capture and request-reply sampling use the SDK's transacted guarantee and receiver options.
 - Sends report in-doubt and resent outcomes from the SDK's receipts.

@@ -12,8 +12,11 @@ import java.util.UUID;
  * consumers, with the broker's own bookkeeping left behind by the transport, plus where it came from.
  *
  * <ul>
- *   <li><b>Copied:</b> the body and its type, durability, priority, absolute expiration, timestamp, id,
- *       and every property, which keeps group, correlation, reply-to and last-value keys.
+ *   <li><b>Copied:</b> the body and its type, priority, absolute expiration, timestamp, id, and every
+ *       property, which keeps group, correlation, reply-to and last-value keys.
+ *   <li><b>Made durable:</b> the target receives it in a transaction, and the broker SDK sends every
+ *       transacted message durable (a non-durable one is refused), so a non-durable message arrives
+ *       durable (ADR-0211).
  *   <li><b>Added:</b> a duplicate-detection id {@code rahdar:<run>:<source message id>}, so a batch
  *       relayed twice is dropped by the target, and the {@code _rahdar_*} provenance properties.
  * </ul>
@@ -53,6 +56,7 @@ public final class RelayedMessages {
         return OutboundMessage.copyOf(source)
                 .withHeaders(source.headers().toBuilder()
                         .deduplicationId("rahdar:" + p.runId() + ":" + sourceId)
+                        .durable(null)
                         .build())
                 .withProperties(provenance);
     }

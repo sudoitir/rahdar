@@ -2,56 +2,59 @@ package io.github.sudoitir.rahdar.feature.plugins.messaging.internal;
 
 import io.github.sudoitir.openbroker.BrokerException;
 import io.github.sudoitir.openbroker.ErrorReasons;
-import io.github.sudoitir.openbroker.messaging.Message;
-import io.github.sudoitir.openbroker.messaging.ReceiveOptions;
-import io.github.sudoitir.openbroker.messaging.Receiver;
+import io.github.sudoitir.openbroker.messaging.FlowControl;
+import io.github.sudoitir.openbroker.messaging.LinkState;
+import io.github.sudoitir.openbroker.messaging.MessageContext;
+import io.github.sudoitir.openbroker.messaging.OrderingScope;
+import io.github.sudoitir.openbroker.messaging.Processor;
+import io.github.sudoitir.openbroker.messaging.ProcessorOptions;
+import io.github.sudoitir.openbroker.messaging.ReceiverOptions;
+import io.github.sudoitir.openbroker.messaging.RetryPolicy;
 import io.github.sudoitir.rahdar.feature.plugins.messaging.Disposition;
 import io.github.sudoitir.rahdar.feature.plugins.messaging.PluginMessage;
 import io.github.sudoitir.rahdar.feature.plugins.messaging.RegistrationMode;
 import io.github.sudoitir.rahdar.platform.broker.BrokerMessages;
 import java.time.Duration;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 /**
- * The receivers that deliver registrations' messages to plugins: one drain per registration and
- * node, with one slot per unit of the registration's concurrency (ADR-0111, ADR-0112).
+ * The broker SDK processors that deliver registrations' messages to plugins: one per registration and
+ * node, with one lane per unit of the registration's concurrency (ADR-0111, ADR-0112, ADR-0211).
  *
- * <p>Every slot is its own receiver, read on its own virtual thread, so settling one message
- * settles exactly the message just handled, the slots of a drain handle messages in parallel, and a
- * plugin that blocks holds only its own slot's thread. A slot has no prefetch, so it holds at most
- * the one message it is handling; the broker's message grouping keeps a group on one slot, in
- * order. A tap's copy is accepted whatever the handler said — the original never left its queue. A
- * consumed message is accepted only on {@link Disposition#ACCEPT}; a release hands it back
- * uncounted, and a rejection or an exception hands it back counted, so the broker redelivers it
- * within its own {@code max-delivery-attempts}. A drain that stops, or a Rahdar that dies, accepts
- * nothing it had not already settled, so what it held is redelivered.
+ * <p>Each lane holds at most the one message it is handling and reads nothing ahead, so a slow plugin
+ * is handed fewer messages and the rest wait on the subscription for other consumers. The lanes keep
+ * a message group in order, one message at a time. Retries are the broker's: a rejection or an
+ * exception hands the message back counted, so it is redelivered within the broker's own {@code
+ * max-delivery-attempts} and then dead-lettered by the broker; a release hands it back uncounted. A
+ * tap's copy is accepted whatever the handler said, since the original never left its queue. The SDK
+ * reopens a lost link on its own; a processor it gives up on is dropped here, and the next pass starts
+ * it again. A processor that stops, or a Rahdar that dies, accepts nothing it had not already settled,
+ * so what it held is redelivered.
  */
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class PluginDrains {
 
-    /** How long one receive waits; also how soon a slot sees its drain stop. */
-    private static final Duration POLL = Duration.ofMillis(500);
-
-    /** How long stopping a drain waits for a handler still running. */
+    /** How long stopping a drain waits for a handler still running; the rest goes back uncounted. */
     private static final Duration STOP_WAIT = Duration.ofSeconds(30);
+
+    /** Set while a lane runs a plugin's handler, so a stop asked from inside one never waits on itself. */
+    private static final ThreadLocal<Boolean> IN_HANDLER = new ThreadLocal<>();
 
     private final BrokerMessages messages;
     private final PluginHandlers handlers;
 
-    /** One drain's identity and what it reads. {@code source} is the queue the receivers open. */
+    /** One drain's identity and what it reads. {@code source} is the queue the processor opens. */
     record Spec(
             UUID registrationId,
             String pluginId,
@@ -74,59 +77,68 @@ public class PluginDrains {
         }
     }
 
+    /** A running drain: its spec and the processor delivering it. */
+    private record Drain(Spec spec, Processor processor) {}
+
     private final Map<String, Drain> running = new ConcurrentHashMap<>();
 
     private static String key(UUID registrationId, UUID nodeId) {
         return registrationId + "|" + nodeId;
     }
 
+    /** Whether the drain runs; one whose link the SDK gave up on is dropped, so the next pass restarts it. */
     boolean isRunning(UUID registrationId, UUID nodeId) {
-        return running.containsKey(key(registrationId, nodeId));
+        String key = key(registrationId, nodeId);
+        Drain drain = running.get(key);
+        if (drain == null) {
+            return false;
+        }
+        if (drain.processor().state() == LinkState.FAILED && running.remove(key, drain)) {
+            log.warn(
+                    "Plugin delivery of {} on {} lost its broker link for good and restarts on this pass",
+                    drain.spec().queue(),
+                    drain.spec().nodeName());
+            close(drain);
+            return false;
+        }
+        return true;
     }
 
-    /** How many slots a running drain has, or 0 when it is not running. */
+    /** How many lanes a running drain has, or 0 when it is not running. */
     int concurrency(UUID registrationId, UUID nodeId) {
         Drain drain = running.get(key(registrationId, nodeId));
-        return drain == null ? 0 : drain.slots.size();
+        return drain == null ? 0 : drain.spec().concurrency();
     }
 
     /** The registrations draining on a node. */
     Set<UUID> runningOn(UUID nodeId) {
         return running.values().stream()
-                .filter(d -> d.spec.nodeId().equals(nodeId))
-                .map(d -> d.spec.registrationId())
+                .filter(d -> d.spec().nodeId().equals(nodeId))
+                .map(d -> d.spec().registrationId())
                 .collect(Collectors.toSet());
     }
 
     Set<UUID> nodesOf(UUID registrationId) {
         return running.values().stream()
-                .filter(d -> d.spec.registrationId().equals(registrationId))
-                .map(d -> d.spec.nodeId())
+                .filter(d -> d.spec().registrationId().equals(registrationId))
+                .map(d -> d.spec().nodeId())
                 .collect(Collectors.toSet());
     }
 
-    /** Start draining, or do nothing if already draining. Every slot starts, or none does. */
-    void start(Spec spec) throws StartFailure {
-        if (running.containsKey(key(spec.registrationId(), spec.nodeId()))) {
+    /**
+     * Start draining, or do nothing if already draining. Every lane opens, or none does. Starts are serial, so
+     * two passes never both open a processor for one drain, which a queue's consumer limit would report as
+     * another replica delivering it.
+     */
+    synchronized void start(Spec spec) throws StartFailure {
+        String key = key(spec.registrationId(), spec.nodeId());
+        if (running.containsKey(key)) {
             return;
         }
-        Drain drain = new Drain(spec);
-        try {
-            for (int i = 0; i < spec.concurrency(); i++) {
-                drain.slots.add(openSlot(drain));
-            }
-        } catch (StartFailure e) {
-            drain.close();
-            throw e;
-        }
-        drain.slots.forEach(slot -> slot.thread.set(Thread.ofVirtual()
-                .name("plugin-" + spec.pluginId() + "-" + spec.key())
-                .start(slot::run)));
-        String key = key(spec.registrationId(), spec.nodeId());
-        running.put(key, drain);
-        if (drain.closed) {
-            // A slot failed as it started; the next pass tries again.
-            running.remove(key, drain);
+        Processor processor = open(spec);
+        if (running.putIfAbsent(key, new Drain(spec, processor)) != null) {
+            processor.close();
+            return;
         }
         log.info(
                 "Delivering {} of {} on {} to plugin {} ({}, {} at once)",
@@ -138,16 +150,21 @@ public class PluginDrains {
                 spec.concurrency());
     }
 
-    private Slot openSlot(Drain drain) throws StartFailure {
-        Spec spec = drain.spec;
+    private Processor open(Spec spec) throws StartFailure {
+        ProcessorOptions options = new ProcessorOptions(
+                ReceiverOptions.consume().withFlow(FlowControl.none()),
+                spec.concurrency(),
+                OrderingScope.GROUP,
+                RetryPolicy.system(),
+                STOP_WAIT);
         try {
-            return new Slot(
-                    drain,
-                    messages.receiver(
-                            spec.clusterId(),
-                            spec.nodeId(),
-                            spec.source(),
-                            ReceiveOptions.consume().withPrefetch(0)));
+            return messages.process(
+                    spec.clusterId(),
+                    spec.nodeId(),
+                    spec.source(),
+                    options,
+                    context -> deliver(spec, context),
+                    "plugin " + spec.pluginId() + "/" + spec.key());
         } catch (BrokerException e) {
             boolean elsewhere = ErrorReasons.MAX_CONSUMERS_REACHED.equals(e.reason());
             throw new StartFailure(
@@ -163,165 +180,101 @@ public class PluginDrains {
         }
     }
 
+    private io.github.sudoitir.openbroker.messaging.Disposition deliver(Spec spec, MessageContext context) {
+        Optional<Disposition> outcome;
+        IN_HANDLER.set(Boolean.TRUE);
+        try {
+            PluginMessage delivered = MessageConversion.toPlugin(
+                    spec.key(), spec.clusterId(), spec.nodeId(), spec.queue(), context.message());
+            outcome = handlers.deliver(spec.pluginId(), delivered);
+        } catch (Exception | LinkageError e) {
+            // The message's content is never logged: it is production payload.
+            log.warn(
+                    "Plugin {} failed on a message from {} ({}): {}",
+                    spec.pluginId(),
+                    spec.queue(),
+                    spec.key(),
+                    e.toString());
+            outcome = Optional.of(Disposition.REJECT);
+        } finally {
+            IN_HANDLER.remove();
+        }
+        // An empty outcome: the plugin is not receiving (it is being stopped), so the message goes back
+        // uncounted.
+        return settlement(spec.mode(), outcome.orElse(Disposition.RELEASE));
+    }
+
     void stop(UUID registrationId, UUID nodeId) {
         Drain drain = running.remove(key(registrationId, nodeId));
         if (drain != null) {
-            drain.close();
+            close(drain);
         }
     }
 
     /** Stop every drain of a registration, on every node. */
     public void stopRegistration(UUID registrationId) {
-        running.entrySet().removeIf(e -> {
-            if (!e.getValue().spec.registrationId().equals(registrationId)) {
-                return false;
-            }
-            e.getValue().close();
-            return true;
-        });
+        stopWhere(d -> d.spec().registrationId().equals(registrationId));
     }
 
     /** Stop every drain on a cluster, because this replica no longer owns it. */
     void stopCluster(UUID clusterId) {
-        running.entrySet().removeIf(e -> {
-            if (!e.getValue().spec.clusterId().equals(clusterId)) {
-                return false;
-            }
-            e.getValue().close();
-            return true;
-        });
+        stopWhere(d -> d.spec().clusterId().equals(clusterId));
     }
 
     /** Stop every drain delivering to a plugin, before its context closes. */
     void stopPlugin(String pluginId) {
+        stopWhere(d -> d.spec().pluginId().equals(pluginId));
+    }
+
+    private void stopWhere(Predicate<Drain> which) {
         running.entrySet().removeIf(e -> {
-            if (!e.getValue().spec.pluginId().equals(pluginId)) {
+            if (!which.test(e.getValue())) {
                 return false;
             }
-            e.getValue().close();
+            close(e.getValue());
             return true;
         });
+    }
+
+    /**
+     * Stop taking messages, wait for running handlers, and hand back what is left uncounted. Asked from
+     * inside a handler (a plugin stopping its own registration), it closes on another thread, since the
+     * processor would otherwise wait for the very handler asking.
+     */
+    private static void close(Drain drain) {
+        if (Boolean.TRUE.equals(IN_HANDLER.get())) {
+            Thread.ofVirtual().name("plugin-stop-" + drain.spec().key()).start(() -> closeQuietly(drain));
+            return;
+        }
+        closeQuietly(drain);
+    }
+
+    private static void closeQuietly(Drain drain) {
+        try {
+            drain.processor().close();
+        } catch (RuntimeException e) {
+            log.warn(
+                    "Stopping plugin delivery of {} on {} failed: {}",
+                    drain.spec().queue(),
+                    drain.spec().nodeName(),
+                    e.getMessage());
+        }
     }
 
     private static String reason(Exception e) {
         return e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
     }
 
-    /** One registration on one node: its slots, which stop together. */
-    private static final class Drain {
-
-        private final Spec spec;
-        private final List<Slot> slots = new ArrayList<>();
-        private volatile boolean closed;
-
-        Drain(Spec spec) {
-            this.spec = spec;
-        }
-
-        /**
-         * Stop taking messages on every slot, then wait for each to finish the message it is handling
-         * and close its receiver, which hands back whatever it holds unsettled.
-         */
-        void close() {
-            closed = true;
-            for (Slot slot : slots) {
-                slot.awaitStopped();
-            }
-        }
-    }
-
-    /** One receiver, read on its own thread: a message at a time. */
-    private final class Slot {
-
-        private final Drain drain;
-        private final Receiver receiver;
-        private final AtomicReference<Thread> thread = new AtomicReference<>();
-
-        Slot(Drain drain, Receiver receiver) {
-            this.drain = drain;
-            this.receiver = receiver;
-        }
-
-        void run() {
-            try {
-                while (!drain.closed) {
-                    for (Message message : receiver.receive(1, POLL)) {
-                        deliver(message);
-                    }
-                }
-            } catch (RuntimeException e) {
-                if (!drain.closed) {
-                    lost(e);
-                }
-            } finally {
-                receiver.close();
-            }
-        }
-
-        private void deliver(Message message) {
-            Spec spec = drain.spec;
-            Optional<Disposition> outcome;
-            try {
-                PluginMessage delivered =
-                        MessageConversion.toPlugin(spec.key(), spec.clusterId(), spec.nodeId(), spec.queue(), message);
-                outcome = handlers.deliver(spec.pluginId(), delivered);
-            } catch (Exception | LinkageError e) {
-                // The message's content is never logged: it is production payload.
-                log.warn(
-                        "Plugin {} failed on a message from {} ({}): {}",
-                        spec.pluginId(),
-                        spec.queue(),
-                        spec.key(),
-                        e.toString());
-                outcome = Optional.of(Disposition.REJECT);
-            }
-            if (outcome.isEmpty()) {
-                // The plugin is not receiving (it is being stopped); leave the message unsettled so
-                // closing this drain returns it to the broker.
-                return;
-            }
-            receiver.settle(message, settlement(spec.mode(), outcome.get()));
-        }
-
-        /** The slot lost its receiver: the drain ends, and the next pass starts it again. */
-        private void lost(RuntimeException failure) {
-            if (running.remove(key(drain.spec.registrationId(), drain.spec.nodeId()), drain)) {
-                log.warn(
-                        "Plugin delivery of {} on {} lost its broker connection and restarts on the next pass: {}",
-                        drain.spec.queue(),
-                        drain.spec.nodeName(),
-                        failure.getMessage());
-            }
-            drain.closed = true;
-        }
-
-        /** Wait for the slot's thread to leave its handler and close its receiver. */
-        void awaitStopped() {
-            Thread owner = thread.get();
-            if (owner == null) {
-                receiver.close();
-                return;
-            }
-            if (owner == Thread.currentThread()) {
-                return;
-            }
-            try {
-                if (!owner.join(STOP_WAIT)) {
-                    log.warn("A plugin drain on {} did not stop within {}", drain.spec.nodeName(), STOP_WAIT);
-                }
-            } catch (InterruptedException _) {
-                Thread.currentThread().interrupt();
-            }
-        }
-    }
-
-    /** A tap's copy is always accepted; a consumed message is settled as the plugin said. */
+    /**
+     * A tap's copy is always accepted. A consumed message is accepted, handed back uncounted on a
+     * release, or handed back counted on a rejection, so the broker redelivers it within its own
+     * delivery-attempt limit before it dead-letters it.
+     */
     static io.github.sudoitir.openbroker.messaging.Disposition settlement(RegistrationMode mode, Disposition outcome) {
         if (mode == RegistrationMode.TAP || outcome == Disposition.ACCEPT) {
             return io.github.sudoitir.openbroker.messaging.Disposition.accept();
         }
-        return outcome == Disposition.RELEASE
-                ? new io.github.sudoitir.openbroker.messaging.Disposition.Release(Optional.empty(), false)
-                : new io.github.sudoitir.openbroker.messaging.Disposition.Reject(Optional.empty());
+        return new io.github.sudoitir.openbroker.messaging.Disposition.Release(
+                Optional.empty(), outcome == Disposition.REJECT);
     }
 }

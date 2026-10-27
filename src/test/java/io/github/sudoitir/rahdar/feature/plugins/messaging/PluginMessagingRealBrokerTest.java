@@ -64,6 +64,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.jar.JarFile;
@@ -294,6 +295,27 @@ class PluginMessagingRealBrokerTest extends PostgresIntegrationTest {
         assertThat(again).isNotNull();
         assertThat(again.deliveryCount()).isGreaterThanOrEqualTo(2);
         assertThat(again.headers()).containsEntry("messageId", first.headers().get("messageId"));
+        awaitQueueCount(queue, 0);
+    }
+
+    @Test
+    void aPluginThatStopsItsOwnRegistrationFromItsHandlerDoesNotWaitOnItself() throws Exception {
+        String queue = queue("CONSUME");
+        String plugin = activate("consume");
+        CountDownLatch stopped = new CountDownLatch(1);
+        MessagingProbe.ON_RECEIVE.put(plugin, () -> {
+            messaging(plugin).unregister("work");
+            stopped.countDown();
+        });
+        messaging(plugin)
+                .register(new RegistrationSpec(
+                        "work", clusterId, ResourceRef.subscription(queue), RegistrationMode.CONSUME, 1, operator));
+
+        send(queue, 1, 16);
+
+        // A stop that waited for the handler asking for it would hold it for the whole stop grace (30 s).
+        assertThat(stopped.await(10, TimeUnit.SECONDS)).isTrue();
+        assertThat(MessagingProbe.inbox(plugin).poll(10, TimeUnit.SECONDS)).isNotNull();
         awaitQueueCount(queue, 0);
     }
 

@@ -246,6 +246,7 @@ describe('AuditView rows and states', () => {
           affectedCount: 50,
           targetName: 'orders.in',
         }),
+        row({ id: 4, username: 'cy', outcome: 'IN_DOUBT', action: 'SEND_MESSAGE', targetName: 'orders.out' }),
       ]),
     );
     renderWithProviders(<AuditView />);
@@ -254,6 +255,8 @@ describe('AuditView rows and states', () => {
     expect(await within(grid).findByText('success')).toBeInTheDocument();
     expect(within(grid).getByText('pending')).toBeInTheDocument();
     expect(within(grid).getByText('refused')).toBeInTheDocument();
+    // A send whose confirmation never came back is in doubt, never pending or a success.
+    expect(within(grid).getByText('in doubt')).toBeInTheDocument();
     expect(within(grid).getByText('50')).toBeInTheDocument();
     // The target is shortened in the middle, so the whole value, dry-run mark included, is read from one place.
     expect(within(grid).getByText('ORDERS · dry run')).toBeInTheDocument();
@@ -261,7 +264,7 @@ describe('AuditView rows and states', () => {
     expect(within(grid).getAllByText('—').length).toBeGreaterThanOrEqual(2);
     expect(within(grid).getByText('ann')).toBeInTheDocument();
     expect(within(grid).getByText('anonymous')).toBeInTheDocument();
-    expect(screen.getByText('1–3 of 3 audit events')).toBeInTheDocument();
+    expect(screen.getByText('1–4 of 4 audit events')).toBeInTheDocument();
   });
 
   it('teaches what is recorded here when no event matches', async () => {
