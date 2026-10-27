@@ -1,5 +1,6 @@
 package io.github.sudoitir.rahdar.platform.broker;
 
+import io.github.sudoitir.openbroker.NodeId;
 import io.github.sudoitir.openbroker.messaging.LinkEvent;
 import io.github.sudoitir.openbroker.messaging.LinkListener;
 import io.github.sudoitir.openbroker.messaging.LinkState;
@@ -36,7 +37,7 @@ import org.springframework.stereotype.Component;
 public class BrokerLinks extends AbstractHealthIndicator {
 
     /** How many recent state changes diagnostics shows. */
-    static final int RECENT = 100;
+    static final int MAX_RECENT = 100;
 
     /** One link, as last heard of. */
     public record Link(
@@ -146,7 +147,7 @@ public class BrokerLinks extends AbstractHealthIndicator {
                 owner,
                 clusterId,
                 event.node().value(),
-                event.servedBy().map(n -> n.value()).orElse(null),
+                event.servedBy().map(NodeId::value).orElse(null),
                 event.state(),
                 event.cause().map(Throwable::getMessage).orElse(null),
                 event.at());
@@ -159,7 +160,7 @@ public class BrokerLinks extends AbstractHealthIndicator {
             links.put(event.link(), link);
         }
         synchronized (recent) {
-            if (recent.size() == RECENT) {
+            if (recent.size() == MAX_RECENT) {
                 recent.removeLast();
             }
             recent.addFirst(link);
