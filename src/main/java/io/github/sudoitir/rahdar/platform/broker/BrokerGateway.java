@@ -10,11 +10,13 @@ import io.github.sudoitir.openbroker.Credentials;
 import io.github.sudoitir.openbroker.NodeId;
 import io.github.sudoitir.openbroker.NodeSpec;
 import io.github.sudoitir.openbroker.TlsProvider;
+import io.github.sudoitir.openbroker.spring.boot.autoconfigure.OpenBrokerConnectOptions;
+import io.github.sudoitir.openbroker.spring.boot.autoconfigure.OpenBrokerProperties;
+import io.github.sudoitir.openbroker.spring.boot.autoconfigure.SslBundleTls;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.time.Clock;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -23,7 +25,6 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.UnaryOperator;
 import java.util.stream.Stream;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.DisposableBean;
@@ -52,18 +53,12 @@ public class BrokerGateway implements DisposableBean {
 
     public static final String CORE = "core";
 
-    /**
-     * Where large message bodies are spooled while a relay or a drain holds them. Nothing needs one
-     * once Rahdar has restarted: a resumed run or a drain receives again.
-     */
-    static final Path SPOOL = Path.of(System.getProperty("java.io.tmpdir"), "rahdar-spool");
-
     private final BrokerDrivers drivers;
     private final NodeDirectory directory;
     private final ConnectionSettingsSource settings;
-    private final BrokerTls tls;
-    private final RahdarCallInterceptor interceptor;
-    private final BrokerTimeouts timeouts;
+    private final SslBundleTls tls;
+    private final OpenBrokerConnectOptions connectOptions;
+    private final OpenBrokerProperties brokerProperties;
     private final BrokerTelemetry telemetry;
     private final Map<UUID, Held> clusters = new ConcurrentHashMap<>();
 
@@ -74,16 +69,16 @@ public class BrokerGateway implements DisposableBean {
             BrokerDrivers drivers,
             NodeDirectory directory,
             ConnectionSettingsSource settings,
-            BrokerTls tls,
-            RahdarCallInterceptor interceptor,
-            BrokerTimeouts timeouts,
+            SslBundleTls tls,
+            OpenBrokerConnectOptions connectOptions,
+            OpenBrokerProperties brokerProperties,
             BrokerTelemetry telemetry) {
         this.drivers = drivers;
         this.directory = directory;
         this.settings = settings;
         this.tls = tls;
-        this.interceptor = interceptor;
-        this.timeouts = timeouts;
+        this.connectOptions = connectOptions;
+        this.brokerProperties = brokerProperties;
         this.telemetry = telemetry;
     }
 
@@ -95,7 +90,7 @@ public class BrokerGateway implements DisposableBean {
                 ClusterConnection connection = drivers.connect(request(id, spec));
                 AutoCloseable watch = connection
                         .transport()
-                        .map(t -> t.watch(telemetry.listener(id)))
+                        .map(t -> t.watch(telemetry.listener(id, directory.system(id))))
                         .orElse(() -> {});
                 return new Held(connection, spec, watch);
             }
@@ -118,8 +113,11 @@ public class BrokerGateway implements DisposableBean {
         CredentialSource credentials = plane -> with.hasCredentials()
                 ? Credentials.usernamePassword(with.username(), with.password())
                 : new Credentials.None();
-        return new ProbeSession(
-                spec -> drivers.connect(new ConnectRequest(SYSTEM, spec, credentials, options(tls.forCluster(with)))));
+        return new ProbeSession(spec -> drivers.connect(new ConnectRequest(
+                SYSTEM,
+                spec,
+                credentials,
+                options(with.clusterId(), SYSTEM, tls(with.hasTls(), with.tlsBundle(), with.verifyHostname())))));
     }
 
     /**
@@ -130,9 +128,9 @@ public class BrokerGateway implements DisposableBean {
         CredentialSource credentials = plane -> with.hasCredentials()
                 ? Credentials.usernamePassword(with.username(), with.password())
                 : new Credentials.None();
-        TlsProvider dataTls = tls.forCluster(new BrokerConnectionSettings(
-                with.clusterId(), with.username(), with.password(), with.tlsBundle(), with.verifyHostname()));
-        return drivers.connect(new ConnectRequest(SYSTEM, ClusterSpec.ofNodes(nodes), credentials, options(dataTls)));
+        TlsProvider dataTls = tls(with.hasTls(), with.tlsBundle(), with.verifyHostname());
+        return drivers.connect(new ConnectRequest(
+                SYSTEM, ClusterSpec.ofNodes(nodes), credentials, options(with.clusterId(), SYSTEM, dataTls)));
     }
 
     /** A registered node, through its cluster's connection. */
@@ -203,33 +201,37 @@ public class BrokerGateway implements DisposableBean {
                         : new Credentials.None();
             }
         };
+        String system = directory.system(clusterId);
+        BrokerConnectionSettings tlsSettings = settings.jolokiaSettings(clusterId);
         return new ConnectRequest(
-                directory.system(clusterId),
+                system,
                 spec,
                 credentials,
-                options(tls.forCluster(settings.jolokiaSettings(clusterId))));
+                options(
+                        clusterId,
+                        system,
+                        tls(tlsSettings.hasTls(), tlsSettings.tlsBundle(), tlsSettings.verifyHostname())));
     }
 
-    private ConnectOptions options(TlsProvider clusterTls) {
-        return ConnectOptions.defaults()
-                .withInterceptor(interceptor)
-                .withTls(clusterTls)
-                .withClock(Clock.systemUTC())
-                .withContextPropagation(UnaryOperator.identity())
-                .withSpoolDirectory(SPOOL)
-                .withTimeouts(timeouts)
-                .withObserver(telemetry.observer());
+    private ConnectOptions options(UUID clusterId, String system, TlsProvider clusterTls) {
+        return connectOptions.forConnection(clusterId.toString(), system, clusterTls);
+    }
+
+    /** The cluster's TLS from its SSL bundle (ADR-0009): none when it names no bundle. */
+    private TlsProvider tls(boolean enabled, String bundle, boolean verifyHostname) {
+        return enabled ? tls.forBundle(bundle, verifyHostname) : TlsProvider.none();
     }
 
     /** Spool files left by a Rahdar that stopped mid-relay are useless now. */
     @EventListener(ApplicationReadyEvent.class)
     void sweepSpool() {
-        if (!Files.exists(SPOOL)) {
+        Path spool = brokerProperties.client().spoolDirectory();
+        if (spool == null || !Files.exists(spool)) {
             return;
         }
-        try (Stream<Path> paths = Files.walk(SPOOL)) {
+        try (Stream<Path> paths = Files.walk(spool)) {
             paths.sorted(Comparator.reverseOrder())
-                    .filter(p -> !p.equals(SPOOL))
+                    .filter(p -> !p.equals(spool))
                     .forEach(p -> {
                         try {
                             Files.deleteIfExists(p);
@@ -238,7 +240,7 @@ public class BrokerGateway implements DisposableBean {
                         }
                     });
         } catch (IOException e) {
-            throw new UncheckedIOException("Could not sweep the large-message spool " + SPOOL, e);
+            throw new UncheckedIOException("Could not sweep the large-message spool " + spool, e);
         }
     }
 }
