@@ -63,6 +63,7 @@ import io.github.sudoitir.rahdar.platform.broker.BulkCapExceededException;
 import io.github.sudoitir.rahdar.platform.broker.BulkResult;
 import io.github.sudoitir.rahdar.platform.broker.MessageExpiry;
 import io.github.sudoitir.rahdar.platform.broker.MessageKind;
+import io.github.sudoitir.rahdar.platform.broker.SendInDoubtException;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
 import io.github.sudoitir.rahdar.platform.governance.ClearViewAudit;
@@ -483,6 +484,23 @@ class MessageServiceTest {
                 .isEqualTo(new Attempt.Failed<Outcome>(BrokerConnectionException.Kind.CREDENTIALS_REJECTED, "denied"));
         verify(audit).fail(event, "denied");
         verify(hub, never()).publishAbout(any(UUID.class), anyString(), anyCollection(), anyCollection());
+    }
+
+    @Test
+    void aSendWhoseConfirmationNeverCameBackIsInDoubtNeverSentOrFailed() {
+        doThrow(new SendInDoubtException("no confirmation", null))
+                .when(messages)
+                .sendTo(any(), any(), any(), any());
+
+        Attempt<Outcome> result = service.send(CLUSTER, "orders", null, sendRequest(), false);
+
+        assertThat(result)
+                .isInstanceOfSatisfying(
+                        Attempt.Ok.class,
+                        ok -> assertThat(ok.value()).isEqualTo(new Outcome.InDoubt("no confirmation", NODE_B)));
+        verify(audit).inDoubt(event, "no confirmation");
+        verify(audit, never()).succeed(any(), anyLong());
+        verify(audit, never()).fail(any(), anyString());
     }
 
     @Test

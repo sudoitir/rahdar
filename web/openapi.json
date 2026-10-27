@@ -8935,6 +8935,16 @@
               }
             }
           },
+          "202" : {
+            "description" : "The message was sent, but the broker's confirmation never came back: it may or may not be on the broker.",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/InDoubtView"
+                }
+              }
+            }
+          },
           "4XX" : {
             "description" : "Client error",
             "content" : {
@@ -29910,6 +29920,22 @@
           }
         },
         "required" : [ "durable", "kind" ]
+      },
+      "InDoubtView" : {
+        "type" : "object",
+        "properties" : {
+          "inDoubt" : {
+            "type" : "boolean"
+          },
+          "detail" : {
+            "type" : "string"
+          },
+          "node" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        },
+        "required" : [ "detail", "inDoubt", "node" ]
       },
       "MessageActionRequest" : {
         "type" : "object",

@@ -8,6 +8,7 @@ import io.github.sudoitir.rahdar.feature.messages.web.MessageRequests.MessageAct
 import io.github.sudoitir.rahdar.feature.messages.web.MessageRequests.SendMessageRequest;
 import io.github.sudoitir.rahdar.feature.messages.web.MessageViews.AffectedView;
 import io.github.sudoitir.rahdar.feature.messages.web.MessageViews.DryRunView;
+import io.github.sudoitir.rahdar.feature.messages.web.MessageViews.InDoubtView;
 import io.github.sudoitir.rahdar.feature.messages.web.MessageViews.MessageDetailView;
 import io.github.sudoitir.rahdar.feature.messages.web.MessageViews.MessagePageView;
 import io.github.sudoitir.rahdar.feature.messages.web.MessageViews.PartialView;
@@ -78,6 +79,11 @@ public class MessageController {
     @ApiResponse(
             responseCode = "200",
             content = @Content(schema = @Schema(anyOf = {AffectedView.class, DryRunView.class, PartialView.class})))
+    @ApiResponse(
+            responseCode = "202",
+            description = "The message was sent, but the broker's confirmation never came back: it may or may not"
+                    + " be on the broker.",
+            content = @Content(schema = @Schema(implementation = InDoubtView.class)))
     @PostMapping("/{path}/messages")
     public ResponseEntity<Object> send(
             @PathVariable UUID clusterId,
@@ -144,8 +150,9 @@ public class MessageController {
                     case Outcome.Partial(var count, var notDone, var error, var node) ->
                         new PartialView(
                                 count, notDone.stream().map(String::valueOf).toList(), error, true, node);
+                    case Outcome.InDoubt(var detail, var node) -> new InDoubtView(true, detail, node);
                 };
-        return ResponseEntity.ok(body);
+        return outcome instanceof Outcome.InDoubt ? ResponseEntity.accepted().body(body) : ResponseEntity.ok(body);
     }
 
     private static <T> T unwrap(Attempt<T> attempt) {

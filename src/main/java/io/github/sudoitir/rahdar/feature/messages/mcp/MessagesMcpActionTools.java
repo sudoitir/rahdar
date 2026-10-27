@@ -192,6 +192,10 @@ public class MessagesMcpActionTools {
                     case Outcome.Affected(var count, var node) ->
                         new McpViews.MutationOutcome(
                                 action, subject, false, count, null, false, String.valueOf(node), "Applied.");
+                    // Neither applied nor failed: affected is 0 only because nothing is confirmed.
+                    case Outcome.InDoubt(var detail, var node) ->
+                        new McpViews.MutationOutcome(
+                                action, subject, false, 0, null, false, String.valueOf(node), "In doubt. " + detail);
                     case Outcome.Partial(var count, var notDone, var error, var node) ->
                         new McpViews.MutationOutcome(
                                 action,

@@ -154,6 +154,14 @@ public class AuditService {
         writer.fail(event.getId(), error);
     }
 
+    /**
+     * An action whose outcome is unknown: the broker's confirmation never came back, so it may or may not
+     * have happened (ADR-0211). Recorded as {@code IN_DOUBT}, never as a success or a failure.
+     */
+    public void inDoubt(AuditEvent event, String reason) {
+        writer.inDoubt(event.getId(), reason);
+    }
+
     /** An action that failed after affecting some of its targets; the count is recorded with the error. */
     public void failPartial(AuditEvent event, long affectedCount, String error) {
         writer.failPartial(event.getId(), affectedCount, error);

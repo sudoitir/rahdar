@@ -2,6 +2,7 @@ package io.github.sudoitir.rahdar.platform.broker;
 
 import io.github.sudoitir.openbroker.BrokerException;
 import io.github.sudoitir.openbroker.ClusterConnection;
+import io.github.sudoitir.openbroker.Dispatch;
 import io.github.sudoitir.openbroker.ErrorReasons;
 import io.github.sudoitir.openbroker.NodeId;
 import io.github.sudoitir.openbroker.messaging.BrowseRequest;
@@ -114,12 +115,25 @@ public class BrokerMessages {
     /**
      * Sends one message through a node to a destination, which routes it, or straight to a subscription;
      * returns its id, when the system gives one.
+     *
+     * @throws SendInDoubtException when the broker's confirmation never came back, so the message may or
+     *     may not be there
      */
     public Optional<String> sendTo(UUID clusterId, UUID nodeId, ResourceRef target, OutboundMessage message) {
         return translated(() -> {
             ClusterConnection c = gateway.cluster(clusterId);
-            SendReceipt receipt =
-                    c.messages().send(sendTarget(c, target), Scope.node(BrokerGateway.idOf(nodeId)), message);
+            SendReceipt receipt;
+            try {
+                receipt = c.messages().send(sendTarget(c, target), Scope.node(BrokerGateway.idOf(nodeId)), message);
+            } catch (BrokerException e) {
+                if (e.dispatch() == Dispatch.IN_DOUBT) {
+                    throw new SendInDoubtException(
+                            "The message was sent, but the broker's confirmation never came back: it may or may not"
+                                    + " be on the broker. Look for it before sending it again, or it may be there twice.",
+                            e);
+                }
+                throw e;
+            }
             return receipt.messageId();
         });
     }

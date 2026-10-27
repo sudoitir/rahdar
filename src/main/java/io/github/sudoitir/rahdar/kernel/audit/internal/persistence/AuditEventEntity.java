@@ -141,6 +141,12 @@ public class AuditEventEntity implements AuditEvent {
         this.affectedCount = count;
     }
 
+    /** The outcome is unknown: the broker's confirmation never came back, so it may or may not have happened. */
+    public void markInDoubt(String reason) {
+        this.outcome = "IN_DOUBT";
+        this.error = reason;
+    }
+
     public void markFailure(String error) {
         this.outcome = "FAILURE";
         this.error = error;

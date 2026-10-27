@@ -18,6 +18,7 @@ import io.github.sudoitir.rahdar.kernel.security.ActorResolver;
 import io.github.sudoitir.rahdar.kernel.security.ResourceRef;
 import io.github.sudoitir.rahdar.platform.broker.BrokerMessages;
 import io.github.sudoitir.rahdar.platform.broker.MessageKind;
+import io.github.sudoitir.rahdar.platform.broker.SendInDoubtException;
 import io.github.sudoitir.rahdar.platform.broker.SendNames;
 import io.github.sudoitir.rahdar.platform.broker.SentMessages;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
@@ -239,6 +240,9 @@ public class PluginMessagingService implements PluginScopedBeans {
                             Map.of(),
                             properties));
             audit.succeed(event, 1);
+        } catch (SendInDoubtException e) {
+            audit.inDoubt(event, e.getMessage());
+            throw new MessageInDoubtException(e.getMessage());
         } catch (RuntimeException e) {
             audit.fail(event, e.getMessage());
             throw e;

@@ -71,6 +71,17 @@ class AuditServiceTransactionTest extends PostgresIntegrationTest {
     }
 
     @Test
+    void anActionWhoseConfirmationNeverCameBackIsRecordedInDoubt() {
+        AuditEvent event = begin();
+
+        audit.inDoubt(event, "The broker's confirmation never came back");
+
+        assertThat(outcome(event.getId())).isEqualTo("IN_DOUBT");
+        assertThat(jdbc.queryForObject("SELECT error FROM audit_event WHERE id = ?", String.class, event.getId()))
+                .isEqualTo("The broker's confirmation never came back");
+    }
+
+    @Test
     void aPartialFailureRecordsTheCountAffectedBeforeIt() {
         AuditEvent event = begin();
 

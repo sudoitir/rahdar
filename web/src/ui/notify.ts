@@ -47,7 +47,7 @@ function show(settles: Settles, toast: Parameters<typeof notifications.show>[0])
 }
 
 /**
- * One helper for the four outcomes of a mutation (pending, succeeded, failed, partial), over
+ * One helper for the four outcomes of a mutation (pending, succeeded, failed, partial), and in doubt, over
  * Mantine's notifications, which must be mounted once at the root.
  *
  * <ul>
@@ -118,6 +118,23 @@ export const notify = {
       {
         title: `${action.past} ${subject} on ${reached}`,
         message: next,
+        autoClose: false,
+        role: ASSERTIVE,
+        style: tone('--as-warning'),
+      },
+    );
+  },
+
+  /**
+   * The action may or may not have happened: it left, and the broker's confirmation never came back. Neither a
+   * success nor a failure, so it stays until dismissed and says what to check before trying again.
+   */
+  inDoubt({ action, subject, pendingId, detail }: Notice & Settles & Readonly<{ detail: string }>) {
+    return show(
+      { pendingId },
+      {
+        title: `Not confirmed: ${action.progressive.toLowerCase()} ${subject}`,
+        message: detail,
         autoClose: false,
         role: ASSERTIVE,
         style: tone('--as-warning'),

@@ -86,6 +86,7 @@ const OUTCOMES = [
   { value: 'SUCCESS', label: 'Success' },
   { value: 'FAILURE', label: 'Failure' },
   { value: 'REFUSED', label: 'Refused' },
+  { value: 'IN_DOUBT', label: 'In doubt' },
   { value: 'PENDING', label: 'Pending' },
 ];
 

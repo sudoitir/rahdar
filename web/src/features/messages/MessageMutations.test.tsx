@@ -432,6 +432,32 @@ describe('SendMessage', () => {
     expect(posts).toHaveLength(0);
   });
 
+  it('says a send the broker never confirmed is in doubt, never sent, and keeps what was typed', async () => {
+    server.use(
+      http.post('*/api/v1/clusters/c1/resources/artemis.queue/ORDERS/messages', () =>
+        HttpResponse.json(
+          {
+            inDoubt: true,
+            detail: 'It may or may not be on the broker. Look for it before sending it again.',
+            node: 'n1',
+          },
+          { status: 202 },
+        ),
+      ),
+    );
+    const user = userEvent.setup();
+    open();
+
+    await user.type(screen.getByLabelText(/^Content/), 'hello');
+    await user.click(screen.getByRole('button', { name: 'Send' }));
+
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('Not confirmed: sending a message to subscription "ORDERS"');
+    expect(alert).toHaveTextContent('Look for it before sending it again.');
+    expect(screen.queryByText('Sent a message to subscription "ORDERS"')).not.toBeInTheDocument();
+    expect(screen.getByLabelText(/^Content/)).toHaveValue('hello');
+  });
+
   it('states the cause and the next step when the broker refuses the message, and keeps what was typed', async () => {
     server.use(
       http.post('*/api/v1/clusters/c1/resources/artemis.queue/ORDERS/messages', () =>
