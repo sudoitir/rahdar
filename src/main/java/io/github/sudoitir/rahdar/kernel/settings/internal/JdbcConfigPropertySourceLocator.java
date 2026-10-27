@@ -26,15 +26,18 @@ import org.springframework.core.env.PropertySource;
  * pool, because a pool built here would outlive its usefulness by the length of
  * the process.
  *
- * <p><b>Never fatal.</b> A missing table (first boot, before Liquibase has run), an
- * unreachable database, or bad credentials all log a warning and contribute no
- * properties. The alternative — refusing to start — would mean an empty database
+ * <p><b>Never fatal.</b> A missing table (first boot, before Liquibase has run) contributes
+ * no properties; it is looked up before it is queried, so a first start logs no error here or
+ * in the database. An unreachable database or bad credentials log a warning and contribute none
+ * either. The alternative — refusing to start — would mean an empty database
  * could brick the very deployment that is trying to create its schema, and would
  * turn an optional configuration source into a hard startup dependency.
  */
 public class JdbcConfigPropertySourceLocator implements PropertySourceLocator {
 
     private static final Logger log = LoggerFactory.getLogger(JdbcConfigPropertySourceLocator.class);
+
+    private static final String TABLE_EXISTS = "SELECT to_regclass('rahdar_config_property') IS NOT NULL";
 
     private static final String SELECT =
             "SELECT \"key\", \"value\" FROM rahdar_config_property WHERE application = ? AND profile = ? AND label = ?";
@@ -59,6 +62,10 @@ public class JdbcConfigPropertySourceLocator implements PropertySourceLocator {
                 url,
                 environment.getProperty("spring.datasource.username"),
                 environment.getProperty("spring.datasource.password"))) {
+            if (!tableExists(connection)) {
+                log.info("No rahdar_config_property table yet (a first start): packaged defaults apply");
+                return null;
+            }
             // Least specific first so a profile-specific row overwrites the shared one.
             load(connection, properties, application, DEFAULT_PROFILE, label);
             for (String profile : profiles) {
@@ -66,8 +73,7 @@ public class JdbcConfigPropertySourceLocator implements PropertySourceLocator {
             }
         } catch (Exception e) {
             log.warn(
-                    "No deploy-time properties loaded from rahdar_config_property ({}). "
-                            + "Packaged defaults apply. This is expected on a first start, before migrations run.",
+                    "No deploy-time properties loaded from rahdar_config_property ({}). Packaged defaults apply.",
                     e.getMessage());
             return null;
         }
@@ -93,6 +99,13 @@ public class JdbcConfigPropertySourceLocator implements PropertySourceLocator {
         properties.putIfAbsent("spring.cloud.config.overrideSystemProperties", "false");
         log.info("Loaded {} deploy-time properties from rahdar_config_property", rowCount);
         return new MapPropertySource("rahdarConfigProperty", properties);
+    }
+
+    private static boolean tableExists(Connection connection) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement(TABLE_EXISTS);
+                ResultSet result = statement.executeQuery()) {
+            return result.next() && result.getBoolean(1);
+        }
     }
 
     private static void load(

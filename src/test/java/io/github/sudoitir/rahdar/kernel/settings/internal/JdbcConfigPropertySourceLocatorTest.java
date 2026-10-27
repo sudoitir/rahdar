@@ -6,7 +6,10 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.core.env.ConfigurableEnvironment;
 import org.springframework.core.env.PropertySource;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -16,6 +19,7 @@ import org.springframework.mock.env.MockEnvironment;
  * The bootstrap-phase loader: what it reads, how profiles layer, and — the part
  * that matters most — that it never stops the application from starting.
  */
+@ExtendWith(OutputCaptureExtension.class)
 class JdbcConfigPropertySourceLocatorTest extends PostgresIntegrationTest {
 
     private final JdbcConfigPropertySourceLocator locator = new JdbcConfigPropertySourceLocator();
@@ -103,11 +107,25 @@ class JdbcConfigPropertySourceLocatorTest extends PostgresIntegrationTest {
     /**
      * The one that keeps a deployment alive: on a first start the schema does not
      * exist yet, because Liquibase has not run and cannot run until the main context
-     * is up. If this threw, an empty database would brick the very start that was
-     * about to create the table.
+     * is up. That is the normal first boot, so it is neither a failure nor a warning,
+     * and the table is looked up before it is queried, so the database logs no error either.
      */
     @Test
-    void aMissingTableIsAWarningAndNotAStartupFailure() {
+    void aMissingTableIsAnOrdinaryFirstStart(CapturedOutput output) {
+        jdbc.execute("CREATE SCHEMA IF NOT EXISTS config_absent");
+        MockEnvironment env = environment();
+        String url = springEnvironment.getProperty("spring.datasource.url");
+        env.setProperty("spring.datasource.url", url + (url.contains("?") ? "&" : "?") + "currentSchema=config_absent");
+
+        assertThat(locator.locate(env)).isNull();
+        assertThat(output)
+                .contains("No rahdar_config_property table yet")
+                .doesNotContain("relation \"rahdar_config_property\" does not exist");
+    }
+
+    /** An unreachable database is a warning, never a startup failure. */
+    @Test
+    void anUnreachableDatabaseIsAWarningAndNotAStartupFailure() {
         MockEnvironment env = environment();
         env.setProperty("spring.datasource.url", "jdbc:postgresql://127.0.0.1:1/nope");
 
