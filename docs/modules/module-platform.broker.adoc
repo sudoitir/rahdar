@@ -30,7 +30,6 @@ _Others_
 * `i.g.s.r.p.b.BrokerSystems`
 * `i.g.s.r.p.b.BrokerTelemetry`
 * `i.g.s.r.p.b.BrokerTimeouts`
-* `i.g.s.r.p.b.BrokerTls`
 * `i.g.s.r.p.b.ClockOffsetRegistry`
 * `i.g.s.r.p.b.DataPlaneCheck`
 * `i.g.s.r.p.b.MonotonicClockWatch`

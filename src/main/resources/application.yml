@@ -1,3 +1,15 @@
+# The broker client is wired by OpenBroker's starter (ADR-0211, ADR-0212).
+openbroker:
+  tracing:
+    # Rahdar moves messages that producers wrote; it never adds a trace header to one.
+    inject-context: false
+  spring-connections:
+    # Clusters are registered at runtime, never derived from spring.kafka or spring.artemis.
+    enabled: false
+  client:
+    # Large bodies spool here while a relay or a drain holds them; the gateway sweeps it at start.
+    spool-directory: ${java.io.tmpdir}/rahdar-spool
+
 spring:
   application:
     name: rahdar
@@ -238,7 +250,7 @@ rahdar:
     # Enforced by NodeCallLimiter (a per-node permit bucket refilled each second).
     management-calls-per-second: 20
   broker:
-    # RestClient timeouts for every Jolokia call (ADR-0010).
+    # Connect and response timeouts of every broker call; Settings changes them live (ADR-0010).
     connect-timeout: 3s
     read-timeout: 10s
     clock-skew-tolerance-ms: 2000  # a broker clock further off than this is called skew (ADR-0053)

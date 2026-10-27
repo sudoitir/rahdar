@@ -7,8 +7,8 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
 /**
  * Broker connection defaults.
  *
- * @param connectTimeout {@code RestClient} connect timeout for every Jolokia call (ADR-0010)
- * @param readTimeout {@code RestClient} read timeout for every Jolokia call (ADR-0010)
+ * @param connectTimeout connect timeout of every broker call; Settings changes it live (ADR-0010)
+ * @param readTimeout response timeout of every broker call; Settings changes it live (ADR-0010)
  * @param clockSkewToleranceMs how far a broker clock may disagree with Rahdar's before it
  *     is called skew. The floor is set by the measurement, not by taste: Jolokia reports
  *     its timestamp in whole seconds, so a single reading is ±500ms before the network is

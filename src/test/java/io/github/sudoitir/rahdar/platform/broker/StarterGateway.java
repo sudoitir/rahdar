@@ -1,0 +1,39 @@
+package io.github.sudoitir.rahdar.platform.broker;
+
+import static org.mockito.Mockito.mock;
+
+import io.github.sudoitir.openbroker.BrokerDrivers;
+import io.github.sudoitir.openbroker.spring.boot.autoconfigure.OpenBrokerAutoConfiguration;
+import io.github.sudoitir.openbroker.spring.boot.autoconfigure.OpenBrokerConnectOptions;
+import io.github.sudoitir.openbroker.spring.boot.autoconfigure.OpenBrokerProperties;
+import io.github.sudoitir.openbroker.spring.boot.autoconfigure.SslBundleTls;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import org.springframework.boot.ssl.SslBundles;
+import org.springframework.context.annotation.AnnotationConfigApplicationContext;
+
+/** A {@link BrokerGateway} wired the way the application wires it: by OpenBroker's starter (ADR-0212). */
+final class StarterGateway {
+
+    private StarterGateway() {}
+
+    /** The gateway over {@code bundles}, with a node directory and settings source nobody fills. */
+    static BrokerGateway of(SslBundles bundles, BrokerTimeouts timeouts) {
+        AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext();
+        context.registerBean(SslBundles.class, () -> bundles);
+        context.registerBean(BrokerTimeouts.class, () -> timeouts);
+        context.registerBean(RahdarCallInterceptor.class, () -> mock(RahdarCallInterceptor.class));
+        context.registerBean(BrokerConnectOptionsCustomizer.class);
+        context.registerBean(BrokerLinks.class, () -> new BrokerLinks(new SimpleMeterRegistry()));
+        context.register(OpenBrokerAutoConfiguration.class);
+        context.refresh();
+        OpenBrokerConnectOptions options = context.getBean(OpenBrokerConnectOptions.class);
+        return new BrokerGateway(
+                context.getBean(BrokerDrivers.class),
+                mock(NodeDirectory.class),
+                mock(ConnectionSettingsSource.class),
+                context.getBean(SslBundleTls.class),
+                options,
+                context.getBean(OpenBrokerProperties.class),
+                new BrokerTelemetry(context.getBean(BrokerLinks.class), options));
+    }
+}

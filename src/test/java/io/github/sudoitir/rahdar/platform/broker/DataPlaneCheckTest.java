@@ -3,7 +3,6 @@ package io.github.sudoitir.rahdar.platform.broker;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 
-import io.github.sudoitir.openbroker.BrokerDrivers;
 import io.github.sudoitir.rahdar.support.ArtemisIntegrationTest;
 import java.time.Duration;
 import java.time.Instant;
@@ -19,14 +18,9 @@ import org.springframework.boot.ssl.SslBundles;
 class DataPlaneCheckTest extends ArtemisIntegrationTest {
 
     /** A notification stream takes no call permits, so the interceptor is never asked. */
-    private final DataPlaneCheck check = new DataPlaneCheck(new BrokerGateway(
-            BrokerDrivers.load(),
-            mock(NodeDirectory.class),
-            mock(ConnectionSettingsSource.class),
-            new BrokerTls(mock(SslBundles.class)),
-            mock(RahdarCallInterceptor.class),
-            new BrokerTimeouts(new BrokerProperties(Duration.ofSeconds(3), Duration.ofSeconds(10), 2_000)),
-            BrokerTelemetry.none()));
+    private final DataPlaneCheck check = new DataPlaneCheck(StarterGateway.of(
+            mock(SslBundles.class),
+            new BrokerTimeouts(new BrokerProperties(Duration.ofSeconds(3), Duration.ofSeconds(10), 2_000))));
 
     private static NodeEndpoint node(String core, String role, boolean active) {
         return new NodeEndpoint(

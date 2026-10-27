@@ -3,9 +3,7 @@ package io.github.sudoitir.rahdar.platform.broker;
 import static io.github.sudoitir.rahdar.support.ArtemisIntegrationTest.BROKER_PASSWORD;
 import static io.github.sudoitir.rahdar.support.ArtemisIntegrationTest.BROKER_USER;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.mock;
 
-import io.github.sudoitir.openbroker.BrokerDrivers;
 import io.github.sudoitir.rahdar.support.ArtemisIntegrationTest;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -63,14 +61,9 @@ class DataPlaneTlsPerClusterTest {
         DefaultSslBundleRegistry bundles = new DefaultSslBundleRegistry();
         bundles.registerBundle("ca-a", trusting(caA));
         bundles.registerBundle("ca-b", trusting(caB));
-        check = new DataPlaneCheck(new BrokerGateway(
-                BrokerDrivers.load(),
-                mock(NodeDirectory.class),
-                mock(ConnectionSettingsSource.class),
-                new BrokerTls(bundles),
-                mock(RahdarCallInterceptor.class),
-                new BrokerTimeouts(new BrokerProperties(Duration.ofSeconds(5), Duration.ofSeconds(10), 2_000)),
-                BrokerTelemetry.none()));
+        check = new DataPlaneCheck(StarterGateway.of(
+                bundles,
+                new BrokerTimeouts(new BrokerProperties(Duration.ofSeconds(5), Duration.ofSeconds(10), 2_000))));
     }
 
     @AfterAll
