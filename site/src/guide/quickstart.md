@@ -43,6 +43,10 @@ curl -s "$base/.env.example" -o .env   # then edit it — see Configuration
 docker compose -f compose.prod.yaml --env-file .env up -d
 ```
 
+Postgres reads `postgresql.conf` and the SQL file as its own user, not as you. If your umask makes new
+files owner-only (`077`), it stops with `could not open configuration file … Permission denied`: run
+`chmod a+r ../postgres/*` and start it again. `just up` does this for you.
+
 Or a bare container against a Postgres you already have:
 
 ```bash

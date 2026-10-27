@@ -18,12 +18,19 @@ git_cliff    := "git-cliff@2.13.1"
 default:
     @just --list --unsorted --list-heading $'Rahdar tasks\n'
 
+# The files the stacks bind-mount are read by the containers' own users (postgres, haproxy, artemis), not by
+# whoever cloned the repo. A clone made under a strict umask (077) leaves them owner-only, and Postgres and
+# HAProxy then refuse to start. Make those files readable, and nothing else: deploy/compose/.env holds secrets.
+[private]
+mounts:
+    @chmod a+r deploy/postgres/postgresql.conf deploy/postgres/*.sql deploy/compose/ha/haproxy.cfg deploy/compose/dev/artemis/*/broker.xml
+
 # ── stack ────────────────────────────────────────────────────────────────────
 
 # Run Rahdar from the published image: two replicas behind HAProxy on one Postgres (runs `just setup`).
 # Register your brokers in the UI. Rahdar is on http://localhost:8080.
 [group('stack')]
-up: setup
+up: mounts setup
     {{compose_ha}} up -d --wait --wait-timeout 300
     @echo "→ http://localhost:8080"
     @{{compose_ha}} logs rahdar-1 rahdar-2 2>/dev/null | grep -A8 'Created administrator' \
@@ -31,7 +38,7 @@ up: setup
 
 # The same, with one Rahdar replica and no load balancer (compose.prod.yaml).
 [group('stack')]
-up-single: setup
+up-single: mounts setup
     {{compose_prod}} up -d --wait --wait-timeout 300
     @echo "→ http://localhost:8080"
     @{{compose_prod}} logs rahdar 2>/dev/null | grep -A8 'Created administrator' \
@@ -85,7 +92,7 @@ setup:
 
 # Full dev stack: Postgres + a real Artemis primary/backup pair + Rahdar, built locally.
 [group('develop')]
-dev-up:
+dev-up: mounts
     {{compose_dev}} up --build -d --wait --wait-timeout 180
     @echo "→ http://localhost:8080   (Artemis console: http://localhost:8161)"
     @{{compose_dev}} logs rahdar 2>/dev/null | grep -A8 'Created administrator' \
@@ -96,7 +103,7 @@ dev-up:
 # On a fresh stack that password is one-time; add NEW_ADMIN_PASSWORD=... the first time. The seed also sets up
 # the admin's authenticator app (its role requires one) and prints ADMIN_TOTP_SECRET, which later runs need.
 [group('develop')]
-demo:
+demo: mounts
     {{compose_demo}} up --build -d --wait --wait-timeout 300
     COMPOSE="{{compose_demo}}" ./scripts/demo-seed.sh
 
@@ -124,7 +131,7 @@ dev-down:
 # broker pair and its traffic. The admin's credentials stay in web/.sweep/auth/credentials.env for reruns.
 # Start a second, isolated stack for a UI sweep, beside whatever else runs.
 [group('develop')]
-qa-up name port demo="":
+qa-up name port demo="": mounts
     #!/usr/bin/env bash
     set -euo pipefail
     export QA_PORT={{port}}
@@ -175,12 +182,12 @@ qa-down name:
 # (else the Dockerfile is built). The stack is project rahdar-load on 127.0.0.1:18090, removed with its volumes.
 # Run the load test (ADR-0198, docs/sizing.md) and write load/target/report; REGRESSION marks a figure below its target.
 [group('test')]
-load profile="reference":
+load profile="reference": mounts
     ./scripts/load.sh {{profile}}
 
 # Run the load test with a tiny profile, to check the test itself works. Not a measurement.
 [group('test')]
-load-smoke:
+load-smoke: mounts
     ./scripts/load.sh smoke
 
 # Tail dev stack logs (all services, or `just dev-logs rahdar`).
@@ -248,7 +255,7 @@ verify-web:
 
 # Kill, then drain, a replica of the HA reference stack under load (HA_IMAGE_BUILT=1 reuses rahdar:ci). Needs Docker, Node.
 [group('quality')]
-ha-failover:
+ha-failover: mounts
     #!/usr/bin/env bash
     set -euo pipefail
     # Requests, event streams and scraping must carry on; web/scripts/ha-failover.ts says what is checked.
