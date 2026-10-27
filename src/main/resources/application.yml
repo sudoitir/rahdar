@@ -238,7 +238,7 @@ rahdar:
     # Enforced by NodeCallLimiter (a per-node permit bucket refilled each second).
     management-calls-per-second: 20
   broker:
-    # RestClient timeouts for every Jolokia call (ADR-0010).
+    # Connect and response timeouts of every broker call; Settings changes them live (ADR-0010).
     connect-timeout: 3s
     read-timeout: 10s
     clock-skew-tolerance-ms: 2000  # a broker clock further off than this is called skew (ADR-0053)

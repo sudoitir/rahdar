@@ -53,6 +53,7 @@ Rahdar's surface is broker-neutral, and its estate view was built to hold more t
 ## Depends on
 - 19e-openbroker-kafka (the OpenBroker release with the Kafka driver, on Maven Central)
 - 19e3-openbroker-messaging-client (Rahdar on OpenBroker's messaging client)
+- 19e2b-rahdar-on-the-openbroker-starter (the broker client wired by OpenBroker's starter, so Kafka is wired the same way)
 
 ## Execution
 **Subagent-driven + reviewer**:
