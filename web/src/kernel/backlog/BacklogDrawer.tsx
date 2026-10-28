@@ -35,14 +35,19 @@ export function BacklogDrawer({ target, onClose }: Readonly<{ target: BacklogTar
     body = (
       <Stack gap="sm">
         <Text size="sm" c="dimmed">
-          Sampled <Ago at={breakdown.data.sampledAt} now={now} />. The slowest partitions come first.
+          {breakdown.data.sampledAt ? (
+            <>
+              Sampled <Ago at={breakdown.data.sampledAt} now={now} />.{' '}
+            </>
+          ) : null}
+          The slowest partitions come first.
         </Text>
         <DataTable
           variant="static"
           label={`${target?.name ?? 'Subscription'} backlog by partition`}
           storageKey="backlog.partitions"
           columns={columns}
-          data={breakdown.data.partitions}
+          data={breakdown.data.partitions ?? []}
           rowKey={(p) => String(p.partition)}
           height={{ maxRows: 12 }}
           empty={

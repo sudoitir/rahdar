@@ -1,12 +1,19 @@
 import { Stack, Text } from '@mantine/core';
 
 import type { Column } from '../../ui/table/index.ts';
-import type { PartitionBacklog } from './api.ts';
+/** The columns' view of a partition: a breakdown's, or a group's own, both with figures that may be absent. */
+export interface PartitionRow {
+  partition: number;
+  committed?: number | null;
+  end?: number | null;
+  lag?: number | null;
+  reason?: string | null;
+}
 
 const figure = (n: number) => n.toLocaleString();
 
 /** The partitions of a backlog, slowest first as the server sends them. A lag that could not be read says so, never 0. */
-export function partitionColumns(): Column<PartitionBacklog>[] {
+export function partitionColumns(): Column<PartitionRow>[] {
   return [
     {
       id: 'partition',
@@ -49,7 +56,7 @@ export function partitionColumns(): Column<PartitionBacklog>[] {
       id: 'end',
       header: 'End offset',
       short: 'End',
-      accessor: (p) => figure(p.end),
+      accessor: (p) => (p.end == null ? 'Unknown' : figure(p.end)),
       kind: 'number',
       priority: 'high',
     },

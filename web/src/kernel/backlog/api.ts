@@ -1,22 +1,13 @@
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 
 import { clusterKey, request, type ApiError } from '../api/request.ts';
+import type { components } from '../api/schema.d.ts';
 
 /** One partition of a backlog breakdown. */
-export interface PartitionBacklog {
-  partition: number;
-  committed?: number | null;
-  end: number;
-  lag?: number | null;
-  /** Why this partition has no lag, such as a group that never committed there. */
-  reason?: string | null;
-}
+export type PartitionBacklog = components['schemas']['PartitionLag'];
 
 /** `GET …/subscriptions/{kind}/{path}/backlog`: the partitions, slowest first, and when they were sampled. */
-export interface BacklogBreakdown {
-  sampledAt: string;
-  partitions: PartitionBacklog[];
-}
+export type BacklogBreakdown = components['schemas']['Breakdown'];
 
 /** The breakdown of one subscription's backlog, read only while `id` is set. */
 export function useBacklogBreakdown(

@@ -1,12 +1,7 @@
-/** How much a backlog figure can be trusted. */
-export interface BacklogValue {
-  value?: number | null;
-  accuracy: 'EXACT' | 'ESTIMATE' | 'UNAVAILABLE';
-  /** Why the figure is an estimate or unavailable. */
-  reason?: string | null;
-  /** Whether a per-partition breakdown can be read. */
-  breakdown: boolean;
-}
+import type { components } from '../kernel/api/schema.d.ts';
+
+/** How much a backlog figure can be trusted: its value, accuracy, the reason, and whether a breakdown can be read. */
+export type BacklogValue = components['schemas']['Backlog'];
 
 /** The figure as the table sorts and measures it: exact as a number, an estimate marked, and never 0 for unknown. */
 export function backlogWords(backlog: BacklogValue): string {
