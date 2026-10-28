@@ -7,7 +7,7 @@ description: Rahdar از Model Context Protocol پشتیبانی می‌کند،
 
 Rahdar از [Model Context Protocol](https://modelcontextprotocol.io) پشتیبانی می‌کند، پس یک دستیار می‌تواند *«چرا `ORDERS.DLQ` انباشته شده»* را روی کلاسترهای واقعی شما پاسخ دهد، به‌جای حدس‌زدن.
 
-سطح در معرض، شانزده ابزار **مبتنی بر قصد** است — `diagnose`، `message_action`، `artemis_config_change` — نه آینه‌ای از REST API. یک آینه، context مدل را صرف لوله‌کشی می‌کند و سرهم‌کردن تشخیص را به خودش وامی‌گذارد؛ این ابزارها به‌جایش به شکل خودِ پرسش‌ها ساخته شده‌اند ([ADR-0045](/reference/adr/0045-mcp-server-is-a-capability-surface)، انگلیسی).
+سطح در معرض، ابزارهای **مبتنی بر قصد** است — `diagnose`، `message_action`، `artemis_config_change` — نه آینه‌ای از REST API. یک آینه، context مدل را صرف لوله‌کشی می‌کند و سرهم‌کردن تشخیص را به خودش وامی‌گذارد؛ این ابزارها به‌جایش به شکل خودِ پرسش‌ها ساخته شده‌اند ([ADR-0045](/reference/adr/0045-mcp-server-is-a-capability-surface)، انگلیسی).
 
 ## گرفتن یک کلید
 
@@ -64,6 +64,11 @@ curl -s https://rahdar.example.com/mcp \
 | Tool | `artemis_config_change` | اعلام یک پیکربندی، یا اعمال آن اول روی قناری با تصدیق خطرها بر اساس شناسه |
 | Tool | `connection_action` | بستن یک اتصال، کانال، مصرف‌کننده یا مصرف‌کننده‌های یک مقصد |
 | Tool | `send_message` | صف‌کردن یک پیام |
+| Tool | `kafka_list_groups`، `kafka_describe_group` | گروه‌های مصرف‌کننده با وضعیت، اعضا و lag؛ و پارتیشن‌ها و اعضای یک گروه |
+| Tool | `kafka_preview_offset_reset`، `kafka_reset_offsets` | اینکه یک بازنشانی چه چیزی را جابه‌جا می‌کند، و خودِ بازنشانی که روی همان پیش‌نمایش اجرا می‌شود |
+| Tool | `kafka_topic_config`، `kafka_set_topic_config` | تنظیمات یک topic و منشأ هرکدام، و تغییر آن‌ها |
+| Tool | `kafka_list_acls` | ACLهای کلاستر |
+| Tool | `kafka_abort_transaction` | لغو یک تراکنش، پس از پیش‌نمایش آن |
 | Tool | `alert_rule` / `rahdar_setting` | قواعد هشدار؛ تنظیمات عملیاتی |
 | Resource | `rahdar://clusters`، `rahdar://permissions`، `rahdar://tools` | این کلید چه می‌بیند و چه می‌تواند بکند |
 | Resource | `cluster://{id}/topology`، `cluster://{id}/capabilities`، `cluster://{id}/nodes/{nodeId}/settings` | نودها؛ اتصال از چه پشتیبانی می‌کند، به‌همراه `broker.xml` لازم برای باقی؛ تنظیمات مؤثر یک نود |
@@ -73,7 +78,7 @@ curl -s https://rahdar.example.com/mcp \
 
 ابزارها یک منبع را با **شناسهٔ استاندارد** آن نام می‌برند، مثل `artemis.queue/orders`؛ همان `id` که `list_resources` در هر ردیف برمی‌گرداند، همراه با `kind` و `kindLabel` که سیستم به آن می‌دهد. آرگومان‌ها بر اساس چیستیِ منبع نام دارند: `subscription`، `destination`، `resource` (هدف چرخهٔ حیات) و `target`. `list_resources` همان `role` را می‌گیرد که باید فهرست شود — یکی از `destination`، `subscription`، `route`، `connection`، `channel`، `consumer` و `producer` — و در صورت نیاز یک `kind`.
 
-ابزاری که فقط برای یک سیستم بروکر وجود دارد، شناسهٔ آن سیستم را پیشوند دارد: `artemis_config`، `artemis_config_change`، `artemis_config_diff`، `artemis_divert_lifecycle` و `setup_review`. فقط به کلیدی عرضه می‌شود که بتواند کلاستری از آن سیستم را بخواند، و فراخوانی‌ای که کلاستر سیستم دیگری را نام ببرد خطای ابزاری می‌گیرد که می‌گوید آن کلاستر چه سیستمی را اجرا می‌کند.
+ابزاری که فقط برای یک سیستم بروکر وجود دارد، شناسهٔ آن سیستم را پیشوند دارد: `artemis_config`، `artemis_config_change`، `artemis_config_diff`، `artemis_divert_lifecycle`، هشت ابزار `kafka_*` و `setup_review`. فقط به کلیدی عرضه می‌شود که بتواند کلاستری از آن سیستم را بخواند، و فراخوانی‌ای که کلاستر سیستم دیگری را نام ببرد خطای ابزاری می‌گیرد که می‌گوید آن کلاستر چه سیستمی را اجرا می‌کند.
 
 ## قرارداد ایمنی
 
@@ -81,6 +86,7 @@ curl -s https://rahdar.example.com/mcp \
 
 - **یک کلید هرگز از مالکش فراتر نمی‌رود.** دسترسی‌ها در هر فراخوانی با دسترسی‌های *زندهٔ* مالک اشتراک گرفته می‌شوند، پس محدودکردن یک فرد بی‌درنگ کلیدهایش را هم محدود می‌کند ([ADR-0046](/reference/adr/0046-mcp-authenticates-with-existing-api-tokens)، انگلیسی).
 - **تغییرها به‌طور پیش‌فرض dry-run اند.** یک اجرای مخرب واقعی افزون بر آن نیاز دارد `confirm` برابر نام خودِ اشتراک یا مقصد باشد — که پرسشی جدا از `override` مربوط به سقف انبوه است و `confirm` هرگز آن را برآورده نمی‌کند.
+- **تغییر Kafka اول پیش‌نمایش می‌شود و سپس نگه داشته می‌شود.** `kafka_preview_offset_reset` می‌گوید هر پارتیشن چه چیزی را رد یا دوباره می‌خواند، چه کسانی هنوز گروه را در دست دارند، و یک `etag` برمی‌گرداند؛ `kafka_reset_offsets`، `kafka_set_topic_config` و `kafka_abort_transaction` فقط روی `etag` پیش‌نمایش خود اجرا می‌شوند، اگر وضعیت عوض شده باشد به‌عنوان کهنه رد می‌شوند، و هرجا دروازهٔ تأیید روشن است تا تأیید نگه داشته می‌شوند. مثل هر ابزار تغییردهنده‌ای، وقتی نصب فقط‌خواندنی است پنهان می‌شوند.
 - **هر فراخوانی ممیزی می‌شود**، خواندن‌ها هم، به‌صورت `MCP_TOOL_CALL` به نام مالک و با نام کلید ضمیمه‌شده (`ada [token: laptop-agent]`)، همراه با نام ابزار، کلاستر و نتیجه. ردیف‌هایی که یک تغییر می‌نویسد، شامل dry runها، زیر آن قرار می‌گیرند ([ADR-0137](/reference/adr/0137-one-gate-on-the-mcp-transport)، انگلیسی).
 - **کل نصب را می‌توان فقط‌خواندنی کرد.** *Settings ← MCP server ← Read-only* همهٔ ابزارهای تغییردهنده را برای همهٔ کلیدها پنهان و رد می‌کند، هر `confirm` ای که داده شود. یک کلید فقط‌خواندنی همان کلیدی است که فقط مجوزهای خواندن دارد.
 - **کلاستری که کلید بر آن دسترسی ندارد** با این پاسخ برمی‌گردد: *«چنین کلاستری وجود ندارد، یا این کلید بر آن دسترسی ندارد»* — بدون نام‌بردن از مجوزی و بدون تأیید هیچ id ای.
