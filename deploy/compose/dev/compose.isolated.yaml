@@ -23,6 +23,11 @@ services:
   postgres:
     ports: !reset []
 
+  # Not published: a tool on the host has no business here, and the listener a host tool would use
+  # advertises a fixed port that could not be this stack's.
+  kafka:
+    ports: !reset []
+
   artemis-primary:
     ports: !override
       - "127.0.0.1::8161"

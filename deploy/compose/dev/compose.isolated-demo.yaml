@@ -30,3 +30,12 @@ services:
     ports: !override
       - "127.0.0.1::8161"
       - "127.0.0.1::61616"
+
+  kafka-1:
+    ports: !reset []
+
+  kafka-2:
+    ports: !reset []
+
+  kafka-3:
+    ports: !reset []
