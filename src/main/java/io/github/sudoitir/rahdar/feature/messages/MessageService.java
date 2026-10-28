@@ -10,6 +10,7 @@ import io.github.sudoitir.openbroker.messaging.Position;
 import io.github.sudoitir.openbroker.model.PartitionId;
 import io.github.sudoitir.openbroker.model.ResourceId;
 import io.github.sudoitir.openbroker.model.Shard;
+import io.github.sudoitir.rahdar.feature.messages.MessageActionParams.LogPurgeParams;
 import io.github.sudoitir.rahdar.feature.messages.MessageActionParams.MessageDeleteParams;
 import io.github.sudoitir.rahdar.feature.messages.MessageActionParams.MessageExpireParams;
 import io.github.sudoitir.rahdar.feature.messages.MessageActionParams.MessageMoveParams;
@@ -556,6 +557,51 @@ public class MessageService {
             return runPurge(clusterId, queueName, nodeId, true, override);
         }
         return gatedPurge(new QueuePurgeParams(clusterId, queueName, nodeId, override));
+    }
+
+    /**
+     * Purges the subscription of a partitioned log: its position moves to the end, which the driver refuses for a
+     * group that has members or is rebalancing, naming them (409). The records are not deleted.
+     */
+    public Attempt<Outcome> purgeLog(UUID clusterId, ResourceId subscription, boolean dryRun) {
+        clusterAccess.requireResource(
+                clusterId,
+                ResourceRef.subscription(subscription.path().segments().getFirst()),
+                MessagePermissions.SUBSCRIPTION_PURGE);
+        if (dryRun) {
+            return runPurgeLog(clusterId, subscription, true);
+        }
+        return gatedPurgeLog(new LogPurgeParams(clusterId, subscription.format()));
+    }
+
+    @Gated("subscription.purge-log")
+    private Attempt<Outcome> gatedPurgeLog(LogPurgeParams p) {
+        return gate.run(Operation.of(p), () -> runPurgeLog(p.clusterId(), ResourceId.parse(p.subscription()), false));
+    }
+
+    /** What purging the subscription would skip and the state it was counted against, for the gate's estimate. */
+    public Reach reachOfLogPurge(LogPurgeParams p) {
+        BrokerMessages.LogPurge preview = messages.previewLogPurge(p.clusterId(), ResourceId.parse(p.subscription()));
+        return new Reach(preview.records(), preview.etag());
+    }
+
+    private Attempt<Outcome> runPurgeLog(UUID clusterId, ResourceId subscription, boolean dryRun) {
+        AuditEvent event = begin("PURGE_SUBSCRIPTION", subscription.format(), clusterId, null, Map.of(), dryRun);
+        try {
+            BrokerMessages.LogPurge preview = messages.previewLogPurge(clusterId, subscription);
+            if (dryRun) {
+                audit.succeed(event, preview.records());
+                return new Attempt.Ok<>(
+                        new Outcome.DryRun(preview.records(), settings.intValue(BrokerSettings.BULK_CAP), false, null));
+            }
+            // The driver counts the partitions it moved; the operator is told the records they skip.
+            messages.purgeLog(clusterId, subscription, preview.etag());
+            audit.succeed(event, preview.records());
+            return new Attempt.Ok<>(new Outcome.Affected(preview.records(), null));
+        } catch (RuntimeException e) {
+            audit.fail(event, e.getMessage());
+            throw e;
+        }
     }
 
     @Gated("subscription.purge")

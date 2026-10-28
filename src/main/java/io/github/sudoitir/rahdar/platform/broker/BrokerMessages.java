@@ -5,6 +5,7 @@ import io.github.sudoitir.openbroker.ClusterConnection;
 import io.github.sudoitir.openbroker.Dispatch;
 import io.github.sudoitir.openbroker.ErrorReasons;
 import io.github.sudoitir.openbroker.NodeId;
+import io.github.sudoitir.openbroker.Status;
 import io.github.sudoitir.openbroker.messaging.BrowseRequest;
 import io.github.sudoitir.openbroker.messaging.BulkOutcome;
 import io.github.sudoitir.openbroker.messaging.Count;
@@ -30,6 +31,8 @@ import io.github.sudoitir.openbroker.model.ResourceId;
 import io.github.sudoitir.openbroker.model.Scope;
 import io.github.sudoitir.openbroker.model.Shard;
 import io.github.sudoitir.openbroker.operation.Operation;
+import io.github.sudoitir.openbroker.operation.Precondition;
+import io.github.sudoitir.rahdar.kernel.core.ConflictException;
 import io.github.sudoitir.rahdar.kernel.security.ResourceRef;
 import java.time.Instant;
 import java.util.LinkedHashSet;
@@ -236,6 +239,59 @@ public class BrokerMessages {
                             action)
                     .orThrow();
         });
+    }
+
+    /** What purging a subscription of a log would skip, and the state it was counted against. */
+    public record LogPurge(long records, String etag) {}
+
+    /**
+     * What purging the subscription of a log (moving its position to the end) would skip. The driver refuses a
+     * group that has members or is rebalancing, naming them, and that refusal is a conflict with its reason.
+     */
+    public LogPurge previewLogPurge(UUID clusterId, ResourceId subscription) {
+        try {
+            var preview =
+                    gateway.cluster(clusterId).operations().preview(subscription, new Operation.Purge(), Scope.whole());
+            // The driver names a group's active members in the preview; moving a busy group's position is refused.
+            for (var change : preview.diff()) {
+                if (change.key().endsWith(".members") && change.before().isPresent()) {
+                    throw new ConflictException(
+                            "purge-refused",
+                            "Cannot purge " + subscription + " while its group has active members: "
+                                    + change.before().get() + ". Stop them first.");
+                }
+            }
+            long records =
+                    switch (preview.estimate().count()) {
+                        case Count.Exact(var n) -> n;
+                        case Count.Estimate(var n) -> n;
+                        case Count.Unavailable(var _) -> 0L;
+                    };
+            return new LogPurge(records, preview.etag());
+        } catch (BrokerException e) {
+            throw refusedPurge(e);
+        }
+    }
+
+    /** Moves the subscription's position to the end of the log, if its state is still the one counted. */
+    public long purgeLog(UUID clusterId, ResourceId subscription, String etag) {
+        try {
+            return gateway.cluster(clusterId)
+                    .operations()
+                    .execute(subscription, new Operation.Purge(), Scope.whole(), Precondition.ifMatch(etag))
+                    .orThrow()
+                    .affected()
+                    .orElse(0L);
+        } catch (BrokerException e) {
+            throw refusedPurge(e);
+        }
+    }
+
+    private static RuntimeException refusedPurge(BrokerException e) {
+        if (e.status() == Status.FAILED_PRECONDITION || ErrorReasons.PRECONDITION_FAILED.equals(e.reason())) {
+            return new ConflictException("purge-refused", e.getMessage());
+        }
+        return BrokerFailures.translate(e);
     }
 
     /** Removes every message of the queue on the node; returns how many the broker removed. */

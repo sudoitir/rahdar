@@ -153,6 +153,13 @@ public class MessageController {
             @RequestParam(required = false) UUID node,
             @RequestParam(defaultValue = "false") boolean dryRun,
             @RequestParam(defaultValue = "false") boolean override) {
+        if (kinds.partitioned(clusterId, kind)) {
+            return respond(messages.purgeLog(
+                    clusterId,
+                    targets.require(clusterId, kind, path, ResourceClass.SUBSCRIPTION)
+                            .id(),
+                    dryRun));
+        }
         return respond(messages.purge(clusterId, subscription(clusterId, kind, path), node, dryRun, override));
     }
 

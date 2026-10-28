@@ -5264,8 +5264,11 @@ export interface components {
             /** Format: int64 */
             affectedCount: number;
             dryRun: boolean;
-            /** Format: uuid */
-            node: string;
+            /**
+             * Format: uuid
+             * @description The node acted on; null where the system has none.
+             */
+            node?: string | null;
         };
         DryRunView: {
             /** Format: int64 */
@@ -5274,7 +5277,7 @@ export interface components {
             cap: number;
             overCap: boolean;
             /** Format: uuid */
-            node: string;
+            node?: string | null;
         };
         PartialView: {
             /** Format: int64 */

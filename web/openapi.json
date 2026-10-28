@@ -32086,11 +32086,12 @@
             "type" : "boolean"
           },
           "node" : {
-            "type" : "string",
-            "format" : "uuid"
+            "type" : [ "string", "null" ],
+            "format" : "uuid",
+            "description" : "The node acted on; null where the system has none."
           }
         },
-        "required" : [ "affectedCount", "dryRun", "node" ]
+        "required" : [ "affectedCount", "dryRun" ]
       },
       "DryRunView" : {
         "type" : "object",
@@ -32107,11 +32108,11 @@
             "type" : "boolean"
           },
           "node" : {
-            "type" : "string",
+            "type" : [ "string", "null" ],
             "format" : "uuid"
           }
         },
-        "required" : [ "affectedCount", "cap", "node", "overCap" ]
+        "required" : [ "affectedCount", "cap", "overCap" ]
       },
       "PartialView" : {
         "type" : "object",

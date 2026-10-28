@@ -416,6 +416,58 @@ class KafkaRegisterRealBrokerTest extends PostgresIntegrationTest {
     }
 
     @Test
+    void aGroupWithMembersIsNotPurgedAndAnEmptyOneIsMovedToTheEnd() throws Exception {
+        UUID id = ((Attempt.Ok<ClusterDetail>) service.register(request("purge", kafka.getBootstrapServers())))
+                .value()
+                .id();
+        String topic = run + "-purge";
+        String group = run + "-purger";
+        try (Admin admin = Admin.create(Map.of("bootstrap.servers", kafka.getBootstrapServers()))) {
+            admin.createTopics(List.of(new NewTopic(topic, 1, (short) 1))).all().get();
+        }
+        try (KafkaProducer<byte[], byte[]> producer = new KafkaProducer<>(
+                Map.of("bootstrap.servers", kafka.getBootstrapServers()),
+                new ByteArraySerializer(),
+                new ByteArraySerializer())) {
+            for (int i = 0; i < 10; i++) {
+                producer.send(new ProducerRecord<>(topic, 0, new byte[] {1}, new byte[] {2}))
+                        .get();
+            }
+        }
+        Map<String, Object> config = Map.of(
+                "bootstrap.servers", kafka.getBootstrapServers(), "group.id", group, "enable.auto.commit", "false");
+        ResourceId subscription = ResourceId.of("kafka.group-topic", group, topic);
+        try (KafkaConsumer<byte[], byte[]> member =
+                new KafkaConsumer<>(config, new ByteArrayDeserializer(), new ByteArrayDeserializer())) {
+            member.commitSync(Map.of(new TopicPartition(topic, 0), new OffsetAndMetadata(2)));
+            member.subscribe(List.of(topic));
+            long until = System.currentTimeMillis() + 30_000;
+            while (member.assignment().isEmpty() && System.currentTimeMillis() < until) {
+                member.poll(java.time.Duration.ofMillis(200));
+            }
+
+            assertThatThrownBy(() -> messages.purgeLog(id, subscription, true))
+                    .isInstanceOf(ConflictException.class)
+                    .hasMessageContaining("member");
+        }
+        Object outcome = null;
+        for (int attempt = 0; attempt < 50 && outcome == null; attempt++) {
+            try {
+                outcome = ((Attempt.Ok<?>) messages.purgeLog(id, subscription, true)).value();
+            } catch (ConflictException stillLeaving) {
+                Thread.sleep(300);
+            }
+        }
+
+        assertThat(outcome).isInstanceOf(MessageService.Outcome.DryRun.class);
+        assertThat(((MessageService.Outcome.DryRun) outcome).count()).isEqualTo(8);
+        assertThat(((MessageService.Outcome.Affected)
+                                ((Attempt.Ok<?>) messages.purgeLog(id, subscription, false)).value())
+                        .count())
+                .isEqualTo(8);
+    }
+
+    @Test
     void aBootstrapServerNobodyListensOnFailsTheCheckWithItsCause() {
         ConnectionCheck check = check(request("refused", "localhost:1"));
 

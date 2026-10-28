@@ -159,7 +159,9 @@ public final class MessageViews {
     public record AffectedView(
             @Schema(requiredMode = REQUIRED) long affectedCount,
             @Schema(requiredMode = REQUIRED) boolean dryRun,
-            @Schema(requiredMode = REQUIRED) UUID node) {}
+
+            @Schema(nullable = true, description = "The node acted on; null where the system has none.")
+            UUID node) {}
 
     /**
      * An operation by ids that stopped part-way. Some messages were acted on, so this is never
@@ -187,7 +189,7 @@ public final class MessageViews {
             @Schema(requiredMode = REQUIRED) long affectedCount,
             @Schema(requiredMode = REQUIRED) long cap,
             @Schema(requiredMode = REQUIRED) boolean overCap,
-            @Schema(requiredMode = REQUIRED) UUID node) {}
+            @Schema(nullable = true) UUID node) {}
 
     // ---- dead letters (Slice 9) -----------------------------------------
 
