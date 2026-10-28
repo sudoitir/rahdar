@@ -1,4 +1,4 @@
-import { ARTEMIS_KINDS, destinationId, subscriptionIdentity } from '../../test/wire.ts';
+import { ARTEMIS_KINDS, destinationId, subscriptionId, subscriptionIdentity } from '../../test/wire.ts';
 import { beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 import { delay, http, HttpResponse } from 'msw';
 import { act, screen, waitFor, within } from '@testing-library/react';
@@ -38,13 +38,14 @@ vi.mock('./SubscriptionDetailDrawer.tsx', () => ({
     missing,
     onClose,
   }: {
-    subscription: { name: string } | null;
+    subscription: { id: string; name: string } | null;
     missing?: string;
     onClose: () => void;
   }) =>
     subscription ? (
       <div role="dialog" aria-label="Subscription detail">
-        {subscription.name}
+        <span>{subscription.name}</span>
+        <span hidden>{subscription.id}</span>
         <button onClick={onClose}>Close detail</button>
       </div>
     ) : missing ? (
@@ -273,19 +274,19 @@ describe('SubscriptionsView the open subscription', () => {
     const { unmount } = renderWithProviders(<SubscriptionsView />);
 
     await user.click(await screen.findByText('orders.a', { selector: '[role="gridcell"]' }));
-    expect(nextSearch({ q: 'x' })).toEqual({ q: 'x', subscription: 'orders.a' });
+    expect(nextSearch({ q: 'x' })).toEqual({ q: 'x', subscription: subscriptionId('orders.a') });
     unmount();
 
-    search = { subscription: 'orders.a' };
+    search = { subscription: subscriptionId('orders.a') };
     renderWithProviders(<SubscriptionsView />);
     const dialog = await screen.findByRole('dialog', { name: 'Subscription detail' });
     expect(dialog).toHaveTextContent('orders.a');
     await user.click(within(dialog).getByRole('button', { name: 'Close detail' }));
-    expect(nextSearch({ subscription: 'orders.a' })).toEqual({ subscription: undefined });
+    expect(nextSearch({ subscription: subscriptionId('orders.a') })).toEqual({ subscription: undefined });
   });
 
   it('looks up a subscription named by the destination that is not on the loaded page', async () => {
-    search = { subscription: 'elsewhere' };
+    search = { subscription: subscriptionId('elsewhere') };
     server.use(
       http.get('*/api/v1/auth/me', () =>
         HttpResponse.json({ id: 'u1', username: 'admin', mustChangePassword: false, grants: [] }),
@@ -608,5 +609,30 @@ describe('SubscriptionsView with a subscription named like markup', () => {
     const cells = await screen.findAllByRole('gridcell');
     expect(cells.some((cell) => cell.textContent?.includes(name))).toBe(true);
     expect(document.body.querySelector('script, img, [onerror]')).toBeNull();
+  });
+});
+
+describe('SubscriptionsView on a group that reads two topics', () => {
+  const row = (topic: string) => ({
+    ...subscription('billing'),
+    id: `kafka.group-topic/billing/${topic}`,
+    kind: 'kafka.group-topic',
+    destination: `kafka.topic/${topic}`,
+  });
+
+  it('finds the one the address names by its id, and says when that topic has no such group', async () => {
+    search = { subscription: 'kafka.group-topic/billing/payments' };
+    serve({ subscriptions: [row('orders'), row('payments')] });
+    const { unmount } = renderWithProviders(<SubscriptionsView />);
+    const dialog = await screen.findByRole('dialog', { name: 'Subscription detail' });
+    expect(dialog).toHaveTextContent('kafka.group-topic/billing/payments');
+    expect(dialog).not.toHaveTextContent('kafka.group-topic/billing/orders');
+    unmount();
+
+    search = { subscription: 'kafka.group-topic/billing/shipping' };
+    renderWithProviders(<SubscriptionsView />);
+    expect(
+      await screen.findByRole('dialog', { name: 'Subscription not found: kafka.group-topic/billing/shipping' }),
+    ).toBeInTheDocument();
   });
 });

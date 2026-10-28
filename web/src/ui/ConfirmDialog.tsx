@@ -46,8 +46,24 @@ export function ConfirmDialog({
   useEffect(() => {
     if (done) outcome.current?.focus();
   }, [done]);
+  const cancelRef = useRef<HTMLButtonElement>(null);
+  // Cancel is inert while the caller is busy, such as while the estimate the dialog states is taken, and an
+  // inert button cannot hold focus: the dialog that opened in that moment gave it to the page. When the caller
+  // settles and focus is not in the dialog, it is Cancel's, as it is when the dialog opens idle.
+  useEffect(() => {
+    if (!opened || pending || done) return;
+    const button = cancelRef.current;
+    const dialog = button?.closest('[role="dialog"]');
+    if (button && dialog && !dialog.contains(document.activeElement)) button.focus();
+  }, [opened, pending, done]);
   const cancel = (
-    <Button variant="default" data-autofocus={done ? undefined : true} disabled={pending} onClick={onClose}>
+    <Button
+      ref={cancelRef}
+      variant="default"
+      data-autofocus={done ? undefined : true}
+      disabled={pending}
+      onClick={onClose}
+    >
       {done ? 'Close' : dismissLabel}
     </Button>
   );

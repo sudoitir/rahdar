@@ -98,7 +98,7 @@ export function estateSubscriptionColumns(
       cell: (r) => (
         <Link
           to={`/clusters/${r.cluster.id}/subscriptions`}
-          search={{ subscription: r.subscription.name }}
+          search={{ subscription: r.subscription.id }}
           className={linkClasses.link}
         >
           {r.subscription.name}

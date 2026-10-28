@@ -91,6 +91,17 @@ export function subscriptionRef(subscription: { id: string; name: string }): str
   return rest.includes('/') ? subscription.id : subscription.name;
 }
 
+/** The name a subscription id carries: its first path segment, decoded (a Kafka group, an Artemis queue). */
+export function subscriptionNameOf(id: string): string {
+  const rest = id.slice(id.indexOf('/') + 1);
+  const first = rest.split('/', 1)[0] ?? '';
+  try {
+    return decodeURIComponent(first);
+  } catch {
+    return first;
+  }
+}
+
 /** A subscription reference for people: its name, or for a whole id the group and topic without the kind. */
 export function subscriptionRefWords(ref: string): string {
   const slash = ref.indexOf('/');

@@ -146,9 +146,15 @@ describe('the subscription row menu (ADR-0107)', () => {
     await user.keyboard('{Enter}');
 
     // The dialog opens with its preview already taken — the two-phase mount keeps that working.
-    const dialog = await screen.findByRole('dialog', { name: 'Delete orders' });
+    await screen.findByRole('dialog', { name: 'Delete orders' });
     await waitFor(() => expect(urls.some((u) => u.includes('dryRun=true'))).toBe(true));
-    await waitFor(() => expect(dialog).toContainElement(document.activeElement as HTMLElement));
+    // The dialog is looked up again on every attempt: it is rebuilt when the row arrives and again when the
+    // preview does, so a node held from before would be a detached one, and focus never "inside" it.
+    await waitFor(() =>
+      expect(
+        within(screen.getByRole('dialog', { name: 'Delete orders' })).getByRole('button', { name: 'Cancel' }),
+      ).toHaveFocus(),
+    );
 
     await user.keyboard('{Escape}');
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Delete orders' })).not.toBeInTheDocument());

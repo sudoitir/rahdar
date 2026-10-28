@@ -252,14 +252,14 @@ export function SubscriptionsView() {
     size: PAGE_SIZE,
   });
 
-  // The open subscription is an destination, not a copy: held as a name and looked up in the
+  // The open subscription is an destination, not a copy: held as its id and looked up in the
   // rows each render, so a pause, an edit or a delete that refetches the listing is
   // reflected in the panel instead of leaving it showing the subscription as it was when
   // it was opened (non-negotiable #9).
   //
   // A shared or palette link can name a subscription that is not on the loaded page; it is looked up by
-  // name then, rather than the link silently opening nothing.
-  const onPage = (query.data?.data ?? []).find((q) => q.name === search.subscription);
+  // id then, rather than the link silently opening nothing.
+  const onPage = (query.data?.data ?? []).find((q) => q.id === search.subscription);
   const offPage = useSubscription(clusterId, onPage ? undefined : search.subscription);
   const selected = onPage ?? offPage.subscription ?? null;
   // Neither the page nor an exact lookup has it: gone, or no longer visible to the caller. Not while still asking.
@@ -267,7 +267,7 @@ export function SubscriptionsView() {
     !selected && search.subscription && !offPage.isPending && !offPage.isError ? search.subscription : undefined;
   useTitlePart('resource', selected?.name);
   const setSelected = (subscription: SubscriptionView | null) =>
-    navigate({ to: '.', search: (prev: Record<string, unknown>) => ({ ...prev, subscription: subscription?.name }) });
+    navigate({ to: '.', search: (prev: Record<string, unknown>) => ({ ...prev, subscription: subscription?.id }) });
   const [createOpen, setCreateOpen] = useState(false);
   const { can, reach, createPatterns, loading: grantsLoading } = useCan();
   // Through a team or a share the caller may create under their patterns; only with neither is the control not theirs.

@@ -40,7 +40,7 @@ export const SubscriptionPalette: PaletteSource = ({ clusterId, query, opened, r
               description: `${where}backlog ${backlogWords(q.backlog)} · ${q.nodesPresent}/${q.nodesTotal} nodes`,
               // The query itself, so the palette's own filter keeps what the server already matched.
               keywords: [query, destinationOf(q)],
-              onClick: () => navigate({ to: `/clusters/${clusterId}/subscriptions`, search: { subscription: q.name } }),
+              onClick: () => navigate({ to: `/clusters/${clusterId}/subscriptions`, search: { subscription: q.id } }),
             };
           }),
           ...(hasNext
