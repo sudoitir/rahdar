@@ -186,7 +186,6 @@ export function useAbortTransaction(clusterId: string, id: string) {
 // ── Brokers ──────────────────────────────────────────────────────────────────
 
 export type KafkaBroker = Schemas['BrokerRow'];
-export type Quorum = Schemas['BrokerQuorum'];
 export type QuorumVoter = Schemas['QuorumVoter'];
 export type Brokers = Schemas['Brokers'];
 

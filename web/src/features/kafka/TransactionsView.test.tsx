@@ -82,7 +82,7 @@ describe('the transactions', () => {
           HttpResponse.json({
             id: 'payments-1',
             state: 'Ongoing',
-            effect: 'Aborts payments-1 and fences its producer.',
+            effect: 'payments-1 is not open past its timeout, so it cannot be aborted.',
             released: [],
             abortable: false,
             etag: 't1',
@@ -95,8 +95,8 @@ describe('the transactions', () => {
     await user.click(await screen.findByRole('button', { name: 'Abort payments-1' }));
     const dialog = await screen.findByRole('dialog', { name: 'Abort transaction payments-1' });
     expect(
-      await within(dialog).findByText(/Only an open transaction past its timeout can be aborted/),
-    ).toBeInTheDocument();
+      await within(dialog).findAllByText('payments-1 is not open past its timeout, so it cannot be aborted.'),
+    ).not.toHaveLength(0);
     expect(within(dialog).getByRole('button', { name: 'Abort transaction payments-1' })).toBeDisabled();
   });
 
