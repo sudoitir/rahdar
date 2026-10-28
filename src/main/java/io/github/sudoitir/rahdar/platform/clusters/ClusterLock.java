@@ -52,6 +52,9 @@ public class ClusterLock {
     /** How often the held connection is probed while the work runs. */
     static final Duration WATCH = Duration.ofSeconds(2);
 
+    /** How often {@link #runWhenFree} asks for a lock someone else holds. */
+    private static final Duration WAIT_POLL = Duration.ofMillis(50);
+
     private final DataSource dataSource;
 
     /**
@@ -143,6 +146,31 @@ public class ClusterLock {
             log.debug("Could not take the reconcile lock for cluster {}: {}", clusterId, e.getMessage());
             return false;
         }
+    }
+
+    /**
+     * Run {@code work} while holding this cluster's lock in this scope, waiting up to {@code wait} for
+     * whoever holds it now. For work a caller needs done rather than merely attempted: a change that must
+     * be converged before the call that made it returns, where skipping because a pass is running would
+     * leave it to the next scheduled pass.
+     *
+     * @return whether the work ran; {@code false} means the lock was not free within {@code wait}, or the
+     *     database could not be reached
+     */
+    public boolean runWhenFree(UUID clusterId, Scope scope, Duration wait, Runnable work) {
+        long deadline = System.nanoTime() + wait.toNanos();
+        while (!runIfHeld(clusterId, scope, work)) {
+            if (System.nanoTime() >= deadline) {
+                return false;
+            }
+            try {
+                Thread.sleep(WAIT_POLL);
+            } catch (InterruptedException _) {
+                Thread.currentThread().interrupt();
+                return false;
+            }
+        }
+        return true;
     }
 
     /** A lost connection has already lost the lock, so a failed unlock changes nothing. */

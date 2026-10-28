@@ -33,6 +33,7 @@ import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
 import io.github.sudoitir.rahdar.platform.broker.QueueRow;
 import io.github.sudoitir.rahdar.platform.broker.RahdarNames;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
+import io.github.sudoitir.rahdar.platform.clusters.ClusterLock;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterService;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterRepository;
@@ -114,6 +115,9 @@ class PluginMessagingRealBrokerTest extends PostgresIntegrationTest {
 
     @Autowired
     PluginMessagingReconciler reconciler;
+
+    @Autowired
+    ClusterLock clusterLock;
 
     @Autowired
     ClusterService clusterService;
@@ -724,6 +728,78 @@ class PluginMessagingRealBrokerTest extends PostgresIntegrationTest {
         assertThat(messaging(plugin).unregister("orders")).isTrue();
         assertThat(tapQueues()).isEmpty();
         assertThat(messaging(plugin).registrations()).isEmpty();
+    }
+
+    /**
+     * A registration made while another pass holds the cluster's lock (here, on another replica) waits for
+     * it, rather than being left to the next scheduled pass: the tap is installed when the call returns.
+     */
+    @Test
+    void aRegistrationMadeWhileAPassRunsIsInstalledWhenTheCallReturns() throws Exception {
+        String queue = queue("BUSY");
+        String plugin = activate("busy");
+        Thread pass = holdTheLock(Duration.ofSeconds(2));
+        MessageRegistration reg = messaging(plugin)
+                .register(new RegistrationSpec(
+                        "orders", clusterId, ResourceRef.subscription(queue), RegistrationMode.TAP, 1, operator));
+        pass.join();
+        assertThat(reg.state()).isEqualTo(RegistrationState.ACTIVE);
+        assertThat(tapQueues()).hasSize(1);
+    }
+
+    /**
+     * A registration removed while another pass holds the lock is removed once that pass is over, so the
+     * pass never writes state for a registration that is gone, and the tap is gone when the call returns.
+     */
+    @Test
+    void aRegistrationRemovedWhileAPassRunsIsGoneWhenTheCallReturns() throws Exception {
+        String queue = queue("BUSYOFF");
+        String plugin = activate("busyoff");
+        messaging(plugin)
+                .register(new RegistrationSpec(
+                        "orders", clusterId, ResourceRef.subscription(queue), RegistrationMode.TAP, 1, operator));
+        Thread pass = holdTheLock(Duration.ofSeconds(2));
+        assertThat(messaging(plugin).unregister("orders")).isTrue();
+        pass.join();
+        assertThat(tapQueues()).isEmpty();
+        assertThat(messaging(plugin).registrations()).isEmpty();
+    }
+
+    /** A registration moved to another queue keeps only the new queue's tap. */
+    @Test
+    void aRegistrationMovedToAnotherQueueKeepsOnlyTheNewTap() throws Exception {
+        String first = queue("MOVEA");
+        String second = queue("MOVEB");
+        String plugin = activate("move");
+        messaging(plugin)
+                .register(new RegistrationSpec(
+                        "orders", clusterId, ResourceRef.subscription(first), RegistrationMode.TAP, 1, operator));
+        MessageRegistration moved = messaging(plugin)
+                .register(new RegistrationSpec(
+                        "orders", clusterId, ResourceRef.subscription(second), RegistrationMode.TAP, 1, operator));
+
+        assertThat(moved.state()).isEqualTo(RegistrationState.ACTIVE);
+        assertThat(tapQueues()).hasSize(1);
+        assertThat(messaging(plugin).registrations())
+                .singleElement()
+                .satisfies(r -> assertThat(r.source().name()).isEqualTo(second));
+    }
+
+    /** Holds the cluster's plugin messaging lock for {@code hold}, as a pass would; returns once it is held. */
+    private Thread holdTheLock(Duration hold) throws InterruptedException {
+        CountDownLatch held = new CountDownLatch(1);
+        Thread pass = Thread.ofVirtual()
+                .start(() -> clusterLock.runIfHeld(clusterId, ClusterLock.Scope.PLUGIN_MESSAGING, () -> {
+                    held.countDown();
+                    try {
+                        // Nothing releases it early: the latch only bounds the hold.
+                        new CountDownLatch(1).await(hold.toMillis(), TimeUnit.MILLISECONDS);
+                    } catch (InterruptedException _) {
+                        Thread.currentThread().interrupt();
+                    }
+                }));
+        assertThat(held.await(10, TimeUnit.SECONDS)).as("the lock is held").isTrue();
+        return pass;
     }
 
     @Test

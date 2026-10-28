@@ -29,7 +29,9 @@ public final class PluginMessaging {
     }
 
     /**
-     * Store a registration, replacing any under the same key, and try to make it true at once.
+     * Store a registration, replacing any under the same key, and make it true on the broker before
+     * returning: a pass already running over the cluster is waited for, not skipped (ADR-0213). The
+     * returned per-node states say where it could not be made true, and why.
      *
      * @throws RegistrationRefusedException when the acting user may not use the subscription in this mode,
      *     the cluster is unknown, or the subscription is one Rahdar reserves for itself
@@ -38,7 +40,10 @@ public final class PluginMessaging {
         return service.register(pluginId, spec);
     }
 
-    /** Remove a registration and everything it created on the broker. Removing an unknown key is a no-op. */
+    /**
+     * Remove a registration and everything it created on the broker, before returning (ADR-0213). Removing
+     * an unknown key is a no-op.
+     */
     public boolean unregister(String key) {
         return service.unregister(pluginId, key);
     }
