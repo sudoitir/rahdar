@@ -37,7 +37,7 @@ function run(over: Partial<BulkRunView>): BulkRunView {
     overrideCap: false,
     continueOnFailure: false,
     disconnectConsumers: false,
-    selection: { names: ['orders.a'], q: null },
+    selection: { ids: ['artemis.queue/orders.a'], q: null },
     planHash: 'h1',
     auditEventId: 7,
     error: null,

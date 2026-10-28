@@ -245,7 +245,7 @@ export function BulkPreviewDialog({
     execute.reset();
     preview.mutate({
       operation,
-      names: selection.kind === 'names' ? selection.names : null,
+      ids: selection.kind === 'ids' ? selection.ids : null,
       q: selection.kind === 'filter' ? selection.q : null,
       // A bulk delete refuses a subscription with consumers; closing them is not offered in bulk yet.
       disconnectConsumers: false,

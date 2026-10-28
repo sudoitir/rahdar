@@ -2,7 +2,7 @@ import { UnstyledButton } from '@mantine/core';
 import { Link } from '@tanstack/react-router';
 
 import linkClasses from '../../ui/InlineLink.module.css';
-import { nameOf } from '../../kernel/api/resourceId.ts';
+import { subscriptionLabel } from '../../kernel/api/resourceId.ts';
 import { absoluteLabel } from '../../kernel/time/time.ts';
 import { StatusBadge } from '../../ui/StatusBadge.tsx';
 import { MiddleTruncate } from '../../ui/table/MiddleTruncate.tsx';
@@ -33,10 +33,10 @@ export function SubscriptionButton({
     <UnstyledButton
       className={linkClasses.link}
       maw="100%"
-      aria-label={`Show node detail for ${nameOf(item.subscription)}`}
+      aria-label={`Show node detail for ${subscriptionLabel(item.subscription)}`}
       onClick={() => onOpen(item.subscription)}
     >
-      <MiddleTruncate text={nameOf(item.subscription)} />
+      <MiddleTruncate text={subscriptionLabel(item.subscription)} />
     </UnstyledButton>
   );
 }

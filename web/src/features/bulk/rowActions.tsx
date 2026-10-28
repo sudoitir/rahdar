@@ -37,7 +37,7 @@ export function PurgeSubscription({ clusterId, target, host }: Readonly<ActionPr
         host.open(BulkPreviewDialog, {
           clusterId,
           operation: 'PURGE',
-          selection: { kind: 'names', names: [target.name] },
+          selection: { kind: 'ids', ids: [target.id] },
           onStarted: () => {},
         })
       }

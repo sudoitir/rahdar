@@ -167,21 +167,21 @@ function useSubscriptionSelection(rows: SubscriptionView[], total: number, q: st
     setPicked(new Map());
     setAllMatching(false);
   }, [q]);
-  // "All matching" is a filter, not a list of names: the subscriptions on the other pages were never loaded.
-  // Changing any one row turns it back into names, starting from this page.
-  const pageNames = () => new Map(rows.map((r) => [rowKey(r), r.name]));
+  // "All matching" is a filter, not a list of ids: the subscriptions on the other pages were never loaded.
+  // Changing any one row turns it back into ids, starting from this page.
+  const pageIds = () => new Map(rows.map((r) => [rowKey(r), r.id]));
   const toggleRow = (key: string) => {
-    const next = allMatching ? pageNames() : new Map(picked);
+    const next = allMatching ? pageIds() : new Map(picked);
     setAllMatching(false);
     if (next.has(key)) next.delete(key);
-    else next.set(key, rows.find((r) => rowKey(r) === key)?.name ?? key);
+    else next.set(key, rows.find((r) => rowKey(r) === key)?.id ?? key);
     setPicked(next);
   };
   const toggleAll = (keys: string[], allSelected: boolean) => {
-    const next = allMatching ? pageNames() : new Map(picked);
+    const next = allMatching ? pageIds() : new Map(picked);
     setAllMatching(false);
     if (allSelected) keys.forEach((k) => next.delete(k));
-    else rows.forEach((r) => next.set(rowKey(r), r.name));
+    else rows.forEach((r) => next.set(rowKey(r), r.id));
     setPicked(next);
   };
   const selectedKeys: ReadonlySet<string> = allMatching ? new Set(rows.map(rowKey)) : new Set(picked.keys());
@@ -190,7 +190,7 @@ function useSubscriptionSelection(rows: SubscriptionView[], total: number, q: st
   const matching = q ? ` matching "${q}"` : ' on this cluster';
   const selection: SubscriptionSelection = allMatching
     ? { kind: 'filter', q: q ?? '', total }
-    : { kind: 'names', names: [...picked.values()] };
+    : { kind: 'ids', ids: [...picked.values()] };
 
   return {
     picked,

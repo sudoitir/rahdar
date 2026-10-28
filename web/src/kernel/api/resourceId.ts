@@ -102,6 +102,21 @@ export function subscriptionNameOf(id: string): string {
   }
 }
 
+/** A subscription id for people: its path with each segment decoded, so a group on a topic reads "group/topic". */
+export function subscriptionLabel(id: string): string {
+  return id
+    .slice(id.indexOf('/') + 1)
+    .split('/')
+    .map((segment) => {
+      try {
+        return decodeURIComponent(segment);
+      } catch {
+        return segment;
+      }
+    })
+    .join('/');
+}
+
 /** A subscription reference for people: its name, or for a whole id the group and topic without the kind. */
 export function subscriptionRefWords(ref: string): string {
   const slash = ref.indexOf('/');

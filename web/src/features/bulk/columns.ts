@@ -1,6 +1,6 @@
 import { createElement } from 'react';
 
-import { nameOf } from '../../kernel/api/resourceId.ts';
+import { subscriptionLabel } from '../../kernel/api/resourceId.ts';
 import { absoluteLabel } from '../../kernel/time/time.ts';
 import { AUTO, localZone } from '../../kernel/time/timezone.ts';
 import { kindColumn, type Column } from '../../ui/table/index.ts';
@@ -73,7 +73,7 @@ export function itemColumns(destructive: boolean, onOpen: (subscription: string)
     {
       id: 'subscription',
       header: 'Subscription',
-      accessor: (i) => nameOf(i.subscription),
+      accessor: (i) => subscriptionLabel(i.subscription),
       cell: (i) => createElement(SubscriptionButton, { item: i, onOpen }),
       kind: 'identifier',
       priority: 'essential',
@@ -103,7 +103,7 @@ export function previewColumns(destructive: boolean): Column<BulkItemView>[] {
     {
       id: 'subscription',
       header: 'Subscription',
-      accessor: (i) => nameOf(i.subscription),
+      accessor: (i) => subscriptionLabel(i.subscription),
       kind: 'identifier',
       priority: 'essential',
     },

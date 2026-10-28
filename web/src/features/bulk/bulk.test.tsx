@@ -66,7 +66,7 @@ function run(over: Partial<BulkRunView> = {}): BulkRunView {
     overrideCap: false,
     continueOnFailure: false,
     disconnectConsumers: false,
-    selection: { names: ['orders.a', 'orders.b', 'orders.c'], q: null },
+    selection: { ids: ['artemis.queue/orders.a', 'artemis.queue/orders.b', 'artemis.queue/orders.c'], q: null },
     planHash: 'h1',
     auditEventId: 7,
     error: null,
@@ -139,7 +139,10 @@ vi.mock('@tanstack/react-router', async (importOriginal) => ({
 const { BulkActionBar } = await import('./BulkActionBar.tsx');
 const { BulkRunView } = await import('./BulkRunView.tsx');
 
-const THREE: SubscriptionSelection = { kind: 'names', names: ['orders.a', 'orders.b', 'orders.c'] };
+const THREE: SubscriptionSelection = {
+  kind: 'ids',
+  ids: ['artemis.queue/orders.a', 'artemis.queue/orders.b', 'artemis.queue/orders.c'],
+};
 
 function Bar({ selection = THREE, count = 3 }: { selection?: SubscriptionSelection; count?: number }) {
   return <BulkActionBar clusterId="c1" selection={selection} count={count} clear={() => {}} />;
@@ -183,7 +186,7 @@ describe('BulkActionBar', () => {
     // Grants and capabilities have landed and allow every action, so what follows is the selection's doing.
     await waitFor(() => expect(screen.getByRole('button', { name: 'Delete…' })).toBeEnabled());
 
-    rerender(<Bar selection={{ kind: 'names', names: [] }} count={0} />);
+    rerender(<Bar selection={{ kind: 'ids', ids: [] }} count={0} />);
     for (const label of ['Pause', 'Resume', 'Purge…', 'Delete…']) {
       expect(screen.getByRole('button', { name: label })).toBeDisabled();
     }
@@ -206,14 +209,14 @@ describe('BulkPreviewDialog', () => {
       await waitFor(() => expect(preview.bodies).toHaveLength(1));
       expect(preview.bodies[0]).toEqual({
         operation,
-        names: ['orders.a', 'orders.b', 'orders.c'],
+        ids: ['artemis.queue/orders.a', 'artemis.queue/orders.b', 'artemis.queue/orders.c'],
         q: null,
         disconnectConsumers: false,
       });
     },
   );
 
-  it('previews "all matching" as the filter, not as names', async () => {
+  it('previews "all matching" as the filter, not as ids', async () => {
     const preview = capturePreview();
     server.use(meHandler(), clusterHandler(), preview.handler);
     const user = userEvent.setup();
@@ -222,19 +225,24 @@ describe('BulkPreviewDialog', () => {
     await openPreview(user, 'Pause');
 
     await waitFor(() => expect(preview.bodies).toHaveLength(1));
-    expect(preview.bodies[0]).toEqual({ operation: 'PAUSE', names: null, q: 'orders', disconnectConsumers: false });
+    expect(preview.bodies[0]).toEqual({ operation: 'PAUSE', ids: null, q: 'orders', disconnectConsumers: false });
   });
 
-  it('previews a partial selection as exactly the names picked', async () => {
+  it('previews a partial selection as exactly the ids picked', async () => {
     const preview = capturePreview();
     server.use(meHandler(), clusterHandler(), preview.handler);
     const user = userEvent.setup();
-    renderWithProviders(<Bar selection={{ kind: 'names', names: ['orders.b'] }} count={1} />);
+    renderWithProviders(<Bar selection={{ kind: 'ids', ids: ['artemis.queue/orders.b'] }} count={1} />);
 
     await openPreview(user, 'Purge…');
 
     await waitFor(() => expect(preview.bodies).toHaveLength(1));
-    expect(preview.bodies[0]).toEqual({ operation: 'PURGE', names: ['orders.b'], q: null, disconnectConsumers: false });
+    expect(preview.bodies[0]).toEqual({
+      operation: 'PURGE',
+      ids: ['artemis.queue/orders.b'],
+      q: null,
+      disconnectConsumers: false,
+    });
   });
 
   it('states a rejected preview (400) and offers to preview again', async () => {
@@ -331,6 +339,67 @@ describe('BulkPreviewDialog', () => {
     expect(within(dialog).getByText(/1 subscription is refused and will not be touched/)).toBeInTheDocument();
     expect(within(dialog).getByText('It has consumers attached')).toBeInTheDocument();
     expect(within(dialog).getAllByText('unknown').length).toBeGreaterThan(0);
+  });
+
+  it('previews a purge of Artemis and Kafka subscriptions together, refusing an active group by name', async () => {
+    const preview = capturePreview();
+    const kafka = (group: string, over: Partial<BulkItemView>) =>
+      item({
+        subscription: `kafka.group-topic/${group}/orders`,
+        kind: 'kafka.group-topic',
+        kindLabel: { singular: 'Group on topic', plural: 'Groups on topics' },
+        nodes: [],
+        ...over,
+      });
+    server.use(
+      meHandler(),
+      clusterHandler(),
+      http.post('*/api/v1/clusters/c1/bulk/preview', async ({ request }) => {
+        preview.bodies.push(await request.json());
+        return HttpResponse.json(
+          {
+            run: run({ total: 3 }),
+            items: [
+              item({ ordinal: 0 }),
+              kafka('analytics', {
+                ordinal: 1,
+                affected: 1200,
+                warning: 'It moves the group to the end of the log, skipping 1,200 records. Nothing is deleted.',
+              }),
+              kafka('billing', {
+                ordinal: 2,
+                status: 'REFUSED',
+                affected: null,
+                error: 'The group has 2 members (consumer-1, consumer-2). Stop them before purging.',
+              }),
+            ],
+          },
+          { status: 201 },
+        );
+      }),
+    );
+    const user = userEvent.setup();
+    renderWithProviders(
+      <Bar
+        selection={{
+          kind: 'ids',
+          ids: ['artemis.queue/orders.a', 'kafka.group-topic/analytics/orders', 'kafka.group-topic/billing/orders'],
+        }}
+      />,
+    );
+
+    const dialog = await openPreview(user, 'Purge…');
+
+    expect(await within(dialog).findByText(/skipping 1,200 records\. Nothing is deleted/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/1 subscription is refused and will not be touched/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/The group has 2 members \(consumer-1, consumer-2\)/)).toBeInTheDocument();
+    // A group on a topic is named as such, not by its topic alone.
+    expect(within(dialog).getByText('billing/orders')).toBeInTheDocument();
+    expect(within(dialog).getByText('analytics/orders')).toBeInTheDocument();
+    expect(preview.bodies[0]).toMatchObject({
+      operation: 'PURGE',
+      ids: ['artemis.queue/orders.a', 'kafka.group-topic/analytics/orders', 'kafka.group-topic/billing/orders'],
+    });
   });
 
   it('cannot arm a delete until the action and count are typed, then runs it and opens the run', async () => {
@@ -535,6 +604,58 @@ describe('BulkRunView', () => {
     expect(status).toHaveTextContent('8 succeeded');
     expect(status).toHaveTextContent('2 failed');
     expect(screen.getByRole('link', { name: /audit/i })).toHaveAttribute('href', '/clusters/c1/audit?parentId=7');
+  });
+
+  it('shows each subscription of a mixed run with its own outcome, and a group that began rebalancing as failed', async () => {
+    server.use(
+      meHandler(),
+      http.get('*/api/v1/clusters/c1/bulk/runs/r1', () =>
+        HttpResponse.json({
+          run: run({
+            status: 'PARTIAL',
+            total: 3,
+            succeeded: 1,
+            failed: 1,
+            skipped: 1,
+            finishedAt: '2026-09-21T10:02:00Z',
+          }),
+          items: [
+            item({ status: 'SUCCEEDED' }),
+            item({
+              ordinal: 1,
+              subscription: 'kafka.group-topic/analytics/orders',
+              kind: 'kafka.group-topic',
+              status: 'FAILED',
+              error: 'The group began rebalancing. Try again when it is stable.',
+              nodes: [],
+              outcome: [
+                {
+                  nodeId: 'cluster',
+                  nodeName: 'The whole cluster',
+                  status: 'FAILED',
+                  error: 'The group began rebalancing. Try again when it is stable.',
+                },
+              ],
+            }),
+            item({
+              ordinal: 2,
+              subscription: 'kafka.group-topic/billing/orders',
+              kind: 'kafka.group-topic',
+              status: 'REFUSED',
+              error: 'The group has 2 members (consumer-1, consumer-2).',
+              nodes: [],
+            }),
+          ],
+        }),
+      ),
+    );
+    renderWithProviders(<BulkRunView />);
+
+    expect(await screen.findByText('analytics/orders')).toBeInTheDocument();
+    expect(screen.getByText('billing/orders')).toBeInTheDocument();
+    expect(screen.getByText('orders.a')).toBeInTheDocument();
+    expect(screen.getAllByText(/The group began rebalancing/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/The group has 2 members/).length).toBeGreaterThan(0);
   });
 
   it('expands a subscription to its per-node detail', async () => {
