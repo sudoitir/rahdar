@@ -32,7 +32,7 @@ Order: 1, then 2 to 4 (backend and web in parallel against the contract in `desi
 
 ## 5. Plugin messaging, MCP, stacks
 - [x] 5.1 Consume source by subscription reference; Kafka consumer and share groups with release, reject, key ordering and the counted-release disclosure; taps refused on Kafka. Check: plugin messaging tests against a Kafka Testcontainer; japicmp, `Contract.VERSION` if flagged
-- [ ] 5.2 Kafka MCP tools with previews and approval holding; raise the tool budget with a comment. Check: `McpSystemToolsTest`, `McpToolSchemaBudgetTest`
+- [x] 5.2 Kafka MCP tools with previews and approval holding; raise the tool budget with a comment. Check: `McpSystemToolsTest`, `McpToolSchemaBudgetTest`
 - [ ] 5.3 Kafka in the dev compose and a three-broker KRaft cluster in the demo compose and `scripts/demo-seed.sh` (groups, lag, a share group, a hanging transaction). Check: `just demo` brings up both systems and the estate shows both
 
 ## 6. Docs, sweep, review, finish

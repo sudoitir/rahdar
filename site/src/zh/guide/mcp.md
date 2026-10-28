@@ -87,7 +87,7 @@ curl -s https://rahdar.example.com/mcp \
 
 - **密钥永远不会超过它的所有者。** 每次调用都会与所有者*当下*的授权取交集，所以收紧一个人的权限会立刻收紧他的所有密钥（[ADR-0046](/reference/adr/0046-mcp-authenticates-with-existing-api-tokens)，英文）。
 - **变更默认 dry-run。** 真正的破坏性执行还额外要求 `confirm` 等于订阅或目的地自身的名称——这与批量上限的 `override` 是两个不同的问题，`confirm` 永远无法满足 `override`。
-- **Kafka 的变更先预览，再被挂起。** `kafka_preview_offset_reset` 返回每个分区会跳过或重读什么、谁还占着这个消费组，以及一个 `etag`；`kafka_reset_offsets`、`kafka_set_topic_config` 与 `kafka_abort_transaction` 只会按其预览的 `etag` 执行，状态变动后会因过期而被拒绝，并且在审批闸门开启的地方被挂起等待批准。与所有变更类工具一样，安装设为只读时它们会被隐藏。
+- **Kafka 的变更先预览，再被挂起。** `kafka_preview_offset_reset` 返回每个分区会跳过或重读什么、谁还占着这个消费组，以及一个 `etag`；`kafka_reset_offsets`、`kafka_set_topic_config` 与 `kafka_abort_transaction` 只会按其预览的 `etag` 执行，状态变动后会因过期而被拒绝，并且在审批闸门开启的地方被挂起等待批准。真正执行时还需要 `confirm` 等于消费组、主题或事务 id，且 `kafka_set_topic_config` 与 `kafka_abort_transaction` 默认只预览（`dryRun`）。与所有变更类工具一样，安装设为只读时它们会被隐藏。
 - **每次调用都会被审计**，读取也不例外：以 `MCP_TOOL_CALL` 记在所有者名下并附上密钥名称（`ada [token: laptop-agent]`），写明工具、集群和结果。变更写下的审计行（包括 dry run）都挂在它下面（[ADR-0137](/reference/adr/0137-one-gate-on-the-mcp-transport)，英文）。
 - **整个安装可以设为只读。** *Settings → MCP server → Read-only* 会对所有密钥隐藏并拒绝一切变更类工具，无论 `confirm` 为何。单把只读密钥就是只被授予读权限的密钥。
 - **对于密钥没有授权的集群**，返回的是*"不存在这样的集群，或这把密钥对它没有授权"*——既不点名缺了哪项权限，也不确认这个 id 是否存在。

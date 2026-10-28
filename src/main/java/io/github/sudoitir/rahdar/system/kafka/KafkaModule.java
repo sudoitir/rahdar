@@ -3,6 +3,7 @@ package io.github.sudoitir.rahdar.system.kafka;
 import io.github.sudoitir.rahdar.kernel.plugin.FeatureDescriptor;
 import io.github.sudoitir.rahdar.kernel.plugin.PermissionDef;
 import io.github.sudoitir.rahdar.kernel.security.Permissions;
+import io.github.sudoitir.rahdar.system.kafka.mcp.KafkaMcpToolDefs;
 
 /** What only Apache Kafka has: its registration, health and the Kafka namespace (ADR-0216). Module descriptor (ADR-0070). */
 public final class KafkaModule {
@@ -30,6 +31,7 @@ public final class KafkaModule {
                     TRANSACTION_READ, "See a Kafka cluster's transactions", Permissions.CLUSTER_READ))
             .permission(PermissionDef.cluster(
                     TRANSACTION_ABORT, "Abort a Kafka cluster's hanging transactions", TRANSACTION_READ))
+            .mcpTools(KafkaMcpToolDefs.ALL)
             .build();
 
     private KafkaModule() {}

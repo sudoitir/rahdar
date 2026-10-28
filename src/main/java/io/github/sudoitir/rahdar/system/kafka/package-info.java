@@ -16,6 +16,7 @@
             "platform.broker",
             "platform.clusters",
             "platform.clusters::web",
+            "platform.mcp",
             "platform.scrape"
         })
 package io.github.sudoitir.rahdar.system.kafka;

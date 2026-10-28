@@ -11,6 +11,7 @@ import io.github.sudoitir.rahdar.kernel.security.PermissionResolver;
 import io.github.sudoitir.rahdar.platform.broker.BrokerSystems;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.RegisteredCluster;
+import io.github.sudoitir.rahdar.system.kafka.KafkaModule;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -109,5 +110,41 @@ class McpSystemToolsTest {
 
         assertThat(catalog.refusedOnCluster("list_resources", other)).isNull();
         assertThat(catalog.refusedOnCluster("list_resources", null)).isNull();
+    }
+
+    private McpToolCatalog kafkaCatalog() {
+        FeatureRegistry features = mock(FeatureRegistry.class);
+        when(features.enabled()).thenReturn(List.of(KafkaModule.DESCRIPTOR));
+        return new McpToolCatalog(features, mock(ObjectProvider.class), new McpSystems(clusters, systems, perm));
+    }
+
+    @Test
+    void theKafkaToolsAreOfferedOnlyToACallerWhoCanReadAKafkaCluster() {
+        world(false);
+        when(perm.canSeeCluster(other)).thenReturn(false);
+        assertThat(kafkaCatalog().toolNames()).isEmpty();
+
+        when(perm.canSeeCluster(other)).thenReturn(true);
+        assertThat(kafkaCatalog().toolNames())
+                .containsExactlyInAnyOrder(
+                        "kafka_list_groups",
+                        "kafka_describe_group",
+                        "kafka_preview_offset_reset",
+                        "kafka_reset_offsets",
+                        "kafka_topic_config",
+                        "kafka_set_topic_config",
+                        "kafka_list_acls",
+                        "kafka_abort_transaction");
+    }
+
+    @Test
+    void aKafkaToolCalledOnAnArtemisClusterIsAToolErrorThatNamesBoth() {
+        world(true);
+        when(systems.nameOf("artemis")).thenReturn("Artemis");
+
+        assertThat(kafkaCatalog().refusedOnCluster("kafka_reset_offsets", artemis))
+                .isEqualTo("kafka_reset_offsets applies to Kafka clusters; prod runs Artemis.");
+        assertThat(kafkaCatalog().refusedOnCluster("kafka_reset_offsets", other))
+                .isNull();
     }
 }

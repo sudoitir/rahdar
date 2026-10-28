@@ -132,8 +132,10 @@ boring and explicit. This one is:
 - **A Kafka change is previewed first, and held.** `kafka_preview_offset_reset` returns what each partition
   would skip or read again, who still holds the group and an `etag`; `kafka_reset_offsets`,
   `kafka_set_topic_config` and `kafka_abort_transaction` run only against the `etag` of their preview, are
-  refused as stale if the state moved, and are held for approval wherever the approval gate is on. Like every
-  mutating tool they are hidden when the installation is read-only.
+  refused as stale if the state moved, and are held for approval wherever the approval gate is on. A real run also needs
+  `confirm` equal to the group, the topic or the transactional id, and `kafka_set_topic_config` and
+  `kafka_abort_transaction` preview by default (`dryRun`). Like every mutating tool they are hidden when the
+  installation is read-only.
 - **A configuration apply is the same contract at cluster scale.** The dry run
   returns the plan, its hazards and the exact `acknowledge` ids a real run must
   echo; the real run needs `confirm` to equal the cluster's name and
