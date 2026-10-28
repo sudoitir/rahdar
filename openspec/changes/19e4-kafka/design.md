@@ -187,6 +187,9 @@ AIP-193 reason. Built-in roles: operator gains `subscription:seek`, `destination
   within a partition), else NONE (share groups). A cluster-wide drain uses
   `FlowControl(concurrency, 0, 0)`. ACCEPT → Accept; REJECT and handler failures → counted Release;
   RELEASE → uncounted Release.
+  On a consumer group only rejections count: a rejected record is retried in place and then
+  dead-lettered, and an uncounted release is redelivered in place without counting (the plugin sees
+  delivery count 1 on each in-place retry). Only a share group counts a release.
 - **Counted releases.** OpenBroker 0.6.0's `SubscriptionCapabilities` declares whether a release counts
   as a delivery attempt; an ACTIVE registration on such a subscription says so in its state and sets
   `releases_counted`.
