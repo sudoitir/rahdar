@@ -701,7 +701,7 @@ export const KAFKA_ROUTES: RouteSpec[] = [
             .first()
             .click();
           await press(page, 'Show partitions');
-          await dialogOf(page).waitFor();
+          await dialogOf(page).first().waitFor();
           await page.waitForTimeout(1000);
         },
       },
