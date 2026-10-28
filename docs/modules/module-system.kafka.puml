@@ -18,6 +18,7 @@ top to bottom direction
 System_Boundary("RahdarApplication_boundary", "RahdarApplication", $tags="") {
   Container_Boundary("RahdarApplication.RahdarApplication_boundary", "RahdarApplication", $tags="") {
     Component(RahdarApplication.RahdarApplication.Brokerconnectivity, "Broker connectivity", $techn="Module", $descr="", $tags="", $link="")
+    Component(RahdarApplication.RahdarApplication.Clusters, "Clusters", $techn="Module", $descr="", $tags="", $link="")
     Component(RahdarApplication.RahdarApplication.Core, "Core", $techn="Module", $descr="", $tags="", $link="")
     Component(RahdarApplication.RahdarApplication.Kafka, "Kafka", $techn="Module", $descr="", $tags="", $link="")
     Component(RahdarApplication.RahdarApplication.Plugincontract, "Plugin contract", $techn="Module", $descr="", $tags="", $link="")
@@ -27,7 +28,11 @@ System_Boundary("RahdarApplication_boundary", "RahdarApplication", $tags="") {
 
 Rel(RahdarApplication.RahdarApplication.Brokerconnectivity, RahdarApplication.RahdarApplication.Core, "depends on", $techn="", $tags="", $link="")
 Rel(RahdarApplication.RahdarApplication.Brokerconnectivity, RahdarApplication.RahdarApplication.Plugincontract, "depends on", $techn="", $tags="", $link="")
+Rel(RahdarApplication.RahdarApplication.Clusters, RahdarApplication.RahdarApplication.Brokerconnectivity, "uses", $techn="", $tags="", $link="")
+Rel(RahdarApplication.RahdarApplication.Clusters, RahdarApplication.RahdarApplication.Core, "uses", $techn="", $tags="", $link="")
+Rel(RahdarApplication.RahdarApplication.Clusters, RahdarApplication.RahdarApplication.Plugincontract, "uses", $techn="", $tags="", $link="")
 Rel(RahdarApplication.RahdarApplication.Kafka, RahdarApplication.RahdarApplication.Brokerconnectivity, "uses", $techn="", $tags="", $link="")
+Rel(RahdarApplication.RahdarApplication.Kafka, RahdarApplication.RahdarApplication.Clusters, "depends on", $techn="", $tags="", $link="")
 Rel(RahdarApplication.RahdarApplication.Kafka, RahdarApplication.RahdarApplication.Core, "depends on", $techn="", $tags="", $link="")
 Rel(RahdarApplication.RahdarApplication.Kafka, RahdarApplication.RahdarApplication.Plugincontract, "depends on", $techn="", $tags="", $link="")
 Rel(RahdarApplication.RahdarApplication.Plugincontract, RahdarApplication.RahdarApplication.Core, "depends on", $techn="", $tags="", $link="")

@@ -20,6 +20,7 @@ import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshotUpsert;
 import io.github.sudoitir.rahdar.support.AdminAuthenticationExtension;
 import io.github.sudoitir.rahdar.support.ArtemisIntegrationTest;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
+import io.github.sudoitir.rahdar.support.Registrations;
 import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
 import io.github.sudoitir.rahdar.system.artemis.DivertOperations;
 import io.github.sudoitir.rahdar.system.artemis.QueueLifecycleOperations;
@@ -108,7 +109,7 @@ class CaptureTailRealBrokerTest extends PostgresIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        Attempt<ClusterDetail> attempt = clusterService.register(new RegisterClusterRequest(
+        Attempt<ClusterDetail> attempt = clusterService.register(Registrations.artemis(
                 List.of(ArtemisIntegrationTest.jolokiaUrl()),
                 "captured-tail-" + run,
                 null,

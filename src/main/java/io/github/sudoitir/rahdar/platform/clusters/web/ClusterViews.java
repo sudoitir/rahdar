@@ -68,6 +68,100 @@ public final class ClusterViews {
             @Schema(requiredMode = REQUIRED) SystemView system,
             @Schema(requiredMode = REQUIRED) List<KindView> kinds) {}
 
+    /**
+     * What a check of a connection found, before anything is stored (ADR-0213): the version, every node with the
+     * address it advertises and whether Rahdar reached it there, the quorum, what the account may do, and the
+     * cause of a failure with the next action.
+     */
+    public record RegistrationCheck(
+            @Schema(requiredMode = REQUIRED, description = "The system's id, such as kafka.")
+            String system,
+
+            @Schema(nullable = true, description = "The version found; null when the check never reached a broker.")
+            VersionFound version,
+
+            @Schema(requiredMode = REQUIRED, description = "Whether the driver supports what was found.")
+            boolean supported,
+
+            @Schema(nullable = true, description = "The cluster's own id as the brokers report it.")
+            String clusterId,
+
+            @Schema(
+                    nullable = true,
+                    description = "The registered cluster that already holds this one, when the caller may read it.")
+            RegisteredRef alreadyRegistered,
+
+            @Schema(requiredMode = REQUIRED) List<NodeReach> nodes,
+            @Schema(nullable = true) Quorum quorum,
+            @Schema(requiredMode = REQUIRED) List<AccessFinding> access,
+
+            @Schema(nullable = true, description = "Why the check failed, or null when it passed.")
+            Failure failure) {
+
+        public RegistrationCheck withAlreadyRegistered(RegisteredRef ref) {
+            return new RegistrationCheck(system, version, supported, clusterId, ref, nodes, quorum, access, failure);
+        }
+    }
+
+    /** A version as far as it is known: {@code exact} is false when only a lower bound could be read. */
+    public record VersionFound(
+            @Schema(requiredMode = REQUIRED, description = "Such as \"at least 3.5\" or \"4.0.2\".")
+            String text,
+
+            @Schema(nullable = true, description = "The cluster's metadata mode, such as KRaft or ZooKeeper.")
+            String mode,
+
+            @Schema(requiredMode = REQUIRED) boolean exact) {}
+
+    /** A registered cluster, named for a link. */
+    public record RegisteredRef(
+            @Schema(requiredMode = REQUIRED) UUID id,
+            @Schema(requiredMode = REQUIRED) String name) {}
+
+    /** One node of a checked cluster. */
+    public record NodeReach(
+            @Schema(requiredMode = REQUIRED) String id,
+
+            @Schema(nullable = true, description = "The address the node advertises; null when it was never learned.")
+            String address,
+
+            @Schema(requiredMode = REQUIRED, description = "BROKER, CONTROLLER or STORAGE.")
+            List<String> functions,
+
+            @Schema(requiredMode = REQUIRED, description = "OK or UNREACHABLE.")
+            String outcome,
+
+            @Schema(nullable = true, description = "DNS, REFUSED, TIMEOUT, TLS or AUTHENTICATION when unreachable.")
+            String cause,
+
+            @Schema(nullable = true) String message) {}
+
+    /** The controller quorum, or why it cannot be read. */
+    public record Quorum(
+            @Schema(requiredMode = REQUIRED) boolean available,
+            @Schema(nullable = true) String reason,
+            @Schema(nullable = true) String leader,
+            @Schema(nullable = true) Integer voters) {}
+
+    /** What the account may do, one capability at a time. */
+    public record AccessFinding(
+            @Schema(requiredMode = REQUIRED) String capability,
+
+            @Schema(requiredMode = REQUIRED, description = "AVAILABLE, UNAVAILABLE or UNKNOWN.")
+            String status,
+
+            @Schema(requiredMode = REQUIRED) String reason) {}
+
+    /** Why a check failed and what to do next. */
+    public record Failure(
+            @Schema(
+                    requiredMode = REQUIRED,
+                    description = "DNS, REFUSED, TIMEOUT, TLS, AUTHENTICATION, AUTHORIZATION or UNSUPPORTED_VERSION.")
+            String cause,
+
+            @Schema(requiredMode = REQUIRED) String message,
+            @Schema(requiredMode = REQUIRED) String next) {}
+
     /** The full cluster screen payload. */
     public record ClusterDetail(
             @Schema(requiredMode = REQUIRED) UUID id,
@@ -112,7 +206,25 @@ public final class ClusterViews {
             @Schema(
                     nullable = true,
                     description = "The Core account's user name, or null while Core uses the management account")
-            String coreUsername) {}
+            String coreUsername,
+
+            @Schema(nullable = true, description = "A Kafka cluster's connection; null for other systems.")
+            KafkaConnectionDetail kafka) {}
+
+    /** How a Kafka cluster is reached, as stored: never a secret. */
+    public record KafkaConnectionDetail(
+            @Schema(requiredMode = REQUIRED) List<String> bootstrapServers,
+            @Schema(requiredMode = REQUIRED) String securityProtocol,
+            @Schema(nullable = true) String saslMechanism,
+
+            @Schema(nullable = true, description = "The account's user name; null for a token or no account.")
+            String username,
+
+            @Schema(requiredMode = REQUIRED, description = "Whether a password or token is stored.")
+            boolean secretStored,
+
+            @Schema(nullable = true) String tlsBundle,
+            @Schema(nullable = true) String clientId) {}
 
     /** One broker endpoint — a {@code broker_node} row, minus anything secret. */
     public record NodeEndpointView(

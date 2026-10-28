@@ -115,6 +115,23 @@ public class BrokerNodeEntity implements ClusterNode {
     @Column(name = "clock_uncertainty_ms")
     private Integer clockUncertaintyMs;
 
+    /** A broker or controller a driver reported: its own id, a name for people and every address it advertises. */
+    public static BrokerNodeEntity reported(UUID clusterId, String name, String nativeId, List<Endpoint> reached) {
+        BrokerNodeEntity n = new BrokerNodeEntity();
+        n.clusterId = clusterId;
+        n.name = name;
+        n.nativeNodeId = nativeId;
+        reached.forEach(e -> n.setEndpoint(e.plane(), e.protocol(), e.address(), Source.DISCOVERED));
+        return n;
+    }
+
+    /** Replaces what the driver reports of a node it already knows. */
+    public void mergeReported(String name, List<Endpoint> reached) {
+        this.name = name;
+        endpoints.clear();
+        reached.forEach(e -> setEndpoint(e.plane(), e.protocol(), e.address(), Source.DISCOVERED));
+    }
+
     /** A row learned from the broker's topology: named after its connector, no management URL yet. */
     public static BrokerNodeEntity discovered(UUID clusterId, String connector, String haDesignation, String nodeId) {
         BrokerNodeEntity n = new BrokerNodeEntity();

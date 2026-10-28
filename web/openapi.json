@@ -29193,6 +29193,13 @@
           "coreUsername" : {
             "type" : [ "string", "null" ],
             "description" : "The Core account's user name, or null while Core uses the management account"
+          },
+          "kafka" : {
+            "anyOf" : [ {
+              "$ref" : "#/components/schemas/KafkaConnectionDetail"
+            }, {
+              "type" : "null"
+            } ]
           }
         },
         "required" : [ "seedUrls" ]
@@ -29295,6 +29302,38 @@
           }
         },
         "required" : [ "clusterId", "credentialRejections", "level", "liveEndpointNames", "notes", "replicationBehind", "splitBrain" ]
+      },
+      "KafkaConnectionDetail" : {
+        "type" : "object",
+        "properties" : {
+          "bootstrapServers" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "securityProtocol" : {
+            "type" : "string"
+          },
+          "saslMechanism" : {
+            "type" : [ "string", "null" ]
+          },
+          "username" : {
+            "type" : [ "string", "null" ],
+            "description" : "The account's user name; null for a token or no account."
+          },
+          "secretStored" : {
+            "type" : "boolean",
+            "description" : "Whether a password or token is stored."
+          },
+          "tlsBundle" : {
+            "type" : [ "string", "null" ]
+          },
+          "clientId" : {
+            "type" : [ "string", "null" ]
+          }
+        },
+        "required" : [ "bootstrapServers", "secretStored", "securityProtocol" ]
       },
       "KindName" : {
         "type" : "object",

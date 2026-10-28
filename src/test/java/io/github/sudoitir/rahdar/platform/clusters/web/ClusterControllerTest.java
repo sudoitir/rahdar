@@ -167,9 +167,33 @@ class ClusterControllerTest extends PostgresIntegrationTest {
 
     private String registerBody() {
         return """
-                { "seedUrls": ["%s"], "name": "prod-emea",
-                  "credentials": { "username": "artemis", "password": "artemis" } }
+                { "system": "artemis", "name": "prod-emea",
+                  "connection": { "system": "artemis", "seedUrls": ["%s"],
+                    "credentials": { "username": "artemis", "password": "artemis" } } }
                 """.formatted(SEED);
+    }
+
+    @Test
+    void aSystemRahdarDoesNotLoadIsRefusedNamingTheSupportedOnes() throws Exception {
+        mvc.perform(post("/api/v1/clusters")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                { "system": "rabbitmq", "connection": { "system": "rabbitmq" } }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value(Matchers.endsWith("/problems/unsupported-system")))
+                .andExpect(jsonPath("$.detail").value(Matchers.containsString("Supported systems: artemis, kafka.")));
+    }
+
+    @Test
+    void aConnectionShapedForAnotherSystemIsRefused() throws Exception {
+        mvc.perform(post("/api/v1/clusters")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                { "system": "kafka", "connection": { "system": "artemis", "seedUrls": ["http://a:8161/console/jolokia"] } }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value(Matchers.endsWith("/problems/unsupported-system")));
     }
 
     @Test
@@ -329,9 +353,10 @@ class ClusterControllerTest extends PostgresIntegrationTest {
 
     private String registerBody(boolean adopt) {
         return """
-                { "seedUrls": ["%s"], "name": "prod-emea", "adopt": %s,
-                  "credentials": { "username": "artemis", "password": "artemis" } }
-                """.formatted(SEED, adopt);
+                { "system": "artemis", "name": "prod-emea", "adopt": %s,
+                  "connection": { "system": "artemis", "seedUrls": ["%s"],
+                    "credentials": { "username": "artemis", "password": "artemis" } } }
+                """.formatted(adopt, SEED);
     }
 
     @Test
@@ -523,8 +548,9 @@ class ClusterControllerTest extends PostgresIntegrationTest {
                         .param("dryRun", String.valueOf(dryRun))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                { "seedUrls": ["%s"], "name": "prod-emea-again",
-                                  "credentials": { "username": "artemis", "password": "artemis" } }
+                                { "system": "artemis", "name": "prod-emea-again",
+                                  "connection": { "system": "artemis", "seedUrls": ["%s"],
+                                    "credentials": { "username": "artemis", "password": "artemis" } } }
                                 """.formatted(alias)))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.type").value(Matchers.endsWith("/problems/cluster-already-registered")))

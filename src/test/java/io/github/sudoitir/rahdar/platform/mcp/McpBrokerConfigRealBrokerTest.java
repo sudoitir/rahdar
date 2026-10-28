@@ -21,6 +21,7 @@ import io.github.sudoitir.rahdar.support.AdminAuthenticationExtension;
 import io.github.sudoitir.rahdar.support.ArtemisIntegrationTest;
 import io.github.sudoitir.rahdar.support.McpFixture;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
+import io.github.sudoitir.rahdar.support.Registrations;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -101,7 +102,7 @@ class McpBrokerConfigRealBrokerTest extends PostgresIntegrationTest {
         // calls below go through the security filter chain with a minted key, and
         // one MockMvc cannot be both that and an authenticated browser session.
         // What matters here is that discovery and credential sealing are real.
-        var attempt = clusterService.register(new RegisterClusterRequest(
+        var attempt = clusterService.register(Registrations.artemis(
                 List.of(ArtemisIntegrationTest.jolokiaUrl()),
                 clusterName,
                 null,

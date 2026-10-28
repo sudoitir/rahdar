@@ -1,0 +1,297 @@
+package io.github.sudoitir.rahdar.system.kafka;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
+import io.github.sudoitir.openbroker.BrokerDrivers;
+import io.github.sudoitir.openbroker.BrokerException;
+import io.github.sudoitir.openbroker.ConnectionReport;
+import io.github.sudoitir.openbroker.Dispatch;
+import io.github.sudoitir.openbroker.Endpoint;
+import io.github.sudoitir.openbroker.ErrorInfo;
+import io.github.sudoitir.openbroker.ErrorReasons;
+import io.github.sudoitir.openbroker.NodeId;
+import io.github.sudoitir.openbroker.NodeOutcome;
+import io.github.sudoitir.openbroker.Partial;
+import io.github.sudoitir.openbroker.Plane;
+import io.github.sudoitir.openbroker.Status;
+import io.github.sudoitir.openbroker.access.AccessSnapshot;
+import io.github.sudoitir.openbroker.kafka.KafkaOptions;
+import io.github.sudoitir.openbroker.model.Attributes;
+import io.github.sudoitir.openbroker.model.Designation;
+import io.github.sudoitir.openbroker.model.Membership;
+import io.github.sudoitir.openbroker.model.NodeDescription;
+import io.github.sudoitir.openbroker.model.NodeFunction;
+import io.github.sudoitir.openbroker.model.Serving;
+import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
+import io.github.sudoitir.rahdar.platform.broker.ConnectionSettingsSource;
+import io.github.sudoitir.rahdar.platform.broker.CoreConnectionSettings;
+import io.github.sudoitir.rahdar.platform.clusters.ClusterRegistrar.Checked;
+import io.github.sudoitir.rahdar.platform.clusters.ClusterRegistrar.Resolved;
+import io.github.sudoitir.rahdar.platform.clusters.web.ClusterRequests.KafkaConnectionUpdate;
+import io.github.sudoitir.rahdar.platform.clusters.web.ClusterRequests.KafkaCredentials;
+import io.github.sudoitir.rahdar.platform.clusters.web.ClusterRequests.RegisterClusterRequest.KafkaConnection;
+import io.github.sudoitir.rahdar.system.kafka.internal.persistence.KafkaConnectionEntity;
+import io.github.sudoitir.rahdar.system.kafka.internal.persistence.KafkaConnectionRepository;
+import java.time.Instant;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+import org.junit.jupiter.api.Test;
+
+/** The Kafka connection is checked as a whole, and a check names every node and each failure's cause. */
+class KafkaRegistrarTest {
+
+    private final BrokerGateway gateway = mock(BrokerGateway.class);
+    private final KafkaConnectionRepository connections = mock(KafkaConnectionRepository.class);
+    private final ConnectionSettingsSource settings = mock(ConnectionSettingsSource.class);
+    private final KafkaRegistrar registrar = new KafkaRegistrar(gateway, BrokerDrivers.load(), connections, settings);
+
+    private static KafkaConnection plaintext(String... servers) {
+        return new KafkaConnection(
+                KafkaModule.SYSTEM, List.of(servers), KafkaOptions.PLAINTEXT, null, null, null, null);
+    }
+
+    private static KafkaConnection sasl(String mechanism, KafkaCredentials credentials) {
+        return new KafkaConnection(
+                KafkaModule.SYSTEM, List.of("k1:9092"), KafkaOptions.SASL_SSL, mechanism, credentials, null, null);
+    }
+
+    // ---- bootstrap servers ----------------------------------------------------------------------------------
+
+    @Test
+    void everyTokenOfTheFieldIsKeptWithTheDefaultPort() {
+        assertThat(KafkaRegistrar.parse(List.of("k1:9092, k2\nk3:9093", "k1:9092")))
+                .containsExactly("k1:9092", "k2:9092", "k3:9093");
+    }
+
+    @Test
+    void aSchemeOrAnAccountIsRefused() {
+        assertThatThrownBy(() -> KafkaRegistrar.parse(List.of("kafka://k1:9092")))
+                .hasMessageContaining("without a scheme or an account");
+        assertThatThrownBy(() -> KafkaRegistrar.parse(List.of("user:pw@k1:9092")))
+                .hasMessageContaining("without a scheme or an account");
+        assertThatThrownBy(() -> KafkaRegistrar.parse(List.of("k1:notaport"))).hasMessageContaining("port");
+    }
+
+    // ---- security settings ----------------------------------------------------------------------------------
+
+    @Test
+    void aMechanismIsRequiredExactlyForSasl() {
+        assertThatThrownBy(() -> KafkaRegistrar.validated(sasl(null, null)))
+                .hasMessageContaining("saslMechanism is required");
+        KafkaConnection stray = new KafkaConnection(
+                KafkaModule.SYSTEM, List.of("k1"), KafkaOptions.SSL, KafkaOptions.PLAIN, null, null, null);
+        assertThatThrownBy(() -> KafkaRegistrar.validated(stray)).hasMessageContaining("only for SASL");
+    }
+
+    @Test
+    void credentialsMustMatchTheMechanismAndNameTheMissingMember() {
+        assertThatThrownBy(() ->
+                        KafkaRegistrar.validated(sasl(KafkaOptions.PLAIN, new KafkaCredentials(null, "pw", null))))
+                .hasMessageContaining("credentials.username");
+        assertThatThrownBy(() -> KafkaRegistrar.validated(
+                        sasl(KafkaOptions.SCRAM_SHA_512, new KafkaCredentials("u", null, null))))
+                .hasMessageContaining("credentials.password");
+        assertThatThrownBy(() ->
+                        KafkaRegistrar.validated(sasl(KafkaOptions.OAUTHBEARER, new KafkaCredentials("u", "p", null))))
+                .hasMessageContaining("credentials.token");
+        assertThat(KafkaRegistrar.validated(sasl(KafkaOptions.OAUTHBEARER, new KafkaCredentials(null, null, "t"))))
+                .isNotNull();
+    }
+
+    @Test
+    void anAccountOnAPlainConnectionIsRefused() {
+        KafkaConnection withAccount = new KafkaConnection(
+                KafkaModule.SYSTEM,
+                List.of("k1"),
+                KafkaOptions.PLAINTEXT,
+                null,
+                new KafkaCredentials("u", "p", null),
+                null,
+                null);
+        assertThatThrownBy(() -> KafkaRegistrar.validated(withAccount)).hasMessageContaining("only for SASL");
+    }
+
+    // ---- what a check reports -------------------------------------------------------------------------------
+
+    private static NodeDescription broker(String id, String address, boolean voter, boolean leader) {
+        return new NodeDescription(
+                NodeId.of(id),
+                id,
+                new Membership(Optional.empty(), Designation.NONE, Serving.ACTIVE, Optional.empty()),
+                Set.of(NodeFunction.BROKER),
+                List.of(Endpoint.of(Plane.DATA, KafkaOptions.PROTOCOL, address)),
+                Optional.empty(),
+                List.of(),
+                Attributes.builder()
+                        .putRaw("kafka.cluster_id", "Mk3OEYBSD34fcwNTJENDM2Qk")
+                        .putRaw("kafka.quorum_voter", voter)
+                        .putRaw("kafka.quorum_leader", leader)
+                        .build(),
+                Optional.empty());
+    }
+
+    private static BrokerException refused(String reason, Throwable cause) {
+        return new BrokerException(
+                Status.UNAVAILABLE,
+                new ErrorInfo(reason, ErrorReasons.DOMAIN, Map.of()),
+                Dispatch.NOT_SENT,
+                null,
+                "broker said no",
+                cause);
+    }
+
+    @Test
+    void aPartlyReachedClusterNamesTheNodeItCouldNotReach() {
+        NodeDescription one = broker("1", "k1:9092", true, true);
+        NodeDescription two = broker("2", "k2:9092", true, false);
+        BrokerException unreachable =
+                refused(ErrorReasons.UNREACHABLE, new java.net.ConnectException("Connection refused"));
+        Partial<List<NodeDescription>> nodes = new Partial<>(
+                List.of(one, two),
+                Map.of(
+                        one.node(),
+                        NodeOutcome.APPLIED,
+                        two.node(),
+                        NodeOutcome.APPLIED,
+                        NodeId.of("3"),
+                        NodeOutcome.FAILED),
+                Map.of(NodeId.of("3"), unreachable));
+        when(gateway.verify(any(), any(), any(), any()))
+                .thenReturn(new ConnectionReport(nodes, new AccessSnapshot(Map.of(), Instant.now())));
+
+        Checked checked = registrar.check(plaintext("k1"));
+
+        assertThat(checked.passed()).isTrue();
+        assertThat(checked.view().clusterId()).isEqualTo("Mk3OEYBSD34fcwNTJENDM2Qk");
+        assertThat(checked.view().nodes())
+                .extracting(n -> n.id() + ":" + n.outcome() + ":" + n.cause())
+                .containsExactly("1:OK:null", "2:OK:null", "3:UNREACHABLE:REFUSED");
+        assertThat(checked.view().quorum().available()).isTrue();
+        assertThat(checked.view().quorum().leader()).isEqualTo("1");
+        assertThat(checked.view().quorum().voters()).isEqualTo(2);
+        assertThat(checked.view().version().mode()).isEqualTo("KRaft");
+        assertThat(checked.view().version().exact()).isFalse();
+        assertThat(checked.view().version().text()).startsWith("at least ");
+        assertThat(checked.nodes()).extracting(n -> n.name()).containsExactly("broker-1", "broker-2");
+    }
+
+    @Test
+    void aClusterWithNoVotersIsZooKeeperAndItsQuorumIsUnavailable() {
+        NodeDescription one = broker("1", "k1:9092", false, false);
+        when(gateway.verify(any(), any(), any(), any()))
+                .thenReturn(new ConnectionReport(
+                        Partial.complete(List.of(one), List.of(one.node())),
+                        new AccessSnapshot(Map.of(), Instant.now())));
+
+        Checked checked = registrar.check(plaintext("k1"));
+
+        assertThat(checked.view().version().mode()).isEqualTo("ZooKeeper");
+        assertThat(checked.view().quorum().available()).isFalse();
+        assertThat(checked.view().quorum().reason()).contains("ZooKeeper");
+    }
+
+    @Test
+    void eachFailureNamesItsCauseAndTheNextAction() {
+        assertCause(refused(ErrorReasons.CREDENTIALS_REJECTED, null), "AUTHENTICATION");
+        assertCause(refused(ErrorReasons.NOT_AUTHORIZED, null), "AUTHORIZATION");
+        assertCause(refused(ErrorReasons.TLS_HANDSHAKE_FAILED, null), "TLS");
+        assertCause(refused(ErrorReasons.UNSUPPORTED_VERSION, null), "UNSUPPORTED_VERSION");
+        assertCause(refused(ErrorReasons.UNREACHABLE, new java.net.UnknownHostException("k1")), "DNS");
+        assertCause(refused(ErrorReasons.UNREACHABLE, new java.net.ConnectException("Connection refused")), "REFUSED");
+        assertCause(refused(ErrorReasons.UNREACHABLE, new java.net.SocketTimeoutException("timed out")), "TIMEOUT");
+    }
+
+    private void assertCause(BrokerException failure, String cause) {
+        doThrow(failure).when(gateway).verify(any(), any(), any(), any());
+
+        Checked checked = registrar.check(plaintext("k1"));
+
+        assertThat(checked.passed()).isFalse();
+        assertThat(checked.view().failure().cause()).isEqualTo(cause);
+        assertThat(checked.view().failure().next()).isNotBlank();
+        assertThat(checked.view().supported()).isEqualTo(!cause.equals("UNSUPPORTED_VERSION"));
+    }
+
+    @Test
+    void anAuthorizationFailureSaysTheAccountWasAccepted() {
+        doThrow(refused(ErrorReasons.NOT_AUTHORIZED, null)).when(gateway).verify(any(), any(), any(), any());
+
+        assertThat(registrar.check(plaintext("k1")).view().failure().message()).contains("accepted");
+    }
+
+    // ---- editing --------------------------------------------------------------------------------------------
+
+    private UUID storedScram() {
+        UUID id = UUID.randomUUID();
+        when(connections.findById(id))
+                .thenReturn(Optional.of(new KafkaConnectionEntity(
+                        id, "k1:9092", KafkaOptions.SASL_SSL, KafkaOptions.SCRAM_SHA_512, null)));
+        when(settings.coreSettings(id)).thenReturn(new CoreConnectionSettings(id, "app", "stored-pw", null, true));
+        return id;
+    }
+
+    @Test
+    void anOmittedSecretKeepsTheStoredOneWhenNothingAboutTheDestinationChanged() {
+        UUID id = storedScram();
+
+        Resolved resolved =
+                registrar.edited(id, new KafkaConnectionUpdate(null, null, null, null, null, "renamed-client"));
+
+        KafkaConnection connection = (KafkaConnection) resolved.connection();
+        assertThat(connection.credentials().password()).isEqualTo("stored-pw");
+        assertThat(connection.clientId()).isEqualTo("renamed-client");
+        assertThat(resolved.account()).isNull();
+    }
+
+    @Test
+    void aNewServerNeedsTheSecretAgain() {
+        UUID id = storedScram();
+
+        assertThatThrownBy(() -> registrar.edited(
+                        id, new KafkaConnectionUpdate(List.of("k1:9092", "k9:9092"), null, null, null, null, null)))
+                .hasMessageContaining("Enter the password again");
+    }
+
+    @Test
+    void aNewUserNameNeedsTheSecretAgain() {
+        UUID id = storedScram();
+
+        assertThatThrownBy(() -> registrar.edited(
+                        id,
+                        new KafkaConnectionUpdate(
+                                null, null, null, new KafkaCredentials("someone", null, null), null, null)))
+                .hasMessageContaining("Enter the password again");
+    }
+
+    @Test
+    void aRotatedPasswordIsStoredAndUsedForTheCheck() {
+        UUID id = storedScram();
+
+        Resolved resolved = registrar.edited(
+                id,
+                new KafkaConnectionUpdate(null, null, null, new KafkaCredentials("app", "new-pw", null), null, null));
+
+        assertThat(((KafkaConnection) resolved.connection()).credentials().password())
+                .isEqualTo("new-pw");
+        assertThat(resolved.account().secret()).isEqualTo("new-pw");
+    }
+
+    @Test
+    void movingToAPlainProtocolClearsTheStoredAccount() {
+        UUID id = storedScram();
+
+        Resolved resolved =
+                registrar.edited(id, new KafkaConnectionUpdate(null, KafkaOptions.PLAINTEXT, null, null, null, null));
+
+        assertThat(((KafkaConnection) resolved.connection()).credentials()).isNull();
+        assertThat(resolved.account().secret()).isNull();
+    }
+}

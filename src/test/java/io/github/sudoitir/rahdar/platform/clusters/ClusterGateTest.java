@@ -40,6 +40,7 @@ import io.github.sudoitir.rahdar.platform.clusters.web.EnvironmentViews.Environm
 import io.github.sudoitir.rahdar.platform.clusters.web.EnvironmentViews.EnvironmentView;
 import io.github.sudoitir.rahdar.support.AdminAuthenticationExtension;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
+import io.github.sudoitir.rahdar.support.Registrations;
 import io.github.sudoitir.rahdar.system.artemis.ArtemisModule;
 import java.time.Duration;
 import java.time.Instant;
@@ -333,7 +334,7 @@ class ClusterGateTest extends PostgresIntegrationTest {
 
     @Test
     void aRegistrationShowsItsAccountsWithoutTheirPasswords() {
-        var request = new RegisterClusterRequest(
+        var request = Registrations.artemis(
                 List.of("http://a:8161/console/jolokia"),
                 "prod-eu",
                 null,
@@ -348,16 +349,20 @@ class ClusterGateTest extends PostgresIntegrationTest {
 
         assertThat(rows.toString()).contains("admin", "core").doesNotContain("s3cret");
         assertThat(clusterRegisterOperation.redactedPaths())
-                .containsExactlyInAnyOrder("/credentials/password", "/coreCredentials/password");
+                .containsExactlyInAnyOrder(
+                        "/connection/credentials/password",
+                        "/connection/credentials/token",
+                        "/connection/coreCredentials/password");
         assertThat(clusterRegisterOperation.summary(request)).isEqualTo("Register cluster prod-eu");
         assertThat(clusterRegisterOperation.traits(request)).isEqualTo(Set.of(Trait.ACCESS_CONTROL));
-        assertThat(clusterRegisterOperation.estimate(request).etag()).isEqualTo("seeds:http://a:8161/console/jolokia");
+        assertThat(clusterRegisterOperation.estimate(request).etag())
+                .isEqualTo("targets:http://a:8161/console/jolokia");
     }
 
     @Test
     void aHeldRegistrationIsTheRequestItselfAndAnInvalidOneIsRefusedBeforeTheGate() {
         holds();
-        var request = new RegisterClusterRequest(
+        var request = Registrations.artemis(
                 List.of("http://a:8161/console/jolokia"),
                 "prod-eu",
                 null,
@@ -382,7 +387,8 @@ class ClusterGateTest extends PostgresIntegrationTest {
                 null,
                 null,
                 new AccountUpdate("admin", "s3cret"),
-                AccountUpdate.CLEAR);
+                AccountUpdate.CLEAR,
+                null);
         ClusterUpdateParams params = new ClusterUpdateParams(
                 clusterId,
                 request.name(),
@@ -392,7 +398,8 @@ class ClusterGateTest extends PostgresIntegrationTest {
                 request.tlsBundle(),
                 request.management(),
                 null,
-                true);
+                true,
+                null);
 
         ClusterUpdateParams back =
                 JsonMapper.builder().build().readValue(CanonicalJson.write(params), ClusterUpdateParams.class);
@@ -400,7 +407,11 @@ class ClusterGateTest extends PostgresIntegrationTest {
         assertThat(back).isEqualTo(params);
         assertThat(back.toRequest().core()).isSameAs(AccountUpdate.CLEAR);
         assertThat(clusterUpdateOperation.redactedPaths())
-                .containsExactlyInAnyOrder("/management/password", "/core/password");
+                .containsExactlyInAnyOrder(
+                        "/management/password",
+                        "/core/password",
+                        "/connection/credentials/password",
+                        "/connection/credentials/token");
         assertThat(clusterUpdateOperation.display(params).toString())
                 .doesNotContain("s3cret")
                 .contains("cleared");

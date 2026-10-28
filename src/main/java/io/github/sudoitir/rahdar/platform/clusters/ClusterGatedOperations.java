@@ -18,6 +18,9 @@ import io.github.sudoitir.rahdar.platform.clusters.EnvironmentService.Environmen
 import io.github.sudoitir.rahdar.platform.clusters.EnvironmentService.EnvironmentUpdateParams;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterRequests.AccountUpdate;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterRequests.RegisterClusterRequest;
+import io.github.sudoitir.rahdar.platform.clusters.web.ClusterRequests.RegisterClusterRequest.ArtemisConnection;
+import io.github.sudoitir.rahdar.platform.clusters.web.ClusterRequests.RegisterClusterRequest.KafkaConnection;
+import io.github.sudoitir.rahdar.platform.clusters.web.ClusterRequests.RegisterClusterRequest.UnknownConnection;
 import io.github.sudoitir.rahdar.platform.clusters.web.EnvironmentViews.EnvironmentRequest;
 import java.util.ArrayList;
 import java.util.List;
@@ -180,6 +183,15 @@ class ClusterGatedOperations {
         };
     }
 
+    /** What the request reaches the cluster at: its seed URLs or its bootstrap servers. */
+    private static List<String> targets(RegisterClusterRequest p) {
+        return switch (p.connection()) {
+            case ArtemisConnection a -> a.seedUrls();
+            case KafkaConnection k -> k.bootstrapServers();
+            case UnknownConnection _ -> List.of(p.system());
+        };
+    }
+
     @Bean
     GatedOperation<RegisterClusterRequest> clusterRegisterOperation(
             ClusterService service, EnvironmentService environments) {
@@ -192,29 +204,50 @@ class ClusterGatedOperations {
             @Override
             public String summary(RegisterClusterRequest p) {
                 return "Register cluster "
-                        + (p.name() != null ? p.name() : p.seedUrls().getFirst());
+                        + (p.name() != null ? p.name() : targets(p).getFirst());
             }
 
             @Override
             public List<DisplayRow> display(RegisterClusterRequest p) {
                 List<DisplayRow> rows = new ArrayList<>();
                 rows.add(DisplayRow.of("Name", p.name()));
-                rows.add(DisplayRow.of("Seed URLs", String.join(", ", p.seedUrls())));
+                rows.add(DisplayRow.of("System", p.system()));
+                rows.add(DisplayRow.of(
+                        p.connection() instanceof KafkaConnection ? "Bootstrap servers" : "Seed URLs",
+                        String.join(", ", targets(p))));
                 rows.add(DisplayRow.of(LABEL_ENVIRONMENT, environments.labelOf(p.environmentId())));
-                if (p.hasCredentials()) {
-                    rows.add(DisplayRow.of("Management account", p.credentials().username()));
+                switch (p.connection()) {
+                    case ArtemisConnection a -> {
+                        if (a.credentials() != null) {
+                            rows.add(DisplayRow.of(
+                                    "Management account", a.credentials().username()));
+                        }
+                        if (a.coreCredentials() != null) {
+                            rows.add(DisplayRow.of(
+                                    LABEL_CORE_ACCOUNT, a.coreCredentials().username()));
+                        }
+                        rows.add(DisplayRow.of("Adopt the running configuration", p.adopts() ? "yes" : "no"));
+                    }
+                    case KafkaConnection k -> {
+                        rows.add(DisplayRow.of("Security protocol", k.securityProtocol()));
+                        if (k.saslMechanism() != null) {
+                            rows.add(DisplayRow.of("SASL mechanism", k.saslMechanism()));
+                        }
+                        if (k.credentials() != null && k.credentials().username() != null) {
+                            rows.add(DisplayRow.of("Account", k.credentials().username()));
+                        }
+                    }
+                    case UnknownConnection _ -> {}
                 }
-                if (p.hasCoreCredentials()) {
-                    rows.add(DisplayRow.of(
-                            LABEL_CORE_ACCOUNT, p.coreCredentials().username()));
-                }
-                rows.add(DisplayRow.of("Adopt the running configuration", p.adopts() ? "yes" : "no"));
                 return rows;
             }
 
             @Override
             public Set<String> redactedPaths() {
-                return Set.of("/credentials/password", "/coreCredentials/password");
+                return Set.of(
+                        "/connection/credentials/password",
+                        "/connection/credentials/token",
+                        "/connection/coreCredentials/password");
             }
 
             @Override
@@ -222,9 +255,8 @@ class ClusterGatedOperations {
                 return new Effect(
                         1,
                         UNIT_CLUSTERS,
-                        "seeds:"
-                                + String.join(
-                                        ",", p.seedUrls().stream().sorted().toList()),
+                        "targets:"
+                                + String.join(",", targets(p).stream().sorted().toList()),
                         null);
             }
 
@@ -262,6 +294,20 @@ class ClusterGatedOperations {
                 }
                 addIfSet(rows, "Management URL pattern", p.managementUrlPattern());
                 addIfSet(rows, "TLS bundle", p.tlsBundle());
+                if (p.connection() != null) {
+                    addIfSet(
+                            rows,
+                            "Bootstrap servers",
+                            p.connection().bootstrapServers() == null
+                                    ? null
+                                    : String.join(", ", p.connection().bootstrapServers()));
+                    addIfSet(rows, "Security protocol", p.connection().securityProtocol());
+                    addIfSet(rows, "SASL mechanism", p.connection().saslMechanism());
+                    if (p.connection().credentials() != null) {
+                        addIfSet(rows, "Account", p.connection().credentials().username());
+                        rows.add(DisplayRow.of("Account secret", REDACTED_PASSWORD));
+                    }
+                }
                 account(rows, "Management account", p.management());
                 if (p.clearCore()) {
                     rows.add(new DisplayRow(LABEL_CORE_ACCOUNT, null, "cleared"));
@@ -273,7 +319,11 @@ class ClusterGatedOperations {
 
             @Override
             public Set<String> redactedPaths() {
-                return Set.of("/management/password", "/core/password");
+                return Set.of(
+                        "/management/password",
+                        "/core/password",
+                        "/connection/credentials/password",
+                        "/connection/credentials/token");
             }
 
             @Override

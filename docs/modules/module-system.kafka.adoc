@@ -4,4 +4,5 @@
 |`io.github.sudoitir.rahdar.system.kafka`
 |Bean references
 |* `i.g.s.r.p.b.ConnectionSettingsSource` (in Broker connectivity)
+* `i.g.s.r.p.b.BrokerGateway` (in Broker connectivity)
 |===

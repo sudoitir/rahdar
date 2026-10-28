@@ -5,6 +5,7 @@ import io.github.sudoitir.openbroker.ClusterConnection;
 import io.github.sudoitir.openbroker.ClusterSpec;
 import io.github.sudoitir.openbroker.ConnectOptions;
 import io.github.sudoitir.openbroker.ConnectRequest;
+import io.github.sudoitir.openbroker.ConnectionReport;
 import io.github.sudoitir.openbroker.CredentialSource;
 import io.github.sudoitir.openbroker.Credentials;
 import io.github.sudoitir.openbroker.NodeId;
@@ -24,6 +25,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -141,6 +143,20 @@ public class BrokerGateway implements DisposableBean {
                 options(with.clusterId(), ArtemisModule.SYSTEM, dataTls)));
     }
 
+    /**
+     * Reaches a cluster that is not registered once and reports what it found; nothing stays open. The driver
+     * reaches every node it learns of and names each one's outcome in the report.
+     */
+    public ConnectionReport verify(
+            String system,
+            ClusterSpec spec,
+            CredentialSource credentials,
+            Optional<ConnectionOptions.TlsBundle> bundle) {
+        TlsProvider clusterTls =
+                bundle.map(b -> tls(true, b.name(), b.verifyHostname())).orElseGet(TlsProvider::none);
+        return drivers.verify(new ConnectRequest(system, spec, credentials, options(null, system, clusterTls)));
+    }
+
     /** A registered node, through its cluster's connection. */
     public BrokerTarget node(UUID clusterId, UUID nodeId) {
         return new BrokerTarget(cluster(clusterId), idOf(nodeId));
@@ -212,7 +228,7 @@ public class BrokerGateway implements DisposableBean {
     }
 
     private ConnectOptions options(UUID clusterId, String system, TlsProvider clusterTls) {
-        return connectOptions.forConnection(clusterId.toString(), system, clusterTls);
+        return connectOptions.forConnection(String.valueOf(clusterId), system, clusterTls);
     }
 
     /** The cluster's TLS from its SSL bundle (ADR-0009): none when it names no bundle. */

@@ -82,6 +82,14 @@ public class BrokerIdentityClaims {
                         """).params(keys.kinds(), keys.identities(), clusterId).update();
     }
 
+    /** The cluster holding this identity, if any. */
+    public Optional<UUID> holder(String kind, String identity) {
+        return jdbc.sql("SELECT cluster_id FROM broker_identity WHERE kind = ? AND identity = ?")
+                .params(kind, identity)
+                .query(UUID.class)
+                .optional();
+    }
+
     private void insert(UUID clusterId, Keys keys) {
         jdbc.sql("""
                         INSERT INTO broker_identity (kind, identity, cluster_id)

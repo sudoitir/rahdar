@@ -4540,6 +4540,7 @@ export interface components {
             managementUsername?: string | null;
             /** @description The Core account's user name, or null while Core uses the management account */
             coreUsername?: string | null;
+            kafka?: components["schemas"]["KafkaConnectionDetail"] | null;
         };
         ClusterDetail: {
             /** Format: uuid */
@@ -4570,6 +4571,17 @@ export interface components {
             notes: string[];
             /** @description The accounts a broker rejected, and on which nodes, so the view can link to where the account is edited */
             credentialRejections: components["schemas"]["CredentialRejectionView"][];
+        };
+        KafkaConnectionDetail: {
+            bootstrapServers: string[];
+            securityProtocol: string;
+            saslMechanism?: string | null;
+            /** @description The account's user name; null for a token or no account. */
+            username?: string | null;
+            /** @description Whether a password or token is stored. */
+            secretStored: boolean;
+            tlsBundle?: string | null;
+            clientId?: string | null;
         };
         KindName: {
             /** @description The name of one, such as Queue. */

@@ -20,6 +20,7 @@ import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.ConnectionCh
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.HealthView;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.NodeEndpointView;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.RegisterPreview;
+import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.RegistrationCheck;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.TopologyView;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -64,7 +65,7 @@ public class ClusterController {
     @ApiResponse(
             responseCode = "200",
             description = "dryRun=true: connection probe result, nothing persisted",
-            content = @Content(schema = @Schema(implementation = RegisterPreview.class)))
+            content = @Content(schema = @Schema(oneOf = {RegisterPreview.class, RegistrationCheck.class})))
     @ApiResponse(
             responseCode = "201",
             description = "cluster registered",
@@ -121,7 +122,15 @@ public class ClusterController {
     @ApiResponse(
             responseCode = "200",
             description = "dryRun=true: per-node probe result, nothing saved; otherwise the saved cluster",
-            content = @Content(schema = @Schema(oneOf = {ConnectionCheck.class, ClusterConnectionView.class})))
+            content =
+                    @Content(
+                            schema =
+                                    @Schema(
+                                            oneOf = {
+                                                ConnectionCheck.class,
+                                                RegistrationCheck.class,
+                                                ClusterConnectionView.class
+                                            })))
     @HeldResponse
     @PatchMapping("/{clusterId}")
     public Object update(

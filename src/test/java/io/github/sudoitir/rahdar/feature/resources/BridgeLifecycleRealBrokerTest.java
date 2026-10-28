@@ -13,6 +13,7 @@ import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.ClusterDetai
 import io.github.sudoitir.rahdar.support.AdminAuthenticationExtension;
 import io.github.sudoitir.rahdar.support.ArtemisIntegrationTest;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
+import io.github.sudoitir.rahdar.support.Registrations;
 import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
 import io.github.sudoitir.rahdar.system.artemis.BridgeOperations;
 import io.github.sudoitir.rahdar.system.artemis.BridgeRow;
@@ -72,7 +73,7 @@ class BridgeLifecycleRealBrokerTest extends PostgresIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        var attempt = clusterService.register(new RegisterClusterRequest(
+        var attempt = clusterService.register(Registrations.artemis(
                 List.of(ArtemisIntegrationTest.jolokiaUrl()),
                 "bridge-real-" + run,
                 null,

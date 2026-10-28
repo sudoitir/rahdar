@@ -23,6 +23,7 @@ import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshotUpsert;
 import io.github.sudoitir.rahdar.support.ArtemisIntegrationTest;
 import io.github.sudoitir.rahdar.support.OperatorFixture;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
+import io.github.sudoitir.rahdar.support.Registrations;
 import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
 import io.github.sudoitir.rahdar.system.artemis.MBeanNames;
 import io.github.sudoitir.rahdar.system.artemis.QueueLifecycleOperations;
@@ -96,7 +97,7 @@ class BulkRealBrokerTest extends PostgresIntegrationTest {
     @BeforeEach
     void setUp() {
         OperatorFixture.signIn(users, roles, rolePermissions, userRoles, grants);
-        var attempt = clusterService.register(new RegisterClusterRequest(
+        var attempt = clusterService.register(Registrations.artemis(
                 List.of(ArtemisIntegrationTest.jolokiaUrl()),
                 "bulk-real-" + run,
                 null,

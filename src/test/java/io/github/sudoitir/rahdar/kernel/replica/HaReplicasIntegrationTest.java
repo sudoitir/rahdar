@@ -12,6 +12,7 @@ import io.github.sudoitir.rahdar.platform.clusters.web.ClusterRequests.RegisterC
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.ClusterDetail;
 import io.github.sudoitir.rahdar.support.AdminAuthenticationExtension;
 import io.github.sudoitir.rahdar.support.ArtemisIntegrationTest;
+import io.github.sudoitir.rahdar.support.Registrations;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import java.sql.Timestamp;
@@ -88,7 +89,7 @@ class HaReplicasIntegrationTest {
 
         new AdminAuthenticationExtension().beforeEach(null);
         var registered = a.getBean(ClusterService.class)
-                .register(new RegisterClusterRequest(
+                .register(Registrations.artemis(
                         List.of(broker.join()),
                         "ha-replicas-0",
                         null,

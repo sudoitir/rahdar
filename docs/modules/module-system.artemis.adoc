@@ -17,5 +17,6 @@
 |Bean references
 |* `i.g.s.r.p.b.ConnectionSettingsSource` (in Broker connectivity)
 * `i.g.s.r.p.s.QueueLocator` (in Scraping)
+* `i.g.s.r.p.c.HaStateEvaluator` (in Clusters)
 * `i.g.s.r.p.b.BrokerGateway` (in Broker connectivity)
 |===

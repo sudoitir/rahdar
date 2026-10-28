@@ -5,7 +5,13 @@
  */
 @ApplicationModule(
         displayName = "Kafka",
-        allowedDependencies = {"kernel.core", "kernel.plugin", "platform.broker", "platform.clusters", "platform.scrape"
+        allowedDependencies = {
+            "kernel.core",
+            "kernel.plugin",
+            "platform.broker",
+            "platform.clusters",
+            "platform.clusters::web",
+            "platform.scrape"
         })
 package io.github.sudoitir.rahdar.system.kafka;
 

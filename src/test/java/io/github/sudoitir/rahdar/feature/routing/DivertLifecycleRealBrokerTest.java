@@ -29,6 +29,7 @@ import io.github.sudoitir.rahdar.support.AdminAuthenticationExtension;
 import io.github.sudoitir.rahdar.support.ArtemisIntegrationTest;
 import io.github.sudoitir.rahdar.support.McpFixture;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
+import io.github.sudoitir.rahdar.support.Registrations;
 import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
 import io.github.sudoitir.rahdar.system.artemis.DivertOperations;
 import io.github.sudoitir.rahdar.system.artemis.DivertRow;
@@ -106,7 +107,7 @@ class DivertLifecycleRealBrokerTest extends PostgresIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        var attempt = clusterService.register(new RegisterClusterRequest(
+        var attempt = clusterService.register(Registrations.artemis(
                 List.of(ArtemisIntegrationTest.jolokiaUrl()),
                 "divert-real-" + run,
                 null,

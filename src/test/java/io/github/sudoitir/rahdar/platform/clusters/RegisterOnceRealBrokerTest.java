@@ -17,6 +17,7 @@ import io.github.sudoitir.rahdar.support.AdminAuthenticationExtension;
 import io.github.sudoitir.rahdar.support.ArtemisBrokers;
 import io.github.sudoitir.rahdar.support.ArtemisIntegrationTest;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
+import io.github.sudoitir.rahdar.support.Registrations;
 import io.github.sudoitir.rahdar.system.artemis.ArtemisModule;
 import java.net.InetAddress;
 import java.net.URI;
@@ -79,7 +80,7 @@ class RegisterOnceRealBrokerTest extends PostgresIntegrationTest {
     }
 
     private RegisterClusterRequest request(String name, String... seeds) {
-        return new RegisterClusterRequest(
+        return Registrations.artemis(
                 List.of(seeds),
                 run + "-" + name,
                 null,

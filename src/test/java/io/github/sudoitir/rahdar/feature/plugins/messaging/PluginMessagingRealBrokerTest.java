@@ -43,6 +43,7 @@ import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshotUpsert;
 import io.github.sudoitir.rahdar.support.AdminAuthenticationExtension;
 import io.github.sudoitir.rahdar.support.ArtemisIntegrationTest;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
+import io.github.sudoitir.rahdar.support.Registrations;
 import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
 import io.github.sudoitir.rahdar.system.artemis.DivertOperations;
 import io.github.sudoitir.rahdar.system.artemis.MBeanNames;
@@ -178,7 +179,7 @@ class PluginMessagingRealBrokerTest extends PostgresIntegrationTest {
 
     @BeforeEach
     void setUp() throws Exception {
-        var attempt = clusterService.register(new RegisterClusterRequest(
+        var attempt = clusterService.register(Registrations.artemis(
                 List.of(ArtemisIntegrationTest.jolokiaUrl()),
                 "plugin-messaging-" + run,
                 null,
