@@ -15,7 +15,6 @@ import io.github.sudoitir.openbroker.spring.boot.autoconfigure.OpenBrokerConnect
 import io.github.sudoitir.openbroker.spring.boot.autoconfigure.OpenBrokerProperties;
 import io.github.sudoitir.openbroker.spring.boot.autoconfigure.SslBundleTls;
 import io.github.sudoitir.rahdar.kernel.core.ConflictException;
-import io.github.sudoitir.rahdar.system.artemis.ArtemisModule;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
@@ -110,21 +109,19 @@ public class BrokerGateway implements DisposableBean {
     }
 
     /**
-     * Jolokia seeds reached with credentials and TLS given before the cluster exists. Only Artemis clusters
-     * are registered from seeds, so the probe is Artemis's; a Kafka registration verifies through the driver.
+     * Jolokia seeds reached with credentials and TLS given before the cluster exists. The probe is the one of the
+     * system that is registered from Jolokia seeds (see {@link ConnectionOptions.Entry}); a system registered from
+     * bootstrap servers verifies through its driver instead.
      */
     public ProbeSession probe(BrokerConnectionSettings with) {
         CredentialSource credentials = plane -> with.hasCredentials()
                 ? Credentials.usernamePassword(with.username(), with.password())
                 : new Credentials.None();
         return new ProbeSession(spec -> drivers.connect(new ConnectRequest(
-                ArtemisModule.SYSTEM,
+                seedSystem(),
                 spec,
                 credentials,
-                options(
-                        with.clusterId(),
-                        ArtemisModule.SYSTEM,
-                        tls(with.hasTls(), with.tlsBundle(), with.verifyHostname())))));
+                options(with.clusterId(), seedSystem(), tls(with.hasTls(), with.tlsBundle(), with.verifyHostname())))));
     }
 
     /**
@@ -137,10 +134,10 @@ public class BrokerGateway implements DisposableBean {
                 : new Credentials.None();
         TlsProvider dataTls = tls(with.hasTls(), with.tlsBundle(), with.verifyHostname());
         return drivers.connect(new ConnectRequest(
-                ArtemisModule.SYSTEM,
+                seedSystem(),
                 ClusterSpec.ofNodes(nodes),
                 credentials,
-                options(with.clusterId(), ArtemisModule.SYSTEM, dataTls)));
+                options(with.clusterId(), seedSystem(), dataTls)));
     }
 
     /**
@@ -208,6 +205,16 @@ public class BrokerGateway implements DisposableBean {
             nodes.add(new NodeSpec(idOf(n.id()), n.endpoints()));
         }
         return ClusterSpec.ofNodes(nodes);
+    }
+
+    /** The system whose clusters are registered from Jolokia seeds, which the seed and data-plane probes speak. */
+    private String seedSystem() {
+        return connections.stream()
+                .filter(c -> c.entry() == ConnectionOptions.Entry.JOLOKIA_SEEDS)
+                .map(ConnectionOptions::system)
+                .findFirst()
+                .orElseThrow(() -> new ConflictException(
+                        "unsupported-on-system", "No installed system is registered from Jolokia seeds."));
     }
 
     private ConnectRequest request(UUID clusterId, ClusterSpec spec) {

@@ -277,6 +277,9 @@ public final class ClusterRequests {
                 AccountUpdate core)
                 implements ConnectionUpdate {
 
+            /** The wire name of this connection's system. */
+            public static final String SYSTEM = "artemis";
+
             @JsonIgnore
             @Schema(hidden = true)
             @AssertTrue(message = "an account needs a username") public boolean isAccountNamed() {
