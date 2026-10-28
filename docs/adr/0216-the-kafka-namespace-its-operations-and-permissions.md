@@ -14,7 +14,7 @@ or a truncate, affect applications the operator does not see.
 ## Decision
 
 - **Namespace.** `system/kafka` and the web's `features/kafka`, under `/clusters/{c}/kafka/…` (ADR-0207).
-  It reads and writes only through the SDK; it keeps no tables.
+  It reads and writes the broker only through the SDK, and keeps one table, `kafka_connection`, for a cluster's non-secret connection settings.
 - **Operations.** Offset reset, configuration change, ACL change and transaction abort are gated
   operations with an `Effect` whose etag is the state key: a preview, a held confirmation, the approval
   gate, and an audit with before and after. An approved request checks its etag again when it runs.

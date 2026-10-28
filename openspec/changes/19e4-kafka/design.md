@@ -43,7 +43,7 @@ partitions merged; mobile layouts.
 `BrokerGateway` reads `cluster.system` and asks the system's `ConnectionOptions` extension
 (ADR-0208) for the connect options. `BrokerGateway.SYSTEM` is removed; Artemis-only code names
 `ArtemisModule.SYSTEM`, Kafka-only code `KafkaModule.SYSTEM`. `GET /api/v1/systems` lists the loaded
-drivers: `{id, name, supportedVersions, connection: "jolokia-seeds"|"bootstrap"}`.
+drivers as the standard paged view `{data: [{id, name, supportedVersions, connection: "jolokia-seeds"|"bootstrap"}], page, pageSize, count}`.
 - Rejected: one gateway per system. The gateway's caching, probing and reconfiguration are neutral.
 
 ### D2. Registration is per system, on its own page (ADR-0213)
@@ -136,7 +136,7 @@ the reason in a popover; UNAVAILABLE reads "Unavailable" with the reason, never 
 
 ### D7. The `system/kafka` module and its API (ADR-0216)
 Backend `system/kafka` (`KafkaModule`, its read services and gated operations); web
-`features/kafka` with views `system: 'kafka'` in the cluster's navigation. No tables. Routes are
+`features/kafka` with views `system: 'kafka'` in the cluster's navigation. One table, `kafka_connection` (ADR-0204 prefix), holds a cluster's non-secret connection settings (bootstrap servers, protocol, mechanism, client id); the account is the cluster's `broker_credential` (a token held as its password), the TLS bundle `broker_tls`, and the cluster id a `broker_identity` of kind `CLUSTER_ID`. Routes are
 under `/api/v1/clusters/{c}/kafka/`; `SystemNamespaceInterceptor` answers other systems 404 before
 any broker call. Lists page with an opaque `cursor` and `limit` (default 100, max 500).
 
