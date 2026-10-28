@@ -29,7 +29,6 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Builds the cross-node queue grid from {@code subscription_snapshot} (ADR-0017). A
@@ -51,7 +50,6 @@ public class CrossNodeAggregator {
     private final TeamIndex teams;
     private final BrokerGateway gateway;
 
-    @Transactional(readOnly = true)
     public PagedView<SubscriptionView> subscriptions(UUID clusterId, ResourceQuery query) {
         ResourceFilter readable = permissions.filter(clusterId, ResourceType.SUBSCRIPTION);
         List<SubscriptionView> rows = accessibleQueues(clusterId, readable).stream()
@@ -73,7 +71,6 @@ public class CrossNodeAggregator {
      * them — a consumer-health verdict that skipped the 501st queue could omit the worst
      * one in the cluster and still look complete (ADR-0089).
      */
-    @Transactional(readOnly = true)
     public List<SubscriptionView> allQueues(UUID clusterId) {
         return accessibleQueues(clusterId, permissions.filter(clusterId, ResourceType.SUBSCRIPTION));
     }
@@ -98,7 +95,6 @@ public class CrossNodeAggregator {
      *
      * <p><b>Never call this from a request path.</b> {@link #allQueues} is that entry point.
      */
-    @Transactional(readOnly = true)
     public List<SubscriptionView> rollUp(UUID clusterId) {
         return rolledUp(clusterId);
     }

@@ -9,6 +9,7 @@ import static io.github.sudoitir.rahdar.platform.broker.ResourceIds.text;
 import io.github.sudoitir.openbroker.ClusterConnection;
 import io.github.sudoitir.openbroker.model.KindId;
 import io.github.sudoitir.openbroker.model.MetricKeys;
+import io.github.sudoitir.openbroker.model.Precision;
 import io.github.sudoitir.openbroker.model.Resource;
 import io.github.sudoitir.openbroker.model.ResourceId;
 import io.github.sudoitir.openbroker.model.StandardAttributes;
@@ -21,6 +22,7 @@ import io.github.sudoitir.rahdar.feature.resources.web.ResourceViews.Destination
 import io.github.sudoitir.rahdar.feature.resources.web.ResourceViews.ProducerView;
 import io.github.sudoitir.rahdar.feature.resources.web.ResourceViews.SubscriptionNodeCell;
 import io.github.sudoitir.rahdar.feature.resources.web.ResourceViews.SubscriptionView;
+import io.github.sudoitir.rahdar.platform.broker.QueueRow;
 import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshot;
 import java.time.Instant;
 import java.util.List;
@@ -64,17 +66,25 @@ public class ResourceViewMapper {
                         r.paused()))
                 .sorted((a, b) -> a.nodeName().compareToIgnoreCase(b.nodeName()))
                 .toList();
+        // A subscription is of the kind its rows were scraped as, and its id has as many segments as the system gives
+        // it.
+        QueueSnapshot first = rows.getFirst();
+        KindId kind = first.kind() == null || first.kind().isBlank() ? subscriptionKind : KindId.of(first.kind());
+        String path = first.attributes().get(QueueRow.PATH);
+        ResourceId id =
+                path == null ? ResourceId.of(kind.value(), key.name()) : ResourceId.parse(kind.value() + "/" + path);
+        long total =
+                cells.stream().mapToLong(SubscriptionNodeCell::messageCount).sum();
         return new SubscriptionView(
-                ResourceId.of(subscriptionKind.value(), key.name()).format(),
-                subscriptionKind.value(),
-                label(connection, subscriptionKind),
-                key.name(),
+                id.format(),
+                kind.value(),
+                label(connection, kind),
+                // The group or queue is what a team owns, so it is the name; the destination says which topic.
+                path == null ? key.name() : id.path().segments().getFirst(),
                 ResourceId.of(destinationKind.value(), key.destination()).format(),
-                Map.of("routingType", key.routingType()),
+                key.routingType() == null ? Map.of() : Map.of("routingType", key.routingType()),
                 rows.stream().anyMatch(QueueSnapshot::durable),
-                Backlog.exact(cells.stream()
-                        .mapToLong(SubscriptionNodeCell::messageCount)
-                        .sum()),
+                backlogOf(first.attributes(), total),
                 cells.stream().mapToLong(SubscriptionNodeCell::consumerCount).sum(),
                 cells.stream().mapToLong(SubscriptionNodeCell::deliveringCount).sum(),
                 cells.stream().mapToLong(SubscriptionNodeCell::scheduledCount).sum(),
@@ -87,6 +97,18 @@ public class ResourceViewMapper {
                 cells,
                 List.of(),
                 null);
+    }
+
+    /** Exact unless the scrape marked the figure an estimate, which it says with its reason. */
+    private static Backlog backlogOf(Map<String, String> attributes, long total) {
+        if (!Precision.ESTIMATE.name().equals(attributes.get(QueueRow.BACKLOG_PRECISION))) {
+            return Backlog.exact(total);
+        }
+        return new Backlog(
+                total,
+                Backlog.Accuracy.ESTIMATE,
+                attributes.get(QueueRow.BACKLOG_REASON),
+                Boolean.parseBoolean(attributes.get(QueueRow.BACKLOG_BREAKDOWN)));
     }
 
     public DestinationView destination(Resource r, NodeRef node, ClusterConnection connection) {

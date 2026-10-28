@@ -16,6 +16,7 @@ import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshots;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -195,7 +196,9 @@ class MessageIndexCoverageTest {
                 0,
                 0,
                 0,
-                0);
+                0,
+                "artemis.queue",
+                Map.of());
     }
 
     private MessageIndexSubscriptionEntity capturing(String pattern) {

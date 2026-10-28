@@ -99,7 +99,8 @@ class CrossNodeAggregatorTest extends PostgresIntegrationTest {
                 0,
                 0,
                 false,
-                "artemis.queue");
+                "artemis.queue",
+                Map.of());
     }
 
     @Test
@@ -162,7 +163,7 @@ class CrossNodeAggregatorTest extends PostgresIntegrationTest {
                 row(f.nodeA(), "A", "alpha", 1), row(f.nodeA(), "B", "beta", 99), row(f.nodeA(), "C", "gamma", 50)));
 
         List<SubscriptionView> byDepthDesc = aggregator
-                .subscriptions(clusterId, ResourceQuery.of(null, 1, 50, "-depth"))
+                .subscriptions(clusterId, ResourceQuery.of(null, 1, 50, "-backlog"))
                 .data();
         assertThat(byDepthDesc).extracting(SubscriptionView::name).containsExactly("beta", "gamma", "alpha");
 

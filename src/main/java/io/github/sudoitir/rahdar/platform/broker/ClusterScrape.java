@@ -1,5 +1,6 @@
 package io.github.sudoitir.rahdar.platform.broker;
 
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -11,4 +12,10 @@ public interface ClusterScrape extends SystemExtension {
 
     /** Reads every node of the cluster once and records its state, or the error that kept it from answering. */
     void nodes(UUID clusterId, long cycle);
+
+    /**
+     * Reads every subscription of the cluster once, each tagged with a node of the cluster that carries it in the
+     * snapshot cache: a system with subscriptions that belong to no node picks one.
+     */
+    List<QueueRow> subscriptions(UUID clusterId);
 }

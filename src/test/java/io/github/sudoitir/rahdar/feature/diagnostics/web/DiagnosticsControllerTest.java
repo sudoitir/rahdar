@@ -112,8 +112,8 @@ class DiagnosticsControllerTest extends PostgresIntegrationTest {
                 clusterId, "node-a", "PRIMARY", UUID.randomUUID().toString());
         node.attachSeedUrl(URL);
         nodeId = nodes.save(node).getId();
-        upsert.upsertBatch(List.of(
-                new QueueRow(clusterId, nodeId, Q, Q, "ANYCAST", true, 0, 0, 0, 0, 0, 0, 0, false, "artemis.queue")));
+        upsert.upsertBatch(List.of(new QueueRow(
+                clusterId, nodeId, Q, Q, "ANYCAST", true, 0, 0, 0, 0, 0, 0, 0, false, "artemis.queue", Map.of())));
     }
 
     @AfterEach

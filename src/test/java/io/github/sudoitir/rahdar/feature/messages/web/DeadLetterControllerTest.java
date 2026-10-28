@@ -26,6 +26,7 @@ import io.github.sudoitir.rahdar.system.artemis.ArtemisNodes;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.hamcrest.Matchers;
 import org.junit.jupiter.api.AfterEach;
@@ -80,7 +81,22 @@ class DeadLetterControllerTest extends PostgresIntegrationTest {
         nodeId = nodes.save(a).getId();
         // DLQ fixture reports deadLetterAddress "DLQ"; seed a queue on it.
         upsert.upsertBatch(List.of(new QueueRow(
-                clusterId, nodeId, "DLQ", "DLQ", "ANYCAST", true, 7, 0, 0, 0, 0, 0, 0, false, "artemis.queue")));
+                clusterId,
+                nodeId,
+                "DLQ",
+                "DLQ",
+                "ANYCAST",
+                true,
+                7,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                false,
+                "artemis.queue",
+                Map.of())));
     }
 
     @AfterEach

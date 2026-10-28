@@ -24,6 +24,7 @@ import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
 import io.github.sudoitir.rahdar.system.artemis.ArtemisModule;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -122,7 +123,8 @@ abstract class BulkTestSupport extends PostgresIntegrationTest {
                 0,
                 0,
                 paused,
-                "artemis.queue")));
+                "artemis.queue",
+                Map.of())));
     }
 
     /** The node stops answering: its last snapshot is older than the freshness window. */

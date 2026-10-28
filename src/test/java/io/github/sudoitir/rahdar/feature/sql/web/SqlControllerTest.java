@@ -15,6 +15,7 @@ import io.github.sudoitir.rahdar.support.AdminAuthenticationExtension;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
 import io.github.sudoitir.rahdar.system.artemis.ArtemisModule;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.hamcrest.Matchers;
 import org.junit.jupiter.api.AfterEach;
@@ -80,7 +81,8 @@ class SqlControllerTest extends PostgresIntegrationTest {
                         0,
                         0,
                         false,
-                        "artemis.queue"),
+                        "artemis.queue",
+                        Map.of()),
                 new QueueRow(
                         clusterId,
                         nodeId,
@@ -96,7 +98,8 @@ class SqlControllerTest extends PostgresIntegrationTest {
                         0,
                         0,
                         false,
-                        "artemis.queue")));
+                        "artemis.queue",
+                        Map.of())));
     }
 
     @AfterEach

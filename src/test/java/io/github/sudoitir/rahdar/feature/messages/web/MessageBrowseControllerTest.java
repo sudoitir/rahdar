@@ -95,7 +95,8 @@ class MessageBrowseControllerTest extends PostgresIntegrationTest {
                 0,
                 0,
                 false,
-                "artemis.queue")));
+                "artemis.queue",
+                Map.of())));
     }
 
     @AfterEach
@@ -226,7 +227,8 @@ class MessageBrowseControllerTest extends PostgresIntegrationTest {
                         0,
                         0,
                         false,
-                        "artemis.queue"),
+                        "artemis.queue",
+                        Map.of()),
                 new QueueRow(
                         clusterId,
                         nodeBId,
@@ -242,7 +244,8 @@ class MessageBrowseControllerTest extends PostgresIntegrationTest {
                         0,
                         0,
                         false,
-                        "artemis.queue")));
+                        "artemis.queue",
+                        Map.of())));
 
         serving(nodeBId, "SPLIT", batch("browse.json", 4));
 

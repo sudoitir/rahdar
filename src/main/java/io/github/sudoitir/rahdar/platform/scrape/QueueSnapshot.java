@@ -1,6 +1,7 @@
 package io.github.sudoitir.rahdar.platform.scrape;
 
 import java.time.Instant;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -22,4 +23,6 @@ public record QueueSnapshot(
         long scheduledCount,
         long messagesAdded,
         long messagesAcked,
-        long messagesExpired) {}
+        long messagesExpired,
+        String kind,
+        Map<String, String> attributes) {}

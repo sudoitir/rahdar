@@ -107,7 +107,22 @@ class ResourceIdRoutingTest extends PostgresIntegrationTest {
         node.attachSeedUrl("http://localhost:8161/console/jolokia");
         UUID nodeId = nodes.save(node).getId();
         upsert.upsertBatch(List.of(new QueueRow(
-                clusterId, nodeId, "orders.addr", NAME, "ANYCAST", true, 3, 1, 0, 0, 0, 0, 0, false, "artemis.queue")));
+                clusterId,
+                nodeId,
+                "orders.addr",
+                NAME,
+                "ANYCAST",
+                true,
+                3,
+                1,
+                0,
+                0,
+                0,
+                0,
+                0,
+                false,
+                "artemis.queue",
+                Map.of())));
         ClusterConnection connection = FixtureJolokia.cluster(Map.of(nodeId, new FixtureJolokia()));
         when(gateway.cluster(clusterId)).thenReturn(connection);
 

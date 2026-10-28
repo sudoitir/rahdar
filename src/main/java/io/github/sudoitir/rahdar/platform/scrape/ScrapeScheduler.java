@@ -171,6 +171,25 @@ public class ScrapeScheduler implements DisposableBean {
         return systemScrapes.stream().filter(s -> s.system().equals(system)).findFirst();
     }
 
+    /** The subscriptions of a cluster read as a whole, written as a sweep is: upserted, then the ones gone reaped. */
+    private void systemSubscriptions(UUID clusterId, ClusterScrape scrape) {
+        String key = clusterId + "/cluster/subscriptions";
+        Instant start = Instant.now();
+        try {
+            List<QueueRow> rows = scrape.subscriptions(clusterId);
+            upsert.upsertBatch(rows);
+            metrics.appendQueueSamples(rows);
+            streamSignals.afterQueueScrape(clusterId, rows);
+            rows.stream().map(QueueRow::nodeId).distinct().forEach(node -> upsert.reapStale(node, start));
+            lastFailures.remove(key);
+        } catch (RuntimeException e) {
+            String why = e.toString();
+            if (!why.equals(lastFailures.put(key, why))) {
+                log.warn("The subscription scrape of cluster {} failed: {}", clusterId, why);
+            }
+        }
+    }
+
     /** A tier A pass for a system that reads its cluster as a whole: one read, then the same signals. */
     private void systemTierA(UUID clusterId, ClusterScrape scrape, long cycle) {
         String key = clusterId + "/cluster/nodes";
@@ -256,7 +275,16 @@ public class ScrapeScheduler implements DisposableBean {
         try (ExecutorService pool = Executors.newVirtualThreadPerTaskExecutor()) {
             for (RegisteredCluster cluster : clusters.owned()) {
                 UUID clusterId = cluster.getId();
-                fanOut(pool, manageableNodes(clusterId), "hot queue read", node -> scrapeHotQueues(clusterId, node));
+                Optional<ClusterScrape> own = systemScrape(clusterId);
+                if (own.isPresent()) {
+                    systemSubscriptions(clusterId, own.get());
+                } else {
+                    fanOut(
+                            pool,
+                            manageableNodes(clusterId),
+                            "hot queue read",
+                            node -> scrapeHotQueues(clusterId, node));
+                }
                 eventPublisher.publishEvent(new ScrapeTierCompleted(clusterId, ScrapeTierCompleted.Tier.B));
             }
         }

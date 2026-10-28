@@ -10,11 +10,15 @@ import io.github.sudoitir.rahdar.feature.messages.MessageAction;
 import io.github.sudoitir.rahdar.feature.messages.MessageService;
 import io.github.sudoitir.rahdar.feature.messages.web.MessageViews.MessagePageView;
 import io.github.sudoitir.rahdar.feature.resources.BacklogService;
+import io.github.sudoitir.rahdar.feature.resources.CrossNodeAggregator;
 import io.github.sudoitir.rahdar.feature.resources.TruncateService;
+import io.github.sudoitir.rahdar.feature.resources.web.ResourceViews.Backlog;
+import io.github.sudoitir.rahdar.feature.resources.web.ResourceViews.SubscriptionView;
 import io.github.sudoitir.rahdar.kernel.core.ConflictException;
 import io.github.sudoitir.rahdar.platform.broker.Attempt;
 import io.github.sudoitir.rahdar.platform.broker.BacklogBreakdown.Breakdown;
 import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
+import io.github.sudoitir.rahdar.platform.broker.QueueRow;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterAlreadyRegisteredException;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterService;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerIdentityClaims;
@@ -27,6 +31,7 @@ import io.github.sudoitir.rahdar.platform.clusters.web.ClusterRequests.UpdateClu
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterRequests.UpdateClusterRequest.KafkaConnectionUpdate;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.ClusterDetail;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.ConnectionCheck;
+import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshotUpsert;
 import io.github.sudoitir.rahdar.support.AdminAuthenticationExtension;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
 import io.github.sudoitir.rahdar.system.kafka.internal.persistence.KafkaConnectionRepository;
@@ -92,6 +97,12 @@ class KafkaRegisterRealBrokerTest extends PostgresIntegrationTest {
 
     @Autowired
     KafkaScrape scrape;
+
+    @Autowired
+    QueueSnapshotUpsert snapshotUpsert;
+
+    @Autowired
+    CrossNodeAggregator aggregator;
 
     @Autowired
     KafkaPartitions partitions;
@@ -502,6 +513,55 @@ class KafkaRegisterRealBrokerTest extends PostgresIntegrationTest {
             assertThat(broker.getLastError()).isNull();
         });
         assertThat(partitions.offline(id)).hasValue(0);
+    }
+
+    @Test
+    void aGroupOnATopicIsInTheSubscriptionsTableWithAnEstimatedBacklogItsGroupNamesAndAnId() throws Exception {
+        UUID id = ((Attempt.Ok<ClusterDetail>) service.register(request("table", kafka.getBootstrapServers())))
+                .value()
+                .id();
+        String topic = run + "-table";
+        String group = run + "-ledger";
+        try (Admin admin = Admin.create(Map.of("bootstrap.servers", kafka.getBootstrapServers()))) {
+            admin.createTopics(List.of(new NewTopic(topic, 1, (short) 1))).all().get();
+        }
+        try (KafkaProducer<byte[], byte[]> producer = new KafkaProducer<>(
+                Map.of("bootstrap.servers", kafka.getBootstrapServers()),
+                new ByteArraySerializer(),
+                new ByteArraySerializer())) {
+            for (int i = 0; i < 10; i++) {
+                producer.send(new ProducerRecord<>(topic, 0, new byte[] {1}, new byte[] {2}))
+                        .get();
+            }
+        }
+        Map<String, Object> config = Map.of(
+                "bootstrap.servers", kafka.getBootstrapServers(), "group.id", group, "enable.auto.commit", "false");
+        try (KafkaConsumer<byte[], byte[]> consumer =
+                new KafkaConsumer<>(config, new ByteArrayDeserializer(), new ByteArrayDeserializer())) {
+            consumer.commitSync(Map.of(new TopicPartition(topic, 0), new OffsetAndMetadata(4)));
+        }
+        List<QueueRow> rows = List.of();
+        for (int attempt = 0;
+                attempt < 50 && rows.stream().noneMatch(r -> r.queueName().contains(group));
+                attempt++) {
+            rows = scrape.subscriptions(id);
+            Thread.sleep(200);
+        }
+        snapshotUpsert.upsertBatch(rows);
+
+        SubscriptionView view = aggregator.rollUp(id).stream()
+                .filter(v -> v.name().equals(group))
+                .findFirst()
+                .orElseThrow();
+
+        assertThat(view.id()).isEqualTo("kafka.group-topic/" + group + "/" + topic);
+        assertThat(view.kind()).isEqualTo("kafka.group-topic");
+        assertThat(view.destination()).isEqualTo("kafka.topic/" + topic);
+        assertThat(view.backlog().accuracy()).isEqualTo(Backlog.Accuracy.ESTIMATE);
+        assertThat(view.backlog().value()).isEqualTo(6);
+        assertThat(view.backlog().reason()).isNotBlank();
+        assertThat(view.backlog().breakdown()).isTrue();
+        assertThat(view.nativeAttributes()).isEmpty();
     }
 
     @Test

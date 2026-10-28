@@ -534,7 +534,8 @@ class PluginMessagingRealBrokerTest extends PostgresIntegrationTest {
                 0,
                 0,
                 false,
-                "artemis.queue")));
+                "artemis.queue",
+                Map.of())));
         UUID subscription = indexes.create(
                         clusterId,
                         new MessageIndexService.Spec(

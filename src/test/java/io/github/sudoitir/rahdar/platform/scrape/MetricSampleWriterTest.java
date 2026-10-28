@@ -72,7 +72,8 @@ class MetricSampleWriterTest extends PostgresIntegrationTest {
                 850,
                 5,
                 false,
-                "artemis.queue")));
+                "artemis.queue",
+                Map.of())));
 
         assertThat(metricsWritten())
                 .containsExactlyInAnyOrder(

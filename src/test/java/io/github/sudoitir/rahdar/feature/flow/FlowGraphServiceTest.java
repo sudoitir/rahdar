@@ -593,9 +593,41 @@ class FlowGraphServiceTest {
         when(directory.nodes(clusterId)).thenReturn(both);
         // Stranded: node-b holds the backlog and has no consumer.
         queues.add(new QueueSnapshot(
-                clusterId, nodeA, "orders", "orders", "ANYCAST", true, false, now, 10, 2, 0, 0, 0, 0, 0));
+                clusterId,
+                nodeA,
+                "orders",
+                "orders",
+                "ANYCAST",
+                true,
+                false,
+                now,
+                10,
+                2,
+                0,
+                0,
+                0,
+                0,
+                0,
+                "artemis.queue",
+                Map.of()));
         queues.add(new QueueSnapshot(
-                clusterId, nodeB, "orders", "orders", "ANYCAST", true, false, now, 9_000, 0, 0, 0, 0, 0, 0));
+                clusterId,
+                nodeB,
+                "orders",
+                "orders",
+                "ANYCAST",
+                true,
+                false,
+                now,
+                9_000,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                "artemis.queue",
+                Map.of()));
         Map<String, Map<UUID, SubjectRate>> addedByNode = Map.of(
                 "orders",
                 Map.of(
@@ -650,7 +682,23 @@ class FlowGraphServiceTest {
 
     private void queue(String name, String address, String routingType, long messages, long consumers) {
         queues.add(new QueueSnapshot(
-                clusterId, nodeA, name, address, routingType, true, false, now, messages, consumers, 0, 0, 0, 0, 0));
+                clusterId,
+                nodeA,
+                name,
+                address,
+                routingType,
+                true,
+                false,
+                now,
+                messages,
+                consumers,
+                0,
+                0,
+                0,
+                0,
+                0,
+                "artemis.queue",
+                Map.of()));
     }
 
     private void rate(Map<String, SubjectRate> map, String queue, double rate, Duration span) {
@@ -1003,8 +1051,24 @@ class FlowGraphServiceTest {
         UUID gone = UUID.randomUUID();
         queue("q1", "orders", "MULTICAST", 10, 1);
         queue("q2", "orders", "MULTICAST", 5, 2);
-        queues.add(
-                new QueueSnapshot(clusterId, gone, "q1", "orders", "MULTICAST", true, false, now, 1, 1, 0, 0, 0, 0, 0));
+        queues.add(new QueueSnapshot(
+                clusterId,
+                gone,
+                "q1",
+                "orders",
+                "MULTICAST",
+                true,
+                false,
+                now,
+                1,
+                1,
+                0,
+                0,
+                0,
+                0,
+                0,
+                "artemis.queue",
+                Map.of()));
         when(metrics.latestRateWithTimeBySubjectAndNode(eq(clusterId), eq("openbroker.enqueued"), any(), any()))
                 .thenReturn(Map.of(
                         "q1", Map.of(nodeA, new SubjectRate(1.0, now.minusSeconds(5), Duration.ofSeconds(15))),

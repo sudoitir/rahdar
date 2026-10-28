@@ -4,18 +4,25 @@ import io.github.sudoitir.openbroker.BrokerException;
 import io.github.sudoitir.openbroker.NodeId;
 import io.github.sudoitir.openbroker.Partial;
 import io.github.sudoitir.openbroker.model.NodeDescription;
+import io.github.sudoitir.openbroker.model.ResourceClass;
+import io.github.sudoitir.openbroker.model.ResourcePage;
+import io.github.sudoitir.openbroker.model.ResourceQuery;
 import io.github.sudoitir.openbroker.model.Scope;
+import io.github.sudoitir.rahdar.kernel.core.NotFoundException;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
 import io.github.sudoitir.rahdar.platform.broker.BrokerFailures;
 import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
 import io.github.sudoitir.rahdar.platform.broker.ClusterScrape;
+import io.github.sudoitir.rahdar.platform.broker.QueueRow;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
 import io.github.sudoitir.rahdar.platform.clusters.NodeStateRecorder;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -33,6 +40,8 @@ class KafkaScrape implements ClusterScrape {
     private final BrokerGateway gateway;
     private final ClusterDirectory clusters;
     private final NodeStateRecorder recorder;
+    private static final int PAGE = 200;
+
     private final KafkaPartitions partitions;
 
     @Override
@@ -75,6 +84,31 @@ class KafkaScrape implements ClusterScrape {
                         "The cluster no longer lists this broker.",
                         BrokerConnectionException.Kind.UNREACHABLE));
         partitions.refresh(clusterId);
+    }
+
+    /** Every subscription of the cluster, a group on a topic, carried by its first stored broker. */
+    @Override
+    public List<QueueRow> subscriptions(UUID clusterId) {
+        ClusterNode carrier = clusters.nodes(clusterId).stream()
+                .min(java.util.Comparator.comparing(ClusterNode::getName))
+                .orElseThrow(() -> new NotFoundException("node", clusterId));
+        List<QueueRow> rows = new ArrayList<>();
+        Optional<String> next = Optional.empty();
+        try {
+            do {
+                ResourceQuery query =
+                        ResourceQuery.of(ResourceClass.SUBSCRIPTION).limit(PAGE);
+                ResourcePage page = gateway.cluster(clusterId)
+                        .resources()
+                        .read(next.map(query::continueFrom).orElse(query))
+                        .orThrow();
+                page.items().forEach(r -> rows.add(QueueRow.of(clusterId, carrier.getId(), r)));
+                next = page.continueToken();
+            } while (next.isPresent());
+        } catch (BrokerException failure) {
+            throw BrokerFailures.translate(failure);
+        }
+        return rows;
     }
 
     private void record(ClusterNode node, BrokerException failure) {

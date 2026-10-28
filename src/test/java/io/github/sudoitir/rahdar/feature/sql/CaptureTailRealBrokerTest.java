@@ -164,7 +164,8 @@ class CaptureTailRealBrokerTest extends PostgresIntegrationTest {
                 0,
                 0,
                 false,
-                "artemis.queue")));
+                "artemis.queue",
+                Map.of())));
     }
 
     @AfterEach

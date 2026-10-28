@@ -117,7 +117,22 @@ class McpResourceLifecycleIntegrationTest extends PostgresIntegrationTest {
         node.applyHaState(new HaObservation(true, "STARTED", "PRIMARY", null, "2.44.0", null), 1L, Instant.now());
         UUID nodeId = nodes.save(node).getId();
         upsert.upsertBatch(List.of(new QueueRow(
-                clusterId, nodeId, QUEUE, QUEUE, "ANYCAST", true, 9, 0, 0, 0, 0, 0, 0, false, "artemis.queue")));
+                clusterId,
+                nodeId,
+                QUEUE,
+                QUEUE,
+                "ANYCAST",
+                true,
+                9,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                false,
+                "artemis.queue",
+                Map.of())));
 
         target = Targets.target();
         ops = Targets.operations(target);

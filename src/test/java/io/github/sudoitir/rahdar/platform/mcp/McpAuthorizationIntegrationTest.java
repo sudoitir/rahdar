@@ -91,7 +91,22 @@ class McpAuthorizationIntegrationTest extends PostgresIntegrationTest {
         node.attachSeedUrl("http://a:8161/console/jolokia");
         UUID nodeId = nodes.save(node).getId();
         upsert.upsertBatch(List.of(new QueueRow(
-                clusterId, nodeId, QUEUE, QUEUE, "ANYCAST", true, 7, 0, 0, 0, 0, 0, 0, false, "artemis.queue")));
+                clusterId,
+                nodeId,
+                QUEUE,
+                QUEUE,
+                "ANYCAST",
+                true,
+                7,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                false,
+                "artemis.queue",
+                Map.of())));
     }
 
     @AfterEach

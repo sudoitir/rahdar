@@ -85,6 +85,11 @@ public class QueueSnapshotEntity {
     @Column(name = "expired", nullable = false)
     private long messagesExpired;
 
+    /** The system's own attributes of the subscription, by native name. */
+    public Map<String, String> getNativeAttributes() {
+        return Map.copyOf(nativeAttributes);
+    }
+
     /** An Artemis queue's routing type, {@code ANYCAST} or {@code MULTICAST}; {@code null} on another system. */
     public String getRoutingType() {
         return nativeAttributes.get(QueueRow.ROUTING_TYPE);
