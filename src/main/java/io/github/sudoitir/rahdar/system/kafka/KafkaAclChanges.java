@@ -17,6 +17,7 @@ import io.github.sudoitir.rahdar.system.kafka.web.KafkaViews.Acl;
 import io.github.sudoitir.rahdar.system.kafka.web.KafkaViews.AclChangeRequest;
 import io.github.sudoitir.rahdar.system.kafka.web.KafkaViews.AclPreview;
 import io.github.sudoitir.rahdar.system.kafka.web.KafkaViews.AclResult;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -74,6 +75,8 @@ public class KafkaAclChanges {
                 null,
                 Map.of("add", p.add(), "remove", p.remove(), "access", preview.access()),
                 false);
+        List<Acl> added = new ArrayList<>();
+        List<Acl> removed = new ArrayList<>();
         try {
             ClusterConnection connection = gateway.cluster(p.clusterId());
             // Rules are added before others are removed, so a replacement never leaves a gap in access.
@@ -82,19 +85,60 @@ public class KafkaAclChanges {
                         .operations()
                         .execute(KafkaAcls.id(a), new Create(Attributes.empty()), Scope.whole())
                         .orThrow());
+                added.add(a);
             }
             for (Acl a : p.remove()) {
                 KafkaFailures.call(() -> connection
                         .operations()
                         .execute(KafkaAcls.id(a), new Delete(false, false), Scope.whole())
                         .orThrow());
+                removed.add(a);
             }
-            audit.finish(event, false, preview.added() + preview.removed(), null, Map.of("access", preview.access()));
-            return new AclResult(preview.added(), preview.removed());
         } catch (RuntimeException e) {
-            audit.fail(event, e.getMessage());
+            // Whatever was applied before the failure stays applied: the row says what, and what was left.
+            audit.finish(
+                    event,
+                    true,
+                    added.size() + removed.size(),
+                    e.getMessage(),
+                    Map.of(
+                            "added",
+                            added,
+                            "removed",
+                            removed,
+                            "notAdded",
+                            without(p.add(), added),
+                            "notRemoved",
+                            without(p.remove(), removed)));
             throw e;
         }
+        // The cluster is asked again for what it holds, so the row records the state and not only the calls made.
+        List<Acl> now;
+        try {
+            now = acls.all(p.clusterId());
+        } catch (RuntimeException e) {
+            audit.finish(
+                    event,
+                    true,
+                    added.size() + removed.size(),
+                    "The ACLs were changed but the cluster could not be asked what it holds: " + e.getMessage(),
+                    Map.of("added", added, "removed", removed));
+            throw e;
+        }
+        List<Acl> missing = p.add().stream().filter(a -> !now.contains(a)).toList();
+        List<Acl> remaining = p.remove().stream().filter(now::contains).toList();
+        boolean confirmed = missing.isEmpty() && remaining.isEmpty();
+        audit.finish(
+                event,
+                !confirmed,
+                preview.added() + preview.removed(),
+                confirmed ? null : "The cluster does not hold the ACLs as changed.",
+                Map.of("access", preview.access(), "aclCount", now.size(), "missing", missing, "remaining", remaining));
+        return new AclResult(preview.added(), preview.removed());
+    }
+
+    private static List<Acl> without(List<Acl> all, List<Acl> done) {
+        return all.stream().filter(a -> !done.contains(a)).toList();
     }
 
     private static AclChangeRequest request(AclChangeParams p) {
