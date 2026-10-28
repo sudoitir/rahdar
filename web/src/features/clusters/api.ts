@@ -196,7 +196,11 @@ export function useHealth(id: string): UseQueryResult<HealthView, ApiError> {
 
 /** The broker systems Rahdar loads, for the registration page's choice. */
 export function useSystems(): UseQueryResult<LoadedSystem[], ApiError> {
-  return useQuery({ queryKey: ['systems'], queryFn: () => request<LoadedSystem[]>('/systems'), staleTime: Infinity });
+  return useQuery({
+    queryKey: ['systems'],
+    queryFn: () => request<PagedView<LoadedSystem>>('/systems').then((page) => page.data),
+    staleTime: Infinity,
+  });
 }
 
 export function useCheckConnection() {

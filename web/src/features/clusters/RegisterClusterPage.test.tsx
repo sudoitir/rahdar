@@ -64,7 +64,7 @@ describe('RegisterClusterPage', () => {
   });
 
   it('opens the only loaded system without a choice', async () => {
-    server.use(http.get('*/api/v1/systems', () => HttpResponse.json([LOADED_SYSTEMS[1]])));
+    server.use(http.get('*/api/v1/systems', () => HttpResponse.json(paged([LOADED_SYSTEMS[1]]))));
     renderAppAt('/clusters/new');
 
     expect(await screen.findByRole('textbox', { name: /Bootstrap servers/ })).toBeInTheDocument();
@@ -83,7 +83,7 @@ describe('RegisterClusterPage', () => {
       http.get('*/api/v1/systems', () =>
         failing
           ? HttpResponse.json({ title: 'Error', detail: 'The driver registry is down.' }, { status: 500 })
-          : HttpResponse.json(LOADED_SYSTEMS),
+          : HttpResponse.json(paged(LOADED_SYSTEMS)),
       ),
     );
     const user = userEvent.setup();
