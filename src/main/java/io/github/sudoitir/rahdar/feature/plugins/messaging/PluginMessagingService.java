@@ -17,9 +17,11 @@ import io.github.sudoitir.rahdar.kernel.security.ActorResolver;
 import io.github.sudoitir.rahdar.kernel.security.ResourceRef;
 import io.github.sudoitir.rahdar.platform.broker.BrokerMessages;
 import io.github.sudoitir.rahdar.platform.broker.MessageKind;
+import io.github.sudoitir.rahdar.platform.broker.ReservedNames;
 import io.github.sudoitir.rahdar.platform.broker.SendInDoubtException;
 import io.github.sudoitir.rahdar.platform.broker.SendNames;
 import io.github.sudoitir.rahdar.platform.broker.SentMessages;
+import io.github.sudoitir.rahdar.platform.broker.SystemExtensions;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterKinds;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
@@ -64,6 +66,7 @@ public class PluginMessagingService implements PluginScopedBeans {
     private final PluginDrains drains;
     private final ClusterDirectory clusters;
     private final ClusterKinds kinds;
+    private final SystemExtensions extensions;
     private final BrokerMessages messages;
     private final AuditService audit;
     private final ActorResolver actors;
@@ -189,12 +192,16 @@ public class PluginMessagingService implements PluginScopedBeans {
         if (target.name().length() > MAX_NAME) {
             return Optional.of("The target's name is longer than " + MAX_NAME + " characters.");
         }
-        String reserved = Reservations.reason(target.name());
-        if (reserved != null) {
-            return Optional.of(reserved);
+        String own = Reservations.reason(target.name());
+        if (own != null) {
+            return Optional.of(own);
         }
         if (clusters.cluster(clusterId).isEmpty()) {
             return Optional.of("The cluster " + clusterId + " is not registered.");
+        }
+        String reserved = reservedReason(clusterId, target.name());
+        if (reserved != null) {
+            return Optional.of(reserved);
         }
         return access.denial(actingUserId, clusterId, AccessCheck.sendNeeds(target));
     }
@@ -304,15 +311,29 @@ public class PluginMessagingService implements PluginScopedBeans {
             throw new RegistrationRefusedException("A subscription's id is at most " + MAX_NAME + " characters, not "
                     + source.id().length() + ".");
         }
-        String reserved = Reservations.reason(source.segments().getFirst());
-        if (reserved != null) {
-            throw new RegistrationRefusedException(reserved);
+        for (String segment : source.segments()) {
+            String reserved = reservedReason(spec.clusterId(), segment);
+            if (reserved != null) {
+                throw new RegistrationRefusedException(reserved);
+            }
         }
         if (spec.mode() == RegistrationMode.TAP) {
             reconciler.tapRefusal(spec.clusterId()).ifPresent(why -> {
                 throw new RegistrationRefusedException(why);
             });
         }
+    }
+
+    /** Why a plugin may not use the name: Rahdar's own, or one the cluster's system keeps for itself. */
+    private String reservedReason(UUID clusterId, String name) {
+        String reserved = Reservations.reason(name);
+        if (reserved != null) {
+            return reserved;
+        }
+        return extensions
+                .forCluster(clusterId, ReservedNames.class)
+                .flatMap(names -> names.reason(name))
+                .orElse(null);
     }
 
     private ClusterNode servingWithCore(UUID clusterId) {

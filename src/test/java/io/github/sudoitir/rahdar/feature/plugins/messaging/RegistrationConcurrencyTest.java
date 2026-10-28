@@ -12,6 +12,7 @@ import io.github.sudoitir.rahdar.feature.plugins.messaging.internal.PluginMessag
 import io.github.sudoitir.rahdar.kernel.audit.AuditService;
 import io.github.sudoitir.rahdar.kernel.security.ActorResolver;
 import io.github.sudoitir.rahdar.platform.broker.BrokerMessages;
+import io.github.sudoitir.rahdar.platform.broker.SystemExtensions;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterKinds;
 import java.time.Clock;
@@ -33,6 +34,7 @@ class RegistrationConcurrencyTest {
             mock(PluginDrains.class),
             mock(ClusterDirectory.class),
             mock(ClusterKinds.class),
+            mock(SystemExtensions.class),
             mock(BrokerMessages.class),
             audit,
             mock(ActorResolver.class),
