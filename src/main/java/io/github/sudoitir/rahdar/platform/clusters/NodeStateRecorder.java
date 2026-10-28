@@ -38,9 +38,11 @@ public class NodeStateRecorder {
     public void applyTierA(UUID nodeId, NodeDescription ha, long cycle) {
         nodes.findById(nodeId).ifPresent(node -> {
             String nodeIdBefore = node.getNativeNodeId();
+            // A node that reports serving rather than started (a Kafka broker) is started while it serves.
             String state = ha.conditions().stream()
-                    .filter(c -> c.type().equals(ConditionTypes.STARTED))
-                    .findFirst()
+                    .filter(c ->
+                            c.type().equals(ConditionTypes.STARTED) || c.type().equals(ConditionTypes.SERVING))
+                    .min(java.util.Comparator.comparing(c -> c.type().equals(ConditionTypes.STARTED) ? 0 : 1))
                     .map(c -> switch (c.status()) {
                         case TRUE -> "STARTED";
                         case FALSE -> "STOPPED";

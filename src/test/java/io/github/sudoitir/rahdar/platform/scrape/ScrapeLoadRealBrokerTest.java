@@ -9,6 +9,7 @@ import io.github.sudoitir.rahdar.kernel.stream.SseHub;
 import io.github.sudoitir.rahdar.platform.broker.Attempt;
 import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
 import io.github.sudoitir.rahdar.platform.broker.BrokerNotifications;
+import io.github.sudoitir.rahdar.platform.broker.BrokerSystems;
 import io.github.sudoitir.rahdar.platform.broker.NodeAddress;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterOwnership;
@@ -104,7 +105,9 @@ class ScrapeLoadRealBrokerTest extends PostgresIntegrationTest {
                 samples,
                 new StreamSignals(mock(SseHub.class)),
                 mock(BrokerNotifications.class),
-                events);
+                events,
+                List.of(),
+                mock(BrokerSystems.class));
     }
 
     @AfterEach

@@ -11,6 +11,8 @@ import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
 import io.github.sudoitir.rahdar.platform.broker.BrokerFailures;
 import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
 import io.github.sudoitir.rahdar.platform.broker.BrokerNotifications;
+import io.github.sudoitir.rahdar.platform.broker.BrokerSystems;
+import io.github.sudoitir.rahdar.platform.broker.ClusterScrape;
 import io.github.sudoitir.rahdar.platform.broker.NodeEndpoint;
 import io.github.sudoitir.rahdar.platform.broker.QueueRow;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
@@ -106,6 +108,8 @@ public class ScrapeScheduler implements DisposableBean {
     private final StreamSignals streamSignals;
     private final BrokerNotifications notifications;
     private final ApplicationEventPublisher eventPublisher;
+    private final List<ClusterScrape> systemScrapes;
+    private final BrokerSystems systems;
 
     private record QueuesPage(List<QueueRow> rows, Optional<String> next) {}
 
@@ -133,6 +137,11 @@ public class ScrapeScheduler implements DisposableBean {
      */
     private void tierA(UUID clusterId) {
         long cycle = scrapeCycle.next(clusterId);
+        Optional<ClusterScrape> own = systemScrape(clusterId);
+        if (own.isPresent()) {
+            systemTierA(clusterId, own.get(), cycle);
+            return;
+        }
         List<ClusterNode> targets = manageableNodes(clusterId).stream()
                 .filter(node -> probesInFlight.add(node.getId()))
                 .toList();
@@ -154,6 +163,28 @@ public class ScrapeScheduler implements DisposableBean {
                 }))
                 .toList();
         awaitProbes(started);
+    }
+
+    /** The scrape of the cluster's system, for a system that is not probed node by node. */
+    private Optional<ClusterScrape> systemScrape(UUID clusterId) {
+        String system = systems.idOf(clusterId);
+        return systemScrapes.stream().filter(s -> s.system().equals(system)).findFirst();
+    }
+
+    /** A tier A pass for a system that reads its cluster as a whole: one read, then the same signals. */
+    private void systemTierA(UUID clusterId, ClusterScrape scrape, long cycle) {
+        String key = clusterId + "/cluster/nodes";
+        try {
+            scrape.nodes(clusterId, cycle);
+            lastFailures.remove(key);
+            streamSignals.afterTierA(clusterId, persist.endpoints(clusterId));
+        } catch (RuntimeException e) {
+            String why = e.toString();
+            if (!why.equals(lastFailures.put(key, why))) {
+                log.warn("The node scrape of cluster {} failed: {}", clusterId, why);
+            }
+        }
+        eventPublisher.publishEvent(new ScrapeTierCompleted(clusterId, ScrapeTierCompleted.Tier.A));
     }
 
     /** What follows once every probe of a cycle has finished: corroboration, stream signals and subscriptions. */

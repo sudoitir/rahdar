@@ -19,6 +19,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.OptionalLong;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -43,10 +44,12 @@ class KafkaHealth implements ClusterHealthEvaluator {
     private record Reading(Instant at, ClusterHealth health) {}
 
     private final BrokerGateway gateway;
+    private final KafkaPartitions partitions;
     private final Map<UUID, Reading> readings = new ConcurrentHashMap<>();
 
-    KafkaHealth(BrokerGateway gateway) {
+    KafkaHealth(BrokerGateway gateway, KafkaPartitions partitions) {
         this.gateway = gateway;
+        this.partitions = partitions;
     }
 
     @Override
@@ -74,11 +77,11 @@ class KafkaHealth implements ClusterHealthEvaluator {
             return verdict(
                     clusterId, Level.CRITICAL, List.of(), List.of("No broker is reachable: " + e.getMessage()), false);
         }
-        return judge(clusterId, described);
+        return judge(clusterId, described, partitions.offline(clusterId));
     }
 
     /** The verdict for what the driver described; separate from the read so it is tested on its own. */
-    static ClusterHealth judge(UUID clusterId, Partial<List<NodeDescription>> described) {
+    static ClusterHealth judge(UUID clusterId, Partial<List<NodeDescription>> described, OptionalLong offline) {
         List<String> notes = new ArrayList<>();
         List<String> serving = new ArrayList<>();
         Level level = Level.OK;
@@ -151,6 +154,13 @@ class KafkaHealth implements ClusterHealthEvaluator {
         } else if (!leader) {
             level = Level.CRITICAL;
             notes.add("The controller quorum has no leader.");
+        }
+        if (offline.isPresent() && offline.getAsLong() > 0) {
+            level = Level.CRITICAL;
+            notes.add(offline.getAsLong()
+                    + " partitions have no leader, so their records can be neither read nor written.");
+        } else if (offline.isEmpty()) {
+            notes.add("The partitions' leaders could not be read, so offline partitions are not ruled out.");
         }
         return verdict(clusterId, level, serving, notes, behind);
     }

@@ -28,6 +28,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.OptionalLong;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -77,7 +78,8 @@ class KafkaHealthTest {
                         List.of(nodes),
                         java.util.Arrays.stream(nodes)
                                 .map(NodeDescription::node)
-                                .toList()));
+                                .toList()),
+                OptionalLong.of(0));
     }
 
     @Test
@@ -148,7 +150,8 @@ class KafkaHealthTest {
                 new Partial<>(
                         List.of(one),
                         Map.of(one.node(), NodeOutcome.APPLIED, NodeId.of("2"), NodeOutcome.FAILED),
-                        Map.of(NodeId.of("2"), down)));
+                        Map.of(NodeId.of("2"), down)),
+                OptionalLong.of(0));
 
         assertThat(health.level()).isEqualTo(Level.DEGRADED);
         assertThat(health.notes()).anyMatch(n -> n.contains("Node 2 is unreachable"));
@@ -163,9 +166,31 @@ class KafkaHealthTest {
     }
 
     @Test
+    void partitionsWithoutALeaderAreCritical() {
+        ClusterHealth health = KafkaHealth.judge(
+                CLUSTER,
+                Partial.complete(List.of(broker("1", true, true, serving(true))), List.of(NodeId.of("1"))),
+                OptionalLong.of(3));
+
+        assertThat(health.level()).isEqualTo(Level.CRITICAL);
+        assertThat(health.notes()).anyMatch(n -> n.contains("3 partitions have no leader"));
+    }
+
+    @Test
+    void partitionsWhoseLeadersCouldNotBeReadAreNotCountedAsFine() {
+        ClusterHealth health = KafkaHealth.judge(
+                CLUSTER,
+                Partial.complete(List.of(broker("1", true, true, serving(true))), List.of(NodeId.of("1"))),
+                OptionalLong.empty());
+
+        assertThat(health.level()).isEqualTo(Level.OK);
+        assertThat(health.notes()).anyMatch(n -> n.contains("offline partitions are not ruled out"));
+    }
+
+    @Test
     void noBrokerAtAllIsCritical() {
-        ClusterHealth health =
-                KafkaHealth.judge(CLUSTER, new Partial<>(new ArrayList<NodeDescription>(), Map.of(), Map.of()));
+        ClusterHealth health = KafkaHealth.judge(
+                CLUSTER, new Partial<>(new ArrayList<NodeDescription>(), Map.of(), Map.of()), OptionalLong.of(0));
 
         assertThat(health.level()).isEqualTo(Level.CRITICAL);
         assertThat(health.liveEndpointNames()).isEmpty();

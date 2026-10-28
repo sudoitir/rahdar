@@ -91,6 +91,12 @@ class KafkaRegisterRealBrokerTest extends PostgresIntegrationTest {
     TruncateService truncates;
 
     @Autowired
+    KafkaScrape scrape;
+
+    @Autowired
+    KafkaPartitions partitions;
+
+    @Autowired
     JdbcClient jdbc;
 
     private final String run = "kafka-register-" + UUID.randomUUID().toString().substring(0, 8);
@@ -479,6 +485,23 @@ class KafkaRegisterRealBrokerTest extends PostgresIntegrationTest {
                     .isInstanceOf(ConflictException.class)
                     .hasMessageContaining("append-only");
         }
+    }
+
+    @Test
+    void theScrapeRecordsEachBrokersStateFromWhatTheClusterSaysOfIt() {
+        UUID id = ((Attempt.Ok<ClusterDetail>) service.register(request("scrape", kafka.getBootstrapServers())))
+                .value()
+                .id();
+
+        scrape.nodes(id, 1);
+
+        assertThat(nodes.findByClusterIdOrderByNameAsc(id)).singleElement().satisfies(broker -> {
+            assertThat(broker.getState()).isEqualTo("STARTED");
+            assertThat(broker.getActive()).isTrue();
+            assertThat(broker.getLastSeenAt()).isNotNull();
+            assertThat(broker.getLastError()).isNull();
+        });
+        assertThat(partitions.offline(id)).hasValue(0);
     }
 
     @Test

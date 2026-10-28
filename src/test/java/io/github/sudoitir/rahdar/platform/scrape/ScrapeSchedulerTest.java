@@ -46,6 +46,8 @@ import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
 import io.github.sudoitir.rahdar.platform.broker.BrokerFailures;
 import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
 import io.github.sudoitir.rahdar.platform.broker.BrokerNotifications;
+import io.github.sudoitir.rahdar.platform.broker.BrokerSystems;
+import io.github.sudoitir.rahdar.platform.broker.ClusterScrape;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDutyAcquired;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDutyReleased;
@@ -122,6 +124,12 @@ class ScrapeSchedulerTest {
     @Mock
     ClusterOwnership ownership;
 
+    @Mock
+    ClusterScrape systemScrape;
+
+    @Mock
+    BrokerSystems systems;
+
     ScrapeCycle scrapeCycle;
     ScrapeScheduler scheduler;
     ListAppender<ILoggingEvent> logs;
@@ -135,6 +143,7 @@ class ScrapeSchedulerTest {
         when(gateway.cluster(any())).thenReturn(connection);
         when(connection.nodes()).thenReturn(nodes);
         when(connection.resources()).thenReturn(resources);
+        Mockito.lenient().when(systemScrape.system()).thenReturn("kafka");
         scrapeCycle = new ScrapeCycle(persist);
         scheduler = new ScrapeScheduler(
                 settings,
@@ -148,7 +157,9 @@ class ScrapeSchedulerTest {
                 metrics,
                 new StreamSignals(Mockito.mock(SseHub.class)),
                 notifications,
-                eventPublisher);
+                eventPublisher,
+                List.of(systemScrape),
+                systems);
     }
 
     @AfterEach
@@ -232,6 +243,19 @@ class ScrapeSchedulerTest {
 
         verify(clusterService).rediscover(broken.getId());
         verify(clusterService).rediscover(fine.getId());
+    }
+
+    @Test
+    void aClusterWhoseSystemScrapesAsAWholeIsHandedToItAndItsNodesAreNotProbed() {
+        ClusterEntity cluster = cluster("kafka");
+        when(systems.idOf(cluster.getId())).thenReturn("kafka");
+        when(clusters.owned()).thenReturn(List.of(cluster));
+
+        scheduler.tierA();
+
+        verify(systemScrape).nodes(eq(cluster.getId()), anyLong());
+        verify(gateway, never()).cluster(any());
+        verify(eventPublisher).publishEvent(any(ScrapeTierCompleted.class));
     }
 
     @Test
