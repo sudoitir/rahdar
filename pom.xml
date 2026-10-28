@@ -55,7 +55,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 
         <!-- The broker SDK and its Artemis driver (ADR-0203). Never a SNAPSHOT on main: CI refuses one. -->
-        <openbroker.version>0.6.0-SNAPSHOT</openbroker.version>
+        <openbroker.version>0.6.0</openbroker.version>
         <testcontainers.version>2.0.5</testcontainers.version>
         <spotless.version>3.10.4</spotless.version>
         <!-- Publishing the plugin API (ADR-0102); verified against Maven Central 2026-09-23. -->
