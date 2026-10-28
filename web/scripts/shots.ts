@@ -24,14 +24,6 @@ const OUT = resolve(HERE, '../../docs/img');
 
 password(); // fail before launching a browser if it is missing
 
-// A query with one pushdown predicate and one target wildcard: the cost line
-// then has something to classify, which is the part of this screen worth showing.
-// No ORDER BY: sorting reads every message under ORDERS.*, which on a demo that has run for a while
-// runs to the console's 30 s bound. Unsorted, the scan stops at the limit.
-const SQL = `SELECT * FROM "ORDERS.*"
-WHERE props.tenant = 'acme'
-LIMIT 200`;
-
 /**
  * The double-submit CSRF token, read back out of the session's own cookie jar.
  * The browser sends it automatically; a request made through `page.request` has
@@ -82,56 +74,9 @@ async function main() {
       ready: () => page.getByRole('heading', { name: 'Its pair' }).waitFor({ timeout: 10_000 }),
     },
     {
-      file: 'flow.png',
-      // The flow view samples clients only while it is open, and rates need two samples: open it,
-      // wait for real nodes, then give the sampler two sweeps before photographing.
-      // Routing layers on, Rahdar's capture tap included; dead-letter edges stay off (one per queue).
-      path: `/clusters/${clusterId}/flow?layers=BRIDGES,CAPTURE,CLUSTER,DIVERTS`,
-      // Wide: five columns and their routing hops only fit side by side at a legible zoom on a wide screen.
-      width: 1920,
-      height: 1300,
-      ready: async () => {
-        await page.locator('.react-flow__node-queue').first().waitFor({ timeout: 60_000 });
-        // Client nodes arrive with the sampler's first sweep and their rates with the second. Reload
-        // once both exist, so the layout orders every column busiest first.
-        await page
-          .locator('.react-flow__node-client')
-          .first()
-          .waitFor({ timeout: 90_000 })
-          .catch(() => console.warn('flow.png: no sampled clients yet — the seed may not be running'));
-        await page.waitForTimeout(35_000);
-        await page.reload();
-        await page.locator('.react-flow__node-client').first().waitFor({ timeout: 60_000 });
-        await page.waitForTimeout(2_000);
-      },
-    },
-    {
       file: 'queues.png',
       path: `/clusters/${clusterId}/queues`,
       ready: () => page.getByRole('row').nth(1).waitFor({ timeout: 30_000 }),
-    },
-    {
-      file: 'sql.png',
-      path: `/clusters/${clusterId}/sql`,
-      height: 1100,
-      // The console is an empty form until a query has been run, so this one is
-      // driven rather than merely visited: an empty editor is a screenshot of
-      // nothing.
-      before: async () => {
-        await page.getByRole('textbox', { name: /query/i }).click();
-        // The console restores the last query, so a click leaves the cursor in
-        // the middle of it and typing would splice the two together.
-        await page.keyboard.press('ControlOrMeta+a');
-        await page.keyboard.type(SQL);
-        await page.getByRole('button', { name: 'Run', exact: true }).click();
-      },
-      // Longer than the console's own 30 s query bound, so a slow broker still yields its rows.
-      ready: () => page.getByRole('row').nth(1).waitFor({ timeout: 60_000 }),
-    },
-    {
-      file: 'settings.png',
-      path: `/clusters/${clusterId}/settings?tab=settings-operational`,
-      ready: () => page.getByRole('heading', { name: 'Operational configuration' }).waitFor({ timeout: 30_000 }),
     },
     // ── declared configuration (ADR-0067) ────────────────────────────────
     // Ordered on purpose: the first-run offer only exists while the cluster has

@@ -111,7 +111,7 @@ async function navigate(page: Page, name: string | RegExp) {
   await click(page, page.getByRole('link', { name, exact: typeof name === 'string' }).first());
 }
 
-async function encode(webm: string, name: string, skip: number, size: typeof SIZE, gifWidth: number) {
+async function encode(webm: string, name: string, skip: number, gifWidth: number) {
   // Recording starts when the context does, so the first seconds are the login
   // screen and the navigation to the first view. `mark()` says where the part
   // worth watching begins; everything before it is cut.
@@ -132,25 +132,7 @@ async function encode(webm: string, name: string, skip: number, size: typeof SIZ
     `${filters}[x];[x][1:v]paletteuse=dither=none:diff_mode=rectangle`,
     join(OUT, `${name}.gif`),
   ]);
-  // The MP4 is a fraction of the size and is what a page with a player should
-  // prefer; the GIF is what GitHub can render inline.
-  await run('ffmpeg', [
-    '-y',
-    ...trim,
-    '-vf',
-    `scale=${size.width}:-2`,
-    '-c:v',
-    'libx264',
-    '-pix_fmt',
-    'yuv420p',
-    '-crf',
-    '26',
-    '-movflags',
-    '+faststart',
-    '-an',
-    join(OUT, `${name}.mp4`),
-  ]);
-  console.log(`wrote docs/img/${name}.gif and ${name}.mp4`);
+  console.log(`wrote docs/img/${name}.gif`);
 }
 
 /** One clip: its own context, so its own video file. */
@@ -182,7 +164,7 @@ async function clip(
   }
   const [video] = (await readdir(dir)).filter((f) => f.endsWith('.webm'));
   if (!video) throw new Error(`${name}: playwright wrote no video into ${dir}`);
-  await encode(join(dir, video), name, skip, size, gifWidth);
+  await encode(join(dir, video), name, skip, gifWidth);
   await rm(dir, { recursive: true, force: true });
 }
 
