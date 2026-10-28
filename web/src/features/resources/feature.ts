@@ -1,3 +1,4 @@
+import { DestinationTruncate } from './TruncateDestination.tsx';
 import { createElement } from 'react';
 import { IconAt, IconListDetails, IconNetwork, IconPlugConnected, IconSend, IconUsers } from '@tabler/icons-react';
 import { createRoute } from '@tanstack/react-router';
@@ -123,6 +124,7 @@ const resourceSlots: SlotContributions = {
     { id: 'resources.destination.open', order: 20, section: 'open', Component: DestinationOpenConsumers },
     { id: 'resources.destination.copy', order: 10, section: 'copy', Component: DestinationCopy },
     { id: 'resources.destination.close', order: 10, section: 'operate', Component: DestinationCloseConsumers },
+    { id: 'resources.destination.truncate', order: 20, section: 'destroy', Component: DestinationTruncate },
   ],
   'connection.link': [{ id: 'resources.connection.link', order: 10, Component: ConnectionLink }],
   'channel.link': [{ id: 'resources.channel.link', order: 10, Component: ChannelLink }],
