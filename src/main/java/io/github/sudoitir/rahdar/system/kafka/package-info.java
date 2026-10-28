@@ -6,8 +6,13 @@
 @ApplicationModule(
         displayName = "Kafka",
         allowedDependencies = {
+            "feature.resources",
+            "feature.resources::web",
+            "kernel.audit",
             "kernel.core",
+            "kernel.gate",
             "kernel.plugin",
+            "kernel.security",
             "platform.broker",
             "platform.clusters",
             "platform.clusters::web",
