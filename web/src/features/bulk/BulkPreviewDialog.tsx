@@ -282,7 +282,6 @@ export function BulkPreviewDialog({
   const data = preview.data;
   const acting = data?.items.filter((i) => i.status !== 'REFUSED') ?? [];
   const refused = (data?.items.length ?? 0) - acting.length;
-  const unknown = op.destructive ? acting.filter((i) => i.affected == null).length : 0;
   const overCap = data?.run.overCap ?? false;
   const shown = onlyProblems ? (data?.items.filter(hasProblem) ?? []) : (data?.items ?? []);
   const cluster = useCluster(clusterId);
@@ -291,6 +290,7 @@ export function BulkPreviewDialog({
     operation === 'PURGE' &&
     acting.length > 0 &&
     acting.every((i) => cluster.data?.kinds?.find((k) => k.id === i.kind)?.partitioned === true);
+  const unknown = op.destructive ? acting.filter((i) => (moves ? i.skipped : i.affected) == null).length : 0;
   const skippedTotal = acting.some((i) => i.skipped != null)
     ? acting.reduce((sum, i) => sum + (i.skipped ?? 0), 0)
     : null;

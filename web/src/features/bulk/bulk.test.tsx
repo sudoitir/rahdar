@@ -446,6 +446,7 @@ describe('BulkPreviewDialog', () => {
     ).toBeInTheDocument();
     expect(within(dialog).getByRole('button', { name: 'Skip 1,200 records for 1 group' })).toBeInTheDocument();
     expect(within(dialog).queryByText(/destroy|cannot be undone/i)).not.toBeInTheDocument();
+    expect(within(dialog).queryByText(/does not know/)).not.toBeInTheDocument();
   });
 
   it('cannot arm a delete until the action and count are typed, then runs it and opens the run', async () => {
