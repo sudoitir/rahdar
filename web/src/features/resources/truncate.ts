@@ -28,14 +28,14 @@ export function parseCut(mode: 'offsets' | 'time', text: string): { before: Trun
     : { problem: 'Enter at least one cut as partition:offset, such as 0:120.' };
 }
 
-/** The truncate of one destination: a preview (`dryRun`) of the effect, then the run. */
+/** The truncate of one destination: a preview (`dryRun`) of the effect, then the run, which sends the preview's `etag` back. */
 export function useTruncateDestination(clusterId: string, destinationId: string) {
   const qc = useQueryClient();
   const slash = destinationId.indexOf('/');
   const path = `/clusters/${clusterId}/destinations/${destinationId.slice(0, slash)}/${encodeURIComponent(destinationId.slice(slash + 1))}:truncate`;
-  return useMutation<TruncateEffect, ApiError, { before: TruncateBefore; dryRun?: boolean }>({
-    mutationFn: ({ before, dryRun }) =>
-      request(`${path}${dryRun ? '?dryRun=true' : ''}`, { method: 'POST', body: JSON.stringify({ before }) }),
+  return useMutation<TruncateEffect, ApiError, { before: TruncateBefore; dryRun?: boolean; etag?: string }>({
+    mutationFn: ({ before, dryRun, etag }) =>
+      request(`${path}${dryRun ? '?dryRun=true' : ''}`, { method: 'POST', body: JSON.stringify({ before, etag }) }),
     onSuccess: (_, { dryRun }) => {
       if (!dryRun) void qc.invalidateQueries({ queryKey: clusterKey(clusterId) });
     },

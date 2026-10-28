@@ -34,6 +34,7 @@ export function TruncateDestinationDialog({
   const [problem, setProblem] = useState<string | null>(null);
   const [previewed, setPreviewed] = useState<{ cut: string; effect: TruncateEffect } | null>(null);
   const [refusal, setRefusal] = useState<ApiErrorLike | null>(null);
+  const [stale, setStale] = useState(false);
 
   const cut = parseCut(mode, text);
   const signature = `${mode}\u0000${text.trim()}`;
@@ -42,6 +43,7 @@ export function TruncateDestinationDialog({
   const reset = () => {
     setPreviewed(null);
     setRefusal(null);
+    setStale(false);
     setProblem(null);
   };
   const preview = () => {
@@ -53,22 +55,28 @@ export function TruncateDestinationDialog({
     );
   };
   const run = () => {
-    if (!('before' in cut)) return;
+    if (!('before' in cut) || !current?.etag) return;
     truncate.mutate(
-      { before: cut.before },
+      { before: cut.before, etag: current.etag },
       {
         onSuccess: () => {
           notify.succeeded({ action: TRUNCATE, subject: destination.name });
           dismiss();
         },
-        onError: (error) =>
+        onError: (error) => {
+          if (error.status === 412) {
+            setStale(true);
+            setPreviewed(null);
+            return;
+          }
           notify.settle(error, {
             action: TRUNCATE,
             subject: destination.name,
             cause: error.message,
             next: 'Check the audit log for what ran, then try again.',
             onHeld: dismiss,
-          }),
+          });
+        },
       },
     );
   };
@@ -80,7 +88,8 @@ export function TruncateDestinationDialog({
   };
 
   let blocked: string | undefined;
-  if (refusal) blocked = refusal.message;
+  if (stale) blocked = 'The log changed since the preview. Preview the cut again.';
+  else if (refusal) blocked = refusal.message;
   else if (!current) blocked = 'Preview the cut first: the button waits for what it would remove.';
   const count = current?.records ?? null;
 
@@ -145,7 +154,13 @@ export function TruncateDestinationDialog({
               {refusal.message}
             </Notice>
           ) : null}
-          {truncate.isError && !truncate.variables?.dryRun && !refusal ? (
+          {stale ? (
+            <Notice tone="warning" title="The log changed since the preview">
+              Records were added or removed after the preview, so what it showed is out of date. Preview the cut again
+              before confirming.
+            </Notice>
+          ) : null}
+          {truncate.isError && !truncate.variables?.dryRun && !refusal && !stale ? (
             <ErrorState variant="inline" error={truncate.error} />
           ) : null}
           {current ? <EffectSummary effect={current} /> : null}
