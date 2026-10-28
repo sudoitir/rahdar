@@ -8,7 +8,7 @@ import { holdButton } from '../../test/hold.ts';
 import { renderWithProviders } from '../../test/render.tsx';
 import { server } from '../../test/setup.ts';
 import { KAFKA_SYSTEM } from '../../test/wire.ts';
-import { ConnectionSection } from './ClusterSettings.tsx';
+import { CapabilitiesSection, ConnectionSection } from './ClusterSettings.tsx';
 
 const CLUSTER = '22222222-2222-2222-2222-222222222222';
 
@@ -111,5 +111,31 @@ describe('ConnectionSection of a Kafka cluster', () => {
       bootstrapServers: ['k1:9092'],
       credentials: { username: 'rahdar', password: 'new-secret' },
     });
+  });
+});
+
+describe('CapabilitiesSection of a Kafka cluster', () => {
+  it('speaks of the connection, not of Jolokia or broker.xml', async () => {
+    kafkaCluster();
+    server.use(
+      http.get('*/api/v1/clusters/:id', () =>
+        HttpResponse.json({
+          id: CLUSTER,
+          name: 'events',
+          system: KAFKA_SYSTEM,
+          capabilities: {
+            managementRead: { status: 'AVAILABLE', reason: 'The account may describe the cluster.' },
+            managementWrite: { status: 'AVAILABLE', reason: 'ok' },
+            notifications: { status: 'UNAVAILABLE', reason: 'Kafka has no broker events.' },
+            messageIo: { status: 'AVAILABLE', reason: 'ok' },
+            slowConsumerDetection: { status: 'AVAILABLE', reason: 'ok' },
+            versionGates: [],
+          },
+        }),
+      ),
+    );
+    renderWithProviders(<CapabilitiesSection clusterId={CLUSTER} />);
+    expect(await screen.findByText('Live events')).toBeInTheDocument();
+    expect(document.body.textContent).not.toMatch(/Jolokia|broker\.xml/);
   });
 });

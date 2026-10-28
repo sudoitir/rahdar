@@ -99,8 +99,8 @@ export const KAFKA_SYSTEM = { id: 'kafka', name: 'Apache Kafka' };
 
 /** The systems `GET /systems` lists when both drivers are loaded. */
 export const LOADED_SYSTEMS = [
-  { id: 'artemis', name: 'Apache ActiveMQ Artemis', supportedVersions: ['2.30 to 2.60'], connection: 'jolokia-seeds' },
-  { id: 'kafka', name: 'Apache Kafka', supportedVersions: ['3.0 and later'], connection: 'bootstrap' },
+  { id: 'artemis', name: 'Apache ActiveMQ Artemis', supportedVersions: '[2.30.0,2.60.0]', connection: 'jolokia-seeds' },
+  { id: 'kafka', name: 'Apache Kafka', supportedVersions: '[3.0.0,)', connection: 'bootstrap' },
 ];
 
 /** The system an Artemis cluster reports, which decides which system-only views it is offered. */

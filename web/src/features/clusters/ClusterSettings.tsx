@@ -77,14 +77,23 @@ export function ConnectionSection({ clusterId }: Readonly<{ clusterId: string }>
   );
 }
 
+/** The Artemis wording: its management channel is Jolokia and its fixes are `broker.xml` changes. */
+const ARTEMIS_CAPABILITY_WORDS = (
+  <>
+    What this connection can and cannot do over Jolokia. Rows that are not plainly available expand with the reason and
+    the exact <code>broker.xml</code> change to close the gap.
+  </>
+);
+
 /** Settings section: what this connection can and cannot do. */
 export function CapabilitiesSection({ clusterId }: Readonly<{ clusterId: string }>) {
   const cluster = useCluster(clusterId);
   return (
     <>
       <Text size="sm" c="dimmed" mb="sm" className={classes.intro}>
-        What this connection can and cannot do over Jolokia. Rows that are not plainly available expand with the reason
-        and the exact <code>broker.xml</code> change to close the gap.
+        {cluster.data?.system.id === 'artemis'
+          ? ARTEMIS_CAPABILITY_WORDS
+          : 'What this connection can and cannot do. Rows that are not plainly available expand with the reason.'}
       </Text>
       <SectionBody cluster={cluster} blockSize="14rem">
         {(data) => <CapabilityLedger capabilities={data.capabilities} clusterId={clusterId} />}

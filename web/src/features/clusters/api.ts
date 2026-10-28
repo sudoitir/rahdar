@@ -35,7 +35,7 @@ export type EstateSubscription = Schemas['EstateSubscriptionView'];
 export interface LoadedSystem {
   id: string;
   name: string;
-  supportedVersions: string[];
+  supportedVersions: string;
   connection: 'jolokia-seeds' | 'bootstrap';
 }
 

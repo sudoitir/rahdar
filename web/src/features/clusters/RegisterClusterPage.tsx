@@ -11,6 +11,7 @@ import { Section } from '../../ui/Section.tsx';
 import { useSystems, type LoadedSystem } from './api.ts';
 import { ArtemisRegistrationForm } from './ArtemisRegistrationForm.tsx';
 import classes from './Clusters.module.css';
+import { versionRangeWords } from './versionRange.ts';
 import { KafkaRegistrationForm } from './KafkaRegistrationForm.tsx';
 
 /** The system's connection form; one per kind of connection the drivers take. */
@@ -64,7 +65,7 @@ export function RegisterClusterPage() {
                     </Text>
                   </Group>
                   <Text size="xs" c="dimmed" mt={4}>
-                    {`Versions: ${s.supportedVersions.join(', ')}`}
+                    {`Versions: ${versionRangeWords(s.supportedVersions)}`}
                   </Text>
                 </Radio.Card>
               ))}
