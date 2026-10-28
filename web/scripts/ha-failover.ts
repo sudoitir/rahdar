@@ -360,10 +360,14 @@ async function main() {
       'POST',
       '/clusters',
       {
-        seedUrls: [BROKER],
+        system: 'artemis',
         name: 'ha-failover',
-        credentials: { username: 'artemis', password: 'artemis' },
-        coreCredentials: { username: 'artemis', password: 'artemis' },
+        connection: {
+          system: 'artemis',
+          seedUrls: [BROKER],
+          credentials: { username: 'artemis', password: 'artemis' },
+          coreCredentials: { username: 'artemis', password: 'artemis' },
+        },
       },
       60_000,
     ),

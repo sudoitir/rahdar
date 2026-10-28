@@ -126,10 +126,14 @@ existing=$(api GET /clusters | py "next((c['id'] for c in d if c['name']=='$CLUS
 [ -n "$existing" ] && api DELETE "/clusters/$existing" >/dev/null
 
 check=$(api POST '/clusters?dryRun=true' -d "{
-  \"seedUrls\": [\"http://artemis-primary:8161/console/jolokia\", \"http://artemis-backup:8161/console/jolokia\"],
+  \"system\": \"artemis\",
   \"name\": \"$CLUSTER_NAME\",
-  \"credentials\": {\"username\": \"artemis\", \"password\": \"artemis\"},
-  \"coreCredentials\": {\"username\": \"artemis\", \"password\": \"artemis\"}
+  \"connection\": {
+    \"system\": \"artemis\",
+    \"seedUrls\": [\"http://artemis-primary:8161/console/jolokia\", \"http://artemis-backup:8161/console/jolokia\"],
+    \"credentials\": {\"username\": \"artemis\", \"password\": \"artemis\"},
+    \"coreCredentials\": {\"username\": \"artemis\", \"password\": \"artemis\"}
+  }
 }")
 note "connection check: $(py "json.dumps(d)[:200]" <<<"$check" 2>/dev/null || echo unparsed)"
 # The check is where a first-launch operator meets their capability gaps.
@@ -143,11 +147,15 @@ else
 fi
 
 CLUSTER=$(api POST /clusters -d "{
-  \"seedUrls\": [\"http://artemis-primary:8161/console/jolokia\", \"http://artemis-backup:8161/console/jolokia\"],
+  \"system\": \"artemis\",
   \"name\": \"$CLUSTER_NAME\",
   \"description\": \"configuration end-to-end\",
-  \"credentials\": {\"username\": \"artemis\", \"password\": \"artemis\"},
-  \"coreCredentials\": {\"username\": \"artemis\", \"password\": \"artemis\"}
+  \"connection\": {
+    \"system\": \"artemis\",
+    \"seedUrls\": [\"http://artemis-primary:8161/console/jolokia\", \"http://artemis-backup:8161/console/jolokia\"],
+    \"credentials\": {\"username\": \"artemis\", \"password\": \"artemis\"},
+    \"coreCredentials\": {\"username\": \"artemis\", \"password\": \"artemis\"}
+  }
 }" | py "d['id']")
 [ -n "$CLUSTER" ] || die "cluster registration returned no id"
 pass "registered cluster $CLUSTER"

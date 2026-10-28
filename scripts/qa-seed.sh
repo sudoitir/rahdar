@@ -97,12 +97,16 @@ say "finding the cluster the sweep opens"
 cluster=$(find_id /clusters name demo)
 if [ -z "$cluster" ]; then
   cluster=$(api POST /clusters -d '{
-    "seedUrls": ["http://artemis-primary:8161/console/jolokia"],
+    "system": "artemis",
     "name": "demo",
     "description": "Primary and backup, registered by the QA seed from one URL",
-    "credentials": {"username": "artemis", "password": "artemis"},
-    "coreCredentials": {"username": "artemis", "password": "artemis"},
-    "adopt": true
+    "adopt": true,
+    "connection": {
+      "system": "artemis",
+      "seedUrls": ["http://artemis-primary:8161/console/jolokia"],
+      "credentials": {"username": "artemis", "password": "artemis"},
+      "coreCredentials": {"username": "artemis", "password": "artemis"}
+    }
   }' | python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])')
   echo "registered: $cluster"
 else

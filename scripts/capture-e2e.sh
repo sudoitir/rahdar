@@ -59,11 +59,15 @@ say "registering the dev cluster"
 existing=$(api GET "/clusters?size=500" | python3 -c 'import json,sys; print(next((c["id"] for c in json.load(sys.stdin)["data"] if c["name"]=="dev"), ""))')
 if [ -n "$existing" ]; then api DELETE "/clusters/$existing" >/dev/null; fi
 CLUSTER=$(api POST /clusters -d '{
-  "seedUrls": ["http://artemis-primary:8161/console/jolokia", "http://artemis-backup:8161/console/jolokia"],
+  "system": "artemis",
   "name": "dev",
   "description": "capture end-to-end",
-  "credentials": {"username": "artemis", "password": "artemis"},
-  "coreCredentials": {"username": "artemis", "password": "artemis"}
+  "connection": {
+    "system": "artemis",
+    "seedUrls": ["http://artemis-primary:8161/console/jolokia", "http://artemis-backup:8161/console/jolokia"],
+    "credentials": {"username": "artemis", "password": "artemis"},
+    "coreCredentials": {"username": "artemis", "password": "artemis"}
+  }
 }' | python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])')
 [ -n "$CLUSTER" ] || fail "cluster registration returned no id"
 pass "cluster $CLUSTER"
