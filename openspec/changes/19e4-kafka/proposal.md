@@ -17,8 +17,8 @@ This change is designed: `design.md` holds the decisions, and `tasks.md` holds t
 Rahdar's surface is broker-neutral, and its estate view was built to hold more than one system. OpenBroker now has a Kafka driver. With it, Rahdar can manage the most widely run streaming platform next to Artemis in one estate, with the same shared screens, honest about what Kafka can and cannot do, plus the screens only Kafka needs: consumer groups and lag, offset resets, topic configuration, ACLs, transactions and the controller quorum.
 
 ## What Changes
-- Rahdar builds against the OpenBroker release that has `openbroker-kafka`, and loads the Kafka driver.
-- Kafka clusters are registered from bootstrap servers with SASL or mutual TLS. The supported range is Kafka 4.0 and later.
+- Rahdar builds against OpenBroker `0.5.0`, whose Kafka driver supports Kafka 3.0 and later in ZooKeeper and KRaft mode, and loads it next to Artemis. The cluster's system decides its driver end to end.
+- Registering a cluster becomes a page of its own: choose the system, enter its connection, check it (every broker on its advertised address, each failure's cause) and register. Kafka clusters are registered from bootstrap servers with SASL or mutual TLS. The supported range is Kafka 3.0 and later.
 - The estate view lists Kafka clusters next to Artemis, with comparable health and their subscriptions (consumer groups and share groups on topics), with lag as an estimate.
 - Shared screens show Kafka's own labels from the SDK's kinds. Actions Kafka cannot perform (move, copy, delete by message) are disabled with the reason. Purge and truncate state their reach, need an empty group where Kafka requires it, and go through the approval gate.
 - Browsing a Kafka topic picks a partition and an offset or a time, and never joins a group.
@@ -39,7 +39,8 @@ Rahdar's surface is broker-neutral, and its estate view was built to hold more t
 
 ### Modified Capabilities
 - `cluster-registration`: a Kafka cluster is registered from bootstrap servers, with its version range.
-- `estate-view`: native labels come from the SDK's kinds, and lag is shown as an estimate with its breakdown.
+- `estate-view`: native labels come from the SDK's kinds, lag is shown as an estimate with its breakdown, and health is formed per system.
+- `authorization`: permissions to seek, truncate, update a destination's configuration, manage access rules and abort transactions.
 - `message-operations`: browsing by partition, offset and time; purge and truncate state their reach on a partitioned log.
 - `mcp-server`: Kafka tools.
 - `plugin-messaging`: a plugin can consume a partitioned log, and where a system counts every delivery a release is counted and disclosed.
@@ -48,10 +49,10 @@ Rahdar's surface is broker-neutral, and its estate view was built to hold more t
 - Kafka Streams, Connect and schema registries (schema detection is a later change).
 - Partition reassignment, broker configuration and quotas.
 - Cloud-specific authentication, for example IAM-signed SASL.
-- Clusters before Kafka 4.0.
+- Clusters before Kafka 3.0.
 
 ## Depends on
-- 19e-openbroker-kafka (the OpenBroker release with the Kafka driver, on Maven Central)
+- 19e-openbroker-kafka, and OpenBroker `0.5.0` from the session change `kafka-older-clusters-and-broker-reach` (Kafka 3.0+, empty classic groups resettable, `verify` reaching every broker), on Maven Central
 - 19e3-openbroker-messaging-client (Rahdar on OpenBroker's messaging client)
 - 19e2b-rahdar-on-the-openbroker-starter (the broker client wired by OpenBroker's starter, so Kafka is wired the same way)
 

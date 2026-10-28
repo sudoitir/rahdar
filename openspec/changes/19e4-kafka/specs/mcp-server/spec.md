@@ -10,3 +10,7 @@ The MCP server SHALL offer, for Kafka clusters only, tools to list groups with l
 #### Scenario: A Kafka tool on an Artemis cluster
 - **WHEN** an assistant calls a Kafka tool for an Artemis cluster
 - **THEN** the call is refused as unsupported on that system
+
+#### Scenario: A read-only token
+- **WHEN** an assistant whose token is read-only calls the offset reset tool
+- **THEN** the call is refused and nothing is previewed or held

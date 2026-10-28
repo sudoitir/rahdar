@@ -2,38 +2,44 @@ Rules:
 - Heavy commands run in `systemd-run --user --scope -q -p MemoryMax=3G -p MemorySwapMax=2G -- …`, at most two at once across agents.
 - Read narrowly. Run only the tests a unit touches; CI runs the rest.
 - Agents commit and push their own work and never open a PR; the lead opens one PR.
+- Until OpenBroker `0.5.0` is on Central, build against `0.5.0-SNAPSHOT` from `~/.m2`; raise to `0.5.0` before the PR.
 
-Order: unit 1 first; units 2 and 3 in parallel (one backend and one web implementer, against D4); unit 4 after 3; unit 5 last.
+Order: 1, then 2 to 4 (backend and web in parallel against the contract in `design.md`), then 5 to 6.
 
-## 1. Driver, registration and labels
-- [ ] 1.1 Raise `openbroker.version` to the release with `openbroker-kafka` (`0.3.0`) and add the driver. Migrate its breaks: `Credentials.usernamePassword(...)` at every call site, plugin drains re-checked against the default retry resolution, and kind labels. Check: `BrokerDrivers` lists `kafka` in a unit test, and the plugin messaging tests pass unchanged
-- [ ] 1.2 Per-system registration request (D1), the Kafka form, and a dry run through `verify`. Check: registration tests against a Kafka Testcontainer, including the 3.9 refusal
-- [ ] 1.3 Kind labels from the SDK replace `ResourceIds.label` in the API and the web (D2). Check: cluster view tests and the web unit tests for kind names
-- [ ] 1.4 Estate health and lag estimates for Kafka clusters. Check: estate view tests with an Artemis and a Kafka cluster
+## 1. Driver, system per cluster, labels
+- [ ] 1.1 Add `openbroker-kafka`; `BrokerGateway` builds options per `cluster.system` through a `ConnectionOptions` extension; remove `BrokerGateway.SYSTEM` (callers name `ArtemisModule.SYSTEM` or `KafkaModule.SYSTEM`); `system/kafka` module skeleton with `KafkaModule`. Check: `BrokerDrivers` lists `kafka` in a unit test, `ModularityTest`, `BoundaryRulesTest`
+- [ ] 1.2 `GET /api/v1/systems` (D1). Check: controller test
+- [ ] 1.3 Kind labels from the SDK replace `ResourceIds.label` and `kindLabelOf` in the API and the web, `plural()` removed (D3). Check: cluster view and mapper tests, web unit tests for kind names
 
-## 2. Kafka backend (`system/kafka`)
-- [ ] 2.1 Groups, lag and members reads, batched per cycle. Check: tests against a Kafka Testcontainer with a lagging group
-- [ ] 2.2 Offset reset preview and run, gated, approval-held and audited. Check: tests for empty, active and stale cases
-- [ ] 2.3 Topic configuration, ACLs, transactions and brokers with quorum, with their previews. Check: one test class per resource
-- [ ] 2.4 Namespace routing and the not-found answer for other systems. Check: `SystemNamespaceTest` extended for Kafka
+## 2. Registration and estate
+- [ ] 2.1 Per-system registration and edit API with the `connection` union, the `ConnectionCheck` view, per-node reach, failure causes, already-registered by cluster id, sealed secrets (D2). Check: registration tests against Kafka Testcontainers (4.4 SASL SCRAM, 3.5 ZooKeeper, 2.8 refused, an unreachable advertised listener), Artemis registration tests unchanged in behaviour
+- [ ] 2.2 Registration page `/clusters/new` with the system choice, the Kafka and Artemis forms (multi-token seeds and bootstrap servers, protocol and mechanism, credential pairs, plaintext SASL warning), the check panel and Register; the entry points link to it; the modal removed; the connection edit form per system. Check: Vitest browser tests for both systems, every failure cause, pairs both directions, keyboard pass
+- [ ] 2.3 Health per system (D4) and the backlog accuracy model with the breakdown endpoint (D5). Check: health evaluator unit tests, estate tests with an Artemis and a Kafka cluster
+- [ ] 2.4 Estate and subscriptions tables with Backlog, estimate marking and the breakdown drawer. Check: browser tests
 
-## 3. Kafka screens and shared screens
-- [ ] 3.1 Groups list and group page with the per-partition table (`console-data-table`), empty and error states. Check: Vitest browser tests
-- [ ] 3.2 Offset reset flow with preview, held confirmation and disabled-with-reason for active groups (`rahdar-safe-interactions`). Check: browser tests
-- [ ] 3.3 Topic configuration, ACLs, transactions and brokers screens. Check: browser tests per screen
-- [ ] 3.4 Shared screens: the browse partition and start picker, purge and truncate reach previews, disabled per-message actions, and the lag breakdown drawer. Check: browser tests on a Kafka fixture
+## 3. Shared screens on Kafka
+- [ ] 3.1 Browse by partition, offset and time; filter refused with the reason (D6). Check: API tests against a Kafka Testcontainer (time, past end, retention start, tombstone), browser tests
+- [ ] 3.2 Purge preview naming members or rebalancing; shared truncate with `destination:truncate`, compacted refusal, held confirmation, gate and audit. Check: gated operation tests, browser tests with `holdButton`
+- [ ] 3.3 Per-record move, copy and delete disabled with the driver's reason, API refusal; Artemis-only actions gated by kind verbs; no system literal in shared components; stale "typed name" comments fixed. Check: browser tests on a Kafka fixture, grep for `'artemis'` in shared web code
 
-## 4. Plugin messaging, MCP, dev stack and demo
-- [ ] 4.0 Plugin consume registrations on Kafka consumer-group and share-group subscriptions, with release, reject and key ordering as the spec states and the counted-release disclosure. Check: plugin messaging tests against a Kafka Testcontainer
-- [ ] 4.1 Kafka MCP tools with previews and approval holding; raise the tool budget with a comment. Check: `McpSystemToolsTest`, `McpToolSchemaBudgetTest`
-- [ ] 4.2 Kafka in the dev compose (one broker) and a three-broker KRaft cluster in the demo compose, and in `scripts/demo-seed.sh` traffic (groups, lag, a share group). Check: `just demo` brings up both systems and the estate shows both
+## 4. Kafka backend and screens (`system/kafka`, `features/kafka`)
+- [ ] 4.1 Groups list and group detail reads, batched per cycle; namespace 404 for other systems. Check: tests against a Kafka Testcontainer with a lagging group, `SystemNamespaceTest` extended
+- [ ] 4.2 Offset reset preview and run, gated, approval-held, audited, etag re-checked on approval. Check: tests for empty, active, rebalancing, stale, out of range, past end, classic and share groups
+- [ ] 4.3 Topic configuration, ACLs, transactions and brokers with quorum, with their previews; new permissions in the catalogue and built-in roles. Check: one test class per resource, permission tests
+- [ ] 4.4 Groups and group screens. Check: Vitest browser tests for every state
+- [ ] 4.5 Offset reset flow with preview, held confirmation and disabled-with-reason. Check: browser tests, keyboard pass
+- [ ] 4.6 Topic configuration, ACLs, transactions and brokers screens. Check: browser tests per screen, every state
 
-## 5. Docs, screenshots and finish
-- [ ] 5.1 ADRs (D9), the docs pages for Kafka clusters, and the glossary terms. Check: the docs build
-- [ ] 5.2 Screenshot sweep (`ui-visual-qa-loop`): estate, each Kafka screen and the shared screens on Kafka, light and dark, empty, error and unavailable states; fix and recapture. Check: captures reviewed, no open finding
-- [ ] 5.3 `reviewer` pass on the destructive paths and the approval gate; fix findings. Check: the reviewer's list is closed
-- [ ] 5.4 Push; CI green and the Sonar list empty. Check: the PR's checks
+## 5. Plugin messaging, MCP, stacks
+- [ ] 5.1 Consume source by subscription reference; Kafka consumer and share groups with release, reject, key ordering and the counted-release disclosure; taps refused on Kafka. Check: plugin messaging tests against a Kafka Testcontainer; japicmp, `Contract.VERSION` if flagged
+- [ ] 5.2 Kafka MCP tools with previews and approval holding; raise the tool budget with a comment. Check: `McpSystemToolsTest`, `McpToolSchemaBudgetTest`
+- [ ] 5.3 Kafka in the dev compose and a three-broker KRaft cluster in the demo compose and `scripts/demo-seed.sh` (groups, lag, a share group, a hanging transaction). Check: `just demo` brings up both systems and the estate shows both
+
+## 6. Docs, sweep, review, finish
+- [ ] 6.1 ADRs 0213 to 0216; docs pages (supported versions, registering a Kafka cluster, the Kafka screens, MCP); glossary terms. Check: the site builds
+- [ ] 6.2 Screenshot sweep (`ui-visual-qa-loop`): estate, registration, every Kafka screen and the shared screens on Kafka, light and dark, every state; fix and recapture. Check: captures reviewed, no open finding
+- [ ] 6.3 `reviewer` pass on the destructive paths, the approval gate, secrets and the registration API; fix findings. Check: the reviewer's list is closed
+- [ ] 6.4 Raise `openbroker.version` to `0.5.0`; push; CI green and the Sonar list empty. Check: the PR's checks
 
 ## Workflow follow-up
 - Merge, `/opsx:archive`, stop the stacks the session started.
-- The merge releases Rahdar (CalVer). Ask a maintainer to run `publish-central.yml` for that release, because changes that build against Rahdar from Maven Central need it there.
