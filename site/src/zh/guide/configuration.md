@@ -106,6 +106,15 @@ Postgres 拥有配置、用户与审计链路。来自 Broker 的表——`subsc
 
 ## Broker 连接
 
-通过界面注册，而不是通过环境变量。一个连接保存种子管理端点与凭据，并加密存储。主传输是 Jolokia HTTP；Artemis Core 客户端是第二通道，用于通知与忠实的消息 I/O，依赖它的功能会以它是否可达为门控——而且是可见地门控，并附上可以启用它的 `broker.xml`。
+通过界面注册，而不是通过环境变量（见[快速开始](/zh/guide/quickstart)）。一个连接保存什么取决于集群所属的系统；所有机密都加密存储，API 从不返回，也从不写入审计日志。
+
+| 系统 | 连接保存的内容 |
+| --- | --- |
+| Apache Kafka | bootstrap servers、安全协议、SASL 机制、账号（用户名与密码，或令牌）、TLS bundle 与客户端 id。 |
+| Apache Artemis | 种子管理端点、给出其余各节点管理地址的管理 URL 模式、管理与 Core 凭据，以及 TLS bundle。 |
+
+在 **Settings → Connection** 中编辑全部内容，那里显示的是集群所属系统自己的字段。**Check connection** 运行与注册时相同的检查，不保存任何东西；对这组值的检查通过之后，才会提供 **Save connection**。机密留空表示保留已存的那一份，但已存的机密绝不会被发送到它未曾提供给的地方：修改 bootstrap 服务器、协议、机制或用户名，都会要求重新输入机密。修改账号需要按住按钮确认。
+
+在 Artemis 上，主传输是 Jolokia HTTP；Artemis Core 客户端是第二通道，用于通知与忠实的消息 I/O，依赖它的功能会以它是否可达为门控——而且是可见地门控，并附上可以启用它的 `broker.xml`。在 Kafka 上，Rahdar 使用你提供的账号，通过 Kafka 的管理与消费协议工作；账号不能做的事会显示为不可用，并附上 Broker 给出的原因。
 
 见 [ADR-0002](/reference/adr/0002-broker-transport-and-capability-model)（英文）。
