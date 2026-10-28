@@ -27,4 +27,8 @@ export interface Toolkit {
   /** Presses and holds the confirmation until it fills, as a person does. */
   hold: (name: string | RegExp) => Promise<void>;
   open: (path: string) => Promise<void>;
+  /** A page signed in as another saved account (`requester`), opened on a context of its own. */
+  /** A page freshly signed in through the login screen as `qa-approver`, whose step-up an approval needs. */
+  signedIn: (user: 'qa-approver' | 'admin') => Promise<Page>;
+  as: (account: 'requester' | 'reader') => Promise<Page>;
 }

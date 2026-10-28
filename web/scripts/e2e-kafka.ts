@@ -12,9 +12,11 @@
  */
 import { chromium } from '@playwright/test';
 import { mkdirSync, writeFileSync } from 'node:fs';
+import { readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { login } from './session.ts';
 import type { Check, Flow, Toolkit } from './e2e-kafka/types.ts';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -100,6 +102,31 @@ async function main() {
       note: (text) => {
         result.notes.push(text);
         console.log(`  note ${text}`);
+      },
+      signedIn: async (user) => {
+        const creds = Object.fromEntries(
+          (await readFile(resolve(HERE, '../.sweep/auth/credentials.env'), 'utf8'))
+            .split('\n')
+            .filter((l) => l.includes('='))
+            .map((l) => [l.slice(0, l.indexOf('=')), l.slice(l.indexOf('=') + 1)]),
+        );
+        const other = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+        const fresh = await other.newPage();
+        await login(
+          fresh,
+          user,
+          user === 'admin' ? creds.ADMIN_PASSWORD : creds.QA_USER_PASSWORD,
+          user === 'admin' ? creds.ADMIN_TOTP_SECRET : undefined,
+        );
+        return fresh;
+      },
+      as: async (account) => {
+        const saved = JSON.parse(await readFile(resolve(HERE, `../.sweep/auth/${account}.json`), 'utf8'));
+        const other = await browser.newContext({
+          storageState: { ...saved, origins: [] },
+          viewport: { width: 1440, height: 900 },
+        });
+        return other.newPage();
       },
       open: async (path) => {
         await page.goto(`${BASE}${path.replace(':kafka', cluster)}`);

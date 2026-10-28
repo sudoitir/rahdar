@@ -1,3 +1,4 @@
+import { BASE } from '../e2e-base.ts';
 import {
   committed,
   inContainer,
@@ -601,6 +602,81 @@ const abortTransaction: Flow = {
   },
 };
 
+const heldReset: Flow = {
+  id: 'held-reset',
+  title:
+    'with the approval gate on and two approvers, an offset reset by the requester is held, runs only once another approver approves, and then moves the offsets on the broker',
+  run: async (t) => {
+    const status = (await t.api('/gate/status')) as { approvers: number; quorate: boolean; enforcing: boolean };
+    t.check(
+      status.enforcing && status.quorate && status.approvers >= 2,
+      `the gate is enforcing with ${status.approvers} approvers`,
+    );
+    const before = committed('analytics', 'orders');
+    const requester = await t.as('requester');
+    await requester.goto(`${BASE}/clusters/${t.cluster}/kafka/groups/analytics`);
+    await requester.getByRole('button', { name: 'Reset offsets…' }).click();
+    await requester.getByRole('combobox', { name: 'Move to' }).click();
+    await requester.getByRole('option', { name: 'The latest offset' }).click();
+    await requester.getByRole('button', { name: 'Preview the reset' }).click();
+    const confirm = requester.getByRole('dialog').getByRole('button', { name: /^Reset \d+ partitions?$/ });
+    await confirm.waitFor();
+    await confirm.hover();
+    await requester.mouse.down();
+    await requester.waitForTimeout(1900);
+    await requester.mouse.up();
+    await requester.waitForTimeout(2500);
+    const toast = (await requester.locator('body').innerText()).replace(/\s+/g, ' ');
+    t.note(
+      `requester sees: ${toast.slice(toast.search(/approval|held|waits/i) - 80, toast.search(/approval|held|waits/i) + 260)}`,
+    );
+    t.check(/approval|held/i.test(toast), 'the requester is told the reset awaits approval');
+    t.check(
+      JSON.stringify(committed('analytics', 'orders')) === JSON.stringify(before),
+      'nothing moved on the broker while the request is held',
+    );
+    await requester.screenshot({ path: '/tmp/claude-1000/e2e/held-reset-requester.png' });
+
+    const list = (await t.api('/held-operations?scope=DECIDABLE&state=HELD&limit=50')) as {
+      items?: { id: string; summary: string; state: string }[];
+      data?: { id: string; summary: string; state: string }[];
+    };
+    const rows = list.items ?? list.data ?? [];
+    const held =
+      rows.find((r) => /analytics/.test(r.summary) && /HELD|PENDING/i.test(r.state)) ??
+      rows.find((r) => /analytics/.test(r.summary));
+    t.note(`held request: ${JSON.stringify(held)}`);
+    t.check(Boolean(held), 'the held request is listed with the group named');
+    if (!held) return;
+    // The second approver signs in afresh: an approval asks for it.
+    const approver = await t.signedIn('qa-approver');
+    await approver.goto(`${BASE}/approvals/${held.id}`);
+    await approver.waitForTimeout(1500);
+    const text = (await approver.locator('main').innerText()).replace(/\s+/g, ' ');
+    t.note(`approval page (qa-approver): ${text.slice(0, 500)}`);
+    await approver.screenshot({ path: '/tmp/claude-1000/e2e/held-reset-approver.png' });
+    await approver
+      .getByRole('button', { name: /^Approve/ })
+      .first()
+      .click();
+    const dlg = approver.getByRole('dialog');
+    await dlg.waitFor();
+    t.note(`approve dialog: ${(await dlg.innerText()).replace(/\s+/g, ' ').slice(0, 300)}`);
+    const go = dlg.getByRole('button', { name: /^Approve$/ }).last();
+    await go.hover();
+    await approver.mouse.down();
+    await approver.waitForTimeout(1900);
+    await approver.mouse.up();
+    await t.page.waitForTimeout(4000);
+    const after = committed('analytics', 'orders');
+    t.note(`before ${JSON.stringify(before)} after ${JSON.stringify(after)}`);
+    t.check(
+      JSON.stringify(after) !== JSON.stringify(before),
+      'the committed offsets moved on the broker after the approval',
+    );
+  },
+};
+
 export const FLOWS: Flow[] = [
   estate,
   register,
@@ -614,4 +690,5 @@ export const FLOWS: Flow[] = [
   bulkPurge,
   backlogDrawer,
   abortTransaction,
+  heldReset,
 ];
