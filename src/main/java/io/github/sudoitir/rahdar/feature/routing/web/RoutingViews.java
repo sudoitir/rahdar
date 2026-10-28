@@ -2,6 +2,7 @@ package io.github.sudoitir.rahdar.feature.routing.web;
 
 import static io.swagger.v3.oas.annotations.media.Schema.RequiredMode.REQUIRED;
 
+import io.github.sudoitir.rahdar.kernel.core.KindName;
 import io.github.sudoitir.rahdar.platform.clusters.LifecycleViews;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.media.Schema.RequiredMode;
@@ -34,8 +35,8 @@ public final class RoutingViews {
             @Schema(requiredMode = REQUIRED, description = "The id of the route's kind, such as artemis.divert.")
             String kind,
 
-            @Schema(requiredMode = REQUIRED, description = "The kind's name for people, such as Divert.")
-            String kindLabel,
+            @Schema(requiredMode = REQUIRED, description = "The kind's name for people, singular and plural.")
+            KindName kindLabel,
 
             @Schema(requiredMode = REQUIRED) String name,
 

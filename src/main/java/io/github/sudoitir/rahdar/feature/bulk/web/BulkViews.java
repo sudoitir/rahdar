@@ -5,6 +5,7 @@ import static io.swagger.v3.oas.annotations.media.Schema.RequiredMode.REQUIRED;
 import io.github.sudoitir.rahdar.feature.bulk.BulkItemStatus;
 import io.github.sudoitir.rahdar.feature.bulk.BulkOperation;
 import io.github.sudoitir.rahdar.feature.bulk.BulkRunStatus;
+import io.github.sudoitir.rahdar.kernel.core.KindName;
 import io.github.sudoitir.rahdar.platform.clusters.LifecycleOutcome.NodeOutcome;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
@@ -93,8 +94,8 @@ public final class BulkViews {
             @Schema(requiredMode = REQUIRED, description = "The id of the subscription's kind, such as artemis.queue.")
             String kind,
 
-            @Schema(requiredMode = REQUIRED, description = "The kind's name for people, such as Queue.")
-            String kindLabel,
+            @Schema(requiredMode = REQUIRED, description = "The kind's name for people, singular and plural.")
+            KindName kindLabel,
 
             @Schema(requiredMode = REQUIRED) BulkItemStatus status,
             @Schema(nullable = true) String error,

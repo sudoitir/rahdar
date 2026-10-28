@@ -2,6 +2,7 @@ package io.github.sudoitir.rahdar.feature.resources;
 
 import io.github.sudoitir.openbroker.model.ResourceClass;
 import io.github.sudoitir.openbroker.model.ResourceId;
+import io.github.sudoitir.rahdar.kernel.core.KindName;
 import io.github.sudoitir.rahdar.kernel.core.NotFoundException;
 import io.github.sudoitir.rahdar.kernel.security.ClusterAccessGuard;
 import io.github.sudoitir.rahdar.kernel.security.Permissions;
@@ -57,7 +58,7 @@ public class SubscriptionConfigurationReader {
     public record SubscriptionConfiguration(
             String id,
             String kind,
-            String kindLabel,
+            KindName kindLabel,
             String name,
             String destination,
             Map<String, String> nativeAttributes,
@@ -94,7 +95,7 @@ public class SubscriptionConfigurationReader {
         return new SubscriptionConfiguration(
                 id.format(),
                 id.kind().value(),
-                ResourceIds.label(id.kind()),
+                ResourceIds.label(gateway.cluster(clusterId), id.kind()),
                 queueName,
                 ResourceIds.of(gateway.cluster(clusterId), ResourceClass.DESTINATION, first.address())
                         .format(),

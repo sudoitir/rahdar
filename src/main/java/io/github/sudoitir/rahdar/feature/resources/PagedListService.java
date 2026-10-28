@@ -1,6 +1,7 @@
 package io.github.sudoitir.rahdar.feature.resources;
 
 import io.github.sudoitir.openbroker.BrokerException;
+import io.github.sudoitir.openbroker.ClusterConnection;
 import io.github.sudoitir.openbroker.model.Resource;
 import io.github.sudoitir.openbroker.model.ResourceClass;
 import io.github.sudoitir.openbroker.model.Scope;
@@ -33,7 +34,6 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -202,8 +202,14 @@ public class PagedListService {
         return query.paginate(filtered, comparator);
     }
 
+    /** One listed resource of a node → its view. */
+    @FunctionalInterface
+    private interface RowMapper<T> {
+        T map(Resource resource, NodeRef node, ClusterConnection connection);
+    }
+
     /** Every node's rows of one kind, merged and tagged with their node; unfiltered, so never returned as is. */
-    private <T> List<T> gather(UUID clusterId, ResourceClass kind, BiFunction<Resource, NodeRef, T> rowMapper) {
+    private <T> List<T> gather(UUID clusterId, ResourceClass kind, RowMapper<T> rowMapper) {
         List<ClusterNode> servingNodes = servingManageableNodes(clusterId);
         if (servingNodes.isEmpty()) {
             throw new BrokerConnectionException(
@@ -211,12 +217,13 @@ public class PagedListService {
                     "This cluster has no reachable node with a management URL.");
         }
 
+        ClusterConnection connection = gateway.cluster(clusterId);
         List<T> merged = new ArrayList<>();
         BrokerConnectionException firstError = null;
         for (ClusterNode node : servingNodes) {
             try {
                 NodeRef ref = new NodeRef(node.getId(), node.getName());
-                fetch(clusterId, node, kind).forEach(resource -> merged.add(rowMapper.apply(resource, ref)));
+                fetch(clusterId, node, kind).forEach(resource -> merged.add(rowMapper.map(resource, ref, connection)));
             } catch (BrokerConnectionException e) {
                 if (firstError == null) {
                     firstError = e;

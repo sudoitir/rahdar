@@ -4488,13 +4488,19 @@ export interface components {
             /** @description The accounts a broker rejected, and on which nodes, so the view can link to where the account is edited */
             credentialRejections: components["schemas"]["CredentialRejectionView"][];
         };
+        KindName: {
+            /** @description The name of one, such as Queue. */
+            singular: string;
+            /** @description The name of several, such as Queues. */
+            plural: string;
+        };
         KindView: {
             /** @description The kind's id, such as artemis.queue. */
             id: string;
             /** @description The role the kind plays: SUBSCRIPTION, DESTINATION, ROUTE, CONSUMER and so on. */
             resourceClass: string;
-            /** @description The kind's name for people, such as Queue. */
-            label: string;
+            /** @description The kind's name for people, singular and plural. */
+            label: components["schemas"]["KindName"];
             /** @description What the system can do to this kind (create, delete, pause, purge, ...), plus what Rahdar adds when the system provides it (reset-counters, expire). */
             verbs: string[];
         };
@@ -5020,8 +5026,8 @@ export interface components {
             subscription: string;
             /** @description The id of the subscription's kind, such as artemis.queue. */
             kind: string;
-            /** @description The kind's name for people, such as Queue. */
-            kindLabel: string;
+            /** @description The kind's name for people, singular and plural. */
+            kindLabel: components["schemas"]["KindName"];
             /** @enum {string} */
             status: "PENDING" | "REFUSED" | "RUNNING" | "SUCCEEDED" | "PARTIAL" | "FAILED" | "SKIPPED" | "CANCELLED" | "UNKNOWN";
             error?: string | null;
@@ -6064,8 +6070,8 @@ export interface components {
             id: string;
             /** @description The id of the resource's kind, such as artemis.queue. */
             kind: string;
-            /** @description The kind's name for people, such as Queue. */
-            kindLabel: string;
+            /** @description The kind's name for people, singular and plural. */
+            kindLabel: components["schemas"]["KindName"];
             name: string;
             /** @description The id of the destination this subscription is bound to. */
             destination: string;
@@ -6926,8 +6932,8 @@ export interface components {
             id: string;
             /** @description The id of the route's kind, such as artemis.divert. */
             kind: string;
-            /** @description The kind's name for people, such as Divert. */
-            kindLabel: string;
+            /** @description The kind's name for people, singular and plural. */
+            kindLabel: components["schemas"]["KindName"];
             name: string;
             /**
              * @description BINDING attaches a subscription to a destination, FORWARD copies or moves what reaches one destination into another, LINK carries it to another broker.
@@ -6964,7 +6970,7 @@ export interface components {
         SubscriptionConfiguration: {
             id?: string;
             kind?: string;
-            kindLabel?: string;
+            kindLabel?: components["schemas"]["KindName"];
             name?: string;
             destination?: string;
             nativeAttributes?: {
@@ -7101,8 +7107,8 @@ export interface components {
             id: string;
             /** @description The id of the resource's kind, such as artemis.queue. */
             kind: string;
-            /** @description The kind's name for people, such as Queue. */
-            kindLabel: string;
+            /** @description The kind's name for people, singular and plural. */
+            kindLabel: components["schemas"]["KindName"];
             clientId?: string | null;
             /** @description The id of the channel the producer runs in. */
             channel?: string | null;
@@ -7344,8 +7350,8 @@ export interface components {
             id: string;
             /** @description The id of the resource's kind, such as artemis.queue. */
             kind: string;
-            /** @description The kind's name for people, such as Queue. */
-            kindLabel: string;
+            /** @description The kind's name for people, singular and plural. */
+            kindLabel: components["schemas"]["KindName"];
             name: string;
             /** @description How the destination delivers: to one consumer, to every subscription, or both. */
             delivery: ("POINT_TO_POINT" | "PUBLISH_SUBSCRIBE")[];
@@ -7382,8 +7388,8 @@ export interface components {
             id: string;
             /** @description The id of its kind, such as artemis.address. */
             kind: string;
-            /** @description The kind's name for people, such as Address. */
-            kindLabel: string;
+            /** @description The kind's name for people, singular and plural. */
+            kindLabel: components["schemas"]["KindName"];
             name: string;
             /** @description dead-letter or expiry. */
             purpose: string;
@@ -7394,8 +7400,8 @@ export interface components {
             id: string;
             /** @description The id of its kind, such as artemis.queue. */
             kind: string;
-            /** @description The kind's name for people, such as Queue. */
-            kindLabel: string;
+            /** @description The kind's name for people, singular and plural. */
+            kindLabel: components["schemas"]["KindName"];
             name: string;
             /** @description The id of the destination it is bound to. */
             destination: string;
@@ -7415,8 +7421,8 @@ export interface components {
             id: string;
             /** @description The id of the resource's kind, such as artemis.queue. */
             kind: string;
-            /** @description The kind's name for people, such as Queue. */
-            kindLabel: string;
+            /** @description The kind's name for people, singular and plural. */
+            kindLabel: components["schemas"]["KindName"];
             /** @description The id of the channel the consumer runs in. */
             channel?: string | null;
             /** @description The id of the subscription it consumes. */
@@ -7456,8 +7462,8 @@ export interface components {
             subscription: string;
             /** @description The id of the subscription's kind, such as artemis.queue. */
             kind: string;
-            /** @description The kind's name for people, such as Queue. */
-            kindLabel: string;
+            /** @description The kind's name for people, singular and plural. */
+            kindLabel: components["schemas"]["KindName"];
             /** @description One of INSUFFICIENT_DATA, PAUSED, NO_CONSUMERS, BROKER_SLOW, STALLED, STARVED, FALLING_BEHIND, DRAINING, HEALTHY. */
             verdict: string;
             /**
@@ -7534,8 +7540,8 @@ export interface components {
             id: string;
             /** @description The id of the resource's kind, such as artemis.queue. */
             kind: string;
-            /** @description The kind's name for people, such as Queue. */
-            kindLabel: string;
+            /** @description The kind's name for people, singular and plural. */
+            kindLabel: components["schemas"]["KindName"];
             remoteAddress?: string | null;
             protocol?: string | null;
             clientId?: string | null;
@@ -7566,8 +7572,8 @@ export interface components {
             id: string;
             /** @description The id of the resource's kind, such as artemis.queue. */
             kind: string;
-            /** @description The kind's name for people, such as Queue. */
-            kindLabel: string;
+            /** @description The kind's name for people, singular and plural. */
+            kindLabel: components["schemas"]["KindName"];
             /** @description The id of the connection the channel belongs to. */
             connection?: string | null;
             user?: string | null;

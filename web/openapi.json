@@ -29032,6 +29032,20 @@
         },
         "required" : [ "clusterId", "credentialRejections", "level", "liveEndpointNames", "notes", "replicationBehind", "splitBrain" ]
       },
+      "KindName" : {
+        "type" : "object",
+        "properties" : {
+          "singular" : {
+            "type" : "string",
+            "description" : "The name of one, such as Queue."
+          },
+          "plural" : {
+            "type" : "string",
+            "description" : "The name of several, such as Queues."
+          }
+        },
+        "required" : [ "plural", "singular" ]
+      },
       "KindView" : {
         "type" : "object",
         "properties" : {
@@ -29044,8 +29058,8 @@
             "description" : "The role the kind plays: SUBSCRIPTION, DESTINATION, ROUTE, CONSUMER and so on."
           },
           "label" : {
-            "type" : "string",
-            "description" : "The kind's name for people, such as Queue."
+            "$ref" : "#/components/schemas/KindName",
+            "description" : "The kind's name for people, singular and plural."
           },
           "verbs" : {
             "type" : "array",
@@ -30231,8 +30245,8 @@
             "description" : "The id of the subscription's kind, such as artemis.queue."
           },
           "kindLabel" : {
-            "type" : "string",
-            "description" : "The kind's name for people, such as Queue."
+            "$ref" : "#/components/schemas/KindName",
+            "description" : "The kind's name for people, singular and plural."
           },
           "status" : {
             "type" : "string",
@@ -32761,8 +32775,8 @@
             "description" : "The id of the resource's kind, such as artemis.queue."
           },
           "kindLabel" : {
-            "type" : "string",
-            "description" : "The kind's name for people, such as Queue."
+            "$ref" : "#/components/schemas/KindName",
+            "description" : "The kind's name for people, singular and plural."
           },
           "name" : {
             "type" : "string"
@@ -34825,8 +34839,8 @@
             "description" : "The id of the route's kind, such as artemis.divert."
           },
           "kindLabel" : {
-            "type" : "string",
-            "description" : "The kind's name for people, such as Divert."
+            "$ref" : "#/components/schemas/KindName",
+            "description" : "The kind's name for people, singular and plural."
           },
           "name" : {
             "type" : "string"
@@ -34905,7 +34919,7 @@
             "type" : "string"
           },
           "kindLabel" : {
-            "type" : "string"
+            "$ref" : "#/components/schemas/KindName"
           },
           "name" : {
             "type" : "string"
@@ -35231,8 +35245,8 @@
             "description" : "The id of the resource's kind, such as artemis.queue."
           },
           "kindLabel" : {
-            "type" : "string",
-            "description" : "The kind's name for people, such as Queue."
+            "$ref" : "#/components/schemas/KindName",
+            "description" : "The kind's name for people, singular and plural."
           },
           "clientId" : {
             "type" : [ "string", "null" ]
@@ -35872,8 +35886,8 @@
             "description" : "The id of the resource's kind, such as artemis.queue."
           },
           "kindLabel" : {
-            "type" : "string",
-            "description" : "The kind's name for people, such as Queue."
+            "$ref" : "#/components/schemas/KindName",
+            "description" : "The kind's name for people, singular and plural."
           },
           "name" : {
             "type" : "string"
@@ -35968,8 +35982,8 @@
             "description" : "The id of its kind, such as artemis.address."
           },
           "kindLabel" : {
-            "type" : "string",
-            "description" : "The kind's name for people, such as Address."
+            "$ref" : "#/components/schemas/KindName",
+            "description" : "The kind's name for people, singular and plural."
           },
           "name" : {
             "type" : "string"
@@ -35999,8 +36013,8 @@
             "description" : "The id of its kind, such as artemis.queue."
           },
           "kindLabel" : {
-            "type" : "string",
-            "description" : "The kind's name for people, such as Queue."
+            "$ref" : "#/components/schemas/KindName",
+            "description" : "The kind's name for people, singular and plural."
           },
           "name" : {
             "type" : "string"
@@ -36056,8 +36070,8 @@
             "description" : "The id of the resource's kind, such as artemis.queue."
           },
           "kindLabel" : {
-            "type" : "string",
-            "description" : "The kind's name for people, such as Queue."
+            "$ref" : "#/components/schemas/KindName",
+            "description" : "The kind's name for people, singular and plural."
           },
           "channel" : {
             "type" : [ "string", "null" ],
@@ -36141,8 +36155,8 @@
             "description" : "The id of the subscription's kind, such as artemis.queue."
           },
           "kindLabel" : {
-            "type" : "string",
-            "description" : "The kind's name for people, such as Queue."
+            "$ref" : "#/components/schemas/KindName",
+            "description" : "The kind's name for people, singular and plural."
           },
           "verdict" : {
             "type" : "string",
@@ -36280,8 +36294,8 @@
             "description" : "The id of the resource's kind, such as artemis.queue."
           },
           "kindLabel" : {
-            "type" : "string",
-            "description" : "The kind's name for people, such as Queue."
+            "$ref" : "#/components/schemas/KindName",
+            "description" : "The kind's name for people, singular and plural."
           },
           "remoteAddress" : {
             "type" : [ "string", "null" ]
@@ -36356,8 +36370,8 @@
             "description" : "The id of the resource's kind, such as artemis.queue."
           },
           "kindLabel" : {
-            "type" : "string",
-            "description" : "The kind's name for people, such as Queue."
+            "$ref" : "#/components/schemas/KindName",
+            "description" : "The kind's name for people, singular and plural."
           },
           "connection" : {
             "type" : [ "string", "null" ],

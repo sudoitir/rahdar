@@ -4,6 +4,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 
+import io.github.sudoitir.rahdar.kernel.core.KindName;
 import io.github.sudoitir.rahdar.kernel.security.ResourceIdTexts;
 import io.github.sudoitir.rahdar.kernel.security.ResourceIdTexts.Of;
 
@@ -19,6 +20,15 @@ public final class ArtemisIds {
         @Override
         public String destination(String name) {
             return destinationId(name);
+        }
+
+        @Override
+        public KindName kindLabel(String id) {
+            return id == null
+                    ? null
+                    : id.startsWith("artemis.queue/")
+                            ? new KindName("Queue", "Queues")
+                            : new KindName("Address", "Addresses");
         }
     };
 

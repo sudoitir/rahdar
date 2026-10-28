@@ -7,6 +7,7 @@ import io.github.sudoitir.rahdar.feature.bulk.web.BulkViews.BulkRunView;
 import io.github.sudoitir.rahdar.feature.bulk.web.BulkViews.BulkSelection;
 import io.github.sudoitir.rahdar.feature.bulk.web.BulkViews.NodeFigure;
 import io.github.sudoitir.rahdar.kernel.core.CentralMapperConfig;
+import io.github.sudoitir.rahdar.kernel.core.KindName;
 import io.github.sudoitir.rahdar.platform.broker.ResourceIds;
 import io.github.sudoitir.rahdar.platform.clusters.LifecycleOutcome.NodeOutcome;
 import java.util.List;
@@ -35,10 +36,13 @@ public interface BulkRunMapper {
 
     @Mapping(target = "subscription", source = "subscriptionId")
     @Mapping(target = "kind", expression = "java(ResourceIds.kindOf(subscriptionId))")
-    @Mapping(target = "kindLabel", expression = "java(ResourceIds.kindLabelOf(subscriptionId))")
     @Mapping(target = "nodes", source = "figures.nodes")
     @Mapping(target = "warning", source = "figures.warning")
     @Mapping(target = "outcome", source = "nodeOutcomes")
     BulkItemView toView(
-            BulkRunItemEntity item, String subscriptionId, ItemEstimate figures, List<NodeOutcome> nodeOutcomes);
+            BulkRunItemEntity item,
+            String subscriptionId,
+            KindName kindLabel,
+            ItemEstimate figures,
+            List<NodeOutcome> nodeOutcomes);
 }

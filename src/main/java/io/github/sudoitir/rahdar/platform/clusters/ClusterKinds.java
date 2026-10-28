@@ -52,7 +52,7 @@ public class ClusterKinds {
                     .map(kind -> new KindView(
                             kind.id().value(),
                             kind.resourceClass().name(),
-                            ResourceIds.label(kind.id()),
+                            ResourceIds.name(kind.label()),
                             verbs(kind, resetCounters, expire)))
                     .toList();
         } catch (RuntimeException e) {

@@ -2,6 +2,7 @@ package io.github.sudoitir.rahdar.platform.clusters.web;
 
 import static io.swagger.v3.oas.annotations.media.Schema.RequiredMode.REQUIRED;
 
+import io.github.sudoitir.rahdar.kernel.core.KindName;
 import io.github.sudoitir.rahdar.platform.broker.AccountResult;
 import io.github.sudoitir.rahdar.platform.broker.BrokerAccount;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
@@ -46,8 +47,8 @@ public final class ClusterViews {
                     description = "The role the kind plays: SUBSCRIPTION, DESTINATION, ROUTE, CONSUMER and so on.")
             String resourceClass,
 
-            @Schema(requiredMode = REQUIRED, description = "The kind's name for people, such as Queue.")
-            String label,
+            @Schema(requiredMode = REQUIRED, description = "The kind's name for people, singular and plural.")
+            KindName label,
 
             @Schema(
                     requiredMode = REQUIRED,

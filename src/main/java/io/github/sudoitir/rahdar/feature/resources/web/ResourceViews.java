@@ -2,6 +2,7 @@ package io.github.sudoitir.rahdar.feature.resources.web;
 
 import static io.swagger.v3.oas.annotations.media.Schema.RequiredMode.REQUIRED;
 
+import io.github.sudoitir.rahdar.kernel.core.KindName;
 import io.github.sudoitir.rahdar.kernel.security.TeamRef;
 import io.github.sudoitir.rahdar.platform.broker.ResourceIds;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -31,7 +32,7 @@ public final class ResourceViews {
             + " caller holds on it, such as subscription:purge. The console gates its controls from this.";
     private static final String ID = "The resource's canonical id, such as artemis.queue/orders.";
     private static final String KIND = "The id of the resource's kind, such as artemis.queue.";
-    private static final String KIND_LABEL = "The kind's name for people, such as Queue.";
+    private static final String KIND_LABEL = "The kind's name for people, singular and plural.";
 
     // ---- subscriptions (aggregated from subscription_snapshot) --------------------
 
@@ -43,7 +44,7 @@ public final class ResourceViews {
             String kind,
 
             @Schema(requiredMode = REQUIRED, description = KIND_LABEL)
-            String kindLabel,
+            KindName kindLabel,
 
             @Schema(requiredMode = REQUIRED) String name,
 
@@ -156,7 +157,7 @@ public final class ResourceViews {
             String kind,
 
             @Schema(requiredMode = REQUIRED, description = KIND_LABEL)
-            String kindLabel,
+            KindName kindLabel,
 
             @Schema(requiredMode = REQUIRED) String name,
 
@@ -201,7 +202,7 @@ public final class ResourceViews {
             String kind,
 
             @Schema(requiredMode = REQUIRED, description = KIND_LABEL)
-            String kindLabel,
+            KindName kindLabel,
 
             @Schema(nullable = true, description = "The id of the channel the consumer runs in.")
             String channel,
@@ -258,7 +259,7 @@ public final class ResourceViews {
             String kind,
 
             @Schema(requiredMode = REQUIRED, description = KIND_LABEL)
-            String kindLabel,
+            KindName kindLabel,
 
             @Schema(nullable = true, description = "The id of the connection the channel belongs to.")
             String connection,
@@ -314,7 +315,7 @@ public final class ResourceViews {
             String kind,
 
             @Schema(requiredMode = REQUIRED, description = KIND_LABEL)
-            String kindLabel,
+            KindName kindLabel,
 
             @Schema(nullable = true) String remoteAddress,
             @Schema(nullable = true) String protocol,
@@ -368,7 +369,7 @@ public final class ResourceViews {
             String kind,
 
             @Schema(requiredMode = REQUIRED, description = KIND_LABEL)
-            String kindLabel,
+            KindName kindLabel,
 
             @Schema(nullable = true) String clientId,
 

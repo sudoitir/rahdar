@@ -9,7 +9,7 @@ Order: 1, then 2 to 4 (backend and web in parallel against the contract in `desi
 ## 1. Driver, system per cluster, labels
 - [x] 1.1 Add `openbroker-kafka`; `BrokerGateway` builds options per `cluster.system` through a `ConnectionOptions` extension; remove `BrokerGateway.SYSTEM` (callers name `ArtemisModule.SYSTEM` or `KafkaModule.SYSTEM`); `system/kafka` module skeleton with `KafkaModule`. Check: `BrokerDrivers` lists `kafka` in a unit test, `ModularityTest`, `BoundaryRulesTest`
 - [x] 1.2 `GET /api/v1/systems` (D1). Check: controller test
-- [ ] 1.3 Kind labels from the SDK replace `ResourceIds.label` and `kindLabelOf` in the API and the web, `plural()` removed (D3). Check: cluster view and mapper tests, web unit tests for kind names
+- [x] 1.3 (backend) Kind labels from the SDK replace `ResourceIds.label` and `kindLabelOf` in the API and the web, `plural()` removed (D3). Check: cluster view and mapper tests, web unit tests for kind names
 
 ## 2. Registration and estate
 - [ ] 2.1 Per-system registration and edit API with the `connection` union, the `ConnectionCheck` view, per-node reach, failure causes, already-registered by cluster id, sealed secrets (D2). Check: registration tests against Kafka Testcontainers (4.4 SASL SCRAM, 3.5 ZooKeeper, 2.8 refused, an unreachable advertised listener), Artemis registration tests unchanged in behaviour

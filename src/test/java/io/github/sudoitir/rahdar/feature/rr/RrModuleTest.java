@@ -1,6 +1,7 @@
 package io.github.sudoitir.rahdar.feature.rr;
 
 import io.github.sudoitir.rahdar.kernel.lifecycle.LifecycleRegistry;
+import io.github.sudoitir.rahdar.platform.broker.ConnectionSettingsSource;
 import io.github.sudoitir.rahdar.platform.scrape.QueueLocator;
 import io.github.sudoitir.rahdar.support.ModuleIntegrationTest;
 import io.github.sudoitir.rahdar.system.artemis.DivertOperations;
@@ -15,6 +16,10 @@ class RrModuleTest extends ModuleIntegrationTest {
 
     // The SQL module's capture tap, a direct dependency, creates its queues and diverts through the
     // queues module.
+
+    /** The Artemis module's connection options read a cluster's stored accounts through the clusters module. */
+    @MockitoBean
+    ConnectionSettingsSource connectionSettings;
 
     @MockitoBean
     DivertOperations divertOperations;

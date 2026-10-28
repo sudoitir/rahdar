@@ -79,7 +79,7 @@ public class DlqService {
                 destinations.add(new DeadLetterDestination(
                         id.format(),
                         id.kind().value(),
-                        ResourceIds.label(id.kind()),
+                        ResourceIds.label(connection, id.kind()),
                         address,
                         entry.getValue(),
                         queues));
@@ -114,7 +114,7 @@ public class DlqService {
             queues.add(new DeadLetterSubscription(
                     id.format(),
                     id.kind().value(),
-                    ResourceIds.label(id.kind()),
+                    ResourceIds.label(connection, id.kind()),
                     queueName,
                     ResourceIds.of(connection, ResourceClass.DESTINATION, address)
                             .format(),

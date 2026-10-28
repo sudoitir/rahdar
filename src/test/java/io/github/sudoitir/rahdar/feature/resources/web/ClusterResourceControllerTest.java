@@ -136,7 +136,8 @@ class ClusterResourceControllerTest extends PostgresIntegrationTest {
                 .andExpect(jsonPath("$.count").value(1))
                 .andExpect(jsonPath("$.data[0].name").value("ORDERS"))
                 .andExpect(jsonPath("$.data[0].id").value("artemis.queue/ORDERS"))
-                .andExpect(jsonPath("$.data[0].kindLabel").value("Queue"))
+                .andExpect(jsonPath("$.data[0].kindLabel.singular").value("Queue"))
+                .andExpect(jsonPath("$.data[0].kindLabel.plural").value("Queues"))
                 .andExpect(jsonPath("$.data[0].totalMessageCount").value(15))
                 .andExpect(jsonPath("$.data[0].nodesPresent").value(2));
     }

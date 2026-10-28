@@ -2,6 +2,7 @@ package io.github.sudoitir.rahdar.feature.messages.web;
 
 import static io.swagger.v3.oas.annotations.media.Schema.RequiredMode.REQUIRED;
 
+import io.github.sudoitir.rahdar.kernel.core.KindName;
 import io.github.sudoitir.rahdar.platform.governance.GovernanceViews.RedactionView;
 import io.github.sudoitir.rahdar.platform.governance.GovernanceViews.WithheldView;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -160,8 +161,8 @@ public final class MessageViews {
             @Schema(requiredMode = REQUIRED, description = "The id of its kind, such as artemis.queue.")
             String kind,
 
-            @Schema(requiredMode = REQUIRED, description = "The kind's name for people, such as Queue.")
-            String kindLabel,
+            @Schema(requiredMode = REQUIRED, description = "The kind's name for people, singular and plural.")
+            KindName kindLabel,
 
             @Schema(requiredMode = REQUIRED) String name,
 
@@ -178,8 +179,8 @@ public final class MessageViews {
             @Schema(requiredMode = REQUIRED, description = "The id of its kind, such as artemis.address.")
             String kind,
 
-            @Schema(requiredMode = REQUIRED, description = "The kind's name for people, such as Address.")
-            String kindLabel,
+            @Schema(requiredMode = REQUIRED, description = "The kind's name for people, singular and plural.")
+            KindName kindLabel,
 
             @Schema(requiredMode = REQUIRED) String name,
 

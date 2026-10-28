@@ -125,6 +125,7 @@ public class CrossNodeAggregator {
         return byKey.entrySet().stream()
                 .map(e -> mapper.subscription(
                         e.getKey(),
+                        connection,
                         subscriptionKind,
                         destinationKind,
                         e.getValue(),

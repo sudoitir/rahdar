@@ -496,6 +496,7 @@ public class BulkService {
         return views.toView(
                 item,
                 idTexts.subscription(item.getSubscription()),
+                idTexts.kindLabel(idTexts.subscription(item.getSubscription())),
                 json.readValue(item.getEstimate(), ItemEstimate.class),
                 outcome);
     }

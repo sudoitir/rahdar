@@ -106,7 +106,7 @@ public class ResourcesMcpReadTools {
                         .map(q -> new McpViews.ResourceRow(
                                 q.id(),
                                 q.kind(),
-                                q.kindLabel(),
+                                q.kindLabel().singular(),
                                 q.name(),
                                 q.nodesPresent() + "/" + q.nodesTotal() + " nodes",
                                 null,
@@ -118,7 +118,7 @@ public class ResourcesMcpReadTools {
                         .map(a -> new McpViews.ResourceRow(
                                 a.id(),
                                 a.kind(),
-                                a.kindLabel(),
+                                a.kindLabel().singular(),
                                 a.name(),
                                 a.nodeName(),
                                 a.nodeId(),
@@ -134,7 +134,7 @@ public class ResourcesMcpReadTools {
                         .map(c -> new McpViews.ResourceRow(
                                 c.id(),
                                 c.kind(),
-                                c.kindLabel(),
+                                c.kindLabel().singular(),
                                 ResourceIds.nameOf(c.id()),
                                 c.nodeName(),
                                 c.nodeId(),
@@ -147,7 +147,7 @@ public class ResourcesMcpReadTools {
                         .map(x -> new McpViews.ResourceRow(
                                 x.id(),
                                 x.kind(),
-                                x.kindLabel(),
+                                x.kindLabel().singular(),
                                 ResourceIds.nameOf(x.id()),
                                 x.nodeName(),
                                 x.nodeId(),
@@ -159,7 +159,7 @@ public class ResourcesMcpReadTools {
                         .map(x -> new McpViews.ResourceRow(
                                 x.id(),
                                 x.kind(),
-                                x.kindLabel(),
+                                x.kindLabel().singular(),
                                 ResourceIds.nameOf(x.id()),
                                 x.nodeName(),
                                 x.nodeId(),
@@ -172,7 +172,7 @@ public class ResourcesMcpReadTools {
                         .map(x -> new McpViews.ResourceRow(
                                 x.id(),
                                 x.kind(),
-                                x.kindLabel(),
+                                x.kindLabel().singular(),
                                 ResourceIds.nameOf(x.id()),
                                 x.nodeName(),
                                 x.nodeId(),

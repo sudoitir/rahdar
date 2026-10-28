@@ -4,12 +4,14 @@ import io.github.sudoitir.openbroker.ClusterConnection;
 import io.github.sudoitir.openbroker.model.AttributeKey;
 import io.github.sudoitir.openbroker.model.Kind;
 import io.github.sudoitir.openbroker.model.KindId;
+import io.github.sudoitir.openbroker.model.KindLabel;
 import io.github.sudoitir.openbroker.model.MetricValue;
 import io.github.sudoitir.openbroker.model.Resource;
 import io.github.sudoitir.openbroker.model.ResourceClass;
 import io.github.sudoitir.openbroker.model.ResourceId;
 import io.github.sudoitir.openbroker.model.ResourcePath;
 import io.github.sudoitir.openbroker.model.StandardAttributes;
+import io.github.sudoitir.rahdar.kernel.core.KindName;
 import java.time.Instant;
 
 /** Rahdar's way into the SDK's resource model: a system's kind for a class, ids, and attribute values. */
@@ -42,11 +44,18 @@ public final class ResourceIds {
         }
     }
 
-    /** The kind's name for people: the local part of its id in sentence case ({@code artemis.queue} is "Queue"). */
-    public static String label(KindId kind) {
-        String value = kind.value();
-        String local = value.substring(value.indexOf('.') + 1).replace('-', ' ');
-        return local.isEmpty() ? local : Character.toUpperCase(local.charAt(0)) + local.substring(1);
+    /** A driver's label of a kind, as the name Rahdar's views carry. */
+    public static KindName name(KindLabel label) {
+        return new KindName(label.singular(), label.plural());
+    }
+
+    /** The kind's name for people, as the connection's system's driver gives it. */
+    public static KindName label(ClusterConnection connection, KindId kind) {
+        return name(connection.resources().kinds().stream()
+                .filter(k -> k.id().equals(kind))
+                .findFirst()
+                .orElseThrow(() -> new InvalidResourceIdException("This cluster has no resource kind '" + kind + "'."))
+                .label());
     }
 
     /** The id of the kind a canonical id text names, or {@code null} for no id. */
@@ -55,8 +64,8 @@ public final class ResourceIds {
     }
 
     /** The kind's name for people, of the kind a canonical id text names, or {@code null} for no id. */
-    public static String kindLabelOf(String id) {
-        return id == null ? null : label(ResourceId.parse(id).kind());
+    public static KindName labelOf(ClusterConnection connection, String id) {
+        return id == null ? null : label(connection, ResourceId.parse(id).kind());
     }
 
     /** The name of the resource a canonical id text names, or {@code null} for no id. */

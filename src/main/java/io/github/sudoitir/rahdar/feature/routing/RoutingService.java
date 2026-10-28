@@ -233,7 +233,7 @@ public class RoutingService {
         return new RouteView(
                 id.format(),
                 id.kind().value(),
-                ResourceIds.label(id.kind()),
+                ResourceIds.label(connection, id.kind()),
                 name,
                 ROUTE_FORWARD,
                 ResourceIds.of(connection, ResourceClass.DESTINATION, first.address())
@@ -289,7 +289,7 @@ public class RoutingService {
         return new RouteView(
                 id.format(),
                 id.kind().value(),
-                ResourceIds.label(id.kind()),
+                ResourceIds.label(connection, id.kind()),
                 first.name(),
                 ROUTE_LINK,
                 first.queueName() == null
