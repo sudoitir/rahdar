@@ -170,17 +170,17 @@ function EffectSummary({ effect }: Readonly<{ effect: TruncateEffect }>) {
   return (
     <Stack gap="xs" aria-live="polite">
       <Text size="sm" fw={600}>
-        {effect.records === null
+        {effect.records == null
           ? 'The number of records this removes could not be counted.'
           : `This removes ${plural(effect.records, 'record')}.`}
       </Text>
-      {effect.groups.length > 0 ? (
+      {(effect.groups ?? []).length > 0 ? (
         <DataTable
           variant="static"
           label="Groups that lose unread records"
           storageKey="truncate.groups"
           columns={[
-            { id: 'group', header: 'Group', accessor: (g) => g.group, kind: 'identifier', priority: 'essential' },
+            { id: 'group', header: 'Group', accessor: (g) => g.group ?? '', kind: 'identifier', priority: 'essential' },
             {
               id: 'records',
               header: 'Unread records lost',
@@ -190,8 +190,8 @@ function EffectSummary({ effect }: Readonly<{ effect: TruncateEffect }>) {
               priority: 'essential',
             },
           ]}
-          data={effect.groups}
-          rowKey={(g) => g.group}
+          data={effect.groups ?? []}
+          rowKey={(g) => g.group ?? ''}
           height={{ maxRows: 8 }}
           empty={null}
         />

@@ -1,18 +1,13 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { ApiError, clusterKey, request } from '../../kernel/api/request.ts';
+import type { components } from '../../kernel/api/schema.d.ts';
 
 /** Where a truncate cuts: before an offset in each named partition, or before a time. */
-export type TruncateBefore = { offsets: Record<string, number> } | { time: string };
+export type TruncateBefore = components['schemas']['Before'];
 
-/**
- * What a truncate does, or would do (design D6): how many records go, and every group that loses records it
- * has not read, with the count. Hand-written until the backend generates it.
- */
-export interface TruncateEffect {
-  records: number | null;
-  groups: { group: string; records: number }[];
-}
+/** What a truncate does, or would do: how many records go (unknown when the driver cannot count) and every group that loses some. */
+export type TruncateEffect = components['schemas']['TruncateEffect'];
 
 /** What is wrong with the cut as typed, by field; the cut itself when it is whole. */
 export function parseCut(mode: 'offsets' | 'time', text: string): { before: TruncateBefore } | { problem: string } {
