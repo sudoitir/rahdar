@@ -2,7 +2,7 @@ Rules:
 - Heavy commands run in `systemd-run --user --scope -q -p MemoryMax=3G -p MemorySwapMax=2G -- …`, at most two at once across agents.
 - Read narrowly. Run only the tests a unit touches; CI runs the rest.
 - Agents commit and push their own work and never open a PR; the lead opens one PR.
-- Until OpenBroker `0.5.0` is on Central, build against `0.5.0-SNAPSHOT` from `~/.m2`; raise to `0.5.0` before the PR.
+- Builds against the released OpenBroker `0.6.0`.
 
 Order: 1, then 2 to 4 (backend and web in parallel against the contract in `design.md`), then 5 to 6.
 
@@ -40,7 +40,7 @@ Order: 1, then 2 to 4 (backend and web in parallel against the contract in `desi
 - [ ] 6.2 Screenshot sweep (`ui-visual-qa-loop`): estate, registration, every Kafka screen and the shared screens on Kafka, light and dark, every state; fix and recapture. Check: captures reviewed, no open finding
 - [ ] 6.2b Design and UX review by an Opus agent (`opus-medium`): the design, every user flow (registration, offset reset, truncate, ACL change, transaction abort, browse) and the UI against an enterprise-grade bar (prior art: Confluent Control Center, Redpanda Console, Conduktor, AKHQ), from the sweep's captures and the running app; findings merged into the one fix round. Check: its list is closed
 - [ ] 6.3 `reviewer` pass on the destructive paths, the approval gate, secrets and the registration API; fix findings. Check: the reviewer's list is closed
-- [ ] 6.4 Raise `openbroker.version` to `0.5.0`; push; CI green and the Sonar list empty. Check: the PR's checks
+- [ ] 6.4 Raise `openbroker.version` to `0.6.0` (done, 3188d46ab); push; CI green and the Sonar list empty. Check: the PR's checks
 
 ## Workflow follow-up
 - Merge, `/opsx:archive`, stop the stacks the session started.
