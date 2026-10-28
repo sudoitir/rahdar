@@ -25,6 +25,38 @@ const dialogOf = (page: Page) => page.getByRole('dialog');
 /** The seeded subscriptions the browse and purge captures open: a group on a topic is addressed by its whole id. */
 const subscription = (group: string, topic: string) => encodeURIComponent(`kafka.group-topic/${group}/${topic}`);
 
+/** The estate with a second Kafka cluster nobody answers for, put into the cluster list on the real page. */
+export const ESTATE_UNREACHABLE_SCENES: Scene[] = [
+  {
+    id: 'unreachable-kafka-cluster-stub',
+    act: async (page) => {
+      await page.route(
+        (url) => url.pathname === '/api/v1/clusters',
+        async (route) => {
+          if (route.request().method() !== 'GET') return route.fallback();
+          const response = await route.fetch();
+          const body = (await response.json()) as { data: Record<string, unknown>[]; count?: number };
+          const kafkaRow = body.data.find((c) => (c.system as { id?: string } | undefined)?.id === 'kafka');
+          const down = {
+            ...(kafkaRow ?? {}),
+            id: '00000000-0000-0000-0000-0000000000d4',
+            name: 'events-dr',
+            description: 'Kafka disaster-recovery cluster',
+            health: 'UNKNOWN',
+            nodeCount: 0,
+          };
+          return route.fulfill({
+            response,
+            json: { ...body, data: [...body.data, down], count: (body.count ?? body.data.length) + 1 },
+          });
+        },
+      );
+      await page.reload();
+      await page.waitForTimeout(800);
+    },
+  },
+];
+
 /** The 200-character names `kafka-seed.sh` builds. */
 const LONG_GROUP = `qa.${Array.from({ length: 8 }, (_, i) => `consumer-group-segment-${String(i + 1).padStart(2, '0')}.`).join('')}terminal`;
 
@@ -42,6 +74,57 @@ async function stubGet(page: Page, path: RegExp, body: unknown) {
   );
   await page.reload();
   await settle(page);
+}
+
+/** Answers a method on a path with a status and a body, on the real page; the rest of its calls are untouched. */
+async function stubCall(
+  page: Page,
+  method: 'GET' | 'POST',
+  path: RegExp,
+  status: number,
+  json: unknown,
+  headers: Record<string, string> = {},
+  when: (url: URL) => boolean = () => true,
+) {
+  await page.route(
+    (url) => path.test(url.pathname) && when(url),
+    (route) =>
+      route.request().method() === method
+        ? route.fulfill({
+            status,
+            contentType: status >= 400 ? 'application/problem+json' : 'application/json',
+            headers,
+            json,
+          })
+        : route.fallback(),
+  );
+}
+
+const isDryRun = (url: URL) => url.searchParams.get('dryRun') === 'true';
+const isRun = (url: URL) => !isDryRun(url);
+
+/** What the server says of an operation it held for approval: a 202 whose header names the request. */
+const held = (summary: string) => ({
+  status: 202,
+  headers: { 'X-Rahdar-Held-Operation': '00000000-0000-0000-0000-00000000a11d' },
+  json: {
+    heldOperation: {
+      id: '00000000-0000-0000-0000-00000000a11d',
+      summary,
+      expiresAt: new Date(Date.now() + 86_400_000).toISOString(),
+      link: '/api/v1/held-operations/00000000-0000-0000-0000-00000000a11d',
+    },
+  },
+});
+
+/** Presses and holds the confirmation until it fills, as a person does. */
+async function holdConfirm(page: Page, name: string) {
+  const button = dialogOf(page).getByRole('button', { name });
+  await button.hover();
+  await page.mouse.down();
+  await page.waitForTimeout(1900);
+  await page.mouse.up();
+  await page.waitForTimeout(800);
 }
 
 // ── Registration ──────────────────────────────────────────────────────────────────────────────────────────────────
@@ -260,7 +343,41 @@ async function previewReset(page: Page) {
   await page.waitForTimeout(1200);
 }
 
+const RESET_PREVIEW = {
+  partitions: [
+    { topic: 'orders', partition: 0, current: 120, next: 0, skipped: 0, reread: 120 },
+    { topic: 'orders', partition: 1, current: 90, next: 0, skipped: 0, reread: 90 },
+  ],
+  members: [],
+  blocked: null,
+  etag: 'qa-etag',
+};
+
 const RESET_SCENES: Scene[] = [
+  {
+    id: 'reset-held-stub',
+    act: async (page) => {
+      const answer = held('Reset the offsets of analytics on events');
+      await stubCall(page, 'POST', /\/offsets:preview$/, 200, RESET_PREVIEW);
+      await stubCall(page, 'POST', /\/offsets:reset$/, answer.status, answer.json, answer.headers);
+      await previewReset(page);
+      await holdConfirm(page, 'Reset 2 partitions');
+    },
+  },
+  {
+    id: 'reset-stale-stub',
+    act: async (page) => {
+      await stubCall(page, 'POST', /\/offsets:preview$/, 200, RESET_PREVIEW);
+      await stubCall(page, 'POST', /\/offsets:reset$/, 412, {
+        title: 'Precondition failed',
+        status: 412,
+        detail: 'The group changed.',
+      });
+      await previewReset(page);
+      await holdConfirm(page, 'Reset 2 partitions');
+    },
+    expectedStatus: [412],
+  },
   { id: 'reset-dialog', act: openReset },
   { id: 'reset-preview', act: previewReset },
   {
@@ -563,6 +680,36 @@ export const KAFKA_ROUTES: RouteSpec[] = [
         },
       },
       {
+        id: 'truncate-held-stub',
+        act: async (page) => {
+          const answer = held('Truncate topic "orders" on events');
+          await stubCall(
+            page,
+            'POST',
+            /:truncate$/,
+            200,
+            {
+              records: 1250,
+              groups: [
+                { group: 'billing', records: 900 },
+                { group: 'analytics', records: 350 },
+              ],
+            },
+            {},
+            isDryRun,
+          );
+          await stubCall(page, 'POST', /:truncate$/, answer.status, answer.json, answer.headers, isRun);
+          await page.getByRole('button', { name: 'Actions for orders' }).first().click();
+          await page.getByRole('menuitem', { name: /Truncate/ }).click();
+          await dialogOf(page)
+            .getByRole('textbox', { name: /Delete records before/ })
+            .fill('0:100');
+          await press(page, 'Preview the cut');
+          await page.waitForTimeout(1200);
+          await holdConfirm(page, 'Truncate 1,250 records');
+        },
+      },
+      {
         id: 'truncate-compacted-refused',
         act: async (page) => {
           await page.getByRole('button', { name: 'Actions for customer-state' }).first().click();
@@ -625,10 +772,151 @@ export const KAFKA_ROUTES: RouteSpec[] = [
         expectedStatus: [409],
       },
       {
+        // The estimate is taken, then the group began rebalancing: the run is refused and its reason stays in the dialog.
+        id: 'purge-refused-rebalancing-stub',
+        act: async (page) => {
+          await stubCall(
+            page,
+            'POST',
+            /:purge$/,
+            200,
+            { affectedCount: 1200, cap: 100000, overCap: false, dryRun: true },
+            {},
+            isDryRun,
+          );
+          await stubCall(
+            page,
+            'POST',
+            /:purge$/,
+            409,
+            {
+              title: 'Failed precondition',
+              status: 409,
+              detail: 'The group began rebalancing. Try again when it is stable.',
+            },
+            {},
+            isRun,
+          );
+          await press(page, 'Purge subscription');
+          await dialogOf(page).waitFor();
+          await page.waitForTimeout(1000);
+          await holdConfirm(page, 'Purge subscription');
+        },
+        expectedStatus: [409],
+      },
+      {
+        id: 'purge-held-stub',
+        act: async (page) => {
+          const answer = held('Purge subscription "billing" on events');
+          await stubCall(
+            page,
+            'POST',
+            /:purge$/,
+            200,
+            { affectedCount: 1200, cap: 100000, overCap: false, dryRun: true },
+            {},
+            isDryRun,
+          );
+          await stubCall(page, 'POST', /:purge$/, answer.status, answer.json, answer.headers, isRun);
+          await press(page, 'Purge subscription');
+          await dialogOf(page).waitFor();
+          await page.waitForTimeout(1000);
+          await holdConfirm(page, 'Purge subscription');
+        },
+      },
+      {
         id: 'record-open',
         act: async (page) => {
           await page.getByRole('row').nth(1).click();
           await dialogOf(page).waitFor();
+        },
+      },
+    ],
+  },
+  {
+    // A bulk purge that ran: a run of Kafka subscriptions, one done, one failed because its group began
+    // rebalancing, one refused at the preview because it has members. The run is the API's answer put in place.
+    area: 'kafka-shared',
+    id: 'bulk-run-stub',
+    path: kafka('bulk/runs'),
+    scenes: [
+      {
+        id: 'run-with-rebalancing-failure-stub',
+        act: async (page) => {
+          const cluster = /\/clusters\/([^/]+)/.exec(new URL(page.url()).pathname)?.[1] ?? '';
+          const item = (
+            ordinal: number,
+            group: string,
+            status: string,
+            error: string | null,
+            outcome: unknown[] | null,
+          ) => ({
+            ordinal,
+            subscription: `kafka.group-topic/${group}/orders`,
+            kind: 'kafka.group-topic',
+            kindLabel: { singular: 'Group on topic', plural: 'Groups on topics' },
+            status,
+            error,
+            warning: null,
+            affected: status === 'REFUSED' ? null : 1200,
+            nodes: [],
+            outcome,
+            startedAt: '2026-10-28T10:00:00Z',
+            finishedAt: '2026-10-28T10:00:02Z',
+          });
+          const rebalancing = 'The group began rebalancing. Try again when it is stable.';
+          await stubCall(page, 'GET', /\/bulk\/runs\/qa-stub-run$/, 200, {
+            run: {
+              id: 'qa-stub-run',
+              clusterId: cluster,
+              operation: 'PURGE',
+              status: 'PARTIAL',
+              username: 'admin',
+              createdAt: '2026-10-28T10:00:00Z',
+              expiresAt: '2026-10-28T10:10:00Z',
+              startedAt: '2026-10-28T10:00:00Z',
+              finishedAt: '2026-10-28T10:00:03Z',
+              total: 3,
+              succeeded: 1,
+              failed: 1,
+              skipped: 1,
+              estimate: 3600,
+              estimateComplete: true,
+              cap: 100000,
+              overCap: false,
+              overrideCap: false,
+              continueOnFailure: false,
+              disconnectConsumers: false,
+              selection: {
+                ids: [
+                  'kafka.group-topic/analytics/orders',
+                  'kafka.group-topic/reporting/orders',
+                  'kafka.group-topic/billing/orders',
+                ],
+                q: null,
+              },
+              planHash: 'qa',
+              auditEventId: null,
+              error: null,
+            },
+            items: [
+              item(0, 'analytics', 'SUCCEEDED', null, [
+                { nodeId: 'cluster', nodeName: 'The whole cluster', status: 'APPLIED', affected: 1200 },
+              ]),
+              item(1, 'reporting', 'FAILED', rebalancing, [
+                { nodeId: 'cluster', nodeName: 'The whole cluster', status: 'FAILED', error: rebalancing },
+              ]),
+              item(
+                2,
+                'billing',
+                'REFUSED',
+                'The group has 2 members (consumer-1, consumer-2). Stop them before purging.',
+                null,
+              ),
+            ],
+          });
+          await page.goto(`${new URL(page.url()).origin}/clusters/${cluster}/bulk/qa-stub-run`);
+          await page.waitForTimeout(800);
         },
       },
     ],

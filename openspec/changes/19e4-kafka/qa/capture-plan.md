@@ -59,10 +59,18 @@ Each route is captured in default, loading, error, empty, filtered-empty and for
 | Truncate, purge | `destinations` (scenes truncate-dialog, truncate-preview, truncate-compacted-refused); `messages-orders` scene purge-refused-members |
 | Browse | `messages-orders` (default, loading, error, forbidden; scenes from-offset, from-time, offset-past-end, selector-disabled-actions, record-open), `messages-tombstone`, `messages-long-name` |
 
-## Not covered by a live capture
+## Stubbed states that close the live gaps
 
-- The run-time refusal of a purge by a group that began rebalancing, and a held (approval) offset reset or truncate:
-  both need the approval provider or a timing the seed cannot hold; check them in the browser tests.
-- A second Kafka cluster that is unreachable: the unreachable state is the broker-down stub.
-- The scenes were written against the screens' roles and labels and have not been run: the stack was not started
-  (disk), so the first run will find the labels and waits that need fixing.
+| Capture | What is put in place of the live answer |
+| --- | --- |
+| `messages-orders` / `purge-refused-rebalancing-stub` | the purge's estimate is answered, then its run is refused `409` with "The group began rebalancing…": the reason stays in the open dialog, which stays open and disabled |
+| `bulk-run-stub` / `run-with-rebalancing-failure-stub` | a bulk purge's run page: one subscription done, one failed with the rebalancing reason, one refused at the preview naming its members |
+| `group-lagging` / `reset-held-stub` | the reset's preview is answered, its run answers `202` with the held-operation header: how the page says it awaits approval; `reset-stale-stub` is the `412` |
+| `messages-orders` / `purge-held-stub` | the same held `202` for the purge of a log |
+| `destinations` / `truncate-held-stub` | the cut's preview is answered, its run answers `202` held |
+| `home` / `unreachable-kafka-cluster-stub` | a second Kafka cluster, `events-dr`, in the cluster list with health UNKNOWN: its row says so in words, and the subscriptions grid notes that its subscriptions are unavailable |
+
+## Still not captured
+
+- Nothing of the above has run: the stack was not started (disk), so the first run will find the labels and waits that
+  need fixing. Held operations are stubs: a real hold needs the approval provider (`sweep/approval-provider/install.sh`).

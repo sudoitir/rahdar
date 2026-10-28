@@ -24,7 +24,7 @@ import {
   SETTINGS_DRAFT_SCENES,
   TEAMS_SCENES,
 } from './scenes.ts';
-import { KAFKA_ROUTES, REGISTRATION_ROUTES } from './kafka.ts';
+import { ESTATE_UNREACHABLE_SCENES, KAFKA_ROUTES, REGISTRATION_ROUTES } from './kafka.ts';
 
 export interface DataCall {
   path: string;
@@ -139,6 +139,7 @@ export const ROUTES: RouteSpec[] = [
     path: '/',
     data: [paged('/clusters'), paged('/subscriptions')],
     filter: `?q=${NO_MATCH}`,
+    scenes: ESTATE_UNREACHABLE_SCENES,
   },
   stateless('shell', 'login', '/login', { auth: 'none', expectedStatus: [401] }),
   {
