@@ -30,9 +30,6 @@ class ApiSchemaNamesTest extends PostgresIntegrationTest {
 
     private static final String BASE = "io.github.sudoitir.rahdar.";
 
-    /** Clashes that were there before this guard; each is renamed away and removed from here. */
-    private static final Set<String> KNOWN = Set.of("SystemView", "FindingView", "PlanView", "Delivery", "Outcome");
-
     @Autowired
     @Qualifier("requestMappingHandlerMapping") RequestMappingHandlerMapping mapping;
 
@@ -51,18 +48,12 @@ class ApiSchemaNamesTest extends PostgresIntegrationTest {
         }
         List<String> clashes = new ArrayList<>();
         byName.forEach((name, types) -> {
-            if (types.size() > 1 && !KNOWN.contains(name)) {
+            if (types.size() > 1) {
                 clashes.add(name + " = "
                         + new TreeSet<>(types.stream().map(Class::getName).toList()));
             }
         });
 
-        assertThat(byName.entrySet().stream()
-                        .filter(e -> e.getValue().size() > 1)
-                        .map(Map.Entry::getKey)
-                        .toList())
-                .as("a known clash that is gone: remove it from KNOWN")
-                .containsAll(KNOWN);
         assertThat(byName).as("the scan sees the API's types").hasSizeGreaterThan(100);
         assertThat(clashes).as("two API types with one schema name: rename one").isEmpty();
     }

@@ -30,7 +30,7 @@ public final class SqlViews {
     public record SqlQueryTicketView(UUID queryId, String expiresAt) {}
 
     @Schema(description = "What a query will do, worked out without contacting a broker.")
-    public record PlanView(
+    public record QueryPlanView(
             @Schema(description = "BROKER or INDEX — which backend will answer.")
             String source,
 
@@ -163,7 +163,7 @@ public final class SqlViews {
             @Schema(description = "True when a bound was hit or a node did not answer.")
             boolean partial,
 
-            PlanView plan) {}
+            QueryPlanView plan) {}
 
     @Schema(description = "What a live tail has seen, and what it can prove it missed.")
     public record TailStatusView(

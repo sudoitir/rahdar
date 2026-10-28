@@ -182,7 +182,7 @@ class JobRunnerTest {
         runner.schedule(every("timed", Duration.ofMillis(10), ScheduledJob.Scope.INSTANCE, () -> sleep(LONG))
                 .withTimeout(() -> Duration.ofMillis(50)));
 
-        await().atMost(LONG).until(() -> status("timed").lastOutcome() == JobStatus.Outcome.TIMED_OUT);
+        await().atMost(LONG).until(() -> status("timed").lastOutcome() == JobStatus.JobOutcome.TIMED_OUT);
 
         assertThat(status("timed").timeouts()).isEqualTo(1);
         assertThat(status("timed").lastError()).contains("Timed out");
@@ -225,7 +225,7 @@ class JobRunnerTest {
         await().atMost(LONG).until(() -> status("lost").lockLost() >= 1);
 
         assertThat(sawInterrupt).isTrue();
-        assertThat(status("lost").lastOutcome()).isEqualTo(JobStatus.Outcome.LOCK_LOST);
+        assertThat(status("lost").lastOutcome()).isEqualTo(JobStatus.JobOutcome.LOCK_LOST);
         assertThat(meters.get("rahdar.job.lock_lost")
                         .tag("job.id", "lost")
                         .counter()
@@ -311,14 +311,14 @@ class JobRunnerTest {
 
         runner.pause(Duration.ofMillis(100));
 
-        assertThat(status("busy").lastOutcome()).isEqualTo(JobStatus.Outcome.INTERRUPTED);
+        assertThat(status("busy").lastOutcome()).isEqualTo(JobStatus.JobOutcome.INTERRUPTED);
         sleep(Duration.ofMillis(100));
         assertThat(runs).hasValue(1); // paused: nothing starts
 
         hang.set(false);
         runner.resume();
         await().atMost(LONG).until(() -> runs.get() >= 3);
-        assertThat(status("busy").lastOutcome()).isEqualTo(JobStatus.Outcome.SUCCEEDED);
+        assertThat(status("busy").lastOutcome()).isEqualTo(JobStatus.JobOutcome.SUCCEEDED);
     }
 
     @Test

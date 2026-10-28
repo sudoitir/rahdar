@@ -14,9 +14,9 @@ import io.github.sudoitir.rahdar.feature.flow.FlowQuery.GroupBy;
 import io.github.sudoitir.rahdar.feature.flow.FlowQuery.Rank;
 import io.github.sudoitir.rahdar.feature.flow.FlowStore.NodeSample;
 import io.github.sudoitir.rahdar.feature.flow.FlowStore.StoredEdge;
-import io.github.sudoitir.rahdar.feature.flow.web.FlowViews.Delivery;
 import io.github.sudoitir.rahdar.feature.flow.web.FlowViews.EdgeKind;
 import io.github.sudoitir.rahdar.feature.flow.web.FlowViews.Fault;
+import io.github.sudoitir.rahdar.feature.flow.web.FlowViews.FlowDelivery;
 import io.github.sudoitir.rahdar.feature.flow.web.FlowViews.FlowEdgeView;
 import io.github.sudoitir.rahdar.feature.flow.web.FlowViews.FlowGraphView;
 import io.github.sudoitir.rahdar.feature.flow.web.FlowViews.FlowNodeView;
@@ -128,7 +128,7 @@ class FlowGraphServiceTest {
                 .containsExactlyInAnyOrder(
                         "destination:orders", "subscription:orders", "producer:order-svc", "consumer:billing");
         FlowEdgeView route = edge(graph, EdgeKind.ROUTE);
-        assertThat(route.delivery()).isEqualTo(Delivery.SHARED);
+        assertThat(route.delivery()).isEqualTo(FlowDelivery.SHARED);
         assertThat(route.rate()).isEqualTo(42.0);
         assertThat(route.averagedOverSeconds()).isNull();
         assertThat(edge(graph, EdgeKind.CONSUME).members()).isEqualTo(3);
@@ -154,7 +154,7 @@ class FlowGraphServiceTest {
                 .findFirst()
                 .orElseThrow();
         assertThat(orders.rate()).isNull();
-        assertThat(orders.delivery()).isEqualTo(Delivery.COPY);
+        assertThat(orders.delivery()).isEqualTo(FlowDelivery.COPY);
         assertThat(audit.averagedOverSeconds()).isEqualTo(300);
         assertThat(graph.kpis().inRate()).isEqualTo(2.0);
         assertThat(graph.measuring()).isTrue();

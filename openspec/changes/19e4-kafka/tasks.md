@@ -23,9 +23,9 @@ Order: 1, then 2 to 4 (backend and web in parallel against the contract in `desi
 - [x] 3.3 Per-record move, copy and delete disabled with the driver's reason, API refusal; Artemis-only actions gated by kind verbs; no system literal in shared components; stale "typed name" comments fixed. Check: browser tests on a Kafka fixture, grep for `'artemis'` in shared web code
 
 ## 4. Kafka backend and screens (`system/kafka`, `features/kafka`)
-- [ ] 4.1 Groups list and group detail reads, batched per cycle; namespace 404 for other systems. Check: tests against a Kafka Testcontainer with a lagging group, `SystemNamespaceTest` extended
-- [ ] 4.2 Offset reset preview and run, gated, approval-held, audited, etag re-checked on approval. Check: tests for empty, active, rebalancing, stale, out of range, past end, classic and share groups
-- [ ] 4.3 Topic configuration, ACLs, transactions and brokers with quorum, with their previews; new permissions in the catalogue and built-in roles. Check: one test class per resource, permission tests
+- [x] 4.1 Groups list and group detail reads, batched per cycle; namespace 404 for other systems. Check: tests against a Kafka Testcontainer with a lagging group, `SystemNamespaceTest` extended
+- [x] 4.2 Offset reset preview and run, gated, approval-held, audited, etag re-checked on approval. Check: tests for empty, active, rebalancing, stale, out of range, past end, classic and share groups
+- [x] 4.3 Topic configuration, ACLs, transactions and brokers with quorum, with their previews; new permissions in the catalogue and built-in roles. Check: one test class per resource, permission tests
 - [ ] 4.4 Groups and group screens. Check: Vitest browser tests for every state
 - [ ] 4.5 Offset reset flow with preview, held confirmation and disabled-with-reason. Check: browser tests, keyboard pass
 - [ ] 4.6 Topic configuration, ACLs, transactions and brokers screens. Check: browser tests per screen, every state

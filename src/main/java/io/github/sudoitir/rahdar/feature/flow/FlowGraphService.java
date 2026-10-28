@@ -11,10 +11,10 @@ import io.github.sudoitir.rahdar.feature.flow.FlowStore.Route;
 import io.github.sudoitir.rahdar.feature.flow.FlowStore.RouteKind;
 import io.github.sudoitir.rahdar.feature.flow.FlowStore.StoredEdge;
 import io.github.sudoitir.rahdar.feature.flow.FlowStore.StoredRoute;
-import io.github.sudoitir.rahdar.feature.flow.web.FlowViews.Delivery;
 import io.github.sudoitir.rahdar.feature.flow.web.FlowViews.EdgeKind;
 import io.github.sudoitir.rahdar.feature.flow.web.FlowViews.Fault;
 import io.github.sudoitir.rahdar.feature.flow.web.FlowViews.FlowBrokerNodeView;
+import io.github.sudoitir.rahdar.feature.flow.web.FlowViews.FlowDelivery;
 import io.github.sudoitir.rahdar.feature.flow.web.FlowViews.FlowEdgeView;
 import io.github.sudoitir.rahdar.feature.flow.web.FlowViews.FlowFocusView;
 import io.github.sudoitir.rahdar.feature.flow.web.FlowViews.FlowGraphView;
@@ -1106,11 +1106,11 @@ public class FlowGraphService {
         return name != null && name.startsWith(RahdarNames.CAPTURE_PREFIX);
     }
 
-    private static Delivery delivery(String routingType) {
+    private static FlowDelivery delivery(String routingType) {
         if ("MULTICAST".equalsIgnoreCase(routingType)) {
-            return Delivery.COPY;
+            return FlowDelivery.COPY;
         }
-        return "ANYCAST".equalsIgnoreCase(routingType) ? Delivery.SHARED : null;
+        return "ANYCAST".equalsIgnoreCase(routingType) ? FlowDelivery.SHARED : null;
     }
 
     private static Double rate(SubjectRate r) {

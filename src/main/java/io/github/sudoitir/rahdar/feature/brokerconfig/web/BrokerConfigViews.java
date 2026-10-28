@@ -642,7 +642,7 @@ public final class BrokerConfigViews {
     public record PlanView(
             @Schema(requiredMode = REQUIRED) List<NodePlanView> nodes,
             @Schema(requiredMode = REQUIRED) List<HazardView> hazards,
-            @Schema(requiredMode = REQUIRED) List<FindingView> findings,
+            @Schema(requiredMode = REQUIRED) List<ConfigFindingView> findings,
             @Schema(requiredMode = REQUIRED) String planHash,
             @Schema(requiredMode = REQUIRED) int stepCount,
             @Schema(nullable = true) UUID canaryNodeId) {
@@ -650,7 +650,7 @@ public final class BrokerConfigViews {
             return new PlanView(
                     p.nodes().stream().map(NodePlanView::of).toList(),
                     p.hazards().stream().map(HazardView::of).toList(),
-                    p.findings().stream().map(FindingView::of).toList(),
+                    p.findings().stream().map(ConfigFindingView::of).toList(),
                     p.planHash(),
                     p.stepCount(),
                     p.canaryNodeId());
@@ -740,15 +740,15 @@ public final class BrokerConfigViews {
     }
 
     @Schema(name = "ConfigFindingView", description = "Something the plan noticed and will not act on")
-    public record FindingView(
+    public record ConfigFindingView(
             @Schema(requiredMode = REQUIRED) String kind,
             @Schema(requiredMode = REQUIRED) UUID nodeId,
             @Schema(requiredMode = REQUIRED) String nodeName,
             @Schema(nullable = true) String section,
             @Schema(nullable = true) String key,
             @Schema(requiredMode = REQUIRED) String detail) {
-        static FindingView of(Plan.Finding f) {
-            return new FindingView(
+        static ConfigFindingView of(Plan.Finding f) {
+            return new ConfigFindingView(
                     f.kind().name(),
                     f.nodeId(),
                     f.nodeName(),

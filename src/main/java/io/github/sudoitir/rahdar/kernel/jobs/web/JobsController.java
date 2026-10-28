@@ -37,7 +37,7 @@ public class JobsController {
             @Schema(nullable = true) Instant lastEnd,
 
             @Schema(nullable = true, description = "How the most recent run ended; absent until one has.")
-            JobStatus.Outcome lastOutcome,
+            JobStatus.JobOutcome lastOutcome,
 
             @Schema(
                     nullable = true,

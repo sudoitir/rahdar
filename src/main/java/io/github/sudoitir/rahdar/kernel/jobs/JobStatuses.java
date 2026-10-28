@@ -80,7 +80,7 @@ public class JobStatuses {
         update(jobId, s -> s.succeeded(at));
     }
 
-    void ended(String jobId, Instant at, JobStatus.Outcome outcome, String error) {
+    void ended(String jobId, Instant at, JobStatus.JobOutcome outcome, String error) {
         update(jobId, s -> s.ended(at, outcome, error));
         String counter =
                 switch (outcome) {

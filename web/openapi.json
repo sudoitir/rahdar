@@ -7585,7 +7585,7 @@
             "content" : {
               "*/*" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/PlanView"
+                  "$ref" : "#/components/schemas/QueryPlanView"
                 }
               }
             }
@@ -17356,7 +17356,7 @@
             "content" : {
               "*/*" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/PagedViewSystemView"
+                  "$ref" : "#/components/schemas/PagedViewSupportedSystemView"
                 }
               }
             }
@@ -31746,7 +31746,7 @@
           }
         }
       },
-      "PlanView" : {
+      "QueryPlanView" : {
         "type" : "object",
         "description" : "What a query will do, worked out without contacting a broker.",
         "properties" : {
@@ -35045,13 +35045,13 @@
         },
         "required" : [ "permissions", "roles" ]
       },
-      "PagedViewSystemView" : {
+      "PagedViewSupportedSystemView" : {
         "type" : "object",
         "properties" : {
           "data" : {
             "type" : "array",
             "items" : {
-              "$ref" : "#/components/schemas/SystemView"
+              "$ref" : "#/components/schemas/SupportedSystemView"
             }
           },
           "page" : {
@@ -35072,6 +35072,24 @@
           }
         },
         "required" : [ "data", "hasNext", "page", "pageSize" ]
+      },
+      "SupportedSystemView" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "supportedVersions" : {
+            "type" : "string"
+          },
+          "connection" : {
+            "type" : "string",
+            "enum" : [ "jolokia-seeds", "bootstrap" ]
+          }
+        }
       },
       "JobStatusView" : {
         "type" : "object",
@@ -36916,7 +36934,7 @@
             "description" : "True when a bound was hit or a node did not answer."
           },
           "plan" : {
-            "$ref" : "#/components/schemas/PlanView"
+            "$ref" : "#/components/schemas/QueryPlanView"
           }
         },
         "required" : [ "partial" ]

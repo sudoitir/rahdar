@@ -30,15 +30,15 @@ class JobStatusesTest {
         assertThat(ok.failures()).isZero();
         assertThat(ok.lastError()).isNull();
         assertThat(ok.lastEnd()).isNotNull();
-        assertThat(ok.lastOutcome()).isEqualTo(JobStatus.Outcome.SUCCEEDED);
+        assertThat(ok.lastOutcome()).isEqualTo(JobStatus.JobOutcome.SUCCEEDED);
 
         statuses.started("demo", Instant.now());
-        statuses.ended("demo", Instant.now(), JobStatus.Outcome.FAILED, "boom");
+        statuses.ended("demo", Instant.now(), JobStatus.JobOutcome.FAILED, "boom");
         JobStatus failed = statuses.all().getFirst();
         assertThat(failed.runs()).isEqualTo(2);
         assertThat(failed.failures()).isEqualTo(1);
         assertThat(failed.lastError()).isEqualTo("boom");
-        assertThat(failed.lastOutcome()).isEqualTo(JobStatus.Outcome.FAILED);
+        assertThat(failed.lastOutcome()).isEqualTo(JobStatus.JobOutcome.FAILED);
         assertThat(failed.timeouts()).isZero();
     }
 
@@ -47,9 +47,9 @@ class JobStatusesTest {
         register("slow", ScheduledJob.Scope.INSTALLATION);
 
         statuses.started("slow", Instant.now());
-        statuses.ended("slow", Instant.now(), JobStatus.Outcome.TIMED_OUT, "Timed out after PT5M");
+        statuses.ended("slow", Instant.now(), JobStatus.JobOutcome.TIMED_OUT, "Timed out after PT5M");
         statuses.started("slow", Instant.now());
-        statuses.ended("slow", Instant.now(), JobStatus.Outcome.LOCK_LOST, "Lost its lock while running");
+        statuses.ended("slow", Instant.now(), JobStatus.JobOutcome.LOCK_LOST, "Lost its lock while running");
         statuses.overran("slow");
 
         JobStatus s = statuses.all().getFirst();
@@ -57,7 +57,7 @@ class JobStatusesTest {
         assertThat(s.lockLost()).isEqualTo(1);
         assertThat(s.overruns()).isEqualTo(1);
         assertThat(s.failures()).isEqualTo(2);
-        assertThat(s.lastOutcome()).isEqualTo(JobStatus.Outcome.LOCK_LOST);
+        assertThat(s.lastOutcome()).isEqualTo(JobStatus.JobOutcome.LOCK_LOST);
         assertThat(meters.get("rahdar.job.timeouts")
                         .tag("job.id", "slow")
                         .counter()

@@ -32,7 +32,7 @@ public record JobStatus(
         Instant registeredAt,
         Instant lastStart,
         Instant lastEnd,
-        Outcome lastOutcome,
+        JobOutcome lastOutcome,
         String lastError,
         long runs,
         long failures,
@@ -45,7 +45,7 @@ public record JobStatus(
         Instant lastSkippedElsewhere) {
 
     /** How a run ended. */
-    public enum Outcome {
+    public enum JobOutcome {
         SUCCEEDED,
         FAILED,
         /** Interrupted for exceeding the job's timeout. */
@@ -73,20 +73,20 @@ public record JobStatus(
     JobStatus succeeded(Instant at) {
         return toBuilder()
                 .lastEnd(at)
-                .lastOutcome(Outcome.SUCCEEDED)
+                .lastOutcome(JobOutcome.SUCCEEDED)
                 .lastError(null)
                 .build();
     }
 
     /** A run that did not succeed; {@code outcome} says why, and its own counter rises with the failure count. */
-    JobStatus ended(Instant at, Outcome outcome, String error) {
+    JobStatus ended(Instant at, JobOutcome outcome, String error) {
         return toBuilder()
                 .lastEnd(at)
                 .lastOutcome(outcome)
                 .lastError(error)
                 .failures(failures + 1)
-                .timeouts(outcome == Outcome.TIMED_OUT ? timeouts + 1 : timeouts)
-                .lockLost(outcome == Outcome.LOCK_LOST ? lockLost + 1 : lockLost)
+                .timeouts(outcome == JobOutcome.TIMED_OUT ? timeouts + 1 : timeouts)
+                .lockLost(outcome == JobOutcome.LOCK_LOST ? lockLost + 1 : lockLost)
                 .build();
     }
 

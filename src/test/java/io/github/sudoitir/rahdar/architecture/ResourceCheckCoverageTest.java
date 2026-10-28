@@ -195,10 +195,7 @@ class ResourceCheckCoverageTest {
                     "'source' names the module or plugin that posts the notice, not a queue"),
             Map.entry(
                     "kernel.inbox.InboxService.resolve",
-                    "'source' names the module or plugin that posted the notice, not a queue"),
-            Map.entry(
-                    "feature.plugins.messaging.internal.AccessCheck.needsOf",
-                    "only lists the needs of a registration; AccessCheck.denial checks them for the acting user"));
+                    "'source' names the module or plugin that posted the notice, not a queue"));
 
     /** What a scan found: the methods it looked at, each with how it fares, and how many check call sites it reaches. */
     private record Subject(String id, boolean checked, boolean composite, boolean coversEachName, int sites) {}

@@ -24,15 +24,16 @@ public class SystemsController {
      * @param supportedVersions the version range the driver is tested against, in Maven range syntax
      * @param connection whether a cluster is registered from Jolokia seeds or from bootstrap servers
      */
-    public record SystemView(String id, String name, String supportedVersions, Entry connection) {}
+    public record SupportedSystemView(String id, String name, String supportedVersions, Entry connection) {}
 
     @GetMapping("/systems")
-    public PagedView<SystemView> list(
+    public PagedView<SupportedSystemView> list(
             @RequestParam(required = false) Integer page, @RequestParam(required = false) Integer size) {
-        List<SystemView> systems = drivers.systems().stream()
+        List<SupportedSystemView> systems = drivers.systems().stream()
                 .flatMap(system -> connections.stream()
                         .filter(c -> c.system().equals(system.id()))
-                        .map(c -> new SystemView(system.id(), system.name(), system.supportedVersions(), c.entry())))
+                        .map(c -> new SupportedSystemView(
+                                system.id(), system.name(), system.supportedVersions(), c.entry())))
                 .toList();
         return ResourceQuery.ofPage(page, size).paginate(systems, null);
     }

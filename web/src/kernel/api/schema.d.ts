@@ -5095,7 +5095,7 @@ export interface components {
             detail?: string;
         };
         /** @description What a query will do, worked out without contacting a broker. */
-        PlanView: {
+        QueryPlanView: {
             /** @description BROKER or INDEX — which backend will answer. */
             source?: string;
             /** @description The queue-and-node pairs the query will read. */
@@ -6450,8 +6450,8 @@ export interface components {
             roles: components["schemas"]["RoleView"][];
             permissions: components["schemas"]["PermissionView"][];
         };
-        PagedViewSystemView: {
-            data: components["schemas"]["SystemView"][];
+        PagedViewSupportedSystemView: {
+            data: components["schemas"]["SupportedSystemView"][];
             /** Format: int32 */
             page: number;
             /** Format: int32 */
@@ -6462,6 +6462,13 @@ export interface components {
              */
             count?: number | null;
             hasNext: boolean;
+        };
+        SupportedSystemView: {
+            id?: string;
+            name?: string;
+            supportedVersions?: string;
+            /** @enum {string} */
+            connection?: "jolokia-seeds" | "bootstrap";
         };
         JobStatusView: {
             id: string;
@@ -7252,7 +7259,7 @@ export interface components {
             notices?: components["schemas"]["NoticeView"][];
             /** @description True when a bound was hit or a node did not answer. */
             partial: boolean;
-            plan?: components["schemas"]["PlanView"];
+            plan?: components["schemas"]["QueryPlanView"];
         };
         /** @description A message, and where it came from. */
         RowView: {
@@ -13642,7 +13649,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["PlanView"];
+                    "*/*": components["schemas"]["QueryPlanView"];
                 };
             };
             /** @description Too many requests. Wait for Retry-After seconds. */
@@ -19396,7 +19403,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["PagedViewSystemView"];
+                    "*/*": components["schemas"]["PagedViewSupportedSystemView"];
                 };
             };
             /** @description Too many requests. Wait for Retry-After seconds. */
