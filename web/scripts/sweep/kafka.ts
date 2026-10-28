@@ -378,6 +378,22 @@ const RESET_SCENES: Scene[] = [
     },
     expectedStatus: [412],
   },
+  {
+    // The reset moved one topic and stopped at the next: which moved, which did not, and why.
+    id: 'reset-partial-stub',
+    act: async (page) => {
+      await stubCall(page, 'POST', /\/offsets:preview$/, 200, RESET_PREVIEW);
+      await stubCall(page, 'POST', /\/offsets:reset$/, 200, {
+        partitions: RESET_PREVIEW.partitions,
+        moved: 2,
+        movedTopics: ['orders'],
+        notMovedTopics: ['payments'],
+        failure: 'The group coordinator moved while the offsets of payments were being written.',
+      });
+      await previewReset(page);
+      await holdConfirm(page, 'Reset 2 partitions');
+    },
+  },
   { id: 'reset-dialog', act: openReset },
   { id: 'reset-preview', act: previewReset },
   {
@@ -479,6 +495,8 @@ export const KAFKA_ROUTES: RouteSpec[] = [
     ],
   },
   { area: 'kafka', id: 'topic-config-compacted', path: kafka('kafka/topics/customer-state/config') },
+  // An internal topic: its configuration is read-only, with the reason, and every Change is disabled.
+  { area: 'kafka', id: 'topic-config-internal', path: kafka('kafka/topics/__consumer_offsets/config') },
   {
     area: 'kafka',
     id: 'acls',
@@ -538,6 +556,27 @@ export const KAFKA_ROUTES: RouteSpec[] = [
           await page.waitForTimeout(1000);
         },
       },
+      {
+        // A transaction that is still within its timeout: aborting it would fence a working producer, so the button is disabled with the system's reason.
+        id: 'abort-not-hanging-stub',
+        act: async (page) => {
+          await stubCall(page, 'POST', /:abort-preview$/, 200, {
+            id: 'payments-settlement',
+            state: 'ongoing',
+            released: [{ topic: 'payments', partition: 0 }],
+            effect:
+              'payments-settlement is open and within its timeout, so it is not hanging: aborting it would fence a producer that is working.',
+            abortable: false,
+            etag: 'qa-etag',
+          });
+          await page
+            .getByRole('button', { name: /^Abort / })
+            .first()
+            .click();
+          await dialogOf(page).waitFor();
+          await page.waitForTimeout(1000);
+        },
+      },
     ],
   },
   {
@@ -556,17 +595,19 @@ export const KAFKA_ROUTES: RouteSpec[] = [
         id: 'zookeeper-stub',
         act: (page) =>
           stubGet(page, /\/api\/v1\/clusters\/[^/]+\/kafka\/brokers$/, {
+            mode: 'ZooKeeper',
             brokers: [
               { id: '1', address: 'kafka-1:9092', reachable: true, leaders: 12, underReplicated: 0, offline: 0 },
               { id: '2', address: 'kafka-2:9092', reachable: true, leaders: 11, underReplicated: 0, offline: 0 },
             ],
-            quorum: { available: false, reason: 'The cluster runs ZooKeeper.' },
+            quorum: { available: false, reason: 'The cluster runs ZooKeeper.', voters: [], majority: false },
           }),
       },
       {
         id: 'broker-down-stub',
         act: (page) =>
           stubGet(page, /\/api\/v1\/clusters\/[^/]+\/kafka\/brokers$/, {
+            mode: 'KRaft',
             brokers: [
               {
                 id: '1',
@@ -600,11 +641,34 @@ export const KAFKA_ROUTES: RouteSpec[] = [
             quorum: {
               available: true,
               leader: '1',
-              majority: 2,
+              majority: true,
               voters: [
                 { id: '1', lag: 0, caughtUp: true },
                 { id: '2', lag: 0, caughtUp: true },
                 { id: '3', lag: 4800, caughtUp: false },
+              ],
+            },
+          }),
+      },
+      {
+        // Two of the three voters are behind: the caught-up voters are not a majority, the critical state.
+        id: 'no-majority-stub',
+        act: (page) =>
+          stubGet(page, /\/api\/v1\/clusters\/[^/]+\/kafka\/brokers$/, {
+            mode: 'KRaft',
+            brokers: [
+              { id: '1', address: 'kafka-1:9092', reachable: true, leaders: 20, underReplicated: 0, offline: 0 },
+              { id: '2', address: 'kafka-2:9092', reachable: true, leaders: 20, underReplicated: 0, offline: 0 },
+              { id: '3', address: 'kafka-3:9092', reachable: true, leaders: 20, underReplicated: 0, offline: 0 },
+            ],
+            quorum: {
+              available: true,
+              leader: '1',
+              majority: false,
+              voters: [
+                { id: '1', lag: 0, caughtUp: true },
+                { id: '2', lag: 12000, caughtUp: false },
+                { id: '3', caughtUp: false },
               ],
             },
           }),
