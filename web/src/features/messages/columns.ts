@@ -10,11 +10,11 @@ import { BodyPreview, SubscriptionLink } from './cells.tsx';
  * The columns of the message browser. The enqueue time is written in the display zone `zone`, which
  * the header states, so a view builds its columns again when the zone changes.
  */
-export function messageColumns(zone: string): Column<MessageSummaryView>[] {
+export function messageColumns(zone: string, partitioned = false): Column<MessageSummaryView>[] {
   return [
     {
       id: 'position',
-      header: 'Message ID',
+      header: partitioned ? 'Offset' : 'Message ID',
       accessor: (m) => m.position,
       kind: 'identifier',
       priority: 'essential',

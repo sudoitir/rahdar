@@ -33,6 +33,10 @@ export interface MessageBrowseParams {
   filter?: string;
   page?: number;
   size?: number;
+  /** A partitioned log is read from one partition, from a start; there are no pages. */
+  partition?: number;
+  from?: string;
+  value?: string;
 }
 
 function messageSearch(params: MessageBrowseParams): string {
@@ -41,6 +45,9 @@ function messageSearch(params: MessageBrowseParams): string {
   if (params.filter) sp.set('filter', params.filter);
   if (params.page && params.page > 1) sp.set('page', String(params.page));
   if (params.size) sp.set('size', String(params.size));
+  if (params.partition !== undefined) sp.set('partition', String(params.partition));
+  if (params.from) sp.set('from', params.from);
+  if (params.value) sp.set('value', params.value);
   const s = sp.toString();
   return s ? `?${s}` : '';
 }

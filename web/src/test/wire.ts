@@ -64,6 +64,7 @@ export const KAFKA_KINDS = [
   {
     id: 'kafka.topic',
     resourceClass: 'DESTINATION',
+    partitioned: true,
     label: { singular: 'Topic', plural: 'Topics' },
     verbs: ['create', 'delete', 'update', 'purge', 'truncate'],
   },
@@ -82,6 +83,7 @@ export const KAFKA_KINDS = [
   {
     id: 'kafka.group-topic',
     resourceClass: 'SUBSCRIPTION',
+    partitioned: true,
     label: { singular: 'Group on topic', plural: 'Groups on topics' },
     verbs: ['purge'],
   },

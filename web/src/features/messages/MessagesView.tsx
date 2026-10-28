@@ -4,7 +4,7 @@ import { Link, useNavigate, useParams, useSearch } from '@tanstack/react-router'
 import { useDebouncedValue } from '@mantine/hooks';
 
 import { CapabilityLedger, useCluster, useRoleIds } from '../clusters/index.ts';
-import { refOf } from '../../kernel/api/resourceId.ts';
+import { kindOf, refOf } from '../../kernel/api/resourceId.ts';
 import { useMessages, type MessageSummaryView } from './api.ts';
 import { CapabilityGate } from '../../ui/CapabilityGate.tsx';
 import { EmptyState } from '../../ui/EmptyState.tsx';
@@ -16,6 +16,8 @@ import { PageHeader } from '../../ui/PageHeader.tsx';
 import { Toolbar } from '../../ui/Toolbar.tsx';
 import { DataTable } from '../../ui/table/index.ts';
 import { messageColumns } from './columns.ts';
+import { browseOf, SELECTOR_REFUSAL, type PartitionBrowse } from './partitionBrowse.ts';
+import { PartitionControls, PartitionNotices } from './PartitionControls.tsx';
 import { useMessageGate } from './gates.ts';
 import { MessageDetailPanel } from './MessageDetailPanel.tsx';
 import { MessageActions } from './MessageActions.tsx';
@@ -56,7 +58,17 @@ function MessagesEmpty({
   filtered,
   unreachable,
   onClearSelector,
-}: Readonly<{ filtered: boolean; unreachable: string[]; onClearSelector: () => void }>) {
+  partitioned,
+}: Readonly<{ filtered: boolean; unreachable: string[]; onClearSelector: () => void; partitioned: boolean }>) {
+  if (partitioned && unreachable.length === 0) {
+    return (
+      <EmptyState
+        kind="empty"
+        title="No records from here"
+        description="This partition has no committed record at or after the start you chose. Choose the earliest record, another partition or an earlier time."
+      />
+    );
+  }
   if (filtered) {
     return (
       <EmptyState
@@ -98,7 +110,15 @@ export function MessagesView() {
     clusterId: string;
     subscriptionName: string;
   };
-  const search = useSearch({ strict: false }) as { node?: string; filter?: string; page?: number; message?: string };
+  const search = useSearch({ strict: false }) as {
+    node?: string;
+    filter?: string;
+    page?: number;
+    message?: string;
+    partition?: number;
+    from?: string;
+    value?: string;
+  };
   const navigate = useNavigate();
 
   const cluster = useCluster(clusterId);
@@ -109,7 +129,11 @@ export function MessagesView() {
     [roleIds, subscriptionName],
   );
   const sendGate = useMessageGate(clusterId, 'message:send', 'Send messages', 'messageIo');
-  const columns = useMemo(() => messageColumns(zone), [zone]);
+  // A partitioned log is read from one partition and a start, not by selector, node and page.
+  const subscriptionKind = roleIds.loaded ? kindOf(roleIds.subscription(subscriptionName)) : undefined;
+  const partitioned = cluster.data?.kinds?.find((k) => k.id === subscriptionKind)?.partitioned === true;
+  const browse = browseOf(search);
+  const columns = useMemo(() => messageColumns(zone, partitioned), [zone, partitioned]);
   const [filter, setFilter] = useState(search.filter ?? '');
   const [debounced] = useDebouncedValue(filter, 250);
   // The open message is in the destination, so a link to one message opens it (non-negotiable #9).
@@ -156,12 +180,22 @@ export function MessagesView() {
     [cluster.data],
   );
 
-  const messages = useMessages(clusterId, subscriptionName, {
-    node: search.node,
-    filter: search.filter,
-    page,
-    size: PAGE_SIZE,
-  });
+  const messages = useMessages(
+    clusterId,
+    subscriptionName,
+    partitioned ? { ...browse, size: PAGE_SIZE } : { node: search.node, filter: search.filter, page, size: PAGE_SIZE },
+  );
+  const setBrowse = (next: PartitionBrowse) =>
+    navigate({
+      to: '.',
+      search: (prev: Record<string, unknown>) => ({
+        ...prev,
+        partition: next.partition,
+        from: next.from === 'earliest' ? undefined : next.from,
+        value: next.value,
+        message: undefined,
+      }),
+    });
 
   const messageIo = cluster.data?.capabilities.messageIo;
   // Block only on a known refusal. Since ADR-0049 D5 this capability is UNKNOWN
@@ -256,21 +290,25 @@ export function MessagesView() {
     <Page fill>
       {header}
       {uncertainty}
+      {partitioned ? <PartitionNotices page={messages.data} /> : null}
 
       <Toolbar
         label="Message filters"
         start={
           <>
+            {partitioned ? <PartitionControls browse={browse} onBrowse={setBrowse} /> : null}
             <TextInput
               ref={filterRef}
               label="Message selector"
-              placeholder="Selector, e.g. region = 'eu'"
-              value={filter}
+              placeholder={partitioned ? undefined : "Selector, e.g. region = 'eu'"}
+              description={partitioned ? SELECTOR_REFUSAL : undefined}
+              disabled={partitioned}
+              value={partitioned ? '' : filter}
               onChange={(e) => setFilter(e.currentTarget.value)}
-              w="17.5rem"
+              w={partitioned ? '22rem' : '17.5rem'}
               size="xs"
             />
-            {endpoints.length > 1 ? (
+            {endpoints.length > 1 && !partitioned ? (
               <Select
                 size="xs"
                 w="11.25rem"
@@ -286,9 +324,11 @@ export function MessagesView() {
         }
         end={
           <>
-            <Text size="xs" c="dimmed">
-              {lastPage == null ? `page ${page} · total unavailable` : `page ${page} of ${lastPage}`}
-            </Text>
+            {partitioned ? null : (
+              <Text size="xs" c="dimmed">
+                {lastPage == null ? `page ${page} · total unavailable` : `page ${page} of ${lastPage}`}
+              </Text>
+            )}
             {subscription
               ? selectionSlot.map(({ id, Component }) => (
                   <Component
@@ -343,7 +383,12 @@ export function MessagesView() {
             ) : null,
         }}
         empty={
-          <MessagesEmpty filtered={Boolean(search.filter)} unreachable={unreachable} onClearSelector={clearSelector} />
+          <MessagesEmpty
+            filtered={Boolean(search.filter)}
+            unreachable={unreachable}
+            onClearSelector={clearSelector}
+            partitioned={partitioned}
+          />
         }
       />
 
