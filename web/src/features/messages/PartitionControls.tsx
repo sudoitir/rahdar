@@ -20,11 +20,14 @@ interface Fields {
 export function PartitionControls({
   browse,
   partitions,
+  next,
   onBrowse,
 }: Readonly<{
   browse: PartitionBrowse;
   /** How many partitions the destination has, when known: the choice is then a list. */
   partitions?: number;
+  /** The offset after the records on this page, when the log has more. */
+  next?: number | null;
   onBrowse: (next: PartitionBrowse) => void;
 }>) {
   const form = useForm<Fields>({
@@ -86,6 +89,16 @@ export function PartitionControls({
       <Button type="submit" size="xs" variant="default" style={{ alignSelf: 'end' }}>
         Browse
       </Button>
+      {next != null ? (
+        <Button
+          size="xs"
+          variant="default"
+          style={{ alignSelf: 'end' }}
+          onClick={() => onBrowse({ partition: browse.partition, from: 'offset', value: String(next) })}
+        >
+          {`Next records, from offset ${next}`}
+        </Button>
+      ) : null}
     </form>
   );
 }
@@ -94,23 +107,29 @@ export function PartitionControls({
  * What a read of a partitioned log has to say before the rows: an offset past the end, a start that retention
  * moved, and that records of an open or aborted transaction are not shown.
  */
-export function PartitionNotices({ page }: Readonly<{ page: MessagePageView | undefined }>) {
+export function PartitionNotices({
+  page,
+  browse,
+}: Readonly<{ page: MessagePageView | undefined; browse: PartitionBrowse }>) {
   const log = page?.log;
+  const asked = browse.from === 'offset' ? Number(browse.value) : null;
   return (
     <>
-      {log && log.requestedOffset != null && log.requestedOffset > log.endOffset ? (
+      {log && asked !== null && asked > log.end ? (
         <Notice tone="info" title="That offset is past the end of the partition">
-          {`Offset ${log.requestedOffset} does not exist yet in partition ${log.partition}. The log ends at offset ${log.endOffset}.`}
+          {`Offset ${asked} does not exist yet in partition ${log.partition}. The log ends at offset ${log.end}.`}
         </Notice>
       ) : null}
-      {log?.retentionMovedStart ? (
+      {log?.retentionMoved ? (
         <Notice tone="info" title="Retention removed the start of the partition">
-          {`Records before offset ${log.startOffset} are gone, so the browse starts there, not where it was asked to.`}
+          {`Records before offset ${log.start} are gone, so the browse starts there, not where it was asked to.`}
         </Notice>
       ) : null}
-      <Notice tone="neutral" title="Only committed records are shown">
-        Records of a transaction that is still open or was aborted are not shown.
-      </Notice>
+      {log?.uncommittedHidden !== false ? (
+        <Notice tone="neutral" title="Only committed records are shown">
+          Records of a transaction that is still open or was aborted are not shown.
+        </Notice>
+      ) : null}
     </>
   );
 }

@@ -11,6 +11,35 @@ import { BodyPreview, SubscriptionLink } from './cells.tsx';
  * the header states, so a view builds its columns again when the zone changes.
  */
 export function messageColumns(zone: string, partitioned = false): Column<MessageSummaryView>[] {
+  // A record of a log has none of an Artemis message's priority, durability or properties; the server sends zeros.
+  const own: Column<MessageSummaryView>[] = partitioned
+    ? [
+        {
+          id: 'key',
+          header: 'Key',
+          description: 'The record key; base64 where it is not text',
+          accessor: (m) => m.key ?? '',
+          kind: 'code',
+          priority: 'high',
+        },
+      ]
+    : [
+        { id: 'priority', header: 'Prio', accessor: (m) => m.priority, kind: 'number', priority: 'low' },
+        {
+          id: 'durable',
+          header: 'Durable',
+          accessor: (m) => (m.durable ? 'yes' : 'no'),
+          kind: 'status',
+          priority: 'low',
+        },
+      ];
+  const PROPS: Column<MessageSummaryView> = {
+    id: 'props',
+    header: 'Props',
+    accessor: (m) => m.propertyCount,
+    kind: 'number',
+    priority: 'low',
+  };
   return [
     {
       id: 'position',
@@ -21,22 +50,15 @@ export function messageColumns(zone: string, partitioned = false): Column<Messag
     },
     {
       id: 'timestamp',
-      header: 'Enqueued',
+      header: partitioned ? 'Written' : 'Enqueued',
       accessor: (m) => absoluteLabel(m.timestamp),
       description: `When the broker enqueued the message, in ${zone === AUTO ? localZone() : zone}`,
       kind: 'time',
       priority: 'high',
     },
-    { id: 'priority', header: 'Prio', accessor: (m) => m.priority, kind: 'number', priority: 'low' },
-    {
-      id: 'durable',
-      header: 'Durable',
-      accessor: (m) => (m.durable ? 'yes' : 'no'),
-      kind: 'status',
-      priority: 'low',
-    },
+    ...own,
     { id: 'size', header: 'Size', accessor: (m) => m.size, kind: 'number', priority: 'high' },
-    { id: 'props', header: 'Props', accessor: (m) => m.propertyCount, kind: 'number', priority: 'low' },
+    ...(partitioned ? [] : [PROPS]),
     {
       id: 'body',
       header: 'Body',

@@ -218,9 +218,11 @@ export function MessagesView() {
       }
       description={
         messages.data
-          ? `${countLabel(messages.data)} · read from ${
-              endpoints.find((e) => e.id === messages.data.node)?.name ?? 'the live node'
-            }`
+          ? partitioned
+            ? `Partition ${browse.partition}`
+            : `${countLabel(messages.data)} · read from ${
+                endpoints.find((e) => e.id === messages.data.node)?.name ?? 'the live node'
+              }`
           : 'Reading the subscription…'
       }
       actions={
@@ -290,13 +292,15 @@ export function MessagesView() {
     <Page fill>
       {header}
       {uncertainty}
-      {partitioned ? <PartitionNotices page={messages.data} /> : null}
+      {partitioned ? <PartitionNotices page={messages.data} browse={browse} /> : null}
 
       <Toolbar
         label="Message filters"
         start={
           <>
-            {partitioned ? <PartitionControls browse={browse} onBrowse={setBrowse} /> : null}
+            {partitioned ? (
+              <PartitionControls browse={browse} onBrowse={setBrowse} next={messages.data?.log?.next ?? null} />
+            ) : null}
             <TextInput
               ref={filterRef}
               label="Message selector"
@@ -398,6 +402,7 @@ export function MessagesView() {
         messageId={openId}
         node={search.node}
         filter={search.filter}
+        partition={partitioned ? browse.partition : undefined}
         onClose={() => setOpenId(null)}
       />
 

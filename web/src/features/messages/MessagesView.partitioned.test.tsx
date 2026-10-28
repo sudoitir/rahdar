@@ -115,7 +115,14 @@ const page = (data: object[], log: object | null = null) => ({
 describe('MessagesView on a partitioned log', () => {
   it('reads partition 0 from the earliest record, without paging, and disables the selector with its reason', async () => {
     const seen = mockKafka(() =>
-      page([record(0), record(1, true)], { partition: 0, startOffset: 0, endOffset: 2, retentionMovedStart: false }),
+      page([record(0), record(1, true)], {
+        partition: 0,
+        start: 0,
+        end: 2,
+        next: null,
+        retentionMoved: false,
+        uncommittedHidden: true,
+      }),
     );
     renderWithProviders(<MessagesView />);
 
@@ -134,7 +141,14 @@ describe('MessagesView on a partitioned log', () => {
 
   it('browses from an offset, checking the value beside its field first', async () => {
     const seen = mockKafka(() =>
-      page([record(500)], { partition: 3, startOffset: 0, endOffset: 900, retentionMovedStart: false }),
+      page([record(500)], {
+        partition: 3,
+        start: 0,
+        end: 900,
+        next: null,
+        retentionMoved: false,
+        uncommittedHidden: true,
+      }),
     );
     const user = userEvent.setup();
     renderWithProviders(<MessagesView />);
@@ -159,7 +173,7 @@ describe('MessagesView on a partitioned log', () => {
   it('states the end of the log when the offset is past it, and that retention moved the start', async () => {
     searchState = { partition: 0, from: 'offset', value: '5000' };
     mockKafka(() =>
-      page([], { partition: 0, startOffset: 200, endOffset: 900, requestedOffset: 5000, retentionMovedStart: true }),
+      page([], { partition: 0, start: 200, end: 900, next: null, retentionMoved: true, uncommittedHidden: true }),
     );
     renderWithProviders(<MessagesView />);
 
@@ -170,7 +184,9 @@ describe('MessagesView on a partitioned log', () => {
   });
 
   it("keeps move, retry, delete and expire visible but disabled, with the system's own words", async () => {
-    mockKafka(() => page([record(0)], { partition: 0, startOffset: 0, endOffset: 1, retentionMovedStart: false }));
+    mockKafka(() =>
+      page([record(0)], { partition: 0, start: 0, end: 1, next: null, retentionMoved: false, uncommittedHidden: true }),
+    );
     const user = userEvent.setup();
     renderWithProviders(<MessagesView />);
     await screen.findByText('value-0');
@@ -185,5 +201,37 @@ describe('MessagesView on a partitioned log', () => {
       await vi.waitFor(() => expect(item).toHaveAttribute('aria-disabled', 'true'));
       expect(item).toHaveAccessibleDescription(words);
     }
+  });
+
+  it('offers the next records from the offset the page ends at, and shows the record key', async () => {
+    const seen = mockKafka((url) =>
+      url.searchParams.get('value') === '2'
+        ? page([record(2)], {
+            partition: 0,
+            start: 0,
+            end: 3,
+            next: null,
+            retentionMoved: false,
+            uncommittedHidden: true,
+          })
+        : page([{ ...record(0), key: 'order-17' }, record(1)], {
+            partition: 0,
+            start: 0,
+            end: 3,
+            next: 2,
+            retentionMoved: false,
+            uncommittedHidden: true,
+          }),
+    );
+    const user = userEvent.setup();
+    renderWithProviders(<MessagesView />);
+
+    expect(await screen.findByText('order-17')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Next records, from offset 2' }));
+    expect(await screen.findByText('value-2')).toBeInTheDocument();
+    const last = seen.at(-1)!;
+    expect(last.searchParams.get('from')).toBe('offset');
+    expect(last.searchParams.get('value')).toBe('2');
+    expect(screen.queryByRole('button', { name: /Next records/ })).not.toBeInTheDocument();
   });
 });

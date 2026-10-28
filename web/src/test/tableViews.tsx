@@ -338,6 +338,7 @@ const message = (f: Fixture, i: number): MessageSummaryView => ({
   priority: 4,
   timestamp: Date.parse(at(i)),
   expiration: 0,
+  tombstone: false,
   size: num(f, 1_024 + i),
   groupId: null,
   correlationId: null,
