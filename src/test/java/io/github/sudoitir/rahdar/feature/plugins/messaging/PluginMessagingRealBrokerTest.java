@@ -765,6 +765,26 @@ class PluginMessagingRealBrokerTest extends PostgresIntegrationTest {
         assertThat(messaging(plugin).registrations()).isEmpty();
     }
 
+    /** A registration moved to another queue keeps only the new queue's tap. */
+    @Test
+    void aRegistrationMovedToAnotherQueueKeepsOnlyTheNewTap() throws Exception {
+        String first = queue("MOVEA");
+        String second = queue("MOVEB");
+        String plugin = activate("move");
+        messaging(plugin)
+                .register(new RegistrationSpec(
+                        "orders", clusterId, ResourceRef.subscription(first), RegistrationMode.TAP, 1, operator));
+        MessageRegistration moved = messaging(plugin)
+                .register(new RegistrationSpec(
+                        "orders", clusterId, ResourceRef.subscription(second), RegistrationMode.TAP, 1, operator));
+
+        assertThat(moved.state()).isEqualTo(RegistrationState.ACTIVE);
+        assertThat(tapQueues()).hasSize(1);
+        assertThat(messaging(plugin).registrations())
+                .singleElement()
+                .satisfies(r -> assertThat(r.source().name()).isEqualTo(second));
+    }
+
     /** Holds the cluster's plugin messaging lock for {@code hold}, as a pass would; returns once it is held. */
     private Thread holdTheLock(Duration hold) throws InterruptedException {
         CountDownLatch held = new CountDownLatch(1);
@@ -772,7 +792,8 @@ class PluginMessagingRealBrokerTest extends PostgresIntegrationTest {
                 .start(() -> clusterLock.runIfHeld(clusterId, ClusterLock.Scope.PLUGIN_MESSAGING, () -> {
                     held.countDown();
                     try {
-                        Thread.sleep(hold);
+                        // Nothing releases it early: the latch only bounds the hold.
+                        new CountDownLatch(1).await(hold.toMillis(), TimeUnit.MILLISECONDS);
                     } catch (InterruptedException _) {
                         Thread.currentThread().interrupt();
                     }

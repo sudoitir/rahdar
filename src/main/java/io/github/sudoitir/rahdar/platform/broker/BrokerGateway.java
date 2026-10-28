@@ -193,7 +193,29 @@ public class BrokerGateway implements DisposableBean {
         return ClusterSpec.ofNodes(nodes);
     }
 
-    private Credentials account(UUID clusterId, Plane plane) {
+    /**
+     * The cluster's broker accounts, read from Rahdar's database on every connect. A driver asks on its own
+     * threads, a notification stream's among them, and backs off and asks again on a BrokerException;
+     * anything else would end that thread for good, so a failed read is reported as the broker being
+     * unavailable.
+     */
+    static CredentialSource credentials(ConnectionSettingsSource settings, UUID clusterId) {
+        return plane -> {
+            try {
+                return account(settings, clusterId, plane);
+            } catch (DataAccessException e) {
+                throw new BrokerException(
+                        Status.UNAVAILABLE,
+                        ErrorInfo.of(ErrorReasons.UNREACHABLE),
+                        Dispatch.NOT_SENT,
+                        null,
+                        "Rahdar could not read the cluster's broker credentials from its database.",
+                        e);
+            }
+        };
+    }
+
+    private static Credentials account(ConnectionSettingsSource settings, UUID clusterId, Plane plane) {
         return switch (plane) {
             case MANAGEMENT -> {
                 BrokerConnectionSettings s = settings.jolokiaSettings(clusterId);
@@ -211,21 +233,7 @@ public class BrokerGateway implements DisposableBean {
     }
 
     private ConnectRequest request(UUID clusterId, ClusterSpec spec) {
-        CredentialSource credentials = plane -> {
-            try {
-                return account(clusterId, plane);
-            } catch (DataAccessException e) {
-                // A driver asks on its own threads, a notification stream's among them, and backs off and asks
-                // again on a BrokerException; anything else would end that thread for good.
-                throw new BrokerException(
-                        Status.UNAVAILABLE,
-                        ErrorInfo.of(ErrorReasons.UNREACHABLE),
-                        Dispatch.NOT_SENT,
-                        null,
-                        "Rahdar could not read the cluster's broker credentials from its database.",
-                        e);
-            }
-        };
+        CredentialSource credentials = credentials(settings, clusterId);
         String system = directory.system(clusterId);
         BrokerConnectionSettings tlsSettings = settings.jolokiaSettings(clusterId);
         return new ConnectRequest(

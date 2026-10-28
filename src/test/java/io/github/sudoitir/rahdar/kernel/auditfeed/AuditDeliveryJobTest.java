@@ -77,12 +77,10 @@ class AuditDeliveryJobTest extends PostgresIntegrationTest {
     private FakeHandle handle;
     private SimpleLock scheduled;
 
-    /**
-     * The scheduled delivery job runs in this context too, every two seconds, and would deliver to this
-     * test's receiver between the test's own calls. Holding its lock, as another replica would, keeps it out.
-     */
     @BeforeEach
-    void holdTheScheduledDelivery() {
+    void attach() {
+        // The scheduled delivery job runs in this context too, every two seconds, and would deliver to this
+        // test's receiver between the test's own calls. Holding its lock, as another replica would, keeps it out.
         Awaitility.await("the audit-delivery job's lock")
                 .atMost(Duration.ofSeconds(10))
                 .until(() -> {
@@ -91,17 +89,6 @@ class AuditDeliveryJobTest extends PostgresIntegrationTest {
                             .orElse(null);
                     return scheduled != null;
                 });
-    }
-
-    @AfterEach
-    void releaseTheScheduledDelivery() {
-        if (scheduled != null) {
-            scheduled.unlock();
-        }
-    }
-
-    @BeforeEach
-    void attach() {
         handle = new FakeHandle(pluginId, true, false, Map.of(AuditReceiver.class, receiver));
         receivers.attach(handle);
         // A new receiver starts at the beginning of the trail; this test cares about its own records only.
@@ -114,6 +101,9 @@ class AuditDeliveryJobTest extends PostgresIntegrationTest {
 
     @AfterEach
     void detach() {
+        if (scheduled != null) {
+            scheduled.unlock();
+        }
         receivers.detach(handle);
         jdbc.update("DELETE FROM audit_receiver WHERE plugin_id = ?", pluginId);
         jdbc.update("UPDATE audit_feed_state SET retained_from = NULL");
