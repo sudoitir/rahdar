@@ -206,7 +206,7 @@ const CASES: Case[] = [
           },
         ],
         mode: 'ZooKeeper',
-        quorum: { available: false, reason: 'The cluster runs ZooKeeper.' },
+        quorum: { available: false, reason: 'The cluster runs ZooKeeper.', voters: [], majority: false },
       }),
   },
 ];

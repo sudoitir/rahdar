@@ -11,7 +11,7 @@ import { PageHeader } from '../../ui/PageHeader.tsx';
 import { Section } from '../../ui/Section.tsx';
 import { StatusBadge } from '../../ui/StatusBadge.tsx';
 import { DataTable, type Column } from '../../ui/table/index.ts';
-import { useKafkaBrokers, type KafkaBroker } from './api.ts';
+import { useKafkaBrokers, type KafkaBroker, type QuorumVoter } from './api.ts';
 
 const BROKER_COLUMNS: Column<KafkaBroker>[] = [
   { id: 'id', header: 'Broker', accessor: (b) => `Broker ${b.id}`, kind: 'identifier', priority: 'essential' },
@@ -61,6 +61,28 @@ const BROKER_COLUMNS: Column<KafkaBroker>[] = [
   { id: 'offline', header: 'Offline', accessor: (b) => b.offline, kind: 'number', priority: 'high' },
 ];
 
+const VOTER_COLUMNS: Column<QuorumVoter>[] = [
+  { id: 'id', header: 'Voter', accessor: (v) => `Broker ${v.id}`, kind: 'identifier', priority: 'essential' },
+  {
+    id: 'lag',
+    header: 'Lag',
+    description: 'Records behind the quorum leader',
+    accessor: (v) => v.lag ?? null,
+    cell: (v) => (v.lag == null ? 'Unknown' : v.lag.toLocaleString()),
+    kind: 'number',
+    priority: 'high',
+  },
+  {
+    id: 'caughtUp',
+    header: 'Caught up',
+    accessor: (v) => (v.caughtUp ? 'Yes' : 'Lagging'),
+    cell: (v) => <StatusBadge tone={v.caughtUp ? 'neutral' : 'warning'}>{v.caughtUp ? 'Yes' : 'Lagging'}</StatusBadge>,
+    kind: 'text',
+    badge: true,
+    priority: 'essential',
+  },
+];
+
 /** The brokers of a Kafka cluster with what each leads, and the controller quorum or why it cannot be shown. */
 export function BrokersView() {
   const { clusterId } = useParams({ strict: false }) as { clusterId: string };
@@ -82,6 +104,7 @@ export function BrokersView() {
     );
   }
   const { quorum } = brokers.data;
+  const caughtUp = quorum.voters.filter((v) => v.caughtUp).length;
   return (
     <Page>
       <PageHeader
@@ -102,15 +125,34 @@ export function BrokersView() {
       </Section>
       <Section title="Controller quorum">
         {quorum.available ? (
-          <DescriptionList
-            label="Controller quorum"
-            columns={2}
-            items={[
-              { term: 'Mode', value: brokers.data.mode },
-              { term: 'Leader', value: quorum.leader ? `Broker ${quorum.leader}` : 'None elected' },
-              { term: 'Voters', value: String(quorum.voters ?? 'Unknown') },
-            ]}
-          />
+          <Stack gap="md">
+            <DescriptionList
+              label="Controller quorum"
+              columns={2}
+              items={[
+                { term: 'Mode', value: brokers.data.mode },
+                { term: 'Leader', value: quorum.leader ? `Broker ${quorum.leader}` : 'None elected' },
+              ]}
+            />
+            <Notice
+              tone={quorum.majority ? 'neutral' : 'danger'}
+              title={quorum.majority ? 'The quorum has a majority' : 'The quorum has no majority'}
+            >
+              {quorum.majority
+                ? `${caughtUp} of ${quorum.voters.length} voters are caught up, a majority.`
+                : `Only ${caughtUp} of ${quorum.voters.length} voters are caught up, which is not a majority. The controllers cannot commit metadata changes.`}
+            </Notice>
+            <DataTable
+              variant="static"
+              label="Controller voters"
+              storageKey="kafka.voters"
+              columns={VOTER_COLUMNS}
+              data={quorum.voters}
+              rowKey={(v) => v.id}
+              height={{ maxRows: 8 }}
+              empty={<EmptyState kind="empty" title="No voter was found" description="The quorum reported no voter." />}
+            />
+          </Stack>
         ) : (
           <Notice tone="info" title="The controller quorum is not shown">
             {quorum.reason ?? 'This cluster does not expose its quorum.'} It is not read as healthy; it is unknown.

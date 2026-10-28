@@ -37,7 +37,16 @@ describe('the brokers', () => {
         HttpResponse.json({
           mode: 'KRaft',
           brokers: BROKERS,
-          quorum: { available: true, leader: '1', voters: 3 },
+          quorum: {
+            available: true,
+            leader: '1',
+            majority: true,
+            voters: [
+              { id: '1', lag: 0, caughtUp: true },
+              { id: '2', lag: 5, caughtUp: true },
+              { id: '3', caughtUp: false },
+            ],
+          },
         }),
       ),
     );
@@ -47,7 +56,36 @@ describe('the brokers', () => {
     expect(within(table).getByText('Not reached')).toBeInTheDocument();
     expect(await screen.findByText('KRaft')).toBeInTheDocument();
     expect(screen.getByText('Broker 1', { selector: 'dd, dd *' })).toBeInTheDocument();
-    expect(screen.getByText('3')).toBeInTheDocument();
+    expect(screen.getByText('The quorum has a majority')).toBeInTheDocument();
+    expect(screen.getByText('2 of 3 voters are caught up, a majority.')).toBeInTheDocument();
+    const voters = screen.getByRole('table', { name: 'Controller voters' });
+    expect(within(voters).getByText('Lagging')).toBeInTheDocument();
+    expect(within(voters).getByText('Unknown')).toBeInTheDocument();
+  });
+
+  it('states that the quorum has no majority as the critical state', async () => {
+    mockKafkaCluster();
+    server.use(
+      http.get('*/api/v1/clusters/k1/kafka/brokers', () =>
+        HttpResponse.json({
+          mode: 'KRaft',
+          brokers: BROKERS.slice(0, 1),
+          quorum: {
+            available: true,
+            leader: '1',
+            majority: false,
+            voters: [
+              { id: '1', lag: 0, caughtUp: true },
+              { id: '2', lag: 900, caughtUp: false },
+              { id: '3', caughtUp: false },
+            ],
+          },
+        }),
+      ),
+    );
+    renderAppAt('/clusters/k1/kafka/brokers');
+    expect(await screen.findByText('The quorum has no majority')).toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent('Only 1 of 3 voters are caught up, which is not a majority.');
   });
 
   it('says the quorum is unknown on a ZooKeeper cluster, never healthy', async () => {
@@ -57,7 +95,7 @@ describe('the brokers', () => {
         HttpResponse.json({
           mode: 'ZooKeeper',
           brokers: BROKERS.slice(0, 1),
-          quorum: { available: false, reason: 'The cluster runs ZooKeeper.' },
+          quorum: { available: false, reason: 'The cluster runs ZooKeeper.', voters: [], majority: false },
         }),
       ),
     );
