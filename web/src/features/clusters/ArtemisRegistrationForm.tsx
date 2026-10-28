@@ -1,30 +1,28 @@
 import { useEffect, useState } from 'react';
 import { flushSync } from 'react-dom';
-import { ActionIcon, Button, Collapse, PasswordInput, Select, Stack, Switch, Text, TextInput } from '@mantine/core';
+import { ActionIcon, Button, Collapse, PasswordInput, Stack, Switch, Text, TextInput } from '@mantine/core';
 import { useForm } from '@mantine/form';
 
 import { pairProblems, useRevalidatePairs } from '../../ui/formPairs.ts';
 import { IconChevronRight, IconX } from '@tabler/icons-react';
-import { Link, useNavigate } from '@tanstack/react-router';
+import { useNavigate } from '@tanstack/react-router';
 
 import {
   alreadyRegistered,
   useCheckConnection,
-  useEnvironments,
   useRegisterCluster,
   type AdoptionPreviewView,
-  type ProblemDetail,
   type RegisterClusterRequest,
   type TopologyView,
 } from './api.ts';
 import { useSlot } from '../../kernel/slots.ts';
-import { ErrorState } from '../../ui/ErrorState.tsx';
 import { FieldRow } from '../../ui/FieldRow.tsx';
 import { focusFirstInvalid } from '../../ui/formErrors.ts';
 import { Notice } from '../../ui/Notice.tsx';
-import linkClasses from '../../ui/InlineLink.module.css';
 import { notify, type ActionVerb } from '../../ui/notify.ts';
 import { CapabilityLedger } from './CapabilityLedger.tsx';
+import { ClusterIdentityFields } from './ClusterIdentityFields.tsx';
+import { RegistrationFailure } from './RegistrationFailure.tsx';
 import classes from './Clusters.module.css';
 import { adoptionCountsWords, defaultPattern } from './connectionWords.ts';
 import { NodeProbeTable } from './NodeProbeTable.tsx';
@@ -39,6 +37,7 @@ interface Fields {
   seed: string;
   moreSeeds: SeedRow[];
   name: string;
+  description: string;
   username: string;
   password: string;
   coreUsername: string;
@@ -53,6 +52,7 @@ const EMPTY: Fields = {
   seed: '',
   moreSeeds: [],
   name: '',
+  description: '',
   username: '',
   password: '',
   coreUsername: '',
@@ -62,11 +62,12 @@ const EMPTY: Fields = {
   pattern: '',
 };
 
-/** What is wrong with one management URL as typed, or null. */
+/** What is wrong with the management URLs typed in one box, or null: the first token that cannot be used. */
 function seedProblem(value: string): string | null {
-  const [first] = normaliseSeeds(value);
-  if (first?.url === null) return `Couldn't make sense of: ${first.original}`;
-  if (first && new URL(first.url).username) return 'Put the account in the Management account fields, not in the URL.';
+  for (const seed of normaliseSeeds(value)) {
+    if (seed.url === null) return `Couldn't make sense of: ${seed.original}`;
+    if (new URL(seed.url).username) return 'Put the account in the Management account fields, not in the URL.';
+  }
   return null;
 }
 
@@ -91,59 +92,24 @@ function blockedReason(
 function CheckOutcome({
   check,
   register,
-  onLeave,
 }: Readonly<{
   check: ReturnType<typeof useCheckConnection>;
   register: ReturnType<typeof useRegisterCluster>;
-  onLeave?: () => void;
 }>) {
-  const nodes = check.data?.nodes.length ?? 0;
+  const preview = check.data?.system === 'artemis' ? check.data : null;
+  const nodes = preview?.nodes.length ?? 0;
   return (
     <div aria-live="polite" className={classes.form}>
-      {check.isSuccess ? (
+      {preview ? (
         <Text size="sm" c="dimmed">
           {`Connected. Found ${nodes} node${nodes === 1 ? '' : 's'}.`}
         </Text>
       ) : null}
-      {check.isSuccess ? <NodeProbeTable nodes={check.data.nodes} label="Nodes found by the check" /> : null}
-      {check.isSuccess ? <UntestedVersions topology={check.data.topology} /> : null}
-      {check.isError ? <Failure error={check.error} onLeave={onLeave} /> : null}
-      {register.isError ? <Failure error={register.error} onLeave={onLeave} /> : null}
+      {preview ? <NodeProbeTable nodes={preview.nodes} label="Nodes found by the check" /> : null}
+      {preview ? <UntestedVersions topology={preview.topology} /> : null}
+      {check.isError ? <RegistrationFailure error={check.error} /> : null}
+      {register.isError ? <RegistrationFailure error={register.error} /> : null}
     </div>
-  );
-}
-
-/** A failed check or registration: brokers that are registered already get their own notice. */
-function Failure({ error, onLeave }: Readonly<{ error: unknown; onLeave?: () => void }>) {
-  const registered = alreadyRegistered(error);
-  return registered ? (
-    <AlreadyRegistered problem={registered} onLeave={onLeave} />
-  ) : (
-    <ErrorState variant="inline" error={error} />
-  );
-}
-
-/**
- * The brokers already belong to a registered cluster (ADR-0167). Registering them again would show the
- * same brokers twice, so the form says which cluster has them and links to it; when the operator may not
- * see that cluster, the server leaves it unnamed and there is no link.
- */
-function AlreadyRegistered({ problem, onLeave }: Readonly<{ problem: ProblemDetail; onLeave?: () => void }>) {
-  const { existingClusterId: id, existingClusterName: name } = problem;
-  return (
-    <Notice
-      title={problem.title ?? 'These brokers are already registered'}
-      tone="danger"
-      action={
-        id ? (
-          <Link to={`/clusters/${id}`} className={linkClasses.link} onClick={onLeave}>
-            {`Open ${name ?? 'that cluster'}`}
-          </Link>
-        ) : undefined
-      }
-    >
-      {problem.detail}
-    </Notice>
   );
 }
 
@@ -184,7 +150,7 @@ function AdoptionChoice({
   );
 }
 
-/** The seeds typed so far, normalised, with the ones that do not parse. */
+/** Every management URL typed, normalised, and what is wrong with the boxes that hold them. */
 function seedsOf(f: Fields): { urls: string[]; problems: Record<string, string> } {
   const urls: string[] = [];
   const problems: Record<string, string> = {};
@@ -192,8 +158,9 @@ function seedsOf(f: Fields): { urls: string[]; problems: Record<string, string> 
     const path = i === 0 ? 'seed' : `moreSeeds.${i - 1}.url`;
     const issue = seedProblem(value);
     if (issue) problems[path] = issue;
-    const [first] = normaliseSeeds(value);
-    if (first?.url) urls.push(first.url);
+    for (const seed of normaliseSeeds(value)) {
+      if (seed.url && !urls.includes(seed.url)) urls.push(seed.url);
+    }
   });
   if (urls.length === 0 && !problems.seed) problems.seed = 'Add at least one management URL.';
   return { urls, problems };
@@ -240,25 +207,16 @@ function problemsOf(values: Fields): Record<string, string> {
 }
 
 /**
- * The registration form. Rendered inline on the empty state, in a modal after. `onDone` is called when
- * the form has nothing left to do: a cluster was registered, or the operator went to the cluster that
- * already holds the brokers.
+ * The Artemis registration form: management URLs, accounts, the connection check and registering. The page
+ * around it is the one for every system.
  */
-export function RegisterClusterForm({
-  onDone,
-  onDirtyChange,
-}: Readonly<{
-  onDone?: () => void;
-  /** Told whether the form holds input, so a dialog around it can keep that input from a stray click. */
-  onDirtyChange?: (dirty: boolean) => void;
-}>) {
+export function ArtemisRegistrationForm() {
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [checkedInputs, setCheckedInputs] = useState<string | null>(null);
   const [adoptChoice, setAdoptChoice] = useState<boolean | null>(null);
 
   const check = useCheckConnection();
   const register = useRegisterCluster();
-  const environments = useEnvironments();
   const navigate = useNavigate();
 
   const form = useForm<Fields>({
@@ -268,13 +226,11 @@ export function RegisterClusterForm({
   });
   const f = form.values;
   useRevalidatePairs(form, PAIRS);
-  const dirty = form.isDirty();
-  useEffect(() => onDirtyChange?.(dirty), [dirty, onDirtyChange]);
 
   const { urls: seedList } = seedsOf(f);
   const rewritten = [f.seed, ...f.moreSeeds.map((row) => row.url)]
-    .map((value) => normaliseSeeds(value)[0])
-    .filter((s) => s?.url && s.url !== s.original);
+    .flatMap((value) => normaliseSeeds(value))
+    .filter((s) => s.url && s.url !== s.original);
   const pattern = f.pattern || defaultPattern(seedList[0]);
 
   // What is wrong, whether or not the field was touched: that decides if the form can be sent. A message
@@ -299,20 +255,21 @@ export function RegisterClusterForm({
   // Registering is gated on a passing check of these exact inputs. The check opens a real Core
   // session per node, so it is the only thing that can catch a Core account the broker refuses —
   // the failure that otherwise surfaces after registration, where it reads as a broken cluster.
-  const checkPassed = check.isSuccess && checkedThis;
+  const checkPassed = check.isSuccess && checkedThis && check.data.system === 'artemis';
   const afterProbe = useSlot('cluster.registration.afterProbe');
   // Brokers a registered cluster holds stay refused whichever call found it: the check, or a registration
   // that lost a race with another one. Only a new check of changed details can clear it.
   const registeredAlready = checkedThis && Boolean(alreadyRegistered(check.error) ?? alreadyRegistered(register.error));
   const registerBlockedReason = blockedReason(valid, check, checkPassed, stale, registeredAlready);
 
-  const adoption = checkPassed ? (check.data.adoption ?? null) : null;
+  const preview = check.data?.system === 'artemis' ? check.data : null;
+  const adoption = checkPassed ? (preview?.adoption ?? null) : null;
   const adopt = adoption ? (adoptChoice ?? adoption.disagreements.length === 0) : false;
 
   // Open the advanced fields on their own once a check reveals they'd matter —
   // the operator never has to know they exist until the ledger says so.
   useEffect(() => {
-    if (!check.data) return;
+    if (check.data?.system !== 'artemis') return;
     // A refusal, not an unproven capability: at check time no write has been
     // attempted, so messageIo is legitimately UNKNOWN and opening the advanced
     // fields for it would fire on every single registration.
@@ -338,18 +295,21 @@ export function RegisterClusterForm({
 
   function payload(): RegisterClusterRequest {
     return {
-      seedUrls: seedList,
+      system: 'artemis',
       name: f.name || undefined,
-      credentials: f.username ? { username: f.username, password: f.password } : undefined,
-      coreCredentials: f.coreUsername ? { username: f.coreUsername, password: f.corePassword } : undefined,
-      tlsBundle: f.tlsBundle || undefined,
-      managementUrlPattern: pattern || undefined,
+      description: f.description || undefined,
       environmentId: f.environmentId || undefined,
       adopt,
+      connection: {
+        system: 'artemis',
+        seedUrls: seedList,
+        credentials: f.username ? { username: f.username, password: f.password } : undefined,
+        coreCredentials: f.coreUsername ? { username: f.coreUsername, password: f.corePassword } : undefined,
+        tlsBundle: f.tlsBundle || undefined,
+        managementUrlPattern: pattern || undefined,
+      },
     };
   }
-
-  const environmentOptions = (environments.data ?? []).map((e) => ({ value: e.id, label: e.name }));
 
   return (
     <div className={classes.register}>
@@ -394,12 +354,6 @@ export function RegisterClusterForm({
             ))}
           </Text>
         ) : null}
-        <TextInput
-          label="Name"
-          description="Optional. Defaults to the first broker's host."
-          {...form.getInputProps('name')}
-        />
-
         <Text size="sm" fw={600}>
           Management account
         </Text>
@@ -419,19 +373,6 @@ export function RegisterClusterForm({
           />
           <PasswordInput label="Core password" autoComplete="off" {...form.getInputProps('corePassword')} />
         </FieldRow>
-
-        <Select
-          label="Environment"
-          description={
-            environmentOptions.length > 0
-              ? 'Optional. Groups the cluster with others.'
-              : 'Optional. There are no environments yet; create one under Administration.'
-          }
-          data={environmentOptions}
-          disabled={environmentOptions.length === 0}
-          clearable
-          {...form.getInputProps('environmentId')}
-        />
 
         <Button
           variant="subtle"
@@ -462,17 +403,22 @@ export function RegisterClusterForm({
           </div>
         </Collapse>
 
-        <CheckOutcome check={check} register={register} onLeave={onDone} />
+        <CheckOutcome check={check} register={register} />
 
-        {check.isSuccess ? <CapabilityLedger capabilities={check.data.capabilities} /> : null}
+        {preview ? <CapabilityLedger capabilities={preview.capabilities} /> : null}
 
         {adoption ? <AdoptionChoice adoption={adoption} adopt={adopt} onChange={setAdoptChoice} /> : null}
 
         {/* What the enabled features make of the check, such as the configuration it
             recommends; each reads its own part of the check's contributions. */}
-        {check.isSuccess
-          ? afterProbe.map(({ id, Component }) => <Component key={id} contributions={check.data.contributions} />)
+        {preview
+          ? afterProbe.map(({ id, Component }) => <Component key={id} contributions={preview.contributions} />)
           : null}
+
+        <ClusterIdentityFields
+          input={(path) => form.getInputProps(path)}
+          nameHint="Optional. Defaults to the first broker's host."
+        />
 
         <div className={`${classes.actions} ${classes.stickyActions}`}>
           {registerBlockedReason ? (
@@ -491,7 +437,6 @@ export function RegisterClusterForm({
                 onSuccess: (detail) => {
                   notify.succeeded({ action: REGISTER, subject: `cluster ${detail.name}` });
                   form.reset();
-                  onDone?.();
                   void navigate({ to: `/clusters/${detail.id}/topology` });
                 },
               })

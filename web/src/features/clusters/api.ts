@@ -19,19 +19,109 @@ export type LogicalNodeView = Schemas['LogicalNodeView'];
 export type NodeEndpointView = Schemas['NodeEndpointView'];
 export type ProblemDetail = Schemas['ProblemDetail'];
 export type VersionGateView = Schemas['VersionGateView'];
-export type RegisterClusterRequest = Schemas['RegisterClusterRequest'];
 export type RegisterPreview = Schemas['RegisterPreview'];
 export type NodeProbeView = Schemas['NodeProbeView'];
 export type AdoptionPreviewView = Schemas['AdoptionPreviewView'];
-export type ConnectionCheck = Schemas['ConnectionCheck'];
 export type ConnectionView = Schemas['ConnectionView'];
 export type ClusterConnectionView = Schemas['ClusterConnectionView'];
 /** The edit: `core: null` clears the Core account, which the generated type cannot say. */
-export type UpdateClusterRequest = Omit<Schemas['UpdateClusterRequest'], 'core'> & {
-  core?: Schemas['AccountUpdate'] | null;
-};
 export type TopologyView = Schemas['TopologyView'];
 export type EstateSubscription = Schemas['EstateSubscriptionView'];
+
+// The registration contract of design D2. The types up to `UpdateClusterRequest` are hand-written until the
+// generated schema carries them; replace them with `Schemas[...]` then.
+
+/** A broker system Rahdar loads, from `GET /systems`. `connection` says which form the system's connection takes. */
+export interface LoadedSystem {
+  id: string;
+  name: string;
+  supportedVersions: string[];
+  connection: 'jolokia-seeds' | 'bootstrap';
+}
+
+export type SecurityProtocol = 'PLAINTEXT' | 'SSL' | 'SASL_PLAINTEXT' | 'SASL_SSL';
+export type SaslMechanism = 'PLAIN' | 'SCRAM-SHA-256' | 'SCRAM-SHA-512' | 'OAUTHBEARER';
+
+export interface ArtemisConnection {
+  system: 'artemis';
+  seedUrls: string[];
+  credentials?: Schemas['Credentials'];
+  coreCredentials?: Schemas['Credentials'];
+  tlsBundle?: string;
+  managementUrlPattern?: string;
+}
+
+export interface KafkaConnection {
+  system: 'kafka';
+  bootstrapServers: string[];
+  securityProtocol: SecurityProtocol;
+  saslMechanism?: SaslMechanism | null;
+  /** Read back, a connection holds the username only; a secret is never returned. */
+  credentials?: { username: string; password?: string } | { token: string } | null;
+  tlsBundle?: string | null;
+  clientId?: string | null;
+}
+
+export type ConnectionInput = ArtemisConnection | KafkaConnection;
+
+export interface RegisterClusterRequest {
+  system: string;
+  name?: string;
+  description?: string;
+  environmentId?: string;
+  adopt?: boolean;
+  connection: ConnectionInput;
+}
+
+export type CauseKind = 'DNS' | 'REFUSED' | 'TIMEOUT' | 'TLS' | 'AUTHENTICATION';
+
+export interface KafkaNodeCheck {
+  id: string;
+  address: string;
+  functions: string[];
+  outcome: 'OK' | 'UNREACHABLE';
+  cause: CauseKind | null;
+  message: string | null;
+}
+
+/** The dry run of a Kafka registration or edit. */
+export interface KafkaConnectionCheck {
+  system: 'kafka';
+  version: { text: string; mode: 'KRaft' | 'ZooKeeper'; exact: boolean };
+  supported: boolean;
+  clusterId: string | null;
+  alreadyRegistered: { id: string; name: string } | null;
+  nodes: KafkaNodeCheck[];
+  quorum: { available: true; leader: string; voters: number } | { available: false; reason: string };
+  access: { capability: string; status: CapabilityStatus; reason: string | null }[];
+  failure: {
+    cause: CauseKind | 'AUTHORIZATION' | 'UNSUPPORTED_VERSION';
+    message: string;
+    next: string;
+  } | null;
+}
+
+/** The dry run of an Artemis registration: the probe, as before. */
+export type ArtemisConnectionCheck = RegisterPreview & { system: 'artemis' };
+
+export type RegistrationCheck = ArtemisConnectionCheck | KafkaConnectionCheck;
+
+/** The edit of an Artemis cluster: `core: null` clears the Core account, which the generated type cannot say. */
+export type ArtemisUpdateRequest = Omit<Schemas['UpdateClusterRequest'], 'core'> & {
+  core?: Schemas['AccountUpdate'] | null;
+};
+
+/** The edit of a Kafka cluster: its whole connection, a secret left out keeping the stored one. */
+export interface KafkaUpdateRequest {
+  name?: string;
+  description?: string;
+  connection: KafkaConnection;
+}
+
+export type UpdateClusterRequest = ArtemisUpdateRequest | KafkaUpdateRequest;
+
+/** The dry run of an Artemis edit, node by node. */
+export type ConnectionCheck = Schemas['ConnectionCheck'];
 
 /** String enums the backend serialises as bare strings; narrowed here for the UI. */
 export type CapabilityStatus = 'AVAILABLE' | 'UNAVAILABLE' | 'UNKNOWN';
@@ -104,8 +194,13 @@ export function useHealth(id: string): UseQueryResult<HealthView, ApiError> {
   });
 }
 
+/** The broker systems Rahdar loads, for the registration page's choice. */
+export function useSystems(): UseQueryResult<LoadedSystem[], ApiError> {
+  return useQuery({ queryKey: ['systems'], queryFn: () => request<LoadedSystem[]>('/systems'), staleTime: Infinity });
+}
+
 export function useCheckConnection() {
-  return useMutation<RegisterPreview, ApiError, RegisterClusterRequest>({
+  return useMutation<RegistrationCheck, ApiError, RegisterClusterRequest>({
     mutationFn: (body) =>
       request('/clusters?dryRun=true', {
         method: 'POST',
@@ -155,7 +250,15 @@ export function useDeleteCluster() {
 
 /** Checks an edited connection node by node; nothing is saved. */
 export function useCheckConnectionEdit(clusterId: string) {
-  return useMutation<ConnectionCheck, ApiError, UpdateClusterRequest>({
+  return useMutation<ConnectionCheck, ApiError, ArtemisUpdateRequest>({
+    mutationFn: (body) =>
+      request(`/clusters/${clusterId}?dryRun=true`, { method: 'PATCH', body: JSON.stringify(body) }),
+  });
+}
+
+/** Checks an edited Kafka connection broker by broker; nothing is saved. */
+export function useCheckKafkaConnectionEdit(clusterId: string) {
+  return useMutation<KafkaConnectionCheck, ApiError, KafkaUpdateRequest>({
     mutationFn: (body) =>
       request(`/clusters/${clusterId}?dryRun=true`, { method: 'PATCH', body: JSON.stringify(body) }),
   });

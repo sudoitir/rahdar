@@ -28,10 +28,11 @@ vi.mock('@tanstack/react-router', async (importOriginal) => ({
   ),
 }));
 
-const { RegisterClusterForm } = await import('./RegisterCluster.tsx');
+const { ArtemisRegistrationForm } = await import('./ArtemisRegistrationForm.tsx');
 
 function preview() {
   return {
+    system: 'artemis',
     capabilities: {
       managementRead: { status: 'AVAILABLE', reason: 'ok', brokerXmlSnippet: null },
       managementWrite: { status: 'AVAILABLE', reason: 'ok', brokerXmlSnippet: null },
@@ -154,11 +155,11 @@ beforeEach(() =>
 
 afterEach(() => act(() => notifications.clean()));
 
-describe('RegisterClusterForm', () => {
+describe('ArtemisRegistrationForm', () => {
   it('says what the check found once it passes', async () => {
     server.use(http.post('*/api/v1/clusters', () => HttpResponse.json(preview())));
     const user = userEvent.setup();
-    renderWithProviders(<RegisterClusterForm />);
+    renderWithProviders(<ArtemisRegistrationForm />);
 
     await user.type(screen.getByLabelText(/Broker management URL/), 'broker-1');
     await user.click(screen.getByRole('button', { name: 'Check connection' }));
@@ -167,7 +168,7 @@ describe('RegisterClusterForm', () => {
   });
 
   it('tells the operator that one management URL is enough', () => {
-    renderWithProviders(<RegisterClusterForm />);
+    renderWithProviders(<ArtemisRegistrationForm />);
     expect(screen.getByLabelText(/Broker management URL/)).toHaveAccessibleDescription(
       /^One is enough: Rahdar finds the rest of the cluster from it\./,
     );
@@ -176,7 +177,7 @@ describe('RegisterClusterForm', () => {
   it('asks for a new check once the URLs are edited after a check', async () => {
     server.use(http.post('*/api/v1/clusters', () => HttpResponse.json(preview())));
     const user = userEvent.setup();
-    renderWithProviders(<RegisterClusterForm />);
+    renderWithProviders(<ArtemisRegistrationForm />);
 
     await user.type(screen.getByLabelText(/Broker management URL/), 'broker-1');
     await user.click(screen.getByRole('button', { name: 'Check connection' }));
@@ -194,7 +195,7 @@ describe('RegisterClusterForm', () => {
     untested.topology.nodes[0].endpoints[0].versionSupport = 'NEWER_THAN_TESTED';
     server.use(http.post('*/api/v1/clusters', () => HttpResponse.json(untested)));
     const user = userEvent.setup();
-    renderWithProviders(<RegisterClusterForm />);
+    renderWithProviders(<ArtemisRegistrationForm />);
 
     await user.type(screen.getByLabelText(/Broker management URL/), 'broker-1');
     await user.click(screen.getByRole('button', { name: 'Check connection' }));
@@ -221,7 +222,7 @@ describe('RegisterClusterForm', () => {
       ),
     );
     const user = userEvent.setup();
-    renderWithProviders(<RegisterClusterForm />);
+    renderWithProviders(<ArtemisRegistrationForm />);
 
     await user.type(screen.getByLabelText(/Broker management URL/), 'broker-1');
     await user.click(screen.getByRole('button', { name: 'Check connection' }));
@@ -234,9 +235,8 @@ describe('RegisterClusterForm', () => {
 
   it('says which cluster already has the brokers, links to it and will not register them again', async () => {
     server.use(http.post('*/api/v1/clusters', () => alreadyRegistered()));
-    const done = vi.fn();
     const user = userEvent.setup();
-    renderWithProviders(<RegisterClusterForm onDone={done} />);
+    renderWithProviders(<ArtemisRegistrationForm />);
 
     await user.type(screen.getByLabelText(/Broker management URL/), 'broker-1');
     await user.click(screen.getByRole('button', { name: 'Check connection' }));
@@ -252,10 +252,6 @@ describe('RegisterClusterForm', () => {
     expect(
       screen.getByText('These brokers are registered already, so there is nothing to register.'),
     ).toBeInTheDocument();
-
-    // In the dialog, following the link closes it.
-    await user.click(open);
-    expect(done).toHaveBeenCalled();
   });
 
   it('keeps registration refused when another registration of the same brokers won the race', async () => {
@@ -265,7 +261,7 @@ describe('RegisterClusterForm', () => {
       ),
     );
     const user = userEvent.setup();
-    renderWithProviders(<RegisterClusterForm />);
+    renderWithProviders(<ArtemisRegistrationForm />);
 
     await user.type(screen.getByLabelText(/Broker management URL/), 'broker-1');
     await user.click(screen.getByRole('button', { name: 'Check connection' }));
@@ -280,7 +276,7 @@ describe('RegisterClusterForm', () => {
   it('names no cluster the operator cannot see', async () => {
     server.use(http.post('*/api/v1/clusters', () => alreadyRegistered(false)));
     const user = userEvent.setup();
-    renderWithProviders(<RegisterClusterForm />);
+    renderWithProviders(<ArtemisRegistrationForm />);
 
     await user.type(screen.getByLabelText(/Broker management URL/), 'broker-1');
     await user.click(screen.getByRole('button', { name: 'Check connection' }));
@@ -303,17 +299,17 @@ describe('RegisterClusterForm', () => {
     });
     server.use(http.post('*/api/v1/clusters', () => HttpResponse.json(gated)));
     const user = userEvent.setup();
-    renderWithProviders(<RegisterClusterForm />);
+    renderWithProviders(<ArtemisRegistrationForm />);
 
     await user.type(screen.getByLabelText(/Broker management URL/), 'broker-1');
     await user.click(screen.getByRole('button', { name: 'Check connection' }));
 
-    expect(await screen.findByRole('button', { name: /Doing X\s*Needs Artemis 2\.60\.0/ })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: /Doing X\s*Needs version 2\.60\.0/ })).toBeInTheDocument();
   });
 
   it('will not register until the connection has been checked, and says so', async () => {
     const user = userEvent.setup();
-    renderWithProviders(<RegisterClusterForm />);
+    renderWithProviders(<ArtemisRegistrationForm />);
 
     await user.type(screen.getByLabelText(/Broker management URL/), 'broker-1');
 
@@ -325,7 +321,7 @@ describe('RegisterClusterForm', () => {
   it('enables registration once the check passes', async () => {
     server.use(http.post('*/api/v1/clusters', () => HttpResponse.json(preview())));
     const user = userEvent.setup();
-    renderWithProviders(<RegisterClusterForm />);
+    renderWithProviders(<ArtemisRegistrationForm />);
 
     await user.type(screen.getByLabelText(/Broker management URL/), 'broker-1');
     await user.click(screen.getByRole('button', { name: 'Check connection' }));
@@ -337,7 +333,7 @@ describe('RegisterClusterForm', () => {
   it('re-blocks registration when a credential changes after a passing check', async () => {
     server.use(http.post('*/api/v1/clusters', () => HttpResponse.json(preview())));
     const user = userEvent.setup();
-    renderWithProviders(<RegisterClusterForm />);
+    renderWithProviders(<ArtemisRegistrationForm />);
 
     await user.type(screen.getByLabelText(/Broker management URL/), 'broker-1');
     await user.click(screen.getByRole('button', { name: 'Check connection' }));
@@ -363,7 +359,7 @@ describe('RegisterClusterForm', () => {
       }),
     );
     const user = userEvent.setup();
-    renderWithProviders(<RegisterClusterForm />);
+    renderWithProviders(<ArtemisRegistrationForm />);
 
     const check = screen.getByRole('button', { name: 'Check connection' });
     expect(check).toBeEnabled();
@@ -377,7 +373,7 @@ describe('RegisterClusterForm', () => {
 
   it('focuses the first invalid field of several, in page order', async () => {
     const user = userEvent.setup();
-    renderWithProviders(<RegisterClusterForm />);
+    renderWithProviders(<ArtemisRegistrationForm />);
 
     await user.type(screen.getByLabelText(/Broker management URL/), 'broker-1');
     await user.type(screen.getByLabelText('Username'), 'artemis');
@@ -389,7 +385,7 @@ describe('RegisterClusterForm', () => {
 
   it('clears the message on the username as soon as the password is filled in, with no retyping', async () => {
     const user = userEvent.setup();
-    renderWithProviders(<RegisterClusterForm />);
+    renderWithProviders(<ArtemisRegistrationForm />);
 
     await user.type(screen.getByLabelText('Username'), 'artemis');
     await user.tab();
@@ -403,7 +399,7 @@ describe('RegisterClusterForm', () => {
 
   it('moves the message to the member that is missing when one is cleared again', async () => {
     const user = userEvent.setup();
-    renderWithProviders(<RegisterClusterForm />);
+    renderWithProviders(<ArtemisRegistrationForm />);
 
     await user.type(screen.getByLabelText('Username'), 'artemis');
     await user.type(screen.getByLabelText('Password'), 'secret');
@@ -427,7 +423,7 @@ describe('RegisterClusterForm', () => {
     renderWithProviders(
       <>
         <Notifications />
-        <RegisterClusterForm />
+        <ArtemisRegistrationForm />
       </>,
     );
 
@@ -443,7 +439,7 @@ describe('RegisterClusterForm', () => {
   it('lists each node with what the management and the Core account each did there', async () => {
     server.use(http.post('*/api/v1/clusters', () => HttpResponse.json(preview())));
     const user = userEvent.setup();
-    renderWithProviders(<RegisterClusterForm />);
+    renderWithProviders(<ArtemisRegistrationForm />);
 
     await user.type(screen.getByLabelText(/Broker management URL/), 'broker-1');
     await user.click(screen.getByRole('button', { name: 'Check connection' }));
@@ -467,7 +463,7 @@ describe('RegisterClusterForm', () => {
       }),
     );
     const user = userEvent.setup();
-    renderWithProviders(<RegisterClusterForm />);
+    renderWithProviders(<ArtemisRegistrationForm />);
 
     await user.type(screen.getByLabelText(/Broker management URL/), 'broker-1');
     await user.click(screen.getByRole('button', { name: /Advanced/ }));
@@ -475,14 +471,50 @@ describe('RegisterClusterForm', () => {
     await user.click(screen.getByRole('button', { name: 'Check connection' }));
     await screen.findByText(/^Connected\./);
 
-    expect(body.seedUrls).toEqual(['http://broker-1:8161/console/jolokia']);
-    expect(body.managementUrlPattern).toBe('http://{host}:8161/console/jolokia');
+    expect(body.system).toBe('artemis');
+    expect(body.connection).toMatchObject({
+      system: 'artemis',
+      seedUrls: ['http://broker-1:8161/console/jolokia'],
+      managementUrlPattern: 'http://{host}:8161/console/jolokia',
+    });
+  });
+
+  it('keeps every host typed in one box, shows what each became and sends them all', async () => {
+    let body: { connection: { seedUrls: string[] } } | undefined;
+    server.use(
+      http.post('*/api/v1/clusters', async ({ request }) => {
+        body = (await request.json()) as typeof body;
+        return HttpResponse.json(preview());
+      }),
+    );
+    const user = userEvent.setup();
+    renderWithProviders(<ArtemisRegistrationForm />);
+
+    await user.type(screen.getByLabelText(/Broker management URL/), 'broker-1, broker-2');
+    expect(screen.getByText(/http:\/\/broker-2:8161\/console\/jolokia/)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Check connection' }));
+    await screen.findByText(/^Connected\./);
+
+    expect(body?.connection.seedUrls).toEqual([
+      'http://broker-1:8161/console/jolokia',
+      'http://broker-2:8161/console/jolokia',
+    ]);
+  });
+
+  it('refuses the second host of a box when it cannot be read, not only the first', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<ArtemisRegistrationForm />);
+
+    await user.type(screen.getByLabelText(/Broker management URL/), 'broker-1 http://');
+    await user.click(screen.getByRole('button', { name: 'Check connection' }));
+
+    expect(await screen.findByText(/Couldn't make sense of: http:\/\//)).toBeInTheDocument();
   });
 
   it('offers to adopt the running configuration, on when the nodes agree, with the counts', async () => {
     server.use(http.post('*/api/v1/clusters', () => HttpResponse.json(preview())));
     const user = userEvent.setup();
-    renderWithProviders(<RegisterClusterForm />);
+    renderWithProviders(<ArtemisRegistrationForm />);
 
     await user.type(screen.getByLabelText(/Broker management URL/), 'broker-1');
     await user.click(screen.getByRole('button', { name: 'Check connection' }));
@@ -497,7 +529,7 @@ describe('RegisterClusterForm', () => {
     disagreeing.adoption.disagreements = ["Address settings for orders differ between a and b; a's were kept."];
     server.use(http.post('*/api/v1/clusters', () => HttpResponse.json(disagreeing)));
     const user = userEvent.setup();
-    renderWithProviders(<RegisterClusterForm />);
+    renderWithProviders(<ArtemisRegistrationForm />);
 
     await user.type(screen.getByLabelText(/Broker management URL/), 'broker-1');
     await user.click(screen.getByRole('button', { name: 'Check connection' }));
@@ -517,7 +549,7 @@ describe('RegisterClusterForm', () => {
       }),
     );
     const user = userEvent.setup();
-    renderWithProviders(<RegisterClusterForm />);
+    renderWithProviders(<ArtemisRegistrationForm />);
 
     await user.type(screen.getByLabelText(/Broker management URL/), 'broker-1');
     await user.click(screen.getByRole('button', { name: 'Check connection' }));
@@ -540,7 +572,7 @@ describe('RegisterClusterForm', () => {
       }),
     );
     const user = userEvent.setup();
-    renderWithProviders(<RegisterClusterForm />);
+    renderWithProviders(<ArtemisRegistrationForm />);
 
     await user.type(screen.getByLabelText(/Broker management URL/), 'broker-1');
     await user.click(screen.getByRole('button', { name: 'Check connection' }));
@@ -560,7 +592,7 @@ describe('RegisterClusterForm', () => {
       }),
     );
     const user = userEvent.setup();
-    renderWithProviders(<RegisterClusterForm />);
+    renderWithProviders(<ArtemisRegistrationForm />);
 
     await user.type(screen.getByLabelText(/Broker management URL/), 'http://admin:secret@broker-1:8161');
     await user.click(screen.getByRole('button', { name: 'Check connection' }));
@@ -573,7 +605,7 @@ describe('RegisterClusterForm', () => {
 
   it('refuses a pattern that could name another host', async () => {
     const user = userEvent.setup();
-    renderWithProviders(<RegisterClusterForm />);
+    renderWithProviders(<ArtemisRegistrationForm />);
 
     await user.type(screen.getByLabelText(/Broker management URL/), 'broker-1');
     await user.click(screen.getByRole('button', { name: /Advanced/ }));
@@ -587,7 +619,7 @@ describe('RegisterClusterForm', () => {
 
   it('adds and removes another seed', async () => {
     const user = userEvent.setup();
-    renderWithProviders(<RegisterClusterForm />);
+    renderWithProviders(<ArtemisRegistrationForm />);
 
     await user.click(screen.getByRole('button', { name: 'Add another seed' }));
     expect(screen.getByLabelText(/Another management URL/)).toBeInTheDocument();

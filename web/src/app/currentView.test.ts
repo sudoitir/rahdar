@@ -4,6 +4,11 @@ import { FEATURES } from './features.ts';
 import { matchView, sameViewOn } from '../kernel/nav/currentView.ts';
 
 describe('matchView (ADR-0109)', () => {
+  it('does not take the registration page for a cluster called new', () => {
+    expect(matchView('/clusters/new', FEATURES)).toBeNull();
+    expect(matchView('/clusters/newer/topology', FEATURES)?.clusterId).toBe('newer');
+  });
+
   it('names the view an address is under, by the longest navigation path', () => {
     const view = matchView('/clusters/c1/subscriptions/orders/messages', FEATURES);
     expect(view?.clusterId).toBe('c1');

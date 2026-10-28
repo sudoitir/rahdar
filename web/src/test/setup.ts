@@ -6,7 +6,7 @@ import { setupServer } from 'msw/node';
 
 import { accessHandler } from './access.ts';
 import { manifestHandler } from './manifest.ts';
-import { ARTEMIS_KINDS } from './wire.ts';
+import { ARTEMIS_KINDS, LOADED_SYSTEMS } from './wire.ts';
 
 const AVAILABLE = { status: 'AVAILABLE', reason: 'ok', brokerXmlSnippet: null };
 
@@ -51,6 +51,7 @@ export const server = setupServer(
       kinds: ARTEMIS_KINDS,
     }),
   ),
+  http.get('*/api/v1/systems', () => HttpResponse.json(LOADED_SYSTEMS)),
   http.get('*/api/v1/held-operations', () => HttpResponse.json({ items: [], next: null })),
 );
 

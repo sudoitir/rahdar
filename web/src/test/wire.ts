@@ -29,6 +29,50 @@ export const ARTEMIS_KINDS = [
   { id: 'artemis.bridge', resourceClass: 'ROUTE', label: 'Bridge', verbs: [] },
 ];
 
+/** The kinds the Kafka driver offers, labelled as its kinds declare them. */
+export const KAFKA_KINDS = [
+  {
+    id: 'kafka.topic',
+    resourceClass: 'DESTINATION',
+    label: { singular: 'Topic', plural: 'Topics' },
+    verbs: ['create', 'delete', 'update', 'purge', 'truncate'],
+  },
+  {
+    id: 'kafka.partition',
+    resourceClass: 'CHANNEL',
+    label: { singular: 'Partition', plural: 'Partitions' },
+    verbs: [],
+  },
+  {
+    id: 'kafka.group',
+    resourceClass: 'CONSUMER',
+    label: { singular: 'Group', plural: 'Groups' },
+    verbs: ['delete'],
+  },
+  {
+    id: 'kafka.group-topic',
+    resourceClass: 'SUBSCRIPTION',
+    label: { singular: 'Group on topic', plural: 'Groups on topics' },
+    verbs: ['purge'],
+  },
+  { id: 'kafka.acl', resourceClass: 'ROUTE', label: { singular: 'ACL', plural: 'ACLs' }, verbs: ['create', 'delete'] },
+  {
+    id: 'kafka.transactional-id',
+    resourceClass: 'PRODUCER',
+    label: { singular: 'Transactional ID', plural: 'Transactional IDs' },
+    verbs: [],
+  },
+];
+
+/** The system a Kafka cluster reports. */
+export const KAFKA_SYSTEM = { id: 'kafka', name: 'Apache Kafka' };
+
+/** The systems `GET /systems` lists when both drivers are loaded. */
+export const LOADED_SYSTEMS = [
+  { id: 'artemis', name: 'Apache ActiveMQ Artemis', supportedVersions: ['2.30 to 2.60'], connection: 'jolokia-seeds' },
+  { id: 'kafka', name: 'Apache Kafka', supportedVersions: ['3.0 and later'], connection: 'bootstrap' },
+];
+
 /** The system an Artemis cluster reports, which decides which system-only views it is offered. */
 export const ARTEMIS_SYSTEM = { id: 'artemis', name: 'Artemis' };
 

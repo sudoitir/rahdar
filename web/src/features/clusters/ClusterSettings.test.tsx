@@ -6,6 +6,7 @@ import userEvent from '@testing-library/user-event';
 
 import { renderWithProviders } from '../../test/render.tsx';
 import { server } from '../../test/setup.ts';
+import { ARTEMIS_SYSTEM } from '../../test/wire.ts';
 import { CapabilitiesSection, ConnectionSection } from './ClusterSettings.tsx';
 import { holdButton } from '../../test/hold.ts';
 
@@ -23,6 +24,7 @@ function cluster(connection: object | null = {}) {
         id: CLUSTER,
         name: 'prod-eu',
         description: null,
+        system: ARTEMIS_SYSTEM,
         connection:
           connection === null
             ? null

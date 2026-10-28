@@ -14,7 +14,7 @@ import {
   useUpdateConnection,
   type ClusterDetail,
   type ConnectionCheck,
-  type UpdateClusterRequest,
+  type ArtemisUpdateRequest,
 } from './api.ts';
 import classes from './Clusters.module.css';
 import { NodeProbeTable } from './NodeProbeTable.tsx';
@@ -71,7 +71,7 @@ function seedsOf(f: Fields): { urls: string[]; problems: Record<string, string> 
 }
 
 /** The edit these values make, ready to check or save. A password left empty keeps the stored one. */
-function requestOf(f: Fields, connection: Connection): UpdateClusterRequest {
+function requestOf(f: Fields, connection: Connection): ArtemisUpdateRequest {
   return {
     name: f.name.trim(),
     description: f.description,

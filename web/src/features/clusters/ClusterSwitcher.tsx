@@ -15,7 +15,6 @@ import { useNavigate } from '@tanstack/react-router';
 import { sameViewOn, useCurrentView } from '../../kernel/nav/currentView.ts';
 import { useClusters, useEnvironments, type ClusterSummary, type EnvironmentView } from './api.ts';
 import { HEALTH_WORD } from './clusterHealth.ts';
-import { RegisterClusterDialog } from './RegisterClusterButton.tsx';
 import styles from './ClusterSwitcher.module.css';
 
 const REGISTER = 'register';
@@ -168,7 +167,6 @@ export function ClusterSwitcher({ collapsed }: Readonly<{ collapsed: boolean }>)
   const view = useCurrentView();
   const navigate = useNavigate();
   const [search, setSearch] = useState('');
-  const [registering, setRegistering] = useState(false);
   const combobox = useCombobox({
     onDropdownOpen: () => {
       combobox.focusSearchInput();
@@ -207,9 +205,9 @@ export function ClusterSwitcher({ collapsed }: Readonly<{ collapsed: boolean }>)
 
   function choose(value: string) {
     combobox.closeDropdown();
-    // Back on the trigger first: the dialog returns focus to it, and a hidden list cannot hold it.
+    // Back on the trigger first: a hidden list cannot hold focus.
     combobox.targetRef.current?.focus();
-    if (value === REGISTER) setRegistering(true);
+    if (value === REGISTER) void navigate({ to: '/clusters/new' });
     else if (value === RETRY) void clusters.refetch();
     else if (value === ALL) void navigate({ to: '/' });
     else void navigate({ to: sameViewOn(value, view, all.find((c) => c.id === value)?.system.id) });
@@ -301,7 +299,6 @@ export function ClusterSwitcher({ collapsed }: Readonly<{ collapsed: boolean }>)
           </Combobox.Options>
         </Combobox.Dropdown>
       </Combobox>
-      <RegisterClusterDialog opened={registering} onClose={() => setRegistering(false)} />
     </>
   );
 }

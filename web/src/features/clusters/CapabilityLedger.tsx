@@ -143,7 +143,7 @@ function statusWord(key: Key, cap: CapabilityView): { text: string; tone?: 'warn
 /** A version gate in the ledger's words: the release it needs is the status, not a bare "Unavailable". */
 function gateWord(gate: VersionGateView): Row['word'] {
   if (gate.status === 'UNAVAILABLE') {
-    return { text: `Needs Artemis ${gate.requiredVersion}`, tone: 'danger' };
+    return { text: `Needs version ${gate.requiredVersion}`, tone: 'danger' };
   }
   if (gate.status === 'UNKNOWN') {
     return { text: 'Version unknown', tone: 'warning' };

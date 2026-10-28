@@ -178,7 +178,10 @@ describe('the estate view', () => {
 
     expect(await screen.findByText('No clusters yet')).toBeInTheDocument();
     expect(screen.getByText(/A cluster is a set of brokers of one system/)).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Register a cluster', level: 2 })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Register a cluster' })).toHaveAttribute(
+      'href',
+      expect.stringMatching(/^\/clusters\/new/),
+    );
   });
 
   it('says why the clusters could not be read, and retries', async () => {
