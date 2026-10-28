@@ -50,6 +50,19 @@ public class KafkaTopicConfigChanges {
         return new Effect(preview.changes().size(), "settings", preview.etag(), null);
     }
 
+    /** The settings an approver is shown: each name and its value, a sensitive value masked. */
+    String shown(ConfigChangeParams p) {
+        if (p.set() == null || p.set().isEmpty()) {
+            return "none";
+        }
+        try {
+            return configs.shownValues(p.clusterId(), p.topic(), p.set()).toString();
+        } catch (RuntimeException e) {
+            // The values are left out rather than shown unmasked when the settings cannot be read.
+            return p.set().keySet().toString();
+        }
+    }
+
     public void replay(ConfigChangeParams p) {
         run(p);
     }

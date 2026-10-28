@@ -35,6 +35,9 @@ public class KafkaTopicConfigs {
     static final String INTERNAL_REASON =
             "The cluster manages internal topics, so their settings cannot be changed here.";
 
+    /** What stands for the value of a sensitive setting, old or new, wherever one would be shown or recorded. */
+    static final String MASKED = "set, sensitive";
+
     private final KafkaAdminReads admin;
     private final BrokerGateway gateway;
     private final ClusterAccessGuard access;
@@ -46,9 +49,10 @@ public class KafkaTopicConfigs {
                 .sorted(Comparator.comparing(Setting::name))
                 .map(s -> new ConfigEntry(
                         s.name(),
-                        s.value(),
+                        // Whatever the broker answers, a sensitive value is never returned.
+                        s.sensitive() ? null : s.value(),
                         s.source(),
-                        s.defaultValue(),
+                        s.sensitive() ? null : s.defaultValue(),
                         internal || s.readOnly(),
                         s.sensitive(),
                         unit(s.name())))
@@ -80,14 +84,21 @@ public class KafkaTopicConfigs {
                                     AlterConfigOp.OpType.SET))
                     .orElse(null);
             valid &= error == null;
-            rows.add(new ConfigChangeRow(change.getKey(), shown(before), change.getValue(), null, error));
+            // The broker's complaint can quote the value it was given.
+            rows.add(new ConfigChangeRow(
+                    change.getKey(),
+                    shown(before),
+                    before.sensitive() ? MASKED : change.getValue(),
+                    null,
+                    error != null && before.sensitive() ? "The broker refused the new value." : error));
         }
         for (String name : remove.stream().sorted().toList()) {
             Setting before = known(current, name);
             if (before.source() != ConfigSource.TOPIC) {
                 throw new IllegalArgumentException("Setting " + name + " has no topic override to remove.");
             }
-            rows.add(new ConfigChangeRow(name, shown(before), null, before.defaultValue(), null));
+            rows.add(new ConfigChangeRow(
+                    name, shown(before), null, before.sensitive() ? null : before.defaultValue(), null));
         }
         List<String> key = new ArrayList<>();
         current.values().forEach(s -> key.add(s.name() + "=" + s.value() + "@" + s.source()));
@@ -135,7 +146,19 @@ public class KafkaTopicConfigs {
     }
 
     private static String shown(Setting setting) {
-        return setting.sensitive() ? "set, sensitive" : setting.value();
+        return setting.sensitive() ? MASKED : setting.value();
+    }
+
+    /** The values a change would set as an approver may read them: a sensitive setting's is masked. */
+    Map<String, String> shownValues(UUID clusterId, String topic, Map<String, String> set) {
+        Map<String, Setting> current = new TreeMap<>();
+        admin.settings(clusterId, topic).forEach(s -> current.put(s.name(), s));
+        Map<String, String> shown = new TreeMap<>();
+        set.forEach((name, value) -> {
+            Setting known = current.get(name);
+            shown.put(name, known != null && known.sensitive() ? MASKED : value);
+        });
+        return shown;
     }
 
     private static String unit(String name) {

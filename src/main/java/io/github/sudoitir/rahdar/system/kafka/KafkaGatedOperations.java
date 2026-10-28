@@ -44,7 +44,8 @@ class KafkaGatedOperations {
                         DisplayRow.of("Reset to", p.value() == null ? p.to() : p.to() + " " + p.value())),
                 resets::estimate,
                 resets::replay,
-                clusters);
+                clusters,
+                Set.of());
     }
 
     @Bean
@@ -58,13 +59,14 @@ class KafkaGatedOperations {
                 p -> List.of(
                         DisplayRow.of("Cluster", clusters.labelOf(p.clusterId())),
                         DisplayRow.of("Topic", p.topic()),
-                        DisplayRow.of("Set", p.set() == null ? "none" : p.set().toString()),
+                        DisplayRow.of("Set", changes.shown(p)),
                         DisplayRow.of(
                                 "Remove overrides",
                                 p.remove() == null ? "none" : p.remove().toString())),
                 changes::estimate,
                 changes::replay,
-                clusters);
+                clusters,
+                Set.of("/set"));
     }
 
     @Bean
@@ -95,7 +97,8 @@ class KafkaGatedOperations {
                                                 .toString())),
                 changes::estimate,
                 changes::replay,
-                clusters);
+                clusters,
+                Set.of());
     }
 
     @Bean
@@ -110,7 +113,8 @@ class KafkaGatedOperations {
                         DisplayRow.of("Transactional id", p.transactionalId())),
                 aborts::estimate,
                 aborts::replay,
-                clusters);
+                clusters,
+                Set.of());
     }
 
     private static String text(Acl a) {
@@ -126,7 +130,8 @@ class KafkaGatedOperations {
             Function<P, List<DisplayRow>> display,
             Function<P, Effect> estimate,
             Consumer<P> replay,
-            ClusterEnvironmentIndex clusters)
+            ClusterEnvironmentIndex clusters,
+            Set<String> redacted)
             implements GatedOperation<P> {
 
         @Override
@@ -162,7 +167,7 @@ class KafkaGatedOperations {
 
         @Override
         public Set<String> redactedPaths() {
-            return Set.of();
+            return redacted;
         }
 
         @Override
