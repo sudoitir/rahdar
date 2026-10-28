@@ -12,7 +12,7 @@ import type { BulkItemView, BulkOperation, BulkRunDetailView, BulkRunView } from
 
 const AVAILABLE = { status: 'AVAILABLE', reason: 'ok', brokerXmlSnippet: null };
 
-function clusterHandler() {
+function clusterHandler(kinds: object[] = []) {
   return http.get('*/api/v1/clusters/c1', () =>
     HttpResponse.json({
       id: 'c1',
@@ -29,6 +29,7 @@ function clusterHandler() {
       },
       health: { level: 'OK', reasons: [] },
       environmentId: null,
+      kinds,
     }),
   );
 }
@@ -400,6 +401,50 @@ describe('BulkPreviewDialog', () => {
       operation: 'PURGE',
       ids: ['artemis.queue/orders.a', 'kafka.group-topic/analytics/orders', 'kafka.group-topic/billing/orders'],
     });
+  });
+
+  it('words a purge of a partitioned log as moving the groups to its end, never as destroying records', async () => {
+    const kinds = [
+      {
+        id: 'kafka.group-topic',
+        resourceClass: 'SUBSCRIPTION',
+        label: { singular: 'Group on topic', plural: 'Groups on topics' },
+        partitioned: true,
+        verbs: ['purge'],
+      },
+    ];
+    server.use(
+      meHandler(),
+      clusterHandler(kinds),
+      http.post('*/api/v1/clusters/c1/bulk/preview', () =>
+        HttpResponse.json(
+          {
+            run: run({ total: 1, operation: 'PURGE', estimate: 1200, estimateComplete: true }),
+            items: [
+              item({
+                subscription: 'kafka.group-topic/analytics/orders',
+                kind: 'kafka.group-topic',
+                kindLabel: { singular: 'Group on topic', plural: 'Groups on topics' },
+                nodes: [],
+                affected: 1200,
+              }),
+            ],
+          },
+          { status: 201 },
+        ),
+      ),
+    );
+    const user = userEvent.setup();
+    renderWithProviders(<Bar selection={{ kind: 'ids', ids: ['kafka.group-topic/analytics/orders'] }} />);
+    const dialog = await openPreview(user, 'Purge…');
+
+    expect(
+      await within(dialog).findByText(
+        /Moves 1 group to the end of the log, skipping 1,200 records\. No record is deleted/,
+      ),
+    ).toBeInTheDocument();
+    expect(within(dialog).getByRole('button', { name: 'Skip 1,200 records for 1 group' })).toBeInTheDocument();
+    expect(within(dialog).queryByText(/destroy|cannot be undone/i)).not.toBeInTheDocument();
   });
 
   it('cannot arm a delete until the action and count are typed, then runs it and opens the run', async () => {

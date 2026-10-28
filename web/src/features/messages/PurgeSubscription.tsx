@@ -10,6 +10,8 @@ import { usePurgeSubscription, type DryRunView } from './api.ts';
 import { useMessageGate } from './gates.ts';
 import { announceFailure, announceResult, messageCount } from './outcomes.ts';
 
+const records = (n: number): string => `${n.toLocaleString()} record${n === 1 ? '' : 's'}`;
+
 /**
  * The system's own refusal of the purge, such as a group that still has members or is rebalancing (a 409
  * naming the cause): the purge cannot proceed until that changes, so the dialog says so and does not offer it.
@@ -41,9 +43,9 @@ function Consequence({
     return (
       <Stack gap="sm">
         <Text size="sm">
-          Rahdar could not take an estimate, so it cannot tell you how many messages purging {subscriptionName} would
-          destroy. The purge can still proceed. This cannot be undone. The broker's bulk safety cap still applies: if
-          the depth turns out to be over it, the purge is refused.
+          {moves
+            ? `Rahdar could not take an estimate, so it cannot tell you how many records ${subscriptionName} would skip. No record is deleted; the group will not read the records it skips.`
+            : `Rahdar could not take an estimate, so it cannot tell you how many messages purging ${subscriptionName} would destroy. The purge can still proceed. This cannot be undone. The broker's bulk safety cap still applies: if the depth turns out to be over it, the purge is refused.`}
         </Text>
         <ErrorState variant="inline" error={failure} />
       </Stack>
@@ -55,8 +57,8 @@ function Consequence({
       {moves ? (
         <Text size="sm">
           This moves the position of {subscriptionName} to the end of its log, skipping approximately{' '}
-          {messageCount(preview.affectedCount)} (point-in-time estimate). No record is deleted; the group can be reset
-          back.
+          {records(preview.affectedCount)} (point-in-time estimate). No record is deleted: the group will not read those
+          records, and can be reset back.
         </Text>
       ) : (
         <Text size="sm">
@@ -118,6 +120,9 @@ export function PurgeSubscription({
     );
   };
 
+  let confirmLabel = overCap ? 'Purge anyway, over the cap' : 'Purge subscription';
+  if (moves) confirmLabel = preview ? `Skip ${records(preview.affectedCount)}` : 'Skip the records';
+
   const confirm = () =>
     purge.mutate(
       { node, override: overCap },
@@ -145,11 +150,11 @@ export function PurgeSubscription({
       <ConfirmDialog
         opened={opened}
         onClose={() => setOpened(false)}
-        title={`Purge subscription ${subscriptionName}`}
+        title={moves ? `Skip the records of ${subscriptionName}` : `Purge subscription ${subscriptionName}`}
         consequence={
           <Consequence subscriptionName={subscriptionName} preview={preview} failure={failure} moves={moves} />
         }
-        confirmLabel={overCap ? 'Purge anyway, over the cap' : 'Purge subscription'}
+        confirmLabel={confirmLabel}
         tone="danger"
         blocked={refusal(failure) ? failure.message : undefined}
         pending={purge.isPending}

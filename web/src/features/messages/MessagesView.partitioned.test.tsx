@@ -260,12 +260,12 @@ describe('MessagesView on a partitioned log', () => {
     const dialog = await screen.findByRole('dialog');
     expect(await within(dialog).findByText(/moves the position of orders to the end of its log/)).toBeInTheDocument();
     expect(within(dialog).getByText(/No record is deleted/)).toBeInTheDocument();
-    await holdButton(within(dialog).getByRole('button', { name: 'Purge subscription' }));
+    await holdButton(within(dialog).getByRole('button', { name: 'Skip 1,200 records' }));
 
     expect(await within(dialog).findByText('The system refuses this purge right now')).toBeInTheDocument();
     expect(within(dialog).getAllByText(/began rebalancing/).length).toBeGreaterThan(0);
     expect(screen.getByRole('dialog')).toBeInTheDocument();
-    expect(within(dialog).getByRole('button', { name: 'Purge subscription' })).toBeDisabled();
+    expect(within(dialog).getByRole('button', { name: 'Skip 1,200 records' })).toBeDisabled();
     expect(calls).toEqual([true, false]);
   });
 });

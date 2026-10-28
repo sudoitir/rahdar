@@ -17,6 +17,7 @@ import {
   type BulkOperation,
   type BulkRunDetailView,
 } from './api.ts';
+import { useCluster } from '../clusters/index.ts';
 import { previewColumns } from './columns.ts';
 import { OPERATIONS, plural } from './words.ts';
 
@@ -26,14 +27,25 @@ const rowKey = (i: BulkItemView) => i.subscription;
 
 const START = { verb: 'Start', past: 'Started', progressive: 'Starting' } as const;
 
-/** What the run would do, as one sentence an operator can check before arming it. */
-function blastRadius(operation: BulkOperation, preview: BulkRunDetailView): string {
+/**
+ * What the run would do, as one sentence an operator can check before arming it. A purge of subscriptions on a
+ * partitioned log moves each group to the end of its log and deletes no record, and says so.
+ */
+function blastRadius(operation: BulkOperation, preview: BulkRunDetailView, moves: boolean): string {
   const { run, items } = preview;
   const op = OPERATIONS[operation];
   const acting = items.filter((i) => i.status !== 'REFUSED');
   const nodes = new Set(acting.flatMap((i) => i.nodes.map((n) => n.nodeId))).size;
   const scope = `${op.verb} ${plural(acting.length, 'subscription')} on ${plural(nodes, 'node')}`;
   if (!op.destructive) return `${scope}.`;
+  if (moves) {
+    const to = `${plural(acting.length, 'group')} to the end of the log`;
+    if (run.estimate == null) {
+      return `Moves ${to}, skipping a number of records that is unavailable. No record is deleted; the groups will not read the records they skip.`;
+    }
+    const records = plural(run.estimate, 'record');
+    return `Moves ${to}, skipping ${run.estimateComplete ? '' : 'at least '}${records}. No record is deleted; the groups will not read the records they skip.`;
+  }
   if (run.estimate == null || (acting.length > 0 && acting.every((i) => i.affected == null))) {
     return `${scope}. How many messages that destroys is unavailable. This cannot be undone.`;
   }
@@ -47,12 +59,14 @@ function blastRadius(operation: BulkOperation, preview: BulkRunDetailView): stri
 function PreviewStatus({
   preview,
   operation,
+  moves,
   unknown,
   refused,
   onRetry,
 }: Readonly<{
   preview: ReturnType<typeof useBulkPreview>;
   operation: BulkOperation;
+  moves: boolean;
   unknown: number;
   refused: number;
   onRetry: () => void;
@@ -74,7 +88,7 @@ function PreviewStatus({
       {data ? (
         <Stack gap="xs">
           <Text size="sm" fw={600}>
-            {blastRadius(operation, data)}
+            {blastRadius(operation, data, moves)}
           </Text>
           {unknown > 0 ? (
             <Text size="sm">
@@ -267,7 +281,15 @@ export function BulkPreviewDialog({
   const unknown = op.destructive ? acting.filter((i) => i.affected == null).length : 0;
   const overCap = data?.run.overCap ?? false;
   const shown = onlyProblems ? (data?.items.filter(hasProblem) ?? []) : (data?.items ?? []);
-  const confirmLabel = `${op.verb} ${plural(acting.length, 'subscription')}`;
+  const cluster = useCluster(clusterId);
+  // A purge of a partitioned log moves the groups to its end: nothing is destroyed, and the cap does not apply to it.
+  const moves =
+    operation === 'PURGE' &&
+    acting.length > 0 &&
+    acting.every((i) => cluster.data?.kinds?.find((k) => k.id === i.kind)?.partitioned === true);
+  const confirmLabel = moves
+    ? `Skip ${data?.run.estimate == null ? 'records' : plural(data.run.estimate, 'record')} for ${plural(acting.length, 'group')}`
+    : `${op.verb} ${plural(acting.length, 'subscription')}`;
 
   const start = () => {
     if (!data) return;
@@ -299,6 +321,7 @@ export function BulkPreviewDialog({
         <PreviewStatus
           preview={preview}
           operation={operation}
+          moves={moves}
           unknown={unknown}
           refused={refused}
           onRetry={takePreview}
@@ -308,9 +331,9 @@ export function BulkPreviewDialog({
           <Section title="Over the safety cap" headingLevel={3} variant="card">
             <Stack gap="xs">
               <Text size="sm">
-                This run would destroy {data.run.estimate?.toLocaleString()} messages, over the cap of{' '}
-                {data.run.cap.toLocaleString()}. It can run only with the cap overridden for this run, and the override
-                is recorded in the audit log.
+                This run would {moves ? 'skip' : 'destroy'} {data.run.estimate?.toLocaleString()}{' '}
+                {moves ? 'records' : 'messages'}, over the cap of {data.run.cap.toLocaleString()}. It can run only with
+                the cap overridden for this run, and the override is recorded in the audit log.
               </Text>
               <Checkbox
                 label="Override the safety cap for this run"
