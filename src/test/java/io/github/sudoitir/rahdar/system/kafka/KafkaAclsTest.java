@@ -18,6 +18,7 @@ import io.github.sudoitir.openbroker.model.Resources;
 import io.github.sudoitir.rahdar.kernel.security.ClusterAccessGuard;
 import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
 import io.github.sudoitir.rahdar.system.kafka.web.KafkaViews.Acl;
+import io.github.sudoitir.rahdar.system.kafka.web.KafkaViews.AclChangeRequest;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -54,5 +55,44 @@ class KafkaAclsTest {
 
         verify(resources, times(2)).read(any(ResourceQuery.class));
         assertThat(all).extracting(Acl::name).containsExactly("t1", "t2", "t3");
+    }
+
+    private static Resource rule(String principal, String operation, String permission, String pattern, String name) {
+        return new Resource(
+                ResourceId.of("kafka.acl", principal, "*", operation, permission, "topic", pattern, name),
+                Attributes.empty(),
+                List.of(),
+                List.of(),
+                Instant.now());
+    }
+
+    @Test
+    void aPrefixedDenyListsTheGrantLostOnEveryResourceItCoversNotOnlyOnThePrefix() {
+        Resources resources = mock(Resources.class);
+        ClusterConnection connection = mock(ClusterConnection.class);
+        BrokerGateway gateway = mock(BrokerGateway.class);
+        when(gateway.cluster(CLUSTER)).thenReturn(connection);
+        when(connection.resources()).thenReturn(resources);
+        when(resources.read(any(ResourceQuery.class)))
+                .thenReturn(Partial.complete(
+                        new ResourcePage(
+                                List.of(
+                                        rule("User:app", "read", "allow", "literal", "orders-eu"),
+                                        rule("User:app", "read", "allow", "literal", "orders-us"),
+                                        rule("User:app", "read", "allow", "literal", "billing")),
+                                Optional.empty()),
+                        List.of()));
+        KafkaAcls acls = new KafkaAcls(gateway, mock(ClusterAccessGuard.class));
+
+        var preview = acls.preview(
+                CLUSTER,
+                new AclChangeRequest(
+                        List.of(new Acl("User:app", "*", "read", "deny", "topic", "prefixed", "orders-")), null, null));
+
+        assertThat(preview.losses())
+                .containsExactlyInAnyOrder(
+                        "User:app loses READ on topic orders-eu", "User:app loses READ on topic orders-us");
+        assertThat(preview.access()).extracting(a -> a.resource()).contains("orders-", "orders-eu", "orders-us");
+        assertThat(preview.access()).extracting(a -> a.resource()).doesNotContain("billing");
     }
 }

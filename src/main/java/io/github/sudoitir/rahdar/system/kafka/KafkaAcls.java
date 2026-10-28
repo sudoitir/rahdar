@@ -38,6 +38,9 @@ public class KafkaAcls {
 
     private static final String SECURITY_DISABLED = "SecurityDisabledException";
 
+    /** The most covered resources one rule of a preview lists access for. */
+    private static final int MAX_COVERED = 100;
+
     /** The size of each page a preview reads the whole set in. */
     private static final int ALL_PAGE = 500;
 
@@ -116,23 +119,16 @@ public class KafkaAcls {
         Set<String> seen = new LinkedHashSet<>();
         for (Acl change : concat(add, remove)) {
             String type = change.resourceType();
-            String name = change.name();
-            for (String principal : principals(change, before, after)) {
-                if (!seen.add(principal + "|" + type + "|" + name)) {
-                    continue;
-                }
-                Set<String> was = KafkaAclAccess.allowed(before, principal, type, name);
-                Set<String> will = KafkaAclAccess.allowed(after, principal, type, name);
-                effective.add(new EffectiveAccess(principal, type, name, upper(was), upper(will)));
-                was.stream()
-                        .filter(op -> !will.contains(op))
-                        .forEach(op -> losses.add(
-                                principal + " loses " + op.toUpperCase(Locale.ROOT) + " on " + type + " " + name));
-                for (String op : KafkaAclAccess.OPERATIONS) {
-                    if (KafkaAclAccess.denied(after, principal, type, name, op)
-                            && KafkaAclAccess.allows(after, principal, type, name, op)) {
-                        notes.add("A deny rule wins for " + principal + " on " + type + " " + name + " "
-                                + op.toUpperCase(Locale.ROOT) + ", although an allow rule also covers it.");
+            List<String> covered = covered(change, before, after);
+            if (covered.size() > MAX_COVERED) {
+                notes.add("Access is shown for " + MAX_COVERED + " of the " + covered.size()
+                        + " resources that the rule on " + type + " " + change.name() + " covers.");
+                covered = covered.subList(0, MAX_COVERED);
+            }
+            for (String name : covered) {
+                for (String principal : principals(change, before, after)) {
+                    if (seen.add(principal + "|" + type + "|" + name)) {
+                        accessOf(principal, type, name, before, after, effective, losses, notes);
                     }
                 }
             }
@@ -190,6 +186,57 @@ public class KafkaAcls {
 
     private static List<String> upper(Set<String> operations) {
         return operations.stream().map(o -> o.toUpperCase(Locale.ROOT)).toList();
+    }
+
+    /** What the principal may do to one resource before and after, its losses and the deny rules that win. */
+    private static void accessOf(
+            String principal,
+            String type,
+            String name,
+            List<Acl> before,
+            List<Acl> after,
+            List<EffectiveAccess> effective,
+            List<String> losses,
+            List<String> notes) {
+        Set<String> was = KafkaAclAccess.allowed(before, principal, type, name);
+        Set<String> will = KafkaAclAccess.allowed(after, principal, type, name);
+        effective.add(new EffectiveAccess(principal, type, name, upper(was), upper(will)));
+        was.stream()
+                .filter(op -> !will.contains(op))
+                .forEach(op ->
+                        losses.add(principal + " loses " + op.toUpperCase(Locale.ROOT) + " on " + type + " " + name));
+        for (String op : KafkaAclAccess.OPERATIONS) {
+            if (KafkaAclAccess.denied(after, principal, type, name, op)
+                    && KafkaAclAccess.allows(after, principal, type, name, op)) {
+                notes.add("A deny rule wins for " + principal + " on " + type + " " + name + " "
+                        + op.toUpperCase(Locale.ROOT) + ", although an allow rule also covers it.");
+            }
+        }
+    }
+
+    /**
+     * The resource names a change affects: its own, and, for a prefixed rule or a literal {@code *}, every resource of
+     * the type that other rules name and the rule covers. A rule on a prefix changes what each of those is allowed,
+     * so a deny on {@code orders-} must list the grants lost on {@code orders-eu} and {@code orders-us}, not only on
+     * a resource called {@code orders-}.
+     */
+    private static List<String> covered(Acl change, List<Acl> before, List<Acl> after) {
+        boolean prefixed = "prefixed".equals(change.pattern());
+        boolean everything = !prefixed && "*".equals(change.name());
+        Set<String> names = new LinkedHashSet<>();
+        names.add(change.name());
+        if (prefixed || everything) {
+            for (List<Acl> state : List.of(before, after)) {
+                for (Acl other : state) {
+                    if (other.resourceType().equals(change.resourceType())
+                            && !"*".equals(other.name())
+                            && (everything || other.name().startsWith(change.name()))) {
+                        names.add(other.name());
+                    }
+                }
+            }
+        }
+        return List.copyOf(names);
     }
 
     /** The principal of a change; for the wildcard principal, every principal with a rule on that resource type. */
