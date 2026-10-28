@@ -61,6 +61,10 @@ class AuditCoverageTest {
                     "registration bookkeeping; PluginMessagingService audits the register and unregister calls that use"
                             + " it, and purge removes a plugin's rows with the rest of its data"),
             Map.entry(
+                    "feature.plugins.internal.persistence.RegistrationNodeRepository",
+                    "per-node delivery state that the reconciler records after each pass; the registrations it follows"
+                            + " are audited by PluginMessagingService"),
+            Map.entry(
                     "feature.plugins.internal.persistence.OwnerWorkRepository",
                     "work bookkeeping; OwnerWorkService audits the publish, suspend, enable and withdraw calls that use"
                             + " it, and purge removes a plugin's rows with the rest of its data"));

@@ -19,12 +19,13 @@ public final class BulkViews {
     private BulkViews() {}
 
     /**
-     * What to preview: explicit {@code names}, in the order given, or, when {@code names} is null, every
-     * queue whose name or address contains {@code q} (every queue when {@code q} is blank).
+     * What to preview: explicit subscription {@code ids} ({@code artemis.queue/orders}), in the order given, or,
+     * when {@code ids} is null, every subscription whose name or destination contains {@code q} (every
+     * subscription when {@code q} is blank).
      */
     public record BulkPreviewRequest(
             @Schema(requiredMode = REQUIRED) @NotNull BulkOperation operation,
-            @Schema(nullable = true) List<String> names,
+            @Schema(nullable = true) List<String> ids,
             @Schema(nullable = true) String q,
 
             @Schema(description = "Delete only: close attached consumers instead of refusing the queue.")
@@ -34,9 +35,9 @@ public final class BulkViews {
     public record BulkExecuteRequest(
             @Schema(requiredMode = REQUIRED) @NotNull String planHash, boolean override, boolean continueOnFailure) {}
 
-    /** How the operator chose the queues: the names, or the filter. */
+    /** How the operator chose the subscriptions: their ids, or the filter. */
     public record BulkSelection(
-            @Schema(nullable = true) List<String> names,
+            @Schema(nullable = true) List<String> ids,
             @Schema(nullable = true) String q) {}
 
     /** One node's figures for a queue at preview; null where the node has not answered recently. */

@@ -38,6 +38,7 @@ import io.github.sudoitir.rahdar.kernel.security.ResourceRef;
 import io.github.sudoitir.rahdar.kernel.settings.SettingsService;
 import io.github.sudoitir.rahdar.platform.broker.BrokerSettings;
 import io.github.sudoitir.rahdar.platform.broker.BulkCapExceededException;
+import io.github.sudoitir.rahdar.platform.clusters.ClusterKinds;
 import io.github.sudoitir.rahdar.platform.clusters.LifecycleOutcome.NodeOutcome;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -45,6 +46,7 @@ import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -84,6 +86,7 @@ public class BulkService {
     private final ReplicaRegistry replicas;
     private final OperationGate gate;
     private final ResourceIdTexts ids;
+    private final ClusterKinds kinds;
 
     /**
      * What the gate holds of a bulk run: the run, the plan it was previewed with (its hash, operation and queue
@@ -108,10 +111,10 @@ public class BulkService {
     public BulkRunDetailView preview(UUID clusterId, BulkPreviewRequest request) {
         BulkOperation operation = Objects.requireNonNull(request.operation(), "operation");
         clusterAccess.requireVisible(clusterId);
-        Map<String, SubscriptionView> byName = new LinkedHashMap<>();
-        queues.allQueues(clusterId).forEach(q -> byName.putIfAbsent(q.name(), q));
+        Map<String, SubscriptionView> byId = new LinkedHashMap<>();
+        queues.allQueues(clusterId).forEach(q -> byId.putIfAbsent(q.id(), q));
 
-        List<String> names = resolve(request, byName);
+        List<String> names = resolve(request, byId);
         // Every queue of the plan, before anything is stored: one the caller may not read is not found,
         // one they may read and not change is refused, and the run is not planned at all.
         clusterAccess.requireAll(clusterId, requirements(names, operation.permission()));
@@ -131,7 +134,7 @@ public class BulkService {
         }
 
         List<Planned> plan = names.stream()
-                .map(name -> plan(operation, request.disconnectConsumers(), name, byName.get(name)))
+                .map(id -> plan(operation, request.disconnectConsumers(), id, byId.get(id), clusterId))
                 .toList();
         long estimate = 0;
         boolean complete = true;
@@ -156,7 +159,7 @@ public class BulkService {
                 handoff.capture().actor().displayName(),
                 new BulkRunEntity.Preview(
                         planHash(operation, options, names),
-                        json.writeValueAsString(new BulkSelection(request.names() == null ? null : names, request.q())),
+                        json.writeValueAsString(new BulkSelection(request.ids() == null ? null : names, request.q())),
                         json.writeValueAsString(options),
                         names.size(),
                         (int) plan.stream().filter(p -> p.refusal() != null).count(),
@@ -176,24 +179,28 @@ public class BulkService {
 
     private record Planned(String name, String refusal, ItemEstimate figures) {}
 
-    private static List<String> resolve(BulkPreviewRequest request, Map<String, SubscriptionView> byName) {
-        if (request.names() != null) {
-            return List.copyOf(new LinkedHashSet<>(request.names()));
+    private static List<String> resolve(BulkPreviewRequest request, Map<String, SubscriptionView> byId) {
+        if (request.ids() != null) {
+            return List.copyOf(new LinkedHashSet<>(request.ids()));
         }
         ResourceQuery query = ResourceQuery.of(request.q(), 1, 1, null);
-        return byName.values().stream()
+        return byId.values().stream()
                 .filter(q -> query.matches(q.name()) || query.matches(q.destinationName()))
-                .map(SubscriptionView::name)
-                .sorted(String.CASE_INSENSITIVE_ORDER)
+                .sorted(Comparator.comparing(SubscriptionView::name, String.CASE_INSENSITIVE_ORDER)
+                        .thenComparing(SubscriptionView::id))
+                .map(SubscriptionView::id)
                 .toList();
     }
 
     /** One queue's figures, refusal and warning, by the rules the single-queue preflight applies. */
-    private static Planned plan(
-            BulkOperation operation, boolean disconnectConsumers, String name, SubscriptionView queue) {
+    private Planned plan(
+            BulkOperation operation, boolean disconnectConsumers, String name, SubscriptionView queue, UUID clusterId) {
         if (queue == null) {
             return new Planned(
-                    name, "No queue with this name exists on the cluster.", new ItemEstimate(List.of(), null));
+                    name, "No subscription with this id exists on the cluster.", new ItemEstimate(List.of(), null));
+        }
+        if (kinds.partitioned(clusterId, queue.kind())) {
+            return planLog(operation, name, queue);
         }
         List<NodeFigure> nodes =
                 queue.perNode().stream().map(BulkService::figure).toList();
@@ -238,6 +245,46 @@ public class BulkService {
         }
         return new Planned(
                 name, refusal, new ItemEstimate(nodes, warnings.isEmpty() ? null : String.join(" ", warnings)));
+    }
+
+    /**
+     * A subscription of a partitioned log is a position, not a queue: only a purge acts on it, moving the position to
+     * the end of the log without deleting a record, and only for a group that has no members. Members are read from
+     * the snapshot; the driver's own refusal, such as a rebalance in progress, is the item's outcome at run time.
+     */
+    private static Planned planLog(BulkOperation operation, String id, SubscriptionView subscription) {
+        List<NodeFigure> nodes =
+                subscription.perNode().stream().map(BulkService::figure).toList();
+        if (operation != BulkOperation.PURGE) {
+            return new Planned(
+                    id,
+                    "This subscription is a position in a log, so it cannot be paused, resumed or deleted."
+                            + " Only a purge acts on it, by moving it to the end of the log.",
+                    new ItemEstimate(nodes, null));
+        }
+        long members = nodes.stream()
+                .map(NodeFigure::consumerCount)
+                .filter(Objects::nonNull)
+                .mapToLong(Long::longValue)
+                .sum();
+        if (members > 0) {
+            return new Planned(
+                    id,
+                    "%d members are attached. A group is purged only when it has none; stop its consumers first."
+                            .formatted(members),
+                    new ItemEstimate(nodes, null));
+        }
+        String skipped = nodes.stream().anyMatch(n -> n.messageCount() == null)
+                ? "Purging moves the position to the end of the log, skipping an unknown number of records."
+                : "Purging moves the position to the end of the log, skipping %d records."
+                        .formatted(nodes.stream()
+                                .mapToLong(NodeFigure::messageCount)
+                                .sum());
+        return new Planned(
+                id,
+                null,
+                new ItemEstimate(
+                        nodes, skipped + " The records themselves are not deleted and others can still read them."));
     }
 
     /** A node that has not answered within the freshness window has unknown figures, never zero. */
@@ -456,7 +503,7 @@ public class BulkService {
     /** What acting on {@code names} with the permission needs: the permission on each queue. */
     private static List<Requirement> requirements(List<String> names, String permission) {
         return names.stream()
-                .map(name -> new Requirement(ResourceRef.subscription(name), permission))
+                .map(id -> new Requirement(ResourceRef.subscription(BulkItemIds.name(id)), permission))
                 .toList();
     }
 
@@ -495,8 +542,8 @@ public class BulkService {
                 : json.readValue(item.getOutcome(), new TypeReference<List<NodeOutcome>>() {});
         return views.toView(
                 item,
-                idTexts.subscription(item.getSubscription()),
-                idTexts.kindLabel(idTexts.subscription(item.getSubscription())),
+                item.getSubscription(),
+                idTexts.kindLabel(item.getSubscription()),
                 json.readValue(item.getEstimate(), ItemEstimate.class),
                 outcome);
     }

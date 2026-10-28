@@ -168,7 +168,13 @@ class BulkRealBrokerTest extends PostgresIntegrationTest {
     }
 
     private BulkRunDetailView runOperation(BulkOperation operation) {
-        BulkRunDetailView preview = bulk.preview(clusterId, new BulkPreviewRequest(operation, queueNames, null, false));
+        BulkRunDetailView preview = bulk.preview(
+                clusterId,
+                new BulkPreviewRequest(
+                        operation,
+                        queueNames.stream().map(n -> "artemis.queue/" + n).toList(),
+                        null,
+                        false));
         bulk.execute(
                 clusterId,
                 preview.run().id(),

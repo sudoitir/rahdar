@@ -5553,7 +5553,7 @@ export interface components {
             error?: string | null;
         };
         BulkSelection: {
-            names?: string[] | null;
+            ids?: string[] | null;
             q?: string | null;
         };
         BulkExecuteRequest: {
@@ -5564,7 +5564,7 @@ export interface components {
         BulkPreviewRequest: {
             /** @enum {string} */
             operation: "PAUSE" | "RESUME" | "PURGE" | "DELETE";
-            names?: string[] | null;
+            ids?: string[] | null;
             q?: string | null;
             /** @description Delete only: close attached consumers instead of refusing the queue. */
             disconnectConsumers: boolean;

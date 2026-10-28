@@ -32793,7 +32793,7 @@
       "BulkSelection" : {
         "type" : "object",
         "properties" : {
-          "names" : {
+          "ids" : {
             "type" : [ "array", "null" ],
             "items" : {
               "type" : "string"
@@ -32826,7 +32826,7 @@
             "type" : "string",
             "enum" : [ "PAUSE", "RESUME", "PURGE", "DELETE" ]
           },
-          "names" : {
+          "ids" : {
             "type" : [ "array", "null" ],
             "items" : {
               "type" : "string"

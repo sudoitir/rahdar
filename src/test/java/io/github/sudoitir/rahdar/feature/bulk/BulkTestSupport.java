@@ -136,7 +136,11 @@ abstract class BulkTestSupport extends PostgresIntegrationTest {
         return bulk.preview(clusterId, new BulkPreviewRequest(operation, null, q, false));
     }
 
+    /** Previews the Artemis queues of these names, as a client names a subscription by its id. */
     BulkRunDetailView preview(BulkOperation operation, List<String> names) {
-        return bulk.preview(clusterId, new BulkPreviewRequest(operation, names, null, false));
+        return bulk.preview(
+                clusterId,
+                new BulkPreviewRequest(
+                        operation, names.stream().map(n -> "artemis.queue/" + n).toList(), null, false));
     }
 }

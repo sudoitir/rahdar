@@ -51,7 +51,7 @@ class BulkControllerTest extends BulkTestSupport {
     @EnumSource(BulkOperation.class)
     void previewsTheNamesTheFrontendSends(BulkOperation operation) throws Exception {
         preview("""
-                        {"operation":"%s","names":["orders.a","orders.b"],"q":null,"disconnectConsumers":false}
+                        {"operation":"%s","ids":["artemis.queue/orders.a","artemis.queue/orders.b"],"q":null,"disconnectConsumers":false}
                         """.formatted(operation))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.run.operation").value(operation.name()))
@@ -63,7 +63,7 @@ class BulkControllerTest extends BulkTestSupport {
     @EnumSource(BulkOperation.class)
     void previewsTheFilterTheFrontendSends(BulkOperation operation) throws Exception {
         preview("""
-                        {"operation":"%s","names":null,"q":"orders","disconnectConsumers":false}
+                        {"operation":"%s","ids":null,"q":"orders","disconnectConsumers":false}
                         """.formatted(operation))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.run.total").value(2))
@@ -74,7 +74,7 @@ class BulkControllerTest extends BulkTestSupport {
     void theHistoryIsPagedAndLeavesOutPreviews() throws Exception {
         for (String name : new String[] {"orders.a", "orders.b", "payments"}) {
             preview("""
-                            {"operation":"PAUSE","names":["%s"],"q":null,"disconnectConsumers":false}
+                            {"operation":"PAUSE","ids":["artemis.queue/%s"],"q":null,"disconnectConsumers":false}
                             """.formatted(name)).andExpect(status().isCreated());
         }
         mvc.perform(get("/api/v1/clusters/{c}/bulk/runs", clusterId))
@@ -99,7 +99,7 @@ class BulkControllerTest extends BulkTestSupport {
     @Test
     void previewsAPartialSelection() throws Exception {
         preview("""
-                        {"operation":"PURGE","names":["payments"],"q":null,"disconnectConsumers":false}
+                        {"operation":"PURGE","ids":["artemis.queue/payments"],"q":null,"disconnectConsumers":false}
                         """)
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.run.total").value(1))
@@ -109,7 +109,7 @@ class BulkControllerTest extends BulkTestSupport {
     @Test
     void refusesAnEmptySelection() throws Exception {
         preview("""
-                        {"operation":"PAUSE","names":[],"q":null,"disconnectConsumers":false}
+                        {"operation":"PAUSE","ids":[],"q":null,"disconnectConsumers":false}
                         """)
                 .andExpect(status().isUnprocessableContent())
                 .andExpect(jsonPath("$.type").value(endsWith("bulk-nothing-selected")));
@@ -118,7 +118,7 @@ class BulkControllerTest extends BulkTestSupport {
     @Test
     void refusesAMissingOperation() throws Exception {
         preview("""
-                        {"names":["orders.a"],"q":null,"disconnectConsumers":false}
+                        {"ids":["artemis.queue/orders.a"],"q":null,"disconnectConsumers":false}
                         """).andExpect(status().isBadRequest());
     }
 
@@ -126,7 +126,7 @@ class BulkControllerTest extends BulkTestSupport {
     void refusesAMissingPrimitive() throws Exception {
         // Jackson 3 fails on a missing primitive: this is why the contract marks it required.
         preview("""
-                        {"operation":"PAUSE","names":["orders.a"],"q":null}
+                        {"operation":"PAUSE","ids":["artemis.queue/orders.a"],"q":null}
                         """).andExpect(status().isBadRequest());
     }
 
@@ -135,7 +135,7 @@ class BulkControllerTest extends BulkTestSupport {
         settings.put(BrokerSettings.BULK_SUBSCRIPTION_CAP, "1");
 
         preview("""
-                        {"operation":"PAUSE","names":null,"q":"orders","disconnectConsumers":false}
+                        {"operation":"PAUSE","ids":null,"q":"orders","disconnectConsumers":false}
                         """)
                 .andExpect(status().isUnprocessableContent())
                 .andExpect(jsonPath("$.type").value(endsWith("bulk-subscription-cap-exceeded")));
@@ -144,7 +144,7 @@ class BulkControllerTest extends BulkTestSupport {
     @Test
     void refusesToExecuteAPlanThatWasNotPreviewed() throws Exception {
         String body = preview("""
-                        {"operation":"PAUSE","names":["orders.a"],"q":null,"disconnectConsumers":false}
+                        {"operation":"PAUSE","ids":["artemis.queue/orders.a"],"q":null,"disconnectConsumers":false}
                         """)
                 .andExpect(status().isCreated())
                 .andReturn()
