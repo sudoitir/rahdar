@@ -66,6 +66,12 @@ scheme or userinfo. `saslMechanism` is required exactly for `SASL_*`; credential
 (username and password for PLAIN and SCRAM, a token for OAUTHBEARER). Secrets are sealed per kind
 (`vault.seal(aad(clusterId, kind))`) and never returned. `PATCH /api/v1/clusters/{id}` takes the same
 `connection` (secrets omitted keep the stored one; a new host needs the secret again, as today).
+Both systems use the same shapes: `PATCH` takes `{name?, description?, environmentId?, connection?}`
+for Artemis and Kafka alike, and both dry runs (register and edit) return `ConnectionCheck`. A check
+that ran answers `200` with its findings, a connection failure included (`failure`); only a malformed
+request is a `400` problem. `supportedVersions` is the driver's range string (`[3.0.0,)`), which the
+web renders in words ("3.0 and later"). The Artemis check fills the same fields from its per-node
+probes, and adds its adoption preview as `adoption`.
 
 The dry run returns the `ConnectionCheck` view:
 
