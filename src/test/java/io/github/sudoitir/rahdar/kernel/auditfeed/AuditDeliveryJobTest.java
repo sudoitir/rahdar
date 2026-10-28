@@ -30,6 +30,9 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import net.javacrumbs.shedlock.core.LockConfiguration;
+import net.javacrumbs.shedlock.core.LockProvider;
+import net.javacrumbs.shedlock.core.SimpleLock;
 import org.awaitility.Awaitility;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -63,12 +66,39 @@ class AuditDeliveryJobTest extends PostgresIntegrationTest {
     @Autowired
     JdbcTemplate jdbc;
 
+    @Autowired
+    LockProvider jobLocks;
+
     private final String pluginId =
             "audit-receiver-" + UUID.randomUUID().toString().substring(0, 8);
     private final String prefix =
             "DELIVERY_TEST_" + UUID.randomUUID().toString().substring(0, 8) + "_";
     private final TestReceiver receiver = new TestReceiver();
     private FakeHandle handle;
+    private SimpleLock scheduled;
+
+    /**
+     * The scheduled delivery job runs in this context too, every two seconds, and would deliver to this
+     * test's receiver between the test's own calls. Holding its lock, as another replica would, keeps it out.
+     */
+    @BeforeEach
+    void holdTheScheduledDelivery() {
+        Awaitility.await("the audit-delivery job's lock")
+                .atMost(Duration.ofSeconds(10))
+                .until(() -> {
+                    scheduled = jobLocks.lock(new LockConfiguration(
+                                    Instant.now(), "audit-delivery", Duration.ofMinutes(5), Duration.ZERO))
+                            .orElse(null);
+                    return scheduled != null;
+                });
+    }
+
+    @AfterEach
+    void releaseTheScheduledDelivery() {
+        if (scheduled != null) {
+            scheduled.unlock();
+        }
+    }
 
     @BeforeEach
     void attach() {
