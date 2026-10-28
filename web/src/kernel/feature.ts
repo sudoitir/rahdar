@@ -39,6 +39,7 @@ export const FEATURE_IDS = [
   'bulk',
   'transfer',
   'setupreview',
+  'kafka',
   'diagnostics',
   'apitokens',
   'plugins',

@@ -19,9 +19,9 @@ export function partitionColumns(): Column<PartitionBacklog>[] {
       id: 'lag',
       header: 'Lag',
       description: 'Records between the group’s position and the end of the partition',
-      accessor: (p) => (p.lag === null ? 'Unavailable' : figure(p.lag)),
+      accessor: (p) => (p.lag == null ? 'Unavailable' : figure(p.lag)),
       cell: (p) =>
-        p.lag === null ? (
+        p.lag == null ? (
           <Stack gap={2} miw={0} align="flex-start">
             <Text size="sm">Unavailable</Text>
             {p.reason ? (
@@ -41,7 +41,7 @@ export function partitionColumns(): Column<PartitionBacklog>[] {
       id: 'committed',
       header: 'Committed offset',
       short: 'Committed',
-      accessor: (p) => (p.committed === null ? 'None' : figure(p.committed)),
+      accessor: (p) => (p.committed == null ? 'None' : figure(p.committed)),
       kind: 'number',
       priority: 'high',
     },

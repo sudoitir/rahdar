@@ -5,11 +5,11 @@ import { clusterKey, request, type ApiError } from '../api/request.ts';
 /** One partition of a backlog breakdown. */
 export interface PartitionBacklog {
   partition: number;
-  committed: number | null;
+  committed?: number | null;
   end: number;
-  lag: number | null;
+  lag?: number | null;
   /** Why this partition has no lag, such as a group that never committed there. */
-  reason: string | null;
+  reason?: string | null;
 }
 
 /** `GET …/subscriptions/{kind}/{path}/backlog`: the partitions, slowest first, and when they were sampled. */
