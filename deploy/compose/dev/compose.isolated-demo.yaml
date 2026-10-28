@@ -33,9 +33,24 @@ services:
 
   kafka-1:
     ports: !reset []
+    # QA only: a simulated stuck coordinator. The coordinator aborts a transaction that outlives its timeout within
+    # seconds; a day here keeps the seed's transaction hanging, so the sweep has one to show and abort. A demo does not
+    # do this: it shows what Kafka does.
+    environment:
+      KAFKA_TRANSACTION_ABORT_TIMED_OUT_TRANSACTION_CLEANUP_INTERVAL_MS: "86400000"
 
   kafka-2:
     ports: !reset []
+    # QA only: a simulated stuck coordinator. The coordinator aborts a transaction that outlives its timeout within
+    # seconds; a day here keeps the seed's transaction hanging, so the sweep has one to show and abort. A demo does not
+    # do this: it shows what Kafka does.
+    environment:
+      KAFKA_TRANSACTION_ABORT_TIMED_OUT_TRANSACTION_CLEANUP_INTERVAL_MS: "86400000"
 
   kafka-3:
     ports: !reset []
+    # QA only: a simulated stuck coordinator. The coordinator aborts a transaction that outlives its timeout within
+    # seconds; a day here keeps the seed's transaction hanging, so the sweep has one to show and abort. A demo does not
+    # do this: it shows what Kafka does.
+    environment:
+      KAFKA_TRANSACTION_ABORT_TIMED_OUT_TRANSACTION_CLEANUP_INTERVAL_MS: "86400000"

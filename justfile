@@ -135,6 +135,8 @@ qa-up name port demo="": mounts
     #!/usr/bin/env bash
     set -euo pipefail
     export QA_PORT={{port}}
+    # The QA stack's stuck coordinator (compose.isolated.yaml) lets the seed's transaction hang after a minute.
+    export KAFKA_TXN_TIMEOUT_MS=60000
     files=(-f deploy/compose/dev/compose.dev.yaml)
     [ -z "{{demo}}" ] || files+=(-f deploy/compose/dev/compose.demo.yaml)
     files+=(-f deploy/compose/dev/compose.isolated.yaml)
