@@ -156,3 +156,83 @@ export function transactionState(id: string): string {
   const out = kafka('kafka-transactions.sh', 'describe', '--transactional-id', id);
   return out.trim().split('\n').pop() ?? '';
 }
+
+/** Records into `topic` with the image's perf tool: lag for the groups reading it. */
+export function produce(topic: string, records: number): void {
+  inContainer(
+    `${PROJECT}-kafka-1-1`,
+    'kafka-producer-perf-test.sh',
+    '--topic',
+    topic,
+    '--num-records',
+    String(records),
+    '--record-size',
+    '128',
+    '--throughput',
+    '1000',
+    '--producer-props',
+    `bootstrap.servers=${BOOTSTRAP}`,
+  );
+}
+
+/** How many members a group has, as the broker reports. */
+export function members(group: string): number {
+  const out = kafka('kafka-consumer-groups.sh', '--describe', '--group', group, '--state');
+  const row = out.trim().split('\n').pop()?.trim().split(/\s+/) ?? [];
+  return Number(row[row.length - 1]) || 0;
+}
+
+/** Starts the detached consumer that keeps `billing` active, as the seed does. */
+export function attachBillingConsumer(): void {
+  execFileSync(
+    'docker',
+    [
+      'exec',
+      '-d',
+      '-e',
+      'KAFKA_HEAP_OPTS=-Xms16m -Xmx128m',
+      `${PROJECT}-kafka-2-1`,
+      '/opt/kafka/bin/kafka-console-consumer.sh',
+      '--bootstrap-server',
+      BOOTSTRAP,
+      '--topic',
+      'orders',
+      '--group',
+      'billing',
+      '--from-beginning',
+    ],
+    { stdio: 'ignore' },
+  );
+}
+
+/** Opens the transaction the seed leaves hanging: a minute's timeout, the producer killed mid-transaction. */
+export function openHangingTransaction(): void {
+  execFileSync(
+    'docker',
+    [
+      'exec',
+      '-e',
+      'KAFKA_HEAP_OPTS=-Xms16m -Xmx128m',
+      `${PROJECT}-kafka-2-1`,
+      'sh',
+      '-c',
+      `/opt/kafka/bin/kafka-producer-perf-test.sh --topic payments --num-records 1000000 --record-size 128 --throughput 20 --transactional-id payments-settlement --transaction-duration-ms 3600000 --producer-props bootstrap.servers=${BOOTSTRAP} transaction.timeout.ms=60000 >/dev/null 2>&1 & pid=$!; sleep 25; kill -9 $pid`,
+    ],
+    { stdio: 'ignore', timeout: 90_000 },
+  );
+}
+
+/** Puts `group`'s committed offset on one partition of `topic` where the test wants it (the group must be empty). */
+export function placeGroup(group: string, topic: string, partition: number, offset: number): void {
+  kafka(
+    'kafka-consumer-groups.sh',
+    '--group',
+    group,
+    '--topic',
+    `${topic}:${partition}`,
+    '--reset-offsets',
+    '--to-offset',
+    String(offset),
+    '--execute',
+  );
+}

@@ -1,9 +1,14 @@
 import { BASE } from '../e2e-base.ts';
 import {
+  attachBillingConsumer,
   committed,
   inContainer,
   kafka,
+  members,
   offsetsAt,
+  openHangingTransaction,
+  placeGroup,
+  produce,
   produceKeyed,
   readCommittedKeys,
   transactionState,
@@ -13,6 +18,43 @@ import type { Flow, Toolkit } from './types.ts';
 const exact = (t: Toolkit, label: string) => t.page.getByLabel(label, { exact: true });
 const press = (t: Toolkit, name: string | RegExp) => t.page.getByRole('button', { name }).click();
 const dialog = (t: Toolkit) => t.page.getByRole('dialog');
+
+/** Puts the seeded states back before the flows that spend them: lag to skip, an active group, a hanging transaction. */
+const prepare: Flow = {
+  id: 'prepare',
+  title: 'the seeded states the flows act on: records to skip, an active group billing, a hanging transaction',
+  run: async (t) => {
+    produce('orders', 800);
+    produce('payments', 600);
+    if (members('billing') === 0) {
+      attachBillingConsumer();
+      await new Promise((r) => setTimeout(r, 8000));
+    }
+    t.check(members('billing') > 0, `billing has ${members('billing')} member on the broker`);
+    const state = (await t.api(`/clusters/${t.cluster}/kafka/transactions`)) as { items: { hanging: boolean }[] };
+    if (!state.items.some((x) => x.hanging)) {
+      openHangingTransaction();
+      // Hanging is a minute past the transaction's own one minute timeout.
+      for (let i = 0; i < 24; i++) {
+        await new Promise((r) => setTimeout(r, 10_000));
+        const now = (await t.api(`/clusters/${t.cluster}/kafka/transactions`)) as { items: { hanging: boolean }[] };
+        if (now.items.some((x) => x.hanging)) break;
+      }
+    }
+    const after = (await t.api(`/clusters/${t.cluster}/kafka/transactions`)) as { items: { hanging: boolean }[] };
+    t.check(
+      after.items.some((x) => x.hanging),
+      'payments-settlement is hanging',
+    );
+    // reporting is a little behind on payments partition 0, above the log start, below the last stable offset.
+    const start = offsetsAt('payments', -2)[0];
+    placeGroup('reporting', 'payments', 0, start + 100);
+    t.check(
+      committed('reporting', 'payments')[0] === start + 100,
+      `reporting is placed at offset ${start + 100} of payments-0`,
+    );
+  },
+};
 
 const estate: Flow = {
   id: 'estate',
@@ -405,20 +447,31 @@ const purgeGroup: Flow = {
     await t.page.waitForTimeout(1500);
     const text = (await dialog(t).innerText()).replace(/\s+/g, ' ');
     t.note(`purge dialog: ${text.slice(0, 300)}`);
+    // The purge moves the group to the last stable offset: records of the open transaction above it stay to read.
+    const skipping = Number(/skipping ([\d,]+) records/.exec(text)?.[1]?.replace(/,/g, '') ?? NaN);
     t.check(
-      text.includes(lagBefore.toLocaleString('en')),
-      `the dialog states the ${lagBefore.toLocaleString('en')} records the broker counts`,
+      skipping > 0 && skipping <= lagBefore,
+      `the dialog states ${skipping} records to skip, of the ${lagBefore} the group lags`,
     );
     t.check(
       !/is unavailable|does not know/.test(text),
       'the dialog does not call the count unavailable or unknown while it states it (it says: "How many messages that destroys is unavailable ... a figure Rahdar does not know")',
     );
     t.check(lagOf('reporting') === lagBefore, 'nothing moved before the hold');
-    // 1,199 records is over the default safety cap of 1,000, so the run is armed only with the override.
-    await dialog(t).getByRole('checkbox', { name: 'Override the safety cap for this run' }).check();
-    await t.hold(/^Purge 1 subscription$/);
+    t.check(
+      /No record is deleted/.test(text) && !/destroy|cannot be undone/i.test(text),
+      'the dialog says no record is deleted, and never destroy or cannot be undone',
+    );
+    t.check(
+      (await dialog(t).getByRole('checkbox', { name: 'Override the safety cap for this run' }).count()) === 0,
+      'no safety cap applies to a purge that deletes nothing',
+    );
+    await t.hold(/^Skip [\d,]+ records? for 1 group$/);
     await t.page.waitForTimeout(3500);
-    t.check(lagOf('reporting') === 0, `the broker now shows reporting with lag ${lagOf('reporting')}`);
+    t.check(
+      lagOf('reporting') === lagBefore - skipping,
+      `the broker's lag of reporting fell from ${lagBefore} by the ${skipping} the dialog stated, to ${lagOf('reporting')}`,
+    );
     const event = (await audit(t)).find((e) => /PURGE/i.test(e.action));
     t.note(`audit: ${JSON.stringify(event)?.slice(0, 400)}`);
     t.check(event?.outcome === 'SUCCESS', `an audit row records the purge (${event?.action}, ${event?.outcome})`);
@@ -480,6 +533,8 @@ const bulkPurge: Flow = {
   title: 'a bulk purge of a mixed selection refuses the active group naming its members and acts on the empty ones',
   expectedStatus: [409],
   run: async (t) => {
+    produce('orders', 300);
+    produce('payments', 300);
     const lag = { analytics: lagOf('analytics'), reporting: lagOf('reporting') };
     t.check(
       lag.analytics > 0 && lag.reporting > 0,
@@ -500,11 +555,11 @@ const bulkPurge: Flow = {
     t.check(/analytics/.test(text) && /reporting/.test(text), 'the preview lists the empty groups as acting');
     const override = dialog(t).getByRole('checkbox', { name: 'Override the safety cap for this run' });
     if (await override.count()) await override.check();
-    await t.hold(/^Purge \d+ subscriptions?$/);
+    await t.hold(/^(Purge|Skip)\b.*(subscriptions?|groups?)$/);
     await t.page.waitForTimeout(5000);
     t.check(
-      lagOf('analytics') === 0 && lagOf('reporting') === 0,
-      `the broker shows analytics ${lagOf('analytics')} and reporting ${lagOf('reporting')} with no lag`,
+      lagOf('analytics') === 0 && lagOf('reporting') < lag.reporting,
+      `the broker shows analytics at ${lagOf('analytics')} and reporting at ${lagOf('reporting')} (from ${lag.reporting}; the records above the open transaction stay to read)`,
     );
     const result = (await t.page.locator('main').innerText()).replace(/\s+/g, ' ');
     t.note(`result page: ${t.page.url()} ${result.slice(0, 700)}`);
@@ -570,6 +625,8 @@ const abortTransaction: Flow = {
   title:
     'aborting the hanging transaction releases the partitions it held: a read-committed consumer sees what was written after it',
   run: async (t) => {
+    // The brokers run with a stuck coordinator here (compose.isolated*.yaml): a simulation, since a real coordinator
+    // aborts a transaction that outlives its timeout.
     const marker = `e2e-marker-${Date.now()}`;
     const row = (
       (await t.api(`/clusters/${t.cluster}/kafka/transactions`)) as { items: { id: string; hanging: boolean }[] }
@@ -620,6 +677,7 @@ const heldReset: Flow = {
       status.enforcing && status.quorate && status.approvers >= 2,
       `the gate is enforcing with ${status.approvers} approvers`,
     );
+    produce('orders', 400);
     const before = committed('analytics', 'orders');
     const requester = await t.as('requester');
     await requester.goto(`${BASE}/clusters/${t.cluster}/kafka/groups/analytics`);
@@ -843,7 +901,60 @@ const tombstone: Flow = {
   },
 };
 
+const heldTruncate: Flow = {
+  id: 'held-truncate',
+  title: 'a truncate by the requester is held, and cuts the log only once the second approver approves',
+  run: async (t) => {
+    const before = offsetsAt('inventory', -2);
+    const requester = await t.as('requester');
+    await requester.goto(`${BASE}/clusters/${t.cluster}/destinations`);
+    await requester.getByRole('button', { name: 'Actions for inventory' }).first().click();
+    await requester.getByRole('menuitem', { name: /Truncate/ }).click();
+    const dlg = requester.getByRole('dialog');
+    await dlg.getByRole('textbox', { name: /Delete records before/ }).fill('0:60');
+    await dlg.getByRole('button', { name: 'Preview the cut' }).click();
+    const confirm = dlg.getByRole('button', { name: /^Truncate [\d,]+ records?$/ });
+    await confirm.waitFor();
+    await confirm.hover();
+    await requester.mouse.down();
+    await requester.waitForTimeout(1900);
+    await requester.mouse.up();
+    await requester.waitForTimeout(2500);
+    const seen = (await requester.locator('body').innerText()).replace(/\s+/g, ' ');
+    t.check(/approval|second person/i.test(seen), 'the requester is told the truncate awaits approval');
+    t.check(
+      JSON.stringify(offsetsAt('inventory', -2)) === JSON.stringify(before),
+      'the log start has not moved while held',
+    );
+    const list = (await t.api('/held-operations?scope=DECIDABLE&state=HELD&limit=50')) as {
+      items: { id: string; summary: string }[];
+    };
+    const held = list.items.find((r) => /inventory/.test(r.summary));
+    t.note(`held request: ${JSON.stringify(held)}`);
+    t.check(Boolean(held), 'the held truncate is listed with the topic named');
+    if (!held) return;
+    const approver = await t.signedIn('qa-approver');
+    await approver.goto(`${BASE}/approvals/${held.id}`);
+    await approver
+      .getByRole('button', { name: /^Approve/ })
+      .first()
+      .click();
+    const ok = approver.getByRole('dialog');
+    await ok.waitFor();
+    const go = ok.getByRole('button', { name: /^Approve$/ }).last();
+    await go.hover();
+    await approver.mouse.down();
+    await approver.waitForTimeout(1900);
+    await approver.mouse.up();
+    await approver.waitForTimeout(4000);
+    const after = offsetsAt('inventory', -2);
+    t.note(`log start before ${JSON.stringify(before)} after ${JSON.stringify(after)}`);
+    t.check(after[0] === 60, 'the broker log start of partition 0 is 60 after the approval');
+  },
+};
+
 export const FLOWS: Flow[] = [
+  prepare,
   estate,
   register,
   groups,
@@ -851,12 +962,13 @@ export const FLOWS: Flow[] = [
   resetRefused,
   topicConfig,
   acls,
-  purgeGroup,
   truncate,
+  purgeGroup,
   bulkPurge,
   backlogDrawer,
-  abortTransaction,
   heldReset,
+  heldTruncate,
   browse,
   tombstone,
+  abortTransaction,
 ];
