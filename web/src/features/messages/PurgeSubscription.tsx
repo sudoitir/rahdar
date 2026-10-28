@@ -57,7 +57,7 @@ function Consequence({
       {moves ? (
         <Text size="sm">
           This moves the position of {subscriptionName} to the end of its log, skipping approximately{' '}
-          {records(preview.affectedCount)} (point-in-time estimate). No record is deleted: the group will not read those
+          {records(preview.skippedCount)} (point-in-time estimate). No record is deleted: the group will not read those
           records, and can be reset back.
         </Text>
       ) : (
@@ -121,7 +121,7 @@ export function PurgeSubscription({
   };
 
   let confirmLabel = overCap ? 'Purge anyway, over the cap' : 'Purge subscription';
-  if (moves) confirmLabel = preview ? `Skip ${records(preview.affectedCount)}` : 'Skip the records';
+  if (moves) confirmLabel = preview ? `Skip ${records(preview.skippedCount)}` : 'Skip the records';
 
   const confirm = () =>
     purge.mutate(

@@ -16,6 +16,7 @@ export const CAUSE_WORDS: Record<string, string> = {
   AUTHENTICATION: 'Authentication failed',
   AUTHORIZATION: 'The account may not describe the cluster',
   UNSUPPORTED_VERSION: 'This version is not supported',
+  ADVERTISED_UNREACHABLE: 'The brokers advertise addresses Rahdar cannot reach',
 };
 
 const ROLE: Record<string, string> = { PRIMARY: 'Primary', BACKUP: 'Backup', NONE: 'Standalone' };

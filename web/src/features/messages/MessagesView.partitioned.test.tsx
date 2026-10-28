@@ -184,6 +184,24 @@ describe('MessagesView on a partitioned log', () => {
     expect(await screen.findByText('No records from here')).toBeInTheDocument();
   });
 
+  it("says where the group stands on the partition when it is read through the group's subscription", async () => {
+    mockKafka(() =>
+      page([record(0)], {
+        partition: 0,
+        start: 0,
+        end: 900,
+        next: null,
+        retentionMoved: false,
+        uncommittedHidden: true,
+        subscriptionPosition: 640,
+      }),
+    );
+    renderWithProviders(<MessagesView />);
+
+    expect(await screen.findByText('Where the group stands')).toBeInTheDocument();
+    expect(screen.getByText(/The group stands at offset 640 on partition 0/)).toBeInTheDocument();
+  });
+
   it("keeps move, retry, delete and expire visible but disabled, with the system's own words", async () => {
     mockKafka(() =>
       page([record(0)], { partition: 0, start: 0, end: 1, next: null, retentionMoved: false, uncommittedHidden: true }),
@@ -246,7 +264,7 @@ describe('MessagesView on a partitioned log', () => {
         const dryRun = new URL(request.url).searchParams.get('dryRun') === 'true';
         calls.push(dryRun);
         return dryRun
-          ? HttpResponse.json({ affectedCount: 1200, cap: 100000, overCap: false, dryRun: true })
+          ? HttpResponse.json({ affectedCount: 0, skippedCount: 1200, cap: 100000, overCap: false, dryRun: true })
           : HttpResponse.json(
               { title: 'Failed precondition', detail: 'The group began rebalancing. Try again when it is stable.' },
               { status: 409 },

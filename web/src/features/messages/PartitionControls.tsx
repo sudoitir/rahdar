@@ -125,6 +125,11 @@ export function PartitionNotices({
           {`Records before offset ${log.start} are gone, so the browse starts there, not where it was asked to.`}
         </Notice>
       ) : null}
+      {log?.subscriptionPosition != null ? (
+        <Notice tone="neutral" title="Where the group stands">
+          {`The group stands at offset ${log.subscriptionPosition.toLocaleString()} on partition ${log.partition}: records from there on it has not read yet.`}
+        </Notice>
+      ) : null}
       {log?.uncommittedHidden !== false ? (
         <Notice tone="neutral" title="Only committed records are shown">
           Records of a transaction that is still open or was aborted are not shown.

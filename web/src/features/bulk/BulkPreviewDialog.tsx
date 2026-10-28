@@ -40,11 +40,15 @@ function blastRadius(operation: BulkOperation, preview: BulkRunDetailView, moves
   if (!op.destructive) return `${scope}.`;
   if (moves) {
     const to = `${plural(acting.length, 'group')} to the end of the log`;
-    if (run.estimate == null) {
+    const known = acting.filter((i) => i.skipped != null);
+    if (known.length === 0) {
       return `Moves ${to}, skipping a number of records that is unavailable. No record is deleted; the groups will not read the records they skip.`;
     }
-    const records = plural(run.estimate, 'record');
-    return `Moves ${to}, skipping ${run.estimateComplete ? '' : 'at least '}${records}. No record is deleted; the groups will not read the records they skip.`;
+    const records = plural(
+      known.reduce((sum, i) => sum + (i.skipped ?? 0), 0),
+      'record',
+    );
+    return `Moves ${to}, skipping ${known.length === acting.length ? '' : 'at least '}${records}. No record is deleted; the groups will not read the records they skip.`;
   }
   if (run.estimate == null || (acting.length > 0 && acting.every((i) => i.affected == null))) {
     return `${scope}. How many messages that destroys is unavailable. This cannot be undone.`;
@@ -287,8 +291,11 @@ export function BulkPreviewDialog({
     operation === 'PURGE' &&
     acting.length > 0 &&
     acting.every((i) => cluster.data?.kinds?.find((k) => k.id === i.kind)?.partitioned === true);
+  const skippedTotal = acting.some((i) => i.skipped != null)
+    ? acting.reduce((sum, i) => sum + (i.skipped ?? 0), 0)
+    : null;
   const confirmLabel = moves
-    ? `Skip ${data?.run.estimate == null ? 'records' : plural(data.run.estimate, 'record')} for ${plural(acting.length, 'group')}`
+    ? `Skip ${skippedTotal === null ? 'records' : plural(skippedTotal, 'record')} for ${plural(acting.length, 'group')}`
     : `${op.verb} ${plural(acting.length, 'subscription')}`;
 
   const start = () => {

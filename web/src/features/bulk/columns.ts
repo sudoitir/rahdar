@@ -9,7 +9,11 @@ import { ItemOutcome, SubscriptionButton, RunLink, RunOutcome } from './cells.ts
 import { itemStatus, OPERATIONS, runStatus } from './words.ts';
 
 /** An unknown figure is stated, never shown as zero. */
-const messagesOf = (i: BulkItemView) => (i.affected == null ? 'unknown' : i.affected.toLocaleString());
+const messagesOf = (i: BulkItemView) => {
+  // A purge of a log destroys nothing and passes over records: that is the figure, said as it is.
+  if (i.skipped != null) return `${i.skipped.toLocaleString()} skipped`;
+  return i.affected == null ? 'unknown' : i.affected.toLocaleString();
+};
 
 /** How many messages a destroy would take from each subscription; only a destroy has the column. */
 const messagesColumn = (id: string): Column<BulkItemView> => ({

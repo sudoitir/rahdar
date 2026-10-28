@@ -38,6 +38,13 @@ export function announceResult(
     });
     return;
   }
+  if (result.skippedCount > 0) {
+    notify.succeeded({
+      action: VERBS[kind],
+      subject: `subscription "${subscriptionName}", passing over ${result.skippedCount.toLocaleString()} record${result.skippedCount === 1 ? '' : 's'}`,
+    });
+    return;
+  }
   notify.succeeded({
     action: VERBS[kind],
     subject: `${messageCount(result.affectedCount)} in subscription "${subscriptionName}"`,
