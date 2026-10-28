@@ -108,7 +108,7 @@ The ACLs screen SHALL list ACLs by principal, resource and operation, filtered b
 - **THEN** it explains that the cluster has no authorizer configured, so it enforces no ACLs, and offers no add action
 
 ### Requirement: Hanging transactions can be aborted
-The transactions screen SHALL list transactional ids with their state, age and timeout, highlight in words a transaction open longer than its timeout with the partitions it blocks, and SHALL let an operator with the transaction abort permission abort it after a preview that says the producer is fenced and the blocked partitions are released. The abort SHALL be a held confirmation, go through the approval gate, and be audited.
+The transactions screen SHALL list open transactional ids with their state, age and timeout as information, saying that the coordinator aborts a transaction past its timeout by itself, and SHALL flag in words one still open after its timeout and the coordinator's cleanup, with the partitions it blocks. It SHALL let an operator with the transaction abort permission abort such a transaction, and no other (a refusal that says why), after a preview that says the producer is fenced and the blocked partitions are released. The abort SHALL be a held confirmation, go through the approval gate, and be audited.
 
 #### Scenario: A hanging transaction
 - **WHEN** a transaction has been open longer than its timeout

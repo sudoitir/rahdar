@@ -68,6 +68,7 @@ curl -s https://rahdar.example.com/mcp \
 | Tool | `kafka_preview_offset_reset`、`kafka_reset_offsets` | 一次重置会移动什么，以及按预览执行的重置本身 |
 | Tool | `kafka_topic_config`、`kafka_set_topic_config` | 主题的各项设置及其来源，以及修改它们 |
 | Tool | `kafka_list_acls` | 集群的 ACL |
+| Tool | `kafka_list_transactions` | 事务 ID 及其状态、开始时间、超时、是否挂起以及阻塞的分区；`hangingOnly` 只保留协调器漏掉的事务 |
 | Tool | `kafka_abort_transaction` | 在预览之后中止一个事务 |
 | Tool | `setup_review` | 集群最近一次的配置评审 |
 | Tool | `alert_rule` / `rahdar_setting` | 告警规则；运维设置 |

@@ -7873,7 +7873,7 @@ export interface components {
             startedAt?: string | null;
             /** Format: int64 */
             timeoutMs: number;
-            /** @description Open longer than its timeout. */
+            /** @description Open past its timeout and the coordinator's cleanup: the coordinator aborts an open transaction by itself within seconds of its timeout, so one still open has been missed. */
             hanging: boolean;
             blocked: components["schemas"]["BlockedPartition"][];
         };

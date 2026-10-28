@@ -23,9 +23,12 @@ import io.github.sudoitir.rahdar.support.McpFixture;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
 import io.github.sudoitir.rahdar.system.kafka.KafkaOffsetResets;
 import io.github.sudoitir.rahdar.system.kafka.KafkaOffsets;
+import io.github.sudoitir.rahdar.system.kafka.KafkaTransactions;
 import io.github.sudoitir.rahdar.system.kafka.web.KafkaViews.OffsetPreview;
 import io.github.sudoitir.rahdar.system.kafka.web.KafkaViews.OffsetRequest;
 import io.github.sudoitir.rahdar.system.kafka.web.KafkaViews.OffsetRow;
+import io.github.sudoitir.rahdar.system.kafka.web.KafkaViews.TransactionPage;
+import io.github.sudoitir.rahdar.system.kafka.web.KafkaViews.TransactionRow;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -63,6 +66,9 @@ class McpKafkaToolsTest extends PostgresIntegrationTest {
 
     @MockitoBean
     KafkaOffsetResets resets;
+
+    @MockitoBean
+    KafkaTransactions transactions;
 
     @Autowired
     WebApplicationContext webContext;
@@ -190,6 +196,21 @@ class McpKafkaToolsTest extends PostgresIntegrationTest {
         } finally {
             SecurityContextHolder.clearContext();
         }
+    }
+
+    @Test
+    void theTransactionsListKeepsOnlyTheHangingOnesWhenAsked() throws Exception {
+        TransactionRow hanging =
+                new TransactionRow("payments-tx", "ongoing", Instant.now().minusSeconds(3600), 60_000, true, List.of());
+        TransactionRow live = new TransactionRow("live-tx", "ongoing", Instant.now(), 60_000, false, List.of());
+        when(transactions.list(eq(CLUSTER), any(), any()))
+                .thenReturn(new TransactionPage(List.of(live, hanging), null));
+
+        JsonNode all = call("kafka_list_transactions", Map.of("clusterId", CLUSTER.toString()));
+        JsonNode only = call("kafka_list_transactions", Map.of("clusterId", CLUSTER.toString(), "hangingOnly", true));
+
+        assertThat(text(all)).contains("live-tx").contains("payments-tx");
+        assertThat(text(only)).contains("payments-tx").doesNotContain("live-tx");
     }
 
     private List<String> listedTools() throws Exception {

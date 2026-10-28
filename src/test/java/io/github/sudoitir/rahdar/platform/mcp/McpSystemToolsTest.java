@@ -134,6 +134,7 @@ class McpSystemToolsTest {
                         "kafka_topic_config",
                         "kafka_set_topic_config",
                         "kafka_list_acls",
+                        "kafka_list_transactions",
                         "kafka_abort_transaction");
     }
 

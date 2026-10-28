@@ -281,7 +281,11 @@ public final class KafkaViews {
             @Schema(nullable = true) Instant startedAt,
             @Schema(requiredMode = REQUIRED) long timeoutMs,
 
-            @Schema(requiredMode = REQUIRED, description = "Open longer than its timeout.")
+            @Schema(
+                    requiredMode = REQUIRED,
+                    description =
+                            "Open past its timeout and the coordinator's cleanup: the coordinator aborts an open"
+                                    + " transaction by itself within seconds of its timeout, so one still open has been missed.")
             boolean hanging,
 
             @Schema(requiredMode = REQUIRED) List<BlockedPartition> blocked) {}

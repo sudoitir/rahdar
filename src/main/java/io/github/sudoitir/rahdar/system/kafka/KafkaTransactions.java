@@ -47,6 +47,13 @@ public class KafkaTransactions {
                 page.continueToken().orElse(null));
     }
 
+    /**
+     * How long past its timeout an open transaction is left to the coordinator, which aborts it by itself within
+     * about ten seconds (its cleanup interval). Only one still open after this has been missed, and is the one an
+     * operator may abort.
+     */
+    static final Duration COORDINATOR_GRACE = Duration.ofSeconds(60);
+
     public AbortPreview abortPreview(UUID clusterId, String id) {
         access.requireCluster(clusterId, KafkaModule.TRANSACTION_ABORT);
         ClusterConnection connection = gateway.cluster(clusterId);
@@ -68,8 +75,8 @@ public class KafkaTransactions {
                                 : blocked.size() == 1 ? "1 blocked partition" : blocked.size() + " blocked partitions")
                         + ". The producer " + producer + " is fenced: its next write fails and it must restart."
                 : open(state)
-                        ? "The transaction is open but has not outlived its timeout, so its producer is still working:"
-                                + " it is not aborted."
+                        ? "The transaction is open and within its timeout, or just past it: the coordinator aborts"
+                                + " one past its timeout by itself, so it is left to it."
                         : "The transaction is " + state + ", not open, so there is nothing to abort.";
         return new AbortPreview(id, state, blocked, effect, abortable, preview.etag());
     }
@@ -107,7 +114,7 @@ public class KafkaTransactions {
         return new TransactionRow(t.id().name(), state, start, timeout, hanging(t, now), blocked(t));
     }
 
-    /** An open transaction that has outlived its timeout: what holds readers back, and the only one to abort. */
+    /** An open transaction the coordinator has not aborted past its timeout and cleanup: the only one to abort. */
     static boolean hanging(Resource t, Instant now) {
         String state = KafkaGroups.text(t, KafkaKinds.TRANSACTION_STATE);
         long timeout = t.attributes()
@@ -122,7 +129,7 @@ public class KafkaTransactions {
         return open(state)
                 && start != null
                 && timeout > 0
-                && Duration.between(start, now).toMillis() > timeout;
+                && Duration.between(start, now).toMillis() > timeout + COORDINATOR_GRACE.toMillis();
     }
 
     /** The partitions the transaction has touched, which a reader of committed records waits behind. */

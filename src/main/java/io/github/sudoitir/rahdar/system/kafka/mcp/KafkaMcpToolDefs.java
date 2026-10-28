@@ -68,6 +68,15 @@ public final class KafkaMcpToolDefs {
                     "A page of a Kafka cluster's ACLs, filtered by principal or resource.",
                     Param.note("principal", "Such as User:app."),
                     Param.note("resource", "Such as topic:orders.")),
+            read(
+                    "kafka_list_transactions",
+                    "A page of a Kafka cluster's transactional ids: state, start, timeout, whether it hangs and what it holds back.",
+                    Param.note(
+                            "hangingOnly",
+                            "Only transactions still open past their timeout and the coordinator's cleanup: the"
+                                    + " coordinator aborts an open one by itself within seconds of its timeout, so"
+                                    + " one that is listed has been missed. Follow next to go on."),
+                    Param.note("cursor", "The next value of the previous page; absent for the first.")),
             mutate(
                     "kafka_abort_transaction",
                     "Abort a hanging transaction, fencing its producer.",

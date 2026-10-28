@@ -171,7 +171,19 @@ any broker call. Lists page with an opaque `cursor` and `limit` (default 100, ma
 | `GET acls?principal&resource&cursor` | `{available, reason?, items: [{principal, host, operation, permission, resourceType, pattern, name}], next}` | `access-rule:read` |
 | `POST acls:preview` / `:apply` | `{add: [acl], remove: [acl]}` → effective access before/after per principal and resource, `losses: ["User:app loses READ on topic orders"]`, DENY notes, `etag` | `access-rule:write` |
 | `GET transactions` | `{items: [{id, state, startedAt?, timeout, hanging, blocked: [{topic, partition}]}]}` | `transaction:read` |
-| `POST transactions/{id}:abort-preview` / `:abort` | effect names the blocked partitions and that the producer is fenced; `etag` | `transaction:abort` |
+| `POST transactions/{id}:abort-preview` / `:abort` | effect names the blocked partitions and that the producer is fenced; `abortable`; `etag`; `409 transaction-not-hanging` unless abortable | `transaction:abort` |
+
+**Transactions model.** The coordinator aborts an open transaction past its timeout by itself within
+about ten seconds, so an open transaction is not the operator's incident. The listing shows the open
+transactional ids as information (state, age, timeout, that the coordinator aborts it after its
+timeout). `hanging` and `abortable` mean the coordinator has missed one: still open past its timeout and
+sixty seconds of cleanup; only those can be aborted by transactional id, as a preview, a hold, the gate
+and an audit row. The incident is the hanging transaction of KIP-664: open on a partition, unknown to the
+coordinator, holding the partition's last stable offset back for ever. The SDK lists those on demand as
+the kind `kafka.hanging-transaction` (`topic/partition/producerId`; attributes `kafka.hanging_topic`,
+`kafka.hanging_partition`, `kafka.hanging_age_ms`) with a RESOLVE that aborts one per partition, previewed
+with an etag. The screen gains a "Hanging transactions" section from a Find action (the cluster, or one
+topic: partition, producer, records held back, age) with Abort per item, and the MCP list returns both.
 | `GET brokers` | `{brokers: [{id, rack?, address, reachable, reason?, leaders, underReplicated, offline}], quorum: {available, reason?, leader?, voters: [{id, lag, caughtUp}], majority}}` | `cluster:read` |
 
 Every mutation is a `GatedOperation` with an `Effect` whose etag is the state key, so the hold, the
@@ -214,7 +226,10 @@ AIP-193 reason. Built-in roles: operator gains `subscription:seek`, `destination
 
 ### D9. MCP
 `kafka_list_groups`, `kafka_describe_group`, `kafka_preview_offset_reset`, `kafka_reset_offsets`,
-`kafka_topic_config`, `kafka_set_topic_config`, `kafka_list_acls`, `kafka_abort_transaction`, with
+`kafka_topic_config`, `kafka_set_topic_config`, `kafka_list_acls`, `kafka_list_transactions` (all
+transactional ids, or with `hangingOnly` those still open past their timeout and the coordinator's
+cleanup, within a bounded scan; the hanging transactions of the planned find action join it when the SDK
+kind lands), `kafka_abort_transaction`, with
 `.forSystem(KafkaModule.SYSTEM)`; mutating tools are `MUTATE`, previewed first and held by `McpGate`.
 Shared enums go into `McpToolCatalog`; `McpToolSchemaBudgetTest` is raised with a comment.
 
