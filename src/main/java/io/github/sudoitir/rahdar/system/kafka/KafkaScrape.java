@@ -75,6 +75,12 @@ class KafkaScrape implements ClusterScrape {
                 answered.add(node.nativeId());
             }
         }
+        for (NodeDescription node : described.value()) {
+            if (!byBroker.containsKey(node.nativeId())) {
+                recorder.adopt(
+                        clusterId, KafkaRegistrar.nameOf(node), node.nativeId(), KafkaRegistrar.dataEndpoints(node));
+            }
+        }
         described.failures().forEach((node, failure) -> record(byBroker.get(node.value()), failure));
         stored.stream()
                 .filter(node -> node.getNativeNodeId() != null && !answered.contains(node.getNativeNodeId()))

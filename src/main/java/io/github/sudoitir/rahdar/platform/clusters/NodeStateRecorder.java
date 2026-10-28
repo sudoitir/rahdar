@@ -67,6 +67,23 @@ public class NodeStateRecorder {
     }
 
     /**
+     * A broker the cluster reports that is not stored yet joins the cluster's nodes, so the nodes stay true without a
+     * re-registration. Nothing happens when a node of that name or broker id is already there.
+     */
+    @Transactional
+    public void adopt(
+            UUID clusterId,
+            String name,
+            String nativeNodeId,
+            java.util.List<io.github.sudoitir.openbroker.Endpoint> endpoints) {
+        boolean known = nodes.findByClusterIdOrderByNameAsc(clusterId).stream()
+                .anyMatch(n -> name.equals(n.getName()) || nativeNodeId.equals(n.getNativeNodeId()));
+        if (!known) {
+            nodes.save(BrokerNodeEntity.reported(clusterId, name, nativeNodeId, endpoints));
+        }
+    }
+
+    /**
      * Record that the tier-A probe got no usable answer from a node, without disturbing last-known-good HA
      * state. The kind says whether the broker did not answer or refused the credentials.
      */

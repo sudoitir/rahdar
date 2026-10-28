@@ -367,11 +367,11 @@ class KafkaRegistrar implements ClusterRegistrar {
                 .orElse(null);
     }
 
-    private static List<Endpoint> dataEndpoints(NodeDescription node) {
+    static List<Endpoint> dataEndpoints(NodeDescription node) {
         return node.endpoints().stream().filter(e -> e.plane() == Plane.DATA).toList();
     }
 
-    private static String nameOf(NodeDescription node) {
+    static String nameOf(NodeDescription node) {
         return (node.functions().contains(NodeFunction.BROKER) ? "broker-" : "controller-") + node.nativeId();
     }
 
