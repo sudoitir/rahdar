@@ -130,4 +130,22 @@ describe('a topic configuration', () => {
     expect(screen.getByRole('button', { name: 'Change retention.ms' })).toBeDisabled();
     expect(await screen.findByText(/You do not have the "Change topic configuration" permission/)).toBeInTheDocument();
   });
+
+  it('states why an internal topic cannot be changed and disables every change control', async () => {
+    const reason = 'Kafka manages __consumer_offsets itself.';
+    serve();
+    server.use(
+      http.get('*/api/v1/clusters/k1/kafka/topics/orders/config', () =>
+        HttpResponse.json({ ...CONFIG, internal: true, readOnlyReason: reason }),
+      ),
+    );
+    renderAppAt('/clusters/k1/kafka/topics/orders/config');
+
+    const grid = await screen.findByRole('grid', { name: 'Topic configuration' });
+    expect(await screen.findByText(reason)).toBeInTheDocument();
+    expect(await within(grid).findByRole('button', { name: 'Change retention.ms' })).toBeDisabled();
+    expect(within(grid).getByRole('button', { name: 'Change cleanup.policy' })).toBeDisabled();
+    await userEvent.click(within(grid).getByRole('button', { name: /Why changing retention\.ms/ }));
+    await waitFor(() => expect(screen.getAllByText(reason).length).toBeGreaterThan(1));
+  });
 });

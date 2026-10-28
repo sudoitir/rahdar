@@ -4,7 +4,7 @@ import { Link, useParams } from '@tanstack/react-router';
 
 import { useCan } from '../../kernel/auth/useCan.ts';
 import { CapabilityGate } from '../../ui/CapabilityGate.tsx';
-import { gateFor } from '../../ui/capabilityGate.ts';
+import { gateFor, type GateVerdict } from '../../ui/capabilityGate.ts';
 import { ConfirmDialog } from '../../ui/ConfirmDialog.tsx';
 import { EmptyState } from '../../ui/EmptyState.tsx';
 import { ErrorState } from '../../ui/ErrorState.tsx';
@@ -60,7 +60,14 @@ export function TopicConfigView() {
   const preview = usePreviewTopicConfig(clusterId, topic);
   const apply = useApplyTopicConfig(clusterId, topic);
   const { can, loading } = useCan();
-  const gate = gateFor(can('destination:update', clusterId), 'Change topic configuration', undefined, loading);
+  const readOnlyReason = config.data?.readOnlyReason ?? null;
+  const gate = useMemo<GateVerdict>(
+    () =>
+      readOnlyReason
+        ? { kind: 'blocked', reason: readOnlyReason }
+        : gateFor(can('destination:update', clusterId), 'Change topic configuration', undefined, loading),
+    [readOnlyReason, can, clusterId, loading],
+  );
   const [edits, setEdits] = useState<Record<string, Edit>>({});
   const [editing, setEditing] = useState<ConfigEntry | null>(null);
   const [draft, setDraft] = useState('');
@@ -174,6 +181,11 @@ export function TopicConfigView() {
         }
         description="Each setting with the value in force and where it comes from. Change as many as you need, then review them together."
       />
+      {readOnlyReason ? (
+        <Notice tone="warning" title="Read-only configuration">
+          {readOnlyReason}
+        </Notice>
+      ) : null}
       {config.data?.internal ? (
         <Notice tone="info" title="An internal topic">
           Kafka manages this topic itself; changing its settings can affect the whole cluster.
