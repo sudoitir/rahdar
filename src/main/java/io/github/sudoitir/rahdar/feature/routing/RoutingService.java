@@ -84,6 +84,12 @@ public class RoutingService {
     /** Every route the caller may see: the diverts and the bridges, in one list. */
     public PagedView<RouteView> routes(UUID clusterId, ResourceQuery query) {
         clusterAccess.requireVisible(clusterId);
+        boolean routable = gateway.cluster(clusterId).resources().kinds().stream()
+                .anyMatch(k -> k.resourceClass() == ResourceClass.ROUTE);
+        if (!routable) {
+            // A system with no routes between its destinations (Kafka) lists none, rather than failing to reach a node.
+            return query.paginate(List.<RouteView>of(), Comparator.comparing(RouteView::source, nullSafe()));
+        }
         List<ClusterNode> serving = servingManageableNodes(clusterId);
         List<RouteView> views = new ArrayList<>(extensions
                 .forCluster(clusterId, DivertSettings.class)

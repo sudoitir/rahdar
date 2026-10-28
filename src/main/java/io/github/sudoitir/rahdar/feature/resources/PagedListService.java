@@ -11,6 +11,7 @@ import io.github.sudoitir.rahdar.feature.resources.web.ResourceViews.ConnectionV
 import io.github.sudoitir.rahdar.feature.resources.web.ResourceViews.ConsumerView;
 import io.github.sudoitir.rahdar.feature.resources.web.ResourceViews.DestinationView;
 import io.github.sudoitir.rahdar.feature.resources.web.ResourceViews.ProducerView;
+import io.github.sudoitir.rahdar.kernel.core.ConflictException;
 import io.github.sudoitir.rahdar.kernel.core.PagedView;
 import io.github.sudoitir.rahdar.kernel.core.ResourceQuery;
 import io.github.sudoitir.rahdar.kernel.plugin.ResourceType;
@@ -29,7 +30,9 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
@@ -211,19 +214,30 @@ public class PagedListService {
     /** Every node's rows of one kind, merged and tagged with their node; unfiltered, so never returned as is. */
     private <T> List<T> gather(UUID clusterId, ResourceClass kind, RowMapper<T> rowMapper) {
         List<ClusterNode> servingNodes = servingManageableNodes(clusterId);
+        boolean whole = false;
         if (servingNodes.isEmpty()) {
-            throw new BrokerConnectionException(
-                    BrokerConnectionException.Kind.UNREACHABLE,
-                    "This cluster has no reachable node with a management URL.");
+            // A system whose brokers have no management URL is read as one cluster, by the first of its stored
+            // nodes; a system whose nodes have one and none answers is unreachable.
+            List<ClusterNode> stored = nodes.nodes(clusterId);
+            if (stored.isEmpty() || stored.stream().anyMatch(n -> n.getManagementUrl() != null)) {
+                throw new BrokerConnectionException(
+                        BrokerConnectionException.Kind.UNREACHABLE,
+                        "This cluster has no reachable node with a management URL.");
+            }
+            servingNodes = List.of(stored.stream()
+                    .min(Comparator.comparing(ClusterNode::getName))
+                    .orElseThrow());
+            whole = true;
         }
-
         ClusterConnection connection = gateway.cluster(clusterId);
+        requireKind(clusterId, connection, kind);
         List<T> merged = new ArrayList<>();
         BrokerConnectionException firstError = null;
         for (ClusterNode node : servingNodes) {
             try {
                 NodeRef ref = new NodeRef(node.getId(), node.getName());
-                fetch(clusterId, node, kind).forEach(resource -> merged.add(rowMapper.map(resource, ref, connection)));
+                fetch(clusterId, node, kind, whole)
+                        .forEach(resource -> merged.add(rowMapper.map(resource, ref, connection)));
             } catch (BrokerConnectionException e) {
                 if (firstError == null) {
                     firstError = e;
@@ -244,7 +258,7 @@ public class PagedListService {
      * one broker call rather than each making their own. A failed read is not kept, so the
      * next request tries again.
      */
-    private List<Resource> fetch(UUID clusterId, ClusterNode node, ResourceClass kind) {
+    private List<Resource> fetch(UUID clusterId, ClusterNode node, ResourceClass kind, boolean whole) {
         ListKey key = new ListKey(clusterId, node.getId(), kind);
         long now = System.nanoTime();
         CompletableFuture<List<Resource>> mine = new CompletableFuture<>();
@@ -255,7 +269,7 @@ public class PagedListService {
                         : new RecentList(mine, now + FRESH.toNanos()));
         if (winner.page() == mine) {
             try {
-                mine.complete(list(clusterId, node, kind));
+                mine.complete(list(clusterId, node, kind, whole));
             } catch (RuntimeException e) {
                 recent.remove(key, winner);
                 mine.completeExceptionally(e);
@@ -268,17 +282,40 @@ public class PagedListService {
         }
     }
 
-    /** One node's whole list of one class, failing as Rahdar's broker exceptions. */
-    private List<Resource> list(UUID clusterId, ClusterNode node, ResourceClass kind) {
+    /**
+     * One node's whole list of one class, or the whole cluster's when the system is read as one, every page of it and
+     * failing as Rahdar's broker exceptions.
+     */
+    private List<Resource> list(UUID clusterId, ClusterNode node, ResourceClass kind, boolean whole) {
         try {
-            return gateway.cluster(clusterId)
-                    .resources()
-                    .read(io.github.sudoitir.openbroker.model.ResourceQuery.of(kind)
-                            .in(Scope.node(BrokerGateway.idOf(node.getId()))))
-                    .orThrow()
-                    .items();
+            List<Resource> items = new ArrayList<>();
+            Optional<String> next = Optional.empty();
+            do {
+                io.github.sudoitir.openbroker.model.ResourceQuery query =
+                        io.github.sudoitir.openbroker.model.ResourceQuery.of(kind);
+                if (!whole) {
+                    query = query.in(Scope.node(BrokerGateway.idOf(node.getId())));
+                }
+                var page = gateway.cluster(clusterId)
+                        .resources()
+                        .read(next.map(query::continueFrom).orElse(query))
+                        .orThrow();
+                items.addAll(page.items());
+                next = page.continueToken();
+            } while (next.isPresent());
+            return items;
         } catch (BrokerException e) {
             throw BrokerFailures.translate(e);
+        }
+    }
+
+    /** A system that has no kind of this class says so, as a conflict with its reason, never as an unreachable node. */
+    private static void requireKind(UUID clusterId, ClusterConnection connection, ResourceClass kind) {
+        boolean offered = connection.resources().kinds().stream().anyMatch(k -> k.resourceClass() == kind);
+        if (!offered) {
+            throw new ConflictException(
+                    "unavailable-on-system",
+                    "This cluster's system has no " + kind.name().toLowerCase(Locale.ROOT) + " resources to list.");
         }
     }
 

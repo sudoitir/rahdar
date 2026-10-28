@@ -30,7 +30,6 @@ import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 /**
  * The consumer-health verdict ladder (ADR-0089) — the one place it is evaluated.
@@ -71,7 +70,6 @@ public class ConsumerHealthService {
      * Every queue in the cluster, ranked worst-first unless the caller asked for another
      * order. A request path, so it keeps to the queues the caller may read before ranking, paging or counting.
      */
-    @Transactional(readOnly = true)
     public PagedView<ConsumerHealth> page(UUID clusterId, ResourceQuery query) {
         clusterAccess.requireVisible(clusterId);
         ResourceFilter readable = permissions.filter(clusterId, ResourceType.SUBSCRIPTION);
@@ -90,7 +88,6 @@ public class ConsumerHealthService {
     }
 
     /** One queue's verdict, for the drawer panel and the {@code diagnose} tool. */
-    @Transactional(readOnly = true)
     public Optional<ConsumerHealth> forSubscription(UUID clusterId, String queueName) {
         clusterAccess.requireResource(clusterId, ResourceRef.subscription(queueName), Permissions.SUBSCRIPTION_READ);
         return evaluated(clusterId).stream()
@@ -105,7 +102,6 @@ public class ConsumerHealthService {
      * {@code SlowConsumerCondition} — wide enough that a queue swept on the slow tier has
      * two samples in it, narrow enough that the rate still describes now.
      */
-    @Transactional(readOnly = true)
     public List<ConsumerHealth> evaluate(UUID clusterId) {
         return evaluated(clusterId);
     }
