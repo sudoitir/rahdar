@@ -48,10 +48,11 @@ import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterE
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterRepository;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.EnvironmentRepository;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterRequests.AccountUpdate;
-import io.github.sudoitir.rahdar.platform.clusters.web.ClusterRequests.KafkaConnectionUpdate;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterRequests.NodeOverrideRequest;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterRequests.RegisterClusterRequest;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterRequests.UpdateClusterRequest;
+import io.github.sudoitir.rahdar.platform.clusters.web.ClusterRequests.UpdateClusterRequest.ArtemisConnectionUpdate;
+import io.github.sudoitir.rahdar.platform.clusters.web.ClusterRequests.UpdateClusterRequest.ConnectionUpdate;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.AdoptionCountsView;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.AdoptionPreviewView;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.CapabilitiesView;
@@ -161,18 +162,26 @@ public class ClusterService {
             AccountUpdate management,
             AccountUpdate core,
             boolean clearCore,
-            KafkaConnectionUpdate connection) {
+            ConnectionUpdate connection,
+            UUID environmentId) {
 
         UpdateClusterRequest toRequest() {
-            return new UpdateClusterRequest(
-                    name,
-                    description,
-                    seedUrls,
-                    managementUrlPattern,
-                    tlsBundle,
-                    management,
-                    clearCore ? AccountUpdate.CLEAR : core,
-                    connection);
+            boolean artemis = seedUrls != null
+                    || managementUrlPattern != null
+                    || tlsBundle != null
+                    || management != null
+                    || core != null
+                    || clearCore;
+            ConnectionUpdate edit = connection != null || !artemis
+                    ? connection
+                    : new ArtemisConnectionUpdate(
+                            ArtemisModule.SYSTEM,
+                            seedUrls,
+                            managementUrlPattern,
+                            tlsBundle,
+                            management,
+                            clearCore ? AccountUpdate.CLEAR : core);
+            return new UpdateClusterRequest(name, description, environmentId, edit);
         }
     }
 
@@ -210,14 +219,19 @@ public class ClusterService {
     // ---- connection check (?dryRun=true) -------------------------------------
 
     @PreAuthorize("@perm.can(T(io.github.sudoitir.rahdar.platform.clusters.ClusterPermissions).CLUSTER_WRITE)")
-    public Attempt<?> checkConnection(RegisterClusterRequest request) {
+    public ConnectionCheck checkConnection(RegisterClusterRequest request) {
         systemRegistration.requireSupported(request);
         if (systemRegistration.handles(request.system())) {
-            return new Attempt.Ok<>(systemRegistration.check(request));
+            return systemRegistration.check(request);
         }
         ConnectionInputs inputs = inputsOf(request);
         try (ProbeSession session = gateway.probe(inputs.management())) {
-            return checkConnection(request, inputs, session);
+            return switch (checkConnection(request, inputs, session)) {
+                case Attempt.Ok<RegisterPreview>(var preview) -> ArtemisChecks.of(preview);
+                case Attempt.Failed<RegisterPreview>(var kind, var detail) -> ArtemisChecks.failed(kind, detail);
+            };
+        } catch (ClusterAlreadyRegisteredException held) {
+            return ArtemisChecks.alreadyRegistered(held);
         }
     }
 
@@ -920,9 +934,10 @@ public class ClusterService {
      * the request's values over the stored ones. A password left empty is the stored one, so changing only a
      * pattern is checked with the accounts the cluster already uses.
      */
-    public Object checkUpdate(UUID clusterId, UpdateClusterRequest request) {
+    public ConnectionCheck checkUpdate(UUID clusterId, UpdateClusterRequest request) {
         clusterAccess.requireCluster(clusterId, ClusterPermissions.CLUSTER_WRITE);
         ClusterEntity cluster = requireCluster(clusterId);
+        systemRegistration.requireSameSystem(cluster.getSystem(), request);
         if (systemRegistration.handles(cluster.getSystem())) {
             return systemRegistration.checkUpdate(clusterId, request);
         }
@@ -958,7 +973,7 @@ public class ClusterService {
             }
         }
         audit.succeed(event, rows.size());
-        return new ConnectionCheck(edited.pattern(), rows);
+        return ArtemisChecks.of(edited.pattern(), rows);
     }
 
     /**
@@ -1008,6 +1023,7 @@ public class ClusterService {
     public ClusterConnectionView updateConnection(UUID clusterId, UpdateClusterRequest request) {
         clusterAccess.requireCluster(clusterId, ClusterPermissions.CLUSTER_WRITE);
         ClusterEntity cluster = requireCluster(clusterId);
+        systemRegistration.requireSameSystem(cluster.getSystem(), request);
         if (systemRegistration.handles(cluster.getSystem())) {
             return gatedSystemUpdate(updateParams(clusterId, request), request);
         }
@@ -1030,13 +1046,15 @@ public class ClusterService {
                 request.management(),
                 clearCore ? null : request.core(),
                 clearCore,
-                request.connection());
+                request.connection() instanceof ArtemisConnectionUpdate ? null : request.connection(),
+                request.environmentId());
     }
 
     @Gated("cluster.update")
     private ClusterConnectionView gatedSystemUpdate(ClusterUpdateParams params, UpdateClusterRequest request) {
         return gate.run(Operation.of(params), () -> {
             systemRegistration.update(params.clusterId(), request);
+            applyEnvironment(params.clusterId(), request.environmentId());
             ClusterEntity saved = requireCluster(params.clusterId());
             return new ClusterConnectionView(
                     params.clusterId(),
@@ -1088,9 +1106,26 @@ public class ClusterService {
                     clusterId,
                     e.toString());
         }
+        applyEnvironment(clusterId, request.environmentId());
         ClusterEntity saved = requireCluster(clusterId);
         return new ClusterConnectionView(
                 clusterId, saved.getName(), saved.getDescription(), connectionView(clusterId, saved));
+    }
+
+    /** Moves the cluster to the environment an edit names; an edit that names none leaves it where it is. */
+    private void applyEnvironment(UUID clusterId, UUID environmentId) {
+        if (environmentId == null) {
+            return;
+        }
+        if (!environments.existsById(environmentId)) {
+            throw new NotFoundException("environment", environmentId);
+        }
+        transactions.executeWithoutResult(status -> {
+            ClusterEntity cluster = requireCluster(clusterId);
+            cluster.setEnvironmentId(environmentId);
+            clusters.save(cluster);
+        });
+        environmentIndex.invalidate();
     }
 
     private void saveConnection(UUID clusterId, Edited edited) {

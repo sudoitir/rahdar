@@ -23,16 +23,17 @@ import io.github.sudoitir.rahdar.platform.broker.ConnectionOptions.TlsBundle;
 import io.github.sudoitir.rahdar.platform.broker.ConnectionSettingsSource;
 import io.github.sudoitir.rahdar.platform.broker.CoreConnectionSettings;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterRegistrar;
-import io.github.sudoitir.rahdar.platform.clusters.web.ClusterRequests.KafkaConnectionUpdate;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterRequests.KafkaCredentials;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterRequests.RegisterClusterRequest.Connection;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterRequests.RegisterClusterRequest.KafkaConnection;
+import io.github.sudoitir.rahdar.platform.clusters.web.ClusterRequests.UpdateClusterRequest.ConnectionUpdate;
+import io.github.sudoitir.rahdar.platform.clusters.web.ClusterRequests.UpdateClusterRequest.KafkaConnectionUpdate;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.AccessFinding;
+import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.ConnectionCheck;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.Failure;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.KafkaConnectionDetail;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.NodeReach;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.Quorum;
-import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.RegistrationCheck;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.VersionFound;
 import io.github.sudoitir.rahdar.system.kafka.internal.persistence.KafkaConnectionEntity;
 import io.github.sudoitir.rahdar.system.kafka.internal.persistence.KafkaConnectionRepository;
@@ -65,6 +66,11 @@ class KafkaRegistrar implements ClusterRegistrar {
     /** The attribute the driver puts on every node it describes: the cluster's own id. */
     private static final String CLUSTER_ID = "kafka.cluster_id";
 
+    private static final String CLUSTER_VERSION = "kafka.cluster_version";
+    private static final String CLUSTER_MODE = "kafka.cluster_mode";
+    private static final String QUORUM_CAPABILITY = "kafka.quorum";
+    private static final String ENDPOINT = "kafka.endpoint";
+    private static final String REACH_FAILURE = "kafka.reach_failure";
     private static final String QUORUM_VOTER = "kafka.quorum_voter";
     private static final String QUORUM_LEADER = "kafka.quorum_leader";
     private static final int DEFAULT_PORT = 9092;
@@ -172,12 +178,13 @@ class KafkaRegistrar implements ClusterRegistrar {
 
     @Override
     @Transactional(readOnly = true)
-    public Resolved edited(UUID clusterId, KafkaConnectionUpdate update) {
+    public Resolved edited(UUID clusterId, ConnectionUpdate requested) {
         KafkaConnectionEntity stored =
                 connections.findById(clusterId).orElseThrow(() -> new NotFoundException("cluster", clusterId));
         CoreConnectionSettings account = settings.coreSettings(clusterId);
-        KafkaConnectionUpdate edit =
-                update == null ? new KafkaConnectionUpdate(null, null, null, null, null, null) : update;
+        KafkaConnectionUpdate edit = requested instanceof KafkaConnectionUpdate kafka
+                ? kafka
+                : new KafkaConnectionUpdate(KafkaModule.SYSTEM, null, null, null, null, null, null);
 
         List<String> servers = edit.bootstrapServers() != null
                 ? parse(edit.bootstrapServers())
@@ -233,6 +240,7 @@ class KafkaRegistrar implements ClusterRegistrar {
         String leader = null;
         int voters = 0;
         Optional<String> version = Optional.empty();
+        String mode = null;
         Set<NodeId> described = new LinkedHashSet<>();
         for (NodeDescription node : nodes.value()) {
             described.add(node.node());
@@ -247,7 +255,8 @@ class KafkaRegistrar implements ClusterRegistrar {
                     functions,
                     ok ? "OK" : "UNREACHABLE",
                     ok ? null : causeOf(failure),
-                    ok ? null : failure == null ? "The node did not answer." : failure.getMessage()));
+                    ok ? null : failure == null ? "The node did not answer." : failure.getMessage(),
+                    null));
             if (ok) {
                 reached.add(new DiscoveredNode(node.nativeId(), nameOf(node), dataEndpoints(node)));
             }
@@ -256,7 +265,13 @@ class KafkaRegistrar implements ClusterRegistrar {
                         node.attributes().raw(CLUSTER_ID).map(String::valueOf).orElse(null);
             }
             if (version.isEmpty()) {
-                version = node.version();
+                version = node.attributes()
+                        .raw(CLUSTER_VERSION)
+                        .map(String::valueOf)
+                        .or(node::version);
+            }
+            if (mode == null) {
+                mode = node.attributes().raw(CLUSTER_MODE).map(String::valueOf).orElse(null);
             }
             if (isTrue(node, QUORUM_VOTER)) {
                 voters++;
@@ -269,31 +284,45 @@ class KafkaRegistrar implements ClusterRegistrar {
             if (!described.contains(failure.getKey())) {
                 rows.add(new NodeReach(
                         failure.getKey().value(),
-                        null,
+                        failure.getValue().info().metadata().get(ENDPOINT),
                         List.of(),
                         "UNREACHABLE",
                         causeOf(failure.getValue()),
-                        failure.getValue().getMessage()));
+                        failure.getValue().getMessage(),
+                        null));
             }
         }
-        boolean kraft = voters > 0;
-        Quorum quorum = kraft
+        boolean kraft = mode != null ? "kraft".equalsIgnoreCase(mode) : voters > 0;
+        String quorumReason = report.access().assessments().entrySet().stream()
+                .filter(e -> e.getKey().id().equals(QUORUM_CAPABILITY)
+                        && e.getValue().status() != Assessment.Status.AVAILABLE)
+                .map(e -> e.getValue().reason())
+                .findFirst()
+                .orElse("The cluster reports no controller quorum, as a ZooKeeper-mode cluster does;"
+                        + " its controllers cannot be read.");
+        Quorum quorum = kraft && voters > 0
                 ? new Quorum(true, null, leader, voters)
-                : new Quorum(
-                        false,
-                        "The cluster reports no controller quorum, as a ZooKeeper-mode cluster does; its controllers cannot be read.",
-                        null,
-                        null);
+                : new Quorum(false, quorumReason, null, null);
+        String versionText = version.orElseGet(() -> "at least " + lowerBound());
         VersionFound versionFound = new VersionFound(
-                version.orElseGet(() -> "at least " + lowerBound()),
-                kraft ? "KRaft" : "ZooKeeper",
-                version.isPresent());
+                versionText, kraft ? "KRaft" : "ZooKeeper", version.isPresent() && !versionText.startsWith("at least"));
         List<AccessFinding> access = report.access().assessments().entrySet().stream()
                 .map(e -> finding(e.getKey().id(), e.getValue()))
                 .sorted(java.util.Comparator.comparing(AccessFinding::capability))
                 .toList();
-        RegistrationCheck view = new RegistrationCheck(
-                KafkaModule.SYSTEM, versionFound, true, clusterId, null, rows, quorum, access, null);
+        ConnectionCheck view = new ConnectionCheck(
+                KafkaModule.SYSTEM,
+                versionFound,
+                true,
+                clusterId,
+                null,
+                rows,
+                quorum,
+                access,
+                null,
+                null,
+                null,
+                Map.of());
         return new Checked(view, reached);
     }
 
@@ -337,7 +366,7 @@ class KafkaRegistrar implements ClusterRegistrar {
 
     // ---- failures -----------------------------------------------------------------------------------------------
 
-    private RegistrationCheck failed(BrokerException e) {
+    private ConnectionCheck failed(BrokerException e) {
         String cause = causeOf(e);
         String next =
                 switch (cause) {
@@ -355,7 +384,7 @@ class KafkaRegistrar implements ClusterRegistrar {
         String message = "AUTHORIZATION".equals(cause)
                 ? "The account was accepted but may not describe the cluster. " + e.getMessage()
                 : e.getMessage();
-        return new RegistrationCheck(
+        return new ConnectionCheck(
                 KafkaModule.SYSTEM,
                 null,
                 !"UNSUPPORTED_VERSION".equals(cause),
@@ -364,13 +393,20 @@ class KafkaRegistrar implements ClusterRegistrar {
                 List.of(),
                 null,
                 List.of(),
-                new Failure(cause, message, next));
+                new Failure(cause, message, next),
+                null,
+                null,
+                Map.of());
     }
 
     /** What went wrong reaching a node, from the driver's reason and, for an unreachable one, the cause chain. */
     static String causeOf(BrokerException e) {
         if (e == null) {
             return "TIMEOUT";
+        }
+        String reach = e.info().metadata().get(REACH_FAILURE);
+        if (reach != null) {
+            return reach.toUpperCase(Locale.ROOT);
         }
         switch (e.reason()) {
             case ErrorReasons.TLS_HANDSHAKE_FAILED:

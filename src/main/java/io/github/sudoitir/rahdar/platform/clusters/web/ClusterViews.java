@@ -52,6 +52,12 @@ public final class ClusterViews {
 
             @Schema(
                     requiredMode = REQUIRED,
+                    description =
+                            "Whether the kind reads a partitioned log: browsing is by partition and offset or time.")
+            boolean partitioned,
+
+            @Schema(
+                    requiredMode = REQUIRED,
                     description = "What the system can do to this kind (create, delete, pause, purge, ...), plus"
                             + " what Rahdar adds when the system provides it (reset-counters, expire).")
             List<String> verbs) {}
@@ -73,7 +79,7 @@ public final class ClusterViews {
      * address it advertises and whether Rahdar reached it there, the quorum, what the account may do, and the
      * cause of a failure with the next action.
      */
-    public record RegistrationCheck(
+    public record ConnectionCheck(
             @Schema(requiredMode = REQUIRED, description = "The system's id, such as kafka.")
             String system,
 
@@ -96,10 +102,37 @@ public final class ClusterViews {
             @Schema(requiredMode = REQUIRED) List<AccessFinding> access,
 
             @Schema(nullable = true, description = "Why the check failed, or null when it passed.")
-            Failure failure) {
+            Failure failure,
 
-        public RegistrationCheck withAlreadyRegistered(RegisteredRef ref) {
-            return new RegistrationCheck(system, version, supported, clusterId, ref, nodes, quorum, access, failure);
+            @Schema(
+                    nullable = true,
+                    description = "Artemis only: what adopting the running configuration would declare. Absent when the"
+                            + " caller may not declare configuration, or the configuration feature is off.")
+            AdoptionPreviewView adoption,
+
+            @Schema(nullable = true, description = "Artemis only: the pattern the check derived management URLs from.")
+            String managementUrlPattern,
+
+            @Schema(
+                    requiredMode = REQUIRED,
+                    description = "What each enabled feature adds to the check, keyed by feature id and read from a"
+                            + " reachable node. Empty where a system has none.")
+            Map<String, Object> contributions) {
+
+        public ConnectionCheck withAlreadyRegistered(RegisteredRef ref) {
+            return new ConnectionCheck(
+                    system,
+                    version,
+                    supported,
+                    clusterId,
+                    ref,
+                    nodes,
+                    quorum,
+                    access,
+                    failure,
+                    adoption,
+                    managementUrlPattern,
+                    contributions);
         }
     }
 
@@ -134,7 +167,22 @@ public final class ClusterViews {
             @Schema(nullable = true, description = "DNS, REFUSED, TIMEOUT, TLS or AUTHENTICATION when unreachable.")
             String cause,
 
-            @Schema(nullable = true) String message) {}
+            @Schema(nullable = true) String message,
+
+            @Schema(nullable = true, description = "Artemis only: the node's pair role and how each account fared.")
+            ArtemisNodeDetail artemis) {}
+
+    /** What only an Artemis node reports: its HA role, where its management URL came from, and each account's result. */
+    public record ArtemisNodeDetail(
+            @Schema(nullable = true, description = "The broker's own node id.")
+            String nativeNodeId,
+
+            @Schema(nullable = true) String version,
+            @Schema(requiredMode = REQUIRED) String haRole,
+            @Schema(nullable = true) ManagementUrlSource urlSource,
+            @Schema(nullable = true) ManagementUrlProblem urlProblem,
+            @Schema(requiredMode = REQUIRED) AccountResult management,
+            @Schema(requiredMode = REQUIRED) AccountResult core) {}
 
     /** The controller quorum, or why it cannot be read. */
     public record Quorum(
@@ -331,7 +379,13 @@ public final class ClusterViews {
             @Schema(
                     requiredMode = REQUIRED,
                     description = "Operations that need a newer Artemis release than some node runs")
-            List<VersionGateView> versionGates) {
+            List<VersionGateView> versionGates,
+
+            @Schema(
+                    requiredMode = REQUIRED,
+                    description = "Every capability the system's driver assessed for the account, with its own reason."
+                            + " Empty for a system whose capabilities are the fixed ones above.")
+            List<AccessFinding> findings) {
 
         /** The statuses alone: the reasons and advice name hosts, URLs and broker configuration. */
         public CapabilitiesView withoutConnectionDetails() {
@@ -341,7 +395,10 @@ public final class ClusterViews {
                     bare(notifications),
                     bare(messageIo),
                     bare(slowConsumerDetection),
-                    versionGates);
+                    versionGates,
+                    findings.stream()
+                            .map(f -> new AccessFinding(f.capability(), f.status(), ""))
+                            .toList());
         }
 
         private static CapabilityView bare(CapabilityView capability) {
@@ -419,12 +476,7 @@ public final class ClusterViews {
 
             @Schema(requiredMode = REQUIRED) List<String> notes) {}
 
-    /** {@code PATCH /clusters/{id}?dryRun=true} — what the edited connection would find, nothing saved. */
-    public record ConnectionCheck(
-            @Schema(requiredMode = REQUIRED) String managementUrlPattern,
-            @Schema(requiredMode = REQUIRED) List<NodeProbeView> nodes) {}
-
-    /** {@code POST /clusters?dryRun=true} — what a connection check found, nothing saved. */
+    /** What the Jolokia check found, before it is laid out as a {@link ConnectionCheck}. Never sent as it is. */
     public record RegisterPreview(
             @Schema(requiredMode = REQUIRED) CapabilitiesView capabilities,
             @Schema(requiredMode = REQUIRED) int reachableSeeds,

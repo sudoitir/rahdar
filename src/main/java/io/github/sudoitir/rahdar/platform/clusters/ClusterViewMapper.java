@@ -42,6 +42,7 @@ public interface ClusterViewMapper {
 
     CapabilityView capability(CapabilityAssessment assessment);
 
+    @Mapping(target = "findings", expression = "java(java.util.List.of())")
     CapabilitiesView capabilities(BrokerCapabilities capabilities, List<VersionGate.Assessment> versionGates);
 
     @Mapping(target = "brokerXmlSnippet", ignore = true)

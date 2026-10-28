@@ -64,7 +64,7 @@ public class EstateSubscriptions {
             case "cluster" -> Comparator.comparing(v -> v.cluster().name(), String.CASE_INSENSITIVE_ORDER);
             case "destination" ->
                 Comparator.comparing(v -> v.subscription().destinationName(), String.CASE_INSENSITIVE_ORDER);
-            case "depth", "messageCount" ->
+            case "backlog" ->
                 Comparator.comparingLong(v -> v.subscription().backlog().valueOrZero());
             case "consumers", "consumerCount" ->
                 Comparator.comparingLong(v -> v.subscription().totalConsumerCount());

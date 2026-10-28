@@ -189,19 +189,6 @@ public final class ClusterRequests {
                 implements Connection {}
     }
 
-    /**
-     * A Kafka cluster's connection after an edit: a field left out is left as it is, and a secret left out keeps the
-     * stored one, unless the bootstrap servers, the protocol or the user name changed, which need it again so a
-     * stored secret never reaches a server the cluster did not already use.
-     */
-    public record KafkaConnectionUpdate(
-            List<@NotBlank String> bootstrapServers,
-            String securityProtocol,
-            String saslMechanism,
-            @Valid KafkaCredentials credentials,
-            String tlsBundle,
-            String clientId) {}
-
     /** A Kafka account: a user name and password, or a bearer token. Never returned. */
     public record KafkaCredentials(String username, String password, String token) {}
 
@@ -239,48 +226,129 @@ public final class ClusterRequests {
     }
 
     /**
-     * {@code PATCH /clusters/{id}}: change any of a cluster's connection, in one request. A field left out is
-     * left as it is, and an empty password keeps the stored one. {@code core} set to {@code null} clears the
-     * Core account, so Core connections use the management account again. {@code ?dryRun=true} checks the
-     * edited connection node by node and saves nothing. Typed confirmation of a credential change is
-     * enforced in the UI.
+     * {@code PATCH /clusters/{id}}: change the cluster's name, description and environment, and its
+     * {@code connection}, shaped by its system. A field left out is left as it is, and a secret left out keeps the
+     * stored one. {@code ?dryRun=true} checks the edited connection and saves nothing. Typed confirmation of a
+     * credential change is enforced in the UI.
      *
-     * @param seedUrls the management URLs the operator gives as seeds; a seed no longer listed stops being one
-     * @param tlsBundle a Spring SSL bundle name; empty clears it
-     * @param connection a Kafka cluster's new connection; the Artemis fields above do not apply to it
+     * @param connection the new connection; its {@code system} must be the cluster's
      */
     public record UpdateClusterRequest(
             String name,
             String description,
-            List<@NotBlank String> seedUrls,
-            String managementUrlPattern,
-            String tlsBundle,
-            AccountUpdate management,
+            UUID environmentId,
+            @Valid ConnectionUpdate connection) {
 
-            @JsonDeserialize(using = CoreAccountDeserializer.class)
-            AccountUpdate core,
+        /** An edit of how a cluster is reached: a sealed union keyed by the cluster's system. */
+        @JsonTypeInfo(
+                use = JsonTypeInfo.Id.NAME,
+                include = JsonTypeInfo.As.EXISTING_PROPERTY,
+                property = "system",
+                visible = true,
+                defaultImpl = UnknownConnectionUpdate.class)
+        @JsonSubTypes({
+            @JsonSubTypes.Type(value = ArtemisConnectionUpdate.class, name = "artemis"),
+            @JsonSubTypes.Type(value = KafkaConnectionUpdate.class, name = "kafka")
+        })
+        public sealed interface ConnectionUpdate
+                permits ArtemisConnectionUpdate, KafkaConnectionUpdate, UnknownConnectionUpdate {
 
-            @Valid KafkaConnectionUpdate connection) {
+            String system();
+        }
+
+        /** An edit for a system no installed driver serves. */
+        public record UnknownConnectionUpdate(String system) implements ConnectionUpdate {}
+
+        /**
+         * An Artemis cluster's edit. {@code core} set to {@code null} clears the Core account, so Core connections use
+         * the management account again.
+         *
+         * @param seedUrls the management URLs the operator gives as seeds; a seed no longer listed stops being one
+         * @param tlsBundle a Spring SSL bundle name; empty clears it
+         */
+        public record ArtemisConnectionUpdate(
+                String system,
+                List<@NotBlank String> seedUrls,
+                String managementUrlPattern,
+                String tlsBundle,
+                AccountUpdate management,
+
+                @JsonDeserialize(using = CoreAccountDeserializer.class)
+                AccountUpdate core)
+                implements ConnectionUpdate {
+
+            @JsonIgnore
+            @Schema(hidden = true)
+            @AssertTrue(message = "an account needs a username") public boolean isAccountNamed() {
+                return (management == null || management.named())
+                        && (core == null || core == AccountUpdate.CLEAR || core.named());
+            }
+
+            @JsonIgnore
+            @Schema(hidden = true)
+            @AssertTrue(
+                    message =
+                            "managementUrlPattern must be http(s)://{host}[:port][/path], with {host} as the whole host")
+            public boolean isPatternValid() {
+                return managementUrlPattern == null || ManagementUrlPattern.isValid(managementUrlPattern);
+            }
+
+            @JsonIgnore
+            @Schema(hidden = true)
+            @AssertTrue(message = "Put the account in the Management account fields, not in the URL.") public boolean isSeedsWithoutAccount() {
+                return seedUrls == null || seedUrls.stream().noneMatch(ManagementUrlPattern::hasUserInfo);
+            }
+        }
+
+        /**
+         * A Kafka cluster's edit: a field left out is left as it is, and a secret left out keeps the stored one,
+         * unless the bootstrap servers, the protocol, the mechanism or the user name changed, which need it again so
+         * a stored secret never reaches a server the cluster did not already use.
+         */
+        public record KafkaConnectionUpdate(
+                String system,
+                List<@NotBlank String> bootstrapServers,
+                String securityProtocol,
+                String saslMechanism,
+                @Valid KafkaCredentials credentials,
+                String tlsBundle,
+                String clientId)
+                implements ConnectionUpdate {}
 
         @JsonIgnore
         @Schema(hidden = true)
-        @AssertTrue(message = "an account needs a username") public boolean isAccountNamed() {
-            return (management == null || management.named())
-                    && (core == null || core == AccountUpdate.CLEAR || core.named());
+        public ArtemisConnectionUpdate artemis() {
+            return connection instanceof ArtemisConnectionUpdate a ? a : null;
         }
 
         @JsonIgnore
         @Schema(hidden = true)
-        @AssertTrue(
-                message = "managementUrlPattern must be http(s)://{host}[:port][/path], with {host} as the whole host")
-        public boolean isPatternValid() {
-            return managementUrlPattern == null || ManagementUrlPattern.isValid(managementUrlPattern);
+        public List<String> seedUrls() {
+            return artemis() == null ? null : artemis().seedUrls();
         }
 
         @JsonIgnore
         @Schema(hidden = true)
-        @AssertTrue(message = "Put the account in the Management account fields, not in the URL.") public boolean isSeedsWithoutAccount() {
-            return seedUrls == null || seedUrls.stream().noneMatch(ManagementUrlPattern::hasUserInfo);
+        public String managementUrlPattern() {
+            return artemis() == null ? null : artemis().managementUrlPattern();
+        }
+
+        @JsonIgnore
+        @Schema(hidden = true)
+        public String tlsBundle() {
+            return artemis() == null ? null : artemis().tlsBundle();
+        }
+
+        @JsonIgnore
+        @Schema(hidden = true)
+        public AccountUpdate management() {
+            return artemis() == null ? null : artemis().management();
+        }
+
+        @JsonIgnore
+        @Schema(hidden = true)
+        public AccountUpdate core() {
+            return artemis() == null ? null : artemis().core();
         }
 
         @JsonIgnore

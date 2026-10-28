@@ -19,8 +19,6 @@ import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.ClusterSumma
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.ConnectionCheck;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.HealthView;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.NodeEndpointView;
-import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.RegisterPreview;
-import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.RegistrationCheck;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.TopologyView;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -65,7 +63,7 @@ public class ClusterController {
     @ApiResponse(
             responseCode = "200",
             description = "dryRun=true: connection probe result, nothing persisted",
-            content = @Content(schema = @Schema(oneOf = {RegisterPreview.class, RegistrationCheck.class})))
+            content = @Content(schema = @Schema(implementation = ConnectionCheck.class)))
     @ApiResponse(
             responseCode = "201",
             description = "cluster registered",
@@ -75,7 +73,7 @@ public class ClusterController {
     public ResponseEntity<Object> register(
             @Valid @RequestBody RegisterClusterRequest request, @RequestParam(defaultValue = "false") boolean dryRun) {
         if (dryRun) {
-            return ResponseEntity.ok(unwrap(service.checkConnection(request)));
+            return ResponseEntity.ok(service.checkConnection(request));
         }
         ClusterDetail detail = unwrap(service.register(request));
         return ResponseEntity.status(HttpStatus.CREATED).body(detail);
@@ -122,15 +120,7 @@ public class ClusterController {
     @ApiResponse(
             responseCode = "200",
             description = "dryRun=true: per-node probe result, nothing saved; otherwise the saved cluster",
-            content =
-                    @Content(
-                            schema =
-                                    @Schema(
-                                            oneOf = {
-                                                ConnectionCheck.class,
-                                                RegistrationCheck.class,
-                                                ClusterConnectionView.class
-                                            })))
+            content = @Content(schema = @Schema(oneOf = {ConnectionCheck.class, ClusterConnectionView.class})))
     @HeldResponse
     @PatchMapping("/{clusterId}")
     public Object update(

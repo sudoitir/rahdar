@@ -2,6 +2,7 @@ package io.github.sudoitir.rahdar.platform.clusters;
 
 import io.github.sudoitir.openbroker.BrokerSystem;
 import io.github.sudoitir.openbroker.model.Kind;
+import io.github.sudoitir.openbroker.model.KindId;
 import io.github.sudoitir.openbroker.model.ResourceClass;
 import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
 import io.github.sudoitir.rahdar.platform.broker.BrokerSystems;
@@ -14,7 +15,9 @@ import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.SystemView;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -48,11 +51,18 @@ public class ClusterKinds {
                 extensions.forCluster(clusterId, QueueCounters.class).isPresent();
         boolean expire = extensions.forCluster(clusterId, MessageExpiry.class).isPresent();
         try {
-            return gateway.cluster(clusterId).resources().kinds().stream()
+            List<Kind> all = gateway.cluster(clusterId).resources().kinds();
+            Set<KindId> logs = all.stream()
+                    .filter(k -> k.resourceClass() == ResourceClass.PARTITION)
+                    .flatMap(k -> k.parent().stream())
+                    .collect(Collectors.toSet());
+            return all.stream()
                     .map(kind -> new KindView(
                             kind.id().value(),
                             kind.resourceClass().name(),
                             ResourceIds.name(kind.label()),
+                            logs.contains(kind.id())
+                                    || (!logs.isEmpty() && kind.resourceClass() == ResourceClass.SUBSCRIPTION),
                             verbs(kind, resetCounters, expire)))
                     .toList();
         } catch (RuntimeException e) {

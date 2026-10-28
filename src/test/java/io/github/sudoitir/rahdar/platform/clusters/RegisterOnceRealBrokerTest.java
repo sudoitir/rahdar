@@ -122,18 +122,20 @@ class RegisterOnceRealBrokerTest extends PostgresIntegrationTest {
 
         for (boolean dryRun : new boolean[] {true, false}) {
             RegisterClusterRequest again = request("again", ArtemisIntegrationTest.jolokiaUrl());
-            assertThatThrownBy(() -> {
-                        if (dryRun) {
-                            service.checkConnection(again);
-                        } else {
-                            service.register(again);
-                        }
-                    })
-                    .isInstanceOfSatisfying(ClusterAlreadyRegisteredException.class, e -> {
-                        assertThat(e.existingClusterId()).isEqualTo(first);
-                        assertThat(e.existingClusterName()).isEqualTo(run + "-first");
-                        assertThat(e.overlappingNodes()).isNotEmpty();
-                    });
+            if (dryRun) {
+                // The check ran, and its finding is whose brokers these are.
+                assertThat(service.checkConnection(again).alreadyRegistered()).satisfies(held -> {
+                    assertThat(held.id()).isEqualTo(first);
+                    assertThat(held.name()).isEqualTo(run + "-first");
+                });
+            } else {
+                assertThatThrownBy(() -> service.register(again))
+                        .isInstanceOfSatisfying(ClusterAlreadyRegisteredException.class, e -> {
+                            assertThat(e.existingClusterId()).isEqualTo(first);
+                            assertThat(e.existingClusterName()).isEqualTo(run + "-first");
+                            assertThat(e.overlappingNodes()).isNotEmpty();
+                        });
+            }
         }
         assertThat(clustersOfThisRun()).isEqualTo(1);
     }
@@ -158,7 +160,7 @@ class RegisterOnceRealBrokerTest extends PostgresIntegrationTest {
 
         RegisterClusterRequest both =
                 request("both", ArtemisBrokers.second().jolokiaUrl(), ArtemisIntegrationTest.jolokiaUrl());
-        assertThatThrownBy(() -> service.checkConnection(both)).isInstanceOf(ClusterAlreadyRegisteredException.class);
+        assertThat(service.checkConnection(both).alreadyRegistered().id()).isEqualTo(first);
         assertThatThrownBy(() -> service.register(both))
                 .isInstanceOfSatisfying(ClusterAlreadyRegisteredException.class, e -> {
                     assertThat(e.existingClusterId()).isEqualTo(first);

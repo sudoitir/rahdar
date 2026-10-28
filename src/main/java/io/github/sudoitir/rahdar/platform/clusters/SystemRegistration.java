@@ -29,11 +29,12 @@ import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterR
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterRequests.RegisterClusterRequest;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterRequests.RegisterClusterRequest.Connection;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterRequests.UpdateClusterRequest;
+import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.AccessFinding;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.CapabilitiesView;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.CapabilityView;
+import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.ConnectionCheck;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.KafkaConnectionDetail;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.RegisteredRef;
-import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.RegistrationCheck;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -104,8 +105,19 @@ class SystemRegistration {
         }
     }
 
+    /** Refuses an edit whose connection is shaped for another system than the cluster's. */
+    void requireSameSystem(String clusterSystem, UpdateClusterRequest request) {
+        if (request.connection() != null
+                && !clusterSystem.equals(request.connection().system())) {
+            throw new UnsupportedSystemException(
+                    "The cluster runs '" + clusterSystem + "', but the connection is shaped for '"
+                            + request.connection().system() + "'.",
+                    systems.ids());
+        }
+    }
+
     /** Reaches the cluster once and reports; nothing is stored. */
-    RegistrationCheck check(RegisterClusterRequest request) {
+    ConnectionCheck check(RegisterClusterRequest request) {
         Checked checked = registrar(request.system()).check(request.connection());
         return withHolder(checked.view(), null);
     }
@@ -116,7 +128,7 @@ class SystemRegistration {
         Connection connection = request.connection();
         String name = request.name() != null ? request.name() : registrar.defaultName(connection);
         Checked checked = registrar.check(connection);
-        RegistrationCheck view = checked.view();
+        ConnectionCheck view = checked.view();
         if (!checked.passed()) {
             AuditEvent event = begin(REGISTER_CLUSTER, name, null, registrar.auditParams(connection));
             audit.fail(event, view.failure().message());
@@ -188,7 +200,14 @@ class SystemRegistration {
                 io,
                 new CapabilityView(
                         "UNKNOWN", "Slow-consumer detection reads Artemis consumers; it does not apply here.", null),
-                List.of());
+                List.of(),
+                found.entrySet().stream()
+                        .map(e -> new AccessFinding(
+                                e.getKey(),
+                                e.getValue().status().name(),
+                                e.getValue().reason()))
+                        .sorted(java.util.Comparator.comparing(AccessFinding::capability))
+                        .toList());
     }
 
     private static CapabilityView worst(CapabilityView... views) {
@@ -203,7 +222,7 @@ class SystemRegistration {
     }
 
     /** What an edit of the connection would find, nothing stored. */
-    RegistrationCheck checkUpdate(UUID clusterId, UpdateClusterRequest request) {
+    ConnectionCheck checkUpdate(UUID clusterId, UpdateClusterRequest request) {
         ClusterRegistrar registrar = registrarOf(clusterId);
         Resolved resolved = registrar.edited(clusterId, request.connection());
         return withHolder(registrar.check(resolved.connection()).view(), clusterId);
@@ -300,7 +319,7 @@ class SystemRegistration {
     }
 
     /** The check with the registered cluster that holds this one, when the caller may read it. */
-    private RegistrationCheck withHolder(RegistrationCheck view, UUID except) {
+    private ConnectionCheck withHolder(ConnectionCheck view, UUID except) {
         if (view.clusterId() == null) {
             return view;
         }
@@ -325,7 +344,7 @@ class SystemRegistration {
         return refusal;
     }
 
-    private static ConflictException failedCheck(RegistrationCheck view) {
+    private static ConflictException failedCheck(ConnectionCheck view) {
         return new ConflictException(
                 "connection-check-failed",
                 view.failure().message() + " " + view.failure().next());

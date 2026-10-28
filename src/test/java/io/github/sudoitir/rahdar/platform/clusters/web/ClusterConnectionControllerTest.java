@@ -41,6 +41,7 @@ import io.github.sudoitir.rahdar.system.artemis.ArtemisModule;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -59,6 +60,8 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.context.WebApplicationContext;
+import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.node.ObjectNode;
 
 /** {@code PATCH /clusters/{id}}: the connection edit, checked first and saved after. */
 @ExtendWith(AdminAuthenticationExtension.class)
@@ -77,7 +80,8 @@ class ClusterConnectionControllerTest extends PostgresIntegrationTest {
     private static final String BOTH_ACCOUNTS = "\"management\":{\"username\":\"old-user\",\"password\":\"" + OLD_SECRET
             + "\"},\"core\":{\"username\":\"core-user\",\"password\":\"" + CORE_SECRET + "\"}";
 
-    private static final String ROW = "$.nodes[?(@.name == '%s')]";
+    private static final JsonMapper MAPPER = JsonMapper.builder().build();
+    private static final String ROW = "$.nodes[?(@.id == '%s')]";
 
     MockMvc mvc;
 
@@ -181,11 +185,23 @@ class ClusterConnectionControllerTest extends PostgresIntegrationTest {
         return vault.open(SecretVault.aad(clusterId, kind), row.getSealed());
     }
 
+    /** The flat body of an Artemis edit, laid out as the API takes it: the cluster's own fields, then its connection. */
     private ResultActions edit(String body, boolean dryRun) throws Exception {
+        ObjectNode flat = (ObjectNode) MAPPER.readTree(body);
+        ObjectNode request = MAPPER.createObjectNode();
+        ObjectNode connection = request.putObject("connection");
+        connection.put("system", "artemis");
+        for (String own : List.of("name", "description", "environmentId")) {
+            if (flat.has(own)) {
+                request.set(own, flat.get(own));
+                flat.remove(own);
+            }
+        }
+        flat.properties().forEach(e -> connection.set(e.getKey(), e.getValue()));
         return mvc.perform(patch("/api/v1/clusters/{id}", clusterId)
                 .param("dryRun", String.valueOf(dryRun))
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(body));
+                .content(request.toString()));
     }
 
     @Test
@@ -195,11 +211,11 @@ class ClusterConnectionControllerTest extends PostgresIntegrationTest {
 
         edit("{\"management\":{\"username\":\"old-user\",\"password\":\"" + NEW_SECRET + "\"}}", true)
                 .andExpect(status().isOk())
-                .andExpect(jsonPath(ROW.formatted("artemis-primary:61616") + ".management")
+                .andExpect(jsonPath(ROW.formatted("artemis-primary:61616") + ".artemis.management")
                         .value("REJECTED"))
-                .andExpect(jsonPath(ROW.formatted("artemis-backup:61616") + ".management")
+                .andExpect(jsonPath(ROW.formatted("artemis-backup:61616") + ".artemis.management")
                         .value("ACCEPTED"))
-                .andExpect(jsonPath(ROW.formatted("artemis-backup:61616") + ".urlSource")
+                .andExpect(jsonPath(ROW.formatted("artemis-backup:61616") + ".artemis.urlSource")
                         .value("DERIVED"));
 
         assertThat(storedPassword(MANAGEMENT)).isEqualTo(OLD_SECRET);

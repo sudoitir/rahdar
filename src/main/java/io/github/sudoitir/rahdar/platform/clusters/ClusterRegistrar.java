@@ -2,10 +2,10 @@ package io.github.sudoitir.rahdar.platform.clusters;
 
 import io.github.sudoitir.openbroker.Endpoint;
 import io.github.sudoitir.rahdar.platform.broker.SystemExtension;
-import io.github.sudoitir.rahdar.platform.clusters.web.ClusterRequests.KafkaConnectionUpdate;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterRequests.RegisterClusterRequest.Connection;
+import io.github.sudoitir.rahdar.platform.clusters.web.ClusterRequests.UpdateClusterRequest.ConnectionUpdate;
+import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.ConnectionCheck;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.KafkaConnectionDetail;
-import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.RegistrationCheck;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -24,7 +24,7 @@ public interface ClusterRegistrar extends SystemExtension {
      * What a check found. {@code view} is what the client sees; {@code nodes} are the nodes reached, to store.
      * The cluster's own id is {@code view.clusterId()}.
      */
-    record Checked(RegistrationCheck view, List<DiscoveredNode> nodes) {
+    record Checked(ConnectionCheck view, List<DiscoveredNode> nodes) {
 
         public boolean passed() {
             return view.failure() == null;
@@ -65,5 +65,5 @@ public interface ClusterRegistrar extends SystemExtension {
      *
      * @throws IllegalArgumentException when a change needs a secret that was not given again
      */
-    Resolved edited(UUID clusterId, KafkaConnectionUpdate update);
+    Resolved edited(UUID clusterId, ConnectionUpdate update);
 }

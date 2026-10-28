@@ -6371,11 +6371,7 @@
             "content" : {
               "*/*" : {
                 "schema" : {
-                  "oneOf" : [ {
-                    "$ref" : "#/components/schemas/RegisterPreview"
-                  }, {
-                    "$ref" : "#/components/schemas/RegistrationCheck"
-                  } ]
+                  "$ref" : "#/components/schemas/ConnectionCheck"
                 }
               }
             }
@@ -14317,8 +14313,6 @@
                 "schema" : {
                   "oneOf" : [ {
                     "$ref" : "#/components/schemas/ConnectionCheck"
-                  }, {
-                    "$ref" : "#/components/schemas/RegistrationCheck"
                   }, {
                     "$ref" : "#/components/schemas/ClusterConnectionView"
                   } ]
@@ -28779,6 +28773,22 @@
         },
         "required" : [ "connection", "system" ]
       },
+      "AccessFinding" : {
+        "type" : "object",
+        "properties" : {
+          "capability" : {
+            "type" : "string"
+          },
+          "status" : {
+            "type" : "string",
+            "description" : "AVAILABLE, UNAVAILABLE or UNKNOWN."
+          },
+          "reason" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "capability", "reason", "status" ]
+      },
       "AdoptionCountsView" : {
         "type" : "object",
         "properties" : {
@@ -28823,157 +28833,18 @@
         },
         "required" : [ "counts", "disagreements", "notes" ]
       },
-      "CapabilitiesView" : {
+      "ArtemisNodeDetail" : {
         "type" : "object",
         "properties" : {
-          "managementRead" : {
-            "$ref" : "#/components/schemas/CapabilityView"
-          },
-          "managementWrite" : {
-            "$ref" : "#/components/schemas/CapabilityView"
-          },
-          "notifications" : {
-            "$ref" : "#/components/schemas/CapabilityView"
-          },
-          "messageIo" : {
-            "$ref" : "#/components/schemas/CapabilityView"
-          },
-          "slowConsumerDetection" : {
-            "$ref" : "#/components/schemas/CapabilityView"
-          },
-          "versionGates" : {
-            "type" : "array",
-            "description" : "Operations that need a newer Artemis release than some node runs",
-            "items" : {
-              "$ref" : "#/components/schemas/VersionGateView"
-            }
-          }
-        },
-        "required" : [ "managementRead", "managementWrite", "messageIo", "notifications", "slowConsumerDetection", "versionGates" ]
-      },
-      "CapabilityView" : {
-        "type" : "object",
-        "properties" : {
-          "status" : {
-            "type" : "string"
-          },
-          "reason" : {
-            "type" : "string"
-          },
-          "brokerXmlSnippet" : {
-            "type" : [ "string", "null" ]
-          }
-        },
-        "required" : [ "reason", "status" ]
-      },
-      "LogicalNodeView" : {
-        "type" : "object",
-        "properties" : {
-          "artemisNodeId" : {
-            "type" : [ "string", "null" ]
-          },
-          "splitBrain" : {
-            "type" : "string"
-          },
-          "replicationBehind" : {
-            "type" : "boolean"
-          },
-          "endpoints" : {
-            "type" : "array",
-            "items" : {
-              "$ref" : "#/components/schemas/NodeEndpointView"
-            }
-          }
-        },
-        "required" : [ "endpoints", "replicationBehind", "splitBrain" ]
-      },
-      "NodeEndpointView" : {
-        "type" : "object",
-        "properties" : {
-          "id" : {
-            "type" : "string",
-            "format" : "uuid"
-          },
-          "name" : {
-            "type" : "string"
-          },
-          "artemisNodeId" : {
-            "type" : [ "string", "null" ]
-          },
-          "jolokiaUrl" : {
-            "type" : [ "string", "null" ]
-          },
-          "coreUrl" : {
-            "type" : [ "string", "null" ]
-          },
-          "haRole" : {
-            "type" : "string"
-          },
-          "state" : {
-            "type" : "string"
-          },
-          "active" : {
-            "type" : "boolean"
-          },
-          "replicaSync" : {
-            "type" : [ "boolean", "null" ]
+          "nativeNodeId" : {
+            "type" : [ "string", "null" ],
+            "description" : "The broker's own node id."
           },
           "version" : {
             "type" : [ "string", "null" ]
           },
-          "versionSupport" : {
-            "type" : "string",
-            "description" : "Where version sits against the supported Artemis range",
-            "enum" : [ "SUPPORTED", "BELOW_MINIMUM", "NEWER_THAN_TESTED", "UNKNOWN" ]
-          },
-          "lastError" : {
-            "type" : [ "string", "null" ]
-          },
-          "lastErrorKind" : {
-            "type" : [ "string", "null" ],
-            "enum" : [ "UNREACHABLE", "THROTTLED", "CREDENTIALS_REJECTED", "NOT_ARTEMIS", "WRONG_PATH", "TLS_FAILED", "BAD_RESPONSE", "UNSUPPORTED_VERSION", null ]
-          },
-          "lastSeenAt" : {
-            "type" : [ "string", "null" ],
-            "format" : "date-time"
-          },
-          "urlSource" : {
-            "type" : [ "string", "null" ],
-            "description" : "Where the management URL came from; null while there is none",
-            "enum" : [ "SEED", "DERIVED", "MANUAL", null ]
-          },
-          "urlProblem" : {
-            "type" : [ "string", "null" ],
-            "description" : "Why the node has no management URL",
-            "enum" : [ "NO_PATTERN", "UNREACHABLE", "CREDENTIALS_REJECTED", "WRONG_ENDPOINT", "TLS_FAILED", "OTHER_BROKER", null ]
-          },
-          "coreUrlManual" : {
-            "type" : "boolean",
-            "description" : "Whether an operator set the Core URL"
-          },
-          "manageable" : {
-            "type" : "boolean"
-          }
-        },
-        "required" : [ "active", "coreUrlManual", "haRole", "id", "manageable", "name", "state", "versionSupport" ]
-      },
-      "NodeProbeView" : {
-        "type" : "object",
-        "properties" : {
-          "name" : {
-            "type" : "string"
-          },
           "haRole" : {
             "type" : "string"
-          },
-          "artemisNodeId" : {
-            "type" : [ "string", "null" ]
-          },
-          "version" : {
-            "type" : [ "string", "null" ]
-          },
-          "managementUrl" : {
-            "type" : [ "string", "null" ]
           },
           "urlSource" : {
             "type" : [ "string", "null" ],
@@ -28992,212 +28863,9 @@
             "enum" : [ "ACCEPTED", "REJECTED", "UNREACHABLE", "NOT_TRIED" ]
           }
         },
-        "required" : [ "core", "haRole", "management", "name" ]
+        "required" : [ "core", "haRole", "management" ]
       },
-      "NodeVersionView" : {
-        "type" : "object",
-        "properties" : {
-          "nodeId" : {
-            "type" : "string",
-            "format" : "uuid"
-          },
-          "nodeName" : {
-            "type" : "string"
-          },
-          "version" : {
-            "type" : [ "string", "null" ]
-          },
-          "supported" : {
-            "type" : "boolean"
-          }
-        },
-        "required" : [ "nodeId", "nodeName", "supported" ]
-      },
-      "RegisterPreview" : {
-        "type" : "object",
-        "properties" : {
-          "capabilities" : {
-            "$ref" : "#/components/schemas/CapabilitiesView"
-          },
-          "reachableSeeds" : {
-            "type" : "integer",
-            "format" : "int32"
-          },
-          "discoveredNodes" : {
-            "type" : "integer",
-            "format" : "int32"
-          },
-          "topology" : {
-            "$ref" : "#/components/schemas/TopologyView"
-          },
-          "managementUrlPattern" : {
-            "type" : "string",
-            "description" : "The pattern the check derived management URLs from"
-          },
-          "nodes" : {
-            "type" : "array",
-            "description" : "One row per node the check found",
-            "items" : {
-              "$ref" : "#/components/schemas/NodeProbeView"
-            }
-          },
-          "adoption" : {
-            "anyOf" : [ {
-              "$ref" : "#/components/schemas/AdoptionPreviewView"
-            }, {
-              "type" : "null"
-            } ]
-          },
-          "contributions" : {
-            "type" : "object",
-            "additionalProperties" : { },
-            "description" : "What each enabled feature adds to the check, keyed by feature id and read from the reachable node. brokerconfig contributes a ConfigRecommendationsView: what to declare once the cluster is registered"
-          }
-        },
-        "required" : [ "capabilities", "contributions", "discoveredNodes", "managementUrlPattern", "nodes", "reachableSeeds", "topology" ]
-      },
-      "TopologyView" : {
-        "type" : "object",
-        "properties" : {
-          "clusterId" : {
-            "type" : "string",
-            "format" : "uuid"
-          },
-          "nodes" : {
-            "type" : "array",
-            "items" : {
-              "$ref" : "#/components/schemas/LogicalNodeView"
-            }
-          }
-        },
-        "required" : [ "clusterId", "nodes" ]
-      },
-      "VersionGateView" : {
-        "type" : "object",
-        "properties" : {
-          "feature" : {
-            "type" : "string"
-          },
-          "label" : {
-            "type" : "string"
-          },
-          "requiredVersion" : {
-            "type" : "string"
-          },
-          "status" : {
-            "type" : "string"
-          },
-          "reason" : {
-            "type" : "string"
-          },
-          "brokerXmlSnippet" : {
-            "type" : [ "string", "null" ]
-          },
-          "nodes" : {
-            "type" : "array",
-            "items" : {
-              "$ref" : "#/components/schemas/NodeVersionView"
-            }
-          }
-        },
-        "required" : [ "feature", "label", "nodes", "reason", "requiredVersion", "status" ]
-      },
-      "AccessFinding" : {
-        "type" : "object",
-        "properties" : {
-          "capability" : {
-            "type" : "string"
-          },
-          "status" : {
-            "type" : "string",
-            "description" : "AVAILABLE, UNAVAILABLE or UNKNOWN."
-          },
-          "reason" : {
-            "type" : "string"
-          }
-        },
-        "required" : [ "capability", "reason", "status" ]
-      },
-      "Failure" : {
-        "type" : "object",
-        "properties" : {
-          "cause" : {
-            "type" : "string",
-            "description" : "DNS, REFUSED, TIMEOUT, TLS, AUTHENTICATION, AUTHORIZATION or UNSUPPORTED_VERSION."
-          },
-          "message" : {
-            "type" : "string"
-          },
-          "next" : {
-            "type" : "string"
-          }
-        },
-        "required" : [ "cause", "message", "next" ]
-      },
-      "NodeReach" : {
-        "type" : "object",
-        "properties" : {
-          "id" : {
-            "type" : "string"
-          },
-          "address" : {
-            "type" : [ "string", "null" ],
-            "description" : "The address the node advertises; null when it was never learned."
-          },
-          "functions" : {
-            "type" : "array",
-            "description" : "BROKER, CONTROLLER or STORAGE.",
-            "items" : {
-              "type" : "string"
-            }
-          },
-          "outcome" : {
-            "type" : "string",
-            "description" : "OK or UNREACHABLE."
-          },
-          "cause" : {
-            "type" : [ "string", "null" ],
-            "description" : "DNS, REFUSED, TIMEOUT, TLS or AUTHENTICATION when unreachable."
-          },
-          "message" : {
-            "type" : [ "string", "null" ]
-          }
-        },
-        "required" : [ "functions", "id", "outcome" ]
-      },
-      "Quorum" : {
-        "type" : "object",
-        "properties" : {
-          "available" : {
-            "type" : "boolean"
-          },
-          "reason" : {
-            "type" : [ "string", "null" ]
-          },
-          "leader" : {
-            "type" : [ "string", "null" ]
-          },
-          "voters" : {
-            "type" : [ "integer", "null" ],
-            "format" : "int32"
-          }
-        },
-        "required" : [ "available" ]
-      },
-      "RegisteredRef" : {
-        "type" : "object",
-        "properties" : {
-          "id" : {
-            "type" : "string",
-            "format" : "uuid"
-          },
-          "name" : {
-            "type" : "string"
-          }
-        },
-        "required" : [ "id", "name" ]
-      },
-      "RegistrationCheck" : {
+      "ConnectionCheck" : {
         "type" : "object",
         "properties" : {
           "system" : {
@@ -29251,9 +28919,111 @@
             }, {
               "type" : "null"
             } ]
+          },
+          "adoption" : {
+            "anyOf" : [ {
+              "$ref" : "#/components/schemas/AdoptionPreviewView"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "managementUrlPattern" : {
+            "type" : [ "string", "null" ],
+            "description" : "Artemis only: the pattern the check derived management URLs from."
+          },
+          "contributions" : {
+            "type" : "object",
+            "additionalProperties" : { },
+            "description" : "What each enabled feature adds to the check, keyed by feature id and read from a reachable node. Empty where a system has none."
           }
         },
-        "required" : [ "access", "nodes", "supported", "system" ]
+        "required" : [ "access", "contributions", "nodes", "supported", "system" ]
+      },
+      "Failure" : {
+        "type" : "object",
+        "properties" : {
+          "cause" : {
+            "type" : "string",
+            "description" : "DNS, REFUSED, TIMEOUT, TLS, AUTHENTICATION, AUTHORIZATION or UNSUPPORTED_VERSION."
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "next" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "cause", "message", "next" ]
+      },
+      "NodeReach" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string"
+          },
+          "address" : {
+            "type" : [ "string", "null" ],
+            "description" : "The address the node advertises; null when it was never learned."
+          },
+          "functions" : {
+            "type" : "array",
+            "description" : "BROKER, CONTROLLER or STORAGE.",
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "outcome" : {
+            "type" : "string",
+            "description" : "OK or UNREACHABLE."
+          },
+          "cause" : {
+            "type" : [ "string", "null" ],
+            "description" : "DNS, REFUSED, TIMEOUT, TLS or AUTHENTICATION when unreachable."
+          },
+          "message" : {
+            "type" : [ "string", "null" ]
+          },
+          "artemis" : {
+            "anyOf" : [ {
+              "$ref" : "#/components/schemas/ArtemisNodeDetail"
+            }, {
+              "type" : "null"
+            } ]
+          }
+        },
+        "required" : [ "functions", "id", "outcome" ]
+      },
+      "Quorum" : {
+        "type" : "object",
+        "properties" : {
+          "available" : {
+            "type" : "boolean"
+          },
+          "reason" : {
+            "type" : [ "string", "null" ]
+          },
+          "leader" : {
+            "type" : [ "string", "null" ]
+          },
+          "voters" : {
+            "type" : [ "integer", "null" ],
+            "format" : "int32"
+          }
+        },
+        "required" : [ "available" ]
+      },
+      "RegisteredRef" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "name" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "id", "name" ]
       },
       "VersionFound" : {
         "type" : "object",
@@ -29271,6 +29041,56 @@
           }
         },
         "required" : [ "exact", "text" ]
+      },
+      "CapabilitiesView" : {
+        "type" : "object",
+        "properties" : {
+          "managementRead" : {
+            "$ref" : "#/components/schemas/CapabilityView"
+          },
+          "managementWrite" : {
+            "$ref" : "#/components/schemas/CapabilityView"
+          },
+          "notifications" : {
+            "$ref" : "#/components/schemas/CapabilityView"
+          },
+          "messageIo" : {
+            "$ref" : "#/components/schemas/CapabilityView"
+          },
+          "slowConsumerDetection" : {
+            "$ref" : "#/components/schemas/CapabilityView"
+          },
+          "versionGates" : {
+            "type" : "array",
+            "description" : "Operations that need a newer Artemis release than some node runs",
+            "items" : {
+              "$ref" : "#/components/schemas/VersionGateView"
+            }
+          },
+          "findings" : {
+            "type" : "array",
+            "description" : "Every capability the system's driver assessed for the account, with its own reason. Empty for a system whose capabilities are the fixed ones above.",
+            "items" : {
+              "$ref" : "#/components/schemas/AccessFinding"
+            }
+          }
+        },
+        "required" : [ "findings", "managementRead", "managementWrite", "messageIo", "notifications", "slowConsumerDetection", "versionGates" ]
+      },
+      "CapabilityView" : {
+        "type" : "object",
+        "properties" : {
+          "status" : {
+            "type" : "string"
+          },
+          "reason" : {
+            "type" : "string"
+          },
+          "brokerXmlSnippet" : {
+            "type" : [ "string", "null" ]
+          }
+        },
+        "required" : [ "reason", "status" ]
       },
       "ClusterConnectionDetail" : {
         "type" : "object",
@@ -29465,6 +29285,10 @@
             "$ref" : "#/components/schemas/KindName",
             "description" : "The kind's name for people, singular and plural."
           },
+          "partitioned" : {
+            "type" : "boolean",
+            "description" : "Whether the kind reads a partitioned log: browsing is by partition and offset or time."
+          },
           "verbs" : {
             "type" : "array",
             "description" : "What the system can do to this kind (create, delete, pause, purge, ...), plus what Rahdar adds when the system provides it (reset-counters, expire).",
@@ -29473,7 +29297,117 @@
             }
           }
         },
-        "required" : [ "id", "label", "resourceClass", "verbs" ]
+        "required" : [ "id", "label", "partitioned", "resourceClass", "verbs" ]
+      },
+      "LogicalNodeView" : {
+        "type" : "object",
+        "properties" : {
+          "artemisNodeId" : {
+            "type" : [ "string", "null" ]
+          },
+          "splitBrain" : {
+            "type" : "string"
+          },
+          "replicationBehind" : {
+            "type" : "boolean"
+          },
+          "endpoints" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/NodeEndpointView"
+            }
+          }
+        },
+        "required" : [ "endpoints", "replicationBehind", "splitBrain" ]
+      },
+      "NodeEndpointView" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "artemisNodeId" : {
+            "type" : [ "string", "null" ]
+          },
+          "jolokiaUrl" : {
+            "type" : [ "string", "null" ]
+          },
+          "coreUrl" : {
+            "type" : [ "string", "null" ]
+          },
+          "haRole" : {
+            "type" : "string"
+          },
+          "state" : {
+            "type" : "string"
+          },
+          "active" : {
+            "type" : "boolean"
+          },
+          "replicaSync" : {
+            "type" : [ "boolean", "null" ]
+          },
+          "version" : {
+            "type" : [ "string", "null" ]
+          },
+          "versionSupport" : {
+            "type" : "string",
+            "description" : "Where version sits against the supported Artemis range",
+            "enum" : [ "SUPPORTED", "BELOW_MINIMUM", "NEWER_THAN_TESTED", "UNKNOWN" ]
+          },
+          "lastError" : {
+            "type" : [ "string", "null" ]
+          },
+          "lastErrorKind" : {
+            "type" : [ "string", "null" ],
+            "enum" : [ "UNREACHABLE", "THROTTLED", "CREDENTIALS_REJECTED", "NOT_ARTEMIS", "WRONG_PATH", "TLS_FAILED", "BAD_RESPONSE", "UNSUPPORTED_VERSION", null ]
+          },
+          "lastSeenAt" : {
+            "type" : [ "string", "null" ],
+            "format" : "date-time"
+          },
+          "urlSource" : {
+            "type" : [ "string", "null" ],
+            "description" : "Where the management URL came from; null while there is none",
+            "enum" : [ "SEED", "DERIVED", "MANUAL", null ]
+          },
+          "urlProblem" : {
+            "type" : [ "string", "null" ],
+            "description" : "Why the node has no management URL",
+            "enum" : [ "NO_PATTERN", "UNREACHABLE", "CREDENTIALS_REJECTED", "WRONG_ENDPOINT", "TLS_FAILED", "OTHER_BROKER", null ]
+          },
+          "coreUrlManual" : {
+            "type" : "boolean",
+            "description" : "Whether an operator set the Core URL"
+          },
+          "manageable" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "active", "coreUrlManual", "haRole", "id", "manageable", "name", "state", "versionSupport" ]
+      },
+      "NodeVersionView" : {
+        "type" : "object",
+        "properties" : {
+          "nodeId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "nodeName" : {
+            "type" : "string"
+          },
+          "version" : {
+            "type" : [ "string", "null" ]
+          },
+          "supported" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "nodeId", "nodeName", "supported" ]
       },
       "SystemView" : {
         "type" : "object",
@@ -29488,6 +29422,52 @@
           }
         },
         "required" : [ "id", "name" ]
+      },
+      "TopologyView" : {
+        "type" : "object",
+        "properties" : {
+          "clusterId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "nodes" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/LogicalNodeView"
+            }
+          }
+        },
+        "required" : [ "clusterId", "nodes" ]
+      },
+      "VersionGateView" : {
+        "type" : "object",
+        "properties" : {
+          "feature" : {
+            "type" : "string"
+          },
+          "label" : {
+            "type" : "string"
+          },
+          "requiredVersion" : {
+            "type" : "string"
+          },
+          "status" : {
+            "type" : "string"
+          },
+          "reason" : {
+            "type" : "string"
+          },
+          "brokerXmlSnippet" : {
+            "type" : [ "string", "null" ]
+          },
+          "nodes" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/NodeVersionView"
+            }
+          }
+        },
+        "required" : [ "feature", "label", "nodes", "reason", "requiredVersion", "status" ]
       },
       "Finding" : {
         "type" : "object",
@@ -32065,32 +32045,81 @@
           }
         }
       },
-      "KafkaConnectionUpdate" : {
-        "type" : "object",
-        "properties" : {
-          "bootstrapServers" : {
-            "type" : "array",
-            "items" : {
-              "type" : "string",
-              "minLength" : 1
+      "ArtemisConnectionUpdate" : {
+        "allOf" : [ {
+          "$ref" : "#/components/schemas/ConnectionUpdate"
+        }, {
+          "type" : "object",
+          "properties" : {
+            "system" : {
+              "type" : "string"
+            },
+            "seedUrls" : {
+              "type" : "array",
+              "items" : {
+                "type" : "string",
+                "minLength" : 1
+              }
+            },
+            "managementUrlPattern" : {
+              "type" : "string"
+            },
+            "tlsBundle" : {
+              "type" : "string"
+            },
+            "management" : {
+              "$ref" : "#/components/schemas/AccountUpdate"
+            },
+            "core" : {
+              "$ref" : "#/components/schemas/AccountUpdate"
             }
-          },
-          "securityProtocol" : {
-            "type" : "string"
-          },
-          "saslMechanism" : {
-            "type" : "string"
-          },
-          "credentials" : {
-            "$ref" : "#/components/schemas/KafkaCredentials"
-          },
-          "tlsBundle" : {
-            "type" : "string"
-          },
-          "clientId" : {
+          }
+        } ]
+      },
+      "ConnectionUpdate" : {
+        "discriminator" : {
+          "propertyName" : "system"
+        },
+        "properties" : {
+          "system" : {
             "type" : "string"
           }
-        }
+        },
+        "required" : [ "system" ]
+      },
+      "KafkaConnectionUpdate" : {
+        "allOf" : [ {
+          "$ref" : "#/components/schemas/ConnectionUpdate"
+        }, {
+          "type" : "object",
+          "properties" : {
+            "system" : {
+              "type" : "string"
+            },
+            "bootstrapServers" : {
+              "type" : "array",
+              "items" : {
+                "type" : "string",
+                "minLength" : 1
+              }
+            },
+            "securityProtocol" : {
+              "type" : "string"
+            },
+            "saslMechanism" : {
+              "type" : "string"
+            },
+            "credentials" : {
+              "$ref" : "#/components/schemas/KafkaCredentials"
+            },
+            "tlsBundle" : {
+              "type" : "string"
+            },
+            "clientId" : {
+              "type" : "string"
+            }
+          }
+        } ]
       },
       "UpdateClusterRequest" : {
         "type" : "object",
@@ -32101,44 +32130,18 @@
           "description" : {
             "type" : "string"
           },
-          "seedUrls" : {
-            "type" : "array",
-            "items" : {
-              "type" : "string",
-              "minLength" : 1
-            }
-          },
-          "managementUrlPattern" : {
-            "type" : "string"
-          },
-          "tlsBundle" : {
-            "type" : "string"
-          },
-          "management" : {
-            "$ref" : "#/components/schemas/AccountUpdate"
-          },
-          "core" : {
-            "$ref" : "#/components/schemas/AccountUpdate"
+          "environmentId" : {
+            "type" : "string",
+            "format" : "uuid"
           },
           "connection" : {
-            "$ref" : "#/components/schemas/KafkaConnectionUpdate"
+            "oneOf" : [ {
+              "$ref" : "#/components/schemas/ArtemisConnectionUpdate"
+            }, {
+              "$ref" : "#/components/schemas/KafkaConnectionUpdate"
+            } ]
           }
         }
-      },
-      "ConnectionCheck" : {
-        "type" : "object",
-        "properties" : {
-          "managementUrlPattern" : {
-            "type" : "string"
-          },
-          "nodes" : {
-            "type" : "array",
-            "items" : {
-              "$ref" : "#/components/schemas/NodeProbeView"
-            }
-          }
-        },
-        "required" : [ "managementUrlPattern", "nodes" ]
       },
       "ClusterConnectionView" : {
         "type" : "object",

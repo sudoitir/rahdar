@@ -32,9 +32,9 @@ import io.github.sudoitir.rahdar.platform.broker.ConnectionSettingsSource;
 import io.github.sudoitir.rahdar.platform.broker.CoreConnectionSettings;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterRegistrar.Checked;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterRegistrar.Resolved;
-import io.github.sudoitir.rahdar.platform.clusters.web.ClusterRequests.KafkaConnectionUpdate;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterRequests.KafkaCredentials;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterRequests.RegisterClusterRequest.KafkaConnection;
+import io.github.sudoitir.rahdar.platform.clusters.web.ClusterRequests.UpdateClusterRequest.KafkaConnectionUpdate;
 import io.github.sudoitir.rahdar.system.kafka.internal.persistence.KafkaConnectionEntity;
 import io.github.sudoitir.rahdar.system.kafka.internal.persistence.KafkaConnectionRepository;
 import java.time.Instant;
@@ -242,8 +242,8 @@ class KafkaRegistrarTest {
     void anOmittedSecretKeepsTheStoredOneWhenNothingAboutTheDestinationChanged() {
         UUID id = storedScram();
 
-        Resolved resolved =
-                registrar.edited(id, new KafkaConnectionUpdate(null, null, null, null, null, "renamed-client"));
+        Resolved resolved = registrar.edited(
+                id, new KafkaConnectionUpdate(KafkaModule.SYSTEM, null, null, null, null, null, "renamed-client"));
 
         KafkaConnection connection = (KafkaConnection) resolved.connection();
         assertThat(connection.credentials().password()).isEqualTo("stored-pw");
@@ -256,7 +256,9 @@ class KafkaRegistrarTest {
         UUID id = storedScram();
 
         assertThatThrownBy(() -> registrar.edited(
-                        id, new KafkaConnectionUpdate(List.of("k1:9092", "k9:9092"), null, null, null, null, null)))
+                        id,
+                        new KafkaConnectionUpdate(
+                                KafkaModule.SYSTEM, List.of("k1:9092", "k9:9092"), null, null, null, null, null)))
                 .hasMessageContaining("Enter the password again");
     }
 
@@ -267,7 +269,13 @@ class KafkaRegistrarTest {
         assertThatThrownBy(() -> registrar.edited(
                         id,
                         new KafkaConnectionUpdate(
-                                null, null, null, new KafkaCredentials("someone", null, null), null, null)))
+                                KafkaModule.SYSTEM,
+                                null,
+                                null,
+                                null,
+                                new KafkaCredentials("someone", null, null),
+                                null,
+                                null)))
                 .hasMessageContaining("Enter the password again");
     }
 
@@ -277,7 +285,8 @@ class KafkaRegistrarTest {
 
         Resolved resolved = registrar.edited(
                 id,
-                new KafkaConnectionUpdate(null, null, null, new KafkaCredentials("app", "new-pw", null), null, null));
+                new KafkaConnectionUpdate(
+                        KafkaModule.SYSTEM, null, null, null, new KafkaCredentials("app", "new-pw", null), null, null));
 
         assertThat(((KafkaConnection) resolved.connection()).credentials().password())
                 .isEqualTo("new-pw");
@@ -288,8 +297,9 @@ class KafkaRegistrarTest {
     void movingToAPlainProtocolClearsTheStoredAccount() {
         UUID id = storedScram();
 
-        Resolved resolved =
-                registrar.edited(id, new KafkaConnectionUpdate(null, KafkaOptions.PLAINTEXT, null, null, null, null));
+        Resolved resolved = registrar.edited(
+                id,
+                new KafkaConnectionUpdate(KafkaModule.SYSTEM, null, KafkaOptions.PLAINTEXT, null, null, null, null));
 
         assertThat(((KafkaConnection) resolved.connection()).credentials()).isNull();
         assertThat(resolved.account().secret()).isNull();

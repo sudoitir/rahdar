@@ -36,6 +36,7 @@ import io.github.sudoitir.rahdar.platform.clusters.web.ClusterRequests.NodeOverr
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterRequests.RegisterClusterRequest;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterRequests.RegisterClusterRequest.Credentials;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterRequests.UpdateClusterRequest;
+import io.github.sudoitir.rahdar.platform.clusters.web.ClusterRequests.UpdateClusterRequest.ArtemisConnectionUpdate;
 import io.github.sudoitir.rahdar.platform.clusters.web.EnvironmentViews.EnvironmentRequest;
 import io.github.sudoitir.rahdar.platform.clusters.web.EnvironmentViews.EnvironmentView;
 import io.github.sudoitir.rahdar.support.AdminAuthenticationExtension;
@@ -383,12 +384,14 @@ class ClusterGateTest extends PostgresIntegrationTest {
         var request = new UpdateClusterRequest(
                 "renamed",
                 null,
-                List.of("http://a:8161/console/jolokia"),
                 null,
-                null,
-                new AccountUpdate("admin", "s3cret"),
-                AccountUpdate.CLEAR,
-                null);
+                new ArtemisConnectionUpdate(
+                        ArtemisModule.SYSTEM,
+                        List.of("http://a:8161/console/jolokia"),
+                        null,
+                        null,
+                        new AccountUpdate("admin", "s3cret"),
+                        AccountUpdate.CLEAR));
         ClusterUpdateParams params = new ClusterUpdateParams(
                 clusterId,
                 request.name(),
@@ -399,6 +402,7 @@ class ClusterGateTest extends PostgresIntegrationTest {
                 request.management(),
                 null,
                 true,
+                null,
                 null);
 
         ClusterUpdateParams back =

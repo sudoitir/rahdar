@@ -15,12 +15,12 @@ import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerId
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNodeEntity;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNodeRepository;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterRepository;
-import io.github.sudoitir.rahdar.platform.clusters.web.ClusterRequests.KafkaConnectionUpdate;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterRequests.RegisterClusterRequest;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterRequests.RegisterClusterRequest.KafkaConnection;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterRequests.UpdateClusterRequest;
+import io.github.sudoitir.rahdar.platform.clusters.web.ClusterRequests.UpdateClusterRequest.KafkaConnectionUpdate;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.ClusterDetail;
-import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.RegistrationCheck;
+import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.ConnectionCheck;
 import io.github.sudoitir.rahdar.support.AdminAuthenticationExtension;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
 import io.github.sudoitir.rahdar.system.kafka.internal.persistence.KafkaConnectionRepository;
@@ -39,7 +39,6 @@ import org.apache.kafka.common.serialization.ByteArraySerializer;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -112,15 +111,15 @@ class KafkaRegisterRealBrokerTest extends PostgresIntegrationTest {
                 new KafkaConnection(KafkaModule.SYSTEM, List.of(bootstrap), "PLAINTEXT", null, null, null, null));
     }
 
-    private RegistrationCheck check(RegisterClusterRequest request) {
-        return (RegistrationCheck) ((Attempt.Ok<?>) service.checkConnection(request)).value();
+    private ConnectionCheck check(RegisterClusterRequest request) {
+        return service.checkConnection(request);
     }
 
     @Test
     void theCheckNamesEveryBrokerAndTheQuorumAndStoresNothing() {
         int before = clusters.findAll().size();
 
-        RegistrationCheck check = check(request("check", kafka.getBootstrapServers()));
+        ConnectionCheck check = check(request("check", kafka.getBootstrapServers()));
 
         assertThat(check.failure()).isNull();
         assertThat(check.supported()).isTrue();
@@ -177,7 +176,7 @@ class KafkaRegisterRealBrokerTest extends PostgresIntegrationTest {
         RegisterClusterRequest first = request("once", kafka.getBootstrapServers());
         UUID id = ((Attempt.Ok<ClusterDetail>) service.register(first)).value().id();
 
-        RegistrationCheck again = check(request("once-again", kafka.getBootstrapServers()));
+        ConnectionCheck again = check(request("once-again", kafka.getBootstrapServers()));
 
         assertThat(again.alreadyRegistered()).isNotNull();
         assertThat(again.alreadyRegistered().id()).isEqualTo(id);
@@ -186,7 +185,7 @@ class KafkaRegisterRealBrokerTest extends PostgresIntegrationTest {
     }
 
     private UpdateClusterRequest edit(KafkaConnectionUpdate connection) {
-        return new UpdateClusterRequest(null, null, null, null, null, null, null, connection);
+        return new UpdateClusterRequest(null, null, null, connection);
     }
 
     @Test
@@ -194,9 +193,10 @@ class KafkaRegisterRealBrokerTest extends PostgresIntegrationTest {
         UUID id = ((Attempt.Ok<ClusterDetail>) service.register(request("edit", kafka.getBootstrapServers())))
                 .value()
                 .id();
-        KafkaConnectionUpdate renamed = new KafkaConnectionUpdate(null, null, null, null, null, "rahdar-edited");
+        KafkaConnectionUpdate renamed =
+                new KafkaConnectionUpdate(KafkaModule.SYSTEM, null, null, null, null, null, "rahdar-edited");
 
-        RegistrationCheck dryRun = (RegistrationCheck) service.checkUpdate(id, edit(renamed));
+        ConnectionCheck dryRun = service.checkUpdate(id, edit(renamed));
 
         assertThat(dryRun.failure()).isNull();
         assertThat(dryRun.alreadyRegistered()).isNull();
@@ -219,7 +219,9 @@ class KafkaRegisterRealBrokerTest extends PostgresIntegrationTest {
         String before = connections.findById(id).orElseThrow().getBootstrapServers();
 
         assertThatThrownBy(() -> service.updateConnection(
-                        id, edit(new KafkaConnectionUpdate(List.of("localhost:1"), null, null, null, null, null))))
+                        id,
+                        edit(new KafkaConnectionUpdate(
+                                KafkaModule.SYSTEM, List.of("localhost:1"), null, null, null, null, null))))
                 .hasMessageContaining("Check the host and port");
 
         assertThat(connections.findById(id).orElseThrow().getBootstrapServers()).isEqualTo(before);
@@ -242,7 +244,7 @@ class KafkaRegisterRealBrokerTest extends PostgresIntegrationTest {
 
     @Test
     void aBootstrapServerNobodyListensOnFailsTheCheckWithItsCause() {
-        RegistrationCheck check = check(request("refused", "localhost:1"));
+        ConnectionCheck check = check(request("refused", "localhost:1"));
 
         assertThat(check.failure()).isNotNull();
         assertThat(check.failure().cause()).isIn("REFUSED", "TIMEOUT");
@@ -294,15 +296,16 @@ class KafkaRegisterRealBrokerTest extends PostgresIntegrationTest {
     }
 
     @Test
-    @Disabled("needs OpenBroker 0.5.0, which supports Kafka 3.0 and later")
     void aKafka3ClusterIsRegistered() {
         try (KafkaContainer older = new KafkaContainer("apache/kafka:3.9.1")) {
             older.start();
 
-            RegistrationCheck check = check(request("three", older.getBootstrapServers()));
+            ConnectionCheck check = check(request("three", older.getBootstrapServers()));
 
             assertThat(check.failure()).isNull();
             assertThat(check.supported()).isTrue();
+            assertThat(check.version().text()).startsWith("3.");
+            assertThat(check.version().mode()).isEqualTo("KRaft");
         }
     }
 }

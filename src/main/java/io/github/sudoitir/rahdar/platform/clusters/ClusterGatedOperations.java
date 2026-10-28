@@ -21,6 +21,7 @@ import io.github.sudoitir.rahdar.platform.clusters.web.ClusterRequests.RegisterC
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterRequests.RegisterClusterRequest.ArtemisConnection;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterRequests.RegisterClusterRequest.KafkaConnection;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterRequests.RegisterClusterRequest.UnknownConnection;
+import io.github.sudoitir.rahdar.platform.clusters.web.ClusterRequests.UpdateClusterRequest.KafkaConnectionUpdate;
 import io.github.sudoitir.rahdar.platform.clusters.web.EnvironmentViews.EnvironmentRequest;
 import java.util.ArrayList;
 import java.util.List;
@@ -271,7 +272,10 @@ class ClusterGatedOperations {
 
     @Bean
     GatedOperation<ClusterUpdateParams> clusterUpdateOperation(
-            ClusterService service, ClusterDirectory directory, ClusterEnvironmentIndex clusters) {
+            ClusterService service,
+            ClusterDirectory directory,
+            ClusterEnvironmentIndex clusters,
+            EnvironmentService environments) {
         return new Operations.Base<>("cluster.update", ClusterUpdateParams.class, Set.of(Trait.ACCESS_CONTROL)) {
             @Override
             public OperationScope scope(ClusterUpdateParams p) {
@@ -294,19 +298,20 @@ class ClusterGatedOperations {
                 }
                 addIfSet(rows, "Management URL pattern", p.managementUrlPattern());
                 addIfSet(rows, "TLS bundle", p.tlsBundle());
-                if (p.connection() != null) {
+                if (p.connection() instanceof KafkaConnectionUpdate k) {
                     addIfSet(
                             rows,
                             "Bootstrap servers",
-                            p.connection().bootstrapServers() == null
-                                    ? null
-                                    : String.join(", ", p.connection().bootstrapServers()));
-                    addIfSet(rows, "Security protocol", p.connection().securityProtocol());
-                    addIfSet(rows, "SASL mechanism", p.connection().saslMechanism());
-                    if (p.connection().credentials() != null) {
-                        addIfSet(rows, "Account", p.connection().credentials().username());
+                            k.bootstrapServers() == null ? null : String.join(", ", k.bootstrapServers()));
+                    addIfSet(rows, "Security protocol", k.securityProtocol());
+                    addIfSet(rows, "SASL mechanism", k.saslMechanism());
+                    if (k.credentials() != null) {
+                        addIfSet(rows, "Account", k.credentials().username());
                         rows.add(DisplayRow.of("Account secret", REDACTED_PASSWORD));
                     }
+                }
+                if (p.environmentId() != null) {
+                    rows.add(DisplayRow.of(LABEL_ENVIRONMENT, environments.labelOf(p.environmentId())));
                 }
                 account(rows, "Management account", p.management());
                 if (p.clearCore()) {

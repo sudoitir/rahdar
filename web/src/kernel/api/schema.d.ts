@@ -4366,6 +4366,12 @@ export interface components {
             adopt?: boolean;
             connection: components["schemas"]["ArtemisConnection"] | components["schemas"]["KafkaConnection"];
         };
+        AccessFinding: {
+            capability: string;
+            /** @description AVAILABLE, UNAVAILABLE or UNKNOWN. */
+            status: string;
+            reason: string;
+        };
         AdoptionCountsView: {
             /** Format: int32 */
             addresses: number;
@@ -4382,68 +4388,11 @@ export interface components {
             disagreements: string[];
             notes: string[];
         };
-        CapabilitiesView: {
-            managementRead: components["schemas"]["CapabilityView"];
-            managementWrite: components["schemas"]["CapabilityView"];
-            notifications: components["schemas"]["CapabilityView"];
-            messageIo: components["schemas"]["CapabilityView"];
-            slowConsumerDetection: components["schemas"]["CapabilityView"];
-            /** @description Operations that need a newer Artemis release than some node runs */
-            versionGates: components["schemas"]["VersionGateView"][];
-        };
-        CapabilityView: {
-            status: string;
-            reason: string;
-            brokerXmlSnippet?: string | null;
-        };
-        LogicalNodeView: {
-            artemisNodeId?: string | null;
-            splitBrain: string;
-            replicationBehind: boolean;
-            endpoints: components["schemas"]["NodeEndpointView"][];
-        };
-        NodeEndpointView: {
-            /** Format: uuid */
-            id: string;
-            name: string;
-            artemisNodeId?: string | null;
-            jolokiaUrl?: string | null;
-            coreUrl?: string | null;
-            haRole: string;
-            state: string;
-            active: boolean;
-            replicaSync?: boolean | null;
+        ArtemisNodeDetail: {
+            /** @description The broker's own node id. */
+            nativeNodeId?: string | null;
             version?: string | null;
-            /**
-             * @description Where version sits against the supported Artemis range
-             * @enum {string}
-             */
-            versionSupport: "SUPPORTED" | "BELOW_MINIMUM" | "NEWER_THAN_TESTED" | "UNKNOWN";
-            lastError?: string | null;
-            /** @enum {string|null} */
-            lastErrorKind?: "UNREACHABLE" | "THROTTLED" | "CREDENTIALS_REJECTED" | "NOT_ARTEMIS" | "WRONG_PATH" | "TLS_FAILED" | "BAD_RESPONSE" | "UNSUPPORTED_VERSION" | null;
-            /** Format: date-time */
-            lastSeenAt?: string | null;
-            /**
-             * @description Where the management URL came from; null while there is none
-             * @enum {string|null}
-             */
-            urlSource?: "SEED" | "DERIVED" | "MANUAL" | null;
-            /**
-             * @description Why the node has no management URL
-             * @enum {string|null}
-             */
-            urlProblem?: "NO_PATTERN" | "UNREACHABLE" | "CREDENTIALS_REJECTED" | "WRONG_ENDPOINT" | "TLS_FAILED" | "OTHER_BROKER" | null;
-            /** @description Whether an operator set the Core URL */
-            coreUrlManual: boolean;
-            manageable: boolean;
-        };
-        NodeProbeView: {
-            name: string;
             haRole: string;
-            artemisNodeId?: string | null;
-            version?: string | null;
-            managementUrl?: string | null;
             /** @enum {string|null} */
             urlSource?: "SEED" | "DERIVED" | "MANUAL" | null;
             /** @enum {string|null} */
@@ -4453,49 +4402,26 @@ export interface components {
             /** @enum {string} */
             core: "ACCEPTED" | "REJECTED" | "UNREACHABLE" | "NOT_TRIED";
         };
-        NodeVersionView: {
-            /** Format: uuid */
-            nodeId: string;
-            nodeName: string;
-            version?: string | null;
+        ConnectionCheck: {
+            /** @description The system's id, such as kafka. */
+            system: string;
+            version?: components["schemas"]["VersionFound"] | null;
+            /** @description Whether the driver supports what was found. */
             supported: boolean;
-        };
-        RegisterPreview: {
-            capabilities: components["schemas"]["CapabilitiesView"];
-            /** Format: int32 */
-            reachableSeeds: number;
-            /** Format: int32 */
-            discoveredNodes: number;
-            topology: components["schemas"]["TopologyView"];
-            /** @description The pattern the check derived management URLs from */
-            managementUrlPattern: string;
-            /** @description One row per node the check found */
-            nodes: components["schemas"]["NodeProbeView"][];
+            /** @description The cluster's own id as the brokers report it. */
+            clusterId?: string | null;
+            alreadyRegistered?: components["schemas"]["RegisteredRef"] | null;
+            nodes: components["schemas"]["NodeReach"][];
+            quorum?: components["schemas"]["Quorum"] | null;
+            access: components["schemas"]["AccessFinding"][];
+            failure?: components["schemas"]["Failure"] | null;
             adoption?: components["schemas"]["AdoptionPreviewView"] | null;
-            /** @description What each enabled feature adds to the check, keyed by feature id and read from the reachable node. brokerconfig contributes a ConfigRecommendationsView: what to declare once the cluster is registered */
+            /** @description Artemis only: the pattern the check derived management URLs from. */
+            managementUrlPattern?: string | null;
+            /** @description What each enabled feature adds to the check, keyed by feature id and read from a reachable node. Empty where a system has none. */
             contributions: {
                 [key: string]: unknown;
             };
-        };
-        TopologyView: {
-            /** Format: uuid */
-            clusterId: string;
-            nodes: components["schemas"]["LogicalNodeView"][];
-        };
-        VersionGateView: {
-            feature: string;
-            label: string;
-            requiredVersion: string;
-            status: string;
-            reason: string;
-            brokerXmlSnippet?: string | null;
-            nodes: components["schemas"]["NodeVersionView"][];
-        };
-        AccessFinding: {
-            capability: string;
-            /** @description AVAILABLE, UNAVAILABLE or UNKNOWN. */
-            status: string;
-            reason: string;
         };
         Failure: {
             /** @description DNS, REFUSED, TIMEOUT, TLS, AUTHENTICATION, AUTHORIZATION or UNSUPPORTED_VERSION. */
@@ -4514,6 +4440,7 @@ export interface components {
             /** @description DNS, REFUSED, TIMEOUT, TLS or AUTHENTICATION when unreachable. */
             cause?: string | null;
             message?: string | null;
+            artemis?: components["schemas"]["ArtemisNodeDetail"] | null;
         };
         Quorum: {
             available: boolean;
@@ -4527,26 +4454,28 @@ export interface components {
             id: string;
             name: string;
         };
-        RegistrationCheck: {
-            /** @description The system's id, such as kafka. */
-            system: string;
-            version?: components["schemas"]["VersionFound"] | null;
-            /** @description Whether the driver supports what was found. */
-            supported: boolean;
-            /** @description The cluster's own id as the brokers report it. */
-            clusterId?: string | null;
-            alreadyRegistered?: components["schemas"]["RegisteredRef"] | null;
-            nodes: components["schemas"]["NodeReach"][];
-            quorum?: components["schemas"]["Quorum"] | null;
-            access: components["schemas"]["AccessFinding"][];
-            failure?: components["schemas"]["Failure"] | null;
-        };
         VersionFound: {
             /** @description Such as "at least 3.5" or "4.0.2". */
             text: string;
             /** @description The cluster's metadata mode, such as KRaft or ZooKeeper. */
             mode?: string | null;
             exact: boolean;
+        };
+        CapabilitiesView: {
+            managementRead: components["schemas"]["CapabilityView"];
+            managementWrite: components["schemas"]["CapabilityView"];
+            notifications: components["schemas"]["CapabilityView"];
+            messageIo: components["schemas"]["CapabilityView"];
+            slowConsumerDetection: components["schemas"]["CapabilityView"];
+            /** @description Operations that need a newer Artemis release than some node runs */
+            versionGates: components["schemas"]["VersionGateView"][];
+            /** @description Every capability the system's driver assessed for the account, with its own reason. Empty for a system whose capabilities are the fixed ones above. */
+            findings: components["schemas"]["AccessFinding"][];
+        };
+        CapabilityView: {
+            status: string;
+            reason: string;
+            brokerXmlSnippet?: string | null;
         };
         ClusterConnectionDetail: {
             managementUrlPattern?: string | null;
@@ -4612,14 +4541,79 @@ export interface components {
             resourceClass: string;
             /** @description The kind's name for people, singular and plural. */
             label: components["schemas"]["KindName"];
+            /** @description Whether the kind reads a partitioned log: browsing is by partition and offset or time. */
+            partitioned: boolean;
             /** @description What the system can do to this kind (create, delete, pause, purge, ...), plus what Rahdar adds when the system provides it (reset-counters, expire). */
             verbs: string[];
+        };
+        LogicalNodeView: {
+            artemisNodeId?: string | null;
+            splitBrain: string;
+            replicationBehind: boolean;
+            endpoints: components["schemas"]["NodeEndpointView"][];
+        };
+        NodeEndpointView: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            artemisNodeId?: string | null;
+            jolokiaUrl?: string | null;
+            coreUrl?: string | null;
+            haRole: string;
+            state: string;
+            active: boolean;
+            replicaSync?: boolean | null;
+            version?: string | null;
+            /**
+             * @description Where version sits against the supported Artemis range
+             * @enum {string}
+             */
+            versionSupport: "SUPPORTED" | "BELOW_MINIMUM" | "NEWER_THAN_TESTED" | "UNKNOWN";
+            lastError?: string | null;
+            /** @enum {string|null} */
+            lastErrorKind?: "UNREACHABLE" | "THROTTLED" | "CREDENTIALS_REJECTED" | "NOT_ARTEMIS" | "WRONG_PATH" | "TLS_FAILED" | "BAD_RESPONSE" | "UNSUPPORTED_VERSION" | null;
+            /** Format: date-time */
+            lastSeenAt?: string | null;
+            /**
+             * @description Where the management URL came from; null while there is none
+             * @enum {string|null}
+             */
+            urlSource?: "SEED" | "DERIVED" | "MANUAL" | null;
+            /**
+             * @description Why the node has no management URL
+             * @enum {string|null}
+             */
+            urlProblem?: "NO_PATTERN" | "UNREACHABLE" | "CREDENTIALS_REJECTED" | "WRONG_ENDPOINT" | "TLS_FAILED" | "OTHER_BROKER" | null;
+            /** @description Whether an operator set the Core URL */
+            coreUrlManual: boolean;
+            manageable: boolean;
+        };
+        NodeVersionView: {
+            /** Format: uuid */
+            nodeId: string;
+            nodeName: string;
+            version?: string | null;
+            supported: boolean;
         };
         SystemView: {
             /** @description The system's id, such as artemis. */
             id: string;
             /** @description The system's name for people. */
             name: string;
+        };
+        TopologyView: {
+            /** Format: uuid */
+            clusterId: string;
+            nodes: components["schemas"]["LogicalNodeView"][];
+        };
+        VersionGateView: {
+            feature: string;
+            label: string;
+            requiredVersion: string;
+            status: string;
+            reason: string;
+            brokerXmlSnippet?: string | null;
+            nodes: components["schemas"]["NodeVersionView"][];
         };
         Finding: {
             /** @enum {string} */
@@ -5673,27 +5667,36 @@ export interface components {
             username?: string;
             password?: string;
         };
+        ArtemisConnectionUpdate: {
+            system: "ArtemisConnectionUpdate";
+        } & (Omit<components["schemas"]["ConnectionUpdate"], "system"> & {
+            system?: string;
+            seedUrls?: string[];
+            managementUrlPattern?: string;
+            tlsBundle?: string;
+            management?: components["schemas"]["AccountUpdate"];
+            core?: components["schemas"]["AccountUpdate"];
+        });
+        ConnectionUpdate: {
+            system: string;
+        };
         KafkaConnectionUpdate: {
+            system: "KafkaConnectionUpdate";
+        } & (Omit<components["schemas"]["ConnectionUpdate"], "system"> & {
+            system?: string;
             bootstrapServers?: string[];
             securityProtocol?: string;
             saslMechanism?: string;
             credentials?: components["schemas"]["KafkaCredentials"];
             tlsBundle?: string;
             clientId?: string;
-        };
+        });
         UpdateClusterRequest: {
             name?: string;
             description?: string;
-            seedUrls?: string[];
-            managementUrlPattern?: string;
-            tlsBundle?: string;
-            management?: components["schemas"]["AccountUpdate"];
-            core?: components["schemas"]["AccountUpdate"];
-            connection?: components["schemas"]["KafkaConnectionUpdate"];
-        };
-        ConnectionCheck: {
-            managementUrlPattern: string;
-            nodes: components["schemas"]["NodeProbeView"][];
+            /** Format: uuid */
+            environmentId?: string;
+            connection?: components["schemas"]["ArtemisConnectionUpdate"] | components["schemas"]["KafkaConnectionUpdate"];
         };
         ClusterConnectionView: {
             /** Format: uuid */
@@ -12269,7 +12272,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["RegisterPreview"] | components["schemas"]["RegistrationCheck"];
+                    "*/*": components["schemas"]["ConnectionCheck"];
                 };
             };
             /** @description cluster registered */
@@ -16974,7 +16977,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ConnectionCheck"] | components["schemas"]["RegistrationCheck"] | components["schemas"]["ClusterConnectionView"];
+                    "*/*": components["schemas"]["ConnectionCheck"] | components["schemas"]["ClusterConnectionView"];
                 };
             };
             /** @description Held for approval: the operation has not run. X-Rahdar-Held-Operation names the request. */
