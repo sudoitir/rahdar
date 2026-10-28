@@ -35,6 +35,7 @@ export function ConfirmDialog({
   pending = false,
   blocked,
   result,
+  size = 'md',
   onConfirm,
 }: ConfirmDialogProps) {
   const theme = useMantineTheme();
@@ -120,6 +121,7 @@ export function ConfirmDialog({
       opened={opened}
       onClose={onClose}
       title={title}
+      size={size}
       centered
       withCloseButton={false}
       closeOnEscape={!pending}
@@ -144,6 +146,8 @@ export type ConfirmDialogProps = Readonly<{
   consequence: ReactNode;
   /** The exact action, such as "Delete subscription". */
   confirmLabel: string;
+  /** A wider dialog for a consequence that holds a table. */
+  size?: 'md' | 'lg';
   /**
    * The button that dismisses without acting; defaults to "Cancel". Name what is kept, such as "Keep
    * request", when the action itself is a cancel, so the two buttons never both read "Cancel".

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { screen } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { renderWithProviders } from '../test/render.tsx';
@@ -80,5 +80,7 @@ describe('BacklogCell', () => {
     expect(await screen.findByText('This figure is an estimate.')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Show partitions' }));
     expect(onBreakdown).toHaveBeenCalledOnce();
+    // The popover gives way to the breakdown it opened, rather than staying over it.
+    await waitFor(() => expect(screen.queryByText('This figure is an estimate.')).not.toBeInTheDocument());
   });
 });

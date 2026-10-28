@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Button, Popover, Stack, Text, VisuallyHidden } from '@mantine/core';
 
 import { backlogWords, type BacklogValue } from './backlog.ts';
@@ -25,12 +26,40 @@ export function BacklogCell({
   const offersBreakdown = backlog.breakdown && onBreakdown !== undefined;
   if (!inexact && !offersBreakdown) return <span className={classes.figure}>{words}</span>;
 
+  return <Explained backlog={backlog} subject={subject} words={words} inexact={inexact} onBreakdown={onBreakdown} />;
+}
+
+/** The figure and its popover, which closes when the breakdown it offers opens, so it does not stay over the drawer. */
+function Explained({
+  backlog,
+  subject,
+  words,
+  inexact,
+  onBreakdown,
+}: Readonly<{
+  backlog: BacklogValue;
+  subject: string;
+  words: string;
+  inexact: boolean;
+  onBreakdown?: () => void;
+}>) {
+  const [opened, setOpened] = useState(false);
+  const offersBreakdown = backlog.breakdown && onBreakdown !== undefined;
   const unavailable = backlog.accuracy === 'UNAVAILABLE';
   const fallback = unavailable ? 'The backlog could not be read.' : 'This figure is an estimate.';
   return (
-    <Popover width="21.25rem" position="bottom-start" withArrow shadow="md" trapFocus returnFocus>
+    <Popover
+      opened={opened}
+      onChange={setOpened}
+      width="21.25rem"
+      position="bottom-start"
+      withArrow
+      shadow="md"
+      trapFocus
+      returnFocus
+    >
       <Popover.Target>
-        <button type="button" className={classes.explain} aria-haspopup="dialog">
+        <button type="button" className={classes.explain} aria-haspopup="dialog" onClick={() => setOpened((o) => !o)}>
           {words}
           {inexact ? (
             <VisuallyHidden>{unavailable ? ', unavailable, why' : ', estimate, why'}</VisuallyHidden>
@@ -43,7 +72,14 @@ export function BacklogCell({
         <Stack gap="xs">
           {inexact ? <Text size="xs">{backlog.reason ?? fallback}</Text> : null}
           {offersBreakdown ? (
-            <Button size="compact-xs" variant="default" onClick={onBreakdown}>
+            <Button
+              size="compact-xs"
+              variant="default"
+              onClick={() => {
+                setOpened(false);
+                onBreakdown();
+              }}
+            >
               Show partitions
             </Button>
           ) : null}
