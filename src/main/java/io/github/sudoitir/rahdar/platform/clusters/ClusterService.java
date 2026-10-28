@@ -62,6 +62,7 @@ import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.ClusterDetai
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.ClusterSummary;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.ConnectionCheck;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.HealthView;
+import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.KindView;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.NodeEndpointView;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.NodeProbeView;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.RegisterPreview;
@@ -434,7 +435,12 @@ public class ClusterService {
         BrokerCapabilities capabilities =
                 capabilityProbe.probe(reachable.get(0).target(), new SubscriptionVerdict.NotAttempted());
         RegistrationAdoption.Reading adopted = request.adopts() ? readAdoption(found, session) : null;
-        return transactions.execute(status -> saveRegistration(request, inputs, survey, found, capabilities, adopted));
+        Attempt<ClusterDetail> saved =
+                transactions.execute(status -> saveRegistration(request, inputs, survey, found, capabilities, adopted));
+        // The kinds are read from the broker's driver, which is not done inside a transaction.
+        return saved instanceof Attempt.Ok<ClusterDetail>(ClusterDetail d)
+                ? new Attempt.Ok<>(withKinds(d, clusterKinds.kindsOf(d.id())))
+                : saved;
     }
 
     /** What the live nodes run, read before the registration transaction opens (ADR-0176). */
@@ -524,7 +530,21 @@ public class ClusterService {
                 cluster.getEnvironmentId(),
                 connectionView(clusterId, cluster),
                 clusterKinds.systemOf(clusterId),
-                clusterKinds.kindsOf(clusterId)));
+                List.of()));
+    }
+
+    private static ClusterDetail withKinds(ClusterDetail d, List<KindView> kinds) {
+        return new ClusterDetail(
+                d.id(),
+                d.name(),
+                d.description(),
+                d.topology(),
+                d.capabilities(),
+                d.health(),
+                d.environmentId(),
+                d.connection(),
+                d.system(),
+                kinds);
     }
 
     // ---- one registration per set of brokers (ADR-0167) ---------------------
@@ -646,6 +666,7 @@ public class ClusterService {
                 ? healthOf(
                         clusterId, topologyDiscovery.currentTopology(clusterId).nodes())
                 : null;
+        List<KindView> kinds = clusterKinds.kindsOf(clusterId);
         return transactions.execute(status -> {
             ClusterEntity cluster = requireCluster(clusterId);
             ClusterTopology topology = topologyDiscovery.currentTopology(clusterId);
@@ -661,7 +682,7 @@ public class ClusterService {
                             ? connectionView(clusterId, cluster)
                             : null,
                     clusterKinds.systemOf(clusterId),
-                    clusterKinds.kindsOf(clusterId));
+                    kinds);
         });
     }
 

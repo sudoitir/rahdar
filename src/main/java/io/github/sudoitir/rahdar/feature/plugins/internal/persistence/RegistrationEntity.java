@@ -35,8 +35,11 @@ public class RegistrationEntity {
     @Column(name = "cluster_id", nullable = false)
     private UUID clusterId;
 
-    @Column(name = "subscription", nullable = false)
-    private String subscription;
+    @Column(name = "source_kind", nullable = false)
+    private String sourceKind;
+
+    @Column(name = "source_path", nullable = false)
+    private String sourcePath;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)

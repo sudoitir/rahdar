@@ -37,9 +37,22 @@ public class ClusterKinds {
         return kindsOf(clusterId).stream().anyMatch(k -> k.id().equals(kind) && k.partitioned());
     }
 
+    /** The ids of the cluster's kinds that are subscriptions, which messages are received from. */
+    public List<String> subscriptionKinds(UUID clusterId) {
+        return kindsOf(clusterId).stream()
+                .filter(k -> ResourceClass.SUBSCRIPTION.name().equals(k.resourceClass()))
+                .map(KindView::id)
+                .toList();
+    }
+
     /** The id of the system the cluster runs. */
     public String systemId(UUID clusterId) {
         return systems.idOf(clusterId);
+    }
+
+    /** The name of the system the cluster runs, for messages to people. */
+    public String systemName(UUID clusterId) {
+        return systemOf(clusterId).name();
     }
 
     public SystemView systemOf(UUID clusterId) {

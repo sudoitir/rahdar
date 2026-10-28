@@ -23,6 +23,7 @@ import io.github.sudoitir.rahdar.kernel.security.ResourceRef;
 import io.github.sudoitir.rahdar.platform.broker.BrokerMessages;
 import io.github.sudoitir.rahdar.platform.broker.SendInDoubtException;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
+import io.github.sudoitir.rahdar.platform.clusters.ClusterKinds;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
 import io.github.sudoitir.rahdar.platform.clusters.RegisteredCluster;
 import java.time.Clock;
@@ -52,6 +53,7 @@ class PluginSendInDoubtTest {
             reconciler,
             mock(PluginDrains.class),
             clusters,
+            mock(ClusterKinds.class),
             messages,
             audit,
             actors,

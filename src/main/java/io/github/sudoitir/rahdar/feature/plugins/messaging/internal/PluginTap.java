@@ -40,6 +40,11 @@ class PluginTap {
         return props;
     }
 
+    /** Whether the cluster's system can copy a destination's traffic into a tap at all. */
+    boolean supported(UUID clusterId) {
+        return extensions.forCluster(clusterId, MessageTaps.class).isPresent();
+    }
+
     /** The tapped queue on this node, or empty when the node does not have it. */
     Optional<TapSource> source(UUID clusterId, UUID nodeId, String queue) {
         return extensions.require(clusterId, MessageTaps.class).source(clusterId, nodeId, queue);

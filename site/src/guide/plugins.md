@@ -414,7 +414,8 @@ class Orders implements PluginMessageHandler {
 
     void watch(UUID clusterId, UUID operatorId) {
         messaging.register(new RegistrationSpec(
-                "orders", clusterId, "ORDERS.IN", RegistrationMode.TAP, 1, operatorId));
+                "orders", clusterId, SubscriptionId.of("artemis.queue", "ORDERS.IN"),
+                RegistrationMode.TAP, 1, operatorId));
     }
 
     @Override
@@ -436,7 +437,18 @@ class Orders implements PluginMessageHandler {
   attempt: return it when the message is not the problem (the service your handler calls is down)
   and you are stopping the registration until it recovers. The broker offers a released message
   again at once, so releasing in a loop that keeps receiving only spins. It needs `message:read`
-  and `subscription:purge` on the subscription.
+  and `subscription:purge` on the subscription. `MessageRegistration.releasesCounted()` says
+  whether the system counts a release as an attempt anyway, as a Kafka share group does; a Kafka
+  consumer group counts only rejections, retries them in place, and then writes the record to its
+  dead-letter topic.
+
+The subscription is named by its `SubscriptionId`, the shared API's id: `SubscriptionId.of("artemis.queue", "ORDERS.IN")`
+for an Artemis queue, `SubscriptionId.of("kafka.group", "billing")` for a Kafka consumer group. An
+Artemis queue lives on each serving node, so Rahdar delivers it on every one of them. A Kafka group is
+one partitioned log, so Rahdar delivers it once for the whole cluster, from one Rahdar instance: its
+`MessageRef.nodeId` is `null` and its registration has one node state, named `whole cluster`. Messages
+with one key stay in order within a partition. `TAP` needs the broker to copy traffic, which Kafka
+cannot do: register in `CONSUME` mode there, or Rahdar refuses the registration.
 - **`send(OutboundMessage)`** sends a body, headers and properties to an address. It needs
   `message:send` on the address. When the connection to the broker is lost after the message left and
   before the broker confirmed it, `send` throws `MessageInDoubtException`: the message may or may not be
@@ -845,6 +857,17 @@ string into markup or script (Trusted Types):
 React, Mantine and the SDK's components work as they are. A library of your own that sets `innerHTML`
 (a rich-text editor, a Markdown renderer) is what to check: it stops working here. Pick one that renders
 through React, or show the text as text.
+
+### Moving a plugin from contract 17 to 18
+
+Contract 18 lets a plugin read a Kafka consumer group. Rahdar refuses a plugin built for contract 17, so
+rebuild it and set `<rahdar.contract>18</rahdar.contract>` in its `pom.xml`:
+
+- **Messaging.** `RegistrationSpec.source`, `MessageRegistration.source` and `PluginMessage.source` are a
+  `SubscriptionId(kind, path)` instead of a `ResourceRef`. Replace `ResourceRef.subscription(queue)` with
+  `SubscriptionId.of("artemis.queue", queue)`. `ResourceRef` stays the key of a permission check and
+  the target of a send. `MessageRef.nodeId` is `null` for a subscription read for the whole cluster, and
+  `MessageRegistration` gained `releasesCounted`.
 
 ### Moving a plugin from contract 16 to 17
 

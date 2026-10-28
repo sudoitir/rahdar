@@ -2,6 +2,7 @@ package io.github.sudoitir.rahdar.feature.plugins.messaging.internal;
 
 import io.github.sudoitir.rahdar.feature.messages.MessagePermissions;
 import io.github.sudoitir.rahdar.feature.plugins.messaging.RegistrationMode;
+import io.github.sudoitir.rahdar.feature.plugins.messaging.SubscriptionId;
 import io.github.sudoitir.rahdar.kernel.security.PermissionResolver;
 import io.github.sudoitir.rahdar.kernel.security.RahdarPrincipal;
 import io.github.sudoitir.rahdar.kernel.security.ResourceRef;
@@ -29,12 +30,17 @@ public class AccessCheck {
     /** One permission the acting user needs on one subscription or destination of the cluster. */
     public record Need(ResourceRef resource, String permission) {}
 
+    /** The permission key of a subscription: its first path segment, the queue (on Kafka, the group). */
+    public static ResourceRef resourceOf(SubscriptionId source) {
+        return ResourceRef.subscription(source.segments().getFirst());
+    }
+
     /**
      * What a registration needs on its subscription: reading it for a tap, and also purging it for a consumer,
      * because consuming removes messages.
      */
-    public static List<Need> needsOf(RegistrationMode mode, String queue) {
-        ResourceRef resource = ResourceRef.subscription(queue);
+    public static List<Need> needsOf(RegistrationMode mode, SubscriptionId source) {
+        ResourceRef resource = resourceOf(source);
         return mode == RegistrationMode.TAP
                 ? List.of(new Need(resource, MessagePermissions.MESSAGE_READ))
                 : List.of(

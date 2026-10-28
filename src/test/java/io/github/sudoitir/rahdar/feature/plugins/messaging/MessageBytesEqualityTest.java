@@ -23,7 +23,7 @@ class MessageBytesEqualityTest {
         PluginMessage x = new PluginMessage(
                 "k",
                 CLUSTER,
-                ResourceRef.subscription("q"),
+                SubscriptionId.of("artemis.queue", "q"),
                 new MessageRef(CLUSTER, "1"),
                 new byte[] {1, 2},
                 false,
@@ -33,7 +33,7 @@ class MessageBytesEqualityTest {
         PluginMessage y = new PluginMessage(
                 "k",
                 CLUSTER,
-                ResourceRef.subscription("q"),
+                SubscriptionId.of("artemis.queue", "q"),
                 new MessageRef(CLUSTER, "1"),
                 new byte[] {1, 2},
                 false,
@@ -43,7 +43,7 @@ class MessageBytesEqualityTest {
         PluginMessage other = new PluginMessage(
                 "k",
                 CLUSTER,
-                ResourceRef.subscription("q"),
+                SubscriptionId.of("artemis.queue", "q"),
                 new MessageRef(CLUSTER, "1"),
                 new byte[] {9},
                 false,

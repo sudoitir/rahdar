@@ -2,6 +2,7 @@ package io.github.sudoitir.rahdar.feature.plugins.messaging.internal;
 
 import io.github.sudoitir.openbroker.BrokerException;
 import io.github.sudoitir.openbroker.ErrorReasons;
+import io.github.sudoitir.openbroker.Status;
 import io.github.sudoitir.openbroker.messaging.FlowControl;
 import io.github.sudoitir.openbroker.messaging.LinkState;
 import io.github.sudoitir.openbroker.messaging.MessageContext;
@@ -13,9 +14,11 @@ import io.github.sudoitir.openbroker.messaging.RetryPolicy;
 import io.github.sudoitir.rahdar.feature.plugins.messaging.Disposition;
 import io.github.sudoitir.rahdar.feature.plugins.messaging.PluginMessage;
 import io.github.sudoitir.rahdar.feature.plugins.messaging.RegistrationMode;
+import io.github.sudoitir.rahdar.feature.plugins.messaging.SubscriptionId;
 import io.github.sudoitir.rahdar.platform.broker.BrokerMessages;
 import java.time.Duration;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -34,7 +37,9 @@ import org.springframework.stereotype.Component;
  * is handed fewer messages and the rest wait on the subscription for other consumers. The lanes keep
  * a message group in order, one message at a time. Retries are the broker's: a rejection or an
  * exception hands the message back counted, so it is redelivered within the broker's own {@code
- * max-delivery-attempts} and then dead-lettered by the broker; a release hands it back uncounted. A
+ * max-delivery-attempts} and then dead-lettered by the broker; a release hands it back uncounted where the
+ * subscription's system leaves it so. On a Kafka consumer group the SDK retries in place and then writes the
+ * record to its dead-letter topic, so the offset passes a rejected record only once it is dead-lettered. A
  * tap's copy is accepted whatever the handler said, since the original never left its queue. The SDK
  * reopens a lost link on its own; a processor it gives up on is dropped here, and the next pass starts
  * it again. A processor that stops, or a Rahdar that dies, accepts nothing it had not already settled,
@@ -54,7 +59,11 @@ public class PluginDrains {
     private final BrokerMessages messages;
     private final PluginHandlers handlers;
 
-    /** One drain's identity and what it reads. {@code source} is the queue the processor opens. */
+    /**
+     * One drain's identity and what it reads. {@code subscription} is what the plugin registered and is
+     * handed; {@code source} is what the processor opens (a tap's holding queue, otherwise the same). A
+     * null {@code nodeId} is a drain for the whole cluster.
+     */
     record Spec(
             UUID registrationId,
             String pluginId,
@@ -64,16 +73,23 @@ public class PluginDrains {
             UUID clusterId,
             UUID nodeId,
             String nodeName,
-            String queue,
-            String source) {}
+            SubscriptionId subscription,
+            SubscriptionId source,
+            OrderingScope ordering,
+            FlowControl flow) {}
 
-    /** Why a drain could not start: the broker let another consumer have it, or anything else. */
+    /**
+     * Why a drain could not start: the broker let another consumer have it, it refused for a reason a retry will
+     * not change ({@code permanent}), or anything else.
+     */
     static final class StartFailure extends Exception {
         final boolean servedElsewhere;
+        final boolean permanent;
 
-        StartFailure(String message, boolean servedElsewhere, Throwable cause) {
+        StartFailure(String message, boolean servedElsewhere, boolean permanent, Throwable cause) {
             super(message, cause);
             this.servedElsewhere = servedElsewhere;
+            this.permanent = permanent;
         }
     }
 
@@ -83,7 +99,7 @@ public class PluginDrains {
     private final Map<String, Drain> running = new ConcurrentHashMap<>();
 
     private static String key(UUID registrationId, UUID nodeId) {
-        return registrationId + "|" + nodeId;
+        return registrationId + "|" + (nodeId == null ? "cluster" : nodeId);
     }
 
     /** Whether the drain runs; one whose link the SDK gave up on is dropped, so the next pass restarts it. */
@@ -96,7 +112,7 @@ public class PluginDrains {
         if (drain.processor().state() == LinkState.FAILED && running.remove(key, drain)) {
             log.warn(
                     "Plugin delivery of {} on {} lost its broker link for good and restarts on this pass",
-                    drain.spec().queue(),
+                    drain.spec().subscription().id(),
                     drain.spec().nodeName());
             close(drain);
             return false;
@@ -113,7 +129,15 @@ public class PluginDrains {
     /** The registrations draining on a node. */
     Set<UUID> runningOn(UUID nodeId) {
         return running.values().stream()
-                .filter(d -> d.spec().nodeId().equals(nodeId))
+                .filter(d -> Objects.equals(d.spec().nodeId(), nodeId))
+                .map(d -> d.spec().registrationId())
+                .collect(Collectors.toSet());
+    }
+
+    /** The registrations draining for the whole of a cluster (a partitioned log), not per node. */
+    Set<UUID> wholeClusterOf(UUID clusterId) {
+        return running.values().stream()
+                .filter(d -> d.spec().nodeId() == null && d.spec().clusterId().equals(clusterId))
                 .map(d -> d.spec().registrationId())
                 .collect(Collectors.toSet());
     }
@@ -143,7 +167,7 @@ public class PluginDrains {
         log.info(
                 "Delivering {} of {} on {} to plugin {} ({}, {} at once)",
                 spec.mode() == RegistrationMode.TAP ? "a copy" : "messages",
-                spec.queue(),
+                spec.subscription().id(),
                 spec.nodeName(),
                 spec.pluginId(),
                 spec.key(),
@@ -152,31 +176,36 @@ public class PluginDrains {
 
     private Processor open(Spec spec) throws StartFailure {
         ProcessorOptions options = new ProcessorOptions(
-                ReceiverOptions.consume().withFlow(FlowControl.none()),
+                ReceiverOptions.consume().withFlow(spec.flow()),
                 spec.concurrency(),
-                OrderingScope.GROUP,
-                RetryPolicy.system(),
+                spec.ordering(),
+                RetryPolicy.defaults(),
                 STOP_WAIT);
         try {
             return messages.process(
                     spec.clusterId(),
                     spec.nodeId(),
-                    spec.source(),
+                    spec.source().kind(),
+                    spec.source().path(),
                     options,
                     context -> deliver(spec, context),
                     "plugin " + spec.pluginId() + "/" + spec.key());
         } catch (BrokerException e) {
             boolean elsewhere = ErrorReasons.MAX_CONSUMERS_REACHED.equals(e.reason());
+            boolean permanent = e.status() == Status.FAILED_PRECONDITION
+                    || e.status() == Status.UNIMPLEMENTED
+                    || e.status() == Status.INVALID_ARGUMENT;
             throw new StartFailure(
                     elsewhere
                             ? "Another Rahdar instance sharing this database is delivering this on " + spec.nodeName()
-                            : "The broker refused a consumer on " + spec.source() + " at " + spec.nodeName() + ": "
-                                    + reason(e),
+                            : "The broker refused a consumer on "
+                                    + spec.source().id() + " at " + spec.nodeName() + ": " + reason(e),
                     elsewhere,
+                    permanent,
                     e);
         } catch (RuntimeException e) {
             throw new StartFailure(
-                    "Rahdar could not open a receiver on " + spec.nodeName() + ": " + reason(e), false, e);
+                    "Rahdar could not open a receiver on " + spec.nodeName() + ": " + reason(e), false, false, e);
         }
     }
 
@@ -185,14 +214,14 @@ public class PluginDrains {
         IN_HANDLER.set(Boolean.TRUE);
         try {
             PluginMessage delivered = MessageConversion.toPlugin(
-                    spec.key(), spec.clusterId(), spec.nodeId(), spec.queue(), context.message());
+                    spec.key(), spec.clusterId(), spec.nodeId(), spec.subscription(), context.message());
             outcome = handlers.deliver(spec.pluginId(), delivered);
         } catch (Exception | LinkageError e) {
             // The message's content is never logged: it is production payload.
             log.warn(
                     "Plugin {} failed on a message from {} ({}): {}",
                     spec.pluginId(),
-                    spec.queue(),
+                    spec.subscription().id(),
                     spec.key(),
                     e.toString());
             outcome = Optional.of(Disposition.REJECT);
@@ -255,7 +284,7 @@ public class PluginDrains {
         } catch (RuntimeException e) {
             log.warn(
                     "Stopping plugin delivery of {} on {} failed: {}",
-                    drain.spec().queue(),
+                    drain.spec().subscription().id(),
                     drain.spec().nodeName(),
                     e.getMessage());
         }

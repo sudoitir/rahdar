@@ -74,10 +74,16 @@ class PluginAccessCheckIntegrationTest extends PostgresIntegrationTest {
 
     @Test
     void aTapIsAllowedOnATeamsQueueAndRefusedOnAnotherTeamsQueueNamingBoth() {
-        assertThat(access.denial(operator, cluster, AccessCheck.needsOf(RegistrationMode.TAP, "orders.in")))
+        assertThat(access.denial(
+                        operator,
+                        cluster,
+                        AccessCheck.needsOf(RegistrationMode.TAP, SubscriptionId.of("artemis.queue", "orders.in"))))
                 .isEmpty();
 
-        assertThat(access.denial(operator, cluster, AccessCheck.needsOf(RegistrationMode.TAP, "billing.in")))
+        assertThat(access.denial(
+                        operator,
+                        cluster,
+                        AccessCheck.needsOf(RegistrationMode.TAP, SubscriptionId.of("artemis.queue", "billing.in"))))
                 .get()
                 .asString()
                 .contains("message:read")
@@ -86,9 +92,12 @@ class PluginAccessCheckIntegrationTest extends PostgresIntegrationTest {
 
     @Test
     void aConsumerNeedsPurgeToo() {
-        assertThat(access.denial(operator, cluster, AccessCheck.needsOf(RegistrationMode.CONSUME, "orders.in")))
+        assertThat(access.denial(
+                        operator,
+                        cluster,
+                        AccessCheck.needsOf(RegistrationMode.CONSUME, SubscriptionId.of("artemis.queue", "orders.in"))))
                 .isEmpty();
-        assertThat(AccessCheck.needsOf(RegistrationMode.CONSUME, "orders.in"))
+        assertThat(AccessCheck.needsOf(RegistrationMode.CONSUME, SubscriptionId.of("artemis.queue", "orders.in")))
                 .extracting(AccessCheck.Need::permission)
                 .containsExactly("message:read", "subscription:purge");
     }

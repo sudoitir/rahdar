@@ -1,5 +1,8 @@
 package io.github.sudoitir.rahdar.feature.plugins.messaging.internal;
 
+import io.github.sudoitir.openbroker.messaging.FlowControl;
+import io.github.sudoitir.openbroker.messaging.OrderingScope;
+import io.github.sudoitir.openbroker.messaging.SubscriptionCapabilities;
 import io.github.sudoitir.rahdar.feature.plugins.internal.persistence.RegistrationEntity;
 import io.github.sudoitir.rahdar.feature.plugins.internal.persistence.RegistrationNodeEntity;
 import io.github.sudoitir.rahdar.feature.plugins.internal.persistence.RegistrationNodeRepository;
@@ -7,14 +10,17 @@ import io.github.sudoitir.rahdar.feature.plugins.internal.persistence.Registrati
 import io.github.sudoitir.rahdar.feature.plugins.messaging.PluginMessagingProperties;
 import io.github.sudoitir.rahdar.feature.plugins.messaging.RegistrationMode;
 import io.github.sudoitir.rahdar.feature.plugins.messaging.RegistrationState;
+import io.github.sudoitir.rahdar.feature.plugins.messaging.SubscriptionId;
 import io.github.sudoitir.rahdar.kernel.audit.AuditEvent;
 import io.github.sudoitir.rahdar.kernel.audit.AuditService;
 import io.github.sudoitir.rahdar.kernel.security.Actor;
 import io.github.sudoitir.rahdar.kernel.settings.RahdarInstance;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
+import io.github.sudoitir.rahdar.platform.broker.BrokerMessages;
 import io.github.sudoitir.rahdar.platform.broker.MessageTaps.TapSource;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDutyReleased;
+import io.github.sudoitir.rahdar.platform.clusters.ClusterKinds;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterLock;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterOwnership;
@@ -62,6 +68,8 @@ public class PluginMessagingReconciler {
     private final PluginDrains drains;
     private final PluginHandlers handlers;
     private final AccessCheck access;
+    private final ClusterKinds kinds;
+    private final BrokerMessages messages;
     private final AuditService audit;
     private final PluginMessagingProperties properties;
     private final Clock clock;
@@ -129,17 +137,31 @@ public class PluginMessagingReconciler {
             verdicts.put(reg.getId(), verdict(reg));
         }
 
+        // A partitioned log is read once for the cluster, not once per node.
+        List<RegistrationEntity> wholeCluster = regs.stream()
+                .filter(r -> kinds.partitioned(clusterId, r.getSourceKind()))
+                .toList();
+        List<RegistrationEntity> perNode =
+                regs.stream().filter(r -> !wholeCluster.contains(r)).toList();
+        for (RegistrationEntity reg : wholeCluster) {
+            write(reg, null, reconcileWhole(clusterId, reg, verdicts.get(reg.getId())));
+        }
+        Set<UUID> known = regs.stream().map(RegistrationEntity::getId).collect(Collectors.toSet());
+        drains.wholeClusterOf(clusterId).stream()
+                .filter(id -> !known.contains(id))
+                .forEach(id -> drains.stop(id, null));
+
         boolean nothingLeft = true;
         for (ClusterNode node : serving) {
             Map<UUID, NodeResult> results = new HashMap<>();
             try {
-                nothingLeft &= reconcileNode(clusterId, node, regs, verdicts, results);
+                nothingLeft &= reconcileNode(clusterId, node, perNode, verdicts, results);
             } catch (RuntimeException e) {
                 nothingLeft = false;
                 String why = "This node did not answer, so delivery could not be asserted on it: " + reason(e);
-                regs.forEach(r -> results.putIfAbsent(r.getId(), new NodeResult(RegistrationState.PENDING, why, null)));
+                perNode.forEach(r -> results.putIfAbsent(r.getId(), pending(why)));
             }
-            regs.forEach(r -> write(r, node, results.get(r.getId())));
+            perNode.forEach(r -> write(r, node.getId(), results.get(r.getId())));
         }
         if (nothingLeft && regs.isEmpty()) {
             installedOn.remove(clusterId);
@@ -150,7 +172,7 @@ public class PluginMessagingReconciler {
         for (ClusterNode node : nodes.nodes(clusterId)) {
             if (!servingIds.contains(node.getId())) {
                 drains.runningOn(node.getId()).forEach(id -> drains.stop(id, node.getId()));
-                regs.forEach(r -> nodeStates.deleteById(new RegistrationNodeEntity(r.getId(), node.getId()).getId()));
+                perNode.forEach(r -> nodeStates.deleteByRegistrationIdAndNodeId(r.getId(), node.getId()));
             }
         }
     }
@@ -162,15 +184,46 @@ public class PluginMessagingReconciler {
                     "The plugin " + reg.getPluginId() + " is not running, or declares no message handler,"
                             + " so nothing is delivered.");
         }
+        if (reg.getMode() == RegistrationMode.TAP) {
+            Optional<String> refusal = tapRefusal(reg.getClusterId());
+            if (refusal.isPresent()) {
+                return new Verdict(RegistrationState.FAILED, refusal.get());
+            }
+        }
         Optional<String> denied = access.denial(
-                reg.getActingUserId(), reg.getClusterId(), AccessCheck.needsOf(reg.getMode(), reg.getSubscription()));
+                reg.getActingUserId(), reg.getClusterId(), AccessCheck.needsOf(reg.getMode(), subscriptionOf(reg)));
         return denied.map(why -> new Verdict(
                         RegistrationState.SUSPENDED,
                         "Suspended: " + why + " It resumes" + " by itself once the permission is granted again."))
                 .orElse(new Verdict(RegistrationState.ACTIVE, null));
     }
 
-    private record NodeResult(RegistrationState state, String detail, Long dropped) {}
+    /** Why the cluster's system cannot copy a destination's traffic for a tap, or empty when it can. */
+    public Optional<String> tapRefusal(UUID clusterId) {
+        return tap.supported(clusterId)
+                ? Optional.empty()
+                : Optional.of("Taps copy a destination's traffic on the broker, which " + kinds.systemName(clusterId)
+                        + " cannot do. Register in consume mode instead.");
+    }
+
+    private static SubscriptionId subscriptionOf(RegistrationEntity reg) {
+        return new SubscriptionId(reg.getSourceKind(), reg.getSourcePath());
+    }
+
+    /** The name the broker knows a per-node subscription by: its first path segment. */
+    private static String queueOf(RegistrationEntity reg) {
+        return subscriptionOf(reg).segments().getFirst();
+    }
+
+    private record NodeResult(RegistrationState state, String detail, Long dropped, boolean releasesCounted) {}
+
+    private static NodeResult result(RegistrationState state, String detail, Long dropped) {
+        return new NodeResult(state, detail, dropped, false);
+    }
+
+    private static NodeResult pending(String detail) {
+        return result(RegistrationState.PENDING, detail, null);
+    }
 
     /** Whether this node is left with nothing of this instance's. */
     private boolean reconcileNode(
@@ -186,7 +239,7 @@ public class PluginMessagingReconciler {
             Verdict verdict = verdicts.get(reg.getId());
             if (!verdict.deliver()) {
                 drains.stop(reg.getId(), node.getId());
-                results.put(reg.getId(), new NodeResult(verdict.state(), verdict.detail(), null));
+                results.put(reg.getId(), result(verdict.state(), verdict.detail(), null));
                 continue;
             }
             if (reg.getMode() == RegistrationMode.TAP) {
@@ -218,27 +271,26 @@ public class PluginMessagingReconciler {
     private NodeResult assertTap(
             UUID clusterId, ClusterNode node, RegistrationEntity reg, String name, boolean installed) {
         if (installed && drains.isRunning(reg.getId(), node.getId())) {
-            return new NodeResult(RegistrationState.ACTIVE, null, tap.dropped(clusterId, node.getId(), name));
+            return result(RegistrationState.ACTIVE, null, tap.dropped(clusterId, node.getId(), name));
         }
         String refusalKey = node.getId() + "|" + name;
-        String fingerprint = reg.getSubscription() + "|" + node.getDataUrl() + "|" + node.getManagementUrl();
+        String fingerprint = subscriptionOf(reg).id() + "|" + node.getDataUrl() + "|" + node.getManagementUrl();
         if (installed && fingerprint.equals(refused.get(refusalKey))) {
-            return new NodeResult(RegistrationState.FAILED, "Refused earlier on this node; see the audit log.", null);
+            return result(RegistrationState.FAILED, "Refused earlier on this node; see the audit log.", null);
         }
         drains.stop(reg.getId(), node.getId());
         if (node.getDataUrl() == null) {
-            return new NodeResult(
+            return result(
                     RegistrationState.FAILED,
                     "This node has no Core URL registered, and delivery is over the Core protocol. Add one to the"
                             + " cluster's connection.",
                     null);
         }
-        TapSource source =
-                tap.source(clusterId, node.getId(), reg.getSubscription()).orElse(null);
+        TapSource source = tap.source(clusterId, node.getId(), queueOf(reg)).orElse(null);
         if (source == null) {
-            return new NodeResult(
+            return result(
                     RegistrationState.PENDING,
-                    "The subscription " + reg.getSubscription() + " does not exist on this node.",
+                    "The subscription " + subscriptionOf(reg).id() + " does not exist on this node.",
                     null);
         }
         AuditEvent event = audit.begin(
@@ -254,65 +306,86 @@ public class PluginMessagingReconciler {
                         "registration",
                         reg.getKey(),
                         "subscription",
-                        reg.getSubscription()),
+                        subscriptionOf(reg).id()),
                 false);
         try {
             tap.install(clusterId, node.getId(), instance.id(), reg.getId(), source, properties.tapRingSize());
-            drains.start(spec(reg, node, TapNames.queueOf(name)));
+            drains.start(
+                    spec(reg, node, SubscriptionId.of(reg.getSourceKind(), TapNames.queueOf(name)), capabilities(reg)));
             refused.remove(refusalKey);
             audit.succeed(event, 1);
-            return new NodeResult(RegistrationState.ACTIVE, null, tap.dropped(clusterId, node.getId(), name));
+            return result(RegistrationState.ACTIVE, null, tap.dropped(clusterId, node.getId(), name));
         } catch (TapRefusedException e) {
             refused.put(refusalKey, fingerprint);
             audit.fail(event, e.getMessage());
-            return new NodeResult(RegistrationState.FAILED, e.getMessage(), null);
+            return result(RegistrationState.FAILED, e.getMessage(), null);
         } catch (PluginDrains.StartFailure e) {
             if (e.servedElsewhere) {
                 audit.succeed(event, 0);
-                return new NodeResult(RegistrationState.SERVED_ELSEWHERE, e.getMessage(), null);
+                return result(RegistrationState.SERVED_ELSEWHERE, e.getMessage(), null);
             }
             audit.fail(event, e.getMessage());
-            return new NodeResult(RegistrationState.PENDING, e.getMessage(), null);
+            return result(RegistrationState.PENDING, e.getMessage(), null);
         } catch (RuntimeException e) {
             audit.fail(event, reason(e));
-            return new NodeResult(RegistrationState.PENDING, reason(e), null);
+            return result(RegistrationState.PENDING, reason(e), null);
         }
     }
 
+    /**
+     * Delivery of a registration the broker's system hands out: on one node, or for the whole cluster when
+     * {@code node} is null.
+     */
     private NodeResult assertConsumer(UUID clusterId, ClusterNode node, RegistrationEntity reg) {
-        int runningWith = drains.concurrency(reg.getId(), node.getId());
+        UUID nodeId = node == null ? null : node.getId();
+        SubscriptionCapabilities caps = capabilities(reg);
+        boolean counted = caps.releaseCountsDelivery();
+        int runningWith = drains.isRunning(reg.getId(), nodeId) ? drains.concurrency(reg.getId(), nodeId) : 0;
         if (runningWith == reg.getConcurrency()) {
-            return new NodeResult(RegistrationState.ACTIVE, null, null);
+            return new NodeResult(RegistrationState.ACTIVE, null, null, counted);
         }
         if (runningWith > 0) {
             // Registered again with another concurrency: restarted with the new count. What the old
             // slots held and had not settled goes back to the queue.
-            drains.stop(reg.getId(), node.getId());
+            drains.stop(reg.getId(), nodeId);
         }
-        if (node.getDataUrl() == null) {
-            return new NodeResult(
-                    RegistrationState.FAILED,
-                    "This node has no Core URL registered, and delivery is over the Core protocol. Add one to the"
-                            + " cluster's connection.",
-                    null);
-        }
-        TapSource source =
-                tap.source(clusterId, node.getId(), reg.getSubscription()).orElse(null);
-        if (source == null) {
-            return new NodeResult(
-                    RegistrationState.PENDING,
-                    "The subscription " + reg.getSubscription() + " does not exist on this node.",
-                    null);
+        if (node != null) {
+            if (node.getDataUrl() == null) {
+                return result(
+                        RegistrationState.FAILED,
+                        "This node has no Core URL registered, and delivery is over the Core protocol. Add one to the"
+                                + " cluster's connection.",
+                        null);
+            }
+            if (tap.source(clusterId, node.getId(), queueOf(reg)).isEmpty()) {
+                return pending("The subscription " + subscriptionOf(reg).id() + " does not exist on this node.");
+            }
         }
         try {
-            drains.start(spec(reg, node, source.queue()));
-            return new NodeResult(RegistrationState.ACTIVE, null, null);
+            drains.start(spec(reg, node, subscriptionOf(reg), caps));
+            return new NodeResult(RegistrationState.ACTIVE, null, null, counted);
         } catch (PluginDrains.StartFailure e) {
-            return new NodeResult(RegistrationState.PENDING, e.getMessage(), null);
+            if (e.servedElsewhere) {
+                return result(RegistrationState.SERVED_ELSEWHERE, e.getMessage(), null);
+            }
+            return result(e.permanent ? RegistrationState.FAILED : RegistrationState.PENDING, e.getMessage(), null);
         }
     }
 
-    private PluginDrains.Spec spec(RegistrationEntity reg, ClusterNode node, String source) {
+    private NodeResult reconcileWhole(UUID clusterId, RegistrationEntity reg, Verdict verdict) {
+        if (!verdict.deliver()) {
+            drains.stop(reg.getId(), null);
+            return result(verdict.state(), verdict.detail(), null);
+        }
+        return assertConsumer(clusterId, null, reg);
+    }
+
+    private SubscriptionCapabilities capabilities(RegistrationEntity reg) {
+        return messages.subscriptionCapabilities(reg.getClusterId(), reg.getSourceKind());
+    }
+
+    private PluginDrains.Spec spec(
+            RegistrationEntity reg, ClusterNode node, SubscriptionId source, SubscriptionCapabilities caps) {
         return new PluginDrains.Spec(
                 reg.getId(),
                 reg.getPluginId(),
@@ -320,10 +393,12 @@ public class PluginMessagingReconciler {
                 reg.getMode(),
                 reg.getConcurrency(),
                 reg.getClusterId(),
-                node.getId(),
-                node.getName(),
-                reg.getSubscription(),
-                source);
+                node == null ? null : node.getId(),
+                node == null ? "the cluster" : node.getName(),
+                subscriptionOf(reg),
+                source,
+                caps.orderings().contains(OrderingScope.GROUP) ? OrderingScope.GROUP : OrderingScope.NONE,
+                node == null ? new FlowControl(reg.getConcurrency(), 0, 0) : FlowControl.none());
     }
 
     private void removeTap(UUID clusterId, ClusterNode node, String name) {
@@ -342,22 +417,25 @@ public class PluginMessagingReconciler {
         }
     }
 
-    private void write(RegistrationEntity reg, ClusterNode node, NodeResult result) {
+    /** Records what the pass found for a node, or for the whole cluster when {@code nodeId} is null. */
+    private void write(RegistrationEntity reg, UUID nodeId, NodeResult result) {
         if (result == null) {
             return;
         }
         RegistrationNodeEntity row = nodeStates
-                .findById(new RegistrationNodeEntity(reg.getId(), node.getId()).getId())
-                .orElseGet(() -> new RegistrationNodeEntity(reg.getId(), node.getId()));
+                .findByRegistrationIdAndNodeId(reg.getId(), nodeId)
+                .orElseGet(() -> new RegistrationNodeEntity(reg.getId(), nodeId));
         boolean unchanged = row.getState() == result.state()
                 && Objects.equals(row.getDetail(), result.detail())
-                && Objects.equals(row.getDroppedCopies(), result.dropped());
+                && Objects.equals(row.getDroppedCopies(), result.dropped())
+                && row.isReleasesCounted() == result.releasesCounted();
         if (unchanged) {
             return;
         }
         row.setState(result.state());
         row.setDetail(result.detail());
         row.setDroppedCopies(result.dropped());
+        row.setReleasesCounted(result.releasesCounted());
         row.setUpdatedAt(clock.instant());
         nodeStates.save(row);
     }

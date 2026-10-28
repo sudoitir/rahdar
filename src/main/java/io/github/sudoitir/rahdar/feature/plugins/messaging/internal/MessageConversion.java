@@ -6,7 +6,7 @@ import io.github.sudoitir.openbroker.messaging.MessageHeaders;
 import io.github.sudoitir.openbroker.messaging.PropertyValue;
 import io.github.sudoitir.rahdar.feature.plugins.messaging.MessageRef;
 import io.github.sudoitir.rahdar.feature.plugins.messaging.PluginMessage;
-import io.github.sudoitir.rahdar.kernel.security.ResourceRef;
+import io.github.sudoitir.rahdar.feature.plugins.messaging.SubscriptionId;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
@@ -24,7 +24,7 @@ final class MessageConversion {
 
     private MessageConversion() {}
 
-    static PluginMessage toPlugin(String key, UUID clusterId, UUID nodeId, String queue, Message m) {
+    static PluginMessage toPlugin(String key, UUID clusterId, UUID nodeId, SubscriptionId source, Message m) {
         MessageHeaders h = m.headers();
         Map<String, Object> headers = new LinkedHashMap<>();
         h.id().ifPresent(id -> headers.put("messageId", id));
@@ -44,7 +44,7 @@ final class MessageConversion {
         return new PluginMessage(
                 key,
                 clusterId,
-                ResourceRef.subscription(queue),
+                source,
                 new MessageRef(nodeId, m.ref().position()),
                 body(m),
                 JmsExtension.messageType(m).orElse(JmsExtension.GENERIC) == JmsExtension.TEXT,

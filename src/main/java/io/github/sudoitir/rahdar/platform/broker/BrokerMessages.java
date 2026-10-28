@@ -23,8 +23,10 @@ import io.github.sudoitir.openbroker.messaging.ReceiverOptions;
 import io.github.sudoitir.openbroker.messaging.Selection;
 import io.github.sudoitir.openbroker.messaging.SendReceipt;
 import io.github.sudoitir.openbroker.messaging.SendTarget;
+import io.github.sudoitir.openbroker.messaging.SubscriptionCapabilities;
 import io.github.sudoitir.openbroker.messaging.Total;
 import io.github.sudoitir.openbroker.messaging.Transport;
+import io.github.sudoitir.openbroker.model.KindId;
 import io.github.sudoitir.openbroker.model.PartitionId;
 import io.github.sudoitir.openbroker.model.ResourceClass;
 import io.github.sudoitir.openbroker.model.ResourceId;
@@ -362,17 +364,32 @@ public class BrokerMessages {
     }
 
     /**
-     * Runs {@code handler} on the queue's messages on the node, in the options' lanes, until the
-     * returned processor is closed; named {@code owner} in diagnostics. Failures, opening included,
+     * Runs {@code handler} on the subscription's messages, in the options' lanes, until the returned
+     * processor is closed; named {@code owner} in diagnostics. A {@code nodeId} reads that node's copy of the
+     * subscription, and none reads it for the whole cluster (a partitioned log). Failures, opening included,
      * are the SDK's own {@link BrokerException}, as for {@link #receiver}.
      */
     public Processor process(
-            UUID clusterId, UUID nodeId, String queue, ProcessorOptions options, MessageHandler handler, String owner) {
+            UUID clusterId,
+            UUID nodeId,
+            String kind,
+            String path,
+            ProcessorOptions options,
+            MessageHandler handler,
+            String owner) {
         ClusterConnection c = gateway.cluster(clusterId);
-        Processor processor = transport(c, "receive messages over")
-                .process(queueId(c, queue), Scope.node(BrokerGateway.idOf(nodeId)), options, handler);
+        Scope scope = nodeId == null ? Scope.whole() : Scope.node(BrokerGateway.idOf(nodeId));
+        Processor processor =
+                transport(c, "receive messages over").process(ResourceIds.parse(kind, path), scope, options, handler);
         gateway.label(processor.id(), owner);
         return processor;
+    }
+
+    /** What the cluster's system can do with a subscription of this kind: its orderings, retry and release counting. */
+    public SubscriptionCapabilities subscriptionCapabilities(UUID clusterId, String kind) {
+        return transport(gateway.cluster(clusterId), "receive messages over")
+                .capabilities()
+                .subscription(KindId.of(kind));
     }
 
     private static Transport transport(ClusterConnection c, String purpose) {
