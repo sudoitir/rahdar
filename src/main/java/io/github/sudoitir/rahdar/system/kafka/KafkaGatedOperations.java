@@ -9,6 +9,7 @@ import io.github.sudoitir.rahdar.kernel.gate.Trait;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterEnvironmentIndex;
 import io.github.sudoitir.rahdar.system.kafka.KafkaAclChanges.AclChangeParams;
 import io.github.sudoitir.rahdar.system.kafka.KafkaOffsetResets.OffsetResetParams;
+import io.github.sudoitir.rahdar.system.kafka.KafkaTopicConfigChanges.ConfigChangeParams;
 import io.github.sudoitir.rahdar.system.kafka.KafkaTransactionAborts.AbortParams;
 import io.github.sudoitir.rahdar.system.kafka.web.KafkaViews.Acl;
 import java.util.List;
@@ -43,6 +44,26 @@ class KafkaGatedOperations {
                         DisplayRow.of("Reset to", p.value() == null ? p.to() : p.to() + " " + p.value())),
                 resets::estimate,
                 resets::replay,
+                clusters);
+    }
+
+    @Bean
+    GatedOperation<ConfigChangeParams> topicConfigChange(
+            KafkaTopicConfigChanges changes, ClusterEnvironmentIndex clusters) {
+        return new Operation<>(
+                "destination.update-config",
+                ConfigChangeParams.class,
+                ConfigChangeParams::clusterId,
+                p -> "Change settings of topic " + p.topic() + " on " + clusters.labelOf(p.clusterId()),
+                p -> List.of(
+                        DisplayRow.of("Cluster", clusters.labelOf(p.clusterId())),
+                        DisplayRow.of("Topic", p.topic()),
+                        DisplayRow.of("Set", p.set() == null ? "none" : p.set().toString()),
+                        DisplayRow.of(
+                                "Remove overrides",
+                                p.remove() == null ? "none" : p.remove().toString())),
+                changes::estimate,
+                changes::replay,
                 clusters);
     }
 

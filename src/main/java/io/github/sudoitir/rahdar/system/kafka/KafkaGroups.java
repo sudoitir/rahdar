@@ -46,7 +46,7 @@ public class KafkaGroups {
 
     private final BrokerGateway gateway;
     private final ClusterAccessGuard access;
-    private final KafkaGroupMembers members;
+    private final KafkaAdminReads admin;
 
     public GroupPage list(UUID clusterId, String type, String state, String q, String cursor, Integer limit) {
         access.requireCluster(clusterId, Permissions.SUBSCRIPTION_READ);
@@ -136,7 +136,9 @@ public class KafkaGroups {
                 text(group, KafkaKinds.GROUP_STATE),
                 readOnly(group),
                 topics,
-                members.of(connection, group, kind),
+                "streams".equals(text(group, KafkaKinds.GROUP_TYPE))
+                        ? List.of()
+                        : admin.members(clusterId, id, "share".equals(text(group, KafkaKinds.GROUP_TYPE))),
                 Instant.now());
     }
 

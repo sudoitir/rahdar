@@ -7,6 +7,8 @@ import io.github.sudoitir.rahdar.system.kafka.KafkaBrokers;
 import io.github.sudoitir.rahdar.system.kafka.KafkaGroups;
 import io.github.sudoitir.rahdar.system.kafka.KafkaOffsetResets;
 import io.github.sudoitir.rahdar.system.kafka.KafkaOffsets;
+import io.github.sudoitir.rahdar.system.kafka.KafkaTopicConfigChanges;
+import io.github.sudoitir.rahdar.system.kafka.KafkaTopicConfigs;
 import io.github.sudoitir.rahdar.system.kafka.KafkaTransactionAborts;
 import io.github.sudoitir.rahdar.system.kafka.KafkaTransactions;
 import io.github.sudoitir.rahdar.system.kafka.web.KafkaViews.AbortPreview;
@@ -17,11 +19,14 @@ import io.github.sudoitir.rahdar.system.kafka.web.KafkaViews.AclPage;
 import io.github.sudoitir.rahdar.system.kafka.web.KafkaViews.AclPreview;
 import io.github.sudoitir.rahdar.system.kafka.web.KafkaViews.AclResult;
 import io.github.sudoitir.rahdar.system.kafka.web.KafkaViews.Brokers;
+import io.github.sudoitir.rahdar.system.kafka.web.KafkaViews.ConfigChangeRequest;
+import io.github.sudoitir.rahdar.system.kafka.web.KafkaViews.ConfigPreview;
 import io.github.sudoitir.rahdar.system.kafka.web.KafkaViews.GroupDetail;
 import io.github.sudoitir.rahdar.system.kafka.web.KafkaViews.GroupPage;
 import io.github.sudoitir.rahdar.system.kafka.web.KafkaViews.OffsetPreview;
 import io.github.sudoitir.rahdar.system.kafka.web.KafkaViews.OffsetRequest;
 import io.github.sudoitir.rahdar.system.kafka.web.KafkaViews.OffsetResult;
+import io.github.sudoitir.rahdar.system.kafka.web.KafkaViews.TopicConfig;
 import io.github.sudoitir.rahdar.system.kafka.web.KafkaViews.TransactionPage;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -51,6 +56,8 @@ public class KafkaController {
     private final KafkaTransactions transactions;
     private final KafkaTransactionAborts aborts;
     private final KafkaBrokers brokers;
+    private final KafkaTopicConfigs configs;
+    private final KafkaTopicConfigChanges configChanges;
 
     @GetMapping("/groups")
     public GroupPage groups(
@@ -79,6 +86,24 @@ public class KafkaController {
     public OffsetResult resetOffsets(
             @PathVariable UUID clusterId, @PathVariable String group, @RequestBody OffsetRequest request) {
         return resets.reset(clusterId, group, request);
+    }
+
+    @GetMapping("/topics/{topic}/config")
+    public TopicConfig topicConfig(@PathVariable UUID clusterId, @PathVariable String topic) {
+        return configs.read(clusterId, topic);
+    }
+
+    @PostMapping("/topics/{topic}/config:preview")
+    public ConfigPreview previewConfig(
+            @PathVariable UUID clusterId, @PathVariable String topic, @RequestBody ConfigChangeRequest request) {
+        return configs.preview(clusterId, topic, request);
+    }
+
+    @HeldResponse
+    @PostMapping("/topics/{topic}/config:apply")
+    public ConfigPreview applyConfig(
+            @PathVariable UUID clusterId, @PathVariable String topic, @RequestBody ConfigChangeRequest request) {
+        return configChanges.apply(clusterId, topic, request);
     }
 
     @GetMapping("/acls")

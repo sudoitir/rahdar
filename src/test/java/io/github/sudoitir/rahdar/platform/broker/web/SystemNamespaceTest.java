@@ -70,6 +70,15 @@ class SystemNamespaceTest extends PostgresIntegrationTest {
     }
 
     @Test
+    void aClusterThatRunsAnotherSystemHasNoKafkaScreens() throws Exception {
+        mvc.perform(get("/api/v1/clusters/{c}/kafka/groups", artemis))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.detail").value(containsString("does not run kafka")));
+        mvc.perform(get("/api/v1/clusters/{c}/kafka/brokers", artemis)).andExpect(status().isNotFound());
+        mvc.perform(get("/api/v1/clusters/{c}/kafka/acls", artemis)).andExpect(status().isNotFound());
+    }
+
+    @Test
     void anArtemisClusterReachesItsNamespace() throws Exception {
         mvc.perform(get("/api/v1/clusters/{c}/artemis/config", artemis))
                 .andExpect(content().string(not(containsString("does not run"))));
