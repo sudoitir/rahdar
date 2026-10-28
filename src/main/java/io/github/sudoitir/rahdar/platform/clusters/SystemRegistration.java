@@ -36,6 +36,7 @@ import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.CapabilityVi
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.ConnectionCheck;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.KafkaConnectionDetail;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.RegisteredRef;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -212,7 +213,7 @@ class SystemRegistration {
                                         .remedy()
                                         .map(r -> new AccessRemedy(r.text(), r.snippet(), r.mediaType()))
                                         .orElse(null)))
-                        .sorted(java.util.Comparator.comparing(AccessFinding::capability))
+                        .sorted(Comparator.comparing(AccessFinding::capability))
                         .toList());
     }
 

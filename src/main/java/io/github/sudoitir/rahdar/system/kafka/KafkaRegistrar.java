@@ -44,6 +44,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -52,7 +53,14 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.UUID;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
@@ -68,6 +76,12 @@ import org.springframework.transaction.annotation.Transactional;
 class KafkaRegistrar implements ClusterRegistrar {
 
     /** The attribute the driver puts on every node it describes: the cluster's own id. */
+    /** How many bootstrap servers a request may carry. */
+    static final int MAX_BOOTSTRAP = 32;
+
+    /** How many of them are probed for the advertised-listener hint. */
+    private static final int PROBED = 3;
+
     private static final String CLUSTER_ID = "kafka.cluster_id";
 
     private static final String CLUSTER_VERSION = "kafka.cluster_version";
@@ -321,7 +335,7 @@ class KafkaRegistrar implements ClusterRegistrar {
                 versionText, kraft ? "KRaft" : "ZooKeeper", version.isPresent() && !versionText.startsWith("at least"));
         List<AccessFinding> access = report.access().assessments().entrySet().stream()
                 .map(e -> finding(e.getKey().id(), e.getValue()))
-                .sorted(java.util.Comparator.comparing(AccessFinding::capability))
+                .sorted(Comparator.comparing(AccessFinding::capability))
                 .toList();
         ConnectionCheck view = new ConnectionCheck(
                 KafkaModule.SYSTEM,
@@ -417,16 +431,46 @@ class KafkaRegistrar implements ClusterRegistrar {
                 .map(BrokerSystem::supportedVersions)
                 .findFirst()
                 .orElse("");
-        java.util.regex.Matcher m = LOWER_BOUND.matcher(range);
+        Matcher m = LOWER_BOUND.matcher(range);
         return m.find() ? m.group(1) : "the supported minimum";
+    }
+
+    /**
+     * Whether any of the first few bootstrap servers accepts a connection, probed together under one deadline, so a
+     * long list of dead entries cannot hold the check for the sum of their waits.
+     */
+    private boolean anyAccepts(List<String> bootstrap) {
+        ExecutorService pool = Executors.newVirtualThreadPerTaskExecutor();
+        try {
+            List<Future<Boolean>> probes = bootstrap.stream()
+                    .limit(PROBED)
+                    .map(server -> pool.submit(() -> bootstrapProbe.accepts(server)))
+                    .toList();
+            long deadline =
+                    System.nanoTime() + BootstrapProbe.WAIT.plusSeconds(1).toNanos();
+            for (Future<Boolean> probe : probes) {
+                try {
+                    if (probe.get(Math.max(0, deadline - System.nanoTime()), TimeUnit.NANOSECONDS)) {
+                        return true;
+                    }
+                } catch (TimeoutException | ExecutionException _) {
+                    // This server did not answer in time; the others may.
+                }
+            }
+            return false;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return false;
+        } finally {
+            pool.shutdownNow();
+        }
     }
 
     // ---- failures -----------------------------------------------------------------------------------------------
 
     private ConnectionCheck failed(BrokerException e, List<String> bootstrap) {
         String cause = causeOf(e);
-        boolean advertised = (cause.equals("TIMEOUT") || cause.equals("REFUSED"))
-                && bootstrap.stream().anyMatch(bootstrapProbe::accepts);
+        boolean advertised = (cause.equals("TIMEOUT") || cause.equals("REFUSED")) && anyAccepts(bootstrap);
         String next = advertised
                 ? "The bootstrap server answered, but the brokers advertise addresses Rahdar cannot reach. Set"
                         + " advertised.listeners to an address reachable from Rahdar (not localhost inside a container)."
@@ -533,8 +577,7 @@ class KafkaRegistrar implements ClusterRegistrar {
             throw new IllegalArgumentException("A Kafka cluster is registered with a Kafka connection.");
         }
         if (!PROTOCOLS.contains(kafka.securityProtocol())) {
-            throw new IllegalArgumentException(
-                    "securityProtocol must be one of " + new java.util.TreeSet<>(PROTOCOLS) + ".");
+            throw new IllegalArgumentException("securityProtocol must be one of " + new TreeSet<>(PROTOCOLS) + ".");
         }
         boolean sasl = isSasl(kafka.securityProtocol());
         if (sasl != (kafka.saslMechanism() != null)) {
@@ -545,8 +588,7 @@ class KafkaRegistrar implements ClusterRegistrar {
                             : "saslMechanism is only for SASL_PLAINTEXT and SASL_SSL.");
         }
         if (sasl && !MECHANISMS.contains(kafka.saslMechanism())) {
-            throw new IllegalArgumentException(
-                    "saslMechanism must be one of " + new java.util.TreeSet<>(MECHANISMS) + ".");
+            throw new IllegalArgumentException("saslMechanism must be one of " + new TreeSet<>(MECHANISMS) + ".");
         }
         KafkaCredentials credentials = kafka.credentials();
         if (!sasl && credentials != null) {
@@ -600,6 +642,10 @@ class KafkaRegistrar implements ClusterRegistrar {
         }
         if (servers.isEmpty()) {
             throw new IllegalArgumentException("At least one bootstrap server is required.");
+        }
+        if (servers.size() > MAX_BOOTSTRAP) {
+            throw new IllegalArgumentException(
+                    "At most " + MAX_BOOTSTRAP + " bootstrap servers, not " + servers.size() + ".");
         }
         return List.copyOf(servers);
     }

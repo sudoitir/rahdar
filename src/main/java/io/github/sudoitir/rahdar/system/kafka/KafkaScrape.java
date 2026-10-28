@@ -18,6 +18,7 @@ import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
 import io.github.sudoitir.rahdar.platform.clusters.NodeStateRecorder;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -96,7 +97,7 @@ class KafkaScrape implements ClusterScrape {
     @Override
     public List<QueueRow> subscriptions(UUID clusterId) {
         ClusterNode carrier = clusters.nodes(clusterId).stream()
-                .min(java.util.Comparator.comparing(ClusterNode::getName))
+                .min(Comparator.comparing(ClusterNode::getName))
                 .orElseThrow(() -> new NotFoundException("node", clusterId));
         List<QueueRow> rows = new ArrayList<>();
         Optional<String> next = Optional.empty();

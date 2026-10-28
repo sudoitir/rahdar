@@ -18,8 +18,10 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.TreeSet;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -100,7 +102,7 @@ class KafkaBacklogBreakdown implements BacklogBreakdown {
                     .forEach((shard, lag) -> partitionOf(shard).ifPresent(p -> lags.put(p, lag.longValue())));
         }
         List<PartitionLag> out = new ArrayList<>();
-        Set<Integer> all = new java.util.TreeSet<>(ends.keySet());
+        Set<Integer> all = new TreeSet<>(ends.keySet());
         all.addAll(committed.keySet());
         all.addAll(unavailable.keySet());
         for (int partition : all) {
@@ -123,10 +125,10 @@ class KafkaBacklogBreakdown implements BacklogBreakdown {
         return out;
     }
 
-    private static java.util.Optional<Integer> partitionOf(Shard shard) {
+    private static Optional<Integer> partitionOf(Shard shard) {
         return shard instanceof Shard.Partition p
-                ? java.util.Optional.of(Integer.parseInt(p.partition().value()))
-                : java.util.Optional.empty();
+                ? Optional.of(Integer.parseInt(p.partition().value()))
+                : Optional.empty();
     }
 
     private static Map<Integer, Long> numbers(Object raw) {

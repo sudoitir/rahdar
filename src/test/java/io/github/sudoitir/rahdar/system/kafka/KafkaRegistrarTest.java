@@ -44,6 +44,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.IntStream;
 import org.junit.jupiter.api.Test;
 
 /** The Kafka connection is checked as a whole, and a check names every node and each failure's cause. */
@@ -396,5 +398,43 @@ class KafkaRegistrarTest {
 
         assertThat(((KafkaConnection) resolved.connection()).credentials()).isNull();
         assertThat(resolved.account().secret()).isNull();
+    }
+
+    @Test
+    void aRequestMayCarryAtMostThirtyTwoBootstrapServers() {
+        List<String> many =
+                IntStream.rangeClosed(1, 33).mapToObj(n -> "k" + n + ":9092").toList();
+
+        assertThat(KafkaRegistrar.parse(many.subList(0, 32))).hasSize(32);
+        assertThatThrownBy(() -> KafkaRegistrar.parse(many))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("At most 32");
+    }
+
+    @Test
+    void onlyTheFirstThreeBootstrapServersAreProbedAndTogetherNotOneAfterAnother() {
+        doThrow(refused(ErrorReasons.UNREACHABLE, new java.net.SocketTimeoutException("timed out")))
+                .when(gateway)
+                .verify(any(), any(), any(), any());
+        AtomicInteger probed = new AtomicInteger();
+        KafkaRegistrar slow = new KafkaRegistrar(gateway, BrokerDrivers.load(), connections, settings, host -> {
+            probed.incrementAndGet();
+            try {
+                Thread.sleep(500);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+            return false;
+        });
+        String[] servers =
+                IntStream.rangeClosed(1, 10).mapToObj(n -> "k" + n + ":9092").toArray(String[]::new);
+
+        long started = System.nanoTime();
+        var failure = slow.check(plaintext(servers)).view().failure();
+        long tookMillis = (System.nanoTime() - started) / 1_000_000;
+
+        assertThat(failure.next()).doesNotContain("advertised.listeners");
+        assertThat(probed).hasValue(3);
+        assertThat(tookMillis).as("three probes at once, not ten in turn").isLessThan(1_400);
     }
 }

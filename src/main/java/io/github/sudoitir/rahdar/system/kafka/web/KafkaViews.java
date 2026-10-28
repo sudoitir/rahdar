@@ -6,6 +6,7 @@ import io.github.sudoitir.rahdar.feature.resources.web.ResourceViews.Backlog;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 
 /** What the Kafka namespace answers (ADR-0216). Every figure that is not known is absent with its reason, never zero. */
 public final class KafkaViews {
@@ -165,7 +166,7 @@ public final class KafkaViews {
 
     public record ConfigChangeRequest(
             @Schema(description = "Settings to override, by name.")
-            java.util.Map<String, String> set,
+            Map<String, String> set,
 
             @Schema(description = "Overrides to remove, by name.")
             List<String> remove,
@@ -317,7 +318,7 @@ public final class KafkaViews {
             @Schema(requiredMode = REQUIRED, description = "Partitions it replicates that have no leader.")
             long offline) {}
 
-    public record Voter(
+    public record QuorumVoter(
             @Schema(requiredMode = REQUIRED) String id,
 
             @Schema(nullable = true, description = "Records behind the quorum leader.")
@@ -325,13 +326,13 @@ public final class KafkaViews {
 
             @Schema(requiredMode = REQUIRED) boolean caughtUp) {}
 
-    public record Quorum(
+    public record BrokerQuorum(
             @Schema(requiredMode = REQUIRED, description = "False on a ZooKeeper-mode cluster.")
             boolean available,
 
             @Schema(nullable = true) String reason,
             @Schema(nullable = true) String leader,
-            @Schema(requiredMode = REQUIRED) List<Voter> voters,
+            @Schema(requiredMode = REQUIRED) List<QuorumVoter> voters,
 
             @Schema(requiredMode = REQUIRED, description = "Whether the voters that are caught up are a majority.")
             boolean majority) {}
@@ -341,5 +342,5 @@ public final class KafkaViews {
             String mode,
 
             @Schema(requiredMode = REQUIRED) List<BrokerRow> brokers,
-            @Schema(requiredMode = REQUIRED) Quorum quorum) {}
+            @Schema(requiredMode = REQUIRED) BrokerQuorum quorum) {}
 }
