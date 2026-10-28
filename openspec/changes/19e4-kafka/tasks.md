@@ -18,9 +18,9 @@ Order: 1, then 2 to 4 (backend and web in parallel against the contract in `desi
 - [ ] 2.4 Estate and subscriptions tables with Backlog, estimate marking and the breakdown drawer. Check: browser tests
 
 ## 3. Shared screens on Kafka
-- [ ] 3.1 Browse by partition, offset and time; filter refused with the reason (D6). Check: API tests against a Kafka Testcontainer (time, past end, retention start, tombstone), browser tests
-- [ ] 3.2 Purge preview naming members or rebalancing; shared truncate with `destination:truncate`, compacted refusal, held confirmation, gate and audit. Check: gated operation tests, browser tests with `holdButton`
-- [ ] 3.3 Per-record move, copy and delete disabled with the driver's reason, API refusal; Artemis-only actions gated by kind verbs; no system literal in shared components; stale "typed name" comments fixed. Check: browser tests on a Kafka fixture, grep for `'artemis'` in shared web code
+- [x] 3.1 (backend) Browse by partition, offset and time; filter refused with the reason (D6). Check: API tests against a Kafka Testcontainer (time, past end, retention start, tombstone), browser tests
+- [x] 3.2 (backend) Purge preview naming members or rebalancing; shared truncate with `destination:truncate`, compacted refusal, held confirmation, gate and audit. Check: gated operation tests, browser tests with `holdButton`
+- [x] 3.3 (backend) Per-record move, copy and delete disabled with the driver's reason, API refusal; Artemis-only actions gated by kind verbs; no system literal in shared components; stale "typed name" comments fixed. Check: browser tests on a Kafka fixture, grep for `'artemis'` in shared web code
 
 ## 4. Kafka backend and screens (`system/kafka`, `features/kafka`)
 - [ ] 4.1 Groups list and group detail reads, batched per cycle; namespace 404 for other systems. Check: tests against a Kafka Testcontainer with a lagging group, `SystemNamespaceTest` extended
