@@ -6,12 +6,12 @@
 
 <sub>«راهدار» از «راه» + «دار» (نگه‌دارنده) ساخته شده است: نگهبانی که همهٔ راه‌هایی را که پیام‌هایتان می‌پیمایند باز و امن نگه می‌دارد.</sub>
 
-**یک کنسول برای همهٔ کلاسترهای Apache ActiveMQ Artemis که دارید.**
+**یک کنسول متن‌باز برای کلاسترهای Apache ActiveMQ® Artemis و Apache Kafka® شما.**
 
-توپولوژی زنده، همهٔ صف‌های همهٔ نودها در یک جدول، مسیر پیام‌ها جلوی چشمتان، عملیات امن روی پیام‌ها و جست‌وجوی پیام‌ها با SQL؛ همه از یک نمونهٔ Rahdar.
+هر کلاستری که اجرا می‌کنید در یک estate است، lag به‌عنوان همان تخمینی که هست نشان داده می‌شود، پیش از هر کار مخرب پیش‌نمایش می‌بینید، و دروازهٔ تأییدی که هم انسان‌ها و هم دستیارها را نگه می‌دارد.
 
-<a href="https://rahdar.dev/fa/"><img src="https://img.shields.io/badge/Play%20the%20story-Find%20the%20backed--up%20queue%20across%208%20brokers-0b7285?style=for-the-badge&labelColor=0b1418&logo=data:image/svg%2Bxml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNDAgMjQwIiByb2xlPSJpbWciIGFyaWEtbGFiZWw9IlJhaGRhciI+PHBhdGggZmlsbD0iIzBjODU5OSIgZD0iTTAgOTAgQTkwIDkwIDAgMCAxIDkwIDAgSDI0MCBWNjAgSDE1MCBBOTAgOTAgMCAwIDAgNjAgMTUwIFYyNDAgSDAgWiBNMTA1IDI0MCBWMTUwIEE0NSA0NSAwIDAgMSAxNTAgMTA1IEgyNDAgVjE1MCBBOTAgOTAgMCAwIDEgMTUwIDI0MCBIMTA1IFoiLz48L3N2Zz4K" alt="Play the story: find the backed-up queue across 8 brokers" height="36"></a><br>
-<sub>یک رخداد تعاملی ساعت سه بامداد · حدود ۲ دقیقه · در مرورگر خودتان اجرا می‌شود</sub>
+<a href="https://rahdar.dev/fa/"><img src="https://img.shields.io/badge/Play%20the%20story-One%20night%20on%20call%20across%20Artemis%20and%20Kafka-0b7285?style=for-the-badge&labelColor=0b1418&logo=data:image/svg%2Bxml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNDAgMjQwIiByb2xlPSJpbWciIGFyaWEtbGFiZWw9IlJhaGRhciI+PHBhdGggZmlsbD0iIzBjODU5OSIgZD0iTTAgOTAgQTkwIDkwIDAgMCAxIDkwIDAgSDI0MCBWNjAgSDE1MCBBOTAgOTAgMCAwIDAgNjAgMTUwIFYyNDAgSDAgWiBNMTA1IDI0MCBWMTUwIEE0NSA0NSAwIDAgMSAxNTAgMTA1IEgyNDAgVjE1MCBBOTAgOTAgMCAwIDEgMTUwIDI0MCBIMTA1IFoiLz48L3N2Zz4K" alt="Play the story: one night on call across Artemis and Kafka" height="36"></a><br>
+<sub>یک شب تعاملی کشیک · حدود ۲ دقیقه · در مرورگر خودتان اجرا می‌شود</sub>
 
 [English](README.md) · [简体中文](README.zh.md) · **فارسی**
 
@@ -28,6 +28,7 @@
 
 [مستندات](https://rahdar.dev/fa/guide/) ·
 [شروع سریع](#شروع-سریع) ·
+[Kafka](https://rahdar.dev/guide/kafka) ·
 [Flow](https://rahdar.dev/guide/flow) ·
 [SQL Console](https://rahdar.dev/fa/guide/sql-console) ·
 [MCP](https://rahdar.dev/fa/guide/mcp) ·
@@ -91,13 +92,13 @@ docker run -p 8080:8080 \
 
 ## چرا
 
-ساعت سه بامداد است و `ORDERS.DLQ` جایی در کلاستر شما دارد پر می‌شود. کنسولی که همراه Artemis می‌آید هر بار فقط یک بروکر را مدیریت می‌کند و اصلاً از وجود کلاستر خبر ندارد؛ پس برای هر نود یک تب باز می‌کنید، در هر کدام درخت JMX را زیر و رو می‌کنید و attributeها را یکی‌یکی می‌خوانید تا بالاخره پیدایش کنید.
+ساعت ۰۲:۵۱ است و دو چیز هم‌زمان شما را بیدار می‌کنند: یک consumer group در Kafka روی `payments` دارد عقب می‌افتد و `ORDERS.DLQ` جایی روی یک جفت Artemis دارد پر می‌شود. بدون Rahdar یعنی یک تب کنسول مدیریت برای هر بروکر Artemis، `kafka-consumer-groups.sh` و `kafka-transactions.sh` در ترمینال، و حساب‌وکتاب خودتان در میانهٔ آن‌ها.
 
-Rahdar **کلاستر را واحد همه‌چیز** می‌داند. همهٔ نودهای همهٔ کلاسترها روی یک توپولوژی‌اند و نقش HA هرکدام زنده poll می‌شود. همهٔ صف‌های همهٔ نودها هم در یک جدول‌اند، مرتب‌شده بر اساس عمق صف؛ پس صفی که دنبالش بودید ردیف اول است. یک نمونهٔ Rahdar برای هر تعداد کلاستری که دارید کافی است و روی همان بروکرهای فعلی‌تان کار می‌کند.
+Rahdar **هر کلاستری را که اجرا می‌کنید در یک estate** می‌گذارد، بروکرش هر چه باشد. سلامت روی یک مقیاس سنجیده می‌شود و همهٔ backlogها در یک جدول‌اند، بدترین اول: صف‌های Artemis و groupهای Kafka کنار هم، هر کدام با نام خودش. هر عدد می‌گوید چقدر مطمئن است: عمق یک صف Artemis دقیق است، lag یک group در Kafka تخمین است و تفکیک هر partition را همراه دارد، و عددی که Rahdar نتواند بخواند همین را می‌گوید، نه اینکه صفر نشان بدهد. هیچ کار مخربی پیش از آن‌که ببینید چه می‌کند اجرا نمی‌شود، و جایی که دروازهٔ تأیید روشن است، نفر دوم باید تأییدش کند.
 
-<a href="https://rahdar.dev/fa/"><img src="docs/img/story.webp" width="1600" height="900" alt="داستان ساعت ۰۳:۰۷ با یک هشدار شروع می‌شود: عمق ORDERS.DLQ جایی میان ۸ بروکر در ۲ کلاستر بالا می‌رود. آن را در مرورگرتان بازی کنید."></a>
+<a href="https://rahdar.dev/fa/"><img src="docs/img/story.webp" width="1600" height="900" alt="داستان ساعت ۰۲:۵۱ با دو هشدار شروع می‌شود: یک consumer group در Kafka روی payments عقب می‌افتد و ORDERS.DLQ روی یک جفت Artemis بالا می‌رود. آن را در مرورگرتان بازی کنید."></a>
 
-**[▶ داستان را بازی کنید](https://rahdar.dev/fa/)**: اول خودتان با یک تب برای هر بروکر دنبال صف بگردید، بعد ببینید Rahdar چطور آن را در یک صفحه پیدا می‌کند.
+**[▶ داستان را بازی کنید](https://rahdar.dev/fa/)**: تراکنش معلقِ پشت lag را پیدا کنید و abort کنید، یک group را با تأییدِ نگه‌داشته reset کنید و صف dead-letter در Artemis را پاک کنید، همه در یک estate.
 
 ## چه کارهایی می‌کند
 
@@ -109,9 +110,35 @@ Rahdar **کلاستر را واحد همه‌چیز** می‌داند. همهٔ 
 | **کلاینت‌ها و مسیر پیام** | **SQL Console** |
 | [![Flow: نقطه‌های متحرک نرخ هر مسیر را نشان می‌دهند و با رفتن نشانگر روی یک صف، کل مسیرش برجسته می‌ماند](docs/img/flow.gif)](docs/img/flow.gif) | [![SQL Console: کوئری روی همهٔ صف‌های کلاستر، با تعیین هزینه پیش از اجرا و سپس tail زنده](docs/img/sql-console.gif)](docs/img/sql-console.gif) |
 | **پلاگین‌ها** | **تنظیمات** |
-| [![نصب یک پلاگین: کارهایی که اجازه دارد انجام دهد و SQL تغییرات پایگاه‌داده‌اش، پیش از تأیید با تایپ بررسی می‌شوند](docs/img/plugin-install.gif)](docs/img/plugin-install.gif) | [![تنظیمات: ترجیحات نمایش، پیکربندی عملیاتی Rahdar، و بخش‌های این کلاستر و هر پلاگین](docs/img/settings.png)](docs/img/settings.png) |
+| [![نصب یک پلاگین: کارهایی که اجازه دارد انجام دهد و SQL تغییرات پایگاه‌داده‌اش، پیش از تأیید با نگه‌داشتن دکمه بررسی می‌شوند](docs/img/plugin-install.gif)](docs/img/plugin-install.gif) | [![تنظیمات: ترجیحات نمایش، پیکربندی عملیاتی Rahdar، و بخش‌های این کلاستر و هر پلاگین](docs/img/settings.png)](docs/img/settings.png) |
 
 <div dir="rtl" align="right">
+
+Rahdar از طریق [OpenBroker](https://github.com/sudoitir/openbroker)، یک SDK متن‌باز بروکر با یک درایور برای هر سیستم، با بروکرها صحبت می‌کند. صفحه‌هایی که همهٔ سیستم‌ها دارند (estate، subscriptionها و destinationها، مرور پیام‌ها، purge، گزارش ممیزی، API و MCP) روی هر کدام و با واژگان خودِ همان سیستم کار می‌کنند، و کاری که یک سیستم نتواند انجام دهد دیدنی می‌ماند، غیرفعال و همراه با دلیل.
+
+</div>
+
+| سیستم | پشتیبانی‌شده | راهنما |
+| --- | --- | --- |
+| Apache ActiveMQ® Artemis | نسخهٔ ۲٫۳۳٫۰ و بالاتر | [راهنما](https://rahdar.dev/fa/guide/) |
+| Apache Kafka® | نسخهٔ ۳٫۰ و بالاتر، در حالت KRaft و ZooKeeper | [Kafka](https://rahdar.dev/guide/kafka) |
+| RabbitMQ | به‌زودی؛ هنوز پشتیبانی نمی‌شود | |
+
+<div dir="rtl" align="right">
+
+جزئیات و آنچه بیرون از این بازه‌ها رخ می‌دهد: [نسخه‌های پشتیبانی‌شدهٔ بروکر](https://rahdar.dev/guide/supported-versions).
+
+### Apache Kafka
+
+- **[Consumer groupها](https://rahdar.dev/guide/kafka#consumer-groups)**: groupهای classic، consumer و share همراه با وضعیت، اعضا و lag. lag یک تخمین است و همین‌طور علامت‌گذاری می‌شود: بازش کنید تا همهٔ partitionها را ببینید، کندترین اول، با offset ثبت‌شده، انتهای لاگ و سن نمونه.
+- **[Reset کردن offsetها](https://rahdar.dev/guide/kafka#reset-offsets)**: به earliest، latest، یک زمان یا یک offset، با پیش‌نمایش برای هر partition از آنچه group رد می‌کند یا دوباره می‌خواند. groupی که عضو دارد، با نام اعضا، رد می‌شود؛ reset روی همان وضعیتی اجرا می‌شود که پیش‌نمایش شد، با نگه‌داشتن دکمه تأیید می‌شود، جایی که دروازه روشن است منتظر تأیید می‌ماند، و با offsetهای پیش و پس از آن ممیزی می‌شود.
+- **[پیکربندی topic](https://rahdar.dev/guide/kafka#topic-configuration)**: هر تنظیم همراه با اینکه مقدارش از کجا می‌آید، با تغییر از راه یک بازبینی که بروکر پیش از اعمال هر چیزی اعتبارسنجی‌اش می‌کند.
+- **[ACLها](https://rahdar.dev/guide/kafka#acls)**: فهرست، افزودن و حذف، همراه با دسترسی مؤثر هر principal پیش و پس از تغییر.
+- **[تراکنش‌ها](https://rahdar.dev/guide/kafka#transactions)**: تراکنش معلقی که consumerهای read-committed را عقب نگه می‌دارد علامت می‌خورد، و abort کردنش پیش‌نمایش دارد، با نگه‌داشتن دکمه تأیید و ممیزی می‌شود.
+- **[بروکرها و quorum](https://rahdar.dev/guide/kafka#brokers-and-the-quorum)**: هر بروکر، اینکه Rahdar از آدرس advertise‌شده‌اش به آن رسیده یا نه، و quorum کنترلرهای KRaft.
+- **روی صفحه‌های مشترک**: یک topic را بر اساس partition و offset یا زمان مرور کنید، بدون پیوستن به group؛ رکوردهای نخوانده یک group را purge کنید یا یک topic را truncate کنید، با گفتن دامنهٔ اثر، از جمله هر groupی که رکوردهای نخوانده‌اش را از دست می‌دهد.
+
+### Apache Artemis
 
 - **توپولوژی**: جفت‌های live/backup و وضعیت replication آن‌ها. نقش HA در هر چرخه از تک‌تک نودها poll می‌شود و هرگز از پیکربندی خوانده نمی‌شود؛ اگر در یک جفت دو نود هم‌زمان live باشند، هشدار split-brain داده می‌شود.
 - **[Flow](https://rahdar.dev/guide/flow)**: کدام اپلیکیشن به کدام آدرس پیام می‌فرستد، آن آدرس از مسیر divertها، bridgeها و پرش‌های کلاستر به کدام صف‌ها می‌رسد، و چه کسی با چه نرخی آن‌ها را مصرف می‌کند. مشکلاتی مثل انباشت پیام بدون مصرف‌کننده با کلمات روشن گفته می‌شوند، و از کلاینت‌ها فقط تا وقتی کسی صفحه را نگاه می‌کند نمونه‌برداری می‌شود.
@@ -137,19 +164,19 @@ LIMIT 50
 - **[ارسال هشدار](https://rahdar.dev/guide/alert-delivery)**: Slack، Microsoft Teams، PagerDuty (incidentها همراه با هشدار باز و بسته می‌شوند)، ایمیل و webhookهای امضاشده؛ هرکدام پیش از ذخیره آزمایش می‌شود و گزارش ارسال می‌گوید چرا یک اعلان نرسیده است.
 - **[حاکمیت داده](https://rahdar.dev/guide/data-governance)**: هدرها و propertyهای حساس پوشانده می‌شوند، اطلاعات شخصی (PII) خودکار دسته‌بندی می‌شود و پوشاندنشان به نقش بیننده بستگی دارد.
 - **حاکمیت**: احراز هویت در همه‌جا، نقش‌ها و مجوزها در سه سطح سراسری ← محیط ← کلاستر، توکن‌های API، OIDC/SSO اختیاری، و گزارش ممیزی‌ای که هر تغییر و نتیجه‌اش را ثبت می‌کند.
-- **[سرور MCP](https://rahdar.dev/fa/guide/mcp)**: همین قابلیت‌ها برای دستیار هوش مصنوعی، با همان مجوزها و همان گزارش ممیزی.
+- **[سرور MCP](https://rahdar.dev/fa/guide/mcp)**: همین قابلیت‌ها برای دستیار هوش مصنوعی، با همان مجوزها و همان گزارش ممیزی. هشت ابزار `kafka_*` آن چیزی را تغییر نمی‌دهند که پیش‌تر پیش‌نمایش داده نشده باشد، و هرجا دروازهٔ تأیید روشن است منتظر یک انسان می‌مانند.
 - **[پلاگین‌ها](https://rahdar.dev/guide/plugins)**: فایل `.jar` یک پلاگین را از رابط کاربری نصب کنید؛ با صفحه‌ها، API، ابزارهای دستیار و داده‌های مخصوص خودش. پیش از تأیید، هر کاری که می‌تواند بکند نشان داده می‌شود و جز در صورت نیاز، راه‌اندازی مجدد لازم نیست. به‌روزرسانی‌ها نشان می‌دهند چه چیزی عوض می‌شود و قابل بازگشت‌اند؛ پلاگینی که خطا بدهد هرگز Rahdar را از کار نمی‌اندازد. برای شروع یک پلاگین از [قالب آماده](examples/plugin-template) استفاده کنید.
 
 ## چطور کار می‌کند
 
 چهار قاعده در سراسر محصول برقرار است:
 
-- **از پایه، هوای بروکر را دارد.** خواندن‌ها دسته‌ای است (برای هر نود یک POST به Jolokia، هرگز یکی برای هر صف)، polling لایه‌بندی شده و برای هر نود محدودیت نرخ وجود دارد. Rahdar هرگز نباید دلیل از پا افتادن یک بروکر باشد.
-- **پیش‌فرض، ایمنی است.** هر فراخوانی مخرب را می‌شود اول به‌صورت dry run اجرا کرد، و برای purge و حذف باید نام منبع را تایپ کنید.
-- **وضعیت HA از نودها می‌آید، نه از پیکربندی.** اینکه چه کسی live است را فقط نودهای live می‌دانند.
+- **از پایه، هوای بروکر را دارد.** خواندن‌ها دسته‌ای است (در Artemis، برای هر نود یک POST به Jolokia، هرگز یکی برای هر صف)، polling لایه‌بندی شده و برای هر نود محدودیت نرخ وجود دارد. Rahdar هرگز نباید دلیل از پا افتادن یک بروکر باشد.
+- **پیش‌فرض، ایمنی است.** هر فراخوانی مخرب را می‌شود اول به‌صورت dry run اجرا کرد و دامنهٔ اثرش را می‌گوید، و purge، حذف، truncate و resetها با نگه‌داشتن دکمه‌ای که تعداد را نام می‌برد تأیید می‌شوند.
+- **وضعیت از بروکرها می‌آید، نه از پیکربندی.** نقش‌های HA در Artemis از تک‌تک نودها poll می‌شود، و سلامت یک کلاستر Kafka از بروکرها و quorumش ساخته می‌شود.
 - **صداقت دربارهٔ قابلیت‌ها.** اگر قابلیتی در دسترس نباشد، همین را می‌گوید و دقیقاً همان `broker.xml` لازم برای فعال‌کردنش را نشان می‌دهد. هیچ‌چیز بی‌صدا ناپدید نمی‌شود.
 
-Java 25 · Spring Boot 4.1 · PostgreSQL با Liquibase · React 19 + Vite + Mantine 9 · TanStack Router/Query/Table · React Flow · در درجهٔ اول Jolokia روی HTTP و در درجهٔ دوم کلاینت Core خود Artemis · SSE · یک ایمیج کانتینر. [معماری](https://rahdar.dev/reference/architecture) و [همهٔ تصمیم‌های ثبت‌شده](https://rahdar.dev/reference/adr/) را بخوانید.
+Java 25 · Spring Boot 4.1 · PostgreSQL با Liquibase · React 19 + Vite + Mantine 9 · TanStack Router/Query/Table · React Flow · SDK [OpenBroker](https://github.com/sudoitir/openbroker) با درایورهای Artemis و Kafka · SSE · یک ایمیج کانتینر. [معماری](https://rahdar.dev/reference/architecture) و [همهٔ تصمیم‌های ثبت‌شده](https://rahdar.dev/reference/adr/) را بخوانید.
 
 ## مشارکت
 
@@ -158,14 +185,14 @@ Java 25 · Spring Boot 4.1 · PostgreSQL با Liquibase · React 19 + Vite + Man
 </div>
 
 ```bash
-just dev-up          # Postgres + یک جفت واقعی primary/backup از Artemis + Rahdar، از روی سورس
+just dev-up          # Postgres + یک جفت واقعی primary/backup از Artemis + یک نود Kafka + Rahdar، از روی سورس
 just dev             # یا: بک‌اند :8080 و Vite :5173 با هم، همراه با live reload
 just verify          # همهٔ بررسی‌های CI
 ```
 
 <div dir="rtl" align="right">
 
-فرمان `ADMIN_PASSWORD=… just demo` (اجرای اول به `NEW_ADMIN_PASSWORD=…` و اجراهای بعدی به `ADMIN_TOTP_SECRET=…` هم نیاز دارند) دو جفت live/backup دیگر اضافه می‌کند و هر شش نود را با ترافیکی شبیه محیط واقعی پر می‌کند: divertها، یک bridge، پرش‌های کلاستر، صفی بدون مصرف‌کننده که مدام پرتر می‌شود، انباشت واقعی dead-letter و یک نود متوقف. تصاویر بالا با `just shots` و `just demo-gif` از همین استک ضبط شده‌اند و هیچ‌چیزشان صحنه‌سازی نیست.
+فرمان `ADMIN_PASSWORD=… just demo` (اجرای اول به `NEW_ADMIN_PASSWORD=…` و اجراهای بعدی به `ADMIN_TOTP_SECRET=…` هم نیاز دارند) دو جفت live/backup دیگر اضافه می‌کند و هر شش نود را با ترافیکی شبیه محیط واقعی پر می‌کند: divertها، یک bridge، پرش‌های کلاستر، صفی بدون مصرف‌کننده که مدام پرتر می‌شود، انباشت واقعی dead-letter و یک نود متوقف. همچنین یک کلاستر Kafka سه‌بروکره به نام `events` ثبت می‌کند، با groupهایی که عقب نمی‌مانند و groupهایی که عقب می‌افتند، یک topic فشرده‌شده (compacted)، ACLها و یک تراکنش معلق. تصاویر بالا با `just shots` و `just demo-gif` از همین استک ضبط شده‌اند و هیچ‌چیزشان صحنه‌سازی نیست.
 
 هر قابلیت از فرایند **OpenSpec** می‌گذرد و تصمیم‌های مهم به‌صورت [**ADR**](docs/adr/) ثبت می‌شوند. از [`CONTRIBUTING.md`](CONTRIBUTING.md) شروع کنید.
 
@@ -175,9 +202,9 @@ just verify          # همهٔ بررسی‌های CI
 
 ## مجوز
 
-[Apache-2.0](LICENSE)؛ همان مجوزی که خود Artemis دارد.
+[Apache-2.0](LICENSE)؛ همان مجوزی که خود Artemis و Kafka دارند.
 
-Apache ActiveMQ و Apache ActiveMQ Artemis علامت‌های تجاری بنیاد نرم‌افزار Apache هستند. Rahdar پروژه‌ای مستقل است؛ نه ساختهٔ بنیاد نرم‌افزار Apache است، نه مورد تأیید آن و نه وابسته به آن. هر جا از «Artemis» نام برده شده، منظور بروکری است که این ابزار مدیریتش می‌کند.
+Apache، Apache Kafka، Kafka، Apache ActiveMQ، ActiveMQ و Artemis نشان‌های تجاری بنیاد نرم‌افزار Apache هستند؛ RabbitMQ نشان تجاری مالک آن است. Rahdar به آن‌ها وابسته نیست و از سوی آن‌ها تأیید نشده است. این نام‌ها فقط برای توصیف بروکرهایی به کار رفته‌اند که Rahdar با آن‌ها کار می‌کند.
 
 </div>
 
