@@ -3,6 +3,7 @@ package io.github.sudoitir.rahdar.platform.clusters.web;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
+import io.github.sudoitir.rahdar.kernel.core.SecretRedactor;
 import io.github.sudoitir.rahdar.platform.clusters.ManagementUrlPattern;
 import io.swagger.v3.oas.annotations.media.DiscriminatorMapping;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -43,7 +44,14 @@ public final class ClusterRequests {
             @NotNull @Valid Connection connection) {
 
         public record Credentials(
-                @NotBlank String username, @NotBlank String password) {}
+                @NotBlank String username, @NotBlank String password) {
+
+            /** The password is never printed. */
+            @Override
+            public String toString() {
+                return "Credentials[username=" + username + ", password=" + SecretRedactor.MASK + "]";
+            }
+        }
 
         @JsonIgnore
         @Schema(hidden = true)
@@ -200,7 +208,16 @@ public final class ClusterRequests {
     }
 
     /** A Kafka account: a user name and password, or a bearer token. Never returned. */
-    public record KafkaCredentials(String username, String password, String token) {}
+    public record KafkaCredentials(String username, String password, String token) {
+
+        /** The password and the token are never printed; whether each is set is. */
+        @Override
+        public String toString() {
+            return "KafkaCredentials[username=" + username + ", password="
+                    + (password == null ? "none" : SecretRedactor.MASK) + ", token="
+                    + (token == null ? "none" : SecretRedactor.MASK) + "]";
+        }
+    }
 
     /**
      * One account in {@link UpdateClusterRequest}: the password is optional, because an empty one keeps the
@@ -210,6 +227,13 @@ public final class ClusterRequests {
 
         /** What a JSON {@code null} for the Core account reads as: clear it, so Core uses the management account. */
         public static final AccountUpdate CLEAR = new AccountUpdate(null, null);
+
+        /** The password is never printed. */
+        @Override
+        public String toString() {
+            return "AccountUpdate[username=" + username + ", password="
+                    + (password == null ? "none" : SecretRedactor.MASK) + "]";
+        }
 
         boolean named() {
             return username != null && !username.isBlank();

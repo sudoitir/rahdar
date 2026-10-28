@@ -1,6 +1,7 @@
 package io.github.sudoitir.rahdar.kernel.security.internal;
 
 import io.github.sudoitir.rahdar.kernel.core.NotFoundException;
+import io.github.sudoitir.rahdar.kernel.core.SecretRedactor;
 import io.github.sudoitir.rahdar.kernel.gate.DisplayRow;
 import io.github.sudoitir.rahdar.kernel.gate.Effect;
 import io.github.sudoitir.rahdar.kernel.gate.GatedOperation;
@@ -21,7 +22,14 @@ import org.springframework.context.annotation.Configuration;
 @Configuration(proxyBeanMethods = false)
 class UserOperations {
 
-    record CreateUser(String username, String email, String password) {}
+    record CreateUser(String username, String email, String password) {
+
+        /** The password is never printed. */
+        @Override
+        public String toString() {
+            return "CreateUser[username=" + username + ", email=" + email + ", password=" + SecretRedactor.MASK + "]";
+        }
+    }
 
     record DisableUser(UUID userId) {}
 

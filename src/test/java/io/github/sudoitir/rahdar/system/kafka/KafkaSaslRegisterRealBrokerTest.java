@@ -1,6 +1,7 @@
 package io.github.sudoitir.rahdar.system.kafka;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.catchThrowable;
 
 import io.github.sudoitir.rahdar.platform.broker.Attempt;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterService;
@@ -8,6 +9,8 @@ import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterR
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterRequests.KafkaCredentials;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterRequests.RegisterClusterRequest;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterRequests.RegisterClusterRequest.KafkaConnection;
+import io.github.sudoitir.rahdar.platform.clusters.web.ClusterRequests.UpdateClusterRequest;
+import io.github.sudoitir.rahdar.platform.clusters.web.ClusterRequests.UpdateClusterRequest.KafkaConnectionUpdate;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.ClusterDetail;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.ConnectionCheck;
 import io.github.sudoitir.rahdar.support.AdminAuthenticationExtension;
@@ -149,5 +152,52 @@ class KafkaSaslRegisterRealBrokerTest extends PostgresIntegrationTest {
         assertThat(check.failure()).isNotNull();
         assertThat(check.failure().cause()).isEqualTo("AUTHENTICATION");
         assertThat(check.failure().next()).isNotBlank();
+    }
+
+    @Test
+    void noPasswordReachesAResponseAFailureOrAnAuditRowOnRegisterCheckOrEdit() throws Exception {
+        JsonMapper json = JsonMapper.builder().build();
+        String wrong = "not-the-password-4711";
+        KafkaConnectionUpdate sameAccount = new KafkaConnectionUpdate(
+                KafkaModule.SYSTEM, null, null, null, new KafkaCredentials(USER, SECRET, null), null, null);
+        KafkaConnectionUpdate wrongAccount = new KafkaConnectionUpdate(
+                KafkaModule.SYSTEM, null, null, null, new KafkaCredentials(USER, wrong, null), null, null);
+
+        // A failed check, and a failed registration, say what went wrong without the password that was sent.
+        ConnectionCheck failed = service.checkConnection(request("leak-check", wrong));
+        assertThat(json.writeValueAsString(failed)).doesNotContain(wrong).doesNotContain(SECRET);
+        assertThat(request("leak-request", wrong).toString()).doesNotContain(wrong);
+        Throwable refused = catchThrowable(() -> service.register(request("leak-register", wrong)));
+        assertThat(String.valueOf(refused))
+                .contains("rejected these credentials")
+                .doesNotContain(wrong);
+
+        ClusterDetail detail = ((Attempt.Ok<ClusterDetail>) service.register(request("leak", SECRET))).value();
+        UUID id = detail.id();
+        UpdateClusterRequest edit = new UpdateClusterRequest(null, null, null, wrongAccount);
+
+        // The edit's dry run, a refused edit and an accepted one: none returns or stores the password in the clear.
+        Throwable refusedDryRun = catchThrowable(() -> service.checkUpdate(id, edit));
+        assertThat(String.valueOf(refusedDryRun)).doesNotContain(wrong);
+        Throwable refusedEdit = catchThrowable(() -> service.updateConnection(id, edit));
+        assertThat(String.valueOf(refusedEdit)).doesNotContain(wrong);
+        assertThat(edit.toString()).doesNotContain(wrong);
+        var accepted = service.updateConnection(id, new UpdateClusterRequest(null, null, null, sameAccount));
+        assertThat(json.writeValueAsString(accepted)).doesNotContain(SECRET);
+        assertThat(json.writeValueAsString(service.get(id)))
+                .doesNotContain(SECRET)
+                .doesNotContain(wrong);
+
+        assertThat(jdbc.sql("SELECT row_to_json(a)::text FROM audit_event a WHERE a.cluster_id = ?")
+                        .param(id)
+                        .query(String.class)
+                        .list())
+                .isNotEmpty()
+                .noneMatch(row -> row.contains(SECRET) || row.contains(wrong));
+        assertThat(jdbc.sql("SELECT row_to_json(a)::text FROM audit_event a WHERE a.params::text LIKE ?")
+                        .param("%" + run + "%")
+                        .query(String.class)
+                        .list())
+                .noneMatch(row -> row.contains(SECRET) || row.contains(wrong));
     }
 }

@@ -1,6 +1,7 @@
 package io.github.sudoitir.rahdar.platform.clusters;
 
 import io.github.sudoitir.openbroker.Endpoint;
+import io.github.sudoitir.rahdar.kernel.core.SecretRedactor;
 import io.github.sudoitir.rahdar.platform.broker.SystemExtension;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterRequests.RegisterClusterRequest.Connection;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterRequests.UpdateClusterRequest.ConnectionUpdate;
@@ -32,7 +33,14 @@ public interface ClusterRegistrar extends SystemExtension {
     }
 
     /** The account a connection signs in with, held in memory only; the secret is sealed when it is stored. */
-    record Account(String username, String secret) {}
+    record Account(String username, String secret) {
+
+        /** The secret is never printed. */
+        @Override
+        public String toString() {
+            return "Account[username=" + username + ", secret=" + SecretRedactor.MASK + "]";
+        }
+    }
 
     /** A connection resolved against what is stored: the connection to check, and the account to store, if it changed. */
     record Resolved(Connection connection, Account account) {}

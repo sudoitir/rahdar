@@ -923,7 +923,14 @@ public class ClusterService {
     // ---- connection edit (PATCH /clusters/{id}) ---------------------------------
 
     /** An account's user name and password; both {@code null} for a Core account that falls back. */
-    private record Account(String username, String password) {}
+    private record Account(String username, String password) {
+
+        /** The password is never printed. */
+        @Override
+        public String toString() {
+            return "Account[username=" + username + ", password=" + SecretRedactor.MASK + "]";
+        }
+    }
 
     /** The connection as it would be after a request: the stored values with the request laid over them. */
     private record Edited(
