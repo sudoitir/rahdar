@@ -32080,7 +32080,8 @@
         "properties" : {
           "affectedCount" : {
             "type" : "integer",
-            "format" : "int64"
+            "format" : "int64",
+            "description" : "Messages destroyed; 0 for a purge of a log."
           },
           "dryRun" : {
             "type" : "boolean"
@@ -32089,9 +32090,14 @@
             "type" : [ "string", "null" ],
             "format" : "uuid",
             "description" : "The node acted on; null where the system has none."
+          },
+          "skippedCount" : {
+            "type" : "integer",
+            "format" : "int64",
+            "description" : "Records a purge of a log passed over without deleting them; 0 otherwise."
           }
         },
-        "required" : [ "affectedCount", "dryRun" ]
+        "required" : [ "affectedCount", "dryRun", "skippedCount" ]
       },
       "DryRunView" : {
         "type" : "object",
@@ -32110,9 +32116,14 @@
           "node" : {
             "type" : [ "string", "null" ],
             "format" : "uuid"
+          },
+          "skippedCount" : {
+            "type" : "integer",
+            "format" : "int64",
+            "description" : "Records a purge of a log would pass over without deleting them; 0 otherwise. The cap counts destroyed messages only, so it never applies to these."
           }
         },
-        "required" : [ "affectedCount", "cap", "overCap" ]
+        "required" : [ "affectedCount", "cap", "overCap", "skippedCount" ]
       },
       "PartialView" : {
         "type" : "object",
@@ -32903,7 +32914,13 @@
           },
           "affected" : {
             "type" : [ "integer", "null" ],
-            "format" : "int64"
+            "format" : "int64",
+            "description" : "Messages destroyed; 0 for a purge of a log."
+          },
+          "skipped" : {
+            "type" : [ "integer", "null" ],
+            "format" : "int64",
+            "description" : "Records a purge of a log passes over (expected in the preview, passed over once run) without deleting them; absent for every other action."
           },
           "nodes" : {
             "type" : "array",
@@ -32987,6 +33004,10 @@
           },
           "error" : {
             "type" : "string"
+          },
+          "skipped" : {
+            "type" : "integer",
+            "format" : "int64"
           }
         }
       },
@@ -36729,6 +36750,17 @@
             "items" : {
               "$ref" : "#/components/schemas/PartitionLag"
             }
+          },
+          "destination" : {
+            "$ref" : "#/components/schemas/ResourceId"
+          }
+        }
+      },
+      "KindId" : {
+        "type" : "object",
+        "properties" : {
+          "value" : {
+            "type" : "string"
           }
         }
       },
@@ -36756,6 +36788,28 @@
           }
         },
         "required" : [ "partition" ]
+      },
+      "ResourceId" : {
+        "type" : "object",
+        "properties" : {
+          "kind" : {
+            "$ref" : "#/components/schemas/KindId"
+          },
+          "path" : {
+            "$ref" : "#/components/schemas/ResourcePath"
+          }
+        }
+      },
+      "ResourcePath" : {
+        "type" : "object",
+        "properties" : {
+          "segments" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          }
+        }
       },
       "BoundView" : {
         "type" : "object",
@@ -37752,6 +37806,11 @@
           "uncommittedHidden" : {
             "type" : "boolean",
             "description" : "Records of open or aborted transactions are not shown, as a read-committed consumer would not see them."
+          },
+          "subscriptionPosition" : {
+            "type" : [ "integer", "null" ],
+            "format" : "int64",
+            "description" : "Where the group stands on this partition, when the log is read through a group's subscription: its committed offset (a share group's start offset). Absent when the log is read as a topic, or the group has no position on the partition."
           }
         },
         "required" : [ "end", "partition", "retentionMoved", "start", "uncommittedHidden" ]

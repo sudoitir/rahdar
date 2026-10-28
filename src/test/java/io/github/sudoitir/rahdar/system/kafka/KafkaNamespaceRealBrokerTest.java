@@ -19,6 +19,7 @@ import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.ClusterDetai
 import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshotUpsert;
 import io.github.sudoitir.rahdar.support.AdminAuthenticationExtension;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
+import java.net.URI;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
@@ -153,6 +154,33 @@ class KafkaNamespaceRealBrokerTest extends PostgresIntegrationTest {
                 .getResponse();
         assertThat(response.getStatus()).as(response.getContentAsString()).isLessThan(300);
         return response.getContentAsString();
+    }
+
+    @Test
+    void aGroupsSubscriptionIsBrowsedLikeItsTopicAndSaysWhereTheGroupStands() throws Exception {
+        commit(Map.of(0, 3L, 1, 2L));
+        String id = "kafka.group-topic/" + group + "%2F" + topic;
+
+        mvc.perform(get(URI.create(
+                        "/api/v1/clusters/" + cluster + "/resources/" + id + "/messages?partition=0&from=earliest")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(5))
+                .andExpect(jsonPath("$.log.partition").value(0))
+                .andExpect(jsonPath("$.log.subscriptionPosition").value(3));
+        mvc.perform(get(URI.create(
+                        "/api/v1/clusters/" + cluster + "/resources/" + id + "/messages?partition=1&from=earliest")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.log.subscriptionPosition").value(2));
+        // The detail of one record, through the same subscription.
+        mvc.perform(get(URI.create("/api/v1/clusters/" + cluster + "/resources/" + id + "/messages/1?partition=0")))
+                .andExpect(status().isOk());
+        // Read as the topic, no group stands anywhere.
+        mvc.perform(get(
+                        "/api/v1/clusters/{c}/resources/kafka.topic/{t}/messages?partition=0&from=earliest",
+                        cluster,
+                        topic))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.log.subscriptionPosition").doesNotExist());
     }
 
     @Test

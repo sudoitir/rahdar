@@ -38,6 +38,7 @@ import io.github.sudoitir.rahdar.kernel.security.ResourceRef;
 import io.github.sudoitir.rahdar.kernel.settings.SettingsService;
 import io.github.sudoitir.rahdar.kernel.stream.SseHub;
 import io.github.sudoitir.rahdar.platform.broker.Attempt;
+import io.github.sudoitir.rahdar.platform.broker.BacklogBreakdown;
 import io.github.sudoitir.rahdar.platform.broker.BodyEncoding;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
 import io.github.sudoitir.rahdar.platform.broker.BrokerMessages;
@@ -72,6 +73,7 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
@@ -130,6 +132,15 @@ public class MessageService {
         record Affected(long count, UUID node) implements Outcome {}
 
         record DryRun(long count, long cap, boolean overCap, UUID node) implements Outcome {}
+
+        /**
+         * A purge of a partitioned log moves a group's position and deletes nothing: {@code skipped} records are passed
+         * over, none is destroyed, so the bulk cap, which counts destroyed messages, does not apply to it.
+         */
+        record LogPurged(long skipped, UUID node) implements Outcome {}
+
+        /** What a purge of a partitioned log would skip, point in time: it destroys nothing and is not capped. */
+        record LogPurgeDryRun(long skipped, long cap, UUID node) implements Outcome {}
 
         /**
          * An operation by ids that stopped part-way: {@code count} were acted on, and
@@ -215,6 +226,47 @@ public class MessageService {
      */
     public MessagePageView browseLog(
             UUID clusterId, ResourceId log, int partition, LogStart from, String filter, int requestedSize) {
+        return browseLog(clusterId, log, null, partition, from, filter, requestedSize);
+    }
+
+    /**
+     * The same, through a group's subscription of the log: its records are those of the topic the subscription
+     * reads, and the page says where the group stands on the partition.
+     */
+    public MessagePageView browseSubscriptionLog(
+            UUID clusterId, ResourceId subscription, int partition, LogStart from, String filter, int requestedSize) {
+        BacklogBreakdown.Breakdown breakdown = subscriptionLog(clusterId, subscription);
+        return browseLog(clusterId, breakdown.destination(), breakdown, partition, from, filter, requestedSize);
+    }
+
+    /** One record of the log a group's subscription reads. */
+    public MessageDetailView detailSubscriptionLog(
+            UUID clusterId, ResourceId subscription, int partition, long offset) {
+        return detailLog(clusterId, subscriptionLog(clusterId, subscription).destination(), partition, offset);
+    }
+
+    /** The subscription's breakdown, which names the destination whose log it reads; the caller may read both. */
+    private BacklogBreakdown.Breakdown subscriptionLog(UUID clusterId, ResourceId subscription) {
+        clusterAccess.requireResource(
+                clusterId,
+                ResourceRef.subscription(subscription.path().segments().getFirst()),
+                MessagePermissions.MESSAGE_READ);
+        BacklogBreakdown.Breakdown breakdown =
+                extensions.require(clusterId, BacklogBreakdown.class).read(clusterId, subscription);
+        if (breakdown.destination() == null) {
+            throw new NotFoundException("destination of subscription", subscription.format());
+        }
+        return breakdown;
+    }
+
+    private MessagePageView browseLog(
+            UUID clusterId,
+            ResourceId log,
+            BacklogBreakdown.Breakdown through,
+            int partition,
+            LogStart from,
+            String filter,
+            int requestedSize) {
         clusterAccess.requireResource(clusterId, ResourceRef.destination(log.name()), MessagePermissions.MESSAGE_READ);
         LogBounds.Bounds bounds = extensions.require(clusterId, LogBounds.class).of(clusterId, log, partition);
         int size = Math.min(requestedSize, BROKER_PAGE_CAP);
@@ -253,7 +305,21 @@ public class MessageService {
                 page.next() != null,
                 "A log is read by offset: its size is its end offset less its start, and compaction leaves gaps.",
                 null,
-                new LogView(partition, bounds.start(), bounds.end(), page.next(), moved, true));
+                new LogView(
+                        partition,
+                        bounds.start(),
+                        bounds.end(),
+                        page.next(),
+                        moved,
+                        true,
+                        through == null
+                                ? null
+                                : through.partitions().stream()
+                                        .filter(p -> p.partition() == partition)
+                                        .map(BacklogBreakdown.PartitionLag::committed)
+                                        .filter(Objects::nonNull)
+                                        .findFirst()
+                                        .orElse(null)));
     }
 
     /** One record of a partition of a log, expanded. */
@@ -610,13 +676,13 @@ public class MessageService {
             BrokerMessages.LogPurge preview = messages.previewLogPurge(clusterId, subscription);
             if (dryRun) {
                 audit.succeed(event, preview.records());
-                return new Attempt.Ok<>(
-                        new Outcome.DryRun(preview.records(), settings.intValue(BrokerSettings.BULK_CAP), false, null));
+                return new Attempt.Ok<>(new Outcome.LogPurgeDryRun(
+                        preview.records(), settings.intValue(BrokerSettings.BULK_CAP), null));
             }
             // The driver counts the partitions it moved; the operator is told the records they skip.
             messages.purgeLog(clusterId, subscription, preview.etag());
             audit.succeed(event, preview.records());
-            return new Attempt.Ok<>(new Outcome.Affected(preview.records(), null));
+            return new Attempt.Ok<>(new Outcome.LogPurged(preview.records(), null));
         } catch (RuntimeException e) {
             audit.fail(event, e.getMessage());
             throw e;

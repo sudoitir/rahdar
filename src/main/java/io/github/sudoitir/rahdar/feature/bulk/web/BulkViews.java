@@ -101,7 +101,16 @@ public final class BulkViews {
             @Schema(requiredMode = REQUIRED) BulkItemStatus status,
             @Schema(nullable = true) String error,
             @Schema(nullable = true) String warning,
-            @Schema(nullable = true) Long affected,
+
+            @Schema(nullable = true, description = "Messages destroyed; 0 for a purge of a log.")
+            Long affected,
+
+            @Schema(
+                    nullable = true,
+                    description = "Records a purge of a log passes over (expected in the preview, passed over once run)"
+                            + " without deleting them; absent for every other action.")
+            Long skipped,
+
             @Schema(requiredMode = REQUIRED) List<NodeFigure> nodes,
             @Schema(nullable = true) List<NodeOutcome> outcome,
             @Schema(nullable = true) Instant startedAt,

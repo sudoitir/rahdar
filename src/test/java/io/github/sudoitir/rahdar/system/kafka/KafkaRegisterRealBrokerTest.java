@@ -484,11 +484,12 @@ class KafkaRegisterRealBrokerTest extends PostgresIntegrationTest {
             }
         }
 
-        assertThat(outcome).isInstanceOf(MessageService.Outcome.DryRun.class);
-        assertThat(((MessageService.Outcome.DryRun) outcome).count()).isEqualTo(8);
-        assertThat(((MessageService.Outcome.Affected)
+        // A purge of a log destroys nothing: the figure is the records the position passes over.
+        assertThat(outcome).isInstanceOf(MessageService.Outcome.LogPurgeDryRun.class);
+        assertThat(((MessageService.Outcome.LogPurgeDryRun) outcome).skipped()).isEqualTo(8);
+        assertThat(((MessageService.Outcome.LogPurged)
                                 ((Attempt.Ok<?>) messages.purgeLog(id, subscription, false)).value())
-                        .count())
+                        .skipped())
                 .isEqualTo(8);
     }
 

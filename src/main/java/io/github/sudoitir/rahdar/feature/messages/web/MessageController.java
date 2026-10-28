@@ -1,7 +1,6 @@
 package io.github.sudoitir.rahdar.feature.messages.web;
 
 import io.github.sudoitir.openbroker.model.ResourceClass;
-import io.github.sudoitir.openbroker.model.ResourceId;
 import io.github.sudoitir.rahdar.feature.messages.MessageAction;
 import io.github.sudoitir.rahdar.feature.messages.MessageService;
 import io.github.sudoitir.rahdar.feature.messages.MessageService.LogStart;
@@ -21,6 +20,7 @@ import io.github.sudoitir.rahdar.platform.broker.Attempt;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterKinds;
 import io.github.sudoitir.rahdar.platform.clusters.ResourceTargets;
+import io.github.sudoitir.rahdar.platform.clusters.ResourceTargets.Target;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -68,14 +68,15 @@ public class MessageController {
             @RequestParam(required = false) String value) {
         ResourceQuery paging = ResourceQuery.ofPage(page, size);
         if (kinds.partitioned(clusterId, kind)) {
-            // A partitioned log is read one partition at a time, from an offset or a time (ADR-0216).
-            return messages.browseLog(
-                    clusterId,
-                    log(clusterId, kind, path),
-                    requirePartition(partition),
-                    LogStart.parse(from, value),
-                    filter,
-                    paging.size());
+            // A partitioned log is read one partition at a time, from an offset or a time (ADR-0216), through a
+            // topic or through a group's subscription of it, which also says where the group stands.
+            Target target = logTarget(clusterId, kind, path);
+            LogStart start = LogStart.parse(from, value);
+            return target.resourceClass() == ResourceClass.SUBSCRIPTION
+                    ? messages.browseSubscriptionLog(
+                            clusterId, target.id(), requirePartition(partition), start, filter, paging.size())
+                    : messages.browseLog(
+                            clusterId, target.id(), requirePartition(partition), start, filter, paging.size());
         }
         return messages.browse(
                 clusterId, subscription(clusterId, kind, path), node, filter, paging.page(), paging.size());
@@ -91,8 +92,11 @@ public class MessageController {
             @RequestParam(required = false) String filter,
             @RequestParam(required = false) Integer partition) {
         if (kinds.partitioned(clusterId, kind)) {
-            return messages.detailLog(
-                    clusterId, log(clusterId, kind, path), requirePartition(partition), Long.parseLong(position));
+            Target target = logTarget(clusterId, kind, path);
+            return target.resourceClass() == ResourceClass.SUBSCRIPTION
+                    ? messages.detailSubscriptionLog(
+                            clusterId, target.id(), requirePartition(partition), Long.parseLong(position))
+                    : messages.detailLog(clusterId, target.id(), requirePartition(partition), Long.parseLong(position));
         }
         return messages.detail(
                 clusterId, subscription(clusterId, kind, path), MessageActionRequest.number(position), node, filter);
@@ -166,9 +170,9 @@ public class MessageController {
         return respond(messages.purge(clusterId, subscription(clusterId, kind, path), node, dryRun, override));
     }
 
-    /** The destination whose log the route names. */
-    private ResourceId log(UUID clusterId, String kind, String path) {
-        return targets.require(clusterId, kind, path, ResourceClass.DESTINATION).id();
+    /** The destination whose log the route names, or the subscription that reads one. */
+    private Target logTarget(UUID clusterId, String kind, String path) {
+        return targets.require(clusterId, kind, path, ResourceClass.DESTINATION, ResourceClass.SUBSCRIPTION);
     }
 
     private static int requirePartition(Integer partition) {
@@ -188,9 +192,12 @@ public class MessageController {
         Outcome outcome = unwrap(attempt);
         Object body =
                 switch (outcome) {
-                    case Outcome.Affected(var count, var node) -> new AffectedView(count, false, node);
+                    case Outcome.Affected(var count, var node) -> new AffectedView(count, false, node, 0);
                     case Outcome.DryRun(var count, var cap, var overCap, var node) ->
-                        new DryRunView(count, cap, overCap, node);
+                        new DryRunView(count, cap, overCap, node, 0);
+                    case Outcome.LogPurged(var skipped, var node) -> new AffectedView(0, false, node, skipped);
+                    case Outcome.LogPurgeDryRun(var skipped, var cap, var node) ->
+                        new DryRunView(0, cap, false, node, skipped);
                     case Outcome.Partial(var count, var notDone, var error, var node) ->
                         new PartialView(
                                 count, notDone.stream().map(String::valueOf).toList(), error, true, node);

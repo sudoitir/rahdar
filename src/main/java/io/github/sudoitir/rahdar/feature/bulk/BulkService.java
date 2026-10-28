@@ -139,7 +139,8 @@ public class BulkService {
         long estimate = 0;
         boolean complete = true;
         for (Planned p : plan) {
-            if (p.refusal() != null || !operation.destructive()) {
+            // A purge of a log destroys nothing, so what it skips is not what the cap counts.
+            if (p.refusal() != null || !operation.destructive() || p.figures().log()) {
                 continue;
             }
             for (NodeFigure n : p.figures().nodes()) {
@@ -260,7 +261,7 @@ public class BulkService {
                     id,
                     "This subscription is a position in a log, so it cannot be paused, resumed or deleted."
                             + " Only a purge acts on it, by moving it to the end of the log.",
-                    new ItemEstimate(nodes, null));
+                    new ItemEstimate(nodes, null, null, true));
         }
         long members = nodes.stream()
                 .map(NodeFigure::consumerCount)
@@ -272,19 +273,23 @@ public class BulkService {
                     id,
                     "%d members are attached. A group is purged only when it has none; stop its consumers first."
                             .formatted(members),
-                    new ItemEstimate(nodes, null));
+                    new ItemEstimate(nodes, null, null, true));
         }
-        String skipped = nodes.stream().anyMatch(n -> n.messageCount() == null)
+        boolean unknown = nodes.stream().anyMatch(n -> n.messageCount() == null);
+        Long skippedRecords = unknown
+                ? null
+                : nodes.stream().mapToLong(NodeFigure::messageCount).sum();
+        String skipped = unknown
                 ? "Purging moves the position to the end of the log, skipping an unknown number of records."
-                : "Purging moves the position to the end of the log, skipping %d records."
-                        .formatted(nodes.stream()
-                                .mapToLong(NodeFigure::messageCount)
-                                .sum());
+                : "Purging moves the position to the end of the log, skipping %d records.".formatted(skippedRecords);
         return new Planned(
                 id,
                 null,
                 new ItemEstimate(
-                        nodes, skipped + " The records themselves are not deleted and others can still read them."));
+                        nodes,
+                        skipped + " The records themselves are not deleted and others can still read them.",
+                        skippedRecords,
+                        true));
     }
 
     /** A node that has not answered within the freshness window has unknown figures, never zero. */

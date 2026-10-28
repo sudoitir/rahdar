@@ -10,6 +10,7 @@ import io.github.sudoitir.openbroker.model.Resource;
 import io.github.sudoitir.openbroker.model.ResourceId;
 import io.github.sudoitir.openbroker.model.ResourceQuery;
 import io.github.sudoitir.openbroker.model.Shard;
+import io.github.sudoitir.openbroker.model.StandardAttributes;
 import io.github.sudoitir.rahdar.kernel.core.NotFoundException;
 import io.github.sudoitir.rahdar.platform.broker.BacklogBreakdown;
 import io.github.sudoitir.rahdar.platform.broker.BrokerFailures;
@@ -64,7 +65,10 @@ class KafkaBacklogBreakdown implements BacklogBreakdown {
                     .findFirst()
                     .orElseThrow(() -> new NotFoundException("subscription", subscription.format()));
             Map<Integer, Long> ends = ends(connection, path.get(1));
-            return new Breakdown(group.observedAt(), partitions(group.attributes(), ends));
+            return new Breakdown(
+                    group.observedAt(),
+                    partitions(group.attributes(), ends),
+                    group.attributes().get(StandardAttributes.DESTINATION).orElse(null));
         } catch (BrokerException e) {
             throw BrokerFailures.translate(e);
         }

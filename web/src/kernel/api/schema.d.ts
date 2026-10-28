@@ -5261,7 +5261,10 @@ export interface components {
             capturePayload: boolean;
         };
         AffectedView: {
-            /** Format: int64 */
+            /**
+             * Format: int64
+             * @description Messages destroyed; 0 for a purge of a log.
+             */
             affectedCount: number;
             dryRun: boolean;
             /**
@@ -5269,6 +5272,11 @@ export interface components {
              * @description The node acted on; null where the system has none.
              */
             node?: string | null;
+            /**
+             * Format: int64
+             * @description Records a purge of a log passed over without deleting them; 0 otherwise.
+             */
+            skippedCount: number;
         };
         DryRunView: {
             /** Format: int64 */
@@ -5278,6 +5286,11 @@ export interface components {
             overCap: boolean;
             /** Format: uuid */
             node?: string | null;
+            /**
+             * Format: int64
+             * @description Records a purge of a log would pass over without deleting them; 0 otherwise. The cap counts destroyed messages only, so it never applies to these.
+             */
+            skippedCount: number;
         };
         PartialView: {
             /** Format: int64 */
@@ -5596,8 +5609,16 @@ export interface components {
             status: "PENDING" | "REFUSED" | "RUNNING" | "SUCCEEDED" | "PARTIAL" | "FAILED" | "SKIPPED" | "CANCELLED" | "UNKNOWN";
             error?: string | null;
             warning?: string | null;
-            /** Format: int64 */
+            /**
+             * Format: int64
+             * @description Messages destroyed; 0 for a purge of a log.
+             */
             affected?: number | null;
+            /**
+             * Format: int64
+             * @description Records a purge of a log passes over (expected in the preview, passed over once run) without deleting them; absent for every other action.
+             */
+            skipped?: number | null;
             nodes: components["schemas"]["NodeFigure"][];
             outcome?: components["schemas"]["NodeOutcome"][] | null;
             /** Format: date-time */
@@ -5628,6 +5649,8 @@ export interface components {
             /** Format: int64 */
             affected?: number;
             error?: string;
+            /** Format: int64 */
+            skipped?: number;
         };
         AcceptanceView: {
             reason: string;
@@ -7177,6 +7200,10 @@ export interface components {
             /** Format: date-time */
             sampledAt?: string;
             partitions?: components["schemas"]["PartitionLag"][];
+            destination?: components["schemas"]["ResourceId"];
+        };
+        KindId: {
+            value?: string;
         };
         PartitionLag: {
             /** Format: int32 */
@@ -7188,6 +7215,13 @@ export interface components {
             /** Format: int64 */
             lag?: number;
             reason?: string;
+        };
+        ResourceId: {
+            kind?: components["schemas"]["KindId"];
+            path?: components["schemas"]["ResourcePath"];
+        };
+        ResourcePath: {
+            segments?: string[];
         };
         /** @description A limit the query ran into, which is why it stopped. */
         BoundView: {
@@ -7636,6 +7670,11 @@ export interface components {
             retentionMoved: boolean;
             /** @description Records of open or aborted transactions are not shown, as a read-committed consumer would not see them. */
             uncommittedHidden: boolean;
+            /**
+             * Format: int64
+             * @description Where the group stands on this partition, when the log is read through a group's subscription: its committed offset (a share group's start offset). Absent when the log is read as a topic, or the group has no position on the partition.
+             */
+            subscriptionPosition?: number | null;
         };
         MessagePageView: {
             data: components["schemas"]["MessageSummaryView"][];

@@ -58,9 +58,9 @@ class BulkLogPurgeTest extends BulkTestSupport {
                         group("g-empty", "u", 5, 0),
                         queue("orders.q", 4)));
         when(messages.purgeLog(clusterId, ResourceId.parse("kafka.group-topic/g-empty/t"), false))
-                .thenReturn(new Attempt.Ok<>(new MessageService.Outcome.Affected(10, null)));
+                .thenReturn(new Attempt.Ok<>(new MessageService.Outcome.LogPurged(10, null)));
         when(messages.purgeLog(clusterId, ResourceId.parse("kafka.group-topic/g-empty/u"), false))
-                .thenReturn(new Attempt.Ok<>(new MessageService.Outcome.Affected(5, null)));
+                .thenReturn(new Attempt.Ok<>(new MessageService.Outcome.LogPurged(5, null)));
         when(messages.purgeLog(clusterId, ResourceId.parse("kafka.group-topic/g-rebalancing/t"), false))
                 .thenThrow(new ConflictException("group-rebalancing", "The group g-rebalancing is rebalancing."));
         when(messages.purge(clusterId, "orders.q", nodeA, false, false))
@@ -79,6 +79,11 @@ class BulkLogPurgeTest extends BulkTestSupport {
                         null,
                         false));
 
+        // The plan carries what each log purge skips, and the run's estimate, which the cap counts, destroys none of
+        // it.
+        assertThat(item(preview, "kafka.group-topic/g-empty/t").skipped()).isEqualTo(10L);
+        assertThat(preview.run().estimate()).isEqualTo(4L);
+        assertThat(preview.run().overCap()).isFalse();
         BulkItemView active = item(preview, "kafka.group-topic/g-active/t");
         assertThat(active.status()).isEqualTo(BulkItemStatus.REFUSED);
         assertThat(active.error()).contains("2 members");
@@ -94,8 +99,10 @@ class BulkLogPurgeTest extends BulkTestSupport {
 
         // Two groups reading one name stay two items.
         assertThat(item(run, "kafka.group-topic/g-empty/t").status()).isEqualTo(BulkItemStatus.SUCCEEDED);
-        assertThat(item(run, "kafka.group-topic/g-empty/t").affected()).isEqualTo(10L);
-        assertThat(item(run, "kafka.group-topic/g-empty/u").affected()).isEqualTo(5L);
+        // A purge of a log destroys nothing and says how many records it passed over.
+        assertThat(item(run, "kafka.group-topic/g-empty/t").affected()).isZero();
+        assertThat(item(run, "kafka.group-topic/g-empty/t").skipped()).isEqualTo(10L);
+        assertThat(item(run, "kafka.group-topic/g-empty/u").skipped()).isEqualTo(5L);
         // A purge of the whole cluster names no node.
         assertThat(item(run, "kafka.group-topic/g-empty/t").outcome())
                 .singleElement()

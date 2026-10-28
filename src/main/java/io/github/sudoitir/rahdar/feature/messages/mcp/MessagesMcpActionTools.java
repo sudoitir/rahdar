@@ -198,6 +198,28 @@ public class MessagesMcpActionTools {
                     case Outcome.Affected(var count, var node) ->
                         new McpViews.MutationOutcome(
                                 action, subject, false, count, null, false, String.valueOf(node), "Applied.");
+                    case Outcome.LogPurgeDryRun(var skipped, var cap, var node) ->
+                        new McpViews.MutationOutcome(
+                                action,
+                                subject,
+                                true,
+                                0,
+                                null,
+                                false,
+                                String.valueOf(node),
+                                "Nothing was changed. A real run moves the group's position past " + skipped
+                                        + " record(s) and deletes none, so no override is needed. Re-run with"
+                                        + " dryRun=false and confirm=\"" + subject + "\".");
+                    case Outcome.LogPurged(var skipped, var node) ->
+                        new McpViews.MutationOutcome(
+                                action,
+                                subject,
+                                false,
+                                0,
+                                null,
+                                false,
+                                String.valueOf(node),
+                                "Applied: the position moved past " + skipped + " record(s); none was deleted.");
                     // Neither applied nor failed: affected is 0 only because nothing is confirmed.
                     case Outcome.InDoubt(var detail, var node) ->
                         new McpViews.MutationOutcome(

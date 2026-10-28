@@ -129,8 +129,22 @@ the reason in a popover; UNAVAILABLE reads "Unavailable" with the reason, never 
   past it, a notice when retention moved the start, tombstones as "Tombstone (no value)", and that
   uncommitted and aborted records are not shown. `filter` on such a kind answers `400` with the
   driver's reason; the web disables the input with it.
+- **Browse through a group:** a partitioned subscription's id (`kafka.group-topic/<group>%2F<topic>`,
+  likewise a share group) browses and opens records of the topic it reads, found from the driver's own
+  breakdown of the subscription and not by splitting the id; the page's `log.subscriptionPosition` is the
+  group's committed offset on the partition (a share group's start offset), so the web can mark where
+  the group stands. Read as the topic, it is absent.
 - **Purge:** as today (`subscription:purge`), with the preview naming members or the rebalancing
-  state from the driver's refusal; confirm disabled with that reason.
+  state from the driver's refusal; confirm disabled with that reason. A purge of a partitioned
+  subscription moves the position and deletes nothing, so it reports the records it passes over as
+  `skippedCount` (single) and `skipped` (a bulk item, expected in the plan and reported once run) and
+  `affectedCount` / `affected` stays what was destroyed, 0 here. The bulk cap counts destroyed
+  messages only: a log purge is never capped, needs no override and adds nothing to a run's estimate;
+  it keeps preview, hold, gate and audit.
+- **Shared read routes** answer a cluster whose system lacks what they list with `409
+  unavailable-on-system` naming it (connections, producers, channels, consumers), an empty list where
+  nothing of the kind can exist (routes, dead letters), and never a `5xx`; a test walks every read
+  route of a Kafka cluster against a real broker.
 - **Truncate (new):** gated operation `destination.truncate`, permission `destination:truncate`, on a
   kind with the TRUNCATE verb. `POST /api/v1/clusters/{c}/destinations/{kind}/{path}:truncate[?dryRun]`
   with `{before: {offsets: {"0": 120}} | {time: ISO-8601}}`; the effect lists every group losing

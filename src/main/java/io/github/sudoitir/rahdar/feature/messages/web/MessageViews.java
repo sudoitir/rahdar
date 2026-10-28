@@ -141,7 +141,14 @@ public final class MessageViews {
                     requiredMode = REQUIRED,
                     description = "Records of open or aborted transactions are not shown, as a read-committed"
                             + " consumer would not see them.")
-            boolean uncommittedHidden) {}
+            boolean uncommittedHidden,
+
+            @Schema(
+                    nullable = true,
+                    description = "Where the group stands on this partition, when the log is read through a group's"
+                            + " subscription: its committed offset (a share group's start offset). Absent when the"
+                            + " log is read as a topic, or the group has no position on the partition.")
+            Long subscriptionPosition) {}
 
     /**
      * A send whose outcome is unknown (HTTP 202): the message left, and the broker's confirmation never came
@@ -157,11 +164,18 @@ public final class MessageViews {
 
     /** The result of a mutation: the broker's own affected count (not a dry-run estimate). */
     public record AffectedView(
-            @Schema(requiredMode = REQUIRED) long affectedCount,
+            @Schema(requiredMode = REQUIRED, description = "Messages destroyed; 0 for a purge of a log.")
+            long affectedCount,
+
             @Schema(requiredMode = REQUIRED) boolean dryRun,
 
             @Schema(nullable = true, description = "The node acted on; null where the system has none.")
-            UUID node) {}
+            UUID node,
+
+            @Schema(
+                    requiredMode = REQUIRED,
+                    description = "Records a purge of a log passed over without deleting them; 0 otherwise.")
+            long skippedCount) {}
 
     /**
      * An operation by ids that stopped part-way. Some messages were acted on, so this is never
@@ -189,7 +203,13 @@ public final class MessageViews {
             @Schema(requiredMode = REQUIRED) long affectedCount,
             @Schema(requiredMode = REQUIRED) long cap,
             @Schema(requiredMode = REQUIRED) boolean overCap,
-            @Schema(nullable = true) UUID node) {}
+            @Schema(nullable = true) UUID node,
+
+            @Schema(
+                    requiredMode = REQUIRED,
+                    description = "Records a purge of a log would pass over without deleting them; 0 otherwise."
+                            + " The cap counts destroyed messages only, so it never applies to these.")
+            long skippedCount) {}
 
     // ---- dead letters (Slice 9) -----------------------------------------
 

@@ -274,8 +274,8 @@ class BulkRunner {
         NodeOutcome outcome;
         try {
             outcome = switch (messages.purgeLog(run.getClusterId(), BulkItemIds.parse(item.getSubscription()), false)) {
-                case Attempt.Ok<MessageService.Outcome>(MessageService.Outcome.Affected affected) ->
-                    new NodeOutcome(null, WHOLE_CLUSTER, NodeStatus.APPLIED, affected.count(), null);
+                case Attempt.Ok<MessageService.Outcome>(MessageService.Outcome.LogPurged purged) ->
+                    new NodeOutcome(null, WHOLE_CLUSTER, NodeStatus.APPLIED, 0L, null, purged.skipped());
                 case Attempt.Ok<MessageService.Outcome>(var other) ->
                     NodeOutcome.failed(null, WHOLE_CLUSTER, "Unexpected purge result: " + other);
                 case Attempt.Failed<MessageService.Outcome> failed ->
