@@ -60,12 +60,16 @@ public class KafkaTransactions {
                 .raw(KafkaKinds.PRODUCER_ID)
                 .map(String::valueOf)
                 .orElse("?");
-        String effect = open(state)
+        boolean abortable = hanging(transaction, Instant.now());
+        String effect = abortable
                 ? "Aborting rolls back the open transaction and releases "
                         + (blocked.isEmpty() ? "its partitions" : blocked.size() + " blocked partition(s)")
                         + ". The producer " + producer + " is fenced: its next write fails and it must restart."
-                : "The transaction is " + state + ", not open, so there is nothing to abort.";
-        return new AbortPreview(id, state, blocked, effect, preview.etag());
+                : open(state)
+                        ? "The transaction is open but has not outlived its timeout, so its producer is still working:"
+                                + " it is not aborted."
+                        : "The transaction is " + state + ", not open, so there is nothing to abort.";
+        return new AbortPreview(id, state, blocked, effect, abortable, preview.etag());
     }
 
     Resource find(ClusterConnection connection, String id) {
@@ -98,11 +102,25 @@ public class KafkaTransactions {
                 .filter(Instant.class::isInstance)
                 .map(Instant.class::cast)
                 .orElse(null);
-        boolean hanging = open(state)
+        return new TransactionRow(t.id().name(), state, start, timeout, hanging(t, now), blocked(t));
+    }
+
+    /** An open transaction that has outlived its timeout: what holds readers back, and the only one to abort. */
+    static boolean hanging(Resource t, Instant now) {
+        String state = KafkaGroups.text(t, KafkaKinds.TRANSACTION_STATE);
+        long timeout = t.attributes()
+                .raw(KafkaKinds.TRANSACTION_TIMEOUT_MS)
+                .map(v -> ((Number) v).longValue())
+                .orElse(0L);
+        Instant start = t.attributes()
+                .raw(KafkaKinds.TRANSACTION_START)
+                .filter(Instant.class::isInstance)
+                .map(Instant.class::cast)
+                .orElse(null);
+        return open(state)
                 && start != null
                 && timeout > 0
                 && Duration.between(start, now).toMillis() > timeout;
-        return new TransactionRow(t.id().name(), state, start, timeout, hanging, blocked(t));
     }
 
     /** The partitions the transaction has touched, which a reader of committed records waits behind. */

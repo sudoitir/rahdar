@@ -7,6 +7,7 @@ import io.github.sudoitir.openbroker.operation.Precondition;
 import io.github.sudoitir.openbroker.operation.Resolution;
 import io.github.sudoitir.rahdar.kernel.audit.AuditEvent;
 import io.github.sudoitir.rahdar.kernel.audit.AuditService;
+import io.github.sudoitir.rahdar.kernel.core.ConflictException;
 import io.github.sudoitir.rahdar.kernel.gate.Effect;
 import io.github.sudoitir.rahdar.kernel.gate.Gated;
 import io.github.sudoitir.rahdar.kernel.gate.Operation;
@@ -35,7 +36,9 @@ public class KafkaTransactionAborts {
     private final ActorResolver actors;
 
     public AbortResult abort(UUID clusterId, String id, String etag) {
-        KafkaEtags.require(etag, transactions.abortPreview(clusterId, id).etag());
+        AbortPreview preview = transactions.abortPreview(clusterId, id);
+        KafkaEtags.require(etag, preview.etag());
+        refuseUnlessHanging(preview);
         return gated(new AbortParams(clusterId, id, etag));
     }
 
@@ -48,6 +51,13 @@ public class KafkaTransactionAborts {
         run(p);
     }
 
+    /** Only a transaction that is open and past its timeout is aborted; the preview says why another is not. */
+    private static void refuseUnlessHanging(AbortPreview preview) {
+        if (!preview.abortable()) {
+            throw new ConflictException("transaction-not-hanging", preview.effect());
+        }
+    }
+
     @Gated("transaction.abort")
     private AbortResult gated(AbortParams p) {
         return gate.run(Operation.of(p), () -> run(p));
@@ -56,6 +66,7 @@ public class KafkaTransactionAborts {
     private AbortResult run(AbortParams p) {
         AbortPreview preview = transactions.abortPreview(p.clusterId(), p.transactionalId());
         KafkaEtags.require(p.etag(), preview.etag());
+        refuseUnlessHanging(preview);
         AuditEvent event = audit.begin(
                 actors.resolve(),
                 "ABORT_TRANSACTION",

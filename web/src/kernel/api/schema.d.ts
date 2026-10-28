@@ -5353,6 +5353,8 @@ export interface components {
             released: components["schemas"]["BlockedPartition"][];
             /** @description What the abort does, in words, naming the fenced producer. */
             effect: string;
+            /** @description True only for an open transaction that has outlived its timeout; any other is refused, since aborting a live one would fence a producer that is working. */
+            abortable: boolean;
             etag: string;
         };
         BlockedPartition: {

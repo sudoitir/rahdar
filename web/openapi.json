@@ -32299,11 +32299,15 @@
             "type" : "string",
             "description" : "What the abort does, in words, naming the fenced producer."
           },
+          "abortable" : {
+            "type" : "boolean",
+            "description" : "True only for an open transaction that has outlived its timeout; any other is refused, since aborting a live one would fence a producer that is working."
+          },
           "etag" : {
             "type" : "string"
           }
         },
-        "required" : [ "effect", "etag", "id", "released", "state" ]
+        "required" : [ "abortable", "effect", "etag", "id", "released", "state" ]
       },
       "BlockedPartition" : {
         "type" : "object",

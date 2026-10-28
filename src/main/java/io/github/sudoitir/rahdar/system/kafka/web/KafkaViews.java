@@ -298,6 +298,12 @@ public final class KafkaViews {
             @Schema(requiredMode = REQUIRED, description = "What the abort does, in words, naming the fenced producer.")
             String effect,
 
+            @Schema(
+                    requiredMode = REQUIRED,
+                    description = "True only for an open transaction that has outlived its timeout; any other is"
+                            + " refused, since aborting a live one would fence a producer that is working.")
+            boolean abortable,
+
             @Schema(requiredMode = REQUIRED) String etag) {}
 
     public record AbortRequest(
