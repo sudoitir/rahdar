@@ -63,7 +63,9 @@ public class KafkaTransactions {
         boolean abortable = hanging(transaction, Instant.now());
         String effect = abortable
                 ? "Aborting rolls back the open transaction and releases "
-                        + (blocked.isEmpty() ? "its partitions" : blocked.size() + " blocked partition(s)")
+                        + (blocked.isEmpty()
+                                ? "its partitions"
+                                : blocked.size() == 1 ? "1 blocked partition" : blocked.size() + " blocked partitions")
                         + ". The producer " + producer + " is fenced: its next write fails and it must restart."
                 : open(state)
                         ? "The transaction is open but has not outlived its timeout, so its producer is still working:"
