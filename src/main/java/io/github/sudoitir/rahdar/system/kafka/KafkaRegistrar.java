@@ -94,6 +94,7 @@ class KafkaRegistrar implements ClusterRegistrar {
     private final BrokerDrivers drivers;
     private final KafkaConnectionRepository connections;
     private final ConnectionSettingsSource settings;
+    private final BootstrapProbe bootstrapProbe;
 
     @Override
     public String system() {
@@ -116,7 +117,7 @@ class KafkaRegistrar implements ClusterRegistrar {
             ConnectionReport report = gateway.verify(KafkaModule.SYSTEM, spec, credentials(kafka), bundle);
             return found(report);
         } catch (BrokerException e) {
-            return new Checked(failed(e), List.of());
+            return new Checked(failed(e, bootstrap), List.of());
         }
     }
 
@@ -422,10 +423,14 @@ class KafkaRegistrar implements ClusterRegistrar {
 
     // ---- failures -----------------------------------------------------------------------------------------------
 
-    private ConnectionCheck failed(BrokerException e) {
+    private ConnectionCheck failed(BrokerException e, List<String> bootstrap) {
         String cause = causeOf(e);
-        String next =
-                switch (cause) {
+        boolean advertised = (cause.equals("TIMEOUT") || cause.equals("REFUSED"))
+                && bootstrap.stream().anyMatch(bootstrapProbe::accepts);
+        String next = advertised
+                ? "The bootstrap server answered, but the brokers advertise addresses Rahdar cannot reach. Set"
+                        + " advertised.listeners to an address reachable from Rahdar (not localhost inside a container)."
+                : switch (cause) {
                     case "DNS" -> "Check the bootstrap server's host name resolves from Rahdar.";
                     case "REFUSED" ->
                         "Check the host and port, that the broker listens there and that no firewall blocks it.";

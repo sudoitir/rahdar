@@ -52,7 +52,9 @@ class KafkaRegistrarTest {
     private final BrokerGateway gateway = mock(BrokerGateway.class);
     private final KafkaConnectionRepository connections = mock(KafkaConnectionRepository.class);
     private final ConnectionSettingsSource settings = mock(ConnectionSettingsSource.class);
-    private final KafkaRegistrar registrar = new KafkaRegistrar(gateway, BrokerDrivers.load(), connections, settings);
+    private boolean accepts;
+    private final KafkaRegistrar registrar =
+            new KafkaRegistrar(gateway, BrokerDrivers.load(), connections, settings, host -> accepts);
 
     private static KafkaConnection plaintext(String... servers) {
         return new KafkaConnection(
@@ -274,6 +276,41 @@ class KafkaRegistrarTest {
         assertThat(checked.view().failure().cause()).isEqualTo(cause);
         assertThat(checked.view().failure().next()).isNotBlank();
         assertThat(checked.view().supported()).isEqualTo(!cause.equals("UNSUPPORTED_VERSION"));
+    }
+
+    @Test
+    void aTimeoutAfterTheBootstrapServerAcceptedSaysTheBrokersAdvertiseAnUnreachableAddress() {
+        doThrow(refused(ErrorReasons.UNREACHABLE, new java.net.SocketTimeoutException("timed out")))
+                .when(gateway)
+                .verify(any(), any(), any(), any());
+        accepts = true;
+
+        var failure = registrar.check(plaintext("k1")).view().failure();
+
+        assertThat(failure.cause()).isEqualTo("TIMEOUT");
+        assertThat(failure.next()).contains("bootstrap server answered").contains("advertised.listeners");
+    }
+
+    @Test
+    void aTimeoutWithNothingListeningAtTheBootstrapServerIsAboutTheBootstrapServer() {
+        doThrow(refused(ErrorReasons.UNREACHABLE, new java.net.SocketTimeoutException("timed out")))
+                .when(gateway)
+                .verify(any(), any(), any(), any());
+        accepts = false;
+
+        var failure = registrar.check(plaintext("k1")).view().failure();
+
+        assertThat(failure.next()).doesNotContain("advertised.listeners").contains("reachable from Rahdar");
+    }
+
+    @Test
+    void aNameThatDoesNotResolveIsNotMistakenForAnAdvertisedAddress() {
+        doThrow(refused(ErrorReasons.UNREACHABLE, new java.net.UnknownHostException("k1")))
+                .when(gateway)
+                .verify(any(), any(), any(), any());
+        accepts = true;
+
+        assertThat(registrar.check(plaintext("k1")).view().failure().next()).doesNotContain("advertised.listeners");
     }
 
     @Test
