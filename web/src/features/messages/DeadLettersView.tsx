@@ -20,9 +20,13 @@ import { messageCount } from './outcomes.ts';
 const rowKey = (r: DeadLetterRow) => `${r.destination}/${r.subscription.name}`;
 
 /** "Replay all…" on a subscription's row: every message back to the subscription it came from, through the shared preview. */
-function ReplayItem({ clusterId, onReplay }: Readonly<{ clusterId: string; onReplay: () => void }>) {
+function ReplayItem({
+  clusterId,
+  kindId,
+  onReplay,
+}: Readonly<{ clusterId: string; kindId: string; onReplay: () => void }>) {
   const host = useActionHost();
-  const gate = useActionGate(clusterId, 'retry');
+  const gate = useActionGate(clusterId, 'retry', kindId);
   return (
     <ActionMenuItem
       label="Replay all…"
@@ -121,7 +125,11 @@ export function DeadLettersView() {
                 icon={<IconListDetails size="1rem" aria-hidden />}
                 onSelect={() => setBreakdown(r.subscription)}
               />
-              <ReplayItem clusterId={clusterId} onReplay={() => setReplay(r.subscription)} />
+              <ReplayItem
+                clusterId={clusterId}
+                kindId={r.subscription.kind}
+                onReplay={() => setReplay(r.subscription)}
+              />
             </>
           ),
         }}

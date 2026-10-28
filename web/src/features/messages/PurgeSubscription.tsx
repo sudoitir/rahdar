@@ -11,6 +11,14 @@ import { useMessageGate } from './gates.ts';
 import { announceFailure, announceResult, messageCount } from './outcomes.ts';
 
 /**
+ * The system's own refusal of the purge, such as a group that still has members or is rebalancing (a 409
+ * naming the cause): the purge cannot proceed until that changes, so the dialog says so and does not offer it.
+ */
+function refusal(failure: ApiError | null): failure is ApiError {
+  return failure?.status === 409;
+}
+
+/**
  * What the dialog says before the purge can be armed: the estimate, or that it could not be taken.
  * An unavailable estimate is stated, never omitted: an absent number reads as zero, and the operator
  * must know the blast radius is unknown. The cap is overridden only where the operator was told the
@@ -21,6 +29,13 @@ function Consequence({
   preview,
   failure,
 }: Readonly<{ subscriptionName: string; preview: DryRunView | null; failure: ApiError | null }>) {
+  if (refusal(failure)) {
+    return (
+      <Notice tone="warning" title="The system refuses this purge right now">
+        {failure.message}
+      </Notice>
+    );
+  }
   if (failure) {
     return (
       <Stack gap="sm">
@@ -113,6 +128,7 @@ export function PurgeSubscription({
         consequence={<Consequence subscriptionName={subscriptionName} preview={preview} failure={failure} />}
         confirmLabel={overCap ? 'Purge anyway, over the cap' : 'Purge subscription'}
         tone="danger"
+        blocked={refusal(failure) ? failure.message : undefined}
         pending={purge.isPending}
         onConfirm={confirm}
       />

@@ -5,6 +5,7 @@ import { useForm } from '@mantine/form';
 import { useActionHost } from '../../kernel/actions/hostContext.ts';
 import { ActionMenuItem } from '../../ui/ActionMenuItem.tsx';
 import { CapabilityGate } from '../../ui/CapabilityGate.tsx';
+import { kindOf } from '../../kernel/api/resourceId.ts';
 import { useRoleIds } from '../clusters/index.ts';
 import { ConfirmDialog } from '../../ui/ConfirmDialog.tsx';
 import { focusFirstInvalid } from '../../ui/formErrors.ts';
@@ -36,10 +37,11 @@ function consequenceOf(action: MessageActionKind, count: number, subscriptionNam
 function SelectorItem({
   clusterId,
   action,
+  kindId,
   onSelect,
-}: Readonly<{ clusterId: string; action: MessageActionKind; onSelect: () => void }>) {
+}: Readonly<{ clusterId: string; action: MessageActionKind; kindId?: string; onSelect: () => void }>) {
   const host = useActionHost();
-  const gate = useActionGate(clusterId, action);
+  const gate = useActionGate(clusterId, action, kindId);
   return (
     <ActionMenuItem
       label={`${VERBS[action].verb} by selector`}
@@ -55,9 +57,10 @@ function SelectorItem({
 function SelectionAction({
   clusterId,
   action,
+  kindId,
   onSelect,
-}: Readonly<{ clusterId: string; action: MessageActionKind; onSelect: () => void }>) {
-  const gate = useActionGate(clusterId, action);
+}: Readonly<{ clusterId: string; action: MessageActionKind; kindId?: string; onSelect: () => void }>) {
+  const gate = useActionGate(clusterId, action, kindId);
   return (
     <CapabilityGate verdict={gate} what={`${VERBS[action].progressive.toLowerCase()} the selected messages`}>
       <Button size="xs" variant="default" disabled={gate.kind === 'blocked'} onClick={onSelect}>
@@ -88,6 +91,7 @@ export function MessageActions({
 }>) {
   const run = useMessageAction(clusterId, subscriptionName);
   const roleIds = useRoleIds(clusterId);
+  const kindId = roleIds.loaded ? kindOf(roleIds.subscription(subscriptionName)) : undefined;
   // The action stays set while the dialog closes, so its text does not change during the exit.
   const [action, setAction] = useState<MessageActionKind>('move');
   const [opened, setOpened] = useState(false);
@@ -144,7 +148,7 @@ export function MessageActions({
             </Menu.Target>
             <Menu.Dropdown>
               {ACTIONS.map((a) => (
-                <SelectorItem key={a} clusterId={clusterId} action={a} onSelect={() => setBulk(a)} />
+                <SelectorItem key={a} clusterId={clusterId} action={a} kindId={kindId} onSelect={() => setBulk(a)} />
               ))}
             </Menu.Dropdown>
           </Menu>
@@ -156,7 +160,7 @@ export function MessageActions({
                 {selected.size} selected
               </Text>
               {ACTIONS.map((a) => (
-                <SelectionAction key={a} clusterId={clusterId} action={a} onSelect={() => open(a)} />
+                <SelectionAction key={a} clusterId={clusterId} action={a} kindId={kindId} onSelect={() => open(a)} />
               ))}
               <Button size="xs" variant="subtle" onClick={onCleared}>
                 Clear

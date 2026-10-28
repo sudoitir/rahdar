@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { http, HttpResponse } from 'msw';
-import { act, screen } from '@testing-library/react';
+import { act, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { notifications } from '@mantine/notifications';
 
@@ -167,5 +167,23 @@ describe('MessagesView on a partitioned log', () => {
     expect(screen.getByText(/The log ends at offset 900/)).toBeInTheDocument();
     expect(screen.getByText('Retention removed the start of the partition')).toBeInTheDocument();
     expect(await screen.findByText('No records from here')).toBeInTheDocument();
+  });
+
+  it("keeps move, retry, delete and expire visible but disabled, with the system's own words", async () => {
+    mockKafka(() => page([record(0)], { partition: 0, startOffset: 0, endOffset: 1, retentionMovedStart: false }));
+    const user = userEvent.setup();
+    renderWithProviders(<MessagesView />);
+    await screen.findByText('value-0');
+
+    await user.click(screen.getByRole('button', { name: 'By selector…' }));
+    const menu = await screen.findByRole('menu');
+    for (const [label, words] of [
+      ['Move by selector', /Messages cannot be moved out of Apache Kafka groups on topics/],
+      ['Delete by selector', /Messages cannot be deleted from Apache Kafka groups on topics/],
+    ] as const) {
+      const item = await within(menu).findByRole('menuitem', { name: new RegExp(label) });
+      await vi.waitFor(() => expect(item).toHaveAttribute('aria-disabled', 'true'));
+      expect(item).toHaveAccessibleDescription(words);
+    }
   });
 });

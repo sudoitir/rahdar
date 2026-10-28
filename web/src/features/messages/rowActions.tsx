@@ -208,7 +208,7 @@ function OneMessageItem({
   action,
   icon,
 }: ActionProps<MessageTarget> & { action: OneAction; icon: React.ReactNode }) {
-  const gate = useActionGate(clusterId, action);
+  const gate = useActionGate(clusterId, action, target.subscription.kind);
   return (
     <ActionMenuItem
       label={`${VERBS[action].verb}…`}
