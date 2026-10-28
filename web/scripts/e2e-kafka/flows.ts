@@ -431,7 +431,10 @@ const truncate: Flow = {
   run: async (t) => {
     const startBefore = offsetsAt('payments', -2);
     const lagBefore = lagOf('reporting');
-    const cut = `0:${startBefore[0] + 900}`;
+    // A little past what the group `reporting` has read on partition 0, so the cut costs it unread records.
+    // The cut may not pass the last stable offset, which the open transaction holds back (the page says so).
+    const cutAt = committed('reporting', 'payments')[0] + 77;
+    const cut = `0:${cutAt}`;
     await t.open('/clusters/:kafka/destinations');
     await t.page.getByRole('button', { name: 'Actions for payments' }).first().click();
     await t.page.getByRole('menuitem', { name: /Truncate/ }).click();
@@ -458,10 +461,15 @@ const truncate: Flow = {
       `log start before ${JSON.stringify(startBefore)}, after ${JSON.stringify(startAfter)}; reporting lag ${lagBefore} -> ${lagOf('reporting')}`,
     );
     t.check(
-      startAfter[0] === startBefore[0] + 900,
+      startAfter[0] === cutAt,
       `the broker's log start of partition 0 moved from ${startBefore[0]} to ${startAfter[0]}`,
     );
-    t.check(lagOf('reporting') < lagBefore, 'the group lag shrank on the broker');
+    // The broker keeps the group's committed offset where it was (it falls below the log start); the preview's figure
+    // is what the cut took from the group: the cut minus where the group had read.
+    t.check(
+      /reporting\s+77\b/.test(text),
+      'the preview stated 77 unread records lost for reporting, the cut (1150) minus its committed offset (1073)',
+    );
     const event = (await audit(t)).find((e) => /TRUNCATE/i.test(e.action));
     t.check(event?.outcome === 'SUCCESS', `an audit row records the truncate (${event?.action}, ${event?.outcome})`);
   },
@@ -677,6 +685,164 @@ const heldReset: Flow = {
   },
 };
 
+const subscriptionPath = (group: string, topic: string) =>
+  `/clusters/:kafka/subscriptions/${encodeURIComponent(`kafka.group-topic/${group}/${topic}`)}/messages`;
+
+/** The offset of the first record at or after a time, as the broker answers it. */
+const offsetAtTime = (topic: string, partition: number, ms: number): number => {
+  const out = kafka('kafka-get-offsets.sh', '--topic', topic, '--partitions', String(partition), '--time', String(ms));
+  return Number(out.trim().split(':')[2]);
+};
+
+/** The first record the broker's own consumer reads from a partition at an offset: key, value and timestamp. */
+const recordAt = (topic: string, partition: number, offset: number) => {
+  const out = inContainer(
+    'rahdar-qa-kafka-kafka-1-1',
+    'kafka-console-consumer.sh',
+    '--bootstrap-server',
+    'kafka-1:9092',
+    '--topic',
+    topic,
+    '--partition',
+    String(partition),
+    '--offset',
+    String(offset),
+    '--max-messages',
+    '1',
+    '--timeout-ms',
+    '15000',
+    '--property',
+    'print.timestamp=true',
+    '--property',
+    'print.key=true',
+    '--property',
+    'print.offset=true',
+  );
+  const line = out.split('\n').find((l) => l.startsWith('CreateTime')) ?? '';
+  const [ts, off, key, ...value] = line.split('\t');
+  return {
+    ts: Number(ts.replace('CreateTime:', '')),
+    off: Number(off.replace('Offset:', '')),
+    key,
+    value: value.join('\t'),
+  };
+};
+
+const browse: Flow = {
+  id: 'browse',
+  title:
+    "browsing a group's records by partition, offset and time shows what the broker holds, with the group's own position",
+  run: async (t) => {
+    await t.open(subscriptionPath('billing', 'orders'));
+    const table = t.page.getByRole('grid').or(t.page.getByRole('table')).first();
+    await table.waitFor({ timeout: 30_000 });
+    const body = async () => (await t.page.locator('main').innerText()).replace(/\s+/g, ' ');
+    const first = await body();
+    t.check(/Where the group stands/.test(first), 'the page says where the group stands on the partition');
+    const stands = /The group stands at offset ([\d,]+) on partition 0/.exec(first);
+    t.note(`group position on the page: ${stands?.[1]}`);
+
+    // From an offset: the first row is that offset, and its key and size match the broker's own consumer.
+    await t.page.getByRole('combobox', { name: 'Start from' }).click();
+    await t.page.getByRole('option', { name: 'An offset' }).click();
+    await t.page.getByLabel('Offset', { exact: true }).fill('40');
+    await t.page.getByRole('button', { name: 'Browse', exact: true }).click();
+    await t.page.waitForTimeout(2000);
+    const fromOffset = await body();
+    const rec = recordAt('orders', 0, 40);
+    t.note(`broker offset 40: ${JSON.stringify({ off: rec.off, ts: rec.ts })}`);
+    t.check(rec.off === 40, 'the broker holds a record at offset 40 of partition 0');
+    t.check(/\b40\b/.test(fromOffset) && !/\b39\b\s+\d{4}-/.test(fromOffset), 'the browse starts at offset 40');
+
+    // From a time: the first row is the offset the broker resolves that time to.
+    const at = new Date(rec.ts + 1).toISOString();
+    await t.page.getByRole('combobox', { name: 'Start from' }).click();
+    await t.page.getByRole('option', { name: 'A time' }).click();
+    await t.page.getByLabel('Time (ISO-8601)', { exact: true }).fill(at);
+    await t.page.getByRole('button', { name: 'Browse', exact: true }).click();
+    await t.page.waitForTimeout(2000);
+    const expected = offsetAtTime('orders', 0, rec.ts + 1);
+    const fromTime = await body();
+    const firstRow = /Offset Written Key Size Body Actions (\d[\d,]*)/.exec(fromTime)?.[1];
+    t.note(`a time of ${at}: broker resolves offset ${expected}; page first row ${firstRow}`);
+    t.check(
+      Number((firstRow ?? '').replace(/,/g, '')) === expected,
+      'the first row is the offset the broker resolves that time to',
+    );
+
+    // Past the end: said, not an empty table.
+    await t.page.getByRole('combobox', { name: 'Start from' }).click();
+    await t.page.getByRole('option', { name: 'An offset' }).click();
+    await t.page.getByLabel('Offset', { exact: true }).fill('99999999');
+    await t.page.getByRole('button', { name: 'Browse', exact: true }).click();
+    await t.page.waitForTimeout(1500);
+    t.check(/past the end of the partition/.test(await body()), 'an offset past the end is stated');
+  },
+};
+
+const tombstone: Flow = {
+  id: 'tombstone',
+  title:
+    "a tombstone on a compacted topic is shown as a tombstone, and every per-record action is disabled with the broker kind's reason",
+  run: async (t) => {
+    const onBroker = inContainer(
+      'rahdar-qa-kafka-kafka-1-1',
+      'kafka-console-consumer.sh',
+      '--bootstrap-server',
+      'kafka-1:9092',
+      '--topic',
+      'customer-state',
+      '--from-beginning',
+      '--timeout-ms',
+      '12000',
+      '--property',
+      'print.key=true',
+    );
+    const tomb = onBroker.split('\n').filter((l) => /^c4\tnull/.test(l.trim()));
+    t.check(tomb.length > 0, 'the broker holds a tombstone for key c4 (null value)');
+    // Find the partition of the c4 tombstone by browsing each partition of the topic.
+    await t.open(subscriptionPath('state-reader', 'customer-state'));
+    await t.page.getByRole('grid').or(t.page.getByRole('table')).first().waitFor({ timeout: 30_000 });
+    let found = false;
+    for (let partition = 0; partition < 3 && !found; partition++) {
+      await t.page.getByLabel('Partition', { exact: true }).fill(String(partition));
+      await t.page.getByRole('button', { name: 'Browse', exact: true }).click();
+      await t.page.waitForTimeout(2500);
+      const text = (await t.page.locator('main').innerText()).replace(/\s+/g, ' ');
+      if (/tombstone/i.test(text)) {
+        found = true;
+        t.note(
+          `tombstone on partition ${partition}: ${text.slice(text.search(/tombstone/i) - 100, text.search(/tombstone/i) + 80)}`,
+        );
+      }
+    }
+    t.check(found, 'a record is marked as a tombstone');
+    // Per-record actions: open a row's menu; move, retry, delete and expire are disabled with a reason.
+    await t.page
+      .getByRole('button', { name: /^Actions for message/ })
+      .first()
+      .click();
+    const menu = t.page.getByRole('menu');
+    await menu.waitFor();
+    const entries = menu.getByRole('menuitem');
+    const items: { text: string; disabled: boolean }[] = [];
+    for (let n = 0; n < (await entries.count()); n++) {
+      const entry = entries.nth(n);
+      items.push({
+        text: (await entry.innerText()).replace(/\s+/g, ' '),
+        disabled: (await entry.getAttribute('aria-disabled')) === 'true' || (await entry.isDisabled()),
+      });
+    }
+    t.note(`record menu: ${JSON.stringify(items)}`);
+    const writes = items.filter((i) => /Move|Retry|Delete|Expire|Dead/i.test(i.text));
+    t.check(writes.length > 0 && writes.every((i) => i.disabled), 'every move, retry, delete and expire is disabled');
+    t.check(
+      writes.every((i) => /cannot|append-only|not/i.test(i.text)),
+      "each says why in the system's own words",
+    );
+  },
+};
+
 export const FLOWS: Flow[] = [
   estate,
   register,
@@ -691,4 +857,6 @@ export const FLOWS: Flow[] = [
   backlogDrawer,
   abortTransaction,
   heldReset,
+  browse,
+  tombstone,
 ];
