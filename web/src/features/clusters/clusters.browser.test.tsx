@@ -51,9 +51,9 @@ const probed: ConnectionCheck = {
       address: `http://${LONG}:8161/console/jolokia`,
       functions: [],
       outcome: 'OK',
+      version: { text: '2.44.0', support: 'SUPPORTED' },
       artemis: {
         nativeNodeId: 'f7734597-a768-11f1-aa4c-ceae3fa2df1d',
-        version: '2.44.0',
         haRole: 'PRIMARY',
         urlSource: 'DERIVED',
         management: 'ACCEPTED',
@@ -65,9 +65,9 @@ const probed: ConnectionCheck = {
       address: null,
       functions: [],
       outcome: 'OK',
+      version: { text: '2.44.0', support: 'SUPPORTED' },
       artemis: {
         nativeNodeId: 'f7734597-a768-11f1-aa4c-ceae3fa2df1d',
-        version: '2.44.0',
         haRole: 'BACKUP',
         urlProblem: 'OTHER_BROKER',
         management: 'ACCEPTED',

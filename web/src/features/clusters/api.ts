@@ -41,57 +41,11 @@ export interface LoadedSystem {
 export type SecurityProtocol = 'PLAINTEXT' | 'SSL' | 'SASL_PLAINTEXT' | 'SASL_SSL';
 export type SaslMechanism = 'PLAIN' | 'SCRAM-SHA-256' | 'SCRAM-SHA-512' | 'OAUTHBEARER';
 
-export interface ArtemisConnection {
-  system: 'artemis';
-  seedUrls: string[];
-  credentials?: Schemas['Credentials'];
-  coreCredentials?: Schemas['Credentials'];
-  tlsBundle?: string;
-  managementUrlPattern?: string;
-}
-
-export interface KafkaConnection {
-  system: 'kafka';
-  bootstrapServers: string[];
-  securityProtocol: SecurityProtocol;
-  saslMechanism?: SaslMechanism | null;
-  /** Read back, a connection holds the username only; a secret is never returned. */
-  credentials?: { username: string; password?: string } | { token: string } | null;
-  tlsBundle?: string | null;
-  clientId?: string | null;
-}
-
-export type ConnectionInput = ArtemisConnection | KafkaConnection;
-
-export interface RegisterClusterRequest {
-  system: string;
-  name?: string;
-  description?: string;
-  environmentId?: string;
-  adopt?: boolean;
-  connection: ConnectionInput;
-}
-
-/**
- * The edit of a cluster's connection, for either system. Hand-written because the generated union's
- * discriminator is spelled as a class name and cannot be satisfied; `core: null` clears the Core account.
- * A secret left out keeps the stored one.
- */
-export interface ArtemisConnectionUpdate {
-  system: 'artemis';
-  seedUrls?: string[];
-  managementUrlPattern?: string;
-  tlsBundle?: string;
-  management?: { username: string; password: string };
-  core?: { username: string; password: string } | null;
-}
-
-export interface UpdateClusterRequest {
-  name?: string;
-  description?: string;
-  environmentId?: string;
-  connection?: ArtemisConnectionUpdate | KafkaConnection;
-}
+export type RegisterClusterRequest = Schemas['RegisterClusterRequest'];
+export type UpdateClusterRequest = Schemas['UpdateClusterRequest'];
+export type ArtemisConnection = Schemas['ArtemisConnection'];
+export type KafkaConnection = Schemas['KafkaConnection'];
+export type ArtemisConnectionUpdate = Schemas['ArtemisConnectionUpdate'];
 
 /** String enums the backend serialises as bare strings; narrowed here for the UI. */
 export type CapabilityStatus = 'AVAILABLE' | 'UNAVAILABLE' | 'UNKNOWN';

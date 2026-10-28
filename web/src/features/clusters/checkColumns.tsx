@@ -27,9 +27,7 @@ export const nodeName = (n: CheckNode): string => (n.artemis ? n.id : `Broker ${
 function nodeFacts(n: CheckNode): string {
   if (!n.artemis) return n.functions.map((f) => f.toLowerCase()).join(', ');
   const role = ROLE[n.artemis.haRole] ?? n.artemis.haRole;
-  return [role, n.artemis.version ?? 'version unknown', `NodeID ${n.artemis.nativeNodeId ?? 'not reported'}`].join(
-    ' · ',
-  );
+  return [role, n.version?.text ?? 'version unknown', `NodeID ${n.artemis.nativeNodeId ?? 'not reported'}`].join(' · ');
 }
 
 /** A cell with its value and, under it, a dimmed line that explains it. */

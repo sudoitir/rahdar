@@ -39,6 +39,11 @@ function check(over: Partial<ConnectionCheck> = {}): ConnectionCheck {
         capability: 'Read consumer group offsets',
         status: 'UNAVAILABLE',
         reason: 'The account may not describe groups',
+        remedy: {
+          text: 'Grant Describe on groups',
+          snippet: 'kafka-acls.sh --add --operation Describe --group *',
+          mediaType: 'text/x-shellscript',
+        },
       },
     ],
     failure: null,
@@ -174,6 +179,8 @@ describe('KafkaRegistrationForm', () => {
     expect(screen.getByText('k2:9092')).toBeInTheDocument();
     expect(screen.getByText(/Read consumer group offsets/)).toBeInTheDocument();
     expect(screen.getByText(/The account may not describe groups/)).toBeInTheDocument();
+    expect(screen.getByText('Grant Describe on groups')).toBeInTheDocument();
+    expect(screen.getByText(/kafka-acls\.sh --add --operation Describe/)).toBeInTheDocument();
   });
 
   it('keeps Register disabled, with its reason, until a check passed on these exact inputs', async () => {

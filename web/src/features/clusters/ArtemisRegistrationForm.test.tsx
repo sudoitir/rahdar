@@ -46,9 +46,9 @@ function preview() {
         outcome: 'OK',
         cause: null,
         message: null,
+        version: { text: '2.40.0', support: 'SUPPORTED' },
         artemis: {
           nativeNodeId: 'node-a',
-          version: '2.40.0',
           haRole: 'PRIMARY',
           urlSource: 'SEED',
           urlProblem: null,
@@ -63,9 +63,9 @@ function preview() {
         outcome: 'OK',
         cause: null,
         message: null,
+        version: { text: '2.40.0', support: 'SUPPORTED' },
         artemis: {
           nativeNodeId: 'node-a',
-          version: '2.40.0',
           haRole: 'BACKUP',
           urlSource: null,
           urlProblem: 'OTHER_BROKER',
@@ -168,6 +168,48 @@ describe('ArtemisRegistrationForm', () => {
     await user.type(screen.getByLabelText(/Another management URL/), 'broker-2');
     expect(await screen.findByText(/details changed since the last check/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Register cluster' })).toBeDisabled();
+  });
+
+  it('warns before registering a broker newer than Rahdar has tested, and still lets it register', async () => {
+    const untested = preview();
+    untested.nodes[0].version = { text: '2.60.0', support: 'NEWER_THAN_TESTED' };
+    server.use(http.post('*/api/v1/clusters', () => HttpResponse.json(untested)));
+    const user = userEvent.setup();
+    renderWithProviders(<ArtemisRegistrationForm />);
+
+    await user.type(screen.getByLabelText(/Broker management URL/), 'broker-1');
+    await user.click(screen.getByRole('button', { name: 'Check connection' }));
+
+    expect(await screen.findByText('Newer Apache ActiveMQ Artemis than Rahdar has tested')).toBeInTheDocument();
+    expect(screen.getByText(/broker-1 runs Apache ActiveMQ Artemis 2\.60\.0/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Register cluster' })).toBeEnabled();
+  });
+
+  it('lists an operation the brokers are too old for, and what a capability gap needs in broker.xml', async () => {
+    const gated = preview();
+    const findings: { capability: string; status: string; reason: string; snippet?: string }[] = gated.access;
+    findings.push(
+      {
+        capability: 'version-gate:Doing X',
+        status: 'UNAVAILABLE',
+        reason: 'Doing X needs Artemis 2.60.0 or later. This cluster runs broker-1 (2.40.0).',
+      },
+      {
+        capability: 'notifications',
+        status: 'UNAVAILABLE',
+        reason: 'The broker has no notification address.',
+        snippet: '<address name="notif"/>',
+      },
+    );
+    server.use(http.post('*/api/v1/clusters', () => HttpResponse.json(gated)));
+    const user = userEvent.setup();
+    renderWithProviders(<ArtemisRegistrationForm />);
+
+    await user.type(screen.getByLabelText(/Broker management URL/), 'broker-1');
+    await user.click(screen.getByRole('button', { name: 'Check connection' }));
+
+    expect(await screen.findByText(/Doing X needs Artemis 2\.60\.0 or later/)).toBeInTheDocument();
+    expect(screen.getByText('<address name="notif"/>')).toBeInTheDocument();
   });
 
   it('states why a broker older than the supported minimum is refused', async () => {

@@ -29,3 +29,13 @@ const SYSTEM_NAMES: Record<string, string> = {
 
 /** A system's name for the check's version line. */
 export const systemWords = (id: string): string => SYSTEM_NAMES[id] ?? id;
+
+/** The nodes that run a release newer than Rahdar has been tested against (ADR-0142): accepted, with a warning. */
+export function untestedNodes(check: ConnectionCheck): { id: string; version: string }[] {
+  return check.nodes.flatMap((n) =>
+    n.version?.support === 'NEWER_THAN_TESTED' ? [{ id: n.id, version: n.version.text }] : [],
+  );
+}
+
+/** A version gate is listed among the access findings as `version-gate:<feature>`; this is its feature. */
+export const GATE_PREFIX = 'version-gate:';

@@ -1,4 +1,4 @@
-import { Stack, Text } from '@mantine/core';
+import { Code, Stack, Text } from '@mantine/core';
 import { Link } from '@tanstack/react-router';
 
 import { DescriptionList, type DescriptionItem } from '../../ui/DescriptionList.tsx';
@@ -9,7 +9,7 @@ import { Section } from '../../ui/Section.tsx';
 import { DataTable } from '../../ui/table/index.ts';
 import type { ConnectionCheck } from './api.ts';
 import { CAUSE_WORDS, CHECK_NODE_COLUMNS } from './checkColumns.tsx';
-import { systemWords, unreachedNodes } from './connectionCheck.ts';
+import { GATE_PREFIX, systemWords, unreachedNodes, untestedNodes } from './connectionCheck.ts';
 
 function quorumWords(check: ConnectionCheck): string {
   const { quorum } = check;
@@ -44,6 +44,7 @@ export function ConnectionCheckPanel({ check, selfId }: Readonly<{ check: Connec
   const unreached = unreachedNodes(check);
   const lacking = check.access.filter((a) => a.status !== 'AVAILABLE');
   const other = check.alreadyRegistered && check.alreadyRegistered.id !== selfId ? check.alreadyRegistered : null;
+  const untested = untestedNodes(check);
   const passiveBackup = check.nodes.some((n) => n.artemis?.core === 'NOT_TRIED' && n.artemis.haRole === 'BACKUP');
   return (
     <Stack gap="sm" aria-live="polite">
@@ -79,6 +80,12 @@ export function ConnectionCheckPanel({ check, selfId }: Readonly<{ check: Connec
         </Notice>
       ) : null}
 
+      {untested.length > 0 ? (
+        <Notice title={`Newer ${systemWords(check.system)} than Rahdar has tested`} tone="warning">
+          {`${untested.map((n) => `${n.id} runs ${systemWords(check.system)} ${n.version}`).join('; ')}. Registration will go ahead, but this release is outside the range Rahdar's tests cover, so a management call may behave differently. The supported versions page lists the tested range.`}
+        </Notice>
+      ) : null}
+
       <DescriptionList label="What the check found" columns={2} items={facts(check)} />
 
       <DataTable
@@ -104,10 +111,24 @@ export function ConnectionCheckPanel({ check, selfId }: Readonly<{ check: Connec
             {lacking.map((a) => (
               <li key={a.capability}>
                 <Text size="sm">
-                  <strong>{a.capability}</strong>
+                  <strong>
+                    {a.capability.startsWith(GATE_PREFIX) ? a.capability.slice(GATE_PREFIX.length) : a.capability}
+                  </strong>
                   {a.status === 'UNKNOWN' ? ' (not established)' : ' (unavailable)'}
                   {a.reason ? `: ${a.reason}` : ''}
                 </Text>
+                {(a.remedy ?? a.snippet) ? (
+                  <Stack gap={4} mt={4}>
+                    {a.remedy ? (
+                      <Text size="xs" c="dimmed">
+                        {a.remedy.text}
+                      </Text>
+                    ) : null}
+                    <Code block fz="xs" style={{ whiteSpace: 'pre-wrap' }}>
+                      {(a.remedy?.snippet ?? a.snippet ?? '').trimEnd()}
+                    </Code>
+                  </Stack>
+                ) : null}
               </li>
             ))}
           </Stack>
