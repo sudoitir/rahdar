@@ -29,7 +29,7 @@ export default defineConfig({
   lang: 'en',
   title: 'Rahdar',
   description:
-    'One console for every Apache ActiveMQ Artemis cluster you run — live topology, cross-node queues, safe message operations, and SQL over your messages.',
+    'One open-source console for your Apache ActiveMQ Artemis and Apache Kafka clusters: one estate across systems, honest lag, previews before anything destructive, and an approval gate.',
   cleanUrls: true,
   lastUpdated: true,
   sitemap: { hostname: ORIGIN },
@@ -41,7 +41,7 @@ export default defineConfig({
     ['link', { rel: 'icon', href: `${BASE}favicon.ico`, sizes: '48x48' }],
     ['link', { rel: 'icon', type: 'image/svg+xml', href: `${BASE}favicon.svg` }],
     ['link', { rel: 'apple-touch-icon', href: `${BASE}apple-touch-icon.png` }],
-    ['meta', { name: 'theme-color', content: '#0b7285' }],
+    ['meta', { name: 'theme-color', content: '#0b6e80' }],
     ['meta', { property: 'og:type', content: 'website' }],
     ['meta', { property: 'og:site_name', content: 'Rahdar' }],
     ['meta', { property: 'og:image', content: `${ORIGIN}img/og-image.png` }],
@@ -103,7 +103,7 @@ export default defineConfig({
     zh: {
       label: '简体中文',
       lang: 'zh-Hans',
-      description: '一个控制台，管理你运行的每一个 Apache ActiveMQ Artemis 集群——实时拓扑、跨节点队列、安全的消息操作，以及对消息的 SQL 查询。',
+      description: '一个开源控制台，管理你的 Apache ActiveMQ Artemis 与 Apache Kafka 集群：跨系统的同一个资产视图、如实的延迟、破坏性操作先预览，以及审批闸门。',
       themeConfig: {
         nav: [
           { text: '指南', link: '/zh/guide/quickstart' },
@@ -146,7 +146,7 @@ export default defineConfig({
       lang: 'fa',
       dir: 'rtl',
       description:
-        'یک کنسول برای همهٔ کلاسترهای Apache ActiveMQ Artemis شما — توپولوژی زنده، صف‌ها در همهٔ نودها، عملیات امن روی پیام‌ها، و SQL روی پیام‌ها.',
+        'یک کنسول متن‌باز برای کلاسترهای Apache ActiveMQ Artemis و Apache Kafka شما: یک estate برای همهٔ سیستم‌ها، lag صادقانه، پیش‌نمایش پیش از هر کار مخرب، و دروازهٔ تأیید.',
       themeConfig: {
         nav: [
           { text: 'راهنما', link: '/fa/guide/quickstart' },

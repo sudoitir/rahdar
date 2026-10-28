@@ -4,643 +4,681 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Rahdar</title>
-<meta name="description" content="Open-source, cluster-wide management and observability for Apache ActiveMQ Artemis — live/backup topology, cross-node queues, safe message operations, request-reply tracing, and SQL over your messages.">
+<meta name="description" content="Open-source operations console for Apache ActiveMQ Artemis and Apache Kafka: every cluster in one estate, lag shown as the estimate it is, a preview before anything destructive, and an approval gate for people and assistants alike.">
 <link rel="canonical" href="https://rahdar.dev/">
-<link rel="icon" href="https://rahdar.dev/favicon.ico" sizes="48x48">
-<link rel="icon" type="image/svg+xml" href="https://rahdar.dev/favicon.svg">
-<link rel="apple-touch-icon" href="https://rahdar.dev/apple-touch-icon.png">
-<meta name="theme-color" content="#0b7285">
+<link rel="icon" href="/favicon.ico" sizes="48x48">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta name="theme-color" content="#f6f7f9" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0d1014" media="(prefers-color-scheme: dark)">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Rahdar">
-<meta property="og:title" content="Rahdar — one console for every Artemis cluster you run">
-<meta property="og:description" content="Stop hunting across one tab per broker. Live topology, every queue on every node in one table, safe message operations and SQL over your messages.">
+<meta property="og:title" content="Rahdar: one console for your Artemis and Kafka clusters">
+<meta property="og:description" content="One estate across broker systems. Honest lag, previews before anything destructive, and an approval gate for people and assistants.">
 <meta property="og:url" content="https://rahdar.dev/">
 <meta property="og:image" content="https://rahdar.dev/img/og-image.png">
 <meta name="twitter:card" content="summary_large_image">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="preload" href="/fonts/atkinson-next.woff2" as="font" type="font/woff2" crossorigin>
+<script>
+  // First paint in the chosen scheme: a stored choice wins, otherwise the system decides (CSS).
+  try { const t = localStorage.getItem('rahdar-theme'); if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; } catch {}
+</script>
 <style>
+/* Self-hosted: Atkinson Hyperlegible Next and Mono, the app's own faces (SIL OFL 1.1, see /fonts/OFL.txt). */
+@font-face { font-family: "Atkinson Next"; src: url("/fonts/atkinson-next.woff2") format("woff2"); font-weight: 200 800; font-display: swap; }
+@font-face { font-family: "Atkinson Mono"; src: url("/fonts/atkinson-mono.woff2") format("woff2"); font-weight: 200 800; font-display: swap; }
+
+/* ── tokens: light is the default, dark follows the system unless the toggle chose ── */
 :root {
+  color-scheme: light;
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --raised: #eef0f4;
+  --line: #dde1e8;
+  --line-strong: #b9c0cc;
+  --ink: #161a21;
+  --muted: #4f5766;
+  --accent: #0b6e80;
+  --accent-ink: #ffffff;
+  --accent-soft: #e3f2f5;
+  --crit: #b42318;
+  --crit-soft: #fdecea;
+  --warn: #8a5a00;
+  --warn-soft: #fbf1dc;
+  --ok: #1f7a3d;
+  --held: repeating-linear-gradient(135deg, #e8d7b0 0 6px, #f6ead0 6px 12px);
+  --shadow: 0 1px 2px rgb(22 26 33 / .06), 0 12px 32px -12px rgb(22 26 33 / .18);
+  --sans: "Atkinson Next", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "Atkinson Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --hold: 1500ms;
+  --wrap: min(1240px, 100% - 32px);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #0d1014; --surface: #151a20; --raised: #1b2129; --line: #2a313d; --line-strong: #3c4553;
+    --ink: #e8eaf0; --muted: #a6aebb; --accent: #4fc6d6; --accent-ink: #06272d; --accent-soft: #10303a;
+    --crit: #ff8a80; --crit-soft: #3a1a1a; --warn: #f2c14e; --warn-soft: #33290f; --ok: #6fd08c;
+    --held: repeating-linear-gradient(135deg, #4a3a14 0 6px, #2d2410 6px 12px);
+    --shadow: 0 1px 2px rgb(0 0 0 / .4), 0 18px 40px -16px rgb(0 0 0 / .7);
+  }
+}
+:root[data-theme="dark"] {
   color-scheme: dark;
-  --bg: #070b0d;
-  --bg-2: #0b1418;
-  --panel: #0f1b20;
-  --panel-2: #132329;
-  --line: #1d3037;
-  --ink: #e7f0f2;
-  --muted: #8ea3aa;
-  --dim: #5d727a;
-  --brand: #0b7285;
-  --teal: #15aabf;
-  --teal-hi: #3bc9db;
-  --amber: #fab005;
-  --red: #ff6b6b;
-  --green: #51cf66;
-  --display: "Bricolage Grotesque", system-ui, sans-serif;
-  --serif: "Instrument Serif", Georgia, serif;
-  --mono: "JetBrains Mono", ui-monospace, monospace;
-  --wrap: min(1200px, 100% - 32px);
+  --bg: #0d1014; --surface: #151a20; --raised: #1b2129; --line: #2a313d; --line-strong: #3c4553;
+  --ink: #e8eaf0; --muted: #a6aebb; --accent: #4fc6d6; --accent-ink: #06272d; --accent-soft: #10303a;
+  --crit: #ff8a80; --crit-soft: #3a1a1a; --warn: #f2c14e; --warn-soft: #33290f; --ok: #6fd08c;
+  --held: repeating-linear-gradient(135deg, #4a3a14 0 6px, #2d2410 6px 12px);
+  --shadow: 0 1px 2px rgb(0 0 0 / .4), 0 18px 40px -16px rgb(0 0 0 / .7);
 }
+
 * { box-sizing: border-box; }
-html { scroll-behavior: smooth; }
-body {
-  margin: 0; background: var(--bg); color: var(--ink);
-  font: 400 17px/1.6 var(--display);
-  -webkit-font-smoothing: antialiased; overflow-x: hidden;
-}
-a { color: var(--teal-hi); }
-code, .mono { font-family: var(--mono); }
-.sql-ed, .plan, .res, code { font-variant-ligatures: none; }
+html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 400 17px/1.6 var(--sans); -webkit-font-smoothing: antialiased; overflow-x: clip; }
+a { color: var(--accent); text-underline-offset: .18em; }
+a:hover { text-decoration-thickness: 2px; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
+code, .mono, .num { font-family: var(--mono); font-variant-numeric: tabular-nums; font-variant-ligatures: none; }
+code { font-size: .9em; padding: .05em .3em; border-radius: 4px; background: var(--raised); }
 .wrap { width: var(--wrap); margin-inline: auto; }
-.kicker { font: 600 12px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--teal-hi); }
-h1, h2, h3 { font-family: var(--display); font-weight: 800; letter-spacing: -.02em; line-height: 1.02; margin: 0; }
-h2 { font-size: clamp(2.2rem, 4.6vw, 4rem); }
-h3 { font-size: 1.6rem; letter-spacing: -.01em; line-height: 1.1; }
-.serif { font-family: var(--serif); font-weight: 400; font-style: italic; letter-spacing: 0; }
-.lede { color: var(--muted); font-size: 1.2rem; max-width: 60ch; }
-section { position: relative; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+h1, h2, h3 { margin: 0; font-weight: 750; letter-spacing: -.022em; line-height: 1.08; text-wrap: balance; }
+h1 { font-size: clamp(2.4rem, 5.4vw, 4.4rem); max-width: 15ch; }
+h2 { font-size: clamp(1.8rem, 3.4vw, 2.75rem); max-width: 22ch; }
+h3 { font-size: 1.15rem; letter-spacing: -.01em; line-height: 1.25; }
+p { margin: 0 0 1em; }
+.lede { color: var(--muted); font-size: clamp(1.05rem, 1.4vw, 1.2rem); max-width: 58ch; }
+.copy p, .copy li { color: var(--muted); max-width: 62ch; }
+.copy ul { padding-inline-start: 1.1em; margin: 0 0 1em; }
+.copy li { margin-block-end: .4em; }
+.copy li::marker { color: var(--accent); }
+.copy b, .copy strong { color: var(--ink); }
+
+/* ── buttons ── */
 .btn {
-  display: inline-flex; align-items: center; gap: .5em; padding: .8em 1.3em; border-radius: 999px;
-  font: 600 15px/1 var(--display); text-decoration: none; cursor: pointer; border: 1px solid var(--line);
-  background: var(--panel); color: var(--ink); transition: background .2s, border-color .2s, transform .2s;
+  display: inline-flex; align-items: center; justify-content: center; gap: .5em; min-height: 44px; padding: .55em 1.15em;
+  border-radius: 10px; border: 1px solid var(--line-strong); background: var(--surface); color: var(--ink);
+  font: 650 15px/1.2 var(--sans); text-decoration: none; cursor: pointer;
+  transition: background-color 160ms ease, border-color 160ms ease, transform 120ms var(--ease-out);
 }
-.btn:hover { border-color: var(--teal); transform: translateY(-1px); }
-.btn.primary { background: var(--teal); color: #03181c; border-color: var(--teal); }
-.btn.primary:hover { background: var(--teal-hi); }
-.btn:focus-visible, button:focus-visible, input:focus-visible { outline: 2px solid var(--teal-hi); outline-offset: 2px; }
-
-/* scroll progress, native scroll-driven animation */
-.progress { position: fixed; inset: 0 0 auto; height: 2px; background: var(--teal); transform-origin: 0 50%; transform: scaleX(0); z-index: 60; animation: grow linear both; animation-timeline: scroll(root); }
-@keyframes grow { to { transform: scaleX(1); } }
-
-/* ── header ─────────────────────────────────────────────── */
-.top {
-  position: fixed; inset: 0 0 auto; z-index: 50; height: 60px; display: flex; align-items: center;
-  background: color-mix(in srgb, var(--bg) 70%, transparent); backdrop-filter: blur(12px);
-  border-bottom: 1px solid color-mix(in srgb, var(--line) 60%, transparent);
+.btn:active:not(:disabled) { transform: scale(.97); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.btn:disabled { cursor: not-allowed; opacity: .55; }
+@media (hover: hover) and (pointer: fine) {
+  .btn:hover:not(:disabled) { border-color: var(--accent); }
+  .btn.primary:hover:not(:disabled) { background: color-mix(in srgb, var(--accent) 88%, var(--ink)); }
 }
-.top .wrap { display: flex; align-items: center; gap: 28px; }
-.brand { display: flex; align-items: center; gap: 10px; color: var(--ink); text-decoration: none; font-weight: 800; letter-spacing: -.01em; }
-.brand img { width: 26px; height: 26px; }
-.top nav { display: flex; gap: 22px; margin-left: auto; align-items: center; }
-.top nav a { color: var(--muted); text-decoration: none; font-size: 15px; }
-.top nav a:hover { color: var(--ink); }
-.top nav .btn { padding: .55em 1em; font-size: 14px; }
-@media (max-width: 760px) { .top nav a:not(.btn) { display: none; } }
 
-/* ── 1. cold open ───────────────────────────────────────── */
-.open {
-  min-height: 100vh; display: grid; place-items: center; padding: 100px 0 60px; overflow: hidden;
-  background: radial-gradient(60% 50% at 50% 38%, #3a0e10 0%, transparent 70%), var(--bg);
+/* ── header ── */
+.top { position: sticky; inset-block-start: 0; z-index: 20; background: color-mix(in srgb, var(--bg) 86%, transparent); backdrop-filter: blur(10px); border-block-end: 1px solid var(--line); }
+.top .wrap { display: flex; align-items: center; gap: 20px; min-height: 60px; }
+.brand { display: inline-flex; align-items: center; gap: 10px; color: var(--ink); text-decoration: none; font-weight: 750; font-size: 18px; }
+.brand img { width: 24px; height: 24px; }
+.top nav { margin-inline-start: auto; display: flex; align-items: center; gap: 4px; }
+.top nav a:not(.btn) { color: var(--muted); text-decoration: none; padding: 8px 10px; border-radius: 8px; font-size: 15px; }
+.top nav a:not(.btn):hover { color: var(--ink); }
+.top .btn { min-height: 38px; padding: .4em .9em; font-size: 14px; }
+.theme { width: 40px; height: 40px; padding: 0; border-radius: 10px; border: 1px solid var(--line); background: transparent; color: var(--ink); cursor: pointer; display: grid; place-items: center; }
+.theme svg { width: 18px; height: 18px; }
+.theme .sun { display: none; }
+:root[data-theme="dark"] .theme .sun { display: block; }
+:root[data-theme="dark"] .theme .moon { display: none; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .theme .sun { display: block; } :root:not([data-theme="light"]) .theme .moon { display: none; } }
+@media (max-width: 820px) { .top nav a.hide-sm { display: none; } }
+
+/* ── hero ── */
+.hero { padding: clamp(48px, 9vw, 112px) 0 clamp(40px, 6vw, 72px); }
+.hero .wrap { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: clamp(32px, 5vw, 72px); align-items: center; }
+@media (max-width: 900px) { .hero .wrap { grid-template-columns: 1fr; } }
+.hero h1 { margin-block-end: 22px; }
+.hero h1 em { font-style: normal; color: var(--accent); }
+.ctas { display: flex; flex-wrap: wrap; gap: 12px; margin-block: 28px 14px; }
+.fine { font-size: 14px; color: var(--muted); }
+.pagers { display: grid; gap: 14px; }
+.clock { font: 600 clamp(2.6rem, 6vw, 4rem)/1 var(--mono); letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+.clock small { font-size: .42em; color: var(--muted); margin-inline-start: .1em; }
+.pager { display: grid; grid-template-columns: auto 1fr; gap: 2px 14px; padding: 16px 18px; border-radius: 14px; background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow); }
+.pager .sys { grid-row: span 3; align-self: start; font: 700 11px/1 var(--mono); letter-spacing: .06em; padding: 7px 8px; border-radius: 6px; background: var(--crit-soft); color: var(--crit); }
+.pager .who { font: 600 13px/1.3 var(--mono); color: var(--muted); display: flex; justify-content: space-between; gap: 12px; }
+.pager .what { font-weight: 700; }
+.pager .why { color: var(--muted); font-size: 15px; }
+@media (prefers-reduced-motion: no-preference) {
+  .pager { animation: arrive 520ms var(--ease-out) both; }
+  .pager + .pager { animation-delay: 900ms; }
+  @keyframes arrive { from { opacity: 0; transform: translateY(-10px) scale(.97); } }
 }
-.open .wrap { display: grid; gap: 34px; justify-items: center; text-align: center; }
-.clock { font: 600 clamp(4rem, 13vw, 10rem)/.9 var(--mono); letter-spacing: -.04em; color: #ffdede; text-shadow: 0 0 60px rgba(255, 90, 90, .35); }
-.clock small { font-size: .32em; color: var(--red); letter-spacing: .02em; vertical-align: .9em; margin-left: .15em; }
-.pager {
-  width: min(460px, 100%); text-align: left; display: grid; grid-template-columns: 40px 1fr; gap: 4px 14px;
-  padding: 16px 18px; border-radius: 18px; background: rgba(40, 18, 20, .82); border: 1px solid #5c2226;
-  box-shadow: 0 30px 80px -20px rgba(255, 60, 60, .35); backdrop-filter: blur(8px);
-  animation: buzz .9s 1.4s both cubic-bezier(.2, 1.4, .4, 1);
+
+/* ── the incident log: a timestamp gutter and an entry ── */
+.log { position: relative; }
+.entry { padding: clamp(56px, 8vw, 104px) 0; border-block-start: 1px solid var(--line); }
+.entry > .wrap { display: grid; grid-template-columns: 6.5rem minmax(0, 1fr); gap: 0 clamp(16px, 3vw, 40px); }
+.stamp { font: 600 15px/1 var(--mono); color: var(--muted); padding-block-start: .55em; font-variant-numeric: tabular-nums; }
+.stamp b { display: block; color: var(--ink); font-size: 22px; margin-block-end: 8px; }
+@media (min-width: 901px) { .stamp { position: sticky; inset-block-start: 88px; align-self: start; } }
+@media (max-width: 900px) { .entry > .wrap { grid-template-columns: 1fr; } .stamp { margin-block-end: 14px; } .stamp b { display: inline; margin-inline-end: 10px; } }
+.body { min-width: 0; }
+.body h2 { margin-block-end: 18px; }
+.split { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: clamp(24px, 4vw, 56px); align-items: start; }
+.split.flip { grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); }
+.split.flip > .copy { order: 2; }
+.split.stack { grid-template-columns: minmax(0, 1fr); }
+.split.stack > .copy { columns: 2 22rem; column-gap: clamp(24px, 4vw, 56px); }
+.split.stack > .copy h2 { column-span: all; }
+.split.stack > .copy p { break-inside: avoid; }
+@media (max-width: 1080px) { .split, .split.flip { grid-template-columns: 1fr; } .split.flip > .copy { order: 0; } }
+.more { font-weight: 650; }
+
+/* ── a scene: an illustration of a real screen, labelled as one ── */
+.scene { margin: 0; min-width: 0; }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); overflow: hidden; }
+.bar { display: flex; align-items: center; gap: 10px; padding: 10px 16px; border-block-end: 1px solid var(--line); font-size: 14px; color: var(--muted); }
+.bar b { color: var(--ink); font-weight: 700; }
+.bar .tag { margin-inline-start: auto; }
+.scene figcaption { font-size: 13.5px; color: var(--muted); margin-block-start: 10px; }
+.scroll { overflow-x: auto; }
+.scroll:focus-visible { outline-offset: -2px; }
+table { border-collapse: collapse; width: 100%; font-size: 14.5px; }
+th { text-align: start; font-weight: 600; color: var(--muted); font-size: 13px; padding: 10px 12px; border-block-end: 1px solid var(--line); white-space: nowrap; }
+td { padding: 10px 12px; border-block-end: 1px solid var(--line); white-space: nowrap; vertical-align: middle; }
+tr:last-child td { border-block-end: 0; }
+td.n, th.n { text-align: end; font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.kind { color: var(--muted); }
+.tag { display: inline-flex; align-items: center; gap: 6px; font: 650 12px/1 var(--sans); padding: 5px 8px; border-radius: 999px; border: 1px solid var(--line-strong); color: var(--muted); white-space: nowrap; }
+.tag.crit { color: var(--crit); border-color: currentColor; background: var(--crit-soft); }
+.tag.warn { color: var(--warn); border-color: currentColor; background: var(--warn-soft); }
+.tag.ok { color: var(--ok); border-color: currentColor; }
+.sysname { font-size: 13px; color: var(--muted); }
+.rowbtn { all: unset; cursor: pointer; font-weight: 650; color: var(--ink); border-radius: 4px; }
+.rowbtn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+tr.sel td { background: var(--accent-soft); }
+tr.sel td:first-child { box-shadow: inset 3px 0 var(--accent); }
+.est { color: var(--warn); }
+.est small { font: 600 11px/1 var(--sans); letter-spacing: .02em; margin-inline-start: 6px; padding: 3px 6px; border-radius: 999px; border: 1px solid currentColor; vertical-align: 2px; }
+
+/* the clusters strip of the estate */
+.clusters { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1px; background: var(--line); border-block-end: 1px solid var(--line); }
+.cluster { background: var(--surface); padding: 14px 16px; display: grid; gap: 4px; }
+.cluster .name { font-weight: 700; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.cluster .meta { font-size: 14px; color: var(--muted); }
+
+/* the per-partition breakdown: a bar per partition, read part and lag */
+.breakdown { padding: 16px; border-block-start: 1px solid var(--line); background: color-mix(in srgb, var(--raised) 45%, var(--surface)); }
+.breakdown h3 { margin-block-end: 4px; }
+.breakdown .why { font-size: 14px; color: var(--muted); margin-block-end: 12px; }
+.parts { display: grid; gap: 8px; }
+.part { display: grid; grid-template-columns: 7.5rem minmax(0, 1fr) 7rem; gap: 12px; align-items: center; font-size: 14px; }
+.part .label { font-family: var(--mono); }
+.part .lag { text-align: end; font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.part.hot .lag { color: var(--crit); font-weight: 700; }
+.part .na { color: var(--muted); font-style: italic; text-align: end; }
+.meter { height: 8px; position: relative; overflow: hidden; border-radius: 4px; }
+.meter i { position: absolute; inset: 0; border-radius: 4px; background: var(--line-strong); transform-origin: 0 50%; transform: scaleX(var(--v, 0)); transition: transform 600ms var(--ease-out); }
+.part.hot .meter i { background: var(--crit); }
+@media (max-width: 560px) { .part { grid-template-columns: 5.5rem minmax(0, 1fr) 5.5rem; gap: 8px; font-size: 13px; } }
+
+/* ── the transaction scene: a partition's log, the last stable offset, the consumer ── */
+.logview { padding: 18px 16px 8px; display: grid; gap: 18px; }
+.track { display: grid; gap: 6px; }
+.track .head { display: flex; justify-content: space-between; gap: 12px; font-size: 14px; }
+.track .head span:last-child { color: var(--muted); font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.lane { position: relative; height: 30px; border-radius: 6px; background: var(--held); overflow: hidden; border: 1px solid var(--line); }
+.lane .read { position: absolute; inset: 0; background: var(--accent); opacity: .85; transform-origin: 0 50%; transform: scaleX(var(--r, .42)); }
+.lane .lso { position: absolute; inset-block: -4px; inset-inline-start: 0; width: 2px; background: var(--ink); transform: translateX(var(--x, 0px)); }
+.legend { display: flex; flex-wrap: wrap; gap: 8px 18px; font-size: 13px; color: var(--muted); padding: 0 16px 14px; }
+.legend i { display: inline-block; width: 14px; height: 10px; border-radius: 3px; vertical-align: -1px; margin-inline-end: 6px; }
+.legend .l-read { background: var(--accent); }
+.legend .l-held { background: var(--held); border: 1px solid var(--line-strong); }
+.legend .l-lso { width: 2px; background: var(--ink); }
+.txn { border-block-start: 1px solid var(--line); padding: 16px; display: grid; gap: 12px; }
+.txn dl { display: grid; grid-template-columns: max-content 1fr; gap: 4px 16px; margin: 0; font-size: 14.5px; }
+.txn dt { color: var(--muted); }
+.txn dd { margin: 0; }
+.preview { border: 1px solid var(--line); border-radius: 10px; padding: 14px; background: var(--bg); display: grid; gap: 10px; font-size: 14.5px; }
+.preview[hidden] { display: none; }
+.preview ul { margin: 0; padding-inline-start: 1.1em; color: var(--muted); }
+.preview .refused { color: var(--crit); font-weight: 650; }
+.actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.hint { font-size: 13.5px; color: var(--muted); margin: 0; min-height: 1.4em; }
+.out { font: 13.5px/1.55 var(--mono); padding: 10px 12px; border-radius: 8px; background: var(--raised); color: var(--ink); white-space: pre-wrap; overflow-wrap: anywhere; }
+.out .ok { color: var(--ok); }
+.out .warn { color: var(--warn); }
+.out .dim { color: var(--muted); }
+
+/* hold to confirm: the fill is a second copy of the label, revealed by a clip from the start edge.
+   The hold length is part of the control, not decoration, so reduced motion keeps it. */
+.hold { position: relative; overflow: hidden; border-color: var(--crit); color: var(--crit); background: transparent; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; touch-action: manipulation; }
+.hold.tone-default { border-color: var(--accent); color: var(--ink); }
+.hold .fill { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: var(--crit); color: #fff; clip-path: inset(0 100% 0 0); transition: clip-path 200ms var(--ease-out); pointer-events: none; }
+.hold.tone-default .fill { background: var(--accent); color: var(--accent-ink); }
+.hold.holding .fill { clip-path: inset(0); transition: clip-path var(--hold) linear; }
+.hold.done .fill { clip-path: inset(0); transition: none; }
+.hold.done:disabled { opacity: 1; cursor: default; }
+:root[data-theme="dark"] .hold .fill { color: #2a0b08; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .hold .fill { color: #2a0b08; } }
+
+/* ── the reset: steps that light up in order ── */
+.steps { display: grid; gap: 0; counter-reset: s; }
+.step { padding: 16px; border-block-start: 1px solid var(--line); display: grid; gap: 10px; }
+.step:first-child { border-block-start: 0; }
+.step h3 { display: flex; gap: 10px; align-items: baseline; }
+.step h3::before { counter-increment: s; content: counter(s); font: 700 13px/1 var(--mono); color: var(--muted); border: 1px solid var(--line-strong); border-radius: 999px; width: 24px; height: 24px; display: inline-grid; place-items: center; flex: none; transform: translateY(-2px); }
+.step[data-state="done"] h3::before { content: "\2713"; color: var(--ok); border-color: var(--ok); }
+.step[data-state="wait"] h3 { color: var(--muted); font-weight: 600; }
+.person { font: 600 12px/1 var(--sans); padding: 4px 8px; border-radius: 999px; background: var(--raised); color: var(--muted); }
+
+/* ── Artemis: the pair and its queues ── */
+.pair { padding: 16px; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; border-block-end: 1px solid var(--line); }
+.node { border: 1px solid var(--line-strong); border-radius: 10px; padding: 12px 14px; display: grid; gap: 2px; font-size: 14px; }
+.node b { font-family: var(--mono); font-size: 14px; }
+.node span { color: var(--muted); }
+.node.live { border-color: var(--accent); }
+.flow { display: block; width: 100%; min-width: 560px; height: auto; }
+.flow .edge { fill: none; stroke: var(--line-strong); stroke-width: 1.5; }
+.flow .box { fill: var(--surface); stroke: var(--line-strong); }
+.flow .box.bad { stroke: var(--crit); fill: var(--crit-soft); }
+.flow text { fill: var(--ink); font: 600 12px var(--mono); }
+.flow .sub { fill: var(--muted); font: 400 11px var(--sans); }
+.flow .sub.bad { fill: var(--crit); font-weight: 700; }
+.flow .dot { fill: var(--accent); }
+.flow .dot.dlq { fill: var(--crit); }
+.contrast { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-block-start: 18px; }
+@media (max-width: 640px) { .contrast, .pair { grid-template-columns: 1fr; } }
+.contrast > div { border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; background: var(--surface); display: grid; gap: 8px; align-content: start; }
+.contrast .reason { font-size: 14px; color: var(--muted); }
+
+/* ── the assistant ── */
+.chat { padding: 16px; display: grid; gap: 10px; font-size: 15px; }
+.msg { max-width: 92%; padding: 10px 14px; border-radius: 12px; background: var(--raised); }
+.msg.you { justify-self: end; background: var(--accent-soft); }
+.call { font: 13px/1.5 var(--mono); padding: 8px 12px; border-radius: 8px; border: 1px dashed var(--line-strong); color: var(--muted); overflow-wrap: anywhere; }
+.call b { color: var(--ink); font-weight: 600; }
+.call.held { border-style: solid; border-color: var(--warn); color: var(--warn); background: var(--warn-soft); }
+@media (prefers-reduced-motion: no-preference) {
+  .chat.armed > * { opacity: 0; transform: translateY(8px); }
+  .chat.play > * { opacity: 1; transform: none; transition: opacity 320ms var(--ease-out), transform 320ms var(--ease-out); transition-delay: calc(var(--i) * 420ms); }
 }
-.pager .icon { grid-row: span 3; width: 40px; height: 40px; border-radius: 10px; background: var(--red); display: grid; place-items: center; color: #2a0506; font: 800 20px/1 var(--display); }
-.pager .who { font: 600 12px/1.2 var(--mono); color: #ffb3b3; display: flex; justify-content: space-between; }
-.pager .what { font-weight: 600; }
-.pager .why { color: #d9a9a9; font-size: 14px; }
-@keyframes buzz {
-  0% { opacity: 0; transform: translateY(-30px) scale(.95); }
-  60% { opacity: 1; transform: translateY(0) rotate(-1.2deg); }
-  70% { transform: rotate(1.2deg); } 80% { transform: rotate(-.8deg); } 100% { opacity: 1; transform: none; }
-}
-.open h1 { font-size: clamp(2.4rem, 5.6vw, 5rem); max-width: 18ch; }
-.open .lede { margin: 0 auto; }
-.cue { font: 600 13px/1 var(--mono); color: var(--muted); text-decoration: none; letter-spacing: .1em; text-transform: uppercase; display: inline-flex; flex-direction: column; align-items: center; gap: 12px; }
-.cue::after { content: ""; width: 1px; height: 46px; background: linear-gradient(var(--red), transparent); animation: drip 1.8s infinite; }
-@keyframes drip { 0% { transform: scaleY(0); transform-origin: top; } 50% { transform: scaleY(1); transform-origin: top; } 51% { transform-origin: bottom; } 100% { transform: scaleY(0); transform-origin: bottom; } }
 
-/* ── 2. the hunt ────────────────────────────────────────── */
-.hunt { padding: 120px 0; background: linear-gradient(var(--bg), #0d0f10 30%); }
-.hunt-grid { display: grid; grid-template-columns: minmax(260px, 340px) 1fr; gap: 48px; align-items: start; margin-top: 48px; }
-@media (max-width: 980px) { .hunt-grid { grid-template-columns: 1fr; } }
-.pains { list-style: none; padding: 0; margin: 0; display: grid; gap: 18px; }
-.pains li { display: grid; grid-template-columns: 28px 1fr; gap: 12px; color: var(--muted); font-size: 15px; }
-.pains b { color: var(--ink); display: block; font-size: 16px; }
-.pains .x { width: 26px; height: 26px; border-radius: 50%; border: 1px solid #5c2226; color: var(--red); display: grid; place-items: center; font: 600 13px/1 var(--mono); }
-.watch { margin-top: 32px; padding: 18px 20px; border-radius: 16px; background: var(--panel); border: 1px solid var(--line); display: grid; gap: 12px; }
-.watch .t { font: 600 2.4rem/1 var(--mono); letter-spacing: -.02em; }
-.watch .t.running { color: var(--amber); }
-.watch .meta { font: 400 13px/1.4 var(--mono); color: var(--muted); }
-.watch button { justify-self: start; }
-.fine { font-size: 12px; color: var(--dim); margin-top: 14px; }
+/* ── systems ── */
+.systems { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, .62fr); gap: 16px; margin-block-start: 32px; }
+@media (max-width: 1080px) { .systems { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 680px) { .systems { grid-template-columns: 1fr; } }
+.system { border: 1px solid var(--line); background: var(--surface); border-radius: 14px; padding: 22px; display: grid; gap: 10px; align-content: start; }
+.system .ver { font: 600 14px/1.4 var(--mono); color: var(--accent); }
+.system ul { margin: 0; padding-inline-start: 1.1em; color: var(--muted); font-size: 15.5px; }
+.system li { margin-block-end: .3em; }
+.system.next { background: transparent; border-style: dashed; }
+.system.next .ver { color: var(--muted); }
+.rules { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 28px 48px; margin-block-start: 40px; }
+@media (max-width: 760px) { .rules { grid-template-columns: 1fr; } }
+.rules p { color: var(--muted); margin: 6px 0 0; }
 
-/* the legacy console: deliberately cramped, grey, JMX-shaped */
-.legacy {
-  --l-bg: #e8e5de; --l-panel: #f5f3ee; --l-line: #bdb7aa; --l-ink: #2b2d30; --l-dim: #6b6a66;
-  position: relative; border-radius: 10px; overflow: hidden; background: var(--l-bg); color: var(--l-ink);
-  font: 12px/1.35 Verdana, Tahoma, "DejaVu Sans", sans-serif; box-shadow: 0 40px 100px -30px rgba(0, 0, 0, .8);
-  border: 1px solid #3a3a3a;
-}
-.chrome { background: #2d3136; padding: 8px 8px 0; }
-.dots { display: flex; gap: 6px; padding: 0 4px 8px; }
-.dots i { width: 10px; height: 10px; border-radius: 50%; background: #5a5f66; }
-.tabs { display: flex; gap: 2px; overflow-x: auto; scrollbar-width: none; }
-.tab {
-  flex: 1 0 96px; max-width: 150px; padding: 7px 10px; border: 0; border-radius: 7px 7px 0 0; background: #454a51; color: #c9ccd1;
-  font: 11px/1.2 Verdana, Tahoma, sans-serif; text-align: left; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-.tab[aria-selected="true"] { background: var(--l-bg); color: #111; }
-.tab .seen { color: #8fbc8f; }
-.urlbar { background: var(--l-bg); padding: 6px 10px; border-bottom: 1px solid var(--l-line); }
-.urlbar div { background: #fff; border: 1px solid var(--l-line); border-radius: 4px; padding: 3px 8px; font: 11px/1.3 var(--mono); color: #555; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.appbar { background: #4a5563; color: #e8ebef; padding: 6px 12px; display: flex; gap: 18px; font-size: 11px; }
-.appbar b { font-weight: 700; }
-.appbar span { opacity: .7; }
-.pane { display: grid; grid-template-columns: 250px 1fr; height: 440px; }
-@media (max-width: 640px) { .pane { grid-template-columns: 1fr; height: auto; } }
-.tree { background: var(--l-panel); border-right: 1px solid var(--l-line); overflow: auto; padding: 6px 0; }
-.tree ul { list-style: none; margin: 0; padding-left: 12px; }
-.tree > ul { padding-left: 4px; }
-.tree button {
-  all: unset; box-sizing: border-box; display: block; width: 100%; padding: 1px 6px; cursor: pointer; white-space: nowrap;
-  font: 12px/1.5 Verdana, Tahoma, sans-serif; color: var(--l-ink);
-}
-.tree button:hover { background: #e2dfd6; }
-.tree button:focus-visible { outline: 1px dotted #333; }
-.tree button[aria-current="true"] { background: #c7d5e8; }
-.tree .tw { display: inline-block; width: 12px; color: var(--l-dim); }
-.tree .ic { color: #9a8a5a; margin-right: 3px; }
-.tree .note { padding: 4px 8px; color: var(--l-dim); font-style: italic; white-space: normal; }
-.attrs { overflow: auto; padding: 10px 12px; }
-.attrs h4 { margin: 0 0 6px; font: 700 12px/1.3 Verdana, sans-serif; }
-.attrs p { margin: 0 0 8px; color: var(--l-dim); }
-.attrs table { border-collapse: collapse; width: 100%; font-size: 11px; }
-.attrs th, .attrs td { text-align: left; border: 1px solid #d3cec3; padding: 2px 6px; }
-.attrs th { background: #dedad0; font-weight: 700; }
-.attrs td:nth-child(2) { font-family: var(--mono); }
-.attrs tr.hl td { background: #fff3c4; font-weight: 700; }
-.found {
-  position: absolute; inset: auto 16px 16px; padding: 16px 18px; border-radius: 12px; background: rgba(12, 20, 23, .96); color: var(--ink);
-  font: 15px/1.5 var(--display); border: 1px solid var(--teal); box-shadow: 0 20px 60px rgba(0, 0, 0, .6); display: none;
-}
-.found.show { display: block; animation: rise .5s both cubic-bezier(.2, 1.2, .4, 1); }
-.found b { color: var(--amber); }
-.found a { font-weight: 600; }
-@keyframes rise { from { opacity: 0; transform: translateY(16px); } }
+/* ── real screens (filled from the screenshot sweep) ── */
+.shot img { display: block; width: 100%; height: auto; aspect-ratio: 16 / 10; object-fit: cover; object-position: top left; }
+.shot .s-dark { display: none; }
+:root[data-theme="dark"] .shot .s-light { display: none; }
+:root[data-theme="dark"] .shot .s-dark { display: block; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .shot .s-light { display: none; } :root:not([data-theme="light"]) .shot .s-dark { display: block; } }
 
-/* ── 3. the turn ────────────────────────────────────────── */
-.turn { height: 100vh; overflow: hidden; display: grid; place-items: center; background: radial-gradient(50% 50% at 50% 50%, #0c2a31 0%, var(--bg) 70%); }
-.chips { position: absolute; inset: 0; pointer-events: none; }
-.chip {
-  position: absolute; left: 50%; top: 50%; width: 170px; height: 36px; margin: -18px 0 0 -85px; border-radius: 8px 8px 2px 2px;
-  background: #454a51; color: #c9ccd1; font: 12px/36px Verdana, sans-serif; padding: 0 12px; visibility: hidden;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, .5);
-}
-.turn-copy { position: relative; text-align: center; display: grid; gap: 22px; justify-items: center; }
-.turn-copy .pre { font: 400 clamp(1.6rem, 3vw, 2.4rem)/1.1 var(--serif); font-style: italic; color: var(--muted); }
-.turn-copy h2 { font-size: clamp(2.6rem, 6.4vw, 6rem); max-width: 16ch; }
-.turn-copy h2 em { font-style: normal; color: var(--teal-hi); }
-.one-window { width: 84px; height: 60px; border-radius: 10px; border: 2px solid var(--teal); display: grid; place-items: center; box-shadow: 0 0 80px rgba(21, 170, 191, .45); }
-.one-window img { width: 38px; }
-
-/* ── 4. after ───────────────────────────────────────────── */
-.after { padding: 120px 0 80px; }
-.rahdar {
-  margin-top: 44px; border-radius: 16px; overflow: hidden; border: 1px solid var(--line); background: var(--bg-2);
-  box-shadow: 0 60px 140px -40px rgba(21, 170, 191, .35), 0 0 0 1px rgba(59, 201, 219, .06);
-}
-.rahdar-bar { display: flex; align-items: center; gap: 18px; padding: 10px 16px; border-bottom: 1px solid var(--line); background: #0a1417; font-size: 13px; }
-.rahdar-bar .brand { font-size: 14px; }
-.rahdar-bar .brand img { width: 20px; height: 20px; }
-.rahdar-bar nav { display: flex; gap: 4px; }
-.rahdar-bar nav span { padding: 4px 10px; border-radius: 6px; color: var(--muted); }
-.rahdar-bar nav span.on { background: var(--panel-2); color: var(--ink); }
-.rahdar-bar .live { margin-left: auto; font: 600 11px/1 var(--mono); color: var(--green); display: flex; align-items: center; gap: 6px; }
-.rahdar-bar .live::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--green); animation: blink 1.6s infinite; }
-@keyframes blink { 50% { opacity: .3; } }
-.rahdar-body { display: grid; grid-template-columns: 1.05fr 1fr; }
-@media (max-width: 980px) { .rahdar-body { grid-template-columns: 1fr; } }
-.topo { padding: 18px; border-right: 1px solid var(--line); }
-.topo svg { width: 100%; height: auto; display: block; }
-.topo .cl { fill: rgba(21, 170, 191, .04); stroke: var(--line); }
-.topo .cl-label { fill: var(--muted); font: 600 11px var(--mono); letter-spacing: .08em; }
-.topo .link { stroke: var(--teal); stroke-width: 2; fill: none; }
-.topo .repl { stroke: #2c6e78; stroke-width: 1.6; stroke-dasharray: 4 5; fill: none; }
-.topo .node rect { fill: var(--panel-2); stroke: #2a4852; stroke-width: 1.2; }
-.topo .node.live rect { stroke: var(--teal); }
-.topo .node text { fill: var(--ink); font: 600 12px var(--mono); }
-.topo .node .role { fill: var(--muted); font: 400 10px var(--mono); letter-spacing: .06em; }
-.topo .node.live .role { fill: var(--teal-hi); }
-.topo .node.hot rect { stroke: var(--red); fill: #2a1316; }
-.topo .node.hot .role { fill: var(--red); }
-.topo .ring { fill: none; stroke: var(--red); stroke-width: 2; transform-box: fill-box; transform-origin: center; animation: ring 1.8s infinite; }
-@keyframes ring { from { opacity: .9; transform: scale(1); } to { opacity: 0; transform: scale(1.35); } }
-.topo .dot { fill: var(--teal-hi); }
-.topo .dot.r { fill: #5aa6b1; }
-.topo-legend { display: flex; gap: 16px; font: 11px var(--mono); color: var(--muted); margin-top: 8px; flex-wrap: wrap; }
-.grid { padding: 18px; overflow-x: auto; }
-.grid-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; font-size: 13px; color: var(--muted); }
-.grid-head b { color: var(--ink); }
-.grid table { width: 100%; border-collapse: collapse; font: 12.5px/1.3 var(--mono); }
-.grid th { text-align: left; color: var(--dim); font-weight: 400; padding: 6px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
-.grid th.sort { color: var(--teal-hi); }
-.grid td { padding: 9px 8px; border-bottom: 1px solid #13232a; white-space: nowrap; }
-.grid tr.worst td { background: rgba(255, 107, 107, .08); }
-.grid tr.worst td:first-child { box-shadow: inset 3px 0 var(--red); }
-.bar { display: flex; align-items: center; gap: 8px; }
-.bar i { display: block; height: 6px; border-radius: 3px; background: var(--teal); min-width: 2px; }
-.worst .bar i { background: var(--red); }
-.chip-s { font-size: 10.5px; padding: 2px 7px; border-radius: 999px; border: 1px solid; }
-.chip-s.bad { color: var(--red); border-color: #6b2a2d; }
-.chip-s.ok { color: var(--green); border-color: #24502c; }
-.verdict { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: 28px; }
-@media (max-width: 760px) { .verdict { grid-template-columns: 1fr; } }
-.verdict > div { padding: 22px 24px; border-radius: 16px; border: 1px solid var(--line); background: var(--panel); }
-.verdict .you { border-color: #3d3413; }
-.verdict .num { font: 600 2.2rem/1.1 var(--mono); letter-spacing: -.03em; margin: 6px 0; }
-.verdict .you .num { color: var(--amber); }
-.verdict .us .num { color: var(--teal-hi); }
-.verdict p { margin: 0; color: var(--muted); font-size: 15px; }
-.facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 40px; margin-top: 56px; }
-@media (max-width: 760px) { .facts { grid-template-columns: 1fr; } }
-.facts p { color: var(--muted); margin: 10px 0 0; }
-
-/* ── 5. chapters ────────────────────────────────────────── */
-.chapter { padding: 110px 0; border-top: 1px solid #0f1c21; }
-.chapter .wrap { display: grid; grid-template-columns: minmax(280px, 420px) 1fr; gap: 64px; align-items: center; }
-.chapter.flip .wrap { grid-template-columns: 1fr minmax(280px, 420px); }
-.chapter.flip .copy { order: 2; }
-@media (max-width: 980px) { .chapter .wrap, .chapter.flip .wrap { grid-template-columns: 1fr; } .chapter.flip .copy { order: 0; } }
-.copy .num { font: 600 13px/1 var(--mono); color: var(--dim); }
-.copy h2 { margin: 14px 0 18px; font-size: clamp(2rem, 3.8vw, 3.2rem); }
-.copy p { color: var(--muted); margin: 0 0 14px; }
-.copy ul { color: var(--muted); padding-left: 1.1em; margin: 0 0 14px; }
-.copy li { margin-bottom: 6px; }
-.copy li::marker { color: var(--teal); }
-.copy .more { font-weight: 600; text-decoration: none; }
-.copy .more::after { content: " →"; }
-.frame { border-radius: 14px; overflow: hidden; border: 1px solid var(--line); background: var(--bg-2); box-shadow: 0 50px 120px -40px rgba(0, 0, 0, .9); }
-.frame .fbar { display: flex; gap: 6px; padding: 10px 12px; border-bottom: 1px solid var(--line); align-items: center; font: 11px var(--mono); color: var(--dim); }
-.frame .fbar i { width: 9px; height: 9px; border-radius: 50%; background: #1f343b; }
-.frame .fbar span { margin-left: 8px; }
-.frame video, .frame img { display: block; width: 100%; height: auto; }
-.stack { display: grid; gap: 16px; }
-
-/* mock panels */
-.mock { padding: 20px; font: 13px/1.5 var(--mono); }
-.mock .row { display: flex; justify-content: space-between; gap: 12px; padding: 7px 0; border-bottom: 1px dashed #17292f; }
-.mock .row span:first-child { color: var(--dim); }
-.mock .actions { display: flex; gap: 10px; margin-top: 16px; flex-wrap: wrap; }
-.mock button.fake { font: 600 12px var(--mono); padding: 8px 14px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel-2); color: var(--ink); cursor: default; }
-.mock button.fake.press { border-color: var(--teal); box-shadow: 0 0 0 3px rgba(21, 170, 191, .25); }
-.mock button.danger { font: 600 12px var(--mono); padding: 8px 14px; border-radius: 8px; border: 1px solid #6b2a2d; background: #2a1316; color: #7d5557; cursor: not-allowed; }
-.mock button.hold { position: relative; overflow: hidden; color: #ff8787; border-color: #c92a2a; background: transparent; cursor: pointer; user-select: none; touch-action: manipulation; transition: transform 120ms cubic-bezier(.2, 0, 0, 1); }
-.mock button.hold:active { transform: scale(.97); }
-.mock button.hold .fill { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: #c92a2a; color: #fff; clip-path: inset(0 100% 0 0); transition: clip-path 180ms cubic-bezier(.2, 0, 0, 1); pointer-events: none; }
-.mock button.hold.holding .fill, .mock button.hold.done .fill { clip-path: inset(0); }
-.mock button.hold.holding .fill { transition: clip-path 1500ms linear; }
-.mock button.hold:disabled { cursor: default; }
-.mock .hint { margin: 8px 0 0; color: var(--dim); font-size: 12px; }
-.out { margin-top: 14px; padding: 12px 14px; border-radius: 10px; background: #081115; border: 1px solid var(--line); min-height: 3.2em; white-space: pre-wrap; }
-.out .ok { color: var(--green); }
-.out .warn { color: var(--amber); }
-.out .dim { color: var(--dim); }
-.mock .title { font: 700 15px/1.2 var(--display); color: var(--ink); margin-bottom: 8px; }
-.caret::after { content: "▍"; color: var(--teal-hi); animation: blink 1s steps(1) infinite; }
-
-.sql-ed { padding: 18px 20px; font: 14px/1.7 var(--mono); background: #081115; border-bottom: 1px solid var(--line); min-height: 7.2em; white-space: pre-wrap; }
-.sql-ed .k { color: #c297ff; } .sql-ed .s { color: #ffd479; } .sql-ed .q { color: var(--teal-hi); } .sql-ed .n { color: #ff9e7a; }
-.plan { display: flex; flex-wrap: wrap; gap: 8px; padding: 12px 20px; border-bottom: 1px solid var(--line); font: 11.5px var(--mono); }
-.plan span { padding: 3px 9px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); }
-.plan .t { color: var(--teal-hi); border-color: #1f5560; }
-.plan .sc { color: var(--amber); border-color: #5b4a12; }
-.res { padding: 6px 12px 14px; overflow-x: auto; }
-.res table { width: 100%; border-collapse: collapse; font: 12px/1.3 var(--mono); }
-.res th { text-align: left; color: var(--dim); font-weight: 400; padding: 8px; border-bottom: 1px solid var(--line); }
-.res td { padding: 8px; border-bottom: 1px solid #13232a; white-space: nowrap; }
-.res td.body { color: var(--muted); white-space: normal; }
-.res mark { background: rgba(250, 176, 5, .2); color: var(--amber); border-radius: 3px; padding: 0 2px; }
-
-.diff { padding: 18px 20px; font: 13px/1.7 var(--mono); }
-.diff .h { color: var(--muted); }
-.diff .z { font: 700 clamp(1.4rem, 3vw, 2.2rem)/1.2 var(--mono); color: var(--green); margin: 10px 0 6px; }
-.diff pre { margin: 12px 0 0; padding: 14px; border-radius: 10px; background: #081115; border: 1px solid var(--line); color: var(--muted); overflow-x: auto; font: 12.5px/1.6 var(--mono); }
-.diff pre b { color: var(--teal-hi); font-weight: 400; }
-
-/* ── 6. proof + extras ──────────────────────────────────── */
-.real { padding: 120px 0; text-align: center; background: linear-gradient(var(--bg), #08171b 50%, var(--bg)); }
-.real .frame { margin-top: 44px; text-align: left; }
-.real .lede { margin: 18px auto 0; }
-.extras { padding: 60px 0 120px; }
-.cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-top: 36px; }
-@media (max-width: 980px) { .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 640px) { .cards { grid-template-columns: 1fr; } }
-.card { display: block; padding: 22px; border-radius: 16px; background: var(--panel); border: 1px solid var(--line); text-decoration: none; color: var(--ink); transition: border-color .2s, transform .2s; }
-.card:hover { border-color: var(--teal); transform: translateY(-2px); }
-.card h3 { font-size: 1.15rem; margin-bottom: 8px; }
-.card p { color: var(--muted); margin: 0; font-size: 15px; }
-
-/* ── 7. close ───────────────────────────────────────────── */
-.close { padding: 140px 0 100px; text-align: center; background: radial-gradient(50% 60% at 50% 100%, #0c3a44 0%, var(--bg) 70%); }
-.close h2 { font-size: clamp(2.6rem, 6vw, 5.4rem); max-width: 16ch; margin: 0 auto; }
-.install { margin: 44px auto 0; max-width: 720px; text-align: left; border-radius: 14px; border: 1px solid var(--line); background: #081115; }
-.install .fbar { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; border-bottom: 1px solid var(--line); font: 12px var(--mono); color: var(--dim); }
-.install button { font: 600 12px var(--mono); background: var(--panel-2); color: var(--ink); border: 1px solid var(--line); border-radius: 6px; padding: 5px 10px; cursor: pointer; }
-.install pre { margin: 0; padding: 18px; font: 14px/1.8 var(--mono); overflow-x: auto; }
-.install pre .c { color: var(--dim); }
-.install pre .p { color: var(--teal); user-select: none; }
-.install p { margin: 0; padding: 0 18px 16px; color: var(--muted); font-size: 14px; }
-.ctas { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-top: 32px; }
-.alpha { max-width: 720px; margin: 36px auto 0; padding: 14px 18px; border-radius: 12px; border: 1px solid #5b4a12; background: rgba(250, 176, 5, .06); color: #e6d39a; font-size: 14px; text-align: left; }
-.alpha b { color: var(--amber); }
-footer { padding: 40px 0 60px; border-top: 1px solid #0f1c21; color: var(--dim); font-size: 13px; }
+/* ── close ── */
+.close { padding: clamp(64px, 9vw, 120px) 0; border-block-start: 1px solid var(--line); }
+.close h2 { max-width: 18ch; }
+.install { margin-block-start: 28px; max-width: 760px; border-radius: 14px; border: 1px solid var(--line); background: var(--surface); box-shadow: var(--shadow); }
+.install .bar button { margin-inline-start: auto; }
+.install pre { margin: 0; padding: 16px 18px; font: 14px/1.8 var(--mono); overflow-x: auto; }
+.install pre .p { color: var(--muted); user-select: none; }
+.install pre .c { color: var(--muted); }
+.install p { padding: 0 18px 16px; margin: 0; color: var(--muted); font-size: 15px; }
+.alpha { margin-block-start: 28px; max-width: 760px; padding: 14px 16px; border-radius: 12px; border: 1px solid var(--warn); background: var(--warn-soft); font-size: 15px; }
+.alpha b { color: var(--warn); }
+footer { padding: 36px 0 56px; border-block-start: 1px solid var(--line); color: var(--muted); font-size: 14px; }
 footer .wrap { display: grid; gap: 10px; }
+footer nav { display: flex; flex-wrap: wrap; gap: 6px 18px; }
 
+/* ── entrance: entries settle in as they scroll into view (scroll-driven, no script) ── */
+@media (prefers-reduced-motion: no-preference) {
+  @supports (animation-timeline: view()) {
+    .reveal { animation: settle linear both; animation-timeline: view(); animation-range: entry 0% entry 40%; }
+    @keyframes settle { from { opacity: 0; transform: translateY(16px); } }
+  }
+}
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
-  *, *::before, *::after { animation: none !important; transition: none !important; }
-  .progress { display: none; }
+  .meter i, .lane .read, .lane .lso { transition: none !important; }
 }
 </style>
 </head>
 <body>
-<div class="progress" aria-hidden="true"></div>
-
+<a class="sr" href="#main">Skip to the story</a>
 <header class="top">
   <div class="wrap">
-    <a class="brand" href="https://rahdar.dev/"><img src="https://rahdar.dev/favicon.svg" alt=""> Rahdar</a>
+    <a class="brand" href="https://rahdar.dev/"><img src="/favicon.svg" alt="" width="24" height="24">Rahdar</a>
     <nav aria-label="Site">
-      <a href="https://rahdar.dev/guide/">Docs</a>
-      <a href="https://rahdar.dev/guide/sql-console">SQL Console</a>
-      <a href="https://rahdar.dev/guide/mcp">MCP</a>
+      <a class="hide-sm" href="https://rahdar.dev/guide/">Docs</a>
+      <a class="hide-sm" href="https://rahdar.dev/guide/kafka">Kafka</a>
+      <a class="hide-sm" href="https://rahdar.dev/guide/mcp">MCP</a>
       <a href="https://github.com/sudoitir/rahdar">GitHub</a>
+      <button class="theme" type="button" id="theme" aria-label="Switch to dark theme">
+        <svg class="moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5Z"/></svg>
+        <svg class="sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+      </button>
       <a class="btn primary" href="https://rahdar.dev/guide/quickstart">Quickstart</a>
     </nav>
   </div>
 </header>
 
-<main>
-<!-- ── 1. cold open ─────────────────────────────────────── -->
-<section class="open" aria-labelledby="open-h">
+<main id="main">
+<!-- ── hero ── -->
+<section class="hero" aria-labelledby="hero-h">
   <div class="wrap">
-    <div class="clock reveal" aria-label="3:07 a.m."><span id="clock">03:07</span><small id="secs">:00</small></div>
-    <div class="pager" role="img" aria-label="Alert: ORDERS.DLQ depth rising in production">
-      <div class="icon">!</div>
-      <div class="who"><span>ALERT · prod</span><span>now</span></div>
-      <div class="what">ORDERS.DLQ depth rising</div>
-      <div class="why">Somewhere across 8 brokers in 2 clusters. No broker named.</div>
+    <div>
+      <h1 id="hero-h">Two brokers are paging you. <em>Open one console.</em></h1>
+      <p class="lede">Rahdar is an open-source operations console for Apache ActiveMQ&reg; Artemis and Apache Kafka&reg;. Every cluster you run sits in one estate, every number says how sure it is, and nothing destructive runs before you have seen what it will do.</p>
+      <div class="ctas">
+        <a class="btn primary" href="#estate">Walk through the night</a>
+        <a class="btn" href="https://rahdar.dev/guide/quickstart">Install it</a>
+      </div>
+      <p class="fine">An interactive incident, about two minutes, in your browser. The clusters, names and numbers in it are made up.</p>
     </div>
-    <h1 id="open-h" class="reveal">It's 3 a.m. A queue is backing up <span class="serif">somewhere</span> in your cluster.</h1>
-    <p class="lede reveal">Eight brokers, two clusters, four live/backup pairs. Which one is it? Let's find out the way most Artemis operators still do.</p>
-    <a class="cue reveal" href="#hunt">Find it</a>
+    <div class="pagers" aria-label="Two alerts">
+      <div class="clock" aria-hidden="true"><span id="clock">02:51</span><small id="secs">:00</small></div>
+      <div class="pager">
+        <span class="sys">KAFKA</span>
+        <div class="who"><span>events</span><span>02:51</span></div>
+        <div class="what">ledger-writer is falling behind on payments</div>
+        <div class="why">Settlements are not reaching the ledger.</div>
+      </div>
+      <div class="pager">
+        <span class="sys">ARTEMIS</span>
+        <div class="who"><span>orders-ha</span><span>02:52</span></div>
+        <div class="what">ORDERS.DLQ depth rising</div>
+        <div class="why">No broker named. No consumer either.</div>
+      </div>
+    </div>
   </div>
 </section>
 
-<!-- ── 2. the hunt ──────────────────────────────────────── -->
-<section class="hunt" id="hunt" aria-labelledby="hunt-h">
+<div class="log">
+<!-- ── 02:53 the estate ── -->
+<section class="entry" id="estate" aria-labelledby="estate-h">
   <div class="wrap">
-    <p class="kicker">Before</p>
-    <h2 id="hunt-h" style="margin-top:14px">Go on. <span class="serif">Find it.</span></h2>
-    <p class="lede">Artemis ships with a web console that manages <b>one broker at a time</b> and has no idea a cluster exists. So a cluster becomes a row of tabs. Open them. Expand the trees. Read the numbers.</p>
+    <p class="stamp"><b>02:53</b>The estate</p>
+    <div class="body">
+      <div class="split stack">
+        <div class="copy reveal">
+          <h2 id="estate-h">Both systems, one list, worst first.</h2>
+          <p>Without Rahdar this is a management console tab per Artemis broker and <code>kafka-consumer-groups.sh</code> in a terminal. With it, every cluster is in one estate, health is judged on one scale, and every backlog is in one table: Artemis queues and Kafka consumer groups side by side, each under its own name.</p>
+          <p><b>Kafka lag is an estimate, and says so.</b> It is the gap between where a group committed and where each partition ends, sampled a moment ago. A partition the group never committed to has no lag to add, so it is left out and the total tells you. Select a row to see what it is made of.</p>
+          <a class="more" href="https://rahdar.dev/guide/kafka#consumer-groups">How Rahdar reads lag</a>
+        </div>
+        <figure class="scene reveal">
+          <div class="panel">
+            <div class="bar"><b>Estate</b><span>2 clusters, 2 systems</span></div>
+            <div class="clusters">
+              <div class="cluster"><div class="name">orders-ha <span class="tag ok">Healthy</span></div><div class="meta">Apache Artemis, primary and backup in sync</div></div>
+              <div class="cluster"><div class="name">events <span class="tag ok">Healthy</span></div><div class="meta">Apache Kafka, 3 brokers, KRaft quorum of 3</div></div>
+            </div>
+            <div class="scroll" tabindex="0" role="region" aria-label="Subscriptions across the estate">
+              <table>
+                <caption class="sr">Subscriptions across both clusters, sorted by backlog</caption>
+                <thead><tr><th>Subscription</th><th>Kind</th><th>Cluster</th><th class="n">Backlog &#9662;</th><th class="n">Readers</th></tr></thead>
+                <tbody id="subs"></tbody>
+              </table>
+            </div>
+            <div class="breakdown" id="breakdown" aria-live="polite"></div>
+          </div>
+          <figcaption>An illustration of Rahdar's estate and its backlog breakdown, drawn in the page. Real screens are linked from the guides.</figcaption>
+        </figure>
+      </div>
+    </div>
+  </div>
+</section>
 
-    <div class="hunt-grid">
-      <aside>
-        <ul class="pains">
-          <li><span class="x">1</span><span><b>One broker per tab</b>The cluster exists only in your head.</span></li>
-          <li><span class="x">2</span><span><b>No topology</b>Which node is live and which is its backup, you infer.</span></li>
-          <li><span class="x">3</span><span><b>No search across nodes</b>Every queue, on every tab, one at a time.</span></li>
-          <li><span class="x">4</span><span><b>A tree, not an answer</b>Attributes in alphabetical order, not the worst thing first.</span></li>
+<!-- ── 02:56 the transaction ── -->
+<section class="entry" id="txn" aria-labelledby="txn-h">
+  <div class="wrap">
+    <p class="stamp"><b>02:56</b>The cause</p>
+    <div class="body">
+      <div class="split flip">
+        <div class="copy reveal">
+          <h2 id="txn-h">Two partitions are stuck behind a transaction nobody will finish.</h2>
+          <p><b>ledger-writer</b> reads only committed records. A settlement job died half-way through a transaction on <code>payments-2</code> and <code>payments-5</code>, so the consumer cannot read past the transaction's first record, the <b>last stable offset</b>, while new records keep arriving behind it.</p>
+          <p><b>Activity &rarr; Transactions</b> flags a hanging transaction at the top: past its timeout, or its producer gone. <b>Abort&hellip;</b> first previews what the abort does and which partitions it unblocks. Then you press and hold, and it is audited.</p>
+          <p class="fine">Rahdar refuses to abort a transaction that is still live.</p>
+          <a class="more" href="https://rahdar.dev/guide/kafka#transactions">Transactions in the Kafka guide</a>
+        </div>
+        <figure class="scene reveal">
+          <div class="panel">
+            <div class="bar"><b>Transactions</b><span>events</span><span class="tag crit">1 hanging</span></div>
+            <div class="logview" aria-hidden="true">
+              <div class="track" id="t2"><div class="head"><span>payments-2</span><span class="lagv">lag 20,914</span></div><div class="lane"><span class="read"></span><span class="lso"></span></div></div>
+              <div class="track" id="t5"><div class="head"><span>payments-5</span><span class="lagv">lag 20,906</span></div><div class="lane"><span class="read"></span><span class="lso"></span></div></div>
+            </div>
+            <div class="legend" aria-hidden="true"><span><i class="l-read"></i>read by ledger-writer</span><span><i class="l-held"></i>held back, behind the open transaction</span><span><i class="l-lso"></i>last stable offset</span></div>
+            <div class="txn">
+              <dl>
+                <dt>Transactional id</dt><dd><code>payments-settlement</code></dd>
+                <dt>State</dt><dd><span class="tag crit">Hanging</span> open <span class="num" id="txn-age">24 min</span>, timeout 60 s</dd>
+                <dt>Holds back</dt><dd>payments-2, payments-5</dd>
+              </dl>
+              <div class="actions"><button class="btn" type="button" id="abort-open" aria-expanded="false" aria-controls="abort-preview">Abort&hellip;</button></div>
+              <div class="preview" id="abort-preview" hidden>
+                <div><b>Preview:</b> aborting <code>payments-settlement</code></div>
+                <ul>
+                  <li>Unblocks payments-2 and payments-5 for consumers that read committed records.</li>
+                  <li>Its records are marked aborted and never delivered to them.</li>
+                  <li>The producer is fenced: if it comes back, it cannot continue this transaction.</li>
+                </ul>
+                <div class="actions"><button class="btn hold" type="button" id="abort-hold" aria-describedby="abort-hint"><span>Abort the transaction (2 partitions)</span><span class="fill" aria-hidden="true">Abort the transaction (2 partitions)</span></button></div>
+                <p class="hint" id="abort-hint">Press and hold to confirm.</p>
+              </div>
+              <div class="out" id="abort-out" aria-live="polite"><span class="dim">Nothing has run yet.</span></div>
+            </div>
+          </div>
+          <figcaption>An illustration of the Transactions screen. The bars show what the consumer has read and what it is held from.</figcaption>
+        </figure>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── 03:04 the reset ── -->
+<section class="entry" id="reset" aria-labelledby="reset-h">
+  <div class="wrap">
+    <p class="stamp"><b>03:04</b>The reset</p>
+    <div class="body">
+      <div class="split">
+        <div class="copy reveal">
+          <h2 id="reset-h">Skip what nobody needs. See it before it happens.</h2>
+          <p>The ledger is catching up. <b>risk-reports</b> is not a ledger: it scores payments as they happen, and replaying the stalled half hour would raise alerts about payments that settled long ago. The team decides it should start reading at 03:00.</p>
+          <p><b>Reset offsets&hellip;</b> previews every partition: where the group is, where it would move, how many records it would skip or read again. Kafka only lets an <b>empty</b> group move, so a group with members is refused, by name, before anything is armed.</p>
+          <p>Where an approval gate is on, the reset then waits for a second person, and re-checks the group when it runs. Every reset is audited with the offsets before and after, so it can be reset back.</p>
+          <a class="more" href="https://rahdar.dev/guide/kafka#reset-offsets">Reset offsets</a>
+        </div>
+        <figure class="scene reveal">
+          <div class="panel">
+            <div class="bar"><b>risk-reports</b><span>Group on topic payments</span></div>
+            <div class="steps" id="steps">
+              <div class="step" data-state="now" id="s1">
+                <h3>Preview a reset to 03:00</h3>
+                <div class="actions"><button class="btn" type="button" id="r-preview">Preview the reset</button></div>
+                <div class="preview" id="r-refused" hidden>
+                  <div class="refused">This group cannot be reset while it has members.</div>
+                  <ul><li>risk-reports-0 on 10.4.1.17</li><li>risk-reports-1 on 10.4.1.18</li><li>risk-reports-2 on 10.4.2.9</li></ul>
+                  <div class="actions"><button class="btn" type="button" disabled aria-describedby="r-why">Reset 6 partitions</button></div>
+                  <p class="hint" id="r-why">Disabled: only an empty group can be reset. Stop its consumers, then preview again.</p>
+                </div>
+              </div>
+              <div class="step" data-state="wait" id="s2">
+                <h3>Stop the consumers <span class="person">in your deployment, not in Rahdar</span></h3>
+                <div class="actions"><button class="btn" type="button" id="r-stop" disabled>Scale risk-reports to zero</button><button class="btn" type="button" id="r-again" disabled>Preview again</button></div>
+                <div class="preview" id="r-table" hidden>
+                  <div class="scroll" tabindex="0" role="region" aria-label="Reset preview per partition">
+                    <table>
+                      <thead><tr><th>Partition</th><th class="n">Now</th><th class="n">To (03:00)</th><th class="n">Skips</th></tr></thead>
+                      <tbody id="r-rows"></tbody>
+                    </table>
+                  </div>
+                  <div class="actions"><button class="btn hold tone-default" type="button" id="r-hold" aria-describedby="r-hint"><span id="r-label">Reset 6 partitions</span><span class="fill" aria-hidden="true">Reset 6 partitions</span></button></div>
+                  <p class="hint" id="r-hint">Press and hold to confirm.</p>
+                </div>
+              </div>
+              <div class="step" data-state="wait" id="s3">
+                <h3>A second person approves <span class="person">approval gate on</span></h3>
+                <div class="actions"><button class="btn" type="button" id="r-approve" disabled>Approve, as a teammate</button></div>
+                <div class="out" id="r-out" aria-live="polite"><span class="dim">Waiting for the reset to be confirmed.</span></div>
+              </div>
+            </div>
+          </div>
+          <figcaption>An illustration of a group's reset. The approval gate is optional: it is switched on by installing an approval provider, and you cannot approve your own request.</figcaption>
+        </figure>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── 03:09 the Artemis pager ── -->
+<section class="entry" id="artemis" aria-labelledby="artemis-h">
+  <div class="wrap">
+    <p class="stamp"><b>03:09</b>The other pager</p>
+    <div class="body">
+      <div class="split flip">
+        <div class="copy reveal">
+          <h2 id="artemis-h">Meanwhile, ORDERS.DLQ on the Artemis pair.</h2>
+          <p>Artemis's own console shows one broker at a time. Rahdar asks every node which one is serving, on every cycle, and never trusts the configuration for it: two live nodes in one pair is a split-brain alert, not a surprise.</p>
+          <p>Every queue on every node is in one table, sorted by depth. The dead-letter queue is the first row, with no consumer. Moving its messages back is previewed as a dry run that changes nothing, and purge is pressed and held.</p>
+          <a class="more" href="https://rahdar.dev/guide/message-transfer">Moving messages safely</a>
+        </div>
+        <figure class="scene reveal">
+          <div class="panel">
+            <div class="bar"><b>orders-ha</b><span>Apache Artemis</span></div>
+            <div class="pair">
+              <div class="node live"><b>artemis-a</b><span>Primary, live, serving</span></div>
+              <div class="node"><b>artemis-b</b><span>Backup, replicating, in sync</span></div>
+            </div>
+            <div class="scroll flowbox" tabindex="0" role="region" aria-label="Message flow on orders-ha"><svg class="flow" id="flow" viewBox="0 0 640 170" role="img" aria-label="Messages flow from checkout to the ORDERS queue and on to order-service. Failed deliveries go to ORDERS.DLQ, which has no consumer and keeps growing.">
+              <path class="edge" id="e1" d="M118 60 H232"/>
+              <path class="edge" id="e2" d="M362 60 H476"/>
+              <path class="edge" id="e3" d="M297 82 V118"/>
+              <rect class="box" x="8" y="38" width="110" height="44" rx="8"/><text x="22" y="58">checkout</text><text class="sub" x="22" y="73">producer</text>
+              <rect class="box" x="232" y="38" width="130" height="44" rx="8"/><text x="246" y="58">ORDERS</text><text class="sub" x="246" y="73">depth 37</text>
+              <rect class="box" x="476" y="38" width="150" height="44" rx="8"/><text x="490" y="58">order-service</text><text class="sub" x="490" y="73">4 consumers</text>
+              <rect class="box bad" x="222" y="118" width="150" height="44" rx="8"/><text x="236" y="138">ORDERS.DLQ</text><text class="sub bad" x="236" y="153" id="dlq-depth">18,406, no consumer</text>
+              <g id="dots"></g>
+            </svg></div>
+            <div class="txn">
+              <div class="actions"><button class="btn" type="button" id="move-preview">Preview: move ORDERS.DLQ to ORDERS</button></div>
+              <div class="out" id="move-out" aria-live="polite"><span class="dim">Nothing has run yet.</span></div>
+            </div>
+          </div>
+          <div class="contrast">
+            <div><span class="tag ok">Artemis queue</span><b>Move, retry, delete one message</b><span class="reason">Available. A message lives in one queue and can be taken out of it.</span></div>
+            <div><span class="tag">Kafka group on topic</span><b>Move, retry, delete one record</b><span class="reason">Shown, disabled, with the reason: a Kafka record is immutable and shared by every reader. Truncate a topic instead, which states its reach first.</span></div>
+          </div>
+          <figcaption>An illustration of the pair and its message flow. The same screens act on both systems, and say what one of them cannot do.</figcaption>
+        </figure>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── 03:14 the assistant ── -->
+<section class="entry" id="mcp" aria-labelledby="mcp-h">
+  <div class="wrap">
+    <p class="stamp"><b>03:14</b>The assistant</p>
+    <div class="body">
+      <div class="split">
+        <div class="copy reveal">
+          <h2 id="mcp-h">An assistant can propose the change. A person still approves it.</h2>
+          <p>Rahdar is an MCP server. An assistant reads your real clusters with an API key that never exceeds its owner's grants, and every call lands in the same audit trail as a person's.</p>
+          <ul>
+            <li>Eight <code>kafka_*</code> tools: groups and lag, the reset and its preview, topic configuration, ACLs, aborting a transaction.</li>
+            <li>A change runs only against the preview it was shown, is refused as stale if the group moved, and must name what it changes.</li>
+            <li>Where the approval gate is on, the change waits for a person, like yours did.</li>
+          </ul>
+          <a class="more" href="https://rahdar.dev/guide/mcp">The MCP server</a>
+        </div>
+        <figure class="scene reveal">
+          <div class="panel">
+            <div class="bar"><b>Assistant</b><span>MCP, your API key</span></div>
+            <div class="chat armed" id="chat">
+              <div class="msg you" style="--i:0">Move risk-reports to 03:00 on payments.</div>
+              <div class="call" style="--i:1"><b>kafka_describe_group</b> group=risk-reports &rarr; empty, 6 partitions</div>
+              <div class="call" style="--i:2"><b>kafka_preview_offset_reset</b> to 03:00 &rarr; skips 27,341 records, etag 7f3a</div>
+              <div class="call held" style="--i:3"><b>kafka_reset_offsets</b> confirm=risk-reports, etag 7f3a &rarr; held for approval</div>
+              <div class="msg" style="--i:4">The reset is previewed and waiting for an approver. It skips 27,341 records across 6 partitions; nothing has moved yet.</div>
+            </div>
+          </div>
+          <figcaption>An illustration of an assistant's tool calls. Mutating tools are hidden when the installation is read-only.</figcaption>
+        </figure>
+      </div>
+    </div>
+  </div>
+</section>
+</div>
+
+<!-- ── the systems ── -->
+<section class="entry" id="systems" aria-labelledby="systems-h">
+  <div class="wrap" style="display:block">
+    <h2 id="systems-h">What it runs on, today and next.</h2>
+    <p class="lede" style="margin-block-start:16px">Rahdar talks to brokers through <a href="https://github.com/sudoitir/openbroker">OpenBroker</a>, an open-source broker SDK with a driver per system. Each system keeps its own words and its own limits, and the shared screens say which is which.</p>
+    <div class="systems">
+      <div class="system reveal">
+        <h3>Apache ActiveMQ&reg; Artemis</h3>
+        <span class="ver">2.33.0 and later</span>
+        <ul>
+          <li>Topology with HA roles polled from every node</li>
+          <li>Every queue, address, consumer and connection across nodes</li>
+          <li>Flow, SQL over messages, message capture</li>
+          <li>Move, retry, expire, delete and purge, each with a dry run</li>
+          <li>Declared broker configuration and setup review</li>
         </ul>
-        <div class="watch" aria-live="polite">
-          <div class="t" id="watch">00:00.0</div>
-          <div class="meta" id="watch-meta">Starts on your first click · 0 of 8 tabs opened</div>
-          <button class="btn" id="giveup" type="button">Give up. Show me.</button>
-        </div>
-        <p class="fine">An illustration of a one-broker-per-tab console, not a screenshot of any product. The broker holding the backlog is picked at random on every visit.</p>
-      </aside>
-
-      <div class="legacy" id="legacy">
-        <div class="chrome">
-          <div class="dots"><i></i><i></i><i></i></div>
-          <div class="tabs" role="tablist" aria-label="Brokers" id="tabs"></div>
-        </div>
-        <div class="urlbar"><div id="url"></div></div>
-        <div class="appbar"><b>Management Console</b><span>JMX</span><span>Attributes</span><span>Operations</span><span>Charts</span></div>
-        <div class="pane">
-          <div class="tree" id="tree" role="tree" aria-label="JMX tree"></div>
-          <div class="attrs" id="attrs"></div>
-        </div>
-        <div class="found" id="found" role="status"></div>
+        <a class="more" href="https://rahdar.dev/guide/">The guide</a>
+      </div>
+      <div class="system reveal">
+        <h3>Apache Kafka&reg;</h3>
+        <span class="ver">3.0 and later, KRaft and ZooKeeper</span>
+        <ul>
+          <li>Consumer, share and classic groups with per-partition lag</li>
+          <li>Offset reset with a preview, and approval where the gate is on</li>
+          <li>Topic configuration checked by the broker before it applies</li>
+          <li>ACLs with effective access before and after</li>
+          <li>Hanging transactions, brokers and the controller quorum</li>
+          <li>Browse by partition, offset or time; truncate with its reach stated</li>
+        </ul>
+        <a class="more" href="https://rahdar.dev/guide/kafka">The Kafka guide</a>
+      </div>
+      <div class="system next reveal">
+        <h3>RabbitMQ</h3>
+        <span class="ver">Coming next. Not supported yet.</span>
+        <p class="fine" style="margin:0">Planned on the roadmap as another OpenBroker driver. Until it ships, Rahdar does not register RabbitMQ.</p>
       </div>
     </div>
+    <div class="rules">
+      <div><h3>Easy on the broker</h3><p>Reads are batched per node, polled in tiers and rate-limited. Rahdar must never be the reason a broker falls over.</p></div>
+      <div><h3>A preview before anything destructive</h3><p>Every destructive call can run as a dry run, and states its reach: the resource, the nodes or partitions, and how much goes.</p></div>
+      <div><h3>Audited before it runs</h3><p>Every change is recorded before the broker call and updated with its outcome, by people, API keys and assistants alike.</p></div>
+      <div><h3>Honest about what it cannot do</h3><p>An unavailable action stays visible with its reason. An estimate says it is one, and an unknown number is never shown as zero.</p></div>
+    </div>
+    <p style="margin-block-start:28px"><a class="more" href="https://rahdar.dev/guide/supported-versions">Supported broker versions</a></p>
   </div>
 </section>
 
-<!-- ── 3. the turn ──────────────────────────────────────── -->
-<section class="turn" id="turn" aria-labelledby="turn-h">
-  <div class="chips" id="chips" aria-hidden="true"></div>
-  <div class="turn-copy">
-    <p class="pre">Now close all eight tabs.</p>
-    <div class="one-window" aria-hidden="true"><img src="https://rahdar.dev/favicon.svg" alt=""></div>
-    <h2 id="turn-h">One console for <em>every</em> Artemis cluster you run.</h2>
-    <p class="lede" style="margin:0 auto">Rahdar is open source. It talks to every node you run and shows them together, as one estate.</p>
-  </div>
-</section>
-
-<!-- ── 4. after ─────────────────────────────────────────── -->
-<section class="after" id="after" aria-labelledby="after-h">
-  <div class="wrap">
-    <p class="kicker">After</p>
-    <h2 id="after-h" style="margin-top:14px">The same incident. <span class="serif">One screen.</span></h2>
-    <p class="lede">Both clusters on one canvas, with the HA roles Rahdar actually polled. Every queue on every node in one table, sorted by depth. The broker you were hunting for is the one that's glowing, and its queue is the first row.</p>
-
-    <div class="rahdar" id="rahdar">
-      <div class="rahdar-bar">
-        <span class="brand"><img src="https://rahdar.dev/favicon.svg" alt=""> Rahdar</span>
-        <nav aria-hidden="true"><span class="on">Topology</span><span>Queues</span><span>Flow</span><span>SQL</span></nav>
-        <span class="live">LIVE · SSE</span>
-      </div>
-      <div class="rahdar-body">
-        <div class="topo">
-          <svg id="topo" viewBox="0 0 640 330" role="img" aria-label="Topology of two clusters, prod-eu and prod-us, each with two live/backup pairs. One live broker is highlighted in red."></svg>
-          <div class="topo-legend"><span style="color:var(--teal-hi)">● live</span><span>○ backup</span><span>━ cluster connection</span><span>┅ replication</span></div>
-        </div>
-        <div class="grid">
-          <div class="grid-head"><span><b>Queues</b> · all nodes, both clusters</span><span id="grid-count"></span></div>
-          <table>
-            <thead><tr><th>Queue</th><th>Node</th><th class="sort">Messages ▾</th><th>Consumers</th><th></th></tr></thead>
-            <tbody id="grid"></tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-
-    <div class="verdict">
-      <div class="you"><span class="kicker" style="color:var(--amber)">You, one tab at a time</span><div class="num" id="you-num">? s</div><p id="you-text">Try the hunt above. The clock starts on your first click.</p></div>
-      <div class="us"><span class="kicker">Rahdar</span><div class="num">Row 1</div><p>No tabs, no tree, no guessing. It was the first row before you asked.</p></div>
-    </div>
-
-    <div class="facts">
-      <div><h3>The whole cluster, not one broker.</h3><p>Live/backup pairs, replication state and a shared-NodeID axis on one canvas. HA role is polled from every node, never read from config, so two live nodes in a pair shows up as a split-brain alert, not a surprise at 3 a.m.</p></div>
-      <div><h3>Every queue, every node, one table.</h3><p>Queues, addresses, consumers, sessions, connections and producers across the estate in a single virtualised grid, updating over SSE. Sort by depth and the worst thing in the cluster is the first row.</p></div>
-    </div>
-  </div>
-</section>
-
-<!-- ── 5. chapters ──────────────────────────────────────── -->
-<section class="chapter" aria-labelledby="c1-h">
-  <div class="wrap">
-    <div class="copy">
-      <span class="num">01 / Flow</span>
-      <h2 id="c1-h">Watch the messages <span class="serif">move.</span></h2>
-      <p>Mid-incident, "what's in this queue" isn't really the question. It's <i>who sends here, where does it go, and why is it piling up?</i> Flow draws the whole path for a cluster:</p>
-      <ul>
-        <li>Producers, then addresses, then queues, then consumers, with diverts, bridges and the hops between nodes.</li>
-        <li>Dots move along every edge, faster and denser as the path gets busier.</li>
-        <li>Colour only shows up when something is wrong, and the problem is spelled out: <i>no consumer</i>, <i>stalled</i>, <i>not connected</i>.</li>
-      </ul>
-      <a class="more" href="https://rahdar.dev/guide/flow">How Flow works</a>
-    </div>
-    <div class="frame">
-      <div class="fbar"><i></i><i></i><i></i><span>Flow · recorded in Rahdar</span></div>
-      <video data-src="https://rahdar.dev/img/flow.mp4" poster="https://rahdar.dev/img/flow.png" muted loop playsinline preload="none" aria-label="The Flow graph with moving dots on each path"></video>
-    </div>
-  </div>
-</section>
-
-<section class="chapter flip" aria-labelledby="c2-h">
-  <div class="wrap">
-    <div class="copy">
-      <span class="num">02 / Safe operations</span>
-      <h2 id="c2-h">Fix it <span class="serif">without flinching.</span></h2>
-      <p>At 3 a.m. the dangerous part isn't finding the queue. It's the button you press next.</p>
-      <ul>
-        <li>Every destructive call takes <code>?dryRun=true</code> and answers with the affected count, without doing anything.</li>
-        <li>Purge and delete are confirmed by pressing and holding the button until it fills, so a stray click cannot do it.</li>
-        <li>The audit event is written in the same transaction as the command, before the broker call, so even a crash mid-operation leaves a record.</li>
-      </ul>
-      <a class="more" href="https://rahdar.dev/guide/message-transfer">Moving messages safely</a>
-    </div>
-    <div class="stack">
-      <div class="frame">
-        <div class="fbar"><i></i><i></i><i></i><span>Move messages</span></div>
-        <div class="mock" id="ops">
-          <div class="row"><span>From</span><span><b class="q-name">ORDERS.DLQ</b> @ <span class="culprit-id">broker-03</span></span></div>
-          <div class="row"><span>To</span><span>ORDERS</span></div>
-          <div class="row"><span>Filter</span><span>all messages</span></div>
-          <div class="actions"><button class="fake" id="ops-preview" type="button" tabindex="-1">Preview (dry run)</button><button class="fake" type="button" tabindex="-1">Move</button></div>
-          <div class="out" id="ops-out"><span class="dim">Nothing has run yet.</span></div>
-        </div>
-      </div>
-      <div class="frame">
-        <div class="fbar"><i></i><i></i><i></i><span>Purge queue · try it</span></div>
-        <div class="mock">
-          <div class="title">Purge ORDERS.DLQ on <span class="culprit-id">broker-03</span>?</div>
-          <div class="actions"><button class="danger hold" id="purge-btn" type="button" aria-describedby="purge-hint"><span class="lbl">Purge <span class="depth">18,406</span> messages</span><span class="fill" aria-hidden="true"><span class="lbl">Purge <span class="depth">18,406</span> messages</span></span></button></div>
-          <p class="hint" id="purge-hint">Press and hold to confirm.</p>
-          <div class="out" id="audit"><span class="dim">audit · waiting for confirmation</span></div>
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<section class="chapter" aria-labelledby="c3-h">
-  <div class="wrap">
-    <div class="copy">
-      <span class="num">03 / SQL Console</span>
-      <h2 id="c3-h">Ask the question you <span class="serif">actually have.</span></h2>
-      <p>"Where did order 4471 go?" Artemis can't answer that. Its only server-side filter is a JMS selector, which never sees the <b>body</b> and runs against one queue on one node at a time.</p>
-      <ul>
-        <li>One query covers every queue in the cluster, including message bodies.</li>
-        <li>It's <code>SELECT</code>-only and parsed to an AST, so no mutation can even be written.</li>
-        <li>The plan shows what each predicate costs before it runs: target, pushdown or scan.</li>
-      </ul>
-      <a class="more" href="https://rahdar.dev/guide/sql-console">SQL Console guide</a>
-    </div>
-    <div class="stack">
-      <div class="frame" id="sql">
-        <div class="fbar"><i></i><i></i><i></i><span>SQL Console</span></div>
-        <div class="sql-ed" id="sql-ed" aria-label="SELECT * FROM &quot;ORDERS.#&quot; WHERE body->>'orderId' = '4471' LIMIT 50"></div>
-        <div class="plan" id="sql-plan" aria-label="Query plan"><span class="t">target · "ORDERS.#" → 2 queues × 4 live nodes</span><span>pushdown · none</span><span class="sc">scan · body→&gt;'orderId' (Rahdar reads the body)</span></div>
-        <div class="res"><table><thead><tr><th>queue</th><th>node</th><th>timestamp</th><th>body</th></tr></thead><tbody id="sql-res"></tbody></table></div>
-      </div>
-      <div class="frame">
-        <div class="fbar"><i></i><i></i><i></i><span>SQL Console · recorded in Rahdar</span></div>
-        <video data-src="https://rahdar.dev/img/sql-console.mp4" poster="https://rahdar.dev/img/sql.png" muted loop playsinline preload="none" aria-label="Querying every queue in a cluster from the SQL Console"></video>
-      </div>
-    </div>
-  </div>
-</section>
-
-<section class="chapter flip" aria-labelledby="c4-h">
-  <div class="wrap">
-    <div class="copy">
-      <span class="num">04 / Your brokers</span>
-      <h2 id="c4-h">Keep your brokers <span class="serif">exactly as they are.</span></h2>
-      <p>Rahdar registers the brokers you already run. It doesn't install them, doesn't restart them, and never writes <code>broker.xml</code>.</p>
-      <ul>
-        <li>Nothing to rewrite beyond the management endpoints you almost certainly already have on.</li>
-        <li>If a capability is missing, the UI says so and shows the exact snippet that enables it. Nothing just silently disappears.</li>
-        <li>It goes easy on the broker: reads are batched into one Jolokia POST per node, never one per queue, behind a per-node rate limiter.</li>
-      </ul>
-      <a class="more" href="https://rahdar.dev/guide/quickstart">Register your first cluster</a>
-    </div>
-    <div class="frame">
-      <div class="fbar"><i></i><i></i><i></i><span>git diff -- etc/broker.xml</span></div>
-      <div class="diff">
-        <div class="h">Changes Rahdar needs in your broker configuration</div>
-        <div class="z">0 files changed</div>
-        <div class="h">0 insertions(+), 0 deletions(−) · assuming management is on, as it usually is</div>
-<pre><span class="c">&lt;!-- what Rahdar talks to, already in a typical install --&gt;</span>
-<b>Jolokia</b>  http://broker-01:8161/console/jolokia   <span class="c">reads, operations</span>
-<b>Core</b>     tcp://broker-01:61616                  <span class="c">notifications, message I/O</span></pre>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- ── 6. the real thing + extras ───────────────────────── -->
-<section class="real" aria-labelledby="real-h">
-  <div class="wrap">
-    <p class="kicker">Not a mock-up</p>
-    <h2 id="real-h" style="margin-top:14px">This is <span class="serif">the real thing.</span></h2>
-    <p class="lede">A real session against a real cluster pair: the topology, the cross-node queue grid, a message that went to the dead-letter queue, message flow and the charts.</p>
-    <div class="frame">
-      <div class="fbar"><i></i><i></i><i></i><span>Rahdar · unedited session</span></div>
-      <video data-src="https://rahdar.dev/img/demo.mp4" poster="https://rahdar.dev/img/topology.png" muted loop playsinline preload="none" aria-label="Rahdar demo: topology, cross-node queue grid, dead-letter queue, flow and charts"></video>
-    </div>
-  </div>
-</section>
-
-<section class="extras" aria-labelledby="extras-h">
-  <div class="wrap">
-    <p class="kicker">Also in the box</p>
-    <h2 id="extras-h" style="margin-top:14px">Everything else you've <span class="serif">been missing.</span></h2>
-    <div class="cards">
-      <a class="card" href="https://rahdar.dev/guide/"><h3>Request-reply tracing</h3><p>A request matched to its reply across addresses and nodes, with latency and timeouts measured against expectations you declare.</p></a>
-      <a class="card" href="https://rahdar.dev/guide/mcp"><h3>An MCP server</h3><p>Ask an assistant why ORDERS.DLQ is backed up and get an answer from your real clusters, under the same permissions and audit trail as a person.</p></a>
-      <a class="card" href="https://rahdar.dev/guide/broker-configuration"><h3>Configuration drift</h3><p>Declare what a cluster should run, apply it canary-first, and see in plain words when any node has drifted.</p></a>
-      <a class="card" href="https://rahdar.dev/guide/message-capture"><h3>Message capture</h3><p>Index the queues you care about so messages you've already consumed can still be queried.</p></a>
-      <a class="card" href="https://rahdar.dev/guide/alert-delivery"><h3>Alert delivery</h3><p>Send the alert that woke you up to where your team already works, before it wakes anyone at 3 a.m.</p></a>
-      <a class="card" href="https://rahdar.dev/guide/plugins"><h3>Plugins</h3><p>Install screens, API, assistant tools and data from the UI, most of them without a restart.</p></a>
-    </div>
-  </div>
-</section>
-
-<!-- ── 7. close ─────────────────────────────────────────── -->
+<!-- ── close ── -->
 <section class="close" aria-labelledby="close-h">
   <div class="wrap">
-    <h2 id="close-h">Next time it's 3 a.m., <span class="serif">open one tab.</span></h2>
+    <h2 id="close-h">Next time both pagers go off, open one tab.</h2>
     <div class="install">
-      <div class="fbar"><span>Install in one command</span><button type="button" id="copy">Copy</button></div>
-<pre id="cmd"><span class="p">$ </span>git clone https://github.com/sudoitir/rahdar &amp;&amp; cd rahdar
-<span class="p">$ </span>just up   <span class="c"># two Rahdar replicas + HAProxy + Postgres, secrets generated, pinned to the latest release</span></pre>
-      <p>Your brokers already exist. Rahdar registers them, it doesn't start them.</p>
+      <div class="bar"><span>From a clone, with <code>just</code></span><button class="btn" type="button" id="copy">Copy</button></div>
+<pre id="cmd" tabindex="0" aria-label="Install commands"><span class="p">$ </span>git clone https://github.com/sudoitir/rahdar &amp;&amp; cd rahdar
+<span class="p">$ </span>just up   <span class="c"># two Rahdar replicas, HAProxy and Postgres, pinned to the latest release</span></pre>
+      <p>Your brokers already exist. You register them in the UI, from an Artemis management URL or Kafka bootstrap servers, and a check reaches every broker before anything is saved.</p>
     </div>
     <div class="ctas">
       <a class="btn primary" href="https://rahdar.dev/guide/quickstart">Read the quickstart</a>
       <a class="btn" href="https://rahdar.dev/guide/">Docs</a>
-      <a class="btn" href="https://github.com/sudoitir/rahdar">★ Star on GitHub</a>
+      <a class="btn" href="https://github.com/sudoitir/rahdar">Source on GitHub</a>
     </div>
     <div class="alpha"><b>Alpha.</b> Under active development and not yet feature-complete. Published images are pre-stable dev builds (<code>sudoit1/rahdar:dev</code>, no <code>:latest</code> yet). Expect breaking changes.</div>
   </div>
@@ -649,382 +687,252 @@ footer .wrap { display: grid; gap: 10px; }
 
 <footer>
   <div class="wrap">
-    <span>Apache-2.0. Apache ActiveMQ and Apache ActiveMQ Artemis are trademarks of the Apache Software Foundation. Rahdar is an independent project, not produced by, endorsed by, or affiliated with the ASF.</span>
-    <a href="https://github.com/sudoitir/rahdar">github.com/sudoitir/rahdar</a>
+    <nav aria-label="Footer"><a href="https://rahdar.dev/guide/">Docs</a><a href="https://rahdar.dev/guide/kafka">Kafka</a><a href="https://rahdar.dev/guide/supported-versions">Supported versions</a><a href="https://github.com/sudoitir/openbroker">OpenBroker</a><a href="https://github.com/sudoitir/rahdar">GitHub</a><a href="https://rahdar.dev/zh/">简体中文</a><a href="https://rahdar.dev/fa/" lang="fa">فارسی</a></nav>
+    <span>Apache-2.0. Apache, Apache Kafka, Kafka, Apache ActiveMQ, ActiveMQ and Artemis are trademarks of the Apache Software Foundation; RabbitMQ is a trademark of its owner. Rahdar is not affiliated with or endorsed by them.</span>
   </div>
 </footer>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.15.0/gsap.min.js" integrity="sha512-oJ8QbaQThQoJZ7oEv+29jfPM6CcP+zUxh3PKJs1vyOhx0UraUrE7PQgeItu3dOuCJyrzWpoYMsVjkkPEBzbUqw==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.15.0/ScrollTrigger.min.js" integrity="sha512-OaIE7ud4P04EhnBuhEcm0wQSceIxbi2pV03oBLS/+F6ampfxsnxcIxOp7H2eF9G7N0kEht0VAzOLG+dTLSo17Q==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <script>
 (() => {
-  const $ = (s, r = document) => r.querySelector(s);
-  const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+  const $ = (s) => document.querySelector(s);
   const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const fmt = n => n.toLocaleString('en-US');
-  const esc = s => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+  const fmt = (n) => n.toLocaleString('en-US');
+  const visible = (el, fn, threshold = 0.35) => {
+    const io = new IntersectionObserver(([e]) => fn(e.isIntersecting), { threshold });
+    io.observe(el);
+  };
 
-  // ── the estate: one dataset drives the hunt, the topology, the grid and the mocks ──
-  const BROKERS = [
-    { id: 'broker-01', cluster: 'prod-eu', role: 'live' },
-    { id: 'broker-02', cluster: 'prod-eu', role: 'backup', of: 'broker-01' },
-    { id: 'broker-03', cluster: 'prod-eu', role: 'live' },
-    { id: 'broker-04', cluster: 'prod-eu', role: 'backup', of: 'broker-03' },
-    { id: 'broker-05', cluster: 'prod-us', role: 'live' },
-    { id: 'broker-06', cluster: 'prod-us', role: 'backup', of: 'broker-05' },
-    { id: 'broker-07', cluster: 'prod-us', role: 'live' },
-    { id: 'broker-08', cluster: 'prod-us', role: 'backup', of: 'broker-07' },
-  ];
-  const ADDRESSES = ['activemq.notifications', 'AUDIT.EVENTS', 'DLQ', 'ExpiryQueue', 'INVENTORY.RESERVE', 'ORDERS', 'ORDERS.DLQ', 'PAYMENTS', 'PAYMENTS.DLQ', 'SHIPPING.EVENTS'];
-  const RANGE = { 'AUDIT.EVENTS': 220, 'INVENTORY.RESERVE': 20, ORDERS: 450, PAYMENTS: 80, 'SHIPPING.EVENTS': 60 };
-  const HOT = 'ORDERS.DLQ';
-  const HOT_DEPTH = 18406;
-  // Never the first tab: the hunt should cost something.
-  const lives = BROKERS.filter(b => b.role === 'live' && b.id !== 'broker-01');
-  const culprit = lives[Math.floor(Math.random() * lives.length)].id;
-  const byId = Object.fromEntries(BROKERS.map(b => [b.id, b]));
+  // ── theme toggle: the system decides until the reader chooses ──
+  const root = document.documentElement, themeBtn = $('#theme');
+  const isDark = () => root.dataset.theme ? root.dataset.theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+  const label = () => themeBtn.setAttribute('aria-label', isDark() ? 'Switch to light theme' : 'Switch to dark theme');
+  themeBtn.addEventListener('click', () => {
+    root.dataset.theme = isDark() ? 'light' : 'dark';
+    try { localStorage.setItem('rahdar-theme', root.dataset.theme); } catch {}
+    label();
+  });
+  label();
 
-  let seed = 7;
-  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
-  const DATA = {};
-  for (const b of BROKERS) {
-    if (b.role !== 'live') continue;
-    DATA[b.id] = {};
-    for (const a of ADDRESSES) {
-      const dlq = a.endsWith('DLQ') || a === 'ExpiryQueue';
-      let depth = a === 'activemq.notifications' ? 0 : dlq ? Math.floor(rnd() * 4) : Math.floor(rnd() * (RANGE[a] || 10));
-      let consumers = dlq ? 0 : a === 'activemq.notifications' ? 1 : 1 + Math.floor(rnd() * 6);
-      if (b.id === culprit && a === HOT) depth = HOT_DEPTH;
-      const added = depth + Math.floor(rnd() * 90000);
-      DATA[b.id][a] = { depth, consumers, added, acked: added - depth };
-    }
-  }
-  $$('.culprit-id').forEach(e => (e.textContent = culprit));
-  $$('.depth').forEach(e => (e.textContent = fmt(HOT_DEPTH)));
-
-  // ── 1. clock ──
+  // ── the incident clock, from 02:51 ──
   const t0 = Date.now();
   const tick = () => {
     const s = Math.floor((Date.now() - t0) / 1000);
-    const m = 7 + Math.floor(s / 60);
-    $('#clock').textContent = '03:' + String(m).padStart(2, '0');
+    $('#clock').textContent = '02:' + String(51 + Math.floor(s / 60)).padStart(2, '0');
     $('#secs').textContent = ':' + String(s % 60).padStart(2, '0');
   };
   tick();
   setInterval(tick, 1000);
 
-  // ── 2. the hunt ──
-  const state = { active: 'broker-01', open: {}, sel: {}, started: 0, stopped: 0, seen: new Set(), outcome: null };
-  for (const b of BROKERS) state.open[b.id] = new Set(['root', 'broker', 'addresses']);
-  const tabsEl = $('#tabs'), treeEl = $('#tree'), attrsEl = $('#attrs');
-
-  const renderTabs = () => {
-    tabsEl.innerHTML = BROKERS.map(b =>
-      `<button class="tab" role="tab" title="${b.id} · ${b.cluster} · ${b.role}" aria-selected="${b.id === state.active}" data-tab="${b.id}">${state.seen.has(b.id) ? '<span class="seen">✓</span> ' : ''}${b.id}</button>`).join('');
-    const b = byId[state.active];
-    $('#url').textContent = `http://${b.id}.${b.cluster}.internal:8161/console/artemis/jmx?nid=root-org.apache.activemq.artemis-${b.id}`;
-  };
-
-  const node = (key, label, icon, kids) => {
-    const open = state.open[state.active].has(key);
-    const cur = state.sel[state.active] === key;
-    const expandable = kids !== undefined;
-    return `<li role="treeitem"${expandable ? ` aria-expanded="${open}"` : ''}><button data-key="${esc(key)}"${cur ? ' aria-current="true"' : ''}>` +
-      `<span class="tw">${expandable ? (open ? '▾' : '▸') : ''}</span><span class="ic">${icon}</span>${esc(label)}</button>` +
-      (expandable && open ? `<ul role="group">${kids()}</ul>` : '') + '</li>';
-  };
-
-  const renderTree = () => {
-    const b = byId[state.active];
-    const leaf = (k, l) => node(k, l, '◦');
-    treeEl.innerHTML = '<ul>' + node('root', 'org.apache.activemq.artemis', '▤', () =>
-      node('broker', `"${b.id}"`, '▤', () => {
-        if (b.role === 'backup') return `<li class="note">Backup — replicating from ${b.of}. Not active: no addresses or queues to show. Try its live.</li>`;
-        return node('acceptors', 'acceptors', '▤', () => ['amqp', 'artemis', 'core', 'mqtt', 'openwire', 'stomp'].map(a => leaf('acc:' + a, `"${a}"`)).join('')) +
-          node('cc', 'cluster-connections', '▤', () => leaf('cc:1', `"${b.cluster}-cluster"`)) +
-          node('addresses', 'addresses', '▤', () => ADDRESSES.map(a =>
-            node('a:' + a, `"${a}"`, '▤', () =>
-              node('qs:' + a, 'queues', '▤', () =>
-                node('rt:' + a, a === 'activemq.notifications' ? 'multicast' : 'anycast', '▤', () => leaf('q:' + a, `"${a}"`))))).join('')) +
-          node('bc', 'broker-connections', '▤', () => '<li class="note">(none)</li>');
-      })) + '</ul>';
-    renderAttrs();
-  };
-
-  const renderAttrs = () => {
-    const b = byId[state.active];
-    const key = state.sel[state.active];
-    if (!key || !key.startsWith('q:')) {
-      attrsEl.innerHTML = `<h4>${b.id}</h4><p>Select a queue in the tree to see its attributes.</p>` +
-        `<table><tr><th>Attribute</th><th>Value</th></tr>${[['Name', b.id], ['Version', '2.x'], ['Backup', String(b.role === 'backup')], ['Active', String(b.role === 'live')], ['Clustered', 'true'], ['Uptime', '41 days 6 hours'], ['AddressMemoryUsage', b.role === 'live' ? '104857600' : '0'], ['ConnectionCount', b.role === 'live' ? '38' : '0']].map(([k, v]) => `<tr><td>${k}</td><td>${v}</td></tr>`).join('')}</table>`;
-      return;
-    }
-    const a = key.slice(2), d = DATA[b.id][a], hot = b.id === culprit && a === HOT;
-    const rows = [['Address', a], ['ConsumerCount', d.consumers], ['DeliveringCount', 0], ['DurableMessageCount', d.depth], ['Durable', 'true'], ['Exclusive', 'false'], ['FilterString', ''], ['ID', 1200 + ADDRESSES.indexOf(a)], ['LastValue', 'false'], ['MaxConsumers', -1],
-      ['MessageCount', d.depth], ['MessagesAcknowledged', d.acked], ['MessagesAdded', d.added], ['MessagesExpired', 0], ['MessagesKilled', 0], ['Name', a], ['Paused', 'false'], ['PersistentSize', d.depth * 1432], ['RoutingType', a === 'activemq.notifications' ? 'MULTICAST' : 'ANYCAST'], ['ScheduledCount', 0], ['Temporary', 'false']];
-    attrsEl.innerHTML = `<h4>${esc(a)} on ${b.id}</h4><table><tr><th>Attribute</th><th>Value</th></tr>` +
-      rows.map(([k, v]) => `<tr${hot && k === 'MessageCount' ? ' class="hl"' : ''}><td>${k}</td><td>${esc(String(v))}</td></tr>`).join('') + '</table>';
-    if (hot) finish('found');
-  };
-
-  const fmtWatch = ms => {
-    const s = ms / 1000;
-    return String(Math.floor(s / 60)).padStart(2, '0') + ':' + (s % 60).toFixed(1).padStart(4, '0');
-  };
-  const elapsed = () => (state.stopped || Date.now()) - state.started;
-  const updateWatch = () => {
-    $('#watch').textContent = fmtWatch(state.started ? elapsed() : 0);
-    $('#watch-meta').textContent = `${state.started ? (state.outcome ? 'Stopped' : 'Running') : 'Starts on your first click'} · ${state.seen.size} of 8 tabs opened`;
-  };
-  let raf;
-  const run = () => { updateWatch(); if (!state.stopped) raf = requestAnimationFrame(run); };
-  const start = () => {
-    if (state.started) return;
-    state.started = Date.now();
-    state.seen.add(state.active);
-    $('#watch').classList.add('running');
-    run();
-  };
-
-  const finish = outcome => {
-    if (state.outcome) return;
-    if (!state.started) start();
-    state.stopped = Date.now();
-    state.outcome = outcome;
-    cancelAnimationFrame(raf);
-    $('#watch').classList.remove('running');
-    updateWatch();
-    renderTabs();
-    const secs = (elapsed() / 1000).toFixed(1), tabs = state.seen.size;
-    const f = $('#found');
-    f.innerHTML = outcome === 'found'
-      ? `<b>Found it.</b> ${HOT} on ${culprit}: ${fmt(HOT_DEPTH)} messages, 0 consumers. That took you <b>${secs} s</b> and <b>${tabs} tab${tabs === 1 ? '' : 's'}</b>, and you knew what you were looking for. <a href="#turn">Now watch the same thing in Rahdar ↓</a>`
-      : `It was ${HOT} on <b>${culprit}</b>: ${fmt(HOT_DEPTH)} messages, 0 consumers. You looked for <b>${secs} s</b> across <b>${tabs} tab${tabs === 1 ? '' : 's'}</b>. <a href="#turn">Now watch the same thing in Rahdar ↓</a>`;
-    f.classList.add('show');
-    $('#giveup').disabled = true;
-    $('#you-num').textContent = secs + ' s';
-    $('#you-text').textContent = outcome === 'found'
-      ? `${tabs} tab${tabs === 1 ? '' : 's'} opened, trees expanded, attributes read. And that's with 8 brokers and a clear head.`
-      : `You gave up after ${tabs} tab${tabs === 1 ? '' : 's'}. Nobody would blame you. It's 3 a.m.`;
-  };
-
-  tabsEl.addEventListener('click', e => {
-    const t = e.target.closest('[data-tab]');
-    if (!t) return;
-    start();
-    state.active = t.dataset.tab;
-    if (!state.outcome) state.seen.add(state.active);
-    renderTabs();
-    renderTree();
-  });
-  treeEl.addEventListener('click', e => {
-    const n = e.target.closest('[data-key]');
-    if (!n || state.outcome === 'gaveup') return;
-    start();
-    const k = n.dataset.key, open = state.open[state.active];
-    if (k.startsWith('q:')) state.sel[state.active] = k;
-    else {
-      open.has(k) ? open.delete(k) : open.add(k);
-      if (!k.startsWith('acc:') && !k.startsWith('cc:')) state.sel[state.active] = k;
-    }
-    renderTree();
-    const again = treeEl.querySelector(`[data-key="${CSS.escape(k)}"]`);
-    if (again) again.focus();
-  });
-  $('#giveup').addEventListener('click', () => {
-    state.active = culprit;
-    const open = state.open[culprit];
-    ['a:', 'qs:', 'rt:'].forEach(p => open.add(p + HOT));
-    state.sel[culprit] = 'q:' + HOT;
-    finish('gaveup');
-    renderTree();
-  });
-  renderTabs();
-  renderTree();
-
-  // ── 3. chips for the turn ──
-  $('#chips').innerHTML = BROKERS.map(b => `<div class="chip">${b.id} · ${b.cluster}</div>`).join('');
-
-  // ── 4. topology (SVG) and the cross-node grid ──
-  const POS = {
-    'broker-01': [30, 80], 'broker-02': [30, 230], 'broker-03': [180, 80], 'broker-04': [180, 230],
-    'broker-05': [350, 80], 'broker-06': [350, 230], 'broker-07': [500, 80], 'broker-08': [500, 230],
-  };
-  const W = 110, H = 54;
-  const c = id => [POS[id][0] + W / 2, POS[id][1] + H / 2];
-  let svg = '';
-  for (const [x, name] of [[14, 'prod-eu'], [334, 'prod-us']])
-    svg += `<rect class="cl" x="${x}" y="30" width="292" height="286" rx="14"/><text class="cl-label" x="${x + 16}" y="54">${name.toUpperCase()} · 2 PAIRS</text>`;
-  const paths = [];
-  for (const [a, b] of [['broker-01', 'broker-03'], ['broker-05', 'broker-07']]) {
-    const y = c(a)[1];
-    paths.push({ id: `l-${a}`, d: `M${POS[a][0] + W} ${y} L${POS[b][0]} ${y}`, cls: 'link', back: true });
-  }
-  for (const b of BROKERS.filter(b => b.role === 'backup')) {
-    const [x] = c(b.of);
-    paths.push({ id: `r-${b.id}`, d: `M${x} ${POS[b.of][1] + H} L${x} ${POS[b.id][1]}`, cls: 'repl' });
-  }
-  svg += paths.map(p => `<path id="${p.id}" class="${p.cls}" d="${p.d}"/>`).join('');
-  for (const p of paths) {
-    const cls = p.cls === 'repl' ? 'dot r' : 'dot';
-    for (let i = 0; i < 3; i++)
-      svg += `<circle class="${cls}" r="3"><animateMotion dur="${p.cls === 'repl' ? 1.8 : 2.4}s" begin="${(i * 0.8).toFixed(1)}s" repeatCount="indefinite"${p.back && i === 1 ? ' keyPoints="1;0" keyTimes="0;1" calcMode="linear"' : ''}><mpath href="#${p.id}"/></animateMotion></circle>`;
-  }
-  for (const b of BROKERS) {
-    const [x, y] = POS[b.id], hot = b.id === culprit;
-    svg += `<g class="node ${b.role}${hot ? ' hot' : ''}" data-node="${b.id}">` +
-      (hot ? `<rect class="ring" x="${x}" y="${y}" width="${W}" height="${H}" rx="10"/>` : '') +
-      `<rect x="${x}" y="${y}" width="${W}" height="${H}" rx="10"/>` +
-      `<text x="${x + 12}" y="${y + 23}">${b.id}</text>` +
-      `<text class="role" x="${x + 12}" y="${y + 41}">${hot ? '▲ ORDERS.DLQ' : b.role === 'live' ? '● LIVE' : '○ BACKUP'}</text></g>`;
-  }
-  $('#topo').innerHTML = svg;
-  if (reduced) $('#topo').pauseAnimations();
-
-  const rows = [];
-  for (const id of Object.keys(DATA)) for (const a of ADDRESSES) rows.push({ id, a, ...DATA[id][a] });
-  rows.sort((x, y) => y.depth - x.depth);
-  $('#grid-count').textContent = `${rows.length} queues · 4 live nodes`;
-  const top = rows.slice(0, 7), max = top[0].depth;
-  $('#grid').innerHTML = top.map((r, i) => `<tr class="${i === 0 ? 'worst' : ''}"><td>${r.a}</td><td>${r.id}</td>` +
-    `<td><span class="bar"><i style="width:${Math.max(2, Math.round(Math.sqrt(r.depth / max) * 90))}px"></i>${fmt(r.depth)}</span></td><td>${r.consumers}</td>` +
-    `<td>${i === 0 ? '<span class="chip-s bad">no consumer</span>' : ''}</td></tr>`).join('');
-
-  // ── 5. mocks that play once when they scroll into view ──
-  const wait = ms => new Promise(r => setTimeout(r, reduced ? 0 : ms));
-
-  // The purge is confirmed as Rahdar confirms it: held until the button fills, never typed or clicked.
-  const purgeBtn = $('#purge-btn'), purgeHint = $('#purge-hint');
+  // ── hold to confirm, as the app does it: a press held for the whole fill, keyboard included ──
   const HOLD_MS = 1500;
-  let holdTimer = -1;
-  const purged = () => {
-    holdTimer = -1;
-    purgeBtn.classList.remove('holding');
-    purgeBtn.classList.add('done');
-    purgeBtn.disabled = true;
-    purgeHint.textContent = 'Confirmed.';
-    const now = new Date(), hh = String(now.getHours()).padStart(2, '0'), mm = String(now.getMinutes()).padStart(2, '0');
-    $('#audit').innerHTML = `<span class="warn">audit · ${hh}:${mm} · purge ${HOT} @ ${culprit} · recorded before the broker call</span>\n<span class="dim">This is a demo. Nothing was purged.</span>`;
+  const holdable = (btn, hint, onDone) => {
+    let timer = -1;
+    const start = () => {
+      if (btn.disabled || timer !== -1) return;
+      btn.classList.add('holding');
+      hint.textContent = 'Keep holding…';
+      timer = setTimeout(() => { timer = -1; btn.classList.remove('holding'); btn.classList.add('done'); btn.disabled = true; hint.textContent = 'Confirmed.'; onDone(); }, HOLD_MS);
+    };
+    const stop = () => {
+      if (timer === -1) return;
+      clearTimeout(timer); timer = -1;
+      btn.classList.remove('holding');
+      hint.textContent = 'Released too early. Hold until the button is full.';
+    };
+    btn.addEventListener('pointerdown', start);
+    ['pointerup', 'pointerleave', 'pointercancel', 'blur'].forEach((e) => btn.addEventListener(e, stop));
+    btn.addEventListener('contextmenu', (e) => e.preventDefault());
+    btn.addEventListener('keydown', (e) => { if ((e.key === ' ' || e.key === 'Enter') && !e.repeat) { e.preventDefault(); start(); } });
+    btn.addEventListener('keyup', (e) => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); stop(); } });
   };
-  const startHold = () => {
-    if (purgeBtn.disabled || holdTimer !== -1) return;
-    purgeBtn.classList.add('holding');
-    purgeHint.textContent = 'Keep holding…';
-    holdTimer = setTimeout(purged, HOLD_MS);
+  const clock = () => { const d = new Date(); return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); };
+
+  // ── the estate: one dataset drives the table, the breakdown and the transaction bars ──
+  // ledger-writer on payments: partitions 2 and 5 sit behind the open transaction and fall further behind.
+  const parts = [
+    { p: 0, lag: 18 }, { p: 1, lag: 7 }, { p: 2, lag: 20914, stuck: true },
+    { p: 3, lag: 11 }, { p: 4, lag: null }, { p: 5, lag: 20906, stuck: true },
+  ];
+  let unblocked = false, sampleAge = 4;
+  const ledgerLag = () => parts.reduce((s, x) => s + (x.lag || 0), 0);
+  const SUBS = [
+    { id: 'ledger', name: 'ledger-writer on payments', kind: 'Group on topic', cluster: 'events', lag: ledgerLag, est: true, readers: '4 members' },
+    { id: 'dlq', name: 'ORDERS.DLQ', kind: 'Queue', cluster: 'orders-ha', lag: () => dlqDepth, readers: '0 consumers', bad: true },
+    { id: 'risk', name: 'risk-reports on payments', kind: 'Group on topic', cluster: 'events', lag: () => riskLag, est: true, readers: '3 members' },
+    { id: 'orders', name: 'ORDERS', kind: 'Queue', cluster: 'orders-ha', lag: () => 37, readers: '4 consumers' },
+    { id: 'billing', name: 'billing on orders', kind: 'Group on topic', cluster: 'events', lag: () => 12, est: true, readers: '2 members' },
+  ];
+  let dlqDepth = 18406, riskLag = 27341, selected = 'ledger';
+
+  const backlog = (s) => s.est
+    ? `<span class="est" aria-label="about ${fmt(s.lag())}, estimate">&asymp; ${fmt(s.lag())}<small aria-hidden="true">estimate</small></span>`
+    : fmt(s.lag());
+  const renderSubs = () => {
+    const rows = [...SUBS].sort((a, b) => b.lag() - a.lag());
+    $('#subs').innerHTML = rows.map((s) => `<tr class="${s.id === selected ? 'sel' : ''}">` +
+      `<td><button class="rowbtn" type="button" data-sub="${s.id}" aria-pressed="${s.id === selected}">${s.name}</button></td>` +
+      `<td class="kind">${s.kind}</td><td>${s.cluster}</td><td class="n">${backlog(s)}</td>` +
+      `<td>${s.bad ? '<span class="tag crit">no consumer</span>' : s.readers}</td></tr>`).join('');
   };
-  const stopHold = () => {
-    if (holdTimer === -1) return;
-    clearTimeout(holdTimer);
-    holdTimer = -1;
-    purgeBtn.classList.remove('holding');
-    purgeHint.textContent = 'Released too early. Hold until the button is full.';
+  const renderBreakdown = () => {
+    const el = $('#breakdown');
+    if (selected === 'ledger') {
+      const max = Math.max(...parts.map((x) => x.lag || 0));
+      const sorted = [...parts].sort((a, b) => (b.lag ?? -1) - (a.lag ?? -1));
+      el.innerHTML = `<h3>ledger-writer on payments: &asymp; ${fmt(ledgerLag())} records behind</h3>` +
+        `<p class="why">An estimate: payments-4 has no committed offset, so its lag is unknown and left out. Partitions slowest first, sampled ${sampleAge} s ago.</p>` +
+        `<div class="parts">` + sorted.map((x) => x.lag === null
+          ? `<div class="part"><span class="label">payments-${x.p}</span><span class="meter"></span><span class="na">unavailable</span></div>`
+          : `<div class="part${x.stuck && !unblocked ? ' hot' : ''}"><span class="label">payments-${x.p}</span><span class="meter"><i style="--v:${Math.max(0.004, x.lag / max).toFixed(4)}"></i></span><span class="lag">${fmt(x.lag)}</span></div>`).join('') + `</div>`;
+    } else {
+      const s = SUBS.find((x) => x.id === selected);
+      el.innerHTML = `<h3>${s.name}: ${s.est ? '&asymp; ' : ''}${fmt(s.lag())}</h3><p class="why" style="margin:0">${s.est
+        ? 'An estimate, from committed and end offsets per partition.'
+        : 'Exact: Artemis counts the messages on the broker. ' + (s.bad ? 'No consumer reads this queue, so it only grows.' : '')}</p>`;
+    }
   };
-  purgeBtn.addEventListener('pointerdown', startHold);
-  ['pointerup', 'pointerleave', 'pointercancel', 'blur'].forEach((e) => purgeBtn.addEventListener(e, stopHold));
-  purgeBtn.addEventListener('contextmenu', (e) => e.preventDefault());
-  purgeBtn.addEventListener('keydown', (e) => {
-    if ((e.key === ' ' || e.key === 'Enter') && !e.repeat) { e.preventDefault(); startHold(); }
+  $('#subs').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-sub]');
+    if (!b) return;
+    selected = b.dataset.sub;
+    renderSubs(); renderBreakdown();
+    $(`[data-sub="${selected}"]`).focus();
   });
-  purgeBtn.addEventListener('keyup', (e) => {
-    if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); stopHold(); }
+  renderSubs(); renderBreakdown();
+
+  // Lag grows on the stuck partitions while the scene is on screen; frozen under reduced motion.
+  let onScreen = false;
+  visible($('#estate'), (v) => (onScreen = v), 0.15);
+  if (!reduced) setInterval(() => {
+    if (!onScreen) return;
+    if (!unblocked) parts.forEach((x) => { if (x.stuck) x.lag += 9 + Math.floor(Math.random() * 14); });
+    dlqDepth += Math.random() < 0.4 ? 1 : 0;
+    sampleAge = 1 + Math.floor(Math.random() * 5);
+    // A re-render replaces the row buttons, so a keyboard reader keeps focus on the row they were on.
+    const focused = document.activeElement?.dataset?.sub;
+    renderSubs(); renderBreakdown();
+    if (focused) $(`[data-sub="${focused}"]`).focus({ preventScroll: true });
+  }, 1600);
+
+  // ── the transaction: the read part is pinned at the last stable offset until the abort ──
+  const lanes = ['#t2', '#t5'].map((id) => $(id));
+  const READ = 0.42;
+  const setLane = (lane, r) => {
+    const box = lane.querySelector('.lane');
+    lane.querySelector('.read').style.setProperty('--r', r);
+    lane.querySelector('.lso').style.setProperty('--x', `${Math.max(0, r * box.clientWidth - 2)}px`);
+  };
+  const layoutLanes = () => lanes.forEach((l) => setLane(l, unblocked ? 1 : READ));
+  layoutLanes();
+  new ResizeObserver(layoutLanes).observe($('#t2 .lane'));
+  const syncLagText = () => { $('#t2 .lagv').textContent = 'lag ' + fmt(parts[2].lag); $('#t5 .lagv').textContent = 'lag ' + fmt(parts[5].lag); };
+  if (!reduced) setInterval(() => { if (!unblocked) syncLagText(); }, 1600);
+
+  const abortOpen = $('#abort-open'), abortPreview = $('#abort-preview');
+  abortOpen.addEventListener('click', () => {
+    abortPreview.hidden = false;
+    abortOpen.setAttribute('aria-expanded', 'true');
+    abortOpen.disabled = true;
+    $('#abort-hold').focus();
+  });
+  holdable($('#abort-hold'), $('#abort-hint'), () => {
+    unblocked = true;
+    $('#abort-out').innerHTML = `<span class="ok">Aborted payments-settlement. payments-2 and payments-5 are unblocked.</span>\n<span class="dim">audit ${clock()}  abort transaction payments-settlement  ok\nThis is an illustration. Nothing was aborted.</span>`;
+    // The last stable offset jumps to the end of the log, then the consumer reads up to it and the lag drains.
+    lanes.forEach((lane) => {
+      const box = lane.querySelector('.lane'), lso = lane.querySelector('.lso'), read = lane.querySelector('.read');
+      const end = `translateX(${box.clientWidth - 2}px)`;
+      if (reduced) { setLane(lane, 1); return; }
+      lso.animate([{ transform: getComputedStyle(lso).transform }, { transform: end }], { duration: 500, easing: 'cubic-bezier(0.77, 0, 0.175, 1)', fill: 'forwards' })
+        .finished.then(() => { lso.style.setProperty('--x', `${box.clientWidth - 2}px`); lso.getAnimations().forEach((a) => a.cancel()); });
+      read.animate([{ transform: `scaleX(${READ})` }, { transform: 'scaleX(1)' }], { duration: 1400, delay: 450, easing: 'cubic-bezier(0.23, 1, 0.32, 1)', fill: 'forwards' })
+        .finished.then(() => { read.style.setProperty('--r', 1); read.getAnimations().forEach((a) => a.cancel()); });
+    });
+    const from = [parts[2].lag, parts[5].lag], to = [6, 3], t = performance.now(), dur = reduced ? 0 : 1800;
+    const drain = (now) => {
+      const k = dur ? Math.min(1, (now - t) / dur) : 1, e = 1 - Math.pow(1 - k, 3);
+      parts[2].lag = Math.round(from[0] + (to[0] - from[0]) * e);
+      parts[5].lag = Math.round(from[1] + (to[1] - from[1]) * e);
+      syncLagText(); renderSubs(); renderBreakdown();
+      if (k < 1) requestAnimationFrame(drain);
+    };
+    requestAnimationFrame(drain);
   });
 
-  const playOps = async () => {
-    await wait(500);
-    $('#ops-preview').classList.add('press');
-    const out = $('#ops-out');
-    out.innerHTML = `<span class="dim">move ${HOT} → ORDERS · dryRun=true</span>`;
-    await wait(900);
-    out.innerHTML += `\n<span class="ok">${fmt(HOT_DEPTH)} messages would move to ORDERS.</span>\n<span class="dim">Nothing has changed. Review, then press Move.</span>`;
-    $('#ops-preview').classList.remove('press');
-  };
+  // ── the reset: refused with members, previewed when empty, held, approved, audited ──
+  const RESET = [
+    { p: 0, now: 1204012, to: 1208566 }, { p: 1, now: 1199873, to: 1204420 }, { p: 2, now: 1187310, to: 1191877 },
+    { p: 3, now: 1201544, to: 1206089 }, { p: 4, now: 1196205, to: 1200760 }, { p: 5, now: 1190468, to: 1195017 },
+  ];
+  const skips = RESET.reduce((s, x) => s + (x.to - x.now), 0);
+  const step = (id, state) => ($(id).dataset.state = state);
+  $('#r-preview').addEventListener('click', (e) => {
+    $('#r-refused').hidden = false;
+    e.currentTarget.disabled = true;
+    step('#s2', 'now');
+    $('#r-stop').disabled = false;
+    $('#r-stop').focus();
+  });
+  $('#r-stop').addEventListener('click', (e) => {
+    e.currentTarget.disabled = true;
+    e.currentTarget.textContent = 'Scaled to zero: the group is empty';
+    $('#r-again').disabled = false;
+    $('#r-again').focus();
+  });
+  $('#r-again').addEventListener('click', (e) => {
+    e.currentTarget.disabled = true;
+    step('#s1', 'done');
+    $('#r-rows').innerHTML = RESET.map((x) => `<tr><td>payments-${x.p}</td><td class="n">${fmt(x.now)}</td><td class="n">${fmt(x.to)}</td><td class="n">${fmt(x.to - x.now)}</td></tr>`).join('');
+    $('#r-table').hidden = false;
+    $('#r-hold').focus();
+  });
+  holdable($('#r-hold'), $('#r-hint'), () => {
+    step('#s2', 'done'); step('#s3', 'now');
+    $('#r-out').innerHTML = `<span class="warn">Held for approval. A teammate with the approver permission must approve it; you cannot approve your own request.</span>`;
+    $('#r-approve').disabled = false;
+    $('#r-approve').focus();
+  });
+  $('#r-approve').addEventListener('click', (e) => {
+    e.currentTarget.disabled = true;
+    step('#s3', 'done');
+    riskLag = 0; renderSubs(); renderBreakdown();
+    $('#r-out').innerHTML = `<span class="ok">Approved. The group was checked again, still empty. The reset ran: ${fmt(skips)} records skipped across 6 partitions.</span>\n` +
+      `<span class="dim">audit ${clock()}  reset offsets risk-reports on payments  ok\n` +
+      RESET.map((x) => `  payments-${x.p}  ${fmt(x.now)} -> ${fmt(x.to)}`).join('\n') + `\nThis is an illustration. Nothing was reset.</span>`;
+  });
 
-  const SQL = `SELECT * FROM "ORDERS.#"\nWHERE body->>'orderId' = '4471'\nLIMIT 50`;
-  const hl = s => esc(s)
-    .replace(/\b(SELECT|FROM|WHERE|LIMIT)\b/g, '<span class="k">$1</span>')
-    .replace(/(&quot;ORDERS\.#&quot;)/g, '<span class="q">$1</span>')
-    .replace(/('[^']*')/g, '<span class="s">$1</span>')
-    .replace(/\b(50)\b/g, '<span class="n">$1</span>');
-  const playSql = async () => {
-    const ed = $('#sql-ed');
-    if (!reduced) {
-      ed.classList.add('caret');
-      for (let i = 1; i <= SQL.length; i++) { ed.innerHTML = hl(SQL.slice(0, i)); await wait(28); }
-      ed.classList.remove('caret');
-      await wait(400);
-    } else ed.innerHTML = hl(SQL);
-    gsapOr($('#sql-plan'));
-    await wait(700);
-    const others = Object.keys(DATA).filter(id => id !== culprit);
-    const res = [
-      [HOT, culprit, '03:02:18.441', `{"orderId":"<mark>4471</mark>","sku":"A-2291","qty":3,"reason":"PaymentDeclined"}`],
-      ['ORDERS', others[0], '02:58:03.017', `{"orderId":"<mark>4471</mark>","sku":"A-2291","qty":3,"status":"NEW"}`],
-    ];
-    $('#sql-res').innerHTML = res.map(r => `<tr><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td><td class="body">${r[3]}</td></tr>`).join('');
-  };
-  const gsapOr = el => { if (window.gsap && !reduced) gsap.from(el.children, { autoAlpha: 0, y: 6, stagger: .15, duration: .4 }); };
-  $('#sql-ed').innerHTML = reduced ? hl(SQL) : '';
+  // ── Artemis: messages flow to ORDERS and its consumers; failures land in ORDERS.DLQ, which only grows ──
+  const SVGNS = 'http://www.w3.org/2000/svg';
+  const dots = $('#dots');
+  if (!reduced && 'offsetPath' in document.body.style) {
+    const lanesSvg = [['M118 60 H232', 'dot', 1600], ['M362 60 H476', 'dot', 1600], ['M297 82 V118', 'dot dlq', 2400]];
+    for (const [d, cls, dur] of lanesSvg) for (let i = 0; i < 3; i++) {
+      const c = document.createElementNS(SVGNS, 'circle');
+      c.setAttribute('r', '3.5'); c.setAttribute('class', cls);
+      c.style.offsetPath = `path("${d}")`;
+      c.animate([{ offsetDistance: '0%', opacity: 0 }, { opacity: 1, offset: 0.15 }, { opacity: 1, offset: 0.85 }, { offsetDistance: '100%', opacity: 0 }],
+        { duration: dur, delay: (i * dur) / 3, iterations: Infinity, easing: 'linear' });
+      dots.appendChild(c);
+    }
+    visible($('#flow'), (v) => dots.querySelectorAll('circle').forEach((c) => c.getAnimations().forEach((a) => (v ? a.play() : a.pause()))), 0.1);
+  }
+  const dlqText = $('#dlq-depth');
+  if (!reduced) setInterval(() => (dlqText.textContent = `${fmt(dlqDepth)}, no consumer`), 1600);
+  $('#move-preview').addEventListener('click', (e) => {
+    e.currentTarget.disabled = true;
+    $('#move-out').innerHTML = `<span class="dim">move ORDERS.DLQ -> ORDERS on artemis-a, dryRun=true</span>\n<span class="ok">${fmt(dlqDepth)} messages would move to ORDERS.</span>\n<span class="dim">Nothing has changed. Review, then Move.</span>`;
+  });
 
-  const once = (el, fn, threshold = .45) => {
-    const io = new IntersectionObserver(([e]) => { if (e.isIntersecting) { io.disconnect(); fn(); } }, { threshold });
-    io.observe(el);
-  };
-  once($('#ops'), playOps);
-  once($('#sql'), playSql, .35);
+  // ── the assistant's calls appear in the order they were made, once ──
+  const chat = $('#chat');
+  if (!reduced) visible(chat, (v) => { if (v) { chat.classList.remove('armed'); chat.classList.add('play'); } }, 0.4);
 
-  // videos load and play only while on screen (never autoplay under reduced motion)
-  const vio = new IntersectionObserver(entries => entries.forEach(({ target: v, isIntersecting }) => {
-    if (isIntersecting && !v.src) v.src = v.dataset.src;
-    if (reduced) { v.controls = true; return; }
-    isIntersecting ? v.play().catch(() => (v.controls = true)) : v.pause();
-  }), { threshold: .25 });
-  $$('video[data-src]').forEach(v => vio.observe(v));
-
-  $('#copy').addEventListener('click', async e => {
+  // ── copy the install commands ──
+  $('#copy').addEventListener('click', async (e) => {
     const text = $('#cmd').innerText.replace(/^\$ /gm, '').replace(/\s+#.*$/gm, '');
     try { await navigator.clipboard.writeText(text); e.target.textContent = 'Copied'; }
     catch { e.target.textContent = 'Select and copy'; }
     setTimeout(() => (e.target.textContent = 'Copy'), 1800);
-  });
-
-  // ── scroll choreography: GSAP only adds motion; without it every scene is already in its end state ──
-  if (!window.gsap || !window.ScrollTrigger) return;
-  gsap.registerPlugin(ScrollTrigger);
-  const mm = gsap.matchMedia();
-  mm.add('(prefers-reduced-motion: no-preference)', () => {
-    gsap.from('.open .reveal', { y: 34, autoAlpha: 0, duration: 1.1, stagger: .18, ease: 'power3.out', delay: .2 });
-
-    // the turn: scattered tabs gather into one window
-    const chips = $$('.chip');
-    const turn = gsap.timeline({ scrollTrigger: { trigger: '#turn', start: 'top top', end: '+=1800', scrub: 1, pin: true } });
-    turn.fromTo(chips,
-      { x: () => gsap.utils.random(-560, 560), y: () => gsap.utils.random(-300, 300), rotation: () => gsap.utils.random(-18, 18), autoAlpha: 1 },
-      { x: 0, y: 0, rotation: 0, duration: 1.2, ease: 'power2.inOut', stagger: .04 })
-      .from('.turn-copy .pre', { autoAlpha: 0, y: 20, duration: .4 }, 0)
-      .to(chips, { scale: .2, autoAlpha: 0, duration: .5, stagger: .02 })
-      .from('.one-window', { scale: 0, autoAlpha: 0, duration: .6, ease: 'back.out(2)' }, '<.1')
-      .to('.turn-copy .pre', { autoAlpha: 0, duration: .3 }, '<')
-      .from('#turn-h', { y: 50, autoAlpha: 0, duration: .7 })
-      .from('.turn-copy .lede', { y: 20, autoAlpha: 0, duration: .5 });
-
-    // after: the console assembles itself, worst row last
-    const edges = $$('#topo path.link');
-    edges.forEach(p => { const l = p.getTotalLength(); gsap.set(p, { strokeDasharray: l, strokeDashoffset: l }); });
-    const after = gsap.timeline({ scrollTrigger: { trigger: '#rahdar', start: 'top 70%', end: 'top 15%', scrub: 1 } });
-    after.from('#rahdar', { y: 80, scale: .96, autoAlpha: 0, duration: 1 })
-      .from('#topo .node', { scale: .6, autoAlpha: 0, transformOrigin: '50% 50%', stagger: .06, duration: .5 }, '-=.3')
-      .to(edges, { strokeDashoffset: 0, duration: .6, stagger: .05 }, '-=.2')
-      .from('#topo path.repl, #topo .dot', { autoAlpha: 0, duration: .4 }, '<')
-      .from('#grid tr', { x: 30, autoAlpha: 0, stagger: .07, duration: .4 }, '-=.6');
-    gsap.from('.verdict > div', { y: 40, autoAlpha: 0, stagger: .15, duration: .8, ease: 'power3.out', scrollTrigger: { trigger: '.verdict', start: 'top 85%' } });
-
-    // chapters and the rest: a calm reveal
-    $$('.chapter, .real, .extras, .close, .facts').forEach(s => {
-      gsap.from(s.querySelectorAll('.copy > *, .frame, .stack > *, .card, h2, .lede, .facts > div, .install, .ctas'), {
-        y: 40, autoAlpha: 0, duration: .9, stagger: .08, ease: 'power3.out',
-        scrollTrigger: { trigger: s, start: 'top 75%' },
-      });
-    });
   });
 })();
 </script>

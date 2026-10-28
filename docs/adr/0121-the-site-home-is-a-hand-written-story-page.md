@@ -1,6 +1,6 @@
 # ADR-0121: The site's home page is a hand-written story page
 
-- **Status**: accepted
+- **Status**: superseded by [ADR-0217](0217-the-site-home-tells-a-mixed-estate-story-with-no-third-party-origins.md)
 - **Date**: 2026-09-28
 - **Deciders**: Mahdi Amirabdollahi
 
