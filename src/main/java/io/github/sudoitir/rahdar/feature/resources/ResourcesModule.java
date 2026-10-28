@@ -61,6 +61,21 @@ public final class ResourcesModule {
                     ResourceType.SUBSCRIPTION,
                     Permissions.SUBSCRIPTION_READ))
             .permission(PermissionDef.resource(
+                    ResourcePermissions.DESTINATION_UPDATE,
+                    "Change a destination's configuration",
+                    ResourceType.DESTINATION,
+                    Permissions.DESTINATION_READ))
+            .permission(PermissionDef.resource(
+                    ResourcePermissions.DESTINATION_TRUNCATE,
+                    "Cut the oldest records off a destination",
+                    ResourceType.DESTINATION,
+                    Permissions.DESTINATION_READ))
+            .permission(PermissionDef.resource(
+                    ResourcePermissions.SUBSCRIPTION_SEEK,
+                    "Move a subscription's position",
+                    ResourceType.SUBSCRIPTION,
+                    Permissions.SUBSCRIPTION_READ))
+            .permission(PermissionDef.resource(
                     ResourcePermissions.ROUTE_WRITE,
                     "Create and delete routes",
                     ResourceType.DESTINATION,
