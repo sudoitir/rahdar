@@ -241,6 +241,21 @@ public class BrokerMessages {
         });
     }
 
+    /**
+     * Why the cluster's system offers no such action on messages, in its own words, or empty when it does or when it
+     * cannot say. {@code capability} is the SDK's id, such as {@code messages.move}.
+     */
+    public Optional<String> unavailableBecause(UUID clusterId, String capability) {
+        return translated(() -> {
+            var assessment = gateway.cluster(clusterId)
+                    .access()
+                    .check(new io.github.sudoitir.openbroker.access.Capability(capability), Optional.empty());
+            return assessment.status() == io.github.sudoitir.openbroker.access.Assessment.Status.UNAVAILABLE
+                    ? Optional.of(assessment.reason())
+                    : Optional.<String>empty();
+        });
+    }
+
     /** What purging a subscription of a log would skip, and the state it was counted against. */
     public record LogPurge(long records, String etag) {}
 

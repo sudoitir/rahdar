@@ -131,6 +131,9 @@ public class MessageController {
             @RequestParam(defaultValue = "false") boolean dryRun,
             @RequestParam(defaultValue = "false") boolean override,
             @RequestBody MessageActionRequest request) {
+        if (kinds.partitioned(clusterId, kind)) {
+            messages.requireOffered(clusterId, MessageAction.fromPath(action));
+        }
         return respond(messages.execute(
                 clusterId,
                 subscription(clusterId, kind, path),

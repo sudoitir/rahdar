@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import io.github.sudoitir.openbroker.ClusterConnection;
 import io.github.sudoitir.openbroker.model.Kind;
 import io.github.sudoitir.openbroker.model.ResourceId;
+import io.github.sudoitir.rahdar.feature.messages.MessageAction;
 import io.github.sudoitir.rahdar.feature.messages.MessageService;
 import io.github.sudoitir.rahdar.feature.messages.web.MessageViews.MessagePageView;
 import io.github.sudoitir.rahdar.feature.resources.BacklogService;
@@ -465,6 +466,19 @@ class KafkaRegisterRealBrokerTest extends PostgresIntegrationTest {
                                 ((Attempt.Ok<?>) messages.purgeLog(id, subscription, false)).value())
                         .count())
                 .isEqualTo(8);
+    }
+
+    @Test
+    void aSingleRecordIsNeitherMovedNorDeletedAndTheReasonIsTheDriversOwn() {
+        UUID id = ((Attempt.Ok<ClusterDetail>) service.register(request("append", kafka.getBootstrapServers())))
+                .value()
+                .id();
+
+        for (MessageAction action : MessageAction.values()) {
+            assertThatThrownBy(() -> messages.requireOffered(id, action))
+                    .isInstanceOf(ConflictException.class)
+                    .hasMessageContaining("append-only");
+        }
     }
 
     @Test

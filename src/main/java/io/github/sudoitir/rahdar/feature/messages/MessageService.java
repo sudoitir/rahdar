@@ -24,6 +24,7 @@ import io.github.sudoitir.rahdar.feature.messages.web.MessageViews.MessagePageVi
 import io.github.sudoitir.rahdar.feature.messages.web.MessageViews.MessageSummaryView;
 import io.github.sudoitir.rahdar.kernel.audit.AuditEvent;
 import io.github.sudoitir.rahdar.kernel.audit.AuditService;
+import io.github.sudoitir.rahdar.kernel.core.ConflictException;
 import io.github.sudoitir.rahdar.kernel.core.NotFoundException;
 import io.github.sudoitir.rahdar.kernel.gate.Gated;
 import io.github.sudoitir.rahdar.kernel.gate.Operation;
@@ -297,6 +298,21 @@ public class MessageService {
         GovernedMessage governed = contentPolicy.govern(context, content(message));
         clearViews.recordClear(context, "MESSAGE", queueName + "/" + messageId, List.of(governed));
         return toDetail(message, governed, resolved.node().getId());
+    }
+
+    /**
+     * Refuses a per-message action the cluster's system does not offer, with the system's own reason: a
+     * partitioned log is append-only, so a single record is neither moved nor deleted (409).
+     */
+    public void requireOffered(UUID clusterId, MessageAction action) {
+        String capability =
+                switch (action) {
+                    case MOVE, RETRY -> "messages.move";
+                    case DELETE, EXPIRE -> "messages.delete";
+                };
+        messages.unavailableBecause(clusterId, capability).ifPresent(reason -> {
+            throw new ConflictException("action-unavailable", reason);
+        });
     }
 
     // ---- send (Slice 4) -------------------------------------------------
