@@ -7,6 +7,9 @@ import io.github.sudoitir.rahdar.feature.resources.LifecycleRequests.UpdateResou
 import io.github.sudoitir.rahdar.feature.resources.QueueLifecycleService;
 import io.github.sudoitir.rahdar.feature.resources.SubscriptionConfigurationReader;
 import io.github.sudoitir.rahdar.feature.resources.SubscriptionConfigurationReader.SubscriptionConfiguration;
+import io.github.sudoitir.rahdar.feature.resources.TruncateService;
+import io.github.sudoitir.rahdar.feature.resources.TruncateService.Cut;
+import io.github.sudoitir.rahdar.feature.resources.TruncateService.TruncateEffect;
 import io.github.sudoitir.rahdar.kernel.core.ConflictException;
 import io.github.sudoitir.rahdar.kernel.gate.HeldResponse;
 import io.github.sudoitir.rahdar.platform.broker.Attempt;
@@ -16,6 +19,9 @@ import io.github.sudoitir.rahdar.platform.clusters.LifecycleViews.LifecycleOutco
 import io.github.sudoitir.rahdar.platform.clusters.ResourceTargets;
 import io.github.sudoitir.rahdar.platform.clusters.ResourceTargets.Target;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotNull;
+import java.time.Instant;
+import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -55,6 +61,7 @@ public class ResourceLifecycleController {
     private final QueueLifecycleService lifecycle;
     private final SubscriptionConfigurationReader configurations;
     private final ResourceTargets targets;
+    private final TruncateService truncates;
 
     // ---- create ---------------------------------------------------------
 
@@ -83,6 +90,33 @@ public class ResourceLifecycleController {
      * broker's whole configuration, so this is what the edit form shows before changing
      * one field of it — and what says, afterwards, that the change took.
      */
+    /**
+     * Cuts the oldest records off a destination's log: before an offset in each named partition, or before a time.
+     * {@code ?dryRun=true} answers the effect, which names every group that loses records it has not read, and cuts
+     * nothing. A compacted topic is refused with the driver's reason.
+     */
+    @HeldResponse
+    @PostMapping("/destinations/{kind}/{path}:truncate")
+    public TruncateEffect truncate(
+            @PathVariable UUID clusterId,
+            @PathVariable String kind,
+            @PathVariable String path,
+            @RequestParam(defaultValue = "false") boolean dryRun,
+            @Valid @RequestBody TruncateRequest request) {
+        return truncates.truncate(clusterId, kind, path, request.before().toCut(), dryRun);
+    }
+
+    /** {@code before} is {@code {offsets: {"0": 120}}} or {@code {time: "2026-10-28T09:30:00Z"}}. */
+    public record TruncateRequest(@NotNull @Valid Before before) {
+
+        public record Before(Map<Integer, Long> offsets, Instant time) {
+
+            Cut toCut() {
+                return new Cut(offsets, time);
+            }
+        }
+    }
+
     @GetMapping("/resources/{kind}/{path}")
     public SubscriptionConfiguration configuration(
             @PathVariable UUID clusterId, @PathVariable String kind, @PathVariable String path) {

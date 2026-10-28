@@ -9,6 +9,8 @@ import io.github.sudoitir.openbroker.model.ResourceId;
 import io.github.sudoitir.rahdar.feature.messages.MessageService;
 import io.github.sudoitir.rahdar.feature.messages.web.MessageViews.MessagePageView;
 import io.github.sudoitir.rahdar.feature.resources.BacklogService;
+import io.github.sudoitir.rahdar.feature.resources.TruncateService;
+import io.github.sudoitir.rahdar.kernel.core.ConflictException;
 import io.github.sudoitir.rahdar.platform.broker.Attempt;
 import io.github.sudoitir.rahdar.platform.broker.BacklogBreakdown.Breakdown;
 import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
@@ -83,6 +85,9 @@ class KafkaRegisterRealBrokerTest extends PostgresIntegrationTest {
 
     @Autowired
     MessageService messages;
+
+    @Autowired
+    TruncateService truncates;
 
     @Autowired
     JdbcClient jdbc;
@@ -313,6 +318,101 @@ class KafkaRegisterRealBrokerTest extends PostgresIntegrationTest {
                         id, log, 0, MessageService.LogStart.parse("earliest", null), "header.x = 1", 10))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("cannot filter");
+    }
+
+    @Test
+    void aTruncateNamesTheGroupsThatLoseRecordsCutsTheLogAndIsAudited() throws Exception {
+        UUID id = ((Attempt.Ok<ClusterDetail>) service.register(request("truncate", kafka.getBootstrapServers())))
+                .value()
+                .id();
+        String topic = run + "-truncate";
+        try (Admin admin = Admin.create(Map.of("bootstrap.servers", kafka.getBootstrapServers()))) {
+            admin.createTopics(List.of(new NewTopic(topic, 2, (short) 1))).all().get();
+        }
+        try (KafkaProducer<byte[], byte[]> producer = new KafkaProducer<>(
+                Map.of("bootstrap.servers", kafka.getBootstrapServers()),
+                new ByteArraySerializer(),
+                new ByteArraySerializer())) {
+            for (int i = 0; i < 20; i++) {
+                producer.send(new ProducerRecord<>(topic, i % 2, new byte[] {1}, new byte[] {2}))
+                        .get();
+            }
+        }
+        for (Map.Entry<String, Long> group :
+                Map.of(run + "-slow", 3L, run + "-fast", 8L).entrySet()) {
+            Map<String, Object> config = Map.of(
+                    "bootstrap.servers",
+                    kafka.getBootstrapServers(),
+                    "group.id",
+                    group.getKey(),
+                    "enable.auto.commit",
+                    "false");
+            try (KafkaConsumer<byte[], byte[]> consumer =
+                    new KafkaConsumer<>(config, new ByteArrayDeserializer(), new ByteArrayDeserializer())) {
+                consumer.commitSync(Map.of(new TopicPartition(topic, 0), new OffsetAndMetadata(group.getValue())));
+            }
+        }
+        TruncateService.Cut cut = new TruncateService.Cut(Map.of(0, 6L), null);
+        TruncateService.TruncateEffect effect = null;
+        for (int attempt = 0; attempt < 50 && effect == null; attempt++) {
+            try {
+                effect = truncates.truncate(id, "kafka.topic", topic, cut, true);
+            } catch (RuntimeException metadataNotThereYet) {
+                Thread.sleep(200);
+            }
+        }
+
+        assertThat(effect.records()).isEqualTo(6);
+        assertThat(effect.groups())
+                .extracting(g -> g.group() + ":" + g.records())
+                .containsExactly(run + "-slow:3");
+
+        TruncateService.TruncateEffect done = truncates.truncate(id, "kafka.topic", topic, cut, false);
+
+        assertThat(done.records()).isEqualTo(6);
+        ResourceId log = ResourceId.of("kafka.topic", topic);
+        MessagePageView afterwards = null;
+        for (int attempt = 0; attempt < 50 && afterwards == null; attempt++) {
+            try {
+                afterwards = messages.browseLog(id, log, 0, MessageService.LogStart.parse("earliest", null), null, 10);
+            } catch (RuntimeException metadataNotThereYet) {
+                Thread.sleep(200);
+            }
+        }
+        assertThat(afterwards.log().start()).isEqualTo(6);
+        assertThat(jdbc.sql(
+                                "SELECT outcome FROM audit_event WHERE cluster_id = ? AND action = 'TRUNCATE_DESTINATION' ORDER BY id")
+                        .param(id)
+                        .query(String.class)
+                        .list())
+                .containsExactly("SUCCESS", "SUCCESS");
+    }
+
+    @Test
+    void aCompactedTopicIsRefusedWithTheDriversReason() throws Exception {
+        UUID id = ((Attempt.Ok<ClusterDetail>) service.register(request("compact", kafka.getBootstrapServers())))
+                .value()
+                .id();
+        String topic = run + "-compact";
+        try (Admin admin = Admin.create(Map.of("bootstrap.servers", kafka.getBootstrapServers()))) {
+            admin.createTopics(List.of(new NewTopic(topic, 1, (short) 1).configs(Map.of("cleanup.policy", "compact"))))
+                    .all()
+                    .get();
+        }
+        TruncateService.Cut cut = new TruncateService.Cut(Map.of(0, 1L), null);
+        Throwable refused = null;
+        for (int attempt = 0; attempt < 50 && refused == null; attempt++) {
+            try {
+                truncates.truncate(id, "kafka.topic", topic, cut, true);
+                refused = new AssertionError("a compacted topic was truncated");
+            } catch (ConflictException e) {
+                refused = e;
+            } catch (RuntimeException metadataNotThereYet) {
+                Thread.sleep(200);
+            }
+        }
+
+        assertThat(refused).isInstanceOf(ConflictException.class).hasMessageContaining("compacts");
     }
 
     @Test
