@@ -5,6 +5,7 @@ export const ARTEMIS_KINDS = [
   {
     id: 'artemis.queue',
     resourceClass: 'SUBSCRIPTION',
+    partitioned: false,
     label: { singular: 'Queue', plural: 'Queues' },
     verbs: [
       'create',
@@ -23,40 +24,52 @@ export const ARTEMIS_KINDS = [
   {
     id: 'artemis.address',
     resourceClass: 'DESTINATION',
+    partitioned: false,
     label: { singular: 'Address', plural: 'Addresses' },
     verbs: ['create', 'delete', 'close'],
   },
   {
     id: 'artemis.connection',
     resourceClass: 'CONNECTION',
+    partitioned: false,
     label: { singular: 'Connection', plural: 'Connections' },
     verbs: ['close'],
   },
   {
     id: 'artemis.session',
     resourceClass: 'CHANNEL',
+    partitioned: false,
     label: { singular: 'Session', plural: 'Sessions' },
     verbs: ['close'],
   },
   {
     id: 'artemis.consumer',
     resourceClass: 'CONSUMER',
+    partitioned: false,
     label: { singular: 'Consumer', plural: 'Consumers' },
     verbs: ['close'],
   },
   {
     id: 'artemis.producer',
     resourceClass: 'PRODUCER',
+    partitioned: false,
     label: { singular: 'Producer', plural: 'Producers' },
     verbs: [],
   },
   {
     id: 'artemis.divert',
     resourceClass: 'ROUTE',
+    partitioned: false,
     label: { singular: 'Divert', plural: 'Diverts' },
     verbs: ['create', 'delete'],
   },
-  { id: 'artemis.bridge', resourceClass: 'ROUTE', label: { singular: 'Bridge', plural: 'Bridges' }, verbs: [] },
+  {
+    id: 'artemis.bridge',
+    resourceClass: 'ROUTE',
+    partitioned: false,
+    label: { singular: 'Bridge', plural: 'Bridges' },
+    verbs: [],
+  },
 ];
 
 /** The kinds the Kafka driver offers, labelled as its kinds declare them. */
@@ -71,12 +84,14 @@ export const KAFKA_KINDS = [
   {
     id: 'kafka.partition',
     resourceClass: 'CHANNEL',
+    partitioned: false,
     label: { singular: 'Partition', plural: 'Partitions' },
     verbs: [],
   },
   {
     id: 'kafka.group',
     resourceClass: 'CONSUMER',
+    partitioned: false,
     label: { singular: 'Group', plural: 'Groups' },
     verbs: ['delete'],
   },
@@ -87,10 +102,17 @@ export const KAFKA_KINDS = [
     label: { singular: 'Group on topic', plural: 'Groups on topics' },
     verbs: ['purge'],
   },
-  { id: 'kafka.acl', resourceClass: 'ROUTE', label: { singular: 'ACL', plural: 'ACLs' }, verbs: ['create', 'delete'] },
+  {
+    id: 'kafka.acl',
+    resourceClass: 'ROUTE',
+    partitioned: false,
+    label: { singular: 'ACL', plural: 'ACLs' },
+    verbs: ['create', 'delete'],
+  },
   {
     id: 'kafka.transactional-id',
     resourceClass: 'PRODUCER',
+    partitioned: false,
     label: { singular: 'Transactional ID', plural: 'Transactional IDs' },
     verbs: [],
   },

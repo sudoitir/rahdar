@@ -13,19 +13,18 @@ import {
   useRegisterCluster,
   type AdoptionPreviewView,
   type RegisterClusterRequest,
-  type TopologyView,
 } from './api.ts';
 import { useSlot } from '../../kernel/slots.ts';
 import { FieldRow } from '../../ui/FieldRow.tsx';
 import { focusFirstInvalid } from '../../ui/formErrors.ts';
 import { Notice } from '../../ui/Notice.tsx';
 import { notify, type ActionVerb } from '../../ui/notify.ts';
-import { CapabilityLedger } from './CapabilityLedger.tsx';
 import { ClusterIdentityFields } from './ClusterIdentityFields.tsx';
 import { RegistrationFailure } from './RegistrationFailure.tsx';
 import classes from './Clusters.module.css';
 import { adoptionCountsWords, defaultPattern } from './connectionWords.ts';
-import { NodeProbeTable } from './NodeProbeTable.tsx';
+import { ConnectionCheckPanel } from './ConnectionCheckPanel.tsx';
+import { checkPassed as passes } from './connectionCheck.ts';
 import { normaliseSeeds, seedRow, type SeedRow } from './normaliseSeeds.ts';
 import { isValidPattern } from './pattern.ts';
 
@@ -84,7 +83,7 @@ function blockedReason(
   if (registeredAlready) return 'These brokers are registered already, so there is nothing to register.';
   if (checkPassed) return null;
   if (stale) return 'Check the connection again — the details changed since the last check.';
-  if (check.isError) return 'The check failed. Fix what it reports above, then check again.';
+  if (check.isError || check.data) return 'The check failed. Fix what it reports above, then check again.';
   return 'Check the connection first.';
 }
 
@@ -96,17 +95,9 @@ function CheckOutcome({
   check: ReturnType<typeof useCheckConnection>;
   register: ReturnType<typeof useRegisterCluster>;
 }>) {
-  const preview = check.data?.system !== 'kafka' ? check.data : null;
-  const nodes = preview?.nodes.length ?? 0;
   return (
     <div aria-live="polite" className={classes.form}>
-      {preview ? (
-        <Text size="sm" c="dimmed">
-          {`Connected. Found ${nodes} node${nodes === 1 ? '' : 's'}.`}
-        </Text>
-      ) : null}
-      {preview ? <NodeProbeTable nodes={preview.nodes} label="Nodes found by the check" /> : null}
-      {preview ? <UntestedVersions topology={preview.topology} /> : null}
+      {check.data ? <ConnectionCheckPanel check={check.data} /> : null}
       {check.isError ? <RegistrationFailure error={check.error} /> : null}
       {register.isError ? <RegistrationFailure error={register.error} /> : null}
     </div>
@@ -255,27 +246,29 @@ export function ArtemisRegistrationForm() {
   // Registering is gated on a passing check of these exact inputs. The check opens a real Core
   // session per node, so it is the only thing that can catch a Core account the broker refuses —
   // the failure that otherwise surfaces after registration, where it reads as a broken cluster.
-  const checkPassed = check.isSuccess && checkedThis && check.data.system !== 'kafka';
+  const checkPassed = check.isSuccess && checkedThis && passes(check.data);
   const afterProbe = useSlot('cluster.registration.afterProbe');
   // Brokers a registered cluster holds stay refused whichever call found it: the check, or a registration
   // that lost a race with another one. Only a new check of changed details can clear it.
-  const registeredAlready = checkedThis && Boolean(alreadyRegistered(check.error) ?? alreadyRegistered(register.error));
+  const registeredAlready =
+    checkedThis &&
+    Boolean(check.data?.alreadyRegistered ?? alreadyRegistered(check.error) ?? alreadyRegistered(register.error));
   const registerBlockedReason = blockedReason(valid, check, checkPassed, stale, registeredAlready);
 
-  const preview = check.data?.system !== 'kafka' ? check.data : null;
+  const preview = check.data ?? null;
   const adoption = checkPassed ? (preview?.adoption ?? null) : null;
   const adopt = adoption ? (adoptChoice ?? adoption.disagreements.length === 0) : false;
 
   // Open the advanced fields on their own once a check reveals they'd matter —
   // the operator never has to know they exist until the ledger says so.
   useEffect(() => {
-    if (!check.data || check.data.system === 'kafka') return;
+    if (!check.data) return;
     // A refusal, not an unproven capability: at check time no write has been
-    // attempted, so messageIo is legitimately UNKNOWN and opening the advanced
+    // attempted, so message I/O is legitimately UNKNOWN and opening the advanced
     // fields for it would fire on every single registration.
-    const gap =
-      check.data.capabilities.messageIo.status === 'UNAVAILABLE' ||
-      check.data.capabilities.notifications.status === 'UNAVAILABLE';
+    const gap = check.data.access.some(
+      (a) => (a.capability === 'messages' || a.capability === 'notifications') && a.status === 'UNAVAILABLE',
+    );
     if (gap) setAdvancedOpen(true);
   }, [check.data]);
 
@@ -405,8 +398,6 @@ export function ArtemisRegistrationForm() {
 
         <CheckOutcome check={check} register={register} />
 
-        {preview ? <CapabilityLedger capabilities={preview.capabilities} /> : null}
-
         {adoption ? <AdoptionChoice adoption={adoption} adopt={adopt} onChange={setAdoptChoice} /> : null}
 
         {/* What the enabled features make of the check, such as the configuration it
@@ -447,20 +438,5 @@ export function ArtemisRegistrationForm() {
         </div>
       </form>
     </div>
-  );
-}
-
-/**
- * Nodes on a release newer than Rahdar has been tested against (ADR-0142). Registration
- * goes ahead; the operator is told before they rely on it rather than after.
- */
-function UntestedVersions({ topology }: Readonly<{ topology: TopologyView }>) {
-  const untested = topology.nodes.flatMap((n) => n.endpoints).filter((e) => e.versionSupport === 'NEWER_THAN_TESTED');
-  if (untested.length === 0) return null;
-  const which = untested.map((e) => `${e.name} runs Artemis ${e.version}`).join('; ');
-  return (
-    <Notice title="Newer Artemis than Rahdar has tested" tone="warning">
-      {`${which}. Registration will go ahead, but this release is outside the range Rahdar's tests cover, so a management call may behave differently. The supported versions page lists the tested range.`}
-    </Notice>
   );
 }

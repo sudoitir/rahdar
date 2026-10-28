@@ -29,6 +29,7 @@ const OTHER_KINDS = [
   {
     id: 'other.stream',
     resourceClass: 'SUBSCRIPTION',
+    partitioned: false,
     label: { singular: 'Stream', plural: 'Streams' },
     verbs: ['pause', 'resume'],
   },

@@ -9,8 +9,8 @@ import { useCheckConnection, useRegisterCluster, type RegisterClusterRequest } f
 import { ClusterIdentityFields } from './ClusterIdentityFields.tsx';
 import classes from './Clusters.module.css';
 import { KAFKA_EMPTY, kafkaConnection, kafkaProblems, type KafkaFields } from './kafkaConnection.ts';
-import { kafkaCheckPassed, unreachedBrokers } from './kafkaCheck.ts';
-import { KafkaCheckPanel } from './KafkaCheckPanel.tsx';
+import { checkPassed, unreachedNodes } from './connectionCheck.ts';
+import { ConnectionCheckPanel } from './ConnectionCheckPanel.tsx';
 import { KafkaConnectionFields } from './KafkaConnectionFields.tsx';
 import { RegistrationFailure } from './RegistrationFailure.tsx';
 
@@ -43,9 +43,9 @@ export function KafkaRegistrationForm() {
   // The check vouches for exactly these inputs, secrets included: one edited afterwards is a new check.
   const signature = JSON.stringify(kafkaConnection(f));
   const checkedThis = checkedInputs === signature;
-  const result = check.data?.system === 'kafka' ? check.data : null;
-  const passed = checkedThis && result !== null && kafkaCheckPassed(result);
-  const degraded = passed && result ? unreachedBrokers(result) : [];
+  const result = check.data ?? null;
+  const passed = checkedThis && result !== null && checkPassed(result);
+  const degraded = passed && result ? unreachedNodes(result) : [];
 
   function blockedReason(): string | null {
     if (!valid) return 'Fill in the fields marked above, then check the connection.';
@@ -81,7 +81,7 @@ export function KafkaRegistrationForm() {
         <KafkaConnectionFields form={form} />
 
         {check.isError ? <RegistrationFailure error={check.error} /> : null}
-        {result ? <KafkaCheckPanel check={result} /> : null}
+        {result ? <ConnectionCheckPanel check={result} /> : null}
         {register.isError ? <RegistrationFailure error={register.error} /> : null}
 
         <ClusterIdentityFields

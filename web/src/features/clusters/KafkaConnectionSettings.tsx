@@ -8,16 +8,16 @@ import { ErrorState } from '../../ui/ErrorState.tsx';
 import { focusFirstInvalid } from '../../ui/formErrors.ts';
 import { notify, type ActionVerb } from '../../ui/notify.ts';
 import {
-  useCheckKafkaConnectionEdit,
+  useCheckConnectionEdit,
   useUpdateConnection,
   type ClusterDetail,
   type KafkaConnection,
-  type KafkaUpdateRequest,
+  type UpdateClusterRequest,
 } from './api.ts';
 import classes from './Clusters.module.css';
 import { kafkaConnection, kafkaFieldsOf, kafkaProblems, secretRequired, type KafkaFields } from './kafkaConnection.ts';
-import { kafkaCheckPassed } from './kafkaCheck.ts';
-import { KafkaCheckPanel } from './KafkaCheckPanel.tsx';
+import { checkPassed } from './connectionCheck.ts';
+import { ConnectionCheckPanel } from './ConnectionCheckPanel.tsx';
 import { KafkaConnectionFields } from './KafkaConnectionFields.tsx';
 
 const SAVE: ActionVerb = { verb: 'Save', past: 'Saved', progressive: 'Saving' };
@@ -37,7 +37,7 @@ export function KafkaConnectionForm({
   cluster,
   stored,
 }: Readonly<{ cluster: ClusterDetail; stored: KafkaConnection }>) {
-  const check = useCheckKafkaConnectionEdit(cluster.id);
+  const check = useCheckConnectionEdit(cluster.id);
   const update = useUpdateConnection(cluster.id);
   const [checkedFor, setCheckedFor] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
@@ -53,19 +53,22 @@ export function KafkaConnectionForm({
   useUnsavedSection(form.isDirty());
   const f = form.values;
 
-  const request: KafkaUpdateRequest = {
+  const request: UpdateClusterRequest = {
     name: f.name.trim(),
     description: f.description,
     connection: kafkaConnection(f),
   };
   const signature = JSON.stringify(request);
-  // The cluster being edited is not "another registered cluster" to itself.
-  const result = check.data && {
-    ...check.data,
-    alreadyRegistered: check.data.alreadyRegistered?.id === cluster.id ? null : check.data.alreadyRegistered,
-  };
   const checkedThis = checkedFor === signature;
-  const passed = checkedThis && result !== undefined && kafkaCheckPassed(result);
+  const result = check.data;
+  // The cluster being edited is not "another cluster" to itself.
+  const passed =
+    checkedThis &&
+    result !== undefined &&
+    checkPassed({
+      ...result,
+      alreadyRegistered: result.alreadyRegistered?.id === cluster.id ? null : result.alreadyRegistered,
+    });
   const credentials = secretRequired(f, stored) || f.password !== '' || f.token !== '';
 
   function reason(): string | null {
@@ -107,7 +110,7 @@ export function KafkaConnectionForm({
 
       <div aria-live="polite" className={classes.form}>
         {check.isError ? <ErrorState variant="inline" error={check.error} /> : null}
-        {result && checkedThis ? <KafkaCheckPanel check={result} /> : null}
+        {result && checkedThis ? <ConnectionCheckPanel check={result} selfId={cluster.id} /> : null}
         {update.isError && !confirming ? <ErrorState variant="inline" error={update.error} /> : null}
       </div>
 

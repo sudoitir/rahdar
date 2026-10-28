@@ -6,7 +6,7 @@ import userEvent from '@testing-library/user-event';
 
 import { renderWithProviders } from '../../test/render.tsx';
 import { server } from '../../test/setup.ts';
-import type { KafkaConnectionCheck, RegisterClusterRequest } from './api.ts';
+import type { ConnectionCheck, RegisterClusterRequest } from './api.ts';
 
 const navigateSpy = vi.fn();
 vi.mock('@tanstack/react-router', async (importOriginal) => ({
@@ -21,7 +21,7 @@ vi.mock('@tanstack/react-router', async (importOriginal) => ({
 
 const { KafkaRegistrationForm } = await import('./KafkaRegistrationForm.tsx');
 
-function check(over: Partial<KafkaConnectionCheck> = {}): KafkaConnectionCheck {
+function check(over: Partial<ConnectionCheck> = {}): ConnectionCheck {
   return {
     system: 'kafka',
     version: { text: 'at least 3.5', mode: 'ZooKeeper', exact: false },
@@ -42,12 +42,13 @@ function check(over: Partial<KafkaConnectionCheck> = {}): KafkaConnectionCheck {
       },
     ],
     failure: null,
+    contributions: {},
     ...over,
   };
 }
 
 let bodies: RegisterClusterRequest[];
-function answer(dryRun: KafkaConnectionCheck) {
+function answer(dryRun: ConnectionCheck) {
   server.use(
     http.post('*/api/v1/clusters', async ({ request }) => {
       bodies.push((await request.json()) as RegisterClusterRequest);
@@ -200,7 +201,7 @@ describe('KafkaRegistrationForm', () => {
     ['TLS', 'The certificate is not trusted, or does not match the host name'],
     ['AUTHENTICATION', 'Authentication failed'],
     ['AUTHORIZATION', 'The account may not describe the cluster'],
-    ['UNSUPPORTED_VERSION', 'This Kafka version is not supported'],
+    ['UNSUPPORTED_VERSION', 'This version is not supported'],
   ] as const)('names the cause %s and the next action, and keeps Register disabled', async (cause, title) => {
     const user = userEvent.setup();
     answer(check({ failure: { cause, message: 'It went wrong here.', next: 'Do this next.' }, nodes: [] }));
@@ -233,7 +234,7 @@ describe('KafkaRegistrationForm', () => {
     renderWithProviders(<KafkaRegistrationForm />);
     await fillAndCheck(user);
 
-    expect(await screen.findByText('Some brokers were not reached')).toBeInTheDocument();
+    expect(await screen.findByText('Some nodes were not reached')).toBeInTheDocument();
     expect(screen.getAllByText(/Broker 2 \(internal-k2:9092\)/).length).toBeGreaterThan(0);
     expect(screen.getByText(/advertised listeners must be reachable from Rahdar/)).toBeInTheDocument();
     expect(screen.getByText('1 broker was not reached, so the cluster will be shown degraded.')).toBeInTheDocument();

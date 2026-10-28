@@ -6,7 +6,7 @@ import linkClasses from '../../ui/InlineLink.module.css';
 import type { CapabilitiesView, CapabilityView, VersionGateView } from './api.ts';
 import styles from './CapabilityLedger.module.css';
 
-type Key = Exclude<keyof CapabilitiesView, 'versionGates'>;
+type Key = Exclude<keyof CapabilitiesView, 'versionGates' | 'findings'>;
 
 const LABELS: Record<Key, string> = {
   managementRead: 'Read management data',
@@ -59,21 +59,32 @@ export function CapabilityLedger({
   clusterId?: string;
 }>) {
   const [open, setOpen] = useState<string | null>(null);
-  const rows: Row[] = [
-    ...ORDER.map((key) => ({
-      key,
-      label: LABELS[key],
-      cap: capabilities[key],
-      word: statusWord(key, capabilities[key]),
-      declarable: DECLARABLE[key],
-    })),
-    ...capabilities.versionGates.map((gate) => ({
-      key: gate.feature,
-      label: gate.label,
-      cap: gate,
-      word: gateWord(gate),
-    })),
-  ];
+  // A system whose driver assesses its own capabilities lists them as it names them, with its own reasons;
+  // the fixed rows below are the ones Artemis has.
+  const own: Row[] = (capabilities.findings ?? []).map((f) => ({
+    key: f.capability,
+    label: f.capability,
+    cap: { status: f.status, reason: f.reason },
+    word: statusWord('managementRead', { status: f.status, reason: f.reason }),
+  }));
+  const rows: Row[] =
+    own.length > 0
+      ? own
+      : [
+          ...ORDER.map((key) => ({
+            key,
+            label: LABELS[key],
+            cap: capabilities[key],
+            word: statusWord(key, capabilities[key]),
+            declarable: DECLARABLE[key],
+          })),
+          ...capabilities.versionGates.map((gate) => ({
+            key: gate.feature,
+            label: gate.label,
+            cap: gate,
+            word: gateWord(gate),
+          })),
+        ];
 
   return (
     <div className={styles.ledger}>

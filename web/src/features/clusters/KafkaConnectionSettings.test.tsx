@@ -133,12 +133,22 @@ describe('CapabilitiesSection of a Kafka cluster', () => {
             messageIo: { status: 'AVAILABLE', reason: 'ok' },
             slowConsumerDetection: { status: 'AVAILABLE', reason: 'ok' },
             versionGates: [],
+            findings: [
+              { capability: 'Describe the cluster', status: 'AVAILABLE', reason: 'ok' },
+              {
+                capability: 'Read consumer group offsets',
+                status: 'UNAVAILABLE',
+                reason: 'The account may not describe groups.',
+              },
+            ],
           },
         }),
       ),
     );
     renderWithProviders(<CapabilitiesSection clusterId={CLUSTER} />);
-    expect(await screen.findByText('Live events')).toBeInTheDocument();
+    expect(await screen.findByText('Read consumer group offsets')).toBeInTheDocument();
+    expect(screen.getByText('Describe the cluster')).toBeInTheDocument();
+    expect(screen.queryByText('Live events')).not.toBeInTheDocument();
     expect(document.body.textContent).not.toMatch(/Jolokia|broker\.xml/);
   });
 });

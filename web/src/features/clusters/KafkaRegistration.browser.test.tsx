@@ -4,16 +4,16 @@ import { useForm } from '@mantine/form';
 import { screen } from '@testing-library/react';
 
 import { axeViolations, contentWidth, Frame, renderThemed, SCHEMES, settle } from '../../test/browser.tsx';
-import type { KafkaConnectionCheck } from './api.ts';
+import type { ConnectionCheck } from './api.ts';
 import { KAFKA_EMPTY, kafkaProblems, type KafkaFields } from './kafkaConnection.ts';
-import { KafkaCheckPanel } from './KafkaCheckPanel.tsx';
+import { ConnectionCheckPanel } from './ConnectionCheckPanel.tsx';
 import { KafkaConnectionFields } from './KafkaConnectionFields.tsx';
 
 /** The Kafka registration parts as Chromium lays them out and a keyboard walks them. */
 
 const LONG = 'broker-with-a-very-long-advertised-host-name.eu-west-1.internal.example.com';
 
-function check(over: Partial<KafkaConnectionCheck> = {}): KafkaConnectionCheck {
+function check(over: Partial<ConnectionCheck> = {}): ConnectionCheck {
   return {
     system: 'kafka',
     version: { text: 'at least 3.5', mode: 'ZooKeeper', exact: false },
@@ -40,6 +40,7 @@ function check(over: Partial<KafkaConnectionCheck> = {}): KafkaConnectionCheck {
       },
     ],
     failure: null,
+    contributions: {},
     ...over,
   };
 }
@@ -50,11 +51,11 @@ describe.each(SCHEMES)('the Kafka connection check in the %s scheme', (scheme) =
   it.each([contentWidth(1280), 640])('is axe-clean and inside its box at %i px, partly reached', async (width) => {
     const { container } = renderThemed(
       <Frame width={width} height={900}>
-        <KafkaCheckPanel check={check()} />
+        <ConnectionCheckPanel check={check()} />
       </Frame>,
       scheme,
     );
-    const panel = await screen.findByText('Some brokers were not reached');
+    const panel = await screen.findByText('Some nodes were not reached');
     await settle(() => String(container.scrollWidth));
     const frame = panel.closest('[aria-live]')!.parentElement!;
     expect(frame.scrollWidth).toBeLessThanOrEqual(frame.clientWidth);
@@ -64,7 +65,7 @@ describe.each(SCHEMES)('the Kafka connection check in the %s scheme', (scheme) =
   it.each(CAUSES)('is axe-clean for the failure cause %s', async (cause) => {
     const { container } = renderThemed(
       <Frame width={contentWidth(1280)} height={900}>
-        <KafkaCheckPanel
+        <ConnectionCheckPanel
           check={check({ failure: { cause, message: 'It failed here.', next: 'Do this.' }, nodes: [] })}
         />
       </Frame>,

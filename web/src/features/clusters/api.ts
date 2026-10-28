@@ -19,12 +19,11 @@ export type LogicalNodeView = Schemas['LogicalNodeView'];
 export type NodeEndpointView = Schemas['NodeEndpointView'];
 export type ProblemDetail = Schemas['ProblemDetail'];
 export type VersionGateView = Schemas['VersionGateView'];
-export type RegisterPreview = Schemas['RegisterPreview'];
-export type NodeProbeView = Schemas['NodeProbeView'];
+export type ConnectionCheck = Schemas['ConnectionCheck'];
+export type CheckNode = Schemas['NodeReach'];
 export type AdoptionPreviewView = Schemas['AdoptionPreviewView'];
 export type ConnectionView = Schemas['ConnectionView'];
 export type ClusterConnectionView = Schemas['ClusterConnectionView'];
-/** The edit: `core: null` clears the Core account, which the generated type cannot say. */
 export type TopologyView = Schemas['TopologyView'];
 export type EstateSubscription = Schemas['EstateSubscriptionView'];
 
@@ -73,57 +72,26 @@ export interface RegisterClusterRequest {
   connection: ConnectionInput;
 }
 
-export type CauseKind = 'DNS' | 'REFUSED' | 'TIMEOUT' | 'TLS' | 'AUTHENTICATION';
-
-export interface KafkaNodeCheck {
-  id: string;
-  /** The address the node advertises; null when it was never learned. */
-  address: string | null;
-  functions: string[];
-  outcome: 'OK' | 'UNREACHABLE';
-  cause: CauseKind | null;
-  message: string | null;
+/**
+ * The edit of a cluster's connection, for either system. Hand-written because the generated union's
+ * discriminator is spelled as a class name and cannot be satisfied; `core: null` clears the Core account.
+ * A secret left out keeps the stored one.
+ */
+export interface ArtemisConnectionUpdate {
+  system: 'artemis';
+  seedUrls?: string[];
+  managementUrlPattern?: string;
+  tlsBundle?: string;
+  management?: { username: string; password: string };
+  core?: { username: string; password: string } | null;
 }
 
-/** The dry run of a Kafka registration or edit. */
-export interface KafkaConnectionCheck {
-  system: 'kafka';
-  /** Null when the check never reached a broker. */
-  version: { text: string; mode?: string | null; exact: boolean } | null;
-  supported: boolean;
-  clusterId: string | null;
-  alreadyRegistered: { id: string; name: string } | null;
-  nodes: KafkaNodeCheck[];
-  quorum?: { available: boolean; reason?: string | null; leader?: string | null; voters?: number | null } | null;
-  access: { capability: string; status: CapabilityStatus; reason: string }[];
-  failure: {
-    cause: CauseKind | 'AUTHORIZATION' | 'UNSUPPORTED_VERSION';
-    message: string;
-    next: string;
-  } | null;
-}
-
-/** The dry run of an Artemis registration: the probe, as before. */
-export type ArtemisConnectionCheck = RegisterPreview & { system?: undefined };
-
-export type RegistrationCheck = ArtemisConnectionCheck | KafkaConnectionCheck;
-
-/** The edit of an Artemis cluster: `core: null` clears the Core account, which the generated type cannot say. */
-export type ArtemisUpdateRequest = Omit<Schemas['UpdateClusterRequest'], 'core'> & {
-  core?: Schemas['AccountUpdate'] | null;
-};
-
-/** The edit of a Kafka cluster: its whole connection, a secret left out keeping the stored one. */
-export interface KafkaUpdateRequest {
+export interface UpdateClusterRequest {
   name?: string;
   description?: string;
-  connection: KafkaConnection;
+  environmentId?: string;
+  connection?: ArtemisConnectionUpdate | KafkaConnection;
 }
-
-export type UpdateClusterRequest = ArtemisUpdateRequest | KafkaUpdateRequest;
-
-/** The dry run of an Artemis edit, node by node. */
-export type ConnectionCheck = Schemas['ConnectionCheck'];
 
 /** String enums the backend serialises as bare strings; narrowed here for the UI. */
 export type CapabilityStatus = 'AVAILABLE' | 'UNAVAILABLE' | 'UNKNOWN';
@@ -206,7 +174,7 @@ export function useSystems(): UseQueryResult<LoadedSystem[], ApiError> {
 }
 
 export function useCheckConnection() {
-  return useMutation<RegistrationCheck, ApiError, RegisterClusterRequest>({
+  return useMutation<ConnectionCheck, ApiError, RegisterClusterRequest>({
     mutationFn: (body) =>
       request('/clusters?dryRun=true', {
         method: 'POST',
@@ -256,15 +224,7 @@ export function useDeleteCluster() {
 
 /** Checks an edited connection node by node; nothing is saved. */
 export function useCheckConnectionEdit(clusterId: string) {
-  return useMutation<ConnectionCheck, ApiError, ArtemisUpdateRequest>({
-    mutationFn: (body) =>
-      request(`/clusters/${clusterId}?dryRun=true`, { method: 'PATCH', body: JSON.stringify(body) }),
-  });
-}
-
-/** Checks an edited Kafka connection broker by broker; nothing is saved. */
-export function useCheckKafkaConnectionEdit(clusterId: string) {
-  return useMutation<KafkaConnectionCheck, ApiError, KafkaUpdateRequest>({
+  return useMutation<ConnectionCheck, ApiError, UpdateClusterRequest>({
     mutationFn: (body) =>
       request(`/clusters/${clusterId}?dryRun=true`, { method: 'PATCH', body: JSON.stringify(body) }),
   });

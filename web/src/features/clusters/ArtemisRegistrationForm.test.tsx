@@ -32,41 +32,54 @@ const { ArtemisRegistrationForm } = await import('./ArtemisRegistrationForm.tsx'
 
 function preview() {
   return {
-    capabilities: {
-      managementRead: { status: 'AVAILABLE', reason: 'ok', brokerXmlSnippet: null },
-      managementWrite: { status: 'AVAILABLE', reason: 'ok', brokerXmlSnippet: null },
-      notifications: { status: 'AVAILABLE', reason: 'ok', brokerXmlSnippet: null },
-      messageIo: { status: 'AVAILABLE', reason: 'ok', brokerXmlSnippet: null },
-      slowConsumerDetection: { status: 'UNKNOWN', reason: 'not exposed', brokerXmlSnippet: '<x/>' },
-      versionGates: [],
-    },
-    reachableSeeds: 1,
-    discoveredNodes: 2,
+    system: 'artemis',
+    version: { text: '2.40.0', exact: true },
+    supported: true,
+    clusterId: null,
+    alreadyRegistered: null,
     managementUrlPattern: 'http://{host}:8161/console/jolokia',
     nodes: [
       {
-        name: 'broker-1',
-        haRole: 'PRIMARY',
-        artemisNodeId: 'node-a',
-        version: '2.40.0',
-        managementUrl: 'http://broker-1:8161/console/jolokia',
-        urlSource: 'SEED',
-        urlProblem: null,
-        management: 'ACCEPTED',
-        core: 'REJECTED',
+        id: 'broker-1',
+        address: 'http://broker-1:8161/console/jolokia',
+        functions: [],
+        outcome: 'OK',
+        cause: null,
+        message: null,
+        artemis: {
+          nativeNodeId: 'node-a',
+          version: '2.40.0',
+          haRole: 'PRIMARY',
+          urlSource: 'SEED',
+          urlProblem: null,
+          management: 'ACCEPTED',
+          core: 'REJECTED',
+        },
       },
       {
-        name: 'broker-2',
-        haRole: 'BACKUP',
-        artemisNodeId: 'node-a',
-        version: '2.40.0',
-        managementUrl: null,
-        urlSource: null,
-        urlProblem: 'OTHER_BROKER',
-        management: 'ACCEPTED',
-        core: 'NOT_TRIED',
+        id: 'broker-2',
+        address: null,
+        functions: [],
+        outcome: 'OK',
+        cause: null,
+        message: null,
+        artemis: {
+          nativeNodeId: 'node-a',
+          version: '2.40.0',
+          haRole: 'BACKUP',
+          urlSource: null,
+          urlProblem: 'OTHER_BROKER',
+          management: 'ACCEPTED',
+          core: 'NOT_TRIED',
+        },
       },
     ],
+    quorum: null,
+    access: [
+      { capability: 'management.read', status: 'AVAILABLE', reason: 'ok' },
+      { capability: 'slow-consumer-detection', status: 'UNKNOWN', reason: 'not exposed' },
+    ],
+    failure: null,
     adoption: {
       counts: { addresses: 3, addressSettings: 2, securitySettings: 1, diverts: 0 },
       disagreements: [] as string[],
@@ -90,37 +103,6 @@ function preview() {
           },
         ],
       },
-    },
-    topology: {
-      clusterId: 'preview',
-      nodes: [
-        {
-          artemisNodeId: 'node-a',
-          splitBrain: 'NONE',
-          replicationBehind: false,
-          endpoints: [
-            {
-              id: 'e1',
-              name: 'broker-1',
-              artemisNodeId: 'node-a',
-              jolokiaUrl: 'http://broker-1:8161/console/jolokia',
-              coreUrl: null,
-              haRole: 'PRIMARY',
-              state: 'STARTED',
-              active: true,
-              replicaSync: null,
-              version: '2.40.0',
-              versionSupport: 'SUPPORTED',
-              lastError: null,
-              lastSeenAt: null,
-              urlSource: 'SEED',
-              urlProblem: null,
-              coreUrlManual: false,
-              manageable: true,
-            },
-          ],
-        },
-      ],
     },
   };
 }
@@ -163,7 +145,7 @@ describe('ArtemisRegistrationForm', () => {
     await user.type(screen.getByLabelText(/Broker management URL/), 'broker-1');
     await user.click(screen.getByRole('button', { name: 'Check connection' }));
 
-    expect(await screen.findByText(/^Connected\. Found \d+ nodes?\.$/)).toBeInTheDocument();
+    expect(await screen.findByRole('table', { name: 'Nodes found by the check' })).toBeInTheDocument();
   });
 
   it('tells the operator that one management URL is enough', () => {
@@ -180,7 +162,7 @@ describe('ArtemisRegistrationForm', () => {
 
     await user.type(screen.getByLabelText(/Broker management URL/), 'broker-1');
     await user.click(screen.getByRole('button', { name: 'Check connection' }));
-    await screen.findByText(/^Connected\./);
+    await screen.findByRole('table', { name: 'Nodes found by the check' });
 
     await user.click(screen.getByRole('button', { name: 'Add another seed' }));
     await user.type(screen.getByLabelText(/Another management URL/), 'broker-2');
@@ -188,36 +170,19 @@ describe('ArtemisRegistrationForm', () => {
     expect(screen.getByRole('button', { name: 'Register cluster' })).toBeDisabled();
   });
 
-  it('warns before registering a broker newer than Rahdar has tested, and still lets it register', async () => {
-    const untested = preview();
-    untested.topology.nodes[0].endpoints[0].version = '2.60.0';
-    untested.topology.nodes[0].endpoints[0].versionSupport = 'NEWER_THAN_TESTED';
-    server.use(http.post('*/api/v1/clusters', () => HttpResponse.json(untested)));
-    const user = userEvent.setup();
-    renderWithProviders(<ArtemisRegistrationForm />);
-
-    await user.type(screen.getByLabelText(/Broker management URL/), 'broker-1');
-    await user.click(screen.getByRole('button', { name: 'Check connection' }));
-
-    expect(await screen.findByText('Newer Artemis than Rahdar has tested')).toBeInTheDocument();
-    expect(screen.getByText(/broker-1 runs Artemis 2\.60\.0/)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Register cluster' })).toBeEnabled();
-  });
-
   it('states why a broker older than the supported minimum is refused', async () => {
     server.use(
       http.post('*/api/v1/clusters', () =>
-        HttpResponse.json(
-          {
-            type: 'https://rahdar.dev/problems/broker-unsupported-version',
-            title: 'Artemis version not supported',
-            status: 422,
-            detail:
-              'The broker at http://broker-1:8161/console/jolokia runs Artemis 2.31.2. Rahdar supports Artemis 2.33.0 and later; upgrade the broker to register it.',
-            brokerErrorKind: 'UNSUPPORTED_VERSION',
+        HttpResponse.json({
+          ...preview(),
+          supported: false,
+          failure: {
+            cause: 'UNSUPPORTED_VERSION',
+            message:
+              'The broker at http://broker-1:8161/console/jolokia runs Artemis 2.31.2. Rahdar supports Artemis 2.33.0 and later.',
+            next: 'Upgrade the broker to register it.',
           },
-          { status: 422, headers: { 'Content-Type': 'application/problem+json' } },
-        ),
+        }),
       ),
     );
     const user = userEvent.setup();
@@ -227,6 +192,7 @@ describe('ArtemisRegistrationForm', () => {
     await user.click(screen.getByRole('button', { name: 'Check connection' }));
 
     expect(await screen.findByText(/Rahdar supports Artemis 2\.33\.0 and later/)).toBeInTheDocument();
+    expect(screen.getByText('Next: Upgrade the broker to register it.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Register cluster' })).toBeDisabled();
     // Nothing was edited, so the hint must not claim the details changed.
     expect(screen.getByText('The check failed. Fix what it reports above, then check again.')).toBeInTheDocument();
@@ -264,7 +230,7 @@ describe('ArtemisRegistrationForm', () => {
 
     await user.type(screen.getByLabelText(/Broker management URL/), 'broker-1');
     await user.click(screen.getByRole('button', { name: 'Check connection' }));
-    await screen.findByText(/^Connected\./);
+    await screen.findByRole('table', { name: 'Nodes found by the check' });
     await user.click(screen.getByRole('button', { name: 'Register cluster' }));
 
     expect(await screen.findByRole('link', { name: 'Open prod-emea' })).toHaveAttribute('href', '/clusters/c1');
@@ -285,27 +251,6 @@ describe('ArtemisRegistrationForm', () => {
     expect(screen.getByRole('button', { name: 'Register cluster' })).toBeDisabled();
   });
 
-  it('lists an operation the brokers are too old for with the release it needs', async () => {
-    const gated = preview();
-    (gated.capabilities.versionGates as unknown[]).push({
-      feature: 'X',
-      label: 'Doing X',
-      requiredVersion: '2.60.0',
-      status: 'UNAVAILABLE',
-      reason: 'Doing X needs Artemis 2.60.0 or later. This cluster runs broker-1 (2.40.0).',
-      brokerXmlSnippet: null,
-      nodes: [{ nodeId: 'e1', nodeName: 'broker-1', version: '2.40.0', supported: false }],
-    });
-    server.use(http.post('*/api/v1/clusters', () => HttpResponse.json(gated)));
-    const user = userEvent.setup();
-    renderWithProviders(<ArtemisRegistrationForm />);
-
-    await user.type(screen.getByLabelText(/Broker management URL/), 'broker-1');
-    await user.click(screen.getByRole('button', { name: 'Check connection' }));
-
-    expect(await screen.findByRole('button', { name: /Doing X\s*Needs version 2\.60\.0/ })).toBeInTheDocument();
-  });
-
   it('will not register until the connection has been checked, and says so', async () => {
     const user = userEvent.setup();
     renderWithProviders(<ArtemisRegistrationForm />);
@@ -324,7 +269,7 @@ describe('ArtemisRegistrationForm', () => {
 
     await user.type(screen.getByLabelText(/Broker management URL/), 'broker-1');
     await user.click(screen.getByRole('button', { name: 'Check connection' }));
-    await screen.findByText(/^Connected\./);
+    await screen.findByRole('table', { name: 'Nodes found by the check' });
 
     expect(screen.getByRole('button', { name: 'Register cluster' })).toBeEnabled();
   });
@@ -336,7 +281,7 @@ describe('ArtemisRegistrationForm', () => {
 
     await user.type(screen.getByLabelText(/Broker management URL/), 'broker-1');
     await user.click(screen.getByRole('button', { name: 'Check connection' }));
-    await screen.findByText(/^Connected\./);
+    await screen.findByRole('table', { name: 'Nodes found by the check' });
 
     // A check that survived a password edit would vouch for credentials it never
     // saw — which is exactly how a wrong Core account reached a registered cluster.
@@ -428,7 +373,7 @@ describe('ArtemisRegistrationForm', () => {
 
     await user.type(screen.getByLabelText(/Broker management URL/), 'broker-1');
     await user.click(screen.getByRole('button', { name: 'Check connection' }));
-    await screen.findByText(/^Connected\./);
+    await screen.findByRole('table', { name: 'Nodes found by the check' });
     await user.click(screen.getByRole('button', { name: 'Register cluster' }));
 
     expect(await screen.findByText('Registered cluster prod-eu')).toBeInTheDocument();
@@ -447,9 +392,9 @@ describe('ArtemisRegistrationForm', () => {
     const primary = within(table).getByRole('row', { name: /broker-1/ });
     expect(primary).toHaveTextContent('Accepted');
     expect(primary).toHaveTextContent('Rejected');
-    expect(primary).toHaveTextContent('(from the registered seed address)');
+    expect(primary).toHaveTextContent('From the registered seed address');
     const backup = within(table).getByRole('row', { name: /broker-2/ });
-    expect(backup).toHaveTextContent('None: a different broker answered at the address the pattern gives');
+    expect(backup).toHaveTextContent('No management URL: a different broker answered at the address the pattern gives');
     expect(backup).toHaveTextContent('Not tried');
   });
 
@@ -468,7 +413,7 @@ describe('ArtemisRegistrationForm', () => {
     await user.click(screen.getByRole('button', { name: /Advanced/ }));
     expect(screen.getByLabelText('Management URL pattern')).toHaveValue('http://{host}:8161/console/jolokia');
     await user.click(screen.getByRole('button', { name: 'Check connection' }));
-    await screen.findByText(/^Connected\./);
+    await screen.findByRole('table', { name: 'Nodes found by the check' });
 
     expect(body.system).toBe('artemis');
     expect(body.connection).toMatchObject({
@@ -492,7 +437,7 @@ describe('ArtemisRegistrationForm', () => {
     await user.type(screen.getByLabelText(/Broker management URL/), 'broker-1, broker-2');
     expect(screen.getByText(/http:\/\/broker-2:8161\/console\/jolokia/)).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Check connection' }));
-    await screen.findByText(/^Connected\./);
+    await screen.findByRole('table', { name: 'Nodes found by the check' });
 
     expect(body?.connection.seedUrls).toEqual([
       'http://broker-1:8161/console/jolokia',
