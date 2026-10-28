@@ -8,6 +8,7 @@ import io.github.sudoitir.rahdar.feature.messages.web.MessageRequests.SendMessag
 import io.github.sudoitir.rahdar.platform.broker.Attempt;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
 import io.github.sudoitir.rahdar.platform.broker.MessageKind;
+import io.github.sudoitir.rahdar.platform.clusters.ClusterKinds;
 import io.github.sudoitir.rahdar.platform.mcp.McpArgs;
 import io.github.sudoitir.rahdar.platform.mcp.McpErrors;
 import io.github.sudoitir.rahdar.platform.mcp.McpResources;
@@ -40,6 +41,7 @@ public class MessagesMcpActionTools {
 
     private final MessageService messages;
     private final McpResources resources;
+    private final ClusterKinds kinds;
 
     /** The subscription-scoped mutations, as one tool. */
     public enum SubscriptionActionKind {
@@ -85,22 +87,26 @@ public class MessagesMcpActionTools {
         boolean dry = McpArgs.flag(dryRun, true);
         boolean over = McpArgs.flag(override, false);
         return McpErrors.guard(() -> {
-            String q = resources
-                    .require(id, SUBSCRIPTION, subscription, ResourceClass.SUBSCRIPTION)
-                    .name();
+            McpResources.Target found = resources.require(id, SUBSCRIPTION, subscription, ResourceClass.SUBSCRIPTION);
+            String q = found.name();
             if (!dry) {
                 McpArgs.confirm(q, confirm);
             }
-            Attempt<Outcome> attempt = kind == SubscriptionActionKind.PURGE
-                    ? messages.purge(id, q, null, dry, over)
-                    : messages.execute(
-                            id,
-                            q,
-                            null,
-                            MessageAction.valueOf(kind.name()),
-                            messages.actionRequest(id, parseIds(positions), filter, targetName(id, target)),
-                            dry,
-                            over);
+            // A subscription of a partitioned log is purged by moving its position to the end of the log, through the
+            // log purge and its gate; its records are never moved, retried, deleted or expired one by one.
+            boolean log = kinds.partitioned(id, found.id().kind().value());
+            Attempt<Outcome> attempt = kind == SubscriptionActionKind.PURGE && log
+                    ? messages.purgeLog(id, found.id(), dry)
+                    : kind == SubscriptionActionKind.PURGE
+                            ? messages.purge(id, q, null, dry, over)
+                            : messages.execute(
+                                    id,
+                                    q,
+                                    null,
+                                    MessageAction.valueOf(kind.name()),
+                                    messages.actionRequest(id, parseIds(positions), filter, targetName(id, target)),
+                                    dry,
+                                    over);
             return outcome(kind.name().toLowerCase(Locale.ROOT), q, attempt);
         });
     }

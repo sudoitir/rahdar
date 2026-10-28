@@ -391,6 +391,9 @@ public class MessageService {
             MessageActionRequest req,
             boolean dryRun,
             boolean override) {
+        // Every caller, the screens, the tool and a replay alike, is refused a per-record action on a log before any
+        // broker call.
+        requireOffered(clusterId, action);
         requireAllowed(clusterId, queueName, action, req);
         if (dryRun) {
             return run(clusterId, queueName, nodeId, action, req, true, override);

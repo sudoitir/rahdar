@@ -12,6 +12,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import io.github.sudoitir.openbroker.model.ResourceId;
 import io.github.sudoitir.rahdar.feature.messages.MessageAction;
 import io.github.sudoitir.rahdar.feature.messages.MessageRequestFixtures;
 import io.github.sudoitir.rahdar.feature.messages.MessageService;
@@ -21,6 +22,7 @@ import io.github.sudoitir.rahdar.feature.messages.web.MessageRequests.SendMessag
 import io.github.sudoitir.rahdar.platform.broker.Attempt;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
 import io.github.sudoitir.rahdar.platform.broker.MessageKind;
+import io.github.sudoitir.rahdar.platform.clusters.ClusterKinds;
 import io.github.sudoitir.rahdar.platform.mcp.McpResourcesFixture;
 import io.github.sudoitir.rahdar.platform.mcp.McpViews.MutationOutcome;
 import io.modelcontextprotocol.spec.McpError;
@@ -35,7 +37,9 @@ import org.mockito.ArgumentCaptor;
 class MessagesMcpActionToolsTest {
 
     private final MessageService messages = mock(MessageService.class);
-    private final MessagesMcpActionTools tools = new MessagesMcpActionTools(messages, McpResourcesFixture.resolving());
+    private final ClusterKinds kinds = mock(ClusterKinds.class);
+    private final MessagesMcpActionTools tools =
+            new MessagesMcpActionTools(messages, McpResourcesFixture.resolving(), kinds);
     private final UUID cluster = UUID.randomUUID();
     private final UUID node = UUID.randomUUID();
 
@@ -257,5 +261,20 @@ class MessagesMcpActionToolsTest {
         assertThatThrownBy(() -> tools.sendMessage(clusterId, null, "x", null, null, null))
                 .isInstanceOf(McpError.class);
         verifyNoInteractions(messages);
+    }
+
+    @Test
+    void aPurgeOfASubscriptionOfALogGoesThroughTheLogPurgeAndNotTheQueuePurge() {
+        when(kinds.partitioned(cluster, "kafka.group-topic")).thenReturn(true);
+        ResourceId subscription = ResourceId.parse("kafka.group-topic/billing/orders");
+        when(messages.purgeLog(cluster, subscription, true))
+                .thenReturn(new Attempt.Ok<>(new Outcome.DryRun(12, 100, false, null)));
+
+        CallToolResult result = tools.messageAction(
+                cluster.toString(), "kafka.group-topic/billing/orders", "purge", null, null, null, null, null, null);
+
+        assertThat(result.isError()).isNotEqualTo(true);
+        verify(messages).purgeLog(cluster, subscription, true);
+        verify(messages, never()).purge(any(), any(), any(), anyBoolean(), anyBoolean());
     }
 }

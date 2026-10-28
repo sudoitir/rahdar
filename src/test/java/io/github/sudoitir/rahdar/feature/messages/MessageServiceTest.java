@@ -41,6 +41,7 @@ import io.github.sudoitir.rahdar.feature.messages.web.MessageViews.MessageDetail
 import io.github.sudoitir.rahdar.feature.messages.web.MessageViews.MessagePageView;
 import io.github.sudoitir.rahdar.kernel.audit.AuditEvent;
 import io.github.sudoitir.rahdar.kernel.audit.AuditService;
+import io.github.sudoitir.rahdar.kernel.core.ConflictException;
 import io.github.sudoitir.rahdar.kernel.core.NotFoundException;
 import io.github.sudoitir.rahdar.kernel.gate.Operation;
 import io.github.sudoitir.rahdar.kernel.gate.OperationGate;
@@ -223,6 +224,23 @@ class MessageServiceTest {
     }
 
     // ---- browse and detail ------------------------------------------------------
+
+    @Test
+    void everyPerRecordActionOnALogIsRefusedWithTheSystemsReasonBeforeAnyBrokerCall() {
+        when(messages.unavailableBecause(eq(CLUSTER), anyString()))
+                .thenReturn(Optional.of("A partitioned log is append-only."));
+
+        for (MessageAction action : MessageAction.values()) {
+            for (boolean dryRun : new boolean[] {true, false}) {
+                assertThatThrownBy(() -> service.execute(CLUSTER, "orders", null, action, ids(1L), dryRun, false))
+                        .isInstanceOf(ConflictException.class)
+                        .hasMessageContaining("append-only");
+            }
+        }
+
+        verify(messages, never()).count(any(), any(), any(), any());
+        verify(access, never()).requireAll(any(), any());
+    }
 
     @Test
     void browseReadsTheBusiestNode() {

@@ -96,6 +96,10 @@ class BulkLogPurgeTest extends BulkTestSupport {
         assertThat(item(run, "kafka.group-topic/g-empty/t").status()).isEqualTo(BulkItemStatus.SUCCEEDED);
         assertThat(item(run, "kafka.group-topic/g-empty/t").affected()).isEqualTo(10L);
         assertThat(item(run, "kafka.group-topic/g-empty/u").affected()).isEqualTo(5L);
+        // A purge of the whole cluster names no node.
+        assertThat(item(run, "kafka.group-topic/g-empty/t").outcome())
+                .singleElement()
+                .satisfies(outcome -> assertThat(outcome.nodeId()).isNull());
         assertThat(item(run, "kafka.group-topic/g-active/t").status()).isEqualTo(BulkItemStatus.REFUSED);
         BulkItemView rebalancing = item(run, "kafka.group-topic/g-rebalancing/t");
         assertThat(rebalancing.status()).isEqualTo(BulkItemStatus.FAILED);

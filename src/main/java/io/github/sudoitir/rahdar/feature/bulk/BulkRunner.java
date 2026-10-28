@@ -270,21 +270,19 @@ class BulkRunner {
     }
 
     private LifecycleOutcome purgeLog(BulkRunEntity run, BulkRunItemEntity item) {
-        List<NodeFigure> figures =
-                json.readValue(item.getEstimate(), ItemEstimate.class).nodes();
-        UUID nodeId = figures.isEmpty() ? null : figures.getFirst().nodeId();
+        // One outcome for the whole cluster, so it names no node.
         NodeOutcome outcome;
         try {
             outcome = switch (messages.purgeLog(run.getClusterId(), BulkItemIds.parse(item.getSubscription()), false)) {
                 case Attempt.Ok<MessageService.Outcome>(MessageService.Outcome.Affected affected) ->
-                    new NodeOutcome(nodeId, WHOLE_CLUSTER, NodeStatus.APPLIED, affected.count(), null);
+                    new NodeOutcome(null, WHOLE_CLUSTER, NodeStatus.APPLIED, affected.count(), null);
                 case Attempt.Ok<MessageService.Outcome>(var other) ->
-                    NodeOutcome.failed(nodeId, WHOLE_CLUSTER, "Unexpected purge result: " + other);
+                    NodeOutcome.failed(null, WHOLE_CLUSTER, "Unexpected purge result: " + other);
                 case Attempt.Failed<MessageService.Outcome> failed ->
-                    NodeOutcome.failed(nodeId, WHOLE_CLUSTER, failed.detail());
+                    NodeOutcome.failed(null, WHOLE_CLUSTER, failed.detail());
             };
         } catch (RuntimeException e) {
-            outcome = NodeOutcome.failed(nodeId, WHOLE_CLUSTER, e.getMessage());
+            outcome = NodeOutcome.failed(null, WHOLE_CLUSTER, e.getMessage());
         }
         return new LifecycleOutcome(false, 0, false, List.of(outcome));
     }
