@@ -15,6 +15,7 @@ import io.github.sudoitir.rahdar.feature.resources.TruncateService;
 import io.github.sudoitir.rahdar.feature.resources.web.ResourceViews.Backlog;
 import io.github.sudoitir.rahdar.feature.resources.web.ResourceViews.SubscriptionView;
 import io.github.sudoitir.rahdar.kernel.core.ConflictException;
+import io.github.sudoitir.rahdar.kernel.core.StalePreviewException;
 import io.github.sudoitir.rahdar.platform.broker.Attempt;
 import io.github.sudoitir.rahdar.platform.broker.BacklogBreakdown.Breakdown;
 import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
@@ -64,7 +65,7 @@ import org.testcontainers.kafka.KafkaContainer;
 @ExtendWith(AdminAuthenticationExtension.class)
 class KafkaRegisterRealBrokerTest extends PostgresIntegrationTest {
 
-    private static final String IMAGE = System.getProperty("kafka.image", "apache/kafka:4.0.2");
+    private static final String IMAGE = System.getProperty("kafka.image", "apache/kafka:4.4.0");
 
     private static KafkaContainer kafka;
 
@@ -374,7 +375,7 @@ class KafkaRegisterRealBrokerTest extends PostgresIntegrationTest {
         TruncateService.TruncateEffect effect = null;
         for (int attempt = 0; attempt < 50 && effect == null; attempt++) {
             try {
-                effect = truncates.truncate(id, "kafka.topic", topic, cut, true);
+                effect = truncates.truncate(id, "kafka.topic", topic, cut, null, true);
             } catch (RuntimeException metadataNotThereYet) {
                 Thread.sleep(200);
             }
@@ -385,7 +386,13 @@ class KafkaRegisterRealBrokerTest extends PostgresIntegrationTest {
                 .extracting(g -> g.group() + ":" + g.records())
                 .containsExactly(run + "-slow:3");
 
-        TruncateService.TruncateEffect done = truncates.truncate(id, "kafka.topic", topic, cut, false);
+        assertThat(effect.etag()).isNotBlank();
+        assertThatThrownBy(() -> truncates.truncate(id, "kafka.topic", topic, cut, null, false))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> truncates.truncate(id, "kafka.topic", topic, cut, "stale", false))
+                .isInstanceOf(StalePreviewException.class);
+
+        TruncateService.TruncateEffect done = truncates.truncate(id, "kafka.topic", topic, cut, effect.etag(), false);
 
         assertThat(done.records()).isEqualTo(6);
         ResourceId log = ResourceId.of("kafka.topic", topic);
@@ -403,7 +410,7 @@ class KafkaRegisterRealBrokerTest extends PostgresIntegrationTest {
                         .param(id)
                         .query(String.class)
                         .list())
-                .containsExactly("SUCCESS", "SUCCESS");
+                .containsExactly("SUCCESS", "FAILURE", "SUCCESS");
     }
 
     @Test
@@ -421,7 +428,7 @@ class KafkaRegisterRealBrokerTest extends PostgresIntegrationTest {
         Throwable refused = null;
         for (int attempt = 0; attempt < 50 && refused == null; attempt++) {
             try {
-                truncates.truncate(id, "kafka.topic", topic, cut, true);
+                truncates.truncate(id, "kafka.topic", topic, cut, null, true);
                 refused = new AssertionError("a compacted topic was truncated");
             } catch (ConflictException e) {
                 refused = e;

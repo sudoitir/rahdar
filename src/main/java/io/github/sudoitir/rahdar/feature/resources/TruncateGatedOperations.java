@@ -83,7 +83,7 @@ class TruncateGatedOperations {
 
             @Override
             public void replay(TruncateParams p) {
-                truncates.truncate(p.clusterId(), p.kind(), p.path(), p.cut(), false);
+                truncates.truncate(p.clusterId(), p.kind(), p.path(), p.cut(), p.etag(), false);
             }
 
             private String cut(TruncateParams p) {

@@ -32665,6 +32665,10 @@
         "properties" : {
           "before" : {
             "$ref" : "#/components/schemas/Before"
+          },
+          "etag" : {
+            "type" : "string",
+            "description" : "The dry run's etag; a real run needs it, and is refused as stale if the log moved."
           }
         },
         "required" : [ "before" ]
@@ -32694,6 +32698,9 @@
             "items" : {
               "$ref" : "#/components/schemas/GroupLoss"
             }
+          },
+          "etag" : {
+            "type" : "string"
           }
         }
       },
@@ -38376,6 +38383,32 @@
         },
         "required" : [ "deleted", "partitions", "topic" ]
       },
+      "BrokerQuorum" : {
+        "type" : "object",
+        "properties" : {
+          "available" : {
+            "type" : "boolean",
+            "description" : "False on a ZooKeeper-mode cluster."
+          },
+          "reason" : {
+            "type" : [ "string", "null" ]
+          },
+          "leader" : {
+            "type" : [ "string", "null" ]
+          },
+          "voters" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/QuorumVoter"
+            }
+          },
+          "majority" : {
+            "type" : "boolean",
+            "description" : "Whether the voters that are caught up are a majority."
+          }
+        },
+        "required" : [ "available", "majority", "voters" ]
+      },
       "BrokerRow" : {
         "type" : "object",
         "properties" : {
@@ -38426,10 +38459,27 @@
             }
           },
           "quorum" : {
-            "$ref" : "#/components/schemas/Quorum"
+            "$ref" : "#/components/schemas/BrokerQuorum"
           }
         },
         "required" : [ "brokers", "mode", "quorum" ]
+      },
+      "QuorumVoter" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string"
+          },
+          "lag" : {
+            "type" : [ "integer", "null" ],
+            "format" : "int64",
+            "description" : "Records behind the quorum leader."
+          },
+          "caughtUp" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "caughtUp", "id" ]
       },
       "AclPage" : {
         "type" : "object",

@@ -17,6 +17,7 @@ import io.github.sudoitir.openbroker.operation.Preview;
 import io.github.sudoitir.rahdar.kernel.audit.AuditEvent;
 import io.github.sudoitir.rahdar.kernel.audit.AuditService;
 import io.github.sudoitir.rahdar.kernel.core.ConflictException;
+import io.github.sudoitir.rahdar.kernel.core.StalePreviewException;
 import io.github.sudoitir.rahdar.kernel.gate.Gated;
 import io.github.sudoitir.rahdar.kernel.gate.OperationGate;
 import io.github.sudoitir.rahdar.kernel.security.ActorResolver;
@@ -27,9 +28,11 @@ import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
 import io.github.sudoitir.rahdar.platform.clusters.ResourceTargets;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -59,20 +62,29 @@ public class TruncateService {
 
         public Cut {
             offsets = offsets == null ? Map.of() : Map.copyOf(offsets);
+            offsets.forEach((partition, offset) -> {
+                if (partition == null || partition < 0 || offset == null || offset < 0) {
+                    throw new IllegalArgumentException("A cut's partitions and offsets are not negative, got partition "
+                            + partition + " offset " + offset + ".");
+                }
+            });
             if (offsets.isEmpty() == (time == null)) {
                 throw new IllegalArgumentException("A cut names offsets by partition, or a time, and not both.");
             }
         }
     }
 
-    /** What a cut removes, or removed: the records, and every group that loses records it has not read. */
-    public record TruncateEffect(Long records, List<GroupLoss> groups) {}
+    /**
+     * What a cut removes, or removed: the records, and every group that loses records it has not read. The
+     * {@code etag} is the state the effect was counted against; a real run sends it back.
+     */
+    public record TruncateEffect(Long records, List<GroupLoss> groups, String etag) {}
 
     /** The records of a group's that the cut removes before the group has read them. */
     public record GroupLoss(String group, long records) {}
 
     /** What the gate holds of a truncate. */
-    public record TruncateParams(UUID clusterId, String kind, String path, Cut cut) {}
+    public record TruncateParams(UUID clusterId, String kind, String path, Cut cut, String etag) {}
 
     private final ResourceTargets targets;
     private final BrokerGateway gateway;
@@ -83,25 +95,28 @@ public class TruncateService {
 
     /** What the cut would do, with no audit row of its own beyond the dry run's; nothing is cut. */
     public TruncateEffect preview(UUID clusterId, String kind, String path, Cut cut) {
-        return run(clusterId, kind, path, cut, true);
+        return run(clusterId, kind, path, cut, null, true);
     }
 
     /** Cuts the log, passing the approval gate as {@code destination.truncate}. */
-    public TruncateEffect truncate(UUID clusterId, String kind, String path, Cut cut, boolean dryRun) {
+    public TruncateEffect truncate(UUID clusterId, String kind, String path, Cut cut, String etag, boolean dryRun) {
         if (dryRun) {
-            return run(clusterId, kind, path, cut, true);
+            return run(clusterId, kind, path, cut, null, true);
+        }
+        if (etag == null || etag.isBlank()) {
+            throw new IllegalArgumentException("Preview first, then send the preview's etag.");
         }
         ResourceId destination = destination(clusterId, kind, path);
         access.requireResource(
                 clusterId, ResourceRef.destination(destination.name()), ResourcePermissions.DESTINATION_TRUNCATE);
-        return gatedTruncate(new TruncateParams(clusterId, kind, path, cut));
+        return gatedTruncate(new TruncateParams(clusterId, kind, path, cut, etag));
     }
 
     @Gated("destination.truncate")
     private TruncateEffect gatedTruncate(TruncateParams p) {
         return gate.run(
                 io.github.sudoitir.rahdar.kernel.gate.Operation.of(p),
-                () -> run(p.clusterId(), p.kind(), p.path(), p.cut(), false));
+                () -> run(p.clusterId(), p.kind(), p.path(), p.cut(), p.etag(), false));
     }
 
     /** The cut's reach for the gate's estimate: what a dry run reports, and the log starts as the state key. */
@@ -115,7 +130,7 @@ public class TruncateService {
     /** How many records, and the state they were counted against. */
     public record Reach(long records, String stateKey) {}
 
-    private TruncateEffect run(UUID clusterId, String kind, String path, Cut cut, boolean dryRun) {
+    private TruncateEffect run(UUID clusterId, String kind, String path, Cut cut, String etag, boolean dryRun) {
         ResourceId destination = destination(clusterId, kind, path);
         access.requireResource(
                 clusterId, ResourceRef.destination(destination.name()), ResourcePermissions.DESTINATION_TRUNCATE);
@@ -132,6 +147,10 @@ public class TruncateService {
                 audit.succeed(event, effect.records() == null ? 0 : effect.records());
                 return effect;
             }
+            if (!preview.etag().equals(etag)) {
+                throw new StalePreviewException("The log changed since the preview. Preview again.");
+            }
+            refuseUnknownPartitions(cut, preview);
             List<Map<String, Object>> starts = logStarts(preview);
             OperationResult result = gateway.cluster(clusterId)
                     .operations()
@@ -139,11 +158,35 @@ public class TruncateService {
                     .orThrow();
             long removed = result.affected().orElse(effect.records() == null ? 0 : effect.records());
             audit.finish(event, false, removed, null, starts);
-            return new TruncateEffect(removed, effect.groups());
+            return new TruncateEffect(removed, effect.groups(), effect.etag());
         } catch (BrokerException e) {
             audit.fail(event, e.getMessage());
             throw refused(e);
+        } catch (RuntimeException e) {
+            // A row opened above is never left open: a stale preview or a refused cut closes it as failed.
+            audit.fail(event, e.getMessage());
+            throw e;
         }
+    }
+
+    /** A cut that names a partition the log does not have is a bad request, before anything is cut. */
+    private static void refuseUnknownPartitions(Cut cut, Preview preview) {
+        Set<Integer> known = new HashSet<>();
+        preview.diff().forEach(change -> {
+            Matcher start = LOG_START.matcher(change.key());
+            if (start.matches()) {
+                known.add(Integer.parseInt(start.group(1)));
+            }
+        });
+        if (known.isEmpty()) {
+            return;
+        }
+        cut.offsets().keySet().stream()
+                .filter(partition -> !known.contains(partition))
+                .findFirst()
+                .ifPresent(partition -> {
+                    throw new IllegalArgumentException("Partition " + partition + " is not a partition of this log.");
+                });
     }
 
     private Preview preview(UUID clusterId, ResourceId destination, Cut cut) {
@@ -195,7 +238,7 @@ public class TruncateService {
             }
         });
         groups.sort((a, b) -> Long.compare(b.records(), a.records()));
-        return new TruncateEffect(records, groups);
+        return new TruncateEffect(records, groups, preview.etag());
     }
 
     /** The log start of each partition the cut moves, before and after, by partition. */

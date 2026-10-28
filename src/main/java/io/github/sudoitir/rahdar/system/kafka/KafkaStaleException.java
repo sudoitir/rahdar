@@ -1,7 +1,9 @@
 package io.github.sudoitir.rahdar.system.kafka;
 
-/** What was previewed has changed since: answered {@code 412}, and the operator is offered a fresh preview. */
-public class KafkaStaleException extends RuntimeException {
+import io.github.sudoitir.rahdar.kernel.core.StalePreviewException;
+
+/** A Kafka preview that no longer matches the cluster. */
+public class KafkaStaleException extends StalePreviewException {
 
     public KafkaStaleException(String message) {
         super(message);

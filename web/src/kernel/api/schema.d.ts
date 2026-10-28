@@ -5500,6 +5500,8 @@ export interface components {
         };
         TruncateRequest: {
             before: components["schemas"]["Before"];
+            /** @description The dry run's etag; a real run needs it, and is refused as stale if the log moved. */
+            etag?: string;
         };
         GroupLoss: {
             group?: string;
@@ -5510,6 +5512,7 @@ export interface components {
             /** Format: int64 */
             records?: number;
             groups?: components["schemas"]["GroupLoss"][];
+            etag?: string;
         };
         BulkRunView: {
             /** Format: uuid */
@@ -7877,6 +7880,15 @@ export interface components {
             /** @description Slowest first. */
             partitions: components["schemas"]["PartitionLag"][];
         };
+        BrokerQuorum: {
+            /** @description False on a ZooKeeper-mode cluster. */
+            available: boolean;
+            reason?: string | null;
+            leader?: string | null;
+            voters: components["schemas"]["QuorumVoter"][];
+            /** @description Whether the voters that are caught up are a majority. */
+            majority: boolean;
+        };
         BrokerRow: {
             id: string;
             rack?: string | null;
@@ -7899,7 +7911,16 @@ export interface components {
             /** @description KRaft or ZooKeeper. */
             mode: string;
             brokers: components["schemas"]["BrokerRow"][];
-            quorum: components["schemas"]["Quorum"];
+            quorum: components["schemas"]["BrokerQuorum"];
+        };
+        QuorumVoter: {
+            id: string;
+            /**
+             * Format: int64
+             * @description Records behind the quorum leader.
+             */
+            lag?: number | null;
+            caughtUp: boolean;
         };
         AclPage: {
             /** @description False where the cluster has no authorizer. */

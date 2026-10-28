@@ -1,10 +1,10 @@
 package io.github.sudoitir.rahdar.system.kafka.mcp;
 
 import io.github.sudoitir.rahdar.kernel.core.ConflictException;
+import io.github.sudoitir.rahdar.kernel.core.StalePreviewException;
 import io.github.sudoitir.rahdar.platform.mcp.McpArgs;
 import io.github.sudoitir.rahdar.platform.mcp.McpErrors;
 import io.github.sudoitir.rahdar.system.kafka.KafkaOffsetResets;
-import io.github.sudoitir.rahdar.system.kafka.KafkaStaleException;
 import io.github.sudoitir.rahdar.system.kafka.KafkaTopicConfigChanges;
 import io.github.sudoitir.rahdar.system.kafka.KafkaTopicConfigs;
 import io.github.sudoitir.rahdar.system.kafka.KafkaTransactionAborts;
@@ -138,7 +138,7 @@ public class KafkaMcpActionTools {
         return McpErrors.guard(() -> {
             try {
                 return body.get();
-            } catch (KafkaStaleException e) {
+            } catch (StalePreviewException e) {
                 throw new ConflictException("kafka-stale", e.getMessage());
             }
         });

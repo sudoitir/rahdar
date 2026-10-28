@@ -18,6 +18,7 @@ import io.github.sudoitir.rahdar.platform.clusters.LifecycleOutcome;
 import io.github.sudoitir.rahdar.platform.clusters.LifecycleViews.LifecycleOutcomeView;
 import io.github.sudoitir.rahdar.platform.clusters.ResourceTargets;
 import io.github.sudoitir.rahdar.platform.clusters.ResourceTargets.Target;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import java.time.Instant;
@@ -103,11 +104,15 @@ public class ResourceLifecycleController {
             @PathVariable String path,
             @RequestParam(defaultValue = "false") boolean dryRun,
             @Valid @RequestBody TruncateRequest request) {
-        return truncates.truncate(clusterId, kind, path, request.before().toCut(), dryRun);
+        return truncates.truncate(clusterId, kind, path, request.before().toCut(), request.etag(), dryRun);
     }
 
     /** {@code before} is {@code {offsets: {"0": 120}}} or {@code {time: "2026-10-28T09:30:00Z"}}. */
-    public record TruncateRequest(@NotNull @Valid Before before) {
+    public record TruncateRequest(
+            @NotNull @Valid Before before,
+
+            @Schema(description = "The dry run's etag; a real run needs it, and is refused as stale if the log moved.")
+            String etag) {
 
         public record Before(Map<Integer, Long> offsets, Instant time) {
 
