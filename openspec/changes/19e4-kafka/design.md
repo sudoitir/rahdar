@@ -14,7 +14,7 @@ Labels come from `ResourceIds.label`, which sentence-cases a kind id; the subscr
 message count and no notion of an estimate; browse pages by offset per node; plugin consumers name a
 queue; shared web components carry Artemis literals.
 
-OpenBroker `0.5.0` supplies the Kafka driver for **Kafka 3.0 and later, in ZooKeeper and KRaft mode**:
+OpenBroker `0.6.0` supplies the Kafka driver for **Kafka 3.0 and later, in ZooKeeper and KRaft mode**:
 - kinds `kafka.topic`, `kafka.partition`, `kafka.group`, `kafka.group-topic`,
   `kafka.share-group-topic`, `kafka.acl`, `kafka.transactional-id`, each with a `KindLabel`
   (singular, plural);
@@ -168,11 +168,32 @@ AIP-193 reason. Built-in roles: operator gains `subscription:seek`, `destination
 `access-rule:write`; viewer gains `transaction:read` and `access-rule:read`.
 
 ### D8. Plugin messaging on a partitioned log
-A consume registration's source becomes a subscription reference `{kind, path}` instead of a queue
-name (`PluginMessagingReconciler`, `MessageConversion`, `AccessCheck`). On Kafka: acknowledge settles,
-reject goes through `RetryPolicy.system()`, release redelivers in place, ordering by key; on a share
-group release is counted and the registration's state says so. Taps are unavailable on Kafka with a
-reason. `Contract.VERSION` is raised when japicmp flags the plugin API.
+- **Source.** `RegistrationSpec.source` becomes a new `@PluginApi` record `SubscriptionId(kind, path)`,
+  the shared API's canonical id (`of(kind, segments…)`, `parse(id)`, `id()`), validated with the SDK's
+  `ResourceId.parse` and exposing no SDK type. `ResourceRef` stays the permission key and send target.
+  `Contract.VERSION` becomes 18; the guide's migration note: `ResourceRef.subscription(q)` →
+  `SubscriptionId.of("artemis.queue", q)`.
+- **Stored.** `plugin_message_registration` holds `source_kind`, `source_path` (baseline edited, ADR-0192);
+  `plugin_message_registration_node` gets a uuid `id` key, a nullable `node_id` with
+  `UNIQUE NULLS NOT DISTINCT (registration_id, node_id)`, and `releases_counted boolean`.
+- **Per node or cluster-wide.** The reconciler asks `ClusterKinds.partitioned(cluster, kind)` (SDK-derived).
+  A partitioned source gets one drain at `Scope.whole()` on the replica that owns the cluster (existing
+  `ClusterOwnership` and the `PLUGIN_MESSAGING` lock), its state in one row with a null node ("whole
+  cluster"). Start failures map by status: NOT_FOUND → PENDING; FAILED_PRECONDITION, UNIMPLEMENTED,
+  INVALID_ARGUMENT → FAILED with the SDK's message; others PENDING; retried every pass.
+- **Settlement.** `RetryPolicy.defaults()` (SYSTEM on Artemis and share groups; on a consumer group 10
+  attempts in place, then the SDK's `<topic>.dlt`, so the offset passes a rejected record only once
+  dead-lettered). Ordering GROUP where the kind declares it (on Kafka: by group id, else record key,
+  within a partition), else NONE (share groups). A cluster-wide drain uses
+  `FlowControl(concurrency, 0, 0)`. ACCEPT → Accept; REJECT and handler failures → counted Release;
+  RELEASE → uncounted Release.
+- **Counted releases.** OpenBroker 0.6.0's `SubscriptionCapabilities` declares whether a release counts
+  as a delivery attempt; an ACTIVE registration on such a subscription says so in its state and sets
+  `releases_counted`.
+- **Access.** The permission resource is the subscription's first path segment (the queue; on Kafka the
+  group), as for the log purge and offsets.
+- **Taps.** Refused at registration where the cluster's system has no `MessageTaps`, with the reason
+  naming the system from `ClusterKinds`; the reconciler marks any stored tap there FAILED as a guard.
 
 ### D9. MCP
 `kafka_list_groups`, `kafka_describe_group`, `kafka_preview_offset_reset`, `kafka_reset_offsets`,
