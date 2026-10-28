@@ -65,7 +65,7 @@ public class EstateSubscriptions {
             case "destination" ->
                 Comparator.comparing(v -> v.subscription().destinationName(), String.CASE_INSENSITIVE_ORDER);
             case "depth", "messageCount" ->
-                Comparator.comparingLong(v -> v.subscription().totalMessageCount());
+                Comparator.comparingLong(v -> v.subscription().backlog().valueOrZero());
             case "consumers", "consumerCount" ->
                 Comparator.comparingLong(v -> v.subscription().totalConsumerCount());
             default -> null;

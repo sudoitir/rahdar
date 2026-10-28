@@ -34468,7 +34468,7 @@
             "type" : "string"
           }
         },
-        "required" : [ "end", "partition" ]
+        "required" : [ "partition" ]
       },
       "BoundView" : {
         "type" : "object",

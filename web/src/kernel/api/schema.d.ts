@@ -4605,16 +4605,6 @@ export interface components {
             /** @description The name of several, such as Queues. */
             plural: string;
         };
-        /** @description How many messages wait in a subscription and how far the figure can be trusted (ADR-0216). Hand-written until the backend generates it. */
-        BacklogView: {
-            /** Format: int64 */
-            value?: number | null;
-            /** @enum {string} */
-            accuracy: "EXACT" | "ESTIMATE" | "UNAVAILABLE";
-            reason?: string | null;
-            /** @description Whether a per-partition breakdown can be read */
-            breakdown: boolean;
-        };
         KindView: {
             /** @description The kind's id, such as artemis.queue. */
             id: string;
@@ -4624,8 +4614,6 @@ export interface components {
             label: components["schemas"]["KindName"];
             /** @description What the system can do to this kind (create, delete, pause, purge, ...), plus what Rahdar adds when the system provides it (reset-counters, expire). */
             verbs: string[];
-            /** @description Whether the kind's messages sit in partitions of a log, browsed by partition, offset or time. Hand-written until the backend generates it. */
-            partitioned?: boolean;
         };
         SystemView: {
             /** @description The system's id, such as artemis. */
@@ -6705,7 +6693,7 @@ export interface components {
             /** Format: int64 */
             committed?: number;
             /** Format: int64 */
-            end: number;
+            end?: number;
             /** Format: int64 */
             lag?: number;
             reason?: string;
@@ -7158,21 +7146,6 @@ export interface components {
             countUnavailable?: string | null;
             /** Format: uuid */
             node: string;
-            /** @description Where a partition browse stands in its log. Hand-written until the backend generates it. */
-            log?: components["schemas"]["PartitionLogView"] | null;
-        };
-        /** @description The window a partition browse read: the log's start and end, and what the request asked for. */
-        PartitionLogView: {
-            /** Format: int32 */
-            partition: number;
-            /** Format: int64 */
-            startOffset: number;
-            /** Format: int64 */
-            endOffset: number;
-            /** Format: int64 */
-            requestedOffset?: number | null;
-            /** @description Retention removed records before the offset asked for, so the browse started at startOffset */
-            retentionMovedStart: boolean;
         };
         MessageSummaryView: {
             /** @description The message's position on its node, opaque. */
@@ -7195,8 +7168,6 @@ export interface components {
             /** Format: int32 */
             propertyCount: number;
             redactions: components["schemas"]["RedactionView"][];
-            /** @description A record with a key and no value. Hand-written until the backend generates it. */
-            tombstone?: boolean;
         };
         MessageDetailView: {
             /** @description The message's position on its node, opaque. */

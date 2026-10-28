@@ -111,7 +111,7 @@ public class ResourcesMcpReadTools {
                                 q.nodesPresent() + "/" + q.nodesTotal() + " nodes",
                                 null,
                                 "destination=" + q.destination() + " consumers=" + q.totalConsumerCount(),
-                                q.totalMessageCount()))
+                                q.backlog().value()))
                         .toList();
             case DESTINATION ->
                 lists.destinations(clusterId, query).data().stream()

@@ -141,7 +141,7 @@ public class ConsumerHealthService {
 
         Builder b = new Builder(row, addRates.get(row.name()), ackRates.get(row.name()), slopes.get(row.name()));
 
-        boolean backlog = row.totalMessageCount() >= properties.minBacklog();
+        boolean backlog = row.backlog().valueOrZero() >= properties.minBacklog();
         boolean acking = b.ackRate != null && b.ackRate > properties.idleAckRate();
 
         ConsumerHealth verdict = unmeasuredOrUnattended(b, backlog, brokerSlow.get(row.destinationName()));
@@ -237,7 +237,7 @@ public class ConsumerHealthService {
         // 8. Recovering. Reported rather than hidden: an operator watching an incident
         //    needs to know it is ending, and when.
         if (netRate != null && netRate < 0 && backlog) {
-            Duration eta = Duration.ofSeconds((long) (b.row.totalMessageCount() / -netRate));
+            Duration eta = Duration.ofSeconds((long) (b.row.backlog().valueOrZero() / -netRate));
             return b.eta(eta)
                     .verdict(
                             Verdict.DRAINING,
@@ -385,7 +385,7 @@ public class ConsumerHealthService {
                     cause,
                     verdict == Verdict.BROKER_SLOW ? Source.BROKER : Source.DERIVED,
                     brokerConsumerName,
-                    row.totalMessageCount(),
+                    row.backlog().valueOrZero(),
                     row.totalConsumerCount(),
                     row.totalDeliveringCount(),
                     row.totalScheduledCount(),

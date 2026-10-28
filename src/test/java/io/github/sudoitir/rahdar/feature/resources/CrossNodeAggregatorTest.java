@@ -2,6 +2,7 @@ package io.github.sudoitir.rahdar.feature.resources;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import io.github.sudoitir.rahdar.feature.resources.web.ResourceViews.Backlog;
 import io.github.sudoitir.rahdar.feature.resources.web.ResourceViews.SubscriptionView;
 import io.github.sudoitir.rahdar.kernel.core.ResourceQuery;
 import io.github.sudoitir.rahdar.kernel.security.AccessChanges;
@@ -113,7 +114,9 @@ class CrossNodeAggregatorTest extends PostgresIntegrationTest {
         assertThat(rows).hasSize(1);
         SubscriptionView orders = rows.get(0);
         assertThat(orders.perNode()).hasSize(2);
-        assertThat(orders.totalMessageCount()).isEqualTo(15);
+        assertThat(orders.backlog().value()).isEqualTo(15);
+        assertThat(orders.backlog().accuracy()).isEqualTo(Backlog.Accuracy.EXACT);
+        assertThat(orders.backlog().breakdown()).isFalse();
         assertThat(orders.totalConsumerCount()).isEqualTo(2);
         assertThat(orders.nodesPresent()).isEqualTo(2);
         assertThat(orders.nodesTotal()).isEqualTo(2); // the pair is one logical node + the standalone

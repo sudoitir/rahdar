@@ -5,7 +5,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import io.github.sudoitir.openbroker.ClusterConnection;
 import io.github.sudoitir.openbroker.model.Kind;
+import io.github.sudoitir.rahdar.feature.resources.BacklogService;
 import io.github.sudoitir.rahdar.platform.broker.Attempt;
+import io.github.sudoitir.rahdar.platform.broker.BacklogBreakdown.Breakdown;
 import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterAlreadyRegisteredException;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterService;
@@ -23,7 +25,17 @@ import io.github.sudoitir.rahdar.support.AdminAuthenticationExtension;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
 import io.github.sudoitir.rahdar.system.kafka.internal.persistence.KafkaConnectionRepository;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import org.apache.kafka.clients.admin.Admin;
+import org.apache.kafka.clients.admin.NewTopic;
+import org.apache.kafka.clients.consumer.KafkaConsumer;
+import org.apache.kafka.clients.consumer.OffsetAndMetadata;
+import org.apache.kafka.clients.producer.KafkaProducer;
+import org.apache.kafka.clients.producer.ProducerRecord;
+import org.apache.kafka.common.TopicPartition;
+import org.apache.kafka.common.serialization.ByteArrayDeserializer;
+import org.apache.kafka.common.serialization.ByteArraySerializer;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
@@ -63,6 +75,9 @@ class KafkaRegisterRealBrokerTest extends PostgresIntegrationTest {
 
     @Autowired
     BrokerGateway gateway;
+
+    @Autowired
+    BacklogService backlogs;
 
     @Autowired
     JdbcClient jdbc;
@@ -234,6 +249,48 @@ class KafkaRegisterRealBrokerTest extends PostgresIntegrationTest {
         assertThat(check.failure().next()).isNotBlank();
         assertThatThrownBy(() -> service.register(request("refused", "localhost:1")))
                 .hasMessageContaining(check.failure().next());
+    }
+
+    @Test
+    void aGroupsBacklogIsReadPartitionBySlowestFirstAndAMissingPositionIsNotZero() throws Exception {
+        UUID id = ((Attempt.Ok<ClusterDetail>) service.register(request("backlog", kafka.getBootstrapServers())))
+                .value()
+                .id();
+        String topic = run + "-orders";
+        String group = run + "-billing";
+        try (Admin admin = Admin.create(Map.of("bootstrap.servers", kafka.getBootstrapServers()))) {
+            admin.createTopics(List.of(new NewTopic(topic, 3, (short) 1))).all().get();
+        }
+        try (KafkaProducer<byte[], byte[]> producer = new KafkaProducer<>(
+                Map.of("bootstrap.servers", kafka.getBootstrapServers()),
+                new ByteArraySerializer(),
+                new ByteArraySerializer())) {
+            for (int i = 0; i < 30; i++) {
+                producer.send(new ProducerRecord<>(topic, i % 3, new byte[] {1}, new byte[] {2}))
+                        .get();
+            }
+        }
+        Map<String, Object> config = Map.of(
+                "bootstrap.servers", kafka.getBootstrapServers(), "group.id", group, "enable.auto.commit", "false");
+        try (KafkaConsumer<byte[], byte[]> consumer =
+                new KafkaConsumer<>(config, new ByteArrayDeserializer(), new ByteArrayDeserializer())) {
+            consumer.commitSync(Map.of(
+                    new TopicPartition(topic, 0), new OffsetAndMetadata(4),
+                    new TopicPartition(topic, 1), new OffsetAndMetadata(9)));
+        }
+
+        // The brokers' metadata trails the new topic by a moment, so the third partition's end may take a second look.
+        Breakdown breakdown = backlogs.breakdown(id, "kafka.group-topic", group + "/" + topic);
+        for (int attempt = 0; attempt < 50 && breakdown.partitions().get(2).end() == null; attempt++) {
+            Thread.sleep(200);
+            breakdown = backlogs.breakdown(id, "kafka.group-topic", group + "/" + topic);
+        }
+
+        assertThat(breakdown.sampledAt()).isNotNull();
+        assertThat(breakdown.partitions())
+                .extracting(p -> p.partition() + ":" + p.committed() + ":" + p.end() + ":" + p.lag())
+                .containsExactly("0:4:10:6", "1:9:10:1", "2:null:10:null");
+        assertThat(breakdown.partitions().get(2).reason()).isNotBlank();
     }
 
     @Test

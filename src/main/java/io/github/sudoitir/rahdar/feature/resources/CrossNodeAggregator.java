@@ -147,7 +147,8 @@ public class CrossNodeAggregator {
             case "name" -> Comparator.comparing(SubscriptionView::name, String.CASE_INSENSITIVE_ORDER);
             case "destination", "address" ->
                 Comparator.comparing(SubscriptionView::destinationName, String.CASE_INSENSITIVE_ORDER);
-            case "depth", "messageCount" -> Comparator.comparingLong(SubscriptionView::totalMessageCount);
+            case "depth", "messageCount" ->
+                Comparator.comparingLong(v -> v.backlog().valueOrZero());
             case "consumers", "consumerCount" -> Comparator.comparingLong(SubscriptionView::totalConsumerCount);
             case "delivering" -> Comparator.comparingLong(SubscriptionView::totalDeliveringCount);
             case "scheduled" -> Comparator.comparingLong(SubscriptionView::totalScheduledCount);

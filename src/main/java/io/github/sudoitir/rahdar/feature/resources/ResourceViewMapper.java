@@ -12,6 +12,7 @@ import io.github.sudoitir.openbroker.model.MetricKeys;
 import io.github.sudoitir.openbroker.model.Resource;
 import io.github.sudoitir.openbroker.model.ResourceId;
 import io.github.sudoitir.openbroker.model.StandardAttributes;
+import io.github.sudoitir.rahdar.feature.resources.web.ResourceViews.Backlog;
 import io.github.sudoitir.rahdar.feature.resources.web.ResourceViews.ChannelView;
 import io.github.sudoitir.rahdar.feature.resources.web.ResourceViews.ConnectionView;
 import io.github.sudoitir.rahdar.feature.resources.web.ResourceViews.ConsumerView;
@@ -71,7 +72,9 @@ public class ResourceViewMapper {
                 ResourceId.of(destinationKind.value(), key.destination()).format(),
                 Map.of("routingType", key.routingType()),
                 rows.stream().anyMatch(QueueSnapshot::durable),
-                cells.stream().mapToLong(SubscriptionNodeCell::messageCount).sum(),
+                Backlog.exact(cells.stream()
+                        .mapToLong(SubscriptionNodeCell::messageCount)
+                        .sum()),
                 cells.stream().mapToLong(SubscriptionNodeCell::consumerCount).sum(),
                 cells.stream().mapToLong(SubscriptionNodeCell::deliveringCount).sum(),
                 cells.stream().mapToLong(SubscriptionNodeCell::scheduledCount).sum(),
