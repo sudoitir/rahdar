@@ -108,9 +108,6 @@ services:
       KAFKA_SHARE_COORDINATOR_STATE_TOPIC_REPLICATION_FACTOR: "1"
       KAFKA_SHARE_COORDINATOR_STATE_TOPIC_MIN_ISR: "1"
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: "0"
-      # The coordinator aborts a transaction that outlives its timeout within seconds. A day keeps the seed's
-      # hanging transaction hanging, so the screens that show and abort one have something to act on.
-      KAFKA_TRANSACTION_ABORT_TIMED_OUT_TRANSACTION_CLEANUP_INTERVAL_MS: "86400000"
       KAFKA_AUTHORIZER_CLASS_NAME: org.apache.kafka.metadata.authorizer.StandardAuthorizer
       KAFKA_SUPER_USERS: User:ANONYMOUS
       # Several brokers, Rahdar and Postgres must fit in a laptop's Docker VM together.
