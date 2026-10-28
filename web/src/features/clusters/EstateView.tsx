@@ -3,6 +3,7 @@ import { Button, Select, TextInput } from '@mantine/core';
 import { useDebouncedCallback } from '@mantine/hooks';
 import { Link, useNavigate, useSearch } from '@tanstack/react-router';
 
+import { BacklogDrawer, type BacklogTarget } from '../../kernel/backlog/BacklogDrawer.tsx';
 import { ResourceActions } from '../../kernel/actions/ResourceActions.tsx';
 import { useDisplayZone } from '../../kernel/time/timezone.ts';
 import { EmptyState } from '../../ui/EmptyState.tsx';
@@ -53,7 +54,14 @@ function EstateSubscriptions({
   const [filter, setFilter] = useState(search.q ?? '');
   const page = search.page ?? 1;
   const query = useEstateSubscriptions({ ...search, page, size: PAGE_SIZE });
-  const columns = useMemo(estateSubscriptionColumns, []);
+  const [backlogOf, setBacklogOf] = useState<BacklogTarget | null>(null);
+  const columns = useMemo(
+    () =>
+      estateSubscriptionColumns((row) =>
+        setBacklogOf({ clusterId: row.cluster.id, id: row.subscription.id, name: row.subscription.name }),
+      ),
+    [],
+  );
 
   const write = (patch: EstateSearch) =>
     void navigate({
@@ -171,6 +179,7 @@ function EstateSubscriptions({
           )
         }
       />
+      <BacklogDrawer target={backlogOf} onClose={() => setBacklogOf(null)} />
     </Section>
   );
 }

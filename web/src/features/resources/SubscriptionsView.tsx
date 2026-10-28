@@ -12,6 +12,7 @@ import { Page } from '../../ui/Page.tsx';
 import { PageHeader } from '../../ui/PageHeader.tsx';
 import { Pager } from '../../ui/Pager.tsx';
 import { Toolbar } from '../../ui/Toolbar.tsx';
+import { BacklogDrawer, type BacklogTarget } from '../../kernel/backlog/BacklogDrawer.tsx';
 import { SubscriptionDetailDrawer } from './SubscriptionDetailDrawer.tsx';
 import { CreateSubscriptionForm } from './CreateSubscriptionForm.tsx';
 import { useCan } from '../../kernel/auth/useCan.ts';
@@ -296,7 +297,11 @@ export function SubscriptionsView() {
   const setPage = (next: number) =>
     navigate({ to: '.', search: (prev: Record<string, unknown>) => ({ ...prev, page: next > 1 ? next : undefined }) });
 
-  const columns = useMemo(subscriptionColumns, []);
+  const [backlogOf, setBacklogOf] = useState<BacklogTarget | null>(null);
+  const columns = useMemo(
+    () => subscriptionColumns((row) => setBacklogOf({ clusterId, id: row.id, name: row.name })),
+    [clusterId],
+  );
   const rows = query.data?.data ?? [];
   const total = query.data?.count ?? 0;
 
@@ -317,7 +322,7 @@ export function SubscriptionsView() {
     <Page fill>
       <PageHeader
         title="Subscriptions"
-        description="Every subscription across the cluster's nodes, with its depth and consumers. Select a row to open its detail and actions."
+        description="Every subscription across the cluster's nodes, with its backlog and consumers. Select a row to open its detail and actions."
       />
       <Toolbar
         label="Subscription filters"
@@ -405,6 +410,7 @@ export function SubscriptionsView() {
       />
 
       <SubscriptionDetailDrawer subscription={selected} missing={missing} onClose={() => setSelected(null)} />
+      <BacklogDrawer target={backlogOf} onClose={() => setBacklogOf(null)} />
       <CreateSubscriptionForm clusterId={clusterId} opened={createOpen} onClose={() => setCreateOpen(false)} />
     </Page>
   );

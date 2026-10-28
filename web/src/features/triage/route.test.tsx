@@ -58,6 +58,7 @@ describe('the consumer health destination', () => {
             {
               destination: 'artemis.address/orders',
               subscription: 'artemis.queue/orders',
+              kindLabel: { singular: 'Queue', plural: 'Queues' },
               verdict: 'NO_CONSUMERS',
               severity: 4,
               cause: 'No consumers are attached.',

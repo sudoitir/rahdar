@@ -3,6 +3,7 @@ import { useNavigate } from '@tanstack/react-router';
 
 import type { PaletteSource } from '../../kernel/feature.ts';
 import { destinationOf, useSubscriptions } from './api.ts';
+import { backlogWords } from '../../ui/backlog.ts';
 
 const SHOWN = 8;
 
@@ -36,7 +37,7 @@ export const SubscriptionPalette: PaletteSource = ({ clusterId, query, opened, r
             return {
               id: `subscription-${destinationOf(q)}-${q.name}`,
               label: q.name,
-              description: `${where}depth ${q.totalMessageCount.toLocaleString()} · ${q.nodesPresent}/${q.nodesTotal} nodes`,
+              description: `${where}backlog ${backlogWords(q.backlog)} · ${q.nodesPresent}/${q.nodesTotal} nodes`,
               // The query itself, so the palette's own filter keeps what the server already matched.
               keywords: [query, destinationOf(q)],
               onClick: () => navigate({ to: `/clusters/${clusterId}/subscriptions`, search: { subscription: q.name } }),

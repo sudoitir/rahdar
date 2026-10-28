@@ -311,7 +311,9 @@ describe('the subscriptions table in a 1280 px window', () => {
 
   it('shows every column but the lowest-priority ones, whole, with 16 px to spare', async () => {
     const m = await mount(view, 'normal', contentWidth(1280) - SPARE);
-    expect(visibleIds(view, m.grid)).toEqual(view.visible1280);
+    // Backlog is a character wider than Depth was: with a scroll bar's width to spare, the lowest-priority
+    // column, Scheduled, is the one left out. With none to spare it still fits (the test above).
+    expect(visibleIds(view, m.grid)).toEqual(view.visible1280.filter((id) => id !== 'scheduled'));
     expect(overflows(m.scroller), `scrollWidth ${m.scroller.scrollWidth} > clientWidth ${m.scroller.clientWidth}`).toBe(
       false,
     );

@@ -4308,21 +4308,47 @@ export interface components {
             /** Format: int64 */
             bytes: number;
         };
-        Credentials: {
-            username: string;
-            password: string;
-        };
-        RegisterClusterRequest: {
+        ArtemisConnection: {
+            system: "ArtemisConnection";
+        } & (Omit<WithRequired<components["schemas"]["Connection"], "system">, "system"> & {
+            system: string;
             seedUrls: string[];
-            name?: string;
-            description?: string;
             credentials?: components["schemas"]["Credentials"];
             coreCredentials?: components["schemas"]["Credentials"];
             tlsBundle?: string;
             managementUrlPattern?: string;
+        });
+        Connection: {
+            system: string;
+        };
+        Credentials: {
+            username: string;
+            password: string;
+        };
+        KafkaConnection: {
+            system: "KafkaConnection";
+        } & (Omit<WithRequired<components["schemas"]["Connection"], "system">, "system"> & {
+            system: string;
+            bootstrapServers: string[];
+            securityProtocol: string;
+            saslMechanism?: string;
+            credentials?: components["schemas"]["KafkaCredentials"];
+            tlsBundle?: string;
+            clientId?: string;
+        });
+        KafkaCredentials: {
+            username?: string;
+            password?: string;
+            token?: string;
+        };
+        RegisterClusterRequest: {
+            system: string;
+            name?: string;
+            description?: string;
             /** Format: uuid */
             environmentId?: string;
             adopt?: boolean;
+            connection: components["schemas"]["ArtemisConnection"] | components["schemas"]["KafkaConnection"];
         };
         AdoptionCountsView: {
             /** Format: int32 */
@@ -4449,6 +4475,63 @@ export interface components {
             brokerXmlSnippet?: string | null;
             nodes: components["schemas"]["NodeVersionView"][];
         };
+        AccessFinding: {
+            capability: string;
+            /** @description AVAILABLE, UNAVAILABLE or UNKNOWN. */
+            status: string;
+            reason: string;
+        };
+        Failure: {
+            /** @description DNS, REFUSED, TIMEOUT, TLS, AUTHENTICATION, AUTHORIZATION or UNSUPPORTED_VERSION. */
+            cause: string;
+            message: string;
+            next: string;
+        };
+        NodeReach: {
+            id: string;
+            /** @description The address the node advertises; null when it was never learned. */
+            address?: string | null;
+            /** @description BROKER, CONTROLLER or STORAGE. */
+            functions: string[];
+            /** @description OK or UNREACHABLE. */
+            outcome: string;
+            /** @description DNS, REFUSED, TIMEOUT, TLS or AUTHENTICATION when unreachable. */
+            cause?: string | null;
+            message?: string | null;
+        };
+        Quorum: {
+            available: boolean;
+            reason?: string | null;
+            leader?: string | null;
+            /** Format: int32 */
+            voters?: number | null;
+        };
+        RegisteredRef: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+        };
+        RegistrationCheck: {
+            /** @description The system's id, such as kafka. */
+            system: string;
+            version?: components["schemas"]["VersionFound"] | null;
+            /** @description Whether the driver supports what was found. */
+            supported: boolean;
+            /** @description The cluster's own id as the brokers report it. */
+            clusterId?: string | null;
+            alreadyRegistered?: components["schemas"]["RegisteredRef"] | null;
+            nodes: components["schemas"]["NodeReach"][];
+            quorum?: components["schemas"]["Quorum"] | null;
+            access: components["schemas"]["AccessFinding"][];
+            failure?: components["schemas"]["Failure"] | null;
+        };
+        VersionFound: {
+            /** @description Such as "at least 3.5" or "4.0.2". */
+            text: string;
+            /** @description The cluster's metadata mode, such as KRaft or ZooKeeper. */
+            mode?: string | null;
+            exact: boolean;
+        };
         ClusterConnectionDetail: {
             managementUrlPattern?: string | null;
             /** @description The management URLs the operator gave as seeds, from the nodes that hold one */
@@ -4493,6 +4576,16 @@ export interface components {
             singular: string;
             /** @description The name of several, such as Queues. */
             plural: string;
+        };
+        /** @description How many messages wait in a subscription and how far the figure can be trusted (ADR-0216). Hand-written until the backend generates it. */
+        BacklogView: {
+            /** Format: int64 */
+            value?: number | null;
+            /** @enum {string} */
+            accuracy: "EXACT" | "ESTIMATE" | "UNAVAILABLE";
+            reason?: string | null;
+            /** @description Whether a per-partition breakdown can be read */
+            breakdown: boolean;
         };
         KindView: {
             /** @description The kind's id, such as artemis.queue. */
@@ -5562,6 +5655,14 @@ export interface components {
             username?: string;
             password?: string;
         };
+        KafkaConnectionUpdate: {
+            bootstrapServers?: string[];
+            securityProtocol?: string;
+            saslMechanism?: string;
+            credentials?: components["schemas"]["KafkaCredentials"];
+            tlsBundle?: string;
+            clientId?: string;
+        };
         UpdateClusterRequest: {
             name?: string;
             description?: string;
@@ -5570,6 +5671,7 @@ export interface components {
             tlsBundle?: string;
             management?: components["schemas"]["AccountUpdate"];
             core?: components["schemas"]["AccountUpdate"];
+            connection?: components["schemas"]["KafkaConnectionUpdate"];
         };
         ConnectionCheck: {
             managementUrlPattern: string;
@@ -6080,8 +6182,7 @@ export interface components {
                 [key: string]: string;
             };
             durable: boolean;
-            /** Format: int64 */
-            totalMessageCount: number;
+            backlog: components["schemas"]["BacklogView"];
             /** Format: int64 */
             totalConsumerCount: number;
             /** Format: int64 */
@@ -12118,7 +12219,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["RegisterPreview"];
+                    "*/*": components["schemas"]["RegisterPreview"] | components["schemas"]["RegistrationCheck"];
                 };
             };
             /** @description cluster registered */
@@ -16823,7 +16924,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ConnectionCheck"] | components["schemas"]["ClusterConnectionView"];
+                    "*/*": components["schemas"]["ConnectionCheck"] | components["schemas"]["RegistrationCheck"] | components["schemas"]["ClusterConnectionView"];
                 };
             };
             /** @description Held for approval: the operation has not run. X-Rahdar-Held-Operation names the request. */
@@ -23941,3 +24042,6 @@ export interface operations {
         };
     };
 }
+type WithRequired<T, K extends keyof T> = T & {
+    [P in K]-?: T[P];
+};

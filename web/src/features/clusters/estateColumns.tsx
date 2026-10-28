@@ -3,6 +3,8 @@ import { Link } from '@tanstack/react-router';
 import { nameOf } from '../../kernel/api/resourceId.ts';
 import { absoluteLabel } from '../../kernel/time/time.ts';
 import { AUTO, localZone } from '../../kernel/time/timezone.ts';
+import { BacklogCell } from '../../ui/BacklogCell.tsx';
+import { backlogWords } from '../../ui/backlog.ts';
 import linkClasses from '../../ui/InlineLink.module.css';
 import { StatusBadge } from '../../ui/StatusBadge.tsx';
 import { kindColumn, type Column } from '../../ui/table/index.ts';
@@ -76,7 +78,9 @@ export function freshnessOf(row: EstateSubscription): 'current' | 'stale' | 'par
 }
 
 /** The estate-wide subscriptions: each row says which cluster it is on, in that cluster's own kind label. */
-export function estateSubscriptionColumns(): Column<EstateSubscription>[] {
+export function estateSubscriptionColumns(
+  onBreakdown?: (row: EstateSubscription) => void,
+): Column<EstateSubscription>[] {
   return [
     {
       id: 'cluster',
@@ -114,10 +118,18 @@ export function estateSubscriptionColumns(): Column<EstateSubscription>[] {
       sortKey: 'destination',
     },
     {
-      id: 'depth',
-      header: 'Depth',
-      description: 'Messages waiting in the subscription, on every node',
-      accessor: (r) => r.subscription.totalMessageCount,
+      id: 'backlog',
+      header: 'Backlog',
+      description:
+        'Messages waiting in the subscription. ≈ marks an estimate, and Unavailable says why the figure could not be read',
+      accessor: (r) => backlogWords(r.subscription.backlog),
+      cell: (r) => (
+        <BacklogCell
+          backlog={r.subscription.backlog}
+          subject={r.subscription.name}
+          onBreakdown={onBreakdown && (() => onBreakdown(r))}
+        />
+      ),
       kind: 'number',
       priority: 'high',
       sortKey: 'depth',

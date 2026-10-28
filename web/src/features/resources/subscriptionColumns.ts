@@ -1,5 +1,7 @@
 import { createElement } from 'react';
 
+import { BacklogCell } from '../../ui/BacklogCell.tsx';
+import { backlogWords } from '../../ui/backlog.ts';
 import { kindColumn, type Column } from '../../ui/table/index.ts';
 import { destinationOf, routingTypeOf, type SubscriptionView } from './api.ts';
 import { OwnerChip } from '../../kernel/auth/OwnerChip.tsx';
@@ -20,9 +22,10 @@ export function pausedLabel(r: SubscriptionView): string {
  *
  * Every column fits a 1280 px window beside the expanded navigation (ADR-0164), so the columns are
  * compact rather than hidden: a count is as wide as its figures, its header a short label with the full
- * name on hover, and a routing type is in lower case, the way the destination picker writes it.
+ * name on hover, and a routing type is in lower case, the way the destination picker writes it. `onBreakdown`
+ * opens the backlog by partition, offered from the backlog figure of a row whose system has one.
  */
-export function subscriptionColumns(): Column<SubscriptionView>[] {
+export function subscriptionColumns(onBreakdown?: (row: SubscriptionView) => void): Column<SubscriptionView>[] {
   return [
     {
       id: 'destination',
@@ -62,10 +65,17 @@ export function subscriptionColumns(): Column<SubscriptionView>[] {
       description: 'Routing type: anycast delivers each message to one consumer, multicast to all of them',
     },
     {
-      id: 'depth',
-      header: 'Depth',
-      description: 'Messages waiting in the subscription, on every node',
-      accessor: (r) => r.totalMessageCount,
+      id: 'backlog',
+      header: 'Backlog',
+      description:
+        'Messages waiting in the subscription. ≈ marks an estimate, and Unavailable says why the figure could not be read',
+      accessor: (r) => backlogWords(r.backlog),
+      cell: (r) =>
+        createElement(BacklogCell, {
+          backlog: r.backlog,
+          subject: r.name,
+          onBreakdown: onBreakdown && (() => onBreakdown(r)),
+        }),
       kind: 'number',
       priority: 'high',
       sortKey: 'depth',

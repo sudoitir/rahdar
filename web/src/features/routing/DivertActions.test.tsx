@@ -67,7 +67,7 @@ const BROKER_XML = '<diverts>\n  <divert name="audit-copy">\n  </divert>\n</dive
 const DIVERT: RouteView = {
   id: 'artemis.divert/audit-copy',
   kind: 'artemis.divert',
-  kindLabel: 'Divert',
+  kindLabel: { singular: 'Divert', plural: 'Diverts' },
   name: 'audit-copy',
   routeClass: 'FORWARD',
   source: 'artemis.address/ORDER.IN',

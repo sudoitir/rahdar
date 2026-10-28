@@ -1,5 +1,11 @@
 import type { ReactNode } from 'react';
 
+/** A kind's name for people, as its driver gives it: "Queue" and "Queues". */
+export interface KindName {
+  singular: string;
+  plural: string;
+}
+
 /** What a column holds. It sets the column's bounds, font and how an overlong value is shortened. */
 export type ColumnKind = 'text' | 'identifier' | 'code' | 'number' | 'time' | 'status';
 
@@ -63,14 +69,14 @@ export const KIND_PRESETS: Record<ColumnKind, KindPreset> = {
  * The Kind column of a list of one role: what the row's system calls its kind ("Queue", "Divert"). It is
  * `low` so a narrow table drops it first; the name still identifies the row.
  */
-export function kindColumn<T extends { kindLabel: string }>(): Column<T>;
+export function kindColumn<T extends { kindLabel: KindName }>(): Column<T>;
 /** The same column for rows that hold the label deeper, such as a dead-letter row's subscription. */
-export function kindColumn<T>(label: (row: T) => string): Column<T>;
-export function kindColumn<T>(label?: (row: T) => string): Column<T> {
+export function kindColumn<T>(label: (row: T) => KindName): Column<T>;
+export function kindColumn<T>(label?: (row: T) => KindName): Column<T> {
   return {
     id: 'kind',
     header: 'Kind',
-    accessor: label ?? ((r) => (r as { kindLabel: string }).kindLabel),
+    accessor: (r) => (label ? label(r) : (r as { kindLabel: KindName }).kindLabel).singular,
     kind: 'text',
     priority: 'low',
     // A kind's label is a word or two, so the column holds no more than that and leaves the width to the names.

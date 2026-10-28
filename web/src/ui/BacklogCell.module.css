@@ -1,0 +1,24 @@
+.figure {
+  font-variant-numeric: tabular-nums;
+}
+
+/* The figure of an estimate or an unavailable backlog is the control that explains it. */
+.explain {
+  display: inline-flex;
+  align-items: center;
+  max-inline-size: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  text-decoration: underline dotted;
+  text-underline-offset: 0.2em;
+}
+
+.explain:focus-visible {
+  outline: var(--as-focus-ring);
+  outline-offset: var(--as-focus-offset);
+}

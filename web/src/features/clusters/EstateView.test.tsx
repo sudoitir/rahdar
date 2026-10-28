@@ -26,7 +26,12 @@ const AVAILABLE = { status: 'AVAILABLE', reason: 'ok', brokerXmlSnippet: null };
 const OTHER_SYSTEM = { id: 'other', name: 'Other Broker' };
 /** What a second system offers: its subscriptions can be paused but not purged. */
 const OTHER_KINDS = [
-  { id: 'other.stream', resourceClass: 'SUBSCRIPTION', label: 'Stream', verbs: ['pause', 'resume'] },
+  {
+    id: 'other.stream',
+    resourceClass: 'SUBSCRIPTION',
+    label: { singular: 'Stream', plural: 'Streams' },
+    verbs: ['pause', 'resume'],
+  },
 ];
 
 function cluster(id: string, name: string, over: Partial<ClusterSummary> = {}): ClusterSummary {
@@ -48,7 +53,13 @@ const OTHER = cluster('c2', 'edge-eu', { system: OTHER_SYSTEM, kinds: OTHER_KIND
 
 const ALLOWED = ['subscription:read', 'subscription:pause', 'subscription:purge', 'message:read'];
 
-function row(c: ClusterSummary, name: string, kind: { id: string; label: string }, stale = false) {
+function row(
+  c: ClusterSummary,
+  name: string,
+  kind: { id: string; label: { singular: string; plural: string } },
+  stale = false,
+  backlog: object = { value: 7, accuracy: 'EXACT', reason: null, breakdown: false },
+) {
   return {
     cluster: { id: c.id, name: c.name, system: c.system.id },
     subscription: {
@@ -57,7 +68,7 @@ function row(c: ClusterSummary, name: string, kind: { id: string; label: string 
       kindLabel: kind.label,
       allowedActions: ALLOWED,
       durable: true,
-      totalMessageCount: 7,
+      backlog,
       totalConsumerCount: 1,
       totalDeliveringCount: 0,
       totalScheduledCount: 0,
@@ -82,8 +93,8 @@ function row(c: ClusterSummary, name: string, kind: { id: string; label: string 
 }
 
 const ROWS = [
-  row(ARTEMIS, 'orders', { id: 'artemis.queue', label: 'Queue' }),
-  row(OTHER, 'telemetry', { id: 'other.stream', label: 'Stream' }),
+  row(ARTEMIS, 'orders', { id: 'artemis.queue', label: { singular: 'Queue', plural: 'Queues' } }),
+  row(OTHER, 'telemetry', { id: 'other.stream', label: { singular: 'Stream', plural: 'Streams' } }),
 ];
 
 function detail(c: ClusterSummary) {
@@ -145,6 +156,78 @@ describe('the estate view', () => {
     expect(within(grid).getByRole('link', { name: 'telemetry' })).toBeInTheDocument();
     expect(within(grid).getByText('Queue')).toBeInTheDocument();
     expect(within(grid).getByText('Stream')).toBeInTheDocument();
+  });
+
+  it('says Backlog, marks an estimate in its name, and never writes 0 for a figure that could not be read', async () => {
+    const group = { id: 'kafka.group-topic', label: { singular: 'Group on topic', plural: 'Groups on topics' } };
+    mockApi(
+      [ARTEMIS, OTHER],
+      [
+        row(ARTEMIS, 'orders', group, false, { value: 7, accuracy: 'EXACT', reason: null, breakdown: false }),
+        row(OTHER, 'telemetry', group, false, {
+          value: 12400,
+          accuracy: 'ESTIMATE',
+          reason: 'Two partitions have no committed offset.',
+          breakdown: true,
+        }),
+        row(OTHER, 'audit', group, false, {
+          value: null,
+          accuracy: 'UNAVAILABLE',
+          reason: 'The account may not read offsets.',
+          breakdown: false,
+        }),
+      ],
+    );
+    const user = userEvent.setup();
+    renderWithProviders(<EstateView />);
+
+    const grid = await screen.findByRole('grid', { name: 'Subscriptions' });
+    await within(grid).findByRole('link', { name: 'orders' });
+    expect(within(grid).getByRole('columnheader', { name: /Backlog/ })).toBeInTheDocument();
+    expect(within(grid).queryByRole('columnheader', { name: /Depth/ })).not.toBeInTheDocument();
+    expect(within(grid).getByText('7')).toBeInTheDocument();
+
+    await user.click(within(grid).getByRole('button', { name: /^≈ 12.400.*estimate/ }));
+    expect(await screen.findByText('Two partitions have no committed offset.')).toBeInTheDocument();
+    await user.keyboard('{Escape}');
+
+    await user.click(within(grid).getByRole('button', { name: /^Unavailable.*why/ }));
+    expect(await screen.findByText('The account may not read offsets.')).toBeInTheDocument();
+    expect(within(grid).queryByText('0')).not.toBeInTheDocument();
+  });
+
+  it('opens the partitions of an estimate, slowest first, from its popover', async () => {
+    const group = { id: 'kafka.group-topic', label: { singular: 'Group on topic', plural: 'Groups on topics' } };
+    mockApi(
+      [OTHER],
+      [row(OTHER, 'telemetry', group, false, { value: 5100, accuracy: 'ESTIMATE', reason: null, breakdown: true })],
+    );
+    server.use(
+      http.get('*/api/v1/clusters/c2/subscriptions/*', () =>
+        HttpResponse.json({
+          sampledAt: new Date().toISOString(),
+          partitions: [
+            { partition: 3, committed: 10, end: 5000, lag: 4990, reason: null },
+            { partition: 0, committed: 90, end: 100, lag: 10, reason: null },
+          ],
+        }),
+      ),
+    );
+    const user = userEvent.setup();
+    renderWithProviders(<EstateView />);
+
+    const grid = await screen.findByRole('grid', { name: 'Subscriptions' });
+    await user.click(await within(grid).findByRole('button', { name: /estimate/ }));
+    await user.click(await screen.findByRole('button', { name: 'Show partitions' }));
+
+    const drawer = await screen.findByRole('dialog', { name: 'Backlog of telemetry' });
+    const table = await within(drawer).findByRole('table', { name: 'telemetry backlog by partition' });
+    expect(
+      within(table)
+        .getAllByRole('row')
+        .slice(1)
+        .map((r) => r.firstElementChild?.textContent),
+    ).toEqual(['3', '0']);
   });
 
   it("disables a verb the row's system lacks, with the reason, while the other system's row can purge", async () => {
@@ -218,7 +301,10 @@ describe('the estate view', () => {
 
   it('says so, and shows the rest, when a cluster is not answering', async () => {
     const silent = cluster('c3', 'dark-site', { health: 'UNKNOWN' });
-    mockApi([ARTEMIS, silent], [row(ARTEMIS, 'orders', { id: 'artemis.queue', label: 'Queue' }, true)]);
+    mockApi(
+      [ARTEMIS, silent],
+      [row(ARTEMIS, 'orders', { id: 'artemis.queue', label: { singular: 'Queue', plural: 'Queues' } }, true)],
+    );
     renderWithProviders(<EstateView />);
 
     const clusters = await screen.findByRole('table', { name: 'Clusters' });

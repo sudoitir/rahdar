@@ -12,7 +12,7 @@ function subscription(over: Record<string, unknown> = {}) {
   return {
     ...subscriptionIdentity('orders.request', 'orders.request'),
     durable: true,
-    totalMessageCount: 12,
+    backlog: { value: 12, accuracy: 'EXACT', reason: null, breakdown: false },
     totalConsumerCount: 1,
     totalDeliveringCount: 0,
     totalScheduledCount: 0,

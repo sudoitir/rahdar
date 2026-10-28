@@ -48,7 +48,7 @@ function subscription(name: string, over: Record<string, unknown> = {}) {
       'message:move',
     ],
     durable: true,
-    totalMessageCount: 12,
+    backlog: { value: 12, accuracy: 'EXACT', reason: null, breakdown: false },
     totalConsumerCount: 0,
     totalDeliveringCount: 0,
     totalScheduledCount: 0,

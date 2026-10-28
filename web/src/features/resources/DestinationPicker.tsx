@@ -7,6 +7,7 @@ import styles from './DestinationPicker.module.css';
 
 import { destinationOf, routingTypeOf, useDestinationOptions, useSubscriptions, type SubscriptionView } from './api.ts';
 import { LoadingState } from '../../ui/LoadingState.tsx';
+import { backlogPhrase } from '../../ui/backlog.ts';
 
 const SUGGESTION_LIMIT = 300;
 const ROUTING_TYPES = ['ANYCAST', 'MULTICAST'] as const;
@@ -121,7 +122,7 @@ export function DestinationPicker({
     for (const row of rows) {
       if (wanted && !wanted.has(routingTypeOf(row))) continue;
       const seen = byDestination.get(destinationOf(row));
-      if (!seen || row.totalMessageCount > seen.totalMessageCount) byDestination.set(destinationOf(row), row);
+      if (!seen || (row.backlog.value ?? 0) > (seen.backlog.value ?? 0)) byDestination.set(destinationOf(row), row);
     }
     return [...byDestination.values()].sort((a, b) => destinationOf(a).localeCompare(destinationOf(b)));
   }, [subscriptions.data, types, barred]);
@@ -207,7 +208,7 @@ export function DestinationPicker({
                     key={destinationOf(o)}
                     // Built explicitly: the visual row separates these with flex
                     // gaps, which a screen reader reads as one run-on word.
-                    aria-label={`${destinationOf(o)}, ${routingTypeOf(o).toLowerCase()}, ${o.totalMessageCount.toLocaleString()} messages, on ${o.nodesPresent} of ${o.nodesTotal} nodes`}
+                    aria-label={`${destinationOf(o)}, ${routingTypeOf(o).toLowerCase()}, ${backlogPhrase(o.backlog, 'messages')}, on ${o.nodesPresent} of ${o.nodesTotal} nodes`}
                   >
                     <div className={styles.option}>
                       <span className={styles.name} title={destinationOf(o)}>
@@ -218,7 +219,7 @@ export function DestinationPicker({
                           {routingTypeOf(o).toLowerCase()}
                         </Text>
                         <Text size="xs" span>
-                          {o.totalMessageCount.toLocaleString()} msg
+                          {backlogPhrase(o.backlog, 'msg')}
                         </Text>
                         <Text size="xs" span>
                           {o.nodesPresent}/{o.nodesTotal} nodes

@@ -56,7 +56,7 @@ function mockApi(permissions: string[] = ['*']) {
           {
             ...subscriptionIdentity('ORDERS', 'ORDERS'),
             durable: true,
-            totalMessageCount: 7,
+            backlog: { value: 7, accuracy: 'EXACT', reason: null, breakdown: false },
             totalConsumerCount: 1,
             totalDeliveringCount: 0,
             totalScheduledCount: 0,

@@ -76,7 +76,7 @@ function subscription(name: string) {
       'message:move',
     ],
     durable: true,
-    totalMessageCount: 1,
+    backlog: { value: 1, accuracy: 'EXACT', reason: null, breakdown: false },
     totalConsumerCount: 0,
     totalDeliveringCount: 0,
     totalScheduledCount: 0,
@@ -217,7 +217,7 @@ describe('SubscriptionsView rows', () => {
     renderWithProviders(<SubscriptionsView />);
 
     await screen.findByRole('grid', { name: 'Subscriptions' });
-    await user.click(within(screen.getByRole('columnheader', { name: /Depth/ })).getByRole('button'));
+    await user.click(within(screen.getByRole('columnheader', { name: /Backlog/ })).getByRole('button'));
 
     expect(nextSearch({ page: 3, q: 'x' })).toEqual({ page: undefined, q: 'x', sort: 'depth' });
   });

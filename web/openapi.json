@@ -6371,7 +6371,11 @@
             "content" : {
               "*/*" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/RegisterPreview"
+                  "oneOf" : [ {
+                    "$ref" : "#/components/schemas/RegisterPreview"
+                  }, {
+                    "$ref" : "#/components/schemas/RegistrationCheck"
+                  } ]
                 }
               }
             }
@@ -14313,6 +14317,8 @@
                 "schema" : {
                   "oneOf" : [ {
                     "$ref" : "#/components/schemas/ConnectionCheck"
+                  }, {
+                    "$ref" : "#/components/schemas/RegistrationCheck"
                   }, {
                     "$ref" : "#/components/schemas/ClusterConnectionView"
                   } ]
@@ -28531,6 +28537,51 @@
         },
         "required" : [ "bytes", "rows" ]
       },
+      "ArtemisConnection" : {
+        "allOf" : [ {
+          "$ref" : "#/components/schemas/Connection"
+        }, {
+          "type" : "object",
+          "properties" : {
+            "system" : {
+              "type" : "string",
+              "minLength" : 1
+            },
+            "seedUrls" : {
+              "type" : "array",
+              "items" : {
+                "type" : "string",
+                "minLength" : 1
+              },
+              "minItems" : 1
+            },
+            "credentials" : {
+              "$ref" : "#/components/schemas/Credentials"
+            },
+            "coreCredentials" : {
+              "$ref" : "#/components/schemas/Credentials"
+            },
+            "tlsBundle" : {
+              "type" : "string"
+            },
+            "managementUrlPattern" : {
+              "type" : "string"
+            }
+          }
+        } ],
+        "required" : [ "seedUrls", "system" ]
+      },
+      "Connection" : {
+        "discriminator" : {
+          "propertyName" : "system"
+        },
+        "properties" : {
+          "system" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "system" ]
+      },
       "Credentials" : {
         "type" : "object",
         "properties" : {
@@ -28545,33 +28596,69 @@
         },
         "required" : [ "password", "username" ]
       },
-      "RegisterClusterRequest" : {
-        "type" : "object",
-        "properties" : {
-          "seedUrls" : {
-            "type" : "array",
-            "items" : {
+      "KafkaConnection" : {
+        "allOf" : [ {
+          "$ref" : "#/components/schemas/Connection"
+        }, {
+          "type" : "object",
+          "properties" : {
+            "system" : {
               "type" : "string",
               "minLength" : 1
             },
-            "minItems" : 1
+            "bootstrapServers" : {
+              "type" : "array",
+              "items" : {
+                "type" : "string",
+                "minLength" : 1
+              },
+              "minItems" : 1
+            },
+            "securityProtocol" : {
+              "type" : "string",
+              "minLength" : 1
+            },
+            "saslMechanism" : {
+              "type" : "string"
+            },
+            "credentials" : {
+              "$ref" : "#/components/schemas/KafkaCredentials"
+            },
+            "tlsBundle" : {
+              "type" : "string"
+            },
+            "clientId" : {
+              "type" : "string"
+            }
+          }
+        } ],
+        "required" : [ "bootstrapServers", "securityProtocol", "system" ]
+      },
+      "KafkaCredentials" : {
+        "type" : "object",
+        "properties" : {
+          "username" : {
+            "type" : "string"
+          },
+          "password" : {
+            "type" : "string"
+          },
+          "token" : {
+            "type" : "string"
+          }
+        }
+      },
+      "RegisterClusterRequest" : {
+        "type" : "object",
+        "properties" : {
+          "system" : {
+            "type" : "string",
+            "minLength" : 1
           },
           "name" : {
             "type" : "string"
           },
           "description" : {
-            "type" : "string"
-          },
-          "credentials" : {
-            "$ref" : "#/components/schemas/Credentials"
-          },
-          "coreCredentials" : {
-            "$ref" : "#/components/schemas/Credentials"
-          },
-          "tlsBundle" : {
-            "type" : "string"
-          },
-          "managementUrlPattern" : {
             "type" : "string"
           },
           "environmentId" : {
@@ -28580,9 +28667,16 @@
           },
           "adopt" : {
             "type" : "boolean"
+          },
+          "connection" : {
+            "oneOf" : [ {
+              "$ref" : "#/components/schemas/ArtemisConnection"
+            }, {
+              "$ref" : "#/components/schemas/KafkaConnection"
+            } ]
           }
         },
-        "required" : [ "seedUrls" ]
+        "required" : [ "connection", "system" ]
       },
       "AdoptionCountsView" : {
         "type" : "object",
@@ -28906,6 +29000,176 @@
           }
         },
         "required" : [ "feature", "label", "nodes", "reason", "requiredVersion", "status" ]
+      },
+      "AccessFinding" : {
+        "type" : "object",
+        "properties" : {
+          "capability" : {
+            "type" : "string"
+          },
+          "status" : {
+            "type" : "string",
+            "description" : "AVAILABLE, UNAVAILABLE or UNKNOWN."
+          },
+          "reason" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "capability", "reason", "status" ]
+      },
+      "Failure" : {
+        "type" : "object",
+        "properties" : {
+          "cause" : {
+            "type" : "string",
+            "description" : "DNS, REFUSED, TIMEOUT, TLS, AUTHENTICATION, AUTHORIZATION or UNSUPPORTED_VERSION."
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "next" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "cause", "message", "next" ]
+      },
+      "NodeReach" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string"
+          },
+          "address" : {
+            "type" : [ "string", "null" ],
+            "description" : "The address the node advertises; null when it was never learned."
+          },
+          "functions" : {
+            "type" : "array",
+            "description" : "BROKER, CONTROLLER or STORAGE.",
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "outcome" : {
+            "type" : "string",
+            "description" : "OK or UNREACHABLE."
+          },
+          "cause" : {
+            "type" : [ "string", "null" ],
+            "description" : "DNS, REFUSED, TIMEOUT, TLS or AUTHENTICATION when unreachable."
+          },
+          "message" : {
+            "type" : [ "string", "null" ]
+          }
+        },
+        "required" : [ "functions", "id", "outcome" ]
+      },
+      "Quorum" : {
+        "type" : "object",
+        "properties" : {
+          "available" : {
+            "type" : "boolean"
+          },
+          "reason" : {
+            "type" : [ "string", "null" ]
+          },
+          "leader" : {
+            "type" : [ "string", "null" ]
+          },
+          "voters" : {
+            "type" : [ "integer", "null" ],
+            "format" : "int32"
+          }
+        },
+        "required" : [ "available" ]
+      },
+      "RegisteredRef" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "name" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "id", "name" ]
+      },
+      "RegistrationCheck" : {
+        "type" : "object",
+        "properties" : {
+          "system" : {
+            "type" : "string",
+            "description" : "The system's id, such as kafka."
+          },
+          "version" : {
+            "anyOf" : [ {
+              "$ref" : "#/components/schemas/VersionFound"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "supported" : {
+            "type" : "boolean",
+            "description" : "Whether the driver supports what was found."
+          },
+          "clusterId" : {
+            "type" : [ "string", "null" ],
+            "description" : "The cluster's own id as the brokers report it."
+          },
+          "alreadyRegistered" : {
+            "anyOf" : [ {
+              "$ref" : "#/components/schemas/RegisteredRef"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "nodes" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/NodeReach"
+            }
+          },
+          "quorum" : {
+            "anyOf" : [ {
+              "$ref" : "#/components/schemas/Quorum"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "access" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/AccessFinding"
+            }
+          },
+          "failure" : {
+            "anyOf" : [ {
+              "$ref" : "#/components/schemas/Failure"
+            }, {
+              "type" : "null"
+            } ]
+          }
+        },
+        "required" : [ "access", "nodes", "supported", "system" ]
+      },
+      "VersionFound" : {
+        "type" : "object",
+        "properties" : {
+          "text" : {
+            "type" : "string",
+            "description" : "Such as \"at least 3.5\" or \"4.0.2\"."
+          },
+          "mode" : {
+            "type" : [ "string", "null" ],
+            "description" : "The cluster's metadata mode, such as KRaft or ZooKeeper."
+          },
+          "exact" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "exact", "text" ]
       },
       "ClusterConnectionDetail" : {
         "type" : "object",
@@ -31661,6 +31925,33 @@
           }
         }
       },
+      "KafkaConnectionUpdate" : {
+        "type" : "object",
+        "properties" : {
+          "bootstrapServers" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string",
+              "minLength" : 1
+            }
+          },
+          "securityProtocol" : {
+            "type" : "string"
+          },
+          "saslMechanism" : {
+            "type" : "string"
+          },
+          "credentials" : {
+            "$ref" : "#/components/schemas/KafkaCredentials"
+          },
+          "tlsBundle" : {
+            "type" : "string"
+          },
+          "clientId" : {
+            "type" : "string"
+          }
+        }
+      },
       "UpdateClusterRequest" : {
         "type" : "object",
         "properties" : {
@@ -31688,6 +31979,9 @@
           },
           "core" : {
             "$ref" : "#/components/schemas/AccountUpdate"
+          },
+          "connection" : {
+            "$ref" : "#/components/schemas/KafkaConnectionUpdate"
           }
         }
       },

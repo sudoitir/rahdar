@@ -18,15 +18,13 @@ const REFUSALS: Record<string, (subject: string) => string> = {
   'delete-messages': (s) => `Messages cannot be deleted from ${s}`,
 };
 
-const plural = (noun: string): string => {
-  if (/(s|x|z|ch|sh)$/.test(noun)) return `${noun}es`;
-  if (/[^aeiou]y$/.test(noun)) return `${noun.slice(0, -1)}ies`;
-  return `${noun}s`;
-};
+/** A label mid-sentence: "Queues" becomes "queues", while "ACLs" keeps its capitals. */
+const inSentence = (label: string): string =>
+  /^[A-Z][A-Z]/.test(label) ? label : label.charAt(0).toLowerCase() + label.slice(1);
 
-/** Why a kind cannot take a verb, built from its system and its label: "Artemis addresses cannot be purged." */
-export function verbRefusal(systemName: string, kindLabel: string, verb: string): string {
-  const subject = `${systemName} ${plural(kindLabel.toLowerCase())}`;
+/** Why a kind cannot take a verb, built from its system and its plural label: "Artemis addresses cannot be purged." */
+export function verbRefusal(systemName: string, kindLabel: { plural: string }, verb: string): string {
+  const subject = `${systemName} ${inSentence(kindLabel.plural)}`;
   const reason = REFUSALS[verb]?.(subject) ?? `${subject} do not support ${verb}`;
   return `${reason}.`;
 }

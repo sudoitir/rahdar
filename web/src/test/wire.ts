@@ -5,7 +5,7 @@ export const ARTEMIS_KINDS = [
   {
     id: 'artemis.queue',
     resourceClass: 'SUBSCRIPTION',
-    label: 'Queue',
+    label: { singular: 'Queue', plural: 'Queues' },
     verbs: [
       'create',
       'delete',
@@ -20,13 +20,43 @@ export const ARTEMIS_KINDS = [
       'expire',
     ],
   },
-  { id: 'artemis.address', resourceClass: 'DESTINATION', label: 'Address', verbs: ['create', 'delete', 'close'] },
-  { id: 'artemis.connection', resourceClass: 'CONNECTION', label: 'Connection', verbs: ['close'] },
-  { id: 'artemis.session', resourceClass: 'CHANNEL', label: 'Session', verbs: ['close'] },
-  { id: 'artemis.consumer', resourceClass: 'CONSUMER', label: 'Consumer', verbs: ['close'] },
-  { id: 'artemis.producer', resourceClass: 'PRODUCER', label: 'Producer', verbs: [] },
-  { id: 'artemis.divert', resourceClass: 'ROUTE', label: 'Divert', verbs: ['create', 'delete'] },
-  { id: 'artemis.bridge', resourceClass: 'ROUTE', label: 'Bridge', verbs: [] },
+  {
+    id: 'artemis.address',
+    resourceClass: 'DESTINATION',
+    label: { singular: 'Address', plural: 'Addresses' },
+    verbs: ['create', 'delete', 'close'],
+  },
+  {
+    id: 'artemis.connection',
+    resourceClass: 'CONNECTION',
+    label: { singular: 'Connection', plural: 'Connections' },
+    verbs: ['close'],
+  },
+  {
+    id: 'artemis.session',
+    resourceClass: 'CHANNEL',
+    label: { singular: 'Session', plural: 'Sessions' },
+    verbs: ['close'],
+  },
+  {
+    id: 'artemis.consumer',
+    resourceClass: 'CONSUMER',
+    label: { singular: 'Consumer', plural: 'Consumers' },
+    verbs: ['close'],
+  },
+  {
+    id: 'artemis.producer',
+    resourceClass: 'PRODUCER',
+    label: { singular: 'Producer', plural: 'Producers' },
+    verbs: [],
+  },
+  {
+    id: 'artemis.divert',
+    resourceClass: 'ROUTE',
+    label: { singular: 'Divert', plural: 'Diverts' },
+    verbs: ['create', 'delete'],
+  },
+  { id: 'artemis.bridge', resourceClass: 'ROUTE', label: { singular: 'Bridge', plural: 'Bridges' }, verbs: [] },
 ];
 
 /** The kinds the Kafka driver offers, labelled as its kinds declare them. */
@@ -86,7 +116,7 @@ export function subscriptionIdentity(name: string, address = name, routingType =
   return {
     id: subscriptionId(name),
     kind: QUEUE_KIND,
-    kindLabel: 'Queue',
+    kindLabel: { singular: 'Queue', plural: 'Queues' },
     name,
     destination: destinationId(address),
     nativeAttributes: { routingType },
@@ -95,5 +125,5 @@ export function subscriptionIdentity(name: string, address = name, routingType =
 
 /** The identity fields of an address as the API lists a destination. */
 export function destinationIdentity(name: string) {
-  return { id: destinationId(name), kind: ADDRESS_KIND, kindLabel: 'Address', name };
+  return { id: destinationId(name), kind: ADDRESS_KIND, kindLabel: { singular: 'Address', plural: 'Addresses' }, name };
 }
