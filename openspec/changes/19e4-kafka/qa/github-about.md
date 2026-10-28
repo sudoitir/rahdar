@@ -2,7 +2,7 @@
 
 Applied by the lead after the merge, with `gh repo edit`. Nothing here has been applied.
 
-## Description (229 characters)
+## Description (227 characters)
 
 > Open-source operations console for Apache Artemis and Apache Kafka: every cluster in one estate, consumer lag shown as the estimate it is, previews before anything destructive, and an approval gate for people and AI assistants.
 
