@@ -4,7 +4,7 @@ import { Link, useNavigate, useParams, useSearch } from '@tanstack/react-router'
 import { useDebouncedValue } from '@mantine/hooks';
 
 import { CapabilityLedger, useCluster, useRoleIds } from '../clusters/index.ts';
-import { kindOf, refOf } from '../../kernel/api/resourceId.ts';
+import { kindOf, refOf, subscriptionRefWords } from '../../kernel/api/resourceId.ts';
 import { useMessages, type MessageSummaryView } from './api.ts';
 import { CapabilityGate } from '../../ui/CapabilityGate.tsx';
 import { EmptyState } from '../../ui/EmptyState.tsx';
@@ -213,7 +213,7 @@ export function MessagesView() {
           <Link to={`/clusters/${clusterId}/subscriptions`} className={linkClasses.link}>
             All subscriptions
           </Link>
-          <span className={classes.subscription}>{subscriptionName}</span>
+          <span className={classes.subscription}>{subscriptionRefWords(subscriptionName)}</span>
         </>
       }
       description={
@@ -232,7 +232,12 @@ export function MessagesView() {
               Send
             </Button>
           </CapabilityGate>
-          <PurgeSubscription clusterId={clusterId} subscriptionName={subscriptionName} node={search.node} />
+          <PurgeSubscription
+            clusterId={clusterId}
+            subscriptionName={subscriptionName}
+            node={search.node}
+            moves={partitioned}
+          />
         </>
       }
     />

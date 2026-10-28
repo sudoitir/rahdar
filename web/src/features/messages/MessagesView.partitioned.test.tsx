@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { http, HttpResponse } from 'msw';
 import { act, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { holdButton } from '../../test/hold.ts';
 import { notifications } from '@mantine/notifications';
 
 import { renderWithProviders } from '../../test/render.tsx';
@@ -233,5 +234,38 @@ describe('MessagesView on a partitioned log', () => {
     expect(last.searchParams.get('from')).toBe('offset');
     expect(last.searchParams.get('value')).toBe('2');
     expect(screen.queryByRole('button', { name: /Next records/ })).not.toBeInTheDocument();
+  });
+
+  it('purges a log by moving its position, and keeps the reason in the dialog when the run is refused', async () => {
+    mockKafka(() =>
+      page([record(0)], { partition: 0, start: 0, end: 1, next: null, retentionMoved: false, uncommittedHidden: true }),
+    );
+    const calls: boolean[] = [];
+    server.use(
+      http.post('*/api/v1/clusters/k1/resources/kafka.group-topic/orders\\:purge', ({ request }) => {
+        const dryRun = new URL(request.url).searchParams.get('dryRun') === 'true';
+        calls.push(dryRun);
+        return dryRun
+          ? HttpResponse.json({ affectedCount: 1200, cap: 100000, overCap: false, dryRun: true })
+          : HttpResponse.json(
+              { title: 'Failed precondition', detail: 'The group began rebalancing. Try again when it is stable.' },
+              { status: 409 },
+            );
+      }),
+    );
+    const user = userEvent.setup();
+    renderWithProviders(<MessagesView />);
+    await user.click(await screen.findByRole('button', { name: 'Purge subscription' }));
+
+    const dialog = await screen.findByRole('dialog');
+    expect(await within(dialog).findByText(/moves the position of orders to the end of its log/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/No record is deleted/)).toBeInTheDocument();
+    await holdButton(within(dialog).getByRole('button', { name: 'Purge subscription' }));
+
+    expect(await within(dialog).findByText('The system refuses this purge right now')).toBeInTheDocument();
+    expect(within(dialog).getAllByText(/began rebalancing/).length).toBeGreaterThan(0);
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(within(dialog).getByRole('button', { name: 'Purge subscription' })).toBeDisabled();
+    expect(calls).toEqual([true, false]);
   });
 });

@@ -28,7 +28,8 @@ function Consequence({
   subscriptionName,
   preview,
   failure,
-}: Readonly<{ subscriptionName: string; preview: DryRunView | null; failure: ApiError | null }>) {
+  moves,
+}: Readonly<{ subscriptionName: string; preview: DryRunView | null; failure: ApiError | null; moves: boolean }>) {
   if (refusal(failure)) {
     return (
       <Notice tone="warning" title="The system refuses this purge right now">
@@ -51,10 +52,18 @@ function Consequence({
   if (!preview) return null;
   return (
     <Stack gap="sm">
-      <Text size="sm">
-        This will remove approximately {messageCount(preview.affectedCount)} from {subscriptionName} (point-in-time
-        estimate). This cannot be undone.
-      </Text>
+      {moves ? (
+        <Text size="sm">
+          This moves the position of {subscriptionName} to the end of its log, skipping approximately{' '}
+          {messageCount(preview.affectedCount)} (point-in-time estimate). No record is deleted; the group can be reset
+          back.
+        </Text>
+      ) : (
+        <Text size="sm">
+          This will remove approximately {messageCount(preview.affectedCount)} from {subscriptionName} (point-in-time
+          estimate). This cannot be undone.
+        </Text>
+      )}
       {preview.overCap ? (
         <Notice tone="warning" title="Over the safety cap">
           This would remove {preview.affectedCount.toLocaleString()} messages, over the cap of{' '}
@@ -74,7 +83,14 @@ export function PurgeSubscription({
   clusterId,
   subscriptionName,
   node,
-}: Readonly<{ clusterId: string; subscriptionName: string; node?: string }>) {
+  moves = false,
+}: Readonly<{
+  clusterId: string;
+  subscriptionName: string;
+  node?: string;
+  /** The purge of a log moves the group's position to the end and deletes no record. */
+  moves?: boolean;
+}>) {
   const purge = usePurgeSubscription(clusterId, subscriptionName);
   const [estimating, setEstimating] = useState(false);
   const [opened, setOpened] = useState(false);
@@ -110,7 +126,12 @@ export function PurgeSubscription({
           announceResult('purge', subscriptionName, r, preview?.affectedCount ?? 0);
           setOpened(false);
         },
-        onError: (e) => announceFailure('purge', `subscription "${subscriptionName}"`, e, () => setOpened(false)),
+        onError: (e) => {
+          // The system refuses it now (a group that began rebalancing after the estimate): its reason stays in
+          // the dialog, which stays open and disabled, rather than passing in a toast.
+          if (refusal(e)) setFailure(e);
+          announceFailure('purge', `subscription "${subscriptionName}"`, e, () => setOpened(false));
+        },
       },
     );
 
@@ -125,7 +146,9 @@ export function PurgeSubscription({
         opened={opened}
         onClose={() => setOpened(false)}
         title={`Purge subscription ${subscriptionName}`}
-        consequence={<Consequence subscriptionName={subscriptionName} preview={preview} failure={failure} />}
+        consequence={
+          <Consequence subscriptionName={subscriptionName} preview={preview} failure={failure} moves={moves} />
+        }
         confirmLabel={overCap ? 'Purge anyway, over the cap' : 'Purge subscription'}
         tone="danger"
         blocked={refusal(failure) ? failure.message : undefined}

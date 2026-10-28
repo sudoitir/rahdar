@@ -11,6 +11,7 @@ import {
 } from '@tabler/icons-react';
 import { useNavigate } from '@tanstack/react-router';
 
+import { subscriptionRef } from '../../kernel/api/resourceId.ts';
 import { useResourceGate } from '../../kernel/auth/useResourceGate.ts';
 import type { ActionProps, HostedDialogProps, MessageTarget, SubscriptionTarget } from '../../kernel/actions/types.ts';
 import { absoluteHref, clusterHref } from '../../kernel/routing/href.ts';
@@ -35,7 +36,7 @@ export function BrowseSubscriptionMessages({ clusterId, target }: Readonly<Actio
     resource: target.snapshot,
   });
   if (hidden) return null;
-  const path = `subscriptions/${encodeURIComponent(target.name)}/messages`;
+  const path = `subscriptions/${encodeURIComponent(subscriptionRef(target))}/messages`;
   return (
     <ActionMenuItem
       label="Browse messages"
@@ -49,7 +50,7 @@ export function BrowseSubscriptionMessages({ clusterId, target }: Readonly<Actio
 
 /** Where one message opens: its subscription's browser with the message's detail, on the node browsed. */
 function messagePath(target: MessageTarget) {
-  return `subscriptions/${encodeURIComponent(target.subscription.name)}/messages`;
+  return `subscriptions/${encodeURIComponent(subscriptionRef(target.subscription))}/messages`;
 }
 
 function messageSearch(target: MessageTarget) {

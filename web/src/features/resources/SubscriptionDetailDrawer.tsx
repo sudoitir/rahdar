@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { Button, Drawer, Group, Stack } from '@mantine/core';
 import { Link, useParams } from '@tanstack/react-router';
 
+import { subscriptionRef } from '../../kernel/api/resourceId.ts';
 import { destinationOf, routingTypeOf, type SubscriptionView } from './api.ts';
 import { OwnerChip } from '../../kernel/auth/OwnerChip.tsx';
 import { useSlot } from '../../kernel/slots.ts';
@@ -68,7 +69,7 @@ export function SubscriptionDetailDrawer({
               size="xs"
               variant="default"
               component={Link}
-              to={`/clusters/${clusterId}/subscriptions/${encodeURIComponent(subscription.name)}/messages`}
+              to={`/clusters/${clusterId}/subscriptions/${encodeURIComponent(subscriptionRef(subscription))}/messages`}
               onClick={onClose}
             >
               Browse messages
