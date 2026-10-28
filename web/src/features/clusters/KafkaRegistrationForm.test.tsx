@@ -34,7 +34,7 @@ function check(over: Partial<KafkaConnectionCheck> = {}): KafkaConnectionCheck {
     ],
     quorum: { available: false, reason: 'the cluster runs ZooKeeper' },
     access: [
-      { capability: 'Describe the cluster', status: 'AVAILABLE', reason: null },
+      { capability: 'Describe the cluster', status: 'AVAILABLE', reason: 'The account may describe the cluster.' },
       {
         capability: 'Read consumer group offsets',
         status: 'UNAVAILABLE',

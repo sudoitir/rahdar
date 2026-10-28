@@ -2292,6 +2292,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/clusters/{clusterId}/subscriptions/{kind}/{path}/backlog": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["backlog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/clusters/{clusterId}/sql/stream": {
         parameters: {
             query?: never;
@@ -6141,6 +6157,22 @@ export interface components {
             /** @description The replica is gone or draining. */
             degraded: boolean;
         };
+        Backlog: {
+            /**
+             * Format: int64
+             * @description The figure; null when the accuracy is UNAVAILABLE.
+             */
+            value?: number | null;
+            /**
+             * @description EXACT, ESTIMATE or UNAVAILABLE.
+             * @enum {string}
+             */
+            accuracy: "EXACT" | "ESTIMATE" | "UNAVAILABLE";
+            /** @description Why it is an estimate or unavailable. */
+            reason?: string | null;
+            /** @description Whether the subscription has a per-partition breakdown to read. */
+            breakdown: boolean;
+        };
         ClusterRef: {
             /** Format: uuid */
             id: string;
@@ -6196,7 +6228,7 @@ export interface components {
                 [key: string]: string;
             };
             durable: boolean;
-            backlog: components["schemas"]["BacklogView"];
+            backlog: components["schemas"]["Backlog"];
             /** Format: int64 */
             totalConsumerCount: number;
             /** Format: int64 */
@@ -6661,6 +6693,22 @@ export interface components {
              */
             count?: number | null;
             hasNext: boolean;
+        };
+        Breakdown: {
+            /** Format: date-time */
+            sampledAt?: string;
+            partitions?: components["schemas"]["PartitionLag"][];
+        };
+        PartitionLag: {
+            /** Format: int32 */
+            partition: number;
+            /** Format: int64 */
+            committed?: number;
+            /** Format: int64 */
+            end: number;
+            /** Format: int64 */
+            lag?: number;
+            reason?: string;
         };
         /** @description A limit the query ran into, which is why it stopped. */
         BoundView: {
@@ -19683,6 +19731,65 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["TopologyView"];
+                };
+            };
+            /** @description Too many requests. Wait for Retry-After seconds. */
+            429: {
+                headers: {
+                    /** @description Seconds to wait before retrying. */
+                    "Retry-After"?: number;
+                    /** @description Requests allowed in the window (API tokens). */
+                    "RateLimit-Limit"?: number;
+                    /** @description Requests left in the window (API tokens). */
+                    "RateLimit-Remaining"?: number;
+                    /** @description Seconds until the window resets (API tokens). */
+                    "RateLimit-Reset"?: number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Client error */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Server error */
+            "5XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
+    backlog: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                clusterId: string;
+                kind: string;
+                path: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["Breakdown"];
                 };
             };
             /** @description Too many requests. Wait for Retry-After seconds. */

@@ -8,7 +8,7 @@ import { useCluster } from './api.ts';
 import { CapabilityLedger } from './CapabilityLedger.tsx';
 import { ConnectionForm } from './ConnectionSettings.tsx';
 import { KafkaConnectionForm } from './KafkaConnectionSettings.tsx';
-import type { KafkaConnection } from './api.ts';
+import { storedKafka } from './kafkaConnection.ts';
 import classes from './Clusters.module.css';
 
 /** Settings section: register another cluster. */
@@ -66,9 +66,8 @@ export function ConnectionSection({ clusterId }: Readonly<{ clusterId: string }>
           if (!data.connection) {
             return <Text size="sm">You can see this cluster only through a team, so its connection is not shown.</Text>;
           }
-          if (data.system.id === 'kafka') {
-            // The generated connection type is Artemis-shaped until the schema carries the union.
-            return <KafkaConnectionForm cluster={data} stored={data.connection as unknown as KafkaConnection} />;
+          if (data.connection.kafka) {
+            return <KafkaConnectionForm cluster={data} stored={storedKafka(data.connection.kafka)} />;
           }
           return <ConnectionForm cluster={data} connection={data.connection} />;
         }}

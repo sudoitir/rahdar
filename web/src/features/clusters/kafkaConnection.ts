@@ -131,3 +131,23 @@ export function kafkaFieldsOf(stored: KafkaConnection): KafkaFields {
     clientId: stored.clientId ?? '',
   };
 }
+
+/** A stored connection as the cluster view reads it back: the account's name, never a secret. */
+export function storedKafka(detail: {
+  bootstrapServers: string[];
+  securityProtocol: string;
+  saslMechanism?: string | null;
+  username?: string | null;
+  tlsBundle?: string | null;
+  clientId?: string | null;
+}): KafkaConnection {
+  return {
+    system: 'kafka',
+    bootstrapServers: detail.bootstrapServers,
+    securityProtocol: detail.securityProtocol as SecurityProtocol,
+    saslMechanism: (detail.saslMechanism ?? null) as SaslMechanism | null,
+    credentials: detail.username ? { username: detail.username } : null,
+    tlsBundle: detail.tlsBundle ?? null,
+    clientId: detail.clientId ?? null,
+  };
+}

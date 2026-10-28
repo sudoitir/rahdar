@@ -13,9 +13,9 @@ import { CAUSE_WORDS, KAFKA_NODE_COLUMNS } from './kafkaCheckColumns.tsx';
 
 function quorumWords(check: KafkaConnectionCheck): string {
   const { quorum } = check;
-  return quorum.available
-    ? `${quorum.voters} voters, leader is broker ${quorum.leader}`
-    : `Unavailable: ${quorum.reason}`;
+  if (!quorum) return 'Not read';
+  if (quorum.available) return `${quorum.voters ?? 'Unknown'} voters, leader is broker ${quorum.leader ?? 'unknown'}`;
+  return `Unavailable: ${quorum.reason ?? 'the cluster does not expose it'}`;
 }
 
 /**
@@ -67,10 +67,13 @@ export function KafkaCheckPanel({ check }: Readonly<{ check: KafkaConnectionChec
         items={[
           {
             term: 'Version',
-            value: `Apache Kafka ${check.version.text}`,
-            hint: check.version.exact ? undefined : 'A lower bound: the cluster reports no exact version.',
+            value: check.version ? `Apache Kafka ${check.version.text}` : 'Not read: no broker answered',
+            hint:
+              check.version && !check.version.exact
+                ? 'A lower bound: the cluster reports no exact version.'
+                : undefined,
           },
-          { term: 'Mode', value: check.version.mode },
+          { term: 'Mode', value: check.version?.mode ?? 'Not reported' },
           { term: 'Cluster id', value: check.clusterId ?? 'Not reported' },
           { term: 'Controller quorum', value: quorumWords(check) },
         ]}

@@ -77,7 +77,8 @@ export type CauseKind = 'DNS' | 'REFUSED' | 'TIMEOUT' | 'TLS' | 'AUTHENTICATION'
 
 export interface KafkaNodeCheck {
   id: string;
-  address: string;
+  /** The address the node advertises; null when it was never learned. */
+  address: string | null;
   functions: string[];
   outcome: 'OK' | 'UNREACHABLE';
   cause: CauseKind | null;
@@ -87,13 +88,14 @@ export interface KafkaNodeCheck {
 /** The dry run of a Kafka registration or edit. */
 export interface KafkaConnectionCheck {
   system: 'kafka';
-  version: { text: string; mode: 'KRaft' | 'ZooKeeper'; exact: boolean };
+  /** Null when the check never reached a broker. */
+  version: { text: string; mode?: string | null; exact: boolean } | null;
   supported: boolean;
   clusterId: string | null;
   alreadyRegistered: { id: string; name: string } | null;
   nodes: KafkaNodeCheck[];
-  quorum: { available: true; leader: string; voters: number } | { available: false; reason: string };
-  access: { capability: string; status: CapabilityStatus; reason: string | null }[];
+  quorum?: { available: boolean; reason?: string | null; leader?: string | null; voters?: number | null } | null;
+  access: { capability: string; status: CapabilityStatus; reason: string }[];
   failure: {
     cause: CauseKind | 'AUTHORIZATION' | 'UNSUPPORTED_VERSION';
     message: string;
@@ -102,7 +104,7 @@ export interface KafkaConnectionCheck {
 }
 
 /** The dry run of an Artemis registration: the probe, as before. */
-export type ArtemisConnectionCheck = RegisterPreview & { system: 'artemis' };
+export type ArtemisConnectionCheck = RegisterPreview & { system?: undefined };
 
 export type RegistrationCheck = ArtemisConnectionCheck | KafkaConnectionCheck;
 

@@ -40,10 +40,10 @@ export const KAFKA_NODE_COLUMNS: Column<KafkaNodeCheck>[] = [
     id: 'address',
     header: 'Advertised address',
     short: 'Address',
-    accessor: (n) => n.address,
+    accessor: (n) => n.address ?? 'Not learned',
     cell: (n) => (
       <Text size="sm" className={classes.mono}>
-        {n.address}
+        {n.address ?? 'Not learned'}
       </Text>
     ),
     kind: 'code',

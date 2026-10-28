@@ -32,7 +32,6 @@ const { ArtemisRegistrationForm } = await import('./ArtemisRegistrationForm.tsx'
 
 function preview() {
   return {
-    system: 'artemis',
     capabilities: {
       managementRead: { status: 'AVAILABLE', reason: 'ok', brokerXmlSnippet: null },
       managementWrite: { status: 'AVAILABLE', reason: 'ok', brokerXmlSnippet: null },

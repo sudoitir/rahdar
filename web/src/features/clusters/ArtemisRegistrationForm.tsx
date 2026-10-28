@@ -96,7 +96,7 @@ function CheckOutcome({
   check: ReturnType<typeof useCheckConnection>;
   register: ReturnType<typeof useRegisterCluster>;
 }>) {
-  const preview = check.data?.system === 'artemis' ? check.data : null;
+  const preview = check.data?.system !== 'kafka' ? check.data : null;
   const nodes = preview?.nodes.length ?? 0;
   return (
     <div aria-live="polite" className={classes.form}>
@@ -255,21 +255,21 @@ export function ArtemisRegistrationForm() {
   // Registering is gated on a passing check of these exact inputs. The check opens a real Core
   // session per node, so it is the only thing that can catch a Core account the broker refuses —
   // the failure that otherwise surfaces after registration, where it reads as a broken cluster.
-  const checkPassed = check.isSuccess && checkedThis && check.data.system === 'artemis';
+  const checkPassed = check.isSuccess && checkedThis && check.data.system !== 'kafka';
   const afterProbe = useSlot('cluster.registration.afterProbe');
   // Brokers a registered cluster holds stay refused whichever call found it: the check, or a registration
   // that lost a race with another one. Only a new check of changed details can clear it.
   const registeredAlready = checkedThis && Boolean(alreadyRegistered(check.error) ?? alreadyRegistered(register.error));
   const registerBlockedReason = blockedReason(valid, check, checkPassed, stale, registeredAlready);
 
-  const preview = check.data?.system === 'artemis' ? check.data : null;
+  const preview = check.data?.system !== 'kafka' ? check.data : null;
   const adoption = checkPassed ? (preview?.adoption ?? null) : null;
   const adopt = adoption ? (adoptChoice ?? adoption.disagreements.length === 0) : false;
 
   // Open the advanced fields on their own once a check reveals they'd matter —
   // the operator never has to know they exist until the ledger says so.
   useEffect(() => {
-    if (check.data?.system !== 'artemis') return;
+    if (!check.data || check.data.system === 'kafka') return;
     // A refusal, not an unproven capability: at check time no write has been
     // attempted, so messageIo is legitimately UNKNOWN and opening the advanced
     // fields for it would fire on every single registration.

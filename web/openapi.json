@@ -18844,6 +18844,107 @@
         }
       }
     },
+    "/api/v1/clusters/{clusterId}/subscriptions/{kind}/{path}/backlog" : {
+      "get" : {
+        "tags" : [ "cluster-resource-controller" ],
+        "operationId" : "backlog",
+        "parameters" : [ {
+          "name" : "clusterId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "name" : "kind",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "path",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Breakdown"
+                }
+              }
+            }
+          },
+          "4XX" : {
+            "description" : "Client error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "5XX" : {
+            "description" : "Server error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "429" : {
+            "description" : "Too many requests. Wait for Retry-After seconds.",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds to wait before retrying.",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Limit" : {
+                "description" : "Requests allowed in the window (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Remaining" : {
+                "description" : "Requests left in the window (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Reset" : {
+                "description" : "Seconds until the window resets (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              }
+            },
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/clusters/{clusterId}/sql/stream" : {
       "get" : {
         "tags" : [ "sql-stream-controller" ],
@@ -33001,6 +33102,30 @@
         },
         "required" : [ "degraded", "heartbeatAgeMillis", "host", "id", "ownedClusters", "self", "startedAt", "state", "version" ]
       },
+      "Backlog" : {
+        "type" : "object",
+        "properties" : {
+          "value" : {
+            "type" : [ "integer", "null" ],
+            "format" : "int64",
+            "description" : "The figure; null when the accuracy is UNAVAILABLE."
+          },
+          "accuracy" : {
+            "type" : "string",
+            "description" : "EXACT, ESTIMATE or UNAVAILABLE.",
+            "enum" : [ "EXACT", "ESTIMATE", "UNAVAILABLE" ]
+          },
+          "reason" : {
+            "type" : [ "string", "null" ],
+            "description" : "Why it is an estimate or unavailable."
+          },
+          "breakdown" : {
+            "type" : "boolean",
+            "description" : "Whether the subscription has a per-partition breakdown to read."
+          }
+        },
+        "required" : [ "accuracy", "breakdown" ]
+      },
       "ClusterRef" : {
         "type" : "object",
         "properties" : {
@@ -33128,9 +33253,8 @@
           "durable" : {
             "type" : "boolean"
           },
-          "totalMessageCount" : {
-            "type" : "integer",
-            "format" : "int64"
+          "backlog" : {
+            "$ref" : "#/components/schemas/Backlog"
           },
           "totalConsumerCount" : {
             "type" : "integer",
@@ -33177,7 +33301,7 @@
             } ]
           }
         },
-        "required" : [ "allowedActions", "destination", "durable", "id", "kind", "kindLabel", "name", "nativeAttributes", "nodesPresent", "nodesTotal", "paused", "perNode", "totalConsumerCount", "totalDeliveringCount", "totalMessageCount", "totalScheduledCount" ]
+        "required" : [ "allowedActions", "backlog", "destination", "durable", "id", "kind", "kindLabel", "name", "nativeAttributes", "nodesPresent", "nodesTotal", "paused", "perNode", "totalConsumerCount", "totalDeliveringCount", "totalScheduledCount" ]
       },
       "TeamRef" : {
         "type" : "object",
@@ -34305,6 +34429,46 @@
           }
         },
         "required" : [ "data", "hasNext", "page", "pageSize" ]
+      },
+      "Breakdown" : {
+        "type" : "object",
+        "properties" : {
+          "sampledAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "partitions" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/PartitionLag"
+            }
+          }
+        }
+      },
+      "PartitionLag" : {
+        "type" : "object",
+        "properties" : {
+          "partition" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "committed" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "end" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "lag" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "reason" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "end", "partition" ]
       },
       "BoundView" : {
         "type" : "object",

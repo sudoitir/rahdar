@@ -12,5 +12,7 @@ export function kafkaCheckPassed(check: KafkaConnectionCheck): boolean {
 
 /** The brokers a check did not reach, which register the cluster degraded. */
 export function unreachedBrokers(check: KafkaConnectionCheck): string[] {
-  return check.nodes.filter((n) => n.outcome === 'UNREACHABLE').map((n) => `Broker ${n.id} (${n.address})`);
+  return check.nodes
+    .filter((n) => n.outcome === 'UNREACHABLE')
+    .map((n) => `Broker ${n.id} (${n.address ?? 'address not learned'})`);
 }
