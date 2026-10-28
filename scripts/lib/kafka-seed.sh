@@ -52,13 +52,14 @@ kafka_produce() { # topic records throughput
 
 # One transaction left open. The perf test opens a transaction and holds it for an hour; killing the client
 # in mid-transaction leaves it ongoing, holding back every reader of payments that reads only committed
-# records, until the broker times it out (the producer asks for the broker's 15 minute maximum). Run again
-# before that. Nothing here is a Java program: it is the image's own tool.
+# records. The producer asks for a one minute timeout, so the transaction is past it, hanging, a minute later;
+# the stack's brokers abort a timed-out transaction only once a day (compose files), so it stays hanging until
+# it is aborted from Rahdar. Nothing here is a Java program: it is the image's own tool.
 open_hanging_transaction() {
   $COMPOSE exec -T "${KAFKA_JVM[@]}" "$KAFKA_B" sh -c "/opt/kafka/bin/kafka-producer-perf-test.sh --topic payments \
     --num-records 1000000 --record-size 128 --throughput 20 --transactional-id payments-settlement \
     --transaction-duration-ms 3600000 \
-    --producer-props bootstrap.servers=$KAFKA_BOOTSTRAP transaction.timeout.ms=900000 >/dev/null 2>&1 & \
+    --producer-props bootstrap.servers=$KAFKA_BOOTSTRAP transaction.timeout.ms=60000 >/dev/null 2>&1 & \
     pid=\$!; sleep 25; kill -9 \$pid" >/dev/null 2>&1 || echo "  the open transaction could not be started" >&2
 }
 
