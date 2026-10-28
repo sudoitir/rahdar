@@ -24,32 +24,32 @@ import { useAcls, useApplyAcls, usePreviewAcls, type Acl, type AclChange, type A
 const APPLY: ActionVerb = { verb: 'Apply', past: 'Applied', progressive: 'Applying' };
 
 const OPERATIONS = [
-  'ALL',
-  'READ',
-  'WRITE',
-  'CREATE',
-  'DELETE',
-  'ALTER',
-  'DESCRIBE',
-  'CLUSTER_ACTION',
-  'DESCRIBE_CONFIGS',
-  'ALTER_CONFIGS',
-  'IDEMPOTENT_WRITE',
+  'all',
+  'read',
+  'write',
+  'create',
+  'delete',
+  'alter',
+  'describe',
+  'cluster_action',
+  'describe_configs',
+  'alter_configs',
+  'idempotent_write',
 ];
-const RESOURCE_TYPES = ['TOPIC', 'GROUP', 'CLUSTER', 'TRANSACTIONAL_ID', 'DELEGATION_TOKEN'];
+const RESOURCE_TYPES = ['topic', 'group', 'cluster', 'transactional_id', 'delegation_token'];
 
 const key = (a: Acl) =>
   [a.principal, a.host, a.operation, a.permission, a.resourceType, a.pattern, a.name].join('\u0000');
 const words = (a: Acl) =>
-  `${a.permission === 'DENY' ? 'Deny' : 'Allow'} ${a.principal} ${a.operation} on ${a.resourceType.toLowerCase()} ${a.name}`;
+  `${a.permission === 'deny' ? 'Deny' : 'Allow'} ${a.principal} ${a.operation.toUpperCase()} on ${a.resourceType} ${a.name}`;
 
 const EMPTY_ACL: Acl = {
   principal: '',
   host: '*',
-  operation: 'READ',
-  permission: 'ALLOW',
-  resourceType: 'TOPIC',
-  pattern: 'LITERAL',
+  operation: 'read',
+  permission: 'allow',
+  resourceType: 'topic',
+  pattern: 'literal',
   name: '',
 };
 
@@ -87,7 +87,7 @@ function AddAclDialog({
           <TextInput label="Host" {...form.getInputProps('host')} />
           <Select
             label="Permission"
-            data={['ALLOW', 'DENY']}
+            data={['allow', 'deny']}
             allowDeselect={false}
             {...form.getInputProps('permission')}
           />
@@ -100,7 +100,7 @@ function AddAclDialog({
           />
           <Select
             label="Name match"
-            data={['LITERAL', 'PREFIXED']}
+            data={['literal', 'prefixed']}
             allowDeselect={false}
             {...form.getInputProps('pattern')}
           />
@@ -150,10 +150,10 @@ export function AclsView() {
       {
         id: 'permission',
         header: 'Permission',
-        accessor: (a) => (a.permission === 'DENY' ? 'Deny' : 'Allow'),
+        accessor: (a) => (a.permission === 'deny' ? 'Deny' : 'Allow'),
         cell: (a) => (
-          <StatusBadge tone={a.permission === 'DENY' ? 'warning' : 'neutral'}>
-            {a.permission === 'DENY' ? 'Deny' : 'Allow'}
+          <StatusBadge tone={a.permission === 'deny' ? 'warning' : 'neutral'}>
+            {a.permission === 'deny' ? 'Deny' : 'Allow'}
           </StatusBadge>
         ),
         kind: 'status',
@@ -406,8 +406,8 @@ export function AclsView() {
               label="Effective access before and after"
               storageKey="kafka.acls.review"
               columns={REVIEW_COLUMNS}
-              data={reviewed?.effects ?? []}
-              rowKey={(e) => `${e.principal}/${e.resource}`}
+              data={reviewed?.access ?? []}
+              rowKey={(e) => `${e.principal}/${e.resourceType}/${e.resource}`}
               height={{ maxRows: 10 }}
               empty={null}
             />
@@ -418,9 +418,15 @@ export function AclsView() {
   );
 }
 
-const REVIEW_COLUMNS: Column<AclPreview['effects'][number]>[] = [
+const REVIEW_COLUMNS: Column<AclPreview['access'][number]>[] = [
   { id: 'principal', header: 'Principal', accessor: (e) => e.principal, kind: 'identifier', priority: 'essential' },
-  { id: 'resource', header: 'Resource', accessor: (e) => e.resource, kind: 'identifier', priority: 'essential' },
+  {
+    id: 'resource',
+    header: 'Resource',
+    accessor: (e) => `${e.resourceType} ${e.resource}`,
+    kind: 'identifier',
+    priority: 'essential',
+  },
   {
     id: 'before',
     header: 'Before',

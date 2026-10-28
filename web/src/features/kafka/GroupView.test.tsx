@@ -124,6 +124,37 @@ describe('a consumer group', () => {
     expect(within(dialog).getAllByText(/Stop them before resetting/).length).toBeGreaterThan(0);
   });
 
+  it('shows a partition the position is out of range for as refused, and does not offer the reset', async () => {
+    serve(detail(), [
+      http.post('*/api/v1/clusters/k1/kafka/groups/billing/offsets\\:preview', () =>
+        HttpResponse.json({
+          ...PREVIEW,
+          partitions: [
+            PREVIEW.partitions[0],
+            {
+              topic: 'orders',
+              partition: 1,
+              current: null,
+              skipped: 0,
+              reread: 0,
+              refused: 'Offset 99 is beyond the end (50).',
+            },
+          ],
+        }),
+      ),
+    ]);
+    const user = userEvent.setup();
+    renderAppAt('/clusters/k1/kafka/groups/billing');
+    const dialog = await openReset(user);
+    await user.click(within(dialog).getByRole('button', { name: 'Preview the reset' }));
+
+    const table = await within(dialog).findByRole('table', { name: 'Partitions the reset would move' });
+    expect(within(table).getByText('Refused')).toBeInTheDocument();
+    expect(within(table).getByText('Offset 99 is beyond the end (50).')).toBeInTheDocument();
+    expect(within(dialog).getByRole('button', { name: 'Reset 1 partition' })).toBeDisabled();
+    expect(within(dialog).getAllByText(/1 partition cannot be moved to that position/).length).toBeGreaterThan(0);
+  });
+
   it('asks for a new preview when the group changed since, and states an offset out of range', async () => {
     let status = 412;
     serve(detail(), [

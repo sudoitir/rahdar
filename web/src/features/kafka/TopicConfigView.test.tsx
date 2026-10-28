@@ -14,7 +14,7 @@ const CONFIG = {
       name: 'retention.ms',
       value: '604800000',
       source: 'TOPIC',
-      default: '604800000',
+      defaultValue: '604800000',
       readOnly: false,
       sensitive: false,
       unit: 'ms',
@@ -23,16 +23,16 @@ const CONFIG = {
       name: 'cleanup.policy',
       value: 'delete',
       source: 'BROKER_DEFAULT',
-      default: 'delete',
+      defaultValue: 'delete',
       readOnly: false,
       sensitive: false,
     },
-    { name: 'ssl.key.password', value: null, source: 'STATIC', default: null, readOnly: false, sensitive: true },
+    { name: 'ssl.key.password', value: null, source: 'STATIC', defaultValue: null, readOnly: false, sensitive: true },
     {
       name: 'message.format.version',
       value: '3.0',
       source: 'STATIC',
-      default: '3.0',
+      defaultValue: '3.0',
       readOnly: true,
       sensitive: false,
     },
@@ -66,7 +66,8 @@ describe('a topic configuration', () => {
       http.post('*/api/v1/clusters/k1/kafka/topics/orders/config\\:preview', async ({ request }) => {
         calls.push({ path: 'preview', body: (await request.json()) as never });
         return HttpResponse.json({
-          entries: [{ name: 'retention.ms', before: '604800000', after: '86400000', error: null }],
+          changes: [{ name: 'retention.ms', before: '604800000', after: '86400000', error: null }],
+          valid: true,
           etag: 'e1',
         });
       }),
@@ -99,7 +100,8 @@ describe('a topic configuration', () => {
     serve([
       http.post('*/api/v1/clusters/k1/kafka/topics/orders/config\\:preview', () =>
         HttpResponse.json({
-          entries: [{ name: 'retention.ms', before: '604800000', after: 'soon', error: 'Not a number.' }],
+          changes: [{ name: 'retention.ms', before: '604800000', after: 'soon', error: 'Not a number.' }],
+          valid: false,
           etag: 'e1',
         }),
       ),

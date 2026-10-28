@@ -24,7 +24,7 @@ export function typeWords(type: string): string {
   return type.charAt(0).toUpperCase() + type.slice(1).toLowerCase().replaceAll('_', ' ');
 }
 
-export const GROUP_TYPES = ['classic', 'consumer', 'share'] as const;
+export const GROUP_TYPES = ['classic', 'consumer', 'share', 'streams'] as const;
 
 export const GROUP_STATES = ['stable', 'empty', 'rebalancing'] as const;
 

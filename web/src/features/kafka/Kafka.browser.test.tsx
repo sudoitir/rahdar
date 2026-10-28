@@ -64,7 +64,7 @@ const GROUP: GroupDetail = {
       deleted: false,
       partitions: [
         { partition: 0, committed: 10, end: 100, lag: 90 },
-        { partition: 1, committed: null, end: 50, lag: null, reason: 'No offset has been committed here.' },
+        { partition: 1, end: 50, reason: 'No offset has been committed here.' },
       ],
     },
     { topic: 'old-orders', deleted: true, partitions: [{ partition: 0, committed: 5, end: 5, lag: 0 }] },
@@ -78,7 +78,7 @@ const CONFIG: TopicConfig = {
       name: 'retention.ms',
       value: '604800000',
       source: 'TOPIC',
-      default: '604800000',
+      defaultValue: '604800000',
       readOnly: false,
       sensitive: false,
       unit: 'ms',
@@ -88,7 +88,7 @@ const CONFIG: TopicConfig = {
       name: 'message.format.version',
       value: '3.0',
       source: 'STATIC',
-      default: '3.0',
+      defaultValue: '3.0',
       readOnly: true,
       sensitive: false,
     },
@@ -98,10 +98,10 @@ const CONFIG: TopicConfig = {
 const ACL: Acl = {
   principal: 'User:app',
   host: '*',
-  operation: 'READ',
-  permission: 'ALLOW',
-  resourceType: 'TOPIC',
-  pattern: 'LITERAL',
+  operation: 'read',
+  permission: 'allow',
+  resourceType: 'topic',
+  pattern: 'literal',
   name: LONG,
 };
 
@@ -110,11 +110,11 @@ const TRANSACTIONS: Transaction[] = [
     id: 'payments-1',
     state: 'Ongoing',
     startedAt: '2026-10-28T08:00:00Z',
-    timeout: 60_000,
+    timeoutMs: 60_000,
     hanging: true,
     blocked: [{ topic: 'payments', partition: 2 }],
   },
-  { id: 'audit-7', state: 'Empty', startedAt: null, timeout: 60_000, hanging: false, blocked: [] },
+  { id: 'audit-7', state: 'Empty', startedAt: null, timeoutMs: 60_000, hanging: false, blocked: [] },
 ];
 
 type Seed = (client: QueryClient) => void;
@@ -205,6 +205,7 @@ const CASES: Case[] = [
             offline: 1,
           },
         ],
+        mode: 'ZooKeeper',
         quorum: { available: false, reason: 'The cluster runs ZooKeeper.' },
       }),
   },

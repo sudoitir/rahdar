@@ -93,7 +93,7 @@ export function TopicConfigView() {
       {
         id: 'default',
         header: 'Default',
-        accessor: (e) => e.default ?? '',
+        accessor: (e) => e.defaultValue ?? '',
         kind: 'code',
         priority: 'low',
       },
@@ -138,7 +138,7 @@ export function TopicConfigView() {
     preview.reset();
     apply.reset();
   };
-  const hasError = reviewed?.entries.some((e) => e.error) ?? false;
+  const hasError = reviewed ? !reviewed.valid || reviewed.changes.some((e) => e.error) : false;
   const run = () => {
     if (!reviewed) return;
     apply.mutate(
@@ -225,7 +225,7 @@ export function TopicConfigView() {
               description={
                 editing?.sensitive
                   ? 'A sensitive value is never shown. Enter a new one to replace it.'
-                  : `Now ${editing?.value ?? 'not set'}${editing?.unit ? ` ${editing.unit}` : ''}. Default ${editing?.default ?? 'none'}.`
+                  : `Now ${editing?.value ?? 'not set'}${editing?.unit ? ` ${editing.unit}` : ''}. Default ${editing?.defaultValue ?? 'none'}.`
               }
               value={draft}
               onChange={(e) => setDraft(e.currentTarget.value)}
@@ -272,7 +272,7 @@ export function TopicConfigView() {
             label="Changes to apply"
             storageKey="kafka.topic-config.review"
             columns={REVIEW_COLUMNS}
-            data={reviewed?.entries ?? []}
+            data={reviewed?.changes ?? []}
             rowKey={(e) => e.name}
             height={{ maxRows: 10 }}
             empty={null}
@@ -283,7 +283,7 @@ export function TopicConfigView() {
   );
 }
 
-const REVIEW_COLUMNS: Column<ConfigPreview['entries'][number]>[] = [
+const REVIEW_COLUMNS: Column<ConfigPreview['changes'][number]>[] = [
   { id: 'name', header: 'Setting', accessor: (e) => e.name, kind: 'identifier', priority: 'essential' },
   { id: 'before', header: 'Before', accessor: (e) => e.before ?? 'Not set', kind: 'code', priority: 'essential' },
   {

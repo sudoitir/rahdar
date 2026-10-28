@@ -11,10 +11,10 @@ import { mockKafkaCluster } from '../../test/kafkaCluster.ts';
 const ACL = {
   principal: 'User:app',
   host: '*',
-  operation: 'READ',
-  permission: 'ALLOW',
-  resourceType: 'TOPIC',
-  pattern: 'LITERAL',
+  operation: 'read',
+  permission: 'allow',
+  resourceType: 'topic',
+  pattern: 'literal',
   name: 'orders',
 };
 
@@ -28,7 +28,7 @@ function serve(list: object, handlers: Parameters<typeof server.use> = []) {
 
 describe('the ACLs', () => {
   it('lists them with their permission in words', async () => {
-    serve({ available: true, items: [ACL, { ...ACL, principal: 'User:bad', permission: 'DENY' }], next: null });
+    serve({ available: true, items: [ACL, { ...ACL, principal: 'User:bad', permission: 'deny' }], next: null });
     renderAppAt('/clusters/k1/kafka/acls');
     const grid = await screen.findByRole('grid', { name: 'ACLs' });
     expect(await within(grid).findByText('User:app')).toBeInTheDocument();
@@ -49,7 +49,9 @@ describe('the ACLs', () => {
       http.post('*/api/v1/clusters/k1/kafka/acls\\:preview', async ({ request }) => {
         calls.push({ path: 'preview', body: (await request.json()) as never });
         return HttpResponse.json({
-          effects: [{ principal: 'User:app', resource: 'topic orders', before: ['READ'], after: [] }],
+          access: [{ principal: 'User:app', resourceType: 'topic', resource: 'orders', before: ['read'], after: [] }],
+          added: 0,
+          removed: 1,
           losses: ['User:app loses READ on topic orders'],
           notes: [],
           etag: 'a1',

@@ -1,12 +1,9 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
 
 import { ApiError, clusterKey, request } from '../../kernel/api/request.ts';
-import type { BacklogValue } from '../../ui/backlog.ts';
+import type { components } from '../../kernel/api/schema.d.ts';
 
-/*
- * The Kafka API of design D7, under `/clusters/{c}/kafka/`. These types are hand-written until the backend
- * generates them; replace each with its `Schemas[...]` then.
- */
+type Schemas = components['schemas'];
 
 const base = (clusterId: string) => `/clusters/${clusterId}/kafka`;
 const seg = encodeURIComponent;
@@ -29,46 +26,11 @@ export interface GroupFilter {
   q?: string;
 }
 
-export interface GroupSummary {
-  id: string;
-  type: string;
-  state: string;
-  members: number;
-  lag: BacklogValue;
-  /** Why the group cannot be changed, such as a share group's offsets. */
-  readOnly?: string | null;
-}
-
-export interface GroupPartition {
-  partition: number;
-  committed?: number | null;
-  end: number;
-  lag?: number | null;
-  reason?: string | null;
-}
-
-export interface GroupTopic {
-  topic: string;
-  deleted: boolean;
-  partitions: GroupPartition[];
-}
-
-export interface GroupMember {
-  id: string;
-  clientId: string;
-  host: string;
-  assignments: string[];
-}
-
-export interface GroupDetail {
-  id: string;
-  type: string;
-  state: string;
-  readOnly?: string | null;
-  topics: GroupTopic[];
-  members: GroupMember[];
-  sampledAt: string;
-}
+export type GroupSummary = Schemas['GroupRow'];
+export type GroupPartition = Schemas['PartitionLag'];
+export type GroupTopic = Schemas['GroupTopic'];
+export type GroupMember = Schemas['GroupMember'];
+export type GroupDetail = Schemas['GroupDetail'];
 
 /** The groups of the cluster a page at a time by opaque cursor; `fetchNextPage` reads the next. */
 export function useGroups(clusterId: string, filter: GroupFilter) {
@@ -81,9 +43,7 @@ export function useGroups(clusterId: string, filter: GroupFilter) {
       if (filter.q) sp.set('q', filter.q);
       if (pageParam) sp.set('cursor', pageParam);
       const query = sp.toString();
-      return request<{ items: GroupSummary[]; next: string | null }>(
-        `${base(clusterId)}/groups${query ? `?${query}` : ''}`,
-      );
+      return request<Schemas['GroupPage']>(`${base(clusterId)}/groups${query ? `?${query}` : ''}`);
     },
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (last) => last.next ?? undefined,
@@ -99,34 +59,10 @@ export function useGroup(clusterId: string, group: string): UseQueryResult<Group
   });
 }
 
-export type ResetTarget = 'earliest' | 'latest' | 'time' | 'offset';
-
-export interface ResetRequest {
-  topics?: string[];
-  to: ResetTarget;
-  value?: string;
-}
-
-export interface ResetPartition {
-  topic: string;
-  partition: number;
-  current?: number | null;
-  next: number;
-  /** Records the group would skip (moving forward). */
-  skipped: number;
-  /** Records the group would read again (moving back). */
-  reread: number;
-  note?: string | null;
-}
-
-export interface ResetPreview {
-  partitions: ResetPartition[];
-  /** The members that still hold the group, named, when it is not empty. */
-  members: string[];
-  /** Why the reset cannot run right now: members, or a rebalance in progress. */
-  blocked?: string | null;
-  etag: string;
-}
+export type ResetRequest = Omit<Schemas['OffsetRequest'], 'etag'>;
+export type ResetTarget = ResetRequest['to'];
+export type ResetPartition = Schemas['OffsetRow'];
+export type ResetPreview = Schemas['OffsetPreview'];
 
 export function usePreviewOffsetReset(clusterId: string, group: string) {
   return useMutation<ResetPreview, ApiError, ResetRequest>({
@@ -140,7 +76,7 @@ export function usePreviewOffsetReset(clusterId: string, group: string) {
 
 export function useResetOffsets(clusterId: string, group: string) {
   const qc = useQueryClient();
-  return useMutation<unknown, ApiError, ResetRequest & { etag: string }>({
+  return useMutation<Schemas['OffsetResult'], ApiError, ResetRequest & { etag: string }>({
     mutationFn: (body) =>
       request(`${base(clusterId)}/groups/${seg(group)}/offsets:reset`, { method: 'POST', body: JSON.stringify(body) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: keys.all(clusterId) }),
@@ -149,38 +85,10 @@ export function useResetOffsets(clusterId: string, group: string) {
 
 // ── Topic configuration ──────────────────────────────────────────────────────
 
-export interface ConfigEntry {
-  name: string;
-  value?: string | null;
-  source: 'TOPIC' | 'BROKER_DEFAULT' | 'STATIC' | 'DEFAULT';
-  default?: string | null;
-  readOnly: boolean;
-  sensitive: boolean;
-  unit?: string | null;
-}
-
-export interface TopicConfig {
-  internal: boolean;
-  entries: ConfigEntry[];
-}
-
-export interface ConfigChange {
-  set: Record<string, string>;
-  remove: string[];
-}
-
-export interface ConfigPreview {
-  entries: {
-    name: string;
-    before?: string | null;
-    after?: string | null;
-    /** What the entry falls back to when it is removed. */
-    fallback?: string | null;
-    /** The driver's validation error for this entry. */
-    error?: string | null;
-  }[];
-  etag: string;
-}
+export type ConfigEntry = Schemas['ConfigEntry'];
+export type TopicConfig = Schemas['TopicConfig'];
+export type ConfigChange = Omit<Schemas['ConfigChangeRequest'], 'etag'>;
+export type ConfigPreview = Schemas['ConfigPreview'];
 
 export function useTopicConfig(clusterId: string, topic: string): UseQueryResult<TopicConfig, ApiError> {
   return useQuery({
@@ -198,7 +106,7 @@ export function usePreviewTopicConfig(clusterId: string, topic: string) {
 
 export function useApplyTopicConfig(clusterId: string, topic: string) {
   const qc = useQueryClient();
-  return useMutation<unknown, ApiError, ConfigChange & { etag: string }>({
+  return useMutation<ConfigPreview, ApiError, ConfigChange & { etag: string }>({
     mutationFn: (body) =>
       request(`${base(clusterId)}/topics/${seg(topic)}/config:apply`, { method: 'POST', body: JSON.stringify(body) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: keys.config(clusterId, topic) }),
@@ -207,34 +115,13 @@ export function useApplyTopicConfig(clusterId: string, topic: string) {
 
 // ── ACLs ─────────────────────────────────────────────────────────────────────
 
-export interface Acl {
-  principal: string;
-  host: string;
-  operation: string;
-  permission: 'ALLOW' | 'DENY';
-  resourceType: string;
-  pattern: string;
-  name: string;
-}
+export type Acl = Schemas['Acl'];
+export type AclPreview = Schemas['AclPreview'];
+export type AclChange = Omit<Schemas['AclChangeRequest'], 'etag'>;
 
 export interface AclFilter {
   principal?: string;
   resource?: string;
-}
-
-export interface AclPreview {
-  /** Effective access per principal and resource, before and after. */
-  effects: { principal: string; resource: string; before: string[]; after: string[] }[];
-  /** What a principal would lose, in words: "User:app loses READ on topic orders". */
-  losses: string[];
-  /** Notes on DENY entries, which override ALLOW. */
-  notes: string[];
-  etag: string;
-}
-
-export interface AclChange {
-  add: Acl[];
-  remove: Acl[];
 }
 
 export function useAcls(clusterId: string, filter: AclFilter) {
@@ -246,9 +133,7 @@ export function useAcls(clusterId: string, filter: AclFilter) {
       if (filter.resource) sp.set('resource', filter.resource);
       if (pageParam) sp.set('cursor', pageParam);
       const query = sp.toString();
-      return request<{ available: boolean; reason?: string | null; items: Acl[]; next: string | null }>(
-        `${base(clusterId)}/acls${query ? `?${query}` : ''}`,
-      );
+      return request<Schemas['AclPage']>(`${base(clusterId)}/acls${query ? `?${query}` : ''}`);
     },
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (last) => last.next ?? undefined,
@@ -263,7 +148,7 @@ export function usePreviewAcls(clusterId: string) {
 
 export function useApplyAcls(clusterId: string) {
   const qc = useQueryClient();
-  return useMutation<unknown, ApiError, AclChange & { etag: string }>({
+  return useMutation<Schemas['AclResult'], ApiError, AclChange & { etag: string }>({
     mutationFn: (body) => request(`${base(clusterId)}/acls:apply`, { method: 'POST', body: JSON.stringify(body) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: [...keys.all(clusterId), 'acls'] }),
   });
@@ -271,27 +156,13 @@ export function useApplyAcls(clusterId: string) {
 
 // ── Transactions ─────────────────────────────────────────────────────────────
 
-export interface Transaction {
-  id: string;
-  state: string;
-  startedAt?: string | null;
-  /** The transaction timeout, in milliseconds. */
-  timeout: number;
-  hanging: boolean;
-  blocked: { topic: string; partition: number }[];
-}
+export type Transaction = Schemas['TransactionRow'];
+export type AbortPreview = Schemas['AbortPreview'];
 
-export interface AbortPreview {
-  /** What aborting does, in words, naming the partitions it unblocks and that the producer is fenced. */
-  effect: string;
-  blocked: { topic: string; partition: number }[];
-  etag: string;
-}
-
-export function useTransactions(clusterId: string): UseQueryResult<{ items: Transaction[] }, ApiError> {
+export function useTransactions(clusterId: string): UseQueryResult<Schemas['TransactionPage'], ApiError> {
   return useQuery({
     queryKey: keys.transactions(clusterId),
-    queryFn: () => request<{ items: Transaction[] }>(`${base(clusterId)}/transactions`),
+    queryFn: () => request<Schemas['TransactionPage']>(`${base(clusterId)}/transactions`),
     refetchInterval: 15_000,
   });
 }
@@ -304,7 +175,7 @@ export function usePreviewAbort(clusterId: string, id: string) {
 
 export function useAbortTransaction(clusterId: string, id: string) {
   const qc = useQueryClient();
-  return useMutation<unknown, ApiError, { etag: string }>({
+  return useMutation<Schemas['AbortResult'], ApiError, { etag: string }>({
     mutationFn: (body) =>
       request(`${base(clusterId)}/transactions/${seg(id)}:abort`, { method: 'POST', body: JSON.stringify(body) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: keys.transactions(clusterId) }),
@@ -313,31 +184,14 @@ export function useAbortTransaction(clusterId: string, id: string) {
 
 // ── Brokers ──────────────────────────────────────────────────────────────────
 
-export interface KafkaBroker {
-  id: string;
-  rack?: string | null;
-  address: string;
-  reachable: boolean;
-  reason?: string | null;
-  leaders: number;
-  underReplicated: number;
-  offline: number;
-}
+export type KafkaBroker = Schemas['BrokerRow'];
+export type Quorum = Schemas['Quorum'];
+export type Brokers = Schemas['Brokers'];
 
-export interface Quorum {
-  available: boolean;
-  reason?: string | null;
-  leader?: string | null;
-  voters?: { id: string; lag: number; caughtUp: boolean }[];
-  majority?: number;
-}
-
-export function useKafkaBrokers(
-  clusterId: string,
-): UseQueryResult<{ brokers: KafkaBroker[]; quorum: Quorum }, ApiError> {
+export function useKafkaBrokers(clusterId: string): UseQueryResult<Brokers, ApiError> {
   return useQuery({
     queryKey: keys.brokers(clusterId),
-    queryFn: () => request<{ brokers: KafkaBroker[]; quorum: Quorum }>(`${base(clusterId)}/brokers`),
+    queryFn: () => request<Brokers>(`${base(clusterId)}/brokers`),
     refetchInterval: 15_000,
   });
 }

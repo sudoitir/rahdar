@@ -96,8 +96,8 @@ function AbortDialog({
           {effect ? (
             <>
               <Text size="sm">{effect.effect}</Text>
-              {effect.blocked.length > 0 ? (
-                <Text size="sm">{`Unblocks: ${effect.blocked.map((b) => `${b.topic}-${b.partition}`).join(', ')}.`}</Text>
+              {effect.released.length > 0 ? (
+                <Text size="sm">{`Unblocks: ${effect.released.map((b) => `${b.topic}-${b.partition}`).join(', ')}.`}</Text>
               ) : null}
             </>
           ) : null}
@@ -144,7 +144,7 @@ export function TransactionsView() {
         kind: 'time',
         priority: 'high',
       },
-      { id: 'timeout', header: 'Timeout', accessor: (t) => seconds(t.timeout), kind: 'number', priority: 'low' },
+      { id: 'timeout', header: 'Timeout', accessor: (t) => seconds(t.timeoutMs), kind: 'number', priority: 'low' },
       { id: 'blocked', header: 'Holds back', accessor: blockedWords, kind: 'text', priority: 'high', wrap: true },
       {
         id: 'abort',

@@ -49,7 +49,13 @@ const COLUMNS: Column<ResetPartition>[] = [
     kind: 'number',
     priority: 'high',
   },
-  { id: 'next', header: 'Moves to', accessor: (p) => p.next.toLocaleString(), kind: 'number', priority: 'essential' },
+  {
+    id: 'next',
+    header: 'Moves to',
+    accessor: (p) => (p.next == null ? 'Refused' : p.next.toLocaleString()),
+    kind: 'number',
+    priority: 'essential',
+  },
   {
     id: 'skipped',
     header: 'Records skipped',
@@ -68,15 +74,16 @@ const COLUMNS: Column<ResetPartition>[] = [
     kind: 'number',
     priority: 'high',
   },
-  { id: 'note', header: 'Note', accessor: (p) => p.note ?? '', kind: 'text', priority: 'low', wrap: true },
+  { id: 'note', header: 'Note', accessor: (p) => p.refused ?? p.note ?? '', kind: 'text', priority: 'low', wrap: true },
 ];
 
 function Totals({ preview }: Readonly<{ preview: ResetPreview }>) {
-  const skipped = preview.partitions.reduce((n, p) => n + p.skipped, 0);
-  const reread = preview.partitions.reduce((n, p) => n + p.reread, 0);
+  const movable = preview.partitions.filter((p) => !p.refused);
+  const skipped = movable.reduce((n, p) => n + p.skipped, 0);
+  const reread = movable.reduce((n, p) => n + p.reread, 0);
   return (
     <Text size="sm" fw={600}>
-      {`Moves ${plural(preview.partitions.length, 'partition')}: skips ${plural(skipped, 'record')} and reads ${plural(reread, 'record')} again.`}
+      {`Moves ${plural(movable.length, 'partition')}: skips ${plural(skipped, 'record')} and reads ${plural(reread, 'record')} again.`}
     </Text>
   );
 }
@@ -162,6 +169,10 @@ export function OffsetResetDialog({
   else if (reset.error?.status === 409) blocked = reset.error.message;
   else if (!current) blocked = 'Preview the reset first: the button waits for what it would move.';
   else if (current.blocked) blocked = current.blocked;
+  else if (current.partitions.some((p) => p.refused)) {
+    const n = current.partitions.filter((p) => p.refused).length;
+    blocked = `${plural(n, 'partition')} cannot be moved to that position, as the table says. Choose another position or other topics.`;
+  }
   const refused = reset.error && (reset.error.status === 409 || reset.error.status === 400) ? reset.error : null;
 
   return (
@@ -170,7 +181,9 @@ export function OffsetResetDialog({
       onClose={dismiss}
       title={`Reset the offsets of ${group.id}`}
       tone="danger"
-      confirmLabel={current ? `Reset ${plural(current.partitions.length, 'partition')}` : 'Reset offsets'}
+      confirmLabel={
+        current ? `Reset ${plural(current.partitions.filter((p) => !p.refused).length, 'partition')}` : 'Reset offsets'
+      }
       blocked={blocked}
       pending={reset.isPending}
       onConfirm={run}

@@ -15,7 +15,13 @@ import { useKafkaBrokers, type KafkaBroker } from './api.ts';
 
 const BROKER_COLUMNS: Column<KafkaBroker>[] = [
   { id: 'id', header: 'Broker', accessor: (b) => `Broker ${b.id}`, kind: 'identifier', priority: 'essential' },
-  { id: 'address', header: 'Address', accessor: (b) => b.address, kind: 'code', priority: 'essential' },
+  {
+    id: 'address',
+    header: 'Address',
+    accessor: (b) => b.address ?? 'Not learned',
+    kind: 'code',
+    priority: 'essential',
+  },
   { id: 'rack', header: 'Rack', accessor: (b) => b.rack ?? '', kind: 'text', priority: 'low' },
   {
     id: 'reach',
@@ -96,27 +102,15 @@ export function BrokersView() {
       </Section>
       <Section title="Controller quorum">
         {quorum.available ? (
-          <Stack gap="sm">
-            <DescriptionList
-              label="Controller quorum"
-              columns={2}
-              items={[
-                { term: 'Leader', value: quorum.leader ? `Broker ${quorum.leader}` : 'None elected' },
-                { term: 'Voters', value: String(quorum.voters?.length ?? 0) },
-                { term: 'Majority', value: String(quorum.majority ?? 0) },
-              ]}
-            />
-            <DataTable
-              variant="static"
-              label="Quorum voters"
-              storageKey="kafka.quorum"
-              columns={VOTER_COLUMNS}
-              data={quorum.voters ?? []}
-              rowKey={(v) => v.id}
-              height={{ maxRows: 8 }}
-              empty={null}
-            />
-          </Stack>
+          <DescriptionList
+            label="Controller quorum"
+            columns={2}
+            items={[
+              { term: 'Mode', value: brokers.data.mode },
+              { term: 'Leader', value: quorum.leader ? `Broker ${quorum.leader}` : 'None elected' },
+              { term: 'Voters', value: String(quorum.voters ?? 'Unknown') },
+            ]}
+          />
         ) : (
           <Notice tone="info" title="The controller quorum is not shown">
             {quorum.reason ?? 'This cluster does not expose its quorum.'} It is not read as healthy; it is unknown.
@@ -126,17 +120,3 @@ export function BrokersView() {
     </Page>
   );
 }
-
-const VOTER_COLUMNS: Column<{ id: string; lag: number; caughtUp: boolean }>[] = [
-  { id: 'id', header: 'Voter', accessor: (v) => `Broker ${v.id}`, kind: 'identifier', priority: 'essential' },
-  { id: 'lag', header: 'Lag', accessor: (v) => v.lag, kind: 'number', priority: 'essential' },
-  {
-    id: 'caughtUp',
-    header: 'Caught up',
-    accessor: (v) => (v.caughtUp ? 'Yes' : 'No'),
-    cell: (v) => <StatusBadge tone={v.caughtUp ? 'neutral' : 'warning'}>{v.caughtUp ? 'Yes' : 'Lagging'}</StatusBadge>,
-    kind: 'status',
-    badge: true,
-    priority: 'essential',
-  },
-];

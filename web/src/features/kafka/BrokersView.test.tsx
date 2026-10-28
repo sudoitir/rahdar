@@ -30,21 +30,14 @@ const BROKERS = [
 ];
 
 describe('the brokers', () => {
-  it('lists each broker with what it leads and the quorum with its voters', async () => {
+  it('lists each broker with what it leads and the quorum with its leader and voters', async () => {
     mockKafkaCluster();
     server.use(
       http.get('*/api/v1/clusters/k1/kafka/brokers', () =>
         HttpResponse.json({
+          mode: 'KRaft',
           brokers: BROKERS,
-          quorum: {
-            available: true,
-            leader: '1',
-            majority: 2,
-            voters: [
-              { id: '1', lag: 0, caughtUp: true },
-              { id: '2', lag: 900, caughtUp: false },
-            ],
-          },
+          quorum: { available: true, leader: '1', voters: 3 },
         }),
       ),
     );
@@ -52,9 +45,9 @@ describe('the brokers', () => {
     const table = await screen.findByRole('table', { name: 'Kafka brokers' });
     expect(within(table).getByText('Connection timed out.')).toBeInTheDocument();
     expect(within(table).getByText('Not reached')).toBeInTheDocument();
-    expect(await screen.findByRole('table', { name: 'Quorum voters' })).toBeInTheDocument();
+    expect(await screen.findByText('KRaft')).toBeInTheDocument();
     expect(screen.getByText('Broker 1', { selector: 'dd, dd *' })).toBeInTheDocument();
-    expect(screen.getByText('Lagging')).toBeInTheDocument();
+    expect(screen.getByText('3')).toBeInTheDocument();
   });
 
   it('says the quorum is unknown on a ZooKeeper cluster, never healthy', async () => {
@@ -62,6 +55,7 @@ describe('the brokers', () => {
     server.use(
       http.get('*/api/v1/clusters/k1/kafka/brokers', () =>
         HttpResponse.json({
+          mode: 'ZooKeeper',
           brokers: BROKERS.slice(0, 1),
           quorum: { available: false, reason: 'The cluster runs ZooKeeper.' },
         }),

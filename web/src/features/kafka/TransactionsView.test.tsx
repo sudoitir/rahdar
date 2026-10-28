@@ -12,7 +12,7 @@ const TXN = {
   id: 'payments-1',
   state: 'Ongoing',
   startedAt: new Date(Date.now() - 3_600_000).toISOString(),
-  timeout: 60_000,
+  timeoutMs: 60_000,
   hanging: true,
   blocked: [{ topic: 'payments', partition: 2 }],
 };
@@ -48,8 +48,10 @@ describe('the transactions', () => {
         http.post('*/api/v1/clusters/k1/kafka/transactions/payments-1\\:abort-preview', () => {
           calls.push({ path: 'preview' });
           return HttpResponse.json({
+            id: 'payments-1',
+            state: 'Ongoing',
             effect: 'Aborts payments-1 and releases partition payments-2 for readers.',
-            blocked: [{ topic: 'payments', partition: 2 }],
+            released: [{ topic: 'payments', partition: 2 }],
             etag: 't1',
           });
         }),
