@@ -39,17 +39,25 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.jar.JarFile;
 import org.apache.kafka.clients.admin.Admin;
+import org.apache.kafka.clients.admin.AlterConfigOp;
+import org.apache.kafka.clients.admin.ConfigEntry;
+import org.apache.kafka.clients.admin.FeatureUpdate;
 import org.apache.kafka.clients.admin.NewTopic;
+import org.apache.kafka.clients.admin.OffsetSpec;
+import org.apache.kafka.clients.admin.UpdateFeaturesOptions;
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.TopicPartition;
+import org.apache.kafka.common.config.ConfigResource;
 import org.apache.kafka.common.serialization.ByteArraySerializer;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -119,8 +127,13 @@ class PluginMessagingKafkaRealBrokerTest extends PostgresIntegrationTest {
 
     @BeforeAll
     static void startKafka() {
-        kafka = new KafkaContainer(IMAGE);
+        // One broker holds the share groups' state topic, so it is not replicated three times.
+        kafka = new KafkaContainer(IMAGE)
+                .withEnv("KAFKA_SHARE_COORDINATOR_STATE_TOPIC_REPLICATION_FACTOR", "1")
+                .withEnv("KAFKA_SHARE_COORDINATOR_STATE_TOPIC_MIN_ISR", "1")
+                .withEnv("KAFKA_GROUP_SHARE_MIN_RECORD_LOCK_DURATION_MS", "1000");
         kafka.start();
+        finalizeShareVersion();
     }
 
     @AfterAll
@@ -263,6 +276,91 @@ class PluginMessagingKafkaRealBrokerTest extends PostgresIntegrationTest {
     }
 
     @Test
+    void aRecordThatIsAlwaysRejectedIsRetriedInPlaceThenDeadLetteredAndOnlyThenPassedByTheGroup() throws Exception {
+        String topic = topic("dlt", 1);
+        String group = "g-dlt-" + run;
+        send(topic, 0, "k", 1);
+        String plugin = activate("dlt");
+        MessagingProbe.ANSWER.put(plugin, Disposition.REJECT);
+        messaging(plugin)
+                .register(new RegistrationSpec(
+                        "work",
+                        clusterId,
+                        SubscriptionId.of(KIND, group, topic),
+                        RegistrationMode.CONSUME,
+                        1,
+                        operator));
+
+        // The group's committed position is read before the dead-letter topic's end, so a committed record
+        // whose dead letter was not yet there would show as a zero end.
+        long until = System.currentTimeMillis() + 180_000;
+        long committed = -1;
+        long deadLettered = 0;
+        while (System.currentTimeMillis() < until && committed < 1) {
+            committed = committed(group, topic, 0);
+            deadLettered = endOffset(topic + ".dlt");
+            if (committed >= 1) {
+                assertThat(deadLettered)
+                        .as("a record is passed only once it is dead-lettered")
+                        .isEqualTo(1);
+            }
+            TimeUnit.MILLISECONDS.sleep(500);
+        }
+        assertThat(committed).isEqualTo(1);
+        assertThat(MessagingProbe.inbox(plugin).size())
+                .as("deliveries before the dead letter")
+                .isGreaterThanOrEqualTo(10);
+    }
+
+    @Test
+    void aReleaseOnAShareGroupIsRedeliveredWithTheCountRaisedAndTheRegistrationSaysReleasesCount() throws Exception {
+        String topic = topic("share", 1);
+        String group = shareGroup(topic, true);
+        send(topic, 0, "k", 1);
+        String plugin = activate("share");
+        MessagingProbe.ANSWER.put(plugin, Disposition.RELEASE);
+        messaging(plugin)
+                .register(new RegistrationSpec(
+                        "work",
+                        clusterId,
+                        SubscriptionId.of("kafka.share-group-topic", group, topic),
+                        RegistrationMode.CONSUME,
+                        1,
+                        operator));
+
+        PluginMessage first = MessagingProbe.inbox(plugin).poll(60, TimeUnit.SECONDS);
+        assertThat(first).isNotNull();
+        MessagingProbe.ANSWER.put(plugin, Disposition.ACCEPT);
+        PluginMessage again = MessagingProbe.inbox(plugin).poll(60, TimeUnit.SECONDS);
+        assertThat(again).isNotNull();
+        assertThat(again.deliveryCount()).isGreaterThan(first.deliveryCount());
+
+        MessageRegistration reg = messaging(plugin).registration("work").orElseThrow();
+        assertThat(reg.state()).isEqualTo(RegistrationState.ACTIVE);
+        assertThat(reg.releasesCounted()).isTrue();
+        assertThat(reg.detail()).contains("release counts as a delivery attempt");
+    }
+
+    @Test
+    void aShareGroupWithoutADeadLetterTopicFailsTheRegistrationWithTheBrokersPrecondition() throws Exception {
+        String topic = topic("sharenodlq", 1);
+        String group = shareGroup(topic, false);
+        String plugin = activate("sharenodlq");
+        messaging(plugin)
+                .register(new RegistrationSpec(
+                        "work",
+                        clusterId,
+                        SubscriptionId.of("kafka.share-group-topic", group, topic),
+                        RegistrationMode.CONSUME,
+                        1,
+                        operator));
+
+        MessageRegistration reg = messaging(plugin).registration("work").orElseThrow();
+        assertThat(reg.state()).isEqualTo(RegistrationState.FAILED);
+        assertThat(reg.detail()).contains("errors.deadletterqueue.topic.name");
+    }
+
+    @Test
     void aTapIsRefusedBecauseKafkaCannotCopyTraffic() throws Exception {
         String topic = topic("tap", 1);
         PluginMessaging messaging = messaging(activate("tap"));
@@ -398,6 +496,64 @@ class PluginMessagingKafkaRealBrokerTest extends PostgresIntegrationTest {
                     .get()
                     .get(new TopicPartition(topic, partition));
             return offset == null ? -1 : offset.offset();
+        }
+    }
+
+    /** The end of the topic's only partition, or 0 while the topic does not exist yet. */
+    private static long endOffset(String topic) throws Exception {
+        try (Admin admin = admin()) {
+            return admin.listOffsets(Map.of(new TopicPartition(topic, 0), OffsetSpec.latest()))
+                    .partitionResult(new TopicPartition(topic, 0))
+                    .get()
+                    .offset();
+        } catch (ExecutionException e) {
+            return 0;
+        }
+    }
+
+    /** A share group on the topic, with the broker's dead-letter topic set unless {@code deadLetters} is false. */
+    private String shareGroup(String topic, boolean deadLetters) throws Exception {
+        Assumptions.assumeTrue(shareVersion() >= 2, "The broker's share.version is below 2, where it dead-letters");
+        String group = "g-share-" + UUID.randomUUID().toString().substring(0, 8);
+        try (Admin admin = admin()) {
+            if (deadLetters) {
+                admin.createTopics(List.of(new NewTopic("dlq." + topic, 1, (short) 1)
+                                .configs(Map.of("errors.deadletterqueue.group.enable", "true"))))
+                        .all()
+                        .get();
+                admin.incrementalAlterConfigs(Map.of(
+                                new ConfigResource(ConfigResource.Type.GROUP, group),
+                                List.of(new AlterConfigOp(
+                                        new ConfigEntry("errors.deadletterqueue.topic.name", "dlq." + topic),
+                                        AlterConfigOp.OpType.SET))))
+                        .all()
+                        .get();
+            }
+        }
+        return group;
+    }
+
+    /** Finalizes the share groups' feature level 2 where the image supports it; the share tests skip otherwise. */
+    private static void finalizeShareVersion() {
+        try (Admin admin = admin()) {
+            admin.updateFeatures(
+                            Map.of("share.version", new FeatureUpdate((short) 2, FeatureUpdate.UpgradeType.UPGRADE)),
+                            new UpdateFeaturesOptions())
+                    .all()
+                    .get();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        } catch (ExecutionException _) {
+            // The tests that need it report the level they found.
+        }
+    }
+
+    private static int shareVersion() throws Exception {
+        try (Admin admin = admin()) {
+            var finalized = admin.describeFeatures().featureMetadata().get().finalizedFeatures();
+            return finalized.containsKey("share.version")
+                    ? finalized.get("share.version").maxVersionLevel()
+                    : 0;
         }
     }
 

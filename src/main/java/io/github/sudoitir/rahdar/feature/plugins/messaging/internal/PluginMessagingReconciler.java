@@ -215,6 +215,10 @@ public class PluginMessagingReconciler {
         return subscriptionOf(reg).segments().getFirst();
     }
 
+    /** Said on a delivering registration whose system counts a release as a delivery attempt. */
+    private static final String RELEASES_COUNTED = "A release counts as a delivery attempt on this subscription, so a"
+            + " message the plugin keeps releasing is dead-lettered by the broker.";
+
     private record NodeResult(RegistrationState state, String detail, Long dropped, boolean releasesCounted) {}
 
     private static NodeResult result(RegistrationState state, String detail, Long dropped) {
@@ -342,7 +346,7 @@ public class PluginMessagingReconciler {
         boolean counted = caps.releaseCountsDelivery();
         int runningWith = drains.isRunning(reg.getId(), nodeId) ? drains.concurrency(reg.getId(), nodeId) : 0;
         if (runningWith == reg.getConcurrency()) {
-            return new NodeResult(RegistrationState.ACTIVE, null, null, counted);
+            return new NodeResult(RegistrationState.ACTIVE, counted ? RELEASES_COUNTED : null, null, counted);
         }
         if (runningWith > 0) {
             // Registered again with another concurrency: restarted with the new count. What the old
@@ -363,7 +367,7 @@ public class PluginMessagingReconciler {
         }
         try {
             drains.start(spec(reg, node, subscriptionOf(reg), caps));
-            return new NodeResult(RegistrationState.ACTIVE, null, null, counted);
+            return new NodeResult(RegistrationState.ACTIVE, counted ? RELEASES_COUNTED : null, null, counted);
         } catch (PluginDrains.StartFailure e) {
             if (e.servedElsewhere) {
                 return result(RegistrationState.SERVED_ELSEWHERE, e.getMessage(), null);
