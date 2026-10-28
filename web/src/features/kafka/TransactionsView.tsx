@@ -77,6 +77,9 @@ function AbortDialog({
   let blocked: string | undefined;
   if (abort.error?.status === 412) blocked = 'The transaction changed since the preview. Close this and open it again.';
   else if (abort.error?.status === 409) blocked = abort.error.message;
+  else if (effect && !effect.abortable)
+    blocked =
+      'Only an open transaction past its timeout can be aborted. This one is not, and aborting it would fence a producer that is working.';
   else if (preview.isError) blocked = 'The effect could not be read, so the abort is not offered.';
   else if (!effect) blocked = 'Reading what the abort would do…';
 

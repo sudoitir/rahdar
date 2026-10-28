@@ -52,6 +52,7 @@ describe('the transactions', () => {
             state: 'Ongoing',
             effect: 'Aborts payments-1 and releases partition payments-2 for readers.',
             released: [{ topic: 'payments', partition: 2 }],
+            abortable: true,
             etag: 't1',
           });
         }),
@@ -71,6 +72,62 @@ describe('the transactions', () => {
     await holdButton(within(dialog).getByRole('button', { name: 'Abort transaction payments-1' }));
     await waitFor(() => expect(calls.map((c) => c.path)).toEqual(['preview', 'abort']));
     expect(calls[1].body).toEqual({ etag: 't1' });
+  });
+
+  it('disables the abort with the reason when the transaction is not past its timeout', async () => {
+    serve(
+      [TXN],
+      [
+        http.post('*/api/v1/clusters/k1/kafka/transactions/payments-1\\:abort-preview', () =>
+          HttpResponse.json({
+            id: 'payments-1',
+            state: 'Ongoing',
+            effect: 'Aborts payments-1 and fences its producer.',
+            released: [],
+            abortable: false,
+            etag: 't1',
+          }),
+        ),
+      ],
+    );
+    const user = userEvent.setup();
+    renderAppAt('/clusters/k1/kafka/transactions');
+    await user.click(await screen.findByRole('button', { name: 'Abort payments-1' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Abort transaction payments-1' });
+    expect(
+      await within(dialog).findByText(/Only an open transaction past its timeout can be aborted/),
+    ).toBeInTheDocument();
+    expect(within(dialog).getByRole('button', { name: 'Abort transaction payments-1' })).toBeDisabled();
+  });
+
+  it('shows the refusal when the abort is refused as not hanging after the preview', async () => {
+    serve(
+      [TXN],
+      [
+        http.post('*/api/v1/clusters/k1/kafka/transactions/payments-1\\:abort-preview', () =>
+          HttpResponse.json({
+            id: 'payments-1',
+            state: 'Ongoing',
+            effect: 'Aborts payments-1.',
+            released: [],
+            abortable: true,
+            etag: 't1',
+          }),
+        ),
+        http.post('*/api/v1/clusters/k1/kafka/transactions/payments-1\\:abort', () =>
+          HttpResponse.json(
+            { type: 'transaction-not-hanging', title: 'Conflict', detail: 'payments-1 is no longer past its timeout.' },
+            { status: 409 },
+          ),
+        ),
+      ],
+    );
+    const user = userEvent.setup();
+    renderAppAt('/clusters/k1/kafka/transactions');
+    await user.click(await screen.findByRole('button', { name: 'Abort payments-1' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Abort transaction payments-1' });
+    await holdButton(await within(dialog).findByRole('button', { name: 'Abort transaction payments-1' }));
+    expect((await within(dialog).findAllByText('payments-1 is no longer past its timeout.')).length).toBeGreaterThan(0);
   });
 
   it('keeps Abort visible but disabled, with the reason, for someone without the permission', async () => {

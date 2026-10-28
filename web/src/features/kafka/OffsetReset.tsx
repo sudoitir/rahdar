@@ -5,12 +5,14 @@ import { ApiError } from '../../kernel/api/request.ts';
 import { ConfirmDialog } from '../../ui/ConfirmDialog.tsx';
 import { ErrorState } from '../../ui/ErrorState.tsx';
 import { Notice } from '../../ui/Notice.tsx';
+import { OutcomeSummary } from '../../ui/NodeOutcomeSummary.tsx';
 import { notify, type ActionVerb } from '../../ui/notify.ts';
 import { DataTable, type Column } from '../../ui/table/index.ts';
 import {
   usePreviewOffsetReset,
   useResetOffsets,
   type GroupDetail,
+  type ResetOutcome,
   type ResetPartition,
   type ResetPreview,
   type ResetRequest,
@@ -109,6 +111,7 @@ export function OffsetResetDialog({
   const [problem, setProblem] = useState<string | null>(null);
   const [shown, setShown] = useState<{ key: string; data: ResetPreview } | null>(null);
   const [stale, setStale] = useState(false);
+  const [partial, setPartial] = useState<ResetOutcome | null>(null);
 
   const request = (): ResetRequest => ({
     topics: chosen.length === topics.length ? undefined : chosen,
@@ -121,6 +124,7 @@ export function OffsetResetDialog({
   const forget = () => {
     setShown(null);
     setStale(false);
+    setPartial(null);
     setProblem(null);
     preview.reset();
     reset.reset();
@@ -141,7 +145,18 @@ export function OffsetResetDialog({
     reset.mutate(
       { ...request(), etag: current.etag },
       {
-        onSuccess: () => {
+        onSuccess: (outcome) => {
+          if (outcome.failure) {
+            // Part way: the topics that moved stay moved, so the dialog stays to say which did not, and why.
+            notify.partial({
+              action: RESET,
+              subject: `the offsets of ${group.id}`,
+              reached: `${outcome.movedTopics.length} of ${outcome.movedTopics.length + outcome.notMovedTopics.length} topics`,
+              next: outcome.failure,
+            });
+            setPartial(outcome);
+            return;
+          }
           notify.succeeded({ action: RESET, subject: `the offsets of ${group.id}` });
           dismiss();
         },
@@ -165,7 +180,8 @@ export function OffsetResetDialog({
   };
 
   let blocked: string | undefined;
-  if (stale) blocked = 'The group changed since the preview. Preview it again.';
+  if (partial) blocked = 'The reset stopped part way. Close this and preview the topics that did not move.';
+  else if (stale) blocked = 'The group changed since the preview. Preview it again.';
   else if (reset.error?.status === 409) blocked = reset.error.message;
   else if (!current) blocked = 'Preview the reset first: the button waits for what it would move.';
   else if (current.blocked) blocked = current.blocked;
@@ -240,7 +256,8 @@ export function OffsetResetDialog({
             </Notice>
           ) : null}
           {refused ? <RefusalNotice error={refused} /> : null}
-          {current ? (
+          {partial ? <PartialReset outcome={partial} /> : null}
+          {current && !partial ? (
             <Stack gap="xs" aria-live="polite">
               {current.blocked ? (
                 <Notice tone="warning" title="This group cannot be reset right now">
@@ -285,5 +302,32 @@ function RefusalNotice({ error }: Readonly<{ error: ApiError }>) {
         ))}
       </Stack>
     </Notice>
+  );
+}
+
+/** A reset that stopped part way: which topics moved and how far, which stayed where they were, and why it stopped. */
+function PartialReset({ outcome }: Readonly<{ outcome: ResetOutcome }>) {
+  const movedIn = (topic: string) => outcome.partitions.filter((p) => p.topic === topic && p.next != null).length;
+  return (
+    <OutcomeSummary
+      verdict={`Partly reset: ${outcome.failure}`}
+      verdictTone="danger"
+      total={`${outcome.movedTopics.length} of ${outcome.movedTopics.length + outcome.notMovedTopics.length} topics moved`}
+      rows={[
+        ...outcome.movedTopics.map((topic) => ({
+          key: topic,
+          name: topic,
+          count: plural(movedIn(topic), 'partition'),
+          status: 'Moved',
+        })),
+        ...outcome.notMovedTopics.map((topic) => ({
+          key: topic,
+          name: topic,
+          status: 'Not moved',
+          tone: 'danger' as const,
+          detail: outcome.failure,
+        })),
+      ]}
+    />
   );
 }

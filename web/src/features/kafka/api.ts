@@ -62,6 +62,7 @@ export function useGroup(clusterId: string, group: string): UseQueryResult<Group
 export type ResetRequest = Omit<Schemas['OffsetRequest'], 'etag'>;
 export type ResetTarget = ResetRequest['to'];
 export type ResetPartition = Schemas['OffsetRow'];
+export type ResetOutcome = Schemas['OffsetResult'];
 export type ResetPreview = Schemas['OffsetPreview'];
 
 export function usePreviewOffsetReset(clusterId: string, group: string) {

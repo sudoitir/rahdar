@@ -81,7 +81,12 @@ describe('a consumer group', () => {
       }),
       http.post('*/api/v1/clusters/k1/kafka/groups/billing/offsets\\:reset', async ({ request }) => {
         calls.push({ path: 'reset', body: (await request.json()) as never });
-        return HttpResponse.json({});
+        return HttpResponse.json({
+          partitions: PREVIEW.partitions,
+          moved: 2,
+          movedTopics: ['orders'],
+          notMovedTopics: [],
+        });
       }),
     ]);
     const user = userEvent.setup();
@@ -185,6 +190,36 @@ describe('a consumer group', () => {
     await holdButton(await within(dialog).findByRole('button', { name: 'Reset 2 partitions' }));
     expect(await within(dialog).findByText('The offsets are out of range')).toBeInTheDocument();
     expect(within(dialog).getByText('orders-0: beyond the end (100)')).toBeInTheDocument();
+  });
+
+  it('renders a reset that stopped part way: which topics moved, which did not and why', async () => {
+    serve(detail(), [
+      http.post('*/api/v1/clusters/k1/kafka/groups/billing/offsets\\:preview', () => HttpResponse.json(PREVIEW)),
+      http.post('*/api/v1/clusters/k1/kafka/groups/billing/offsets\\:reset', () =>
+        HttpResponse.json({
+          partitions: PREVIEW.partitions,
+          moved: 2,
+          movedTopics: ['orders'],
+          notMovedTopics: ['payments'],
+          failure: 'The group coordinator moved while resetting payments.',
+        }),
+      ),
+    ]);
+    const user = userEvent.setup();
+    renderAppAt('/clusters/k1/kafka/groups/billing');
+    const dialog = await openReset(user);
+    await user.click(within(dialog).getByRole('button', { name: 'Preview the reset' }));
+    await holdButton(await within(dialog).findByRole('button', { name: 'Reset 2 partitions' }));
+
+    expect(
+      await within(dialog).findByText('Partly reset: The group coordinator moved while resetting payments.'),
+    ).toBeInTheDocument();
+    expect(within(dialog).getByText('1 of 2 topics moved')).toBeInTheDocument();
+    expect(within(dialog).getByText('Moved')).toBeInTheDocument();
+    expect(within(dialog).getByText('2 partitions')).toBeInTheDocument();
+    expect(within(dialog).getByText('Not moved')).toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: 'Reset the offsets of billing' })).toBeInTheDocument();
+    expect(within(dialog).getByRole('button', { name: 'Reset 2 partitions' })).toBeDisabled();
   });
 
   it('checks the target value beside its field, and Escape returns focus to the button', async () => {
