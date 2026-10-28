@@ -9,7 +9,7 @@ Rahdar speaks the [Model Context Protocol](https://modelcontextprotocol.io), so
 an assistant can answer *"why is `ORDERS.DLQ` backed up"* against your real
 clusters instead of guessing.
 
-The surface is sixteen **intent-shaped** tools — `diagnose`,
+The surface is **intent-shaped** tools — `diagnose`,
 `message_action`, `artemis_config_change` — not a mirror of the REST API. A mirror would
 spend the model's context on plumbing and leave it to assemble the diagnosis;
 the tools are shaped like the questions instead
@@ -91,6 +91,11 @@ can be run again.
 | Tool | `artemis_config_change` | declare a configuration, or apply it canary-first with hazards acknowledged by id |
 | Tool | `connection_action` | close a connection, channel, consumer or a destination's consumers |
 | Tool | `send_message` | enqueue one message |
+| Tool | `kafka_list_groups`, `kafka_describe_group` | consumer groups with state, members and lag, and one group's partitions and members |
+| Tool | `kafka_preview_offset_reset`, `kafka_reset_offsets` | what a reset would move, and the reset itself, run against the preview |
+| Tool | `kafka_topic_config`, `kafka_set_topic_config` | a topic's settings and where each comes from, and changing them |
+| Tool | `kafka_list_acls` | the cluster's ACLs |
+| Tool | `kafka_abort_transaction` | abort a transaction, after its preview |
 | Tool | `setup_review` | the latest configuration review of a cluster |
 | Tool | `alert_rule` / `rahdar_setting` | alert rules; operational settings |
 | Resource | `rahdar://clusters`, `rahdar://permissions`, `rahdar://tools` | what this key can see and do |
@@ -108,7 +113,7 @@ system gives it. The arguments are named for what the resource is: `subscription
 
 A tool that exists for one broker system carries that system's id as a prefix:
 `artemis_config`, `artemis_config_change`, `artemis_config_diff`,
-`artemis_divert_lifecycle`, and `setup_review`. It is offered only to a key that can read
+`artemis_divert_lifecycle`, the eight `kafka_*` tools, and `setup_review`. It is offered only to a key that can read
 a cluster of that system, and a call that names a cluster of another system is a tool
 error that says which system the cluster runs.
 
@@ -124,6 +129,11 @@ boring and explicit. This one is:
   `confirm` to equal the subscription's or destination's own name — separate from the bulk-cap
   `override`, which answers a different question and is never satisfied by
   `confirm`.
+- **A Kafka change is previewed first, and held.** `kafka_preview_offset_reset` returns what each partition
+  would skip or read again, who still holds the group and an `etag`; `kafka_reset_offsets`,
+  `kafka_set_topic_config` and `kafka_abort_transaction` run only against the `etag` of their preview, are
+  refused as stale if the state moved, and are held for approval wherever the approval gate is on. Like every
+  mutating tool they are hidden when the installation is read-only.
 - **A configuration apply is the same contract at cluster scale.** The dry run
   returns the plan, its hazards and the exact `acknowledge` ids a real run must
   echo; the real run needs `confirm` to equal the cluster's name and

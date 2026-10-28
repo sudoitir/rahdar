@@ -68,6 +68,7 @@ export default defineConfig({
               { text: 'Configuration', link: '/guide/configuration' },
               { text: 'Teams and permissions', link: '/guide/teams-and-permissions' },
               { text: 'Supported broker versions', link: '/guide/supported-versions' },
+              { text: 'Apache Kafka', link: '/guide/kafka' },
               { text: 'SQL Console', link: '/guide/sql-console' },
               { text: 'Flow', link: '/guide/flow' },
               { text: 'Keyboard shortcuts', link: '/guide/keyboard' },

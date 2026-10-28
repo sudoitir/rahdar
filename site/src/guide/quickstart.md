@@ -86,16 +86,64 @@ sets one up with `POST /api/v1/auth/mfa/totp` (it returns the `secret` and an
 
 ## Register a cluster
 
-Sign in, then **Clusters → Add**. One broker's management URL is enough: give Rahdar that URL and the
+Sign in, then **Clusters → Register cluster** (or the button on the empty estate). Registration is a page of
+its own, at `/clusters/new`, that you can link to: `/clusters/new?system=kafka` opens it on Apache Kafka.
+Choose the broker system first. Rahdar lists the systems it has drivers for, and then asks only for that
+system's connection. When **Check connection** has passed on exactly the details entered, give the cluster a
+name, a description and an environment, and **Register cluster** is enabled. It stays disabled, with its
+reason beside it, until then, and again as soon as a detail changes after a check.
+
+Credentials are encrypted at rest with `RAHDAR_SECRET_KEY` and never shown again.
+
+### Apache Kafka
+
+Enter one or more **bootstrap servers** as `host:port`, separated by commas, spaces or new lines. The port
+defaults to 9092, each server appears as its own entry under the field, and a server written with a scheme
+(`PLAINTEXT://k1:9092`) or an account is refused with a message saying what to remove. One server is enough:
+Rahdar asks it for the other brokers.
+
+Choose the **security protocol**: plaintext, TLS, SASL over plaintext or SASL over TLS. A SASL protocol asks for
+the **mechanism**: `PLAIN`, `SCRAM-SHA-256` or `SCRAM-SHA-512` take a username and a password (give both or
+neither), and `OAUTHBEARER` takes a token. SASL over plaintext sends the credentials unencrypted, so the form
+warns you, and still lets you register. A TLS protocol can name a **TLS bundle** (a Spring SSL bundle) for the
+trust store and a client certificate. Host name verification is always on: a broker whose certificate does not
+name the address it advertises is refused. The client id is under *Advanced*.
+
+**Check connection** reports the Kafka version (as a lower bound where the brokers cannot say more) and its
+mode, every broker with the address it **advertises** and whether Rahdar reached it there, the controller
+quorum or why it is unavailable, and what the account may do. A failed check names its cause and what to do:
+
+| Cause | Meaning | Next |
+| --- | --- | --- |
+| The name does not resolve | DNS has no answer for a server. | Check the spelling and that Rahdar's network resolves it. |
+| The connection was refused | Nothing listens on that port. | Check the port and the listener. |
+| The connection timed out | A firewall or route drops the traffic. | Check the network path from Rahdar. |
+| The certificate is not trusted, or does not match the host name | TLS failed. | Give a TLS bundle that trusts the broker's certificate, and check that it names the advertised address. |
+| Authentication failed | The broker rejected the credentials. | Check the mechanism, the username and the secret. |
+| The account may not describe the cluster | The credentials were accepted, but the account lacks the permission. | Grant `Describe` on the cluster. This is different from a rejected password. |
+| This Kafka version is not supported | The cluster is older than 3.0. | See [Supported broker versions](/guide/supported-versions). |
+
+A bootstrap server may answer while a broker advertises an address Rahdar cannot reach, for example a name
+that only resolves inside the cluster's network. The check then names that broker and its advertised address as
+not reached: a broker's **advertised listeners** must be reachable from Rahdar. If some brokers were reached
+and others were not, you can still register after a warning that the cluster will be shown degraded.
+
+A Kafka cluster is registered once, by the cluster id its brokers report. If the check finds a cluster that is
+already registered, even under another name, it links to that cluster and **Register cluster** stays disabled.
+
+### Apache Artemis
+
+One broker's management URL is enough: give Rahdar that URL and the
 management account (and a separate Core account, if the brokers use one), and it finds the rest of the
-cluster from the broker itself. Credentials are encrypted at rest with `RAHDAR_SECRET_KEY`.
+cluster from the broker itself. Type several URLs in the same box, separated by commas, spaces or new lines,
+to give more than one seed; each is shown as Rahdar will use it.
 
 Artemis advertises only its Core connectors, never where a broker's management endpoint is. Rahdar
 therefore keeps a **management URL pattern** for the cluster (`http://{host}:8161/console/jolokia`: your
 URL with the host left free, editable under *Advanced*), puts each other node's host into it, and asks
 that address which broker answers. The address is kept only when the answering broker reports the node's
 NodeID; otherwise the node is listed as found, with the reason, and you can give it a URL by hand. If your
-host name resolves to several addresses, Rahdar tries each one as a seed. Choose an environment on the same form.
+host name resolves to several addresses, Rahdar tries each one as a seed.
 
 **Check connection** lists every node it found, with its role, NodeID, version, management URL (and whether
 it came from your seed, from the pattern or was set by hand), and what the management account and the Core
@@ -104,7 +152,7 @@ an accepted management account. When the brokers' running configuration can be r
 to **adopt** it as the cluster's first declared revision: the switch is on when the nodes agree, and off,
 with the differences listed, when they do not. Nothing is written to a broker either way.
 
-Brokers are registered once. Rahdar knows a broker by the NodeID it reports, not by the URL you
+Artemis brokers are registered once. Rahdar knows a broker by the NodeID it reports, not by the URL you
 typed, so the same broker reached by its IP address, another port or with a trailing slash is still the
 same broker. If any broker the check reaches or discovers already belongs to a registered cluster,
 **Check connection** says which cluster, links to it, and **Register cluster** stays disabled. That holds
@@ -113,7 +161,7 @@ one cluster is created and the other registration is refused the same way. A bro
 another broker's data directory carries the same NodeID, so Rahdar takes it for that broker; give it a
 fresh journal and it gets its own.
 
-If a capability is missing — the Core client is not reachable, or a management
+If an Artemis capability is missing — the Core client is not reachable, or a management
 operation is not exposed — Rahdar tells you which one and shows the exact
 `broker.xml` snippet that enables it, rather than hiding the feature.
 
