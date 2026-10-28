@@ -17,6 +17,7 @@ import io.github.sudoitir.rahdar.system.kafka.KafkaOffsets.Plan;
 import io.github.sudoitir.rahdar.system.kafka.web.KafkaViews.OffsetRequest;
 import io.github.sudoitir.rahdar.system.kafka.web.KafkaViews.OffsetResult;
 import io.github.sudoitir.rahdar.system.kafka.web.KafkaViews.OffsetRow;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
@@ -82,25 +83,66 @@ public class KafkaOffsetResets {
                 actors.resolve(), "RESET_GROUP_OFFSETS", "SUBSCRIPTION", p.group(), p.clusterId(), null, params, false);
         try {
             ClusterConnection connection = gateway.cluster(p.clusterId());
+            List<String> moved = new ArrayList<>();
+            List<String> pending = new ArrayList<>(plan.positions().keySet());
             for (var topic : plan.positions().entrySet()) {
-                KafkaFailures.call(() -> connection
-                        .operations()
-                        .execute(
-                                plan.ids().get(topic.getKey()),
-                                new Seek(topic.getValue()),
-                                Scope.whole(),
-                                Precondition.ifMatch(plan.etags().get(topic.getKey())))
-                        .orThrow());
+                try {
+                    KafkaFailures.call(() -> connection
+                            .operations()
+                            .execute(
+                                    plan.ids().get(topic.getKey()),
+                                    new Seek(topic.getValue()),
+                                    Scope.whole(),
+                                    Precondition.ifMatch(plan.etags().get(topic.getKey())))
+                            .orThrow());
+                } catch (RuntimeException e) {
+                    if (moved.isEmpty()) {
+                        throw e;
+                    }
+                    return partial(event, plan, moved, pending, e);
+                }
+                moved.add(topic.getKey());
+                pending.remove(topic.getKey());
             }
-            long moved = plan.view().partitions().stream()
-                    .filter(r -> r.refused() == null)
-                    .count();
-            audit.finish(event, false, moved, null, Map.of("before", moves(plan, true), "after", moves(plan, false)));
-            return new OffsetResult(plan.view().partitions(), moved);
+            long partitions = partitionsOf(plan, moved);
+            audit.finish(
+                    event, false, partitions, null, Map.of("before", moves(plan, true), "after", moves(plan, false)));
+            return new OffsetResult(plan.view().partitions(), partitions, List.copyOf(moved), List.of(), null);
         } catch (RuntimeException e) {
             audit.fail(event, e.getMessage());
             throw e;
         }
+    }
+
+    /**
+     * A reset that stopped after some topics moved: those stay moved, so the audit row records what moved and what did
+     * not, as a failure, and the answer names both with the cause instead of hiding the topics that did move.
+     */
+    private OffsetResult partial(
+            AuditEvent event, Plan plan, List<String> moved, List<String> pending, RuntimeException cause) {
+        String why = cause.getMessage() == null ? cause.getClass().getSimpleName() : cause.getMessage();
+        long partitions = partitionsOf(plan, moved);
+        audit.finish(
+                event,
+                true,
+                partitions,
+                why,
+                Map.of(
+                        "movedTopics",
+                        List.copyOf(moved),
+                        "notMovedTopics",
+                        List.copyOf(pending),
+                        "before",
+                        moves(plan, true, moved),
+                        "after",
+                        moves(plan, false, moved)));
+        return new OffsetResult(plan.view().partitions(), partitions, List.copyOf(moved), List.copyOf(pending), why);
+    }
+
+    private static long partitionsOf(Plan plan, List<String> topics) {
+        return plan.view().partitions().stream()
+                .filter(r -> r.refused() == null && topics.contains(r.topic()))
+                .count();
     }
 
     private static void refuseIfBlocked(Plan plan) {
@@ -118,8 +160,16 @@ public class KafkaOffsetResets {
 
     /** "topic/partition" to offset, as they are (before) or will be (after). */
     private static Map<String, Long> moves(Plan plan, boolean before) {
+        return moves(plan, before, null);
+    }
+
+    /** The same, for the named topics only. */
+    private static Map<String, Long> moves(Plan plan, boolean before, List<String> topics) {
         Map<String, Long> out = new TreeMap<>();
         for (OffsetRow r : plan.view().partitions()) {
+            if (topics != null && !topics.contains(r.topic())) {
+                continue;
+            }
             Long value = before ? r.current() : r.next();
             if (value != null) {
                 out.put(r.topic() + "/" + r.partition(), value);

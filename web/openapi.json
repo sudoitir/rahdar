@@ -32419,10 +32419,29 @@
           },
           "moved" : {
             "type" : "integer",
-            "format" : "int64"
+            "format" : "int64",
+            "description" : "Partitions moved."
+          },
+          "movedTopics" : {
+            "type" : "array",
+            "description" : "The topics whose offsets were moved.",
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "notMovedTopics" : {
+            "type" : "array",
+            "description" : "The topics left where they were; empty when all moved.",
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "failure" : {
+            "type" : [ "string", "null" ],
+            "description" : "Why the reset stopped part way; absent when every topic moved."
           }
         },
-        "required" : [ "moved", "partitions" ]
+        "required" : [ "moved", "movedTopics", "notMovedTopics", "partitions" ]
       },
       "OffsetRow" : {
         "type" : "object",

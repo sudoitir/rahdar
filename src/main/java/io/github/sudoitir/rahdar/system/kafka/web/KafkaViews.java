@@ -128,7 +128,18 @@ public final class KafkaViews {
 
     public record OffsetResult(
             @Schema(requiredMode = REQUIRED) List<OffsetRow> partitions,
-            @Schema(requiredMode = REQUIRED) long moved) {}
+
+            @Schema(requiredMode = REQUIRED, description = "Partitions moved.")
+            long moved,
+
+            @Schema(requiredMode = REQUIRED, description = "The topics whose offsets were moved.")
+            List<String> movedTopics,
+
+            @Schema(requiredMode = REQUIRED, description = "The topics left where they were; empty when all moved.")
+            List<String> notMovedTopics,
+
+            @Schema(nullable = true, description = "Why the reset stopped part way; absent when every topic moved.")
+            String failure) {}
 
     // ---- topic configuration ------------------------------------------------------------------------------------
 

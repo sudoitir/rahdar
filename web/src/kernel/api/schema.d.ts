@@ -5397,8 +5397,17 @@ export interface components {
         };
         OffsetResult: {
             partitions: components["schemas"]["OffsetRow"][];
-            /** Format: int64 */
+            /**
+             * Format: int64
+             * @description Partitions moved.
+             */
             moved: number;
+            /** @description The topics whose offsets were moved. */
+            movedTopics: string[];
+            /** @description The topics left where they were; empty when all moved. */
+            notMovedTopics: string[];
+            /** @description Why the reset stopped part way; absent when every topic moved. */
+            failure?: string | null;
         };
         OffsetRow: {
             topic: string;
