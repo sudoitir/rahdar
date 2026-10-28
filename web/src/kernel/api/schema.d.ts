@@ -4694,7 +4694,7 @@ export interface components {
             };
         };
         Failure: {
-            /** @description DNS, REFUSED, TIMEOUT, TLS, AUTHENTICATION, AUTHORIZATION or UNSUPPORTED_VERSION. */
+            /** @description DNS, REFUSED, TIMEOUT, TLS, AUTHENTICATION, AUTHORIZATION, UNSUPPORTED_VERSION or, for a Kafka cluster whose bootstrap server answered but whose brokers advertise addresses Rahdar cannot reach, ADVERTISED_UNREACHABLE. */
             cause: string;
             message: string;
             next: string;

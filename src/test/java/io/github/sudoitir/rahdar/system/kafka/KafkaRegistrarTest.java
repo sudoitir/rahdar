@@ -289,7 +289,8 @@ class KafkaRegistrarTest {
 
         var failure = registrar.check(plaintext("k1")).view().failure();
 
-        assertThat(failure.cause()).isEqualTo("TIMEOUT");
+        assertThat(failure.cause()).isEqualTo("ADVERTISED_UNREACHABLE");
+        assertThat(failure.message()).startsWith("Brokers advertise addresses Rahdar cannot reach.");
         assertThat(failure.next()).contains("bootstrap server answered").contains("advertised.listeners");
     }
 
@@ -302,6 +303,7 @@ class KafkaRegistrarTest {
 
         var failure = registrar.check(plaintext("k1")).view().failure();
 
+        assertThat(failure.cause()).isEqualTo("TIMEOUT");
         assertThat(failure.next()).doesNotContain("advertised.listeners").contains("reachable from Rahdar");
     }
 

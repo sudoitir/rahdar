@@ -80,6 +80,7 @@ class KafkaAdvertisedListenerRealBrokerTest extends PostgresIntegrationTest {
             ConnectionCheck check = check(lone.getHost() + ":" + lone.getMappedPort(9092));
 
             assertThat(check.failure()).isNotNull();
+            assertThat(check.failure().cause()).isEqualTo("ADVERTISED_UNREACHABLE");
             assertThat(check.failure().next())
                     .contains("bootstrap server answered")
                     .contains("advertised.listeners");

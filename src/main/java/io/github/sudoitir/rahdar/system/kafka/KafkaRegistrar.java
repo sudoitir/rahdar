@@ -76,6 +76,9 @@ import org.springframework.transaction.annotation.Transactional;
 class KafkaRegistrar implements ClusterRegistrar {
 
     /** The attribute the driver puts on every node it describes: the cluster's own id. */
+    /** The cause of a check that failed because the bootstrap server answered and the brokers it named did not. */
+    static final String ADVERTISED_UNREACHABLE = "ADVERTISED_UNREACHABLE";
+
     /** How many bootstrap servers a request may carry. */
     static final int MAX_BOOTSTRAP = 32;
 
@@ -469,8 +472,10 @@ class KafkaRegistrar implements ClusterRegistrar {
     // ---- failures -----------------------------------------------------------------------------------------------
 
     private ConnectionCheck failed(BrokerException e, List<String> bootstrap) {
-        String cause = causeOf(e);
-        boolean advertised = (cause.equals("TIMEOUT") || cause.equals("REFUSED")) && anyAccepts(bootstrap);
+        String reached = causeOf(e);
+        boolean advertised = (reached.equals("TIMEOUT") || reached.equals("REFUSED")) && anyAccepts(bootstrap);
+        // The bootstrap server answered and the brokers it named did not: a cause of its own, not a timeout.
+        String cause = advertised ? ADVERTISED_UNREACHABLE : reached;
         String next = advertised
                 ? "The bootstrap server answered, but the brokers advertise addresses Rahdar cannot reach. Set"
                         + " advertised.listeners to an address reachable from Rahdar (not localhost inside a container)."
@@ -486,9 +491,11 @@ class KafkaRegistrar implements ClusterRegistrar {
                     case "AUTHORIZATION" -> "Grant the account permission to describe the cluster.";
                     default -> "Register a cluster that runs a supported version.";
                 };
-        String message = "AUTHORIZATION".equals(cause)
-                ? "The account was accepted but may not describe the cluster. " + e.getMessage()
-                : e.getMessage();
+        String message = advertised
+                ? "Brokers advertise addresses Rahdar cannot reach. " + e.getMessage()
+                : "AUTHORIZATION".equals(cause)
+                        ? "The account was accepted but may not describe the cluster. " + e.getMessage()
+                        : e.getMessage();
         return new ConnectionCheck(
                 KafkaModule.SYSTEM,
                 null,
