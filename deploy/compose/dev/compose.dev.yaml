@@ -87,6 +87,11 @@ services:
   kafka:
     image: apache/kafka:4.4.0
     hostname: kafka
+    # The demo's brokers are kafka-1 to kafka-3; the sweep's scenes name kafka-1 on either stack.
+    networks:
+      default:
+        aliases:
+          - kafka-1
     environment:
       CLUSTER_ID: "rahdar-dev-kafka-0001a"
       KAFKA_NODE_ID: "1"

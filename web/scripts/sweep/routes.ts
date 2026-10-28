@@ -24,6 +24,7 @@ import {
   SETTINGS_DRAFT_SCENES,
   TEAMS_SCENES,
 } from './scenes.ts';
+import { KAFKA_ROUTES, REGISTRATION_ROUTES } from './kafka.ts';
 
 export interface DataCall {
   path: string;
@@ -167,15 +168,20 @@ export const ROUTES: RouteSpec[] = [
     scenes: TEAMS_SCENES,
   },
 
-  // Registering a cluster. `register` needs a stack with no cluster, so that the check can succeed:
-  // `just qa-up`'s seed registers one, which has to be removed first.
-  { area: 'onboarding', id: 'register', path: '/', scenes: REGISTER_SCENES },
+  // Registering a cluster, from its own page. `register` needs a stack whose Artemis brokers are not registered,
+  // so that the check can succeed: `just qa-up`'s seed registers them, so remove that cluster first. The Kafka
+  // outcomes (kafka.ts) do not: a cluster already registered is one of them.
+  { area: 'onboarding', id: 'register', path: '/clusters/new?system=artemis', scenes: REGISTER_SCENES },
+  ...REGISTRATION_ROUTES,
   {
     area: 'onboarding',
     id: 'register-again',
-    path: cluster('settings?tab=clusters-register'),
+    path: '/clusters/new?system=artemis',
     scenes: REGISTER_AGAIN_SCENES,
   },
+
+  // A Kafka cluster's own screens, and the shared ones on it (kafka.ts)
+  ...KAFKA_ROUTES,
 
   // Cluster views
   {
