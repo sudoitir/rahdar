@@ -3,6 +3,7 @@ import { Button, Modal, Stack, Text, TextInput } from '@mantine/core';
 import { useForm } from '@mantine/form';
 
 import { useRoleIds } from '../clusters/index.ts';
+import { useClusterKinds } from '../../kernel/shell/useClusterSystem.ts';
 import { ConfirmDialog } from '../../ui/ConfirmDialog.tsx';
 import { focusFirstInvalid } from '../../ui/formErrors.ts';
 import { useMessageAction, type DryRunView, type MessageActionKind } from './api.ts';
@@ -12,7 +13,7 @@ import { DestinationPicker } from '../resources/index.ts';
 /**
  * By-selector action with a mandatory preview (ADR-0022). "Preview" runs `dryRun=true` and takes the
  * broker's point-in-time estimate; the confirmation then states it and the cap. Deleting or expiring,
- * or going over the cap, is armed by typing the subscription's name, and an over-cap run resends with
+ * or going over the cap, is confirmed by pressing and holding (ADR-0186), and an over-cap run resends with
  * `override=true`. The selector and the target are checked on activation, with the reason beside the
  * field.
  */
@@ -35,6 +36,7 @@ export function BulkActionPreview({
 }>) {
   const run = useMessageAction(clusterId, subscriptionName);
   const ids = useRoleIds(clusterId);
+  const systemName = useClusterKinds(clusterId)?.system?.name ?? 'This system';
   const [preview, setPreview] = useState<DryRunView | null>(null);
   const form = useForm({
     initialValues: { filter: '', target: '' },
@@ -105,7 +107,7 @@ export function BulkActionPreview({
           <Stack gap="sm">
             {action === 'retry' ? (
               <Text size="sm" c="dimmed">
-                Artemis has no by-selector retry — this replays <strong>every</strong> message on the subscription.
+                {systemName} has no by-selector retry — this replays <strong>every</strong> message on the subscription.
                 Preview to see how many.
               </Text>
             ) : (

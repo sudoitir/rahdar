@@ -215,8 +215,8 @@ function SubscriptionsInRun({
 
 /**
  * Preview → confirm → execute for one bulk operation (ADR-0093). The preview freezes the subscription set
- * and states the blast radius; only that frozen plan can be confirmed, and a destroy is armed by
- * typing the action and the count. Once the run is accepted the operator is taken to it.
+ * and states the blast radius; only that frozen plan can be confirmed, and a destroy is confirmed by
+ * pressing and holding a button that names the action and the count. Once the run is accepted the operator is taken to it.
  */
 export function BulkPreviewDialog({
   clusterId,

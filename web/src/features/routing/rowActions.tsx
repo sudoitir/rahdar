@@ -3,7 +3,7 @@ import { IconClipboard, IconTrash } from '@tabler/icons-react';
 import type { ActionProps, RouteTarget } from '../../kernel/actions/types.ts';
 import { ActionMenuItem } from '../../ui/ActionMenuItem.tsx';
 import { DeleteDivertDialog } from './DivertActions.tsx';
-import { DIVERT_KIND } from './columns.ts';
+import { useClusterKinds } from '../../kernel/shell/useClusterSystem.ts';
 import { useDivertWriteGate } from './divertGate.ts';
 
 export function CopyRouteName({ target, host }: Readonly<ActionProps<RouteTarget>>) {
@@ -17,14 +17,16 @@ export function CopyRouteName({ target, host }: Readonly<ActionProps<RouteTarget
 }
 
 /**
- * "Delete divert…" on a divert's row, Artemis-only: no other kind of route offers it. A capture divert is
+ * "Delete divert…" on a route of a kind its system lets Rahdar delete (a divert); no other kind of route offers it. A capture divert is
  * Rahdar's own and reconciliation would put it back, so it is not deletable here, and the item says where
  * it is managed instead.
  */
 export function DeleteDivert({ clusterId, target, host }: Readonly<ActionProps<RouteTarget>>) {
   const gate = useDivertWriteGate(clusterId);
   const divert = target.snapshot;
-  if (target.kind !== DIVERT_KIND) return null;
+  const kinds = useClusterKinds(clusterId);
+  // Hooks first: only a kind the cluster's system lets Rahdar delete offers the item.
+  if (!kinds?.kinds?.find((k) => k.id === target.kind)?.verbs.includes('delete')) return null;
   const verdict =
     divert?.owner === 'MESSAGE_CAPTURE'
       ? ({

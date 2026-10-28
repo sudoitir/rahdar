@@ -22,6 +22,7 @@ import { Notice } from '../../ui/Notice.tsx';
 import { focusBack } from '../../kernel/actions/focusBack.ts';
 import { useActionHost } from '../../kernel/actions/hostContext.ts';
 import type { HostedDialogProps } from '../../kernel/actions/types.ts';
+import { useClusterKinds } from '../../kernel/shell/useClusterSystem.ts';
 import { useDivertWriteGate } from './divertGate.ts';
 
 const PERMISSION_LABEL = 'Create and delete diverts';
@@ -445,4 +446,14 @@ export function DeleteDivertDialog({
       }
     />
   );
+}
+
+/**
+ * The row's delete, on a route whose kind its system lets Rahdar delete (the kind's `delete` verb); nothing
+ * on a route of a kind that has none, such as a bridge.
+ */
+export function DeleteRouteCell({ clusterId, route }: Readonly<{ clusterId: string; route: RouteView }>) {
+  const kinds = useClusterKinds(clusterId);
+  const deletable = kinds?.kinds?.find((k) => k.id === route.kind)?.verbs.includes('delete');
+  return deletable ? <DeleteDivertAction clusterId={clusterId} divert={route} /> : null;
 }

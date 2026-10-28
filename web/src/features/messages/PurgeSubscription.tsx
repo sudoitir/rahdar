@@ -53,7 +53,7 @@ function Consequence({
 
 /**
  * Purge the whole subscription: the estimate first (the button is busy while it is taken), then a
- * confirmation that states it and arms only when the subscription's name is typed.
+ * held confirmation that states it and acts only when the button is pressed and held (ADR-0186).
  */
 export function PurgeSubscription({
   clusterId,

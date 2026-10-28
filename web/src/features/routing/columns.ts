@@ -4,10 +4,7 @@ import { kindColumn, type Column } from '../../ui/table/index.ts';
 import type { RouteView } from './api.ts';
 import { NodesPresent, OwnerCell, RouteDirection, RouteState } from './cells.tsx';
 import { routeEnds, routeState } from './routeWords.ts';
-import { DeleteDivertAction } from './DivertActions.tsx';
-
-/** The id of the kind whose routes Rahdar can delete: Artemis diverts. */
-export const DIVERT_KIND = 'artemis.divert';
+import { DeleteRouteCell } from './DivertActions.tsx';
 
 /** A figure only a link reports, summed over the nodes that carry it; blank for a route that has none. */
 function linkTotal(
@@ -87,7 +84,7 @@ export function routeColumns(clusterId: string): Column<RouteView>[] {
       id: 'action',
       header: 'Action',
       accessor: () => '',
-      cell: (r) => (r.kind === DIVERT_KIND ? createElement(DeleteDivertAction, { clusterId, divert: r }) : null),
+      cell: (r) => createElement(DeleteRouteCell, { clusterId, route: r }),
       kind: 'status',
       priority: 'low',
     },
