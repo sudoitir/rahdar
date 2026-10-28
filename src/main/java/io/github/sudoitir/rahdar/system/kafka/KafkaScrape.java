@@ -17,6 +17,8 @@ import io.github.sudoitir.rahdar.platform.broker.QueueRow;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
 import io.github.sudoitir.rahdar.platform.clusters.NodeStateRecorder;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -44,6 +46,7 @@ class KafkaScrape implements ClusterScrape {
     private static final int PAGE = 200;
 
     private final KafkaPartitions partitions;
+    private final MeterRegistry meters;
 
     @Override
     public String system() {
@@ -55,6 +58,7 @@ class KafkaScrape implements ClusterScrape {
         List<ClusterNode> stored = clusters.nodes(clusterId);
         Partial<List<NodeDescription>> described;
         try {
+            round(clusterId, "nodes");
             described = gateway.cluster(clusterId).nodes().describe(Scope.whole());
         } catch (BrokerException failure) {
             RuntimeException e = BrokerFailures.translate(failure);
@@ -90,7 +94,22 @@ class KafkaScrape implements ClusterScrape {
                         node.getId(),
                         "The cluster no longer lists this broker.",
                         BrokerConnectionException.Kind.UNREACHABLE));
+        round(clusterId, "partitions");
         partitions.refresh(clusterId);
+    }
+
+    /**
+     * One call to the cluster's driver, each of which is one batched read of the whole cluster, counted as
+     * {@code rahdar.kafka.scrape.rounds} by cluster and call. Set against the cycles it takes, it is the scrape's cost
+     * to the brokers: a cycle that grew one round per group or topic would show here.
+     */
+    private void round(UUID clusterId, String call) {
+        Counter.builder("rahdar.kafka.scrape.rounds")
+                .description("Driver reads the Kafka scrape issued, by cluster and call")
+                .tag("cluster", clusterId.toString())
+                .tag("call", call)
+                .register(meters)
+                .increment();
     }
 
     /** Every subscription of the cluster, a group on a topic, carried by its first stored broker. */
@@ -103,6 +122,7 @@ class KafkaScrape implements ClusterScrape {
         Optional<String> next = Optional.empty();
         try {
             do {
+                round(clusterId, "subscriptions");
                 ResourceQuery query =
                         ResourceQuery.of(ResourceClass.SUBSCRIPTION).limit(PAGE);
                 ResourcePage page = gateway.cluster(clusterId)

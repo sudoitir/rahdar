@@ -1,5 +1,6 @@
 package io.github.sudoitir.rahdar.system.kafka;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
@@ -27,6 +28,7 @@ import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
 import io.github.sudoitir.rahdar.platform.clusters.NodeStateRecorder;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -42,7 +44,8 @@ class KafkaScrapeTest {
     private final ClusterDirectory clusters = mock(ClusterDirectory.class);
     private final NodeStateRecorder recorder = mock(NodeStateRecorder.class);
     private final KafkaPartitions partitions = mock(KafkaPartitions.class);
-    private final KafkaScrape scrape = new KafkaScrape(gateway, clusters, recorder, partitions);
+    private final SimpleMeterRegistry meters = new SimpleMeterRegistry();
+    private final KafkaScrape scrape = new KafkaScrape(gateway, clusters, recorder, partitions, meters);
 
     private static ClusterNode stored(String brokerId) {
         ClusterNode node = mock(ClusterNode.class);
@@ -103,5 +106,27 @@ class KafkaScrapeTest {
         verify(recorder).recordNodeError(eq(three.getId()), any(), eq(BrokerConnectionException.Kind.UNREACHABLE));
         verify(recorder, never()).applyTierA(eq(three.getId()), any(), anyLong());
         verify(recorder, never()).adopt(any(), any(), any(), any());
+    }
+
+    @Test
+    void aCycleIsTwoDriverReadsOfTheWholeClusterWhateverItsSize() {
+        clusterReports(broker("1"), broker("2"), broker("3"));
+        List<ClusterNode> brokers = List.of(stored("1"), stored("2"), stored("3"));
+        when(clusters.nodes(CLUSTER)).thenReturn(brokers);
+
+        scrape.nodes(CLUSTER, 1);
+        scrape.nodes(CLUSTER, 2);
+
+        assertThat(meters.get("rahdar.kafka.scrape.rounds")
+                        .tag("cluster", CLUSTER.toString())
+                        .tag("call", "nodes")
+                        .counter()
+                        .count())
+                .isEqualTo(2);
+        assertThat(meters.get("rahdar.kafka.scrape.rounds")
+                        .tag("call", "partitions")
+                        .counter()
+                        .count())
+                .isEqualTo(2);
     }
 }

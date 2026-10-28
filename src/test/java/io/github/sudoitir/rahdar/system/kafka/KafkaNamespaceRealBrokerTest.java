@@ -13,6 +13,7 @@ import com.jayway.jsonpath.JsonPath;
 import io.github.sudoitir.rahdar.platform.broker.Attempt;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterService;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterRepository;
+import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshotUpsert;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterRequests.RegisterClusterRequest;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterRequests.RegisterClusterRequest.KafkaConnection;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.ClusterDetail;
@@ -64,6 +65,12 @@ class KafkaNamespaceRealBrokerTest extends PostgresIntegrationTest {
 
     @Autowired
     ClusterRepository clusters;
+
+    @Autowired
+    KafkaScrape scrape;
+
+    @Autowired
+    QueueSnapshotUpsert snapshotUpsert;
 
     private MockMvc mvc;
     private UUID cluster;
@@ -150,6 +157,8 @@ class KafkaNamespaceRealBrokerTest extends PostgresIntegrationTest {
 
     @Test
     void aLaggingGroupShowsItsLagPerPartitionSlowestFirst() throws Exception {
+        // The list's lag is the scrape's last sample, so the scrape runs once before the list is asked.
+        snapshotUpsert.upsertBatch(scrape.subscriptions(cluster));
         mvc.perform(get("/api/v1/clusters/{c}/kafka/groups?q=" + group, cluster))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.items[0].id").value(group))

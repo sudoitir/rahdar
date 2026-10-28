@@ -21,6 +21,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.UUID;
@@ -36,6 +37,9 @@ public class KafkaAcls {
             "The cluster has no authorizer configured, so it enforces no ACLs and none can be added.";
 
     private static final String SECURITY_DISABLED = "SecurityDisabledException";
+
+    /** The size of each page a preview reads the whole set in. */
+    private static final int ALL_PAGE = 500;
 
     private final BrokerGateway gateway;
     private final ClusterAccessGuard access;
@@ -73,9 +77,18 @@ public class KafkaAcls {
     /** Every ACL on the cluster. */
     List<Acl> all(UUID clusterId) {
         try {
-            return KafkaGroups.read(gateway.cluster(clusterId), ResourceQuery.of(KafkaKinds.ACL)).items().stream()
-                    .map(KafkaAcls::acl)
-                    .toList();
+            // Every page: a preview is computed over the cluster's whole set, and its state key hashes it.
+            List<Acl> all = new ArrayList<>();
+            Optional<String> next = Optional.empty();
+            do {
+                ResourceQuery query = ResourceQuery.of(KafkaKinds.ACL).limit(ALL_PAGE);
+                ResourcePage page = KafkaGroups.read(
+                        gateway.cluster(clusterId),
+                        next.map(query::continueFrom).orElse(query));
+                page.items().stream().map(KafkaAcls::acl).forEach(all::add);
+                next = page.continueToken();
+            } while (next.isPresent());
+            return List.copyOf(all);
         } catch (RuntimeException e) {
             if (noAuthorizer(e)) {
                 throw new ConflictException("acls-unavailable", NO_AUTHORIZER);

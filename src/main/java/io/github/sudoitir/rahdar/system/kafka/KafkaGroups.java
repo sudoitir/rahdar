@@ -3,8 +3,6 @@ package io.github.sudoitir.rahdar.system.kafka;
 import io.github.sudoitir.openbroker.ClusterConnection;
 import io.github.sudoitir.openbroker.kafka.admin.KafkaKinds;
 import io.github.sudoitir.openbroker.model.KindId;
-import io.github.sudoitir.openbroker.model.MetricKeys;
-import io.github.sudoitir.openbroker.model.MetricValue;
 import io.github.sudoitir.openbroker.model.Resource;
 import io.github.sudoitir.openbroker.model.ResourcePage;
 import io.github.sudoitir.openbroker.model.ResourceQuery;
@@ -15,6 +13,9 @@ import io.github.sudoitir.rahdar.kernel.security.ClusterAccessGuard;
 import io.github.sudoitir.rahdar.kernel.security.Permissions;
 import io.github.sudoitir.rahdar.platform.broker.BacklogBreakdown;
 import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
+import io.github.sudoitir.rahdar.platform.broker.QueueRow;
+import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshot;
+import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshots;
 import io.github.sudoitir.rahdar.system.kafka.web.KafkaViews.GroupDetail;
 import io.github.sudoitir.rahdar.system.kafka.web.KafkaViews.GroupPage;
 import io.github.sudoitir.rahdar.system.kafka.web.KafkaViews.GroupRow;
@@ -22,6 +23,8 @@ import io.github.sudoitir.rahdar.system.kafka.web.KafkaViews.GroupTopic;
 import io.github.sudoitir.rahdar.system.kafka.web.KafkaViews.PartitionLag;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -47,6 +50,7 @@ public class KafkaGroups {
     private final BrokerGateway gateway;
     private final ClusterAccessGuard access;
     private final KafkaAdminReads admin;
+    private final QueueSnapshots snapshots;
 
     public GroupPage list(UUID clusterId, String type, String state, String q, String cursor, Integer limit) {
         access.requireCluster(clusterId, Permissions.SUBSCRIPTION_READ);
@@ -66,25 +70,9 @@ public class KafkaGroups {
             query = query.continueFrom(cursor);
         }
         ResourcePage page = read(connection, query);
-        Set<KindId> kinds = kindsOf(connection);
-        List<ResourceQuery> lagQueries = new ArrayList<>();
-        List<Resource> measured = new ArrayList<>();
-        for (Resource group : page.items()) {
-            KindId kind = subscriptionKind(group, kinds);
-            if (kind != null) {
-                measured.add(group);
-                lagQueries.add(
-                        ResourceQuery.of(kind).where(Map.of("group", group.id().name())));
-            }
-        }
-        List<ResourcePage> lags = lagQueries.isEmpty()
-                ? List.of()
-                : KafkaFailures.call(
-                        () -> connection.resources().read(lagQueries).orThrow());
-        Map<String, Backlog> lagByGroup = new TreeMap<>();
-        for (int i = 0; i < measured.size(); i++) {
-            lagByGroup.put(measured.get(i).id().name(), total(lags.get(i).items()));
-        }
+        // One listing of the groups answers the page; their lag is the scrape's last sample, read from the snapshot
+        // beside it, so the page costs one broker round however many groups it holds and never one per row.
+        Map<String, Backlog> lagByGroup = lagOf(clusterId, page.items());
         List<GroupRow> rows = page.items().stream()
                 .map(g -> row(g, lagByGroup.get(g.id().name())))
                 .toList();
@@ -101,30 +89,14 @@ public class KafkaGroups {
             List<Resource> subscriptions = read(
                             connection, ResourceQuery.of(kind).where(Map.of("group", id)))
                     .items();
-            List<ResourceQuery> endQueries = subscriptions.stream()
-                    .map(s -> ResourceQuery.of(KafkaKinds.PARTITION)
-                            .where(Map.of("topic", s.id().name()))
-                            .project(Set.of(KafkaKinds.LOG_END_OFFSET)))
-                    .toList();
-            List<ResourcePage> ends = endQueries.isEmpty()
-                    ? List.of()
-                    : KafkaFailures.call(
-                            () -> connection.resources().read(endQueries).orThrow());
-            for (int i = 0; i < subscriptions.size(); i++) {
-                Resource subscription = subscriptions.get(i);
-                Map<Integer, Long> end = new TreeMap<>();
-                for (Resource partition : ends.get(i).items()) {
-                    partition
-                            .attributes()
-                            .raw(KafkaKinds.LOG_END_OFFSET)
-                            .ifPresent(
-                                    v -> end.put(Integer.parseInt(partition.id().name()), ((Number) v).longValue()));
-                }
+            // A subscription carries each partition's committed offset and lag, and the end is their sum, so a group of
+            // many topics costs no read per topic.
+            for (Resource subscription : subscriptions) {
                 List<BacklogBreakdown.PartitionLag> partitions =
-                        KafkaBacklogBreakdown.partitions(subscription.attributes(), end);
+                        KafkaBacklogBreakdown.partitions(subscription.attributes(), Map.of());
                 topics.add(new GroupTopic(
                         subscription.id().name(),
-                        end.isEmpty(),
+                        partitions.isEmpty(),
                         partitions.stream()
                                 .map(p -> new PartitionLag(p.partition(), p.committed(), p.end(), p.lag(), p.reason()))
                                 .toList()));
@@ -200,22 +172,30 @@ public class KafkaGroups {
                 readOnly);
     }
 
-    /** A group's lag over its topics: the sum of the backlogs that are known, an estimate, or unavailable. */
-    private static Backlog total(List<Resource> subscriptions) {
-        long sum = 0;
-        boolean any = false;
-        String reason = null;
-        for (Resource s : subscriptions) {
-            MetricValue backlog = s.attributes().get(MetricKeys.BACKLOG).orElse(null);
-            if (backlog != null && !backlog.breakdown().isEmpty()) {
-                any = true;
-                sum += backlog.asLong();
+    /**
+     * The lag of each group that has a subscription kind, summed over its topics from the last scrape: an estimate
+     * with the scrape's own reason, or unavailable for a group the scrape has not sampled (a new group, or one with no
+     * committed offsets).
+     */
+    private Map<String, Backlog> lagOf(UUID clusterId, List<Resource> groups) {
+        Set<String> wanted = new HashSet<>();
+        groups.forEach(g -> wanted.add(g.id().name()));
+        Map<String, Long> sums = new HashMap<>();
+        Map<String, String> reasons = new HashMap<>();
+        for (QueueSnapshot row : snapshots.forCluster(clusterId)) {
+            String path = row.attributes().get(QueueRow.PATH);
+            if (path == null || row.kind() == null || !row.kind().startsWith(KafkaModule.SYSTEM + ".")) {
+                continue;
             }
-            reason = Backlog.of(s).reason();
+            String group = path.substring(0, path.indexOf('/'));
+            if (wanted.contains(group)) {
+                sums.merge(group, row.messageCount(), Long::sum);
+                reasons.putIfAbsent(group, row.attributes().get(QueueRow.BACKLOG_REASON));
+            }
         }
-        return any
-                ? new Backlog(sum, Accuracy.ESTIMATE, reason, true)
-                : new Backlog(null, Accuracy.UNAVAILABLE, NO_OFFSETS, false);
+        Map<String, Backlog> out = new TreeMap<>();
+        sums.forEach((group, sum) -> out.put(group, new Backlog(sum, Accuracy.ESTIMATE, reasons.get(group), true)));
+        return out;
     }
 
     private static int pageSize(Integer limit) {
