@@ -121,8 +121,9 @@ class KafkaScrape implements ClusterScrape {
         List<QueueRow> rows = new ArrayList<>();
         Optional<String> next = Optional.empty();
         try {
+            round(clusterId, "subscriptions");
             do {
-                round(clusterId, "subscriptions");
+                round(clusterId, "subscription-pages");
                 ResourceQuery query =
                         ResourceQuery.of(ResourceClass.SUBSCRIPTION).limit(PAGE);
                 ResourcePage page = gateway.cluster(clusterId)
