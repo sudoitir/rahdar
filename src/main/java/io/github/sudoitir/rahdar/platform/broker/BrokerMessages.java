@@ -24,6 +24,7 @@ import io.github.sudoitir.openbroker.messaging.SendReceipt;
 import io.github.sudoitir.openbroker.messaging.SendTarget;
 import io.github.sudoitir.openbroker.messaging.Total;
 import io.github.sudoitir.openbroker.messaging.Transport;
+import io.github.sudoitir.openbroker.model.PartitionId;
 import io.github.sudoitir.openbroker.model.ResourceClass;
 import io.github.sudoitir.openbroker.model.ResourceId;
 import io.github.sudoitir.openbroker.model.Scope;
@@ -79,6 +80,38 @@ public class BrokerMessages {
                 case Count.Estimate(var e) -> new BrowsePage(messages, e);
                 case Count.Unavailable(var u) -> new BrowsePage(messages, null, u);
             };
+        });
+    }
+
+    /**
+     * One page of a partition of a log, read from {@code at} without joining a group or committing anything. A
+     * filter is refused with the driver's reason, because a log cannot be filtered where it is kept.
+     */
+    public LogPage browseLog(UUID clusterId, ResourceId log, int partition, Position at, int size, String filter) {
+        return translated(() -> {
+            ClusterConnection c = gateway.cluster(clusterId);
+            io.github.sudoitir.openbroker.messaging.BrowsePage result;
+            try {
+                result = c.messages()
+                        .browse(
+                                log,
+                                Scope.shards(Set.of(Shard.partition(PartitionId.of(String.valueOf(partition))))),
+                                new BrowseRequest(at, size, filter(c, filter), MAX_BODY_BYTES));
+            } catch (BrokerException e) {
+                if (ErrorReasons.NOT_SUPPORTED.equals(e.reason())) {
+                    throw new IllegalArgumentException(e.getMessage(), e);
+                }
+                throw e;
+            }
+            List<LogPage.LogRecord> records = result.messages().stream()
+                    .map(m -> new LogPage.LogRecord(
+                            BrowsedMessages.of(m), m.body().isTombstone(), BrowsedMessages.keyOf(m)))
+                    .toList();
+            Long next = result.next()
+                    .map(cursor -> Long.parseLong(
+                            cursor.token().substring(cursor.token().indexOf(':') + 1)))
+                    .orElse(null);
+            return new LogPage(records, next);
         });
     }
 

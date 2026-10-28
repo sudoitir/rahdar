@@ -7560,6 +7560,23 @@ export interface components {
             };
             nodes?: components["schemas"]["NodeConfiguration"][];
         };
+        LogView: {
+            /** Format: int32 */
+            partition: number;
+            /** Format: int64 */
+            start: number;
+            /** Format: int64 */
+            end: number;
+            /**
+             * Format: int64
+             * @description The offset the next page starts at; null at the end.
+             */
+            next?: number | null;
+            /** @description The offset asked for was already removed by retention. */
+            retentionMoved: boolean;
+            /** @description Records of open or aborted transactions are not shown, as a read-committed consumer would not see them. */
+            uncommittedHidden: boolean;
+        };
         MessagePageView: {
             data: components["schemas"]["MessageSummaryView"][];
             /** Format: int32 */
@@ -7575,8 +7592,12 @@ export interface components {
             hasNext: boolean;
             /** @description Why count is null. Null whenever count is present. */
             countUnavailable?: string | null;
-            /** Format: uuid */
-            node: string;
+            /**
+             * Format: uuid
+             * @description The node the page was read from; null for a log, which has none.
+             */
+            node?: string | null;
+            log?: components["schemas"]["LogView"] | null;
         };
         MessageSummaryView: {
             /** @description The message's position on its node, opaque. */
@@ -7599,6 +7620,10 @@ export interface components {
             /** Format: int32 */
             propertyCount: number;
             redactions: components["schemas"]["RedactionView"][];
+            /** @description A log record with no value: it deletes its key on compaction. Never true on a queue. */
+            tombstone: boolean;
+            /** @description A log record's key as text, or base64 when it is not text. */
+            key?: string | null;
         };
         MessageDetailView: {
             /** @description The message's position on its node, opaque. */
@@ -7625,8 +7650,11 @@ export interface components {
             bodyTruncated: boolean;
             /** Format: int32 */
             observedLimitBytes?: number | null;
-            /** Format: uuid */
-            node: string;
+            /**
+             * Format: uuid
+             * @description The node the message was read from; null for a log, which has none.
+             */
+            node?: string | null;
             stringProperties: {
                 [key: string]: string;
             };
@@ -7644,6 +7672,8 @@ export interface components {
             };
             redactions: components["schemas"]["RedactionView"][];
             withheld: components["schemas"]["WithheldView"][];
+            tombstone: boolean;
+            key?: string | null;
         };
         /** @description Who has access to one subscription or destination through teams: its owner and every share. */
         ResourceAccessView: {
@@ -14151,6 +14181,9 @@ export interface operations {
                 filter?: string;
                 page?: number;
                 size?: number;
+                partition?: number;
+                from?: string;
+                value?: string;
             };
             header?: never;
             path: {
@@ -21257,6 +21290,7 @@ export interface operations {
             query?: {
                 node?: string;
                 filter?: string;
+                partition?: number;
             };
             header?: never;
             path: {

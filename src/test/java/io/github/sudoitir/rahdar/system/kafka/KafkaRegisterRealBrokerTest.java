@@ -5,6 +5,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import io.github.sudoitir.openbroker.ClusterConnection;
 import io.github.sudoitir.openbroker.model.Kind;
+import io.github.sudoitir.openbroker.model.ResourceId;
+import io.github.sudoitir.rahdar.feature.messages.MessageService;
+import io.github.sudoitir.rahdar.feature.messages.web.MessageViews.MessagePageView;
 import io.github.sudoitir.rahdar.feature.resources.BacklogService;
 import io.github.sudoitir.rahdar.platform.broker.Attempt;
 import io.github.sudoitir.rahdar.platform.broker.BacklogBreakdown.Breakdown;
@@ -77,6 +80,9 @@ class KafkaRegisterRealBrokerTest extends PostgresIntegrationTest {
 
     @Autowired
     BacklogService backlogs;
+
+    @Autowired
+    MessageService messages;
 
     @Autowired
     JdbcClient jdbc;
@@ -240,6 +246,73 @@ class KafkaRegisterRealBrokerTest extends PostgresIntegrationTest {
         assertThat(detail.capabilities().managementRead().status()).isIn("AVAILABLE", "UNKNOWN");
         assertThat(detail.health().notes()).isEmpty();
         assertThat(detail.health().level()).isEqualTo("OK");
+    }
+
+    @Test
+    void aPartitionOfATopicIsBrowsedByOffsetAndTimeAndAFilterIsRefusedWithTheDriversReason() throws Exception {
+        UUID id = ((Attempt.Ok<ClusterDetail>) service.register(request("browse", kafka.getBootstrapServers())))
+                .value()
+                .id();
+        String topic = run + "-browse";
+        try (Admin admin = Admin.create(Map.of("bootstrap.servers", kafka.getBootstrapServers()))) {
+            admin.createTopics(List.of(new NewTopic(topic, 1, (short) 1))).all().get();
+        }
+        long before = System.currentTimeMillis();
+        try (KafkaProducer<byte[], byte[]> producer = new KafkaProducer<>(
+                Map.of("bootstrap.servers", kafka.getBootstrapServers()),
+                new ByteArraySerializer(),
+                new ByteArraySerializer())) {
+            for (int i = 0; i < 5; i++) {
+                producer.send(new ProducerRecord<>(topic, 0, ("k" + i).getBytes(), ("v" + i).getBytes()))
+                        .get();
+            }
+            producer.send(new ProducerRecord<>(topic, 0, "gone".getBytes(), null))
+                    .get();
+        }
+        ResourceId log = ResourceId.of("kafka.topic", topic);
+        MessageService messages = this.messages;
+        MessagePageView page = null;
+        for (int attempt = 0; attempt < 50 && (page == null || page.data().size() < 6); attempt++) {
+            try {
+                page = messages.browseLog(id, log, 0, MessageService.LogStart.parse("earliest", null), null, 100);
+            } catch (RuntimeException metadataNotThereYet) {
+                Thread.sleep(200);
+            }
+        }
+
+        assertThat(page.data())
+                .extracting(r -> r.position() + ":" + r.key())
+                .containsExactly("0:k0", "1:k1", "2:k2", "3:k3", "4:k4", "5:gone");
+        assertThat(page.data().get(5).tombstone()).isTrue();
+        assertThat(page.data().get(0).tombstone()).isFalse();
+        assertThat(page.data().get(0).bodyPreview()).isEqualTo("v0");
+        assertThat(page.log().start()).isZero();
+        assertThat(page.log().end()).isEqualTo(6);
+        assertThat(page.log().next()).isNull();
+
+        MessagePageView from3 = messages.browseLog(id, log, 0, MessageService.LogStart.parse("offset", "3"), null, 2);
+        assertThat(from3.data()).extracting(r -> r.position()).containsExactly("3", "4");
+        assertThat(from3.log().next()).isEqualTo(5L);
+        assertThat(messages.browseLog(id, log, 0, MessageService.LogStart.parse("offset", "99"), null, 2)
+                        .data())
+                .isEmpty();
+        assertThat(messages.browseLog(
+                                id,
+                                log,
+                                0,
+                                MessageService.LogStart.parse(
+                                        "time",
+                                        java.time.Instant.ofEpochMilli(before - 60_000)
+                                                .toString()),
+                                null,
+                                100)
+                        .data())
+                .hasSize(6);
+        assertThat(messages.detailLog(id, log, 0, 2).body()).isEqualTo("v2");
+        assertThatThrownBy(() -> messages.browseLog(
+                        id, log, 0, MessageService.LogStart.parse("earliest", null), "header.x = 1", 10))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("cannot filter");
     }
 
     @Test

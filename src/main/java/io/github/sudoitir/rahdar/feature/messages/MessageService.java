@@ -6,6 +6,10 @@ import io.github.sudoitir.openbroker.messaging.MessageAction.Move;
 import io.github.sudoitir.openbroker.messaging.MessageAction.Retry;
 import io.github.sudoitir.openbroker.messaging.MessageField;
 import io.github.sudoitir.openbroker.messaging.MessageFilter;
+import io.github.sudoitir.openbroker.messaging.Position;
+import io.github.sudoitir.openbroker.model.PartitionId;
+import io.github.sudoitir.openbroker.model.ResourceId;
+import io.github.sudoitir.openbroker.model.Shard;
 import io.github.sudoitir.rahdar.feature.messages.MessageActionParams.MessageDeleteParams;
 import io.github.sudoitir.rahdar.feature.messages.MessageActionParams.MessageExpireParams;
 import io.github.sudoitir.rahdar.feature.messages.MessageActionParams.MessageMoveParams;
@@ -13,6 +17,7 @@ import io.github.sudoitir.rahdar.feature.messages.MessageActionParams.MessageRet
 import io.github.sudoitir.rahdar.feature.messages.MessageActionParams.QueuePurgeParams;
 import io.github.sudoitir.rahdar.feature.messages.web.MessageRequests.MessageActionRequest;
 import io.github.sudoitir.rahdar.feature.messages.web.MessageRequests.SendMessageRequest;
+import io.github.sudoitir.rahdar.feature.messages.web.MessageViews.LogView;
 import io.github.sudoitir.rahdar.feature.messages.web.MessageViews.MessageDetailView;
 import io.github.sudoitir.rahdar.feature.messages.web.MessageViews.MessagePageView;
 import io.github.sudoitir.rahdar.feature.messages.web.MessageViews.MessageSummaryView;
@@ -39,11 +44,14 @@ import io.github.sudoitir.rahdar.platform.broker.BrowsePage;
 import io.github.sudoitir.rahdar.platform.broker.BrowsedMessage;
 import io.github.sudoitir.rahdar.platform.broker.BulkCapExceededException;
 import io.github.sudoitir.rahdar.platform.broker.BulkResult;
+import io.github.sudoitir.rahdar.platform.broker.LogBounds;
+import io.github.sudoitir.rahdar.platform.broker.LogPage;
 import io.github.sudoitir.rahdar.platform.broker.MessageExpiry;
 import io.github.sudoitir.rahdar.platform.broker.MessageKind;
 import io.github.sudoitir.rahdar.platform.broker.SendInDoubtException;
 import io.github.sudoitir.rahdar.platform.broker.SendNames;
 import io.github.sudoitir.rahdar.platform.broker.SentMessages;
+import io.github.sudoitir.rahdar.platform.broker.SystemExtensions;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
 import io.github.sudoitir.rahdar.platform.governance.ClearViewAudit;
@@ -105,6 +113,7 @@ public class MessageService {
     private final ContentPolicy contentPolicy;
     private final ClearViewAudit clearViews;
     private final OperationGate gate;
+    private final SystemExtensions extensions;
 
     /** Resolved (node, address, routingType) for a queue name on a cluster. */
     record ResolvedQueue(ClusterNode node, String address, String routingType) {}
@@ -149,7 +158,7 @@ public class MessageService {
                 .toList();
         List<MessageSummaryView> rows = new ArrayList<>(browsed.size());
         for (int i = 0; i < browsed.size(); i++) {
-            rows.add(toSummary(browsed.get(i), governed.get(i)));
+            rows.add(toSummary(browsed.get(i), governed.get(i), false, null));
         }
         clearViews.recordClear(context, "SUBSCRIPTION", queueName, governed);
         Long total = result.total();
@@ -162,7 +171,107 @@ public class MessageService {
                 total,
                 hasNext,
                 result.totalUnavailable(),
-                resolved.node().getId());
+                resolved.node().getId(),
+                null);
+    }
+
+    // ---- browse a partition of a log --------------------------------------
+
+    /** Where a read of a partition of a log starts. */
+    public record LogStart(Kind kind, long offset, java.time.Instant time) {
+
+        public enum Kind {
+            EARLIEST,
+            LATEST,
+            OFFSET,
+            TIME
+        }
+
+        /** {@code from} is earliest, latest, offset or time; the last two take a {@code value}. */
+        public static LogStart parse(String from, String value) {
+            String kind = from == null || from.isBlank() ? "earliest" : from;
+            try {
+                return switch (kind) {
+                    case "earliest" -> new LogStart(Kind.EARLIEST, 0, null);
+                    case "latest" -> new LogStart(Kind.LATEST, 0, null);
+                    case "offset" -> new LogStart(Kind.OFFSET, Long.parseLong(value), null);
+                    case "time" -> new LogStart(Kind.TIME, 0, java.time.Instant.parse(value));
+                    default -> throw new IllegalArgumentException("from must be earliest, latest, offset or time.");
+                };
+            } catch (NumberFormatException | NullPointerException | java.time.format.DateTimeParseException e) {
+                throw new IllegalArgumentException("from=" + kind + " needs a value that is "
+                        + (kind.equals("offset") ? "an offset." : "an ISO-8601 time."));
+            }
+        }
+    }
+
+    /**
+     * One page of a partition of a log (ADR-0216), read without joining a group. The request is placed against the
+     * partition's start and end first: before the start it is read from the start and says retention moved it, and
+     * past the end it is an empty page that states the end. {@code latest} is the last page. A filter is refused
+     * with the driver's reason.
+     */
+    public MessagePageView browseLog(
+            UUID clusterId, ResourceId log, int partition, LogStart from, String filter, int requestedSize) {
+        clusterAccess.requireResource(clusterId, ResourceRef.destination(log.name()), MessagePermissions.MESSAGE_READ);
+        LogBounds.Bounds bounds = extensions.require(clusterId, LogBounds.class).of(clusterId, log, partition);
+        int size = Math.min(requestedSize, BROKER_PAGE_CAP);
+        Shard shard = Shard.partition(PartitionId.of(String.valueOf(partition)));
+        boolean moved = false;
+        long offset = bounds.start();
+        switch (from.kind()) {
+            case LATEST -> offset = Math.max(bounds.start(), bounds.end() - size);
+            case OFFSET -> {
+                moved = from.offset() < bounds.start();
+                offset = Math.min(Math.max(from.offset(), bounds.start()), bounds.end());
+            }
+            case EARLIEST, TIME -> {}
+        }
+        Position at = from.kind() == LogStart.Kind.TIME
+                ? new Position.AtTime(from.time())
+                : new Position.AtOffsets(Map.of(shard, offset));
+        LogPage page = from.kind() != LogStart.Kind.TIME && offset >= bounds.end()
+                ? new LogPage(List.of(), null)
+                : messages.browseLog(clusterId, log, partition, at, size, filter);
+        GovernContext context = contentPolicy.context(clusterId, log.name(), log.name());
+        List<GovernedMessage> governed = page.records().stream()
+                .map(r -> contentPolicy.govern(context, content(r.message())))
+                .toList();
+        List<MessageSummaryView> rows = new ArrayList<>(governed.size());
+        for (int i = 0; i < governed.size(); i++) {
+            LogPage.LogRecord record = page.records().get(i);
+            rows.add(toSummary(record.message(), governed.get(i), record.tombstone(), record.key()));
+        }
+        clearViews.recordClear(context, "DESTINATION", log.name(), governed);
+        return new MessagePageView(
+                rows,
+                1,
+                size,
+                null,
+                page.next() != null,
+                "A log is read by offset: its size is its end offset less its start, and compaction leaves gaps.",
+                null,
+                new LogView(partition, bounds.start(), bounds.end(), page.next(), moved, true));
+    }
+
+    /** One record of a partition of a log, expanded. */
+    public MessageDetailView detailLog(UUID clusterId, ResourceId log, int partition, long offset) {
+        clusterAccess.requireResource(clusterId, ResourceRef.destination(log.name()), MessagePermissions.MESSAGE_READ);
+        LogPage page = messages.browseLog(
+                clusterId,
+                log,
+                partition,
+                new Position.AtOffsets(Map.of(Shard.partition(PartitionId.of(String.valueOf(partition))), offset)),
+                1,
+                null);
+        LogPage.LogRecord record = page.records().stream()
+                .filter(r -> r.message().messageId() == offset)
+                .findFirst()
+                .orElseThrow(() -> new NotFoundException("record", offset));
+        GovernContext context = contentPolicy.context(clusterId, log.name(), log.name());
+        GovernedMessage governed = contentPolicy.govern(context, content(record.message()));
+        clearViews.recordClear(context, "MESSAGE", log.name() + "/" + partition + "/" + offset, List.of(governed));
+        return toDetail(record.message(), governed, null, record.tombstone(), record.key());
     }
 
     /** An action request that moves into the queue of this name, for a caller that holds names rather than ids. */
@@ -738,7 +847,7 @@ public class MessageService {
                 headers, properties, m.body(), m.bodyEncoding() == BodyEncoding.BASE64, m.contentType());
     }
 
-    private static MessageSummaryView toSummary(BrowsedMessage m, GovernedMessage g) {
+    private static MessageSummaryView toSummary(BrowsedMessage m, GovernedMessage g, boolean tombstone, String key) {
         String body = g.body();
         return new MessageSummaryView(
                 String.valueOf(m.messageId()),
@@ -753,7 +862,9 @@ public class MessageService {
                 preview(body),
                 m.bodyTruncated(),
                 m.propertyCount(),
-                GovernanceViews.redactions(g));
+                GovernanceViews.redactions(g),
+                tombstone,
+                key);
     }
 
     private static String preview(String body) {
@@ -764,6 +875,11 @@ public class MessageService {
     }
 
     private static MessageDetailView toDetail(BrowsedMessage m, GovernedMessage g, UUID node) {
+        return toDetail(m, g, node, false, null);
+    }
+
+    private static MessageDetailView toDetail(
+            BrowsedMessage m, GovernedMessage g, UUID node, boolean tombstone, String key) {
         // A masked value is a marker string whatever its original type, so it is listed with the strings.
         Map<String, String> strings = new LinkedHashMap<>();
         Map<String, Long> ints = new LinkedHashMap<>();
@@ -803,6 +919,8 @@ public class MessageService {
                 doubles,
                 booleans,
                 GovernanceViews.redactions(g),
-                GovernanceViews.withheld(g));
+                GovernanceViews.withheld(g),
+                tombstone,
+                key);
     }
 }

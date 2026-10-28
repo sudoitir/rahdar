@@ -8782,6 +8782,28 @@
             "type" : "integer",
             "format" : "int32"
           }
+        }, {
+          "name" : "partition",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }, {
+          "name" : "from",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "value",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
         } ],
         "responses" : {
           "200" : {
@@ -20556,6 +20578,14 @@
           "required" : false,
           "schema" : {
             "type" : "string"
+          }
+        }, {
+          "name" : "partition",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
           }
         } ],
         "responses" : {
@@ -37445,6 +37475,37 @@
           }
         }
       },
+      "LogView" : {
+        "type" : "object",
+        "properties" : {
+          "partition" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "start" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "end" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "next" : {
+            "type" : [ "integer", "null" ],
+            "format" : "int64",
+            "description" : "The offset the next page starts at; null at the end."
+          },
+          "retentionMoved" : {
+            "type" : "boolean",
+            "description" : "The offset asked for was already removed by retention."
+          },
+          "uncommittedHidden" : {
+            "type" : "boolean",
+            "description" : "Records of open or aborted transactions are not shown, as a read-committed consumer would not see them."
+          }
+        },
+        "required" : [ "end", "partition", "retentionMoved", "start", "uncommittedHidden" ]
+      },
       "MessagePageView" : {
         "type" : "object",
         "properties" : {
@@ -37476,11 +37537,19 @@
             "description" : "Why count is null. Null whenever count is present."
           },
           "node" : {
-            "type" : "string",
-            "format" : "uuid"
+            "type" : [ "string", "null" ],
+            "format" : "uuid",
+            "description" : "The node the page was read from; null for a log, which has none."
+          },
+          "log" : {
+            "anyOf" : [ {
+              "$ref" : "#/components/schemas/LogView"
+            }, {
+              "type" : "null"
+            } ]
           }
         },
-        "required" : [ "data", "hasNext", "node", "page", "pageSize" ]
+        "required" : [ "data", "hasNext", "page", "pageSize" ]
       },
       "MessageSummaryView" : {
         "type" : "object",
@@ -37533,9 +37602,17 @@
             "items" : {
               "$ref" : "#/components/schemas/RedactionView"
             }
+          },
+          "tombstone" : {
+            "type" : "boolean",
+            "description" : "A log record with no value: it deletes its key on compaction. Never true on a queue."
+          },
+          "key" : {
+            "type" : [ "string", "null" ],
+            "description" : "A log record's key as text, or base64 when it is not text."
           }
         },
-        "required" : [ "bodyTruncated", "durable", "expiration", "position", "priority", "propertyCount", "redactions", "size", "timestamp", "type" ]
+        "required" : [ "bodyTruncated", "durable", "expiration", "position", "priority", "propertyCount", "redactions", "size", "timestamp", "tombstone", "type" ]
       },
       "MessageDetailView" : {
         "type" : "object",
@@ -37597,8 +37674,9 @@
             "format" : "int32"
           },
           "node" : {
-            "type" : "string",
-            "format" : "uuid"
+            "type" : [ "string", "null" ],
+            "format" : "uuid",
+            "description" : "The node the message was read from; null for a log, which has none."
           },
           "stringProperties" : {
             "type" : "object",
@@ -37644,9 +37722,15 @@
             "items" : {
               "$ref" : "#/components/schemas/WithheldView"
             }
+          },
+          "tombstone" : {
+            "type" : "boolean"
+          },
+          "key" : {
+            "type" : [ "string", "null" ]
           }
         },
-        "required" : [ "bodyEncoding", "bodyTruncated", "booleanProperties", "doubleProperties", "durable", "expiration", "intProperties", "longProperties", "node", "position", "priority", "redactions", "size", "stringProperties", "timestamp", "type", "withheld" ]
+        "required" : [ "bodyEncoding", "bodyTruncated", "booleanProperties", "doubleProperties", "durable", "expiration", "intProperties", "longProperties", "position", "priority", "redactions", "size", "stringProperties", "timestamp", "tombstone", "type", "withheld" ]
       },
       "ResourceAccessView" : {
         "type" : "object",

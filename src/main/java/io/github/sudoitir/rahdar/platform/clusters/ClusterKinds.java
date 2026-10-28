@@ -32,6 +32,11 @@ public class ClusterKinds {
     private final BrokerGateway gateway;
     private final SystemExtensions extensions;
 
+    /** Whether the cluster's kind of this id reads a partitioned log, so its messages are browsed by partition. */
+    public boolean partitioned(UUID clusterId, String kind) {
+        return kindsOf(clusterId).stream().anyMatch(k -> k.id().equals(kind) && k.partitioned());
+    }
+
     /** The id of the system the cluster runs. */
     public String systemId(UUID clusterId) {
         return systems.idOf(clusterId);

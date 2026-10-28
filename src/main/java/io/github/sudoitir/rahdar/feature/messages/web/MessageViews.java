@@ -42,7 +42,16 @@ public final class MessageViews {
             @Schema(nullable = true) String bodyPreview,
             @Schema(requiredMode = REQUIRED) boolean bodyTruncated,
             @Schema(requiredMode = REQUIRED) int propertyCount,
-            @Schema(requiredMode = REQUIRED) List<RedactionView> redactions) {}
+            @Schema(requiredMode = REQUIRED) List<RedactionView> redactions,
+
+            @Schema(
+                    requiredMode = REQUIRED,
+                    description =
+                            "A log record with no value: it deletes its key on compaction. Never true on a queue.")
+            boolean tombstone,
+
+            @Schema(nullable = true, description = "A log record's key as text, or base64 when it is not text.")
+            String key) {}
 
     /** One message, expanded: the full header set, the typed property maps, and the body. */
     public record MessageDetailView(
@@ -70,14 +79,21 @@ public final class MessageViews {
             @Schema(nullable = true) String contentType,
             @Schema(requiredMode = REQUIRED) boolean bodyTruncated,
             @Schema(nullable = true) Integer observedLimitBytes,
-            @Schema(requiredMode = REQUIRED) UUID node,
+
+            @Schema(
+                    nullable = true,
+                    description = "The node the message was read from; null for a log, which has none.")
+            UUID node,
+
             @Schema(requiredMode = REQUIRED) Map<String, String> stringProperties,
             @Schema(requiredMode = REQUIRED) Map<String, Long> intProperties,
             @Schema(requiredMode = REQUIRED) Map<String, Long> longProperties,
             @Schema(requiredMode = REQUIRED) Map<String, Double> doubleProperties,
             @Schema(requiredMode = REQUIRED) Map<String, Boolean> booleanProperties,
             @Schema(requiredMode = REQUIRED) List<RedactionView> redactions,
-            @Schema(requiredMode = REQUIRED) List<WithheldView> withheld) {}
+            @Schema(requiredMode = REQUIRED) List<WithheldView> withheld,
+            @Schema(requiredMode = REQUIRED) boolean tombstone,
+            @Schema(nullable = true) String key) {}
 
     /** A page of messages: the shared list envelope plus the node it was read from. */
     public record MessagePageView(
@@ -99,7 +115,33 @@ public final class MessageViews {
             @Schema(nullable = true, description = "Why count is null. Null whenever count is present.")
             String countUnavailable,
 
-            @Schema(requiredMode = REQUIRED) UUID node) {}
+            @Schema(nullable = true, description = "The node the page was read from; null for a log, which has none.")
+            UUID node,
+
+            @Schema(nullable = true, description = "Where in the log the page sits; null for a queue.")
+            LogView log) {}
+
+    /**
+     * Where a page of a partitioned log sits. {@code start} and {@code end} are the partition's first offset and
+     * the one after its last, so an offset asked for past the end is an empty page that says where the end is,
+     * and one before the start is read from the start with {@code retentionMoved} set.
+     */
+    public record LogView(
+            @Schema(requiredMode = REQUIRED) int partition,
+            @Schema(requiredMode = REQUIRED) long start,
+            @Schema(requiredMode = REQUIRED) long end,
+
+            @Schema(nullable = true, description = "The offset the next page starts at; null at the end.")
+            Long next,
+
+            @Schema(requiredMode = REQUIRED, description = "The offset asked for was already removed by retention.")
+            boolean retentionMoved,
+
+            @Schema(
+                    requiredMode = REQUIRED,
+                    description = "Records of open or aborted transactions are not shown, as a read-committed"
+                            + " consumer would not see them.")
+            boolean uncommittedHidden) {}
 
     /**
      * A send whose outcome is unknown (HTTP 202): the message left, and the broker's confirmation never came

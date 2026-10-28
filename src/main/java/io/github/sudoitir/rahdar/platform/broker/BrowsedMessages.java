@@ -1,5 +1,6 @@
 package io.github.sudoitir.rahdar.platform.broker;
 
+import io.github.sudoitir.openbroker.messaging.Blob;
 import io.github.sudoitir.openbroker.messaging.JmsExtension;
 import io.github.sudoitir.openbroker.messaging.Message;
 import io.github.sudoitir.openbroker.messaging.MessageHeaders;
@@ -74,7 +75,24 @@ public final class BrowsedMessages {
                 booleans);
     }
 
+    /** A record's key as text when it reads as text, base64 when it does not; null for a record with none. */
+    public static String keyOf(Message m) {
+        return m.headers()
+                .key()
+                .map(Blob::toByteArray)
+                .map(BrowsedMessages::readable)
+                .orElse(null);
+    }
+
+    private static String readable(byte[] key) {
+        BodyDecoder.Decoded decoded = BodyDecoder.decode(key);
+        return decoded.isBinary() ? Base64.getEncoder().encodeToString(key) : decoded.text();
+    }
+
     private static byte[] bytes(Message m) {
+        if (m.body().isTombstone()) {
+            return new byte[0];
+        }
         if (m.body().bytes().isPresent()) {
             return m.body().bytes().get().toByteArray();
         }

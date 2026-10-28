@@ -1,8 +1,10 @@
 package io.github.sudoitir.rahdar.feature.messages.web;
 
 import io.github.sudoitir.openbroker.model.ResourceClass;
+import io.github.sudoitir.openbroker.model.ResourceId;
 import io.github.sudoitir.rahdar.feature.messages.MessageAction;
 import io.github.sudoitir.rahdar.feature.messages.MessageService;
+import io.github.sudoitir.rahdar.feature.messages.MessageService.LogStart;
 import io.github.sudoitir.rahdar.feature.messages.MessageService.Outcome;
 import io.github.sudoitir.rahdar.feature.messages.web.MessageRequests.MessageActionRequest;
 import io.github.sudoitir.rahdar.feature.messages.web.MessageRequests.SendMessageRequest;
@@ -17,6 +19,7 @@ import io.github.sudoitir.rahdar.kernel.core.web.ApiExceptionHandler;
 import io.github.sudoitir.rahdar.kernel.gate.HeldResponse;
 import io.github.sudoitir.rahdar.platform.broker.Attempt;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
+import io.github.sudoitir.rahdar.platform.clusters.ClusterKinds;
 import io.github.sudoitir.rahdar.platform.clusters.ResourceTargets;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -49,6 +52,7 @@ public class MessageController {
 
     private final MessageService messages;
     private final ResourceTargets targets;
+    private final ClusterKinds kinds;
 
     @GetMapping("/{path}/messages")
     public MessagePageView browse(
@@ -58,8 +62,21 @@ public class MessageController {
             @RequestParam(required = false) UUID node,
             @RequestParam(required = false) String filter,
             @RequestParam(required = false) Integer page,
-            @RequestParam(required = false) Integer size) {
+            @RequestParam(required = false) Integer size,
+            @RequestParam(required = false) Integer partition,
+            @RequestParam(required = false) String from,
+            @RequestParam(required = false) String value) {
         ResourceQuery paging = ResourceQuery.ofPage(page, size);
+        if (kinds.partitioned(clusterId, kind)) {
+            // A partitioned log is read one partition at a time, from an offset or a time (ADR-0216).
+            return messages.browseLog(
+                    clusterId,
+                    log(clusterId, kind, path),
+                    requirePartition(partition),
+                    LogStart.parse(from, value),
+                    filter,
+                    paging.size());
+        }
         return messages.browse(
                 clusterId, subscription(clusterId, kind, path), node, filter, paging.page(), paging.size());
     }
@@ -71,7 +88,12 @@ public class MessageController {
             @PathVariable String path,
             @PathVariable String position,
             @RequestParam(required = false) UUID node,
-            @RequestParam(required = false) String filter) {
+            @RequestParam(required = false) String filter,
+            @RequestParam(required = false) Integer partition) {
+        if (kinds.partitioned(clusterId, kind)) {
+            return messages.detailLog(
+                    clusterId, log(clusterId, kind, path), requirePartition(partition), Long.parseLong(position));
+        }
         return messages.detail(
                 clusterId, subscription(clusterId, kind, path), MessageActionRequest.number(position), node, filter);
     }
@@ -132,6 +154,18 @@ public class MessageController {
             @RequestParam(defaultValue = "false") boolean dryRun,
             @RequestParam(defaultValue = "false") boolean override) {
         return respond(messages.purge(clusterId, subscription(clusterId, kind, path), node, dryRun, override));
+    }
+
+    /** The destination whose log the route names. */
+    private ResourceId log(UUID clusterId, String kind, String path) {
+        return targets.require(clusterId, kind, path, ResourceClass.DESTINATION).id();
+    }
+
+    private static int requirePartition(Integer partition) {
+        if (partition == null) {
+            throw new IllegalArgumentException("partition is required: a log is read one partition at a time.");
+        }
+        return partition;
     }
 
     /** The name of the subscription the route names, which the message calls are keyed by. */
