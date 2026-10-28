@@ -26,6 +26,7 @@ import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterR
 import io.github.sudoitir.rahdar.support.AdminAuthenticationExtension;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
 import io.github.sudoitir.rahdar.support.Targets;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisModule;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
@@ -81,7 +82,7 @@ class RoutingServiceTest extends PostgresIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        clusterId = clusters.save(new ClusterEntity("c-" + UUID.randomUUID(), null, null))
+        clusterId = clusters.save(new ClusterEntity(ArtemisModule.SYSTEM, "c-" + UUID.randomUUID(), null, null))
                 .getId();
         nodeA = node("node-a", NODE_A_URL);
         nodeB = node("node-b", NODE_B_URL);

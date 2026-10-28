@@ -7,6 +7,7 @@ import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNo
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterEntity;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterRepository;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisModule;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.HashMap;
@@ -43,7 +44,7 @@ class MetricSamplesSlopeTest extends PostgresIntegrationTest {
     private UUID nodeId;
 
     private void givenCluster() {
-        clusterId = clusters.save(new ClusterEntity("c-" + UUID.randomUUID(), null, null))
+        clusterId = clusters.save(new ClusterEntity(ArtemisModule.SYSTEM, "c-" + UUID.randomUUID(), null, null))
                 .getId();
         nodeId = nodes.save(BrokerNodeEntity.fromSeed(clusterId, "n1", "NONE", "node-1"))
                 .getId();

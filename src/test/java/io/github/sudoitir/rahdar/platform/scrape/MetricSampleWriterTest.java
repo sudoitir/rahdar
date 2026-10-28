@@ -8,6 +8,7 @@ import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNo
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterEntity;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterRepository;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisModule;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -51,7 +52,7 @@ class MetricSampleWriterTest extends PostgresIntegrationTest {
 
     @Test
     void recordsSixMetricsPerQueue() {
-        clusterId = clusters.save(new ClusterEntity("c-" + UUID.randomUUID(), null, null))
+        clusterId = clusters.save(new ClusterEntity(ArtemisModule.SYSTEM, "c-" + UUID.randomUUID(), null, null))
                 .getId();
         nodeId = nodes.save(BrokerNodeEntity.fromSeed(clusterId, "n1", "NONE", "node-1"))
                 .getId();
@@ -87,7 +88,7 @@ class MetricSampleWriterTest extends PostgresIntegrationTest {
 
     @Test
     void writesNothingForAnEmptySweep() {
-        clusterId = clusters.save(new ClusterEntity("c-" + UUID.randomUUID(), null, null))
+        clusterId = clusters.save(new ClusterEntity(ArtemisModule.SYSTEM, "c-" + UUID.randomUUID(), null, null))
                 .getId();
 
         writer.appendQueueSamples(List.of());

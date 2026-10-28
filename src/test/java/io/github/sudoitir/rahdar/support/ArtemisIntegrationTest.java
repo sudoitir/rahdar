@@ -15,6 +15,7 @@ import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
 import io.github.sudoitir.rahdar.platform.broker.BrokerTarget;
 import io.github.sudoitir.rahdar.platform.broker.BrokerVersion;
 import io.github.sudoitir.rahdar.support.wire.WireRecorder;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisModule;
 import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
 import io.github.sudoitir.rahdar.system.artemis.ArtemisNodes;
 import java.time.Duration;
@@ -121,7 +122,7 @@ public abstract class ArtemisIntegrationTest {
     /** As {@link #cluster(UUID)}, with the node's data plane at the given address. */
     public static ClusterConnection cluster(UUID nodeId, String core) {
         return DRIVERS.connect(new ConnectRequest(
-                BrokerGateway.SYSTEM,
+                ArtemisModule.SYSTEM,
                 ClusterSpec.ofNodes(List.of(new NodeSpec(
                         BrokerGateway.idOf(nodeId),
                         List.of(

@@ -37,6 +37,7 @@ import io.github.sudoitir.rahdar.support.AdminAuthenticationExtension;
 import io.github.sudoitir.rahdar.support.DataPlaneChecks;
 import io.github.sudoitir.rahdar.support.FixtureJolokia;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisModule;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
@@ -123,7 +124,7 @@ class ClusterConnectionControllerTest extends PostgresIntegrationTest {
         audits.deleteAll();
         clusters.deleteAll();
 
-        ClusterEntity cluster = new ClusterEntity("c-" + UUID.randomUUID(), null, null);
+        ClusterEntity cluster = new ClusterEntity(ArtemisModule.SYSTEM, "c-" + UUID.randomUUID(), null, null);
         cluster.edit(cluster.getName(), null, PATTERN);
         clusterId = clusters.save(cluster).getId();
 

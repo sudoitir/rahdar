@@ -40,6 +40,7 @@ import io.github.sudoitir.rahdar.platform.clusters.web.EnvironmentViews.Environm
 import io.github.sudoitir.rahdar.platform.clusters.web.EnvironmentViews.EnvironmentView;
 import io.github.sudoitir.rahdar.support.AdminAuthenticationExtension;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisModule;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -112,7 +113,7 @@ class ClusterGateTest extends PostgresIntegrationTest {
     @BeforeEach
     void cluster() {
         name = "env-" + UUID.randomUUID().toString().substring(0, 8);
-        clusterId = clusters.save(new ClusterEntity("c-" + UUID.randomUUID(), null, null))
+        clusterId = clusters.save(new ClusterEntity(ArtemisModule.SYSTEM, "c-" + UUID.randomUUID(), null, null))
                 .getId();
     }
 
@@ -295,7 +296,7 @@ class ClusterGateTest extends PostgresIntegrationTest {
         var params = new ClusterDeleteParams(clusterId);
 
         assertThatThrownBy(() -> clusterDeleteOperation.estimate(params)).isInstanceOf(NotFoundException.class);
-        clusterId = clusters.save(new ClusterEntity("c-" + UUID.randomUUID(), null, null))
+        clusterId = clusters.save(new ClusterEntity(ArtemisModule.SYSTEM, "c-" + UUID.randomUUID(), null, null))
                 .getId();
     }
 

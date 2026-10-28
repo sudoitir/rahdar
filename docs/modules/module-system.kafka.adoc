@@ -1,0 +1,7 @@
+[%autowidth.stretch, cols="h,a"]
+|===
+|Base package
+|`io.github.sudoitir.rahdar.system.kafka`
+|Bean references
+|* `i.g.s.r.p.b.ConnectionSettingsSource` (in Broker connectivity)
+|===

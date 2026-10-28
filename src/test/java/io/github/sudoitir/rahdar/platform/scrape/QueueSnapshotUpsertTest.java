@@ -11,6 +11,7 @@ import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterR
 import io.github.sudoitir.rahdar.platform.scrape.internal.persistence.QueueSnapshotEntity;
 import io.github.sudoitir.rahdar.platform.scrape.internal.persistence.QueueSnapshotRepository;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisModule;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -50,7 +51,7 @@ class QueueSnapshotUpsertTest extends PostgresIntegrationTest {
     }
 
     private void givenClusterAndNode() {
-        clusterId = clusters.save(new ClusterEntity("c-" + UUID.randomUUID(), null, null))
+        clusterId = clusters.save(new ClusterEntity(ArtemisModule.SYSTEM, "c-" + UUID.randomUUID(), null, null))
                 .getId();
         nodeId = nodes.save(BrokerNodeEntity.fromSeed(clusterId, "n-" + UUID.randomUUID(), "PRIMARY", null))
                 .getId();

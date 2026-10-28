@@ -25,6 +25,7 @@ import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterE
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterRepository;
 import io.github.sudoitir.rahdar.support.OperatorFixture;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisModule;
 import java.nio.file.Path;
 import java.security.SecureRandom;
 import java.sql.Timestamp;
@@ -102,7 +103,7 @@ class MetricHistoryIntegrationTest extends PostgresIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        clusterId = clusters.save(new ClusterEntity("history-" + UUID.randomUUID(), null, null))
+        clusterId = clusters.save(new ClusterEntity(ArtemisModule.SYSTEM, "history-" + UUID.randomUUID(), null, null))
                 .getId();
         nodeId = nodes.save(BrokerNodeEntity.fromSeed(
                         clusterId, "node-a", "PRIMARY", UUID.randomUUID().toString()))

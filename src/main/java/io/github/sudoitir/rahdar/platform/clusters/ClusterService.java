@@ -64,6 +64,7 @@ import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.NodeEndpoint
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.NodeProbeView;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.RegisterPreview;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.TopologyView;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisModule;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -427,6 +428,7 @@ public class ClusterService {
             RegistrationAdoption.Reading adopted) {
         ClusterIdentity identity = survey.identity();
         ClusterEntity cluster = new ClusterEntity(
+                ArtemisModule.SYSTEM,
                 request.name() != null
                         ? request.name()
                         : hostOf(request.seedUrls().get(0)),

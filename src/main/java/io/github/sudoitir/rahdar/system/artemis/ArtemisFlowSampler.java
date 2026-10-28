@@ -4,7 +4,6 @@ import static io.github.sudoitir.rahdar.system.artemis.ListRows.num;
 import static io.github.sudoitir.rahdar.system.artemis.ListRows.str;
 
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
-import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
 import io.github.sudoitir.rahdar.platform.broker.FlowSampler;
 import java.util.ArrayList;
 import java.util.List;
@@ -43,7 +42,7 @@ class ArtemisFlowSampler implements FlowSampler {
 
     @Override
     public String system() {
-        return BrokerGateway.SYSTEM;
+        return ArtemisModule.SYSTEM;
     }
 
     @Override

@@ -14,6 +14,7 @@ import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterE
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterRepository;
 import io.github.sudoitir.rahdar.support.AdminAuthenticationExtension;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisModule;
 import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
@@ -45,7 +46,7 @@ class RequestReplyServiceTest extends PostgresIntegrationTest {
     }
 
     private UUID cluster() {
-        clusterId = clusters.save(new ClusterEntity("rr-svc-" + UUID.randomUUID(), null, null))
+        clusterId = clusters.save(new ClusterEntity(ArtemisModule.SYSTEM, "rr-svc-" + UUID.randomUUID(), null, null))
                 .getId();
         return clusterId;
     }

@@ -26,6 +26,7 @@ import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterE
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterRepository;
 import io.github.sudoitir.rahdar.support.AdminAuthenticationExtension;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisModule;
 import java.util.List;
 import java.util.UUID;
 import org.assertj.core.groups.Tuple;
@@ -193,7 +194,7 @@ class InstallationAlertsIntegrationTest extends PostgresIntegrationTest {
 
     @Test
     void everyClustersViewShowsTheInstallationRulesAndFiringsAndCanEditThem() {
-        UUID clusterId = clusters.save(new ClusterEntity("c-" + UUID.randomUUID(), null, null))
+        UUID clusterId = clusters.save(new ClusterEntity(ArtemisModule.SYSTEM, "c-" + UUID.randomUUID(), null, null))
                 .getId();
         try {
             AlertRuleEntity quota = rule("STORAGE_QUOTA");

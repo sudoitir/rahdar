@@ -29,6 +29,7 @@ import io.github.sudoitir.rahdar.support.AdminAuthenticationExtension;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
 import io.github.sudoitir.rahdar.support.Targets;
 import io.github.sudoitir.rahdar.support.TeamAccessFixture;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisModule;
 import io.github.sudoitir.rahdar.system.artemis.ArtemisNodes;
 import java.time.Instant;
 import java.util.List;
@@ -96,7 +97,7 @@ class TeamLifecycleAuthorisationTest extends PostgresIntegrationTest {
     void setUp() {
         mvc = webAppContextSetup(webContext).apply(springSecurity()).build();
         TeamAccessFixture fixture = new TeamAccessFixture(teamService, roles, users);
-        cluster = clusters.save(new ClusterEntity("divert-" + UUID.randomUUID(), null, null))
+        cluster = clusters.save(new ClusterEntity(ArtemisModule.SYSTEM, "divert-" + UUID.randomUUID(), null, null))
                 .getId();
         UUID one = node("one", ONE);
         UUID two = node("two", TWO);

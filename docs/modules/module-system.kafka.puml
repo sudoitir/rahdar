@@ -1,0 +1,37 @@
+@startuml
+title <size:24>Kafka</size>
+
+set separator none
+top to bottom direction
+
+<style>
+  root {
+    BackgroundColor: #ffffff
+    FontColor: #444444
+  }
+</style>
+
+!include <C4/C4>
+!include <C4/C4_Context>
+!include <C4/C4_Component>
+
+System_Boundary("RahdarApplication_boundary", "RahdarApplication", $tags="") {
+  Container_Boundary("RahdarApplication.RahdarApplication_boundary", "RahdarApplication", $tags="") {
+    Component(RahdarApplication.RahdarApplication.Brokerconnectivity, "Broker connectivity", $techn="Module", $descr="", $tags="", $link="")
+    Component(RahdarApplication.RahdarApplication.Core, "Core", $techn="Module", $descr="", $tags="", $link="")
+    Component(RahdarApplication.RahdarApplication.Kafka, "Kafka", $techn="Module", $descr="", $tags="", $link="")
+    Component(RahdarApplication.RahdarApplication.Plugincontract, "Plugin contract", $techn="Module", $descr="", $tags="", $link="")
+  }
+
+}
+
+Rel(RahdarApplication.RahdarApplication.Brokerconnectivity, RahdarApplication.RahdarApplication.Core, "depends on", $techn="", $tags="", $link="")
+Rel(RahdarApplication.RahdarApplication.Brokerconnectivity, RahdarApplication.RahdarApplication.Plugincontract, "depends on", $techn="", $tags="", $link="")
+Rel(RahdarApplication.RahdarApplication.Kafka, RahdarApplication.RahdarApplication.Brokerconnectivity, "uses", $techn="", $tags="", $link="")
+Rel(RahdarApplication.RahdarApplication.Kafka, RahdarApplication.RahdarApplication.Core, "depends on", $techn="", $tags="", $link="")
+Rel(RahdarApplication.RahdarApplication.Kafka, RahdarApplication.RahdarApplication.Plugincontract, "depends on", $techn="", $tags="", $link="")
+Rel(RahdarApplication.RahdarApplication.Plugincontract, RahdarApplication.RahdarApplication.Core, "depends on", $techn="", $tags="", $link="")
+
+SHOW_LEGEND(true)
+hide stereotypes
+@enduml

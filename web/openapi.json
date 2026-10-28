@@ -16195,6 +16195,101 @@
         }
       }
     },
+    "/api/v1/systems" : {
+      "get" : {
+        "tags" : [ "systems-controller" ],
+        "operationId" : "list_9",
+        "parameters" : [ {
+          "name" : "page",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }, {
+          "name" : "size",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PagedViewSystemView"
+                }
+              }
+            }
+          },
+          "4XX" : {
+            "description" : "Client error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "5XX" : {
+            "description" : "Server error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "429" : {
+            "description" : "Too many requests. Wait for Retry-After seconds.",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds to wait before retrying.",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Limit" : {
+                "description" : "Requests allowed in the window (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Remaining" : {
+                "description" : "Requests left in the window (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Reset" : {
+                "description" : "Seconds until the window resets (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              }
+            },
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/system/jobs" : {
       "get" : {
         "tags" : [ "jobs-controller" ],
@@ -16371,7 +16466,7 @@
     "/api/v1/subscriptions" : {
       "get" : {
         "tags" : [ "estate-subscription-controller" ],
-        "operationId" : "list_9",
+        "operationId" : "list_10",
         "parameters" : [ {
           "name" : "q",
           "in" : "query",
@@ -16599,7 +16694,7 @@
     "/api/v1/settings" : {
       "get" : {
         "tags" : [ "settings-controller" ],
-        "operationId" : "list_10",
+        "operationId" : "list_11",
         "responses" : {
           "200" : {
             "description" : "OK",
@@ -17117,7 +17212,7 @@
     "/api/v1/mcp/tools" : {
       "get" : {
         "tags" : [ "mcp-tools-controller" ],
-        "operationId" : "list_11",
+        "operationId" : "list_12",
         "parameters" : [ {
           "name" : "page",
           "in" : "query",
@@ -17290,7 +17385,7 @@
     "/api/v1/inbox" : {
       "get" : {
         "tags" : [ "inbox-controller" ],
-        "operationId" : "list_12",
+        "operationId" : "list_13",
         "parameters" : [ {
           "name" : "unread",
           "in" : "query",
@@ -17472,7 +17567,7 @@
     "/api/v1/held-operations" : {
       "get" : {
         "tags" : [ "held-operation-controller" ],
-        "operationId" : "list_13",
+        "operationId" : "list_14",
         "parameters" : [ {
           "name" : "scope",
           "in" : "query",
@@ -20161,7 +20256,7 @@
     "/api/v1/clusters/{clusterId}/events" : {
       "get" : {
         "tags" : [ "event-controller" ],
-        "operationId" : "list_14",
+        "operationId" : "list_15",
         "parameters" : [ {
           "name" : "clusterId",
           "in" : "path",
@@ -21182,7 +21277,7 @@
     "/api/v1/clusters/{clusterId}/audit" : {
       "get" : {
         "tags" : [ "audit-controller" ],
-        "operationId" : "list_15",
+        "operationId" : "list_16",
         "parameters" : [ {
           "name" : "clusterId",
           "in" : "path",
@@ -23757,7 +23852,7 @@
     "/api/v1/admin/tokens" : {
       "get" : {
         "tags" : [ "admin-tokens-controller" ],
-        "operationId" : "list_16",
+        "operationId" : "list_17",
         "parameters" : [ {
           "name" : "page",
           "in" : "query",
@@ -23948,7 +24043,7 @@
     "/api/v1/admin/plugins" : {
       "get" : {
         "tags" : [ "plugin-admin-controller" ],
-        "operationId" : "list_17",
+        "operationId" : "list_18",
         "responses" : {
           "200" : {
             "description" : "OK",
@@ -32232,6 +32327,34 @@
           }
         },
         "required" : [ "permissions", "roles" ]
+      },
+      "PagedViewSystemView" : {
+        "type" : "object",
+        "properties" : {
+          "data" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/SystemView"
+            }
+          },
+          "page" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "pageSize" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "count" : {
+            "type" : [ "integer", "null" ],
+            "format" : "int64",
+            "description" : "The total across all pages; null when it is not known."
+          },
+          "hasNext" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "data", "hasNext", "page", "pageSize" ]
       },
       "JobStatusView" : {
         "type" : "object",

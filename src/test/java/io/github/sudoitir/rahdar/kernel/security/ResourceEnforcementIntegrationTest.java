@@ -29,6 +29,7 @@ import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshotUpsert;
 import io.github.sudoitir.rahdar.support.AdminAuthenticationExtension;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
 import io.github.sudoitir.rahdar.support.TeamAccessFixture;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisModule;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -98,7 +99,7 @@ class ResourceEnforcementIntegrationTest extends PostgresIntegrationTest {
         mvc = webAppContextSetup(webContext).apply(springSecurity()).build();
         fixture = new TeamAccessFixture(teamService, roles, users);
 
-        cluster = clusters.save(new ClusterEntity("team-" + UUID.randomUUID(), null, null))
+        cluster = clusters.save(new ClusterEntity(ArtemisModule.SYSTEM, "team-" + UUID.randomUUID(), null, null))
                 .getId();
         // A node with a management URL that is not live: a dry run reports it skipped, with no broker to reach.
         BrokerNodeEntity node = BrokerNodeEntity.fromSeed(
@@ -237,7 +238,7 @@ class ResourceEnforcementIntegrationTest extends PostgresIntegrationTest {
         UsernamePasswordAuthenticationToken stranger = fixture.session(fixture.member(
                 fixture.team(
                         "elsewhere",
-                        clusters.save(new ClusterEntity("other-" + UUID.randomUUID(), null, null))
+                        clusters.save(new ClusterEntity(ArtemisModule.SYSTEM, "other-" + UUID.randomUUID(), null, null))
                                 .getId(),
                         "x.#"),
                 "TEAM_VIEWER"));

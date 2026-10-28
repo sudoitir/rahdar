@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterEntity;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterRepository;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisModule;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
@@ -36,7 +37,7 @@ class BulkRunStoreTest extends PostgresIntegrationTest {
 
     @BeforeEach
     void runs() {
-        clusterId = clusters.save(new ClusterEntity("c-" + UUID.randomUUID(), null, null))
+        clusterId = clusters.save(new ClusterEntity(ArtemisModule.SYSTEM, "c-" + UUID.randomUUID(), null, null))
                 .getId();
         oldFinished = run("SUCCEEDED", "100 days", "100 days", "-1 minute");
         oldInterrupted = run("INTERRUPTED", "100 days", "100 days", "-1 minute");

@@ -41,6 +41,7 @@
     <include file="db/changelog/platform/governance/changelog.xml"  relativeToChangelogFile="false"/>
     <include file="db/changelog/platform/clusters/changelog.xml"    relativeToChangelogFile="false"/>
     <include file="db/changelog/platform/scrape/changelog.xml"      relativeToChangelogFile="false"/>
+    <include file="db/changelog/system/kafka/changelog.xml"         relativeToChangelogFile="false"/>
     <include file="db/changelog/feature/apitokens/changelog.xml"    relativeToChangelogFile="false"/>
     <include file="db/changelog/feature/identitylocal/changelog.xml" relativeToChangelogFile="false"/>
     <include file="db/changelog/feature/events/changelog.xml"       relativeToChangelogFile="false"/>

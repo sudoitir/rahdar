@@ -31,6 +31,7 @@ import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterE
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterRepository;
 import io.github.sudoitir.rahdar.support.McpFixture;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisModule;
 import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
 import io.github.sudoitir.rahdar.system.artemis.ArtemisNodes;
 import java.time.Instant;
@@ -105,7 +106,8 @@ class McpBrokerConfigIntegrationTest extends PostgresIntegrationTest {
                 .apply(springSecurity())
                 .build();
         clusterName = "config-" + UUID.randomUUID();
-        clusterId = clusters.save(new ClusterEntity(clusterName, null, null)).getId();
+        clusterId = clusters.save(new ClusterEntity(ArtemisModule.SYSTEM, clusterName, null, null))
+                .getId();
         node("node-a");
         node("node-b");
 

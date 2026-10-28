@@ -14,6 +14,7 @@ import io.github.sudoitir.rahdar.kernel.security.RahdarPrincipal;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterEntity;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterRepository;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisModule;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
@@ -48,7 +49,7 @@ class ConnectionControlAuthorizationTest extends PostgresIntegrationTest {
     @BeforeEach
     void setUp() {
         mvc = webAppContextSetup(webContext).apply(springSecurity()).build();
-        clusterId = clusters.save(new ClusterEntity("conn-auth-" + UUID.randomUUID(), null, null))
+        clusterId = clusters.save(new ClusterEntity(ArtemisModule.SYSTEM, "conn-auth-" + UUID.randomUUID(), null, null))
                 .getId();
     }
 

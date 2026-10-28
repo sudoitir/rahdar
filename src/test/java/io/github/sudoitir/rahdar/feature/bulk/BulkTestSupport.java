@@ -21,6 +21,7 @@ import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshotUpsert;
 import io.github.sudoitir.rahdar.support.ArtemisIds;
 import io.github.sudoitir.rahdar.support.OperatorFixture;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisModule;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -81,7 +82,7 @@ abstract class BulkTestSupport extends PostgresIntegrationTest {
 
     @BeforeEach
     void cluster() {
-        clusterId = clusters.save(new ClusterEntity("c-" + UUID.randomUUID(), null, null))
+        clusterId = clusters.save(new ClusterEntity(ArtemisModule.SYSTEM, "c-" + UUID.randomUUID(), null, null))
                 .getId();
         nodeA = node("a");
         nodeB = node("b");

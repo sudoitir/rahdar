@@ -8,6 +8,7 @@ import io.github.sudoitir.openbroker.spring.boot.autoconfigure.OpenBrokerConnect
 import io.github.sudoitir.openbroker.spring.boot.autoconfigure.OpenBrokerProperties;
 import io.github.sudoitir.openbroker.spring.boot.autoconfigure.SslBundleTls;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import java.util.List;
 import org.springframework.boot.ssl.SslBundles;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 
@@ -30,7 +31,7 @@ final class StarterGateway {
         return new BrokerGateway(
                 context.getBean(BrokerDrivers.class),
                 mock(NodeDirectory.class),
-                mock(ConnectionSettingsSource.class),
+                List.of(),
                 context.getBean(SslBundleTls.class),
                 options,
                 context.getBean(OpenBrokerProperties.class),

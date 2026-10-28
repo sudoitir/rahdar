@@ -17,6 +17,7 @@ import io.github.sudoitir.rahdar.support.AdminAuthenticationExtension;
 import io.github.sudoitir.rahdar.support.ArtemisBrokers;
 import io.github.sudoitir.rahdar.support.ArtemisIntegrationTest;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisModule;
 import java.net.InetAddress;
 import java.net.URI;
 import java.time.Duration;
@@ -217,7 +218,7 @@ class RegisterOnceRealBrokerTest extends PostgresIntegrationTest {
         ExecutorService pool = Executors.newSingleThreadExecutor();
         try {
             Future<UUID> firstCluster = pool.submit(() -> tx.execute(status -> {
-                UUID id = clusters.saveAndFlush(new ClusterEntity(run + "-first", null, null))
+                UUID id = clusters.saveAndFlush(new ClusterEntity(ArtemisModule.SYSTEM, run + "-first", null, null))
                         .getId();
                 assertThat(claims.claim(id, claim)).isEmpty();
                 firstClaimed.countDown();
@@ -232,7 +233,7 @@ class RegisterOnceRealBrokerTest extends PostgresIntegrationTest {
             assertThat(firstClaimed.await(30, TimeUnit.SECONDS)).isTrue();
 
             Optional<UUID> holder = tx.execute(status -> claims.claim(
-                    clusters.saveAndFlush(new ClusterEntity(run + "-second", null, null))
+                    clusters.saveAndFlush(new ClusterEntity(ArtemisModule.SYSTEM, run + "-second", null, null))
                             .getId(),
                     claim));
 

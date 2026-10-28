@@ -19,6 +19,7 @@ import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshotUpsert;
 import io.github.sudoitir.rahdar.support.AdminAuthenticationExtension;
 import io.github.sudoitir.rahdar.support.FixtureJolokia;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisModule;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
@@ -72,7 +73,7 @@ class ClusterResourceControllerTest extends PostgresIntegrationTest {
     @BeforeEach
     void setUp() {
         mvc = webAppContextSetup(webContext).build();
-        clusterId = clusters.save(new ClusterEntity("c-" + UUID.randomUUID(), null, null))
+        clusterId = clusters.save(new ClusterEntity(ArtemisModule.SYSTEM, "c-" + UUID.randomUUID(), null, null))
                 .getId();
         BrokerNodeEntity a = BrokerNodeEntity.fromSeed(
                 clusterId, "node-a", "PRIMARY", UUID.randomUUID().toString());

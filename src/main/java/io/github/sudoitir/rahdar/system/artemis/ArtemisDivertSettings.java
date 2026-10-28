@@ -1,6 +1,5 @@
 package io.github.sudoitir.rahdar.system.artemis;
 
-import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
 import io.github.sudoitir.rahdar.platform.broker.BrokerTarget;
 import io.github.sudoitir.rahdar.platform.broker.DivertSettings;
 import java.util.Set;
@@ -18,7 +17,7 @@ class ArtemisDivertSettings implements DivertSettings {
 
     @Override
     public String system() {
-        return BrokerGateway.SYSTEM;
+        return ArtemisModule.SYSTEM;
     }
 
     @Override

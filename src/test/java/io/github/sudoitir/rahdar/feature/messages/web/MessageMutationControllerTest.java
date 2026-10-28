@@ -25,6 +25,7 @@ import io.github.sudoitir.rahdar.support.AdminAuthenticationExtension;
 import io.github.sudoitir.rahdar.support.FakeArtemis;
 import io.github.sudoitir.rahdar.support.FixtureJolokia;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisModule;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -85,7 +86,7 @@ class MessageMutationControllerTest extends PostgresIntegrationTest {
         mvc = webAppContextSetup(webContext).build();
         when(gateway.cluster(any()))
                 .thenReturn(FixtureJolokia.cluster(Map.of(UUID.randomUUID(), new FixtureJolokia())));
-        clusterId = clusters.save(new ClusterEntity("c-" + UUID.randomUUID(), null, null))
+        clusterId = clusters.save(new ClusterEntity(ArtemisModule.SYSTEM, "c-" + UUID.randomUUID(), null, null))
                 .getId();
         BrokerNodeEntity a = BrokerNodeEntity.fromSeed(
                 clusterId, "node-a", "PRIMARY", UUID.randomUUID().toString());

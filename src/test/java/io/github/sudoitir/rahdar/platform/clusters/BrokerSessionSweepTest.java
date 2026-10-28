@@ -8,6 +8,7 @@ import io.github.sudoitir.rahdar.kernel.replica.BusResumed;
 import io.github.sudoitir.rahdar.platform.broker.BrokerSessions;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterEntity;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterRepository;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisModule;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -23,7 +24,7 @@ class BrokerSessionSweepTest {
     @Test
     void theBusComingBackReleasesWhatIsHeldForClustersNoLongerInTheDatabase() {
         UUID existing = UUID.randomUUID();
-        ClusterEntity cluster = new ClusterEntity("c", null, null);
+        ClusterEntity cluster = new ClusterEntity(ArtemisModule.SYSTEM, "c", null, null);
         ReflectionTestUtils.setField(cluster, "id", existing);
         when(clusters.findAll()).thenReturn(List.of(cluster));
 

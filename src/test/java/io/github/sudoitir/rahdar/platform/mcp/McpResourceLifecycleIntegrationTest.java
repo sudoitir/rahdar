@@ -34,6 +34,7 @@ import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshotUpsert;
 import io.github.sudoitir.rahdar.support.McpFixture;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
 import io.github.sudoitir.rahdar.support.Targets;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisModule;
 import io.github.sudoitir.rahdar.system.artemis.ArtemisNodes;
 import java.time.Instant;
 import java.util.List;
@@ -108,7 +109,7 @@ class McpResourceLifecycleIntegrationTest extends PostgresIntegrationTest {
         mvc = MockMvcBuilders.webAppContextSetup(webContext)
                 .apply(springSecurity())
                 .build();
-        clusterId = clusters.save(new ClusterEntity("lifecycle-" + UUID.randomUUID(), null, null))
+        clusterId = clusters.save(new ClusterEntity(ArtemisModule.SYSTEM, "lifecycle-" + UUID.randomUUID(), null, null))
                 .getId();
         BrokerNodeEntity node = BrokerNodeEntity.fromSeed(
                 clusterId, "node-a", "PRIMARY", UUID.randomUUID().toString());

@@ -1,7 +1,6 @@
 package io.github.sudoitir.rahdar.system.artemis;
 
 import io.github.sudoitir.rahdar.kernel.core.NotFoundException;
-import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
 import io.github.sudoitir.rahdar.platform.broker.BulkResult;
 import io.github.sudoitir.rahdar.platform.broker.MessageExpiry;
 import io.github.sudoitir.rahdar.platform.scrape.QueueLocator;
@@ -19,7 +18,7 @@ public class ArtemisExpiry implements MessageExpiry {
 
     @Override
     public String system() {
-        return BrokerGateway.SYSTEM;
+        return ArtemisModule.SYSTEM;
     }
 
     private final ArtemisNodes nodes;

@@ -68,6 +68,10 @@
     "kind" : "KERNEL",
     "required" : true
   }, {
+    "id" : "kafka",
+    "kind" : "PLATFORM",
+    "required" : true
+  }, {
     "id" : "lifecycle",
     "kind" : "KERNEL",
     "required" : true

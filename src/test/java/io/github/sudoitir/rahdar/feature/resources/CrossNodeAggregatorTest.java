@@ -18,6 +18,7 @@ import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterR
 import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshotUpsert;
 import io.github.sudoitir.rahdar.support.AdminAuthenticationExtension;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisModule;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -71,7 +72,7 @@ class CrossNodeAggregatorTest extends PostgresIntegrationTest {
 
     /** A cluster with a live/backup pair (shared NodeID) plus a standalone node. */
     private Fixture pairPlusStandalone() {
-        clusterId = clusters.save(new ClusterEntity("c-" + UUID.randomUUID(), null, null))
+        clusterId = clusters.save(new ClusterEntity(ArtemisModule.SYSTEM, "c-" + UUID.randomUUID(), null, null))
                 .getId();
         String sharedNodeId = UUID.randomUUID().toString();
         BrokerNodeEntity live = nodes.save(BrokerNodeEntity.fromSeed(clusterId, "live", "PRIMARY", sharedNodeId));

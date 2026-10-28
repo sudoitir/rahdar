@@ -31,6 +31,7 @@ import io.github.sudoitir.rahdar.support.AdminAuthenticationExtension;
 import io.github.sudoitir.rahdar.support.FakeArtemis;
 import io.github.sudoitir.rahdar.support.FixtureJolokia;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisModule;
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
@@ -105,7 +106,7 @@ class DiagnosticsControllerTest extends PostgresIntegrationTest {
     @BeforeEach
     void setUp() {
         mvc = webAppContextSetup(webContext).build();
-        clusterId = clusters.save(new ClusterEntity("diag-" + UUID.randomUUID(), null, null))
+        clusterId = clusters.save(new ClusterEntity(ArtemisModule.SYSTEM, "diag-" + UUID.randomUUID(), null, null))
                 .getId();
         BrokerNodeEntity node = BrokerNodeEntity.fromSeed(
                 clusterId, "node-a", "PRIMARY", UUID.randomUUID().toString());

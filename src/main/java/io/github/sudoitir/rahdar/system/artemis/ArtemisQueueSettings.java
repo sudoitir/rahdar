@@ -1,6 +1,5 @@
 package io.github.sudoitir.rahdar.system.artemis;
 
-import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
 import io.github.sudoitir.rahdar.platform.broker.BrokerTarget;
 import io.github.sudoitir.rahdar.platform.broker.QueueSettings;
 import java.util.Map;
@@ -17,7 +16,7 @@ class ArtemisQueueSettings implements QueueSettings {
 
     @Override
     public String system() {
-        return BrokerGateway.SYSTEM;
+        return ArtemisModule.SYSTEM;
     }
 
     @Override

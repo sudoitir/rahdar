@@ -27,6 +27,7 @@ import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterR
 import io.github.sudoitir.rahdar.support.AdminAuthenticationExtension;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
 import io.github.sudoitir.rahdar.support.TeamAccessFixture;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisModule;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -84,7 +85,7 @@ class AuditExportControllerTest extends PostgresIntegrationTest {
     @BeforeEach
     void setUp() {
         mvc = webAppContextSetup(webContext).apply(springSecurity()).build();
-        clusterId = clusters.save(new ClusterEntity("export-" + UUID.randomUUID(), null, null))
+        clusterId = clusters.save(new ClusterEntity(ArtemisModule.SYSTEM, "export-" + UUID.randomUUID(), null, null))
                 .getId();
         RahdarPrincipal principal = new RahdarPrincipal(
                 null, "exporter", Set.of(new Grant(Grant.ScopeType.GLOBAL, null, Set.of(Permissions.WILDCARD))), false);

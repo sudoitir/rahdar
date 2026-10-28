@@ -14,6 +14,7 @@ import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterE
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterRepository;
 import io.github.sudoitir.rahdar.support.McpFixture;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisModule;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -85,9 +86,9 @@ class McpClusterHidingTest extends PostgresIntegrationTest {
     void aScopedKeySeesItsClusterAndCannotTellTheOtherApartFromAbsence() throws Exception {
         // Both clusters must really exist, or the denial below would be genuine
         // absence and would prove nothing about the guard.
-        visible = clusters.save(new ClusterEntity("visible-" + UUID.randomUUID(), null, null))
+        visible = clusters.save(new ClusterEntity(ArtemisModule.SYSTEM, "visible-" + UUID.randomUUID(), null, null))
                 .getId();
-        hidden = clusters.save(new ClusterEntity("hidden-" + UUID.randomUUID(), null, null))
+        hidden = clusters.save(new ClusterEntity(ArtemisModule.SYSTEM, "hidden-" + UUID.randomUUID(), null, null))
                 .getId();
 
         var key = McpFixture.mintKey(

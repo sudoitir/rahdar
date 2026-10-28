@@ -54,6 +54,7 @@ import io.github.sudoitir.rahdar.platform.clusters.ClusterService;
 import io.github.sudoitir.rahdar.platform.clusters.NodeStateRecorder;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNodeEntity;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterEntity;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisModule;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -204,7 +205,7 @@ class ScrapeSchedulerTest {
     }
 
     private static ClusterEntity cluster(String name) {
-        ClusterEntity c = new ClusterEntity(name, null, null);
+        ClusterEntity c = new ClusterEntity(ArtemisModule.SYSTEM, name, null, null);
         setId(c, UUID.randomUUID());
         return c;
     }

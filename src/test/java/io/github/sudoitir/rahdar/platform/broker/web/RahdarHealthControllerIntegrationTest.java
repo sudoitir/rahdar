@@ -17,6 +17,7 @@ import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNo
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterEntity;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterRepository;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisModule;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -88,7 +89,7 @@ class RahdarHealthControllerIntegrationTest extends PostgresIntegrationTest {
     @Test
     void anUnmeasuredNodeIsUnavailableNotZeroAndAFailureIsRedacted() throws Exception {
         String url = "http://health-" + UUID.randomUUID() + ":8161/console/jolokia";
-        clusterId = clusters.save(new ClusterEntity("health-" + UUID.randomUUID(), null, null))
+        clusterId = clusters.save(new ClusterEntity(ArtemisModule.SYSTEM, "health-" + UUID.randomUUID(), null, null))
                 .getId();
         BrokerNodeEntity node = BrokerNodeEntity.fromSeed(
                 clusterId, "quiet", "PRIMARY", UUID.randomUUID().toString());
@@ -121,7 +122,7 @@ class RahdarHealthControllerIntegrationTest extends PostgresIntegrationTest {
 
     @Test
     void replicasAreListedWithTheirClustersTheAnsweringOneIsMarkedAndAGoneOneIsDegraded() throws Exception {
-        clusterId = clusters.save(new ClusterEntity("owned-" + UUID.randomUUID(), null, null))
+        clusterId = clusters.save(new ClusterEntity(ArtemisModule.SYSTEM, "owned-" + UUID.randomUUID(), null, null))
                 .getId();
         jdbc.update(
                 "INSERT INTO cluster_lease (expires_at, replica_id, cluster_id) VALUES (now() + interval '1 minute', ?, ?)",

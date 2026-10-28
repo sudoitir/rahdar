@@ -9,6 +9,7 @@ import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterE
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterRepository;
 import io.github.sudoitir.rahdar.support.AdminAuthenticationExtension;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisModule;
 import java.util.UUID;
 import org.hamcrest.Matchers;
 import org.junit.jupiter.api.AfterEach;
@@ -39,7 +40,7 @@ class ExportXmlHeadersTest extends PostgresIntegrationTest {
     @BeforeEach
     void setUp() {
         mvc = webAppContextSetup(webContext).build();
-        clusterId = clusters.save(new ClusterEntity("export-" + UUID.randomUUID(), null, null))
+        clusterId = clusters.save(new ClusterEntity(ArtemisModule.SYSTEM, "export-" + UUID.randomUUID(), null, null))
                 .getId();
     }
 

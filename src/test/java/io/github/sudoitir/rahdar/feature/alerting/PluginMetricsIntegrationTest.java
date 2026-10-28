@@ -17,6 +17,7 @@ import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterR
 import io.github.sudoitir.rahdar.platform.scrape.PluginMetrics;
 import io.github.sudoitir.rahdar.platform.scrape.ScrapeTierCompleted;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisModule;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.nio.file.Path;
 import java.security.SecureRandom;
@@ -80,7 +81,7 @@ class PluginMetricsIntegrationTest extends PostgresIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        clusterId = clusters.save(new ClusterEntity("c-" + UUID.randomUUID(), null, null))
+        clusterId = clusters.save(new ClusterEntity(ArtemisModule.SYSTEM, "c-" + UUID.randomUUID(), null, null))
                 .getId();
         id = "acme-meter-" + Math.abs(new SecureRandom().nextInt());
     }

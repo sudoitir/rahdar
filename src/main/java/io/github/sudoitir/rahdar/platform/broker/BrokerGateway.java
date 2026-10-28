@@ -13,6 +13,8 @@ import io.github.sudoitir.openbroker.TlsProvider;
 import io.github.sudoitir.openbroker.spring.boot.autoconfigure.OpenBrokerConnectOptions;
 import io.github.sudoitir.openbroker.spring.boot.autoconfigure.OpenBrokerProperties;
 import io.github.sudoitir.openbroker.spring.boot.autoconfigure.SslBundleTls;
+import io.github.sudoitir.rahdar.kernel.core.ConflictException;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisModule;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
@@ -45,9 +47,6 @@ import org.springframework.stereotype.Component;
 @Component
 public class BrokerGateway implements DisposableBean {
 
-    /** The system a new cluster is registered with, and a seed is probed as, until registration offers a choice. */
-    public static final String SYSTEM = "artemis";
-
     /** The protocol names of the Artemis driver's endpoints. */
     public static final String JOLOKIA = "jolokia";
 
@@ -55,7 +54,7 @@ public class BrokerGateway implements DisposableBean {
 
     private final BrokerDrivers drivers;
     private final NodeDirectory directory;
-    private final ConnectionSettingsSource settings;
+    private final List<ConnectionOptions> connections;
     private final SslBundleTls tls;
     private final OpenBrokerConnectOptions connectOptions;
     private final OpenBrokerProperties brokerProperties;
@@ -68,14 +67,14 @@ public class BrokerGateway implements DisposableBean {
     public BrokerGateway(
             BrokerDrivers drivers,
             NodeDirectory directory,
-            ConnectionSettingsSource settings,
+            List<ConnectionOptions> connections,
             SslBundleTls tls,
             OpenBrokerConnectOptions connectOptions,
             OpenBrokerProperties brokerProperties,
             BrokerTelemetry telemetry) {
         this.drivers = drivers;
         this.directory = directory;
-        this.settings = settings;
+        this.connections = connections;
         this.tls = tls;
         this.connectOptions = connectOptions;
         this.brokerProperties = brokerProperties;
@@ -108,16 +107,22 @@ public class BrokerGateway implements DisposableBean {
         return new ProbeSession(spec -> drivers.connect(request(clusterId, spec)));
     }
 
-    /** Addresses reached with credentials and TLS given before the cluster exists. */
+    /**
+     * Jolokia seeds reached with credentials and TLS given before the cluster exists. Only Artemis clusters
+     * are registered from seeds, so the probe is Artemis's; a Kafka registration verifies through the driver.
+     */
     public ProbeSession probe(BrokerConnectionSettings with) {
         CredentialSource credentials = plane -> with.hasCredentials()
                 ? Credentials.usernamePassword(with.username(), with.password())
                 : new Credentials.None();
         return new ProbeSession(spec -> drivers.connect(new ConnectRequest(
-                SYSTEM,
+                ArtemisModule.SYSTEM,
                 spec,
                 credentials,
-                options(with.clusterId(), SYSTEM, tls(with.hasTls(), with.tlsBundle(), with.verifyHostname())))));
+                options(
+                        with.clusterId(),
+                        ArtemisModule.SYSTEM,
+                        tls(with.hasTls(), with.tlsBundle(), with.verifyHostname())))));
     }
 
     /**
@@ -130,7 +135,10 @@ public class BrokerGateway implements DisposableBean {
                 : new Credentials.None();
         TlsProvider dataTls = tls(with.hasTls(), with.tlsBundle(), with.verifyHostname());
         return drivers.connect(new ConnectRequest(
-                SYSTEM, ClusterSpec.ofNodes(nodes), credentials, options(with.clusterId(), SYSTEM, dataTls)));
+                ArtemisModule.SYSTEM,
+                ClusterSpec.ofNodes(nodes),
+                credentials,
+                options(with.clusterId(), ArtemisModule.SYSTEM, dataTls)));
     }
 
     /** A registered node, through its cluster's connection. */
@@ -187,30 +195,20 @@ public class BrokerGateway implements DisposableBean {
     }
 
     private ConnectRequest request(UUID clusterId, ClusterSpec spec) {
-        CredentialSource credentials = plane -> switch (plane) {
-            case MANAGEMENT -> {
-                BrokerConnectionSettings s = settings.jolokiaSettings(clusterId);
-                yield s.hasCredentials()
-                        ? Credentials.usernamePassword(s.username(), s.password())
-                        : new Credentials.None();
-            }
-            case DATA -> {
-                CoreConnectionSettings s = settings.coreSettings(clusterId);
-                yield s.hasCredentials()
-                        ? Credentials.usernamePassword(s.username(), s.password())
-                        : new Credentials.None();
-            }
-        };
         String system = directory.system(clusterId);
-        BrokerConnectionSettings tlsSettings = settings.jolokiaSettings(clusterId);
+        ConnectionOptions how = connections.stream()
+                .filter(c -> c.system().equals(system))
+                .findFirst()
+                .orElseThrow(() -> new ConflictException(
+                        "unsupported-on-system", "No connection options for the system " + system + "."));
+        TlsProvider clusterTls = how.tls(clusterId)
+                .map(b -> tls(true, b.name(), b.verifyHostname()))
+                .orElseGet(TlsProvider::none);
         return new ConnectRequest(
                 system,
-                spec,
-                credentials,
-                options(
-                        clusterId,
-                        system,
-                        tls(tlsSettings.hasTls(), tlsSettings.tlsBundle(), tlsSettings.verifyHostname())));
+                how.spec(clusterId, spec.nodes()),
+                how.credentials(clusterId),
+                options(clusterId, system, clusterTls));
     }
 
     private ConnectOptions options(UUID clusterId, String system, TlsProvider clusterTls) {

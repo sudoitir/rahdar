@@ -1,6 +1,5 @@
 package io.github.sudoitir.rahdar.system.artemis;
 
-import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
 import io.github.sudoitir.rahdar.platform.broker.ManagementRefusal;
 import io.github.sudoitir.rahdar.platform.broker.MessageTaps;
 import java.util.LinkedHashMap;
@@ -73,7 +72,7 @@ class ArtemisTaps implements MessageTaps {
 
     @Override
     public String system() {
-        return BrokerGateway.SYSTEM;
+        return ArtemisModule.SYSTEM;
     }
 
     @Override

@@ -7,8 +7,8 @@ Rules:
 Order: 1, then 2 to 4 (backend and web in parallel against the contract in `design.md`), then 5 to 6.
 
 ## 1. Driver, system per cluster, labels
-- [ ] 1.1 Add `openbroker-kafka`; `BrokerGateway` builds options per `cluster.system` through a `ConnectionOptions` extension; remove `BrokerGateway.SYSTEM` (callers name `ArtemisModule.SYSTEM` or `KafkaModule.SYSTEM`); `system/kafka` module skeleton with `KafkaModule`. Check: `BrokerDrivers` lists `kafka` in a unit test, `ModularityTest`, `BoundaryRulesTest`
-- [ ] 1.2 `GET /api/v1/systems` (D1). Check: controller test
+- [x] 1.1 Add `openbroker-kafka`; `BrokerGateway` builds options per `cluster.system` through a `ConnectionOptions` extension; remove `BrokerGateway.SYSTEM` (callers name `ArtemisModule.SYSTEM` or `KafkaModule.SYSTEM`); `system/kafka` module skeleton with `KafkaModule`. Check: `BrokerDrivers` lists `kafka` in a unit test, `ModularityTest`, `BoundaryRulesTest`
+- [x] 1.2 `GET /api/v1/systems` (D1). Check: controller test
 - [ ] 1.3 Kind labels from the SDK replace `ResourceIds.label` and `kindLabelOf` in the API and the web, `plural()` removed (D3). Check: cluster view and mapper tests, web unit tests for kind names
 
 ## 2. Registration and estate

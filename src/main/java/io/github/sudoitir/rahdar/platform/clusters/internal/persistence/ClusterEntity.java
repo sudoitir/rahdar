@@ -1,6 +1,5 @@
 package io.github.sudoitir.rahdar.platform.clusters.internal.persistence;
 
-import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
 import io.github.sudoitir.rahdar.platform.clusters.RegisteredCluster;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -46,9 +45,9 @@ public class ClusterEntity implements RegisteredCluster {
     @Column(name = "management_url_pattern")
     private String managementUrlPattern;
 
-    /** The broker system the cluster runs, as the broker SDK names it; registration offers one until a second driver arrives. */
+    /** The broker system the cluster runs, as the broker SDK names it. */
     @Column(name = "system", nullable = false, updatable = false)
-    private String system = BrokerGateway.SYSTEM;
+    private String system;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
@@ -72,7 +71,8 @@ public class ClusterEntity implements RegisteredCluster {
     @Column(name = "management_write_observed_at")
     private Instant managementWriteObservedAt;
 
-    public ClusterEntity(String name, String description, UUID environmentId) {
+    public ClusterEntity(String system, String name, String description, UUID environmentId) {
+        this.system = system;
         this.name = name;
         this.description = description;
         this.environmentId = environmentId;

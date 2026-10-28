@@ -1,7 +1,6 @@
 package io.github.sudoitir.rahdar.system.artemis;
 
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
-import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
 import io.github.sudoitir.rahdar.platform.broker.DeadLetterDestinations;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -18,7 +17,7 @@ class ArtemisDeadLetterDestinations implements DeadLetterDestinations {
 
     @Override
     public String system() {
-        return BrokerGateway.SYSTEM;
+        return ArtemisModule.SYSTEM;
     }
 
     private final ArtemisNodes nodes;

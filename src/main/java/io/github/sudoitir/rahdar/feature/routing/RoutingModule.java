@@ -2,7 +2,7 @@ package io.github.sudoitir.rahdar.feature.routing;
 
 import io.github.sudoitir.rahdar.kernel.plugin.FeatureDescriptor;
 import io.github.sudoitir.rahdar.kernel.plugin.McpToolDef;
-import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisModule;
 import java.util.List;
 
 /** Diverts and bridges. Module descriptor (ADR-0070). */
@@ -41,7 +41,7 @@ public final class RoutingModule {
                                                     + "than a failure. Re-running after a partial application converges."),
                                     McpToolDef.Param.note("dryRun", McpToolDef.DRY_RUN),
                                     McpToolDef.Param.note("confirm", McpToolDef.CONFIRM)))
-                    .forSystem(BrokerGateway.SYSTEM))
+                    .forSystem(ArtemisModule.SYSTEM))
             .build();
 
     private RoutingModule() {}
