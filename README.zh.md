@@ -10,7 +10,7 @@
 
 你运行的每一个集群都在同一个资产视图中，延迟如实标为估算值，破坏性操作先预览，审批闸门对人和助手一视同仁。
 
-<a href="https://rahdar.dev/zh/"><img src="https://img.shields.io/badge/Play%20the%20story-One%20night%20on%20call%20across%20Artemis%20and%20Kafka-0b7285?style=for-the-badge&labelColor=0b1418&logo=data:image/svg%2Bxml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNDAgMjQwIiByb2xlPSJpbWciIGFyaWEtbGFiZWw9IlJhaGRhciI+PHBhdGggZmlsbD0iIzBjODU5OSIgZD0iTTAgOTAgQTkwIDkwIDAgMCAxIDkwIDAgSDI0MCBWNjAgSDE1MCBBOTAgOTAgMCAwIDAgNjAgMTUwIFYyNDAgSDAgWiBNMTA1IDI0MCBWMTUwIEE0NSA0NSAwIDAgMSAxNTAgMTA1IEgyNDAgVjE1MCBBOTAgOTAgMCAwIDEgMTUwIDI0MCBIMTA1IFoiLz48L3N2Zz4K" alt="Play the story: one night on call across Artemis and Kafka" height="36"></a><br>
+<a href="https://rahdar.dev/"><img src="https://img.shields.io/badge/Play%20the%20story-One%20night%20on%20call%20across%20Artemis%20and%20Kafka-0b7285?style=for-the-badge&labelColor=0b1418&logo=data:image/svg%2Bxml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNDAgMjQwIiByb2xlPSJpbWciIGFyaWEtbGFiZWw9IlJhaGRhciI+PHBhdGggZmlsbD0iIzBjODU5OSIgZD0iTTAgOTAgQTkwIDkwIDAgMCAxIDkwIDAgSDI0MCBWNjAgSDE1MCBBOTAgOTAgMCAwIDAgNjAgMTUwIFYyNDAgSDAgWiBNMTA1IDI0MCBWMTUwIEE0NSA0NSAwIDAgMSAxNTAgMTA1IEgyNDAgVjE1MCBBOTAgOTAgMCAwIDEgMTUwIDI0MCBIMTA1IFoiLz48L3N2Zz4K" alt="Play the story: one night on call across Artemis and Kafka" height="36"></a><br>
 <sub>一场交互式的值班之夜 · 约 2 分钟 · 直接在浏览器里运行</sub>
 
 [English](README.md) · **简体中文** · [فارسی](README.fa.md)
@@ -87,9 +87,9 @@ docker run -p 8080:8080 \
 
 Rahdar 把**你运行的每一个集群放进同一个资产视图**，不论 Broker 是哪种。健康状况按同一标尺判断，所有积压汇总在一张表里、最严重的排最前：Artemis 队列与 Kafka 消费者组并列，各自使用自己的名称。每个数字都会说明它有多确定：Artemis 队列的深度是精确值，Kafka 消费者组的延迟是估算值，并附逐分区明细；Rahdar 读不到的数字会如实说明，而不是显示为 0。任何破坏性操作在你看到它将做什么之前都不会执行；启用审批闸门后，还需要第二个人批准。
 
-<a href="https://rahdar.dev/zh/"><img src="docs/img/story.webp" width="1600" height="900" alt="故事从 02:51 的两条告警开始：Kafka 的一个消费者组在 payments 上越落越远，Artemis 的一对节点上 ORDERS.DLQ 正在上涨。在浏览器里亲自体验。"></a>
+<a href="https://rahdar.dev/"><img src="docs/img/story.webp" width="1600" height="900" alt="故事从 02:51 的两条告警开始：Kafka 的一个消费者组在 payments 上越落越远，Artemis 的一对节点上 ORDERS.DLQ 正在上涨。在浏览器里亲自体验。"></a>
 
-**[▶ 体验这个故事](https://rahdar.dev/zh/)**：找出延迟背后那个挂起的事务并中止它，用一次按住确认的审批重置一个消费者组，再清空 Artemis 的死信队列，全部在同一个资产视图里完成。
+**[▶ 体验这个故事（英文）](https://rahdar.dev/)**：找出延迟背后那个挂起的事务并中止它，用一次按住确认的审批重置一个消费者组，再清空 Artemis 的死信队列，全部在同一个资产视图里完成。
 
 ## 功能一览
 

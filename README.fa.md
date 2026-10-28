@@ -10,7 +10,7 @@
 
 هر کلاستری که اجرا می‌کنید در یک estate است، lag به‌عنوان همان تخمینی که هست نشان داده می‌شود، پیش از هر کار مخرب پیش‌نمایش می‌بینید، و دروازهٔ تأییدی که هم انسان‌ها و هم دستیارها را نگه می‌دارد.
 
-<a href="https://rahdar.dev/fa/"><img src="https://img.shields.io/badge/Play%20the%20story-One%20night%20on%20call%20across%20Artemis%20and%20Kafka-0b7285?style=for-the-badge&labelColor=0b1418&logo=data:image/svg%2Bxml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNDAgMjQwIiByb2xlPSJpbWciIGFyaWEtbGFiZWw9IlJhaGRhciI+PHBhdGggZmlsbD0iIzBjODU5OSIgZD0iTTAgOTAgQTkwIDkwIDAgMCAxIDkwIDAgSDI0MCBWNjAgSDE1MCBBOTAgOTAgMCAwIDAgNjAgMTUwIFYyNDAgSDAgWiBNMTA1IDI0MCBWMTUwIEE0NSA0NSAwIDAgMSAxNTAgMTA1IEgyNDAgVjE1MCBBOTAgOTAgMCAwIDEgMTUwIDI0MCBIMTA1IFoiLz48L3N2Zz4K" alt="Play the story: one night on call across Artemis and Kafka" height="36"></a><br>
+<a href="https://rahdar.dev/"><img src="https://img.shields.io/badge/Play%20the%20story-One%20night%20on%20call%20across%20Artemis%20and%20Kafka-0b7285?style=for-the-badge&labelColor=0b1418&logo=data:image/svg%2Bxml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNDAgMjQwIiByb2xlPSJpbWciIGFyaWEtbGFiZWw9IlJhaGRhciI+PHBhdGggZmlsbD0iIzBjODU5OSIgZD0iTTAgOTAgQTkwIDkwIDAgMCAxIDkwIDAgSDI0MCBWNjAgSDE1MCBBOTAgOTAgMCAwIDAgNjAgMTUwIFYyNDAgSDAgWiBNMTA1IDI0MCBWMTUwIEE0NSA0NSAwIDAgMSAxNTAgMTA1IEgyNDAgVjE1MCBBOTAgOTAgMCAwIDEgMTUwIDI0MCBIMTA1IFoiLz48L3N2Zz4K" alt="Play the story: one night on call across Artemis and Kafka" height="36"></a><br>
 <sub>یک شب تعاملی کشیک · حدود ۲ دقیقه · در مرورگر خودتان اجرا می‌شود</sub>
 
 [English](README.md) · [简体中文](README.zh.md) · **فارسی**
@@ -96,9 +96,9 @@ docker run -p 8080:8080 \
 
 Rahdar **هر کلاستری را که اجرا می‌کنید در یک estate** می‌گذارد، بروکرش هر چه باشد. سلامت روی یک مقیاس سنجیده می‌شود و همهٔ backlogها در یک جدول‌اند، بدترین اول: صف‌های Artemis و groupهای Kafka کنار هم، هر کدام با نام خودش. هر عدد می‌گوید چقدر مطمئن است: عمق یک صف Artemis دقیق است، lag یک group در Kafka تخمین است و تفکیک هر partition را همراه دارد، و عددی که Rahdar نتواند بخواند همین را می‌گوید، نه اینکه صفر نشان بدهد. هیچ کار مخربی پیش از آن‌که ببینید چه می‌کند اجرا نمی‌شود، و جایی که دروازهٔ تأیید روشن است، نفر دوم باید تأییدش کند.
 
-<a href="https://rahdar.dev/fa/"><img src="docs/img/story.webp" width="1600" height="900" alt="داستان ساعت ۰۲:۵۱ با دو هشدار شروع می‌شود: یک consumer group در Kafka روی payments عقب می‌افتد و ORDERS.DLQ روی یک جفت Artemis بالا می‌رود. آن را در مرورگرتان بازی کنید."></a>
+<a href="https://rahdar.dev/"><img src="docs/img/story.webp" width="1600" height="900" alt="داستان ساعت ۰۲:۵۱ با دو هشدار شروع می‌شود: یک consumer group در Kafka روی payments عقب می‌افتد و ORDERS.DLQ روی یک جفت Artemis بالا می‌رود. آن را در مرورگرتان بازی کنید."></a>
 
-**[▶ داستان را بازی کنید](https://rahdar.dev/fa/)**: تراکنش معلقِ پشت lag را پیدا کنید و abort کنید، یک group را با تأییدِ نگه‌داشته reset کنید و صف dead-letter در Artemis را پاک کنید، همه در یک estate.
+**[▶ داستان را بازی کنید (انگلیسی)](https://rahdar.dev/)**: تراکنش معلقِ پشت lag را پیدا کنید و abort کنید، یک group را با تأییدِ نگه‌داشته reset کنید و صف dead-letter در Artemis را پاک کنید، همه در یک estate.
 
 ## چه کارهایی می‌کند
 
