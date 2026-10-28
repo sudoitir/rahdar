@@ -30,6 +30,7 @@ import io.github.sudoitir.rahdar.platform.clusters.web.ClusterRequests.RegisterC
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterRequests.RegisterClusterRequest.Connection;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterRequests.UpdateClusterRequest;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.AccessFinding;
+import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.AccessRemedy;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.CapabilitiesView;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.CapabilityView;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.ConnectionCheck;
@@ -205,7 +206,12 @@ class SystemRegistration {
                         .map(e -> new AccessFinding(
                                 e.getKey(),
                                 e.getValue().status().name(),
-                                e.getValue().reason()))
+                                e.getValue().reason(),
+                                e.getValue().remedy().map(r -> r.snippet()).orElse(null),
+                                e.getValue()
+                                        .remedy()
+                                        .map(r -> new AccessRemedy(r.text(), r.snippet(), r.mediaType()))
+                                        .orElse(null)))
                         .sorted(java.util.Comparator.comparing(AccessFinding::capability))
                         .toList());
     }

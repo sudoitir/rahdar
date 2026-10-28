@@ -9185,6 +9185,970 @@
         }
       }
     },
+    "/api/v1/clusters/{clusterId}/kafka/transactions/{id}:abort" : {
+      "post" : {
+        "tags" : [ "kafka-controller" ],
+        "operationId" : "abort",
+        "parameters" : [ {
+          "name" : "clusterId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "Idempotency-Key",
+          "in" : "header",
+          "description" : "Makes the request safe to retry. Within 24 hours a repeat by the same user with the same method, path, query and body returns the first result with `Idempotent-Replayed: true` and applies nothing again. The same key with another request is 422 `idempotency-key-reused`; while the first is still running it is 409 `idempotency-in-progress`. 1 to 255 printable ASCII characters; not accepted on multipart uploads. Server errors and 401, 403 and 429 are not recorded, so the retry runs.",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "maxLength" : 255,
+            "minLength" : 1
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/AbortRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AbortResult"
+                }
+              }
+            }
+          },
+          "202" : {
+            "description" : "Held for approval: the operation has not run. X-Rahdar-Held-Operation names the request.",
+            "headers" : {
+              "X-Rahdar-Held-Operation" : {
+                "description" : "The held operation's id, when the operation was held.",
+                "schema" : {
+                  "type" : "string",
+                  "format" : "uuid"
+                }
+              }
+            },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/HeldOutcome"
+                }
+              }
+            }
+          },
+          "4XX" : {
+            "description" : "Client error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "5XX" : {
+            "description" : "Server error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "429" : {
+            "description" : "Too many requests. Wait for Retry-After seconds.",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds to wait before retrying.",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Limit" : {
+                "description" : "Requests allowed in the window (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Remaining" : {
+                "description" : "Requests left in the window (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Reset" : {
+                "description" : "Seconds until the window resets (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              }
+            },
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/clusters/{clusterId}/kafka/transactions/{id}:abort-preview" : {
+      "post" : {
+        "tags" : [ "kafka-controller" ],
+        "operationId" : "previewAbort",
+        "parameters" : [ {
+          "name" : "clusterId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "Idempotency-Key",
+          "in" : "header",
+          "description" : "Makes the request safe to retry. Within 24 hours a repeat by the same user with the same method, path, query and body returns the first result with `Idempotent-Replayed: true` and applies nothing again. The same key with another request is 422 `idempotency-key-reused`; while the first is still running it is 409 `idempotency-in-progress`. 1 to 255 printable ASCII characters; not accepted on multipart uploads. Server errors and 401, 403 and 429 are not recorded, so the retry runs.",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "maxLength" : 255,
+            "minLength" : 1
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AbortPreview"
+                }
+              }
+            }
+          },
+          "4XX" : {
+            "description" : "Client error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "5XX" : {
+            "description" : "Server error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "429" : {
+            "description" : "Too many requests. Wait for Retry-After seconds.",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds to wait before retrying.",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Limit" : {
+                "description" : "Requests allowed in the window (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Remaining" : {
+                "description" : "Requests left in the window (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Reset" : {
+                "description" : "Seconds until the window resets (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              }
+            },
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/clusters/{clusterId}/kafka/topics/{topic}/config:preview" : {
+      "post" : {
+        "tags" : [ "kafka-controller" ],
+        "operationId" : "previewConfig",
+        "parameters" : [ {
+          "name" : "clusterId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "name" : "topic",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "Idempotency-Key",
+          "in" : "header",
+          "description" : "Makes the request safe to retry. Within 24 hours a repeat by the same user with the same method, path, query and body returns the first result with `Idempotent-Replayed: true` and applies nothing again. The same key with another request is 422 `idempotency-key-reused`; while the first is still running it is 409 `idempotency-in-progress`. 1 to 255 printable ASCII characters; not accepted on multipart uploads. Server errors and 401, 403 and 429 are not recorded, so the retry runs.",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "maxLength" : 255,
+            "minLength" : 1
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ConfigChangeRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ConfigPreview"
+                }
+              }
+            }
+          },
+          "4XX" : {
+            "description" : "Client error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "5XX" : {
+            "description" : "Server error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "429" : {
+            "description" : "Too many requests. Wait for Retry-After seconds.",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds to wait before retrying.",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Limit" : {
+                "description" : "Requests allowed in the window (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Remaining" : {
+                "description" : "Requests left in the window (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Reset" : {
+                "description" : "Seconds until the window resets (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              }
+            },
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/clusters/{clusterId}/kafka/topics/{topic}/config:apply" : {
+      "post" : {
+        "tags" : [ "kafka-controller" ],
+        "operationId" : "applyConfig",
+        "parameters" : [ {
+          "name" : "clusterId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "name" : "topic",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "Idempotency-Key",
+          "in" : "header",
+          "description" : "Makes the request safe to retry. Within 24 hours a repeat by the same user with the same method, path, query and body returns the first result with `Idempotent-Replayed: true` and applies nothing again. The same key with another request is 422 `idempotency-key-reused`; while the first is still running it is 409 `idempotency-in-progress`. 1 to 255 printable ASCII characters; not accepted on multipart uploads. Server errors and 401, 403 and 429 are not recorded, so the retry runs.",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "maxLength" : 255,
+            "minLength" : 1
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ConfigChangeRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ConfigPreview"
+                }
+              }
+            }
+          },
+          "202" : {
+            "description" : "Held for approval: the operation has not run. X-Rahdar-Held-Operation names the request.",
+            "headers" : {
+              "X-Rahdar-Held-Operation" : {
+                "description" : "The held operation's id, when the operation was held.",
+                "schema" : {
+                  "type" : "string",
+                  "format" : "uuid"
+                }
+              }
+            },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/HeldOutcome"
+                }
+              }
+            }
+          },
+          "4XX" : {
+            "description" : "Client error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "5XX" : {
+            "description" : "Server error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "429" : {
+            "description" : "Too many requests. Wait for Retry-After seconds.",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds to wait before retrying.",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Limit" : {
+                "description" : "Requests allowed in the window (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Remaining" : {
+                "description" : "Requests left in the window (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Reset" : {
+                "description" : "Seconds until the window resets (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              }
+            },
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/clusters/{clusterId}/kafka/groups/{group}/offsets:reset" : {
+      "post" : {
+        "tags" : [ "kafka-controller" ],
+        "operationId" : "resetOffsets",
+        "parameters" : [ {
+          "name" : "clusterId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "name" : "group",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "Idempotency-Key",
+          "in" : "header",
+          "description" : "Makes the request safe to retry. Within 24 hours a repeat by the same user with the same method, path, query and body returns the first result with `Idempotent-Replayed: true` and applies nothing again. The same key with another request is 422 `idempotency-key-reused`; while the first is still running it is 409 `idempotency-in-progress`. 1 to 255 printable ASCII characters; not accepted on multipart uploads. Server errors and 401, 403 and 429 are not recorded, so the retry runs.",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "maxLength" : 255,
+            "minLength" : 1
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/OffsetRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/OffsetResult"
+                }
+              }
+            }
+          },
+          "202" : {
+            "description" : "Held for approval: the operation has not run. X-Rahdar-Held-Operation names the request.",
+            "headers" : {
+              "X-Rahdar-Held-Operation" : {
+                "description" : "The held operation's id, when the operation was held.",
+                "schema" : {
+                  "type" : "string",
+                  "format" : "uuid"
+                }
+              }
+            },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/HeldOutcome"
+                }
+              }
+            }
+          },
+          "4XX" : {
+            "description" : "Client error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "5XX" : {
+            "description" : "Server error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "429" : {
+            "description" : "Too many requests. Wait for Retry-After seconds.",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds to wait before retrying.",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Limit" : {
+                "description" : "Requests allowed in the window (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Remaining" : {
+                "description" : "Requests left in the window (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Reset" : {
+                "description" : "Seconds until the window resets (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              }
+            },
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/clusters/{clusterId}/kafka/groups/{group}/offsets:preview" : {
+      "post" : {
+        "tags" : [ "kafka-controller" ],
+        "operationId" : "previewOffsets",
+        "parameters" : [ {
+          "name" : "clusterId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "name" : "group",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "Idempotency-Key",
+          "in" : "header",
+          "description" : "Makes the request safe to retry. Within 24 hours a repeat by the same user with the same method, path, query and body returns the first result with `Idempotent-Replayed: true` and applies nothing again. The same key with another request is 422 `idempotency-key-reused`; while the first is still running it is 409 `idempotency-in-progress`. 1 to 255 printable ASCII characters; not accepted on multipart uploads. Server errors and 401, 403 and 429 are not recorded, so the retry runs.",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "maxLength" : 255,
+            "minLength" : 1
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/OffsetRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/OffsetPreview"
+                }
+              }
+            }
+          },
+          "4XX" : {
+            "description" : "Client error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "5XX" : {
+            "description" : "Server error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "429" : {
+            "description" : "Too many requests. Wait for Retry-After seconds.",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds to wait before retrying.",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Limit" : {
+                "description" : "Requests allowed in the window (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Remaining" : {
+                "description" : "Requests left in the window (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Reset" : {
+                "description" : "Seconds until the window resets (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              }
+            },
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/clusters/{clusterId}/kafka/acls:preview" : {
+      "post" : {
+        "tags" : [ "kafka-controller" ],
+        "operationId" : "previewAcls",
+        "parameters" : [ {
+          "name" : "clusterId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "name" : "Idempotency-Key",
+          "in" : "header",
+          "description" : "Makes the request safe to retry. Within 24 hours a repeat by the same user with the same method, path, query and body returns the first result with `Idempotent-Replayed: true` and applies nothing again. The same key with another request is 422 `idempotency-key-reused`; while the first is still running it is 409 `idempotency-in-progress`. 1 to 255 printable ASCII characters; not accepted on multipart uploads. Server errors and 401, 403 and 429 are not recorded, so the retry runs.",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "maxLength" : 255,
+            "minLength" : 1
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/AclChangeRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AclPreview"
+                }
+              }
+            }
+          },
+          "4XX" : {
+            "description" : "Client error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "5XX" : {
+            "description" : "Server error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "429" : {
+            "description" : "Too many requests. Wait for Retry-After seconds.",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds to wait before retrying.",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Limit" : {
+                "description" : "Requests allowed in the window (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Remaining" : {
+                "description" : "Requests left in the window (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Reset" : {
+                "description" : "Seconds until the window resets (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              }
+            },
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/clusters/{clusterId}/kafka/acls:apply" : {
+      "post" : {
+        "tags" : [ "kafka-controller" ],
+        "operationId" : "applyAcls",
+        "parameters" : [ {
+          "name" : "clusterId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "name" : "Idempotency-Key",
+          "in" : "header",
+          "description" : "Makes the request safe to retry. Within 24 hours a repeat by the same user with the same method, path, query and body returns the first result with `Idempotent-Replayed: true` and applies nothing again. The same key with another request is 422 `idempotency-key-reused`; while the first is still running it is 409 `idempotency-in-progress`. 1 to 255 printable ASCII characters; not accepted on multipart uploads. Server errors and 401, 403 and 429 are not recorded, so the retry runs.",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "maxLength" : 255,
+            "minLength" : 1
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/AclChangeRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AclResult"
+                }
+              }
+            }
+          },
+          "202" : {
+            "description" : "Held for approval: the operation has not run. X-Rahdar-Held-Operation names the request.",
+            "headers" : {
+              "X-Rahdar-Held-Operation" : {
+                "description" : "The held operation's id, when the operation was held.",
+                "schema" : {
+                  "type" : "string",
+                  "format" : "uuid"
+                }
+              }
+            },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/HeldOutcome"
+                }
+              }
+            }
+          },
+          "4XX" : {
+            "description" : "Client error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "5XX" : {
+            "description" : "Server error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "429" : {
+            "description" : "Too many requests. Wait for Retry-After seconds.",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds to wait before retrying.",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Limit" : {
+                "description" : "Requests allowed in the window (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Remaining" : {
+                "description" : "Requests left in the window (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Reset" : {
+                "description" : "Seconds until the window resets (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              }
+            },
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/clusters/{clusterId}/destinations" : {
       "get" : {
         "tags" : [ "cluster-resource-controller" ],
@@ -20122,6 +21086,622 @@
         }
       }
     },
+    "/api/v1/clusters/{clusterId}/kafka/transactions" : {
+      "get" : {
+        "tags" : [ "kafka-controller" ],
+        "operationId" : "transactions",
+        "parameters" : [ {
+          "name" : "clusterId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "name" : "cursor",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "limit",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/TransactionPage"
+                }
+              }
+            }
+          },
+          "4XX" : {
+            "description" : "Client error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "5XX" : {
+            "description" : "Server error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "429" : {
+            "description" : "Too many requests. Wait for Retry-After seconds.",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds to wait before retrying.",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Limit" : {
+                "description" : "Requests allowed in the window (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Remaining" : {
+                "description" : "Requests left in the window (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Reset" : {
+                "description" : "Seconds until the window resets (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              }
+            },
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/clusters/{clusterId}/kafka/topics/{topic}/config" : {
+      "get" : {
+        "tags" : [ "kafka-controller" ],
+        "operationId" : "topicConfig",
+        "parameters" : [ {
+          "name" : "clusterId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "name" : "topic",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/TopicConfig"
+                }
+              }
+            }
+          },
+          "4XX" : {
+            "description" : "Client error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "5XX" : {
+            "description" : "Server error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "429" : {
+            "description" : "Too many requests. Wait for Retry-After seconds.",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds to wait before retrying.",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Limit" : {
+                "description" : "Requests allowed in the window (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Remaining" : {
+                "description" : "Requests left in the window (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Reset" : {
+                "description" : "Seconds until the window resets (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              }
+            },
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/clusters/{clusterId}/kafka/groups" : {
+      "get" : {
+        "tags" : [ "kafka-controller" ],
+        "operationId" : "groups",
+        "parameters" : [ {
+          "name" : "clusterId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "name" : "type",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "state",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "q",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "cursor",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "limit",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/GroupPage"
+                }
+              }
+            }
+          },
+          "4XX" : {
+            "description" : "Client error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "5XX" : {
+            "description" : "Server error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "429" : {
+            "description" : "Too many requests. Wait for Retry-After seconds.",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds to wait before retrying.",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Limit" : {
+                "description" : "Requests allowed in the window (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Remaining" : {
+                "description" : "Requests left in the window (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Reset" : {
+                "description" : "Seconds until the window resets (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              }
+            },
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/clusters/{clusterId}/kafka/groups/{group}" : {
+      "get" : {
+        "tags" : [ "kafka-controller" ],
+        "operationId" : "group",
+        "parameters" : [ {
+          "name" : "clusterId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "name" : "group",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/GroupDetail"
+                }
+              }
+            }
+          },
+          "4XX" : {
+            "description" : "Client error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "5XX" : {
+            "description" : "Server error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "429" : {
+            "description" : "Too many requests. Wait for Retry-After seconds.",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds to wait before retrying.",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Limit" : {
+                "description" : "Requests allowed in the window (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Remaining" : {
+                "description" : "Requests left in the window (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Reset" : {
+                "description" : "Seconds until the window resets (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              }
+            },
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/clusters/{clusterId}/kafka/brokers" : {
+      "get" : {
+        "tags" : [ "kafka-controller" ],
+        "operationId" : "brokers",
+        "parameters" : [ {
+          "name" : "clusterId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Brokers"
+                }
+              }
+            }
+          },
+          "4XX" : {
+            "description" : "Client error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "5XX" : {
+            "description" : "Server error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "429" : {
+            "description" : "Too many requests. Wait for Retry-After seconds.",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds to wait before retrying.",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Limit" : {
+                "description" : "Requests allowed in the window (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Remaining" : {
+                "description" : "Requests left in the window (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Reset" : {
+                "description" : "Seconds until the window resets (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              }
+            },
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/clusters/{clusterId}/kafka/acls" : {
+      "get" : {
+        "tags" : [ "kafka-controller" ],
+        "operationId" : "acls",
+        "parameters" : [ {
+          "name" : "clusterId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "name" : "principal",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "resource",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "cursor",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "limit",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AclPage"
+                }
+              }
+            }
+          },
+          "4XX" : {
+            "description" : "Client error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "5XX" : {
+            "description" : "Server error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "429" : {
+            "description" : "Too many requests. Wait for Retry-After seconds.",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds to wait before retrying.",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Limit" : {
+                "description" : "Requests allowed in the window (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Remaining" : {
+                "description" : "Requests left in the window (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Reset" : {
+                "description" : "Seconds until the window resets (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              }
+            },
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/clusters/{clusterId}/health" : {
       "get" : {
         "tags" : [ "cluster-controller" ],
@@ -28640,6 +30220,7 @@
           "properties" : {
             "system" : {
               "type" : "string",
+              "enum" : [ "artemis" ],
               "minLength" : 1
             },
             "seedUrls" : {
@@ -28668,8 +30249,17 @@
       },
       "Connection" : {
         "discriminator" : {
-          "propertyName" : "system"
+          "propertyName" : "system",
+          "mapping" : {
+            "artemis" : "#/components/schemas/ArtemisConnection",
+            "kafka" : "#/components/schemas/KafkaConnection"
+          }
         },
+        "oneOf" : [ {
+          "$ref" : "#/components/schemas/ArtemisConnection"
+        }, {
+          "$ref" : "#/components/schemas/KafkaConnection"
+        } ],
         "properties" : {
           "system" : {
             "type" : "string"
@@ -28699,6 +30289,7 @@
           "properties" : {
             "system" : {
               "type" : "string",
+              "enum" : [ "kafka" ],
               "minLength" : 1
             },
             "bootstrapServers" : {
@@ -28764,11 +30355,7 @@
             "type" : "boolean"
           },
           "connection" : {
-            "oneOf" : [ {
-              "$ref" : "#/components/schemas/ArtemisConnection"
-            }, {
-              "$ref" : "#/components/schemas/KafkaConnection"
-            } ]
+            "$ref" : "#/components/schemas/Connection"
           }
         },
         "required" : [ "connection", "system" ]
@@ -28785,9 +30372,36 @@
           },
           "reason" : {
             "type" : "string"
+          },
+          "snippet" : {
+            "type" : [ "string", "null" ],
+            "description" : "What to change on the broker so the capability is available: the broker.xml snippet for Artemis, the command for Kafka."
+          },
+          "remedy" : {
+            "anyOf" : [ {
+              "$ref" : "#/components/schemas/AccessRemedy"
+            }, {
+              "type" : "null"
+            } ]
           }
         },
         "required" : [ "capability", "reason", "status" ]
+      },
+      "AccessRemedy" : {
+        "type" : "object",
+        "properties" : {
+          "text" : {
+            "type" : "string"
+          },
+          "snippet" : {
+            "type" : "string"
+          },
+          "mediaType" : {
+            "type" : "string",
+            "description" : "Such as application/xml or text/x-shellscript."
+          }
+        },
+        "required" : [ "mediaType", "snippet", "text" ]
       },
       "AdoptionCountsView" : {
         "type" : "object",
@@ -28839,9 +30453,6 @@
           "nativeNodeId" : {
             "type" : [ "string", "null" ],
             "description" : "The broker's own node id."
-          },
-          "version" : {
-            "type" : [ "string", "null" ]
           },
           "haRole" : {
             "type" : "string"
@@ -28983,6 +30594,13 @@
           "message" : {
             "type" : [ "string", "null" ]
           },
+          "version" : {
+            "anyOf" : [ {
+              "$ref" : "#/components/schemas/NodeVersion"
+            }, {
+              "type" : "null"
+            } ]
+          },
           "artemis" : {
             "anyOf" : [ {
               "$ref" : "#/components/schemas/ArtemisNodeDetail"
@@ -28992,6 +30610,20 @@
           }
         },
         "required" : [ "functions", "id", "outcome" ]
+      },
+      "NodeVersion" : {
+        "type" : "object",
+        "properties" : {
+          "text" : {
+            "type" : "string"
+          },
+          "support" : {
+            "type" : "string",
+            "description" : "Where the release sits against the supported range.",
+            "enum" : [ "SUPPORTED", "BELOW_MINIMUM", "NEWER_THAN_TESTED", "UNKNOWN" ]
+          }
+        },
+        "required" : [ "support", "text" ]
       },
       "Quorum" : {
         "type" : "object",
@@ -30446,6 +32078,371 @@
             "type" : "string"
           }
         }
+      },
+      "AbortRequest" : {
+        "type" : "object",
+        "properties" : {
+          "etag" : {
+            "type" : "string",
+            "description" : "The preview's etag; required to abort."
+          }
+        }
+      },
+      "AbortResult" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string"
+          },
+          "aborted" : {
+            "type" : "boolean",
+            "description" : "False where it had ended already."
+          }
+        },
+        "required" : [ "aborted", "id" ]
+      },
+      "AbortPreview" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string"
+          },
+          "state" : {
+            "type" : "string"
+          },
+          "released" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/BlockedPartition"
+            }
+          },
+          "effect" : {
+            "type" : "string",
+            "description" : "What the abort does, in words, naming the fenced producer."
+          },
+          "etag" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "effect", "etag", "id", "released", "state" ]
+      },
+      "BlockedPartition" : {
+        "type" : "object",
+        "properties" : {
+          "topic" : {
+            "type" : "string"
+          },
+          "partition" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        },
+        "required" : [ "partition", "topic" ]
+      },
+      "ConfigChangeRequest" : {
+        "type" : "object",
+        "properties" : {
+          "set" : {
+            "type" : "object",
+            "additionalProperties" : {
+              "type" : "string"
+            },
+            "description" : "Settings to override, by name."
+          },
+          "remove" : {
+            "type" : "array",
+            "description" : "Overrides to remove, by name.",
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "etag" : {
+            "type" : "string",
+            "description" : "The preview's etag; required to apply."
+          }
+        }
+      },
+      "ConfigChangeRow" : {
+        "type" : "object",
+        "properties" : {
+          "name" : {
+            "type" : "string"
+          },
+          "before" : {
+            "type" : [ "string", "null" ]
+          },
+          "after" : {
+            "type" : [ "string", "null" ],
+            "description" : "Absent when the override is removed."
+          },
+          "fallback" : {
+            "type" : [ "string", "null" ],
+            "description" : "The value the setting falls back to, for a removal."
+          },
+          "error" : {
+            "type" : [ "string", "null" ],
+            "description" : "The broker's validation message; nothing is applied then."
+          }
+        },
+        "required" : [ "name" ]
+      },
+      "ConfigPreview" : {
+        "type" : "object",
+        "properties" : {
+          "changes" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/ConfigChangeRow"
+            }
+          },
+          "valid" : {
+            "type" : "boolean"
+          },
+          "etag" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "changes", "etag", "valid" ]
+      },
+      "OffsetRequest" : {
+        "type" : "object",
+        "properties" : {
+          "topics" : {
+            "type" : "array",
+            "description" : "The topics to move; every topic of the group when absent.",
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "to" : {
+            "type" : "string",
+            "enum" : [ "earliest", "latest", "time", "offset" ]
+          },
+          "value" : {
+            "type" : "string",
+            "description" : "An ISO-8601 instant for time, an offset for offset."
+          },
+          "etag" : {
+            "type" : "string",
+            "description" : "The preview's etag; required to reset."
+          }
+        },
+        "required" : [ "to" ]
+      },
+      "OffsetResult" : {
+        "type" : "object",
+        "properties" : {
+          "partitions" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/OffsetRow"
+            }
+          },
+          "moved" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        },
+        "required" : [ "moved", "partitions" ]
+      },
+      "OffsetRow" : {
+        "type" : "object",
+        "properties" : {
+          "topic" : {
+            "type" : "string"
+          },
+          "partition" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "current" : {
+            "type" : [ "integer", "null" ],
+            "format" : "int64"
+          },
+          "next" : {
+            "type" : [ "integer", "null" ],
+            "format" : "int64",
+            "description" : "Absent where the partition is refused."
+          },
+          "skipped" : {
+            "type" : "integer",
+            "format" : "int64",
+            "description" : "Records the group will no longer read."
+          },
+          "reread" : {
+            "type" : "integer",
+            "format" : "int64",
+            "description" : "Records the group will read again."
+          },
+          "note" : {
+            "type" : [ "string", "null" ]
+          },
+          "refused" : {
+            "type" : [ "string", "null" ],
+            "description" : "Why this partition cannot be moved, such as an offset out of range."
+          }
+        },
+        "required" : [ "partition", "reread", "skipped", "topic" ]
+      },
+      "OffsetPreview" : {
+        "type" : "object",
+        "properties" : {
+          "partitions" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/OffsetRow"
+            }
+          },
+          "members" : {
+            "type" : "array",
+            "description" : "Active members, as client@host (id).",
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "blocked" : {
+            "type" : [ "string", "null" ],
+            "description" : "Why the reset is refused now: members, rebalancing, read-only."
+          },
+          "etag" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "etag", "members", "partitions" ]
+      },
+      "Acl" : {
+        "type" : "object",
+        "properties" : {
+          "principal" : {
+            "type" : "string",
+            "example" : "User:app"
+          },
+          "host" : {
+            "type" : "string",
+            "example" : "*"
+          },
+          "operation" : {
+            "type" : "string",
+            "example" : "read"
+          },
+          "permission" : {
+            "type" : "string",
+            "enum" : [ "allow", "deny" ]
+          },
+          "resourceType" : {
+            "type" : "string",
+            "example" : "topic"
+          },
+          "pattern" : {
+            "type" : "string",
+            "enum" : [ "literal", "prefixed" ]
+          },
+          "name" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "host", "name", "operation", "pattern", "permission", "principal", "resourceType" ]
+      },
+      "AclChangeRequest" : {
+        "type" : "object",
+        "properties" : {
+          "add" : {
+            "type" : "array",
+            "description" : "ACLs to add.",
+            "items" : {
+              "$ref" : "#/components/schemas/Acl"
+            }
+          },
+          "remove" : {
+            "type" : "array",
+            "description" : "ACLs to remove.",
+            "items" : {
+              "$ref" : "#/components/schemas/Acl"
+            }
+          },
+          "etag" : {
+            "type" : "string",
+            "description" : "The preview's etag; required to apply."
+          }
+        }
+      },
+      "AclPreview" : {
+        "type" : "object",
+        "properties" : {
+          "access" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/EffectiveAccess"
+            }
+          },
+          "losses" : {
+            "type" : "array",
+            "description" : "In words, such as: User:app loses READ on topic orders.",
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "notes" : {
+            "type" : "array",
+            "description" : "Where a deny rule wins, and what is not evaluated.",
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "added" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "removed" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "etag" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "access", "added", "etag", "losses", "notes", "removed" ]
+      },
+      "EffectiveAccess" : {
+        "type" : "object",
+        "properties" : {
+          "principal" : {
+            "type" : "string"
+          },
+          "resourceType" : {
+            "type" : "string"
+          },
+          "resource" : {
+            "type" : "string"
+          },
+          "before" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "after" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          }
+        },
+        "required" : [ "after", "before", "principal", "resource", "resourceType" ]
+      },
+      "AclResult" : {
+        "type" : "object",
+        "properties" : {
+          "added" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "removed" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        },
+        "required" : [ "added", "removed" ]
       },
       "CreateDestinationRequest" : {
         "type" : "object",
@@ -32052,7 +34049,8 @@
           "type" : "object",
           "properties" : {
             "system" : {
-              "type" : "string"
+              "type" : "string",
+              "enum" : [ "artemis" ]
             },
             "seedUrls" : {
               "type" : "array",
@@ -32078,8 +34076,17 @@
       },
       "ConnectionUpdate" : {
         "discriminator" : {
-          "propertyName" : "system"
+          "propertyName" : "system",
+          "mapping" : {
+            "artemis" : "#/components/schemas/ArtemisConnectionUpdate",
+            "kafka" : "#/components/schemas/KafkaConnectionUpdate"
+          }
         },
+        "oneOf" : [ {
+          "$ref" : "#/components/schemas/ArtemisConnectionUpdate"
+        }, {
+          "$ref" : "#/components/schemas/KafkaConnectionUpdate"
+        } ],
         "properties" : {
           "system" : {
             "type" : "string"
@@ -32094,7 +34101,8 @@
           "type" : "object",
           "properties" : {
             "system" : {
-              "type" : "string"
+              "type" : "string",
+              "enum" : [ "kafka" ]
             },
             "bootstrapServers" : {
               "type" : "array",
@@ -32135,11 +34143,7 @@
             "format" : "uuid"
           },
           "connection" : {
-            "oneOf" : [ {
-              "$ref" : "#/components/schemas/ArtemisConnectionUpdate"
-            }, {
-              "$ref" : "#/components/schemas/KafkaConnectionUpdate"
-            } ]
+            "$ref" : "#/components/schemas/ConnectionUpdate"
           }
         }
       },
@@ -35870,6 +37874,298 @@
           }
         },
         "required" : [ "from", "series", "step", "to", "truncated" ]
+      },
+      "TransactionPage" : {
+        "type" : "object",
+        "properties" : {
+          "items" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/TransactionRow"
+            }
+          },
+          "next" : {
+            "type" : [ "string", "null" ]
+          }
+        },
+        "required" : [ "items" ]
+      },
+      "TransactionRow" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string"
+          },
+          "state" : {
+            "type" : "string"
+          },
+          "startedAt" : {
+            "type" : [ "string", "null" ],
+            "format" : "date-time"
+          },
+          "timeoutMs" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "hanging" : {
+            "type" : "boolean",
+            "description" : "Open longer than its timeout."
+          },
+          "blocked" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/BlockedPartition"
+            }
+          }
+        },
+        "required" : [ "blocked", "hanging", "id", "state", "timeoutMs" ]
+      },
+      "ConfigEntry" : {
+        "type" : "object",
+        "properties" : {
+          "name" : {
+            "type" : "string"
+          },
+          "value" : {
+            "type" : [ "string", "null" ],
+            "description" : "Never sent for a sensitive setting."
+          },
+          "source" : {
+            "type" : "string",
+            "enum" : [ "TOPIC", "BROKER_DEFAULT", "STATIC", "DEFAULT" ]
+          },
+          "defaultValue" : {
+            "type" : [ "string", "null" ],
+            "description" : "The value the setting falls back to."
+          },
+          "readOnly" : {
+            "type" : "boolean"
+          },
+          "sensitive" : {
+            "type" : "boolean"
+          },
+          "unit" : {
+            "type" : [ "string", "null" ],
+            "description" : "ms, bytes or the like, when the value is a quantity."
+          }
+        },
+        "required" : [ "name", "readOnly", "sensitive", "source" ]
+      },
+      "TopicConfig" : {
+        "type" : "object",
+        "properties" : {
+          "internal" : {
+            "type" : "boolean"
+          },
+          "readOnlyReason" : {
+            "type" : [ "string", "null" ],
+            "description" : "Why every setting is read-only."
+          },
+          "entries" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/ConfigEntry"
+            }
+          }
+        },
+        "required" : [ "entries", "internal" ]
+      },
+      "GroupPage" : {
+        "type" : "object",
+        "properties" : {
+          "items" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/GroupRow"
+            }
+          },
+          "next" : {
+            "type" : [ "string", "null" ],
+            "description" : "The cursor of the next page; absent on the last."
+          }
+        },
+        "required" : [ "items" ]
+      },
+      "GroupRow" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string"
+          },
+          "type" : {
+            "type" : "string",
+            "description" : "classic, consumer, share, streams or unknown."
+          },
+          "state" : {
+            "type" : "string"
+          },
+          "members" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "lag" : {
+            "$ref" : "#/components/schemas/Backlog",
+            "description" : "Total lag over the group's topics, an estimate."
+          },
+          "readOnly" : {
+            "type" : [ "string", "null" ],
+            "description" : "Why the group's offsets cannot be changed; absent when they can."
+          }
+        },
+        "required" : [ "id", "lag", "members", "state", "type" ]
+      },
+      "GroupDetail" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string"
+          },
+          "type" : {
+            "type" : "string"
+          },
+          "state" : {
+            "type" : "string"
+          },
+          "readOnly" : {
+            "type" : [ "string", "null" ]
+          },
+          "topics" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/GroupTopic"
+            }
+          },
+          "members" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/GroupMember"
+            }
+          },
+          "sampledAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        },
+        "required" : [ "id", "members", "sampledAt", "state", "topics", "type" ]
+      },
+      "GroupMember" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string"
+          },
+          "clientId" : {
+            "type" : "string"
+          },
+          "host" : {
+            "type" : "string"
+          },
+          "assignments" : {
+            "type" : "array",
+            "description" : "Partitions as topic-partition.",
+            "items" : {
+              "type" : "string"
+            }
+          }
+        },
+        "required" : [ "assignments", "clientId", "host", "id" ]
+      },
+      "GroupTopic" : {
+        "type" : "object",
+        "properties" : {
+          "topic" : {
+            "type" : "string"
+          },
+          "deleted" : {
+            "type" : "boolean",
+            "description" : "The group has offsets on a topic that no longer exists."
+          },
+          "partitions" : {
+            "type" : "array",
+            "description" : "Slowest first.",
+            "items" : {
+              "$ref" : "#/components/schemas/PartitionLag"
+            }
+          }
+        },
+        "required" : [ "deleted", "partitions", "topic" ]
+      },
+      "BrokerRow" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string"
+          },
+          "rack" : {
+            "type" : [ "string", "null" ]
+          },
+          "address" : {
+            "type" : [ "string", "null" ]
+          },
+          "reachable" : {
+            "type" : "boolean",
+            "description" : "Whether Rahdar reaches it on the address it advertises."
+          },
+          "reason" : {
+            "type" : [ "string", "null" ],
+            "description" : "Why it is not reachable or not serving."
+          },
+          "leaders" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "underReplicated" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "offline" : {
+            "type" : "integer",
+            "format" : "int64",
+            "description" : "Partitions it replicates that have no leader."
+          }
+        },
+        "required" : [ "id", "leaders", "offline", "reachable", "underReplicated" ]
+      },
+      "Brokers" : {
+        "type" : "object",
+        "properties" : {
+          "mode" : {
+            "type" : "string",
+            "description" : "KRaft or ZooKeeper."
+          },
+          "brokers" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/BrokerRow"
+            }
+          },
+          "quorum" : {
+            "$ref" : "#/components/schemas/Quorum"
+          }
+        },
+        "required" : [ "brokers", "mode", "quorum" ]
+      },
+      "AclPage" : {
+        "type" : "object",
+        "properties" : {
+          "available" : {
+            "type" : "boolean",
+            "description" : "False where the cluster has no authorizer."
+          },
+          "reason" : {
+            "type" : [ "string", "null" ]
+          },
+          "items" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/Acl"
+            }
+          },
+          "next" : {
+            "type" : [ "string", "null" ]
+          }
+        },
+        "required" : [ "available", "items" ]
       },
       "FlowBrokerNodeView" : {
         "type" : "object",

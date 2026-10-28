@@ -265,7 +265,7 @@ class ClusterControllerTest extends PostgresIntegrationTest {
                 .andExpect(jsonPath(BACKUP + ".address").value(BACKUP_URL))
                 .andExpect(jsonPath(BACKUP + ".artemis.urlSource").value("DERIVED"))
                 .andExpect(jsonPath(BACKUP + ".artemis.haRole").value("BACKUP"))
-                .andExpect(jsonPath(BACKUP + ".artemis.version").value("2.44.0"));
+                .andExpect(jsonPath(BACKUP + ".version.text").value("2.44.0"));
         assertThat(nodes.count()).isZero();
     }
 

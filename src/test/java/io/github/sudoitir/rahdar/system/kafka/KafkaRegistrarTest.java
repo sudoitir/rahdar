@@ -20,6 +20,7 @@ import io.github.sudoitir.openbroker.Partial;
 import io.github.sudoitir.openbroker.Plane;
 import io.github.sudoitir.openbroker.Status;
 import io.github.sudoitir.openbroker.access.AccessSnapshot;
+import io.github.sudoitir.openbroker.access.Assessment;
 import io.github.sudoitir.openbroker.kafka.KafkaOptions;
 import io.github.sudoitir.openbroker.model.Attributes;
 import io.github.sudoitir.openbroker.model.Designation;
@@ -181,6 +182,61 @@ class KafkaRegistrarTest {
         assertThat(checked.view().version().exact()).isFalse();
         assertThat(checked.view().version().text()).startsWith("at least ");
         assertThat(checked.nodes()).extracting(n -> n.name()).containsExactly("broker-1", "broker-2");
+    }
+
+    @Test
+    void aNodeCarriesItsVersionAndWhereItSitsAgainstTheSupportedRange() {
+        NodeDescription one = withVersion(broker("1", "k1:9092", true, true), "at least 3.0");
+        when(gateway.verify(any(), any(), any(), any()))
+                .thenReturn(new ConnectionReport(
+                        Partial.complete(List.of(one), List.of(one.node())),
+                        new AccessSnapshot(Map.of(), Instant.now())));
+
+        Checked checked = registrar.check(plaintext("k1"));
+
+        assertThat(checked.view().nodes().getFirst().version().text()).isEqualTo("at least 3.0");
+        assertThat(checked.view().nodes().getFirst().version().support())
+                .isEqualTo(io.github.sudoitir.rahdar.platform.broker.BrokerVersion.Support.SUPPORTED);
+        assertThat(checked.view().version().exact()).isFalse();
+    }
+
+    @Test
+    void anUnavailableCapabilityCarriesTheDriversRemedy() {
+        NodeDescription one = broker("1", "k1:9092", true, true);
+        io.github.sudoitir.openbroker.access.Capability quorum =
+                new io.github.sudoitir.openbroker.access.Capability("kafka.quorum");
+        Map<io.github.sudoitir.openbroker.access.Capability, Assessment> assessments = Map.of(
+                quorum,
+                Assessment.unavailable(
+                        "The controller quorum is not readable.",
+                        Optional.of(new io.github.sudoitir.openbroker.access.Remedy(
+                                "Upgrade the metadata version.", "kafka-features.sh upgrade", "text/x-shellscript"))));
+        when(gateway.verify(any(), any(), any(), any()))
+                .thenReturn(new ConnectionReport(
+                        Partial.complete(List.of(one), List.of(one.node())),
+                        new AccessSnapshot(assessments, Instant.now())));
+
+        var finding = registrar.check(plaintext("k1")).view().access().getFirst();
+
+        assertThat(finding.snippet()).isEqualTo("kafka-features.sh upgrade");
+        assertThat(finding.remedy().mediaType()).isEqualTo("text/x-shellscript");
+    }
+
+    private static NodeDescription withVersion(NodeDescription node, String version) {
+        return new NodeDescription(
+                node.node(),
+                node.nativeId(),
+                node.membership(),
+                node.functions(),
+                node.endpoints(),
+                node.version(),
+                node.conditions(),
+                Attributes.builder()
+                        .putRaw("kafka.cluster_id", "Mk3OEYBSD34fcwNTJENDM2Qk")
+                        .putRaw("kafka.cluster_version", version)
+                        .putRaw("kafka.cluster_mode", "kraft")
+                        .build(),
+                node.serverTime());
     }
 
     @Test

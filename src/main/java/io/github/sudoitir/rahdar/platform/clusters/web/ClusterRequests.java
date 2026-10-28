@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import io.github.sudoitir.rahdar.platform.clusters.ManagementUrlPattern;
+import io.swagger.v3.oas.annotations.media.DiscriminatorMapping;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.AssertTrue;
@@ -110,6 +111,13 @@ public final class ClusterRequests {
             @JsonSubTypes.Type(value = ArtemisConnection.class, name = "artemis"),
             @JsonSubTypes.Type(value = KafkaConnection.class, name = "kafka")
         })
+        @Schema(
+                discriminatorProperty = "system",
+                discriminatorMapping = {
+                    @DiscriminatorMapping(value = "artemis", schema = ArtemisConnection.class),
+                    @DiscriminatorMapping(value = "kafka", schema = KafkaConnection.class)
+                },
+                oneOf = {ArtemisConnection.class, KafkaConnection.class})
         public sealed interface Connection permits ArtemisConnection, KafkaConnection, UnknownConnection {
 
             String system();
@@ -142,7 +150,9 @@ public final class ClusterRequests {
          *     its host replaced by {@code {host}}
          */
         public record ArtemisConnection(
-                @NotBlank String system,
+                @NotBlank @Schema(allowableValues = "artemis")
+                String system,
+
                 @NotEmpty List<@NotBlank String> seedUrls,
                 @Valid Credentials credentials,
                 @Valid Credentials coreCredentials,
@@ -179,7 +189,7 @@ public final class ClusterRequests {
          * @param clientId optional client id the brokers see in their logs
          */
         public record KafkaConnection(
-                @NotBlank String system,
+                @NotBlank @Schema(allowableValues = "kafka") String system,
                 @NotEmpty List<@NotBlank String> bootstrapServers,
                 @NotBlank String securityProtocol,
                 String saslMechanism,
@@ -250,6 +260,13 @@ public final class ClusterRequests {
             @JsonSubTypes.Type(value = ArtemisConnectionUpdate.class, name = "artemis"),
             @JsonSubTypes.Type(value = KafkaConnectionUpdate.class, name = "kafka")
         })
+        @Schema(
+                discriminatorProperty = "system",
+                discriminatorMapping = {
+                    @DiscriminatorMapping(value = "artemis", schema = ArtemisConnectionUpdate.class),
+                    @DiscriminatorMapping(value = "kafka", schema = KafkaConnectionUpdate.class)
+                },
+                oneOf = {ArtemisConnectionUpdate.class, KafkaConnectionUpdate.class})
         public sealed interface ConnectionUpdate
                 permits ArtemisConnectionUpdate, KafkaConnectionUpdate, UnknownConnectionUpdate {
 
@@ -267,7 +284,7 @@ public final class ClusterRequests {
          * @param tlsBundle a Spring SSL bundle name; empty clears it
          */
         public record ArtemisConnectionUpdate(
-                String system,
+                @Schema(allowableValues = "artemis") String system,
                 List<@NotBlank String> seedUrls,
                 String managementUrlPattern,
                 String tlsBundle,
@@ -309,7 +326,7 @@ public final class ClusterRequests {
          * a stored secret never reaches a server the cluster did not already use.
          */
         public record KafkaConnectionUpdate(
-                String system,
+                @Schema(allowableValues = "kafka") String system,
                 List<@NotBlank String> bootstrapServers,
                 String securityProtocol,
                 String saslMechanism,

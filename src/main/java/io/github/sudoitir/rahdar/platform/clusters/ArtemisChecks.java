@@ -2,6 +2,7 @@ package io.github.sudoitir.rahdar.platform.clusters;
 
 import io.github.sudoitir.rahdar.platform.broker.AccountResult;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
+import io.github.sudoitir.rahdar.platform.broker.BrokerVersion;
 import io.github.sudoitir.rahdar.platform.broker.ManagementUrlProblem;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.AccessFinding;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.AdoptionPreviewView;
@@ -12,8 +13,10 @@ import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.ConnectionCh
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.Failure;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.NodeProbeView;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.NodeReach;
+import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.NodeVersion;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.RegisterPreview;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.RegisteredRef;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -118,14 +121,9 @@ final class ArtemisChecks {
                 ok ? "OK" : "UNREACHABLE",
                 cause,
                 ok ? null : messageOf(n),
+                n.version() == null ? null : new NodeVersion(n.version(), BrokerVersion.support(n.version())),
                 new ArtemisNodeDetail(
-                        n.artemisNodeId(),
-                        n.version(),
-                        n.haRole(),
-                        n.urlSource(),
-                        n.urlProblem(),
-                        n.management(),
-                        n.core()));
+                        n.artemisNodeId(), n.haRole(), n.urlSource(), n.urlProblem(), n.management(), n.core()));
     }
 
     private static String causeOf(NodeProbeView n) {
@@ -162,15 +160,23 @@ final class ArtemisChecks {
     }
 
     private static List<AccessFinding> access(CapabilitiesView c) {
-        return List.of(
+        List<AccessFinding> out = new ArrayList<>(List.of(
                 finding("management.read", c.managementRead()),
                 finding("management.write", c.managementWrite()),
                 finding("notifications", c.notifications()),
                 finding("messages", c.messageIo()),
-                finding("slow-consumer-detection", c.slowConsumerDetection()));
+                finding("slow-consumer-detection", c.slowConsumerDetection())));
+        c.versionGates()
+                .forEach(g -> out.add(new AccessFinding(
+                        "version-gate:" + g.feature(),
+                        g.status(),
+                        g.label() + " needs Artemis " + g.requiredVersion() + " or later. " + g.reason(),
+                        g.brokerXmlSnippet(),
+                        null)));
+        return out;
     }
 
     private static AccessFinding finding(String id, CapabilityView view) {
-        return new AccessFinding(id, view.status(), view.reason());
+        return new AccessFinding(id, view.status(), view.reason(), view.brokerXmlSnippet(), null);
     }
 }

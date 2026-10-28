@@ -169,6 +169,9 @@ public final class ClusterViews {
 
             @Schema(nullable = true) String message,
 
+            @Schema(nullable = true, description = "The node's release and whether it is supported; null when unknown.")
+            NodeVersion version,
+
             @Schema(nullable = true, description = "Artemis only: the node's pair role and how each account fared.")
             ArtemisNodeDetail artemis) {}
 
@@ -177,7 +180,6 @@ public final class ClusterViews {
             @Schema(nullable = true, description = "The broker's own node id.")
             String nativeNodeId,
 
-            @Schema(nullable = true) String version,
             @Schema(requiredMode = REQUIRED) String haRole,
             @Schema(nullable = true) ManagementUrlSource urlSource,
             @Schema(nullable = true) ManagementUrlProblem urlProblem,
@@ -198,7 +200,31 @@ public final class ClusterViews {
             @Schema(requiredMode = REQUIRED, description = "AVAILABLE, UNAVAILABLE or UNKNOWN.")
             String status,
 
-            @Schema(requiredMode = REQUIRED) String reason) {}
+            @Schema(requiredMode = REQUIRED) String reason,
+
+            @Schema(
+                    nullable = true,
+                    description = "What to change on the broker so the capability is available: the broker.xml"
+                            + " snippet for Artemis, the command for Kafka.")
+            String snippet,
+
+            @Schema(nullable = true, description = "The driver's remedy, with its media type, where it gives one.")
+            AccessRemedy remedy) {}
+
+    /** A driver's remedy for an unavailable capability. */
+    public record AccessRemedy(
+            @Schema(requiredMode = REQUIRED) String text,
+            @Schema(requiredMode = REQUIRED) String snippet,
+
+            @Schema(requiredMode = REQUIRED, description = "Such as application/xml or text/x-shellscript.")
+            String mediaType) {}
+
+    /** A node's release and where it sits against the range the system's driver is tested on. */
+    public record NodeVersion(
+            @Schema(requiredMode = REQUIRED) String text,
+
+            @Schema(requiredMode = REQUIRED, description = "Where the release sits against the supported range.")
+            BrokerVersion.Support support) {}
 
     /** Why a check failed and what to do next. */
     public record Failure(
@@ -397,7 +423,7 @@ public final class ClusterViews {
                     bare(slowConsumerDetection),
                     versionGates,
                     findings.stream()
-                            .map(f -> new AccessFinding(f.capability(), f.status(), ""))
+                            .map(f -> new AccessFinding(f.capability(), f.status(), "", null, null))
                             .toList());
         }
 

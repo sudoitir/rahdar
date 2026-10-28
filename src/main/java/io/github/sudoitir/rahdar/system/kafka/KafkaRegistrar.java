@@ -19,6 +19,7 @@ import io.github.sudoitir.openbroker.model.NodeDescription;
 import io.github.sudoitir.openbroker.model.NodeFunction;
 import io.github.sudoitir.rahdar.kernel.core.NotFoundException;
 import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
+import io.github.sudoitir.rahdar.platform.broker.BrokerVersion;
 import io.github.sudoitir.rahdar.platform.broker.ConnectionOptions.TlsBundle;
 import io.github.sudoitir.rahdar.platform.broker.ConnectionSettingsSource;
 import io.github.sudoitir.rahdar.platform.broker.CoreConnectionSettings;
@@ -29,10 +30,12 @@ import io.github.sudoitir.rahdar.platform.clusters.web.ClusterRequests.RegisterC
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterRequests.UpdateClusterRequest.ConnectionUpdate;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterRequests.UpdateClusterRequest.KafkaConnectionUpdate;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.AccessFinding;
+import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.AccessRemedy;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.ConnectionCheck;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.Failure;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.KafkaConnectionDetail;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.NodeReach;
+import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.NodeVersion;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.Quorum;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.VersionFound;
 import io.github.sudoitir.rahdar.system.kafka.internal.persistence.KafkaConnectionEntity;
@@ -50,6 +53,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -75,6 +79,9 @@ class KafkaRegistrar implements ClusterRegistrar {
     private static final String QUORUM_LEADER = "kafka.quorum_leader";
     private static final int DEFAULT_PORT = 9092;
     private static final Pattern SEPARATORS = Pattern.compile("[,\\s]+");
+    private static final Pattern RELEASE = Pattern.compile("(\\d+)\\.(\\d+)");
+    private static final Pattern RANGE_START = Pattern.compile("^[\\[(]\\s*(\\d+)(?:\\.(\\d+))?");
+    private static final Pattern RANGE_END = Pattern.compile(",\\s*(\\d+)(?:\\.(\\d+))?[^,]*[)\\]]\\s*$");
     private static final Pattern LOWER_BOUND = Pattern.compile("^[\\[(]\\s*([0-9]+(?:\\.[0-9]+)?)");
     private static final Duration TOKEN_VALIDITY = Duration.ofDays(1);
 
@@ -256,6 +263,10 @@ class KafkaRegistrar implements ClusterRegistrar {
                     ok ? "OK" : "UNREACHABLE",
                     ok ? null : causeOf(failure),
                     ok ? null : failure == null ? "The node did not answer." : failure.getMessage(),
+                    nodeVersion(node.attributes()
+                            .raw(CLUSTER_VERSION)
+                            .map(String::valueOf)
+                            .or(node::version)),
                     null));
             if (ok) {
                 reached.add(new DiscoveredNode(node.nativeId(), nameOf(node), dataEndpoints(node)));
@@ -289,6 +300,7 @@ class KafkaRegistrar implements ClusterRegistrar {
                         "UNREACHABLE",
                         causeOf(failure.getValue()),
                         failure.getValue().getMessage(),
+                        null,
                         null));
             }
         }
@@ -327,7 +339,15 @@ class KafkaRegistrar implements ClusterRegistrar {
     }
 
     private static AccessFinding finding(String capability, Assessment assessment) {
-        return new AccessFinding(capability, assessment.status().name(), assessment.reason());
+        return new AccessFinding(
+                capability,
+                assessment.status().name(),
+                assessment.reason(),
+                assessment.remedy().map(r -> r.snippet()).orElse(null),
+                assessment
+                        .remedy()
+                        .map(r -> new AccessRemedy(r.text(), r.snippet(), r.mediaType()))
+                        .orElse(null));
     }
 
     private static boolean isTrue(NodeDescription node, String attribute) {
@@ -352,6 +372,42 @@ class KafkaRegistrar implements ClusterRegistrar {
 
     private static String nameOf(NodeDescription node) {
         return (node.functions().contains(NodeFunction.BROKER) ? "broker-" : "controller-") + node.nativeId();
+    }
+
+    /** A release, as the cluster says it ("3.9" or "at least 3.0"), against the range the driver is tested on. */
+    private NodeVersion nodeVersion(Optional<String> text) {
+        return text.map(t -> new NodeVersion(t, support(t))).orElse(null);
+    }
+
+    private BrokerVersion.Support support(String text) {
+        Matcher release = RELEASE.matcher(text);
+        if (!release.find()) {
+            return BrokerVersion.Support.UNKNOWN;
+        }
+        int[] found = {Integer.parseInt(release.group(1)), Integer.parseInt(release.group(2))};
+        String range = rangeOfDriver();
+        Matcher lower = RANGE_START.matcher(range);
+        if (lower.find() && compare(found, lower) < 0) {
+            return BrokerVersion.Support.BELOW_MINIMUM;
+        }
+        Matcher upper = RANGE_END.matcher(range);
+        return upper.find() && compare(found, upper) >= 0
+                ? BrokerVersion.Support.NEWER_THAN_TESTED
+                : BrokerVersion.Support.SUPPORTED;
+    }
+
+    private static int compare(int[] version, Matcher bound) {
+        int major = Integer.parseInt(bound.group(1));
+        int minor = bound.group(2) == null ? 0 : Integer.parseInt(bound.group(2));
+        return version[0] != major ? Integer.compare(version[0], major) : Integer.compare(version[1], minor);
+    }
+
+    private String rangeOfDriver() {
+        return drivers.systems().stream()
+                .filter(s -> s.id().equals(KafkaModule.SYSTEM))
+                .map(BrokerSystem::supportedVersions)
+                .findFirst()
+                .orElse("");
     }
 
     private String lowerBound() {
