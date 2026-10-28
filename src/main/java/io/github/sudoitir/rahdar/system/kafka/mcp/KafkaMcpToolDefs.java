@@ -70,17 +70,22 @@ public final class KafkaMcpToolDefs {
                     Param.note("resource", "Such as topic:orders.")),
             read(
                     "kafka_list_transactions",
-                    "A page of a Kafka cluster's transactional ids: state, start, timeout, whether it hangs and what it holds back.",
+                    "A Kafka cluster's open transactional ids, and with hangingOnly the hanging transactions on its partitions.",
                     Param.note(
                             "hangingOnly",
-                            "Only transactions still open past their timeout and the coordinator's cleanup: the"
-                                    + " coordinator aborts an open one by itself within seconds of its timeout, so"
-                                    + " one that is listed has been missed. Follow next to go on."),
-                    Param.note("cursor", "The next value of the previous page; absent for the first.")),
+                            "The coordinator aborts an open transaction by itself within seconds of its timeout, so"
+                                    + " an open one is information. This asks for the ones that are a problem: the open"
+                                    + " ones it has missed, and the hanging transactions found on the partitions"
+                                    + " (open there, unknown to the coordinator, holding readers back). Finding them"
+                                    + " reads every partition in scope."),
+                    Param.note("topic", "With hangingOnly, only this topic's partitions.")),
             mutate(
                     "kafka_abort_transaction",
-                    "Abort a hanging transaction, fencing its producer.",
-                    Param.note("transactionalId", "From the cluster's transactions, such as kafka-ui."),
+                    "Abort a transaction or a hanging transaction, fencing its producer.",
+                    Param.note(
+                            "transactionalId",
+                            "From kafka_list_transactions: a transactional id the coordinator has missed, or the id of"
+                                    + " a hanging transaction, such as kafka.hanging-transaction/orders/0/4711."),
                     Param.note("dryRun", McpToolDef.DRY_RUN + " The preview names what the abort releases."),
                     Param.note("etag", ETAG),
                     Param.note("confirm", "A real run needs confirm equal to the transactional id.")));

@@ -4,14 +4,15 @@ import io.github.sudoitir.rahdar.platform.mcp.McpArgs;
 import io.github.sudoitir.rahdar.platform.mcp.McpErrors;
 import io.github.sudoitir.rahdar.system.kafka.KafkaAcls;
 import io.github.sudoitir.rahdar.system.kafka.KafkaGroups;
+import io.github.sudoitir.rahdar.system.kafka.KafkaHangingTransactions;
 import io.github.sudoitir.rahdar.system.kafka.KafkaOffsets;
 import io.github.sudoitir.rahdar.system.kafka.KafkaTopicConfigs;
 import io.github.sudoitir.rahdar.system.kafka.KafkaTransactions;
+import io.github.sudoitir.rahdar.system.kafka.web.KafkaViews.HangingPage;
 import io.github.sudoitir.rahdar.system.kafka.web.KafkaViews.OffsetRequest;
 import io.github.sudoitir.rahdar.system.kafka.web.KafkaViews.TransactionPage;
 import io.github.sudoitir.rahdar.system.kafka.web.KafkaViews.TransactionRow;
 import io.modelcontextprotocol.spec.McpSchema;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
@@ -33,6 +34,7 @@ public class KafkaMcpReadTools {
     private final KafkaTopicConfigs configs;
     private final KafkaAcls acls;
     private final KafkaTransactions transactions;
+    private final KafkaHangingTransactions hanging;
 
     @McpTool(
             name = "kafka_list_groups",
@@ -128,8 +130,7 @@ public class KafkaMcpReadTools {
 
     @McpTool(
             name = "kafka_list_transactions",
-            description =
-                    "A page of a Kafka cluster's transactional ids: state, timeout, whether they hang, what they block.",
+            description = "Open transactional ids of a Kafka cluster; with hangingOnly, its hanging transactions.",
             annotations =
                     @McpTool.McpAnnotations(
                             readOnlyHint = true,
@@ -139,32 +140,32 @@ public class KafkaMcpReadTools {
     public McpSchema.CallToolResult kafkaListTransactions(
             @McpToolParam(required = true) String clusterId,
             @McpToolParam(required = false) Boolean hangingOnly,
-            @McpToolParam(required = false) String cursor,
+            @McpToolParam(required = false) String topic,
             @McpToolParam(required = false) Integer limit) {
         UUID id = McpArgs.uuid("clusterId", clusterId);
-        boolean hanging = McpArgs.flag(hangingOnly, false);
+        boolean find = McpArgs.flag(hangingOnly, false);
         return McpErrors.guard(() -> {
-            if (!hanging) {
-                return transactions.list(id, cursor, limit);
+            TransactionPage open = transactions.list(id, null, find ? Integer.valueOf(500) : limit);
+            if (!find) {
+                return new TransactionListing(
+                        open,
+                        null,
+                        "These are the open transactions the coordinator knows. Set hangingOnly to find the hanging"
+                                + " ones: it reads every partition, so it is asked for.");
             }
-            // The hanging ones are few among many: read pages until enough are found, within a bound.
-            int wanted = limit == null ? 100 : Math.max(1, Math.min(limit, 500));
-            List<TransactionRow> found = new ArrayList<>();
-            String next = cursor;
-            for (int page = 0; page < HANGING_SCAN_PAGES && found.size() < wanted; page++) {
-                TransactionPage read = transactions.list(id, next, 500);
-                read.items().stream().filter(TransactionRow::hanging).forEach(found::add);
-                next = read.next();
-                if (next == null) {
-                    break;
-                }
-            }
-            return new TransactionPage(found.size() > wanted ? found.subList(0, wanted) : found, next);
+            List<TransactionRow> missed =
+                    open.items().stream().filter(TransactionRow::hanging).toList();
+            return new TransactionListing(
+                    new TransactionPage(missed, null),
+                    hanging.find(id, topic, null, limit),
+                    "open: transactions the coordinator has missed (still open past their timeout and cleanup);"
+                            + " hanging: open on a partition and unknown to the coordinator. Abort either with"
+                            + " kafka_abort_transaction.");
         });
     }
 
-    /** The most pages of transactions a hanging-only listing reads before it hands back a cursor to go on from. */
-    private static final int HANGING_SCAN_PAGES = 5;
+    /** What the transactions tool answers: the coordinator's open transactions, and the hanging ones when asked for. */
+    public record TransactionListing(TransactionPage open, HangingPage hanging, String note) {}
 
     /** The topics a comma-separated argument names; null when none, which means every topic of the group. */
     static List<String> topicList(String topics) {

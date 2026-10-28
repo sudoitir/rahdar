@@ -37,6 +37,7 @@ import org.apache.kafka.common.serialization.ByteArrayDeserializer;
 import org.apache.kafka.common.serialization.ByteArraySerializer;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -154,6 +155,23 @@ class KafkaNamespaceRealBrokerTest extends PostgresIntegrationTest {
                 .getResponse();
         assertThat(response.getStatus()).as(response.getContentAsString()).isLessThan(300);
         return response.getContentAsString();
+    }
+
+    @Test
+    void findingHangingTransactionsOnACleanClusterFindsNoneAndNeverFails() throws Exception {
+        String detail = mvc.perform(get("/api/v1/clusters/{c}", cluster))
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        // The kind arrives with OpenBroker 0.6.2; on an older driver there is nothing to find with.
+        Assumptions.assumeTrue(detail.contains("kafka.hanging-transaction"));
+
+        mvc.perform(post("/api/v1/clusters/{c}/kafka/hanging-transactions:find?topic=" + topic, cluster))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items.length()").value(0));
+        mvc.perform(post("/api/v1/clusters/{c}/kafka/hanging-transactions:find", cluster))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items.length()").value(0));
     }
 
     @Test

@@ -110,6 +110,13 @@ The ACLs screen SHALL list ACLs by principal, resource and operation, filtered b
 ### Requirement: Hanging transactions can be aborted
 The transactions screen SHALL list open transactional ids with their state, age and timeout as information, saying that the coordinator aborts a transaction past its timeout by itself, and SHALL flag in words one still open after its timeout and the coordinator's cleanup, with the partitions it blocks. It SHALL let an operator with the transaction abort permission abort such a transaction, and no other (a refusal that says why), after a preview that says the producer is fenced and the blocked partitions are released. The abort SHALL be a held confirmation, go through the approval gate, and be audited.
 
+### Requirement: Hanging transactions are found on demand and aborted per partition
+A Kafka cluster's transactions screen SHALL offer a Find action, for the cluster or one topic, that lists the transactions open on a partition but unknown to the coordinator (KIP-664), each with its partition, producer, the records it holds back and its age, and SHALL let an operator with the transaction abort permission abort one after a preview that states the records released and that the producer is fenced. Finding SHALL never run on its own, since it reads every partition in scope. The abort SHALL be a held confirmation, pinned to the previewed state, go through the approval gate, and be audited.
+
+#### Scenario: Finding hanging transactions of a topic
+- **WHEN** an operator asks to find the hanging transactions of one topic
+- **THEN** each hanging transaction on its partitions is listed with the records it holds back, and none is listed for a cluster that has none
+
 #### Scenario: A hanging transaction
 - **WHEN** a transaction has been open longer than its timeout
 - **THEN** it is marked as hanging with its age and the partitions it blocks, and an abort is offered

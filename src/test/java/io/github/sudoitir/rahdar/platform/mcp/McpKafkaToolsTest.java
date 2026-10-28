@@ -21,9 +21,13 @@ import io.github.sudoitir.rahdar.kernel.security.internal.persistence.UserRoleRe
 import io.github.sudoitir.rahdar.kernel.settings.SettingsService;
 import io.github.sudoitir.rahdar.support.McpFixture;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
+import io.github.sudoitir.rahdar.system.kafka.KafkaHangingTransactions;
 import io.github.sudoitir.rahdar.system.kafka.KafkaOffsetResets;
 import io.github.sudoitir.rahdar.system.kafka.KafkaOffsets;
 import io.github.sudoitir.rahdar.system.kafka.KafkaTransactions;
+import io.github.sudoitir.rahdar.system.kafka.web.KafkaViews.HangingAbortPreview;
+import io.github.sudoitir.rahdar.system.kafka.web.KafkaViews.HangingPage;
+import io.github.sudoitir.rahdar.system.kafka.web.KafkaViews.HangingTransaction;
 import io.github.sudoitir.rahdar.system.kafka.web.KafkaViews.OffsetPreview;
 import io.github.sudoitir.rahdar.system.kafka.web.KafkaViews.OffsetRequest;
 import io.github.sudoitir.rahdar.system.kafka.web.KafkaViews.OffsetRow;
@@ -69,6 +73,9 @@ class McpKafkaToolsTest extends PostgresIntegrationTest {
 
     @MockitoBean
     KafkaTransactions transactions;
+
+    @MockitoBean
+    KafkaHangingTransactions hangingTransactions;
 
     @Autowired
     WebApplicationContext webContext;
@@ -199,18 +206,48 @@ class McpKafkaToolsTest extends PostgresIntegrationTest {
     }
 
     @Test
-    void theTransactionsListKeepsOnlyTheHangingOnesWhenAsked() throws Exception {
-        TransactionRow hanging =
+    void theTransactionsListReturnsTheOpenOnesAndWithHangingOnlyTheHangingOnesToo() throws Exception {
+        TransactionRow missed =
                 new TransactionRow("payments-tx", "ongoing", Instant.now().minusSeconds(3600), 60_000, true, List.of());
         TransactionRow live = new TransactionRow("live-tx", "ongoing", Instant.now(), 60_000, false, List.of());
-        when(transactions.list(eq(CLUSTER), any(), any()))
-                .thenReturn(new TransactionPage(List.of(live, hanging), null));
+        when(transactions.list(eq(CLUSTER), any(), any())).thenReturn(new TransactionPage(List.of(live, missed), null));
+        when(hangingTransactions.find(eq(CLUSTER), eq("orders"), any(), any()))
+                .thenReturn(new HangingPage(
+                        List.of(new HangingTransaction(
+                                "kafka.hanging-transaction/orders/0/4711",
+                                "orders",
+                                0,
+                                4711,
+                                3L,
+                                100L,
+                                42L,
+                                3_600_000L)),
+                        null));
 
         JsonNode all = call("kafka_list_transactions", Map.of("clusterId", CLUSTER.toString()));
-        JsonNode only = call("kafka_list_transactions", Map.of("clusterId", CLUSTER.toString(), "hangingOnly", true));
+        verify(hangingTransactions, never()).find(any(), any(), any(), any());
+        JsonNode only = call(
+                "kafka_list_transactions",
+                Map.of("clusterId", CLUSTER.toString(), "hangingOnly", true, "topic", "orders"));
 
-        assertThat(text(all)).contains("live-tx").contains("payments-tx");
-        assertThat(text(only)).contains("payments-tx").doesNotContain("live-tx");
+        assertThat(text(all)).contains("live-tx").contains("payments-tx").contains("hangingOnly");
+        assertThat(text(only))
+                .contains("payments-tx")
+                .doesNotContain("live-tx")
+                .contains("kafka.hanging-transaction/orders/0/4711");
+    }
+
+    @Test
+    void aHangingTransactionIsAbortedByItsIdThroughTheHangingService() throws Exception {
+        when(hangingTransactions.abortPreview(CLUSTER, "orders", 0, 4711))
+                .thenReturn(new HangingAbortPreview("orders", 0, 4711, "Aborting releases 42 record(s)", 42, "e1"));
+
+        JsonNode preview = call(
+                "kafka_abort_transaction",
+                Map.of("clusterId", CLUSTER.toString(), "transactionalId", "kafka.hanging-transaction/orders/0/4711"));
+
+        assertThat(text(preview)).contains("e1").contains("42");
+        verify(transactions, never()).abortPreview(any(), any());
     }
 
     private List<String> listedTools() throws Exception {

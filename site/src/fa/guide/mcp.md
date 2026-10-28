@@ -68,7 +68,7 @@ curl -s https://rahdar.example.com/mcp \
 | Tool | `kafka_preview_offset_reset`، `kafka_reset_offsets` | اینکه یک بازنشانی چه چیزی را جابه‌جا می‌کند، و خودِ بازنشانی که روی همان پیش‌نمایش اجرا می‌شود |
 | Tool | `kafka_topic_config`، `kafka_set_topic_config` | تنظیمات یک topic و منشأ هرکدام، و تغییر آن‌ها |
 | Tool | `kafka_list_acls` | ACLهای کلاستر |
-| Tool | `kafka_list_transactions` | شناسه‌های تراکنش با وضعیت، شروع، مهلت، گیر کردن و پارتیشن‌هایی که نگه می‌دارند؛ `hangingOnly` فقط تراکنش‌هایی را نگه می‌دارد که هماهنگ‌کننده از دست داده است |
+| Tool | `kafka_list_transactions` | شناسه‌های تراکنش با وضعیت، شروع، مهلت، گیر کردن و پارتیشن‌هایی که نگه می‌دارند؛ `hangingOnly` آنچه مشکل است را پیدا می‌کند: تراکنش‌های بازی که هماهنگ‌کننده از دست داده و تراکنش‌های گیرکرده روی پارتیشن‌ها (`topic` جست‌وجو را محدود می‌کند) |
 | Tool | `kafka_abort_transaction` | لغو یک تراکنش، پس از پیش‌نمایش آن |
 | Tool | `alert_rule` / `rahdar_setting` | قواعد هشدار؛ تنظیمات عملیاتی |
 | Resource | `rahdar://clusters`، `rahdar://permissions`، `rahdar://tools` | این کلید چه می‌بیند و چه می‌تواند بکند |

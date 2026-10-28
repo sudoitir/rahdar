@@ -8,6 +8,7 @@ import io.github.sudoitir.rahdar.kernel.gate.OperationScope;
 import io.github.sudoitir.rahdar.kernel.gate.Trait;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterEnvironmentIndex;
 import io.github.sudoitir.rahdar.system.kafka.KafkaAclChanges.AclChangeParams;
+import io.github.sudoitir.rahdar.system.kafka.KafkaHangingAborts.HangingAbortParams;
 import io.github.sudoitir.rahdar.system.kafka.KafkaOffsetResets.OffsetResetParams;
 import io.github.sudoitir.rahdar.system.kafka.KafkaTopicConfigChanges.ConfigChangeParams;
 import io.github.sudoitir.rahdar.system.kafka.KafkaTransactionAborts.AbortParams;
@@ -111,6 +112,25 @@ class KafkaGatedOperations {
                 p -> List.of(
                         DisplayRow.of("Cluster", clusters.labelOf(p.clusterId())),
                         DisplayRow.of("Transactional id", p.transactionalId())),
+                aborts::estimate,
+                aborts::replay,
+                clusters,
+                Set.of());
+    }
+
+    @Bean
+    GatedOperation<HangingAbortParams> hangingTransactionAbort(
+            KafkaHangingAborts aborts, ClusterEnvironmentIndex clusters) {
+        return new Operation<>(
+                "transaction.abort-hanging",
+                HangingAbortParams.class,
+                HangingAbortParams::clusterId,
+                p -> "Abort the hanging transaction of producer " + p.producerId() + " on " + p.topic() + "-"
+                        + p.partition() + " on " + clusters.labelOf(p.clusterId()),
+                p -> List.of(
+                        DisplayRow.of("Cluster", clusters.labelOf(p.clusterId())),
+                        DisplayRow.of("Partition", p.topic() + "-" + p.partition()),
+                        DisplayRow.of("Producer id", String.valueOf(p.producerId()))),
                 aborts::estimate,
                 aborts::replay,
                 clusters,

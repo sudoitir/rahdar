@@ -1,9 +1,12 @@
 package io.github.sudoitir.rahdar.system.kafka.mcp;
 
+import io.github.sudoitir.openbroker.model.ResourceId;
 import io.github.sudoitir.rahdar.kernel.core.ConflictException;
 import io.github.sudoitir.rahdar.kernel.core.StalePreviewException;
 import io.github.sudoitir.rahdar.platform.mcp.McpArgs;
 import io.github.sudoitir.rahdar.platform.mcp.McpErrors;
+import io.github.sudoitir.rahdar.system.kafka.KafkaHangingAborts;
+import io.github.sudoitir.rahdar.system.kafka.KafkaHangingTransactions;
 import io.github.sudoitir.rahdar.system.kafka.KafkaOffsetResets;
 import io.github.sudoitir.rahdar.system.kafka.KafkaTopicConfigChanges;
 import io.github.sudoitir.rahdar.system.kafka.KafkaTopicConfigs;
@@ -37,6 +40,11 @@ public class KafkaMcpActionTools {
     private final KafkaTopicConfigChanges configChanges;
     private final KafkaTransactions transactions;
     private final KafkaTransactionAborts aborts;
+    private final KafkaHangingTransactions hanging;
+    private final KafkaHangingAborts hangingAborts;
+
+    /** The id of a hanging transaction that kafka_list_transactions returns. */
+    private static final String HANGING_PREFIX = "kafka.hanging-transaction/";
 
     @McpTool(
             name = "kafka_reset_offsets",
@@ -99,7 +107,7 @@ public class KafkaMcpActionTools {
     @McpTool(
             name = "kafka_abort_transaction",
             description =
-                    "Abort a hanging transaction, fencing its producer. Previews by default; a real run needs the etag.",
+                    "Abort a transaction or hanging transaction, fencing its producer. Previews by default; needs the etag.",
             annotations =
                     @McpTool.McpAnnotations(
                             readOnlyHint = false,
@@ -118,6 +126,16 @@ public class KafkaMcpActionTools {
         if (!dry) {
             McpArgs.required("etag", etag);
             McpArgs.confirm(transactionalId, confirm);
+        }
+        if (transactionalId.startsWith(HANGING_PREFIX)) {
+            // A hanging transaction found on a partition: its id names the partition and the producer.
+            List<String> at = ResourceId.parse(transactionalId).path().segments();
+            String topic = at.get(0);
+            int partition = Integer.parseInt(at.get(1));
+            long producer = Long.parseLong(at.get(2));
+            return guard(() -> dry
+                    ? hanging.abortPreview(id, topic, partition, producer)
+                    : hangingAborts.abort(id, topic, partition, producer, etag));
         }
         return guard(
                 () -> dry ? transactions.abortPreview(id, transactionalId) : aborts.abort(id, transactionalId, etag));

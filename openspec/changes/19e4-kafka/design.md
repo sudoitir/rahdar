@@ -171,6 +171,8 @@ any broker call. Lists page with an opaque `cursor` and `limit` (default 100, ma
 | `GET acls?principal&resource&cursor` | `{available, reason?, items: [{principal, host, operation, permission, resourceType, pattern, name}], next}` | `access-rule:read` |
 | `POST acls:preview` / `:apply` | `{add: [acl], remove: [acl]}` → effective access before/after per principal and resource, `losses: ["User:app loses READ on topic orders"]`, DENY notes, `etag` | `access-rule:write` |
 | `GET transactions` | `{items: [{id, state, startedAt?, timeout, hanging, blocked: [{topic, partition}]}]}` | `transaction:read` |
+| `POST hanging-transactions:find?topic&cursor&limit` | on demand (it reads every partition in scope): `{items: [{id, topic, partition, producerId, producerEpoch?, startOffset?, recordsHeldBack?, ageMs?}], next}` | `transaction:read` |
+| `POST hanging-transactions:abort-preview` / `:abort` | `{topic, partition, producerId, etag?}` → effect, `recordsHeldBack`, `etag`; a stale etag is `412`; held, gated (`transaction.abort-hanging`) and audited | `transaction:abort` |
 | `POST transactions/{id}:abort-preview` / `:abort` | effect names the blocked partitions and that the producer is fenced; `abortable`; `etag`; `409 transaction-not-hanging` unless abortable | `transaction:abort` |
 
 **Transactions model.** The coordinator aborts an open transaction past its timeout by itself within

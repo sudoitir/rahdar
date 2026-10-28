@@ -5,6 +5,8 @@ import io.github.sudoitir.rahdar.system.kafka.KafkaAclChanges;
 import io.github.sudoitir.rahdar.system.kafka.KafkaAcls;
 import io.github.sudoitir.rahdar.system.kafka.KafkaBrokers;
 import io.github.sudoitir.rahdar.system.kafka.KafkaGroups;
+import io.github.sudoitir.rahdar.system.kafka.KafkaHangingAborts;
+import io.github.sudoitir.rahdar.system.kafka.KafkaHangingTransactions;
 import io.github.sudoitir.rahdar.system.kafka.KafkaOffsetResets;
 import io.github.sudoitir.rahdar.system.kafka.KafkaOffsets;
 import io.github.sudoitir.rahdar.system.kafka.KafkaTopicConfigChanges;
@@ -23,6 +25,10 @@ import io.github.sudoitir.rahdar.system.kafka.web.KafkaViews.ConfigChangeRequest
 import io.github.sudoitir.rahdar.system.kafka.web.KafkaViews.ConfigPreview;
 import io.github.sudoitir.rahdar.system.kafka.web.KafkaViews.GroupDetail;
 import io.github.sudoitir.rahdar.system.kafka.web.KafkaViews.GroupPage;
+import io.github.sudoitir.rahdar.system.kafka.web.KafkaViews.HangingAbortPreview;
+import io.github.sudoitir.rahdar.system.kafka.web.KafkaViews.HangingAbortRequest;
+import io.github.sudoitir.rahdar.system.kafka.web.KafkaViews.HangingAbortResult;
+import io.github.sudoitir.rahdar.system.kafka.web.KafkaViews.HangingPage;
 import io.github.sudoitir.rahdar.system.kafka.web.KafkaViews.OffsetPreview;
 import io.github.sudoitir.rahdar.system.kafka.web.KafkaViews.OffsetRequest;
 import io.github.sudoitir.rahdar.system.kafka.web.KafkaViews.OffsetResult;
@@ -55,6 +61,8 @@ public class KafkaController {
     private final KafkaAclChanges aclChanges;
     private final KafkaTransactions transactions;
     private final KafkaTransactionAborts aborts;
+    private final KafkaHangingTransactions hanging;
+    private final KafkaHangingAborts hangingAborts;
     private final KafkaBrokers brokers;
     private final KafkaTopicConfigs configs;
     private final KafkaTopicConfigChanges configChanges;
@@ -144,6 +152,29 @@ public class KafkaController {
     @PostMapping("/transactions/{id}:abort")
     public AbortResult abort(@PathVariable UUID clusterId, @PathVariable String id, @RequestBody AbortRequest request) {
         return aborts.abort(clusterId, id, request.etag());
+    }
+
+    /** Finds the hanging transactions of the cluster or of one topic, on demand: it reads every partition in scope. */
+    @PostMapping("/hanging-transactions:find")
+    public HangingPage findHanging(
+            @PathVariable UUID clusterId,
+            @RequestParam(required = false) String topic,
+            @RequestParam(required = false) String cursor,
+            @RequestParam(required = false) Integer limit) {
+        return hanging.find(clusterId, topic, cursor, limit);
+    }
+
+    @PostMapping("/hanging-transactions:abort-preview")
+    public HangingAbortPreview previewHangingAbort(
+            @PathVariable UUID clusterId, @RequestBody HangingAbortRequest request) {
+        return hanging.abortPreview(clusterId, request.topic(), request.partition(), request.producerId());
+    }
+
+    @HeldResponse
+    @PostMapping("/hanging-transactions:abort")
+    public HangingAbortResult abortHanging(@PathVariable UUID clusterId, @RequestBody HangingAbortRequest request) {
+        return hangingAborts.abort(
+                clusterId, request.topic(), request.partition(), request.producerId(), request.etag());
     }
 
     @GetMapping("/brokers")

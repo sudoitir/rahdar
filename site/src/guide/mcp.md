@@ -95,8 +95,8 @@ can be run again.
 | Tool | `kafka_preview_offset_reset`, `kafka_reset_offsets` | what a reset would move, and the reset itself, run against the preview |
 | Tool | `kafka_topic_config`, `kafka_set_topic_config` | a topic's settings and where each comes from, and changing them |
 | Tool | `kafka_list_acls` | the cluster's ACLs |
-| Tool | `kafka_list_transactions` | transactional ids with state, start, timeout, whether they hang and what they block; `hangingOnly` keeps those the coordinator has missed |
-| Tool | `kafka_abort_transaction` | abort a transaction the coordinator has missed (still open past its timeout and cleanup), after its preview |
+| Tool | `kafka_list_transactions` | the coordinator's open transactional ids; `hangingOnly` finds what is a problem, the open ones it has missed and the hanging transactions on partitions (`topic` narrows the search) |
+| Tool | `kafka_abort_transaction` | abort a transaction the coordinator has missed, or a hanging transaction by the id the list returns, after its preview |
 | Tool | `setup_review` | the latest configuration review of a cluster |
 | Tool | `alert_rule` / `rahdar_setting` | alert rules; operational settings |
 | Resource | `rahdar://clusters`, `rahdar://permissions`, `rahdar://tools` | what this key can see and do |

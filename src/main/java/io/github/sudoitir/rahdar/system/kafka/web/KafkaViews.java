@@ -310,6 +310,60 @@ public final class KafkaViews {
 
             @Schema(requiredMode = REQUIRED) String etag) {}
 
+    /** A transaction open on a partition that the coordinator does not know: found on demand (KIP-664). */
+    public record HangingTransaction(
+            @Schema(
+                    requiredMode = REQUIRED,
+                    description = "Its canonical id, such as"
+                            + " kafka.hanging-transaction/orders/0/4711; what kafka_abort_transaction takes.")
+            String id,
+
+            @Schema(requiredMode = REQUIRED) String topic,
+            @Schema(requiredMode = REQUIRED) int partition,
+            @Schema(requiredMode = REQUIRED) long producerId,
+            @Schema(nullable = true) Long producerEpoch,
+            @Schema(nullable = true) Long startOffset,
+
+            @Schema(
+                    nullable = true,
+                    description = "Records after its start that a read-committed consumer cannot reach.")
+            Long recordsHeldBack,
+
+            @Schema(nullable = true, description = "Milliseconds since the producer last wrote.")
+            Long ageMs) {}
+
+    public record HangingPage(
+            @Schema(requiredMode = REQUIRED) List<HangingTransaction> items,
+            @Schema(nullable = true) String next) {}
+
+    public record HangingAbortPreview(
+            @Schema(requiredMode = REQUIRED) String topic,
+            @Schema(requiredMode = REQUIRED) int partition,
+            @Schema(requiredMode = REQUIRED) long producerId,
+
+            @Schema(requiredMode = REQUIRED, description = "What the abort does, naming the fenced producer.")
+            String effect,
+
+            @Schema(requiredMode = REQUIRED) long recordsHeldBack,
+            @Schema(requiredMode = REQUIRED) String etag) {}
+
+    /** Names one hanging transaction, with the preview's etag to abort it. */
+    public record HangingAbortRequest(
+            @Schema(requiredMode = REQUIRED) String topic,
+            @Schema(requiredMode = REQUIRED) int partition,
+            @Schema(requiredMode = REQUIRED) long producerId,
+
+            @Schema(description = "The preview's etag; required to abort.")
+            String etag) {}
+
+    public record HangingAbortResult(
+            @Schema(requiredMode = REQUIRED) String topic,
+            @Schema(requiredMode = REQUIRED) int partition,
+            @Schema(requiredMode = REQUIRED) long producerId,
+
+            @Schema(requiredMode = REQUIRED, description = "False where it had closed already.")
+            boolean aborted) {}
+
     public record AbortRequest(
             @Schema(description = "The preview's etag; required to abort.")
             String etag) {}
