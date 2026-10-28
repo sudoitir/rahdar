@@ -18,9 +18,9 @@ import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshot;
 import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshots;
 import io.github.sudoitir.rahdar.system.kafka.web.KafkaViews.GroupDetail;
 import io.github.sudoitir.rahdar.system.kafka.web.KafkaViews.GroupPage;
+import io.github.sudoitir.rahdar.system.kafka.web.KafkaViews.GroupPartitionLag;
 import io.github.sudoitir.rahdar.system.kafka.web.KafkaViews.GroupRow;
 import io.github.sudoitir.rahdar.system.kafka.web.KafkaViews.GroupTopic;
-import io.github.sudoitir.rahdar.system.kafka.web.KafkaViews.PartitionLag;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -98,7 +98,8 @@ public class KafkaGroups {
                         subscription.id().name(),
                         partitions.isEmpty(),
                         partitions.stream()
-                                .map(p -> new PartitionLag(p.partition(), p.committed(), p.end(), p.lag(), p.reason()))
+                                .map(p -> new GroupPartitionLag(
+                                        p.partition(), p.committed(), p.end(), p.lag(), p.reason()))
                                 .toList()));
             }
         }

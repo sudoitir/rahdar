@@ -16,10 +16,10 @@ import io.github.sudoitir.openbroker.model.Scope;
 import io.github.sudoitir.rahdar.kernel.security.ClusterAccessGuard;
 import io.github.sudoitir.rahdar.kernel.security.Permissions;
 import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
+import io.github.sudoitir.rahdar.system.kafka.web.KafkaViews.BrokerQuorum;
 import io.github.sudoitir.rahdar.system.kafka.web.KafkaViews.BrokerRow;
 import io.github.sudoitir.rahdar.system.kafka.web.KafkaViews.Brokers;
-import io.github.sudoitir.rahdar.system.kafka.web.KafkaViews.Quorum;
-import io.github.sudoitir.rahdar.system.kafka.web.KafkaViews.Voter;
+import io.github.sudoitir.rahdar.system.kafka.web.KafkaViews.QuorumVoter;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -49,7 +49,7 @@ public class KafkaBrokers {
                                 .project(Set.of(KafkaKinds.LEADER, KafkaKinds.REPLICAS, KafkaKinds.IN_SYNC_REPLICAS)))
                 .items();
         List<BrokerRow> brokers = new ArrayList<>();
-        List<Voter> voters = new ArrayList<>();
+        List<QuorumVoter> voters = new ArrayList<>();
         String leader = null;
         String mode = null;
         Set<NodeId> seen = new HashSet<>();
@@ -65,7 +65,7 @@ public class KafkaBrokers {
                 boolean behind = node.conditions().stream()
                         .anyMatch(
                                 c -> c.type().equals(ConditionTypes.OUT_OF_SYNC) && c.status() == ConditionStatus.TRUE);
-                voters.add(new Voter(
+                voters.add(new QuorumVoter(
                         node.nativeId(),
                         node.attributes()
                                 .raw("kafka.quorum_lag")
@@ -136,17 +136,17 @@ public class KafkaBrokers {
                 offline);
     }
 
-    private static Quorum quorum(boolean kraft, List<Voter> voters, String leader) {
+    private static BrokerQuorum quorum(boolean kraft, List<QuorumVoter> voters, String leader) {
         if (voters.isEmpty()) {
-            return new Quorum(
+            return new BrokerQuorum(
                     false,
                     kraft ? "The cluster did not report its controller quorum." : ZOOKEEPER_QUORUM,
                     null,
                     List.of(),
                     false);
         }
-        long caughtUp = voters.stream().filter(Voter::caughtUp).count();
-        return new Quorum(true, null, leader, voters, leader != null && caughtUp * 2 > voters.size());
+        long caughtUp = voters.stream().filter(QuorumVoter::caughtUp).count();
+        return new BrokerQuorum(true, null, leader, voters, leader != null && caughtUp * 2 > voters.size());
     }
 
     private static List<?> list(Resource p, String key) {

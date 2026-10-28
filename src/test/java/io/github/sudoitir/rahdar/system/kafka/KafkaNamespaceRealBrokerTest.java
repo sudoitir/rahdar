@@ -13,10 +13,10 @@ import com.jayway.jsonpath.JsonPath;
 import io.github.sudoitir.rahdar.platform.broker.Attempt;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterService;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterRepository;
-import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshotUpsert;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterRequests.RegisterClusterRequest;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterRequests.RegisterClusterRequest.KafkaConnection;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.ClusterDetail;
+import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshotUpsert;
 import io.github.sudoitir.rahdar.support.AdminAuthenticationExtension;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
 import java.time.Duration;
@@ -284,6 +284,9 @@ class KafkaNamespaceRealBrokerTest extends PostgresIntegrationTest {
                 .andExpect(jsonPath("$.mode").value("KRaft"))
                 .andExpect(jsonPath("$.brokers[0].reachable").value(true))
                 .andExpect(jsonPath("$.brokers[0].leaders").isNumber())
-                .andExpect(jsonPath("$.quorum.available").value(true));
+                .andExpect(jsonPath("$.quorum.available").value(true))
+                .andExpect(jsonPath("$.quorum.leader").isNotEmpty())
+                .andExpect(jsonPath("$.quorum.voters.length()").value(1))
+                .andExpect(jsonPath("$.quorum.majority").value(true));
     }
 }

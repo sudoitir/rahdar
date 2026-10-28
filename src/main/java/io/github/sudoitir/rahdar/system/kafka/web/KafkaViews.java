@@ -36,7 +36,7 @@ public final class KafkaViews {
             @Schema(nullable = true, description = "The cursor of the next page; absent on the last.")
             String next) {}
 
-    public record PartitionLag(
+    public record GroupPartitionLag(
             @Schema(requiredMode = REQUIRED) int partition,
 
             @Schema(nullable = true, description = "The group's committed (or start) offset; absent when it has none.")
@@ -57,7 +57,7 @@ public final class KafkaViews {
             boolean deleted,
 
             @Schema(requiredMode = REQUIRED, description = "Slowest first.")
-            List<PartitionLag> partitions) {}
+            List<GroupPartitionLag> partitions) {}
 
     public record GroupMember(
             @Schema(requiredMode = REQUIRED) String id,

@@ -7873,12 +7873,32 @@ export interface components {
             /** @description Partitions as topic-partition. */
             assignments: string[];
         };
+        GroupPartitionLag: {
+            /** Format: int32 */
+            partition: number;
+            /**
+             * Format: int64
+             * @description The group's committed (or start) offset; absent when it has none.
+             */
+            committed?: number | null;
+            /**
+             * Format: int64
+             * @description The partition's end offset; absent when it could not be read.
+             */
+            end?: number | null;
+            /**
+             * Format: int64
+             * @description Absent, with the reason, where the lag is not known.
+             */
+            lag?: number | null;
+            reason?: string | null;
+        };
         GroupTopic: {
             topic: string;
             /** @description The group has offsets on a topic that no longer exists. */
             deleted: boolean;
             /** @description Slowest first. */
-            partitions: components["schemas"]["PartitionLag"][];
+            partitions: components["schemas"]["GroupPartitionLag"][];
         };
         BrokerQuorum: {
             /** @description False on a ZooKeeper-mode cluster. */

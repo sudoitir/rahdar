@@ -38363,6 +38363,34 @@
         },
         "required" : [ "assignments", "clientId", "host", "id" ]
       },
+      "GroupPartitionLag" : {
+        "type" : "object",
+        "properties" : {
+          "partition" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "committed" : {
+            "type" : [ "integer", "null" ],
+            "format" : "int64",
+            "description" : "The group's committed (or start) offset; absent when it has none."
+          },
+          "end" : {
+            "type" : [ "integer", "null" ],
+            "format" : "int64",
+            "description" : "The partition's end offset; absent when it could not be read."
+          },
+          "lag" : {
+            "type" : [ "integer", "null" ],
+            "format" : "int64",
+            "description" : "Absent, with the reason, where the lag is not known."
+          },
+          "reason" : {
+            "type" : [ "string", "null" ]
+          }
+        },
+        "required" : [ "partition" ]
+      },
       "GroupTopic" : {
         "type" : "object",
         "properties" : {
@@ -38377,7 +38405,7 @@
             "type" : "array",
             "description" : "Slowest first.",
             "items" : {
-              "$ref" : "#/components/schemas/PartitionLag"
+              "$ref" : "#/components/schemas/GroupPartitionLag"
             }
           }
         },
