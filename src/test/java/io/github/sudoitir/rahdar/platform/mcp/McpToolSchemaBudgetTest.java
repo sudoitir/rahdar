@@ -67,8 +67,12 @@ class McpToolSchemaBudgetTest extends PostgresIntegrationTest {
      * <p>Raised from 136 for the role vocabulary (19d): {@code list_resources} gained {@code kind}, which
      * keeps the rows of one kind of a role and has no other way to be asked for, and five tools now name
      * {@code subscription} where they named {@code queue}, a longer name spelled in every schema.
+     * Raised from 137 for the bounded Kafka reads: {@code kafka_describe_group} and
+     * {@code kafka_preview_offset_reset} take {@code topic} and {@code cursor} to page one topic's partitions
+     * (the answer is otherwise capped to the top 20), and {@code kafka_topic_config} takes
+     * {@code onlyOverridden} and {@code keys}, which is what keeps its answer to the settings that matter.
      */
-    private static final int AVERAGE_TOKEN_BUDGET_PER_TOOL = 137;
+    private static final int AVERAGE_TOKEN_BUDGET_PER_TOOL = 139;
 
     /**
      * A tool that needs more than this is describing too much; split it or collapse it.
