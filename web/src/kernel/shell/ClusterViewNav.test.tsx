@@ -64,9 +64,19 @@ describe('ClusterViewNav', () => {
     mockApi({ disabled: ['sql', 'events', 'audit', 'bulk'] });
     renderWithProviders(<ClusterViewNav clusterId="c1" collapsed={false} />);
 
+    expect(await screen.findByRole('link', { name: 'Subscriptions' })).toBeInTheDocument();
     await waitFor(() => expect(screen.queryByRole('group', { name: 'Activity' })).not.toBeInTheDocument());
     expect(screen.queryByRole('link', { name: 'SQL Console' })).not.toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Subscriptions' })).toBeInTheDocument();
+  });
+
+  it('lists nothing until the cluster says which system it runs, so the list does not jump', async () => {
+    mockApi();
+    renderWithProviders(<ClusterViewNav clusterId="c1" collapsed={false} />);
+
+    const nav = screen.getByRole('navigation', { name: 'Cluster views' });
+    expect(nav).toHaveAttribute('aria-busy', 'true');
+    expect(within(nav).queryAllByRole('link')).toHaveLength(0);
+    expect(await screen.findByRole('link', { name: 'Subscriptions' })).toBeInTheDocument();
   });
 
   it('keeps a view the operator cannot read listed and disabled, with the reason', async () => {

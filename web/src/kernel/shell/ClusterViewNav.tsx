@@ -1,7 +1,7 @@
 import { useCan } from '../auth/useCan.ts';
 import { useFeatures } from '../features.ts';
 import { navGroups } from '../registry.ts';
-import { useClusterSystem } from './useClusterSystem.ts';
+import { useClusterKinds } from './useClusterSystem.ts';
 import { NavGroup } from './NavGroup.tsx';
 import { NavItem } from './NavItem.tsx';
 import styles from './ClusterViewNav.module.css';
@@ -16,10 +16,15 @@ import styles from './ClusterViewNav.module.css';
  * active route.
  */
 export function ClusterViewNav({ clusterId, collapsed }: Readonly<{ clusterId: string; collapsed: boolean }>) {
-  const groups = navGroups(useFeatures(), useClusterSystem(clusterId));
+  const cluster = useClusterKinds(clusterId);
+  const groups = navGroups(useFeatures(), cluster?.system?.id);
   // While grants are still loading the entries are offered: refusing before the answer arrives
   // would claim something that has not been checked.
   const { canAnywhere, loading } = useCan();
+
+  // Until the cluster says which system it runs, nothing is listed: the views of every system, replaced a moment later by
+  // the ones this system has, would be a list that jumps. Entries that arrive move nothing already on screen.
+  if (!cluster) return <nav aria-label="Cluster views" aria-busy="true" className={styles.nav} />;
 
   return (
     <nav aria-label="Cluster views" className={styles.nav}>

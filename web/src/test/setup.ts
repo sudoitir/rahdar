@@ -170,12 +170,16 @@ window.EventSource = EventSourceStub as unknown as typeof EventSource;
 afterEach(() => EventSourceStub.reset());
 export { EventSourceStub };
 
-// @tanstack/react-virtual sizes the scroll element from offsetWidth/offsetHeight,
-// which jsdom always reports as 0 — leaving the virtualizer with no rows. Give
-// every element a viewport-sized box so getVirtualItems() yields rows.
+// @tanstack/react-virtual sizes the scroll element from its box, which jsdom always
+// reports as 0 — leaving the virtualizer with no rows. Give every element a
+// viewport-sized box so getVirtualItems() yields rows. The virtualizer read the
+// offset size up to 3.14.14 and reads the client size from 3.14.15 on, so both are
+// given; clientWidth stays 0 because the table's own width measurement reads it
+// and treats 0 as "no layout" (ui/table/measurement.ts).
 for (const [prop, value] of [
   ['offsetWidth', 1000],
   ['offsetHeight', 800],
+  ['clientHeight', 800],
 ] as const) {
   Object.defineProperty(window.HTMLElement.prototype, prop, {
     configurable: true,
