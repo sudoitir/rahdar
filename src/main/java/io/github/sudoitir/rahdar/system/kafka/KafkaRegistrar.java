@@ -482,7 +482,7 @@ class KafkaRegistrar implements ClusterRegistrar {
 
     private BrokerVersion.Support support(String text) {
         int[] found = releaseNumbers(text);
-        if (found == null) {
+        if (found.length == 0) {
             return BrokerVersion.Support.UNKNOWN;
         }
         String range = rangeOfDriver();
@@ -497,38 +497,35 @@ class KafkaRegistrar implements ClusterRegistrar {
     }
 
     /**
-     * The first major.minor in {@code text}, the same span {@code (digits).(digits)} would find. A dot that is not
-     * between digits is skipped. Null when the text names no release.
+     * The first major.minor in {@code text}, the same span digits, a dot, then digits would find. Empty when the text
+     * names no release.
      */
     private static int[] releaseNumbers(String text) {
+        int[] found = new int[0];
         int i = 0;
-        int length = text.length();
-        while (i < length) {
-            if (!Character.isDigit(text.charAt(i))) {
-                i++;
-                continue;
-            }
-            int majorStart = i;
-            while (i < length && Character.isDigit(text.charAt(i))) {
+        while (i < text.length() && found.length == 0) {
+            int start = i;
+            while (i < text.length() && Character.isDigit(text.charAt(i))) {
                 i++;
             }
             int majorEnd = i;
-            if (i >= length || text.charAt(i) != '.') {
-                continue;
-            }
-            i++;
-            if (i >= length || !Character.isDigit(text.charAt(i))) {
-                continue;
-            }
             int minorStart = i;
-            while (i < length && Character.isDigit(text.charAt(i))) {
+            if (majorEnd > start && i < text.length() && text.charAt(i) == '.') {
+                i++;
+                minorStart = i;
+                while (i < text.length() && Character.isDigit(text.charAt(i))) {
+                    i++;
+                }
+            }
+            if (minorStart < i) {
+                found = new int[] {
+                    Integer.parseInt(text.substring(start, majorEnd)), Integer.parseInt(text.substring(minorStart, i))
+                };
+            } else if (i == start) {
                 i++;
             }
-            return new int[] {
-                Integer.parseInt(text.substring(majorStart, majorEnd)), Integer.parseInt(text.substring(minorStart, i))
-            };
         }
-        return null;
+        return found;
     }
 
     private static int compare(int[] version, Matcher bound) {

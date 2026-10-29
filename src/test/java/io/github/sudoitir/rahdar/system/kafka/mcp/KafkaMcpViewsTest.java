@@ -113,5 +113,9 @@ class KafkaMcpViewsTest {
                         .entries())
                 .extracting(ConfigEntry::name)
                 .containsExactly("segment.bytes", "cleanup.policy");
+        assertThat(KafkaMcpViews.config(config, null, "segment.bytes ,cleanup.policy,")
+                        .entries())
+                .extracting(ConfigEntry::name)
+                .containsExactly("segment.bytes", "cleanup.policy");
     }
 }

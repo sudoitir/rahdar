@@ -29,6 +29,7 @@ import io.github.sudoitir.openbroker.model.NodeDescription;
 import io.github.sudoitir.openbroker.model.NodeFunction;
 import io.github.sudoitir.openbroker.model.Serving;
 import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
+import io.github.sudoitir.rahdar.platform.broker.BrokerVersion;
 import io.github.sudoitir.rahdar.platform.broker.ConnectionSettingsSource;
 import io.github.sudoitir.rahdar.platform.broker.CoreConnectionSettings;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterRegistrar.Checked;
@@ -207,6 +208,15 @@ class KafkaRegistrarTest {
     }
 
     @Test
+    void aVersionThatNamesNoReleaseIsUnknown() {
+        assertThat(supportOf("kafka")).isEqualTo(BrokerVersion.Support.UNKNOWN);
+        assertThat(supportOf("3")).isEqualTo(BrokerVersion.Support.UNKNOWN);
+        assertThat(supportOf("3.")).isEqualTo(BrokerVersion.Support.UNKNOWN);
+        assertThat(supportOf("3.x")).isEqualTo(BrokerVersion.Support.UNKNOWN);
+        assertThat(supportOf("build 3.0")).isEqualTo(BrokerVersion.Support.SUPPORTED);
+    }
+
+    @Test
     void anUnavailableCapabilityCarriesTheDriversRemedy() {
         NodeDescription one = broker("1", "k1:9092", true, true);
         io.github.sudoitir.openbroker.access.Capability quorum =
@@ -243,6 +253,21 @@ class KafkaRegistrarTest {
                         .putRaw("kafka.cluster_mode", "kraft")
                         .build(),
                 node.serverTime());
+    }
+
+    private BrokerVersion.Support supportOf(String version) {
+        NodeDescription one = withVersion(broker("1", "k1:9092", true, true), version);
+        when(gateway.verify(any(), any(), any(), any()))
+                .thenReturn(new ConnectionReport(
+                        Partial.complete(List.of(one), List.of(one.node())),
+                        new AccessSnapshot(Map.of(), Instant.now())));
+        return registrar
+                .check(plaintext("k1"))
+                .view()
+                .nodes()
+                .getFirst()
+                .version()
+                .support();
     }
 
     @Test
