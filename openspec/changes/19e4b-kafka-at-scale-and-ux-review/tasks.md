@@ -10,7 +10,7 @@
 - [ ] 3.2 Fix every finding; recapture the affected screens. Check: the reviewer's list is closed
 
 ## 4. Findings carried from 19e4-kafka
-- [ ] 4.1 S2: cap broker_event by rows as well as by time. Check: a test that inserts past the cap keeps it
+- [ ] 4.1 S2: cap broker_event by rows as well as by time. A start is on branch `claude/19e4b-s2-start` (not in this pull request): housekeeping trims the oldest rows once a store passes its row quota, and broker events start at twenty million. Check: a test that inserts past the cap keeps it
 - [ ] 4.2 S3: store metric samples on change plus a heartbeat, so 4000 Kafka subscriptions stay within the storage budget. Check: the 1.1 measurement
 - [ ] 4.3 B1: one unreachable Kafka cluster must not stall the scrape of the others (per-cluster deadline). Check: a test with a blackholed cluster
 - [ ] 4.4 A10: the scrape reads subscriptions once per tick. Check: a test counting the reads
