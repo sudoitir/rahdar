@@ -21,3 +21,11 @@
 .end {
   margin-inline-start: auto;
 }
+
+/* A status whose words change length stays on this line and truncates. Its flex base is zero, so a
+   longer sentence cannot wrap the end under the controls and push the view down. */
+.end:has([data-fit]) {
+  flex: 1 1 0;
+  justify-content: flex-end;
+  flex-wrap: nowrap;
+}
