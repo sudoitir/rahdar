@@ -12,6 +12,7 @@ import io.github.sudoitir.rahdar.kernel.lifecycle.partition.PartitionDrops;
 import io.github.sudoitir.rahdar.kernel.lifecycle.partition.PartitionSpec;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
@@ -74,5 +75,27 @@ class BrokerEventStore implements ManagedStore, HousekeepingContributor {
     @Override
     public long purgeBatch(Instant cutoff, int limit) {
         return drops.dropOldest(PARTITIONS, cutoff);
+    }
+
+    /** Twenty million rows, about what a day of heavy broker chatter on a few clusters holds. */
+    @Override
+    public int defaultQuota() {
+        return 20_000;
+    }
+
+    /**
+     * Drops the oldest daily partition before today, and when only today's is left deletes its oldest rows, so the
+     * partition being written is never dropped.
+     */
+    @Override
+    public long trimOldest(long excessRows, int limit) {
+        long dropped = drops.dropOldest(PARTITIONS, Instant.now().truncatedTo(ChronoUnit.DAYS));
+        if (dropped > 0) {
+            return dropped;
+        }
+        return jdbc.update(
+                "DELETE FROM " + TABLE + " WHERE (seq, received_at) IN (SELECT seq, received_at FROM " + TABLE
+                        + " ORDER BY received_at, seq LIMIT ?)",
+                Math.min(excessRows, limit));
     }
 }
