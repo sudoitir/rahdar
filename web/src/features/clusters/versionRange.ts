@@ -26,7 +26,7 @@ const readUntil = (text: string, index: number, end: number, stop: (ch: string) 
  */
 function boundsOf(text: string): { low: string; high: string; close: string } | null {
   const open = text[0];
-  const close = text[text.length - 1];
+  const close = text.at(-1);
   if ((open !== '[' && open !== '(') || (close !== ']' && close !== ')')) return null;
   const end = text.length - 1;
   let index = skipSpace(text, 1, end);

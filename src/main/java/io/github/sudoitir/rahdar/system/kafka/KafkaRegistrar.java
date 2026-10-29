@@ -100,7 +100,7 @@ class KafkaRegistrar implements ClusterRegistrar {
     private static final String AUTHORIZATION = "AUTHORIZATION";
     private static final int DEFAULT_PORT = 9092;
     private static final Pattern SEPARATORS = Pattern.compile("[,\\s]+");
-    private static final Pattern RELEASE = Pattern.compile("(\\d++)\\.(\\d++)");
+    private static final Pattern RELEASE = Pattern.compile("(\\d+)\\.(\\d+)");
     private static final Pattern RANGE_START = Pattern.compile("^[\\[(]\\s*(\\d+)(?:\\.(\\d+))?");
     private static final Pattern RANGE_END = Pattern.compile(",\\s*+(\\d++)(?:\\.(\\d++))?[^,]*[)\\]]\\s*+$");
     private static final Pattern LOWER_BOUND = Pattern.compile("^[\\[(]\\s*(\\d+(?:\\.\\d+)?)");

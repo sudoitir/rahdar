@@ -212,7 +212,7 @@ final class KafkaMcpViews {
         if (keys == null || keys.isBlank()) {
             return Set.of();
         }
-        return Set.of(keys.split("\\s*+,\\s*+"));
+        return Set.of(keys.split("\\s*,\\s*"));
     }
 
     private static String configNote(int omitted, boolean overridden) {

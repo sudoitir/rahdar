@@ -104,10 +104,10 @@ public final class BrowsedMessages {
             if (this == other) {
                 return true;
             }
-            if (!(other instanceof Body body)) {
+            if (!(other instanceof Body(byte[] theirs, boolean theirCut))) {
                 return false;
             }
-            return cut == body.cut && Arrays.equals(bytes, body.bytes);
+            return cut == theirCut && Arrays.equals(bytes, theirs);
         }
 
         @Override

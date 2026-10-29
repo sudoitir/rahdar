@@ -489,7 +489,13 @@ class KafkaRegisterRealBrokerTest extends PostgresIntegrationTest {
                 .atMost(METADATA)
                 .pollInterval(MEMBER_LEAVING)
                 .ignoreException(ConflictException.class)
-                .until(() -> ((Attempt.Ok<?>) messages.purgeLog(id, subscription, true)).value(), Objects::nonNull);
+                .until(
+                        () -> {
+                            // Evaluated on every poll. A method reference would purge once and then reread that result.
+                            Attempt.Ok<?> attempt = (Attempt.Ok<?>) messages.purgeLog(id, subscription, true);
+                            return attempt.value();
+                        },
+                        Objects::nonNull);
 
         // A purge of a log destroys nothing: the figure is the records the position passes over.
         assertThat(outcome).isInstanceOf(MessageService.Outcome.LogPurgeDryRun.class);
