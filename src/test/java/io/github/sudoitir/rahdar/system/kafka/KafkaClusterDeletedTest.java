@@ -18,8 +18,6 @@ class KafkaClusterDeletedTest {
 
     private final SimpleMeterRegistry meters = new SimpleMeterRegistry();
     private final KafkaPartitions partitions = new KafkaPartitions(mock(BrokerGateway.class), Clock.systemUTC());
-    private final KafkaHealth health =
-            new KafkaHealth(mock(BrokerGateway.class), partitions, mock(ClusterDirectory.class));
     private final KafkaScrape scrape = new KafkaScrape(
             mock(BrokerGateway.class),
             mock(ClusterDirectory.class),
@@ -28,8 +26,9 @@ class KafkaClusterDeletedTest {
             meters,
             null,
             null,
-            Clock.systemUTC());
-    private final KafkaClusterDeleted deleted = new KafkaClusterDeleted(health, partitions, scrape);
+            Clock.systemUTC(),
+            mock(KafkaHealthStore.class));
+    private final KafkaClusterDeleted deleted = new KafkaClusterDeleted(partitions, scrape);
 
     @Test
     void theMetersReadingsAndIdentityChangeOfTheDeletedClusterGoAndOthersStay() {

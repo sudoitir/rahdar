@@ -18,6 +18,7 @@ import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
 import io.github.sudoitir.rahdar.platform.broker.ClusterScrape;
 import io.github.sudoitir.rahdar.platform.broker.QueueRow;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
+import io.github.sudoitir.rahdar.platform.clusters.ClusterHealth;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
 import io.github.sudoitir.rahdar.platform.clusters.NodeStateRecorder;
 import io.micrometer.core.instrument.Counter;
@@ -56,11 +57,20 @@ class KafkaScrape implements ClusterScrape {
     /** A broker the cluster has not listed for this long, while the cluster answered, has left it for good. */
     static final Duration RETIRE_AFTER = Duration.ofMinutes(10);
 
+    /** An unchanged health verdict is written again after this long, so readers can tell the scrape is alive. */
+    static final Duration HEALTH_HEARTBEAT = Duration.ofSeconds(30);
+
     private final KafkaPartitions partitions;
     private final MeterRegistry meters;
     private final AuditService audit;
     private final ActorResolver actors;
     private final Clock clock;
+    private final KafkaHealthStore healthStore;
+
+    /** What the scrape last wrote of each cluster's health and when, so an unchanged verdict is rewritten only now and then. */
+    private final Map<UUID, Written> written = new ConcurrentHashMap<>();
+
+    private record Written(ClusterHealth health, Instant at) {}
 
     /** Since when each stored broker the cluster does not list has been missing, by cluster. */
     private final Map<UUID, Map<UUID, Instant>> unlistedSince = new ConcurrentHashMap<>();
@@ -84,6 +94,7 @@ class KafkaScrape implements ClusterScrape {
                 String message =
                         e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
                 stored.forEach(node -> recorder.recordNodeError(node.getId(), message, kind));
+                publish(KafkaHealth.unreachable(clusterId, message));
             }
             throw e;
         }
@@ -97,6 +108,7 @@ class KafkaScrape implements ClusterScrape {
         if (changed.isPresent()) {
             stored.forEach(node ->
                     recorder.recordNodeError(node.getId(), changed.get(), BrokerConnectionException.Kind.UNREACHABLE));
+            publish(KafkaHealth.replaced(clusterId, changed.get()));
             return;
         }
         Map<String, ClusterNode> byBroker = new HashMap<>();
@@ -138,6 +150,20 @@ class KafkaScrape implements ClusterScrape {
             round(clusterId, "partitions");
             partitions.refresh(clusterId);
         }
+        publish(KafkaHealth.judge(clusterId, described, partitions.offline(clusterId)));
+    }
+
+    /** Writes the verdict where every replica reads it: when it changed, and otherwise every {@link #HEALTH_HEARTBEAT}. */
+    private void publish(ClusterHealth health) {
+        Instant now = clock.instant();
+        Written last = written.get(health.clusterId());
+        if (last != null
+                && last.health().equals(health)
+                && Duration.between(last.at(), now).compareTo(HEALTH_HEARTBEAT) < 0) {
+            return;
+        }
+        healthStore.write(health, now);
+        written.put(health.clusterId(), new Written(health, now));
     }
 
     /** Drops the cluster's per-cluster meters and the brokers it was waiting on. */
@@ -147,6 +173,7 @@ class KafkaScrape implements ClusterScrape {
                 .meters()
                 .forEach(meters::remove);
         unlistedSince.remove(clusterId);
+        written.remove(clusterId);
     }
 
     /** Removes a broker the cluster dropped, and records that it left. */

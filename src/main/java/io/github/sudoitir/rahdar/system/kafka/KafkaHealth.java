@@ -1,30 +1,25 @@
 package io.github.sudoitir.rahdar.system.kafka;
 
-import io.github.sudoitir.openbroker.BrokerException;
 import io.github.sudoitir.openbroker.Partial;
 import io.github.sudoitir.openbroker.model.Condition;
 import io.github.sudoitir.openbroker.model.ConditionStatus;
 import io.github.sudoitir.openbroker.model.ConditionTypes;
 import io.github.sudoitir.openbroker.model.NodeDescription;
 import io.github.sudoitir.openbroker.model.NodeFunction;
-import io.github.sudoitir.openbroker.model.Scope;
-import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
-import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterHealth;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterHealth.Level;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterHealthEvaluator;
 import io.github.sudoitir.rahdar.platform.clusters.LogicalNode;
 import io.github.sudoitir.rahdar.platform.clusters.SplitBrainStatus;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 import org.springframework.stereotype.Component;
 
 /**
@@ -37,23 +32,18 @@ import org.springframework.stereotype.Component;
 @Component
 class KafkaHealth implements ClusterHealthEvaluator {
 
-    /** A reading is shared by the estate, the cluster screen and the health route for this long. */
-    static final Duration FRESH = Duration.ofSeconds(5);
+    /** A verdict older than this is the scrape's silence, not a reading. */
+    static final Duration STALE = Duration.ofMinutes(2);
 
     private static final String QUORUM_VOTER = "kafka.quorum_voter";
     private static final String QUORUM_LEADER = "kafka.quorum_leader";
 
-    private record Reading(Instant at, ClusterHealth health) {}
+    private final KafkaHealthStore store;
+    private final Clock clock;
 
-    private final BrokerGateway gateway;
-    private final KafkaPartitions partitions;
-    private final ClusterDirectory clusters;
-    private final Map<UUID, Reading> readings = new ConcurrentHashMap<>();
-
-    KafkaHealth(BrokerGateway gateway, KafkaPartitions partitions, ClusterDirectory clusters) {
-        this.gateway = gateway;
-        this.partitions = partitions;
-        this.clusters = clusters;
+    KafkaHealth(KafkaHealthStore store, Clock clock) {
+        this.store = store;
+        this.clock = clock;
     }
 
     @Override
@@ -61,35 +51,34 @@ class KafkaHealth implements ClusterHealthEvaluator {
         return KafkaModule.SYSTEM;
     }
 
+    /** What the scrape last wrote, never a call to a broker: a slow or silent cluster cannot hold a request. */
     @Override
     public ClusterHealth evaluate(UUID clusterId, List<LogicalNode> nodes, Set<UUID> rejectedNodeIds) {
-        Instant now = Instant.now();
-        Reading cached = readings.get(clusterId);
-        if (cached != null && Duration.between(cached.at(), now).compareTo(FRESH) < 0) {
-            return cached.health();
+        Optional<KafkaHealthStore.Stored> stored = store.read(clusterId);
+        if (stored.isEmpty()) {
+            return unknown(clusterId, "The scrape has not read this cluster yet.");
         }
-        ClusterHealth health = read(clusterId);
-        readings.put(clusterId, new Reading(now, health));
-        return health;
+        Instant at = stored.get().at();
+        if (Duration.between(at, clock.instant()).compareTo(STALE) > 0) {
+            return unknown(
+                    clusterId, "The scrape last read this cluster at " + at + ", so its health is not known now.");
+        }
+        return stored.get().health();
     }
 
-    void forget(UUID clusterId) {
-        readings.remove(clusterId);
+    private static ClusterHealth unknown(UUID clusterId, String note) {
+        return new ClusterHealth(
+                clusterId, Level.UNKNOWN, List.of(), SplitBrainStatus.NONE, false, List.of(note), List.of());
     }
 
-    private ClusterHealth read(UUID clusterId) {
-        Partial<List<NodeDescription>> described;
-        try {
-            described = gateway.cluster(clusterId).nodes().describe(Scope.whole());
-        } catch (BrokerException e) {
-            return verdict(
-                    clusterId, Level.CRITICAL, List.of(), List.of("No broker is reachable: " + e.getMessage()), false);
-        }
-        Optional<String> changed = KafkaClusterIdentity.recorded(clusters.nodes(clusterId));
-        if (changed.isPresent()) {
-            return verdict(clusterId, Level.CRITICAL, List.of(), List.of(changed.get()), false);
-        }
-        return judge(clusterId, described, partitions.offline(clusterId));
+    /** The verdict for a cluster no broker answered. */
+    static ClusterHealth unreachable(UUID clusterId, String why) {
+        return verdict(clusterId, Level.CRITICAL, List.of(), List.of("No broker is reachable: " + why), false);
+    }
+
+    /** The verdict for a cluster that now reports another cluster id than the one registered. */
+    static ClusterHealth replaced(UUID clusterId, String words) {
+        return verdict(clusterId, Level.CRITICAL, List.of(), List.of(words), false);
     }
 
     /** The verdict for what the driver described; separate from the read so it is tested on its own. */
@@ -177,7 +166,7 @@ class KafkaHealth implements ClusterHealthEvaluator {
         return verdict(clusterId, level, serving, notes, behind);
     }
 
-    private static ClusterHealth verdict(
+    static ClusterHealth verdict(
             UUID clusterId, Level level, List<String> serving, List<String> notes, boolean behind) {
         return new ClusterHealth(clusterId, level, serving, SplitBrainStatus.NONE, behind, notes, List.of());
     }
