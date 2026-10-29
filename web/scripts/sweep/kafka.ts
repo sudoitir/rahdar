@@ -597,7 +597,11 @@ export const KAFKA_ROUTES: RouteSpec[] = [
     data: [
       {
         path: kafka('kafka/brokers'),
-        empty: { brokers: [], quorum: { available: false, reason: 'No broker answered.' } },
+        empty: {
+          mode: 'KRaft',
+          brokers: [],
+          quorum: { available: false, reason: 'No broker answered.', voters: [], majority: false },
+        },
       },
     ],
     forbidden: true,
@@ -855,7 +859,7 @@ export const KAFKA_ROUTES: RouteSpec[] = [
             'POST',
             /:purge$/,
             200,
-            { affectedCount: 1200, cap: 100000, overCap: false, dryRun: true },
+            { affectedCount: 0, skippedCount: 1200, cap: 100000, overCap: false, dryRun: true },
             {},
             isDryRun,
           );
@@ -875,7 +879,7 @@ export const KAFKA_ROUTES: RouteSpec[] = [
           await press(page, 'Purge subscription');
           await dialogOf(page).waitFor();
           await page.waitForTimeout(1000);
-          await holdConfirm(page, 'Purge subscription');
+          await holdConfirm(page, 'Skip 1,200 records');
         },
         expectedStatus: [409],
       },
@@ -888,7 +892,7 @@ export const KAFKA_ROUTES: RouteSpec[] = [
             'POST',
             /:purge$/,
             200,
-            { affectedCount: 1200, cap: 100000, overCap: false, dryRun: true },
+            { affectedCount: 0, skippedCount: 1200, cap: 100000, overCap: false, dryRun: true },
             {},
             isDryRun,
           );
@@ -896,7 +900,7 @@ export const KAFKA_ROUTES: RouteSpec[] = [
           await press(page, 'Purge subscription');
           await dialogOf(page).waitFor();
           await page.waitForTimeout(1000);
-          await holdConfirm(page, 'Purge subscription');
+          await holdConfirm(page, 'Skip 1,200 records');
         },
       },
       {
@@ -913,7 +917,7 @@ export const KAFKA_ROUTES: RouteSpec[] = [
     // rebalancing, one refused at the preview because it has members. The run is the API's answer put in place.
     area: 'kafka-shared',
     id: 'bulk-run-stub',
-    path: kafka('bulk/runs'),
+    path: kafka('bulk/qa-stub-run'),
     scenes: [
       {
         id: 'run-with-rebalancing-failure-stub',
@@ -1005,7 +1009,7 @@ export const KAFKA_ROUTES: RouteSpec[] = [
     area: 'kafka-shared',
     id: 'messages-long-name',
     path: kafka(
-      `subscriptions/${encodeURIComponent(`kafka.group-topic/${LONG_GROUP}/${LONG_GROUP.replace('consumer-group', 'topic')}`)}/messages`,
+      `subscriptions/${encodeURIComponent(`kafka.group-topic/${LONG_GROUP}/${LONG_GROUP.replaceAll('consumer-group', 'topic')}`)}/messages`,
     ),
   },
 ];
