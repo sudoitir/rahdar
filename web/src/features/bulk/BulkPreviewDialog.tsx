@@ -177,6 +177,51 @@ function RunControls({
   );
 }
 
+/** A purge of a partitioned log moves every group to the end; anything else destroys. */
+function movesLog(
+  operation: BulkOperation,
+  acting: BulkItemView[],
+  kinds: readonly { id: string; partitioned: boolean }[] | undefined,
+): boolean {
+  if (operation !== 'PURGE' || acting.length === 0) return false;
+  return acting.every((item) => kinds?.find((kind) => kind.id === item.kind)?.partitioned === true);
+}
+
+/** The button that starts the run: a skip for a log purge, the verb and the count otherwise. */
+function confirmWords(moves: boolean, skippedTotal: number | null, groups: number, verb: string): string {
+  if (!moves) return `${verb} ${plural(groups, 'subscription')}`;
+  const records = skippedTotal === null ? 'records' : plural(skippedTotal, 'record');
+  return `Skip ${records} for ${plural(groups, 'group')}`;
+}
+
+/** The figures the dialog decides with: what moves, what is unknown, and which rows to show. */
+function runFigures(
+  operation: BulkOperation,
+  data: BulkRunDetailView | undefined,
+  onlyProblems: boolean,
+  kinds: readonly { id: string; partitioned: boolean }[] | undefined,
+) {
+  const items = data?.items ?? [];
+  const acting = items.filter((item) => item.status !== 'REFUSED');
+  const shown = onlyProblems ? items.filter(hasProblem) : items;
+  const moves = movesLog(operation, acting, kinds);
+  const unknown = OPERATIONS[operation].destructive
+    ? acting.filter((item) => (moves ? item.skipped : item.affected) == null).length
+    : 0;
+  const skippedTotal = acting.some((item) => item.skipped != null)
+    ? acting.reduce((sum, item) => sum + (item.skipped ?? 0), 0)
+    : null;
+  return {
+    acting,
+    shown,
+    moves,
+    unknown,
+    refused: items.length - acting.length,
+    overCap: data?.run.overCap ?? false,
+    confirmLabel: confirmWords(moves, skippedTotal, acting.length, OPERATIONS[operation].verb),
+  };
+}
+
 /** The frozen subscription set, optionally narrowed to the ones with a refusal or warning. */
 function SubscriptionsInRun({
   destructive,
@@ -280,23 +325,10 @@ export function BulkPreviewDialog({
   };
 
   const data = preview.data;
-  const acting = data?.items.filter((i) => i.status !== 'REFUSED') ?? [];
-  const refused = (data?.items.length ?? 0) - acting.length;
-  const overCap = data?.run.overCap ?? false;
-  const shown = onlyProblems ? (data?.items.filter(hasProblem) ?? []) : (data?.items ?? []);
   const cluster = useCluster(clusterId);
   // A purge of a partitioned log moves the groups to its end: nothing is destroyed, and the cap does not apply to it.
-  const moves =
-    operation === 'PURGE' &&
-    acting.length > 0 &&
-    acting.every((i) => cluster.data?.kinds?.find((k) => k.id === i.kind)?.partitioned === true);
-  const unknown = op.destructive ? acting.filter((i) => (moves ? i.skipped : i.affected) == null).length : 0;
-  const skippedTotal = acting.some((i) => i.skipped != null)
-    ? acting.reduce((sum, i) => sum + (i.skipped ?? 0), 0)
-    : null;
-  const confirmLabel = moves
-    ? `Skip ${skippedTotal === null ? 'records' : plural(skippedTotal, 'record')} for ${plural(acting.length, 'group')}`
-    : `${op.verb} ${plural(acting.length, 'subscription')}`;
+  const plan = runFigures(operation, data, onlyProblems, cluster.data?.kinds);
+  const { acting, shown, moves, unknown, refused, overCap, confirmLabel } = plan;
 
   const start = () => {
     if (!data) return;

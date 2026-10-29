@@ -6,7 +6,7 @@ import { useNavigate, useParams, useSearch } from '@tanstack/react-router';
 
 import { useCan } from '../../kernel/auth/useCan.ts';
 import { CapabilityGate } from '../../ui/CapabilityGate.tsx';
-import { gateFor } from '../../ui/capabilityGate.ts';
+import { gateFor, type GateVerdict } from '../../ui/capabilityGate.ts';
 import { ConfirmDialog } from '../../ui/ConfirmDialog.tsx';
 import { EmptyState } from '../../ui/EmptyState.tsx';
 import { ErrorState } from '../../ui/ErrorState.tsx';
@@ -52,6 +52,126 @@ const EMPTY_ACL: Acl = {
   pattern: 'literal',
   name: '',
 };
+
+/** The rows left after one ACL is taken back out of the removals. */
+function withoutAcl(acl: Acl) {
+  const id = key(acl);
+  return (rows: Acl[]) => rows.filter((row) => key(row) !== id);
+}
+
+function permissionWord(acl: Acl): 'Deny' | 'Allow' {
+  return acl.permission === 'deny' ? 'Deny' : 'Allow';
+}
+
+function aclColumns(
+  removing: ReadonlySet<string>,
+  gate: GateVerdict,
+  onKeep: (acl: Acl) => void,
+  onRemove: (acl: Acl) => void,
+): Column<Acl>[] {
+  return [
+    {
+      id: 'principal',
+      header: 'Principal',
+      accessor: (acl) => acl.principal,
+      kind: 'identifier',
+      priority: 'essential',
+    },
+    {
+      id: 'permission',
+      header: 'Permission',
+      accessor: permissionWord,
+      cell: (acl) => (
+        <StatusBadge tone={acl.permission === 'deny' ? 'warning' : 'neutral'}>{permissionWord(acl)}</StatusBadge>
+      ),
+      kind: 'status',
+      badge: true,
+      priority: 'essential',
+    },
+    { id: 'operation', header: 'Operation', accessor: (acl) => acl.operation, kind: 'status', priority: 'essential' },
+    {
+      id: 'type',
+      header: 'Resource',
+      accessor: (acl) => acl.resourceType.toLowerCase(),
+      kind: 'status',
+      priority: 'high',
+    },
+    { id: 'pattern', header: 'Match', accessor: (acl) => acl.pattern.toLowerCase(), kind: 'status', priority: 'low' },
+    { id: 'name', header: 'Name', accessor: (acl) => acl.name, kind: 'identifier', priority: 'essential' },
+    { id: 'host', header: 'Host', accessor: (acl) => acl.host, kind: 'code', priority: 'low' },
+    {
+      id: 'remove',
+      header: 'Change',
+      accessor: (acl) => (removing.has(key(acl)) ? 'Removing' : ''),
+      cell: (acl) =>
+        removing.has(key(acl)) ? (
+          <Button size="compact-xs" variant="subtle" aria-label={`Keep ${words(acl)}`} onClick={() => onKeep(acl)}>
+            Keep (removing)
+          </Button>
+        ) : (
+          <CapabilityGate verdict={gate} what="removing an ACL">
+            <Button
+              size="compact-xs"
+              variant="subtle"
+              disabled={gate.kind === 'blocked'}
+              aria-label={`Remove ${words(acl)}`}
+              onClick={() => onRemove(acl)}
+            >
+              Remove
+            </Button>
+          </CapabilityGate>
+        ),
+      kind: 'status',
+      priority: 'essential',
+    },
+  ];
+}
+
+/** How many ACL changes are waiting, for the toolbar. */
+function reviewWords(pending: number): string {
+  if (pending === 0) return 'No changes yet';
+  const noun = pending === 1 ? 'change' : 'changes';
+  return `${pending} ${noun} to review`;
+}
+
+function addsTitle(count: number): string {
+  const noun = count === 1 ? 'ACL' : 'ACLs';
+  return `${count} ${noun} to add`;
+}
+
+/** The empty table: no authoriser, nothing matching the filter, or genuinely no ACLs. */
+function aclEmpty(
+  first: { available: boolean; reason?: string | null } | undefined,
+  filtered: boolean,
+  onClear: () => void,
+) {
+  if (first && !first.available) {
+    return (
+      <EmptyState
+        kind="empty"
+        title="ACLs are not available"
+        description={first.reason ?? 'The cluster has no authoriser.'}
+      />
+    );
+  }
+  if (filtered) {
+    return (
+      <EmptyState
+        kind="filtered"
+        title="No ACL matches this filter"
+        description="ACLs may still exist; none of them match the filter."
+        onClearFilters={onClear}
+      />
+    );
+  }
+  return (
+    <EmptyState
+      kind="empty"
+      title="No ACLs"
+      description="An ACL grants or denies one operation on one resource to one principal. With none, an authorising cluster refuses everything it does not allow by other means."
+    />
+  );
+}
 
 /** The dialog that adds one ACL to the pending changes. */
 function AddAclDialog({
@@ -144,64 +264,14 @@ export function AclsView() {
   const change: AclChange = { add: adds, remove: removes };
   const filtered = Boolean(search.principal || search.resource);
 
-  const columns = useMemo<Column<Acl>[]>(
-    () => [
-      { id: 'principal', header: 'Principal', accessor: (a) => a.principal, kind: 'identifier', priority: 'essential' },
-      {
-        id: 'permission',
-        header: 'Permission',
-        accessor: (a) => (a.permission === 'deny' ? 'Deny' : 'Allow'),
-        cell: (a) => (
-          <StatusBadge tone={a.permission === 'deny' ? 'warning' : 'neutral'}>
-            {a.permission === 'deny' ? 'Deny' : 'Allow'}
-          </StatusBadge>
-        ),
-        kind: 'status',
-        badge: true,
-        priority: 'essential',
-      },
-      { id: 'operation', header: 'Operation', accessor: (a) => a.operation, kind: 'status', priority: 'essential' },
-      {
-        id: 'type',
-        header: 'Resource',
-        accessor: (a) => a.resourceType.toLowerCase(),
-        kind: 'status',
-        priority: 'high',
-      },
-      { id: 'pattern', header: 'Match', accessor: (a) => a.pattern.toLowerCase(), kind: 'status', priority: 'low' },
-      { id: 'name', header: 'Name', accessor: (a) => a.name, kind: 'identifier', priority: 'essential' },
-      { id: 'host', header: 'Host', accessor: (a) => a.host, kind: 'code', priority: 'low' },
-      {
-        id: 'remove',
-        header: 'Change',
-        accessor: (a) => (removing.has(key(a)) ? 'Removing' : ''),
-        cell: (a) =>
-          removing.has(key(a)) ? (
-            <Button
-              size="compact-xs"
-              variant="subtle"
-              aria-label={`Keep ${words(a)}`}
-              onClick={() => setRemoves((s) => s.filter((r) => key(r) !== key(a)))}
-            >
-              Keep (removing)
-            </Button>
-          ) : (
-            <CapabilityGate verdict={gate} what="removing an ACL">
-              <Button
-                size="compact-xs"
-                variant="subtle"
-                disabled={gate.kind === 'blocked'}
-                aria-label={`Remove ${words(a)}`}
-                onClick={() => setRemoves((s) => [...s, a])}
-              >
-                Remove
-              </Button>
-            </CapabilityGate>
-          ),
-        kind: 'status',
-        priority: 'essential',
-      },
-    ],
+  const columns = useMemo(
+    () =>
+      aclColumns(
+        removing,
+        gate,
+        (acl) => setRemoves(withoutAcl(acl)),
+        (acl) => setRemoves((rows) => [...rows, acl]),
+      ),
     [removing, gate],
   );
 
@@ -278,7 +348,7 @@ export function AclsView() {
         end={
           <>
             <Text size="xs" c="dimmed" role="status">
-              {pending === 0 ? 'No changes yet' : `${pending} change${pending === 1 ? '' : 's'} to review`}
+              {reviewWords(pending)}
             </Text>
             <CapabilityGate verdict={gate} what="adding an ACL">
               <Button size="xs" variant="default" disabled={gate.kind === 'blocked'} onClick={() => setAdding(true)}>
@@ -303,7 +373,7 @@ export function AclsView() {
         }
       />
       {adds.length > 0 ? (
-        <Notice tone="info" title={`${adds.length} ACL${adds.length === 1 ? '' : 's'} to add`}>
+        <Notice tone="info" title={addsTitle(adds.length)}>
           <Stack gap={2}>
             {adds.map((a) => (
               <Text key={key(a)} size="sm">
@@ -331,32 +401,11 @@ export function AclsView() {
         rowKey={key}
         loading={acls.isPending}
         error={acls.isError ? <ErrorState error={acls.error} onRetry={() => void acls.refetch()} /> : undefined}
-        empty={
-          first && !first.available ? (
-            <EmptyState
-              kind="empty"
-              title="ACLs are not available"
-              description={first.reason ?? 'The cluster has no authoriser.'}
-            />
-          ) : filtered ? (
-            <EmptyState
-              kind="filtered"
-              title="No ACL matches this filter"
-              description="ACLs may still exist; none of them match the filter."
-              onClearFilters={() => {
-                setPrincipal('');
-                setResource('');
-                write({ principal: undefined, resource: undefined });
-              }}
-            />
-          ) : (
-            <EmptyState
-              kind="empty"
-              title="No ACLs"
-              description="An ACL grants or denies one operation on one resource to one principal. With none, an authorising cluster refuses everything it does not allow by other means."
-            />
-          )
-        }
+        empty={aclEmpty(first, filtered, () => {
+          setPrincipal('');
+          setResource('');
+          write({ principal: undefined, resource: undefined });
+        })}
       />
       {acls.hasNextPage ? (
         <Button size="xs" variant="default" loading={acls.isFetchingNextPage} onClick={() => void acls.fetchNextPage()}>

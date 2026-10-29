@@ -90,6 +90,73 @@ function Totals({ preview }: Readonly<{ preview: ResetPreview }>) {
   );
 }
 
+/** Why the reset is not offered yet, or undefined when the preview may be confirmed. */
+function resetBlocked(
+  partial: ResetOutcome | null,
+  stale: boolean,
+  error: ApiError | null,
+  current: ResetPreview | null,
+): string | undefined {
+  if (partial) return 'The reset stopped part way. Close this and preview the topics that did not move.';
+  if (stale) return 'The group changed since the preview. Preview it again.';
+  if (error?.status === 409) return error.message;
+  if (!current) return 'Preview the reset first: the button waits for what it would move.';
+  if (current.blocked) return current.blocked;
+  const refused = current.partitions.filter((partition) => partition.refused);
+  if (refused.length === 0) return undefined;
+  return `${plural(refused.length, 'partition')} cannot be moved to that position, as the table says. Choose another position or other topics.`;
+}
+
+/** The offset or time the target needs, or the problem with a target that needs neither. */
+function resetValue(to: ResetTarget, value: string, problem: string | null, onValue: (value: string) => void) {
+  if (to === 'offset' || to === 'time') {
+    const label = to === 'offset' ? 'Offset' : 'Time (ISO-8601)';
+    return (
+      <TextInput label={label} value={value} error={problem} onChange={(event) => onValue(event.currentTarget.value)} />
+    );
+  }
+  if (!problem) return null;
+  return (
+    <Text size="sm" c="red" role="alert">
+      {problem}
+    </Text>
+  );
+}
+
+/** What the preview would move, or nothing once a reset has stopped part way. */
+function resetEffect(current: ResetPreview | null, partial: ResetOutcome | null) {
+  if (!current || partial) return null;
+  const named = current.members.length > 0 && !current.members.every((member) => current.blocked?.includes(member));
+  return (
+    <Stack gap="xs" aria-live="polite">
+      {current.blocked ? (
+        <Notice tone="warning" title="This group cannot be reset right now">
+          <Stack gap={4}>
+            <Text size="sm">{current.blocked}</Text>
+            {named ? <Text size="sm">{`Members: ${current.members.join(', ')}.`}</Text> : null}
+          </Stack>
+        </Notice>
+      ) : null}
+      {/* A reset that cannot run moves nothing: the reason is the whole answer, not a table of moves. */}
+      {current.blocked ? null : (
+        <>
+          <Totals preview={current} />
+          <DataTable
+            variant="static"
+            label="Partitions the reset would move"
+            storageKey="kafka.reset"
+            columns={COLUMNS}
+            data={current.partitions}
+            rowKey={(partition) => `${partition.topic}/${partition.partition}`}
+            height={{ maxRows: 10 }}
+            empty={null}
+          />
+        </>
+      )}
+    </Stack>
+  );
+}
+
 /**
  * Reset a group's committed offsets (ADR-0216): choose the topics and where to move, preview what each
  * partition would skip or read again and who still holds the group, then confirm by pressing and holding.
@@ -179,16 +246,7 @@ export function OffsetResetDialog({
     );
   };
 
-  let blocked: string | undefined;
-  if (partial) blocked = 'The reset stopped part way. Close this and preview the topics that did not move.';
-  else if (stale) blocked = 'The group changed since the preview. Preview it again.';
-  else if (reset.error?.status === 409) blocked = reset.error.message;
-  else if (!current) blocked = 'Preview the reset first: the button waits for what it would move.';
-  else if (current.blocked) blocked = current.blocked;
-  else if (current.partitions.some((p) => p.refused)) {
-    const n = current.partitions.filter((p) => p.refused).length;
-    blocked = `${plural(n, 'partition')} cannot be moved to that position, as the table says. Choose another position or other topics.`;
-  }
+  const blocked = resetBlocked(partial, stale, reset.error, current);
   const refused = reset.error && (reset.error.status === 409 || reset.error.status === 400) ? reset.error : null;
 
   return (
@@ -231,21 +289,10 @@ export function OffsetResetDialog({
               forget();
             }}
           />
-          {to === 'offset' || to === 'time' ? (
-            <TextInput
-              label={to === 'offset' ? 'Offset' : 'Time (ISO-8601)'}
-              value={value}
-              error={problem}
-              onChange={(e) => {
-                setValue(e.currentTarget.value);
-                forget();
-              }}
-            />
-          ) : problem ? (
-            <Text size="sm" c="red" role="alert">
-              {problem}
-            </Text>
-          ) : null}
+          {resetValue(to, value, problem, (next) => {
+            setValue(next);
+            forget();
+          })}
           <div>
             <Button size="xs" variant="default" loading={preview.isPending} onClick={runPreview}>
               Preview the reset
@@ -259,36 +306,7 @@ export function OffsetResetDialog({
           ) : null}
           {refused ? <RefusalNotice error={refused} /> : null}
           {partial ? <PartialReset outcome={partial} /> : null}
-          {current && !partial ? (
-            <Stack gap="xs" aria-live="polite">
-              {current.blocked ? (
-                <Notice tone="warning" title="This group cannot be reset right now">
-                  <Stack gap={4}>
-                    <Text size="sm">{current.blocked}</Text>
-                    {current.members.length > 0 && !current.members.every((m) => current.blocked?.includes(m)) ? (
-                      <Text size="sm">{`Members: ${current.members.join(', ')}.`}</Text>
-                    ) : null}
-                  </Stack>
-                </Notice>
-              ) : null}
-              {/* A reset that cannot run moves nothing: the reason is the whole answer, not a table of moves. */}
-              {current.blocked ? null : (
-                <>
-                  <Totals preview={current} />
-                  <DataTable
-                    variant="static"
-                    label="Partitions the reset would move"
-                    storageKey="kafka.reset"
-                    columns={COLUMNS}
-                    data={current.partitions}
-                    rowKey={(p) => `${p.topic}/${p.partition}`}
-                    height={{ maxRows: 10 }}
-                    empty={null}
-                  />
-                </>
-              )}
-            </Stack>
-          ) : null}
+          {resetEffect(current, partial)}
         </Stack>
       }
     />

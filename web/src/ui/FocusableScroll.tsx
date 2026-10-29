@@ -5,7 +5,7 @@ import { ScrollArea, type ScrollAreaAutosizeProps } from '@mantine/core';
  * cannot be scrolled from the keyboard, so the region itself takes focus (WCAG 2.1.1). Pass it as
  * `scrollAreaComponent`.
  */
-export function FocusableScroll(props: ScrollAreaAutosizeProps) {
+export function FocusableScroll(props: Readonly<ScrollAreaAutosizeProps>) {
   return (
     <ScrollArea.Autosize
       {...props}

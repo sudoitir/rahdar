@@ -49,6 +49,104 @@ function changeOf(edits: Record<string, Edit>): ConfigChange {
   return { set, remove };
 }
 
+/** The value column: a pending edit, or the value in force with its unit. */
+function pendingValue(entry: ConfigEntry, edit: Edit | undefined): string {
+  if (edit?.kind === 'set') return `${edit.value} (pending)`;
+  if (edit) return 'Default (pending)';
+  const unit = entry.unit ? ` ${entry.unit}` : '';
+  return `${valueWords(entry)}${unit}`;
+}
+
+/** What the change field starts from: the pending value, or empty when the current one is hidden. */
+function draftOf(entry: ConfigEntry, edit: Edit | undefined): string {
+  if (edit?.kind === 'set') return edit.value;
+  if (entry.sensitive) return '';
+  return entry.value ?? '';
+}
+
+function topicColumns(
+  edits: Record<string, Edit>,
+  gate: GateVerdict,
+  onEdit: (entry: ConfigEntry, draft: string) => void,
+): Column<ConfigEntry>[] {
+  return [
+    { id: 'name', header: 'Setting', accessor: (entry) => entry.name, kind: 'identifier', priority: 'essential' },
+    {
+      id: 'value',
+      header: 'Value',
+      accessor: (entry) => pendingValue(entry, edits[entry.name]),
+      kind: 'code',
+      priority: 'essential',
+    },
+    {
+      id: 'source',
+      header: 'Comes from',
+      accessor: (entry) => SOURCE[entry.source],
+      cell: (entry) => (
+        <StatusBadge tone={entry.source === 'TOPIC' ? 'info' : 'neutral'}>{SOURCE[entry.source]}</StatusBadge>
+      ),
+      kind: 'status',
+      badge: true,
+      priority: 'high',
+    },
+    {
+      id: 'default',
+      header: 'Default',
+      accessor: (entry) => entry.defaultValue ?? '',
+      kind: 'code',
+      priority: 'low',
+    },
+    {
+      id: 'edit',
+      header: 'Change',
+      accessor: () => '',
+      cell: (entry) =>
+        entry.readOnly ? (
+          <Text size="xs" c="dimmed">
+            Read-only
+          </Text>
+        ) : (
+          <CapabilityGate verdict={gate} what={`changing ${entry.name}`}>
+            <Button
+              size="compact-xs"
+              variant="subtle"
+              disabled={gate.kind === 'blocked'}
+              aria-label={`Change ${entry.name}`}
+              onClick={() => onEdit(entry, draftOf(entry, edits[entry.name]))}
+            >
+              Change
+            </Button>
+          </CapabilityGate>
+        ),
+      kind: 'status',
+      priority: 'essential',
+    },
+  ];
+}
+
+/** How many edits are waiting, for the toolbar. */
+function pendingWords(pending: number): string {
+  if (pending === 0) return 'No changes yet';
+  const suffix = pending === 1 ? '' : 's';
+  return `${pending} change${suffix} to review`;
+}
+
+/** The value in force, for the field that replaces it. A sensitive value is never repeated. */
+function editDescription(editing: ConfigEntry | null): string {
+  if (editing?.sensitive) return 'A sensitive value is never shown. Enter a new one to replace it.';
+  const current = editing?.value ?? 'not set';
+  const unit = editing?.unit ? ` ${editing.unit}` : '';
+  const fallback = editing?.defaultValue ?? 'none';
+  return `Now ${current}${unit}. Default ${fallback}.`;
+}
+
+/** Why applying is not offered: the review is stale, or the system rejects a change. */
+function applyBlocked(changed: boolean, rejected: boolean): string | undefined {
+  if (changed) return 'The configuration changed since this review. Close it and review the changes again.';
+  if (rejected) return 'The system rejects at least one change. Fix it, then review again.';
+  return undefined;
+}
+
 /**
  * A topic's configuration with where each value comes from. Edits are collected, reviewed against what they
  * would change (the value before and after, what a removed entry falls back to, and the driver's own
@@ -74,66 +172,12 @@ export function TopicConfigView() {
   const [reviewed, setReviewed] = useState<ConfigPreview | null>(null);
   const pending = Object.keys(edits).length;
 
-  const columns = useMemo<Column<ConfigEntry>[]>(
-    () => [
-      { id: 'name', header: 'Setting', accessor: (e) => e.name, kind: 'identifier', priority: 'essential' },
-      {
-        id: 'value',
-        header: 'Value',
-        accessor: (e) => {
-          const edit = edits[e.name];
-          if (edit) return edit.kind === 'set' ? `${edit.value} (pending)` : 'Default (pending)';
-          return `${valueWords(e)}${e.unit ? ` ${e.unit}` : ''}`;
-        },
-        kind: 'code',
-        priority: 'essential',
-      },
-      {
-        id: 'source',
-        header: 'Comes from',
-        accessor: (e) => SOURCE[e.source],
-        cell: (e) => <StatusBadge tone={e.source === 'TOPIC' ? 'info' : 'neutral'}>{SOURCE[e.source]}</StatusBadge>,
-        kind: 'status',
-        badge: true,
-        priority: 'high',
-      },
-      {
-        id: 'default',
-        header: 'Default',
-        accessor: (e) => e.defaultValue ?? '',
-        kind: 'code',
-        priority: 'low',
-      },
-      {
-        id: 'edit',
-        header: 'Change',
-        accessor: () => '',
-        cell: (e) =>
-          e.readOnly ? (
-            <Text size="xs" c="dimmed">
-              Read-only
-            </Text>
-          ) : (
-            <CapabilityGate verdict={gate} what={`changing ${e.name}`}>
-              <Button
-                size="compact-xs"
-                variant="subtle"
-                disabled={gate.kind === 'blocked'}
-                aria-label={`Change ${e.name}`}
-                onClick={() => {
-                  setEditing(e);
-                  const edit = edits[e.name];
-                  setDraft(edit?.kind === 'set' ? edit.value : e.sensitive ? '' : (e.value ?? ''));
-                }}
-              >
-                Change
-              </Button>
-            </CapabilityGate>
-          ),
-        kind: 'status',
-        priority: 'essential',
-      },
-    ],
+  const columns = useMemo(
+    () =>
+      topicColumns(edits, gate, (entry, draft) => {
+        setEditing(entry);
+        setDraft(draft);
+      }),
     [edits, gate],
   );
 
@@ -196,7 +240,7 @@ export function TopicConfigView() {
         end={
           <>
             <Text size="xs" c="dimmed" role="status">
-              {pending === 0 ? 'No changes yet' : `${pending} change${pending === 1 ? '' : 's'} to review`}
+              {pendingWords(pending)}
             </Text>
             <Button size="xs" variant="subtle" disabled={pending === 0} onClick={() => setEdits({})}>
               Discard
@@ -234,11 +278,7 @@ export function TopicConfigView() {
           <Stack gap="sm">
             <TextInput
               label="New value"
-              description={
-                editing?.sensitive
-                  ? 'A sensitive value is never shown. Enter a new one to replace it.'
-                  : `Now ${editing?.value ?? 'not set'}${editing?.unit ? ` ${editing.unit}` : ''}. Default ${editing?.defaultValue ?? 'none'}.`
-              }
+              description={editDescription(editing)}
               value={draft}
               onChange={(e) => setDraft(e.currentTarget.value)}
               data-autofocus
@@ -269,13 +309,7 @@ export function TopicConfigView() {
         onClose={close}
         title={`Apply ${pending} change${pending === 1 ? '' : 's'} to ${topic}`}
         confirmLabel={`Apply ${pending} change${pending === 1 ? '' : 's'}`}
-        blocked={
-          apply.error?.status === 412
-            ? 'The configuration changed since this review. Close it and review the changes again.'
-            : hasError
-              ? 'The system rejects at least one change. Fix it, then review again.'
-              : undefined
-        }
+        blocked={applyBlocked(apply.error?.status === 412, hasError)}
         pending={apply.isPending}
         onConfirm={run}
         consequence={

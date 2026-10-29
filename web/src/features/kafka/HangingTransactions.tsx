@@ -3,7 +3,7 @@ import { Button, Group, Stack, Text, TextInput } from '@mantine/core';
 
 import { useCan } from '../../kernel/auth/useCan.ts';
 import { CapabilityGate } from '../../ui/CapabilityGate.tsx';
-import { gateFor } from '../../ui/capabilityGate.ts';
+import { gateFor, type GateVerdict } from '../../ui/capabilityGate.ts';
 import { ConfirmDialog } from '../../ui/ConfirmDialog.tsx';
 import { EmptyState } from '../../ui/EmptyState.tsx';
 import { ErrorState } from '../../ui/ErrorState.tsx';
@@ -144,6 +144,76 @@ function AbortHangingDialog({
   );
 }
 
+function hangingColumns(
+  abortGate: GateVerdict,
+  onAbort: (transaction: HangingTransaction) => void,
+): Column<HangingTransaction>[] {
+  return [
+    {
+      id: 'topic',
+      header: 'Topic',
+      accessor: (transaction) => transaction.topic,
+      kind: 'identifier',
+      priority: 'essential',
+    },
+    {
+      id: 'partition',
+      header: 'Partition',
+      accessor: (transaction) => transaction.partition,
+      kind: 'number',
+      priority: 'essential',
+    },
+    {
+      id: 'producer',
+      header: 'Producer',
+      accessor: (transaction) =>
+        transaction.producerEpoch == null
+          ? `${transaction.producerId}`
+          : `${transaction.producerId}, epoch ${transaction.producerEpoch}`,
+      kind: 'code',
+      priority: 'high',
+    },
+    {
+      id: 'held',
+      header: 'Records held back',
+      short: 'Held back',
+      description: 'Records after its start that a read-committed consumer cannot reach',
+      accessor: (transaction) => orNotReported(transaction.recordsHeldBack, (count) => count.toLocaleString()),
+      kind: 'number',
+      priority: 'high',
+    },
+    {
+      id: 'age',
+      header: 'Last write',
+      description: 'How long ago the producer last wrote',
+      accessor: (transaction) => orNotReported(transaction.ageMs, (age) => `${ageWords(age)} ago`),
+      kind: 'number',
+      priority: 'high',
+    },
+    {
+      id: 'abort',
+      header: 'Change',
+      accessor: () => '',
+      cell: (transaction) => (
+        <CapabilityGate verdict={abortGate} what={`aborting the transaction on ${where(transaction)}`}>
+          <Button
+            size="compact-xs"
+            variant="subtle"
+            color="red"
+            disabled={abortGate.kind === 'blocked'}
+            aria-label={`Abort on ${where(transaction)}`}
+            onClick={() => onAbort(transaction)}
+          >
+            Abort…
+          </Button>
+        </CapabilityGate>
+      ),
+      kind: 'status',
+      priority: 'essential',
+    },
+  ];
+}
+
 /**
  * The transactions the coordinator does not know about: open on a partition and holding the last stable offset
  * back for ever, so no timeout will end them. They are found on demand, because finding them reads every partition
@@ -174,58 +244,7 @@ export function HangingTransactions({ clusterId }: Readonly<{ clusterId: string 
     );
   };
 
-  const columns = useMemo<Column<HangingTransaction>[]>(
-    () => [
-      { id: 'topic', header: 'Topic', accessor: (t) => t.topic, kind: 'identifier', priority: 'essential' },
-      { id: 'partition', header: 'Partition', accessor: (t) => t.partition, kind: 'number', priority: 'essential' },
-      {
-        id: 'producer',
-        header: 'Producer',
-        accessor: (t) => (t.producerEpoch == null ? `${t.producerId}` : `${t.producerId}, epoch ${t.producerEpoch}`),
-        kind: 'code',
-        priority: 'high',
-      },
-      {
-        id: 'held',
-        header: 'Records held back',
-        short: 'Held back',
-        description: 'Records after its start that a read-committed consumer cannot reach',
-        accessor: (t) => orNotReported(t.recordsHeldBack, (n) => n.toLocaleString()),
-        kind: 'number',
-        priority: 'high',
-      },
-      {
-        id: 'age',
-        header: 'Last write',
-        description: 'How long ago the producer last wrote',
-        accessor: (t) => orNotReported(t.ageMs, (n) => `${ageWords(n)} ago`),
-        kind: 'number',
-        priority: 'high',
-      },
-      {
-        id: 'abort',
-        header: 'Change',
-        accessor: () => '',
-        cell: (t) => (
-          <CapabilityGate verdict={abortGate} what={`aborting the transaction on ${where(t)}`}>
-            <Button
-              size="compact-xs"
-              variant="subtle"
-              color="red"
-              disabled={abortGate.kind === 'blocked'}
-              aria-label={`Abort on ${where(t)}`}
-              onClick={() => setAborting(t)}
-            >
-              Abort…
-            </Button>
-          </CapabilityGate>
-        ),
-        kind: 'status',
-        priority: 'essential',
-      },
-    ],
-    [abortGate],
-  );
+  const columns = useMemo(() => hangingColumns(abortGate, setAborting), [abortGate]);
 
   let body;
   if (find.isError && !searched) {

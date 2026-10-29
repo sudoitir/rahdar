@@ -28,7 +28,7 @@ import { checkPassed as passes } from './connectionCheck.ts';
 import { normaliseSeeds, seedRow, type SeedRow } from './normaliseSeeds.ts';
 import { isValidPattern } from './pattern.ts';
 
-const EXAMPLE = 'http://broker-1:8161/console/jolokia';
+const EXAMPLE = 'https://broker-1:8161/console/jolokia';
 
 const REGISTER: ActionVerb = { verb: 'Register', past: 'Registered', progressive: 'Registering' };
 

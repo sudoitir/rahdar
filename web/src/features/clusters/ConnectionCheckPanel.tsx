@@ -45,6 +45,9 @@ export function ConnectionCheckPanel({ check, selfId }: Readonly<{ check: Connec
   const lacking = check.access.filter((a) => a.status !== 'AVAILABLE');
   const other = check.alreadyRegistered && check.alreadyRegistered.id !== selfId ? check.alreadyRegistered : null;
   const untested = untestedNodes(check);
+  const newerThanTested = untested
+    .map((node) => `${node.id} runs ${systemWords(check.system)} ${node.version}`)
+    .join('; ');
   const passiveBackup = check.nodes.some((n) => n.artemis?.core === 'NOT_TRIED' && n.artemis.haRole === 'BACKUP');
   return (
     <Stack gap="sm" aria-live="polite">
@@ -82,7 +85,7 @@ export function ConnectionCheckPanel({ check, selfId }: Readonly<{ check: Connec
 
       {untested.length > 0 ? (
         <Notice title={`Newer ${systemWords(check.system)} than Rahdar has tested`} tone="warning">
-          {`${untested.map((n) => `${n.id} runs ${systemWords(check.system)} ${n.version}`).join('; ')}. Registration will go ahead, but this release is outside the range Rahdar's tests cover, so a management call may behave differently. The supported versions page lists the tested range.`}
+          {`${newerThanTested}. Registration will go ahead, but this release is outside the range Rahdar's tests cover, so a management call may behave differently. The supported versions page lists the tested range.`}
         </Notice>
       ) : null}
 

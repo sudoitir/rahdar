@@ -19,6 +19,14 @@ function ConnectionForm({ system }: Readonly<{ system: LoadedSystem }>) {
   return system.connection === 'bootstrap' ? <KafkaRegistrationForm /> : <ArtemisRegistrationForm />;
 }
 
+/** The system the address names, or the only loaded one when the address names none. */
+function chosenSystem(list: LoadedSystem[], chosen: string | undefined): LoadedSystem | undefined {
+  const found = list.find((system) => system.id === chosen);
+  if (found) return found;
+  if (!chosen && list.length === 1) return list[0];
+  return undefined;
+}
+
 /**
  * Registration (`/clusters/new?system=<id>`), a page of its own outside any cluster: choose the system
  * from the drivers Rahdar loads, give its connection, check it, then name and register the cluster. The
@@ -30,7 +38,7 @@ export function RegisterClusterPage() {
   const navigate = useNavigate();
 
   const list = systems.data ?? [];
-  const selected = list.find((s) => s.id === chosen) ?? (chosen ? undefined : list.length === 1 ? list[0] : undefined);
+  const selected = chosenSystem(list, chosen);
 
   let body;
   if (systems.isError) {

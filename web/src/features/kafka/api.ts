@@ -8,6 +8,11 @@ type Schemas = components['schemas'];
 const base = (clusterId: string) => `/clusters/${clusterId}/kafka`;
 const seg = encodeURIComponent;
 
+const withQuery = (path: string, query: string) => {
+  const suffix = query ? `?${query}` : '';
+  return `${path}${suffix}`;
+};
+
 export const keys = {
   all: (c: string) => clusterKey(c, 'kafka'),
   groups: (c: string, filter: GroupFilter) => clusterKey(c, 'kafka', 'groups', filter),
@@ -43,7 +48,7 @@ export function useGroups(clusterId: string, filter: GroupFilter) {
       if (filter.q) sp.set('q', filter.q);
       if (pageParam) sp.set('cursor', pageParam);
       const query = sp.toString();
-      return request<Schemas['GroupPage']>(`${base(clusterId)}/groups${query ? `?${query}` : ''}`);
+      return request<Schemas['GroupPage']>(withQuery(`${base(clusterId)}/groups`, query));
     },
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (last) => last.next ?? undefined,
@@ -134,7 +139,7 @@ export function useAcls(clusterId: string, filter: AclFilter) {
       if (filter.resource) sp.set('resource', filter.resource);
       if (pageParam) sp.set('cursor', pageParam);
       const query = sp.toString();
-      return request<Schemas['AclPage']>(`${base(clusterId)}/acls${query ? `?${query}` : ''}`);
+      return request<Schemas['AclPage']>(withQuery(`${base(clusterId)}/acls`, query));
     },
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (last) => last.next ?? undefined,

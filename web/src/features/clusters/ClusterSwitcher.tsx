@@ -219,86 +219,84 @@ export function ClusterSwitcher({ collapsed }: Readonly<{ collapsed: boolean }>)
   else if (groups.length === 0) empty = 'No cluster matches this search.';
 
   return (
-    <>
-      <Combobox
-        store={combobox}
-        onOptionSubmit={choose}
-        width="max-content"
-        position={collapsed ? 'right-start' : 'bottom-start'}
-        classNames={{ dropdown: styles.dropdown, search: styles.search, option: styles.row }}
-      >
-        {/* The target's own props would clear `aria-expanded`: it is given here, where they are merged last. */}
-        <Combobox.Target targetType="button" {...{ 'aria-expanded': combobox.dropdownOpened }}>
-          <button
-            type="button"
-            className={styles.face}
-            data-collapsed={collapsed || undefined}
-            aria-label={collapsed ? label : undefined}
-            onClick={() => combobox.toggleDropdown()}
-          >
-            <Face collapsed={collapsed} entry={entry} />
-          </button>
-        </Combobox.Target>
-        <Combobox.Dropdown>
-          <Combobox.Search
-            value={search}
-            onChange={(event) => setSearch(event.currentTarget.value)}
-            placeholder="Search clusters"
-            aria-label="Search clusters"
-            onKeyDown={(event) => {
-              if (event.key === 'Tab') {
-                event.preventDefault();
-                combobox.closeDropdown('keyboard');
+    <Combobox
+      store={combobox}
+      onOptionSubmit={choose}
+      width="max-content"
+      position={collapsed ? 'right-start' : 'bottom-start'}
+      classNames={{ dropdown: styles.dropdown, search: styles.search, option: styles.row }}
+    >
+      {/* The target's own props would clear `aria-expanded`: it is given here, where they are merged last. */}
+      <Combobox.Target targetType="button" {...{ 'aria-expanded': combobox.dropdownOpened }}>
+        <button
+          type="button"
+          className={styles.face}
+          data-collapsed={collapsed || undefined}
+          aria-label={collapsed ? label : undefined}
+          onClick={() => combobox.toggleDropdown()}
+        >
+          <Face collapsed={collapsed} entry={entry} />
+        </button>
+      </Combobox.Target>
+      <Combobox.Dropdown>
+        <Combobox.Search
+          value={search}
+          onChange={(event) => setSearch(event.currentTarget.value)}
+          placeholder="Search clusters"
+          aria-label="Search clusters"
+          onKeyDown={(event) => {
+            if (event.key === 'Tab') {
+              event.preventDefault();
+              combobox.closeDropdown('keyboard');
+            }
+          }}
+        />
+        <Combobox.Options aria-label="Clusters">
+          {groups.map(({ environment, entries }) => (
+            <Combobox.Group
+              key={environment?.id ?? 'none'}
+              label={
+                <span className={styles.groupLabel}>
+                  {environment ? <Environment environment={environment} /> : 'No environment'}
+                </span>
               }
-            }}
-          />
-          <Combobox.Options aria-label="Clusters">
-            {groups.map(({ environment, entries }) => (
-              <Combobox.Group
-                key={environment?.id ?? 'none'}
-                label={
-                  <span className={styles.groupLabel}>
-                    {environment ? <Environment environment={environment} /> : 'No environment'}
-                  </span>
-                }
-              >
-                {entries.map(({ cluster }) => (
-                  <Combobox.Option
-                    key={cluster.id}
-                    value={cluster.id}
-                    active={cluster.id === current?.id}
-                    aria-selected={cluster.id === current?.id}
-                  >
-                    <span className={styles.option}>
-                      <span className={styles.line}>
-                        <span className={`${styles.name} ${styles.ellipsis}`}>{cluster.name}</span>
-                        {cluster.id === current?.id ? <IconCheck className={styles.icon} aria-hidden /> : null}
-                        <span className={styles.count}>{nodes(cluster.nodeCount)}</span>
-                      </span>
-                      <span className={styles.line}>
-                        {environment ? <span className={styles.ellipsis}>{environment.name}</span> : null}
-                        <Health level={cluster.health} />
-                      </span>
+            >
+              {entries.map(({ cluster }) => (
+                <Combobox.Option
+                  key={cluster.id}
+                  value={cluster.id}
+                  active={cluster.id === current?.id}
+                  aria-selected={cluster.id === current?.id}
+                >
+                  <span className={styles.option}>
+                    <span className={styles.line}>
+                      <span className={`${styles.name} ${styles.ellipsis}`}>{cluster.name}</span>
+                      {cluster.id === current?.id ? <IconCheck className={styles.icon} aria-hidden /> : null}
+                      <span className={styles.count}>{nodes(cluster.nodeCount)}</span>
                     </span>
-                  </Combobox.Option>
-                ))}
-              </Combobox.Group>
-            ))}
-            {search.trim() === '' ? (
-              <Combobox.Option value={ALL} className={styles.all}>
-                <IconLayoutList className={styles.icon} aria-hidden />
-                All clusters
-              </Combobox.Option>
-            ) : null}
-            {empty ? <Combobox.Empty>{empty}</Combobox.Empty> : null}
-            {clusters.isError ? <Combobox.Option value={RETRY}>Try again</Combobox.Option> : null}
-            <Combobox.Option value={REGISTER} className={styles.register}>
-              <IconPlus className={styles.icon} aria-hidden />
-              Register cluster
+                    <span className={styles.line}>
+                      {environment ? <span className={styles.ellipsis}>{environment.name}</span> : null}
+                      <Health level={cluster.health} />
+                    </span>
+                  </span>
+                </Combobox.Option>
+              ))}
+            </Combobox.Group>
+          ))}
+          {search.trim() === '' ? (
+            <Combobox.Option value={ALL} className={styles.all}>
+              <IconLayoutList className={styles.icon} aria-hidden />
+              All clusters
             </Combobox.Option>
-          </Combobox.Options>
-        </Combobox.Dropdown>
-      </Combobox>
-    </>
+          ) : null}
+          {empty ? <Combobox.Empty>{empty}</Combobox.Empty> : null}
+          {clusters.isError ? <Combobox.Option value={RETRY}>Try again</Combobox.Option> : null}
+          <Combobox.Option value={REGISTER} className={styles.register}>
+            <IconPlus className={styles.icon} aria-hidden />
+            Register cluster
+          </Combobox.Option>
+        </Combobox.Options>
+      </Combobox.Dropdown>
+    </Combobox>
   );
 }

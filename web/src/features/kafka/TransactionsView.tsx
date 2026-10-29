@@ -6,7 +6,7 @@ import { useCan } from '../../kernel/auth/useCan.ts';
 import { Ago } from '../../kernel/time/Ago.tsx';
 import { useServerNow } from '../../kernel/time/time.ts';
 import { CapabilityGate } from '../../ui/CapabilityGate.tsx';
-import { gateFor } from '../../ui/capabilityGate.ts';
+import { gateFor, type GateVerdict } from '../../ui/capabilityGate.ts';
 import { ConfirmDialog } from '../../ui/ConfirmDialog.tsx';
 import { EmptyState } from '../../ui/EmptyState.tsx';
 import { ErrorState } from '../../ui/ErrorState.tsx';
@@ -81,6 +81,7 @@ function AbortDialog({
   else if (effect && !effect.abortable) blocked = effect.effect;
   else if (preview.isError) blocked = 'The effect could not be read, so the abort is not offered.';
   else if (!effect) blocked = 'Reading what the abort would do…';
+  const released = effect?.released.map((part) => `${part.topic}-${part.partition}`).join(', ');
 
   return (
     <ConfirmDialog
@@ -99,9 +100,7 @@ function AbortDialog({
           {effect ? (
             <>
               <Text size="sm">{effect.effect}</Text>
-              {effect.released.length > 0 ? (
-                <Text size="sm">{`Unblocks: ${effect.released.map((b) => `${b.topic}-${b.partition}`).join(', ')}.`}</Text>
-              ) : null}
+              {effect.released.length > 0 ? <Text size="sm">{`Unblocks: ${released}.`}</Text> : null}
             </>
           ) : null}
           <Text size="sm">The producer is fenced and its next write fails. This cannot be undone.</Text>
@@ -109,6 +108,72 @@ function AbortDialog({
       }
     />
   );
+}
+
+function transactionColumns(
+  now: number,
+  gate: GateVerdict,
+  onAbort: (transaction: Transaction) => void,
+): Column<Transaction>[] {
+  return [
+    {
+      id: 'id',
+      header: 'Transactional id',
+      accessor: (transaction) => transaction.id,
+      kind: 'identifier',
+      priority: 'essential',
+    },
+    {
+      id: 'state',
+      header: 'State',
+      accessor: (transaction) => (transaction.hanging ? `${transaction.state} (hanging)` : transaction.state),
+      cell: (transaction) => (
+        <StatusBadge tone={transaction.hanging ? 'warning' : 'neutral'}>
+          {transaction.hanging ? `${transaction.state}, hanging` : transaction.state}
+        </StatusBadge>
+      ),
+      kind: 'status',
+      badge: true,
+      priority: 'essential',
+    },
+    {
+      id: 'started',
+      header: 'Started',
+      accessor: (transaction) => transaction.startedAt ?? 'Not running',
+      cell: (transaction) => (transaction.startedAt ? <Ago at={transaction.startedAt} now={now} /> : 'Not running'),
+      kind: 'time',
+      priority: 'high',
+    },
+    {
+      id: 'timeout',
+      header: 'Timeout',
+      accessor: (transaction) => seconds(transaction.timeoutMs),
+      kind: 'number',
+      priority: 'low',
+    },
+    { id: 'blocked', header: 'Holds back', accessor: blockedWords, kind: 'text', priority: 'high', wrap: true },
+    {
+      id: 'abort',
+      header: 'Change',
+      accessor: () => '',
+      cell: (transaction) => (
+        <CapabilityGate verdict={gate} what={`aborting ${transaction.id}`}>
+          <Button
+            size="compact-xs"
+            variant="subtle"
+            color="red"
+            disabled={gate.kind === 'blocked'}
+            aria-label={`Abort ${transaction.id}`}
+            onClick={() => onAbort(transaction)}
+          >
+            Abort…
+          </Button>
+        </CapabilityGate>
+      ),
+      kind: 'status',
+      priority: 'essential',
+    },
+  ];
 }
 
 /**
@@ -123,56 +188,7 @@ export function TransactionsView() {
   const gate = gateFor(can('transaction:abort', clusterId), 'Abort transactions', undefined, loading);
   const [aborting, setAborting] = useState<Transaction | null>(null);
 
-  const columns = useMemo<Column<Transaction>[]>(
-    () => [
-      { id: 'id', header: 'Transactional id', accessor: (t) => t.id, kind: 'identifier', priority: 'essential' },
-      {
-        id: 'state',
-        header: 'State',
-        accessor: (t) => (t.hanging ? `${t.state} (hanging)` : t.state),
-        cell: (t) => (
-          <StatusBadge tone={t.hanging ? 'warning' : 'neutral'}>
-            {t.hanging ? `${t.state}, hanging` : t.state}
-          </StatusBadge>
-        ),
-        kind: 'status',
-        badge: true,
-        priority: 'essential',
-      },
-      {
-        id: 'started',
-        header: 'Started',
-        accessor: (t) => t.startedAt ?? 'Not running',
-        cell: (t) => (t.startedAt ? <Ago at={t.startedAt} now={now} /> : 'Not running'),
-        kind: 'time',
-        priority: 'high',
-      },
-      { id: 'timeout', header: 'Timeout', accessor: (t) => seconds(t.timeoutMs), kind: 'number', priority: 'low' },
-      { id: 'blocked', header: 'Holds back', accessor: blockedWords, kind: 'text', priority: 'high', wrap: true },
-      {
-        id: 'abort',
-        header: 'Change',
-        accessor: () => '',
-        cell: (t) => (
-          <CapabilityGate verdict={gate} what={`aborting ${t.id}`}>
-            <Button
-              size="compact-xs"
-              variant="subtle"
-              color="red"
-              disabled={gate.kind === 'blocked'}
-              aria-label={`Abort ${t.id}`}
-              onClick={() => setAborting(t)}
-            >
-              Abort…
-            </Button>
-          </CapabilityGate>
-        ),
-        kind: 'status',
-        priority: 'essential',
-      },
-    ],
-    [gate, now],
-  );
+  const columns = useMemo(() => transactionColumns(now, gate, setAborting), [gate, now]);
 
   const hanging = transactions.data?.items.filter((t) => t.hanging) ?? [];
   return (

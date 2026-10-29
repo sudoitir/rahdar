@@ -5,7 +5,7 @@ import { useDebouncedValue } from '@mantine/hooks';
 
 import { CapabilityLedger, useCluster, useRoleIds } from '../clusters/index.ts';
 import { kindOf, refOf, subscriptionRefWords } from '../../kernel/api/resourceId.ts';
-import { useMessages, type MessageSummaryView } from './api.ts';
+import { useMessages, type MessagePageView, type MessageSummaryView } from './api.ts';
 import { CapabilityGate } from '../../ui/CapabilityGate.tsx';
 import { EmptyState } from '../../ui/EmptyState.tsx';
 import { ErrorState } from '../../ui/ErrorState.tsx';
@@ -88,6 +88,61 @@ function MessagesEmpty({
       title="This subscription has no messages"
       description="Messages wait in a subscription until a consumer takes them. Produce to the subscription, or use Send above to add one. Messages here are read over Jolokia as text — faithful binary bodies need the Core client."
     />
+  );
+}
+
+/** The page the header describes: a partition of a log, or a count read from one node. */
+function messagesHeading(
+  page: MessagePageView | undefined,
+  partitioned: boolean,
+  partition: number,
+  endpoints: readonly { id: string; name: string }[],
+): string {
+  if (!page) return 'Reading the subscription…';
+  if (!partitioned) {
+    const node = endpoints.find((endpoint) => endpoint.id === page.node)?.name ?? 'the live node';
+    return `${countLabel(page)} · read from ${node}`;
+  }
+  const hidden =
+    page.log?.uncommittedHidden === false
+      ? ''
+      : '. Only committed records are shown: those of a transaction that is still open or was aborted are not.';
+  return `Partition ${partition}${hidden}`;
+}
+
+/** What the browse asks for: one partition and a start, or a node, a selector and a page. */
+function messageQuery(
+  partitioned: boolean,
+  browse: PartitionBrowse,
+  search: { node?: string; filter?: string },
+  page: number,
+) {
+  if (partitioned) return { ...browse, size: PAGE_SIZE };
+  return { node: search.node, filter: search.filter, page, size: PAGE_SIZE };
+}
+
+/** The selector field of a queue, or the explanation that a log has no selector. */
+function selectorField(partitioned: boolean, filter: string) {
+  if (partitioned) return { placeholder: undefined, description: SELECTOR_REFUSAL, value: '', width: '22rem' };
+  return { placeholder: "Selector, e.g. region = 'eu'", description: undefined, value: filter, width: '17.5rem' };
+}
+
+/** Where the browse stands: the group's offset on a log, or the page of a queue. */
+function browsePosition(partitioned: boolean, log: MessagePageView['log'], page: number, lastPage: number | null) {
+  if (partitioned) {
+    // Said in the toolbar, where its arrival moves nothing: the controls keep their place.
+    if (log?.subscriptionPosition == null) return null;
+    return (
+      <Text size="xs">
+        {`The group stands at offset ${log.subscriptionPosition.toLocaleString()} on partition ${log.partition}: records from there on it has not read yet.`}
+      </Text>
+    );
+  }
+  const pages = lastPage == null ? `page ${page} · total unavailable` : `page ${page} of ${lastPage}`;
+  return (
+    <Text size="xs" c="dimmed">
+      {pages}
+    </Text>
   );
 }
 
@@ -180,11 +235,7 @@ export function MessagesView() {
     [cluster.data],
   );
 
-  const messages = useMessages(
-    clusterId,
-    subscriptionName,
-    partitioned ? { ...browse, size: PAGE_SIZE } : { node: search.node, filter: search.filter, page, size: PAGE_SIZE },
-  );
+  const messages = useMessages(clusterId, subscriptionName, messageQuery(partitioned, browse, search, page));
   const setBrowse = (next: PartitionBrowse) =>
     navigate({
       to: '.',
@@ -216,19 +267,7 @@ export function MessagesView() {
           <span className={classes.subscription}>{subscriptionRefWords(subscriptionName)}</span>
         </>
       }
-      description={
-        messages.data
-          ? partitioned
-            ? `Partition ${browse.partition}${
-                messages.data.log?.uncommittedHidden === false
-                  ? ''
-                  : '. Only committed records are shown: those of a transaction that is still open or was aborted are not.'
-              }`
-            : `${countLabel(messages.data)} · read from ${
-                endpoints.find((e) => e.id === messages.data.node)?.name ?? 'the live node'
-              }`
-          : 'Reading the subscription…'
-      }
+      description={messagesHeading(messages.data, partitioned, browse.partition, endpoints)}
       actions={
         <>
           <CapabilityGate verdict={sendGate} what="sending a message">
@@ -290,6 +329,7 @@ export function MessagesView() {
     .map((e) => e.name);
   // The destination follows the field once typing pauses, so clearing the field clears the selector.
   const clearSelector = () => setFilter('');
+  const selector = selectorField(partitioned, filter);
 
   const setNode = (node: string | null) =>
     navigate({
@@ -311,12 +351,12 @@ export function MessagesView() {
             <TextInput
               ref={filterRef}
               label="Message selector"
-              placeholder={partitioned ? undefined : "Selector, e.g. region = 'eu'"}
-              description={partitioned ? SELECTOR_REFUSAL : undefined}
+              placeholder={selector.placeholder}
+              description={selector.description}
               disabled={partitioned}
-              value={partitioned ? '' : filter}
+              value={selector.value}
               onChange={(e) => setFilter(e.currentTarget.value)}
-              w={partitioned ? '22rem' : '17.5rem'}
+              w={selector.width}
               size="xs"
             />
             {endpoints.length > 1 && !partitioned ? (
@@ -335,18 +375,7 @@ export function MessagesView() {
         }
         end={
           <>
-            {partitioned ? (
-              // Said in the toolbar, where its arrival moves nothing: the controls keep their place.
-              messages.data?.log?.subscriptionPosition == null ? null : (
-                <Text size="xs">
-                  {`The group stands at offset ${messages.data.log.subscriptionPosition.toLocaleString()} on partition ${messages.data.log.partition}: records from there on it has not read yet.`}
-                </Text>
-              )
-            ) : (
-              <Text size="xs" c="dimmed">
-                {lastPage == null ? `page ${page} · total unavailable` : `page ${page} of ${lastPage}`}
-              </Text>
-            )}
+            {browsePosition(partitioned, messages.data?.log, page, lastPage)}
             {subscription
               ? selectionSlot.map(({ id, Component }) => (
                   <Component
