@@ -17,6 +17,7 @@ import io.github.sudoitir.rahdar.platform.scrape.MetricSamples;
 import io.github.sudoitir.rahdar.platform.scrape.MetricSamples.Bucket;
 import io.github.sudoitir.rahdar.platform.scrape.MetricSamples.NodeBucket;
 import io.github.sudoitir.rahdar.platform.scrape.PluginMetrics;
+import io.github.sudoitir.rahdar.platform.scrape.SampleGate;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -44,8 +45,8 @@ public class MetricQueryService {
     private static final Set<String> RATE_METRICS =
             Set.of(MetricKeys.ENQUEUED.name(), MetricKeys.ACKNOWLEDGED.name(), MetricKeys.EXPIRED.name());
 
-    /** No bucket finer than the fastest tier that samples metrics (tier B, 15s). */
-    private static final Duration MIN_STEP = Duration.ofSeconds(15);
+    /** No bucket finer than the cadence samples are stored at (ADR-0220). */
+    private static final Duration MIN_STEP = SampleGate.HEARTBEAT;
 
     private static final int MAX_POINTS = 500;
 

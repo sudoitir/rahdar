@@ -4,6 +4,7 @@ import io.github.sudoitir.openbroker.model.MetricKeys;
 import io.github.sudoitir.rahdar.platform.scrape.MetricSamples;
 import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshot;
 import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshots;
+import io.github.sudoitir.rahdar.platform.scrape.SampleGate;
 import io.github.sudoitir.rahdar.platform.scrape.ScrapeProperties;
 import java.time.Instant;
 import java.util.HashMap;
@@ -72,7 +73,7 @@ public class SlowConsumerCondition implements AlertCondition {
         boolean nodeScoped = scope.node() != null && !scope.node().isBlank();
 
         Instant to = Instant.now();
-        Instant from = to.minus(properties.tierBInterval().multipliedBy(2));
+        Instant from = to.minus(SampleGate.rateWindow(properties.tierBInterval()));
         Map<String, Double> ackRateByQueue = series.latestRateBySubject(clusterId, ACK_METRIC, from, to);
 
         // Consumers attached AND a backlog present AND not paused. Anything else is

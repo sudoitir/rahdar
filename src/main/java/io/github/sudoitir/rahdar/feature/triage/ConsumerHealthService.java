@@ -20,6 +20,7 @@ import io.github.sudoitir.rahdar.kernel.security.ResourceFilter;
 import io.github.sudoitir.rahdar.kernel.security.ResourceRef;
 import io.github.sudoitir.rahdar.platform.scrape.MetricSamples;
 import io.github.sudoitir.rahdar.platform.scrape.MetricSamples.SubjectRate;
+import io.github.sudoitir.rahdar.platform.scrape.SampleGate;
 import io.github.sudoitir.rahdar.platform.scrape.ScrapeProperties;
 import java.time.Duration;
 import java.time.Instant;
@@ -117,7 +118,7 @@ public class ConsumerHealthService {
         List<SubscriptionView> rows = queues.rollUp(clusterId);
 
         Instant to = Instant.now();
-        Instant from = to.minus(scrape.tierBInterval().multipliedBy(2));
+        Instant from = to.minus(SampleGate.rateWindow(scrape.tierBInterval()));
 
         Map<String, SubjectRate> addRates = series.latestRateWithTimeBySubject(clusterId, ADDED, from, to);
         Map<String, SubjectRate> ackRates = series.latestRateWithTimeBySubject(clusterId, ACKED, from, to);

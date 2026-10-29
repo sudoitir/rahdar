@@ -131,6 +131,41 @@ class MetricSampleWriterTest extends PostgresIntegrationTest {
         assertThat(metricsWritten()).isEmpty();
     }
 
+    @Test
+    void aSecondSweepInsideTheHeartbeatStoresNothingMore() {
+        clusterId = clusters.save(new ClusterEntity(ArtemisModule.SYSTEM, "c-" + UUID.randomUUID(), null, null))
+                .getId();
+        nodeId = nodes.save(BrokerNodeEntity.fromSeed(clusterId, "n1", "NONE", "node-1"))
+                .getId();
+        QueueRow first = row(42L, 900);
+        writer.appendQueueSamples(List.of(first));
+        writer.appendQueueSamples(List.of(row(99L, 1_900)));
+
+        assertThat(metricsWritten()).hasSize(6);
+        assertThat(valueOf("openbroker.backlog")).isEqualTo(42.0);
+        assertThat(valueOf("openbroker.enqueued")).isEqualTo(900.0);
+    }
+
+    private QueueRow row(long backlog, long enqueued) {
+        return new QueueRow(
+                clusterId,
+                nodeId,
+                "orders",
+                "orders",
+                "ANYCAST",
+                true,
+                backlog,
+                3,
+                7,
+                1,
+                enqueued,
+                850,
+                5,
+                false,
+                "artemis.queue",
+                Map.of());
+    }
+
     private List<String> metricsWritten() {
         return jdbc.queryForList(
                 "SELECT metric FROM metric_sample WHERE cluster_id = :c", Map.of("c", clusterId), String.class);
