@@ -55,7 +55,7 @@ with the commit that fixes it and its test. Owner names are the agents of this s
 | C4 | audit 3 | A future start time or −1 timestamps give a silent empty page | kafka-hardening | open |
 | C5 | audit 3 | Inline java.time.Instant in MessageService | kafka-hardening | open |
 | C6 | audit 3 | An absent produce time shows as 1970-01-01 | kafka-hardening | open |
-| C7 | audit 3 | Bulk over 4000 subscriptions: item cap and bulk_run retention unverified | kafka-hardening | open: investigate and fix |
-| C8 | audit 3 | Held operations / approval requests: retention and orphans on cluster delete unverified | kafka-hardening | open: investigate and fix |
-| C9 | audit 3 | Alert/notification flapping (a broker flapping every minute): dedup and cooldown unverified | kafka-hardening | open: investigate and fix |
+| C7 | audit 3 | Bulk over 4000 subscriptions: item cap and bulk_run retention unverified | kafka-hardening | verified: cap 200 (BulkService, BulkPreviewTest) and 90-day retention (BulkRunStore, BulkRunStoreTest); no change needed |
+| C8 | audit 3 | Held operations / approval requests: retention and orphans on cluster delete unverified | kafka-hardening | fixed |
+| C9 | audit 3 | Alert/notification flapping (a broker flapping every minute): dedup and cooldown unverified | kafka-hardening | fixed |
 | C10 | audit 3 | SSE payload bytes of one scrape tick over 4000 subscriptions unmeasured | backend (perf run) | open: measure in 6.2d |
