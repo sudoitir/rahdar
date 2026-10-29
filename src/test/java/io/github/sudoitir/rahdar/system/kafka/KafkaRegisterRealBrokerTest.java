@@ -306,7 +306,8 @@ class KafkaRegisterRealBrokerTest extends PostgresIntegrationTest {
                     .get();
         }
         ResourceId log = ResourceId.of("kafka.topic", topic);
-        MessagePageView page = await().atMost(METADATA)
+        MessagePageView page = await().pollInSameThread()
+                .atMost(METADATA)
                 .pollInterval(PAUSE)
                 .ignoreExceptions()
                 .until(
@@ -382,7 +383,8 @@ class KafkaRegisterRealBrokerTest extends PostgresIntegrationTest {
             }
         }
         TruncateService.Cut cut = new TruncateService.Cut(Map.of(0, 6L), null);
-        TruncateService.TruncateEffect effect = await().atMost(METADATA)
+        TruncateService.TruncateEffect effect = await().pollInSameThread()
+                .atMost(METADATA)
                 .pollInterval(PAUSE)
                 .ignoreExceptions()
                 .until(() -> truncates.truncate(id, "kafka.topic", topic, cut, null, true), Objects::nonNull);
@@ -402,7 +404,8 @@ class KafkaRegisterRealBrokerTest extends PostgresIntegrationTest {
 
         assertThat(done.records()).isEqualTo(6);
         ResourceId log = ResourceId.of("kafka.topic", topic);
-        MessagePageView afterwards = await().atMost(METADATA)
+        MessagePageView afterwards = await().pollInSameThread()
+                .atMost(METADATA)
                 .pollInterval(PAUSE)
                 .ignoreExceptions()
                 .until(
@@ -429,7 +432,8 @@ class KafkaRegisterRealBrokerTest extends PostgresIntegrationTest {
                     .get();
         }
         TruncateService.Cut cut = new TruncateService.Cut(Map.of(0, 1L), null);
-        Throwable refused = await().atMost(METADATA)
+        Throwable refused = await().pollInSameThread()
+                .atMost(METADATA)
                 .pollInterval(PAUSE)
                 .ignoreExceptions()
                 .until(
@@ -481,7 +485,8 @@ class KafkaRegisterRealBrokerTest extends PostgresIntegrationTest {
                     .isInstanceOf(ConflictException.class)
                     .hasMessageContaining("member");
         }
-        Object outcome = await().atMost(METADATA)
+        Object outcome = await().pollInSameThread()
+                .atMost(METADATA)
                 .pollInterval(MEMBER_LEAVING)
                 .ignoreException(ConflictException.class)
                 .until(() -> ((Attempt.Ok<?>) messages.purgeLog(id, subscription, true)).value(), Objects::nonNull);
@@ -553,7 +558,8 @@ class KafkaRegisterRealBrokerTest extends PostgresIntegrationTest {
                 new KafkaConsumer<>(config, new ByteArrayDeserializer(), new ByteArrayDeserializer())) {
             consumer.commitSync(Map.of(new TopicPartition(topic, 0), new OffsetAndMetadata(4)));
         }
-        List<QueueRow> rows = await().atMost(METADATA)
+        List<QueueRow> rows = await().pollInSameThread()
+                .atMost(METADATA)
                 .pollInterval(PAUSE)
                 .until(
                         () -> scrape.subscriptions(id),
@@ -616,7 +622,8 @@ class KafkaRegisterRealBrokerTest extends PostgresIntegrationTest {
         }
 
         // The brokers' metadata trails the new topic by a moment, so the third partition's end may take a second look.
-        Breakdown breakdown = await().atMost(METADATA)
+        Breakdown breakdown = await().pollInSameThread()
+                .atMost(METADATA)
                 .pollInterval(PAUSE)
                 .until(
                         () -> backlogs.breakdown(id, "kafka.group-topic", group + "/" + topic),
