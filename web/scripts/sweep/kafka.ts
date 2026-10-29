@@ -1055,7 +1055,9 @@ export const KAFKA_ROUTES: RouteSpec[] = [
               ),
             ],
           });
-          await page.goto(`${new URL(page.url()).origin}/clusters/${cluster}/bulk/00000000-0000-4000-8000-00000000b001`);
+          await page.goto(
+            `${new URL(page.url()).origin}/clusters/${cluster}/bulk/00000000-0000-4000-8000-00000000b001`,
+          );
           await page.waitForTimeout(800);
         },
       },
