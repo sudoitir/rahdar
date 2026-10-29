@@ -813,7 +813,12 @@ class PluginMessagingRealBrokerTest extends PostgresIntegrationTest {
         Thread pass = holdTheLock(Duration.ofSeconds(2));
         MessageRegistration reg = messaging(plugin)
                 .register(new RegistrationSpec(
-                        "orders", clusterId, ResourceRef.subscription(queue), RegistrationMode.TAP, 1, operator));
+                        "orders",
+                        clusterId,
+                        SubscriptionId.of("artemis.queue", queue),
+                        RegistrationMode.TAP,
+                        1,
+                        operator));
         pass.join();
         assertThat(reg.state()).isEqualTo(RegistrationState.ACTIVE);
         assertThat(tapQueues()).hasSize(1);
@@ -829,7 +834,12 @@ class PluginMessagingRealBrokerTest extends PostgresIntegrationTest {
         String plugin = activate("busyoff");
         messaging(plugin)
                 .register(new RegistrationSpec(
-                        "orders", clusterId, ResourceRef.subscription(queue), RegistrationMode.TAP, 1, operator));
+                        "orders",
+                        clusterId,
+                        SubscriptionId.of("artemis.queue", queue),
+                        RegistrationMode.TAP,
+                        1,
+                        operator));
         Thread pass = holdTheLock(Duration.ofSeconds(2));
         assertThat(messaging(plugin).unregister("orders")).isTrue();
         pass.join();
@@ -845,16 +855,26 @@ class PluginMessagingRealBrokerTest extends PostgresIntegrationTest {
         String plugin = activate("move");
         messaging(plugin)
                 .register(new RegistrationSpec(
-                        "orders", clusterId, ResourceRef.subscription(first), RegistrationMode.TAP, 1, operator));
+                        "orders",
+                        clusterId,
+                        SubscriptionId.of("artemis.queue", first),
+                        RegistrationMode.TAP,
+                        1,
+                        operator));
         MessageRegistration moved = messaging(plugin)
                 .register(new RegistrationSpec(
-                        "orders", clusterId, ResourceRef.subscription(second), RegistrationMode.TAP, 1, operator));
+                        "orders",
+                        clusterId,
+                        SubscriptionId.of("artemis.queue", second),
+                        RegistrationMode.TAP,
+                        1,
+                        operator));
 
         assertThat(moved.state()).isEqualTo(RegistrationState.ACTIVE);
         assertThat(tapQueues()).hasSize(1);
         assertThat(messaging(plugin).registrations())
                 .singleElement()
-                .satisfies(r -> assertThat(r.source().name()).isEqualTo(second));
+                .satisfies(r -> assertThat(r.source().path()).isEqualTo(second));
     }
 
     /** Holds the cluster's plugin messaging lock for {@code hold}, as a pass would; returns once it is held. */

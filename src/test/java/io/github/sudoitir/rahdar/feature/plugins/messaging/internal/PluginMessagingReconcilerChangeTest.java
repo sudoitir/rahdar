@@ -13,7 +13,9 @@ import io.github.sudoitir.rahdar.feature.plugins.messaging.PluginMessagingProper
 import io.github.sudoitir.rahdar.kernel.audit.AuditService;
 import io.github.sudoitir.rahdar.kernel.settings.RahdarInstance;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
+import io.github.sudoitir.rahdar.platform.broker.BrokerMessages;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
+import io.github.sudoitir.rahdar.platform.clusters.ClusterKinds;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterLock;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterOwnership;
 import java.time.Clock;
@@ -44,6 +46,8 @@ class PluginMessagingReconcilerChangeTest {
                 mock(PluginDrains.class),
                 mock(PluginHandlers.class),
                 mock(AccessCheck.class),
+                mock(ClusterKinds.class),
+                mock(BrokerMessages.class),
                 mock(AuditService.class),
                 new PluginMessagingProperties(Duration.ofSeconds(10), 10),
                 Clock.systemUTC());

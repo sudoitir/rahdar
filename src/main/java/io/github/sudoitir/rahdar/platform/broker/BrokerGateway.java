@@ -14,7 +14,6 @@ import io.github.sudoitir.openbroker.ErrorInfo;
 import io.github.sudoitir.openbroker.ErrorReasons;
 import io.github.sudoitir.openbroker.NodeId;
 import io.github.sudoitir.openbroker.NodeSpec;
-import io.github.sudoitir.openbroker.Plane;
 import io.github.sudoitir.openbroker.Status;
 import io.github.sudoitir.openbroker.TlsProvider;
 import io.github.sudoitir.openbroker.spring.boot.autoconfigure.OpenBrokerConnectOptions;

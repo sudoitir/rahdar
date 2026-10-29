@@ -34,9 +34,8 @@ class BrokerGatewayCredentialsTest {
 
     @Test
     void anAccountIsPassedThroughForEachPlane() {
-        CredentialSource credentials = BrokerGateway.guarded(plane -> plane == Plane.DATA
-                ? Credentials.usernamePassword("app", "pw")
-                : new Credentials.None());
+        CredentialSource credentials = BrokerGateway.guarded(
+                plane -> plane == Plane.DATA ? Credentials.usernamePassword("app", "pw") : new Credentials.None());
 
         assertThat(credentials.forPlane(Plane.DATA)).isEqualTo(Credentials.usernamePassword("app", "pw"));
         assertThat(credentials.forPlane(Plane.MANAGEMENT)).isInstanceOf(Credentials.None.class);
@@ -49,6 +48,7 @@ class BrokerGatewayCredentialsTest {
         });
 
         assertThatThrownBy(() -> credentials.forPlane(Plane.DATA))
-                .isInstanceOfSatisfying(BrokerException.class, e -> assertThat(e.status()).isEqualTo(Status.UNAVAILABLE));
+                .isInstanceOfSatisfying(
+                        BrokerException.class, e -> assertThat(e.status()).isEqualTo(Status.UNAVAILABLE));
     }
 }
