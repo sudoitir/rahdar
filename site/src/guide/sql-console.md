@@ -5,7 +5,7 @@ description: Query the messages across an Artemis cluster in SQL — including t
 
 # SQL Console
 
-![Querying every queue in a cluster from the SQL Console, then following the live tail](/img/sql-console.gif)
+![The SQL Console: a query across the subscriptions under ORDERS.*, its predicate pushed down to the brokers, and the rows found with each node's answer, one of them refused](/img/sql.png)
 
 The question an operator actually arrives with is *"where did order 4471 go?"*.
 Artemis cannot answer it. Its only server-side filter is a JMS selector, which

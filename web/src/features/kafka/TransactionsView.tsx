@@ -88,6 +88,7 @@ function AbortDialog({
       onClose={dismiss}
       title={`Abort transaction ${id}`}
       tone="danger"
+      align="top"
       confirmLabel={`Abort transaction ${id}`}
       blocked={blocked}
       pending={abort.isPending}
@@ -180,12 +181,6 @@ export function TransactionsView() {
         title="Transactions"
         description="Producers that write atomically. A transaction that never finishes holds back every consumer that reads committed records past it. The coordinator aborts one that outlives its timeout; the ones it does not know are found below."
       />
-      {hanging.length > 0 ? (
-        <Notice tone="warning" title={`${hanging.length} hanging transaction${hanging.length === 1 ? '' : 's'}`}>
-          A hanging transaction is past its timeout, so the coordinator aborts it by itself. Until it does, it blocks
-          the partitions listed beside it.
-        </Notice>
-      ) : null}
       <DataTable
         label="Transactions"
         storageKey="kafka.transactions"
@@ -207,6 +202,12 @@ export function TransactionsView() {
           />
         }
       />
+      {hanging.length > 0 ? (
+        <Notice tone="warning" title={`${hanging.length} hanging transaction${hanging.length === 1 ? '' : 's'}`}>
+          A hanging transaction is past its timeout, so the coordinator aborts it by itself. Until it does, it blocks
+          the partitions listed beside it.
+        </Notice>
+      ) : null}
       <HangingTransactions clusterId={clusterId} />
       <AbortDialog clusterId={clusterId} transaction={aborting} onClose={() => setAborting(null)} />
     </Page>

@@ -978,7 +978,7 @@ export const KAFKA_ROUTES: RouteSpec[] = [
     // rebalancing, one refused at the preview because it has members. The run is the API's answer put in place.
     area: 'kafka-shared',
     id: 'bulk-run-stub',
-    path: kafka('bulk/qa-stub-run'),
+    path: kafka('bulk/00000000-0000-4000-8000-00000000b001'),
     scenes: [
       {
         id: 'run-with-rebalancing-failure-stub',
@@ -1005,9 +1005,9 @@ export const KAFKA_ROUTES: RouteSpec[] = [
             finishedAt: '2026-10-28T10:00:02Z',
           });
           const rebalancing = 'The group began rebalancing. Try again when it is stable.';
-          await stubCall(page, 'GET', /\/bulk\/runs\/qa-stub-run$/, 200, {
+          await stubCall(page, 'GET', /\/bulk\/runs\/00000000-0000-4000-8000-00000000b001$/, 200, {
             run: {
-              id: 'qa-stub-run',
+              id: '00000000-0000-4000-8000-00000000b001',
               clusterId: cluster,
               operation: 'PURGE',
               status: 'PARTIAL',
@@ -1055,7 +1055,7 @@ export const KAFKA_ROUTES: RouteSpec[] = [
               ),
             ],
           });
-          await page.goto(`${new URL(page.url()).origin}/clusters/${cluster}/bulk/qa-stub-run`);
+          await page.goto(`${new URL(page.url()).origin}/clusters/${cluster}/bulk/00000000-0000-4000-8000-00000000b001`);
           await page.waitForTimeout(800);
         },
       },

@@ -50,7 +50,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * Registering and editing a cluster of a system that is reached through its driver (ADR-0213): the system's
+ * Registering and editing a cluster of a system that is reached through its driver (ADR-0219): the system's
  * {@link ClusterRegistrar} reaches the cluster and says what it found, and this stores the cluster, its nodes, its
  * account and its identity claim in one transaction. The same cluster is never registered twice: its own id, as
  * its brokers report it, is claimed in {@code broker_identity}.

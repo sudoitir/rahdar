@@ -198,6 +198,7 @@ export function OffsetResetDialog({
       title={`Reset the offsets of ${group.id}`}
       tone="danger"
       size="lg"
+      align="top"
       confirmLabel={
         current ? `Reset ${plural(current.partitions.filter((p) => !p.refused).length, 'partition')}` : 'Reset offsets'
       }

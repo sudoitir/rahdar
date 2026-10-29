@@ -35,7 +35,7 @@ import tools.jackson.databind.json.JsonMapper;
 
 /**
  * A Kafka 4.4 cluster that asks for SASL SCRAM-SHA-512 is registered with an account whose secret is sealed and
- * never returned, and a wrong password fails the check as an authentication failure (ADR-0213). The account is
+ * never returned, and a wrong password fails the check as an authentication failure (ADR-0219). The account is
  * created through an administrator that signs in with SASL PLAIN, as an operator would with the cluster's tools.
  */
 @ExtendWith(AdminAuthenticationExtension.class)

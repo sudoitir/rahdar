@@ -36,6 +36,7 @@ export function ConfirmDialog({
   blocked,
   result,
   size = 'md',
+  align = 'center',
   onConfirm,
 }: ConfirmDialogProps) {
   const theme = useMantineTheme();
@@ -122,7 +123,7 @@ export function ConfirmDialog({
       onClose={onClose}
       title={title}
       size={size}
-      centered
+      centered={align === 'center'}
       withCloseButton={false}
       closeOnEscape={!pending}
       closeOnClickOutside={!pending}
@@ -148,6 +149,8 @@ export type ConfirmDialogProps = Readonly<{
   confirmLabel: string;
   /** A wider dialog for a consequence that holds a table. */
   size?: 'md' | 'lg';
+  /** `top` keeps the top edge where it opened, for a consequence that grows as it is read; the default centres it. */
+  align?: 'center' | 'top';
   /**
    * The button that dismisses without acting; defaults to "Cancel". Name what is kept, such as "Keep
    * request", when the action itself is a cancel, so the two buttons never both read "Cancel".

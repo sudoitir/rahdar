@@ -13,7 +13,7 @@ import java.util.UUID;
 
 /**
  * Registers clusters of a system that is reached through its driver rather than through Jolokia seeds
- * (ADR-0213). The system reaches the cluster and reads what it found; {@link ClusterService} stores the
+ * (ADR-0219). The system reaches the cluster and reads what it found; {@link ClusterService} stores the
  * cluster, its nodes, its account and its identity claim in one transaction, and audits the attempt.
  */
 public interface ClusterRegistrar extends SystemExtension {

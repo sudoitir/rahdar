@@ -26,7 +26,7 @@ public final class ClusterRequests {
 
     /**
      * {@code POST /clusters}: the system the cluster runs, its name, and a {@code connection} shaped by that
-     * system (ADR-0213). A system Rahdar does not load, or a connection for another system, is refused as an
+     * system (ADR-0219). A system Rahdar does not load, or a connection for another system, is refused as an
      * unsupported system.
      *
      * @param system the broker system's id, such as {@code kafka}
@@ -187,7 +187,7 @@ public final class ClusterRequests {
         }
 
         /**
-         * A Kafka cluster is reached at its bootstrap servers (ADR-0213).
+         * A Kafka cluster is reached at its bootstrap servers (ADR-0219).
          *
          * @param bootstrapServers {@code host:port} entries, the port defaulting to 9092; never a scheme or an account
          * @param securityProtocol PLAINTEXT, SSL, SASL_PLAINTEXT or SASL_SSL

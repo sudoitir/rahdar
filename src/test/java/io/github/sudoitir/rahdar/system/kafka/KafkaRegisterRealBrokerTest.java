@@ -58,7 +58,7 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 import org.testcontainers.kafka.KafkaContainer;
 
 /**
- * A Kafka cluster is registered from its bootstrap servers against a real broker (ADR-0213): the check names every
+ * A Kafka cluster is registered from its bootstrap servers against a real broker (ADR-0219): the check names every
  * broker and the quorum and stores nothing, the registration stores the cluster, its brokers and its connection, the
  * same cluster is registered once, and a bootstrap server nobody listens on fails the check with its cause.
  */

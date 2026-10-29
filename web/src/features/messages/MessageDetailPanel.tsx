@@ -15,6 +15,7 @@ import { LoadingState } from '../../ui/LoadingState.tsx';
 import { GovernedValue, RedactionMarks, WithheldNotice } from '../../ui/RedactedValue.tsx';
 import { redactionsAt } from '../../ui/redactions.ts';
 import { download } from '../../ui/download.ts';
+import { FocusableScroll } from '../../ui/FocusableScroll.tsx';
 import { Section } from '../../ui/Section.tsx';
 import { StatusBadge } from '../../ui/StatusBadge.tsx';
 
@@ -313,6 +314,7 @@ export function MessageDetailPanel({
       onClose={onClose}
       position="right"
       size="xl"
+      scrollAreaComponent={FocusableScroll}
       title={messageId ? `Message ${messageId}` : ''}
     >
       {detail.isPending ? <LoadingState label="Loading the message" blockSize="20rem" /> : null}

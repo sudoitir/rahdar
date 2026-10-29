@@ -19,8 +19,6 @@ you would run as part of Rahdar itself.
 
 ## Install a plugin
 
-![Installing a plugin: Rahdar inspects the jar, states what it will be able to do and shows the SQL of its database changes, then the administrator types its id and it is live without a restart](/img/plugin-install.gif)
-
 Drop the `.jar` anywhere on **Administration → Plugins**, or choose **Install plugin**. Four steps
 follow, and nothing is installed until the third:
 

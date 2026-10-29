@@ -18,7 +18,6 @@
     "test:browser": "vitest run --project browser",
     "test:coverage": "vitest run --coverage",
     "shots": "node --experimental-strip-types scripts/shots.ts",
-    "demo": "node --experimental-strip-types scripts/demo.ts",
     "sweep": "node --experimental-strip-types scripts/sweep.ts"
   },
   "dependencies": {

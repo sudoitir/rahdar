@@ -22,7 +22,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 
 /**
  * A Kafka 3.5 cluster in ZooKeeper mode is registered: its version is a lower bound with its mode, and the
- * controller quorum is unavailable with the reason, never read as healthy (ADR-0213, ADR-0215). Kafka 3.5 is the
+ * controller quorum is unavailable with the reason, never read as healthy (ADR-0219, ADR-0215). Kafka 3.5 is the
  * Confluent Platform 7.5 release; the broker and its ZooKeeper are started by {@link ZooKeeperCluster}.
  */
 @ExtendWith(AdminAuthenticationExtension.class)

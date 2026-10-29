@@ -112,7 +112,7 @@ just dev-up                          # Postgres + 一对 Artemis + Rahdar
 ADMIN_PASSWORD=… just demo           # 第二对节点，加上真实流量
 ```
 
-`just dev-up` 打印的密码是一次性的。第一次运行时，种子脚本需要 `NEW_ADMIN_PASSWORD=…`（你选的新密码），它会替你改掉密码，并为 `admin` 设置其角色所要求的验证器应用，然后打印 `ADMIN_TOTP_SECRET`。之后再运行（包括 `just shots` 和 `just demo-gif`）需要把 `ADMIN_PASSWORD` 设为新密码，并把 `ADMIN_TOTP_SECRET` 设为该密钥。
+`just dev-up` 打印的密码是一次性的。第一次运行时，种子脚本需要 `NEW_ADMIN_PASSWORD=…`（你选的新密码），它会替你改掉密码，并为 `admin` 设置其角色所要求的验证器应用，然后打印 `ADMIN_TOTP_SECRET`。之后再运行（包括 `just shots`）需要把 `ADMIN_PASSWORD` 设为新密码，并把 `ADMIN_TOTP_SECRET` 设为该密钥。
 
 这套种子脚本不会直接写 `metric_sample` 或 `subscription_snapshot`——流量是通过 Broker 自带的 CLI 真实生产与消费的，所以图表是测量结果，而不是编造的。
 
