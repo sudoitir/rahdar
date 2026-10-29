@@ -16,6 +16,7 @@ import { Page } from '../../ui/Page.tsx';
 import { PageHeader } from '../../ui/PageHeader.tsx';
 import { StatusBadge } from '../../ui/StatusBadge.tsx';
 import { DataTable, type Column } from '../../ui/table/index.ts';
+import { HangingTransactions } from './HangingTransactions.tsx';
 import { useAbortTransaction, usePreviewAbort, useTransactions, type AbortPreview, type Transaction } from './api.ts';
 
 const ABORT: ActionVerb = { verb: 'Abort', past: 'Aborted', progressive: 'Aborting' };
@@ -174,21 +175,21 @@ export function TransactionsView() {
 
   const hanging = transactions.data?.items.filter((t) => t.hanging) ?? [];
   return (
-    <Page fill>
+    <Page>
       <PageHeader
         title="Transactions"
-        description="Producers that write atomically. A transaction that never finishes holds back every consumer that reads committed records past it."
+        description="Producers that write atomically. A transaction that never finishes holds back every consumer that reads committed records past it. The coordinator aborts one that outlives its timeout; the ones it does not know are found below."
       />
       {hanging.length > 0 ? (
         <Notice tone="warning" title={`${hanging.length} hanging transaction${hanging.length === 1 ? '' : 's'}`}>
-          A hanging transaction is past its timeout or its producer is gone, and it blocks the partitions listed beside
-          it.
+          A hanging transaction is past its timeout, so the coordinator aborts it by itself. Until it does, it blocks
+          the partitions listed beside it.
         </Notice>
       ) : null}
       <DataTable
         label="Transactions"
         storageKey="kafka.transactions"
-        height="fill"
+        height={{ maxRows: 10 }}
         columns={columns}
         data={transactions.data?.items ?? []}
         rowKey={(t) => t.id}
@@ -206,6 +207,7 @@ export function TransactionsView() {
           />
         }
       />
+      <HangingTransactions clusterId={clusterId} />
       <AbortDialog clusterId={clusterId} transaction={aborting} onClose={() => setAborting(null)} />
     </Page>
   );
