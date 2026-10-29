@@ -23,6 +23,7 @@ import io.github.sudoitir.rahdar.kernel.security.internal.persistence.RoleReposi
 import io.github.sudoitir.rahdar.kernel.security.internal.persistence.UserRoleRepository;
 import io.github.sudoitir.rahdar.platform.broker.Attempt;
 import io.github.sudoitir.rahdar.platform.broker.ResourceIds;
+import io.github.sudoitir.rahdar.platform.clusters.ClusterKinds;
 import io.github.sudoitir.rahdar.platform.clusters.ResourceTargets;
 import io.github.sudoitir.rahdar.support.McpFixture;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
@@ -55,6 +56,10 @@ class McpApprovalGateTest extends PostgresIntegrationTest {
     /** The subscription the tool names is read as written: no cluster is registered behind this test. */
     @MockitoBean
     ResourceTargets targets;
+
+    /** The cluster's kinds are not read either: none is a partitioned log, so a purge empties a queue. */
+    @MockitoBean
+    ClusterKinds kinds;
 
     @Autowired
     WebApplicationContext webContext;
