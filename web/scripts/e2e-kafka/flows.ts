@@ -440,6 +440,11 @@ const purgeGroup: Flow = {
   title: 'purging an empty group moves its committed offsets to the end on the broker',
   run: async (t) => {
     const lagBefore = lagOf('reporting');
+    // The broker's lag counts from the committed offset even where a truncate removed the records below the log start.
+    const lost = Object.entries(committed('reporting', 'payments')).reduce(
+      (n, [p, o]) => n + Math.max(0, offsetsAt('payments', -2)[Number(p)] - o),
+      0,
+    );
     t.check(lagBefore > 0, `reporting lags ${lagBefore} records on the broker before`);
     await rowMenu(t, 'reporting', /^Actions for /);
     await t.page.getByRole('menuitem', { name: /Purge messages/ }).click();
@@ -469,8 +474,8 @@ const purgeGroup: Flow = {
     await t.hold(/^Skip [\d,]+ records? for 1 group$/);
     await t.page.waitForTimeout(3500);
     t.check(
-      lagOf('reporting') === lagBefore - skipping,
-      `the broker's lag of reporting fell from ${lagBefore} by the ${skipping} the dialog stated, to ${lagOf('reporting')}`,
+      lagOf('reporting') === lagBefore - skipping - lost,
+      `the broker's lag of reporting fell from ${lagBefore} by the ${skipping} the dialog stated and the ${lost} a truncate had removed, to ${lagOf('reporting')}`,
     );
     const event = (await audit(t)).find((e) => /PURGE/i.test(e.action));
     t.note(`audit: ${JSON.stringify(event)?.slice(0, 400)}`);
@@ -627,16 +632,18 @@ const abortTransaction: Flow = {
   run: async (t) => {
     // The brokers run with a stuck coordinator here (compose.isolated*.yaml): a simulation, since a real coordinator
     // aborts a transaction that outlives its timeout.
-    const marker = `e2e-marker-${Date.now()}`;
+    // Several markers: at least one hashes to a partition the transaction holds back.
+    const markers = Array.from({ length: 9 }, (_, n) => `e2e-marker-${Date.now()}-${n}`);
     const row = (
       (await t.api(`/clusters/${t.cluster}/kafka/transactions`)) as { items: { id: string; hanging: boolean }[] }
     ).items.find((x) => x.id === 'payments-settlement');
     t.check(row?.hanging === true, `payments-settlement is hanging per the API (${JSON.stringify(row)})`);
     t.note(`broker: ${transactionState('payments-settlement')}`);
-    produceKeyed('payments', marker, 'written after the transaction began');
+    for (const marker of markers) produceKeyed('payments', marker, 'written after the transaction began');
+    const unseen = markers.filter((m) => !readCommittedKeys('payments').includes(m));
     t.check(
-      !readCommittedKeys('payments').includes(marker),
-      'a read-committed consumer does not see a record written after the open transaction began',
+      unseen.length > 0,
+      `a read-committed consumer does not see ${unseen.length} of ${markers.length} records written after the open transaction began`,
     );
 
     await t.open('/clusters/:kafka/kafka/transactions');
@@ -657,9 +664,10 @@ const abortTransaction: Flow = {
       /CompleteAbort|Empty|PrepareAbort/.test(transactionState('payments-settlement')),
       'the broker reports the transaction as aborted',
     );
+    const seen = readCommittedKeys('payments');
     t.check(
-      readCommittedKeys('payments').includes(marker),
-      'a read-committed consumer now sees the record written after the transaction began',
+      markers.every((m) => seen.includes(m)),
+      'a read-committed consumer now sees every record written after the transaction began',
     );
     const event = (await audit(t)).find((e) => /ABORT/i.test(e.action));
     t.note(`audit: ${JSON.stringify(event)?.slice(0, 400)}`);
