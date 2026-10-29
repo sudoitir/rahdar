@@ -1,0 +1,52 @@
+# 19e4-kafka findings ledger
+
+Every finding from the reviews, the audits and the live run, to closure. Nothing is skipped: a line closes only
+with the commit that fixes it and its test. Owner names are the agents of this session.
+
+| # | Source | Finding | Owner | Status |
+|---|---|---|---|---|
+| R1 | review 1 | Multi-topic offset reset failing part-way leaves no audit of moved topics | backend | fixed 41308015e |
+| R2 | review 1 | Topic-config read returns a sensitive value if the broker sends it | backend | fixed cb7004da9 |
+| R3 | review 1 | Bootstrap probe unbounded in count and time | backend | fixed 68051a558 |
+| R4 | review 1 | Inline qualified names (Matcher etc.) | backend | fixed 68051a558 |
+| R5 | review 2 | Sensitive new value and default unmasked in config preview, MCP and audit | backend | fixed cb7004da9 |
+| R6 | review 2 | Truncate not pinned to its preview's etag | backend | fixed ab3d2bc78 |
+| R7 | review 2 | Abort of a not-open or live transaction reaches the broker | backend | fixed 91942f2b5 |
+| R8 | review 2 | ACL preview under-reports losses for prefixed and wildcard rules | backend | fixed 894921131 |
+| R9 | review 2 | ACL audit has no real after-state | backend | fixed 3bd576f67 |
+| R10 | review 2 | Truncate audit row left open on a non-broker failure; Cut not validated | backend | fixed ab3d2bc78 |
+| R11 | review 3 | Plugin reservations checked on the first segment only; Kafka internal topics | backend | fixed a418db56d |
+| R12 | review 3 | Bulk log purge reports the whole-cluster outcome on one node | backend | fixed a2431a3b1 |
+| R13 | review 3 | Credential records print secrets in toString | backend | fixed 2540f02c8 |
+| R14 | self-check | MCP message_action bypassed the log refusal | backend | fixed a2431a3b1 |
+| E1 | live run | Unknown host reported as timeout | OpenBroker 0.7.0 + backend | open: OpenBroker PR 18 |
+| E2 | live run | Closed port reported as timeout after 10 s, log flood | OpenBroker 0.7.0 | open: OpenBroker PR 18 |
+| E3 | live run | Browse of a group's subscription answers 400 | backend | fixed 45e34f19c |
+| E4 | live run | Destinations 502 on Kafka; other shared routes 5xx | backend | fixed b4ffc79f5 |
+| E5 | live run | Purge dialog says destroy for a log purge; cap applied | backend + web | fixed 45e34f19c, cb23d46c6 |
+| E6 | live run | Failed query retried in a loop | web | fixed |
+| E7 | live run | "Open past timeout" is not Kafka's hanging transaction (KIP-664) | OpenBroker 0.7.0 + backend + web | open: web section, live check on 0.7.0 |
+| E8 | live run | Advertised-listener failure titled "timed out" | backend | fixed 9a46f38f4 |
+| E9 | live run | Old "Artemis Studio" product screenshots | web + site-story | open |
+| E10 | live run | Stale approval-provider fixture | web | fixed |
+| S1 | storage | broker_event stores every delivered message | backend | open: ADR-0218 in test |
+| S2 | storage | broker_event bounded in time but not rows: enforce a row cap | backend | open |
+| S3 | storage | metric_sample ≈45 GB/day at 4000 Kafka subscriptions | backend | open: change-only + heartbeat |
+| A1 | audit 1 | Cluster re-provisioned at the same bootstrap not detected | kafka-hardening | open |
+| A2 | audit 1 | Unavailable lag stored and shown as 0 | backend | open |
+| A3 | audit 1 | Replaced broker's node row never retired | kafka-hardening | open |
+| A4 | audit 1 | Health pages every partition on the caller's thread | kafka-hardening | open |
+| A5 | audit 1 | Plugin registration node rows orphaned on node delete | kafka-hardening | open |
+| A6 | audit 1 | Health and partition readings never evicted | kafka-hardening | open |
+| A7 | audit 1 | Per-cluster meters never removed | kafka-hardening | open |
+| A8 | audit 1 | Whole ACL set loaded per preview | kafka-hardening | open |
+| A9 | audit 1 | Inline qualified names in NodeStateRecorder | kafka-hardening | open |
+| A10 | audit 1 | Scrape reads subscriptions twice | backend | open |
+| B1 | audit 2 | One blackholed Kafka cluster stalls the scrape of all others | backend | open |
+| B2 | audit 2 | MCP describe-group and reset-preview unbounded (3000 partitions) | kafka-hardening | open |
+| B3 | audit 2 | Offset-reset audit row grows with partition count | kafka-hardening | open |
+| B4 | audit 2 | kafka_topic_config returns every entry | kafka-hardening | open |
+| P1 | OpenBroker | Driver per-topic and per-query reads (N+1) | OpenBroker 0.6.1 | fixed |
+| P2 | OpenBroker | verify throws when a broker is cut | OpenBroker 0.6.1 | fixed |
+| P3 | OpenBroker | At-most-once sender writes a message twice on a broker kill | OpenBroker 0.6.1 | fixed |
+| C1 | audit 3 | (pending: SSE, browse payloads, bulk, approvals, alert flapping) | — | pending |
