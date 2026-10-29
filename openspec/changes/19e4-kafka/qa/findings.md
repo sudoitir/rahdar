@@ -42,7 +42,7 @@ with the commit that fixes it and its test. Owner names are the agents of this s
 | A8 | audit 1 | Whole ACL set loaded per preview | kafka-hardening | fixed 4d00b5f0a |
 | A9 | audit 1 | Inline qualified names in NodeStateRecorder | kafka-hardening | fixed 2215dfc07 |
 | A10 | audit 1 | Scrape reads subscriptions twice | backend | open |
-| B1 | audit 2 | One blackholed Kafka cluster stalls the scrape of all others | backend | open |
+| B1 | audit 2 | One blackholed Kafka cluster stalls the scrape of all others | backend | fixed |
 | B2 | audit 2 | MCP describe-group and reset-preview unbounded (3000 partitions) | kafka-hardening | fixed 0aadb35f1 |
 | B3 | audit 2 | Offset-reset audit row grows with partition count | kafka-hardening | fixed 5c797e316 |
 | B4 | audit 2 | kafka_topic_config returns every entry | kafka-hardening | fixed 0aadb35f1 |

@@ -25,11 +25,13 @@ import io.github.sudoitir.rahdar.platform.clusters.NodeStateRecorder;
 import io.github.sudoitir.rahdar.platform.clusters.RegisteredCluster;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -85,11 +87,24 @@ public class ScrapeScheduler implements DisposableBean {
      */
     private static final Duration PROBE_GRACE = Duration.ofSeconds(1);
 
+    /**
+     * How long a pass waits for the clusters a system reads as a whole. The cluster that has not finished by then is
+     * marked as not answering and left to finish on its own; it is not read again until it does, and the clusters
+     * read beside it are never held for it.
+     */
+    static final Duration SYSTEM_SCRAPE_LIMIT = Duration.ofSeconds(10);
+
     /** Why each node's job last failed, by cluster, node and job, so a node that keeps failing the same way is logged once. */
     private final Map<String, String> lastFailures = new ConcurrentHashMap<>();
 
     /** The nodes a tier A probe is running for on this replica. */
     private final Set<UUID> probesInFlight = ConcurrentHashMap.newKeySet();
+
+    /** How long a pass waits for system reads; a test shortens it. */
+    Duration systemScrapeLimit = SYSTEM_SCRAPE_LIMIT;
+
+    /** The clusters a system scrape is running for on this replica, by tier, so a slow one is never read twice at once. */
+    private final Set<String> systemScrapesInFlight = ConcurrentHashMap.newKeySet();
 
     /** Where tier A probes run: one virtual thread each, so a stalled node holds nothing but its own. */
     private final ExecutorService probes = Executors.newVirtualThreadPerTaskExecutor();
@@ -123,10 +138,15 @@ public class ScrapeScheduler implements DisposableBean {
 
     /** Tiers A and B visit the clusters this replica owns; C and discovery run once for all (ShedLock). */
     public void tierA() {
+        List<SystemRead> system = new ArrayList<>();
         for (RegisteredCluster cluster : clusters.owned()) {
-            tierA(cluster.getId());
+            tierA(cluster.getId(), system);
         }
+        awaitSystemReads(system);
     }
+
+    /** A system scrape started on the pool, with the cluster it reads. */
+    private record SystemRead(UUID clusterId, CompletableFuture<Void> read, boolean markStale) {}
 
     /**
      * One tier A pass for one cluster. Each node is probed on its own and never twice at once, so a
@@ -135,11 +155,11 @@ public class ScrapeScheduler implements DisposableBean {
      * probes to finish, so a slow node's reading is part of it. Taking a cluster over runs a pass
      * at once, which can overlap the scheduled one.
      */
-    private void tierA(UUID clusterId) {
+    private void tierA(UUID clusterId, List<SystemRead> system) {
         long cycle = scrapeCycle.next(clusterId);
         Optional<ClusterScrape> own = systemScrape(clusterId);
         if (own.isPresent()) {
-            systemTierA(clusterId, own.get(), cycle);
+            startSystemRead(clusterId, "nodes", () -> systemTierA(clusterId, own.get(), cycle), true, system);
             return;
         }
         List<ClusterNode> targets = manageableNodes(clusterId).stream()
@@ -246,7 +266,9 @@ public class ScrapeScheduler implements DisposableBean {
     void onDutyAcquired(ClusterDutyAcquired acquired) {
         Thread.startVirtualThread(() -> {
             try {
-                tierA(acquired.clusterId());
+                List<SystemRead> system = new ArrayList<>();
+                tierA(acquired.clusterId(), system);
+                awaitSystemReads(system);
             } catch (RuntimeException e) {
                 log.warn(
                         "First scrape of cluster {} after taking it over failed: {}",
@@ -272,20 +294,96 @@ public class ScrapeScheduler implements DisposableBean {
     }
 
     public void tierB() {
+        List<SystemRead> system = new ArrayList<>();
         try (ExecutorService pool = Executors.newVirtualThreadPerTaskExecutor()) {
             for (RegisteredCluster cluster : clusters.owned()) {
                 UUID clusterId = cluster.getId();
                 Optional<ClusterScrape> own = systemScrape(clusterId);
                 if (own.isPresent()) {
-                    systemSubscriptions(clusterId, own.get());
+                    startSystemRead(
+                            clusterId,
+                            "subscriptions",
+                            () -> {
+                                systemSubscriptions(clusterId, own.get());
+                                eventPublisher.publishEvent(
+                                        new ScrapeTierCompleted(clusterId, ScrapeTierCompleted.Tier.B));
+                            },
+                            false,
+                            system);
                 } else {
                     fanOut(
                             pool,
                             manageableNodes(clusterId),
                             "hot queue read",
                             node -> scrapeHotQueues(clusterId, node));
+                    eventPublisher.publishEvent(new ScrapeTierCompleted(clusterId, ScrapeTierCompleted.Tier.B));
                 }
-                eventPublisher.publishEvent(new ScrapeTierCompleted(clusterId, ScrapeTierCompleted.Tier.B));
+            }
+        }
+        awaitSystemReads(system);
+    }
+
+    /**
+     * Starts a system's read of one cluster on the pool, unless the last one of the same kind is still running.
+     * Clusters are read side by side, so one that does not answer holds none of the others.
+     */
+    private void startSystemRead(
+            UUID clusterId, String kind, Runnable read, boolean markStale, List<SystemRead> started) {
+        String key = clusterId + "/" + kind;
+        if (!systemScrapesInFlight.add(key)) {
+            return;
+        }
+        started.add(new SystemRead(
+                clusterId,
+                CompletableFuture.runAsync(
+                        () -> {
+                            try {
+                                read.run();
+                            } finally {
+                                systemScrapesInFlight.remove(key);
+                            }
+                        },
+                        probes),
+                markStale));
+    }
+
+    /**
+     * Waits for all the reads together, up to the limit, so one that never answers cannot use up the time of the ones
+     * beside it. A cluster still reading then is recorded as not answering and left to finish on its own.
+     */
+    private void awaitSystemReads(List<SystemRead> started) {
+        if (started.isEmpty()) {
+            return;
+        }
+        try {
+            CompletableFuture.allOf(started.stream().map(SystemRead::read).toArray(CompletableFuture[]::new))
+                    .get(systemScrapeLimit.toNanos(), TimeUnit.NANOSECONDS);
+        } catch (TimeoutException _) {
+            // The ones not done are handled below.
+        } catch (ExecutionException _) {
+            // Each failure is read from its own future below.
+        } catch (InterruptedException _) {
+            Thread.currentThread().interrupt();
+            return;
+        }
+        for (SystemRead read : started) {
+            if (!read.read().isDone()) {
+                log.warn(
+                        "Cluster {} did not finish its scrape within {}; it is read again once it does",
+                        read.clusterId(),
+                        systemScrapeLimit);
+                if (read.markStale()) {
+                    clusters.nodes(read.clusterId())
+                            .forEach(node -> persist.recordNodeError(
+                                    node.getId(),
+                                    "The cluster did not answer within " + systemScrapeLimit.toSeconds() + " seconds.",
+                                    BrokerConnectionException.Kind.UNREACHABLE));
+                }
+            } else if (read.read().isCompletedExceptionally()) {
+                read.read().exceptionally(e -> {
+                    log.warn("Scrape task failed unexpectedly: {}", e.toString(), e);
+                    return null;
+                });
             }
         }
     }
