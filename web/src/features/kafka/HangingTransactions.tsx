@@ -110,6 +110,7 @@ function AbortHangingDialog({
       onClose={dismiss}
       title={target ? `Abort the hanging transaction on ${where(target)}` : 'Abort'}
       tone="danger"
+      align="top"
       confirmLabel={target ? `Abort on ${where(target)}` : 'Abort'}
       blocked={blocked}
       pending={abort.isPending}

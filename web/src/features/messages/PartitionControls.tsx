@@ -104,8 +104,8 @@ export function PartitionControls({
 }
 
 /**
- * What a read of a partitioned log has to say before the rows: an offset past the end, a start that retention
- * moved, and that records of an open or aborted transaction are not shown.
+ * What a read of a partitioned log has to say before the rows, when it is not what was asked: an offset past the end,
+ * and a start that retention moved.
  */
 export function PartitionNotices({
   page,
@@ -123,16 +123,6 @@ export function PartitionNotices({
       {log?.retentionMoved ? (
         <Notice tone="info" title="Retention removed the start of the partition">
           {`Records before offset ${log.start} are gone, so the browse starts there, not where it was asked to.`}
-        </Notice>
-      ) : null}
-      {log?.subscriptionPosition != null ? (
-        <Notice tone="neutral" title="Where the group stands">
-          {`The group stands at offset ${log.subscriptionPosition.toLocaleString()} on partition ${log.partition}: records from there on it has not read yet.`}
-        </Notice>
-      ) : null}
-      {log?.uncommittedHidden !== false ? (
-        <Notice tone="neutral" title="Only committed records are shown">
-          Records of a transaction that is still open or was aborted are not shown.
         </Notice>
       ) : null}
     </>

@@ -219,7 +219,11 @@ export function MessagesView() {
       description={
         messages.data
           ? partitioned
-            ? `Partition ${browse.partition}`
+            ? `Partition ${browse.partition}${
+                messages.data.log?.uncommittedHidden === false
+                  ? ''
+                  : '. Only committed records are shown: those of a transaction that is still open or was aborted are not.'
+              }`
             : `${countLabel(messages.data)} · read from ${
                 endpoints.find((e) => e.id === messages.data.node)?.name ?? 'the live node'
               }`
@@ -331,7 +335,14 @@ export function MessagesView() {
         }
         end={
           <>
-            {partitioned ? null : (
+            {partitioned ? (
+              // Said in the toolbar, where its arrival moves nothing: the controls keep their place.
+              messages.data?.log?.subscriptionPosition == null ? null : (
+                <Text size="xs">
+                  {`The group stands at offset ${messages.data.log.subscriptionPosition.toLocaleString()} on partition ${messages.data.log.partition}: records from there on it has not read yet.`}
+                </Text>
+              )
+            ) : (
               <Text size="xs" c="dimmed">
                 {lastPage == null ? `page ${page} · total unavailable` : `page ${page} of ${lastPage}`}
               </Text>

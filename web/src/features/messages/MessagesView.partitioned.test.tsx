@@ -137,7 +137,7 @@ describe('MessagesView on a partitioned log', () => {
       /cannot select records on the broker/,
     );
     expect(screen.queryByText(/^page 1/)).not.toBeInTheDocument();
-    expect(screen.getByText('Only committed records are shown')).toBeInTheDocument();
+    expect(screen.getByText(/Only committed records are shown/)).toBeInTheDocument();
   });
 
   it('browses from an offset, checking the value beside its field first', async () => {
@@ -198,8 +198,7 @@ describe('MessagesView on a partitioned log', () => {
     );
     renderWithProviders(<MessagesView />);
 
-    expect(await screen.findByText('Where the group stands')).toBeInTheDocument();
-    expect(screen.getByText(/The group stands at offset 640 on partition 0/)).toBeInTheDocument();
+    expect(await screen.findByText(/The group stands at offset 640 on partition 0/)).toBeInTheDocument();
   });
 
   it("keeps move, retry, delete and expire visible but disabled, with the system's own words", async () => {

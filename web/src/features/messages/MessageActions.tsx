@@ -140,7 +140,9 @@ export function MessageActions({
       <Toolbar
         label="Message operations"
         start={
-          <Menu>
+          // Every item is unavailable on a system that offers none of these, and axe reports Mantine's focus
+          // placeholder as a child a menu may not have; without it the first item takes the focus.
+          <Menu withInitialFocusPlaceholder={false}>
             <Menu.Target>
               <Button size="xs" variant="default">
                 By selector…

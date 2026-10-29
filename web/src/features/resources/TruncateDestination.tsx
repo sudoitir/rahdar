@@ -99,6 +99,7 @@ export function TruncateDestinationDialog({
       onClose={dismiss}
       title={`Truncate ${destination.name}`}
       tone="danger"
+      align="top"
       confirmLabel={count === null ? 'Truncate' : `Truncate ${plural(count, 'record')}`}
       blocked={blocked}
       pending={truncate.isPending && !truncate.variables?.dryRun}
