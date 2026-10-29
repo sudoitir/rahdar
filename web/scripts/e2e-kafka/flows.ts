@@ -804,7 +804,7 @@ const browse: Flow = {
     await table.waitFor({ timeout: 30_000 });
     const body = async () => (await t.page.locator('main').innerText()).replace(/\s+/g, ' ');
     const first = await body();
-    t.check(/Where the group stands/.test(first), 'the page says where the group stands on the partition');
+    t.check(/The group stands at offset/.test(first), 'the page says where the group stands on the partition');
     const stands = /The group stands at offset ([\d,]+) on partition 0/.exec(first);
     t.note(`group position on the page: ${stands?.[1]}`);
 
@@ -961,6 +961,30 @@ const heldTruncate: Flow = {
   },
 };
 
+const hangingFind: Flow = {
+  id: 'hanging-find',
+  title:
+    'the hanging transactions section looks on demand, and says what it found: the coordinator knows the open transaction, so none is hanging',
+  run: async (t) => {
+    await t.open('/clusters/:kafka/kafka/transactions');
+    await t.page.getByRole('button', { name: 'Find hanging transactions' }).waitFor();
+    t.check(
+      (await t.page.getByText('Nothing has been looked for yet').count()) === 1,
+      'before Find the section says nothing has been looked for, and has not asked the broker',
+    );
+    const found = t.page.waitForResponse((r) => r.url().includes('hanging-transactions:find'));
+    await t.page.getByRole('button', { name: 'Find hanging transactions' }).click();
+    const response = await found;
+    t.check(response.status() === 200, `Find answers ${response.status()} on OpenBroker 0.7.0`);
+    await t.page.waitForTimeout(1200);
+    const text = (await t.page.locator('main').innerText()).replace(/\s+/g, ' ');
+    t.check(/No hanging transactions/.test(text), 'it says there are no hanging transactions');
+    t.note(
+      'A transaction the coordinator does not know (KIP-664) could not be created on this stack: the transaction log cannot be truncated (delete-records on __transaction_state is refused as an invalid topic), so only the empty answer was verified live; the found, abort and stale paths are covered by the MSW tests and the sweep stubs.',
+    );
+  },
+};
+
 export const FLOWS: Flow[] = [
   prepare,
   estate,
@@ -978,5 +1002,6 @@ export const FLOWS: Flow[] = [
   heldTruncate,
   browse,
   tombstone,
+  hangingFind,
   abortTransaction,
 ];
