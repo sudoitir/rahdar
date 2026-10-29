@@ -20,7 +20,7 @@ public final class KafkaModule {
     public static final String TRANSACTION_ABORT = "transaction:abort";
 
     public static final FeatureDescriptor DESCRIPTOR = FeatureDescriptor.builder()
-            .id("kafka")
+            .id(SYSTEM)
             .title("Kafka")
             .kind(FeatureDescriptor.Kind.PLATFORM)
             .required(true)

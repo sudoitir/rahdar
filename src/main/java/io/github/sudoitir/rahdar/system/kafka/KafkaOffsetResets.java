@@ -1,6 +1,7 @@
 package io.github.sudoitir.rahdar.system.kafka;
 
 import io.github.sudoitir.openbroker.ClusterConnection;
+import io.github.sudoitir.openbroker.messaging.Position;
 import io.github.sudoitir.openbroker.model.Scope;
 import io.github.sudoitir.openbroker.operation.Operation.Seek;
 import io.github.sudoitir.openbroker.operation.Precondition;
@@ -36,6 +37,8 @@ public class KafkaOffsetResets {
 
     /** An audit row keeps every partition's offset up to this many, and a summary per topic beyond it. */
     static final int SUMMARISE_ABOVE = 200;
+
+    private static final String BEFORE = "before";
 
     /** The parameters of {@code subscription.seek}; the etag pins the state the operator confirmed. */
     public record OffsetResetParams(
@@ -78,42 +81,60 @@ public class KafkaOffsetResets {
         KafkaEtags.require(p.etag(), plan.view().etag());
         refuseIfBlocked(plan);
         Map<String, Object> params = Map.of(
-                "to", p.to(),
-                "value", p.value() == null ? "" : p.value(),
-                "before", moves(plan, true),
-                "planned", moves(plan, false));
+                "to",
+                p.to(),
+                "value",
+                p.value() == null ? "" : p.value(),
+                BEFORE,
+                moves(plan, true),
+                "planned",
+                moves(plan, false));
         AuditEvent event = audit.begin(
                 actors.resolve(), "RESET_GROUP_OFFSETS", "SUBSCRIPTION", p.group(), p.clusterId(), null, params, false);
         try {
             ClusterConnection connection = gateway.cluster(p.clusterId());
             List<String> moved = new ArrayList<>();
             List<String> pending = new ArrayList<>(plan.positions().keySet());
-            for (var topic : plan.positions().entrySet()) {
-                try {
-                    KafkaFailures.call(() -> connection
-                            .operations()
-                            .execute(
-                                    plan.ids().get(topic.getKey()),
-                                    new Seek(topic.getValue()),
-                                    Scope.whole(),
-                                    Precondition.ifMatch(plan.etags().get(topic.getKey())))
-                            .orThrow());
-                } catch (RuntimeException e) {
-                    if (moved.isEmpty()) {
-                        throw e;
-                    }
-                    return partial(event, plan, moved, pending, e);
+            for (Map.Entry<String, Position> topic : plan.positions().entrySet()) {
+                OffsetResult stopped = seek(connection, plan, topic, event, moved, pending);
+                if (stopped != null) {
+                    return stopped;
                 }
                 moved.add(topic.getKey());
                 pending.remove(topic.getKey());
             }
             long partitions = partitionsOf(plan, moved);
             audit.finish(
-                    event, false, partitions, null, Map.of("before", moves(plan, true), "after", moves(plan, false)));
+                    event, false, partitions, null, Map.of(BEFORE, moves(plan, true), "after", moves(plan, false)));
             return new OffsetResult(plan.view().partitions(), partitions, List.copyOf(moved), List.of(), null);
         } catch (RuntimeException e) {
             audit.fail(event, e.getMessage());
             throw e;
+        }
+    }
+
+    private OffsetResult seek(
+            ClusterConnection connection,
+            Plan plan,
+            Map.Entry<String, Position> topic,
+            AuditEvent event,
+            List<String> moved,
+            List<String> pending) {
+        try {
+            KafkaFailures.call(() -> connection
+                    .operations()
+                    .execute(
+                            plan.ids().get(topic.getKey()),
+                            new Seek(topic.getValue()),
+                            Scope.whole(),
+                            Precondition.ifMatch(plan.etags().get(topic.getKey())))
+                    .orThrow());
+            return null;
+        } catch (RuntimeException e) {
+            if (moved.isEmpty()) {
+                throw e;
+            }
+            return partial(event, plan, moved, pending, e);
         }
     }
 
@@ -135,7 +156,7 @@ public class KafkaOffsetResets {
                         List.copyOf(moved),
                         "notMovedTopics",
                         List.copyOf(pending),
-                        "before",
+                        BEFORE,
                         moves(plan, true, moved),
                         "after",
                         moves(plan, false, moved)));

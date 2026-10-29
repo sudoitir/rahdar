@@ -91,82 +91,126 @@ class KafkaHealth implements ClusterHealthEvaluator {
         int brokers = 0;
         int voters = 0;
         boolean leader = false;
-
         for (NodeDescription node : described.value()) {
-            String name =
-                    (node.functions().contains(NodeFunction.BROKER) ? "broker-" : "controller-") + node.nativeId();
-            if (node.functions().contains(NodeFunction.BROKER)) {
-                brokers++;
-            }
-            if (node.attributes()
-                    .raw(QUORUM_VOTER)
-                    .map(v -> Boolean.parseBoolean(String.valueOf(v)))
-                    .orElse(false)) {
-                voters++;
-                leader |= node.attributes()
-                        .raw(QUORUM_LEADER)
-                        .map(v -> Boolean.parseBoolean(String.valueOf(v)))
-                        .orElse(false);
-            }
-            boolean fenced = false;
-            for (Condition condition : node.conditions()) {
-                boolean holds = condition.status() == ConditionStatus.TRUE;
-                switch (condition.type()) {
-                    case ConditionTypes.SERVING -> {
-                        if (condition.status() == ConditionStatus.FALSE) {
-                            fenced = true;
-                            level = worst(level, Level.DEGRADED);
-                            notes.add(name + " is not serving: " + condition.message());
-                        }
-                    }
-                    case ConditionTypes.UNDER_REPLICATED -> {
-                        if (holds) {
-                            behind = true;
-                            level = worst(level, Level.DEGRADED);
-                            notes.add(name + " has under-replicated partitions: " + condition.message());
-                        }
-                    }
-                    case ConditionTypes.OUT_OF_SYNC -> {
-                        if (holds) {
-                            behind = true;
-                            level = worst(level, Level.DEGRADED);
-                            notes.add(name + " is a controller voter that lags the quorum leader.");
-                        }
-                    }
-                    default -> {}
-                }
-            }
-            if (!fenced && node.functions().contains(NodeFunction.BROKER)) {
-                serving.add(name);
+            NodeEffect effect = nodeEffect(node);
+            brokers += effect.brokers();
+            voters += effect.voters();
+            leader |= effect.leader();
+            behind |= effect.behind();
+            level = worst(level, effect.level());
+            notes.addAll(effect.notes());
+            if (effect.serving() != null) {
+                serving.add(effect.serving());
             }
         }
+        level = noteFailures(described, notes, level);
+        level = noteBrokers(brokers, voters, leader, notes, level);
+        level = noteOffline(offline, tried, notes, level);
+        return verdict(clusterId, level, serving, notes, behind);
+    }
+
+    private record NodeEffect(
+            int brokers, int voters, boolean leader, boolean behind, Level level, List<String> notes, String serving) {}
+
+    private record ConditionEffect(boolean fenced, boolean behind, Level level, List<String> notes) {}
+
+    private static NodeEffect nodeEffect(NodeDescription node) {
+        boolean broker = node.functions().contains(NodeFunction.BROKER);
+        String name = (broker ? "broker-" : "controller-") + node.nativeId();
+        boolean voter = flag(node, QUORUM_VOTER);
+        ConditionEffect conditions = conditions(node, name);
+        String serving = !conditions.fenced() && broker ? name : null;
+        return new NodeEffect(
+                broker ? 1 : 0,
+                voter ? 1 : 0,
+                voter && flag(node, QUORUM_LEADER),
+                conditions.behind(),
+                conditions.level(),
+                conditions.notes(),
+                serving);
+    }
+
+    private static boolean flag(NodeDescription node, String attribute) {
+        return node.attributes()
+                .raw(attribute)
+                .map(v -> Boolean.parseBoolean(String.valueOf(v)))
+                .orElse(false);
+    }
+
+    private static ConditionEffect conditions(NodeDescription node, String name) {
+        boolean fenced = false;
+        boolean behind = false;
+        Level level = Level.OK;
+        List<String> notes = new ArrayList<>();
+        for (Condition condition : node.conditions()) {
+            switch (condition.type()) {
+                case String type
+                when holds(type, ConditionTypes.SERVING, condition, ConditionStatus.FALSE) -> {
+                    fenced = true;
+                    level = worst(level, Level.DEGRADED);
+                    notes.add(name + " is not serving: " + condition.message());
+                }
+                case String type
+                when holds(type, ConditionTypes.UNDER_REPLICATED, condition, ConditionStatus.TRUE) -> {
+                    behind = true;
+                    level = worst(level, Level.DEGRADED);
+                    notes.add(name + " has under-replicated partitions: " + condition.message());
+                }
+                case String type
+                when holds(type, ConditionTypes.OUT_OF_SYNC, condition, ConditionStatus.TRUE) -> {
+                    behind = true;
+                    level = worst(level, Level.DEGRADED);
+                    notes.add(name + " is a controller voter that lags the quorum leader.");
+                }
+                default -> {
+                    // Other conditions do not change this node's verdict.
+                }
+            }
+        }
+        return new ConditionEffect(fenced, behind, level, notes);
+    }
+
+    private static boolean holds(String type, String expected, Condition condition, ConditionStatus status) {
+        return expected.equals(type) && condition.status() == status;
+    }
+
+    private static Level noteFailures(Partial<List<NodeDescription>> described, List<String> notes, Level level) {
         described.failures().forEach((node, failure) -> {
             notes.add("Node " + node.value() + " is unreachable: " + failure.getMessage());
         });
         if (!described.failures().isEmpty()) {
-            level = worst(level, Level.DEGRADED);
+            return worst(level, Level.DEGRADED);
         }
+        return level;
+    }
+
+    private static Level noteBrokers(int brokers, int voters, boolean leader, List<String> notes, Level level) {
         if (brokers == 0) {
             level = Level.CRITICAL;
             notes.add("No broker answered.");
         }
         if (voters == 0) {
-            notes.add(
-                    "The controller quorum cannot be read (a ZooKeeper-mode cluster has none to read), so it is not counted as healthy.");
+            notes.add("The controller quorum cannot be read (a ZooKeeper-mode cluster has none to read), so it is not"
+                    + " counted as healthy.");
         } else if (!leader) {
             level = Level.CRITICAL;
             notes.add("The controller quorum has no leader.");
         }
+        return level;
+    }
+
+    private static Level noteOffline(OptionalLong offline, boolean tried, List<String> notes, Level level) {
         if (offline.isPresent() && offline.getAsLong() > 0) {
-            level = Level.CRITICAL;
             notes.add(offline.getAsLong()
                     + " partitions have no leader, so their records can be neither read nor written.");
-        } else if (offline.isEmpty() && !tried) {
+            return Level.CRITICAL;
+        }
+        if (offline.isEmpty() && !tried) {
             notes.add("The partitions have not been sampled yet, so offline partitions are not ruled out.");
         } else if (offline.isEmpty()) {
             notes.add("The partitions' leaders could not be read, so offline partitions are not ruled out.");
         }
-        return verdict(clusterId, level, serving, notes, behind);
+        return level;
     }
 
     static ClusterHealth verdict(

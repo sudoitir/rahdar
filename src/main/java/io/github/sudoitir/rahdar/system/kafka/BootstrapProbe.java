@@ -16,7 +16,7 @@ import org.springframework.stereotype.Component;
 interface BootstrapProbe {
 
     /** How long a server gets to accept. */
-    Duration WAIT = Duration.ofSeconds(3);
+    Duration CONNECT_WAIT = Duration.ofSeconds(3);
 
     /** Whether the {@code host:port} accepted a connection. */
     boolean accepts(String hostAndPort);
@@ -32,7 +32,7 @@ interface BootstrapProbe {
                 socket.connect(
                         new InetSocketAddress(
                                 hostAndPort.substring(0, colon), Integer.parseInt(hostAndPort.substring(colon + 1))),
-                        (int) WAIT.toMillis());
+                        (int) CONNECT_WAIT.toMillis());
                 return true;
             } catch (IOException | RuntimeException _) {
                 return false;

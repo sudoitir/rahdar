@@ -46,6 +46,8 @@ public class KafkaMcpActionTools {
     /** The id of a hanging transaction that kafka_list_transactions returns. */
     private static final String HANGING_PREFIX = "kafka.hanging-transaction/";
 
+    private static final String CLUSTER_ID = "clusterId";
+
     @McpTool(
             name = "kafka_reset_offsets",
             description = "Move an empty group's offsets, from a kafka_preview_offset_reset preview's etag.",
@@ -64,7 +66,7 @@ public class KafkaMcpActionTools {
             @McpToolParam(required = false) String topics,
             @McpToolParam(required = true) String etag,
             @McpToolParam(required = true) String confirm) {
-        UUID id = McpArgs.uuid("clusterId", clusterId);
+        UUID id = McpArgs.uuid(CLUSTER_ID, clusterId);
         McpArgs.required("group", group);
         McpArgs.required("to", to);
         McpArgs.required("etag", etag);
@@ -91,7 +93,7 @@ public class KafkaMcpActionTools {
             @McpToolParam(required = false) String etag,
             @McpToolParam(required = false) Boolean dryRun,
             @McpToolParam(required = false) String confirm) {
-        UUID id = McpArgs.uuid("clusterId", clusterId);
+        UUID id = McpArgs.uuid(CLUSTER_ID, clusterId);
         McpArgs.required("topic", topic);
         boolean dry = McpArgs.flag(dryRun, true);
         Map<String, String> overrides = overrides(set);
@@ -107,7 +109,8 @@ public class KafkaMcpActionTools {
     @McpTool(
             name = "kafka_abort_transaction",
             description =
-                    "Abort a transaction or hanging transaction, fencing its producer. Previews by default; needs the etag.",
+                    "Abort a transaction or hanging transaction, fencing its producer. Previews by default; needs the"
+                            + " etag.",
             annotations =
                     @McpTool.McpAnnotations(
                             readOnlyHint = false,
@@ -120,7 +123,7 @@ public class KafkaMcpActionTools {
             @McpToolParam(required = false) String etag,
             @McpToolParam(required = false) Boolean dryRun,
             @McpToolParam(required = false) String confirm) {
-        UUID id = McpArgs.uuid("clusterId", clusterId);
+        UUID id = McpArgs.uuid(CLUSTER_ID, clusterId);
         McpArgs.required("transactionalId", transactionalId);
         boolean dry = McpArgs.flag(dryRun, true);
         if (!dry) {
@@ -141,10 +144,10 @@ public class KafkaMcpActionTools {
                 () -> dry ? transactions.abortPreview(id, transactionalId) : aborts.abort(id, transactionalId, etag));
     }
 
-    /** The settings a JSON object of names and values sets; null when none. */
+    /** The settings a JSON object of names and values sets; empty when none. */
     private static Map<String, String> overrides(String set) {
         if (set == null || set.isBlank()) {
-            return null;
+            return Map.of();
         }
         Map<String, Object> parsed = McpErrors.parse("set", set, Map.class);
         return parsed.entrySet().stream()

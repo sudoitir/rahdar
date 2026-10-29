@@ -86,51 +86,73 @@ public class KafkaOffsets {
         Instant time = "time".equals(to) ? time(request.value()) : null;
         Long offset = "offset".equals(to) ? offset(request.value()) : null;
 
-        List<OffsetRow> rows = new ArrayList<>();
-        Set<String> members = new LinkedHashSet<>();
-        Map<String, ResourceId> ids = new LinkedHashMap<>();
-        Map<String, String> etags = new LinkedHashMap<>();
-        Map<String, Position> positions = new LinkedHashMap<>();
+        PlanDraft draft = new PlanDraft();
+        ResetAim aim = new ResetAim(to, time, offset);
         for (String topic : topics) {
-            Resource subscription = subscriptions.stream()
-                    .filter(s -> s.id().name().equals(topic))
-                    .findFirst()
-                    .orElse(null);
-            Map<Integer, Bounds> bounds = bounds(connection, topic);
-            if (bounds.isEmpty()) {
-                throw new IllegalArgumentException("Topic " + topic + " does not exist.");
-            }
-            Map<Integer, Long> current = committed(subscription);
-            Position position = position(to, time, offset, bounds, topic, rows);
-            if (position == null) {
-                continue;
-            }
-            ResourceId id = subscription != null ? subscription.id() : idOf(kind, group, topic);
-            Preview preview = KafkaFailures.call(
-                    () -> connection.operations().preview(id, new Operation.Seek(position), Scope.whole()));
-            ids.put(topic, id);
-            etags.put(topic, preview.etag());
-            positions.put(topic, position);
-            for (AttributeChange change : preview.diff()) {
-                if (change.key().equals(KafkaKinds.MEMBERS)) {
-                    change.before().ifPresent(l -> ((List<?>) l).forEach(m -> members.add(String.valueOf(m))));
-                } else if (change.key().startsWith(KafkaKinds.OFFSETS + ".")) {
-                    int partition = Integer.parseInt(change.key().substring(KafkaKinds.OFFSETS.length() + 1));
-                    rows.add(row(topic, partition, current.get(partition), change, time, bounds.get(partition)));
-                }
-            }
+            planTopic(connection, group, kind, subscriptions, topic, aim, draft);
         }
-        rows.sort(Comparator.comparing(OffsetRow::topic).thenComparingInt(OffsetRow::partition));
-        String blocked = blocked(groupResource, members);
-        List<String> etagParts = new ArrayList<>(etags.entrySet().stream()
+        draft.rows.sort(Comparator.comparing(OffsetRow::topic).thenComparingInt(OffsetRow::partition));
+        String blocked = blocked(groupResource, draft.members);
+        List<String> etagParts = new ArrayList<>(draft.etags.entrySet().stream()
                 .map(e -> e.getKey() + "=" + e.getValue())
                 .toList());
-        rows.stream().filter(r -> r.refused() != null).forEach(r -> etagParts.add(r.topic() + "/" + r.partition()));
+        draft.rows.stream()
+                .filter(r -> r.refused() != null)
+                .forEach(r -> etagParts.add(r.topic() + "/" + r.partition()));
         return new Plan(
-                new OffsetPreview(List.copyOf(rows), List.copyOf(members), blocked, KafkaEtags.of(etagParts)),
-                ids,
-                etags,
-                positions);
+                new OffsetPreview(
+                        List.copyOf(draft.rows), List.copyOf(draft.members), blocked, KafkaEtags.of(etagParts)),
+                draft.ids,
+                draft.etags,
+                draft.positions);
+    }
+
+    private record ResetAim(String to, Instant time, Long offset) {}
+
+    private static final class PlanDraft {
+        private final List<OffsetRow> rows = new ArrayList<>();
+        private final Set<String> members = new LinkedHashSet<>();
+        private final Map<String, ResourceId> ids = new LinkedHashMap<>();
+        private final Map<String, String> etags = new LinkedHashMap<>();
+        private final Map<String, Position> positions = new LinkedHashMap<>();
+    }
+
+    private void planTopic(
+            ClusterConnection connection,
+            String group,
+            KindId kind,
+            List<Resource> subscriptions,
+            String topic,
+            ResetAim aim,
+            PlanDraft draft) {
+        Resource subscription = subscriptions.stream()
+                .filter(s -> s.id().name().equals(topic))
+                .findFirst()
+                .orElse(null);
+        Map<Integer, Bounds> bounds = bounds(connection, topic);
+        if (bounds.isEmpty()) {
+            throw new IllegalArgumentException("Topic " + topic + " does not exist.");
+        }
+        Map<Integer, Long> current = committed(subscription);
+        Position position = position(aim.to(), aim.time(), aim.offset(), bounds, topic, draft.rows);
+        if (position == null) {
+            return;
+        }
+        ResourceId id = subscription != null ? subscription.id() : idOf(kind, group, topic);
+        Preview preview = KafkaFailures.call(
+                () -> connection.operations().preview(id, new Operation.Seek(position), Scope.whole()));
+        draft.ids.put(topic, id);
+        draft.etags.put(topic, preview.etag());
+        draft.positions.put(topic, position);
+        for (AttributeChange change : preview.diff()) {
+            if (change.key().equals(KafkaKinds.MEMBERS)) {
+                change.before().ifPresent(l -> ((List<?>) l).forEach(m -> draft.members.add(String.valueOf(m))));
+            } else if (change.key().startsWith(KafkaKinds.OFFSETS + ".")) {
+                int partition = Integer.parseInt(change.key().substring(KafkaKinds.OFFSETS.length() + 1));
+                draft.rows.add(
+                        row(topic, partition, current.get(partition), change, aim.time(), bounds.get(partition)));
+            }
+        }
     }
 
     private static ResourceId idOf(KindId kind, String group, String topic) {
@@ -231,7 +253,7 @@ public class KafkaOffsets {
     private static Instant time(String value) {
         try {
             return Instant.parse(value);
-        } catch (DateTimeParseException | NullPointerException e) {
+        } catch (DateTimeParseException | NullPointerException _) {
             throw new IllegalArgumentException("A time is an ISO-8601 instant, such as 2026-10-28T09:00:00Z.");
         }
     }
@@ -239,7 +261,7 @@ public class KafkaOffsets {
     private static Long offset(String value) {
         try {
             return Long.parseLong(value.trim());
-        } catch (NumberFormatException | NullPointerException e) {
+        } catch (NumberFormatException | NullPointerException _) {
             throw new IllegalArgumentException("An offset is a whole number.");
         }
     }

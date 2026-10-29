@@ -73,33 +73,8 @@ public class KafkaTopicConfigs {
         Map<String, Setting> current = new TreeMap<>();
         admin.settings(clusterId, topic).forEach(s -> current.put(s.name(), s));
         List<ConfigChangeRow> rows = new ArrayList<>();
-        boolean valid = true;
-        for (var change : new TreeMap<>(set).entrySet()) {
-            Setting before = known(current, change.getKey());
-            String error = admin.validate(
-                            clusterId,
-                            topic,
-                            new AlterConfigOp(
-                                    new org.apache.kafka.clients.admin.ConfigEntry(change.getKey(), change.getValue()),
-                                    AlterConfigOp.OpType.SET))
-                    .orElse(null);
-            valid &= error == null;
-            // The broker's complaint can quote the value it was given.
-            rows.add(new ConfigChangeRow(
-                    change.getKey(),
-                    shown(before),
-                    before.sensitive() ? MASKED : change.getValue(),
-                    null,
-                    error != null && before.sensitive() ? "The broker refused the new value." : error));
-        }
-        for (String name : remove.stream().sorted().toList()) {
-            Setting before = known(current, name);
-            if (before.source() != ConfigSource.TOPIC) {
-                throw new IllegalArgumentException("Setting " + name + " has no topic override to remove.");
-            }
-            rows.add(new ConfigChangeRow(
-                    name, shown(before), null, before.sensitive() ? null : before.defaultValue(), null));
-        }
+        boolean valid = overrides(clusterId, topic, current, set, rows);
+        removals(current, remove, rows);
         List<String> key = new ArrayList<>();
         current.values().forEach(s -> key.add(s.name() + "=" + s.value() + "@" + s.source()));
         return new ConfigPreview(rows, valid, KafkaEtags.of(key));
@@ -161,7 +136,65 @@ public class KafkaTopicConfigs {
         return shown;
     }
 
+    private boolean overrides(
+            UUID clusterId,
+            String topic,
+            Map<String, Setting> current,
+            Map<String, String> set,
+            List<ConfigChangeRow> rows) {
+        boolean valid = true;
+        for (var change : new TreeMap<>(set).entrySet()) {
+            Setting before = known(current, change.getKey());
+            String error = admin.validate(
+                            clusterId,
+                            topic,
+                            new AlterConfigOp(
+                                    new org.apache.kafka.clients.admin.ConfigEntry(change.getKey(), change.getValue()),
+                                    AlterConfigOp.OpType.SET))
+                    .orElse(null);
+            valid &= error == null;
+            // The broker's complaint can quote the value it was given.
+            rows.add(new ConfigChangeRow(
+                    change.getKey(),
+                    shown(before),
+                    before.sensitive() ? MASKED : change.getValue(),
+                    null,
+                    refusal(error, before)));
+        }
+        return valid;
+    }
+
+    private static String refusal(String error, Setting before) {
+        if (error != null && before.sensitive()) {
+            return "The broker refused the new value.";
+        }
+        return error;
+    }
+
+    private static void removals(Map<String, Setting> current, List<String> remove, List<ConfigChangeRow> rows) {
+        for (String name : remove.stream().sorted().toList()) {
+            Setting before = known(current, name);
+            if (before.source() != ConfigSource.TOPIC) {
+                throw new IllegalArgumentException("Setting " + name + " has no topic override to remove.");
+            }
+            rows.add(new ConfigChangeRow(name, shown(before), null, fallback(before), null));
+        }
+    }
+
+    private static String fallback(Setting before) {
+        if (before.sensitive()) {
+            return null;
+        }
+        return before.defaultValue();
+    }
+
     private static String unit(String name) {
-        return name.endsWith(".ms") ? "ms" : name.endsWith(".bytes") ? "bytes" : null;
+        if (name.endsWith(".ms")) {
+            return "ms";
+        }
+        if (name.endsWith(".bytes")) {
+            return "bytes";
+        }
+        return null;
     }
 }

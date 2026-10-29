@@ -50,6 +50,10 @@ public class KafkaAcls {
     /** The most ACLs one preview reads; past it the preview says its answer is partial. */
     static final int MAX_READ = 20_000;
 
+    private static final String PRINCIPAL = "principal";
+
+    private static final String RESOURCE_TYPE = "resource_type";
+
     private final BrokerGateway gateway;
     private final ClusterAccessGuard access;
 
@@ -57,14 +61,14 @@ public class KafkaAcls {
         access.requireCluster(clusterId, KafkaModule.ACCESS_RULE_READ);
         Map<String, String> selector = new LinkedHashMap<>();
         if (principal != null && !principal.isBlank()) {
-            selector.put("principal", principal);
+            selector.put(PRINCIPAL, principal);
         }
         if (resource != null && !resource.isBlank()) {
             selector.put("resource_name", resource);
         }
         ResourceQuery query = ResourceQuery.of(KafkaKinds.ACL)
                 .where(selector)
-                .limit(limit == null ? KafkaGroups.DEFAULT_LIMIT : Math.max(1, Math.min(limit, KafkaGroups.MAX_LIMIT)));
+                .limit(limit == null ? KafkaGroups.DEFAULT_LIMIT : Math.clamp(limit, 1, KafkaGroups.MAX_LIMIT));
         if (cursor != null && !cursor.isBlank()) {
             query = query.continueFrom(cursor);
         }
@@ -100,10 +104,10 @@ public class KafkaAcls {
                     || "*".equals(change.name())
                     || KafkaAclAccess.WILDCARD_PRINCIPAL.equals(change.principal());
             if (broad) {
-                scopes.add(Map.of("resource_type", type));
+                scopes.add(Map.of(RESOURCE_TYPE, type));
             } else {
-                scopes.add(Map.of("principal", change.principal(), "resource_type", type));
-                scopes.add(Map.of("principal", KafkaAclAccess.WILDCARD_PRINCIPAL, "resource_type", type));
+                scopes.add(Map.of(PRINCIPAL, change.principal(), RESOURCE_TYPE, type));
+                scopes.add(Map.of(PRINCIPAL, KafkaAclAccess.WILDCARD_PRINCIPAL, RESOURCE_TYPE, type));
             }
         }
         try {
@@ -151,33 +155,11 @@ public class KafkaAcls {
         List<EffectiveAccess> effective = new ArrayList<>();
         List<String> losses = new ArrayList<>();
         List<String> notes = new ArrayList<>();
-        Set<String> seen = new LinkedHashSet<>();
+        AccessWork work = new AccessWork(before, after, effective, losses, notes, new LinkedHashSet<>());
         for (Acl change : concat(add, remove)) {
-            String type = change.resourceType();
-            List<String> covered = covered(change, before, after);
-            if (covered.size() > MAX_COVERED) {
-                notes.add("Access is shown for " + MAX_COVERED + " of the " + covered.size()
-                        + " resources that the rule on " + type + " " + change.name() + " covers.");
-                covered = covered.subList(0, MAX_COVERED);
-            }
-            for (String name : covered) {
-                for (String principal : principals(change, before, after)) {
-                    if (seen.add(principal + "|" + type + "|" + name)) {
-                        accessOf(principal, type, name, before, after, effective, losses, notes);
-                    }
-                }
-            }
+            consider(change, work);
         }
-        if (concat(add, remove).stream().anyMatch(a -> !"*".equals(a.host()))) {
-            notes.add("Hosts are not evaluated: access is shown for a client on any host.");
-        }
-        if (held.truncated()) {
-            notes.add("The cluster has more than " + MAX_READ + " ACLs on these resource types, so only the first "
-                    + MAX_READ + " were read and the access shown may be incomplete.");
-        }
-        if (added == 0 && removed == 0) {
-            notes.add("Nothing changes: the ACLs to add exist and the ACLs to remove do not.");
-        }
+        noteLimits(add, remove, held, added, removed, notes);
         List<String> key = new ArrayList<>(
                 new TreeSet<>(before.stream().map(KafkaAcls::key).toList()));
         return new AclPreview(
@@ -227,28 +209,62 @@ public class KafkaAcls {
         return operations.stream().map(o -> o.toUpperCase(Locale.ROOT)).toList();
     }
 
-    /** What the principal may do to one resource before and after, its losses and the deny rules that win. */
-    private static void accessOf(
-            String principal,
-            String type,
-            String name,
+    /** The lists a preview fills as it walks the resources a change covers. */
+    private record AccessWork(
             List<Acl> before,
             List<Acl> after,
             List<EffectiveAccess> effective,
             List<String> losses,
-            List<String> notes) {
-        Set<String> was = KafkaAclAccess.allowed(before, principal, type, name);
-        Set<String> will = KafkaAclAccess.allowed(after, principal, type, name);
-        effective.add(new EffectiveAccess(principal, type, name, upper(was), upper(will)));
+            List<String> notes,
+            Set<String> seen) {}
+
+    private static void consider(Acl change, AccessWork work) {
+        String type = change.resourceType();
+        List<String> covered = covered(change, work.before(), work.after());
+        if (covered.size() > MAX_COVERED) {
+            work.notes()
+                    .add("Access is shown for " + MAX_COVERED + " of the " + covered.size()
+                            + " resources that the rule on " + type + " " + change.name() + " covers.");
+            covered = covered.subList(0, MAX_COVERED);
+        }
+        for (String name : covered) {
+            for (String principal : principals(change, work.before(), work.after())) {
+                if (work.seen().add(principal + "|" + type + "|" + name)) {
+                    accessOf(principal, type, name, work);
+                }
+            }
+        }
+    }
+
+    private static void noteLimits(
+            List<Acl> add, List<Acl> remove, Held held, int added, int removed, List<String> notes) {
+        if (concat(add, remove).stream().anyMatch(a -> !"*".equals(a.host()))) {
+            notes.add("Hosts are not evaluated: access is shown for a client on any host.");
+        }
+        if (held.truncated()) {
+            notes.add("The cluster has more than " + MAX_READ + " ACLs on these resource types, so only the first "
+                    + MAX_READ + " were read and the access shown may be incomplete.");
+        }
+        if (added == 0 && removed == 0) {
+            notes.add("Nothing changes: the ACLs to add exist and the ACLs to remove do not.");
+        }
+    }
+
+    /** What the principal may do to one resource before and after, its losses and the deny rules that win. */
+    private static void accessOf(String principal, String type, String name, AccessWork work) {
+        Set<String> was = KafkaAclAccess.allowed(work.before(), principal, type, name);
+        Set<String> will = KafkaAclAccess.allowed(work.after(), principal, type, name);
+        work.effective().add(new EffectiveAccess(principal, type, name, upper(was), upper(will)));
         was.stream()
                 .filter(op -> !will.contains(op))
-                .forEach(op ->
-                        losses.add(principal + " loses " + op.toUpperCase(Locale.ROOT) + " on " + type + " " + name));
+                .forEach(op -> work.losses()
+                        .add(principal + " loses " + op.toUpperCase(Locale.ROOT) + " on " + type + " " + name));
         for (String op : KafkaAclAccess.OPERATIONS) {
-            if (KafkaAclAccess.denied(after, principal, type, name, op)
-                    && KafkaAclAccess.allows(after, principal, type, name, op)) {
-                notes.add("A deny rule wins for " + principal + " on " + type + " " + name + " "
-                        + op.toUpperCase(Locale.ROOT) + ", although an allow rule also covers it.");
+            if (KafkaAclAccess.denied(work.after(), principal, type, name, op)
+                    && KafkaAclAccess.allows(work.after(), principal, type, name, op)) {
+                work.notes()
+                        .add("A deny rule wins for " + principal + " on " + type + " " + name + " "
+                                + op.toUpperCase(Locale.ROOT) + ", although an allow rule also covers it.");
             }
         }
     }

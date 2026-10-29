@@ -29,6 +29,8 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class KafkaMcpReadTools {
 
+    private static final String CLUSTER_ID = "clusterId";
+
     private final KafkaGroups groups;
     private final KafkaOffsets offsets;
     private final KafkaTopicConfigs configs;
@@ -52,7 +54,7 @@ public class KafkaMcpReadTools {
             @McpToolParam(required = false) String q,
             @McpToolParam(required = false) String cursor,
             @McpToolParam(required = false) Integer limit) {
-        UUID id = McpArgs.uuid("clusterId", clusterId);
+        UUID id = McpArgs.uuid(CLUSTER_ID, clusterId);
         return McpErrors.guard(() -> groups.list(id, type, state, q, cursor, limit));
     }
 
@@ -71,7 +73,7 @@ public class KafkaMcpReadTools {
             @McpToolParam(required = true) String group,
             @McpToolParam(required = false) String topic,
             @McpToolParam(required = false) String cursor) {
-        UUID id = McpArgs.uuid("clusterId", clusterId);
+        UUID id = McpArgs.uuid(CLUSTER_ID, clusterId);
         McpArgs.required("group", group);
         return McpErrors.guard(() -> KafkaMcpViews.group(groups.detail(id, group), topic, cursor, null));
     }
@@ -94,7 +96,7 @@ public class KafkaMcpReadTools {
             @McpToolParam(required = false) String topics,
             @McpToolParam(required = false) String topic,
             @McpToolParam(required = false) String cursor) {
-        UUID id = McpArgs.uuid("clusterId", clusterId);
+        UUID id = McpArgs.uuid(CLUSTER_ID, clusterId);
         McpArgs.required("group", group);
         McpArgs.required("to", to);
         return McpErrors.guard(() -> KafkaMcpViews.reset(
@@ -118,7 +120,7 @@ public class KafkaMcpReadTools {
             @McpToolParam(required = true) String topic,
             @McpToolParam(required = false) Boolean onlyOverridden,
             @McpToolParam(required = false) String keys) {
-        UUID id = McpArgs.uuid("clusterId", clusterId);
+        UUID id = McpArgs.uuid(CLUSTER_ID, clusterId);
         McpArgs.required("topic", topic);
         return McpErrors.guard(() -> KafkaMcpViews.config(configs.read(id, topic), onlyOverridden, keys));
     }
@@ -138,7 +140,7 @@ public class KafkaMcpReadTools {
             @McpToolParam(required = false) String resource,
             @McpToolParam(required = false) String cursor,
             @McpToolParam(required = false) Integer limit) {
-        UUID id = McpArgs.uuid("clusterId", clusterId);
+        UUID id = McpArgs.uuid(CLUSTER_ID, clusterId);
         return McpErrors.guard(() -> acls.list(id, principal, resource, cursor, limit));
     }
 
@@ -156,7 +158,7 @@ public class KafkaMcpReadTools {
             @McpToolParam(required = false) Boolean hangingOnly,
             @McpToolParam(required = false) String topic,
             @McpToolParam(required = false) Integer limit) {
-        UUID id = McpArgs.uuid("clusterId", clusterId);
+        UUID id = McpArgs.uuid(CLUSTER_ID, clusterId);
         boolean find = McpArgs.flag(hangingOnly, false);
         return McpErrors.guard(() -> {
             TransactionPage open = transactions.list(id, null, find ? Integer.valueOf(500) : limit);

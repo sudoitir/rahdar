@@ -51,7 +51,7 @@ public class KafkaAclChanges {
     public Effect estimate(AclChangeParams p) {
         AclPreview preview = acls.preview(p.clusterId(), request(p));
         return new Effect(
-                preview.added() + preview.removed(), "ACLs", preview.etag(), String.join(" ", preview.losses()));
+                (long) preview.added() + preview.removed(), "ACLs", preview.etag(), String.join(" ", preview.losses()));
     }
 
     public void replay(AclChangeParams p) {
@@ -99,7 +99,7 @@ public class KafkaAclChanges {
             audit.finish(
                     event,
                     true,
-                    added.size() + removed.size(),
+                    (long) added.size() + removed.size(),
                     e.getMessage(),
                     Map.of(
                             "added",
@@ -120,7 +120,7 @@ public class KafkaAclChanges {
             audit.finish(
                     event,
                     true,
-                    added.size() + removed.size(),
+                    (long) added.size() + removed.size(),
                     "The ACLs were changed but the cluster could not be asked what it holds: " + e.getMessage(),
                     Map.of("added", added, "removed", removed));
             throw e;
@@ -131,7 +131,7 @@ public class KafkaAclChanges {
         audit.finish(
                 event,
                 !confirmed,
-                preview.added() + preview.removed(),
+                (long) preview.added() + preview.removed(),
                 confirmed ? null : "The cluster does not hold the ACLs as changed.",
                 Map.of("access", preview.access(), "aclsRead", now.size(), "missing", missing, "remaining", remaining));
         return new AclResult(preview.added(), preview.removed());

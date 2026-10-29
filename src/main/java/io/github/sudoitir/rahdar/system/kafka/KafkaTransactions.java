@@ -36,7 +36,7 @@ public class KafkaTransactions {
     public TransactionPage list(UUID clusterId, String cursor, Integer limit) {
         access.requireCluster(clusterId, KafkaModule.TRANSACTION_READ);
         ResourceQuery query = ResourceQuery.of(KafkaKinds.TRANSACTIONAL_ID)
-                .limit(limit == null ? KafkaGroups.DEFAULT_LIMIT : Math.max(1, Math.min(limit, KafkaGroups.MAX_LIMIT)));
+                .limit(limit == null ? KafkaGroups.DEFAULT_LIMIT : Math.clamp(limit, 1, KafkaGroups.MAX_LIMIT));
         if (cursor != null && !cursor.isBlank()) {
             query = query.continueFrom(cursor);
         }
@@ -68,17 +68,8 @@ public class KafkaTransactions {
                 .map(String::valueOf)
                 .orElse("?");
         boolean abortable = hanging(transaction, Instant.now());
-        String effect = abortable
-                ? "Aborting rolls back the open transaction and releases "
-                        + (blocked.isEmpty()
-                                ? "its partitions"
-                                : blocked.size() == 1 ? "1 blocked partition" : blocked.size() + " blocked partitions")
-                        + ". The producer " + producer + " is fenced: its next write fails and it must restart."
-                : open(state)
-                        ? "The transaction is open and within its timeout, or just past it: the coordinator aborts"
-                                + " one past its timeout by itself, so it is left to it."
-                        : "The transaction is " + state + ", not open, so there is nothing to abort.";
-        return new AbortPreview(id, state, blocked, effect, abortable, preview.etag());
+        return new AbortPreview(
+                id, state, blocked, effect(abortable, blocked, producer, state), abortable, preview.etag());
     }
 
     Resource find(ClusterConnection connection, String id) {
@@ -94,6 +85,28 @@ public class KafkaTransactions {
 
     static ResourceId idOf(String id) {
         return new ResourceId(KafkaKinds.TRANSACTIONAL_ID, ResourcePath.of(id));
+    }
+
+    private static String effect(boolean abortable, List<BlockedPartition> blocked, String producer, String state) {
+        if (abortable) {
+            return "Aborting rolls back the open transaction and releases " + released(blocked) + ". The producer "
+                    + producer + " is fenced: its next write fails and it must restart.";
+        }
+        if (open(state)) {
+            return "The transaction is open and within its timeout, or just past it: the coordinator aborts"
+                    + " one past its timeout by itself, so it is left to it.";
+        }
+        return "The transaction is " + state + ", not open, so there is nothing to abort.";
+    }
+
+    private static String released(List<BlockedPartition> blocked) {
+        if (blocked.isEmpty()) {
+            return "its partitions";
+        }
+        if (blocked.size() == 1) {
+            return "1 blocked partition";
+        }
+        return blocked.size() + " blocked partitions";
     }
 
     static boolean open(String state) {

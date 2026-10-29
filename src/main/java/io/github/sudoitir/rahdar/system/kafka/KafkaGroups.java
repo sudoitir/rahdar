@@ -2,6 +2,7 @@ package io.github.sudoitir.rahdar.system.kafka;
 
 import io.github.sudoitir.openbroker.ClusterConnection;
 import io.github.sudoitir.openbroker.kafka.admin.KafkaKinds;
+import io.github.sudoitir.openbroker.model.Kind;
 import io.github.sudoitir.openbroker.model.KindId;
 import io.github.sudoitir.openbroker.model.Resource;
 import io.github.sudoitir.openbroker.model.ResourcePage;
@@ -135,8 +136,7 @@ public class KafkaGroups {
     }
 
     static Set<KindId> kindsOf(ClusterConnection connection) {
-        return Set.copyOf(
-                connection.resources().kinds().stream().map(k -> k.id()).toList());
+        return Set.copyOf(connection.resources().kinds().stream().map(Kind::id).toList());
     }
 
     static ResourcePage read(ClusterConnection connection, ResourceQuery query) {
@@ -157,9 +157,7 @@ public class KafkaGroups {
 
     private static GroupRow row(Resource group, Backlog lag) {
         String readOnly = readOnly(group);
-        Backlog shown = lag != null
-                ? lag
-                : new Backlog(null, Accuracy.UNAVAILABLE, readOnly != null ? readOnly : NO_OFFSETS, false);
+        Backlog shown = shownLag(lag, readOnly);
         long members = group.attributes()
                 .raw(KafkaKinds.MEMBERS)
                 .map(v -> ((Number) v).longValue())
@@ -227,8 +225,15 @@ public class KafkaGroups {
         return out;
     }
 
+    private static Backlog shownLag(Backlog lag, String readOnly) {
+        if (lag != null) {
+            return lag;
+        }
+        return new Backlog(null, Accuracy.UNAVAILABLE, readOnly != null ? readOnly : NO_OFFSETS, false);
+    }
+
     private static int pageSize(Integer limit) {
-        return limit == null ? DEFAULT_LIMIT : Math.max(1, Math.min(limit, MAX_LIMIT));
+        return limit == null ? DEFAULT_LIMIT : Math.clamp(limit, 1, MAX_LIMIT);
     }
 
     /** A name as a glob that matches only it. */

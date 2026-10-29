@@ -88,16 +88,38 @@ class KafkaScrape implements ClusterScrape {
             round(clusterId, "nodes");
             described = gateway.cluster(clusterId).nodes().describe(Scope.whole());
         } catch (BrokerException failure) {
-            RuntimeException e = BrokerFailures.translate(failure);
-            BrokerConnectionException.Kind kind = e instanceof BrokerConnectionException bce ? bce.kind() : null;
-            if (kind != BrokerConnectionException.Kind.THROTTLED) {
-                String message =
-                        e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
-                stored.forEach(node -> recorder.recordNodeError(node.getId(), message, kind));
-                publish(KafkaHealth.unreachable(clusterId, message));
-            }
-            throw e;
+            throw outage(clusterId, stored, failure);
         }
+        if (replaced(clusterId, stored, described)) {
+            return;
+        }
+        Map<String, ClusterNode> byBroker = new HashMap<>();
+        stored.forEach(node -> byBroker.put(node.getNativeNodeId(), node));
+        Set<String> answered = applyKnown(cycle, described, byBroker);
+        adoptUnstored(clusterId, described, byBroker);
+        described.failures().forEach((node, failure) -> record(byBroker.get(node.value()), failure));
+        retireUnlisted(clusterId, stored, described, answered);
+        if (partitions.due(clusterId)) {
+            round(clusterId, "partitions");
+            partitions.refresh(clusterId);
+        }
+        publish(KafkaHealth.judge(clusterId, described, partitions.offline(clusterId), partitions.tried(clusterId)));
+    }
+
+    private RuntimeException outage(UUID clusterId, List<ClusterNode> stored, BrokerException failure) {
+        RuntimeException e = BrokerFailures.translate(failure);
+        BrokerConnectionException.Kind kind = e instanceof BrokerConnectionException bce ? bce.kind() : null;
+        if (kind != BrokerConnectionException.Kind.THROTTLED) {
+            String message =
+                    e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
+            stored.forEach(node -> recorder.recordNodeError(node.getId(), message, kind));
+            publish(KafkaHealth.unreachable(clusterId, message));
+        }
+        return e;
+    }
+
+    /** A cluster that now reports another id is not read further. */
+    private boolean replaced(UUID clusterId, List<ClusterNode> stored, Partial<List<NodeDescription>> described) {
         String live = described.value().stream()
                 .flatMap(node -> node.attributes().raw(KafkaRegistrar.CLUSTER_ID).stream())
                 .map(String::valueOf)
@@ -105,14 +127,17 @@ class KafkaScrape implements ClusterScrape {
                 .orElse(null);
         Optional<String> changed = KafkaClusterIdentity.change(
                 live, clusters.registeredIdentity(clusterId).orElse(null));
-        if (changed.isPresent()) {
-            stored.forEach(node ->
-                    recorder.recordNodeError(node.getId(), changed.get(), BrokerConnectionException.Kind.UNREACHABLE));
-            publish(KafkaHealth.replaced(clusterId, changed.get()));
-            return;
+        if (changed.isEmpty()) {
+            return false;
         }
-        Map<String, ClusterNode> byBroker = new HashMap<>();
-        stored.forEach(node -> byBroker.put(node.getNativeNodeId(), node));
+        stored.forEach(node ->
+                recorder.recordNodeError(node.getId(), changed.get(), BrokerConnectionException.Kind.UNREACHABLE));
+        publish(KafkaHealth.replaced(clusterId, changed.get()));
+        return true;
+    }
+
+    private Set<String> applyKnown(
+            long cycle, Partial<List<NodeDescription>> described, Map<String, ClusterNode> byBroker) {
         Set<String> answered = new HashSet<>();
         for (NodeDescription node : described.value()) {
             ClusterNode known = byBroker.get(node.nativeId());
@@ -121,13 +146,21 @@ class KafkaScrape implements ClusterScrape {
                 answered.add(node.nativeId());
             }
         }
+        return answered;
+    }
+
+    private void adoptUnstored(
+            UUID clusterId, Partial<List<NodeDescription>> described, Map<String, ClusterNode> byBroker) {
         for (NodeDescription node : described.value()) {
             if (!byBroker.containsKey(node.nativeId())) {
                 recorder.adopt(
                         clusterId, KafkaRegistrar.nameOf(node), node.nativeId(), KafkaRegistrar.dataEndpoints(node));
             }
         }
-        described.failures().forEach((node, failure) -> record(byBroker.get(node.value()), failure));
+    }
+
+    private void retireUnlisted(
+            UUID clusterId, List<ClusterNode> stored, Partial<List<NodeDescription>> described, Set<String> answered) {
         List<ClusterNode> unlisted = stored.stream()
                 .filter(node -> node.getNativeNodeId() != null && !answered.contains(node.getNativeNodeId()))
                 .filter(node -> !described.failures().containsKey(NodeId.of(node.getNativeNodeId())))
@@ -137,20 +170,15 @@ class KafkaScrape implements ClusterScrape {
         Instant now = clock.instant();
         for (ClusterNode node : unlisted) {
             Instant since = missing.computeIfAbsent(node.getId(), id -> now);
-            if (!described.value().isEmpty() && Duration.between(since, now).compareTo(RETIRE_AFTER) >= 0) {
-                retire(clusterId, node);
-            } else {
+            if (described.value().isEmpty() || Duration.between(since, now).compareTo(RETIRE_AFTER) < 0) {
                 recorder.recordNodeError(
                         node.getId(),
                         "The cluster no longer lists this broker.",
                         BrokerConnectionException.Kind.UNREACHABLE);
+            } else {
+                retire(clusterId, node);
             }
         }
-        if (partitions.due(clusterId)) {
-            round(clusterId, "partitions");
-            partitions.refresh(clusterId);
-        }
-        publish(KafkaHealth.judge(clusterId, described, partitions.offline(clusterId), partitions.tried(clusterId)));
     }
 
     /** Writes the verdict where every replica reads it: when it changed, and otherwise every {@link #HEALTH_HEARTBEAT}. */

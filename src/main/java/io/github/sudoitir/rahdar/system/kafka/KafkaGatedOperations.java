@@ -29,6 +29,8 @@ import org.springframework.context.annotation.Configuration;
 @Configuration(proxyBeanMethods = false)
 class KafkaGatedOperations {
 
+    private static final String CLUSTER = "Cluster";
+
     @Bean
     GatedOperation<OffsetResetParams> offsetReset(KafkaOffsetResets resets, ClusterEnvironmentIndex clusters) {
         return new Operation<>(
@@ -37,7 +39,7 @@ class KafkaGatedOperations {
                 OffsetResetParams::clusterId,
                 p -> "Reset offsets of group " + p.group() + " to " + p.to() + " on " + clusters.labelOf(p.clusterId()),
                 p -> List.of(
-                        DisplayRow.of("Cluster", clusters.labelOf(p.clusterId())),
+                        DisplayRow.of(CLUSTER, clusters.labelOf(p.clusterId())),
                         DisplayRow.of("Group", p.group()),
                         DisplayRow.of(
                                 "Topics",
@@ -58,7 +60,7 @@ class KafkaGatedOperations {
                 ConfigChangeParams::clusterId,
                 p -> "Change settings of topic " + p.topic() + " on " + clusters.labelOf(p.clusterId()),
                 p -> List.of(
-                        DisplayRow.of("Cluster", clusters.labelOf(p.clusterId())),
+                        DisplayRow.of(CLUSTER, clusters.labelOf(p.clusterId())),
                         DisplayRow.of("Topic", p.topic()),
                         DisplayRow.of("Set", changes.shown(p)),
                         DisplayRow.of(
@@ -79,7 +81,7 @@ class KafkaGatedOperations {
                 p -> "Add " + p.add().size() + " and remove " + p.remove().size() + " ACLs on "
                         + clusters.labelOf(p.clusterId()),
                 p -> List.of(
-                        DisplayRow.of("Cluster", clusters.labelOf(p.clusterId())),
+                        DisplayRow.of(CLUSTER, clusters.labelOf(p.clusterId())),
                         DisplayRow.of(
                                 "Add",
                                 p.add().isEmpty()
@@ -110,7 +112,7 @@ class KafkaGatedOperations {
                 AbortParams::clusterId,
                 p -> "Abort transaction " + p.transactionalId() + " on " + clusters.labelOf(p.clusterId()),
                 p -> List.of(
-                        DisplayRow.of("Cluster", clusters.labelOf(p.clusterId())),
+                        DisplayRow.of(CLUSTER, clusters.labelOf(p.clusterId())),
                         DisplayRow.of("Transactional id", p.transactionalId())),
                 aborts::estimate,
                 aborts::replay,
@@ -128,7 +130,7 @@ class KafkaGatedOperations {
                 p -> "Abort the hanging transaction of producer " + p.producerId() + " on " + p.topic() + "-"
                         + p.partition() + " on " + clusters.labelOf(p.clusterId()),
                 p -> List.of(
-                        DisplayRow.of("Cluster", clusters.labelOf(p.clusterId())),
+                        DisplayRow.of(CLUSTER, clusters.labelOf(p.clusterId())),
                         DisplayRow.of("Partition", p.topic() + "-" + p.partition()),
                         DisplayRow.of("Producer id", String.valueOf(p.producerId()))),
                 aborts::estimate,

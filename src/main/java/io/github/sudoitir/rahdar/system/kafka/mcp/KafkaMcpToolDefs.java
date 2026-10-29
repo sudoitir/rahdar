@@ -16,6 +16,8 @@ public final class KafkaMcpToolDefs {
             "From the preview of this exact change. If the cluster changed since, the call is refused as stale:"
                     + " preview again.";
 
+    private static final String CONFIRM = "confirm";
+
     private static final String CONFIRM_GROUP = "A real run needs confirm equal to the group's name.";
 
     public static final List<McpToolDef> ALL = List.of(
@@ -45,7 +47,7 @@ public final class KafkaMcpToolDefs {
                     "kafka_reset_offsets",
                     "Move an empty group's offsets to earliest, latest, a time or an offset.",
                     Param.note("etag", ETAG),
-                    Param.note("confirm", CONFIRM_GROUP + " Records the group skips are not deleted."),
+                    Param.note(CONFIRM, CONFIRM_GROUP + " Records the group skips are not deleted."),
                     Param.note(
                             "to", "As kafka_preview_offset_reset; send the same to, value and topics as the preview.")),
             read(
@@ -62,7 +64,7 @@ public final class KafkaMcpToolDefs {
                             "dryRun",
                             McpToolDef.DRY_RUN + " The preview carries the etag and the broker's validation."),
                     Param.note("etag", ETAG),
-                    Param.note("confirm", "A real run needs confirm equal to the topic's name.")),
+                    Param.note(CONFIRM, "A real run needs confirm equal to the topic's name.")),
             read(
                     "kafka_list_acls",
                     "A page of a Kafka cluster's ACLs, filtered by principal or resource.",
@@ -70,7 +72,8 @@ public final class KafkaMcpToolDefs {
                     Param.note("resource", "Such as topic:orders.")),
             read(
                     "kafka_list_transactions",
-                    "A Kafka cluster's open transactional ids, and with hangingOnly the hanging transactions on its partitions.",
+                    "A Kafka cluster's open transactional ids, and with hangingOnly the hanging transactions on its"
+                            + " partitions.",
                     Param.note(
                             "hangingOnly",
                             "The coordinator aborts an open transaction by itself within seconds of its timeout, so"
@@ -88,7 +91,7 @@ public final class KafkaMcpToolDefs {
                                     + " a hanging transaction, such as kafka.hanging-transaction/orders/0/4711."),
                     Param.note("dryRun", McpToolDef.DRY_RUN + " The preview names what the abort releases."),
                     Param.note("etag", ETAG),
-                    Param.note("confirm", "A real run needs confirm equal to the transactional id.")));
+                    Param.note(CONFIRM, "A real run needs confirm equal to the transactional id.")));
 
     private KafkaMcpToolDefs() {}
 

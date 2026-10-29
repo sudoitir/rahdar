@@ -57,7 +57,7 @@ public class KafkaTopicConfigChanges {
         }
         try {
             return configs.shownValues(p.clusterId(), p.topic(), p.set()).toString();
-        } catch (RuntimeException e) {
+        } catch (RuntimeException _) {
             // The values are left out rather than shown unmasked when the settings cannot be read.
             return p.set().keySet().toString();
         }

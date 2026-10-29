@@ -47,7 +47,7 @@ public class KafkaHangingTransactions {
     public HangingPage find(UUID clusterId, String topic, String cursor, Integer limit) {
         access.requireCluster(clusterId, KafkaModule.TRANSACTION_READ);
         ResourceQuery query = ResourceQuery.of(KIND)
-                .limit(limit == null ? KafkaGroups.DEFAULT_LIMIT : Math.max(1, Math.min(limit, KafkaGroups.MAX_LIMIT)));
+                .limit(limit == null ? KafkaGroups.DEFAULT_LIMIT : Math.clamp(limit, 1, KafkaGroups.MAX_LIMIT));
         if (topic != null && !topic.isBlank()) {
             query = query.where(Map.of("topic", topic));
         }
