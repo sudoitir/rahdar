@@ -12,7 +12,7 @@
 ## 4. Findings carried from 19e4-kafka
 - [ ] 4.1 S2: cap broker_event by rows as well as by time. A start is on branch `claude/19e4b-s2-start` (not in this pull request): housekeeping trims the oldest rows once a store passes its row quota, and broker events start at twenty million. Check: a test that inserts past the cap keeps it
 - [ ] 4.2 S3: store metric samples on change plus a heartbeat, so 4000 Kafka subscriptions stay within the storage budget. Check: the 1.1 measurement
-- [ ] 4.3 B1: one unreachable Kafka cluster must not stall the scrape of the others (per-cluster deadline). Check: a test with a blackholed cluster
+- [ ] 4.3 B1: one unreachable Kafka cluster must not stall the scrape of the others. The side-by-side read landed in 19e4 (`df042283b`); what remains is a test with a blackholed cluster. Check: that test passes
 - [ ] 4.4 A10: the scrape reads subscriptions once per tick. Check: a test counting the reads
 - [ ] 4.5 E11: per-route tests that an unreadable Kafka resource answers not-found (the authorization spec). Check: the tests pass
 - [ ] 4.6 Web: adopt the nullable depths and the browse/SQL shapes from 19e4-kafka where the UI still renders 0 for unknown. Check: unit tests, and the sweep shows "Unknown"
