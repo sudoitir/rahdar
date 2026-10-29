@@ -56,12 +56,17 @@ class BulkLogPurgeTest extends BulkTestSupport {
                         group("g-rebalancing", "t", 30, 0),
                         group("g-empty", "u", 5, 0),
                         queue("orders.q", 4)));
-        when(messages.purgeLog(clusterId, ResourceId.parse("kafka.group-topic/g-empty/t"), false))
-                .thenReturn(new Attempt.Ok<>(new MessageService.Outcome.LogPurged(10, null)));
-        when(messages.purgeLog(clusterId, ResourceId.parse("kafka.group-topic/g-empty/u"), false))
-                .thenReturn(new Attempt.Ok<>(new MessageService.Outcome.LogPurged(5, null)));
-        when(messages.purgeLog(clusterId, ResourceId.parse("kafka.group-topic/g-rebalancing/t"), false))
+        // The scraped lag is 10 and 5. The live preview is what the plan confirms, and it can be a different number.
+        when(messages.previewLogSkip(clusterId, ResourceId.parse("kafka.group-topic/g-empty/t")))
+                .thenReturn(7L);
+        when(messages.previewLogSkip(clusterId, ResourceId.parse("kafka.group-topic/g-empty/u")))
+                .thenReturn(4L);
+        when(messages.previewLogSkip(clusterId, ResourceId.parse("kafka.group-topic/g-rebalancing/t")))
                 .thenThrow(new ConflictException("group-rebalancing", "The group g-rebalancing is rebalancing."));
+        when(messages.purgeLog(clusterId, ResourceId.parse("kafka.group-topic/g-empty/t"), false))
+                .thenReturn(new Attempt.Ok<>(new MessageService.Outcome.LogPurged(7, null)));
+        when(messages.purgeLog(clusterId, ResourceId.parse("kafka.group-topic/g-empty/u"), false))
+                .thenReturn(new Attempt.Ok<>(new MessageService.Outcome.LogPurged(4, null)));
         when(messages.purge(clusterId, "orders.q", nodeA, false, false))
                 .thenReturn(new Attempt.Ok<>(new MessageService.Outcome.Affected(4, nodeA)));
 
@@ -80,15 +85,16 @@ class BulkLogPurgeTest extends BulkTestSupport {
 
         // The plan carries what each log purge skips, and the run's estimate, which the cap counts, destroys none of
         // it.
-        assertThat(item(preview, "kafka.group-topic/g-empty/t").skipped()).isEqualTo(10L);
+        assertThat(item(preview, "kafka.group-topic/g-empty/t").skipped()).isEqualTo(7L);
         assertThat(preview.run().estimate()).isEqualTo(4L);
         assertThat(preview.run().overCap()).isFalse();
         BulkItemView active = item(preview, "kafka.group-topic/g-active/t");
         assertThat(active.status()).isEqualTo(BulkItemStatus.REFUSED);
         assertThat(active.error()).contains("2 members");
         assertThat(item(preview, "kafka.group-topic/g-empty/t").warning())
-                .contains("skipping 10 records")
-                .contains("not deleted");
+                .contains("skipping 7 records")
+                .contains("not deleted")
+                .contains("open transaction");
 
         bulk.execute(
                 clusterId,
@@ -100,18 +106,48 @@ class BulkLogPurgeTest extends BulkTestSupport {
         assertThat(item(run, "kafka.group-topic/g-empty/t").status()).isEqualTo(BulkItemStatus.SUCCEEDED);
         // A purge of a log destroys nothing and says how many records it passed over.
         assertThat(item(run, "kafka.group-topic/g-empty/t").affected()).isZero();
-        assertThat(item(run, "kafka.group-topic/g-empty/t").skipped()).isEqualTo(10L);
-        assertThat(item(run, "kafka.group-topic/g-empty/u").skipped()).isEqualTo(5L);
+        assertThat(item(run, "kafka.group-topic/g-empty/t").skipped()).isEqualTo(7L);
+        assertThat(item(run, "kafka.group-topic/g-empty/u").skipped()).isEqualTo(4L);
         // A purge of the whole cluster names no node.
         assertThat(item(run, "kafka.group-topic/g-empty/t").outcome())
                 .singleElement()
                 .satisfies(outcome -> assertThat(outcome.nodeId()).isNull());
         assertThat(item(run, "kafka.group-topic/g-active/t").status()).isEqualTo(BulkItemStatus.REFUSED);
-        BulkItemView rebalancing = item(run, "kafka.group-topic/g-rebalancing/t");
-        assertThat(rebalancing.status()).isEqualTo(BulkItemStatus.FAILED);
+        BulkItemView rebalancing = item(preview, "kafka.group-topic/g-rebalancing/t");
+        assertThat(rebalancing.status()).isEqualTo(BulkItemStatus.REFUSED);
         assertThat(rebalancing.error()).contains("rebalancing");
+        assertThat(item(run, "kafka.group-topic/g-rebalancing/t").status()).isEqualTo(BulkItemStatus.REFUSED);
         assertThat(item(run, "artemis.queue/orders.q").status()).isEqualTo(BulkItemStatus.SUCCEEDED);
         verify(messages, never()).purgeLog(clusterId, ResourceId.parse("kafka.group-topic/g-active/t"), false);
+        verify(messages, never()).previewLogSkip(clusterId, ResourceId.parse("kafka.group-topic/g-active/t"));
+        verify(messages, never()).purgeLog(clusterId, ResourceId.parse("kafka.group-topic/g-rebalancing/t"), false);
+    }
+
+    @Test
+    void aGroupTheLivePreviewWouldNotMoveIsRefusedAndNotRun() {
+        when(kinds.partitioned(clusterId, GROUP_TOPIC)).thenReturn(true);
+        when(aggregator.allQueues(clusterId))
+                .thenReturn(List.of(group("g-zero", "t", 40, 0), group("g-unknown", "t", 40, 0)));
+        when(messages.previewLogSkip(clusterId, ResourceId.parse("kafka.group-topic/g-zero/t")))
+                .thenThrow(new ConflictException(
+                        "purge-nothing-to-skip", "This group is already at the last record it can read."));
+        when(messages.previewLogSkip(clusterId, ResourceId.parse("kafka.group-topic/g-unknown/t")))
+                .thenThrow(new ConflictException(
+                        "purge-uncounted", "Rahdar could not count the records this group would skip."));
+
+        BulkRunDetailView preview = bulk.preview(
+                clusterId,
+                new BulkPreviewRequest(
+                        BulkOperation.PURGE,
+                        List.of("kafka.group-topic/g-zero/t", "kafka.group-topic/g-unknown/t"),
+                        null,
+                        false));
+
+        assertThat(item(preview, "kafka.group-topic/g-zero/t").status()).isEqualTo(BulkItemStatus.REFUSED);
+        assertThat(item(preview, "kafka.group-topic/g-zero/t").error()).contains("last record");
+        assertThat(item(preview, "kafka.group-topic/g-unknown/t").status()).isEqualTo(BulkItemStatus.REFUSED);
+        assertThat(item(preview, "kafka.group-topic/g-unknown/t").error()).contains("could not count");
+        assertThat(item(preview, "kafka.group-topic/g-unknown/t").skipped()).isNull();
     }
 
     @Test

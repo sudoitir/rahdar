@@ -130,6 +130,31 @@ describe('the transactions', () => {
     expect((await within(dialog).findAllByText('payments-1 is no longer past its timeout.')).length).toBeGreaterThan(0);
   });
 
+  it('renders a transaction that omitted its partitions and an abort preview that omitted what it releases', async () => {
+    serve(
+      [{ ...TXN, id: 'bare', blocked: undefined }],
+      [
+        http.post('*/api/v1/clusters/k1/kafka/transactions/bare\\:abort-preview', () =>
+          HttpResponse.json({
+            id: 'bare',
+            state: 'Ongoing',
+            effect: 'Aborts bare.',
+            abortable: true,
+            etag: 't1',
+          }),
+        ),
+      ],
+    );
+    const user = userEvent.setup();
+    renderAppAt('/clusters/k1/kafka/transactions');
+    expect(await screen.findByText('None')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Abort bare' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Abort transaction bare' });
+    expect(await within(dialog).findByText('Aborts bare.')).toBeInTheDocument();
+    expect(within(dialog).queryByText(/Unblocks/)).not.toBeInTheDocument();
+    expect(within(dialog).getByText(/The producer is fenced/)).toBeInTheDocument();
+  });
+
   it('keeps Abort visible but disabled, with the reason, for someone without the permission', async () => {
     mockKafkaCluster(['cluster:read', 'transaction:read']);
     server.use(http.get('*/api/v1/clusters/k1/kafka/transactions', () => HttpResponse.json({ items: [TXN] })));

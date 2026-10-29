@@ -46,9 +46,17 @@ A Kafka topic or subscription the caller may not read answers not-found, includi
 
 Shared backlog cells already say a lag is unavailable. The SQL subscription grid still coerces null with `?? 0`. It uses the same "unavailable" wording. The task's "Unknown" is the accuracy, not a new label.
 
+### A purge confirms the live skip count
+
+The number on the hold is the driver's live purge preview (`BrokerMessages.previewLogPurge`), which is a move to the last offset the group can read. It is not the lag the last scrape stored: that lag counts records an open transaction still holds, and the move will not pass them. `Count.Unavailable` stays unavailable. It is not stored as 0, the dialog says the count is unavailable, and the hold is not armed. A group with members is refused by name. A group the preview would not move (a count of zero, or a count the driver did not report) is not an acting row. The row action and a bulk selection both use this preview, because the row opens the bulk dialog. The messages-page purge uses the same dry run. The sentence says that no record is deleted and that records an open transaction still holds stay. The run reports the preview's record count after a successful execute; the driver's affected count is partitions. An unavailable preview does not execute.
+
+Rejected: showing the scraped lag and only hiding the word `NaN`. The live run opened the bulk dialog, and a scraped lag can promise a move the broker will not make. Rejected: a new batched preview in the broker SDK. A page of subscriptions is already inside the bulk cap, and each one is the preview the single purge already performs.
+
+This supersedes decision 2 of ADR-0093 for a purge of a partitioned log only (ADR-0221). A queue preview stays on the aggregated list. The preview still writes no audit row.
+
 ### Known flow defects are fixed before the sweep
 
-The 19e4 live run already failed four flows: the purge dialog shows `NaN` and does not say that no record is deleted; a bulk purge left one group's lag unchanged; browse showed the group position as undefined; aborting a transaction crashed the page. Those are fixed, with tests, before a sweep is spent on them. Hanging-transaction copy describes an open-past-timeout transaction only if the review still finds it misleading. Destructive fixes keep the preview, the reach in words, the hold, the approval gate, and the audit.
+The 19e4 live run failed four flows. The purge dialog was still "Reading what these subscriptions hold" when the check read it, so the check's own parse was `NaN`, and the dialog is the bulk one rather than the messages-page one. A bulk purge then left a group's lag unchanged while the preview had counted the scraped lag. Browse did not show the sentence "The group stands at offset"; the note `undefined` is the check's capture, not the word on the page. Abort failed as `page.goto` crashed before the dialog. The purge count, the browse sentence, and a dialog that tolerates a missing `released` or `blocked` list are fixed, with tests, before a sweep is spent on them. Hanging-transaction copy is left to the review: the page header already separates a transaction past its timeout from one the coordinator does not know. Destructive fixes keep the preview, the reach in words, the hold, the approval gate, and the audit.
 
 ### The scale run measures the fixed writer
 

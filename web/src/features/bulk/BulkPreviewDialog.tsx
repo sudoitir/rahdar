@@ -42,13 +42,13 @@ function blastRadius(operation: BulkOperation, preview: BulkRunDetailView, moves
     const to = `${plural(acting.length, 'group')} to the end of the log`;
     const known = acting.filter((i) => i.skipped != null);
     if (known.length === 0) {
-      return `Moves ${to}, skipping a number of records that is unavailable. No record is deleted; the groups will not read the records they skip.`;
+      return `Moves ${to}, skipping a number of records that is unavailable. No record is deleted; the groups will not read the records they skip. The hold stays disarmed until every group in the run has a count.`;
     }
     const records = plural(
       known.reduce((sum, i) => sum + (i.skipped ?? 0), 0),
       'record',
     );
-    return `Moves ${to}, skipping ${known.length === acting.length ? '' : 'at least '}${records}. No record is deleted; the groups will not read the records they skip.`;
+    return `Moves ${to}, skipping ${known.length === acting.length ? '' : 'at least '}${records}. No record is deleted; the groups will not read the records they skip. Records an open transaction still holds stay.`;
   }
   if (run.estimate == null || (acting.length > 0 && acting.every((i) => i.affected == null))) {
     return `${scope}. How many messages that destroys is unavailable. This cannot be undone.`;
@@ -121,6 +121,7 @@ function RunControls({
   overCap,
   override,
   confirmLabel,
+  holdDisarmed,
   onStart,
   onRetry,
 }: Readonly<{
@@ -131,6 +132,8 @@ function RunControls({
   overCap: boolean;
   override: boolean;
   confirmLabel: string;
+  /** A log purge whose skip count is not known cannot be armed. */
+  holdDisarmed: boolean;
   onStart: () => void;
   onRetry: () => void;
 }>) {
@@ -163,7 +166,7 @@ function RunControls({
         <HoldToConfirm
           label={confirmLabel}
           loading={execute.isPending}
-          disabled={(overCap && !override) || execute.isPending}
+          disabled={holdDisarmed || (overCap && !override) || execute.isPending}
           onConfirm={onStart}
         />
       ) : (
@@ -392,6 +395,7 @@ export function BulkPreviewDialog({
             overCap={overCap}
             override={override}
             confirmLabel={confirmLabel}
+            holdDisarmed={moves && unknown > 0}
             onStart={start}
             onRetry={takePreview}
           />

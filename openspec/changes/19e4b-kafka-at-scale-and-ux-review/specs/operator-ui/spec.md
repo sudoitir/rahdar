@@ -37,3 +37,18 @@ The registration, offset reset, truncate, ACL change, transaction abort, hanging
 #### Scenario: A review finding
 - **WHEN** the review finds a flow that misleads an operator or hides a consequence
 - **THEN** the flow is fixed and the finding is recorded as closed
+
+### Requirement: A Kafka purge confirms the records the group will skip
+A purge of a Kafka group, from its row or from a bulk selection, SHALL state the number of records the driver's live purge preview says the group will skip, and SHALL state that no record is deleted. That number SHALL be the records up to the last offset the group can read, and SHALL NOT be the lag from the last scrape. Records an open transaction still holds SHALL be named as staying. A group that has members SHALL be refused by name and SHALL NOT be moved. A group the preview cannot count SHALL show the count as unavailable, SHALL NOT show zero, and SHALL NOT arm the confirmation. A group the preview would not move SHALL NOT be listed as a group the run will move. After the run, every group the preview said it would move SHALL be at the offset the preview counted, and every group it said it would not touch SHALL be unchanged.
+
+#### Scenario: The confirmed count is the live preview
+- **WHEN** an operator previews a purge of an empty group
+- **THEN** the dialog states the live skip count, says that no record is deleted, and the hold names that count
+
+#### Scenario: An uncounted purge is not armed
+- **WHEN** the driver does not report how many records a purge would skip
+- **THEN** the dialog says the count is unavailable, shows no zero, and the hold is not armed
+
+#### Scenario: A bulk purge moves only the groups the preview marked
+- **WHEN** a bulk purge preview marks some empty groups as acting and refuses or leaves the others
+- **THEN** the run moves only the groups it marked as acting, and the others are unchanged

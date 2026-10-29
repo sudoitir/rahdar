@@ -21,8 +21,10 @@ import { useAbortTransaction, usePreviewAbort, useTransactions, type AbortPrevie
 
 const ABORT: ActionVerb = { verb: 'Abort', past: 'Aborted', progressive: 'Aborting' };
 
-const blockedWords = (t: Transaction): string =>
-  t.blocked.length === 0 ? 'None' : t.blocked.map((b) => `${b.topic}-${b.partition}`).join(', ');
+const blockedWords = (t: Transaction): string => {
+  const blocked = t.blocked ?? [];
+  return blocked.length === 0 ? 'None' : blocked.map((b) => `${b.topic}-${b.partition}`).join(', ');
+};
 
 const seconds = (ms: number): string =>
   ms >= 60_000 ? `${Math.round(ms / 60_000)} min` : `${Math.round(ms / 1000)} s`;
@@ -81,7 +83,8 @@ function AbortDialog({
   else if (effect && !effect.abortable) blocked = effect.effect;
   else if (preview.isError) blocked = 'The effect could not be read, so the abort is not offered.';
   else if (!effect) blocked = 'Reading what the abort would do…';
-  const released = (effect?.released ?? []).map((part) => `${part.topic}-${part.partition}`).join(', ');
+  const releasedParts = effect?.released ?? [];
+  const released = releasedParts.map((part) => `${part.topic}-${part.partition}`).join(', ');
 
   return (
     <ConfirmDialog
@@ -100,7 +103,7 @@ function AbortDialog({
           {effect ? (
             <>
               <Text size="sm">{effect.effect}</Text>
-              {effect.released.length > 0 ? <Text size="sm">{`Unblocks: ${released}.`}</Text> : null}
+              {releasedParts.length > 0 ? <Text size="sm">{`Unblocks: ${released}.`}</Text> : null}
             </>
           ) : null}
           <Text size="sm">The producer is fenced and its next write fails. This cannot be undone.</Text>

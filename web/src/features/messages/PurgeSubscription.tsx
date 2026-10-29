@@ -61,7 +61,7 @@ function Consequence({
         <Text size="sm">
           This moves the position of {subscriptionName} to the end of its log, skipping approximately{' '}
           {records(preview.skippedCount)} (point-in-time estimate). No record is deleted: the group will not read those
-          records, and can be reset back.
+          records, and can be reset back. Records an open transaction still holds stay.
         </Text>
       ) : (
         <Text size="sm">

@@ -1,5 +1,6 @@
 package io.github.sudoitir.rahdar.feature.bulk;
 
+import io.github.sudoitir.openbroker.model.ResourceId;
 import io.github.sudoitir.rahdar.feature.bulk.BulkRunMapper.ItemEstimate;
 import io.github.sudoitir.rahdar.feature.bulk.BulkRunMapper.RunOptions;
 import io.github.sudoitir.rahdar.feature.bulk.internal.persistence.BulkRunEntity;
@@ -13,6 +14,7 @@ import io.github.sudoitir.rahdar.feature.bulk.web.BulkViews.BulkRunDetailView;
 import io.github.sudoitir.rahdar.feature.bulk.web.BulkViews.BulkRunView;
 import io.github.sudoitir.rahdar.feature.bulk.web.BulkViews.BulkSelection;
 import io.github.sudoitir.rahdar.feature.bulk.web.BulkViews.NodeFigure;
+import io.github.sudoitir.rahdar.feature.messages.MessageService;
 import io.github.sudoitir.rahdar.feature.resources.CrossNodeAggregator;
 import io.github.sudoitir.rahdar.feature.resources.web.ResourceViews.SubscriptionNodeCell;
 import io.github.sudoitir.rahdar.feature.resources.web.ResourceViews.SubscriptionView;
@@ -87,6 +89,7 @@ public class BulkService {
     private final OperationGate gate;
     private final ResourceIdTexts ids;
     private final ClusterKinds kinds;
+    private final MessageService messages;
 
     /**
      * What the gate holds of a bulk run: the run, the plan it was previewed with (its hash, operation and queue
@@ -104,9 +107,10 @@ public class BulkService {
     // ---- preview -----------------------------------------------------------
 
     /**
-     * Resolve and freeze the set, and state its blast radius from the aggregated queue snapshot: no
-     * broker call per queue (ADR-0093 D2). The authoritative preflight still runs per queue on execute.
-     * Writes no audit event: nothing is done.
+     * Resolve and freeze the set. A queue's blast radius comes from the aggregated snapshot, with no
+     * broker call per queue (ADR-0093). A purge of a partitioned log asks the driver once per group for
+     * the records that purge would skip (ADR-0221), because the scraped lag is not that number. The
+     * authoritative preflight still runs per queue on execute. Writes no audit event: nothing is done.
      */
     public BulkRunDetailView preview(UUID clusterId, BulkPreviewRequest request) {
         BulkOperation operation = Objects.requireNonNull(request.operation(), "operation");
@@ -201,7 +205,7 @@ public class BulkService {
                     name, "No subscription with this id exists on the cluster.", new ItemEstimate(List.of(), null));
         }
         if (kinds.partitioned(clusterId, queue.kind())) {
-            return planLog(operation, name, queue);
+            return planLog(operation, name, queue, clusterId);
         }
         List<NodeFigure> nodes =
                 queue.perNode().stream().map(BulkService::figure).toList();
@@ -251,9 +255,10 @@ public class BulkService {
     /**
      * A subscription of a partitioned log is a position, not a queue: only a purge acts on it, moving the position to
      * the end of the log without deleting a record, and only for a group that has no members. Members are read from
-     * the snapshot; the driver's own refusal, such as a rebalance in progress, is the item's outcome at run time.
+     * the snapshot. The records it would skip come from the driver's live preview, not the scraped lag. A group the
+     * preview would not move is refused here and is not acted on.
      */
-    private static Planned planLog(BulkOperation operation, String id, SubscriptionView subscription) {
+    private Planned planLog(BulkOperation operation, String id, SubscriptionView subscription, UUID clusterId) {
         List<NodeFigure> nodes =
                 subscription.perNode().stream().map(BulkService::figure).toList();
         if (operation != BulkOperation.PURGE) {
@@ -275,20 +280,25 @@ public class BulkService {
                             .formatted(members),
                     new ItemEstimate(nodes, null, null, true));
         }
-        boolean unknown = nodes.stream().anyMatch(n -> n.messageCount() == null);
-        Long skippedRecords = unknown
-                ? null
-                : nodes.stream().mapToLong(NodeFigure::messageCount).sum();
-        String skipped = unknown
-                ? "Purging moves the position to the end of the log, skipping an unknown number of records."
-                : "Purging moves the position to the end of the log, skipping %d records.".formatted(skippedRecords);
+        try {
+            return counted(id, nodes, messages.previewLogSkip(clusterId, ResourceId.parse(id)));
+        } catch (ConflictException e) {
+            return new Planned(id, e.getMessage(), new ItemEstimate(nodes, null, null, true));
+        }
+    }
+
+    /** The plan for a group the live preview will move. */
+    private static Planned counted(String id, List<NodeFigure> nodes, long skipped) {
         return new Planned(
                 id,
                 null,
                 new ItemEstimate(
                         nodes,
-                        skipped + " The records themselves are not deleted and others can still read them.",
-                        skippedRecords,
+                        ("Purging moves the position to the end of the log, skipping %d records."
+                                        + " The records themselves are not deleted and others can still read them."
+                                        + " Records an open transaction still holds stay.")
+                                .formatted(skipped),
+                        skipped,
                         true));
     }
 
