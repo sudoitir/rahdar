@@ -133,8 +133,10 @@ class KafkaScrape implements ClusterScrape {
                         BrokerConnectionException.Kind.UNREACHABLE);
             }
         }
-        round(clusterId, "partitions");
-        partitions.refresh(clusterId);
+        if (partitions.due(clusterId)) {
+            round(clusterId, "partitions");
+            partitions.refresh(clusterId);
+        }
     }
 
     /** Removes a broker the cluster dropped, and records that it left. */

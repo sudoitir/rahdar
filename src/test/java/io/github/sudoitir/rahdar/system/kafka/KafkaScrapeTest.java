@@ -218,6 +218,7 @@ class KafkaScrapeTest {
         clusterReports(broker("1"), broker("2"), broker("3"));
         List<ClusterNode> brokers = List.of(stored("1"), stored("2"), stored("3"));
         when(clusters.nodes(CLUSTER)).thenReturn(brokers);
+        when(partitions.due(CLUSTER)).thenReturn(true);
 
         scrape.nodes(CLUSTER, 1);
         scrape.nodes(CLUSTER, 2);
@@ -233,6 +234,18 @@ class KafkaScrapeTest {
                         .counter()
                         .count())
                 .isEqualTo(2);
+    }
+
+    @Test
+    void thePartitionsAreReadOnlyWhenTheyAreDue() {
+        clusterReports(broker("1"));
+        ClusterNode one = stored("1");
+        when(clusters.nodes(CLUSTER)).thenReturn(List.of(one));
+        when(partitions.due(CLUSTER)).thenReturn(false);
+
+        scrape.nodes(CLUSTER, 1);
+
+        verify(partitions, never()).refresh(any());
     }
 
     @Test
