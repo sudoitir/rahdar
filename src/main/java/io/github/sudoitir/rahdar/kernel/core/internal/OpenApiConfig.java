@@ -108,7 +108,9 @@ class OpenApiConfig {
     /**
      * A nullable reference is "the object or null", and a nullable enum lists {@code null}: springdoc renders the
      * first as {@code type: null} beside the {@code $ref} (nothing can satisfy that) and the second without the
-     * {@code null} value, so a client generated from the document would reject a response the API sends.
+     * {@code null} value, so a client generated from the document would reject a response the API sends. Union
+     * members hide those properties inside {@code allOf} until {@link #unionMembersStandAlone()} flattens them, so
+     * this walks composed schemas and that flattener runs it again on the schema it publishes.
      */
     @Bean
     OpenApiCustomizer nullableReferencesAndEnums() {
@@ -132,6 +134,7 @@ class OpenApiConfig {
                         property.getTypes() != null && property.getTypes().contains("null");
                 if (nullable && property.get$ref() != null) {
                     return new Schema<>()
+                            .description(property.getDescription())
                             .anyOf(List.of(
                                     new Schema<>().$ref(property.get$ref()), new Schema<>().types(Set.of("null"))));
                 }
@@ -148,6 +151,16 @@ class OpenApiConfig {
         fixNullable(schema.getItems());
         if (schema.getAdditionalProperties() instanceof Schema additional) {
             fixNullable(additional);
+        }
+        walkComposed(schema.getAllOf());
+        walkComposed(schema.getAnyOf());
+        walkComposed(schema.getOneOf());
+    }
+
+    @SuppressWarnings("rawtypes")
+    private static void walkComposed(List<Schema> composed) {
+        if (composed != null) {
+            composed.forEach(OpenApiConfig::fixNullable);
         }
     }
 
@@ -184,6 +197,9 @@ class OpenApiConfig {
                         child.getRequired().forEach(flat::addRequiredItem);
                     }
                     flat.setDescription(child.getDescription());
+                    // Flattening copies properties out of allOf after the nullable pass, including a
+                    // type:null beside a $ref. Rewrite those on the schema this publishes.
+                    fixNullable(flat);
                     schemas.put(ref.substring(ref.lastIndexOf('/') + 1), flat);
                 }
                 parent.setProperties(null);

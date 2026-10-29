@@ -101,30 +101,35 @@ export function kafkaProblems(values: KafkaFields, stored: KafkaConnection | nul
   return problems;
 }
 
-/** The connection these values describe, ready to check or save. */
+/**
+ * The connection these values describe, ready to check or save. Optional fields are left out rather than sent as
+ * null: Jackson reads both as null, a mechanism is cleared when the protocol is sent without one, and an absent
+ * bundle or client id keeps the stored value (an empty string is what clears those).
+ */
 export function kafkaConnection(values: KafkaFields): KafkaConnection {
   const sasl = usesSasl(values.securityProtocol);
-  let credentials: KafkaConnection['credentials'] = null;
-  if (sasl && values.saslMechanism === 'OAUTHBEARER') credentials = values.token ? { token: values.token } : null;
+  let credentials: KafkaConnection['credentials'];
+  if (sasl && values.saslMechanism === 'OAUTHBEARER') credentials = values.token ? { token: values.token } : undefined;
   else if (sasl) credentials = { username: values.username, password: values.password || undefined };
   return {
     system: 'kafka',
     bootstrapServers: bootstrapOf(values).servers,
     securityProtocol: values.securityProtocol,
-    saslMechanism: sasl && values.saslMechanism ? values.saslMechanism : null,
-    credentials,
-    tlsBundle: usesTls(values.securityProtocol) && values.tlsBundle ? values.tlsBundle : null,
-    clientId: values.clientId || null,
+    ...(sasl && values.saslMechanism ? { saslMechanism: values.saslMechanism } : {}),
+    ...(credentials ? { credentials } : {}),
+    ...(usesTls(values.securityProtocol) && values.tlsBundle ? { tlsBundle: values.tlsBundle } : {}),
+    ...(values.clientId ? { clientId: values.clientId } : {}),
   };
 }
 
 /** The form's starting values for a stored connection: never a secret. */
 export function kafkaFieldsOf(stored: KafkaConnection): KafkaFields {
+  const username = stored.credentials && 'username' in stored.credentials ? stored.credentials.username : '';
   return {
     bootstrap: stored.bootstrapServers.join('\n'),
-    securityProtocol: stored.securityProtocol,
-    saslMechanism: stored.saslMechanism ?? '',
-    username: stored.credentials && 'username' in stored.credentials ? stored.credentials.username : '',
+    securityProtocol: stored.securityProtocol as SecurityProtocol,
+    saslMechanism: (stored.saslMechanism ?? '') as SaslMechanism | '',
+    username: username ?? '',
     password: '',
     token: '',
     tlsBundle: stored.tlsBundle ?? '',
@@ -144,10 +149,10 @@ export function storedKafka(detail: {
   return {
     system: 'kafka',
     bootstrapServers: detail.bootstrapServers,
-    securityProtocol: detail.securityProtocol as SecurityProtocol,
-    saslMechanism: (detail.saslMechanism ?? null) as SaslMechanism | null,
-    credentials: detail.username ? { username: detail.username } : null,
-    tlsBundle: detail.tlsBundle ?? null,
-    clientId: detail.clientId ?? null,
+    securityProtocol: detail.securityProtocol,
+    ...(detail.saslMechanism ? { saslMechanism: detail.saslMechanism } : {}),
+    ...(detail.username ? { credentials: { username: detail.username } } : {}),
+    ...(detail.tlsBundle ? { tlsBundle: detail.tlsBundle } : {}),
+    ...(detail.clientId ? { clientId: detail.clientId } : {}),
   };
 }

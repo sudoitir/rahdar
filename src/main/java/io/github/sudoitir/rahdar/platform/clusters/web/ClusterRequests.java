@@ -315,6 +315,10 @@ public final class ClusterRequests {
                 AccountUpdate management,
 
                 @JsonDeserialize(using = CoreAccountDeserializer.class)
+                @Schema(
+                        nullable = true,
+                        description =
+                                "Null clears the Core account, so Core uses the management account. Leave the field out to keep it.")
                 AccountUpdate core)
                 implements ConnectionUpdate {
 

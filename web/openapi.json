@@ -30898,7 +30898,8 @@
               "$ref" : "#/components/schemas/AccessRemedy"
             }, {
               "type" : "null"
-            } ]
+            } ],
+            "description" : "The driver's remedy, with its media type, where it gives one."
           }
         },
         "required" : [ "capability", "reason", "status" ]
@@ -31004,7 +31005,8 @@
               "$ref" : "#/components/schemas/VersionFound"
             }, {
               "type" : "null"
-            } ]
+            } ],
+            "description" : "The version found; null when the check never reached a broker."
           },
           "supported" : {
             "type" : "boolean",
@@ -31019,7 +31021,8 @@
               "$ref" : "#/components/schemas/RegisteredRef"
             }, {
               "type" : "null"
-            } ]
+            } ],
+            "description" : "The registered cluster that already holds this one, when the caller may read it."
           },
           "nodes" : {
             "type" : "array",
@@ -31045,14 +31048,16 @@
               "$ref" : "#/components/schemas/Failure"
             }, {
               "type" : "null"
-            } ]
+            } ],
+            "description" : "Why the check failed, or null when it passed."
           },
           "adoption" : {
             "anyOf" : [ {
               "$ref" : "#/components/schemas/AdoptionPreviewView"
             }, {
               "type" : "null"
-            } ]
+            } ],
+            "description" : "Artemis only: what adopting the running configuration would declare. Absent when the caller may not declare configuration, or the configuration feature is off."
           },
           "managementUrlPattern" : {
             "type" : [ "string", "null" ],
@@ -31115,14 +31120,16 @@
               "$ref" : "#/components/schemas/NodeVersion"
             }, {
               "type" : "null"
-            } ]
+            } ],
+            "description" : "The node's release and whether it is supported; null when unknown."
           },
           "artemis" : {
             "anyOf" : [ {
               "$ref" : "#/components/schemas/ArtemisNodeDetail"
             }, {
               "type" : "null"
-            } ]
+            } ],
+            "description" : "Artemis only: the node's pair role and how each account fared."
           }
         },
         "required" : [ "functions", "id", "outcome" ]
@@ -31268,7 +31275,8 @@
               "$ref" : "#/components/schemas/KafkaConnectionDetail"
             }, {
               "type" : "null"
-            } ]
+            } ],
+            "description" : "A Kafka cluster's connection; null for other systems."
           }
         },
         "required" : [ "seedUrls" ]
@@ -31304,7 +31312,8 @@
               "$ref" : "#/components/schemas/ClusterConnectionDetail"
             }, {
               "type" : "null"
-            } ]
+            } ],
+            "description" : "How Rahdar reaches the cluster. Absent for a caller who sees the cluster only through a team's subscriptions"
           },
           "system" : {
             "$ref" : "#/components/schemas/SystemView"
@@ -34360,7 +34369,8 @@
               "$ref" : "#/components/schemas/MeView"
             }, {
               "type" : "null"
-            } ]
+            } ],
+            "description" : "The signed-in user; set when the status is AUTHENTICATED."
           },
           "methods" : {
             "type" : [ "array", "null" ],
@@ -34811,7 +34821,12 @@
             "$ref" : "#/components/schemas/AccountUpdate"
           },
           "core" : {
-            "$ref" : "#/components/schemas/AccountUpdate"
+            "anyOf" : [ {
+              "$ref" : "#/components/schemas/AccountUpdate"
+            }, {
+              "type" : "null"
+            } ],
+            "description" : "Null clears the Core account, so Core uses the management account. Leave the field out to keep it."
           }
         }
       },
@@ -36055,7 +36070,8 @@
               "$ref" : "#/components/schemas/TeamRef"
             }, {
               "type" : "null"
-            } ]
+            } ],
+            "description" : "The team whose patterns own this subscription; null when no team does."
           }
         },
         "required" : [ "allowedActions", "backlog", "destination", "durable", "id", "kind", "kindLabel", "name", "nativeAttributes", "nodesPresent", "nodesTotal", "paused", "perNode", "totalConsumerCount", "totalDeliveringCount", "totalScheduledCount" ]
@@ -38305,7 +38321,8 @@
               "$ref" : "#/components/schemas/LogView"
             }, {
               "type" : "null"
-            } ]
+            } ],
+            "description" : "Where in the log the page sits; null for a queue."
           },
           "truncated" : {
             "type" : "boolean",
@@ -38520,7 +38537,8 @@
               "$ref" : "#/components/schemas/TeamRef"
             }, {
               "type" : "null"
-            } ]
+            } ],
+            "description" : "The team whose patterns own the name; null when none does."
           },
           "grants" : {
             "type" : "array",
@@ -39650,7 +39668,8 @@
               "$ref" : "#/components/schemas/TeamRef"
             }, {
               "type" : "null"
-            } ]
+            } ],
+            "description" : "The team whose patterns own this destination; null when none does."
           }
         },
         "required" : [ "allowedActions", "delivery", "id", "kind", "kindLabel", "messageCount", "name", "nodeId", "nodeName", "subscriptionCount" ]
@@ -39755,8 +39774,14 @@
             "description" : "The id of the destination it is bound to."
           },
           "totalDepth" : {
+            "type" : [ "integer", "null" ],
+            "format" : "int64",
+            "description" : "The depth over the nodes that reported one; null when none did."
+          },
+          "unknownDepthNodes" : {
             "type" : "integer",
-            "format" : "int64"
+            "format" : "int32",
+            "description" : "How many nodes reported no depth, which the total leaves out rather than counts as 0."
           },
           "perNode" : {
             "type" : "array",
@@ -39765,7 +39790,7 @@
             }
           }
         },
-        "required" : [ "destination", "id", "kind", "kindLabel", "name", "perNode", "totalDepth" ]
+        "required" : [ "destination", "id", "kind", "kindLabel", "name", "perNode", "unknownDepthNodes" ]
       },
       "DeadLetterView" : {
         "type" : "object",
@@ -40468,7 +40493,8 @@
               "$ref" : "#/components/schemas/ConfigRolesSource"
             }, {
               "type" : "null"
-            } ]
+            } ],
+            "description" : "For a security setting: where the prefilled roles came from. Null for any other recommendation"
           },
           "keys" : {
             "type" : "array",

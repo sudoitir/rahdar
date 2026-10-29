@@ -4663,6 +4663,7 @@ export interface components {
             reason: string;
             /** @description What to change on the broker so the capability is available: the broker.xml snippet for Artemis, the command for Kafka. */
             snippet?: string | null;
+            /** @description The driver's remedy, with its media type, where it gives one. */
             remedy?: components["schemas"]["AccessRemedy"] | null;
         };
         AccessRemedy: {
@@ -4703,16 +4704,20 @@ export interface components {
         ConnectionCheck: {
             /** @description The system's id, such as kafka. */
             system: string;
+            /** @description The version found; null when the check never reached a broker. */
             version?: components["schemas"]["VersionFound"] | null;
             /** @description Whether the driver supports what was found. */
             supported: boolean;
             /** @description The cluster's own id as the brokers report it. */
             clusterId?: string | null;
+            /** @description The registered cluster that already holds this one, when the caller may read it. */
             alreadyRegistered?: components["schemas"]["RegisteredRef"] | null;
             nodes: components["schemas"]["NodeReach"][];
             quorum?: components["schemas"]["Quorum"] | null;
             access: components["schemas"]["AccessFinding"][];
+            /** @description Why the check failed, or null when it passed. */
             failure?: components["schemas"]["Failure"] | null;
+            /** @description Artemis only: what adopting the running configuration would declare. Absent when the caller may not declare configuration, or the configuration feature is off. */
             adoption?: components["schemas"]["AdoptionPreviewView"] | null;
             /** @description Artemis only: the pattern the check derived management URLs from. */
             managementUrlPattern?: string | null;
@@ -4738,7 +4743,9 @@ export interface components {
             /** @description DNS, REFUSED, TIMEOUT, TLS or AUTHENTICATION when unreachable. */
             cause?: string | null;
             message?: string | null;
+            /** @description The node's release and whether it is supported; null when unknown. */
             version?: components["schemas"]["NodeVersion"] | null;
+            /** @description Artemis only: the node's pair role and how each account fared. */
             artemis?: components["schemas"]["ArtemisNodeDetail"] | null;
         };
         NodeVersion: {
@@ -4792,6 +4799,7 @@ export interface components {
             managementUsername?: string | null;
             /** @description The Core account's user name, or null while Core uses the management account */
             coreUsername?: string | null;
+            /** @description A Kafka cluster's connection; null for other systems. */
             kafka?: components["schemas"]["KafkaConnectionDetail"] | null;
         };
         ClusterDetail: {
@@ -4804,6 +4812,7 @@ export interface components {
             health: components["schemas"]["HealthView"];
             /** Format: uuid */
             environmentId?: string | null;
+            /** @description How Rahdar reaches the cluster. Absent for a caller who sees the cluster only through a team's subscriptions */
             connection?: components["schemas"]["ClusterConnectionDetail"] | null;
             system: components["schemas"]["SystemView"];
             kinds: components["schemas"]["KindView"][];
@@ -6082,6 +6091,7 @@ export interface components {
         AuthResult: {
             /** @enum {string} */
             status: "AUTHENTICATED" | "SECOND_FACTOR_REQUIRED";
+            /** @description The signed-in user; set when the status is AUTHENTICATED. */
             me?: components["schemas"]["MeView"] | null;
             /** @description How the user can prove a second factor; set when the status is SECOND_FACTOR_REQUIRED. TOTP is a code from an authenticator app, WEBAUTHN a passkey, RECOVERY_CODE one of the single-use codes. */
             methods?: ("TOTP" | "WEBAUTHN" | "RECOVERY_CODE" | "TRUSTED_DEVICE")[] | null;
@@ -6247,7 +6257,8 @@ export interface components {
             managementUrlPattern?: string;
             tlsBundle?: string;
             management?: components["schemas"]["AccountUpdate"];
-            core?: components["schemas"]["AccountUpdate"];
+            /** @description Null clears the Core account, so Core uses the management account. Leave the field out to keep it. */
+            core?: components["schemas"]["AccountUpdate"] | null;
         };
         ConnectionUpdate: components["schemas"]["ArtemisConnectionUpdate"] | components["schemas"]["KafkaConnectionUpdate"];
         KafkaConnectionUpdate: {
@@ -6817,6 +6828,7 @@ export interface components {
             perNode: components["schemas"]["SubscriptionNodeCell"][];
             /** @description The actions of the catalogue that apply to this row and that the caller holds on it, such as subscription:purge. The console gates its controls from this. */
             allowedActions: string[];
+            /** @description The team whose patterns own this subscription; null when no team does. */
             ownerTeam?: components["schemas"]["TeamRef"] | null;
         };
         /** @description A team, by id and name. */
@@ -7770,6 +7782,7 @@ export interface components {
              * @description The node the page was read from; null for a log, which has none.
              */
             node?: string | null;
+            /** @description Where in the log the page sits; null for a queue. */
             log?: components["schemas"]["LogView"] | null;
             /** @description The page was cut short at its byte budget: messages the broker returned are not in it. Ask for a smaller page, or, on a log, continue from log.next. */
             truncated: boolean;
@@ -7870,6 +7883,7 @@ export interface components {
         };
         /** @description Who has access to one subscription or destination through teams: its owner and every share. */
         ResourceAccessView: {
+            /** @description The team whose patterns own the name; null when none does. */
             ownerTeam?: components["schemas"]["TeamRef"] | null;
             grants: components["schemas"]["ResourceTeamGrant"][];
         };
@@ -8310,6 +8324,7 @@ export interface components {
             messageCount: number;
             /** @description The actions of the catalogue that apply to this row and that the caller holds on it, such as subscription:purge. The console gates its controls from this. */
             allowedActions: string[];
+            /** @description The team whose patterns own this destination; null when none does. */
             ownerTeam?: components["schemas"]["TeamRef"] | null;
         };
         PagedViewDestinationView: {
@@ -8357,8 +8372,16 @@ export interface components {
             name: string;
             /** @description The id of the destination it is bound to. */
             destination: string;
-            /** Format: int64 */
-            totalDepth: number;
+            /**
+             * Format: int64
+             * @description The depth over the nodes that reported one; null when none did.
+             */
+            totalDepth?: number | null;
+            /**
+             * Format: int32
+             * @description How many nodes reported no depth, which the total leaves out rather than counts as 0.
+             */
+            unknownDepthNodes: number;
             perNode: components["schemas"]["DeadLetterDepth"][];
         };
         DeadLetterView: {
@@ -8676,6 +8699,7 @@ export interface components {
             };
             /** @description For a security setting: the roles of the account Rahdar connects to Core with, as the broker's user management reports them; empty when it could not */
             accountRoles: string[];
+            /** @description For a security setting: where the prefilled roles came from. Null for any other recommendation */
             accountRolesSource?: components["schemas"]["ConfigRolesSource"] | null;
             /** @description The keys this recommendation itself sets */
             keys: string[];
