@@ -183,6 +183,45 @@ export function useAbortTransaction(clusterId: string, id: string) {
   });
 }
 
+// ── Hanging transactions ─────────────────────────────────────────────────────
+
+export type HangingTransaction = Schemas['HangingTransaction'];
+export type HangingPage = Schemas['HangingPage'];
+export type HangingAbortPreview = Schemas['HangingAbortPreview'];
+export type HangingTarget = Pick<HangingTransaction, 'topic' | 'partition' | 'producerId'>;
+
+/**
+ * Looks for the transactions the coordinator does not know: it reads every partition in scope, so it is a button
+ * and never a query that runs on mount. Whole cluster, or one topic; `cursor` reads the page after one.
+ */
+export function useFindHanging(clusterId: string) {
+  return useMutation<HangingPage, ApiError, { topic?: string; cursor?: string }>({
+    mutationFn: ({ topic, cursor }) => {
+      const sp = new URLSearchParams({ limit: '100' });
+      if (topic) sp.set('topic', topic);
+      if (cursor) sp.set('cursor', cursor);
+      return request(`${base(clusterId)}/hanging-transactions:find?${sp}`, { method: 'POST' });
+    },
+  });
+}
+
+export function usePreviewHangingAbort(clusterId: string) {
+  return useMutation<HangingAbortPreview, ApiError, HangingTarget>({
+    mutationFn: (target) =>
+      request(`${base(clusterId)}/hanging-transactions:abort-preview`, {
+        method: 'POST',
+        body: JSON.stringify(target),
+      }),
+  });
+}
+
+export function useAbortHanging(clusterId: string) {
+  return useMutation<Schemas['HangingAbortResult'], ApiError, HangingTarget & { etag: string }>({
+    mutationFn: (body) =>
+      request(`${base(clusterId)}/hanging-transactions:abort`, { method: 'POST', body: JSON.stringify(body) }),
+  });
+}
+
 // ── Brokers ──────────────────────────────────────────────────────────────────
 
 export type KafkaBroker = Schemas['BrokerRow'];

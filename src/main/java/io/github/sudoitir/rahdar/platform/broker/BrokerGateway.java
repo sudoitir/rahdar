@@ -1,6 +1,7 @@
 package io.github.sudoitir.rahdar.platform.broker;
 
 import io.github.sudoitir.openbroker.BrokerDrivers;
+import io.github.sudoitir.openbroker.BrokerException;
 import io.github.sudoitir.openbroker.ClusterConnection;
 import io.github.sudoitir.openbroker.ClusterSpec;
 import io.github.sudoitir.openbroker.ConnectOptions;
@@ -8,8 +9,12 @@ import io.github.sudoitir.openbroker.ConnectRequest;
 import io.github.sudoitir.openbroker.ConnectionReport;
 import io.github.sudoitir.openbroker.CredentialSource;
 import io.github.sudoitir.openbroker.Credentials;
+import io.github.sudoitir.openbroker.Dispatch;
+import io.github.sudoitir.openbroker.ErrorInfo;
+import io.github.sudoitir.openbroker.ErrorReasons;
 import io.github.sudoitir.openbroker.NodeId;
 import io.github.sudoitir.openbroker.NodeSpec;
+import io.github.sudoitir.openbroker.Status;
 import io.github.sudoitir.openbroker.TlsProvider;
 import io.github.sudoitir.openbroker.spring.boot.autoconfigure.OpenBrokerConnectOptions;
 import io.github.sudoitir.openbroker.spring.boot.autoconfigure.OpenBrokerProperties;
@@ -33,6 +38,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.DisposableBean;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
+import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Component;
 
 /**
@@ -217,6 +223,28 @@ public class BrokerGateway implements DisposableBean {
                         "unsupported-on-system", "No installed system is registered from Jolokia seeds."));
     }
 
+    /**
+     * A system's broker accounts, read from Rahdar's database on every connect. A driver asks on its own
+     * threads, a notification stream's among them, and backs off and asks again on a BrokerException;
+     * anything else would end that thread for good, so a failed read is reported as the broker being
+     * unavailable. Every system's credentials go through it.
+     */
+    static CredentialSource guarded(CredentialSource accounts) {
+        return plane -> {
+            try {
+                return accounts.forPlane(plane);
+            } catch (DataAccessException e) {
+                throw new BrokerException(
+                        Status.UNAVAILABLE,
+                        ErrorInfo.of(ErrorReasons.UNREACHABLE),
+                        Dispatch.NOT_SENT,
+                        null,
+                        "Rahdar could not read the cluster's broker credentials from its database.",
+                        e);
+            }
+        };
+    }
+
     private ConnectRequest request(UUID clusterId, ClusterSpec spec) {
         String system = directory.system(clusterId);
         ConnectionOptions how = connections.stream()
@@ -230,7 +258,7 @@ public class BrokerGateway implements DisposableBean {
         return new ConnectRequest(
                 system,
                 how.spec(clusterId, spec.nodes()),
-                how.credentials(clusterId),
+                guarded(how.credentials(clusterId)),
                 options(clusterId, system, clusterTls));
     }
 

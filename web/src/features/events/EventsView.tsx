@@ -25,7 +25,7 @@ import { Section } from '../../ui/Section.tsx';
 import { StatusBadge } from '../../ui/StatusBadge.tsx';
 import { Toolbar } from '../../ui/Toolbar.tsx';
 import styles from './EventsView.module.css';
-import { eventColumns, occurredAt, subjectOf } from './columns.ts';
+import { eventColumns, occurredAt, subjectOf, summaryOf } from './columns.ts';
 import { useDisplayZone } from '../../kernel/time/timezone.ts';
 import { useFilterShortcut } from '../../kernel/keyboard/filterShortcut.ts';
 
@@ -46,7 +46,7 @@ const TYPES = [
   { value: 'openbroker.client.disconnected', label: 'Client disconnected' },
   { value: 'openbroker.channel.opened', label: 'Channel opened' },
   { value: 'openbroker.channel.closed', label: 'Channel closed' },
-  { value: 'openbroker.message.delivered', label: 'Message delivered' },
+  { value: 'openbroker.message.delivered', label: 'Messages delivered (summary)' },
   { value: 'openbroker.message.expired', label: 'Message expired' },
 ];
 
@@ -171,6 +171,7 @@ function EventDetail({
           { term: 'Time', value: occurredAt(selected) },
           { term: 'Destination', value: selected.destination ?? 'no destination' },
           { term: 'Subject', value: subjectOf(selected) },
+          ...(summaryOf(selected) ? [{ term: 'What happened', value: summaryOf(selected) }] : []),
           { term: 'Remote address', value: selected.remoteAddress ?? '—' },
         ]}
       />

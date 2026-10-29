@@ -1,4 +1,4 @@
-# ADR-0213: Cluster registration is per system, on its own page
+# ADR-0219: Cluster registration is per system, on its own page
 
 - **Status**: accepted
 - **Date**: 2026-10-28

@@ -343,6 +343,32 @@ async function previewReset(page: Page) {
   await page.waitForTimeout(1200);
 }
 
+const HANGING_FOUND = {
+  items: [
+    {
+      id: 'kafka.hanging-transaction/orders/0/4711',
+      topic: 'orders',
+      partition: 0,
+      producerId: 4711,
+      producerEpoch: 3,
+      startOffset: 120,
+      recordsHeldBack: 842,
+      ageMs: 540_000,
+    },
+    {
+      id: 'kafka.hanging-transaction/payments/2/9',
+      topic: 'payments',
+      partition: 2,
+      producerId: 9,
+      producerEpoch: null,
+      startOffset: null,
+      recordsHeldBack: null,
+      ageMs: null,
+    },
+  ],
+  next: null,
+};
+
 const RESET_PREVIEW = {
   partitions: [
     { topic: 'orders', partition: 0, current: 120, next: 0, skipped: 0, reread: 120 },
@@ -563,6 +589,41 @@ export const KAFKA_ROUTES: RouteSpec[] = [
             .getByRole('button', { name: /^Abort / })
             .first()
             .click();
+          await dialogOf(page).waitFor();
+          await page.waitForTimeout(1000);
+        },
+      },
+      {
+        // The search for transactions the coordinator does not know, with two found (the live stack needs OpenBroker 0.7.0).
+        id: 'hanging-found-stub',
+        act: async (page) => {
+          await stubCall(page, 'POST', /hanging-transactions:find$/, 200, HANGING_FOUND);
+          await press(page, 'Find hanging transactions');
+          await page.waitForTimeout(1200);
+        },
+      },
+      {
+        id: 'hanging-none-stub',
+        act: async (page) => {
+          await stubCall(page, 'POST', /hanging-transactions:find$/, 200, { items: [], next: null });
+          await press(page, 'Find hanging transactions');
+          await page.waitForTimeout(1200);
+        },
+      },
+      {
+        id: 'hanging-abort-dialog-stub',
+        act: async (page) => {
+          await stubCall(page, 'POST', /hanging-transactions:find$/, 200, HANGING_FOUND);
+          await stubCall(page, 'POST', /hanging-transactions:abort-preview$/, 200, {
+            topic: 'orders',
+            partition: 0,
+            producerId: 4711,
+            effect: 'Aborts the open transaction of producer 4711 on orders-0 and fences it: its next write fails.',
+            recordsHeldBack: 842,
+            etag: 'qa-etag',
+          });
+          await press(page, 'Find hanging transactions');
+          await page.getByRole('button', { name: 'Abort on orders-0' }).click();
           await dialogOf(page).waitFor();
           await page.waitForTimeout(1000);
         },

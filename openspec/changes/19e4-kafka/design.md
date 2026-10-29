@@ -46,7 +46,7 @@ partitions merged; mobile layouts.
 drivers as the standard paged view `{data: [{id, name, supportedVersions, connection: "jolokia-seeds"|"bootstrap"}], page, pageSize, count}`.
 - Rejected: one gateway per system. The gateway's caching, probing and reconfiguration are neutral.
 
-### D2. Registration is per system, on its own page (ADR-0213)
+### D2. Registration is per system, on its own page (ADR-0219)
 `POST /api/v1/clusters[?dryRun=true]` takes:
 
 ```json

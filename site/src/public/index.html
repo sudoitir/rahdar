@@ -314,7 +314,14 @@ tr.sel td:first-child { box-shadow: inset 3px 0 var(--accent); }
 @media (max-width: 760px) { .rules { grid-template-columns: 1fr; } }
 .rules p { color: var(--muted); margin: 6px 0 0; }
 
-/* ── real screens (filled from the screenshot sweep) ── */
+/* ── real screens: captures from a live estate, one at a time ── */
+.tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-block: 28px 16px; }
+.tabs [role="tab"] { min-height: 40px; padding: .45em .95em; border-radius: 999px; border: 1px solid var(--line); background: transparent; color: var(--muted); font: 600 14.5px/1.2 var(--sans); cursor: pointer; transition: background-color 160ms ease, color 160ms ease, border-color 160ms ease; }
+.tabs [role="tab"][aria-selected="true"] { background: var(--ink); border-color: var(--ink); color: var(--bg); }
+@media (hover: hover) and (pointer: fine) { .tabs [role="tab"]:hover:not([aria-selected="true"]) { color: var(--ink); border-color: var(--line-strong); } }
+.shot { margin: 0; }
+.shot .frame { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); overflow: hidden; }
+.shot figcaption { margin-block-start: 12px; color: var(--muted); font-size: 15px; min-height: 3em; }
 .shot img { display: block; width: 100%; height: auto; aspect-ratio: 16 / 10; object-fit: cover; object-position: top left; }
 .shot .s-dark { display: none; }
 :root[data-theme="dark"] .shot .s-light { display: none; }
@@ -428,7 +435,7 @@ footer nav { display: flex; flex-wrap: wrap; gap: 6px 18px; }
             </div>
             <div class="breakdown" id="breakdown" aria-live="polite"></div>
           </div>
-          <figcaption>An illustration of Rahdar's estate and its backlog breakdown, drawn in the page. Real screens are linked from the guides.</figcaption>
+          <figcaption>An illustration of Rahdar's estate and its backlog breakdown, drawn in the page. The real screens follow the story.</figcaption>
         </figure>
       </div>
     </div>
@@ -617,6 +624,22 @@ footer nav { display: flex; flex-wrap: wrap; gap: 6px 18px; }
   </div>
 </section>
 </div>
+
+<!-- ── the real screens ── -->
+<section class="entry" id="screens" aria-labelledby="screens-h">
+  <div class="wrap" style="display:block">
+    <h2 id="screens-h">The same night, in the real screens.</h2>
+    <p class="lede" style="margin-block-start:16px">Captured from a live estate of six Artemis nodes and three Kafka brokers with traffic running, shown in your colour scheme.</p>
+    <div class="tabs" role="tablist" aria-label="Screens" id="shot-tabs"></div>
+    <div role="tabpanel" id="shot-panel" tabindex="0"><figure class="shot">
+      <div class="frame">
+        <img class="s-light" id="shot-light" width="1600" height="1000" loading="lazy" decoding="async" alt="">
+        <img class="s-dark" id="shot-dark" width="1600" height="1000" loading="lazy" decoding="async" alt="">
+      </div>
+      <figcaption id="shot-cap"></figcaption>
+    </figure></div>
+  </div>
+</section>
 
 <!-- ── the systems ── -->
 <section class="entry" id="systems" aria-labelledby="systems-h">
@@ -926,6 +949,41 @@ footer nav { display: flex; flex-wrap: wrap; gap: 6px 18px; }
   // ── the assistant's calls appear in the order they were made, once ──
   const chat = $('#chat');
   if (!reduced) visible(chat, (v) => { if (v) { chat.classList.remove('armed'); chat.classList.add('play'); } }, 0.4);
+
+  // ── the real screens: one tab per capture, light and dark from the same state ──
+  const SHOTS = [
+    ['estate', 'Estate', 'readme/estate', 'Both clusters with their health, and every subscription sorted by backlog. Kafka groups read ≈, an estimate.', 'The estate: an Apache Artemis cluster and an Apache Kafka cluster with their health, above one table of subscriptions sorted by backlog, where Kafka lag is marked as an estimate.'],
+    ['lag', 'Lag', 'readme/subscriptions', "A group's backlog opened: every partition, slowest first, with the sample's age.", "A Kafka group's backlog breakdown: each partition's lag, committed offset and end offset, slowest first."],
+    ['reset', 'Reset preview', 'readme/offset-reset', 'An offset reset previewed per partition, confirmed by holding a button that names the partitions.', "The reset-offsets preview: each partition's current and new offset and the records skipped, with a press-and-hold button."],
+    ['approval', 'Approval', 'home/approval', 'The held reset as the second person sees it: what will happen, who asked, and Approve or Reject.', 'A request waiting for approval: reset offsets of group analytics to latest, with the six partitions it affects, the requester, the policy and the Approve and Reject buttons.'],
+    ['txn', 'Transaction', 'readme/transactions', 'A hanging transaction, and the abort previewed: the partitions it unblocks and the producer fenced.', 'The abort preview of a hanging transaction, naming the partitions it unblocks and that the producer is fenced, with a press-and-hold button.'],
+    ['register', 'Registration', 'readme/register-kafka', 'Registering a Kafka cluster: the check reaches every broker on the address it advertises.', 'The Kafka registration page after a passed check: the version and mode, and every broker reached on its advertised address.'],
+    ['topology', 'Artemis topology', 'readme/artemis-topology', 'The Artemis pairs, with the serving node asked of every node on every cycle.', 'The Artemis topology: primary and backup pairs with their replication state, one node unreachable.'],
+  ];
+  const tabsEl = $('#shot-tabs'), light = $('#shot-light'), dark = $('#shot-dark');
+  tabsEl.innerHTML = SHOTS.map(([id, name], i) =>
+    `<button type="button" role="tab" id="tab-${id}" aria-controls="shot-panel" aria-selected="${i === 0}" tabindex="${i === 0 ? 0 : -1}">${name}</button>`).join('');
+  const tabs = [...tabsEl.children];
+  const show = (i, focus) => {
+    const [id, , src, cap, alt] = SHOTS[i];
+    tabs.forEach((t, k) => { t.setAttribute('aria-selected', String(k === i)); t.tabIndex = k === i ? 0 : -1; });
+    if (focus) tabs[i].focus();
+    $('#shot-panel').setAttribute('aria-labelledby', `tab-${id}`);
+    light.src = `/img/${src}-light.webp`; dark.src = `/img/${src}-dark.webp`;
+    light.alt = dark.alt = alt;
+    $('#shot-cap').textContent = cap;
+    // A short fade so one screen does not snap into the next; none under reduced motion.
+    if (!reduced) [light, dark].forEach((img) => img.animate([{ opacity: 0.25 }, { opacity: 1 }], { duration: 180, easing: 'ease-out' }));
+  };
+  tabsEl.addEventListener('click', (e) => { const i = tabs.indexOf(e.target.closest('[role="tab"]')); if (i >= 0) show(i, false); });
+  tabsEl.addEventListener('keydown', (e) => {
+    const i = tabs.indexOf(document.activeElement);
+    const next = { ArrowRight: i + 1, ArrowLeft: i - 1, Home: 0, End: tabs.length - 1 }[e.key];
+    if (next === undefined) return;
+    e.preventDefault();
+    show((next + tabs.length) % tabs.length, true);
+  });
+  show(0, false);
 
   // ── copy the install commands ──
   $('#copy').addEventListener('click', async (e) => {

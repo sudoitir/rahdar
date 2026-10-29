@@ -2,7 +2,7 @@ Rules:
 - Heavy commands run in `systemd-run --user --scope -q -p MemoryMax=3G -p MemorySwapMax=2G -- …`, at most two at once across agents.
 - Read narrowly. Run only the tests a unit touches; CI runs the rest.
 - Agents commit and push their own work and never open a PR; the lead opens one PR.
-- Builds against the released OpenBroker `0.6.1`.
+- Builds against the released OpenBroker `0.7.0`.
 
 Order: 1, then 2 to 4 (backend and web in parallel against the contract in `design.md`), then 5 to 6.
 
@@ -43,7 +43,7 @@ Order: 1, then 2 to 4 (backend and web in parallel against the contract in `desi
 - [ ] 6.2b Design and UX review by an Opus agent (`opus-medium`): the design, every user flow (registration, offset reset, truncate, ACL change, transaction abort, browse) and the UI against an enterprise-grade bar (prior art: Confluent Control Center, Redpanda Console, Conduktor, AKHQ), from the sweep's captures and the running app; findings merged into the one fix round. Check: its list is closed
 - [ ] 6.2e The public face: the story home page (multi-broker narrative, high-end visual design and motion), READMEs in en/zh/fa, docs/dockerhub.md, and the GitHub About text; RabbitMQ only as coming. Check: site builds, captures at 390-1920 light/dark/reduced motion reviewed, no console error
 - [ ] 6.3 `reviewer` pass on the destructive paths, the approval gate, secrets and the registration API; fix findings. Check: the reviewer's list is closed
-- [ ] 6.4 Raise `openbroker.version` to `0.6.1`; push; CI green and the Sonar list empty. Check: the PR's checks
+- [ ] 6.4 Raise `openbroker.version` to `0.7.0`; push; CI green and the Sonar list empty. Check: the PR's checks
 
 ## Workflow follow-up
 - Merge, `/opsx:archive`, stop the stacks the session started.
