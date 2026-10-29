@@ -201,6 +201,25 @@ describe('MessagesView on a partitioned log', () => {
     expect(await screen.findByText(/The group stands at offset 640 on partition 0/)).toBeInTheDocument();
   });
 
+  it('says the group position is unavailable when the read did not report one', async () => {
+    mockKafka(() =>
+      page([record(0)], {
+        partition: 0,
+        start: 0,
+        end: 900,
+        next: null,
+        retentionMoved: false,
+        uncommittedHidden: true,
+        subscriptionPosition: null,
+      }),
+    );
+    renderWithProviders(<MessagesView />);
+
+    expect(await screen.findByText(/The group's position on this partition is unavailable/)).toBeInTheDocument();
+    expect(screen.queryByText(/undefined/)).toBeNull();
+    expect(screen.queryByText(/stands at offset 0/)).toBeNull();
+  });
+
   it("keeps move, retry, delete and expire visible but disabled, with the system's own words", async () => {
     mockKafka(() =>
       page([record(0)], { partition: 0, start: 0, end: 1, next: null, retentionMoved: false, uncommittedHidden: true }),

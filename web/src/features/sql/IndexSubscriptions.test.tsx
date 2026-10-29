@@ -436,6 +436,16 @@ describe('IndexSubscriptions rows', () => {
     expect(screen.queryByText(/oldest/)).toBeNull();
   });
 
+  it('says a depth that was not reported is unavailable and not zero', async () => {
+    mockMe();
+    listing([subscription({ messagesHeld: null, bytesHeld: null })]);
+    renderWithProviders(<IndexSubscriptions />);
+
+    expect(await screen.findByText('Unavailable')).toBeInTheDocument();
+    expect(screen.getByText(/size unavailable/)).toBeInTheDocument();
+    expect(screen.queryByText(/^0 messages$/)).toBeNull();
+  });
+
   it('shows a date that cannot be read as a dash, and a large payload in its own unit', async () => {
     mockMe();
     listing([subscription({ captureFrom: 'not a date', bytesHeld: 3 * 1024 ** 4 })]);

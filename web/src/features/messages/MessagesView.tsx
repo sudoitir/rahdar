@@ -131,7 +131,9 @@ function selectorField(partitioned: boolean, filter: string) {
 function browsePosition(partitioned: boolean, log: MessagePageView['log'], page: number, lastPage: number | null) {
   if (partitioned) {
     // Said in the toolbar, where its arrival moves nothing: the controls keep their place.
-    if (log?.subscriptionPosition == null) return null;
+    if (log?.subscriptionPosition == null) {
+      return <Text size="xs">The group's position on this partition is unavailable.</Text>;
+    }
     return (
       <Text size="xs">
         {`The group stands at offset ${log.subscriptionPosition.toLocaleString()} on partition ${log.partition}: records from there on it has not read yet.`}

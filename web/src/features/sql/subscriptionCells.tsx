@@ -95,16 +95,17 @@ export function SubscriptionsCell({ subscription }: Readonly<{ subscription: Sql
   );
 }
 
-/** What a subscription holds, and how much of what it may. */
+/** What a subscription holds, and how much of what it may. A depth that was not reported is unavailable, never zero. */
 export function HeldCell({ subscription }: Readonly<{ subscription: SqlIndexSubscriptionView }>) {
-  const held = subscription.messagesHeld ?? 0;
+  const held = subscription.messagesHeld;
+  const size = subscription.bytesHeld;
   return (
     <Stack gap={2}>
       <Text size="sm" className={classes.numeric}>
-        {held.toLocaleString()} message{held === 1 ? '' : 's'}
+        {held == null ? 'Unavailable' : `${held.toLocaleString()} message${held === 1 ? '' : 's'}`}
       </Text>
       <Text size="xs" c="dimmed" className={classes.numeric}>
-        {bytes(subscription.bytesHeld ?? 0)}
+        {size == null ? 'size unavailable' : bytes(size)}
         {subscription.mode === 'CAPTURE' && subscription.maxBytes
           ? ` of ${bytes(subscription.maxBytes)} allowed`
           : ' of payload'}
@@ -161,7 +162,11 @@ export function DeleteCell({
   const remove = useDeleteIndexSubscription(clusterId);
   const [confirming, setConfirming] = useState(false);
   const pattern = subscription.subscriptionPattern ?? '';
-  const held = subscription.messagesHeld ?? 0;
+  const held = subscription.messagesHeld;
+  const heldWords =
+    held == null
+      ? 'an unavailable number of captured messages'
+      : `${held.toLocaleString()} captured message${held === 1 ? '' : 's'}`;
 
   return (
     <>
@@ -178,8 +183,8 @@ export function DeleteCell({
         consequence={
           <Stack gap="xs">
             <Text size="sm">
-              This deletes the subscription and the {held.toLocaleString()} captured message{held === 1 ? '' : 's'} it
-              holds. They cannot be recovered — a consumed message cannot be observed a second time.
+              This deletes the subscription and the {heldWords} it holds. They cannot be recovered — a consumed message
+              cannot be observed a second time.
               {subscription.mode === 'CAPTURE'
                 ? ' It also removes the divert, the capture subscription, the address setting and the security setting from every node that answers now; a node that is unreachable is cleaned on its next reconcile pass. Nothing else removes them.'
                 : ''}

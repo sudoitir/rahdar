@@ -10,7 +10,10 @@ import { usePurgeSubscription, type DryRunView } from './api.ts';
 import { useMessageGate } from './gates.ts';
 import { announceFailure, announceResult, messageCount } from './outcomes.ts';
 
-const records = (n: number): string => `${n.toLocaleString()} record${n === 1 ? '' : 's'}`;
+const records = (n: number | null | undefined): string =>
+  n == null || Number.isNaN(n)
+    ? 'an unavailable number of records'
+    : `${n.toLocaleString()} record${n === 1 ? '' : 's'}`;
 
 /**
  * The system's own refusal of the purge, such as a group that still has members or is rebalancing (a 409

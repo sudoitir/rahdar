@@ -81,7 +81,7 @@ function AbortDialog({
   else if (effect && !effect.abortable) blocked = effect.effect;
   else if (preview.isError) blocked = 'The effect could not be read, so the abort is not offered.';
   else if (!effect) blocked = 'Reading what the abort would do…';
-  const released = effect?.released.map((part) => `${part.topic}-${part.partition}`).join(', ');
+  const released = (effect?.released ?? []).map((part) => `${part.topic}-${part.partition}`).join(', ');
 
   return (
     <ConfirmDialog
