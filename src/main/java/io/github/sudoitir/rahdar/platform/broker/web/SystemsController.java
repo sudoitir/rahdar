@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-/** The broker systems this Rahdar loads a driver for, which registration offers as its first choice (ADR-0213). */
+/** The broker systems this Rahdar loads a driver for, which registration offers as its first choice (ADR-0219). */
 @RestController
 @RequiredArgsConstructor
 public class SystemsController {

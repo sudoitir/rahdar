@@ -434,7 +434,7 @@ class ClusterControllerTest extends PostgresIntegrationTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(registerBody()));
         if (dryRun) {
-            // A check that ran answers with its findings (ADR-0213).
+            // A check that ran answers with its findings (ADR-0219).
             response.andExpect(status().isOk())
                     .andExpect(jsonPath("$.failure.cause").value("UNSUPPORTED_VERSION"))
                     .andExpect(jsonPath("$.supported").value(false))

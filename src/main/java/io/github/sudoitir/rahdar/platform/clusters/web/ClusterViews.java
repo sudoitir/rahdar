@@ -75,7 +75,7 @@ public final class ClusterViews {
             @Schema(requiredMode = REQUIRED) List<KindView> kinds) {}
 
     /**
-     * What a check of a connection found, before anything is stored (ADR-0213): the version, every node with the
+     * What a check of a connection found, before anything is stored (ADR-0219): the version, every node with the
      * address it advertises and whether Rahdar reached it there, the quorum, what the account may do, and the
      * cause of a failure with the next action.
      */

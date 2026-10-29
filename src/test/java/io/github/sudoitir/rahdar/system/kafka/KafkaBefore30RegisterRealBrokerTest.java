@@ -19,7 +19,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 
 /**
  * A Kafka 2.8 cluster (Confluent Platform 6.2) is refused: the check fails naming what it found and the supported
- * range, and nothing is stored (ADR-0213).
+ * range, and nothing is stored (ADR-0219).
  */
 @ExtendWith(AdminAuthenticationExtension.class)
 class KafkaBefore30RegisterRealBrokerTest extends PostgresIntegrationTest {

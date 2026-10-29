@@ -23,7 +23,7 @@ import org.testcontainers.lifecycle.Startables;
 
 /**
  * The commonest way a Kafka registration goes wrong: the bootstrap server answers, but a broker advertises an address
- * Rahdar cannot reach (ADR-0213). With one broker the check fails and says so; with two, it reaches the first and
+ * Rahdar cannot reach (ADR-0219). With one broker the check fails and says so; with two, it reaches the first and
  * names the second with the address it advertises and why it cannot be reached there.
  */
 @ExtendWith(AdminAuthenticationExtension.class)

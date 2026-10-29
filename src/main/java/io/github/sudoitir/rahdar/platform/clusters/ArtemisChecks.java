@@ -22,7 +22,7 @@ import java.util.Map;
 import java.util.Objects;
 
 /**
- * What the Jolokia check found, laid out as the {@link ConnectionCheck} every system answers with (ADR-0213): its
+ * What the Jolokia check found, laid out as the {@link ConnectionCheck} every system answers with (ADR-0219): its
  * per-node probes become nodes with their reach, its capabilities become access findings, and its adoption preview
  * and feature contributions ride along.
  */
