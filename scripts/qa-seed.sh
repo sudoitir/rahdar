@@ -260,6 +260,9 @@ if [ -n "${COMPOSE:-}" ]; then
     echo "  the Kafka cluster is registered already"
   fi
   kafka_seed_long
+  # The read-only account reads the Kafka cluster too: its forbidden captures are a refusal inside the cluster, not a
+  # cluster that does not exist for it.
+  api POST "/users/$reader_id/grants" -d "{\"roleId\":\"$reader\",\"scopeType\":\"CLUSTER\",\"scopeId\":\"$(find_id /clusters name events)\"}" -o /dev/null || true
 else
   echo "  COMPOSE is not set: no Kafka cluster is registered or seeded" >&2
 fi
