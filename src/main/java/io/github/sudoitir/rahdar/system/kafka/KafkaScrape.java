@@ -34,7 +34,8 @@ import org.springframework.stereotype.Component;
 /**
  * A Kafka cluster's brokers on the scrape schedule: one batched read of every node, then each stored broker takes
  * its state from what the cluster says of it (serving, or fenced), and one the cluster did not answer for keeps its
- * last state with the error. The partitions without a leader are counted on the same cycle.
+ * last state with the error. The partitions without a leader are counted on the same cycle. A cluster that reports
+ * another cluster id than the one registered is not read further, so the two clusters' data is never mixed.
  */
 @Component
 @RequiredArgsConstructor
@@ -47,6 +48,7 @@ class KafkaScrape implements ClusterScrape {
 
     private final KafkaPartitions partitions;
     private final MeterRegistry meters;
+    private final KafkaIdentityWatch identity;
 
     @Override
     public String system() {
@@ -69,6 +71,15 @@ class KafkaScrape implements ClusterScrape {
                 stored.forEach(node -> recorder.recordNodeError(node.getId(), message, kind));
             }
             throw e;
+        }
+        String live = described.value().stream()
+                .flatMap(node -> node.attributes().raw(KafkaRegistrar.CLUSTER_ID).stream())
+                .map(String::valueOf)
+                .findFirst()
+                .orElse(null);
+        if (identity.check(
+                clusterId, live, clusters.registeredIdentity(clusterId).orElse(null))) {
+            return;
         }
         Map<String, ClusterNode> byBroker = new HashMap<>();
         stored.forEach(node -> byBroker.put(node.getNativeNodeId(), node));
@@ -115,6 +126,9 @@ class KafkaScrape implements ClusterScrape {
     /** Every subscription of the cluster, a group on a topic, carried by its first stored broker. */
     @Override
     public List<QueueRow> subscriptions(UUID clusterId) {
+        identity.change(clusterId).ifPresent(change -> {
+            throw new IllegalStateException(change);
+        });
         ClusterNode carrier = clusters.nodes(clusterId).stream()
                 .min(Comparator.comparing(ClusterNode::getName))
                 .orElseThrow(() -> new NotFoundException("node", clusterId));

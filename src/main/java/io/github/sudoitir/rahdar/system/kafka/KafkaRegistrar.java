@@ -68,7 +68,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Registers Kafka clusters (ADR-0213): reaches every broker through the driver once, names each one's outcome, and
+ * Registers Kafka clusters (ADR-0219): reaches every broker through the driver once, names each one's outcome, and
  * classifies a failure by its cause with the next action. Nothing is stored by a check.
  */
 @Component
@@ -85,7 +85,7 @@ class KafkaRegistrar implements ClusterRegistrar {
     /** How many of them are probed for the advertised-listener hint. */
     private static final int PROBED = 3;
 
-    private static final String CLUSTER_ID = "kafka.cluster_id";
+    static final String CLUSTER_ID = "kafka.cluster_id";
 
     private static final String CLUSTER_VERSION = "kafka.cluster_version";
     private static final String CLUSTER_MODE = "kafka.cluster_mode";
@@ -578,7 +578,7 @@ class KafkaRegistrar implements ClusterRegistrar {
         return KafkaOptions.SASL_PLAINTEXT.equals(protocol) || KafkaOptions.SASL_SSL.equals(protocol);
     }
 
-    /** The connection, checked as a whole (ADR-0213): protocol, mechanism, credentials and servers agree. */
+    /** The connection, checked as a whole (ADR-0219): protocol, mechanism, credentials and servers agree. */
     static KafkaConnection validated(Connection connection) {
         if (!(connection instanceof KafkaConnection kafka)) {
             throw new IllegalArgumentException("A Kafka cluster is registered with a Kafka connection.");

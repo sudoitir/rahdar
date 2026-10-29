@@ -1,6 +1,7 @@
 package io.github.sudoitir.rahdar.system.kafka;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
@@ -45,7 +46,8 @@ class KafkaScrapeTest {
     private final NodeStateRecorder recorder = mock(NodeStateRecorder.class);
     private final KafkaPartitions partitions = mock(KafkaPartitions.class);
     private final SimpleMeterRegistry meters = new SimpleMeterRegistry();
-    private final KafkaScrape scrape = new KafkaScrape(gateway, clusters, recorder, partitions, meters);
+    private final KafkaIdentityWatch identity = new KafkaIdentityWatch();
+    private final KafkaScrape scrape = new KafkaScrape(gateway, clusters, recorder, partitions, meters, identity);
 
     private static ClusterNode stored(String brokerId) {
         ClusterNode node = mock(ClusterNode.class);
@@ -65,6 +67,19 @@ class KafkaScrapeTest {
                 Optional.empty(),
                 List.of(),
                 Attributes.empty(),
+                Optional.empty());
+    }
+
+    private static NodeDescription brokerOf(String id, String clusterId) {
+        return new NodeDescription(
+                NodeId.of(id),
+                id,
+                new Membership(Optional.empty(), Designation.NONE, Serving.ACTIVE, Optional.empty()),
+                Set.of(NodeFunction.BROKER),
+                List.of(Endpoint.of(Plane.DATA, KafkaOptions.PROTOCOL, "k" + id + ":9092")),
+                Optional.empty(),
+                List.of(),
+                Attributes.builder().putRaw("kafka.cluster_id", clusterId).build(),
                 Optional.empty());
     }
 
@@ -128,5 +143,30 @@ class KafkaScrapeTest {
                         .counter()
                         .count())
                 .isEqualTo(2);
+    }
+
+    @Test
+    void aClusterReProvisionedAtTheSameAddressIsNotReadFurtherUntilItIsTheRegisteredOneAgain() {
+        ClusterNode one = stored("1");
+        when(clusters.nodes(CLUSTER)).thenReturn(List.of(one));
+        when(clusters.registeredIdentity(CLUSTER)).thenReturn(Optional.of("registered-id"));
+        clusterReports(brokerOf("1", "new-id"), brokerOf("2", "new-id"));
+
+        scrape.nodes(CLUSTER, 1);
+
+        verify(recorder, never()).applyTierA(any(), any(), anyLong());
+        verify(recorder, never()).adopt(any(), any(), any(), any());
+        verify(partitions, never()).refresh(any());
+        assertThat(identity.change(CLUSTER))
+                .hasValueSatisfying(words -> assertThat(words)
+                        .isEqualTo("The cluster at this address changed: it reports cluster id new-id, registered as"
+                                + " registered-id. Re-register it or restore the original cluster."));
+        assertThatThrownBy(() -> scrape.subscriptions(CLUSTER)).isInstanceOf(IllegalStateException.class);
+
+        clusterReports(brokerOf("1", "registered-id"));
+        scrape.nodes(CLUSTER, 2);
+
+        verify(recorder).applyTierA(eq(one.getId()), any(), eq(2L));
+        assertThat(identity.change(CLUSTER)).isEmpty();
     }
 }

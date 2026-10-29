@@ -32,7 +32,7 @@ with the commit that fixes it and its test. Owner names are the agents of this s
 | S1 | storage | broker_event stores every delivered message | backend | open: ADR-0218 in test |
 | S2 | storage | broker_event bounded in time but not rows: enforce a row cap | backend | open |
 | S3 | storage | metric_sample ≈45 GB/day at 4000 Kafka subscriptions | backend | open: change-only + heartbeat |
-| A1 | audit 1 | Cluster re-provisioned at the same bootstrap not detected | kafka-hardening | open |
+| A1 | audit 1 | Cluster re-provisioned at the same bootstrap not detected | kafka-hardening | fixed |
 | A2 | audit 1 | Unavailable lag stored and shown as 0 | backend | open |
 | A3 | audit 1 | Replaced broker's node row never retired | kafka-hardening | open |
 | A4 | audit 1 | Health pages every partition on the caller's thread | kafka-hardening | open |

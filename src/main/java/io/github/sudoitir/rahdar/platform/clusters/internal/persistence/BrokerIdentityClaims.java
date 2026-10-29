@@ -90,6 +90,14 @@ public class BrokerIdentityClaims {
                 .optional();
     }
 
+    /** The identity of this kind a cluster holds, if any. */
+    public Optional<String> identityOf(UUID clusterId, String kind) {
+        return jdbc.sql("SELECT identity FROM broker_identity WHERE cluster_id = ? AND kind = ? LIMIT 1")
+                .params(clusterId, kind)
+                .query(String.class)
+                .optional();
+    }
+
     private void insert(UUID clusterId, Keys keys) {
         jdbc.sql("""
                         INSERT INTO broker_identity (kind, identity, cluster_id)

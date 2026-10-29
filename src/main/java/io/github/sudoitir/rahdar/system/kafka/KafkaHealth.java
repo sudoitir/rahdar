@@ -19,6 +19,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.Set;
 import java.util.UUID;
@@ -45,11 +46,13 @@ class KafkaHealth implements ClusterHealthEvaluator {
 
     private final BrokerGateway gateway;
     private final KafkaPartitions partitions;
+    private final KafkaIdentityWatch identity;
     private final Map<UUID, Reading> readings = new ConcurrentHashMap<>();
 
-    KafkaHealth(BrokerGateway gateway, KafkaPartitions partitions) {
+    KafkaHealth(BrokerGateway gateway, KafkaPartitions partitions, KafkaIdentityWatch identity) {
         this.gateway = gateway;
         this.partitions = partitions;
+        this.identity = identity;
     }
 
     @Override
@@ -76,6 +79,10 @@ class KafkaHealth implements ClusterHealthEvaluator {
         } catch (BrokerException e) {
             return verdict(
                     clusterId, Level.CRITICAL, List.of(), List.of("No broker is reachable: " + e.getMessage()), false);
+        }
+        Optional<String> changed = identity.change(clusterId);
+        if (changed.isPresent()) {
+            return verdict(clusterId, Level.CRITICAL, List.of(), List.of(changed.get()), false);
         }
         return judge(clusterId, described, partitions.offline(clusterId));
     }
