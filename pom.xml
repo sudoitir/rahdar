@@ -125,6 +125,19 @@
 
     <dependencyManagement>
         <dependencies>
+            <!-- The Kafka client's compression codecs, raised past the releases with high-severity advisories
+                 (snappy-java GHSA-gwq9-9ffj-mvrv, GHSA-q233-g92q-qxp6; lz4-java GHSA-mcr4-qmvw-px4g) that the
+                 image scan refuses. Drop each entry once kafka-clients itself depends on a fixed release. -->
+            <dependency>
+                <groupId>org.xerial.snappy</groupId>
+                <artifactId>snappy-java</artifactId>
+                <version>1.1.10.9</version>
+            </dependency>
+            <dependency>
+                <groupId>at.yawk.lz4</groupId>
+                <artifactId>lz4-java</artifactId>
+                <version>1.11.4</version>
+            </dependency>
             <!-- Spring Boot 4.x no longer manages the Testcontainers versions itself. -->
             <dependency>
                 <groupId>org.springframework.ai</groupId>
