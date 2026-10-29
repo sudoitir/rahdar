@@ -58,4 +58,7 @@ with the commit that fixes it and its test. Owner names are the agents of this s
 | C7 | audit 3 | Bulk over 4000 subscriptions: item cap and bulk_run retention unverified | kafka-hardening | open: investigate and fix |
 | C8 | audit 3 | Held operations / approval requests: retention and orphans on cluster delete unverified | kafka-hardening | open: investigate and fix |
 | C9 | audit 3 | Alert/notification flapping (a broker flapping every minute): dedup and cooldown unverified | kafka-hardening | open: investigate and fix |
+| D1 | Dependabot | react-virtual 3.14.22 broke 40 DataTable tests (jsdom setup gave no clientHeight) | web | fixed dae5e7301 |
+| D2 | Dependabot | Mantine 9.7.4 Menu.Item overwrote aria-disabled on unavailable actions | web | fixed dae5e7301 |
+| E11 | live run | A reader without destination:read gets 404 for an existing topic's configuration, not 403 naming the permission | backend | open |
 | C10 | audit 3 | SSE payload bytes of one scrape tick over 4000 subscriptions unmeasured | backend (perf run) | open: measure in 6.2d |

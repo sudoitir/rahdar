@@ -9,8 +9,5 @@
 - [ ] 3.1 `opus-medium` reviews the design, every Kafka flow and the UI from the captures and the running app against the enterprise-grade bar. Check: a findings list
 - [ ] 3.2 Fix every finding; recapture the affected screens. Check: the reviewer's list is closed
 
-## 4. Dependencies
-- [ ] 4.1 Find the root cause of the 40 DataTable test failures on `@tanstack/react-virtual` 3.14.22: fix Rahdar and remove the pin, or keep the pin with the upstream issue and a Dependabot ignore. Check: the web unit suite passes on the chosen version
-
 ## 5. Finish
 - [ ] 5.1 Push; CI green and the Sonar list empty. Check: the PR's checks
