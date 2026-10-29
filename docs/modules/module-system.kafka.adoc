@@ -2,7 +2,35 @@
 |===
 |Base package
 |`io.github.sudoitir.rahdar.system.kafka`
+|Spring components
+|_Services_
+
+* `i.g.s.r.s.k.KafkaAclChanges`
+* `i.g.s.r.s.k.KafkaAcls`
+* `i.g.s.r.s.k.KafkaBrokers`
+* `i.g.s.r.s.k.KafkaGroups`
+* `i.g.s.r.s.k.KafkaHangingAborts`
+* `i.g.s.r.s.k.KafkaHangingTransactions`
+* `i.g.s.r.s.k.KafkaOffsetResets`
+* `i.g.s.r.s.k.KafkaOffsets`
+* `i.g.s.r.s.k.KafkaTopicConfigChanges`
+* `i.g.s.r.s.k.KafkaTopicConfigs`
+* `i.g.s.r.s.k.KafkaTransactionAborts`
+* `i.g.s.r.s.k.KafkaTransactions`
+
+_Others_
+
+* `i.g.s.r.s.k.BootstrapProbe` (via `i.g.s.r.s.k.BootstrapProbe.Socketed`)
 |Bean references
 |* `i.g.s.r.p.b.BrokerGateway` (in Broker connectivity)
+* `i.g.s.r.k.g.OperationGate` (in Approval gate contract)
+* `i.g.s.r.k.a.AuditService` (in Audit log)
+* `i.g.s.r.k.s.ActorResolver` (in Security)
+* `i.g.s.r.k.s.ClusterAccessGuard` (in Security)
 * `i.g.s.r.p.b.ConnectionSettingsSource` (in Broker connectivity)
+* `i.g.s.r.p.s.QueueSnapshots` (in Scraping)
+* `i.g.s.r.p.c.ClusterDirectory` (in Clusters)
+* `i.g.s.r.p.c.NodeStateRecorder` (in Clusters)
+|Events listened to
+|* `i.g.s.r.k.r.ReplicaSignal` 
 |===

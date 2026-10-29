@@ -18,6 +18,7 @@ _Services_
 * `i.g.s.r.f.r.EstateSubscriptions`
 * `i.g.s.r.f.r.PagedListService`
 * `i.g.s.r.f.r.QueueLifecycleService`
+* `i.g.s.r.f.r.TruncateService`
 
 _Others_
 

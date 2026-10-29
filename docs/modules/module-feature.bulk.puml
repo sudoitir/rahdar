@@ -51,7 +51,7 @@ Rel(RahdarApplication.RahdarApplication.Brokerconnectivity, RahdarApplication.Ra
 Rel(RahdarApplication.RahdarApplication.Bulkoperations, RahdarApplication.RahdarApplication.Approvalgatecontract, "uses", $techn="", $tags="", $link="")
 Rel(RahdarApplication.RahdarApplication.Bulkoperations, RahdarApplication.RahdarApplication.Auditlog, "uses", $techn="", $tags="", $link="")
 Rel(RahdarApplication.RahdarApplication.Bulkoperations, RahdarApplication.RahdarApplication.Brokerconnectivity, "depends on", $techn="", $tags="", $link="")
-Rel(RahdarApplication.RahdarApplication.Bulkoperations, RahdarApplication.RahdarApplication.Clusters, "depends on", $techn="", $tags="", $link="")
+Rel(RahdarApplication.RahdarApplication.Bulkoperations, RahdarApplication.RahdarApplication.Clusters, "uses", $techn="", $tags="", $link="")
 Rel(RahdarApplication.RahdarApplication.Bulkoperations, RahdarApplication.RahdarApplication.Core, "uses", $techn="", $tags="", $link="")
 Rel(RahdarApplication.RahdarApplication.Bulkoperations, RahdarApplication.RahdarApplication.Datalifecycle, "depends on", $techn="", $tags="", $link="")
 Rel(RahdarApplication.RahdarApplication.Bulkoperations, RahdarApplication.RahdarApplication.Eventstream, "uses", $techn="", $tags="", $link="")
