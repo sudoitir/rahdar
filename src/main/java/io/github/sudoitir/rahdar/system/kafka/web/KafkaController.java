@@ -3,7 +3,6 @@ package io.github.sudoitir.rahdar.system.kafka.web;
 import io.github.sudoitir.rahdar.kernel.gate.HeldResponse;
 import io.github.sudoitir.rahdar.system.kafka.KafkaAclChanges;
 import io.github.sudoitir.rahdar.system.kafka.KafkaAcls;
-import io.github.sudoitir.rahdar.system.kafka.KafkaBrokers;
 import io.github.sudoitir.rahdar.system.kafka.KafkaGroups;
 import io.github.sudoitir.rahdar.system.kafka.KafkaHangingAborts;
 import io.github.sudoitir.rahdar.system.kafka.KafkaHangingTransactions;
@@ -20,7 +19,6 @@ import io.github.sudoitir.rahdar.system.kafka.web.KafkaViews.AclChangeRequest;
 import io.github.sudoitir.rahdar.system.kafka.web.KafkaViews.AclPage;
 import io.github.sudoitir.rahdar.system.kafka.web.KafkaViews.AclPreview;
 import io.github.sudoitir.rahdar.system.kafka.web.KafkaViews.AclResult;
-import io.github.sudoitir.rahdar.system.kafka.web.KafkaViews.Brokers;
 import io.github.sudoitir.rahdar.system.kafka.web.KafkaViews.ConfigChangeRequest;
 import io.github.sudoitir.rahdar.system.kafka.web.KafkaViews.ConfigPreview;
 import io.github.sudoitir.rahdar.system.kafka.web.KafkaViews.GroupDetail;
@@ -63,7 +61,6 @@ public class KafkaController {
     private final KafkaTransactionAborts aborts;
     private final KafkaHangingTransactions hanging;
     private final KafkaHangingAborts hangingAborts;
-    private final KafkaBrokers brokers;
     private final KafkaTopicConfigs configs;
     private final KafkaTopicConfigChanges configChanges;
 
@@ -175,10 +172,5 @@ public class KafkaController {
     public HangingAbortResult abortHanging(@PathVariable UUID clusterId, @RequestBody HangingAbortRequest request) {
         return hangingAborts.abort(
                 clusterId, request.topic(), request.partition(), request.producerId(), request.etag());
-    }
-
-    @GetMapping("/brokers")
-    public Brokers brokers(@PathVariable UUID clusterId) {
-        return brokers.read(clusterId);
     }
 }

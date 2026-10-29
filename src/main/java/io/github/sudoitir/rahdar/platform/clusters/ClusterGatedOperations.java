@@ -388,7 +388,8 @@ class ClusterGatedOperations {
                     rows.add(DisplayRow.of("Management account", a.credentials().username()));
                 }
                 if (a.coreCredentials() != null) {
-                    rows.add(DisplayRow.of(LABEL_CORE_ACCOUNT, a.coreCredentials().username()));
+                    rows.add(DisplayRow.of(
+                            LABEL_CORE_ACCOUNT, a.coreCredentials().username()));
                 }
                 rows.add(DisplayRow.of("Adopt the running configuration", p.adopts() ? "yes" : "no"));
             }

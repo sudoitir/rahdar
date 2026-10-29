@@ -292,21 +292,20 @@ class PluginMessagingKafkaRealBrokerTest extends PostgresIntegrationTest {
                         operator));
 
         // The group's committed position is read before the dead-letter topic's end, so a committed record
-        // whose dead letter was not yet there would show as a zero end.
-        long until = System.currentTimeMillis() + 180_000;
-        long committed = -1;
-        long deadLettered = 0;
-        while (System.currentTimeMillis() < until && committed < 1) {
-            committed = committed(group, topic, 0);
-            deadLettered = endOffset(topic + ".dlt");
-            if (committed >= 1) {
-                assertThat(deadLettered)
-                        .as("a record is passed only once it is dead-lettered")
-                        .isEqualTo(1);
-            }
-            TimeUnit.MILLISECONDS.sleep(500);
-        }
-        assertThat(committed).isEqualTo(1);
+        // whose dead letter was not yet there would show as a zero end. That mismatch fails at once.
+        await().atMost(180, TimeUnit.SECONDS)
+                .pollInterval(500, TimeUnit.MILLISECONDS)
+                .until(() -> {
+                    long committedNow = committed(group, topic, 0);
+                    if (committedNow < 1) {
+                        return false;
+                    }
+                    assertThat(committedNow).isEqualTo(1);
+                    assertThat(endOffset(topic + ".dlt"))
+                            .as("a record is passed only once it is dead-lettered")
+                            .isEqualTo(1);
+                    return true;
+                });
         assertThat(MessagingProbe.inbox(plugin))
                 .as("deliveries before the dead letter")
                 .hasSizeGreaterThanOrEqualTo(10);

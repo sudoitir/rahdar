@@ -290,7 +290,7 @@ class BulkRunner {
     private static LifecycleOutcome unwrap(Attempt<LifecycleOutcome> attempt) {
         return switch (attempt) {
             case Attempt.Ok<LifecycleOutcome>(var value) -> value;
-            case Attempt.Failed<LifecycleOutcome>(var _, var detail) -> throw new IllegalStateException(detail);
+            case Attempt.Failed<LifecycleOutcome> failed -> throw new IllegalStateException(failed.detail());
         };
     }
 

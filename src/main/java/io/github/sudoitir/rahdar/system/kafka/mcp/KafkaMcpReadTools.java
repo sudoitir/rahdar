@@ -183,10 +183,12 @@ public class KafkaMcpReadTools {
     /** What the transactions tool answers: the coordinator's open transactions, and the hanging ones when asked for. */
     public record TransactionListing(TransactionPage open, HangingPage hanging, String note) {}
 
-    /** The topics a comma-separated argument names; null when none, which means every topic of the group. */
+    /**
+     * The topics a comma-separated argument names. An empty list is every topic of a group, and no setting to remove.
+     */
     static List<String> topicList(String topics) {
         if (topics == null || topics.isBlank()) {
-            return null;
+            return List.of();
         }
         return Arrays.stream(topics.split(","))
                 .map(String::trim)

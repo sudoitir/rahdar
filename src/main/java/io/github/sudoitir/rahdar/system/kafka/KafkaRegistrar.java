@@ -568,7 +568,7 @@ class KafkaRegistrar implements ClusterRegistrar {
         String cause = advertised ? ADVERTISED_UNREACHABLE : reached;
         String next = advertised
                 ? "The bootstrap server answered, but the brokers advertise addresses Rahdar cannot reach. Set"
-                      + " advertised.listeners to an address reachable from Rahdar (not localhost inside a container)."
+                        + " advertised.listeners to an address reachable from Rahdar (not localhost inside a container)."
                 : nextStep(cause);
         String message = failureMessage(advertised, cause, detail);
         return new ConnectionCheck(

@@ -2,6 +2,7 @@ package io.github.sudoitir.rahdar.system.kafka;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.awaitility.Awaitility.await;
 
 import io.github.sudoitir.openbroker.ClusterConnection;
 import io.github.sudoitir.openbroker.model.Kind;
@@ -36,8 +37,10 @@ import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshotUpsert;
 import io.github.sudoitir.rahdar.support.AdminAuthenticationExtension;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
 import io.github.sudoitir.rahdar.system.kafka.internal.persistence.KafkaConnectionRepository;
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import org.apache.kafka.clients.admin.Admin;
 import org.apache.kafka.clients.admin.NewTopic;
@@ -66,6 +69,14 @@ import org.testcontainers.kafka.KafkaContainer;
 class KafkaRegisterRealBrokerTest extends PostgresIntegrationTest {
 
     private static final String IMAGE = System.getProperty("kafka.image", "apache/kafka:4.4.0");
+
+    /** How long topic metadata may trail a create. The old loops took fifty looks. */
+    private static final Duration METADATA = Duration.ofSeconds(60);
+
+    private static final Duration PAUSE = Duration.ofMillis(200);
+
+    /** A member leaves the group on close; the purge stays refused until it has. */
+    private static final Duration MEMBER_LEAVING = Duration.ofMillis(300);
 
     private static KafkaContainer kafka;
 
@@ -295,14 +306,13 @@ class KafkaRegisterRealBrokerTest extends PostgresIntegrationTest {
                     .get();
         }
         ResourceId log = ResourceId.of("kafka.topic", topic);
-        MessagePageView page = null;
-        for (int attempt = 0; attempt < 50 && (page == null || page.data().size() < 6); attempt++) {
-            try {
-                page = messages.browseLog(id, log, 0, MessageService.LogStart.parse("earliest", null), null, 100);
-            } catch (RuntimeException _) {
-                Thread.sleep(200);
-            }
-        }
+        MessagePageView page = await().atMost(METADATA)
+                .pollInterval(PAUSE)
+                .ignoreExceptions()
+                .until(
+                        () -> messages.browseLog(
+                                id, log, 0, MessageService.LogStart.parse("earliest", null), null, 100),
+                        seen -> seen.data().size() >= 6);
 
         assertThat(page.data())
                 .extracting(r -> r.position() + ":" + r.key())
@@ -372,14 +382,10 @@ class KafkaRegisterRealBrokerTest extends PostgresIntegrationTest {
             }
         }
         TruncateService.Cut cut = new TruncateService.Cut(Map.of(0, 6L), null);
-        TruncateService.TruncateEffect effect = null;
-        for (int attempt = 0; attempt < 50 && effect == null; attempt++) {
-            try {
-                effect = truncates.truncate(id, "kafka.topic", topic, cut, null, true);
-            } catch (RuntimeException _) {
-                Thread.sleep(200);
-            }
-        }
+        TruncateService.TruncateEffect effect = await().atMost(METADATA)
+                .pollInterval(PAUSE)
+                .ignoreExceptions()
+                .until(() -> truncates.truncate(id, "kafka.topic", topic, cut, null, true), Objects::nonNull);
 
         assertThat(effect.records()).isEqualTo(6);
         assertThat(effect.groups())
@@ -396,14 +402,12 @@ class KafkaRegisterRealBrokerTest extends PostgresIntegrationTest {
 
         assertThat(done.records()).isEqualTo(6);
         ResourceId log = ResourceId.of("kafka.topic", topic);
-        MessagePageView afterwards = null;
-        for (int attempt = 0; attempt < 50 && afterwards == null; attempt++) {
-            try {
-                afterwards = messages.browseLog(id, log, 0, MessageService.LogStart.parse("earliest", null), null, 10);
-            } catch (RuntimeException _) {
-                Thread.sleep(200);
-            }
-        }
+        MessagePageView afterwards = await().atMost(METADATA)
+                .pollInterval(PAUSE)
+                .ignoreExceptions()
+                .until(
+                        () -> messages.browseLog(id, log, 0, MessageService.LogStart.parse("earliest", null), null, 10),
+                        Objects::nonNull);
         assertThat(afterwards.log().start()).isEqualTo(6);
         assertThat(jdbc.sql(
                                 "SELECT outcome FROM audit_event WHERE cluster_id = ? AND action = 'TRUNCATE_DESTINATION' ORDER BY id")
@@ -425,17 +429,19 @@ class KafkaRegisterRealBrokerTest extends PostgresIntegrationTest {
                     .get();
         }
         TruncateService.Cut cut = new TruncateService.Cut(Map.of(0, 1L), null);
-        Throwable refused = null;
-        for (int attempt = 0; attempt < 50 && refused == null; attempt++) {
-            try {
-                truncates.truncate(id, "kafka.topic", topic, cut, null, true);
-                refused = new AssertionError("a compacted topic was truncated");
-            } catch (ConflictException e) {
-                refused = e;
-            } catch (RuntimeException _) {
-                Thread.sleep(200);
-            }
-        }
+        Throwable refused = await().atMost(METADATA)
+                .pollInterval(PAUSE)
+                .ignoreExceptions()
+                .until(
+                        () -> {
+                            try {
+                                truncates.truncate(id, "kafka.topic", topic, cut, null, true);
+                            } catch (ConflictException e) {
+                                return e;
+                            }
+                            throw new AssertionError("a compacted topic was truncated");
+                        },
+                        Objects::nonNull);
 
         assertThat(refused).isInstanceOf(ConflictException.class).hasMessageContaining("compacts");
     }
@@ -468,21 +474,17 @@ class KafkaRegisterRealBrokerTest extends PostgresIntegrationTest {
             member.subscribe(List.of(topic));
             long until = System.currentTimeMillis() + 30_000;
             while (member.assignment().isEmpty() && System.currentTimeMillis() < until) {
-                member.poll(java.time.Duration.ofMillis(200));
+                member.poll(Duration.ofMillis(200));
             }
 
             assertThatThrownBy(() -> messages.purgeLog(id, subscription, true))
                     .isInstanceOf(ConflictException.class)
                     .hasMessageContaining("member");
         }
-        Object outcome = null;
-        for (int attempt = 0; attempt < 50 && outcome == null; attempt++) {
-            try {
-                outcome = ((Attempt.Ok<?>) messages.purgeLog(id, subscription, true)).value();
-            } catch (ConflictException _) {
-                Thread.sleep(300);
-            }
-        }
+        Object outcome = await().atMost(METADATA)
+                .pollInterval(MEMBER_LEAVING)
+                .ignoreException(ConflictException.class)
+                .until(() -> ((Attempt.Ok<?>) messages.purgeLog(id, subscription, true)).value(), Objects::nonNull);
 
         // A purge of a log destroys nothing: the figure is the records the position passes over.
         assertThat(outcome).isInstanceOf(MessageService.Outcome.LogPurgeDryRun.class);
@@ -551,13 +553,11 @@ class KafkaRegisterRealBrokerTest extends PostgresIntegrationTest {
                 new KafkaConsumer<>(config, new ByteArrayDeserializer(), new ByteArrayDeserializer())) {
             consumer.commitSync(Map.of(new TopicPartition(topic, 0), new OffsetAndMetadata(4)));
         }
-        List<QueueRow> rows = List.of();
-        for (int attempt = 0;
-                attempt < 50 && rows.stream().noneMatch(r -> r.queueName().contains(group));
-                attempt++) {
-            rows = scrape.subscriptions(id);
-            Thread.sleep(200);
-        }
+        List<QueueRow> rows = await().atMost(METADATA)
+                .pollInterval(PAUSE)
+                .until(
+                        () -> scrape.subscriptions(id),
+                        found -> found.stream().anyMatch(r -> r.queueName().contains(group)));
         snapshotUpsert.upsertBatch(rows);
 
         SubscriptionView view = aggregator.rollUp(id).stream()
@@ -583,7 +583,8 @@ class KafkaRegisterRealBrokerTest extends PostgresIntegrationTest {
         assertThat(check.failure().cause()).isIn("REFUSED", "TIMEOUT");
         assertThat(check.failure().next()).isNotBlank();
         RegisterClusterRequest refused = request("refused", "localhost:1");
-        assertThatThrownBy(() -> service.register(refused)).hasMessageContaining(check.failure().next());
+        assertThatThrownBy(() -> service.register(refused))
+                .hasMessageContaining(check.failure().next());
     }
 
     @Test
@@ -615,11 +616,11 @@ class KafkaRegisterRealBrokerTest extends PostgresIntegrationTest {
         }
 
         // The brokers' metadata trails the new topic by a moment, so the third partition's end may take a second look.
-        Breakdown breakdown = backlogs.breakdown(id, "kafka.group-topic", group + "/" + topic);
-        for (int attempt = 0; attempt < 50 && breakdown.partitions().get(2).end() == null; attempt++) {
-            Thread.sleep(200);
-            breakdown = backlogs.breakdown(id, "kafka.group-topic", group + "/" + topic);
-        }
+        Breakdown breakdown = await().atMost(METADATA)
+                .pollInterval(PAUSE)
+                .until(
+                        () -> backlogs.breakdown(id, "kafka.group-topic", group + "/" + topic),
+                        found -> found.partitions().get(2).end() != null);
 
         assertThat(breakdown.sampledAt()).isNotNull();
         assertThat(breakdown.partitions())

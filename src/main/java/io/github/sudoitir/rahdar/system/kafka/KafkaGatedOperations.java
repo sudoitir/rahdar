@@ -65,7 +65,9 @@ class KafkaGatedOperations {
                         DisplayRow.of("Set", changes.shown(p)),
                         DisplayRow.of(
                                 "Remove overrides",
-                                p.remove() == null ? "none" : p.remove().toString())),
+                                p.remove() == null || p.remove().isEmpty()
+                                        ? "none"
+                                        : p.remove().toString())),
                 changes::estimate,
                 changes::replay,
                 clusters,

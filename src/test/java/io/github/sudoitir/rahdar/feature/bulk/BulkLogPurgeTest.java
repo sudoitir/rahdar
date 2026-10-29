@@ -111,8 +111,7 @@ class BulkLogPurgeTest extends BulkTestSupport {
         assertThat(rebalancing.status()).isEqualTo(BulkItemStatus.FAILED);
         assertThat(rebalancing.error()).contains("rebalancing");
         assertThat(item(run, "artemis.queue/orders.q").status()).isEqualTo(BulkItemStatus.SUCCEEDED);
-        verify(messages, never())
-                .purgeLog(clusterId, ResourceId.parse("kafka.group-topic/g-active/t"), false);
+        verify(messages, never()).purgeLog(clusterId, ResourceId.parse("kafka.group-topic/g-active/t"), false);
     }
 
     @Test

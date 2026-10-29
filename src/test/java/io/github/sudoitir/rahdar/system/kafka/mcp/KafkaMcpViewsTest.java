@@ -70,6 +70,13 @@ class KafkaMcpViewsTest {
     }
 
     @Test
+    void anOmittedTopicListIsEmptyAndAListNamesEachTopic() {
+        assertThat(KafkaMcpReadTools.topicList(null)).isEmpty();
+        assertThat(KafkaMcpReadTools.topicList("  ")).isEmpty();
+        assertThat(KafkaMcpReadTools.topicList("orders, payments , ,")).containsExactly("orders", "payments");
+    }
+
+    @Test
     void aResetPreviewGivesPerTopicTotalsAndTheBiggestMovesOnly() {
         List<OffsetRow> rows = IntStream.range(0, 3000)
                 .mapToObj(p -> new OffsetRow("orders", p, 10L, 0L, p, 0, null, p == 7 ? "out of range" : null))
