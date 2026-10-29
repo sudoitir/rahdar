@@ -104,7 +104,7 @@ class McpDryRunIntegrationTest extends PostgresIntegrationTest {
                 QUEUE,
                 "ANYCAST",
                 true,
-                9,
+                9L,
                 0,
                 0,
                 0,

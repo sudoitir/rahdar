@@ -64,8 +64,8 @@ public class QueueSnapshotEntity {
     @Column(name = "ts", nullable = false)
     private Instant ts;
 
-    @Column(name = "backlog", nullable = false)
-    private long messageCount;
+    @Column(name = "backlog")
+    private Long messageCount;
 
     @Column(name = "consumer_count", nullable = false)
     private long consumerCount;

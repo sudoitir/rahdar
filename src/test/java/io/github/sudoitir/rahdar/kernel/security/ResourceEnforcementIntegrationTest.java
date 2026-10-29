@@ -349,8 +349,10 @@ class ResourceEnforcementIntegrationTest extends PostgresIntegrationTest {
 
     @Test
     void aBulkPlanWithAForeignQueueIsRefusedAndNothingIsPlanned() throws Exception {
-        MockHttpServletResponse response =
-                postJson(base() + "/bulk/preview", bulk("\"names\":[\"orders.in\",\"billing.in\"]"), ordersOperator);
+        MockHttpServletResponse response = postJson(
+                base() + "/bulk/preview",
+                bulk("\"ids\":[\"artemis.queue/orders.in\",\"artemis.queue/billing.in\"]"),
+                ordersOperator);
 
         assertThat(response.getStatus()).isEqualTo(404);
         assertThat(call(get(base() + "/bulk/runs"), ordersOperator).getContentAsString())
@@ -359,8 +361,10 @@ class ResourceEnforcementIntegrationTest extends PostgresIntegrationTest {
 
     @Test
     void aBulkPlanOfTheCallersOwnQueuesIsPlanned() throws Exception {
-        MockHttpServletResponse response =
-                postJson(base() + "/bulk/preview", bulk("\"names\":[\"orders.in\",\"orders.out\"]"), ordersOperator);
+        MockHttpServletResponse response = postJson(
+                base() + "/bulk/preview",
+                bulk("\"ids\":[\"artemis.queue/orders.in\",\"artemis.queue/orders.out\"]"),
+                ordersOperator);
 
         assertThat(response.getStatus())
                 .describedAs(response.getContentAsString())
@@ -643,8 +647,10 @@ class ResourceEnforcementIntegrationTest extends PostgresIntegrationTest {
 
     @Test
     void aRunOfAnotherTeamsQueuesIsNotFoundByItsOwnIdWithoutNamingAQueue() throws Exception {
-        MockHttpServletResponse planned =
-                postJson(base() + "/bulk/preview", bulk("\"names\":[\"orders.in\",\"billing.in\"]"), platformOperator);
+        MockHttpServletResponse planned = postJson(
+                base() + "/bulk/preview",
+                bulk("\"ids\":[\"artemis.queue/orders.in\",\"artemis.queue/billing.in\"]"),
+                platformOperator);
         String run = body(planned).get("run").get("id").asString();
 
         for (MockHttpServletResponse response : List.of(

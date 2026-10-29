@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -115,7 +116,13 @@ public class DlqService {
                     .map(r -> new DeadLetterDepth(
                             r.nodeId(), nodeNames.getOrDefault(r.nodeId(), "unknown"), r.messageCount()))
                     .toList();
-            long totalDepth = perNode.stream().mapToLong(DeadLetterDepth::depth).sum();
+            List<Long> known = perNode.stream()
+                    .map(DeadLetterDepth::depth)
+                    .filter(Objects::nonNull)
+                    .toList();
+            Long totalDepth = known.isEmpty()
+                    ? null
+                    : Long.valueOf(known.stream().mapToLong(Long::longValue).sum());
             ResourceId id = ResourceIds.of(connection, ResourceClass.SUBSCRIPTION, queueName);
             queues.add(new DeadLetterSubscription(
                     id.format(),
@@ -125,6 +132,7 @@ public class DlqService {
                     ResourceIds.of(connection, ResourceClass.DESTINATION, address)
                             .format(),
                     totalDepth,
+                    perNode.size() - known.size(),
                     perNode));
         });
         return queues;

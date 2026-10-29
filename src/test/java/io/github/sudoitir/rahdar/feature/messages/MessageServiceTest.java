@@ -147,12 +147,12 @@ class MessageServiceTest {
                 gate,
                 extensions);
         when(locator.locate(CLUSTER, "target"))
-                .thenReturn(List.of(new QueueLocation(NODE_A, "target", "target", "ANYCAST", 1)));
-        when(locator.locate(CLUSTER, "t")).thenReturn(List.of(new QueueLocation(NODE_A, "t", "t", "ANYCAST", 1)));
+                .thenReturn(List.of(new QueueLocation(NODE_A, "target", "target", "ANYCAST", 1L)));
+        when(locator.locate(CLUSTER, "t")).thenReturn(List.of(new QueueLocation(NODE_A, "t", "t", "ANYCAST", 1L)));
         when(locator.locate(CLUSTER, "orders"))
                 .thenReturn(List.of(
-                        new QueueLocation(NODE_A, "orders", "orders.addr", "ANYCAST", 5),
-                        new QueueLocation(NODE_B, "orders", "orders.addr", "ANYCAST", 50)));
+                        new QueueLocation(NODE_A, "orders", "orders.addr", "ANYCAST", 5L),
+                        new QueueLocation(NODE_B, "orders", "orders.addr", "ANYCAST", 50L)));
         when(directory.nodes(CLUSTER)).thenReturn(List.of(nodeA, nodeB));
         when(actors.resolve()).thenReturn(new Actor("alice", "127.0.0.1", "req", null));
         when(audit.begin(any(), anyString(), anyString(), anyString(), any(), any(), any(), any(Boolean.class)))
@@ -922,7 +922,7 @@ class MessageServiceTest {
     @Test
     void movingNeedsMessageMoveOnTheSourceAndMessageSendOnTheTargetsAddress() {
         when(locator.locate(CLUSTER, "billing"))
-                .thenReturn(List.of(new QueueLocation(NODE_A, "billing", "billing.addr", "ANYCAST", 1)));
+                .thenReturn(List.of(new QueueLocation(NODE_A, "billing", "billing.addr", "ANYCAST", 1L)));
 
         service.execute(CLUSTER, "orders", null, MessageAction.MOVE, filter("f", "billing"), true, false);
 

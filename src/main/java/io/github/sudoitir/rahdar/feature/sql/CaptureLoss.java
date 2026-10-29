@@ -127,6 +127,7 @@ public class CaptureLoss {
         long routed = routedToCovered(used, covered);
         long inRing = used.stream()
                 .filter(row -> isCaptureQueue(row, suffix))
+                .filter(QueueSnapshot::backlogKnown)
                 .mapToLong(QueueSnapshot::messageCount)
                 .sum();
         long captured = capturedRows(clusterId, subscription, covered, node.getNodeId(), asOf);

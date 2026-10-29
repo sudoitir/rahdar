@@ -102,7 +102,7 @@ class McpMessagesGovernanceTest extends PostgresIntegrationTest {
                 "PHASE3.SRC",
                 "ANYCAST",
                 true,
-                1,
+                1L,
                 0,
                 0,
                 0,

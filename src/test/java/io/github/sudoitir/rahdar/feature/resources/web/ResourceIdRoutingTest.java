@@ -113,7 +113,7 @@ class ResourceIdRoutingTest extends PostgresIntegrationTest {
                 NAME,
                 "ANYCAST",
                 true,
-                3,
+                3L,
                 1,
                 0,
                 0,

@@ -1170,6 +1170,11 @@ public class FlowGraphService {
         }
 
         /** Sums two rates where either may be unknown; a ternary here would unbox a null. */
+        /** A sum of per-node counts where a node that gave none leaves the other's count as it is. */
+        private static Long plusCount(Long a, Long b) {
+            return a == null ? b : b == null ? a : Long.valueOf(a + b);
+        }
+
         private static Double plus(Double a, Double b) {
             if (a == null) {
                 return b;
@@ -1204,7 +1209,7 @@ public class FlowGraphService {
                                     : new FlowNodeShare(
                                             prev.nodeId(),
                                             prev.node(),
-                                            prev.messageCount() + s.messageCount(),
+                                            plusCount(prev.messageCount(), s.messageCount()),
                                             prev.consumerCount() + s.consumerCount(),
                                             plus(prev.inRate(), in),
                                             plus(prev.outRate(), outRate),
@@ -1272,7 +1277,9 @@ public class FlowGraphService {
                 }
                 QueueSnapshot s = q.perNode.get(node);
                 if (s != null) {
-                    backlog = (backlog == null ? 0 : backlog) + s.messageCount();
+                    if (s.backlogKnown()) {
+                        backlog = (backlog == null ? 0 : backlog) + s.messageCount();
+                    }
                     consumerTotal = (consumerTotal == null ? 0 : consumerTotal) + s.consumerCount();
                 }
                 in = plus(in, rateOf(added, q.name, node));
@@ -1411,7 +1418,9 @@ public class FlowGraphService {
         void add(QueueSnapshot s, String nodeName) {
             perNode.put(s.nodeId(), s);
             routingType = s.routingType();
-            messageCount = (messageCount == null ? 0 : messageCount) + s.messageCount();
+            if (s.backlogKnown()) {
+                messageCount = (messageCount == null ? 0 : messageCount) + s.messageCount();
+            }
             consumerCount = (consumerCount == null ? 0 : consumerCount) + s.consumerCount();
             if (nodeName != null) {
                 brokerNodes.add(nodeName);

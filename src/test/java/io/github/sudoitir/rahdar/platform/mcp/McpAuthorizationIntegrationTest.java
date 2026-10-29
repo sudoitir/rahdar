@@ -97,7 +97,7 @@ class McpAuthorizationIntegrationTest extends PostgresIntegrationTest {
                 QUEUE,
                 "ANYCAST",
                 true,
-                7,
+                7L,
                 0,
                 0,
                 0,

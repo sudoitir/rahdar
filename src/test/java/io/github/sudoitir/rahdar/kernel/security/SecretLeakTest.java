@@ -106,7 +106,9 @@ class SecretLeakTest extends PostgresIntegrationTest {
         String base = "/api/v1/clusters/" + clusterId;
         send(patch(base)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"management\":{\"username\":\"admin\",\"password\":\"" + CLUSTER_PASSWORD + "\"}}"));
+                .content(
+                        "{\"connection\":{\"system\":\"artemis\",\"management\":{\"username\":\"admin\",\"password\":\""
+                                + CLUSTER_PASSWORD + "\"}}}"));
         send(put(base + "/artemis/config/bridge-credentials/remote-a")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"username\":\"bridge\",\"password\":\"" + BRIDGE_PASSWORD + "\"}"));
@@ -144,13 +146,15 @@ class SecretLeakTest extends PostgresIntegrationTest {
         // registration whose unreachable URL has user-info.
         send(patch(base)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"management\":{\"username\":\"\",\"password\":\"" + BODY_SECRET + "\"}}"));
+                .content("{\"connection\":{\"system\":\"artemis\",\"management\":{\"username\":\"\",\"password\":\""
+                        + BODY_SECRET + "\"}}}"));
         send(patch(base)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"management\":{\"password\":\"" + BODY_SECRET));
+                .content("{\"connection\":{\"system\":\"artemis\",\"management\":{\"password\":\"" + BODY_SECRET));
         send(post("/api/v1/clusters?dryRun=true")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"seedUrls\":[\"http://admin:" + URL_SECRET + "@127.0.0.1:1/console/jolokia\"]}"));
+                .content("{\"system\":\"artemis\",\"connection\":{\"system\":\"artemis\",\"seedUrls\":[\"http://admin:"
+                        + URL_SECRET + "@127.0.0.1:1/console/jolokia\"]}}"));
 
         // A second-factor proof that is refused or does not parse (ADR-0143).
         send(post("/api/v1/auth/second-factor")
@@ -167,7 +171,8 @@ class SecretLeakTest extends PostgresIntegrationTest {
     void noSecretIsInAnAuditRow() throws Exception {
         send(post("/api/v1/clusters?dryRun=true")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"seedUrls\":[\"http://admin:" + URL_SECRET + "@127.0.0.1:1/console/jolokia\"]}"));
+                .content("{\"system\":\"artemis\",\"connection\":{\"system\":\"artemis\",\"seedUrls\":[\"http://admin:"
+                        + URL_SECRET + "@127.0.0.1:1/console/jolokia\"]}}"));
 
         String rows = String.join("\n", jdbc.queryForList("SELECT t::text FROM audit_event t", String.class));
 
@@ -184,7 +189,8 @@ class SecretLeakTest extends PostgresIntegrationTest {
                 "connect failed", new IllegalStateException("cannot reach tcp://bob:" + EXCEPTION_SECRET + "@broker"));
         send(post("/api/v1/clusters?dryRun=true")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"seedUrls\":[\"http://admin:" + URL_SECRET + "@127.0.0.1:1/console/jolokia\"]}"));
+                .content("{\"system\":\"artemis\",\"connection\":{\"system\":\"artemis\",\"seedUrls\":[\"http://admin:"
+                        + URL_SECRET + "@127.0.0.1:1/console/jolokia\"]}}"));
 
         assertThat(output.getAll())
                 .contains("password=[redacted]", "totpCode=[redacted]", "recoveryCode=[redacted]")

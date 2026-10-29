@@ -183,7 +183,10 @@ public final class ResourceViews {
             @Schema(requiredMode = REQUIRED) String nodeName,
             @Schema(requiredMode = REQUIRED) boolean stale,
             @Schema(nullable = true) Instant lastSeenAt,
-            @Schema(requiredMode = REQUIRED) long messageCount,
+
+            @Schema(nullable = true, description = "Null when the node reported no backlog: unknown, not empty.")
+            Long messageCount,
+
             @Schema(requiredMode = REQUIRED) long consumerCount,
             @Schema(requiredMode = REQUIRED) long deliveringCount,
             @Schema(requiredMode = REQUIRED) long scheduledCount,

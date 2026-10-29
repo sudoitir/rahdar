@@ -86,6 +86,11 @@ class KafkaPartitions {
         return OptionalLong.of(reading.offline());
     }
 
+    /** Whether a read of the cluster's partitions has been tried yet, whether or not it succeeded. */
+    boolean tried(UUID clusterId) {
+        return tried.containsKey(clusterId);
+    }
+
     void forget(UUID clusterId) {
         readings.remove(clusterId);
         tried.remove(clusterId);

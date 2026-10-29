@@ -4,6 +4,7 @@ import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
 import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
 import io.github.sudoitir.rahdar.platform.broker.BrokerNotifications;
 import io.github.sudoitir.rahdar.platform.broker.BrokerSessions;
+import io.github.sudoitir.rahdar.platform.broker.BrokerSystems;
 import io.github.sudoitir.rahdar.platform.broker.DataPlaneCheck;
 import io.github.sudoitir.rahdar.platform.broker.NodeCallLimiter;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterKinds;
@@ -28,6 +29,9 @@ class DiagnosticsModuleTest extends ModuleIntegrationTest {
 
     @MockitoBean
     BrokerSessions sessions;
+
+    @MockitoBean
+    BrokerSystems systems;
 
     @MockitoBean
     DataPlaneCheck dataPlaneCheck;

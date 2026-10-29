@@ -144,7 +144,7 @@ class MessageIndexGovernanceTest extends PostgresIntegrationTest {
 
     private List<Row> run(String sql) {
         QueryAst ast = parser.parse(sql);
-        Target target = new Target(NODE, "primary", "ORDER.IN", "ORDER.IN", "ANYCAST", 0, Instant.now(), true);
+        Target target = new Target(NODE, "primary", "ORDER.IN", "ORDER.IN", "ANYCAST", 0L, Instant.now(), true);
         QueryPlan plan = new QueryPlan(
                 ast, Source.INDEX, List.of(target), null, false, List.of(), List.of(), 0, 100, false, List.of());
         Collect sink = new Collect();

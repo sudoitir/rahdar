@@ -73,7 +73,7 @@ class FlowControllerTest extends PostgresIntegrationTest {
                 "orders.dead",
                 "ANYCAST",
                 true,
-                12,
+                12L,
                 0,
                 0,
                 0,

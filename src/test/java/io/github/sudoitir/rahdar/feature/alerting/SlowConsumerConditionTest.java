@@ -119,6 +119,20 @@ class SlowConsumerConditionTest extends PostgresIntegrationTest {
     }
 
     @Test
+    void anUnknownBacklogIsNotEvidenceOfOne() {
+        givenCluster();
+        jdbc.update("""
+                INSERT INTO subscription_snapshot
+                  (node_id, subscription, cluster_id, destination, kind, native_attributes,
+                   consumer_count, backlog, paused)
+                VALUES (:n, 'orders', :c, 'orders', 'artemis.queue', '{"artemis.routing_type":"ANYCAST"}', 3, NULL, false)
+                """, Map.of("n", nodeId, "c", clusterId));
+        ackSamples("orders", 100, 100);
+
+        assertThat(condition.evaluate(clusterId, rule(1.0, null)).universe()).isEmpty();
+    }
+
+    @Test
     void backlogButNoConsumersIsNotASlowConsumer() {
         givenCluster();
         queue("orders", 0, 5_000, false);

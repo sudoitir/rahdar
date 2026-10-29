@@ -27,6 +27,7 @@ import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshot;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import org.springframework.stereotype.Component;
 
@@ -73,8 +74,11 @@ public class ResourceViewMapper {
         String path = first.attributes().get(QueueRow.PATH);
         ResourceId id =
                 path == null ? ResourceId.of(kind.value(), key.name()) : ResourceId.parse(kind.value() + "/" + path);
-        long total =
-                cells.stream().mapToLong(SubscriptionNodeCell::messageCount).sum();
+        long total = cells.stream()
+                .map(SubscriptionNodeCell::messageCount)
+                .filter(Objects::nonNull)
+                .mapToLong(Long::longValue)
+                .sum();
         return new SubscriptionView(
                 id.format(),
                 kind.value(),
@@ -84,7 +88,7 @@ public class ResourceViewMapper {
                 ResourceId.of(destinationKind.value(), key.destination()).format(),
                 key.routingType() == null ? Map.of() : Map.of("routingType", key.routingType()),
                 rows.stream().anyMatch(QueueSnapshot::durable),
-                backlogOf(first.attributes(), total),
+                backlogOf(rows, total),
                 cells.stream().mapToLong(SubscriptionNodeCell::consumerCount).sum(),
                 cells.stream().mapToLong(SubscriptionNodeCell::deliveringCount).sum(),
                 cells.stream().mapToLong(SubscriptionNodeCell::scheduledCount).sum(),
@@ -99,8 +103,23 @@ public class ResourceViewMapper {
                 null);
     }
 
-    /** Exact unless the scrape marked the figure an estimate, which it says with its reason. */
-    private static Backlog backlogOf(Map<String, String> attributes, long total) {
+    /**
+     * Exact unless the scrape marked the figure an estimate, which it says with its reason; unavailable when no node
+     * reported one.
+     */
+    private static Backlog backlogOf(List<QueueSnapshot> rows, long total) {
+        Map<String, String> attributes = rows.getFirst().attributes();
+        long unknown = rows.stream().filter(r -> !r.backlogKnown()).count();
+        if (unknown == rows.size()) {
+            return new Backlog(null, Backlog.Accuracy.UNAVAILABLE, attributes.get(QueueRow.BACKLOG_REASON), false);
+        }
+        if (unknown > 0) {
+            return new Backlog(
+                    total,
+                    Backlog.Accuracy.ESTIMATE,
+                    "Excludes " + unknown + " of " + rows.size() + " nodes that reported no backlog.",
+                    false);
+        }
         if (!Precision.ESTIMATE.name().equals(attributes.get(QueueRow.BACKLOG_PRECISION))) {
             return Backlog.exact(total);
         }

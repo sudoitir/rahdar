@@ -2,6 +2,7 @@ package io.github.sudoitir.rahdar.platform.scrape;
 
 import io.github.sudoitir.rahdar.platform.broker.QueueRow;
 import java.sql.Timestamp;
+import java.sql.Types;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -94,7 +95,7 @@ public class QueueSnapshotUpsert {
 
     private SqlParameterSource params(QueueRow r) {
         return new MapSqlParameterSource()
-                .addValue("backlog", r.messageCount())
+                .addValue("backlog", r.messageCount(), Types.BIGINT)
                 .addValue("consumerCount", r.consumerCount())
                 .addValue("inFlight", r.deliveringCount())
                 .addValue("scheduled", r.scheduledCount())

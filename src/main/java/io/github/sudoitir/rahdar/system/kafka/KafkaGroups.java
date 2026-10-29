@@ -182,6 +182,8 @@ public class KafkaGroups {
         Set<String> wanted = new HashSet<>();
         groups.forEach(g -> wanted.add(g.id().name()));
         Map<String, Long> sums = new HashMap<>();
+        Map<String, Integer> unknown = new HashMap<>();
+        Map<String, Integer> rowCount = new HashMap<>();
         Map<String, String> reasons = new HashMap<>();
         for (QueueSnapshot row : snapshots.forCluster(clusterId)) {
             String path = row.attributes().get(QueueRow.PATH);
@@ -190,12 +192,38 @@ public class KafkaGroups {
             }
             String group = path.substring(0, path.indexOf('/'));
             if (wanted.contains(group)) {
-                sums.merge(group, row.messageCount(), Long::sum);
-                reasons.putIfAbsent(group, row.attributes().get(QueueRow.BACKLOG_REASON));
+                rowCount.merge(group, 1, Integer::sum);
+                if (row.backlogKnown()) {
+                    sums.merge(group, row.messageCount(), Long::sum);
+                    reasons.putIfAbsent(group, row.attributes().get(QueueRow.BACKLOG_REASON));
+                } else {
+                    unknown.merge(group, 1, Integer::sum);
+                }
             }
         }
         Map<String, Backlog> out = new TreeMap<>();
-        sums.forEach((group, sum) -> out.put(group, new Backlog(sum, Accuracy.ESTIMATE, reasons.get(group), true)));
+        rowCount.forEach((group, rows) -> {
+            int missing = unknown.getOrDefault(group, 0);
+            if (missing == rows) {
+                out.put(
+                        group,
+                        new Backlog(
+                                null,
+                                Accuracy.UNAVAILABLE,
+                                "No topic of the group has a committed offset, so it has no lag to report.",
+                                false));
+            } else if (missing > 0) {
+                out.put(
+                        group,
+                        new Backlog(
+                                sums.get(group),
+                                Accuracy.ESTIMATE,
+                                "Excludes " + missing + " of " + rows + " topics with no committed offset.",
+                                true));
+            } else {
+                out.put(group, new Backlog(sums.get(group), Accuracy.ESTIMATE, reasons.get(group), true));
+            }
+        });
         return out;
     }
 

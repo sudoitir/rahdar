@@ -18,7 +18,7 @@ PARTITION BY RANGE (ts);
 
 CREATE TABLE subscription_snapshot (
     ts timestamp with time zone DEFAULT now() NOT NULL,
-    backlog bigint DEFAULT 0 NOT NULL,
+    backlog bigint,
     consumer_count bigint DEFAULT 0 NOT NULL,
     in_flight bigint DEFAULT 0 NOT NULL,
     scheduled bigint DEFAULT 0 NOT NULL,

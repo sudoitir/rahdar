@@ -29,6 +29,7 @@ class StoreCoverageTest extends PostgresIntegrationTest {
     /** Tables that do not grow with use, and why. */
     private static final Map<String, String> BOUNDED_BY_DESIGN = Map.ofEntries(
             Map.entry("app_user", "configuration: one row per user"),
+            Map.entry("kafka_connection", "configuration: one row per Kafka cluster, removed with its cluster"),
             Map.entry("role", "configuration"),
             Map.entry("role_permission", "configuration"),
             Map.entry("user_role", "configuration"),

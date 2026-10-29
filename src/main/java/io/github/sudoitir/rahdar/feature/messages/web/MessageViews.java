@@ -216,7 +216,9 @@ public final class MessageViews {
     public record DeadLetterDepth(
             @Schema(requiredMode = REQUIRED) UUID nodeId,
             @Schema(requiredMode = REQUIRED) String nodeName,
-            @Schema(requiredMode = REQUIRED) long depth) {}
+
+            @Schema(nullable = true, description = "Null when the node reported no depth: unknown, not empty.")
+            Long depth) {}
 
     public record DeadLetterSubscription(
             @Schema(requiredMode = REQUIRED, description = "The subscription's canonical id.")
@@ -233,7 +235,15 @@ public final class MessageViews {
             @Schema(requiredMode = REQUIRED, description = "The id of the destination it is bound to.")
             String destination,
 
-            @Schema(requiredMode = REQUIRED) long totalDepth,
+            @Schema(nullable = true, description = "The depth over the nodes that reported one; null when none did.")
+            Long totalDepth,
+
+            @Schema(
+                    requiredMode = REQUIRED,
+                    description =
+                            "How many nodes reported no depth, which the total leaves out rather than counts as 0.")
+            int unknownDepthNodes,
+
             @Schema(requiredMode = REQUIRED) List<DeadLetterDepth> perNode) {}
 
     public record DeadLetterDestination(

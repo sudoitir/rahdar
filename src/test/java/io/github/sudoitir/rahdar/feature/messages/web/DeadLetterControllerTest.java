@@ -87,7 +87,7 @@ class DeadLetterControllerTest extends PostgresIntegrationTest {
                 "DLQ",
                 "ANYCAST",
                 true,
-                7,
+                7L,
                 0,
                 0,
                 0,
@@ -141,6 +141,36 @@ class DeadLetterControllerTest extends PostgresIntegrationTest {
                         jsonPath("$.destinations[?(@.name == 'DLQ')].purpose").value(Matchers.hasItem("dead-letter")))
                 .andExpect(jsonPath("$..subscriptions[?(@.name == 'DLQ')].totalDepth")
                         .value(Matchers.hasItem(7)));
+    }
+
+    @Test
+    void aDeadLetterQueueWithNoDepthIsUnknownAndLeftOutOfTheTotalNotCountedAsZero() throws Exception {
+        upsert.upsertBatch(List.of(new QueueRow(
+                clusterId,
+                nodeId,
+                "DLQ",
+                "DLQ",
+                "ANYCAST",
+                true,
+                null,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                false,
+                "artemis.queue",
+                Map.of())));
+        when(artemisNodes.on(eq(clusterId), any(UUID.class)))
+                .thenReturn(client(SEARCH, fixture("address-settings.json")));
+
+        mvc.perform(get("/api/v1/clusters/{c}/dead-letters", clusterId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$..subscriptions[?(@.name == 'DLQ')].totalDepth")
+                        .value(Matchers.hasItem(Matchers.nullValue())))
+                .andExpect(jsonPath("$..subscriptions[?(@.name == 'DLQ')].unknownDepthNodes")
+                        .value(Matchers.hasItem(1)));
     }
 
     @Test

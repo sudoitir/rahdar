@@ -25,7 +25,7 @@ public record QueueRow(
         String queueName,
         String routingType,
         boolean durable,
-        long messageCount,
+        Long messageCount,
         long consumerCount,
         long deliveringCount,
         long scheduledCount,
@@ -62,6 +62,11 @@ public record QueueRow(
         if (segments.size() > 1) {
             extra.put(PATH, path);
         }
+        if (a.get(MetricKeys.BACKLOG).isEmpty()) {
+            extra.put(
+                    BACKLOG_REASON,
+                    "The system reported no backlog for it, such as a group with no committed offsets.");
+        }
         a.get(MetricKeys.BACKLOG).ifPresent(backlog -> {
             if (backlog.precision() == Precision.ESTIMATE) {
                 extra.put(BACKLOG_PRECISION, Precision.ESTIMATE.name());
@@ -81,7 +86,7 @@ public record QueueRow(
                 segments.size() > 1 ? path : queue.id().name(),
                 a.raw(ROUTING_TYPE).map(Object::toString).orElse(null),
                 a.get(StandardAttributes.DURABLE).orElse(false),
-                metric(a, MetricKeys.BACKLOG),
+                a.get(MetricKeys.BACKLOG).map(MetricValue::asLong).orElse(null),
                 metric(a, MetricKeys.CONSUMER_COUNT),
                 metric(a, MetricKeys.IN_FLIGHT),
                 metric(a, MetricKeys.SCHEDULED),
@@ -97,6 +102,11 @@ public record QueueRow(
         return a.get(key).map(MetricValue::asLong).orElse(0L);
     }
 
+    /** False when the system gave no backlog: {@link #messageCount} is then null, never zero. */
+    public boolean backlogKnown() {
+        return messageCount != null;
+    }
+
     /** What the system says about the queue beyond the standard attributes, by native name, as the snapshot keeps it. */
     public Map<String, String> nativeAttributes() {
         Map<String, String> all = new LinkedHashMap<>(attributes);
@@ -108,6 +118,9 @@ public record QueueRow(
 
     /** True when this queue had traffic worth re-reading on the fast tier. */
     public boolean busy() {
-        return consumerCount > 0 || messageCount > 0 || deliveringCount > 0 || scheduledCount > 0;
+        return consumerCount > 0
+                || (messageCount != null && messageCount > 0)
+                || deliveringCount > 0
+                || scheduledCount > 0;
     }
 }

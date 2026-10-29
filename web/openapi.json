@@ -32178,11 +32178,11 @@
             "description" : "The id of the destination the subscription is bound to."
           },
           "messageCount" : {
-            "type" : "integer",
-            "format" : "int64"
+            "type" : [ "integer", "null" ],
+            "format" : "int64",
+            "description" : "Null when the node reported no depth: unknown, not empty."
           }
-        },
-        "required" : [ "messageCount" ]
+        }
       },
       "IndexSubscriptionRequest" : {
         "type" : "object",
@@ -35984,8 +35984,9 @@
             "format" : "date-time"
           },
           "messageCount" : {
-            "type" : "integer",
-            "format" : "int64"
+            "type" : [ "integer", "null" ],
+            "format" : "int64",
+            "description" : "Null when the node reported no backlog: unknown, not empty."
           },
           "consumerCount" : {
             "type" : "integer",
@@ -36003,7 +36004,7 @@
             "type" : "boolean"
           }
         },
-        "required" : [ "consumerCount", "deliveringCount", "messageCount", "nodeId", "nodeName", "paused", "scheduledCount", "stale" ]
+        "required" : [ "consumerCount", "deliveringCount", "nodeId", "nodeName", "paused", "scheduledCount", "stale" ]
       },
       "SubscriptionView" : {
         "type" : "object",
@@ -39700,11 +39701,12 @@
             "type" : "string"
           },
           "depth" : {
-            "type" : "integer",
-            "format" : "int64"
+            "type" : [ "integer", "null" ],
+            "format" : "int64",
+            "description" : "Null when the node reported no depth: unknown, not empty."
           }
         },
-        "required" : [ "depth", "nodeId", "nodeName" ]
+        "required" : [ "nodeId", "nodeName" ]
       },
       "DeadLetterDestination" : {
         "type" : "object",

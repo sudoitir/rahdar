@@ -748,7 +748,7 @@ class BrokerConfigServiceTest {
                 durable,
                 false,
                 Instant.now(),
-                0,
+                0L,
                 0,
                 0,
                 0,

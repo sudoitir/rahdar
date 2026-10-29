@@ -89,11 +89,12 @@ class KafkaHealth implements ClusterHealthEvaluator {
         if (changed.isPresent()) {
             return verdict(clusterId, Level.CRITICAL, List.of(), List.of(changed.get()), false);
         }
-        return judge(clusterId, described, partitions.offline(clusterId));
+        return judge(clusterId, described, partitions.offline(clusterId), partitions.tried(clusterId));
     }
 
     /** The verdict for what the driver described; separate from the read so it is tested on its own. */
-    static ClusterHealth judge(UUID clusterId, Partial<List<NodeDescription>> described, OptionalLong offline) {
+    static ClusterHealth judge(
+            UUID clusterId, Partial<List<NodeDescription>> described, OptionalLong offline, boolean tried) {
         List<String> notes = new ArrayList<>();
         List<String> serving = new ArrayList<>();
         Level level = Level.OK;
@@ -171,6 +172,8 @@ class KafkaHealth implements ClusterHealthEvaluator {
             level = Level.CRITICAL;
             notes.add(offline.getAsLong()
                     + " partitions have no leader, so their records can be neither read nor written.");
+        } else if (offline.isEmpty() && !tried) {
+            notes.add("The partitions have not been sampled yet, so offline partitions are not ruled out.");
         } else if (offline.isEmpty()) {
             notes.add("The partitions' leaders could not be read, so offline partitions are not ruled out.");
         }

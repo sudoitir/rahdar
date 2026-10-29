@@ -85,6 +85,46 @@ class KafkaGroupsTest {
                 Map.of(QueueRow.PATH, group + "/" + topic, QueueRow.BACKLOG_REASON, "an estimate"));
     }
 
+    private static QueueSnapshot noLag(String group, String topic) {
+        QueueSnapshot known = lag(group, topic, 0);
+        return new QueueSnapshot(
+                known.clusterId(),
+                known.nodeId(),
+                known.queueName(),
+                known.address(),
+                null,
+                true,
+                false,
+                known.ts(),
+                null,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                known.kind(),
+                Map.of(QueueRow.PATH, group + "/" + topic));
+    }
+
+    @Test
+    void aGroupWithNoCommittedOffsetHasNoLagNotZeroLag() {
+        List<Resource> page = List.of(group("g1", 0), group("g2", 0));
+        when(resources.read(any(ResourceQuery.class)))
+                .thenReturn(Partial.complete(new ResourcePage(page, Optional.empty()), List.of()));
+        when(snapshots.forCluster(CLUSTER))
+                .thenReturn(List.of(noLag("g1", "orders"), lag("g2", "orders", 7), noLag("g2", "payments")));
+
+        GroupPage result = groups.list(CLUSTER, null, null, null, null, 10);
+
+        var byId = result.items().stream().collect(Collectors.toMap(r -> r.id(), r -> r));
+        assertThat(byId.get("g1").lag().accuracy()).isEqualTo(Accuracy.UNAVAILABLE);
+        assertThat(byId.get("g1").lag().value()).isNull();
+        assertThat(byId.get("g2").lag().value()).isEqualTo(7);
+        assertThat(byId.get("g2").lag().accuracy()).isEqualTo(Accuracy.ESTIMATE);
+        assertThat(byId.get("g2").lag().reason()).contains("Excludes 1 of 2 topics");
+    }
+
     @Test
     void aPageOfThreeHundredGroupsIsOneReadAndTheirLagComesFromTheLastSample() {
         List<Resource> page =

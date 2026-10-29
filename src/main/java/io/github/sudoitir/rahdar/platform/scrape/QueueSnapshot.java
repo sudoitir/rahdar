@@ -17,7 +17,7 @@ public record QueueSnapshot(
         boolean durable,
         boolean paused,
         Instant ts,
-        long messageCount,
+        Long messageCount,
         long consumerCount,
         long deliveringCount,
         long scheduledCount,
@@ -25,4 +25,10 @@ public record QueueSnapshot(
         long messagesAcked,
         long messagesExpired,
         String kind,
-        Map<String, String> attributes) {}
+        Map<String, String> attributes) {
+
+    /** False when the system gave no backlog: {@link #messageCount} is then null, never zero. */
+    public boolean backlogKnown() {
+        return messageCount != null;
+    }
+}

@@ -5179,8 +5179,11 @@ export interface components {
             subscription?: string;
             /** @description The id of the destination the subscription is bound to. */
             destination?: string;
-            /** Format: int64 */
-            messageCount: number;
+            /**
+             * Format: int64
+             * @description Null when the node reported no depth: unknown, not empty.
+             */
+            messageCount?: number | null;
         };
         /** @description A request to start capturing a queue's messages into the index. */
         IndexSubscriptionRequest: {
@@ -6810,8 +6813,11 @@ export interface components {
             stale: boolean;
             /** Format: date-time */
             lastSeenAt?: string | null;
-            /** Format: int64 */
-            messageCount: number;
+            /**
+             * Format: int64
+             * @description Null when the node reported no backlog: unknown, not empty.
+             */
+            messageCount?: number | null;
             /** Format: int64 */
             consumerCount: number;
             /** Format: int64 */
@@ -8340,8 +8346,11 @@ export interface components {
             /** Format: uuid */
             nodeId: string;
             nodeName: string;
-            /** Format: int64 */
-            depth: number;
+            /**
+             * Format: int64
+             * @description Null when the node reported no depth: unknown, not empty.
+             */
+            depth?: number | null;
         };
         DeadLetterDestination: {
             /** @description The destination's canonical id. */

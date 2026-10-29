@@ -89,6 +89,26 @@ class ConsumerHealthServiceTest extends PostgresIntegrationTest {
     }
 
     @Test
+    void anUnavailableBacklogIsNeverCaughtUp() {
+        givenCluster();
+        jdbc.update("""
+                INSERT INTO subscription_snapshot
+                  (node_id, subscription, cluster_id, destination, kind, native_attributes,
+                   consumer_count, backlog, in_flight, paused)
+                VALUES (:n, 'orders', :c, 'orders', 'artemis.queue',
+                        '{"rahdar.backlog_reason":"no committed offsets"}',
+                        2, NULL, 0, false)
+                """, Map.of("n", nodeId, "c", clusterId));
+        // Rates that would read as healthy if the placeholder zero were taken for a backlog.
+        counterSamples("orders", 100, 200, 100, 200);
+
+        ConsumerHealth health = verdictFor("orders");
+
+        assertThat(health.verdict()).isEqualTo(Verdict.INSUFFICIENT_DATA);
+        assertThat(health.cause()).contains("no committed offsets");
+    }
+
+    @Test
     void pausedOutranksEveryConsumerVerdict() {
         givenCluster();
         // Also satisfies NO_CONSUMERS and STALLED; paused must win, because the backlog

@@ -72,7 +72,8 @@ public final class SqlViews {
             @Schema(description = "The id of the destination the subscription is bound to.")
             String destination,
 
-            long messageCount) {}
+            @Schema(nullable = true, description = "Null when the node reported no depth: unknown, not empty.")
+            Long messageCount) {}
 
     @Schema(description = "Something true about a plan or result that changes how it should be read.")
     public record NoticeView(String kind, String detail) {}

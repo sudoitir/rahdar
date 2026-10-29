@@ -5,6 +5,7 @@ import io.github.sudoitir.openbroker.notification.EventTypes;
 import io.github.sudoitir.rahdar.feature.events.BrokerEventService;
 import io.github.sudoitir.rahdar.feature.events.web.EventViews.BrokerEventView;
 import io.github.sudoitir.rahdar.feature.resources.CrossNodeAggregator;
+import io.github.sudoitir.rahdar.feature.resources.web.ResourceViews.Backlog;
 import io.github.sudoitir.rahdar.feature.resources.web.ResourceViews.SubscriptionNodeCell;
 import io.github.sudoitir.rahdar.feature.resources.web.ResourceViews.SubscriptionView;
 import io.github.sudoitir.rahdar.feature.triage.ConsumerHealth.Source;
@@ -136,6 +137,16 @@ public class ConsumerHealthService {
             Map<String, BrokerEventView> brokerSlow) {
 
         Builder b = new Builder(row, addRates.get(row.name()), ackRates.get(row.name()), slopes.get(row.name()));
+
+        // An unknown backlog is not an empty one: nothing below can say "caught up" about a figure it does not have.
+        if (row.backlog().accuracy() == Backlog.Accuracy.UNAVAILABLE) {
+            return b.verdict(
+                    Verdict.INSUFFICIENT_DATA,
+                    "The system gave no backlog for this subscription"
+                            + (row.backlog().reason() == null
+                                    ? "."
+                                    : ": " + row.backlog().reason()));
+        }
 
         boolean backlog = row.backlog().valueOrZero() >= properties.minBacklog();
         boolean acking = b.ackRate != null && b.ackRate > properties.idleAckRate();

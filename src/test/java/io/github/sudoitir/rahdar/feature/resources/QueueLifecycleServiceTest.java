@@ -180,7 +180,7 @@ class QueueLifecycleServiceTest extends PostgresIntegrationTest {
                 QUEUE,
                 "ANYCAST",
                 true,
-                5,
+                5L,
                 0,
                 0,
                 0,

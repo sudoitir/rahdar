@@ -601,7 +601,7 @@ class FlowGraphServiceTest {
                 true,
                 false,
                 now,
-                10,
+                10L,
                 2,
                 0,
                 0,
@@ -619,7 +619,7 @@ class FlowGraphServiceTest {
                 true,
                 false,
                 now,
-                9_000,
+                9_000L,
                 0,
                 0,
                 0,
@@ -678,6 +678,40 @@ class FlowGraphServiceTest {
             assertThat(r.rate()).isEqualTo(4.0);
             assertThat(r.stale()).isTrue();
         });
+    }
+
+    @Test
+    void aQueueWithNoBacklogIsDrawnUnknownNeverEmptyAndKnownQueuesAreStillSummed() {
+        queue("known", "orders", "MULTICAST", 10, 1);
+        queues.add(new QueueSnapshot(
+                clusterId,
+                nodeA,
+                "unknown",
+                "orders",
+                "MULTICAST",
+                true,
+                false,
+                now,
+                null,
+                1,
+                0,
+                0,
+                0,
+                0,
+                0,
+                "kafka.group-topic",
+                Map.of()));
+
+        FlowGraphView graph = service.graph(clusterId, query(null, 40));
+
+        assertThat(graph.nodes())
+                .filteredOn(n -> n.id().equals("subscription:unknown"))
+                .singleElement()
+                .satisfies(n -> assertThat(n.messageCount()).isNull());
+        assertThat(graph.nodes())
+                .filteredOn(n -> n.id().equals("subscription:known"))
+                .singleElement()
+                .satisfies(n -> assertThat(n.messageCount()).isEqualTo(10));
     }
 
     private void queue(String name, String address, String routingType, long messages, long consumers) {
@@ -1060,7 +1094,7 @@ class FlowGraphServiceTest {
                 true,
                 false,
                 now,
-                1,
+                1L,
                 1,
                 0,
                 0,

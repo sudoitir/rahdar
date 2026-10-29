@@ -79,7 +79,8 @@ class KafkaHealthTest {
                         java.util.Arrays.stream(nodes)
                                 .map(NodeDescription::node)
                                 .toList()),
-                OptionalLong.of(0));
+                OptionalLong.of(0),
+                true);
     }
 
     @Test
@@ -151,7 +152,8 @@ class KafkaHealthTest {
                         List.of(one),
                         Map.of(one.node(), NodeOutcome.APPLIED, NodeId.of("2"), NodeOutcome.FAILED),
                         Map.of(NodeId.of("2"), down)),
-                OptionalLong.of(0));
+                OptionalLong.of(0),
+                true);
 
         assertThat(health.level()).isEqualTo(Level.DEGRADED);
         assertThat(health.notes()).anyMatch(n -> n.contains("Node 2 is unreachable"));
@@ -170,7 +172,8 @@ class KafkaHealthTest {
         ClusterHealth health = KafkaHealth.judge(
                 CLUSTER,
                 Partial.complete(List.of(broker("1", true, true, serving(true))), List.of(NodeId.of("1"))),
-                OptionalLong.of(3));
+                OptionalLong.of(3),
+                true);
 
         assertThat(health.level()).isEqualTo(Level.CRITICAL);
         assertThat(health.notes()).anyMatch(n -> n.contains("3 partitions have no leader"));
@@ -181,16 +184,30 @@ class KafkaHealthTest {
         ClusterHealth health = KafkaHealth.judge(
                 CLUSTER,
                 Partial.complete(List.of(broker("1", true, true, serving(true))), List.of(NodeId.of("1"))),
-                OptionalLong.empty());
+                OptionalLong.empty(),
+                true);
 
         assertThat(health.level()).isEqualTo(Level.OK);
-        assertThat(health.notes()).anyMatch(n -> n.contains("offline partitions are not ruled out"));
+        assertThat(health.notes()).anyMatch(n -> n.contains("could not be read"));
+    }
+
+    @Test
+    void partitionsNotSampledYetAreSaidToBeUnsampledNotUnreadable() {
+        ClusterHealth health = KafkaHealth.judge(
+                CLUSTER,
+                Partial.complete(List.of(broker("1", true, true, serving(true))), List.of(NodeId.of("1"))),
+                OptionalLong.empty(),
+                false);
+
+        assertThat(health.level()).isEqualTo(Level.OK);
+        assertThat(health.notes())
+                .containsExactly("The partitions have not been sampled yet, so offline partitions are not ruled out.");
     }
 
     @Test
     void noBrokerAtAllIsCritical() {
         ClusterHealth health = KafkaHealth.judge(
-                CLUSTER, new Partial<>(new ArrayList<NodeDescription>(), Map.of(), Map.of()), OptionalLong.of(0));
+                CLUSTER, new Partial<>(new ArrayList<NodeDescription>(), Map.of(), Map.of()), OptionalLong.of(0), true);
 
         assertThat(health.level()).isEqualTo(Level.CRITICAL);
         assertThat(health.liveEndpointNames()).isEmpty();

@@ -113,7 +113,7 @@ class DiagnosticsControllerTest extends PostgresIntegrationTest {
         node.attachSeedUrl(URL);
         nodeId = nodes.save(node).getId();
         upsert.upsertBatch(List.of(new QueueRow(
-                clusterId, nodeId, Q, Q, "ANYCAST", true, 0, 0, 0, 0, 0, 0, 0, false, "artemis.queue", Map.of())));
+                clusterId, nodeId, Q, Q, "ANYCAST", true, 0L, 0, 0, 0, 0, 0, 0, false, "artemis.queue", Map.of())));
     }
 
     @AfterEach

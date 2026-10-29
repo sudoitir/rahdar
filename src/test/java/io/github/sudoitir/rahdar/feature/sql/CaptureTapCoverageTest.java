@@ -32,7 +32,7 @@ class CaptureTapCoverageTest {
     }
 
     private static QueryPlan.Target target(String queue, String address) {
-        return new QueryPlan.Target(UUID.randomUUID(), "n", queue, address, "ANYCAST", 0, null, false);
+        return new QueryPlan.Target(UUID.randomUUID(), "n", queue, address, "ANYCAST", 0L, null, false);
     }
 
     @Test

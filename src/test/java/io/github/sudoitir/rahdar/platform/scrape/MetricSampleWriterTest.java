@@ -64,7 +64,7 @@ class MetricSampleWriterTest extends PostgresIntegrationTest {
                 "orders",
                 "ANYCAST",
                 true,
-                42,
+                42L,
                 3,
                 7,
                 1,
@@ -85,6 +85,40 @@ class MetricSampleWriterTest extends PostgresIntegrationTest {
                         "openbroker.expired");
         assertThat(valueOf("openbroker.in_flight")).isEqualTo(7.0);
         assertThat(valueOf("openbroker.expired")).isEqualTo(5.0);
+    }
+
+    @Test
+    void aBacklogTheSystemDidNotGiveIsNotRecordedAsZero() {
+        clusterId = clusters.save(new ClusterEntity(ArtemisModule.SYSTEM, "c-" + UUID.randomUUID(), null, null))
+                .getId();
+        nodeId = nodes.save(BrokerNodeEntity.fromSeed(clusterId, "n1", "NONE", "node-1"))
+                .getId();
+
+        writer.appendQueueSamples(List.of(new QueueRow(
+                clusterId,
+                nodeId,
+                "orders",
+                "orders",
+                "ANYCAST",
+                true,
+                null,
+                3,
+                7,
+                1,
+                900,
+                850,
+                5,
+                false,
+                "kafka.group-topic",
+                Map.of())));
+
+        assertThat(metricsWritten())
+                .containsExactlyInAnyOrder(
+                        "openbroker.consumer.count",
+                        "openbroker.enqueued",
+                        "openbroker.acknowledged",
+                        "openbroker.in_flight",
+                        "openbroker.expired");
     }
 
     @Test

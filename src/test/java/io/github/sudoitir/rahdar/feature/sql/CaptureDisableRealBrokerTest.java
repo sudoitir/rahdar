@@ -115,7 +115,7 @@ class CaptureDisableRealBrokerTest extends PostgresIntegrationTest {
                 address,
                 "ANYCAST",
                 true,
-                0,
+                0L,
                 0,
                 0,
                 0,
