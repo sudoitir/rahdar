@@ -65,6 +65,8 @@ import io.github.sudoitir.rahdar.platform.governance.GovernedMessage;
 import io.github.sudoitir.rahdar.platform.governance.MessageContent;
 import io.github.sudoitir.rahdar.platform.scrape.QueueLocator;
 import io.github.sudoitir.rahdar.platform.scrape.QueueLocator.QueueLocation;
+import java.time.Instant;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Comparator;
@@ -171,7 +173,7 @@ public class MessageService {
                 .toList();
         List<MessageSummaryView> rows = new ArrayList<>(browsed.size());
         for (int i = 0; i < browsed.size(); i++) {
-            rows.add(toSummary(browsed.get(i), governed.get(i), false, null));
+            rows.add(toSummary(browsed.get(i), governed.get(i), false, null, null));
         }
         clearViews.recordClear(context, "SUBSCRIPTION", queueName, governed);
         Long total = result.total();
@@ -185,13 +187,18 @@ public class MessageService {
                 hasNext,
                 result.totalUnavailable(),
                 resolved.node().getId(),
-                null);
+                null,
+                result.truncated(),
+                result.truncated()
+                        ? "The page was cut short at its " + (BrokerMessages.PAGE_BYTE_BUDGET >> 20)
+                                + " MB budget: ask for a smaller page to see every message."
+                        : null);
     }
 
     // ---- browse a partition of a log --------------------------------------
 
     /** Where a read of a partition of a log starts. */
-    public record LogStart(Kind kind, long offset, java.time.Instant time) {
+    public record LogStart(Kind kind, long offset, Instant time) {
 
         public enum Kind {
             EARLIEST,
@@ -208,10 +215,10 @@ public class MessageService {
                     case "earliest" -> new LogStart(Kind.EARLIEST, 0, null);
                     case "latest" -> new LogStart(Kind.LATEST, 0, null);
                     case "offset" -> new LogStart(Kind.OFFSET, Long.parseLong(value), null);
-                    case "time" -> new LogStart(Kind.TIME, 0, java.time.Instant.parse(value));
+                    case "time" -> new LogStart(Kind.TIME, 0, Instant.parse(value));
                     default -> throw new IllegalArgumentException("from must be earliest, latest, offset or time.");
                 };
-            } catch (NumberFormatException | NullPointerException | java.time.format.DateTimeParseException e) {
+            } catch (NumberFormatException | NullPointerException | DateTimeParseException e) {
                 throw new IllegalArgumentException("from=" + kind + " needs a value that is "
                         + (kind.equals("offset") ? "an offset." : "an ISO-8601 time."));
             }
@@ -281,6 +288,11 @@ public class MessageService {
             }
             case EARLIEST, TIME -> {}
         }
+        if (from.kind() == LogStart.Kind.TIME && from.time().isAfter(Instant.now())) {
+            throw new IllegalArgumentException("The start time " + from.time()
+                    + " is in the future, so no record can be at or after it. Choose a time that has passed, or"
+                    + " read from latest.");
+        }
         Position at = from.kind() == LogStart.Kind.TIME
                 ? new Position.AtTime(from.time())
                 : new Position.AtOffsets(Map.of(shard, offset));
@@ -294,9 +306,12 @@ public class MessageService {
         List<MessageSummaryView> rows = new ArrayList<>(governed.size());
         for (int i = 0; i < governed.size(); i++) {
             LogPage.LogRecord record = page.records().get(i);
-            rows.add(toSummary(record.message(), governed.get(i), record.tombstone(), record.key()));
+            rows.add(toSummary(
+                    record.message(), governed.get(i), record.tombstone(), record.key(), record.keyEncoding()));
         }
         clearViews.recordClear(context, "DESTINATION", log.name(), governed);
+        String notice =
+                from.kind() == LogStart.Kind.TIME ? timeNotice(clusterId, log, partition, from, bounds, page) : null;
         return new MessagePageView(
                 rows,
                 1,
@@ -319,7 +334,40 @@ public class MessageService {
                                         .map(BacklogBreakdown.PartitionLag::committed)
                                         .filter(Objects::nonNull)
                                         .findFirst()
-                                        .orElse(null)));
+                                        .orElse(null)),
+                page.truncated(),
+                notice);
+    }
+
+    /**
+     * Why a read from a time found nothing, or what it could not match: an empty page says where the partition's
+     * records end in time, and records with no timestamp are named as unmatchable by time.
+     */
+    private String timeNotice(
+            UUID clusterId, ResourceId log, int partition, LogStart from, LogBounds.Bounds bounds, LogPage page) {
+        if (!page.records().isEmpty()) {
+            return page.records().stream().anyMatch(r -> r.message().timestamp() <= 0)
+                    ? "Some records carry no timestamp, so a start time cannot place them."
+                    : null;
+        }
+        if (bounds.end() <= bounds.start()) {
+            return "The partition holds no records.";
+        }
+        LogPage last = messages.browseLog(
+                clusterId,
+                log,
+                partition,
+                new Position.AtOffsets(
+                        Map.of(Shard.partition(PartitionId.of(String.valueOf(partition))), bounds.end() - 1)),
+                1,
+                null);
+        long at = last.records().isEmpty()
+                ? 0
+                : last.records().getFirst().message().timestamp();
+        return "No record at or after " + from.time() + "; the partition's last record "
+                + (at > 0
+                        ? "is at " + Instant.ofEpochMilli(at) + "."
+                        : "carries no timestamp, so it cannot be placed by time.");
     }
 
     /** One record of a partition of a log, expanded. */
@@ -339,7 +387,7 @@ public class MessageService {
         GovernContext context = contentPolicy.context(clusterId, log.name(), log.name());
         GovernedMessage governed = contentPolicy.govern(context, content(record.message()));
         clearViews.recordClear(context, "MESSAGE", log.name() + "/" + partition + "/" + offset, List.of(governed));
-        return toDetail(record.message(), governed, null, record.tombstone(), record.key());
+        return toDetail(record.message(), governed, null, record.tombstone(), record.key(), record.keyEncoding());
     }
 
     /** An action request that moves into the queue of this name, for a caller that holds names rather than ids. */
@@ -978,14 +1026,15 @@ public class MessageService {
                 headers, properties, m.body(), m.bodyEncoding() == BodyEncoding.BASE64, m.contentType());
     }
 
-    private static MessageSummaryView toSummary(BrowsedMessage m, GovernedMessage g, boolean tombstone, String key) {
+    private static MessageSummaryView toSummary(
+            BrowsedMessage m, GovernedMessage g, boolean tombstone, String key, BodyEncoding keyEncoding) {
         String body = g.body();
         return new MessageSummaryView(
                 String.valueOf(m.messageId()),
                 m.type(),
                 m.durable(),
                 m.priority(),
-                m.timestamp(),
+                producedAt(m),
                 m.expiration(),
                 m.size(),
                 g.headers().get(GROUP_ID),
@@ -995,7 +1044,13 @@ public class MessageService {
                 m.propertyCount(),
                 GovernanceViews.redactions(g),
                 tombstone,
-                key);
+                key,
+                keyEncoding == null ? null : keyEncoding.name());
+    }
+
+    /** When the producer stamped the message, or null: a message with no time is not one from 1970. */
+    private static Long producedAt(BrowsedMessage m) {
+        return m.timestamp() > 0 ? m.timestamp() : null;
     }
 
     private static String preview(String body) {
@@ -1006,11 +1061,11 @@ public class MessageService {
     }
 
     private static MessageDetailView toDetail(BrowsedMessage m, GovernedMessage g, UUID node) {
-        return toDetail(m, g, node, false, null);
+        return toDetail(m, g, node, false, null, null);
     }
 
     private static MessageDetailView toDetail(
-            BrowsedMessage m, GovernedMessage g, UUID node, boolean tombstone, String key) {
+            BrowsedMessage m, GovernedMessage g, UUID node, boolean tombstone, String key, BodyEncoding keyEncoding) {
         // A masked value is a marker string whatever its original type, so it is listed with the strings.
         Map<String, String> strings = new LinkedHashMap<>();
         Map<String, Long> ints = new LinkedHashMap<>();
@@ -1031,7 +1086,7 @@ public class MessageService {
                 m.type(),
                 m.durable(),
                 m.priority(),
-                m.timestamp(),
+                producedAt(m),
                 m.expiration(),
                 m.size(),
                 g.headers().get(GROUP_ID),
@@ -1052,6 +1107,7 @@ public class MessageService {
                 GovernanceViews.redactions(g),
                 GovernanceViews.withheld(g),
                 tombstone,
-                key);
+                key,
+                keyEncoding == null ? null : keyEncoding.name());
     }
 }

@@ -1265,6 +1265,72 @@ class MessageServiceTest {
     }
 
     @Test
+    void aStartTimeInTheFutureIsRefusedWithTheReason() {
+        logOf(0, 120, new LogPage(List.of(), null));
+
+        assertThatThrownBy(() -> service.browseLog(
+                        CLUSTER, TOPIC, 0, MessageService.LogStart.parse("time", "2999-01-01T00:00:00Z"), null, 50))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("in the future");
+    }
+
+    @Test
+    void anEmptyPageFromATimeSaysWhenThePartitionsLastRecordIs() {
+        logOf(0, 120, new LogPage(List.of(), null));
+        when(messages.browseLog(eq(CLUSTER), eq(TOPIC), eq(0), eq(at(119)), eq(1), any()))
+                .thenReturn(new LogPage(List.of(record(119, false)), null));
+
+        MessagePageView page = service.browseLog(
+                CLUSTER, TOPIC, 0, MessageService.LogStart.parse("time", "2026-10-01T00:00:00Z"), null, 50);
+
+        assertThat(page.data()).isEmpty();
+        assertThat(page.notice())
+                .isEqualTo("No record at or after 2026-10-01T00:00:00Z; the partition's last record is at"
+                        + " 1970-01-01T00:00:01Z.");
+    }
+
+    @Test
+    void aRecordWithNoTimeIsNullNotAnEpochAndAKeyNamesItsEncoding() {
+        BrowsedMessage m = message(5, "v", BodyEncoding.TEXT);
+        BrowsedMessage untimed = new BrowsedMessage(
+                m.messageId(),
+                m.type(),
+                m.durable(),
+                m.priority(),
+                0L,
+                m.expiration(),
+                m.size(),
+                m.groupId(),
+                m.correlationId(),
+                m.replyTo(),
+                m.userId(),
+                m.body(),
+                m.bodyEncoding(),
+                m.bodyCompression(),
+                m.contentType(),
+                false,
+                null,
+                m.stringProperties(),
+                m.intProperties(),
+                m.longProperties(),
+                m.doubleProperties(),
+                m.booleanProperties());
+        logOf(
+                0,
+                120,
+                new LogPage(List.of(new LogPage.LogRecord(untimed, false, "/wD+", BodyEncoding.BASE64)), null, false));
+
+        MessagePageView page =
+                service.browseLog(CLUSTER, TOPIC, 0, MessageService.LogStart.parse("earliest", null), null, 50);
+
+        assertThat(page.data()).singleElement().satisfies(row -> {
+            assertThat(row.timestamp()).isNull();
+            assertThat(row.key()).isEqualTo("/wD+");
+            assertThat(row.keyEncoding()).isEqualTo("BASE64");
+        });
+    }
+
+    @Test
     void aFromThatNeedsAValueWithoutOneIsRefused() {
         assertThatThrownBy(() -> MessageService.LogStart.parse("offset", null)).hasMessageContaining("offset");
         assertThatThrownBy(() -> MessageService.LogStart.parse("time", "yesterday"))

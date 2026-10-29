@@ -37505,8 +37505,9 @@
             "format" : "int32"
           },
           "timestamp" : {
-            "type" : "integer",
-            "format" : "int64"
+            "type" : [ "integer", "null" ],
+            "format" : "int64",
+            "description" : "When the producer stamped it, epoch milliseconds; null when it carries no time."
           },
           "expiration" : {
             "type" : "integer",
@@ -37578,7 +37579,7 @@
             }
           }
         },
-        "required" : [ "bodyTruncated", "durable", "expiration", "messageId", "messageType", "priority", "size", "timestamp" ]
+        "required" : [ "bodyTruncated", "durable", "expiration", "messageId", "messageType", "priority", "size" ]
       },
       "SqlNodeOutcomeView" : {
         "type" : "object",
@@ -38332,9 +38333,17 @@
             }, {
               "type" : "null"
             } ]
+          },
+          "truncated" : {
+            "type" : "boolean",
+            "description" : "The page was cut short at its byte budget: messages the broker returned are not in it. Ask for a smaller page, or, on a log, continue from log.next."
+          },
+          "notice" : {
+            "type" : [ "string", "null" ],
+            "description" : "Something worth saying about this page, such as why it is empty."
           }
         },
-        "required" : [ "data", "hasNext", "page", "pageSize" ]
+        "required" : [ "data", "hasNext", "page", "pageSize", "truncated" ]
       },
       "MessageSummaryView" : {
         "type" : "object",
@@ -38355,8 +38364,9 @@
             "format" : "int32"
           },
           "timestamp" : {
-            "type" : "integer",
-            "format" : "int64"
+            "type" : [ "integer", "null" ],
+            "format" : "int64",
+            "description" : "When the producer stamped it, epoch milliseconds; null when it carries no time."
           },
           "expiration" : {
             "type" : "integer",
@@ -38395,9 +38405,14 @@
           "key" : {
             "type" : [ "string", "null" ],
             "description" : "A log record's key as text, or base64 when it is not text."
+          },
+          "keyEncoding" : {
+            "type" : [ "string", "null" ],
+            "description" : "How key is written; null with no key.",
+            "enum" : [ "TEXT", "BASE64", null ]
           }
         },
-        "required" : [ "bodyTruncated", "durable", "expiration", "position", "priority", "propertyCount", "redactions", "size", "timestamp", "tombstone", "type" ]
+        "required" : [ "bodyTruncated", "durable", "expiration", "position", "priority", "propertyCount", "redactions", "size", "tombstone", "type" ]
       },
       "MessageDetailView" : {
         "type" : "object",
@@ -38418,8 +38433,9 @@
             "format" : "int32"
           },
           "timestamp" : {
-            "type" : "integer",
-            "format" : "int64"
+            "type" : [ "integer", "null" ],
+            "format" : "int64",
+            "description" : "When the producer stamped it, epoch milliseconds; null when it carries no time."
           },
           "expiration" : {
             "type" : "integer",
@@ -38513,9 +38529,14 @@
           },
           "key" : {
             "type" : [ "string", "null" ]
+          },
+          "keyEncoding" : {
+            "type" : [ "string", "null" ],
+            "description" : "How key is written; null with no key.",
+            "enum" : [ "TEXT", "BASE64", null ]
           }
         },
-        "required" : [ "bodyEncoding", "bodyTruncated", "booleanProperties", "doubleProperties", "durable", "expiration", "intProperties", "longProperties", "position", "priority", "redactions", "size", "stringProperties", "timestamp", "tombstone", "type", "withheld" ]
+        "required" : [ "bodyEncoding", "bodyTruncated", "booleanProperties", "doubleProperties", "durable", "expiration", "intProperties", "longProperties", "position", "priority", "redactions", "size", "stringProperties", "tombstone", "type", "withheld" ]
       },
       "ResourceAccessView" : {
         "type" : "object",

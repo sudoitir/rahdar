@@ -34,7 +34,12 @@ public final class MessageViews {
             @Schema(requiredMode = REQUIRED) int type,
             @Schema(requiredMode = REQUIRED) boolean durable,
             @Schema(requiredMode = REQUIRED) int priority,
-            @Schema(requiredMode = REQUIRED) long timestamp,
+
+            @Schema(
+                    nullable = true,
+                    description = "When the producer stamped it, epoch milliseconds; null when it carries no time.")
+            Long timestamp,
+
             @Schema(requiredMode = REQUIRED) long expiration,
             @Schema(requiredMode = REQUIRED) long size,
             @Schema(nullable = true) String groupId,
@@ -51,7 +56,13 @@ public final class MessageViews {
             boolean tombstone,
 
             @Schema(nullable = true, description = "A log record's key as text, or base64 when it is not text.")
-            String key) {}
+            String key,
+
+            @Schema(
+                    nullable = true,
+                    allowableValues = {"TEXT", "BASE64"},
+                    description = "How key is written; null with no key.")
+            String keyEncoding) {}
 
     /** One message, expanded: the full header set, the typed property maps, and the body. */
     public record MessageDetailView(
@@ -61,7 +72,12 @@ public final class MessageViews {
             @Schema(requiredMode = REQUIRED) int type,
             @Schema(requiredMode = REQUIRED) boolean durable,
             @Schema(requiredMode = REQUIRED) int priority,
-            @Schema(requiredMode = REQUIRED) long timestamp,
+
+            @Schema(
+                    nullable = true,
+                    description = "When the producer stamped it, epoch milliseconds; null when it carries no time.")
+            Long timestamp,
+
             @Schema(requiredMode = REQUIRED) long expiration,
             @Schema(requiredMode = REQUIRED) long size,
             @Schema(nullable = true) String groupId,
@@ -93,7 +109,13 @@ public final class MessageViews {
             @Schema(requiredMode = REQUIRED) List<RedactionView> redactions,
             @Schema(requiredMode = REQUIRED) List<WithheldView> withheld,
             @Schema(requiredMode = REQUIRED) boolean tombstone,
-            @Schema(nullable = true) String key) {}
+            @Schema(nullable = true) String key,
+
+            @Schema(
+                    nullable = true,
+                    allowableValues = {"TEXT", "BASE64"},
+                    description = "How key is written; null with no key.")
+            String keyEncoding) {}
 
     /** A page of messages: the shared list envelope plus the node it was read from. */
     public record MessagePageView(
@@ -119,7 +141,16 @@ public final class MessageViews {
             UUID node,
 
             @Schema(nullable = true, description = "Where in the log the page sits; null for a queue.")
-            LogView log) {}
+            LogView log,
+
+            @Schema(
+                    requiredMode = REQUIRED,
+                    description = "The page was cut short at its byte budget: messages the broker returned are not in"
+                            + " it. Ask for a smaller page, or, on a log, continue from log.next.")
+            boolean truncated,
+
+            @Schema(nullable = true, description = "Something worth saying about this page, such as why it is empty.")
+            String notice) {}
 
     /**
      * Where a page of a partitioned log sits. {@code start} and {@code end} are the partition's first offset and

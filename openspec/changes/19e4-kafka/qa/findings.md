@@ -49,12 +49,12 @@ with the commit that fixes it and its test. Owner names are the agents of this s
 | P1 | OpenBroker | Driver per-topic and per-query reads (N+1) | OpenBroker 0.6.1 | fixed |
 | P2 | OpenBroker | verify throws when a broker is cut | OpenBroker 0.6.1 | fixed |
 | P3 | OpenBroker | At-most-once sender writes a message twice on a broker kill | OpenBroker 0.6.1 | fixed |
-| C1 | audit 3 | Browse page has no total byte cap (500 × 1 MB values ≈ 1.2 GB heap) | kafka-hardening | open |
-| C2 | audit 3 | A message key has no encoding flag (text vs base64 indistinguishable) | kafka-hardening | open |
-| C3 | audit 3 | A streamed value is read whole before truncation | kafka-hardening | open |
-| C4 | audit 3 | A future start time or −1 timestamps give a silent empty page | kafka-hardening | open |
-| C5 | audit 3 | Inline java.time.Instant in MessageService | kafka-hardening | open |
-| C6 | audit 3 | An absent produce time shows as 1970-01-01 | kafka-hardening | open |
+| C1 | audit 3 | Browse page has no total byte cap (500 × 1 MB values ≈ 1.2 GB heap) | kafka-hardening | fixed |
+| C2 | audit 3 | A message key has no encoding flag (text vs base64 indistinguishable) | kafka-hardening | fixed |
+| C3 | audit 3 | A streamed value is read whole before truncation | kafka-hardening | fixed |
+| C4 | audit 3 | A future start time or −1 timestamps give a silent empty page | kafka-hardening | fixed |
+| C5 | audit 3 | Inline java.time.Instant in MessageService | kafka-hardening | fixed |
+| C6 | audit 3 | An absent produce time shows as 1970-01-01 | kafka-hardening | fixed |
 | C7 | audit 3 | Bulk over 4000 subscriptions: item cap and bulk_run retention unverified | kafka-hardening | verified: cap 200 (BulkService, BulkPreviewTest) and 90-day retention (BulkRunStore, BulkRunStoreTest); no change needed |
 | C8 | audit 3 | Held operations / approval requests: retention and orphans on cluster delete unverified | kafka-hardening | fixed |
 | C9 | audit 3 | Alert/notification flapping (a broker flapping every minute): dedup and cooldown unverified | kafka-hardening | fixed |

@@ -9,6 +9,7 @@ import io.github.sudoitir.openbroker.Status;
 import io.github.sudoitir.openbroker.messaging.BrowseRequest;
 import io.github.sudoitir.openbroker.messaging.BulkOutcome;
 import io.github.sudoitir.openbroker.messaging.Count;
+import io.github.sudoitir.openbroker.messaging.Message;
 import io.github.sudoitir.openbroker.messaging.MessageAction;
 import io.github.sudoitir.openbroker.messaging.MessageField;
 import io.github.sudoitir.openbroker.messaging.MessageFilter;
@@ -37,12 +38,14 @@ import io.github.sudoitir.openbroker.operation.Precondition;
 import io.github.sudoitir.rahdar.kernel.core.ConflictException;
 import io.github.sudoitir.rahdar.kernel.security.ResourceRef;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
 import java.util.function.Supplier;
 import org.springframework.stereotype.Component;
 
@@ -58,6 +61,9 @@ public class BrokerMessages {
 
     /** The most body bytes a browse reads of one message; a longer body is marked truncated. */
     public static final long MAX_BODY_BYTES = 1024L * 1024;
+
+    /** The most body bytes one page holds in all; a page that would hold more stops there and says so. */
+    public static final long PAGE_BYTE_BUDGET = 8L * 1024 * 1024;
 
     private final BrokerGateway gateway;
 
@@ -78,12 +84,11 @@ public class BrokerMessages {
                             queueId(c, queue),
                             Scope.node(node),
                             new BrowseRequest(at, size, filter(c, filter), MAX_BODY_BYTES));
-            List<BrowsedMessage> messages =
-                    result.messages().stream().map(BrowsedMessages::of).toList();
+            Within<BrowsedMessage> kept = within(result.messages(), BrowsedMessages::of);
             return switch (result.total().count()) {
-                case Count.Exact(var e) -> new BrowsePage(messages, e);
-                case Count.Estimate(var e) -> new BrowsePage(messages, e);
-                case Count.Unavailable(var u) -> new BrowsePage(messages, null, u);
+                case Count.Exact(var e) -> new BrowsePage(kept.items(), e, null, kept.truncated());
+                case Count.Estimate(var e) -> new BrowsePage(kept.items(), e, null, kept.truncated());
+                case Count.Unavailable(var u) -> new BrowsePage(kept.items(), null, u, kept.truncated());
             };
         });
     }
@@ -108,16 +113,40 @@ public class BrokerMessages {
                 }
                 throw e;
             }
-            List<LogPage.LogRecord> records = result.messages().stream()
-                    .map(m -> new LogPage.LogRecord(
-                            BrowsedMessages.of(m), m.body().isTombstone(), BrowsedMessages.keyOf(m)))
-                    .toList();
-            Long next = result.next()
-                    .map(cursor -> Long.parseLong(
-                            cursor.token().substring(cursor.token().indexOf(':') + 1)))
-                    .orElse(null);
-            return new LogPage(records, next);
+            Within<LogPage.LogRecord> kept = within(result.messages(), m -> {
+                BrowsedMessages.Key key = BrowsedMessages.keyOf(m);
+                return new LogPage.LogRecord(
+                        BrowsedMessages.of(m),
+                        m.body().isTombstone(),
+                        key == null ? null : key.text(),
+                        key == null ? null : key.encoding());
+            });
+            Long next = kept.truncated()
+                    ? Long.valueOf(
+                            result.messages().get(kept.items().size()).ref().position())
+                    : result.next()
+                            .map(cursor -> Long.parseLong(
+                                    cursor.token().substring(cursor.token().indexOf(':') + 1)))
+                            .orElse(null);
+            return new LogPage(kept.items(), next, kept.truncated());
         });
+    }
+
+    /** What was kept of a page, and whether the budget stopped it short. */
+    private record Within<R>(List<R> items, boolean truncated) {}
+
+    /** Converts messages in order until their bodies add up to {@link #PAGE_BYTE_BUDGET}; the first is always kept. */
+    private static <R> Within<R> within(List<Message> messages, Function<Message, R> convert) {
+        List<R> out = new ArrayList<>();
+        long bytes = 0;
+        for (Message m : messages) {
+            bytes += Math.min(m.body().size(), MAX_BODY_BYTES);
+            if (bytes > PAGE_BYTE_BUDGET && !out.isEmpty()) {
+                return new Within<>(List.copyOf(out), true);
+            }
+            out.add(convert.apply(m));
+        }
+        return new Within<>(List.copyOf(out), false);
     }
 
     /**

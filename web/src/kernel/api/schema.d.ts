@@ -7419,8 +7419,11 @@ export interface components {
             durable: boolean;
             /** Format: int32 */
             priority: number;
-            /** Format: int64 */
-            timestamp: number;
+            /**
+             * Format: int64
+             * @description When the producer stamped it, epoch milliseconds; null when it carries no time.
+             */
+            timestamp?: number | null;
             /** Format: int64 */
             expiration: number;
             /** Format: int64 */
@@ -7802,6 +7805,10 @@ export interface components {
              */
             node?: string | null;
             log?: components["schemas"]["LogView"] | null;
+            /** @description The page was cut short at its byte budget: messages the broker returned are not in it. Ask for a smaller page, or, on a log, continue from log.next. */
+            truncated: boolean;
+            /** @description Something worth saying about this page, such as why it is empty. */
+            notice?: string | null;
         };
         MessageSummaryView: {
             /** @description The message's position on its node, opaque. */
@@ -7811,8 +7818,11 @@ export interface components {
             durable: boolean;
             /** Format: int32 */
             priority: number;
-            /** Format: int64 */
-            timestamp: number;
+            /**
+             * Format: int64
+             * @description When the producer stamped it, epoch milliseconds; null when it carries no time.
+             */
+            timestamp?: number | null;
             /** Format: int64 */
             expiration: number;
             /** Format: int64 */
@@ -7828,6 +7838,11 @@ export interface components {
             tombstone: boolean;
             /** @description A log record's key as text, or base64 when it is not text. */
             key?: string | null;
+            /**
+             * @description How key is written; null with no key.
+             * @enum {string|null}
+             */
+            keyEncoding?: "TEXT" | "BASE64" | null;
         };
         MessageDetailView: {
             /** @description The message's position on its node, opaque. */
@@ -7837,8 +7852,11 @@ export interface components {
             durable: boolean;
             /** Format: int32 */
             priority: number;
-            /** Format: int64 */
-            timestamp: number;
+            /**
+             * Format: int64
+             * @description When the producer stamped it, epoch milliseconds; null when it carries no time.
+             */
+            timestamp?: number | null;
             /** Format: int64 */
             expiration: number;
             /** Format: int64 */
@@ -7878,6 +7896,11 @@ export interface components {
             withheld: components["schemas"]["WithheldView"][];
             tombstone: boolean;
             key?: string | null;
+            /**
+             * @description How key is written; null with no key.
+             * @enum {string|null}
+             */
+            keyEncoding?: "TEXT" | "BASE64" | null;
         };
         /** @description Who has access to one subscription or destination through teams: its owner and every share. */
         ResourceAccessView: {
