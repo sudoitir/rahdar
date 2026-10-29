@@ -18,7 +18,7 @@ import lombok.Setter;
  * Maps {@code alert_state} (changeset 006): the current OK/PENDING/FIRING
  * position of one {@code (rule, subject)} pair — the {@code for_seconds} debounce
  * clock lives in {@code since} so it survives a restart (ADR-0035, design.md
- * decision 4). History of past firings is {@link AlertFiringEntity}, not this row.
+ * decision 4). While firing, {@code since} is when the condition first read false, null while it holds. History of past firings is {@link AlertFiringEntity}, not this row.
  */
 @Entity
 @Table(name = "alert_state")
