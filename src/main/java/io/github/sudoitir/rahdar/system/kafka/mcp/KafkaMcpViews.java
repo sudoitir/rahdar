@@ -212,7 +212,29 @@ final class KafkaMcpViews {
         if (keys == null || keys.isBlank()) {
             return Set.of();
         }
-        return Set.of(keys.split("\\s*,\\s*"));
+        List<String> names = new ArrayList<>();
+        int start = 0;
+        int i = 0;
+        while (i <= keys.length()) {
+            if (i != keys.length() && keys.charAt(i) != ',') {
+                i++;
+                continue;
+            }
+            int end = i;
+            while (end > start && Character.isWhitespace(keys.charAt(end - 1))) {
+                end--;
+            }
+            names.add(keys.substring(start, end));
+            i++;
+            while (i < keys.length() && Character.isWhitespace(keys.charAt(i))) {
+                i++;
+            }
+            start = i;
+        }
+        while (!names.isEmpty() && names.getLast().isEmpty()) {
+            names.removeLast();
+        }
+        return Set.copyOf(names);
     }
 
     private static String configNote(int omitted, boolean overridden) {
