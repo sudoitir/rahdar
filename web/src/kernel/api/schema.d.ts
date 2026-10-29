@@ -4612,36 +4612,28 @@ export interface components {
             /** Format: int64 */
             bytes: number;
         };
-        ArtemisConnection: Omit<WithRequired<components["schemas"]["Connection"], "system">, "system"> & {
-            /** @enum {string} */
+        ArtemisConnection: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
             system: "artemis";
             seedUrls: string[];
             credentials?: components["schemas"]["Credentials"];
             coreCredentials?: components["schemas"]["Credentials"];
             tlsBundle?: string;
             managementUrlPattern?: string;
-        } & {
-            /**
-             * @description discriminator enum property added by openapi-typescript
-             * @enum {string}
-             */
-            system: "artemis";
-        } & {
-            /**
-             * @description discriminator enum property added by openapi-typescript
-             * @enum {string}
-             */
-            system: "artemis";
         };
-        Connection: {
-            system: string;
-        } & (components["schemas"]["ArtemisConnection"] | components["schemas"]["KafkaConnection"]);
+        Connection: components["schemas"]["ArtemisConnection"] | components["schemas"]["KafkaConnection"];
         Credentials: {
             username: string;
             password: string;
         };
-        KafkaConnection: Omit<WithRequired<components["schemas"]["Connection"], "system">, "system"> & {
-            /** @enum {string} */
+        KafkaConnection: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
             system: "kafka";
             bootstrapServers: string[];
             securityProtocol: string;
@@ -4649,18 +4641,6 @@ export interface components {
             credentials?: components["schemas"]["KafkaCredentials"];
             tlsBundle?: string;
             clientId?: string;
-        } & {
-            /**
-             * @description discriminator enum property added by openapi-typescript
-             * @enum {string}
-             */
-            system: "kafka";
-        } & {
-            /**
-             * @description discriminator enum property added by openapi-typescript
-             * @enum {string}
-             */
-            system: "kafka";
         };
         KafkaCredentials: {
             username?: string;
@@ -6254,51 +6234,31 @@ export interface components {
             username?: string;
             password?: string;
         };
-        ArtemisConnectionUpdate: Omit<components["schemas"]["ConnectionUpdate"], "system"> & {
-            /** @enum {string} */
-            system?: "artemis";
+        ArtemisConnectionUpdate: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            system: "artemis";
             seedUrls?: string[];
             managementUrlPattern?: string;
             tlsBundle?: string;
             management?: components["schemas"]["AccountUpdate"];
             core?: components["schemas"]["AccountUpdate"];
-        } & {
-            /**
-             * @description discriminator enum property added by openapi-typescript
-             * @enum {string}
-             */
-            system: "artemis";
-        } & {
-            /**
-             * @description discriminator enum property added by openapi-typescript
-             * @enum {string}
-             */
-            system: "artemis";
         };
-        ConnectionUpdate: {
-            system: string;
-        } & (components["schemas"]["ArtemisConnectionUpdate"] | components["schemas"]["KafkaConnectionUpdate"]);
-        KafkaConnectionUpdate: Omit<components["schemas"]["ConnectionUpdate"], "system"> & {
-            /** @enum {string} */
-            system?: "kafka";
+        ConnectionUpdate: components["schemas"]["ArtemisConnectionUpdate"] | components["schemas"]["KafkaConnectionUpdate"];
+        KafkaConnectionUpdate: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            system: "kafka";
             bootstrapServers?: string[];
             securityProtocol?: string;
             saslMechanism?: string;
             credentials?: components["schemas"]["KafkaCredentials"];
             tlsBundle?: string;
             clientId?: string;
-        } & {
-            /**
-             * @description discriminator enum property added by openapi-typescript
-             * @enum {string}
-             */
-            system: "kafka";
-        } & {
-            /**
-             * @description discriminator enum property added by openapi-typescript
-             * @enum {string}
-             */
-            system: "kafka";
         };
         UpdateClusterRequest: {
             name?: string;
@@ -26185,6 +26145,3 @@ export interface operations {
         };
     };
 }
-type WithRequired<T, K extends keyof T> = T & {
-    [P in K]-?: T[P];
-};
