@@ -8,7 +8,7 @@ Every Kafka screen and every shared screen on a Kafka cluster SHALL pass the vis
 - **THEN** no capture fails a check
 
 ### Requirement: The Kafka flows meet an independent design review
-The registration, offset reset, truncate, ACL change, transaction abort, browse and bulk purge flows SHALL be reviewed independently against an enterprise-grade bar, and every finding SHALL be fixed before the change merges.
+The registration, offset reset, truncate, ACL change, transaction abort, browse and bulk purge flows SHALL be reviewed independently against an production-grade bar, and every finding SHALL be fixed before the change merges.
 
 #### Scenario: A review finding
 - **WHEN** the review finds a flow that misleads an operator or hides a consequence

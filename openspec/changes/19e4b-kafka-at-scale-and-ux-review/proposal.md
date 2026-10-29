@@ -9,12 +9,12 @@ Run it in a fresh Claude session after `19e4-kafka` is merged:
 6. Push, and let CI run the full suite. PR, merge on green CI and an empty Sonar list, `/opsx:archive`, and tick it in `ROADMAP.md`.
 
 ## Why
-`19e4-kafka` built and verified Kafka in Rahdar end to end on real brokers, with three review passes and three retention and edge-case audits closed. Three checks the change set itself remain: Kafka at a large estate's scale has not been measured, the screenshot sweep's failing checks are not all triaged, and the design and user flows have not had an independent review against an enterprise-grade bar, . They are separated here so the Kafka support can merge and these finish on a clean branch.
+`19e4-kafka` built and verified Kafka in Rahdar end to end on real brokers, with three review passes and three retention and edge-case audits closed. Three checks the change set itself remain: Kafka at a large estate's scale has not been measured, the screenshot sweep's failing checks are not all triaged, and the design and user flows have not had an independent review against an production-grade bar. They are separated here so the Kafka support can merge and these finish on a clean branch.
 
 ## What Changes
 - **Performance at scale.** A Kafka cluster seeded at scale (≈200 topics and 3,000 partitions, ≈300 groups, deep lag, ≈500 ACLs, hanging transactions) is measured with the repository's seed and measurement scripts (`scripts/perf/kafka-load-seed.sh`, `scripts/perf/kafka-measure.sh`): API latency, the scrape's broker rounds per cycle, the scrape cycle against its interval, bounded responses, storage growth per hour (`broker_event`, `metric_sample`) and the SSE bytes of one scrape tick. Every budget is met, or the cause is fixed.
 - **The screenshot sweep.** Every failing check of the sweep over the estate, registration, every Kafka screen and the shared screens on Kafka (1440 and 1920 wide, light and dark, every state) is fixed in the product or, where the check is wrong, in the sweep, and the sweep ends with no open failure.
-- **Design and UX review.** An independent Opus review of the design, every user flow (registration, offset reset, truncate, ACL change, transaction abort and hanging transactions, browse, bulk purge) and the UI against an enterprise-grade bar (prior art: Confluent Control Center, Redpanda Console, Conduktor, AKHQ, Kafbat UI), from the sweep's captures and the running app. Every finding is fixed.
+- **Design and UX review.** An independent Opus review of the design, every user flow (registration, offset reset, truncate, ACL change, transaction abort and hanging transactions, browse, bulk purge) and the UI against an production-grade bar (prior art: Confluent Control Center, Redpanda Console, Conduktor, AKHQ, Kafbat UI), from the sweep's captures and the running app. Every finding is fixed.
 
 ## Capabilities
 ### Modified Capabilities
