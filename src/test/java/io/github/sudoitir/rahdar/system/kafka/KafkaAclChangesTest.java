@@ -59,7 +59,7 @@ class KafkaAclChangesTest {
     void theRowRecordsWhatTheClusterHoldsAfterTheCalls() {
         when(operations.execute(any(), any(), any()))
                 .thenReturn(Partial.complete(mock(OperationResult.class), List.of()));
-        when(acls.all(CLUSTER)).thenReturn(List.of(A));
+        when(acls.held(eq(CLUSTER), any())).thenReturn(new KafkaAcls.Held(List.of(A), false));
 
         changes.replay(params());
 

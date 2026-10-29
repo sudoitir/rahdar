@@ -23,9 +23,11 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.IntStream;
 import org.junit.jupiter.api.Test;
 
-/** An ACL preview is computed over every ACL of the cluster, however many pages that takes to read. */
+/** An ACL preview reads the ACLs that decide the access it shows, however many pages that takes, and no more. */
 class KafkaAclsTest {
 
     private static final UUID CLUSTER = UUID.randomUUID();
@@ -40,7 +42,7 @@ class KafkaAclsTest {
     }
 
     @Test
-    void everyPageOfTheClustersAclsIsReadBeforeAPreviewIsComputed() {
+    void everyPageOfTheScopeIsReadBeforeAPreviewIsComputed() {
         Resources resources = mock(Resources.class);
         ClusterConnection connection = mock(ClusterConnection.class);
         BrokerGateway gateway = mock(BrokerGateway.class);
@@ -51,9 +53,10 @@ class KafkaAclsTest {
                 .thenReturn(Partial.complete(new ResourcePage(List.of(acl(3)), Optional.empty()), List.of()));
         KafkaAcls acls = new KafkaAcls(gateway, mock(ClusterAccessGuard.class));
 
-        List<Acl> all = acls.all(CLUSTER);
+        List<Acl> all = acls.held(CLUSTER, List.of(new Acl("User:u1", "*", "read", "allow", "topic", "literal", "t1")))
+                .acls();
 
-        verify(resources, times(2)).read(any(ResourceQuery.class));
+        verify(resources, times(3)).read(any(ResourceQuery.class));
         assertThat(all).extracting(Acl::name).containsExactly("t1", "t2", "t3");
     }
 
@@ -94,5 +97,61 @@ class KafkaAclsTest {
                         "User:app loses READ on topic orders-eu", "User:app loses READ on topic orders-us");
         assertThat(preview.access()).extracting(a -> a.resource()).contains("orders-", "orders-eu", "orders-us");
         assertThat(preview.access()).extracting(a -> a.resource()).doesNotContain("billing");
+    }
+
+    @Test
+    void aHundredThousandAclsAreNotReadForARuleOnOnePrincipalAndOneTopic() {
+        List<Resource> every =
+                IntStream.range(0, 100_000).mapToObj(KafkaAclsTest::acl).toList();
+        AtomicInteger returned = new AtomicInteger();
+        Resources resources = mock(Resources.class);
+        ClusterConnection connection = mock(ClusterConnection.class);
+        BrokerGateway gateway = mock(BrokerGateway.class);
+        when(gateway.cluster(CLUSTER)).thenReturn(connection);
+        when(connection.resources()).thenReturn(resources);
+        when(resources.read(any(ResourceQuery.class))).thenAnswer(call -> {
+            ResourceQuery query = call.getArgument(0);
+            String principal = query.fieldSelector().get("principal");
+            List<Resource> matching = every.stream()
+                    .filter(r ->
+                            principal == null || r.id().path().segments().get(0).equals(principal))
+                    .limit(query.limit())
+                    .toList();
+            returned.addAndGet(matching.size());
+            return Partial.complete(new ResourcePage(matching, Optional.empty()), List.of());
+        });
+        KafkaAcls acls = new KafkaAcls(gateway, mock(ClusterAccessGuard.class));
+
+        var preview = acls.preview(
+                CLUSTER,
+                new AclChangeRequest(
+                        List.of(new Acl("User:u7", "*", "write", "allow", "topic", "literal", "t7")), null, null));
+
+        assertThat(returned.get()).isLessThanOrEqualTo(2);
+        assertThat(preview.added()).isEqualTo(1);
+    }
+
+    @Test
+    void aPrefixedRuleReadsTheTypeUpToTheCapAndSaysItWasCut() {
+        Resources resources = mock(Resources.class);
+        ClusterConnection connection = mock(ClusterConnection.class);
+        BrokerGateway gateway = mock(BrokerGateway.class);
+        when(gateway.cluster(CLUSTER)).thenReturn(connection);
+        when(connection.resources()).thenReturn(resources);
+        AtomicInteger next = new AtomicInteger();
+        when(resources.read(any(ResourceQuery.class))).thenAnswer(call -> {
+            int from = next.getAndAdd(500);
+            List<Resource> page = IntStream.range(from, from + 500)
+                    .mapToObj(KafkaAclsTest::acl)
+                    .toList();
+            return Partial.complete(new ResourcePage(page, Optional.of("more")), List.of());
+        });
+        KafkaAcls acls = new KafkaAcls(gateway, mock(ClusterAccessGuard.class));
+
+        KafkaAcls.Held held =
+                acls.held(CLUSTER, List.of(new Acl("User:app", "*", "read", "deny", "topic", "prefixed", "orders-")));
+
+        assertThat(held.truncated()).isTrue();
+        assertThat(held.acls()).hasSize(KafkaAcls.MAX_READ);
     }
 }

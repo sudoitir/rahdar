@@ -115,7 +115,7 @@ public class KafkaAclChanges {
         // The cluster is asked again for what it holds, so the row records the state and not only the calls made.
         List<Acl> now;
         try {
-            now = acls.all(p.clusterId());
+            now = acls.held(p.clusterId(), concat(p.add(), p.remove())).acls();
         } catch (RuntimeException e) {
             audit.finish(
                     event,
@@ -133,8 +133,14 @@ public class KafkaAclChanges {
                 !confirmed,
                 preview.added() + preview.removed(),
                 confirmed ? null : "The cluster does not hold the ACLs as changed.",
-                Map.of("access", preview.access(), "aclCount", now.size(), "missing", missing, "remaining", remaining));
+                Map.of("access", preview.access(), "aclsRead", now.size(), "missing", missing, "remaining", remaining));
         return new AclResult(preview.added(), preview.removed());
+    }
+
+    private static List<Acl> concat(List<Acl> a, List<Acl> b) {
+        List<Acl> out = new ArrayList<>(a);
+        out.addAll(b);
+        return out;
     }
 
     private static List<Acl> without(List<Acl> all, List<Acl> done) {

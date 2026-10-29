@@ -28,7 +28,10 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
-/** A Kafka cluster's ACLs, and what a change would do to who may do what (ADR-0216). */
+/**
+ * A Kafka cluster's ACLs, and what a change would do to who may do what (ADR-0216). A preview reads only the ACLs
+ * that decide the access it shows, not the cluster's whole set.
+ */
 @Service
 @RequiredArgsConstructor
 public class KafkaAcls {
@@ -41,8 +44,11 @@ public class KafkaAcls {
     /** The most covered resources one rule of a preview lists access for. */
     private static final int MAX_COVERED = 100;
 
-    /** The size of each page a preview reads the whole set in. */
+    /** The size of each page a preview reads in. */
     private static final int ALL_PAGE = 500;
+
+    /** The most ACLs one preview reads; past it the preview says its answer is partial. */
+    static final int MAX_READ = 20_000;
 
     private final BrokerGateway gateway;
     private final ClusterAccessGuard access;
@@ -77,21 +83,49 @@ public class KafkaAcls {
         }
     }
 
-    /** Every ACL on the cluster. */
-    List<Acl> all(UUID clusterId) {
+    /** The ACLs a read found, and whether the cap cut it short. */
+    record Held(List<Acl> acls, boolean truncated) {}
+
+    /**
+     * The ACLs that decide who may do what for a change: for a rule on one principal and one literal name, every
+     * rule of that principal and of the wildcard principal on the resource type; for a prefixed rule, a literal
+     * {@code *} or the wildcard principal, every rule on the type. Never the whole cluster, and never more than
+     * {@link #MAX_READ}.
+     */
+    Held held(UUID clusterId, List<Acl> changes) {
+        Set<Map<String, String>> scopes = new LinkedHashSet<>();
+        for (Acl change : changes) {
+            String type = change.resourceType();
+            boolean broad = "prefixed".equals(change.pattern())
+                    || "*".equals(change.name())
+                    || KafkaAclAccess.WILDCARD_PRINCIPAL.equals(change.principal());
+            if (broad) {
+                scopes.add(Map.of("resource_type", type));
+            } else {
+                scopes.add(Map.of("principal", change.principal(), "resource_type", type));
+                scopes.add(Map.of("principal", KafkaAclAccess.WILDCARD_PRINCIPAL, "resource_type", type));
+            }
+        }
         try {
-            // Every page: a preview is computed over the cluster's whole set, and its state key hashes it.
-            List<Acl> all = new ArrayList<>();
-            Optional<String> next = Optional.empty();
-            do {
-                ResourceQuery query = ResourceQuery.of(KafkaKinds.ACL).limit(ALL_PAGE);
-                ResourcePage page = KafkaGroups.read(
-                        gateway.cluster(clusterId),
-                        next.map(query::continueFrom).orElse(query));
-                page.items().stream().map(KafkaAcls::acl).forEach(all::add);
-                next = page.continueToken();
-            } while (next.isPresent());
-            return List.copyOf(all);
+            Set<Acl> found = new LinkedHashSet<>();
+            boolean truncated = false;
+            for (Map<String, String> scope : scopes) {
+                Optional<String> next = Optional.empty();
+                do {
+                    ResourceQuery query =
+                            ResourceQuery.of(KafkaKinds.ACL).where(scope).limit(ALL_PAGE);
+                    ResourcePage page = KafkaGroups.read(
+                            gateway.cluster(clusterId),
+                            next.map(query::continueFrom).orElse(query));
+                    page.items().stream().map(KafkaAcls::acl).forEach(found::add);
+                    next = page.continueToken();
+                    if (found.size() >= MAX_READ && next.isPresent()) {
+                        truncated = true;
+                        next = Optional.empty();
+                    }
+                } while (next.isPresent());
+            }
+            return new Held(List.copyOf(found), truncated);
         } catch (RuntimeException e) {
             if (noAuthorizer(e)) {
                 throw new ConflictException("acls-unavailable", NO_AUTHORIZER);
@@ -104,7 +138,8 @@ public class KafkaAcls {
         access.requireCluster(clusterId, KafkaModule.ACCESS_RULE_WRITE);
         List<Acl> add = normalised(request.add());
         List<Acl> remove = normalised(request.remove());
-        List<Acl> before = all(clusterId);
+        Held held = held(clusterId, concat(add, remove));
+        List<Acl> before = held.acls();
         Set<Acl> state = new LinkedHashSet<>(before);
         state.removeAll(remove);
         state.addAll(add);
@@ -135,6 +170,10 @@ public class KafkaAcls {
         }
         if (concat(add, remove).stream().anyMatch(a -> !"*".equals(a.host()))) {
             notes.add("Hosts are not evaluated: access is shown for a client on any host.");
+        }
+        if (held.truncated()) {
+            notes.add("The cluster has more than " + MAX_READ + " ACLs on these resource types, so only the first "
+                    + MAX_READ + " were read and the access shown may be incomplete.");
         }
         if (added == 0 && removed == 0) {
             notes.add("Nothing changes: the ACLs to add exist and the ACLs to remove do not.");
