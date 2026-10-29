@@ -34,6 +34,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.event.EventListener;
@@ -101,48 +102,50 @@ public class PluginMessagingService implements PluginScopedBeans {
                         "concurrency",
                         spec.concurrency()),
                 false);
-        UUID replaced = tx.execute(status -> {
-            Optional<RegistrationEntity> existing = registrations.findByPluginIdAndKey(pluginId, spec.key());
-            UUID old = null;
-            if (existing.isPresent()) {
-                RegistrationEntity e = existing.get();
-                boolean sameTarget = e.getClusterId().equals(spec.clusterId())
-                        && e.getSourceKind().equals(spec.source().kind())
-                        && e.getSourcePath().equals(spec.source().path())
-                        && e.getMode() == spec.mode();
-                if (sameTarget) {
-                    // A changed concurrency is converged by the pass below, which restarts the drains.
-                    e.setConcurrency(spec.concurrency());
-                    e.setActingUserId(spec.actingUserId());
-                    e.setUpdatedAt(clock.instant());
-                    registrations.save(e);
-                    return null;
-                }
-                // A different target is a different registration: the old one's broker objects are
-                // removed as orphans, the new one's installed afresh.
-                old = e.getId();
-                registrations.delete(e);
-                registrations.flush();
-            }
-            RegistrationEntity row = new RegistrationEntity();
-            row.setPluginId(pluginId);
-            row.setKey(spec.key());
-            row.setClusterId(spec.clusterId());
-            row.setSourceKind(spec.source().kind());
-            row.setSourcePath(spec.source().path());
-            row.setMode(spec.mode());
-            row.setConcurrency(spec.concurrency());
-            row.setActingUserId(spec.actingUserId());
-            row.setCreatedAt(clock.instant());
-            row.setUpdatedAt(clock.instant());
-            registrations.save(row);
-            return old;
-        });
+        AtomicReference<UUID> replaced = new AtomicReference<>();
+        reconciler.change(
+                spec.clusterId(),
+                () -> replaced.set(tx.execute(status -> {
+                    Optional<RegistrationEntity> existing = registrations.findByPluginIdAndKey(pluginId, spec.key());
+                    UUID old = null;
+                    if (existing.isPresent()) {
+                        RegistrationEntity e = existing.get();
+                        boolean sameTarget = e.getClusterId().equals(spec.clusterId())
+                                && e.getSourceKind().equals(spec.source().kind())
+                                && e.getSourcePath().equals(spec.source().path())
+                                && e.getMode() == spec.mode();
+                        if (sameTarget) {
+                            // A changed concurrency is converged by the pass below, which restarts the drains.
+                            e.setConcurrency(spec.concurrency());
+                            e.setActingUserId(spec.actingUserId());
+                            e.setUpdatedAt(clock.instant());
+                            registrations.save(e);
+                            return null;
+                        }
+                        // A different target is a different registration: the old one's broker objects are
+                        // removed as orphans, the new one's installed afresh.
+                        old = e.getId();
+                        registrations.delete(e);
+                        registrations.flush();
+                    }
+                    RegistrationEntity row = new RegistrationEntity();
+                    row.setPluginId(pluginId);
+                    row.setKey(spec.key());
+                    row.setClusterId(spec.clusterId());
+                    row.setSourceKind(spec.source().kind());
+                    row.setSourcePath(spec.source().path());
+                    row.setMode(spec.mode());
+                    row.setConcurrency(spec.concurrency());
+                    row.setActingUserId(spec.actingUserId());
+                    row.setCreatedAt(clock.instant());
+                    row.setUpdatedAt(clock.instant());
+                    registrations.save(row);
+                    return old;
+                })));
         audit.succeed(event, 1);
-        if (replaced != null) {
-            drains.stopRegistration(replaced);
+        if (replaced.get() != null) {
+            drains.stopRegistration(replaced.get());
         }
-        reconciler.reconcileNow(spec.clusterId());
         return registration(pluginId, spec.key()).orElseThrow();
     }
 
@@ -168,9 +171,8 @@ public class PluginMessagingService implements PluginScopedBeans {
                         reg.getMode().name()),
                 false);
         drains.stopRegistration(reg.getId());
-        registrations.delete(reg);
+        reconciler.change(reg.getClusterId(), () -> registrations.delete(reg));
         audit.succeed(event, 1);
-        reconciler.reconcileNow(reg.getClusterId());
         return true;
     }
 

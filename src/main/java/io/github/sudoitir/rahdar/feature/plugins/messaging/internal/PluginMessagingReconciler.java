@@ -26,6 +26,7 @@ import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterOwnership;
 import io.github.sudoitir.rahdar.platform.clusters.ServingNodes;
 import java.time.Clock;
+import java.time.Duration;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -109,13 +110,38 @@ public class PluginMessagingReconciler {
 
     /** One pass over one cluster, if this instance holds its lock. */
     public void reconcileNow(UUID clusterId) {
-        clusterLock.runIfHeld(clusterId, ClusterLock.Scope.PLUGIN_MESSAGING, () -> {
-            try {
-                reconcileCluster(clusterId);
-            } catch (RuntimeException e) {
-                log.warn("Plugin messaging pass for cluster {} did not complete: {}", clusterId, e.toString());
-            }
-        });
+        clusterLock.runIfHeld(clusterId, ClusterLock.Scope.PLUGIN_MESSAGING, () -> pass(clusterId));
+    }
+
+    /**
+     * Makes {@code change} to the cluster's registrations, then one pass over the cluster, both under its
+     * lock. The pass sees the change, so a registration delivers, or a removed one has stopped, when the
+     * call that made it returns; and no other pass is writing state for a registration the change removes.
+     * A pass already running, here or on another replica, is waited for rather than skipped, for up to one
+     * reconcile interval: the longest the scheduled pass would have kept the caller waiting anyway. When the
+     * lock is not free in that time, the change is made without it and the next scheduled pass converges it.
+     */
+    public void change(UUID clusterId, Runnable change) {
+        Duration wait = properties.reconcileInterval();
+        if (!clusterLock.runWhenFree(clusterId, ClusterLock.Scope.PLUGIN_MESSAGING, wait, () -> {
+            change.run();
+            pass(clusterId);
+        })) {
+            log.warn(
+                    "The plugin messaging lock of cluster {} was not free within {}; the change waits for the"
+                            + " next pass",
+                    clusterId,
+                    wait);
+            change.run();
+        }
+    }
+
+    private void pass(UUID clusterId) {
+        try {
+            reconcileCluster(clusterId);
+        } catch (RuntimeException e) {
+            log.warn("Plugin messaging pass for cluster {} did not complete: {}", clusterId, e.toString());
+        }
     }
 
     /** What one registration should be on every node this pass: delivering, or not and why. */

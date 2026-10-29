@@ -1,6 +1,6 @@
 # ADR-0111: Plugins get beans scoped to them, and message through registrations Studio converges
 
-- **Status**: accepted
+- **Status**: accepted; amended by [ADR-0213](0213-a-registration-change-is-converged-under-the-cluster-lock.md): a registration change is converged before the call returns
 - **Date**: 2026-09-24
 - **Deciders**: Mahdi Amirabdollahi
 - **Change**: `openspec/changes/plugin-messaging-and-secrets`
