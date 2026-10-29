@@ -27,7 +27,7 @@ with the commit that fixes it and its test. Owner names are the agents of this s
 | E6 | live run | Failed query retried in a loop | web | fixed |
 | E7 | live run | "Open past timeout" is not Kafka's hanging transaction (KIP-664) | OpenBroker 0.7.0 + backend + web | open: web section, live check on 0.7.0 |
 | E8 | live run | Advertised-listener failure titled "timed out" | backend | fixed 9a46f38f4 |
-| E9 | live run | Old "Artemis Studio" product screenshots | web + site-story | open |
+| E9 | live run | Old "Artemis Studio" product screenshots | web + site-story | fixed 34db7cd54, 21abc295f, 98637af38, cafe1729c |
 | E10 | live run | Stale approval-provider fixture | web | fixed |
 | S1 | storage | broker_event stores every delivered message | backend | open: ADR-0218 in test |
 | S2 | storage | broker_event bounded in time but not rows: enforce a row cap | backend | open |
