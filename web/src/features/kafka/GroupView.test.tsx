@@ -127,6 +127,8 @@ describe('a consumer group', () => {
     expect(within(dialog).getByText('Members: consumer-1, consumer-2.')).toBeInTheDocument();
     expect(within(dialog).getByRole('button', { name: /Reset 2 partitions/ })).toBeDisabled();
     expect(within(dialog).getAllByText(/Stop them before resetting/).length).toBeGreaterThan(0);
+    // A reset that cannot run moves nothing: no table of moves under the reason.
+    expect(within(dialog).queryByRole('table', { name: 'Partitions the reset would move' })).not.toBeInTheDocument();
   });
 
   it('shows a partition the position is out of range for as refused, and does not offer the reset', async () => {

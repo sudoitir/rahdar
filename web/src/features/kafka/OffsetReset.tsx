@@ -264,23 +264,28 @@ export function OffsetResetDialog({
                 <Notice tone="warning" title="This group cannot be reset right now">
                   <Stack gap={4}>
                     <Text size="sm">{current.blocked}</Text>
-                    {current.members.length > 0 ? (
+                    {current.members.length > 0 && !current.members.every((m) => current.blocked?.includes(m)) ? (
                       <Text size="sm">{`Members: ${current.members.join(', ')}.`}</Text>
                     ) : null}
                   </Stack>
                 </Notice>
               ) : null}
-              <Totals preview={current} />
-              <DataTable
-                variant="static"
-                label="Partitions the reset would move"
-                storageKey="kafka.reset"
-                columns={COLUMNS}
-                data={current.partitions}
-                rowKey={(p) => `${p.topic}/${p.partition}`}
-                height={{ maxRows: 10 }}
-                empty={null}
-              />
+              {/* A reset that cannot run moves nothing: the reason is the whole answer, not a table of moves. */}
+              {current.blocked ? null : (
+                <>
+                  <Totals preview={current} />
+                  <DataTable
+                    variant="static"
+                    label="Partitions the reset would move"
+                    storageKey="kafka.reset"
+                    columns={COLUMNS}
+                    data={current.partitions}
+                    rowKey={(p) => `${p.topic}/${p.partition}`}
+                    height={{ maxRows: 10 }}
+                    empty={null}
+                  />
+                </>
+              )}
             </Stack>
           ) : null}
         </Stack>
