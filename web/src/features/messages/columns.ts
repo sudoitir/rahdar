@@ -77,6 +77,19 @@ export interface DeadLetterRow {
   subscription: DeadLetterSubscription;
 }
 
+/**
+ * The depth the nodes reported. Null is unknown, never zero. A total that leaves some nodes out says so,
+ * because those nodes are not counted as empty.
+ */
+function deadLetterDepth(subscription: DeadLetterSubscription): string | number {
+  if (subscription.totalDepth == null) return 'Unknown';
+  if (subscription.unknownDepthNodes > 0) {
+    const nodes = subscription.unknownDepthNodes === 1 ? '1 node' : `${subscription.unknownDepthNodes} nodes`;
+    return `${subscription.totalDepth.toLocaleString()} (${nodes} unknown)`;
+  }
+  return subscription.totalDepth;
+}
+
 /** The dead-letter grid's columns. The subscription identifies a row and is never hidden. */
 export function deadLetterColumns(clusterId: string): Column<DeadLetterRow>[] {
   return [
@@ -94,7 +107,7 @@ export function deadLetterColumns(clusterId: string): Column<DeadLetterRow>[] {
     {
       id: 'depth',
       header: 'Messages',
-      accessor: (r) => r.subscription.totalDepth,
+      accessor: (r) => deadLetterDepth(r.subscription),
       kind: 'number',
       priority: 'essential',
     },

@@ -61,6 +61,7 @@ function dlq(body: Record<string, unknown>) {
 const QUEUE = {
   ...subscriptionIdentity('DLQ.orders', 'DLQ'),
   totalDepth: 7,
+  unknownDepthNodes: 0,
   perNode: [
     { nodeId: 'n1', nodeName: 'primary', depth: 4 },
     { nodeId: 'n2', nodeName: 'backup', depth: 3 },
@@ -103,6 +104,51 @@ describe('DeadLettersView', () => {
     expect(within(list).getByText('primary')).toBeInTheDocument();
     expect(within(list).getByText('4 messages')).toBeInTheDocument();
     expect(within(list).getByText('3 messages')).toBeInTheDocument();
+  });
+
+  it('says a depth no node reported is unknown, and a partial total names the nodes it leaves out', async () => {
+    signedInWith(['*']);
+    dlq({
+      settingsAvailable: true,
+      destinations: [
+        {
+          ...destinationIdentity('DLQ'),
+          purpose: 'dead-letter',
+          subscriptions: [
+            {
+              ...QUEUE,
+              totalDepth: null,
+              unknownDepthNodes: 2,
+              perNode: [
+                { nodeId: 'n1', nodeName: 'primary', depth: null },
+                { nodeId: 'n2', nodeName: 'backup', depth: null },
+              ],
+            },
+            {
+              ...QUEUE,
+              name: 'Expiry.orders',
+              totalDepth: 4,
+              unknownDepthNodes: 1,
+              perNode: [
+                { nodeId: 'n1', nodeName: 'primary', depth: 4 },
+                { nodeId: 'n2', nodeName: 'backup', depth: null },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+    const user = userEvent.setup();
+    renderWithProviders(<DeadLettersView />);
+
+    const grid = await screen.findByRole('grid', { name: 'Dead-letter subscriptions' });
+    expect(await within(grid).findByRole('gridcell', { name: 'Unknown' })).toBeInTheDocument();
+    expect(within(grid).getByRole('gridcell', { name: '4 (1 node unknown)' })).toBeInTheDocument();
+
+    await user.click(await screen.findByRole('button', { name: /^Actions for dead-letter subscription DLQ.orders/ }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Per-node breakdown' }));
+    const dialog = await screen.findByRole('dialog', { name: 'DLQ.orders by node' });
+    expect(within(dialog).getAllByText('Unknown')).toHaveLength(2);
   });
 
   it('offers Replay all through the shared preview, and explains why not to an operator who may not move messages', async () => {

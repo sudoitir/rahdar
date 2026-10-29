@@ -149,7 +149,10 @@ export function DeadLettersView() {
         {breakdown ? (
           <DescriptionList
             label="Messages on each node"
-            items={breakdown.perNode.map((n) => ({ term: n.nodeName, value: messageCount(n.depth) }))}
+            items={breakdown.perNode.map((n) => ({
+              term: n.nodeName,
+              value: n.depth == null ? 'Unknown' : messageCount(n.depth),
+            }))}
           />
         ) : null}
       </Modal>
