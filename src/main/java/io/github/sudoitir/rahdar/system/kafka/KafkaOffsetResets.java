@@ -34,6 +34,9 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class KafkaOffsetResets {
 
+    /** An audit row keeps every partition's offset up to this many, and a summary per topic beyond it. */
+    static final int SUMMARISE_ABOVE = 200;
+
     /** The parameters of {@code subscription.seek}; the etag pins the state the operator confirmed. */
     public record OffsetResetParams(
             UUID clusterId, String group, List<String> topics, String to, String value, String etag) {}
@@ -158,13 +161,39 @@ public class KafkaOffsetResets {
         }
     }
 
-    /** "topic/partition" to offset, as they are (before) or will be (after). */
-    private static Map<String, Long> moves(Plan plan, boolean before) {
-        return moves(plan, before, null);
+    /** "topic/partition" to offset, as they are (before) or will be (after), for the audit row. */
+    private static Object moves(Plan plan, boolean before) {
+        return recorded(offsets(plan, before, null));
     }
 
     /** The same, for the named topics only. */
-    private static Map<String, Long> moves(Plan plan, boolean before, List<String> topics) {
+    private static Object moves(Plan plan, boolean before, List<String> topics) {
+        return recorded(offsets(plan, before, topics));
+    }
+
+    /**
+     * The offsets as the audit row keeps them: every partition up to {@link #SUMMARISE_ABOVE}, and above that a count and
+     * the lowest and highest offset per topic, marked {@code summarised}, so a row stays small at thousands of
+     * partitions. The row's {@code to} and {@code value} still say where the reset aimed.
+     */
+    static Object recorded(Map<String, Long> offsets) {
+        if (offsets.size() <= SUMMARISE_ABOVE) {
+            return offsets;
+        }
+        Map<String, long[]> stats = new TreeMap<>();
+        offsets.forEach((key, offset) -> {
+            long[] t = stats.computeIfAbsent(
+                    key.substring(0, key.lastIndexOf('/')), topic -> new long[] {0, Long.MAX_VALUE, Long.MIN_VALUE});
+            t[0]++;
+            t[1] = Math.min(t[1], offset);
+            t[2] = Math.max(t[2], offset);
+        });
+        Map<String, Object> perTopic = new TreeMap<>();
+        stats.forEach((topic, t) -> perTopic.put(topic, Map.of("partitions", t[0], "min", t[1], "max", t[2])));
+        return Map.of("summarised", true, "topics", perTopic);
+    }
+
+    private static Map<String, Long> offsets(Plan plan, boolean before, List<String> topics) {
         Map<String, Long> out = new TreeMap<>();
         for (OffsetRow r : plan.view().partitions()) {
             if (topics != null && !topics.contains(r.topic())) {
