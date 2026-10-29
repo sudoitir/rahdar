@@ -100,7 +100,6 @@ class KafkaRegistrar implements ClusterRegistrar {
     private static final String AUTHORIZATION = "AUTHORIZATION";
     private static final int DEFAULT_PORT = 9092;
     private static final Pattern SEPARATORS = Pattern.compile("[,\\s]+");
-    private static final Pattern RELEASE = Pattern.compile("(\\d+)\\.(\\d+)");
     private static final Pattern RANGE_START = Pattern.compile("^[\\[(]\\s*(\\d+)(?:\\.(\\d+))?");
     private static final Pattern RANGE_END = Pattern.compile(",\\s*+(\\d++)(?:\\.(\\d++))?[^,]*[)\\]]\\s*+$");
     private static final Pattern LOWER_BOUND = Pattern.compile("^[\\[(]\\s*(\\d+(?:\\.\\d+)?)");
@@ -482,11 +481,10 @@ class KafkaRegistrar implements ClusterRegistrar {
     }
 
     private BrokerVersion.Support support(String text) {
-        Matcher release = RELEASE.matcher(text);
-        if (!release.find()) {
+        int[] found = releaseNumbers(text);
+        if (found == null) {
             return BrokerVersion.Support.UNKNOWN;
         }
-        int[] found = {Integer.parseInt(release.group(1)), Integer.parseInt(release.group(2))};
         String range = rangeOfDriver();
         Matcher lower = RANGE_START.matcher(range);
         if (lower.find() && compare(found, lower) < 0) {
@@ -496,6 +494,41 @@ class KafkaRegistrar implements ClusterRegistrar {
         return upper.find() && compare(found, upper) >= 0
                 ? BrokerVersion.Support.NEWER_THAN_TESTED
                 : BrokerVersion.Support.SUPPORTED;
+    }
+
+    /**
+     * The first major.minor in {@code text}, the same span {@code (digits).(digits)} would find. A dot that is not
+     * between digits is skipped. Null when the text names no release.
+     */
+    private static int[] releaseNumbers(String text) {
+        int i = 0;
+        int length = text.length();
+        while (i < length) {
+            if (!Character.isDigit(text.charAt(i))) {
+                i++;
+                continue;
+            }
+            int majorStart = i;
+            while (i < length && Character.isDigit(text.charAt(i))) {
+                i++;
+            }
+            int majorEnd = i;
+            if (i >= length || text.charAt(i) != '.') {
+                continue;
+            }
+            i++;
+            if (i >= length || !Character.isDigit(text.charAt(i))) {
+                continue;
+            }
+            int minorStart = i;
+            while (i < length && Character.isDigit(text.charAt(i))) {
+                i++;
+            }
+            return new int[] {
+                Integer.parseInt(text.substring(majorStart, majorEnd)), Integer.parseInt(text.substring(minorStart, i))
+            };
+        }
+        return null;
     }
 
     private static int compare(int[] version, Matcher bound) {
