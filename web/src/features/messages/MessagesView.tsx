@@ -297,8 +297,6 @@ export function MessagesView() {
     <Page fill>
       {header}
       {uncertainty}
-      {partitioned ? <PartitionNotices page={messages.data} browse={browse} /> : null}
-
       <Toolbar
         label="Message filters"
         start={
@@ -362,6 +360,9 @@ export function MessagesView() {
         selected={selected}
         onCleared={() => setSelected(new Set())}
       />
+
+      {/* Below the controls, so what the read has to say arrives under them and never pushes them down. */}
+      {partitioned ? <PartitionNotices page={messages.data} browse={browse} /> : null}
 
       <DataTable
         label="Messages"

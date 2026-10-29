@@ -7,7 +7,7 @@ import { followInApp } from './inAppNavigation.ts';
 export function HeldRequestLink({ id }: Readonly<{ id: string }>) {
   const to = approvalPath(id);
   return (
-    <Anchor href={to} size="sm" onClick={(event) => followInApp(event, to)}>
+    <Anchor href={to} size="sm" underline="always" onClick={(event) => followInApp(event, to)}>
       View request
     </Anchor>
   );
