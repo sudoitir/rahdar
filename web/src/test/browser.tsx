@@ -33,13 +33,18 @@ export function contentWidth(windowWidth: number): number {
   return windowWidth - navW - 2 * padding - scrollBarWidth();
 }
 
-/** A box of a fixed size, standing in for the content area of a window of that width. */
+/**
+ * A box of a fixed size, standing in for the content area of a window of that width. It is a column,
+ * as the shell's main area is, so a page that fills grows into the height and its grid has a viewport.
+ */
 export function Frame({
   width,
   height = 480,
   children,
 }: Readonly<{ width: number; height?: number; children: ReactNode }>) {
-  return <div style={{ inlineSize: width, blockSize: height }}>{children}</div>;
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', inlineSize: width, blockSize: height }}>{children}</div>
+  );
 }
 
 /** `ui` under Mantine with the application's real theme and variables resolver, in one colour scheme. */

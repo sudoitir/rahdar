@@ -23,6 +23,8 @@ import { SubscriptionHealthPanel } from './SubscriptionHealthPanel.tsx';
 const row = (subscriptionName: string, verdict: string, severity: number, over: Record<string, unknown> = {}) => ({
   destination: `artemis.address/${subscriptionName}`,
   subscription: `artemis.queue/${subscriptionName}`,
+  kind: 'artemis.queue',
+  kindLabel: { singular: 'Queue', plural: 'Queues' },
   verdict,
   severity,
   cause: 'The consumer is blocked, or a message it cannot process is being redelivered.',

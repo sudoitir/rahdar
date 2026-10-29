@@ -355,6 +355,7 @@ const dlqRow = (f: Fixture, i: number): DeadLetterRow => ({
     ...subscriptionIdentity(name(f, 'DLQ.orders', i)),
     destination: destinationId(f === 'normal' ? ['DLQ', 'ExpiryQueue'][i % 2] : address(f, i)),
     totalDepth: num(f, 1_204 + i),
+    unknownDepthNodes: 0,
     perNode: [
       { nodeId: 'node-1', nodeName: 'broker-1', depth: num(f, 600 + i) },
       { nodeId: 'node-2', nodeName: 'broker-2', depth: num(f, 604) },
@@ -826,7 +827,7 @@ export const VIEWS: TableView_[] = [
     rows: (f) => ROWS.map((i) => brokerEvent(f, i)),
     rowKey: (r) => String(r.seq),
     identifiers: ['address', 'subject'],
-    visible1280: ['time', 'type', 'family', 'destination', 'subject', 'remote'],
+    visible1280: ['time', 'type', 'family', 'destination', 'subject', 'summary', 'remote'],
   }),
   view({
     name: 'audit',
