@@ -156,7 +156,7 @@ the reason in a popover; UNAVAILABLE reads "Unavailable" with the reason, never 
 
 ### D7. The `system/kafka` module and its API (ADR-0216)
 Backend `system/kafka` (`KafkaModule`, its read services and gated operations); web
-`features/kafka` with views `system: 'kafka'` in the cluster's navigation. One table, `kafka_connection` (ADR-0204 prefix), holds a cluster's non-secret connection settings (bootstrap servers, protocol, mechanism, client id); the account is the cluster's `broker_credential` (a token held as its password), the TLS bundle `broker_tls`, and the cluster id a `broker_identity` of kind `CLUSTER_ID`. Routes are
+`features/kafka` with views `system: 'kafka'` in the cluster's navigation. Two tables (ADR-0204 prefix): `kafka_connection` holds a cluster's non-secret connection settings (bootstrap servers, protocol, mechanism, client id), and `kafka_health` the verdict the scrape last formed (written by the scrape only, when it changes and every 30 s otherwise; health reads it and never calls a broker, and a row older than two minutes reads as UNKNOWN); the account is the cluster's `broker_credential` (a token held as its password), the TLS bundle `broker_tls`, and the cluster id a `broker_identity` of kind `CLUSTER_ID`. Routes are
 under `/api/v1/clusters/{c}/kafka/`; `SystemNamespaceInterceptor` answers other systems 404 before
 any broker call. Lists page with an opaque `cursor` and `limit` (default 100, max 500).
 
