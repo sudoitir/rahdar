@@ -1,6 +1,8 @@
 package io.github.sudoitir.rahdar.system.kafka;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import io.github.sudoitir.openbroker.BrokerException;
 import io.github.sudoitir.openbroker.Dispatch;
@@ -24,6 +26,10 @@ import io.github.sudoitir.openbroker.model.NodeFunction;
 import io.github.sudoitir.openbroker.model.Serving;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterHealth;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterHealth.Level;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -211,5 +217,50 @@ class KafkaHealthTest {
 
         assertThat(health.level()).isEqualTo(Level.CRITICAL);
         assertThat(health.liveEndpointNames()).isEmpty();
+    }
+
+    private final KafkaHealthStore store = mock(KafkaHealthStore.class);
+    private final Instant[] now = {Instant.parse("2026-10-29T10:00:00Z")};
+    private final KafkaHealth health = new KafkaHealth(store, new Clock() {
+        @Override
+        public ZoneId getZone() {
+            return ZoneOffset.UTC;
+        }
+
+        @Override
+        public Clock withZone(ZoneId zone) {
+            return this;
+        }
+
+        @Override
+        public Instant instant() {
+            return now[0];
+        }
+    });
+
+    @Test
+    void healthIsWhatTheScrapeWroteAndNeverACallToABroker() {
+        ClusterHealth written =
+                KafkaHealth.verdict(CLUSTER, Level.DEGRADED, List.of("broker-1"), List.of("note"), true);
+        when(store.read(CLUSTER)).thenReturn(Optional.of(new KafkaHealthStore.Stored(written, now[0])));
+
+        assertThat(health.evaluate(CLUSTER, List.of(), Set.of())).isEqualTo(written);
+        // It holds no way to reach a broker, so a blocked or slow driver cannot delay a health request.
+        assertThat(KafkaHealth.class.getDeclaredFields())
+                .noneMatch(field -> field.getType().getName().startsWith("io.github.sudoitir.rahdar.platform.broker"))
+                .noneMatch(field -> field.getType().getName().startsWith("io.github.sudoitir.openbroker"));
+    }
+
+    @Test
+    void aClusterTheScrapeHasNotReadOrHasStoppedReadingIsUnknownWithTheReason() {
+        assertThat(health.evaluate(CLUSTER, List.of(), Set.of()).level()).isEqualTo(Level.UNKNOWN);
+
+        ClusterHealth written = KafkaHealth.verdict(CLUSTER, Level.OK, List.of("broker-1"), List.of(), false);
+        when(store.read(CLUSTER)).thenReturn(Optional.of(new KafkaHealthStore.Stored(written, now[0])));
+        now[0] = now[0].plus(KafkaHealth.STALE).plusSeconds(1);
+
+        ClusterHealth stale = health.evaluate(CLUSTER, List.of(), Set.of());
+        assertThat(stale.level()).isEqualTo(Level.UNKNOWN);
+        assertThat(stale.notes()).anyMatch(n -> n.contains("last read this cluster at"));
     }
 }

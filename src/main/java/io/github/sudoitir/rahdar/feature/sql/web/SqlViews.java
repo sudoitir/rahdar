@@ -93,7 +93,12 @@ public final class SqlViews {
             int messageType,
             boolean durable,
             int priority,
-            long timestamp,
+
+            @Schema(
+                    nullable = true,
+                    description = "When the producer stamped it, epoch milliseconds; null when it carries no time.")
+            Long timestamp,
+
             long expiration,
             long size,
             String jmsType,

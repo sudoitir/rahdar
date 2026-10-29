@@ -8,6 +8,7 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -58,9 +59,10 @@ class KafkaScrapeTest {
     private final SimpleMeterRegistry meters = new SimpleMeterRegistry();
     private final AuditService audit = mock(AuditService.class);
     private final ActorResolver actors = mock(ActorResolver.class);
+    private final KafkaHealthStore healthStore = mock(KafkaHealthStore.class);
     private final MutableClock clock = new MutableClock();
     private final KafkaScrape scrape =
-            new KafkaScrape(gateway, clusters, recorder, partitions, meters, audit, actors, clock);
+            new KafkaScrape(gateway, clusters, recorder, partitions, meters, audit, actors, clock, healthStore);
 
     /** A clock the test moves. */
     private static final class MutableClock extends Clock {
@@ -234,6 +236,25 @@ class KafkaScrapeTest {
                         .counter()
                         .count())
                 .isEqualTo(2);
+    }
+
+    @Test
+    void theHealthVerdictIsWrittenWhenItChangesAndOtherwiseOnlyOnTheHeartbeat() {
+        ClusterNode one = stored("1");
+        when(clusters.nodes(CLUSTER)).thenReturn(List.of(one));
+        clusterReports(broker("1"));
+
+        scrape.nodes(CLUSTER, 1);
+        scrape.nodes(CLUSTER, 2);
+        verify(healthStore, times(1)).write(any(), any());
+
+        clock.advance(KafkaScrape.HEALTH_HEARTBEAT);
+        scrape.nodes(CLUSTER, 3);
+        verify(healthStore, times(2)).write(any(), any());
+
+        clusterReports(broker("1"), brokerOf("2", "x"));
+        scrape.nodes(CLUSTER, 4);
+        verify(healthStore, times(3)).write(any(), any());
     }
 
     @Test

@@ -149,7 +149,8 @@ public class AlertEvaluator {
             boolean active = evaluation.active().containsKey(subject);
             Double value = evaluation.active().get(subject);
 
-            Transition t = AlertStateMachine.advance(state, active, value, rule.getForSeconds(), now);
+            Transition t =
+                    AlertStateMachine.advance(state, active, value, rule.getForSeconds(), resolveSeconds(rule), now);
             if (!"OK".equals(state.getState())) {
                 states.save(state);
             } else if (!isNew) {
@@ -172,6 +173,11 @@ public class AlertEvaluator {
             states.delete(orphan);
         }
         return transitions;
+    }
+
+    /** A state rule's alert holds its resolution, because a broker that flaps drives it; a threshold's does not. */
+    private static int resolveSeconds(AlertRuleEntity rule) {
+        return "STATE".equals(rule.getKind()) ? AlertStateMachine.STATE_RESOLVE_SECONDS : 0;
     }
 
     private void recordHistory(AlertRuleEntity rule, Transition t, Instant now) {

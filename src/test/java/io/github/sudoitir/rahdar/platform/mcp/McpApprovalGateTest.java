@@ -57,7 +57,7 @@ class McpApprovalGateTest extends PostgresIntegrationTest {
     @MockitoBean
     ResourceTargets targets;
 
-    /** No cluster is registered behind this test either, so no subscription is a log. */
+    /** The cluster's kinds are not read either: none is a partitioned log, so a purge empties a queue. */
     @MockitoBean
     ClusterKinds kinds;
 

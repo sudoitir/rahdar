@@ -152,6 +152,47 @@ class OpenApiConfig {
     }
 
     /**
+     * A union keyed by a discriminator ({@code oneOf} with a discriminator) lists members that each say they are the
+     * union too ({@code allOf} of the union), which is a cycle: openapi-generator makes every member extend the union
+     * and override the other members' properties, and the Java client does not compile. A member stands alone here,
+     * with its own properties and required list, and the union keeps only its {@code oneOf} and discriminator.
+     */
+    @Bean
+    OpenApiCustomizer unionMembersStandAlone() {
+        return openApi -> {
+            Map<String, Schema> schemas = openApi.getComponents().getSchemas();
+            new ArrayList<>(schemas.entrySet()).forEach(union -> {
+                Schema<?> parent = union.getValue();
+                if (parent.getOneOf() == null || parent.getDiscriminator() == null) {
+                    return;
+                }
+                String parentRef = "#/components/schemas/" + union.getKey();
+                for (Object member : parent.getOneOf()) {
+                    String ref = ((Schema<?>) member).get$ref();
+                    Schema<?> child = ref == null ? null : schemas.get(ref.substring(ref.lastIndexOf('/') + 1));
+                    if (child == null || child.getAllOf() == null) {
+                        continue;
+                    }
+                    Schema<?> flat = new ObjectSchema();
+                    for (Object part : child.getAllOf()) {
+                        Schema<?> piece = (Schema<?>) part;
+                        if (!parentRef.equals(piece.get$ref()) && piece.getProperties() != null) {
+                            piece.getProperties().forEach(flat::addProperty);
+                        }
+                    }
+                    if (child.getRequired() != null) {
+                        child.getRequired().forEach(flat::addRequiredItem);
+                    }
+                    flat.setDescription(child.getDescription());
+                    schemas.put(ref.substring(ref.lastIndexOf('/') + 1), flat);
+                }
+                parent.setProperties(null);
+                parent.setRequired(null);
+            });
+        };
+    }
+
+    /**
      * Every {@code POST}, {@code PUT}, {@code PATCH} and {@code DELETE} accepts an optional
      * {@code Idempotency-Key} (ADR-0150). The refusals it adds are problems, covered by {@code 4XX}.
      */

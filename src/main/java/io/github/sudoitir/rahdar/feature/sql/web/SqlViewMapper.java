@@ -69,7 +69,7 @@ public class SqlViewMapper {
                 row.messageType(),
                 row.durable(),
                 row.priority(),
-                row.timestamp(),
+                row.timestamp() > 0 ? row.timestamp() : null,
                 row.expiration(),
                 row.size(),
                 row.jmsType(),

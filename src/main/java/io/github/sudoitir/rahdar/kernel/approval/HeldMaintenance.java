@@ -6,6 +6,7 @@ import io.github.sudoitir.rahdar.kernel.gate.HeldState;
 import io.github.sudoitir.rahdar.kernel.plugin.PluginInstallStatus;
 import io.github.sudoitir.rahdar.kernel.plugin.PluginStatusChanged;
 import io.github.sudoitir.rahdar.kernel.replica.ReplicaRegistry;
+import io.github.sudoitir.rahdar.kernel.replica.ReplicaSignal;
 import io.github.sudoitir.rahdar.kernel.security.Actor;
 import java.util.ArrayList;
 import java.util.List;
@@ -21,7 +22,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Ends held requests nobody will finish (ADR-0180): those past their expiry or run deadline, those whose provider was
- * removed, and those whose running replica disappeared, which become {@code OUTCOME_UNKNOWN} and never run again. Each
+ * removed, those of a cluster that was deleted, and those whose running replica disappeared, which become {@code OUTCOME_UNKNOWN} and never run again. Each
  * batch is one transaction that skips rows another writer holds, and every time check is the database's. Expiry is
  * exact even when the job is late, because the vote and the claim check the time themselves.
  */
@@ -40,6 +41,12 @@ class HeldMaintenance {
             + " plugin_install WHERE approval_provider AND status IN (" + DESIRED_ACTIVE + ")) OR (position(':' IN"
             + " type) > 0 AND split_part(type, ':', 1) NOT IN (SELECT id FROM plugin_install WHERE status IN ("
             + DESIRED_ACTIVE + "))))";
+
+    /** Open and not yet running, of a cluster that has been deleted. */
+    private static final String CLUSTER_GONE =
+            "state IN ('HELD', 'APPROVED') AND cluster_id IS NOT NULL AND cluster_id NOT IN (SELECT id FROM cluster)";
+
+    static final String CLUSTER_DELETED = "The cluster was deleted, so this request was cancelled.";
 
     static final String PROVIDER_REMOVED = "The approval provider was removed, so this request was cancelled.";
 
@@ -85,6 +92,13 @@ class HeldMaintenance {
                 "The Rahdar instance running it stopped before recording the outcome. It will not run again; check"
                         + " the audit log, then request it again if needed.");
         drain(ORPHANED, List.of(), HeldState.CANCELLED, PROVIDER_REMOVED);
+        drain(CLUSTER_GONE, List.of(), HeldState.CANCELLED, CLUSTER_DELETED);
+    }
+
+    /** A cluster was deleted on any replica, once its transaction committed: its open requests end now. */
+    @EventListener(condition = "#signal.kind() == 'cluster-deleted'")
+    void onClusterDeleted(ReplicaSignal signal) {
+        drain(CLUSTER_GONE, List.of(), HeldState.CANCELLED, CLUSTER_DELETED);
     }
 
     private void drain(String where, List<Object> args, HeldState to, String detail) {

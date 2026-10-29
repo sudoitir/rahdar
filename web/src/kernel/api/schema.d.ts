@@ -4612,36 +4612,28 @@ export interface components {
             /** Format: int64 */
             bytes: number;
         };
-        ArtemisConnection: Omit<WithRequired<components["schemas"]["Connection"], "system">, "system"> & {
-            /** @enum {string} */
+        ArtemisConnection: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
             system: "artemis";
             seedUrls: string[];
             credentials?: components["schemas"]["Credentials"];
             coreCredentials?: components["schemas"]["Credentials"];
             tlsBundle?: string;
             managementUrlPattern?: string;
-        } & {
-            /**
-             * @description discriminator enum property added by openapi-typescript
-             * @enum {string}
-             */
-            system: "artemis";
-        } & {
-            /**
-             * @description discriminator enum property added by openapi-typescript
-             * @enum {string}
-             */
-            system: "artemis";
         };
-        Connection: {
-            system: string;
-        } & (components["schemas"]["ArtemisConnection"] | components["schemas"]["KafkaConnection"]);
+        Connection: components["schemas"]["ArtemisConnection"] | components["schemas"]["KafkaConnection"];
         Credentials: {
             username: string;
             password: string;
         };
-        KafkaConnection: Omit<WithRequired<components["schemas"]["Connection"], "system">, "system"> & {
-            /** @enum {string} */
+        KafkaConnection: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
             system: "kafka";
             bootstrapServers: string[];
             securityProtocol: string;
@@ -4649,18 +4641,6 @@ export interface components {
             credentials?: components["schemas"]["KafkaCredentials"];
             tlsBundle?: string;
             clientId?: string;
-        } & {
-            /**
-             * @description discriminator enum property added by openapi-typescript
-             * @enum {string}
-             */
-            system: "kafka";
-        } & {
-            /**
-             * @description discriminator enum property added by openapi-typescript
-             * @enum {string}
-             */
-            system: "kafka";
         };
         KafkaCredentials: {
             username?: string;
@@ -6257,51 +6237,31 @@ export interface components {
             username?: string;
             password?: string;
         };
-        ArtemisConnectionUpdate: Omit<components["schemas"]["ConnectionUpdate"], "system"> & {
-            /** @enum {string} */
-            system?: "artemis";
+        ArtemisConnectionUpdate: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            system: "artemis";
             seedUrls?: string[];
             managementUrlPattern?: string;
             tlsBundle?: string;
             management?: components["schemas"]["AccountUpdate"];
             core?: components["schemas"]["AccountUpdate"];
-        } & {
-            /**
-             * @description discriminator enum property added by openapi-typescript
-             * @enum {string}
-             */
-            system: "artemis";
-        } & {
-            /**
-             * @description discriminator enum property added by openapi-typescript
-             * @enum {string}
-             */
-            system: "artemis";
         };
-        ConnectionUpdate: {
-            system: string;
-        } & (components["schemas"]["ArtemisConnectionUpdate"] | components["schemas"]["KafkaConnectionUpdate"]);
-        KafkaConnectionUpdate: Omit<components["schemas"]["ConnectionUpdate"], "system"> & {
-            /** @enum {string} */
-            system?: "kafka";
+        ConnectionUpdate: components["schemas"]["ArtemisConnectionUpdate"] | components["schemas"]["KafkaConnectionUpdate"];
+        KafkaConnectionUpdate: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            system: "kafka";
             bootstrapServers?: string[];
             securityProtocol?: string;
             saslMechanism?: string;
             credentials?: components["schemas"]["KafkaCredentials"];
             tlsBundle?: string;
             clientId?: string;
-        } & {
-            /**
-             * @description discriminator enum property added by openapi-typescript
-             * @enum {string}
-             */
-            system: "kafka";
-        } & {
-            /**
-             * @description discriminator enum property added by openapi-typescript
-             * @enum {string}
-             */
-            system: "kafka";
         };
         UpdateClusterRequest: {
             name?: string;
@@ -7425,8 +7385,11 @@ export interface components {
             durable: boolean;
             /** Format: int32 */
             priority: number;
-            /** Format: int64 */
-            timestamp: number;
+            /**
+             * Format: int64
+             * @description When the producer stamped it, epoch milliseconds; null when it carries no time.
+             */
+            timestamp?: number | null;
             /** Format: int64 */
             expiration: number;
             /** Format: int64 */
@@ -7808,6 +7771,10 @@ export interface components {
              */
             node?: string | null;
             log?: components["schemas"]["LogView"] | null;
+            /** @description The page was cut short at its byte budget: messages the broker returned are not in it. Ask for a smaller page, or, on a log, continue from log.next. */
+            truncated: boolean;
+            /** @description Something worth saying about this page, such as why it is empty. */
+            notice?: string | null;
         };
         MessageSummaryView: {
             /** @description The message's position on its node, opaque. */
@@ -7817,8 +7784,11 @@ export interface components {
             durable: boolean;
             /** Format: int32 */
             priority: number;
-            /** Format: int64 */
-            timestamp: number;
+            /**
+             * Format: int64
+             * @description When the producer stamped it, epoch milliseconds; null when it carries no time.
+             */
+            timestamp?: number | null;
             /** Format: int64 */
             expiration: number;
             /** Format: int64 */
@@ -7834,6 +7804,11 @@ export interface components {
             tombstone: boolean;
             /** @description A log record's key as text, or base64 when it is not text. */
             key?: string | null;
+            /**
+             * @description How key is written; null with no key.
+             * @enum {string|null}
+             */
+            keyEncoding?: "TEXT" | "BASE64" | null;
         };
         MessageDetailView: {
             /** @description The message's position on its node, opaque. */
@@ -7843,8 +7818,11 @@ export interface components {
             durable: boolean;
             /** Format: int32 */
             priority: number;
-            /** Format: int64 */
-            timestamp: number;
+            /**
+             * Format: int64
+             * @description When the producer stamped it, epoch milliseconds; null when it carries no time.
+             */
+            timestamp?: number | null;
             /** Format: int64 */
             expiration: number;
             /** Format: int64 */
@@ -7884,6 +7862,11 @@ export interface components {
             withheld: components["schemas"]["WithheldView"][];
             tombstone: boolean;
             key?: string | null;
+            /**
+             * @description How key is written; null with no key.
+             * @enum {string|null}
+             */
+            keyEncoding?: "TEXT" | "BASE64" | null;
         };
         /** @description Who has access to one subscription or destination through teams: its owner and every share. */
         ResourceAccessView: {
@@ -26171,6 +26154,3 @@ export interface operations {
         };
     };
 }
-type WithRequired<T, K extends keyof T> = T & {
-    [P in K]-?: T[P];
-};

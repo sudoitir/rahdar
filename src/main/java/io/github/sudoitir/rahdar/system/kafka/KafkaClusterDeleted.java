@@ -6,12 +6,14 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
-/** Lets go of what this replica keeps for a Kafka cluster once the cluster is deleted, on any replica. */
+/**
+ * Lets go of what this replica keeps in memory for a Kafka cluster once the cluster is deleted, on any replica. Its
+ * stored health row goes with the cluster.
+ */
 @Component
 @RequiredArgsConstructor
 class KafkaClusterDeleted {
 
-    private final KafkaHealth health;
     private final KafkaPartitions partitions;
     private final KafkaScrape scrape;
 
@@ -21,7 +23,6 @@ class KafkaClusterDeleted {
     }
 
     void forget(UUID clusterId) {
-        health.forget(clusterId);
         partitions.forget(clusterId);
         scrape.forget(clusterId);
     }

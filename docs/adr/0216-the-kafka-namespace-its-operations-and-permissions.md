@@ -14,7 +14,7 @@ or a truncate, affect applications the operator does not see.
 ## Decision
 
 - **Namespace.** `system/kafka` and the web's `features/kafka`, under `/clusters/{c}/kafka/…` (ADR-0207).
-  It reads and writes the broker only through the SDK, and keeps one table, `kafka_connection`, for a cluster's non-secret connection settings.
+  It reads and writes the broker only through the SDK, and keeps two tables: `kafka_connection`, a cluster's non-secret connection settings, and `kafka_health`, the verdict the scrape last formed for the cluster (level, brokers serving, notes in words), which only the scrape writes (when it changes, and every 30 seconds otherwise) and which health only reads, so a health request never calls a broker and every replica answers alike. A cluster with no row, or one older than two minutes, is UNKNOWN, with the reason in the notes.
 - **Operations.** Offset reset, configuration change, ACL change and transaction abort are gated
   operations with an `Effect` whose etag is the state key: a preview, a held confirmation, the approval
   gate, and an audit with before and after. An approved request checks its etag again when it runs.
