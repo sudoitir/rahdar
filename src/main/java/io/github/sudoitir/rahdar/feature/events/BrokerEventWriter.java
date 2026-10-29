@@ -1,10 +1,12 @@
 package io.github.sudoitir.rahdar.feature.events;
 
+import io.github.sudoitir.openbroker.notification.EventTypes;
 import io.github.sudoitir.rahdar.kernel.core.PartitionProvisioner;
 import io.github.sudoitir.rahdar.kernel.replica.ReplicaSignal;
 import io.github.sudoitir.rahdar.platform.broker.BrokerEvent;
 import io.github.sudoitir.rahdar.platform.broker.BrokerEventSink;
 import java.sql.Timestamp;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -38,6 +40,11 @@ import tools.jackson.databind.ObjectMapper;
  * without blocking, a scheduled {@link #flush} does one JDBC batch, and the
  * buffer is bounded: overflow is dropped and counted per cluster, surfaced by
  * the events API rather than silently.
+ *
+ * <p>A message delivery is the one event with one notification per message, so it is never a row of its
+ * own: deliveries are counted in memory per destination and subscription, and each flush turns the counts
+ * into one summary row per key. The rows grow with the active destinations and the flush interval, not with
+ * traffic (ADR-0218). Every other type is stored verbatim.
  */
 @Component
 @Slf4j
@@ -69,6 +76,22 @@ public class BrokerEventWriter implements BrokerEventSink {
     private final TransactionTemplate transaction;
     private final PartitionProvisioner partitions;
 
+    private record TallyKey(UUID clusterId, UUID nodeId, String destination, String subscription) {}
+
+    private static final class Tally {
+        private long count;
+        private Instant first;
+        private Instant last;
+
+        synchronized void add(Instant at) {
+            count++;
+            first = first == null || at.isBefore(first) ? at : first;
+            last = last == null || at.isAfter(last) ? at : last;
+        }
+    }
+
+    private final Map<TallyKey, Tally> delivered = new ConcurrentHashMap<>();
+
     private final LinkedBlockingDeque<BrokerEvent> buffer = new LinkedBlockingDeque<>();
     private final Map<UUID, AtomicLong> dropped = new ConcurrentHashMap<>();
     private volatile int capacity;
@@ -99,6 +122,14 @@ public class BrokerEventWriter implements BrokerEventSink {
 
     @Override
     public void accept(BrokerEvent event) {
+        if (EventTypes.MESSAGE_DELIVERED.equals(event.type())) {
+            delivered
+                    .computeIfAbsent(
+                            new TallyKey(event.clusterId(), event.nodeId(), event.destination(), event.subscription()),
+                            k -> new Tally())
+                    .add(event.occurredAt());
+            return;
+        }
         if (buffer.size() >= capacity) {
             dropped.computeIfAbsent(event.clusterId(), k -> new AtomicLong()).incrementAndGet();
             return;
@@ -111,6 +142,7 @@ public class BrokerEventWriter implements BrokerEventSink {
     void onClusterDeleted(ReplicaSignal signal) {
         UUID clusterId = UUID.fromString(signal.key());
         buffer.removeIf(event -> event.clusterId().equals(clusterId));
+        delivered.keySet().removeIf(key -> key.clusterId().equals(clusterId));
         dropped.remove(clusterId);
     }
 
@@ -128,6 +160,7 @@ public class BrokerEventWriter implements BrokerEventSink {
      * events can never be stored, so they are dropped and counted and the rest goes on.
      */
     public void flush() {
+        summariseDeliveries();
         List<BrokerEvent> batch = new ArrayList<>(BATCH_MAX);
         buffer.drainTo(batch, BATCH_MAX);
         if (batch.isEmpty()) {
@@ -148,6 +181,40 @@ public class BrokerEventWriter implements BrokerEventSink {
         }
     }
 
+    /** One row per destination and subscription that saw deliveries since the last flush, with the count. */
+    private void summariseDeliveries() {
+        for (TallyKey key : List.copyOf(delivered.keySet())) {
+            Tally tally = delivered.remove(key);
+            if (tally == null) {
+                continue;
+            }
+            Map<String, Object> data;
+            Instant last;
+            synchronized (tally) {
+                data = Map.of("count", tally.count, "from", tally.first.toString(), "to", tally.last.toString());
+                last = tally.last;
+            }
+            BrokerEvent summary = new BrokerEvent(
+                    key.clusterId(),
+                    key.nodeId(),
+                    EventTypes.MESSAGE_DELIVERED,
+                    last,
+                    key.destination(),
+                    key.subscription(),
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    data);
+            if (buffer.size() >= capacity) {
+                dropped.computeIfAbsent(key.clusterId(), k -> new AtomicLong()).incrementAndGet();
+            } else {
+                buffer.add(summary);
+            }
+        }
+    }
+
     /**
      * Flush until the buffer is empty or a write fails — the shutdown flush. A failure is
      * logged rather than thrown: shutdown continues, and what could not be written is what
@@ -155,6 +222,7 @@ public class BrokerEventWriter implements BrokerEventSink {
      */
     public void drain() {
         try {
+            summariseDeliveries();
             while (!buffer.isEmpty()) {
                 flush();
             }

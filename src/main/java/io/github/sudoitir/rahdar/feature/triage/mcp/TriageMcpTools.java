@@ -281,7 +281,25 @@ public class TriageMcpTools {
                 e.username(),
                 e.destination() != null ? e.destination() : e.routingName(),
                 "observed",
-                e.consumerName() != null ? "consumer=" + e.consumerName() : null);
+                delivered(e) != null ? delivered(e) : e.consumerName() != null ? "consumer=" + e.consumerName() : null);
+    }
+
+    /**
+     * A delivered row is a summary of the messages delivered on a destination over an interval, not one
+     * delivery: its props hold {@code count}, {@code from} and {@code to}.
+     */
+    private static String delivered(EventViews.BrokerEventView e) {
+        if (!"openbroker.message.delivered".equals(e.type())
+                || e.props() == null
+                || !e.props().containsKey("count")) {
+            return null;
+        }
+        String where = e.destination() == null ? "?" : e.destination();
+        if (e.routingName() != null) {
+            where += "/" + e.routingName();
+        }
+        return e.props().get("count") + " messages delivered on " + where + " between "
+                + e.props().get("from") + " and " + e.props().get("to");
     }
 
     private static McpViews.ActivityRow toActivity(AuditViews.AuditEventView e) {

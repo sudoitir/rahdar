@@ -65,7 +65,10 @@ and node, the notification timestamp, and — where the notification provides th
 remote-address identifiers. The complete set of `_AMQ_*` properties SHALL be
 retained verbatim on the event. A notification whose type is not recognised
 SHALL still produce an event, marked with the unrecognised type rather than
-discarded.
+discarded. A message-delivered notification, which the broker sends once per
+message, SHALL be counted per destination and subscription and stored as one
+summary row per flush interval (with the count and the interval), never as a row
+per message; request-reply tracing SHALL still receive each delivery live.
 
 Each normalised event SHALL be delivered to every registered consumer of the
 notification stream, not only the event-history writer. A delivery failure in
