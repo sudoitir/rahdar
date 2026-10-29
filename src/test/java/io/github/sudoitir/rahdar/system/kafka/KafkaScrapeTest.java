@@ -44,6 +44,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 /** The scrape keeps a Kafka cluster's stored brokers true: one that joined is added, one that left is marked. */
 class KafkaScrapeTest {
@@ -55,12 +56,11 @@ class KafkaScrapeTest {
     private final NodeStateRecorder recorder = mock(NodeStateRecorder.class);
     private final KafkaPartitions partitions = mock(KafkaPartitions.class);
     private final SimpleMeterRegistry meters = new SimpleMeterRegistry();
-    private final KafkaIdentityWatch identity = new KafkaIdentityWatch();
     private final AuditService audit = mock(AuditService.class);
     private final ActorResolver actors = mock(ActorResolver.class);
     private final MutableClock clock = new MutableClock();
     private final KafkaScrape scrape =
-            new KafkaScrape(gateway, clusters, recorder, partitions, meters, identity, audit, actors, clock);
+            new KafkaScrape(gateway, clusters, recorder, partitions, meters, audit, actors, clock);
 
     /** A clock the test moves. */
     private static final class MutableClock extends Clock {
@@ -260,16 +260,23 @@ class KafkaScrapeTest {
         verify(recorder, never()).applyTierA(any(), any(), anyLong());
         verify(recorder, never()).adopt(any(), any(), any(), any());
         verify(partitions, never()).refresh(any());
-        assertThat(identity.change(CLUSTER))
-                .hasValueSatisfying(words -> assertThat(words)
-                        .isEqualTo("The cluster at this address changed: it reports cluster id new-id, registered as"
-                                + " registered-id. Re-register it or restore the original cluster."));
+        ArgumentCaptor<String> words = ArgumentCaptor.forClass(String.class);
+        verify(recorder)
+                .recordNodeError(eq(one.getId()), words.capture(), eq(BrokerConnectionException.Kind.UNREACHABLE));
+        assertThat(words.getValue())
+                .isEqualTo("The cluster at this address changed: it reports cluster id new-id, registered as"
+                        + " registered-id. Re-register it or restore the original cluster.");
+
+        // Another replica reads the same words from the stored broker, and both health and the sweep stop on them.
+        when(one.getLastError()).thenReturn(words.getValue());
+        assertThat(KafkaClusterIdentity.recorded(List.of(one))).hasValue(words.getValue());
         assertThatThrownBy(() -> scrape.subscriptions(CLUSTER)).isInstanceOf(IllegalStateException.class);
 
+        when(one.getLastError()).thenReturn(null);
         clusterReports(brokerOf("1", "registered-id"));
         scrape.nodes(CLUSTER, 2);
 
         verify(recorder).applyTierA(eq(one.getId()), any(), eq(2L));
-        assertThat(identity.change(CLUSTER)).isEmpty();
+        assertThat(KafkaClusterIdentity.recorded(List.of(one))).isEmpty();
     }
 }

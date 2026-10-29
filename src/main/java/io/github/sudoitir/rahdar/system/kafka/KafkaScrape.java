@@ -58,7 +58,6 @@ class KafkaScrape implements ClusterScrape {
 
     private final KafkaPartitions partitions;
     private final MeterRegistry meters;
-    private final KafkaIdentityWatch identity;
     private final AuditService audit;
     private final ActorResolver actors;
     private final Clock clock;
@@ -93,8 +92,11 @@ class KafkaScrape implements ClusterScrape {
                 .map(String::valueOf)
                 .findFirst()
                 .orElse(null);
-        if (identity.check(
-                clusterId, live, clusters.registeredIdentity(clusterId).orElse(null))) {
+        Optional<String> changed = KafkaClusterIdentity.change(
+                live, clusters.registeredIdentity(clusterId).orElse(null));
+        if (changed.isPresent()) {
+            stored.forEach(node ->
+                    recorder.recordNodeError(node.getId(), changed.get(), BrokerConnectionException.Kind.UNREACHABLE));
             return;
         }
         Map<String, ClusterNode> byBroker = new HashMap<>();
@@ -190,7 +192,7 @@ class KafkaScrape implements ClusterScrape {
     /** Every subscription of the cluster, a group on a topic, carried by its first stored broker. */
     @Override
     public List<QueueRow> subscriptions(UUID clusterId) {
-        identity.change(clusterId).ifPresent(change -> {
+        KafkaClusterIdentity.recorded(clusters.nodes(clusterId)).ifPresent(change -> {
             throw new IllegalStateException(change);
         });
         ClusterNode carrier = clusters.nodes(clusterId).stream()

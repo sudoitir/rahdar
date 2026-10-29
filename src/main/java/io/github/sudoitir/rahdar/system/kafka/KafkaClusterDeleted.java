@@ -13,7 +13,6 @@ class KafkaClusterDeleted {
 
     private final KafkaHealth health;
     private final KafkaPartitions partitions;
-    private final KafkaIdentityWatch identity;
     private final KafkaScrape scrape;
 
     @EventListener(condition = "#signal.kind() == 'cluster-deleted'")
@@ -24,7 +23,6 @@ class KafkaClusterDeleted {
     void forget(UUID clusterId) {
         health.forget(clusterId);
         partitions.forget(clusterId);
-        identity.forget(clusterId);
         scrape.forget(clusterId);
     }
 }

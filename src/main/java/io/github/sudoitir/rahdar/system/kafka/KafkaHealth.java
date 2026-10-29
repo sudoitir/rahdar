@@ -9,6 +9,7 @@ import io.github.sudoitir.openbroker.model.NodeDescription;
 import io.github.sudoitir.openbroker.model.NodeFunction;
 import io.github.sudoitir.openbroker.model.Scope;
 import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
+import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterHealth;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterHealth.Level;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterHealthEvaluator;
@@ -46,13 +47,13 @@ class KafkaHealth implements ClusterHealthEvaluator {
 
     private final BrokerGateway gateway;
     private final KafkaPartitions partitions;
-    private final KafkaIdentityWatch identity;
+    private final ClusterDirectory clusters;
     private final Map<UUID, Reading> readings = new ConcurrentHashMap<>();
 
-    KafkaHealth(BrokerGateway gateway, KafkaPartitions partitions, KafkaIdentityWatch identity) {
+    KafkaHealth(BrokerGateway gateway, KafkaPartitions partitions, ClusterDirectory clusters) {
         this.gateway = gateway;
         this.partitions = partitions;
-        this.identity = identity;
+        this.clusters = clusters;
     }
 
     @Override
@@ -84,7 +85,7 @@ class KafkaHealth implements ClusterHealthEvaluator {
             return verdict(
                     clusterId, Level.CRITICAL, List.of(), List.of("No broker is reachable: " + e.getMessage()), false);
         }
-        Optional<String> changed = identity.change(clusterId);
+        Optional<String> changed = KafkaClusterIdentity.recorded(clusters.nodes(clusterId));
         if (changed.isPresent()) {
             return verdict(clusterId, Level.CRITICAL, List.of(), List.of(changed.get()), false);
         }

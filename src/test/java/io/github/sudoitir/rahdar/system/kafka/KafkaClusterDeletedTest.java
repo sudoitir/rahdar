@@ -18,19 +18,18 @@ class KafkaClusterDeletedTest {
 
     private final SimpleMeterRegistry meters = new SimpleMeterRegistry();
     private final KafkaPartitions partitions = new KafkaPartitions(mock(BrokerGateway.class), Clock.systemUTC());
-    private final KafkaIdentityWatch identity = new KafkaIdentityWatch();
-    private final KafkaHealth health = new KafkaHealth(mock(BrokerGateway.class), partitions, identity);
+    private final KafkaHealth health =
+            new KafkaHealth(mock(BrokerGateway.class), partitions, mock(ClusterDirectory.class));
     private final KafkaScrape scrape = new KafkaScrape(
             mock(BrokerGateway.class),
             mock(ClusterDirectory.class),
             mock(NodeStateRecorder.class),
             partitions,
             meters,
-            identity,
             null,
             null,
             Clock.systemUTC());
-    private final KafkaClusterDeleted deleted = new KafkaClusterDeleted(health, partitions, identity, scrape);
+    private final KafkaClusterDeleted deleted = new KafkaClusterDeleted(health, partitions, scrape);
 
     @Test
     void theMetersReadingsAndIdentityChangeOfTheDeletedClusterGoAndOthersStay() {
@@ -38,7 +37,6 @@ class KafkaClusterDeletedTest {
         UUID kept = UUID.randomUUID();
         for (UUID cluster : List.of(gone, kept)) {
             meters.counter("rahdar.kafka.scrape.rounds", "cluster", cluster.toString(), "call", "nodes");
-            identity.check(cluster, "new", "old");
         }
 
         deleted.onClusterDeleted(new ReplicaSignal("cluster-deleted", gone.toString()));
@@ -51,8 +49,6 @@ class KafkaClusterDeletedTest {
                         .tag("cluster", kept.toString())
                         .meters())
                 .hasSize(1);
-        assertThat(identity.change(gone)).isEmpty();
-        assertThat(identity.change(kept)).isPresent();
         assertThat(partitions.offline(gone)).isEmpty();
     }
 }
