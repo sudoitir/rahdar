@@ -34,7 +34,7 @@ with the commit that fixes it and its test. Owner names are the agents of this s
 | S3 | storage | metric_sample ≈45 GB/day at 4000 Kafka subscriptions | backend | open: change-only + heartbeat |
 | A1 | audit 1 | Cluster re-provisioned at the same bootstrap not detected | kafka-hardening | fixed |
 | A2 | audit 1 | Unavailable lag stored and shown as 0 | backend | open |
-| A3 | audit 1 | Replaced broker's node row never retired | kafka-hardening | open |
+| A3 | audit 1 | Replaced broker's node row never retired | kafka-hardening | fixed |
 | A4 | audit 1 | Health pages every partition on the caller's thread | kafka-hardening | open |
 | A5 | audit 1 | Plugin registration node rows orphaned on node delete | kafka-hardening | fixed |
 | A6 | audit 1 | Health and partition readings never evicted | kafka-hardening | open |

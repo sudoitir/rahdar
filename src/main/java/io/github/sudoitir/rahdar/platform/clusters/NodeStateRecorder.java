@@ -84,6 +84,18 @@ public class NodeStateRecorder {
     }
 
     /**
+     * Remove a node the cluster no longer has, with the rows that hang on it (they go with it by cascade), and
+     * release its identity claims so an unrelated broker may take the address.
+     */
+    @Transactional
+    public void retire(UUID nodeId) {
+        nodes.findById(nodeId).ifPresent(node -> {
+            nodes.delete(node);
+            identityClaims.sync(node.getClusterId());
+        });
+    }
+
+    /**
      * Record that the tier-A probe got no usable answer from a node, without disturbing last-known-good HA
      * state. The kind says whether the broker did not answer or refused the credentials.
      */

@@ -8,7 +8,10 @@ import io.github.sudoitir.openbroker.model.ResourceClass;
 import io.github.sudoitir.openbroker.model.ResourcePage;
 import io.github.sudoitir.openbroker.model.ResourceQuery;
 import io.github.sudoitir.openbroker.model.Scope;
+import io.github.sudoitir.rahdar.kernel.audit.AuditEvent;
+import io.github.sudoitir.rahdar.kernel.audit.AuditService;
 import io.github.sudoitir.rahdar.kernel.core.NotFoundException;
+import io.github.sudoitir.rahdar.kernel.security.ActorResolver;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
 import io.github.sudoitir.rahdar.platform.broker.BrokerFailures;
 import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
@@ -19,6 +22,9 @@ import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
 import io.github.sudoitir.rahdar.platform.clusters.NodeStateRecorder;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -28,13 +34,14 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 /**
  * A Kafka cluster's brokers on the scrape schedule: one batched read of every node, then each stored broker takes
  * its state from what the cluster says of it (serving, or fenced), and one the cluster did not answer for keeps its
- * last state with the error. The partitions without a leader are counted on the same cycle. A cluster that reports
+ * last state with the error. The partitions without a leader are counted on the same cycle. A broker the cluster stops listing is retired after {@link #RETIRE_AFTER}. A cluster that reports
  * another cluster id than the one registered is not read further, so the two clusters' data is never mixed.
  */
 @Component
@@ -46,9 +53,18 @@ class KafkaScrape implements ClusterScrape {
     private final NodeStateRecorder recorder;
     private static final int PAGE = 200;
 
+    /** A broker the cluster has not listed for this long, while the cluster answered, has left it for good. */
+    static final Duration RETIRE_AFTER = Duration.ofMinutes(10);
+
     private final KafkaPartitions partitions;
     private final MeterRegistry meters;
     private final KafkaIdentityWatch identity;
+    private final AuditService audit;
+    private final ActorResolver actors;
+    private final Clock clock;
+
+    /** Since when each stored broker the cluster does not list has been missing. */
+    private final Map<UUID, Instant> unlistedSince = new ConcurrentHashMap<>();
 
     @Override
     public String system() {
@@ -98,15 +114,53 @@ class KafkaScrape implements ClusterScrape {
             }
         }
         described.failures().forEach((node, failure) -> record(byBroker.get(node.value()), failure));
-        stored.stream()
+        List<ClusterNode> unlisted = stored.stream()
                 .filter(node -> node.getNativeNodeId() != null && !answered.contains(node.getNativeNodeId()))
                 .filter(node -> !described.failures().containsKey(NodeId.of(node.getNativeNodeId())))
-                .forEach(node -> recorder.recordNodeError(
+                .toList();
+        unlistedSince
+                .keySet()
+                .retainAll(unlisted.stream().map(ClusterNode::getId).toList());
+        Instant now = clock.instant();
+        for (ClusterNode node : unlisted) {
+            Instant since = unlistedSince.computeIfAbsent(node.getId(), id -> now);
+            if (!described.value().isEmpty() && Duration.between(since, now).compareTo(RETIRE_AFTER) >= 0) {
+                retire(clusterId, node);
+            } else {
+                recorder.recordNodeError(
                         node.getId(),
                         "The cluster no longer lists this broker.",
-                        BrokerConnectionException.Kind.UNREACHABLE));
+                        BrokerConnectionException.Kind.UNREACHABLE);
+            }
+        }
         round(clusterId, "partitions");
         partitions.refresh(clusterId);
+    }
+
+    /** Removes a broker the cluster dropped, and records that it left. */
+    private void retire(UUID clusterId, ClusterNode node) {
+        AuditEvent event = audit.begin(
+                actors.system(),
+                "NODE_LEFT_CLUSTER",
+                "NODE",
+                node.getName(),
+                clusterId,
+                null,
+                Map.of(
+                        "nativeNodeId",
+                        node.getNativeNodeId(),
+                        "detail",
+                        "broker " + node.getNativeNodeId() + " left the cluster: the cluster has not listed it for "
+                                + RETIRE_AFTER.toMinutes() + " minutes"),
+                false);
+        try {
+            recorder.retire(node.getId());
+            unlistedSince.remove(node.getId());
+            audit.succeed(event, 1);
+        } catch (RuntimeException e) {
+            audit.fail(event, e.getMessage());
+            throw e;
+        }
     }
 
     /**
