@@ -5,7 +5,7 @@ description: 用 SQL 查询整个 Artemis 集群中的消息——包括 JMS sel
 
 # SQL 控制台
 
-![在 SQL 控制台中查询集群里的每一个队列，然后跟随实时 tail](/img/sql-console.gif)
+![SQL 控制台：对 ORDERS.* 下的订阅执行查询，谓词下推到 Broker，结果列出找到的行以及每个节点的应答，其中一个节点拒绝了连接](/img/sql.png)
 
 运维人员真正带着来的问题是：*"订单 4471 去哪了？"*。Artemis 回答不了它。它唯一的服务端过滤器是 JMS selector，只能看到消息头与应用属性——**看不到消息体**——而且一次只作用于一个节点上的一个队列。
 

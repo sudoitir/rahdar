@@ -107,18 +107,11 @@ demo: mounts
     {{compose_demo}} up --build -d --wait --wait-timeout 300
     COMPOSE="{{compose_demo}}" ./scripts/demo-seed.sh
 
-# Capture the README screenshots against whatever is running on :8080.
+# Capture the guides' screenshots (docs/img) against whatever is running on :8080.
 # Needs ADMIN_PASSWORD=... ADMIN_TOTP_SECRET=... (the password and the secret `just demo` printed).
 [group('develop')]
 shots:
     {{npm}} run shots
-
-# Record the README demo GIFs (product, flow, SQL console, plugin install) from a real session on :8080.
-# Same prerequisite as `shots`: ADMIN_PASSWORD=... ADMIN_TOTP_SECRET=... just demo-gif
-# PLUGIN_JAR=<a built plugin-template jar> adds the plugin-install clip; CLIPS=demo,flow records only those.
-[group('develop')]
-demo-gif:
-    {{npm}} run demo
 
 # Stop the dev stack and delete its volumes.
 [group('develop')]

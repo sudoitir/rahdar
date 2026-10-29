@@ -203,7 +203,7 @@ ADMIN_PASSWORD=… NEW_ADMIN_PASSWORD=… just demo   # a second pair, plus real
 The password `just dev-up` prints is one-time: Rahdar refuses everything else until it
 is changed. `NEW_ADMIN_PASSWORD` is the one you choose; the seed changes it for you on
 the first run. It also sets up an authenticator app for `admin`, which its role requires,
-and prints `ADMIN_TOTP_SECRET`. Later runs, and `just shots` and `just demo-gif`, need
+and prints `ADMIN_TOTP_SECRET`. Later runs, and `just shots`, need
 `ADMIN_PASSWORD` set to the new password and `ADMIN_TOTP_SECRET` to that secret.
 
 Nothing in that seed writes to `metric_sample` or `subscription_snapshot` directly —
