@@ -42,7 +42,9 @@ anything destructive, and an approval gate that holds people and assistants alik
 > are pre-stable dev builds (`sudoit1/rahdar:dev`; there is no `:latest` yet).
 > Expect breaking changes.
 
-![Rahdar: topology, the cross-node queue grid, the dead-letter queue, message flow and the charts](docs/img/demo.gif)
+<picture><source media="(prefers-color-scheme: dark)" srcset="docs/img/readme/estate-dark.webp"><img src="docs/img/readme/estate-light.webp" alt="The estate with an Apache Artemis cluster and an Apache Kafka cluster and their health, above one table of subscriptions sorted by backlog, where Kafka lag is marked as an estimate."></picture>
+
+<sub>Every cluster in one estate: Artemis and Kafka side by side, the worst backlog first.</sub>
 
 ## Quickstart
 
@@ -132,13 +134,14 @@ one estate.
 
 ## What it does
 
-| Cluster topology | Cross-node queues |
+| | |
 |---|---|
-| [![Live/backup topology with replication and a shared-NodeID axis](docs/img/topology.png)](docs/img/topology.png) | [![Every queue across every node in one virtualised grid](docs/img/queues.png)](docs/img/queues.png) |
-| **Client and message flow** | **SQL Console** |
-| [![Flow: moving dots carry each path's rate; hovering a queue keeps its whole path bright](docs/img/flow.gif)](docs/img/flow.gif) | [![The SQL Console: a query across every queue in the cluster, its cost classified before it runs, then a live tail](docs/img/sql-console.gif)](docs/img/sql-console.gif) |
-| **Plugins** | **Settings** |
-| [![Installing a plugin: what it will be able to do and the SQL of its database changes, reviewed before a held confirmation](docs/img/plugin-install.gif)](docs/img/plugin-install.gif) | [![Settings: display preferences, Rahdar's operational configuration, this cluster's and each plugin's sections](docs/img/settings.png)](docs/img/settings.png) |
+| <picture><source media="(prefers-color-scheme: dark)" srcset="docs/img/readme/subscriptions-dark.webp"><img src="docs/img/readme/subscriptions-light.webp" alt="The subscriptions table on a Kafka cluster with a group's backlog breakdown open: each partition's committed offset, end offset and lag, slowest first, with the sample's age."></picture> | <picture><source media="(prefers-color-scheme: dark)" srcset="docs/img/readme/kafka-group-dark.webp"><img src="docs/img/readme/kafka-group-light.webp" alt="A Kafka consumer group's page: its type and state, lag per partition topic by topic, and its members."></picture> |
+| Kafka lag is an estimate, and opens to every partition, slowest first. | A consumer group's lag per partition and its members. |
+| <picture><source media="(prefers-color-scheme: dark)" srcset="docs/img/readme/offset-reset-dark.webp"><img src="docs/img/readme/offset-reset-light.webp" alt="The reset-offsets preview: each partition's current and new offset and the records skipped, with a press-and-hold button that names the partition count."></picture> | <picture><source media="(prefers-color-scheme: dark)" srcset="docs/img/readme/transactions-dark.webp"><img src="docs/img/readme/transactions-light.webp" alt="The transactions page with a hanging transaction flagged, and its abort preview naming the partitions it unblocks and that the producer is fenced."></picture> |
+| An offset reset is previewed per partition before it is held to confirm. | A hanging transaction, found and aborted with its reach stated first. |
+| <picture><source media="(prefers-color-scheme: dark)" srcset="docs/img/readme/register-kafka-dark.webp"><img src="docs/img/readme/register-kafka-light.webp" alt="The Kafka registration page after a passed check: the version and mode, every broker with its advertised address reached, and the controller quorum."></picture> | <picture><source media="(prefers-color-scheme: dark)" srcset="docs/img/readme/artemis-topology-dark.webp"><img src="docs/img/readme/artemis-topology-light.webp" alt="The Artemis topology: live and backup pairs with their replication state, one node stopped."></picture> |
+| Registration checks every broker on the address it advertises. | Artemis topology, with HA roles polled from every node. |
 
 Rahdar talks to brokers through [OpenBroker](https://github.com/sudoitir/openbroker), an
 open-source broker SDK with a driver per system. The screens every system shares (the
@@ -285,7 +288,7 @@ with realistic traffic: diverts, a bridge, cluster hops, a growing backlog with 
 consumer, a real dead-letter backlog and one stopped node. It also registers a
 three-broker Kafka cluster, `events`, with groups that keep up and fall behind, a
 compacted topic, ACLs and a hanging transaction. The screenshots above are
-recorded from that stack by `just shots` and `just demo-gif`; nothing is staged.
+recorded from that estate; nothing is staged.
 
 Every feature goes through **OpenSpec** and significant decisions are recorded as
 [**ADRs**](docs/adr/). Start with [`CONTRIBUTING.md`](CONTRIBUTING.md).

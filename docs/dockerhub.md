@@ -38,11 +38,33 @@ CycloneDX SBOM: [verify a release](https://rahdar.dev/guide/verify-releases).
 
 ## Screenshots
 
-| Cluster topology | Cross-node queues |
-|---|---|
-| [![Live/backup topology with replication and shared-NodeID axis](https://raw.githubusercontent.com/sudoitir/rahdar/main/docs/img/topology.png)](https://raw.githubusercontent.com/sudoitir/rahdar/main/docs/img/topology.png) | [![Every queue across every node in one virtualized grid](https://raw.githubusercontent.com/sudoitir/rahdar/main/docs/img/queues.png)](https://raw.githubusercontent.com/sudoitir/rahdar/main/docs/img/queues.png) |
-| **Client and message flow** | **SQL Console** |
-| [![Applications, addresses, diverts, a bridge and queues in columns, each path carrying its measured rate](https://raw.githubusercontent.com/sudoitir/rahdar/main/docs/img/flow.png)](https://raw.githubusercontent.com/sudoitir/rahdar/main/docs/img/flow.png) | [![A query across every queue in the cluster with its cost classified before it runs](https://raw.githubusercontent.com/sudoitir/rahdar/main/docs/img/sql.png)](https://raw.githubusercontent.com/sudoitir/rahdar/main/docs/img/sql.png) |
+**Every cluster in one estate: Artemis and Kafka side by side, the worst backlog first.**
+
+[![The estate with an Apache Artemis cluster and an Apache Kafka cluster and their health, above one table of subscriptions sorted by backlog, where Kafka lag is marked as an estimate.](https://raw.githubusercontent.com/sudoitir/rahdar/main/docs/img/readme/estate-light.webp)](https://raw.githubusercontent.com/sudoitir/rahdar/main/docs/img/readme/estate-light.webp)
+
+**Kafka lag is an estimate, and opens to every partition, slowest first.**
+
+[![The subscriptions table on a Kafka cluster with a group's backlog breakdown open: each partition's committed offset, end offset and lag, slowest first, with the sample's age.](https://raw.githubusercontent.com/sudoitir/rahdar/main/docs/img/readme/subscriptions-light.webp)](https://raw.githubusercontent.com/sudoitir/rahdar/main/docs/img/readme/subscriptions-light.webp)
+
+**A consumer group's lag per partition and its members.**
+
+[![A Kafka consumer group's page: its type and state, lag per partition topic by topic, and its members.](https://raw.githubusercontent.com/sudoitir/rahdar/main/docs/img/readme/kafka-group-light.webp)](https://raw.githubusercontent.com/sudoitir/rahdar/main/docs/img/readme/kafka-group-light.webp)
+
+**An offset reset is previewed per partition before it is held to confirm.**
+
+[![The reset-offsets preview: each partition's current and new offset and the records skipped, with a press-and-hold button that names the partition count.](https://raw.githubusercontent.com/sudoitir/rahdar/main/docs/img/readme/offset-reset-light.webp)](https://raw.githubusercontent.com/sudoitir/rahdar/main/docs/img/readme/offset-reset-light.webp)
+
+**A hanging transaction, found and aborted with its reach stated first.**
+
+[![The transactions page with a hanging transaction flagged, and its abort preview naming the partitions it unblocks and that the producer is fenced.](https://raw.githubusercontent.com/sudoitir/rahdar/main/docs/img/readme/transactions-light.webp)](https://raw.githubusercontent.com/sudoitir/rahdar/main/docs/img/readme/transactions-light.webp)
+
+**Registration checks every broker on the address it advertises.**
+
+[![The Kafka registration page after a passed check: the version and mode, every broker with its advertised address reached, and the controller quorum.](https://raw.githubusercontent.com/sudoitir/rahdar/main/docs/img/readme/register-kafka-light.webp)](https://raw.githubusercontent.com/sudoitir/rahdar/main/docs/img/readme/register-kafka-light.webp)
+
+**Artemis topology, with HA roles polled from every node.**
+
+[![The Artemis topology: live and backup pairs with their replication state, one node stopped.](https://raw.githubusercontent.com/sudoitir/rahdar/main/docs/img/readme/artemis-topology-light.webp)](https://raw.githubusercontent.com/sudoitir/rahdar/main/docs/img/readme/artemis-topology-light.webp)
 
 ---
 

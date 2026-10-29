@@ -39,7 +39,9 @@
 > [!WARNING]
 > **نسخهٔ آلفا.** پروژه در حال توسعهٔ فعال است و هنوز همهٔ قابلیت‌هایش را ندارد. ایمیج‌های منتشرشده، بیلدهای dev پیش از نسخهٔ پایدارند (`sudoit1/rahdar:dev`؛ هنوز `:latest` نداریم). منتظر تغییرات ناسازگار باشید.
 
-![Rahdar: توپولوژی، جدول صف‌های همهٔ نودها، صف dead-letter، مسیر پیام‌ها و نمودارها](docs/img/demo.gif)
+<picture><source media="(prefers-color-scheme: dark)" srcset="docs/img/readme/estate-dark.webp"><img src="docs/img/readme/estate-light.webp" alt="estate با یک کلاستر Apache Artemis و یک کلاستر Apache Kafka و سلامتشان، بالای یک جدول از subscriptionها که بر اساس backlog مرتب شده و lag در Kafka در آن به‌عنوان تخمین علامت خورده است."></picture>
+
+<sub>همهٔ کلاسترها در یک estate: ‏Artemis و Kafka کنار هم، بدترین backlog اول.</sub>
 
 <div dir="rtl" align="right">
 
@@ -104,13 +106,14 @@ Rahdar **هر کلاستری را که اجرا می‌کنید در یک estate
 
 </div>
 
-| توپولوژی کلاستر | صف‌های همهٔ نودها |
+| | |
 |---|---|
-| [![توپولوژی live/backup همراه با وضعیت replication و محور NodeID مشترک](docs/img/topology.png)](docs/img/topology.png) | [![همهٔ صف‌های همهٔ نودها در یک جدول مجازی](docs/img/queues.png)](docs/img/queues.png) |
-| **کلاینت‌ها و مسیر پیام** | **SQL Console** |
-| [![Flow: نقطه‌های متحرک نرخ هر مسیر را نشان می‌دهند و با رفتن نشانگر روی یک صف، کل مسیرش برجسته می‌ماند](docs/img/flow.gif)](docs/img/flow.gif) | [![SQL Console: کوئری روی همهٔ صف‌های کلاستر، با تعیین هزینه پیش از اجرا و سپس tail زنده](docs/img/sql-console.gif)](docs/img/sql-console.gif) |
-| **پلاگین‌ها** | **تنظیمات** |
-| [![نصب یک پلاگین: کارهایی که اجازه دارد انجام دهد و SQL تغییرات پایگاه‌داده‌اش، پیش از تأیید با نگه‌داشتن دکمه بررسی می‌شوند](docs/img/plugin-install.gif)](docs/img/plugin-install.gif) | [![تنظیمات: ترجیحات نمایش، پیکربندی عملیاتی Rahdar، و بخش‌های این کلاستر و هر پلاگین](docs/img/settings.png)](docs/img/settings.png) |
+| <picture><source media="(prefers-color-scheme: dark)" srcset="docs/img/readme/subscriptions-dark.webp"><img src="docs/img/readme/subscriptions-light.webp" alt="جدول subscriptionها روی یک کلاستر Kafka با تفکیک backlog یک group که باز شده است: offset ثبت‌شده، offset انتها و lag هر partition، کندترین اول، با سن نمونه."></picture> | <picture><source media="(prefers-color-scheme: dark)" srcset="docs/img/readme/kafka-group-dark.webp"><img src="docs/img/readme/kafka-group-light.webp" alt="صفحهٔ یک consumer group در Kafka: نوع و وضعیت، lag هر partition به تفکیک topic، و اعضا."></picture> |
+| lag در Kafka یک تخمین است و با باز کردنش همهٔ partitionها، کندترین اول، دیده می‌شوند. | lag یک consumer group برای هر partition و اعضای آن. |
+| <picture><source media="(prefers-color-scheme: dark)" srcset="docs/img/readme/offset-reset-dark.webp"><img src="docs/img/readme/offset-reset-light.webp" alt="پیش‌نمایش reset کردن offsetها: offset فعلی و جدید هر partition و تعداد رکوردهای ردشده، با دکمه‌ای که با نگه‌داشتن تأیید می‌شود و تعداد partitionها را نام می‌برد."></picture> | <picture><source media="(prefers-color-scheme: dark)" srcset="docs/img/readme/transactions-dark.webp"><img src="docs/img/readme/transactions-light.webp" alt="صفحهٔ تراکنش‌ها با یک تراکنش معلقِ علامت‌خورده، و پیش‌نمایش abort آن که partitionهایی را که آزاد می‌کند و fence شدن producer را نام می‌برد."></picture> |
+| reset کردن offset پیش از تأیید با نگه‌داشتن دکمه، برای هر partition پیش‌نمایش می‌شود. | یک تراکنش معلق، پیدا و abort شده، با دامنه‌ای که اول گفته می‌شود. |
+| <picture><source media="(prefers-color-scheme: dark)" srcset="docs/img/readme/register-kafka-dark.webp"><img src="docs/img/readme/register-kafka-light.webp" alt="صفحهٔ ثبت Kafka پس از بررسی موفق: نسخه و حالت، رسیدن به هر بروکر روی آدرس اعلام‌شده‌اش، و کوئوروم کنترلر."></picture> | <picture><source media="(prefers-color-scheme: dark)" srcset="docs/img/readme/artemis-topology-dark.webp"><img src="docs/img/readme/artemis-topology-light.webp" alt="توپولوژی Artemis: جفت‌های live و backup با وضعیت replication، و یک نود متوقف."></picture> |
+| ثبت کلاستر بررسی می‌کند که به هر بروکر روی آدرسی که اعلام می‌کند می‌رسد. | توپولوژی Artemis، با نقش HA که از هر نود poll می‌شود. |
 
 <div dir="rtl" align="right">
 
@@ -192,7 +195,7 @@ just verify          # همهٔ بررسی‌های CI
 
 <div dir="rtl" align="right">
 
-فرمان `ADMIN_PASSWORD=… just demo` (اجرای اول به `NEW_ADMIN_PASSWORD=…` و اجراهای بعدی به `ADMIN_TOTP_SECRET=…` هم نیاز دارند) دو جفت live/backup دیگر اضافه می‌کند و هر شش نود را با ترافیکی شبیه محیط واقعی پر می‌کند: divertها، یک bridge، پرش‌های کلاستر، صفی بدون مصرف‌کننده که مدام پرتر می‌شود، انباشت واقعی dead-letter و یک نود متوقف. همچنین یک کلاستر Kafka سه‌بروکره به نام `events` ثبت می‌کند، با groupهایی که عقب نمی‌مانند و groupهایی که عقب می‌افتند، یک topic فشرده‌شده (compacted)، ACLها و یک تراکنش معلق. تصاویر بالا با `just shots` و `just demo-gif` از همین استک ضبط شده‌اند و هیچ‌چیزشان صحنه‌سازی نیست.
+فرمان `ADMIN_PASSWORD=… just demo` (اجرای اول به `NEW_ADMIN_PASSWORD=…` و اجراهای بعدی به `ADMIN_TOTP_SECRET=…` هم نیاز دارند) دو جفت live/backup دیگر اضافه می‌کند و هر شش نود را با ترافیکی شبیه محیط واقعی پر می‌کند: divertها، یک bridge، پرش‌های کلاستر، صفی بدون مصرف‌کننده که مدام پرتر می‌شود، انباشت واقعی dead-letter و یک نود متوقف. همچنین یک کلاستر Kafka سه‌بروکره به نام `events` ثبت می‌کند، با groupهایی که عقب نمی‌مانند و groupهایی که عقب می‌افتند، یک topic فشرده‌شده (compacted)، ACLها و یک تراکنش معلق. تصاویر بالا از همین استک ضبط شده‌اند و هیچ‌چیزشان صحنه‌سازی نیست.
 
 هر قابلیت از فرایند **OpenSpec** می‌گذرد و تصمیم‌های مهم به‌صورت [**ADR**](docs/adr/) ثبت می‌شوند. از [`CONTRIBUTING.md`](CONTRIBUTING.md) شروع کنید.
 

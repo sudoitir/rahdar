@@ -40,7 +40,9 @@
 > **Alpha 阶段。** 项目仍在快速迭代，功能尚不完整。目前发布的镜像都是稳定版之前的 dev 构建
 > （`sudoit1/rahdar:dev`，还没有 `:latest`），后续版本可能包含不兼容的变更。
 
-![Rahdar：拓扑、跨节点队列表、死信队列、消息流向与图表](docs/img/demo.gif)
+<picture><source media="(prefers-color-scheme: dark)" srcset="docs/img/readme/estate-dark.webp"><img src="docs/img/readme/estate-light.webp" alt="资产视图：一个 Apache Artemis 集群和一个 Apache Kafka 集群及其健康状况，下方是一张按积压排序的订阅表，Kafka 的延迟标为估算值。"></picture>
+
+<sub>所有集群在同一个资产视图中：Artemis 与 Kafka 并列，积压最严重的排在最前。</sub>
 
 ## 快速开始
 
@@ -93,13 +95,14 @@ Rahdar 把**你运行的每一个集群放进同一个资产视图**，不论 Br
 
 ## 功能一览
 
-| 集群拓扑 | 跨节点队列 |
+| | |
 |---|---|
-| [![主备拓扑，含复制状态与共享 NodeID 轴](docs/img/topology.png)](docs/img/topology.png) | [![所有节点上的所有队列，汇总在一张虚拟滚动表格里](docs/img/queues.png)](docs/img/queues.png) |
-| **客户端与消息流向** | **SQL Console** |
-| [![Flow：流动的圆点表示每条路径的速率，悬停某个队列即可高亮它的完整链路](docs/img/flow.gif)](docs/img/flow.gif) | [![SQL Console：跨集群所有队列查询，执行前先标明代价，随后实时追踪](docs/img/sql-console.gif)](docs/img/sql-console.gif) |
-| **插件** | **设置** |
-| [![安装插件：它能做什么、它的数据库变更 SQL，都在按住确认之前一一审阅](docs/img/plugin-install.gif)](docs/img/plugin-install.gif) | [![设置：显示偏好、Rahdar 的运行配置、当前集群及各插件的配置项](docs/img/settings.png)](docs/img/settings.png) |
+| <picture><source media="(prefers-color-scheme: dark)" srcset="docs/img/readme/subscriptions-dark.webp"><img src="docs/img/readme/subscriptions-light.webp" alt="Kafka 集群上的订阅表，展开了一个消费者组的积压明细：每个分区的已提交偏移量、末尾偏移量与延迟，最慢的在前，并注明采样时间。"></picture> | <picture><source media="(prefers-color-scheme: dark)" srcset="docs/img/readme/kafka-group-dark.webp"><img src="docs/img/readme/kafka-group-light.webp" alt="Kafka 消费者组页面：类型与状态、按 topic 列出的每个分区的延迟，以及成员。"></picture> |
+| Kafka 的延迟是估算值，展开即可看到每个分区，最慢的在前。 | 一个消费者组每个分区的延迟及其成员。 |
+| <picture><source media="(prefers-color-scheme: dark)" srcset="docs/img/readme/offset-reset-dark.webp"><img src="docs/img/readme/offset-reset-light.webp" alt="重置偏移量的预览：每个分区当前与新的偏移量、将跳过的记录数，以及写明分区数量的按住确认按钮。"></picture> | <picture><source media="(prefers-color-scheme: dark)" srcset="docs/img/readme/transactions-dark.webp"><img src="docs/img/readme/transactions-light.webp" alt="事务页面标出了一个挂起的事务，中止预览列出它将解除阻塞的分区，并说明生产者会被隔离（fenced）。"></picture> |
+| 偏移量重置先逐分区预览，再按住按钮确认。 | 找到挂起的事务，先说明影响范围，再中止它。 |
+| <picture><source media="(prefers-color-scheme: dark)" srcset="docs/img/readme/register-kafka-dark.webp"><img src="docs/img/readme/register-kafka-light.webp" alt="检查通过后的 Kafka 注册页面：版本与模式、每个 Broker 及其通告地址均已连通，以及控制器仲裁。"></picture> | <picture><source media="(prefers-color-scheme: dark)" srcset="docs/img/readme/artemis-topology-dark.webp"><img src="docs/img/readme/artemis-topology-light.webp" alt="Artemis 拓扑：主备节点对及其复制状态，其中一个节点已停止。"></picture> |
+| 注册时会检查每一个 Broker 在其通告地址上是否可达。 | Artemis 拓扑，HA 角色从每个节点轮询得到。 |
 
 Rahdar 通过 [OpenBroker](https://github.com/sudoitir/openbroker) 与 Broker 通信，这是一个开源的 Broker SDK，每个系统一个驱动。各系统共有的界面（资产视图、订阅与目的地、消息浏览、清空、审计记录、API 与 MCP）在每个系统上都能用，并使用该系统自己的术语；某个系统做不到的操作依然可见，置灰并说明原因。
 
@@ -166,7 +169,7 @@ just dev             # 或者：同时启动后端 :8080 和 Vite :5173，支持
 just verify          # 运行 CI 的全部检查
 ```
 
-`ADMIN_PASSWORD=… just demo`（首次运行还需要 `NEW_ADMIN_PASSWORD=…`，之后需要 `ADMIN_TOTP_SECRET=…`）会再加两对主备节点，并给全部六个节点灌入贴近生产的流量：divert、一个 bridge、集群跳转、一个没有消费者且不断增长的积压、一批真实的死信积压，以及一个被停掉的节点。它还会注册一个三 Broker 的 Kafka 集群 `events`，其中有跟得上和落后的消费者组、一个压缩 topic、ACL 和一个挂起的事务。上面的截图和动图都是 `just shots` 和 `just demo-gif` 在这套环境里实录的，没有任何摆拍。
+`ADMIN_PASSWORD=… just demo`（首次运行还需要 `NEW_ADMIN_PASSWORD=…`，之后需要 `ADMIN_TOTP_SECRET=…`）会再加两对主备节点，并给全部六个节点灌入贴近生产的流量：divert、一个 bridge、集群跳转、一个没有消费者且不断增长的积压、一批真实的死信积压，以及一个被停掉的节点。它还会注册一个三 Broker 的 Kafka 集群 `events`，其中有跟得上和落后的消费者组、一个压缩 topic、ACL 和一个挂起的事务。上面的截图都是在这套环境里实录的，没有任何摆拍。
 
 每个功能都要走 **OpenSpec** 流程，重要决策都记录为 [**ADR**](docs/adr/)。从 [`CONTRIBUTING.md`](CONTRIBUTING.md) 开始。
 
