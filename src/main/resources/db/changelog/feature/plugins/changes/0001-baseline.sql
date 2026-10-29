@@ -76,6 +76,11 @@ ALTER TABLE ONLY plugin_message_registration
 ALTER TABLE ONLY plugin_owner_work
     ADD CONSTRAINT uq_plugin_owner_work_key UNIQUE (plugin_id, work_key);
 
+CREATE INDEX ix_plugin_message_registration_node_node_id ON plugin_message_registration_node USING btree (node_id);
+
+ALTER TABLE ONLY plugin_message_registration_node
+    ADD CONSTRAINT fk_plugin_message_registration_node_node FOREIGN KEY (node_id) REFERENCES broker_node(id) ON DELETE CASCADE;
+
 ALTER TABLE ONLY plugin_message_registration_node
     ADD CONSTRAINT fk_plugin_message_registration_node_registration FOREIGN KEY (registration_id) REFERENCES plugin_message_registration(id) ON DELETE CASCADE;
 --rollback DROP TABLE IF EXISTS upload_window CASCADE;

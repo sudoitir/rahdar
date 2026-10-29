@@ -36,7 +36,7 @@ with the commit that fixes it and its test. Owner names are the agents of this s
 | A2 | audit 1 | Unavailable lag stored and shown as 0 | backend | open |
 | A3 | audit 1 | Replaced broker's node row never retired | kafka-hardening | open |
 | A4 | audit 1 | Health pages every partition on the caller's thread | kafka-hardening | open |
-| A5 | audit 1 | Plugin registration node rows orphaned on node delete | kafka-hardening | open |
+| A5 | audit 1 | Plugin registration node rows orphaned on node delete | kafka-hardening | fixed |
 | A6 | audit 1 | Health and partition readings never evicted | kafka-hardening | open |
 | A7 | audit 1 | Per-cluster meters never removed | kafka-hardening | open |
 | A8 | audit 1 | Whole ACL set loaded per preview | kafka-hardening | open |
