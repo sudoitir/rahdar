@@ -14,7 +14,7 @@ import org.junit.jupiter.api.Test;
 /** A record that holds a password or a token never prints it, alone or inside the request that carries it. */
 class SecretToStringTest {
 
-    private static final String SECRET = "s3cr3t-value-4711";
+    private static final String SECRET = "example-password-not-real";
 
     @Test
     void accountsAndCredentialsPrintWhoTheyAreAndNotTheirSecret() {
