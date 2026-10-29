@@ -203,10 +203,17 @@ const BY_STATUS: Readonly<Record<number, (problem: Problem) => Reading>> = {
 };
 
 /**
- * The approval gate's refusals, by problem type. Each says that nothing ran, because an operator who
- * meets one mid-action needs that first. They win over the status, which only says who was at fault.
+ * Problems that read by their type, which win over the status, which only says who was at fault: the approval
+ * gate's refusals, each saying that nothing ran because an operator who meets one mid-action needs that first, and
+ * a view the cluster's system does not have.
  */
 const BY_TYPE: Readonly<Record<string, (problem: Problem) => Reading>> = {
+  'unavailable-on-system': ({ detail }) => ({
+    title: 'This system does not have this',
+    cause: detail ?? 'The system this cluster runs has nothing of this kind to list.',
+    next: 'Choose another view from the sidebar.',
+    retry: false,
+  }),
   'operation-denied': ({ detail }) => ({
     title: 'The approval policy denied this',
     cause: detail ?? 'The approval policy does not allow this operation.',
