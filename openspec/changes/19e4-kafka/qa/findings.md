@@ -43,9 +43,9 @@ with the commit that fixes it and its test. Owner names are the agents of this s
 | A9 | audit 1 | Inline qualified names in NodeStateRecorder | kafka-hardening | fixed |
 | A10 | audit 1 | Scrape reads subscriptions twice | backend | open |
 | B1 | audit 2 | One blackholed Kafka cluster stalls the scrape of all others | backend | open |
-| B2 | audit 2 | MCP describe-group and reset-preview unbounded (3000 partitions) | kafka-hardening | open |
+| B2 | audit 2 | MCP describe-group and reset-preview unbounded (3000 partitions) | kafka-hardening | fixed |
 | B3 | audit 2 | Offset-reset audit row grows with partition count | kafka-hardening | fixed |
-| B4 | audit 2 | kafka_topic_config returns every entry | kafka-hardening | open |
+| B4 | audit 2 | kafka_topic_config returns every entry | kafka-hardening | fixed |
 | P1 | OpenBroker | Driver per-topic and per-query reads (N+1) | OpenBroker 0.6.1 | fixed |
 | P2 | OpenBroker | verify throws when a broker is cut | OpenBroker 0.6.1 | fixed |
 | P3 | OpenBroker | At-most-once sender writes a message twice on a broker kill | OpenBroker 0.6.1 | fixed |

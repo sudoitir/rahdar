@@ -58,7 +58,8 @@ public class KafkaMcpReadTools {
 
     @McpTool(
             name = "kafka_describe_group",
-            description = "One group's members, assignments, topics and per-partition lag.",
+            description =
+                    "One group's members and, per topic, its total lag and slowest partitions; topic pages one topic.",
             annotations =
                     @McpTool.McpAnnotations(
                             readOnlyHint = true,
@@ -66,15 +67,19 @@ public class KafkaMcpReadTools {
                             idempotentHint = true,
                             openWorldHint = false))
     public McpSchema.CallToolResult kafkaDescribeGroup(
-            @McpToolParam(required = true) String clusterId, @McpToolParam(required = true) String group) {
+            @McpToolParam(required = true) String clusterId,
+            @McpToolParam(required = true) String group,
+            @McpToolParam(required = false) String topic,
+            @McpToolParam(required = false) String cursor) {
         UUID id = McpArgs.uuid("clusterId", clusterId);
         McpArgs.required("group", group);
-        return McpErrors.guard(() -> groups.detail(id, group));
+        return McpErrors.guard(() -> KafkaMcpViews.group(groups.detail(id, group), topic, cursor, null));
     }
 
     @McpTool(
             name = "kafka_preview_offset_reset",
-            description = "What moving a group's offsets would do, per partition, and the etag a reset needs.",
+            description =
+                    "What moving a group's offsets would do, per topic, and the etag a reset needs; topic pages one.",
             annotations =
                     @McpTool.McpAnnotations(
                             readOnlyHint = true,
@@ -86,16 +91,22 @@ public class KafkaMcpReadTools {
             @McpToolParam(required = true) String group,
             @McpToolParam(required = true) String to,
             @McpToolParam(required = false) String value,
-            @McpToolParam(required = false) String topics) {
+            @McpToolParam(required = false) String topics,
+            @McpToolParam(required = false) String topic,
+            @McpToolParam(required = false) String cursor) {
         UUID id = McpArgs.uuid("clusterId", clusterId);
         McpArgs.required("group", group);
         McpArgs.required("to", to);
-        return McpErrors.guard(() -> offsets.preview(id, group, new OffsetRequest(topicList(topics), to, value, null)));
+        return McpErrors.guard(() -> KafkaMcpViews.reset(
+                offsets.preview(id, group, new OffsetRequest(topicList(topics), to, value, null)),
+                topic,
+                cursor,
+                null));
     }
 
     @McpTool(
             name = "kafka_topic_config",
-            description = "A topic's settings with their source and default, and whether they can be changed.",
+            description = "A topic's overridden settings (all with onlyOverridden=false, or named in keys).",
             annotations =
                     @McpTool.McpAnnotations(
                             readOnlyHint = true,
@@ -103,10 +114,13 @@ public class KafkaMcpReadTools {
                             idempotentHint = true,
                             openWorldHint = false))
     public McpSchema.CallToolResult kafkaTopicConfig(
-            @McpToolParam(required = true) String clusterId, @McpToolParam(required = true) String topic) {
+            @McpToolParam(required = true) String clusterId,
+            @McpToolParam(required = true) String topic,
+            @McpToolParam(required = false) Boolean onlyOverridden,
+            @McpToolParam(required = false) String keys) {
         UUID id = McpArgs.uuid("clusterId", clusterId);
         McpArgs.required("topic", topic);
-        return McpErrors.guard(() -> configs.read(id, topic));
+        return McpErrors.guard(() -> KafkaMcpViews.config(configs.read(id, topic), onlyOverridden, keys));
     }
 
     @McpTool(
