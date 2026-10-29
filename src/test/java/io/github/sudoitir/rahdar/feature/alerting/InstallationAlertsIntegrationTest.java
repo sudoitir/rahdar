@@ -10,6 +10,7 @@ import io.github.sudoitir.rahdar.feature.alerting.internal.persistence.AlertFiri
 import io.github.sudoitir.rahdar.feature.alerting.internal.persistence.AlertRuleChannelRepository;
 import io.github.sudoitir.rahdar.feature.alerting.internal.persistence.AlertRuleEntity;
 import io.github.sudoitir.rahdar.feature.alerting.internal.persistence.AlertRuleRepository;
+import io.github.sudoitir.rahdar.feature.alerting.internal.persistence.AlertStateEntity;
 import io.github.sudoitir.rahdar.feature.alerting.internal.persistence.AlertStateRepository;
 import io.github.sudoitir.rahdar.feature.alerting.web.AlertViews.AlertRuleRequest;
 import io.github.sudoitir.rahdar.feature.alerting.web.AlertViews.AlertRuleView;
@@ -27,6 +28,7 @@ import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterR
 import io.github.sudoitir.rahdar.support.AdminAuthenticationExtension;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
 import io.github.sudoitir.rahdar.system.artemis.ArtemisModule;
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import org.assertj.core.groups.Tuple;
@@ -156,6 +158,16 @@ class InstallationAlertsIntegrationTest extends PostgresIntegrationTest {
         });
 
         stores(List.of(store("audit", 2), store("events", 1)));
+        evaluator.evaluateInstallation("STATE");
+
+        // A state alert holds its resolution. The first clear reading starts the hold and does not resolve.
+        assertThat(firingsOf(quota))
+                .singleElement()
+                .satisfies(f -> assertThat(f.getResolvedAt()).isNull());
+
+        AlertStateEntity held = states.findByRuleId(quota.getId()).getFirst();
+        held.setSince(Instant.now().minusSeconds(AlertStateMachine.STATE_RESOLVE_SECONDS));
+        states.saveAndFlush(held);
         evaluator.evaluateInstallation("STATE");
 
         assertThat(firingsOf(quota))
