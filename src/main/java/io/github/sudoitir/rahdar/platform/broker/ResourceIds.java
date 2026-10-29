@@ -13,15 +13,36 @@ import io.github.sudoitir.openbroker.model.ResourcePath;
 import io.github.sudoitir.openbroker.model.StandardAttributes;
 import io.github.sudoitir.rahdar.kernel.core.KindName;
 import java.time.Instant;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.WeakHashMap;
 
 /** Rahdar's way into the SDK's resource model: a system's kind for a class, ids, and attribute values. */
 public final class ResourceIds {
 
+    /**
+     * A driver's kind catalogue, once per connection. Listing it is a broker round, and a page of subscriptions
+     * asks for a label on every row.
+     */
+    private static final Map<ClusterConnection, List<Kind>> KINDS = Collections.synchronizedMap(new WeakHashMap<>());
+
     private ResourceIds() {}
+
+    /** The connection's kinds, fetched once and kept while the connection is alive. */
+    private static List<Kind> kinds(ClusterConnection connection) {
+        List<Kind> cached = KINDS.get(connection);
+        if (cached != null) {
+            return cached;
+        }
+        List<Kind> loaded = List.copyOf(connection.resources().kinds());
+        KINDS.put(connection, loaded);
+        return loaded;
+    }
 
     /** The connection's system's kind of this class; the first, when the system has several. */
     public static KindId kind(ClusterConnection connection, ResourceClass resourceClass) {
-        return connection.resources().kinds().stream()
+        return kinds(connection).stream()
                 .filter(k -> k.resourceClass() == resourceClass)
                 .map(Kind::id)
                 .findFirst()
@@ -51,7 +72,7 @@ public final class ResourceIds {
 
     /** The kind's name for people, as the connection's system's driver gives it. */
     public static KindName label(ClusterConnection connection, KindId kind) {
-        return name(connection.resources().kinds().stream()
+        return name(kinds(connection).stream()
                 .filter(k -> k.id().equals(kind))
                 .findFirst()
                 .orElseThrow(() -> new InvalidResourceIdException("This cluster has no resource kind '" + kind + "'."))
@@ -75,7 +96,7 @@ public final class ResourceIds {
 
     /** The connection's system's kind of this id, or a 400 when the system has no such kind. */
     public static Kind kindOf(ClusterConnection connection, ResourceId id) {
-        return connection.resources().kinds().stream()
+        return kinds(connection).stream()
                 .filter(k -> k.id().equals(id.kind()))
                 .findFirst()
                 .orElseThrow(

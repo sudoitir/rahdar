@@ -223,10 +223,11 @@ say "one subscriptions tick on the stream"
 if [ "$DRY_RUN" = 1 ]; then
   echo "  curl the cluster stream and print the longest data: frame, budget $SSE_BUDGET bytes"
 else
+  # The stream stays open. curl's max-time closes it with status 28 after the frames it already received.
   tick=$(curl -sS -N --max-time 25 -b "$COOKIES" -c "$COOKIES" \
     -H "X-XSRF-TOKEN: $(csrf)" \
     "$RAHDAR/api/v1/stream?clusterId=$C&topics=subscriptions" \
-    | awk 'BEGIN { max = 0 } /^data:/ { n = length($0); if (n > max) max = n } END { print max + 0 }')
+    | awk 'BEGIN { max = 0 } /^data:/ { n = length($0); if (n > max) max = n } END { print max + 0 }' || true)
   v=$(awk -v n="$tick" -v budget="$SSE_BUDGET" 'BEGIN { print (n > 0 && n <= budget) ? "ok" : "OVER BUDGET" }')
   [ "$v" != ok ] && FAILED=1
   printf '%-44s %12s %10s  %s\n' "longest subscriptions tick (bytes)" "$tick" "$SSE_BUDGET" "$v"
