@@ -210,8 +210,8 @@ class KafkaRegisterRealBrokerTest extends PostgresIntegrationTest {
 
         assertThat(again.alreadyRegistered()).isNotNull();
         assertThat(again.alreadyRegistered().id()).isEqualTo(id);
-        assertThatThrownBy(() -> service.register(request("once-again", kafka.getBootstrapServers())))
-                .isInstanceOf(ClusterAlreadyRegisteredException.class);
+        RegisterClusterRequest duplicate = request("once-again", kafka.getBootstrapServers());
+        assertThatThrownBy(() -> service.register(duplicate)).isInstanceOf(ClusterAlreadyRegisteredException.class);
     }
 
     private UpdateClusterRequest edit(KafkaConnectionUpdate connection) {
@@ -295,12 +295,11 @@ class KafkaRegisterRealBrokerTest extends PostgresIntegrationTest {
                     .get();
         }
         ResourceId log = ResourceId.of("kafka.topic", topic);
-        MessageService messages = this.messages;
         MessagePageView page = null;
         for (int attempt = 0; attempt < 50 && (page == null || page.data().size() < 6); attempt++) {
             try {
                 page = messages.browseLog(id, log, 0, MessageService.LogStart.parse("earliest", null), null, 100);
-            } catch (RuntimeException metadataNotThereYet) {
+            } catch (RuntimeException _) {
                 Thread.sleep(200);
             }
         }
@@ -334,8 +333,8 @@ class KafkaRegisterRealBrokerTest extends PostgresIntegrationTest {
                         .data())
                 .hasSize(6);
         assertThat(messages.detailLog(id, log, 0, 2).body()).isEqualTo("v2");
-        assertThatThrownBy(() -> messages.browseLog(
-                        id, log, 0, MessageService.LogStart.parse("earliest", null), "header.x = 1", 10))
+        MessageService.LogStart earliest = MessageService.LogStart.parse("earliest", null);
+        assertThatThrownBy(() -> messages.browseLog(id, log, 0, earliest, "header.x = 1", 10))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("cannot filter");
     }
@@ -377,7 +376,7 @@ class KafkaRegisterRealBrokerTest extends PostgresIntegrationTest {
         for (int attempt = 0; attempt < 50 && effect == null; attempt++) {
             try {
                 effect = truncates.truncate(id, "kafka.topic", topic, cut, null, true);
-            } catch (RuntimeException metadataNotThereYet) {
+            } catch (RuntimeException _) {
                 Thread.sleep(200);
             }
         }
@@ -401,7 +400,7 @@ class KafkaRegisterRealBrokerTest extends PostgresIntegrationTest {
         for (int attempt = 0; attempt < 50 && afterwards == null; attempt++) {
             try {
                 afterwards = messages.browseLog(id, log, 0, MessageService.LogStart.parse("earliest", null), null, 10);
-            } catch (RuntimeException metadataNotThereYet) {
+            } catch (RuntimeException _) {
                 Thread.sleep(200);
             }
         }
@@ -433,7 +432,7 @@ class KafkaRegisterRealBrokerTest extends PostgresIntegrationTest {
                 refused = new AssertionError("a compacted topic was truncated");
             } catch (ConflictException e) {
                 refused = e;
-            } catch (RuntimeException metadataNotThereYet) {
+            } catch (RuntimeException _) {
                 Thread.sleep(200);
             }
         }
@@ -480,7 +479,7 @@ class KafkaRegisterRealBrokerTest extends PostgresIntegrationTest {
         for (int attempt = 0; attempt < 50 && outcome == null; attempt++) {
             try {
                 outcome = ((Attempt.Ok<?>) messages.purgeLog(id, subscription, true)).value();
-            } catch (ConflictException stillLeaving) {
+            } catch (ConflictException _) {
                 Thread.sleep(300);
             }
         }
@@ -583,8 +582,8 @@ class KafkaRegisterRealBrokerTest extends PostgresIntegrationTest {
         assertThat(check.failure()).isNotNull();
         assertThat(check.failure().cause()).isIn("REFUSED", "TIMEOUT");
         assertThat(check.failure().next()).isNotBlank();
-        assertThatThrownBy(() -> service.register(request("refused", "localhost:1")))
-                .hasMessageContaining(check.failure().next());
+        RegisterClusterRequest refused = request("refused", "localhost:1");
+        assertThatThrownBy(() -> service.register(refused)).hasMessageContaining(check.failure().next());
     }
 
     @Test

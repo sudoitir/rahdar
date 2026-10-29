@@ -70,8 +70,8 @@ class KafkaTransactionAbortsTest {
         assertThatThrownBy(() -> aborts.abort(CLUSTER, "tx", "etag"))
                 .isInstanceOf(ConflictException.class)
                 .hasMessageContaining("still working");
-        assertThatThrownBy(() -> aborts.replay(new AbortParams(CLUSTER, "tx", "etag")))
-                .isInstanceOf(ConflictException.class);
+        AbortParams params = new AbortParams(CLUSTER, "tx", "etag");
+        assertThatThrownBy(() -> aborts.replay(params)).isInstanceOf(ConflictException.class);
 
         verify(audit, never())
                 .begin(any(), any(), any(), any(), any(), any(), any(), org.mockito.ArgumentMatchers.anyBoolean());

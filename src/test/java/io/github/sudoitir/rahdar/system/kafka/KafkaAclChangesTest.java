@@ -74,7 +74,8 @@ class KafkaAclChangesTest {
                 .thenReturn(Partial.complete(mock(OperationResult.class), List.of()))
                 .thenThrow(new IllegalStateException("the broker went away"));
 
-        assertThatThrownBy(() -> changes.replay(params())).isInstanceOf(IllegalStateException.class);
+        AclChangeParams change = params();
+        assertThatThrownBy(() -> changes.replay(change)).isInstanceOf(IllegalStateException.class);
 
         ArgumentCaptor<Object> detail = ArgumentCaptor.forClass(Object.class);
         verify(audit).finish(any(), eq(true), eq(1L), any(), detail.capture());

@@ -91,20 +91,20 @@ class KafkaHealthTest {
 
     @Test
     void healthyBrokersAndAQuorumLeaderAreOk() {
-        ClusterHealth health = judge(
+        ClusterHealth verdict = judge(
                 broker("1", true, true, serving(true), replicated(false)), broker("2", true, false, serving(true)));
 
-        assertThat(health.level()).isEqualTo(Level.OK);
-        assertThat(health.liveEndpointNames()).containsExactly("broker-1", "broker-2");
-        assertThat(health.notes()).isEmpty();
+        assertThat(verdict.level()).isEqualTo(Level.OK);
+        assertThat(verdict.liveEndpointNames()).containsExactly("broker-1", "broker-2");
+        assertThat(verdict.notes()).isEmpty();
     }
 
     @Test
     void aZooKeeperClusterWithEveryBrokerServingIsOkWithANoteAboutItsQuorum() {
-        ClusterHealth health = judge(broker("1", false, false, serving(true)));
+        ClusterHealth verdict = judge(broker("1", false, false, serving(true)));
 
-        assertThat(health.level()).isEqualTo(Level.OK);
-        assertThat(health.notes())
+        assertThat(verdict.level()).isEqualTo(Level.OK);
+        assertThat(verdict.notes())
                 .singleElement()
                 .asString()
                 .contains("quorum cannot be read")
@@ -113,24 +113,24 @@ class KafkaHealthTest {
 
     @Test
     void aFencedBrokerDegradesTheClusterAndIsNotLive() {
-        ClusterHealth health = judge(broker("1", true, true, serving(true)), broker("2", true, false, serving(false)));
+        ClusterHealth verdict = judge(broker("1", true, true, serving(true)), broker("2", true, false, serving(false)));
 
-        assertThat(health.level()).isEqualTo(Level.DEGRADED);
-        assertThat(health.liveEndpointNames()).containsExactly("broker-1");
-        assertThat(health.notes()).anyMatch(n -> n.contains("broker-2 is not serving"));
+        assertThat(verdict.level()).isEqualTo(Level.DEGRADED);
+        assertThat(verdict.liveEndpointNames()).containsExactly("broker-1");
+        assertThat(verdict.notes()).anyMatch(n -> n.contains("broker-2 is not serving"));
     }
 
     @Test
     void underReplicatedPartitionsDegradeAndMarkReplicationBehind() {
-        ClusterHealth health = judge(broker("1", true, true, serving(true), replicated(true)));
+        ClusterHealth verdict = judge(broker("1", true, true, serving(true), replicated(true)));
 
-        assertThat(health.level()).isEqualTo(Level.DEGRADED);
-        assertThat(health.replicationBehind()).isTrue();
+        assertThat(verdict.level()).isEqualTo(Level.DEGRADED);
+        assertThat(verdict.replicationBehind()).isTrue();
     }
 
     @Test
     void aLaggingVoterDegrades() {
-        ClusterHealth health = judge(
+        ClusterHealth verdict = judge(
                 broker("1", true, true, serving(true)),
                 broker(
                         "2",
@@ -139,8 +139,8 @@ class KafkaHealthTest {
                         serving(true),
                         condition(ConditionTypes.OUT_OF_SYNC, ConditionStatus.TRUE, "VOTER_BEHIND")));
 
-        assertThat(health.level()).isEqualTo(Level.DEGRADED);
-        assertThat(health.notes()).anyMatch(n -> n.contains("lags the quorum leader"));
+        assertThat(verdict.level()).isEqualTo(Level.DEGRADED);
+        assertThat(verdict.notes()).anyMatch(n -> n.contains("lags the quorum leader"));
     }
 
     @Test
@@ -152,7 +152,7 @@ class KafkaHealthTest {
                 Dispatch.NOT_SENT,
                 null,
                 "refused");
-        ClusterHealth health = KafkaHealth.judge(
+        ClusterHealth verdict = KafkaHealth.judge(
                 CLUSTER,
                 new Partial<>(
                         List.of(one),
@@ -161,62 +161,62 @@ class KafkaHealthTest {
                 OptionalLong.of(0),
                 true);
 
-        assertThat(health.level()).isEqualTo(Level.DEGRADED);
-        assertThat(health.notes()).anyMatch(n -> n.contains("Node 2 is unreachable"));
+        assertThat(verdict.level()).isEqualTo(Level.DEGRADED);
+        assertThat(verdict.notes()).anyMatch(n -> n.contains("Node 2 is unreachable"));
     }
 
     @Test
     void aQuorumWithNoLeaderIsCritical() {
-        ClusterHealth health = judge(broker("1", true, false, serving(true)), broker("2", true, false, serving(true)));
+        ClusterHealth verdict = judge(broker("1", true, false, serving(true)), broker("2", true, false, serving(true)));
 
-        assertThat(health.level()).isEqualTo(Level.CRITICAL);
-        assertThat(health.notes()).anyMatch(n -> n.contains("no leader"));
+        assertThat(verdict.level()).isEqualTo(Level.CRITICAL);
+        assertThat(verdict.notes()).anyMatch(n -> n.contains("no leader"));
     }
 
     @Test
     void partitionsWithoutALeaderAreCritical() {
-        ClusterHealth health = KafkaHealth.judge(
+        ClusterHealth verdict = KafkaHealth.judge(
                 CLUSTER,
                 Partial.complete(List.of(broker("1", true, true, serving(true))), List.of(NodeId.of("1"))),
                 OptionalLong.of(3),
                 true);
 
-        assertThat(health.level()).isEqualTo(Level.CRITICAL);
-        assertThat(health.notes()).anyMatch(n -> n.contains("3 partitions have no leader"));
+        assertThat(verdict.level()).isEqualTo(Level.CRITICAL);
+        assertThat(verdict.notes()).anyMatch(n -> n.contains("3 partitions have no leader"));
     }
 
     @Test
     void partitionsWhoseLeadersCouldNotBeReadAreNotCountedAsFine() {
-        ClusterHealth health = KafkaHealth.judge(
+        ClusterHealth verdict = KafkaHealth.judge(
                 CLUSTER,
                 Partial.complete(List.of(broker("1", true, true, serving(true))), List.of(NodeId.of("1"))),
                 OptionalLong.empty(),
                 true);
 
-        assertThat(health.level()).isEqualTo(Level.OK);
-        assertThat(health.notes()).anyMatch(n -> n.contains("could not be read"));
+        assertThat(verdict.level()).isEqualTo(Level.OK);
+        assertThat(verdict.notes()).anyMatch(n -> n.contains("could not be read"));
     }
 
     @Test
     void partitionsNotSampledYetAreSaidToBeUnsampledNotUnreadable() {
-        ClusterHealth health = KafkaHealth.judge(
+        ClusterHealth verdict = KafkaHealth.judge(
                 CLUSTER,
                 Partial.complete(List.of(broker("1", true, true, serving(true))), List.of(NodeId.of("1"))),
                 OptionalLong.empty(),
                 false);
 
-        assertThat(health.level()).isEqualTo(Level.OK);
-        assertThat(health.notes())
+        assertThat(verdict.level()).isEqualTo(Level.OK);
+        assertThat(verdict.notes())
                 .containsExactly("The partitions have not been sampled yet, so offline partitions are not ruled out.");
     }
 
     @Test
     void noBrokerAtAllIsCritical() {
-        ClusterHealth health = KafkaHealth.judge(
+        ClusterHealth verdict = KafkaHealth.judge(
                 CLUSTER, new Partial<>(new ArrayList<NodeDescription>(), Map.of(), Map.of()), OptionalLong.of(0), true);
 
-        assertThat(health.level()).isEqualTo(Level.CRITICAL);
-        assertThat(health.liveEndpointNames()).isEmpty();
+        assertThat(verdict.level()).isEqualTo(Level.CRITICAL);
+        assertThat(verdict.liveEndpointNames()).isEmpty();
     }
 
     private final KafkaHealthStore store = mock(KafkaHealthStore.class);

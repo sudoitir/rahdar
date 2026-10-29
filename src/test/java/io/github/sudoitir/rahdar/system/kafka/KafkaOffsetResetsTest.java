@@ -97,8 +97,8 @@ class KafkaOffsetResetsTest {
     void aFailureOnTheFirstTopicMovedNothingAndIsRefusedAsBefore() {
         when(operations.execute(any(), any(), any(), any())).thenThrow(new IllegalStateException("refused"));
 
-        assertThatThrownBy(() -> resets.reset(CLUSTER, "g", new OffsetRequest(null, "earliest", null, "etag")))
-                .isInstanceOf(IllegalStateException.class);
+        OffsetRequest earliest = new OffsetRequest(null, "earliest", null, "etag");
+        assertThatThrownBy(() -> resets.reset(CLUSTER, "g", earliest)).isInstanceOf(IllegalStateException.class);
 
         verify(audit).fail(any(), any());
     }

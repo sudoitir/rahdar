@@ -127,7 +127,7 @@ class KafkaTopicConfigsTest {
         ConfigChangeParams pinned = new ConfigChangeParams(CLUSTER, "orders", params.set(), null, preview.etag());
         try {
             changes.replay(pinned);
-        } catch (RuntimeException brokerNotReachable) {
+        } catch (RuntimeException _) {
             // The gateway is a mock: the audit row was begun before the call that fails.
         }
         @SuppressWarnings("unchecked")

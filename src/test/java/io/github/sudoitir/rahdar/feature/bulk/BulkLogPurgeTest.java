@@ -1,7 +1,6 @@
 package io.github.sudoitir.rahdar.feature.bulk;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -49,7 +48,7 @@ class BulkLogPurgeTest extends BulkTestSupport {
 
     @Test
     void aMixOfGroupsAndAQueueIsActedOnByKindAndAnActiveGroupIsRefusedAtPlanTime() {
-        when(kinds.partitioned(eq(clusterId), eq(GROUP_TOPIC))).thenReturn(true);
+        when(kinds.partitioned(clusterId, GROUP_TOPIC)).thenReturn(true);
         when(aggregator.allQueues(clusterId))
                 .thenReturn(List.of(
                         group("g-empty", "t", 10, 0),
@@ -113,12 +112,12 @@ class BulkLogPurgeTest extends BulkTestSupport {
         assertThat(rebalancing.error()).contains("rebalancing");
         assertThat(item(run, "artemis.queue/orders.q").status()).isEqualTo(BulkItemStatus.SUCCEEDED);
         verify(messages, never())
-                .purgeLog(eq(clusterId), eq(ResourceId.parse("kafka.group-topic/g-active/t")), eq(false));
+                .purgeLog(clusterId, ResourceId.parse("kafka.group-topic/g-active/t"), false);
     }
 
     @Test
     void aLogSubscriptionCannotBePausedOrDeleted() {
-        when(kinds.partitioned(eq(clusterId), eq(GROUP_TOPIC))).thenReturn(true);
+        when(kinds.partitioned(clusterId, GROUP_TOPIC)).thenReturn(true);
         when(aggregator.allQueues(clusterId)).thenReturn(List.of(group("g-empty", "t", 10, 0)));
 
         for (BulkOperation operation : List.of(BulkOperation.PAUSE, BulkOperation.RESUME, BulkOperation.DELETE)) {

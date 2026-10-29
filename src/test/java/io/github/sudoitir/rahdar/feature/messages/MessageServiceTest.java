@@ -230,9 +230,10 @@ class MessageServiceTest {
         when(messages.unavailableBecause(eq(CLUSTER), anyString()))
                 .thenReturn(Optional.of("A partitioned log is append-only."));
 
+        MessageActionRequest one = ids(1L);
         for (MessageAction action : MessageAction.values()) {
             for (boolean dryRun : new boolean[] {true, false}) {
-                assertThatThrownBy(() -> service.execute(CLUSTER, "orders", null, action, ids(1L), dryRun, false))
+                assertThatThrownBy(() -> service.execute(CLUSTER, "orders", null, action, one, dryRun, false))
                         .isInstanceOf(ConflictException.class)
                         .hasMessageContaining("append-only");
             }
@@ -1268,8 +1269,8 @@ class MessageServiceTest {
     void aStartTimeInTheFutureIsRefusedWithTheReason() {
         logOf(0, 120, new LogPage(List.of(), null));
 
-        assertThatThrownBy(() -> service.browseLog(
-                        CLUSTER, TOPIC, 0, MessageService.LogStart.parse("time", "2999-01-01T00:00:00Z"), null, 50))
+        MessageService.LogStart future = MessageService.LogStart.parse("time", "2999-01-01T00:00:00Z");
+        assertThatThrownBy(() -> service.browseLog(CLUSTER, TOPIC, 0, future, null, 50))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("in the future");
     }

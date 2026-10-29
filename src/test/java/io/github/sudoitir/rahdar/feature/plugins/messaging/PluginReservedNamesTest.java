@@ -85,10 +85,12 @@ class PluginReservedNamesTest {
     void aSystemsInternalTopicIsRefusedWhicheverSegmentNamesIt() {
         kafkaCluster();
 
-        assertThatThrownBy(() -> service.register("acme-x", spec("billing", "__consumer_offsets")))
+        RegistrationSpec offsets = spec("billing", "__consumer_offsets");
+        RegistrationSpec shareGroup = spec("__share_group_state", "orders");
+        assertThatThrownBy(() -> service.register("acme-x", offsets))
                 .isInstanceOf(RegistrationRefusedException.class)
                 .hasMessageContaining("internal topics");
-        assertThatThrownBy(() -> service.register("acme-x", spec("__share_group_state", "orders")))
+        assertThatThrownBy(() -> service.register("acme-x", shareGroup))
                 .isInstanceOf(RegistrationRefusedException.class)
                 .hasMessageContaining("internal topics");
         verifyNoInteractions(registrations, audit);
@@ -98,7 +100,8 @@ class PluginReservedNamesTest {
     void aNameRahdarReservesIsRefusedInTheTopicSegmentToo() {
         kafkaCluster();
 
-        assertThatThrownBy(() -> service.register("acme-x", spec("billing", "rahdar.capture.x")))
+        RegistrationSpec capture = spec("billing", "rahdar.capture.x");
+        assertThatThrownBy(() -> service.register("acme-x", capture))
                 .isInstanceOf(RegistrationRefusedException.class)
                 .hasMessageContaining("reserved");
         verifyNoInteractions(registrations, audit);

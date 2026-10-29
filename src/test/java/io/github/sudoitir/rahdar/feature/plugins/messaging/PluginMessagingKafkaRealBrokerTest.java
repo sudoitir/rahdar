@@ -307,9 +307,9 @@ class PluginMessagingKafkaRealBrokerTest extends PostgresIntegrationTest {
             TimeUnit.MILLISECONDS.sleep(500);
         }
         assertThat(committed).isEqualTo(1);
-        assertThat(MessagingProbe.inbox(plugin).size())
+        assertThat(MessagingProbe.inbox(plugin))
                 .as("deliveries before the dead letter")
-                .isGreaterThanOrEqualTo(10);
+                .hasSizeGreaterThanOrEqualTo(10);
     }
 
     @Test
@@ -506,7 +506,7 @@ class PluginMessagingKafkaRealBrokerTest extends PostgresIntegrationTest {
                     .partitionResult(new TopicPartition(topic, 0))
                     .get()
                     .offset();
-        } catch (ExecutionException e) {
+        } catch (ExecutionException _) {
             return 0;
         }
     }
@@ -541,7 +541,7 @@ class PluginMessagingKafkaRealBrokerTest extends PostgresIntegrationTest {
                             new UpdateFeaturesOptions())
                     .all()
                     .get();
-        } catch (InterruptedException e) {
+        } catch (InterruptedException _) {
             Thread.currentThread().interrupt();
         } catch (ExecutionException _) {
             // The tests that need it report the level they found.

@@ -81,13 +81,17 @@ class TruncateServiceTest {
         assertThat(new Cut(Map.of(0, 5L), null).offsets()).containsEntry(0, 5L);
         assertThat(new Cut(null, Instant.parse("2026-10-28T09:30:00Z")).time()).isNotNull();
         assertThatThrownBy(() -> new Cut(null, null)).isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> new Cut(Map.of(0, 5L), Instant.now())).isInstanceOf(IllegalArgumentException.class);
+        Map<Integer, Long> offsets = Map.of(0, 5L);
+        Instant time = Instant.now();
+        assertThatThrownBy(() -> new Cut(offsets, time)).isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
     void aCutNeverNamesANegativePartitionOrOffset() {
-        assertThatThrownBy(() -> new Cut(Map.of(-1, 5L), null)).isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> new Cut(Map.of(0, -5L), null)).isInstanceOf(IllegalArgumentException.class);
+        Map<Integer, Long> negativePartition = Map.of(-1, 5L);
+        Map<Integer, Long> negativeOffset = Map.of(0, -5L);
+        assertThatThrownBy(() -> new Cut(negativePartition, null)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new Cut(negativeOffset, null)).isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
@@ -109,8 +113,8 @@ class TruncateServiceTest {
     void aCutOfAPartitionTheLogDoesNotHaveIsRefusedBeforeAnythingIsCut() {
         Fixture f = new Fixture();
 
-        assertThatThrownBy(() -> f.service.truncate(
-                        f.cluster, "kafka.topic", "orders", new Cut(Map.of(7, 5L), null), "e1", false))
+        Cut missing = new Cut(Map.of(7, 5L), null);
+        assertThatThrownBy(() -> f.service.truncate(f.cluster, "kafka.topic", "orders", missing, "e1", false))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Partition 7");
 

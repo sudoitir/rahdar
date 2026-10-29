@@ -64,7 +64,8 @@ class KafkaMcpViewsTest {
         assertThat(last.topics().getFirst().nextCursor()).isNull();
 
         assertThat(KafkaMcpViews.group(group(10), null, null, null).truncated()).isFalse();
-        assertThatThrownBy(() -> KafkaMcpViews.group(group(10), "orders", "x", null))
+        GroupDetail ten = group(10);
+        assertThatThrownBy(() -> KafkaMcpViews.group(ten, "orders", "x", null))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 

@@ -44,6 +44,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.IntStream;
 import org.junit.jupiter.api.Test;
@@ -419,24 +421,30 @@ class KafkaRegistrarTest {
                 .when(gateway)
                 .verify(any(), any(), any(), any());
         AtomicInteger probed = new AtomicInteger();
-        KafkaRegistrar slow = new KafkaRegistrar(gateway, BrokerDrivers.load(), connections, settings, host -> {
+        AtomicInteger inFlight = new AtomicInteger();
+        AtomicInteger maxInFlight = new AtomicInteger();
+        CountDownLatch overlapping = new CountDownLatch(3);
+        KafkaRegistrar slow = new KafkaRegistrar(gateway, BrokerDrivers.load(), connections, settings, _ -> {
             probed.incrementAndGet();
+            maxInFlight.accumulateAndGet(inFlight.incrementAndGet(), Math::max);
+            overlapping.countDown();
             try {
-                Thread.sleep(500);
-            } catch (InterruptedException e) {
+                // Released once every probe has entered, so a serial probe cannot finish the others.
+                overlapping.await(2, TimeUnit.SECONDS);
+            } catch (InterruptedException _) {
                 Thread.currentThread().interrupt();
+            } finally {
+                inFlight.decrementAndGet();
             }
             return false;
         });
         String[] servers =
                 IntStream.rangeClosed(1, 10).mapToObj(n -> "k" + n + ":9092").toArray(String[]::new);
 
-        long started = System.nanoTime();
         var failure = slow.check(plaintext(servers)).view().failure();
-        long tookMillis = (System.nanoTime() - started) / 1_000_000;
 
         assertThat(failure.next()).doesNotContain("advertised.listeners");
         assertThat(probed).hasValue(3);
-        assertThat(tookMillis).as("three probes at once, not ten in turn").isLessThan(1_400);
+        assertThat(maxInFlight).as("three probes at once, not ten in turn").hasValue(3);
     }
 }

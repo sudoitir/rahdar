@@ -47,9 +47,11 @@ class KafkaAclAccessTest {
 
     @Test
     void anAclThatIsNotKafkaIsRefused() {
-        assertThatThrownBy(() -> KafkaAclAccess.normalised(acl("app", "read", "allow", "literal", "t")))
+        Acl noPrincipalType = acl("app", "read", "allow", "literal", "t");
+        Acl unknownOperation = acl("User:a", "fly", "allow", "literal", "t");
+        assertThatThrownBy(() -> KafkaAclAccess.normalised(noPrincipalType))
                 .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> KafkaAclAccess.normalised(acl("User:a", "fly", "allow", "literal", "t")))
+        assertThatThrownBy(() -> KafkaAclAccess.normalised(unknownOperation))
                 .isInstanceOf(IllegalArgumentException.class);
         assertThat(KafkaAclAccess.normalised(acl("User:a", "READ", "ALLOW", "LITERAL", "t"))
                         .operation())

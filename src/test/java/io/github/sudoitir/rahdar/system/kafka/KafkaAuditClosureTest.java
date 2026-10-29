@@ -52,9 +52,9 @@ class KafkaAuditClosureTest {
         KafkaTopicConfigChanges changes = new KafkaTopicConfigChanges(
                 configs, gateway, mock(OperationGate.class), audit, mock(ActorResolver.class));
 
-        assertThatThrownBy(() -> changes.replay(
-                        new ConfigChangeParams(CLUSTER, "orders", Map.of("retention.ms", "2"), null, "etag")))
-                .isInstanceOf(IllegalStateException.class);
+        ConfigChangeParams params =
+                new ConfigChangeParams(CLUSTER, "orders", Map.of("retention.ms", "2"), null, "etag");
+        assertThatThrownBy(() -> changes.replay(params)).isInstanceOf(IllegalStateException.class);
 
         verify(audit).fail(any(), any());
     }
@@ -67,8 +67,8 @@ class KafkaAuditClosureTest {
         KafkaTransactionAborts aborts = new KafkaTransactionAborts(
                 transactions, gateway, mock(OperationGate.class), audit, mock(ActorResolver.class));
 
-        assertThatThrownBy(() -> aborts.replay(new AbortParams(CLUSTER, "tx", "etag")))
-                .isInstanceOf(IllegalStateException.class);
+        AbortParams params = new AbortParams(CLUSTER, "tx", "etag");
+        assertThatThrownBy(() -> aborts.replay(params)).isInstanceOf(IllegalStateException.class);
 
         verify(audit).fail(any(), any());
     }
