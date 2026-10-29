@@ -172,40 +172,59 @@ class OpenApiConfig {
      */
     @Bean
     OpenApiCustomizer unionMembersStandAlone() {
-        return openApi -> {
-            Map<String, Schema> schemas = openApi.getComponents().getSchemas();
-            new ArrayList<>(schemas.entrySet()).forEach(union -> {
-                Schema<?> parent = union.getValue();
-                if (parent.getOneOf() == null || parent.getDiscriminator() == null) {
-                    return;
-                }
-                String parentRef = "#/components/schemas/" + union.getKey();
-                for (Object member : parent.getOneOf()) {
-                    String ref = ((Schema<?>) member).get$ref();
-                    Schema<?> child = ref == null ? null : schemas.get(ref.substring(ref.lastIndexOf('/') + 1));
-                    if (child == null || child.getAllOf() == null) {
-                        continue;
-                    }
-                    Schema<?> flat = new ObjectSchema();
-                    for (Object part : child.getAllOf()) {
-                        Schema<?> piece = (Schema<?>) part;
-                        if (!parentRef.equals(piece.get$ref()) && piece.getProperties() != null) {
-                            piece.getProperties().forEach(flat::addProperty);
-                        }
-                    }
-                    if (child.getRequired() != null) {
-                        child.getRequired().forEach(flat::addRequiredItem);
-                    }
-                    flat.setDescription(child.getDescription());
-                    // Flattening copies properties out of allOf after the nullable pass, including a
-                    // type:null beside a $ref. Rewrite those on the schema this publishes.
-                    fixNullable(flat);
-                    schemas.put(ref.substring(ref.lastIndexOf('/') + 1), flat);
-                }
-                parent.setProperties(null);
-                parent.setRequired(null);
-            });
-        };
+        return OpenApiConfig::flattenUnions;
+    }
+
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    private static void flattenUnions(OpenAPI openApi) {
+        Map<String, Schema> schemas = openApi.getComponents().getSchemas();
+        new ArrayList<>(schemas.entrySet()).forEach(union -> flattenUnion(schemas, union.getKey(), union.getValue()));
+    }
+
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    private static void flattenUnion(Map<String, Schema> schemas, String name, Schema<?> parent) {
+        if (parent.getOneOf() == null || parent.getDiscriminator() == null) {
+            return;
+        }
+        String parentRef = "#/components/schemas/" + name;
+        for (Object member : parent.getOneOf()) {
+            flattenMember(schemas, parentRef, (Schema<?>) member);
+        }
+        parent.setProperties(null);
+        parent.setRequired(null);
+    }
+
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    private static void flattenMember(Map<String, Schema> schemas, String parentRef, Schema<?> member) {
+        String ref = member.get$ref();
+        Schema<?> child = ref == null ? null : schemas.get(ref.substring(ref.lastIndexOf('/') + 1));
+        if (child == null || child.getAllOf() == null) {
+            return;
+        }
+        Schema<?> flat = flattened(parentRef, child);
+        // Flattening copies properties out of allOf after the nullable pass, including a
+        // type:null beside a $ref. Rewrite those on the schema this publishes.
+        fixNullable(flat);
+        schemas.put(ref.substring(ref.lastIndexOf('/') + 1), flat);
+    }
+
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    private static Schema<?> flattened(String parentRef, Schema<?> child) {
+        Schema<?> flat = new ObjectSchema();
+        for (Object part : child.getAllOf()) {
+            copyOwnProperties(parentRef, flat, (Schema<?>) part);
+        }
+        if (child.getRequired() != null) {
+            child.getRequired().forEach(flat::addRequiredItem);
+        }
+        flat.setDescription(child.getDescription());
+        return flat;
+    }
+
+    private static void copyOwnProperties(String parentRef, Schema<?> flat, Schema<?> piece) {
+        if (!parentRef.equals(piece.get$ref()) && piece.getProperties() != null) {
+            piece.getProperties().forEach(flat::addProperty);
+        }
     }
 
     /**

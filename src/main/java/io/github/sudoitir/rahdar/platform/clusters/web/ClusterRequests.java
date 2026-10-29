@@ -22,6 +22,8 @@ import tools.jackson.databind.annotation.JsonDeserialize;
 /** The write side of the cluster API. */
 public final class ClusterRequests {
 
+    private static final String PASSWORD_FIELD = ", password=";
+
     private ClusterRequests() {}
 
     /**
@@ -49,7 +51,7 @@ public final class ClusterRequests {
             /** The password is never printed. */
             @Override
             public String toString() {
-                return "Credentials[username=" + username + ", password=" + SecretRedactor.MASK + "]";
+                return "Credentials[username=" + username + PASSWORD_FIELD + SecretRedactor.MASK + "]";
             }
         }
 
@@ -213,7 +215,7 @@ public final class ClusterRequests {
         /** The password and the token are never printed; whether each is set is. */
         @Override
         public String toString() {
-            return "KafkaCredentials[username=" + username + ", password="
+            return "KafkaCredentials[username=" + username + PASSWORD_FIELD
                     + (password == null ? "none" : SecretRedactor.MASK) + ", token="
                     + (token == null ? "none" : SecretRedactor.MASK) + "]";
         }
@@ -231,7 +233,7 @@ public final class ClusterRequests {
         /** The password is never printed. */
         @Override
         public String toString() {
-            return "AccountUpdate[username=" + username + ", password="
+            return "AccountUpdate[username=" + username + PASSWORD_FIELD
                     + (password == null ? "none" : SecretRedactor.MASK) + "]";
         }
 
@@ -323,7 +325,7 @@ public final class ClusterRequests {
                 implements ConnectionUpdate {
 
             /** The wire name of this connection's system. */
-            public static final String SYSTEM = "artemis";
+            public static final String WIRE = "artemis";
 
             @JsonIgnore
             @Schema(hidden = true)

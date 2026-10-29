@@ -65,6 +65,8 @@ public class BrokerMessages {
     /** The most body bytes one page holds in all; a page that would hold more stops there and says so. */
     public static final long PAGE_BYTE_BUDGET = 8L * 1024 * 1024;
 
+    private static final String RECEIVE_PURPOSE = "receive messages over";
+
     private final BrokerGateway gateway;
 
     public BrokerMessages(BrokerGateway gateway) {
@@ -386,7 +388,7 @@ public class BrokerMessages {
      */
     public Receiver receiver(UUID clusterId, UUID nodeId, String queue, ReceiverOptions options, String owner) {
         ClusterConnection c = gateway.cluster(clusterId);
-        Receiver receiver = transport(c, "receive messages over")
+        Receiver receiver = transport(c, RECEIVE_PURPOSE)
                 .receiver(queueId(c, queue), Scope.node(BrokerGateway.idOf(nodeId)), options);
         gateway.label(receiver.id(), owner);
         return receiver;
@@ -409,14 +411,14 @@ public class BrokerMessages {
         ClusterConnection c = gateway.cluster(clusterId);
         Scope scope = nodeId == null ? Scope.whole() : Scope.node(BrokerGateway.idOf(nodeId));
         Processor processor =
-                transport(c, "receive messages over").process(ResourceIds.parse(kind, path), scope, options, handler);
+                transport(c, RECEIVE_PURPOSE).process(ResourceIds.parse(kind, path), scope, options, handler);
         gateway.label(processor.id(), owner);
         return processor;
     }
 
     /** What the cluster's system can do with a subscription of this kind: its orderings, retry and release counting. */
     public SubscriptionCapabilities subscriptionCapabilities(UUID clusterId, String kind) {
-        return transport(gateway.cluster(clusterId), "receive messages over")
+        return transport(gateway.cluster(clusterId), RECEIVE_PURPOSE)
                 .capabilities()
                 .subscription(KindId.of(kind));
     }

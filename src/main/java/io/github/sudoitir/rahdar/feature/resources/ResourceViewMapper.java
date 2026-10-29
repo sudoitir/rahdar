@@ -41,6 +41,9 @@ public class ResourceViewMapper {
     /** The aggregation key of a subscription across the cluster's nodes. */
     public record SubscriptionKey(String destination, String name, String routingType) {}
 
+    /** The kinds a rolled-up subscription and its destination are read as. */
+    record SubscriptionKinds(KindId subscription, KindId destination) {}
+
     /**
      * {@code subscription_snapshot} rows sharing a {@link SubscriptionKey} → one {@link SubscriptionView}: a
      * per-node cell for each row, cluster totals, and node presence (ADR-0017).
@@ -48,8 +51,7 @@ public class ResourceViewMapper {
     public SubscriptionView subscription(
             SubscriptionKey key,
             ClusterConnection connection,
-            KindId subscriptionKind,
-            KindId destinationKind,
+            SubscriptionKinds kinds,
             List<QueueSnapshot> rows,
             Map<UUID, String> nodeNames,
             int nodesTotal,
@@ -70,7 +72,7 @@ public class ResourceViewMapper {
         // A subscription is of the kind its rows were scraped as, and its id has as many segments as the system gives
         // it.
         QueueSnapshot first = rows.getFirst();
-        KindId kind = first.kind() == null || first.kind().isBlank() ? subscriptionKind : KindId.of(first.kind());
+        KindId kind = first.kind() == null || first.kind().isBlank() ? kinds.subscription() : KindId.of(first.kind());
         String path = first.attributes().get(QueueRow.PATH);
         ResourceId id =
                 path == null ? ResourceId.of(kind.value(), key.name()) : ResourceId.parse(kind.value() + "/" + path);
@@ -85,7 +87,7 @@ public class ResourceViewMapper {
                 label(connection, kind),
                 // The group or queue is what a team owns, so it is the name; the destination says which topic.
                 path == null ? key.name() : id.path().segments().getFirst(),
-                ResourceId.of(destinationKind.value(), key.destination()).format(),
+                ResourceId.of(kinds.destination().value(), key.destination()).format(),
                 key.routingType() == null ? Map.of() : Map.of("routingType", key.routingType()),
                 rows.stream().anyMatch(QueueSnapshot::durable),
                 backlogOf(rows, total),

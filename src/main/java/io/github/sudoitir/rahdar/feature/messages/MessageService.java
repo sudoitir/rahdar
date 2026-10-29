@@ -218,7 +218,7 @@ public class MessageService {
                     case "time" -> new LogStart(Kind.TIME, 0, Instant.parse(value));
                     default -> throw new IllegalArgumentException("from must be earliest, latest, offset or time.");
                 };
-            } catch (NumberFormatException | NullPointerException | DateTimeParseException e) {
+            } catch (NumberFormatException | NullPointerException | DateTimeParseException _) {
                 throw new IllegalArgumentException("from=" + kind + " needs a value that is "
                         + (kind.equals("offset") ? "an offset." : "an ISO-8601 time."));
             }
@@ -284,9 +284,11 @@ public class MessageService {
             case LATEST -> offset = Math.max(bounds.start(), bounds.end() - size);
             case OFFSET -> {
                 moved = from.offset() < bounds.start();
-                offset = Math.min(Math.max(from.offset(), bounds.start()), bounds.end());
+                offset = Math.clamp(from.offset(), bounds.start(), bounds.end());
             }
-            case EARLIEST, TIME -> {}
+            case EARLIEST, TIME -> {
+                // Earliest stays at the partition start. A time is placed by Position.AtTime below.
+            }
         }
         if (from.kind() == LogStart.Kind.TIME && from.time().isAfter(Instant.now())) {
             throw new IllegalArgumentException("The start time " + from.time()

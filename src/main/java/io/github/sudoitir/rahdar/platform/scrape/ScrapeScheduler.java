@@ -94,6 +94,8 @@ public class ScrapeScheduler implements DisposableBean {
      */
     static final Duration SYSTEM_SCRAPE_LIMIT = Duration.ofSeconds(10);
 
+    private static final String SCRAPE_TASK_FAILED = "Scrape task failed unexpectedly: {}";
+
     /** Why each node's job last failed, by cluster, node and job, so a node that keeps failing the same way is logged once. */
     private final Map<String, String> lastFailures = new ConcurrentHashMap<>();
 
@@ -253,7 +255,7 @@ public class ScrapeScheduler implements DisposableBean {
             } catch (TimeoutException _) {
                 // Still running: it lands its own result when it answers.
             } catch (ExecutionException e) {
-                log.warn("Scrape task failed unexpectedly: {}", e.getCause() != null ? e.getCause() : e, e);
+                log.warn(SCRAPE_TASK_FAILED, e.getCause() != null ? e.getCause() : e, e);
             } catch (InterruptedException _) {
                 Thread.currentThread().interrupt();
                 return;
@@ -358,10 +360,8 @@ public class ScrapeScheduler implements DisposableBean {
         try {
             CompletableFuture.allOf(started.stream().map(SystemRead::read).toArray(CompletableFuture[]::new))
                     .get(systemScrapeLimit.toNanos(), TimeUnit.NANOSECONDS);
-        } catch (TimeoutException _) {
-            // The ones not done are handled below.
-        } catch (ExecutionException _) {
-            // Each failure is read from its own future below.
+        } catch (TimeoutException | ExecutionException _) {
+            // The ones not done are handled below; each failure is read from its own future.
         } catch (InterruptedException _) {
             Thread.currentThread().interrupt();
             return;
@@ -381,7 +381,7 @@ public class ScrapeScheduler implements DisposableBean {
                 }
             } else if (read.read().isCompletedExceptionally()) {
                 read.read().exceptionally(e -> {
-                    log.warn("Scrape task failed unexpectedly: {}", e.toString(), e);
+                    log.warn(SCRAPE_TASK_FAILED, e.toString(), e);
                     return null;
                 });
             }
@@ -514,7 +514,7 @@ public class ScrapeScheduler implements DisposableBean {
             try {
                 f.get();
             } catch (ExecutionException e) {
-                log.warn("Scrape task failed unexpectedly: {}", e.getCause() != null ? e.getCause() : e, e);
+                log.warn(SCRAPE_TASK_FAILED, e.getCause() != null ? e.getCause() : e, e);
             } catch (InterruptedException _) {
                 Thread.currentThread().interrupt();
                 return;

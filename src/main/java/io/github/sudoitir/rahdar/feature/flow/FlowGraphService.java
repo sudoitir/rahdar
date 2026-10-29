@@ -1169,10 +1169,15 @@ public class FlowGraphService {
             return r == null ? null : r.rate();
         }
 
-        /** Sums two rates where either may be unknown; a ternary here would unbox a null. */
         /** A sum of per-node counts where a node that gave none leaves the other's count as it is. */
         private static Long plusCount(Long a, Long b) {
-            return a == null ? b : b == null ? a : Long.valueOf(a + b);
+            if (a == null) {
+                return b;
+            }
+            if (b == null) {
+                return a;
+            }
+            return Long.valueOf(a + b);
         }
 
         private static Double plus(Double a, Double b) {

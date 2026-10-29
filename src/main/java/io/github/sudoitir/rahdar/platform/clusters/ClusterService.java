@@ -172,15 +172,16 @@ public class ClusterService {
                     || management != null
                     || core != null
                     || clearCore;
-            ConnectionUpdate edit = connection != null || !artemis
-                    ? connection
-                    : new ArtemisConnectionUpdate(
-                            ArtemisConnectionUpdate.SYSTEM,
-                            seedUrls,
-                            managementUrlPattern,
-                            tlsBundle,
-                            management,
-                            clearCore ? AccountUpdate.CLEAR : core);
+            ConnectionUpdate edit = connection;
+            if (connection == null && artemis) {
+                edit = new ArtemisConnectionUpdate(
+                        ArtemisConnectionUpdate.WIRE,
+                        seedUrls,
+                        managementUrlPattern,
+                        tlsBundle,
+                        management,
+                        clearCore ? AccountUpdate.CLEAR : core);
+            }
             return new UpdateClusterRequest(name, description, environmentId, edit);
         }
     }

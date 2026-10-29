@@ -230,7 +230,7 @@ public class PagedListService {
             whole = true;
         }
         ClusterConnection connection = gateway.cluster(clusterId);
-        requireKind(clusterId, connection, kind);
+        requireKind(connection, kind);
         List<T> merged = new ArrayList<>();
         BrokerConnectionException firstError = null;
         for (ClusterNode node : servingNodes) {
@@ -310,7 +310,7 @@ public class PagedListService {
     }
 
     /** A system that has no kind of this class says so, as a conflict with its reason, never as an unreachable node. */
-    private static void requireKind(UUID clusterId, ClusterConnection connection, ResourceClass kind) {
+    private static void requireKind(ClusterConnection connection, ResourceClass kind) {
         boolean offered = connection.resources().kinds().stream().anyMatch(k -> k.resourceClass() == kind);
         if (!offered) {
             throw new ConflictException(

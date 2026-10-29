@@ -4,6 +4,7 @@ import io.github.sudoitir.openbroker.ClusterConnection;
 import io.github.sudoitir.openbroker.model.KindId;
 import io.github.sudoitir.openbroker.model.ResourceClass;
 import io.github.sudoitir.rahdar.feature.resources.ResourceViewMapper.SubscriptionKey;
+import io.github.sudoitir.rahdar.feature.resources.ResourceViewMapper.SubscriptionKinds;
 import io.github.sudoitir.rahdar.feature.resources.web.ResourceViews.SubscriptionView;
 import io.github.sudoitir.rahdar.kernel.core.PagedView;
 import io.github.sudoitir.rahdar.kernel.core.ResourceQuery;
@@ -122,8 +123,7 @@ public class CrossNodeAggregator {
                 .map(e -> mapper.subscription(
                         e.getKey(),
                         connection,
-                        subscriptionKind,
-                        destinationKind,
+                        new SubscriptionKinds(subscriptionKind, destinationKind),
                         e.getValue(),
                         nodeNames,
                         nodesTotal,

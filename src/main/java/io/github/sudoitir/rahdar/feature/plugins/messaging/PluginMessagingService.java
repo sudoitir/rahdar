@@ -304,10 +304,10 @@ public class PluginMessagingService implements PluginScopedBeans {
     /** The source is a subscription of a kind this cluster's system has, and no name Rahdar reserves. */
     private void validateSource(RegistrationSpec spec) {
         SubscriptionId source = spec.source();
-        List<String> kinds = this.kinds.subscriptionKinds(spec.clusterId());
-        if (!kinds.contains(source.kind())) {
+        List<String> subscriptionKinds = kinds.subscriptionKinds(spec.clusterId());
+        if (!subscriptionKinds.contains(source.kind())) {
             throw new RegistrationRefusedException("The cluster has no subscription kind '" + source.kind()
-                    + "'; its subscription kinds are " + String.join(", ", kinds) + ".");
+                    + "'; its subscription kinds are " + String.join(", ", subscriptionKinds) + ".");
         }
         if (source.id().length() > MAX_NAME) {
             throw new RegistrationRefusedException("A subscription's id is at most " + MAX_NAME + " characters, not "

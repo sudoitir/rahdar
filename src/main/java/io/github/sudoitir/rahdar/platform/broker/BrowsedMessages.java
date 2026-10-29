@@ -10,6 +10,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -96,7 +97,29 @@ public final class BrowsedMessages {
     }
 
     /** A body's bytes, and whether more followed than were read. */
-    private record Body(byte[] bytes, boolean cut) {}
+    private record Body(byte[] bytes, boolean cut) {
+
+        @Override
+        public boolean equals(Object other) {
+            if (this == other) {
+                return true;
+            }
+            if (!(other instanceof Body body)) {
+                return false;
+            }
+            return cut == body.cut && Arrays.equals(bytes, body.bytes);
+        }
+
+        @Override
+        public int hashCode() {
+            return 31 * Arrays.hashCode(bytes) + Boolean.hashCode(cut);
+        }
+
+        @Override
+        public String toString() {
+            return "Body[bytes=" + Arrays.toString(bytes) + ", cut=" + cut + "]";
+        }
+    }
 
     private static Body body(Message m) {
         if (m.body().isTombstone()) {

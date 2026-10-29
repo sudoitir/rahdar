@@ -95,18 +95,21 @@ public class MessagesMcpActionTools {
             // A subscription of a partitioned log is purged by moving its position to the end of the log, through the
             // log purge and its gate; its records are never moved, retried, deleted or expired one by one.
             boolean log = kinds.partitioned(id, found.id().kind().value());
-            Attempt<Outcome> attempt = kind == SubscriptionActionKind.PURGE && log
-                    ? messages.purgeLog(id, found.id(), dry)
-                    : kind == SubscriptionActionKind.PURGE
-                            ? messages.purge(id, q, null, dry, over)
-                            : messages.execute(
-                                    id,
-                                    q,
-                                    null,
-                                    MessageAction.valueOf(kind.name()),
-                                    messages.actionRequest(id, parseIds(positions), filter, targetName(id, target)),
-                                    dry,
-                                    over);
+            Attempt<Outcome> attempt;
+            if (kind == SubscriptionActionKind.PURGE && log) {
+                attempt = messages.purgeLog(id, found.id(), dry);
+            } else if (kind == SubscriptionActionKind.PURGE) {
+                attempt = messages.purge(id, q, null, dry, over);
+            } else {
+                attempt = messages.execute(
+                        id,
+                        q,
+                        null,
+                        MessageAction.valueOf(kind.name()),
+                        messages.actionRequest(id, parseIds(positions), filter, targetName(id, target)),
+                        dry,
+                        over);
+            }
             return outcome(kind.name().toLowerCase(Locale.ROOT), q, attempt);
         });
     }
@@ -198,7 +201,7 @@ public class MessagesMcpActionTools {
                     case Outcome.Affected(var count, var node) ->
                         new McpViews.MutationOutcome(
                                 action, subject, false, count, null, false, String.valueOf(node), "Applied.");
-                    case Outcome.LogPurgeDryRun(var skipped, var cap, var node) ->
+                    case Outcome.LogPurgeDryRun(var skipped, _, var node) ->
                         new McpViews.MutationOutcome(
                                 action,
                                 subject,

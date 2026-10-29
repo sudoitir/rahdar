@@ -281,7 +281,7 @@ public class TriageMcpTools {
                 e.username(),
                 e.destination() != null ? e.destination() : e.routingName(),
                 "observed",
-                delivered(e) != null ? delivered(e) : e.consumerName() != null ? "consumer=" + e.consumerName() : null);
+                activityDetail(e));
     }
 
     /**
@@ -312,6 +312,17 @@ public class TriageMcpTools {
                 // reading the audit trail as a record of things that actually happened.
                 e.dryRun() ? e.outcome() + " (dry run)" : e.outcome(),
                 activityDetail(e));
+    }
+
+    private static String activityDetail(EventViews.BrokerEventView e) {
+        String summary = delivered(e);
+        if (summary != null) {
+            return summary;
+        }
+        if (e.consumerName() != null) {
+            return "consumer=" + e.consumerName();
+        }
+        return null;
     }
 
     private static String activityDetail(AuditViews.AuditEventView e) {

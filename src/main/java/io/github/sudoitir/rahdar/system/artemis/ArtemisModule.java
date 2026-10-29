@@ -9,7 +9,7 @@ public final class ArtemisModule {
     public static final String SYSTEM = "artemis";
 
     public static final FeatureDescriptor DESCRIPTOR = FeatureDescriptor.builder()
-            .id("artemis")
+            .id(SYSTEM)
             .title("Artemis")
             .kind(FeatureDescriptor.Kind.PLATFORM)
             .required(true)

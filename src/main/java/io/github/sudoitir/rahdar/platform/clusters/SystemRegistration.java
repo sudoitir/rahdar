@@ -2,6 +2,7 @@ package io.github.sudoitir.rahdar.platform.clusters;
 
 import io.github.sudoitir.openbroker.access.Assessment;
 import io.github.sudoitir.openbroker.access.Capability;
+import io.github.sudoitir.openbroker.access.Remedy;
 import io.github.sudoitir.rahdar.kernel.audit.AuditEvent;
 import io.github.sudoitir.rahdar.kernel.audit.AuditService;
 import io.github.sudoitir.rahdar.kernel.core.ConflictException;
@@ -62,19 +63,17 @@ class SystemRegistration {
     /** The kind of the claim a driver-reported cluster id makes in {@code broker_identity}. */
     static final String CLUSTER_ID = "CLUSTER_ID";
 
-    private static final String DATA = "DATA";
     private static final String REGISTER_CLUSTER = "REGISTER_CLUSTER";
     private static final String UPDATE_CONNECTION = "UPDATE_CLUSTER_CONNECTION";
     private static final String CLUSTER = "CLUSTER";
+    private static final String UNKNOWN = "UNKNOWN";
 
     private final List<ClusterRegistrar> registrars;
     private final BrokerSystems systems;
     private final ClusterRepository clusters;
     private final BrokerNodeRepository nodes;
-    private final BrokerCredentialRepository credentials;
-    private final BrokerTlsRepository tlsRepository;
+    private final StoredClusterAccount accounts;
     private final BrokerIdentityClaims identityClaims;
-    private final SecretVault vault;
     private final AuditService audit;
     private final ActorResolver actorResolver;
     private final PermissionResolver permissions;
@@ -158,8 +157,8 @@ class SystemRegistration {
         if (holder.isPresent()) {
             throw refusal(holder.get(), event);
         }
-        storeAccount(clusterId, registrar.accountOf(connection));
-        storeTls(clusterId, connection.tlsBundle());
+        accounts.storeAccount(clusterId, registrar.accountOf(connection));
+        accounts.storeTls(clusterId, connection.tlsBundle());
         checked.nodes()
                 .forEach(n -> nodes.save(BrokerNodeEntity.reported(clusterId, n.name(), n.nativeId(), n.endpoints())));
         registrar.store(clusterId, connection);
@@ -187,12 +186,7 @@ class SystemRegistration {
             failure = "The cluster could not be reached: " + e.getMessage();
         }
         String reason = failure;
-        Function<String, CapabilityView> of = id -> {
-            Assessment a = found.get(id);
-            return a == null
-                    ? new CapabilityView("UNKNOWN", reason != null ? reason : "Not assessed.", null)
-                    : new CapabilityView(a.status().name(), a.reason(), null);
-        };
+        Function<String, CapabilityView> of = id -> assessed(found.get(id), reason);
         CapabilityView io = worst(
                 of.apply(Capability.BROWSE.id()), of.apply(Capability.SEND.id()), of.apply(Capability.RECEIVE.id()));
         return new CapabilitiesView(
@@ -201,14 +195,14 @@ class SystemRegistration {
                 of.apply(Capability.NOTIFICATIONS.id()),
                 io,
                 new CapabilityView(
-                        "UNKNOWN", "Slow-consumer detection reads Artemis consumers; it does not apply here.", null),
+                        UNKNOWN, "Slow-consumer detection reads Artemis consumers; it does not apply here.", null),
                 List.of(),
                 found.entrySet().stream()
                         .map(e -> new AccessFinding(
                                 e.getKey(),
                                 e.getValue().status().name(),
                                 e.getValue().reason(),
-                                e.getValue().remedy().map(r -> r.snippet()).orElse(null),
+                                e.getValue().remedy().map(Remedy::snippet).orElse(null),
                                 e.getValue()
                                         .remedy()
                                         .map(r -> new AccessRemedy(r.text(), r.snippet(), r.mediaType()))
@@ -217,8 +211,15 @@ class SystemRegistration {
                         .toList());
     }
 
+    private static CapabilityView assessed(Assessment assessment, String reason) {
+        if (assessment == null) {
+            return new CapabilityView(UNKNOWN, reason != null ? reason : "Not assessed.", null);
+        }
+        return new CapabilityView(assessment.status().name(), assessment.reason(), null);
+    }
+
     private static CapabilityView worst(CapabilityView... views) {
-        for (String status : List.of("UNAVAILABLE", "UNKNOWN")) {
+        for (String status : List.of("UNAVAILABLE", UNKNOWN)) {
             for (CapabilityView v : views) {
                 if (v.status().equals(status)) {
                     return v;
@@ -271,9 +272,9 @@ class SystemRegistration {
                 null);
         clusters.save(cluster);
         if (resolved.account() != null) {
-            storeAccount(clusterId, resolved.account());
+            accounts.storeAccount(clusterId, resolved.account());
         }
-        storeTls(clusterId, resolved.connection().tlsBundle());
+        accounts.storeTls(clusterId, resolved.connection().tlsBundle());
         mergeNodes(clusterId, checked.nodes());
         identityClaims
                 .claim(clusterId, Map.of(CLUSTER_ID, Set.of(checked.view().clusterId())))
@@ -297,31 +298,6 @@ class SystemRegistration {
             } else {
                 existing.mergeReported(node.name(), node.endpoints());
             }
-        }
-    }
-
-    private void storeAccount(UUID clusterId, Account account) {
-        Optional<BrokerCredentialEntity> existing = credentials.findByClusterIdAndKind(clusterId, DATA);
-        if (account == null || account.secret() == null) {
-            existing.ifPresent(credentials::delete);
-            return;
-        }
-        byte[] sealed = vault.seal(SecretVault.aad(clusterId, DATA), account.secret());
-        if (existing.isPresent()) {
-            existing.get().replaceSecret(account.username(), sealed);
-        } else {
-            credentials.save(new BrokerCredentialEntity(clusterId, DATA, account.username(), sealed));
-        }
-    }
-
-    private void storeTls(UUID clusterId, String bundle) {
-        Optional<BrokerTlsEntity> existing = tlsRepository.findByClusterId(clusterId);
-        if (bundle == null || bundle.isBlank()) {
-            existing.ifPresent(tlsRepository::delete);
-        } else if (existing.isPresent()) {
-            existing.get().update(bundle, existing.get().getClientCertRef(), true);
-        } else {
-            tlsRepository.save(new BrokerTlsEntity(clusterId, bundle, null, true));
         }
     }
 
@@ -371,5 +347,42 @@ class SystemRegistration {
 
     private ClusterRegistrar registrarOf(UUID clusterId) {
         return registrar(systems.idOf(clusterId));
+    }
+}
+
+/** The account and TLS bundle stored for a cluster. A missing secret removes what was stored. */
+@Component
+@RequiredArgsConstructor
+class StoredClusterAccount {
+
+    private static final String DATA = "DATA";
+
+    private final BrokerCredentialRepository credentials;
+    private final BrokerTlsRepository tlsRepository;
+    private final SecretVault vault;
+
+    void storeAccount(UUID clusterId, Account account) {
+        Optional<BrokerCredentialEntity> existing = credentials.findByClusterIdAndKind(clusterId, DATA);
+        if (account == null || account.secret() == null) {
+            existing.ifPresent(credentials::delete);
+            return;
+        }
+        byte[] sealed = vault.seal(SecretVault.aad(clusterId, DATA), account.secret());
+        if (existing.isPresent()) {
+            existing.get().replaceSecret(account.username(), sealed);
+        } else {
+            credentials.save(new BrokerCredentialEntity(clusterId, DATA, account.username(), sealed));
+        }
+    }
+
+    void storeTls(UUID clusterId, String bundle) {
+        Optional<BrokerTlsEntity> existing = tlsRepository.findByClusterId(clusterId);
+        if (bundle == null || bundle.isBlank()) {
+            existing.ifPresent(tlsRepository::delete);
+        } else if (existing.isPresent()) {
+            existing.get().update(bundle, existing.get().getClientCertRef(), true);
+        } else {
+            tlsRepository.save(new BrokerTlsEntity(clusterId, bundle, null, true));
+        }
     }
 }

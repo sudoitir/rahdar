@@ -29,6 +29,10 @@ import java.util.Objects;
 final class ArtemisChecks {
 
     private static final String ARTEMIS = "artemis";
+    private static final String AUTHENTICATION = "AUTHENTICATION";
+    private static final String CAUSE_UNSUPPORTED_VERSION = "UNSUPPORTED_VERSION";
+    private static final String REFUSED = "REFUSED";
+    private static final String TIMEOUT = "TIMEOUT";
 
     private ArtemisChecks() {}
 
@@ -52,19 +56,19 @@ final class ArtemisChecks {
     static ConnectionCheck failed(BrokerConnectionException.Kind kind, String detail) {
         String cause =
                 switch (kind) {
-                    case CREDENTIALS_REJECTED -> "AUTHENTICATION";
+                    case CREDENTIALS_REJECTED -> AUTHENTICATION;
                     case TLS_FAILED -> "TLS";
-                    case UNSUPPORTED_VERSION -> "UNSUPPORTED_VERSION";
-                    case NOT_ARTEMIS, WRONG_PATH, BAD_RESPONSE -> "REFUSED";
-                    case UNREACHABLE, THROTTLED -> "TIMEOUT";
+                    case UNSUPPORTED_VERSION -> CAUSE_UNSUPPORTED_VERSION;
+                    case NOT_ARTEMIS, WRONG_PATH, BAD_RESPONSE -> REFUSED;
+                    case UNREACHABLE, THROTTLED -> TIMEOUT;
                 };
         String next =
                 switch (cause) {
-                    case "AUTHENTICATION" -> "Check the management account's user name and password.";
+                    case AUTHENTICATION -> "Check the management account's user name and password.";
                     case "TLS" ->
                         "Check the TLS bundle trusts the broker's certificate and that the host name matches it.";
-                    case "UNSUPPORTED_VERSION" -> "Register a broker that runs a supported Artemis release.";
-                    case "REFUSED" ->
+                    case CAUSE_UNSUPPORTED_VERSION -> "Register a broker that runs a supported Artemis release.";
+                    case REFUSED ->
                         "Check the seed is a Jolokia address of an Artemis broker, such as .../console/jolokia.";
                     default ->
                         "Check the seed's host and port are reachable from Rahdar and that a firewall is not dropping the traffic.";
@@ -99,7 +103,7 @@ final class ArtemisChecks {
                         ? null
                         : new io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.VersionFound(
                                 version, null, true),
-                failure == null || !"UNSUPPORTED_VERSION".equals(failure.cause()),
+                failure == null || !CAUSE_UNSUPPORTED_VERSION.equals(failure.cause()),
                 null,
                 null,
                 nodes,
@@ -128,17 +132,17 @@ final class ArtemisChecks {
 
     private static String causeOf(NodeProbeView n) {
         if (n.management() == AccountResult.REJECTED) {
-            return "AUTHENTICATION";
+            return AUTHENTICATION;
         }
         ManagementUrlProblem problem = n.urlProblem();
         if (problem == null) {
-            return "TIMEOUT";
+            return TIMEOUT;
         }
         return switch (problem) {
-            case CREDENTIALS_REJECTED -> "AUTHENTICATION";
+            case CREDENTIALS_REJECTED -> AUTHENTICATION;
             case TLS_FAILED -> "TLS";
-            case UNREACHABLE -> "TIMEOUT";
-            case NO_PATTERN, WRONG_ENDPOINT, OTHER_BROKER -> "REFUSED";
+            case UNREACHABLE -> TIMEOUT;
+            case NO_PATTERN, WRONG_ENDPOINT, OTHER_BROKER -> REFUSED;
         };
     }
 

@@ -32,6 +32,8 @@ import org.springframework.context.annotation.Configuration;
 @Configuration(proxyBeanMethods = false)
 class MessageGatedOperations {
 
+    private static final String LABEL_CLUSTER = "Cluster";
+
     @Bean
     GatedOperation<QueuePurgeParams> queuePurgeOperation(MessageService messages, ClusterEnvironmentIndex clusters) {
         return new GatedOperation<>() {
@@ -73,7 +75,7 @@ class MessageGatedOperations {
             @Override
             public List<DisplayRow> display(QueuePurgeParams p) {
                 return List.of(
-                        DisplayRow.of("Cluster", clusters.labelOf(p.clusterId())),
+                        DisplayRow.of(LABEL_CLUSTER, clusters.labelOf(p.clusterId())),
                         DisplayRow.of("Queue", p.queue()),
                         DisplayRow.of("Removes", "every message"));
             }
@@ -137,7 +139,7 @@ class MessageGatedOperations {
             @Override
             public List<DisplayRow> display(LogPurgeParams p) {
                 return List.of(
-                        DisplayRow.of("Cluster", clusters.labelOf(p.clusterId())),
+                        DisplayRow.of(LABEL_CLUSTER, clusters.labelOf(p.clusterId())),
                         DisplayRow.of("Subscription", p.subscription()),
                         DisplayRow.of("Skips", "every record it has not read"));
             }
@@ -232,7 +234,7 @@ class MessageGatedOperations {
         @Override
         public List<DisplayRow> display(P p) {
             List<DisplayRow> rows = new ArrayList<>();
-            rows.add(DisplayRow.of("Cluster", clusters.labelOf(p.clusterId())));
+            rows.add(DisplayRow.of(LABEL_CLUSTER, clusters.labelOf(p.clusterId())));
             rows.add(DisplayRow.of("Queue", p.queue()));
             rows.add(DisplayRow.of(verb, selection(p.request())));
             if (p.request().byFilter()) {

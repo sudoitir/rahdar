@@ -379,17 +379,9 @@ public class PluginMessagingReconciler {
             // slots held and had not settled goes back to the queue.
             drains.stop(reg.getId(), nodeId);
         }
-        if (node != null) {
-            if (node.getDataUrl() == null) {
-                return result(
-                        RegistrationState.FAILED,
-                        "This node has no Core URL registered, and delivery is over the Core protocol. Add one to the"
-                                + " cluster's connection.",
-                        null);
-            }
-            if (tap.source(clusterId, node.getId(), queueOf(reg)).isEmpty()) {
-                return pending("The subscription " + subscriptionOf(reg).id() + " does not exist on this node.");
-            }
+        NodeResult blocked = consumerNotReady(clusterId, node, reg);
+        if (blocked != null) {
+            return blocked;
         }
         try {
             drains.start(spec(reg, node, subscriptionOf(reg), caps));
@@ -400,6 +392,24 @@ public class PluginMessagingReconciler {
             }
             return result(e.permanent ? RegistrationState.FAILED : RegistrationState.PENDING, e.getMessage(), null);
         }
+    }
+
+    /** Why this node cannot take the consumer yet, or null when it can. A whole-cluster read has no node to check. */
+    private NodeResult consumerNotReady(UUID clusterId, ClusterNode node, RegistrationEntity reg) {
+        if (node == null) {
+            return null;
+        }
+        if (node.getDataUrl() == null) {
+            return result(
+                    RegistrationState.FAILED,
+                    "This node has no Core URL registered, and delivery is over the Core protocol. Add one to the"
+                            + " cluster's connection.",
+                    null);
+        }
+        if (tap.source(clusterId, node.getId(), queueOf(reg)).isEmpty()) {
+            return pending("The subscription " + subscriptionOf(reg).id() + " does not exist on this node.");
+        }
+        return null;
     }
 
     private NodeResult reconcileWhole(UUID clusterId, RegistrationEntity reg, Verdict verdict) {
