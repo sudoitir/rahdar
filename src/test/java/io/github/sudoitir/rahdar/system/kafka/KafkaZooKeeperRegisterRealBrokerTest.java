@@ -38,6 +38,9 @@ class KafkaZooKeeperRegisterRealBrokerTest extends PostgresIntegrationTest {
     @Autowired
     ClusterRepository clusters;
 
+    @Autowired
+    KafkaScrape scrape;
+
     private final String run = "kafka-zk-" + UUID.randomUUID().toString().substring(0, 8);
 
     @BeforeAll
@@ -85,9 +88,16 @@ class KafkaZooKeeperRegisterRealBrokerTest extends PostgresIntegrationTest {
 
     @Test
     void itIsRegisteredAndItsHealthSaysItsQuorumCannotBeRead() {
-        ClusterDetail detail = ((Attempt.Ok<ClusterDetail>) service.register(request())).value();
+        ClusterDetail registered = ((Attempt.Ok<ClusterDetail>) service.register(request())).value();
 
-        assertThat(detail.system().id()).isEqualTo("kafka");
+        assertThat(registered.system().id()).isEqualTo("kafka");
+        // The register request does not call the broker for a verdict. The scrape writes that.
+        assertThat(registered.health().level()).isEqualTo("UNKNOWN");
+        assertThat(registered.health().notes()).containsExactly("The scrape has not read this cluster yet.");
+
+        scrape.nodes(registered.id(), 1);
+        ClusterDetail detail = service.get(registered.id());
+
         assertThat(detail.health().level()).isEqualTo("OK");
         assertThat(detail.health().notes()).anyMatch(note -> note.contains("controller quorum cannot be read"));
     }

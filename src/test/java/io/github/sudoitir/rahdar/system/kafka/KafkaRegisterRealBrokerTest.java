@@ -268,11 +268,9 @@ class KafkaRegisterRealBrokerTest extends PostgresIntegrationTest {
         assertThat(detail.connection().kafka().securityProtocol()).isEqualTo("PLAINTEXT");
         assertThat(detail.connection().kafka().secretStored()).isFalse();
         assertThat(detail.capabilities().managementRead().status()).isIn("AVAILABLE", "UNKNOWN");
-        // The first scrape has not sampled the partitions yet, which the health says rather than reading as none
-        // offline.
-        assertThat(detail.health().notes())
-                .containsExactly("The partitions have not been sampled yet, so offline partitions are not ruled out.");
-        assertThat(detail.health().level()).isEqualTo("OK");
+        // Nothing has scraped this cluster, so the detail says so instead of calling the broker on this request.
+        assertThat(detail.health().notes()).containsExactly("The scrape has not read this cluster yet.");
+        assertThat(detail.health().level()).isEqualTo("UNKNOWN");
     }
 
     @Test
@@ -524,6 +522,9 @@ class KafkaRegisterRealBrokerTest extends PostgresIntegrationTest {
             assertThat(broker.getLastError()).isNull();
         });
         assertThat(partitions.offline(id)).hasValue(0);
+        ClusterDetail detail = service.get(id);
+        assertThat(detail.health().level()).isEqualTo("OK");
+        assertThat(detail.health().notes()).isEmpty();
     }
 
     @Test
