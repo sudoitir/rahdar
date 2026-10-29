@@ -29,8 +29,11 @@ docker run --rm -v "$dir:/spec:ro" "$OASDIFF" breaking --fail-on ERR /spec/base.
 [ "$status" -eq 0 ] && { echo "No breaking change."; exit 0; }
 [ "$status" -eq 1 ] || { echo "oasdiff failed (exit $status)" >&2; exit "$status"; }
 
-if git log --format=%s "$BASE..HEAD" | grep -Eq '^[a-z]+(\([^)]*\))?!:' \
-  || git log --format=%B "$BASE..HEAD" | grep -Eq '^BREAKING[ -]CHANGE:'; then
+# Read the log whole before matching: `git log | grep -q` lets grep exit at its first match while git log
+# is still writing, git log then dies of SIGPIPE, and pipefail turns a marked branch into an unmarked one.
+subjects=$(git log --format=%s "$BASE..HEAD")
+bodies=$(git log --format=%B "$BASE..HEAD")
+if grep -Eq '^[a-z]+(\([^)]*\))?!:' <<<"$subjects" || grep -Eq '^BREAKING[ -]CHANGE:' <<<"$bodies"; then
   echo "Breaking change, marked by a commit in $BASE..HEAD (\`!:\` or \`BREAKING CHANGE:\`): it will be listed under ### Breaking."
   exit 0
 fi
