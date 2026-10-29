@@ -39,10 +39,18 @@ const SETS: Record<string, Shot[]> = {
     { id: 'estate', route: 'home', path: '/?sort=-backlog' },
     { id: 'subscriptions', route: 'subscriptions', scene: 'backlog-drawer' },
     { id: 'kafka-group', route: 'group-lagging' },
-    { id: 'offset-reset', route: 'group-lagging', scene: 'reset-preview' },
+    { id: 'offset-reset', route: 'group-lagging', scene: 'reset-preview-latest' },
     { id: 'transactions', route: 'transactions', scene: 'abort-dialog' },
     { id: 'register-kafka', route: 'register-kafka', scene: 'live-check', fullPage: 1800 },
-    { id: 'artemis-topology', route: 'topology' },
+    {
+      id: 'artemis-topology',
+      route: 'topology',
+      // One node chosen, so the picture shows the panel that says what that broker is, in words.
+      before: async (page) => {
+        await page.locator('.react-flow__node button').first().click();
+        await page.getByRole('heading', { name: 'Its pair' }).waitFor({ timeout: 10_000 });
+      },
+    },
   ],
   home: [
     { id: 'estate', route: 'home', path: '/?sort=-backlog' },
@@ -50,13 +58,21 @@ const SETS: Record<string, Shot[]> = {
     { id: 'transactions', route: 'transactions' },
     { id: 'transactions-abort', route: 'transactions', scene: 'abort-dialog' },
     { id: 'reset-blocked', route: 'group-active', scene: 'reset-blocked-by-members' },
-    { id: 'reset-preview', route: 'group-lagging', scene: 'reset-preview' },
+    { id: 'reset-preview', route: 'group-lagging', scene: 'reset-preview-latest' },
     { id: 'reset-held', route: 'group-lagging', scene: 'reset-held-stub' },
     { id: 'brokers', route: 'brokers' },
     { id: 'truncate', route: 'destinations', scene: 'truncate-preview' },
     { id: 'register', route: 'register-kafka', scene: 'checked-stub', fullPage: 1800 },
-    { id: 'artemis-topology', route: 'topology' },
-    { id: 'artemis-queues', route: 'queues', path: '/clusters/:cluster/subscriptions?sort=-depth' },
+    {
+      id: 'artemis-topology',
+      route: 'topology',
+      // One node chosen, so the picture shows the panel that says what that broker is, in words.
+      before: async (page) => {
+        await page.locator('.react-flow__node button').first().click();
+        await page.getByRole('heading', { name: 'Its pair' }).waitFor({ timeout: 10_000 });
+      },
+    },
+    { id: 'artemis-queues', route: 'subscriptions', path: '/clusters/:cluster/subscriptions?sort=-backlog' },
   ],
 };
 
@@ -67,7 +83,11 @@ async function settle(page: Page) {
   await page.waitForLoadState('load');
   for (let i = 0; i < 100 && (await page.evaluate(BUSY)); i++) await page.waitForTimeout(100);
   // The header says Live once the event stream is connected; a picture of "Polling" is of a page still starting.
-  await page.getByText('Live', { exact: true }).first().waitFor({ timeout: 15_000 }).catch(() => undefined);
+  await page
+    .getByText('Live', { exact: true })
+    .first()
+    .waitFor({ timeout: 15_000 })
+    .catch(() => undefined);
   await page.evaluate('document.fonts.ready.then(() => true)');
   await page.waitForTimeout(800);
 }
@@ -85,9 +105,11 @@ async function main() {
   const browser: Browser = await chromium.launch();
   const admin = { ...JSON.parse(await readFile(resolve(WEB, '.sweep/auth/admin.json'), 'utf8')), origins: [] };
   const probe = await browser.newContext({ storageState: admin });
-  const clusters = ((await (await probe.request.get(`${BASE}/api/v1/clusters?size=100`)).json()) as {
-    data: { id: string; name: string }[];
-  }).data;
+  const clusters = (
+    (await (await probe.request.get(`${BASE}/api/v1/clusters?size=100`)).json()) as {
+      data: { id: string; name: string }[];
+    }
+  ).data;
   await probe.close();
   const demo = clusters.find((c) => c.name === 'demo')?.id ?? '';
   const events = clusters.find((c) => c.name === 'events')?.id ?? '';
@@ -128,7 +150,9 @@ async function main() {
           await page.waitForTimeout(500);
         }
         await page.screenshot({ path: file });
-        console.log(`${errors.length ? 'ERRORS ' : 'ok     '} ${shot.id}-${scheme}${errors.length ? ` ${errors[0]}` : ''}`);
+        console.log(
+          `${errors.length ? 'ERRORS ' : 'ok     '} ${shot.id}-${scheme}${errors.length ? ` ${errors[0]}` : ''}`,
+        );
       } catch (e) {
         console.log(`FAILED  ${shot.id}-${scheme}: ${e instanceof Error ? e.message.split('\n')[0] : e}`);
       } finally {

@@ -394,6 +394,17 @@ const RESET_SCENES: Scene[] = [
       await holdConfirm(page, 'Reset 2 partitions');
     },
   },
+  {
+    // The reset to the end of the log: what the group would skip, the case a lagging group is reset for.
+    id: 'reset-preview-latest',
+    act: async (page) => {
+      await openReset(page);
+      await page.getByRole('combobox', { name: 'Move to' }).click();
+      await page.getByRole('option', { name: 'The latest offset' }).click();
+      await press(page, 'Preview the reset');
+      await page.waitForTimeout(1200);
+    },
+  },
   { id: 'reset-dialog', act: openReset },
   { id: 'reset-preview', act: previewReset },
   {
