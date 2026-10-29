@@ -118,7 +118,16 @@ class BoundaryRulesTest {
                 .should()
                 .dependOnClassesThat()
                 .resideInAPackage("io.github.sudoitir.openbroker.artemis..")
-                .orShould()
+                .check(CLASSES);
+    }
+
+    /** A driver's own interface (Artemis's management, Kafka's admin client) is reached only by that system's module. */
+    @Test
+    void onlyASystemModuleUnwrapsTheConnection() {
+        noClasses()
+                .that()
+                .resideOutsideOfPackages(ROOT + ".system.artemis..", ROOT + ".system.kafka..")
+                .should()
                 .callMethod(ClusterConnection.class, "unwrap", Class.class)
                 .check(CLASSES);
     }

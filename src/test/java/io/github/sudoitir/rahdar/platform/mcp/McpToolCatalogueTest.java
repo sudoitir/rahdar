@@ -16,6 +16,7 @@ import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterE
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterRepository;
 import io.github.sudoitir.rahdar.support.McpFixture;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisModule;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -85,7 +86,7 @@ class McpToolCatalogueTest extends PostgresIntegrationTest {
 
     @Test
     void theCatalogueIsIdenticalWhateverTheKeyHolds() throws Exception {
-        cluster = clusters.save(new ClusterEntity("catalogue-" + UUID.randomUUID(), null, null))
+        cluster = clusters.save(new ClusterEntity(ArtemisModule.SYSTEM, "catalogue-" + UUID.randomUUID(), null, null))
                 .getId();
 
         List<String> readOnly = namesFor(Grant.ScopeType.CLUSTER, cluster, Set.of(Permissions.CLUSTER_READ));

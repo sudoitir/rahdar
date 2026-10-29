@@ -15,6 +15,7 @@ import { LoadingState } from '../../ui/LoadingState.tsx';
 import { GovernedValue, RedactionMarks, WithheldNotice } from '../../ui/RedactedValue.tsx';
 import { redactionsAt } from '../../ui/redactions.ts';
 import { download } from '../../ui/download.ts';
+import { FocusableScroll } from '../../ui/FocusableScroll.tsx';
 import { Section } from '../../ui/Section.tsx';
 import { StatusBadge } from '../../ui/StatusBadge.tsx';
 
@@ -290,6 +291,7 @@ export function MessageDetailPanel({
   messageId,
   node,
   filter,
+  partition,
   onClose,
 }: Readonly<{
   clusterId: string;
@@ -297,9 +299,10 @@ export function MessageDetailPanel({
   messageId: string | null;
   node?: string;
   filter?: string;
+  partition?: number;
   onClose: () => void;
 }>) {
-  const detail = useMessageDetail(clusterId, subscriptionName, messageId, node, filter);
+  const detail = useMessageDetail(clusterId, subscriptionName, messageId, node, filter, partition);
   const m = detail.data;
   // Absolute timestamps here read the display zone from module state, so this
   // subscribes the view to a zone change (`app/timezone.ts`).
@@ -311,6 +314,7 @@ export function MessageDetailPanel({
       onClose={onClose}
       position="right"
       size="xl"
+      scrollAreaComponent={FocusableScroll}
       title={messageId ? `Message ${messageId}` : ''}
     >
       {detail.isPending ? <LoadingState label="Loading the message" blockSize="20rem" /> : null}

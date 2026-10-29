@@ -197,14 +197,25 @@ alert rules are in [Observability](/guide/observability).
 
 ## Broker connections
 
-Registered through the UI, not the environment. A connection stores the seed management
-endpoints, the management URL pattern that gives every other node its own, and the management and Core
-credentials, encrypted at rest. Edit all of it under **Settings → Connection**: **Check connection** runs
-the same per-node check as registering and saves nothing, and **Save connection** is offered once the
-check of exactly those values passed. Changing an account asks you to type the cluster's name, and a
-password left empty keeps the stored one. Jolokia HTTP is the
-primary transport; the Artemis Core client is a second channel used for
+Registered through the UI, not the environment ([Quickstart](/guide/quickstart#register-a-cluster)). What a
+connection stores depends on the cluster's system. All secrets are encrypted at rest, never returned by the
+API and never written to the audit log.
+
+| System | A connection stores |
+| --- | --- |
+| Apache Kafka | The bootstrap servers, the security protocol, the SASL mechanism, the account (a username and password, or a token), the TLS bundle and the client id. |
+| Apache Artemis | The seed management endpoints, the management URL pattern that gives every other node its own, the management and Core credentials, and the TLS bundle. |
+
+Edit all of it under **Settings → Connection**, which shows the fields of the cluster's own system.
+**Check connection** runs the same check as registering and saves nothing, and **Save connection** is offered
+once the check of exactly those values passed. A secret left empty keeps the stored one, but a stored secret is
+never sent to a place it was not given for: changing a bootstrap server, the protocol, the mechanism or the
+username asks for the secret again. Changing an account asks you to confirm by pressing and holding.
+
+On Artemis, Jolokia HTTP is the primary transport; the Artemis Core client is a second channel used for
 notifications and faithful message I/O, and features that need it are gated on
-it being reachable — visibly, with the `broker.xml` that would enable it.
+it being reachable — visibly, with the `broker.xml` that would enable it. On Kafka, Rahdar uses the Kafka
+admin and consumer protocols with the account you gave; what the account may not do is shown as unavailable
+with the broker's reason.
 
 See [ADR-0002](/reference/adr/0002-broker-transport-and-capability-model).

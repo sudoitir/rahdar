@@ -4,7 +4,7 @@ import io.github.sudoitir.rahdar.feature.messages.web.MessageController;
 import io.github.sudoitir.rahdar.feature.sql.MessageVerifier;
 import io.github.sudoitir.rahdar.feature.sql.QueryPlan;
 import io.github.sudoitir.rahdar.feature.sql.SqlConsoleService;
-import io.github.sudoitir.rahdar.feature.sql.web.SqlViews.PlanView;
+import io.github.sudoitir.rahdar.feature.sql.web.SqlViews.QueryPlanView;
 import io.github.sudoitir.rahdar.feature.sql.web.SqlViews.SqlExecuteRequest;
 import io.github.sudoitir.rahdar.feature.sql.web.SqlViews.SqlQueryRequest;
 import io.github.sudoitir.rahdar.feature.sql.web.SqlViews.SqlQueryTicketView;
@@ -44,7 +44,7 @@ public class SqlController {
 
     /** Parse, validate and cost a query without running it. */
     @PostMapping("/plan")
-    public PlanView plan(@PathVariable UUID clusterId, @RequestBody SqlQueryRequest request) {
+    public QueryPlanView plan(@PathVariable UUID clusterId, @RequestBody SqlQueryRequest request) {
         QueryPlan plan = console.plan(clusterId, request.sql());
         return mapper.toView(ids.of(clusterId), plan);
     }

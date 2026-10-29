@@ -1382,6 +1382,25 @@ class ApprovalGateIntegrationTest extends PostgresIntegrationTest {
     }
 
     @Test
+    void theSweepCancelsRequestsOfAClusterThatWasDeleted() {
+        Person alice = requester();
+        approversAre(approver());
+        UUID id = hold(alice, "orders");
+        // The guard trigger keeps what was requested from changing; the test stands in for a request made of a cluster.
+        jdbc.execute("ALTER TABLE held_operation DISABLE TRIGGER USER");
+        try {
+            jdbc.update("UPDATE held_operation SET cluster_id = ? WHERE id = ?", UUID.randomUUID(), id);
+        } finally {
+            jdbc.execute("ALTER TABLE held_operation ENABLE TRIGGER USER");
+        }
+
+        maintenance.sweep();
+
+        assertThat(stateOf(id)).isEqualTo(HeldState.CANCELLED);
+        assertThat(detail(id)).isEqualTo(HeldMaintenance.CLUSTER_DELETED);
+    }
+
+    @Test
     void theProviderReadsItsOwnRequestsAndTheirEventsInCommitOrder() {
         Person alice = requester();
         Person bob = approver();

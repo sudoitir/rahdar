@@ -37,6 +37,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -160,7 +161,12 @@ public class QueueLifecycleService {
             throw new NotFoundException("queue", queueName);
         }
         return new Reach(
-                found.stream().mapToLong(QueueLocation::messageCount).sum(), messages.identity(clusterId, queueName));
+                found.stream()
+                        .map(QueueLocation::messageCount)
+                        .filter(Objects::nonNull)
+                        .mapToLong(Long::longValue)
+                        .sum(),
+                messages.identity(clusterId, queueName));
     }
 
     private Attempt<LifecycleOutcome> runDeleteQueue(

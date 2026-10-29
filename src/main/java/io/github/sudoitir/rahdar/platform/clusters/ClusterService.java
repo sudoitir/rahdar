@@ -51,6 +51,8 @@ import io.github.sudoitir.rahdar.platform.clusters.web.ClusterRequests.AccountUp
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterRequests.NodeOverrideRequest;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterRequests.RegisterClusterRequest;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterRequests.UpdateClusterRequest;
+import io.github.sudoitir.rahdar.platform.clusters.web.ClusterRequests.UpdateClusterRequest.ArtemisConnectionUpdate;
+import io.github.sudoitir.rahdar.platform.clusters.web.ClusterRequests.UpdateClusterRequest.ConnectionUpdate;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.AdoptionCountsView;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.AdoptionPreviewView;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.CapabilitiesView;
@@ -60,6 +62,7 @@ import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.ClusterDetai
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.ClusterSummary;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.ConnectionCheck;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.HealthView;
+import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.KindView;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.NodeEndpointView;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.NodeProbeView;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.RegisterPreview;
@@ -142,6 +145,8 @@ public class ClusterService {
     private final BrokerNodeMapper nodeMapper;
     private final ClusterViewMapper viewMapper;
     private final OperationGate gate;
+    private final SystemRegistration systemRegistration;
+    private final List<ClusterHealthEvaluator> healthEvaluators;
 
     /**
      * What the gate holds of a connection edit: the request with the Core account's {@code null}, which clears it,
@@ -156,17 +161,28 @@ public class ClusterService {
             String tlsBundle,
             AccountUpdate management,
             AccountUpdate core,
-            boolean clearCore) {
+            boolean clearCore,
+            ConnectionUpdate connection,
+            UUID environmentId) {
 
         UpdateClusterRequest toRequest() {
-            return new UpdateClusterRequest(
-                    name,
-                    description,
-                    seedUrls,
-                    managementUrlPattern,
-                    tlsBundle,
-                    management,
-                    clearCore ? AccountUpdate.CLEAR : core);
+            boolean artemis = seedUrls != null
+                    || managementUrlPattern != null
+                    || tlsBundle != null
+                    || management != null
+                    || core != null
+                    || clearCore;
+            ConnectionUpdate edit = connection;
+            if (connection == null && artemis) {
+                edit = new ArtemisConnectionUpdate(
+                        ArtemisConnectionUpdate.WIRE,
+                        seedUrls,
+                        managementUrlPattern,
+                        tlsBundle,
+                        management,
+                        clearCore ? AccountUpdate.CLEAR : core);
+            }
+            return new UpdateClusterRequest(name, description, environmentId, edit);
         }
     }
 
@@ -204,10 +220,19 @@ public class ClusterService {
     // ---- connection check (?dryRun=true) -------------------------------------
 
     @PreAuthorize("@perm.can(T(io.github.sudoitir.rahdar.platform.clusters.ClusterPermissions).CLUSTER_WRITE)")
-    public Attempt<RegisterPreview> checkConnection(RegisterClusterRequest request) {
+    public ConnectionCheck checkConnection(RegisterClusterRequest request) {
+        systemRegistration.requireSupported(request);
+        if (systemRegistration.handles(request.system())) {
+            return systemRegistration.check(request);
+        }
         ConnectionInputs inputs = inputsOf(request);
         try (ProbeSession session = gateway.probe(inputs.management())) {
-            return checkConnection(request, inputs, session);
+            return switch (checkConnection(request, inputs, session)) {
+                case Attempt.Ok<RegisterPreview>(var preview) -> ArtemisChecks.of(preview);
+                case Attempt.Failed<RegisterPreview>(var kind, var detail) -> ArtemisChecks.failed(kind, detail);
+            };
+        } catch (ClusterAlreadyRegisteredException held) {
+            return ArtemisChecks.alreadyRegistered(held);
         }
     }
 
@@ -347,6 +372,10 @@ public class ClusterService {
      */
     @PreAuthorize("@perm.can(T(io.github.sudoitir.rahdar.platform.clusters.ClusterPermissions).CLUSTER_WRITE)")
     public Attempt<ClusterDetail> register(RegisterClusterRequest request) {
+        systemRegistration.requireSupported(request);
+        if (request.adopts() && systemRegistration.handles(request.system())) {
+            throw new IllegalArgumentException("Adopting the running configuration is for Artemis clusters only.");
+        }
         if (request.adopts() && adoption.isEmpty()) {
             throw new ConflictException(
                     "adoption-unavailable",
@@ -364,6 +393,9 @@ public class ClusterService {
     }
 
     private Attempt<ClusterDetail> registerNow(RegisterClusterRequest request) {
+        if (systemRegistration.handles(request.system())) {
+            return new Attempt.Ok<>(get(systemRegistration.register(request)));
+        }
         ConnectionInputs inputs = inputsOf(request);
         try (ProbeSession session = gateway.probe(inputs.management())) {
             return registerNow(request, inputs, session);
@@ -404,7 +436,12 @@ public class ClusterService {
         BrokerCapabilities capabilities =
                 capabilityProbe.probe(reachable.get(0).target(), new SubscriptionVerdict.NotAttempted());
         RegistrationAdoption.Reading adopted = request.adopts() ? readAdoption(found, session) : null;
-        return transactions.execute(status -> saveRegistration(request, inputs, survey, found, capabilities, adopted));
+        Attempt<ClusterDetail> saved =
+                transactions.execute(status -> saveRegistration(request, inputs, survey, found, capabilities, adopted));
+        // The kinds are read from the broker's driver, which is not done inside a transaction.
+        return saved instanceof Attempt.Ok<ClusterDetail>(ClusterDetail d)
+                ? new Attempt.Ok<>(withKinds(d, clusterKinds.kindsOf(d.id())))
+                : saved;
     }
 
     /** What the live nodes run, read before the registration transaction opens (ADR-0176). */
@@ -427,6 +464,7 @@ public class ClusterService {
             RegistrationAdoption.Reading adopted) {
         ClusterIdentity identity = survey.identity();
         ClusterEntity cluster = new ClusterEntity(
+                request.system(),
                 request.name() != null
                         ? request.name()
                         : hostOf(request.seedUrls().get(0)),
@@ -493,7 +531,21 @@ public class ClusterService {
                 cluster.getEnvironmentId(),
                 connectionView(clusterId, cluster),
                 clusterKinds.systemOf(clusterId),
-                clusterKinds.kindsOf(clusterId)));
+                List.of()));
+    }
+
+    private static ClusterDetail withKinds(ClusterDetail d, List<KindView> kinds) {
+        return new ClusterDetail(
+                d.id(),
+                d.name(),
+                d.description(),
+                d.topology(),
+                d.capabilities(),
+                d.health(),
+                d.environmentId(),
+                d.connection(),
+                d.system(),
+                kinds);
     }
 
     // ---- one registration per set of brokers (ADR-0167) ---------------------
@@ -580,8 +632,8 @@ public class ClusterService {
 
     // ---- reads ------------------------------------------------------------
 
+    /** Not one transaction: a system that reads its health from the brokers must not do so inside one. */
     @PostFilter("@perm.canSeeCluster(filterObject.id())")
-    @Transactional(readOnly = true)
     public List<ClusterSummary> list() {
         List<ClusterSummary> out = new ArrayList<>();
         for (ClusterEntity c : clusters.findAllByOrderByNameAsc()) {
@@ -605,9 +657,17 @@ public class ClusterService {
     public ClusterDetail get(UUID clusterId) {
         clusterAccess.requireVisible(clusterId);
         requireCluster(clusterId);
+        boolean driven = systemRegistration.handles(requireCluster(clusterId).getSystem());
         // The probe is shared and runs on its own thread; no transaction (and no connection) is open while it is
         // awaited.
-        CapabilityAssessments.Outcome assessed = capabilityAssessments.outcome(clusterId);
+        CapabilityAssessments.Outcome assessed = driven ? null : capabilityAssessments.outcome(clusterId);
+        CapabilitiesView driverCapabilities = driven ? systemRegistration.capabilities(clusterId) : null;
+        // A system that reads its health from the brokers does so outside the transaction below.
+        ClusterHealth driverHealth = driven
+                ? healthOf(
+                        clusterId, topologyDiscovery.currentTopology(clusterId).nodes())
+                : null;
+        List<KindView> kinds = clusterKinds.kindsOf(clusterId);
         return transactions.execute(status -> {
             ClusterEntity cluster = requireCluster(clusterId);
             ClusterTopology topology = topologyDiscovery.currentTopology(clusterId);
@@ -616,14 +676,14 @@ public class ClusterService {
                     cluster.getName(),
                     cluster.getDescription(),
                     withheld(clusterId, viewMapper.topology(topology)),
-                    capabilitiesFor(clusterId, topology, assessed),
-                    viewMapper.health(healthOf(clusterId, topology.nodes())),
+                    driven ? driverCapabilities : capabilitiesFor(clusterId, topology, assessed),
+                    viewMapper.health(driven ? driverHealth : healthOf(clusterId, topology.nodes())),
                     cluster.getEnvironmentId(),
                     clusterAccess.holds(clusterId, Permissions.CLUSTER_READ)
                             ? connectionView(clusterId, cluster)
                             : null,
                     clusterKinds.systemOf(clusterId),
-                    clusterKinds.kindsOf(clusterId));
+                    kinds);
         });
     }
 
@@ -648,7 +708,8 @@ public class ClusterService {
                 credentials
                         .findByClusterIdAndKind(clusterId, DATA)
                         .map(BrokerCredentialEntity::getUsername)
-                        .orElse(null));
+                        .orElse(null),
+                systemRegistration.handles(cluster.getSystem()) ? systemRegistration.detail(clusterId) : null);
     }
 
     /**
@@ -663,7 +724,13 @@ public class ClusterService {
                 .filter(id -> states.get(id) instanceof SubscriptionVerdict.NodeState.Failed failed
                         && failed.kind() == SubscriptionVerdict.Kind.UNAUTHORIZED)
                 .collect(Collectors.toSet());
-        return evaluator.toHealth(clusterId, logical, coreRejected);
+        String system = clusterKinds.systemId(clusterId);
+        return healthEvaluators.stream()
+                .filter(e -> e.system().equals(system))
+                .findFirst()
+                .orElseThrow(() -> new ConflictException(
+                        "unsupported-on-system", "Rahdar cannot judge the health of a " + system + " cluster."))
+                .evaluate(clusterId, logical, coreRejected);
     }
 
     /**
@@ -702,7 +769,6 @@ public class ClusterService {
         return withheld(clusterId, viewMapper.topology(topologyDiscovery.currentTopology(clusterId)));
     }
 
-    @Transactional(readOnly = true)
     public HealthView health(UUID clusterId) {
         clusterAccess.requireVisible(clusterId);
         requireCluster(clusterId);
@@ -717,7 +783,10 @@ public class ClusterService {
      */
     public CapabilitiesView capabilities(UUID clusterId) {
         clusterAccess.requireVisible(clusterId);
-        requireCluster(clusterId);
+        ClusterEntity cluster = requireCluster(clusterId);
+        if (systemRegistration.handles(cluster.getSystem())) {
+            return systemRegistration.capabilities(clusterId);
+        }
         CapabilityAssessments.Outcome assessed = capabilityAssessments.outcome(clusterId);
         return transactions.execute(
                 status -> capabilitiesFor(clusterId, topologyDiscovery.currentTopology(clusterId), assessed));
@@ -855,7 +924,14 @@ public class ClusterService {
     // ---- connection edit (PATCH /clusters/{id}) ---------------------------------
 
     /** An account's user name and password; both {@code null} for a Core account that falls back. */
-    private record Account(String username, String password) {}
+    private record Account(String username, String password) {
+
+        /** The password is never printed. */
+        @Override
+        public String toString() {
+            return "Account[username=" + username + ", password=" + SecretRedactor.MASK + "]";
+        }
+    }
 
     /** The connection as it would be after a request: the stored values with the request laid over them. */
     private record Edited(
@@ -889,6 +965,10 @@ public class ClusterService {
     public ConnectionCheck checkUpdate(UUID clusterId, UpdateClusterRequest request) {
         clusterAccess.requireCluster(clusterId, ClusterPermissions.CLUSTER_WRITE);
         ClusterEntity cluster = requireCluster(clusterId);
+        systemRegistration.requireSameSystem(cluster.getSystem(), request);
+        if (systemRegistration.handles(cluster.getSystem())) {
+            return systemRegistration.checkUpdate(clusterId, request);
+        }
         Edited edited = merge(clusterId, cluster, request);
         AuditEvent event = audit.begin(
                 actorResolver.resolve(),
@@ -921,7 +1001,7 @@ public class ClusterService {
             }
         }
         audit.succeed(event, rows.size());
-        return new ConnectionCheck(edited.pattern(), rows);
+        return ArtemisChecks.of(edited.pattern(), rows);
     }
 
     /**
@@ -971,6 +1051,10 @@ public class ClusterService {
     public ClusterConnectionView updateConnection(UUID clusterId, UpdateClusterRequest request) {
         clusterAccess.requireCluster(clusterId, ClusterPermissions.CLUSTER_WRITE);
         ClusterEntity cluster = requireCluster(clusterId);
+        systemRegistration.requireSameSystem(cluster.getSystem(), request);
+        if (systemRegistration.handles(cluster.getSystem())) {
+            return gatedSystemUpdate(updateParams(clusterId, request), request);
+        }
         Edited edited = merge(clusterId, cluster, request);
         Set<String> knownHosts = knownHostPorts(nodes.findByClusterIdOrderByNameAsc(clusterId));
         edited.seedUrls().forEach(url -> requireSuppliedForNewHost(edited, url, knownHosts));
@@ -989,7 +1073,23 @@ public class ClusterService {
                 request.tlsBundle(),
                 request.management(),
                 clearCore ? null : request.core(),
-                clearCore);
+                clearCore,
+                request.connection() instanceof ArtemisConnectionUpdate ? null : request.connection(),
+                request.environmentId());
+    }
+
+    @Gated("cluster.update")
+    private ClusterConnectionView gatedSystemUpdate(ClusterUpdateParams params, UpdateClusterRequest request) {
+        return gate.run(Operation.of(params), () -> {
+            systemRegistration.update(params.clusterId(), request);
+            applyEnvironment(params.clusterId(), request.environmentId());
+            ClusterEntity saved = requireCluster(params.clusterId());
+            return new ClusterConnectionView(
+                    params.clusterId(),
+                    saved.getName(),
+                    saved.getDescription(),
+                    connectionView(params.clusterId(), saved));
+        });
     }
 
     @Gated("cluster.update")
@@ -1034,9 +1134,26 @@ public class ClusterService {
                     clusterId,
                     e.toString());
         }
+        applyEnvironment(clusterId, request.environmentId());
         ClusterEntity saved = requireCluster(clusterId);
         return new ClusterConnectionView(
                 clusterId, saved.getName(), saved.getDescription(), connectionView(clusterId, saved));
+    }
+
+    /** Moves the cluster to the environment an edit names; an edit that names none leaves it where it is. */
+    private void applyEnvironment(UUID clusterId, UUID environmentId) {
+        if (environmentId == null) {
+            return;
+        }
+        if (!environments.existsById(environmentId)) {
+            throw new NotFoundException("environment", environmentId);
+        }
+        transactions.executeWithoutResult(status -> {
+            ClusterEntity cluster = requireCluster(clusterId);
+            cluster.setEnvironmentId(environmentId);
+            clusters.save(cluster);
+        });
+        environmentIndex.invalidate();
     }
 
     private void saveConnection(UUID clusterId, Edited edited) {

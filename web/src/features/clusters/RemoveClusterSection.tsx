@@ -16,7 +16,7 @@ const REMOVE: ActionVerb = { verb: 'Remove', past: 'Removed', progressive: 'Remo
 /**
  * Settings section: remove this cluster from Rahdar (cluster-registration spec). It lives here, last in the
  * cluster's settings, rather than above every view of the cluster. What goes and what stays is stated before
- * the typed name arms the button (non-negotiable #2).
+ * the held button confirms it (non-negotiable #2).
  */
 export function RemoveClusterSection({ clusterId }: Readonly<{ clusterId: string }>) {
   const cluster = useCluster(clusterId);

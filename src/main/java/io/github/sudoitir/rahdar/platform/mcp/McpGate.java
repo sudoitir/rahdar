@@ -67,6 +67,8 @@ class McpGate {
             "action",
             "kind",
             "topic",
+            "group",
+            "transactionalId",
             "dryRun",
             "override",
             "limit",

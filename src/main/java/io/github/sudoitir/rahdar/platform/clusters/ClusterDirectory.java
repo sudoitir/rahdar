@@ -1,5 +1,6 @@
 package io.github.sudoitir.rahdar.platform.clusters;
 
+import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerIdentityClaims;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNodeRepository;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterRepository;
 import java.util.List;
@@ -20,6 +21,7 @@ public class ClusterDirectory {
     private final ClusterRepository clusters;
     private final BrokerNodeRepository nodes;
     private final ClusterOwnership ownership;
+    private final BrokerIdentityClaims identityClaims;
 
     /** A cluster's nodes, ordered by name. */
     @Transactional(readOnly = true)
@@ -35,6 +37,12 @@ public class ClusterDirectory {
     @Transactional(readOnly = true)
     public Optional<ClusterNode> node(UUID nodeId) {
         return nodes.findById(nodeId).map(ClusterNode.class::cast);
+    }
+
+    /** The cluster identity the system reported when the cluster was registered, such as a Kafka cluster id. */
+    @Transactional(readOnly = true)
+    public Optional<String> registeredIdentity(UUID clusterId) {
+        return identityClaims.identityOf(clusterId, SystemRegistration.CLUSTER_ID);
     }
 
     /** Every registered cluster, ordered by name. */

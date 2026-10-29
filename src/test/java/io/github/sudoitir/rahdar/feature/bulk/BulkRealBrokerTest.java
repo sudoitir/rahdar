@@ -23,6 +23,7 @@ import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshotUpsert;
 import io.github.sudoitir.rahdar.support.ArtemisIntegrationTest;
 import io.github.sudoitir.rahdar.support.OperatorFixture;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
+import io.github.sudoitir.rahdar.support.Registrations;
 import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
 import io.github.sudoitir.rahdar.system.artemis.MBeanNames;
 import io.github.sudoitir.rahdar.system.artemis.QueueLifecycleOperations;
@@ -96,7 +97,7 @@ class BulkRealBrokerTest extends PostgresIntegrationTest {
     @BeforeEach
     void setUp() {
         OperatorFixture.signIn(users, roles, rolePermissions, userRoles, grants);
-        var attempt = clusterService.register(new RegisterClusterRequest(
+        var attempt = clusterService.register(Registrations.artemis(
                 List.of(ArtemisIntegrationTest.jolokiaUrl()),
                 "bulk-real-" + run,
                 null,
@@ -119,7 +120,22 @@ class BulkRealBrokerTest extends PostgresIntegrationTest {
         for (String name : queueNames) {
             queueOps.createQueue(client, broker, queue(name));
             snapshots.upsertBatch(List.of(new QueueRow(
-                    clusterId, nodeId, name, name, "ANYCAST", true, 0, 0, 0, 0, 0, 0, 0, false, "artemis.queue")));
+                    clusterId,
+                    nodeId,
+                    name,
+                    name,
+                    "ANYCAST",
+                    true,
+                    0L,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    false,
+                    "artemis.queue",
+                    Map.of())));
         }
     }
 
@@ -152,7 +168,13 @@ class BulkRealBrokerTest extends PostgresIntegrationTest {
     }
 
     private BulkRunDetailView runOperation(BulkOperation operation) {
-        BulkRunDetailView preview = bulk.preview(clusterId, new BulkPreviewRequest(operation, queueNames, null, false));
+        BulkRunDetailView preview = bulk.preview(
+                clusterId,
+                new BulkPreviewRequest(
+                        operation,
+                        queueNames.stream().map(n -> "artemis.queue/" + n).toList(),
+                        null,
+                        false));
         bulk.execute(
                 clusterId,
                 preview.run().id(),

@@ -2,6 +2,7 @@ package io.github.sudoitir.rahdar.feature.messages.web;
 
 import static io.swagger.v3.oas.annotations.media.Schema.RequiredMode.REQUIRED;
 
+import io.github.sudoitir.rahdar.kernel.core.KindName;
 import io.github.sudoitir.rahdar.platform.governance.GovernanceViews.RedactionView;
 import io.github.sudoitir.rahdar.platform.governance.GovernanceViews.WithheldView;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -33,7 +34,12 @@ public final class MessageViews {
             @Schema(requiredMode = REQUIRED) int type,
             @Schema(requiredMode = REQUIRED) boolean durable,
             @Schema(requiredMode = REQUIRED) int priority,
-            @Schema(requiredMode = REQUIRED) long timestamp,
+
+            @Schema(
+                    nullable = true,
+                    description = "When the producer stamped it, epoch milliseconds; null when it carries no time.")
+            Long timestamp,
+
             @Schema(requiredMode = REQUIRED) long expiration,
             @Schema(requiredMode = REQUIRED) long size,
             @Schema(nullable = true) String groupId,
@@ -41,7 +47,22 @@ public final class MessageViews {
             @Schema(nullable = true) String bodyPreview,
             @Schema(requiredMode = REQUIRED) boolean bodyTruncated,
             @Schema(requiredMode = REQUIRED) int propertyCount,
-            @Schema(requiredMode = REQUIRED) List<RedactionView> redactions) {}
+            @Schema(requiredMode = REQUIRED) List<RedactionView> redactions,
+
+            @Schema(
+                    requiredMode = REQUIRED,
+                    description =
+                            "A log record with no value: it deletes its key on compaction. Never true on a queue.")
+            boolean tombstone,
+
+            @Schema(nullable = true, description = "A log record's key as text, or base64 when it is not text.")
+            String key,
+
+            @Schema(
+                    nullable = true,
+                    allowableValues = {"TEXT", "BASE64"},
+                    description = "How key is written; null with no key.")
+            String keyEncoding) {}
 
     /** One message, expanded: the full header set, the typed property maps, and the body. */
     public record MessageDetailView(
@@ -51,7 +72,12 @@ public final class MessageViews {
             @Schema(requiredMode = REQUIRED) int type,
             @Schema(requiredMode = REQUIRED) boolean durable,
             @Schema(requiredMode = REQUIRED) int priority,
-            @Schema(requiredMode = REQUIRED) long timestamp,
+
+            @Schema(
+                    nullable = true,
+                    description = "When the producer stamped it, epoch milliseconds; null when it carries no time.")
+            Long timestamp,
+
             @Schema(requiredMode = REQUIRED) long expiration,
             @Schema(requiredMode = REQUIRED) long size,
             @Schema(nullable = true) String groupId,
@@ -69,14 +95,27 @@ public final class MessageViews {
             @Schema(nullable = true) String contentType,
             @Schema(requiredMode = REQUIRED) boolean bodyTruncated,
             @Schema(nullable = true) Integer observedLimitBytes,
-            @Schema(requiredMode = REQUIRED) UUID node,
+
+            @Schema(
+                    nullable = true,
+                    description = "The node the message was read from; null for a log, which has none.")
+            UUID node,
+
             @Schema(requiredMode = REQUIRED) Map<String, String> stringProperties,
             @Schema(requiredMode = REQUIRED) Map<String, Long> intProperties,
             @Schema(requiredMode = REQUIRED) Map<String, Long> longProperties,
             @Schema(requiredMode = REQUIRED) Map<String, Double> doubleProperties,
             @Schema(requiredMode = REQUIRED) Map<String, Boolean> booleanProperties,
             @Schema(requiredMode = REQUIRED) List<RedactionView> redactions,
-            @Schema(requiredMode = REQUIRED) List<WithheldView> withheld) {}
+            @Schema(requiredMode = REQUIRED) List<WithheldView> withheld,
+            @Schema(requiredMode = REQUIRED) boolean tombstone,
+            @Schema(nullable = true) String key,
+
+            @Schema(
+                    nullable = true,
+                    allowableValues = {"TEXT", "BASE64"},
+                    description = "How key is written; null with no key.")
+            String keyEncoding) {}
 
     /** A page of messages: the shared list envelope plus the node it was read from. */
     public record MessagePageView(
@@ -98,7 +137,49 @@ public final class MessageViews {
             @Schema(nullable = true, description = "Why count is null. Null whenever count is present.")
             String countUnavailable,
 
-            @Schema(requiredMode = REQUIRED) UUID node) {}
+            @Schema(nullable = true, description = "The node the page was read from; null for a log, which has none.")
+            UUID node,
+
+            @Schema(nullable = true, description = "Where in the log the page sits; null for a queue.")
+            LogView log,
+
+            @Schema(
+                    requiredMode = REQUIRED,
+                    description = "The page was cut short at its byte budget: messages the broker returned are not in"
+                            + " it. Ask for a smaller page, or, on a log, continue from log.next.")
+            boolean truncated,
+
+            @Schema(nullable = true, description = "Something worth saying about this page, such as why it is empty.")
+            String notice) {}
+
+    /**
+     * Where a page of a partitioned log sits. {@code start} and {@code end} are the partition's first offset and
+     * the one after its last, so an offset asked for past the end is an empty page that says where the end is,
+     * and one before the start is read from the start with {@code retentionMoved} set.
+     */
+    public record LogView(
+            @Schema(requiredMode = REQUIRED) int partition,
+            @Schema(requiredMode = REQUIRED) long start,
+            @Schema(requiredMode = REQUIRED) long end,
+
+            @Schema(nullable = true, description = "The offset the next page starts at; null at the end.")
+            Long next,
+
+            @Schema(requiredMode = REQUIRED, description = "The offset asked for was already removed by retention.")
+            boolean retentionMoved,
+
+            @Schema(
+                    requiredMode = REQUIRED,
+                    description = "Records of open or aborted transactions are not shown, as a read-committed"
+                            + " consumer would not see them.")
+            boolean uncommittedHidden,
+
+            @Schema(
+                    nullable = true,
+                    description = "Where the group stands on this partition, when the log is read through a group's"
+                            + " subscription: its committed offset (a share group's start offset). Absent when the"
+                            + " log is read as a topic, or the group has no position on the partition.")
+            Long subscriptionPosition) {}
 
     /**
      * A send whose outcome is unknown (HTTP 202): the message left, and the broker's confirmation never came
@@ -114,9 +195,18 @@ public final class MessageViews {
 
     /** The result of a mutation: the broker's own affected count (not a dry-run estimate). */
     public record AffectedView(
-            @Schema(requiredMode = REQUIRED) long affectedCount,
+            @Schema(requiredMode = REQUIRED, description = "Messages destroyed; 0 for a purge of a log.")
+            long affectedCount,
+
             @Schema(requiredMode = REQUIRED) boolean dryRun,
-            @Schema(requiredMode = REQUIRED) UUID node) {}
+
+            @Schema(nullable = true, description = "The node acted on; null where the system has none.")
+            UUID node,
+
+            @Schema(
+                    requiredMode = REQUIRED,
+                    description = "Records a purge of a log passed over without deleting them; 0 otherwise.")
+            long skippedCount) {}
 
     /**
      * An operation by ids that stopped part-way. Some messages were acted on, so this is never
@@ -144,14 +234,22 @@ public final class MessageViews {
             @Schema(requiredMode = REQUIRED) long affectedCount,
             @Schema(requiredMode = REQUIRED) long cap,
             @Schema(requiredMode = REQUIRED) boolean overCap,
-            @Schema(requiredMode = REQUIRED) UUID node) {}
+            @Schema(nullable = true) UUID node,
+
+            @Schema(
+                    requiredMode = REQUIRED,
+                    description = "Records a purge of a log would pass over without deleting them; 0 otherwise."
+                            + " The cap counts destroyed messages only, so it never applies to these.")
+            long skippedCount) {}
 
     // ---- dead letters (Slice 9) -----------------------------------------
 
     public record DeadLetterDepth(
             @Schema(requiredMode = REQUIRED) UUID nodeId,
             @Schema(requiredMode = REQUIRED) String nodeName,
-            @Schema(requiredMode = REQUIRED) long depth) {}
+
+            @Schema(nullable = true, description = "Null when the node reported no depth: unknown, not empty.")
+            Long depth) {}
 
     public record DeadLetterSubscription(
             @Schema(requiredMode = REQUIRED, description = "The subscription's canonical id.")
@@ -160,15 +258,23 @@ public final class MessageViews {
             @Schema(requiredMode = REQUIRED, description = "The id of its kind, such as artemis.queue.")
             String kind,
 
-            @Schema(requiredMode = REQUIRED, description = "The kind's name for people, such as Queue.")
-            String kindLabel,
+            @Schema(requiredMode = REQUIRED, description = "The kind's name for people, singular and plural.")
+            KindName kindLabel,
 
             @Schema(requiredMode = REQUIRED) String name,
 
             @Schema(requiredMode = REQUIRED, description = "The id of the destination it is bound to.")
             String destination,
 
-            @Schema(requiredMode = REQUIRED) long totalDepth,
+            @Schema(nullable = true, description = "The depth over the nodes that reported one; null when none did.")
+            Long totalDepth,
+
+            @Schema(
+                    requiredMode = REQUIRED,
+                    description =
+                            "How many nodes reported no depth, which the total leaves out rather than counts as 0.")
+            int unknownDepthNodes,
+
             @Schema(requiredMode = REQUIRED) List<DeadLetterDepth> perNode) {}
 
     public record DeadLetterDestination(
@@ -178,8 +284,8 @@ public final class MessageViews {
             @Schema(requiredMode = REQUIRED, description = "The id of its kind, such as artemis.address.")
             String kind,
 
-            @Schema(requiredMode = REQUIRED, description = "The kind's name for people, such as Address.")
-            String kindLabel,
+            @Schema(requiredMode = REQUIRED, description = "The kind's name for people, singular and plural.")
+            KindName kindLabel,
 
             @Schema(requiredMode = REQUIRED) String name,
 

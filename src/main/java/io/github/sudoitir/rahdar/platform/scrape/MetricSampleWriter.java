@@ -53,7 +53,9 @@ public class MetricSampleWriter {
         }
         List<SqlParameterSource> params = new ArrayList<>(rows.size() * 6);
         for (QueueRow r : rows) {
-            params.add(sample(r, MetricKeys.BACKLOG.name(), r.messageCount()));
+            if (r.backlogKnown()) {
+                params.add(sample(r, MetricKeys.BACKLOG.name(), r.messageCount()));
+            }
             params.add(sample(r, MetricKeys.CONSUMER_COUNT.name(), r.consumerCount()));
             params.add(sample(r, MetricKeys.ENQUEUED.name(), r.messagesAdded()));
             params.add(sample(r, MetricKeys.ACKNOWLEDGED.name(), r.messagesAcked()));

@@ -5,7 +5,7 @@ description: See which applications produce to which addresses, how messages rou
 
 # Flow
 
-![The Flow graph: producers, addresses, queues and consumers in columns, with moving dots showing the rate on each path](/img/flow.gif)
+![The Flow page: totals across every path, a node that did not answer, and the graph of producers, destinations, subscriptions and consumers in columns, each path labelled with its rate](/img/flow.png)
 
 The question an operator asks mid-incident is rarely *"what is in this queue"*. It is
 *"who sends here, where does it go, and why is it piling up?"* Artemis answers each

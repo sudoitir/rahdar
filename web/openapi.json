@@ -6371,7 +6371,7 @@
             "content" : {
               "*/*" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/RegisterPreview"
+                  "$ref" : "#/components/schemas/ConnectionCheck"
                 }
               }
             }
@@ -7585,7 +7585,7 @@
             "content" : {
               "*/*" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/PlanView"
+                  "$ref" : "#/components/schemas/QueryPlanView"
                 }
               }
             }
@@ -8782,6 +8782,28 @@
             "type" : "integer",
             "format" : "int32"
           }
+        }, {
+          "name" : "partition",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }, {
+          "name" : "from",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "value",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
         } ],
         "responses" : {
           "200" : {
@@ -9185,6 +9207,1322 @@
         }
       }
     },
+    "/api/v1/clusters/{clusterId}/kafka/transactions/{id}:abort" : {
+      "post" : {
+        "tags" : [ "kafka-controller" ],
+        "operationId" : "abort",
+        "parameters" : [ {
+          "name" : "clusterId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "Idempotency-Key",
+          "in" : "header",
+          "description" : "Makes the request safe to retry. Within 24 hours a repeat by the same user with the same method, path, query and body returns the first result with `Idempotent-Replayed: true` and applies nothing again. The same key with another request is 422 `idempotency-key-reused`; while the first is still running it is 409 `idempotency-in-progress`. 1 to 255 printable ASCII characters; not accepted on multipart uploads. Server errors and 401, 403 and 429 are not recorded, so the retry runs.",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "maxLength" : 255,
+            "minLength" : 1
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/AbortRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AbortResult"
+                }
+              }
+            }
+          },
+          "202" : {
+            "description" : "Held for approval: the operation has not run. X-Rahdar-Held-Operation names the request.",
+            "headers" : {
+              "X-Rahdar-Held-Operation" : {
+                "description" : "The held operation's id, when the operation was held.",
+                "schema" : {
+                  "type" : "string",
+                  "format" : "uuid"
+                }
+              }
+            },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/HeldOutcome"
+                }
+              }
+            }
+          },
+          "4XX" : {
+            "description" : "Client error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "5XX" : {
+            "description" : "Server error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "429" : {
+            "description" : "Too many requests. Wait for Retry-After seconds.",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds to wait before retrying.",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Limit" : {
+                "description" : "Requests allowed in the window (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Remaining" : {
+                "description" : "Requests left in the window (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Reset" : {
+                "description" : "Seconds until the window resets (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              }
+            },
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/clusters/{clusterId}/kafka/transactions/{id}:abort-preview" : {
+      "post" : {
+        "tags" : [ "kafka-controller" ],
+        "operationId" : "previewAbort",
+        "parameters" : [ {
+          "name" : "clusterId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "Idempotency-Key",
+          "in" : "header",
+          "description" : "Makes the request safe to retry. Within 24 hours a repeat by the same user with the same method, path, query and body returns the first result with `Idempotent-Replayed: true` and applies nothing again. The same key with another request is 422 `idempotency-key-reused`; while the first is still running it is 409 `idempotency-in-progress`. 1 to 255 printable ASCII characters; not accepted on multipart uploads. Server errors and 401, 403 and 429 are not recorded, so the retry runs.",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "maxLength" : 255,
+            "minLength" : 1
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AbortPreview"
+                }
+              }
+            }
+          },
+          "4XX" : {
+            "description" : "Client error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "5XX" : {
+            "description" : "Server error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "429" : {
+            "description" : "Too many requests. Wait for Retry-After seconds.",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds to wait before retrying.",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Limit" : {
+                "description" : "Requests allowed in the window (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Remaining" : {
+                "description" : "Requests left in the window (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Reset" : {
+                "description" : "Seconds until the window resets (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              }
+            },
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/clusters/{clusterId}/kafka/topics/{topic}/config:preview" : {
+      "post" : {
+        "tags" : [ "kafka-controller" ],
+        "operationId" : "previewConfig",
+        "parameters" : [ {
+          "name" : "clusterId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "name" : "topic",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "Idempotency-Key",
+          "in" : "header",
+          "description" : "Makes the request safe to retry. Within 24 hours a repeat by the same user with the same method, path, query and body returns the first result with `Idempotent-Replayed: true` and applies nothing again. The same key with another request is 422 `idempotency-key-reused`; while the first is still running it is 409 `idempotency-in-progress`. 1 to 255 printable ASCII characters; not accepted on multipart uploads. Server errors and 401, 403 and 429 are not recorded, so the retry runs.",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "maxLength" : 255,
+            "minLength" : 1
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ConfigChangeRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ConfigPreview"
+                }
+              }
+            }
+          },
+          "4XX" : {
+            "description" : "Client error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "5XX" : {
+            "description" : "Server error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "429" : {
+            "description" : "Too many requests. Wait for Retry-After seconds.",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds to wait before retrying.",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Limit" : {
+                "description" : "Requests allowed in the window (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Remaining" : {
+                "description" : "Requests left in the window (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Reset" : {
+                "description" : "Seconds until the window resets (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              }
+            },
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/clusters/{clusterId}/kafka/topics/{topic}/config:apply" : {
+      "post" : {
+        "tags" : [ "kafka-controller" ],
+        "operationId" : "applyConfig",
+        "parameters" : [ {
+          "name" : "clusterId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "name" : "topic",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "Idempotency-Key",
+          "in" : "header",
+          "description" : "Makes the request safe to retry. Within 24 hours a repeat by the same user with the same method, path, query and body returns the first result with `Idempotent-Replayed: true` and applies nothing again. The same key with another request is 422 `idempotency-key-reused`; while the first is still running it is 409 `idempotency-in-progress`. 1 to 255 printable ASCII characters; not accepted on multipart uploads. Server errors and 401, 403 and 429 are not recorded, so the retry runs.",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "maxLength" : 255,
+            "minLength" : 1
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ConfigChangeRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ConfigPreview"
+                }
+              }
+            }
+          },
+          "202" : {
+            "description" : "Held for approval: the operation has not run. X-Rahdar-Held-Operation names the request.",
+            "headers" : {
+              "X-Rahdar-Held-Operation" : {
+                "description" : "The held operation's id, when the operation was held.",
+                "schema" : {
+                  "type" : "string",
+                  "format" : "uuid"
+                }
+              }
+            },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/HeldOutcome"
+                }
+              }
+            }
+          },
+          "4XX" : {
+            "description" : "Client error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "5XX" : {
+            "description" : "Server error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "429" : {
+            "description" : "Too many requests. Wait for Retry-After seconds.",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds to wait before retrying.",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Limit" : {
+                "description" : "Requests allowed in the window (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Remaining" : {
+                "description" : "Requests left in the window (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Reset" : {
+                "description" : "Seconds until the window resets (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              }
+            },
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/clusters/{clusterId}/kafka/hanging-transactions:find" : {
+      "post" : {
+        "tags" : [ "kafka-controller" ],
+        "operationId" : "findHanging",
+        "parameters" : [ {
+          "name" : "clusterId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "name" : "topic",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "cursor",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "limit",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }, {
+          "name" : "Idempotency-Key",
+          "in" : "header",
+          "description" : "Makes the request safe to retry. Within 24 hours a repeat by the same user with the same method, path, query and body returns the first result with `Idempotent-Replayed: true` and applies nothing again. The same key with another request is 422 `idempotency-key-reused`; while the first is still running it is 409 `idempotency-in-progress`. 1 to 255 printable ASCII characters; not accepted on multipart uploads. Server errors and 401, 403 and 429 are not recorded, so the retry runs.",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "maxLength" : 255,
+            "minLength" : 1
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/HangingPage"
+                }
+              }
+            }
+          },
+          "4XX" : {
+            "description" : "Client error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "5XX" : {
+            "description" : "Server error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "429" : {
+            "description" : "Too many requests. Wait for Retry-After seconds.",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds to wait before retrying.",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Limit" : {
+                "description" : "Requests allowed in the window (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Remaining" : {
+                "description" : "Requests left in the window (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Reset" : {
+                "description" : "Seconds until the window resets (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              }
+            },
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/clusters/{clusterId}/kafka/hanging-transactions:abort" : {
+      "post" : {
+        "tags" : [ "kafka-controller" ],
+        "operationId" : "abortHanging",
+        "parameters" : [ {
+          "name" : "clusterId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "name" : "Idempotency-Key",
+          "in" : "header",
+          "description" : "Makes the request safe to retry. Within 24 hours a repeat by the same user with the same method, path, query and body returns the first result with `Idempotent-Replayed: true` and applies nothing again. The same key with another request is 422 `idempotency-key-reused`; while the first is still running it is 409 `idempotency-in-progress`. 1 to 255 printable ASCII characters; not accepted on multipart uploads. Server errors and 401, 403 and 429 are not recorded, so the retry runs.",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "maxLength" : 255,
+            "minLength" : 1
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/HangingAbortRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/HangingAbortResult"
+                }
+              }
+            }
+          },
+          "202" : {
+            "description" : "Held for approval: the operation has not run. X-Rahdar-Held-Operation names the request.",
+            "headers" : {
+              "X-Rahdar-Held-Operation" : {
+                "description" : "The held operation's id, when the operation was held.",
+                "schema" : {
+                  "type" : "string",
+                  "format" : "uuid"
+                }
+              }
+            },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/HeldOutcome"
+                }
+              }
+            }
+          },
+          "4XX" : {
+            "description" : "Client error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "5XX" : {
+            "description" : "Server error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "429" : {
+            "description" : "Too many requests. Wait for Retry-After seconds.",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds to wait before retrying.",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Limit" : {
+                "description" : "Requests allowed in the window (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Remaining" : {
+                "description" : "Requests left in the window (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Reset" : {
+                "description" : "Seconds until the window resets (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              }
+            },
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/clusters/{clusterId}/kafka/hanging-transactions:abort-preview" : {
+      "post" : {
+        "tags" : [ "kafka-controller" ],
+        "operationId" : "previewHangingAbort",
+        "parameters" : [ {
+          "name" : "clusterId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "name" : "Idempotency-Key",
+          "in" : "header",
+          "description" : "Makes the request safe to retry. Within 24 hours a repeat by the same user with the same method, path, query and body returns the first result with `Idempotent-Replayed: true` and applies nothing again. The same key with another request is 422 `idempotency-key-reused`; while the first is still running it is 409 `idempotency-in-progress`. 1 to 255 printable ASCII characters; not accepted on multipart uploads. Server errors and 401, 403 and 429 are not recorded, so the retry runs.",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "maxLength" : 255,
+            "minLength" : 1
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/HangingAbortRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/HangingAbortPreview"
+                }
+              }
+            }
+          },
+          "4XX" : {
+            "description" : "Client error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "5XX" : {
+            "description" : "Server error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "429" : {
+            "description" : "Too many requests. Wait for Retry-After seconds.",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds to wait before retrying.",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Limit" : {
+                "description" : "Requests allowed in the window (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Remaining" : {
+                "description" : "Requests left in the window (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Reset" : {
+                "description" : "Seconds until the window resets (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              }
+            },
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/clusters/{clusterId}/kafka/groups/{group}/offsets:reset" : {
+      "post" : {
+        "tags" : [ "kafka-controller" ],
+        "operationId" : "resetOffsets",
+        "parameters" : [ {
+          "name" : "clusterId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "name" : "group",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "Idempotency-Key",
+          "in" : "header",
+          "description" : "Makes the request safe to retry. Within 24 hours a repeat by the same user with the same method, path, query and body returns the first result with `Idempotent-Replayed: true` and applies nothing again. The same key with another request is 422 `idempotency-key-reused`; while the first is still running it is 409 `idempotency-in-progress`. 1 to 255 printable ASCII characters; not accepted on multipart uploads. Server errors and 401, 403 and 429 are not recorded, so the retry runs.",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "maxLength" : 255,
+            "minLength" : 1
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/OffsetRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/OffsetResult"
+                }
+              }
+            }
+          },
+          "202" : {
+            "description" : "Held for approval: the operation has not run. X-Rahdar-Held-Operation names the request.",
+            "headers" : {
+              "X-Rahdar-Held-Operation" : {
+                "description" : "The held operation's id, when the operation was held.",
+                "schema" : {
+                  "type" : "string",
+                  "format" : "uuid"
+                }
+              }
+            },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/HeldOutcome"
+                }
+              }
+            }
+          },
+          "4XX" : {
+            "description" : "Client error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "5XX" : {
+            "description" : "Server error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "429" : {
+            "description" : "Too many requests. Wait for Retry-After seconds.",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds to wait before retrying.",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Limit" : {
+                "description" : "Requests allowed in the window (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Remaining" : {
+                "description" : "Requests left in the window (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Reset" : {
+                "description" : "Seconds until the window resets (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              }
+            },
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/clusters/{clusterId}/kafka/groups/{group}/offsets:preview" : {
+      "post" : {
+        "tags" : [ "kafka-controller" ],
+        "operationId" : "previewOffsets",
+        "parameters" : [ {
+          "name" : "clusterId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "name" : "group",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "Idempotency-Key",
+          "in" : "header",
+          "description" : "Makes the request safe to retry. Within 24 hours a repeat by the same user with the same method, path, query and body returns the first result with `Idempotent-Replayed: true` and applies nothing again. The same key with another request is 422 `idempotency-key-reused`; while the first is still running it is 409 `idempotency-in-progress`. 1 to 255 printable ASCII characters; not accepted on multipart uploads. Server errors and 401, 403 and 429 are not recorded, so the retry runs.",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "maxLength" : 255,
+            "minLength" : 1
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/OffsetRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/OffsetPreview"
+                }
+              }
+            }
+          },
+          "4XX" : {
+            "description" : "Client error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "5XX" : {
+            "description" : "Server error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "429" : {
+            "description" : "Too many requests. Wait for Retry-After seconds.",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds to wait before retrying.",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Limit" : {
+                "description" : "Requests allowed in the window (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Remaining" : {
+                "description" : "Requests left in the window (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Reset" : {
+                "description" : "Seconds until the window resets (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              }
+            },
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/clusters/{clusterId}/kafka/acls:preview" : {
+      "post" : {
+        "tags" : [ "kafka-controller" ],
+        "operationId" : "previewAcls",
+        "parameters" : [ {
+          "name" : "clusterId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "name" : "Idempotency-Key",
+          "in" : "header",
+          "description" : "Makes the request safe to retry. Within 24 hours a repeat by the same user with the same method, path, query and body returns the first result with `Idempotent-Replayed: true` and applies nothing again. The same key with another request is 422 `idempotency-key-reused`; while the first is still running it is 409 `idempotency-in-progress`. 1 to 255 printable ASCII characters; not accepted on multipart uploads. Server errors and 401, 403 and 429 are not recorded, so the retry runs.",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "maxLength" : 255,
+            "minLength" : 1
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/AclChangeRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AclPreview"
+                }
+              }
+            }
+          },
+          "4XX" : {
+            "description" : "Client error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "5XX" : {
+            "description" : "Server error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "429" : {
+            "description" : "Too many requests. Wait for Retry-After seconds.",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds to wait before retrying.",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Limit" : {
+                "description" : "Requests allowed in the window (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Remaining" : {
+                "description" : "Requests left in the window (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Reset" : {
+                "description" : "Seconds until the window resets (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              }
+            },
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/clusters/{clusterId}/kafka/acls:apply" : {
+      "post" : {
+        "tags" : [ "kafka-controller" ],
+        "operationId" : "applyAcls",
+        "parameters" : [ {
+          "name" : "clusterId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "name" : "Idempotency-Key",
+          "in" : "header",
+          "description" : "Makes the request safe to retry. Within 24 hours a repeat by the same user with the same method, path, query and body returns the first result with `Idempotent-Replayed: true` and applies nothing again. The same key with another request is 422 `idempotency-key-reused`; while the first is still running it is 409 `idempotency-in-progress`. 1 to 255 printable ASCII characters; not accepted on multipart uploads. Server errors and 401, 403 and 429 are not recorded, so the retry runs.",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "maxLength" : 255,
+            "minLength" : 1
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/AclChangeRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AclResult"
+                }
+              }
+            }
+          },
+          "202" : {
+            "description" : "Held for approval: the operation has not run. X-Rahdar-Held-Operation names the request.",
+            "headers" : {
+              "X-Rahdar-Held-Operation" : {
+                "description" : "The held operation's id, when the operation was held.",
+                "schema" : {
+                  "type" : "string",
+                  "format" : "uuid"
+                }
+              }
+            },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/HeldOutcome"
+                }
+              }
+            }
+          },
+          "4XX" : {
+            "description" : "Client error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "5XX" : {
+            "description" : "Server error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "429" : {
+            "description" : "Too many requests. Wait for Retry-After seconds.",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds to wait before retrying.",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Limit" : {
+                "description" : "Requests allowed in the window (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Remaining" : {
+                "description" : "Requests left in the window (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Reset" : {
+                "description" : "Seconds until the window resets (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              }
+            },
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/clusters/{clusterId}/destinations" : {
       "get" : {
         "tags" : [ "cluster-resource-controller" ],
@@ -9325,6 +10663,154 @@
               "*/*" : {
                 "schema" : {
                   "$ref" : "#/components/schemas/LifecycleOutcomeView"
+                }
+              }
+            }
+          },
+          "4XX" : {
+            "description" : "Client error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "5XX" : {
+            "description" : "Server error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "429" : {
+            "description" : "Too many requests. Wait for Retry-After seconds.",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds to wait before retrying.",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Limit" : {
+                "description" : "Requests allowed in the window (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Remaining" : {
+                "description" : "Requests left in the window (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Reset" : {
+                "description" : "Seconds until the window resets (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              }
+            },
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/clusters/{clusterId}/destinations/{kind}/{path}:truncate" : {
+      "post" : {
+        "tags" : [ "resource-lifecycle-controller" ],
+        "operationId" : "truncate",
+        "parameters" : [ {
+          "name" : "clusterId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "name" : "kind",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "path",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "dryRun",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "boolean",
+            "default" : false
+          }
+        }, {
+          "name" : "Idempotency-Key",
+          "in" : "header",
+          "description" : "Makes the request safe to retry. Within 24 hours a repeat by the same user with the same method, path, query and body returns the first result with `Idempotent-Replayed: true` and applies nothing again. The same key with another request is 422 `idempotency-key-reused`; while the first is still running it is 409 `idempotency-in-progress`. 1 to 255 printable ASCII characters; not accepted on multipart uploads. Server errors and 401, 403 and 429 are not recorded, so the retry runs.",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "maxLength" : 255,
+            "minLength" : 1
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/TruncateRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/TruncateEffect"
+                }
+              }
+            }
+          },
+          "202" : {
+            "description" : "Held for approval: the operation has not run. X-Rahdar-Held-Operation names the request.",
+            "headers" : {
+              "X-Rahdar-Held-Operation" : {
+                "description" : "The held operation's id, when the operation was held.",
+                "schema" : {
+                  "type" : "string",
+                  "format" : "uuid"
+                }
+              }
+            },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/HeldOutcome"
                 }
               }
             }
@@ -16195,6 +17681,101 @@
         }
       }
     },
+    "/api/v1/systems" : {
+      "get" : {
+        "tags" : [ "systems-controller" ],
+        "operationId" : "list_9",
+        "parameters" : [ {
+          "name" : "page",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }, {
+          "name" : "size",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PagedViewSupportedSystemView"
+                }
+              }
+            }
+          },
+          "4XX" : {
+            "description" : "Client error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "5XX" : {
+            "description" : "Server error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "429" : {
+            "description" : "Too many requests. Wait for Retry-After seconds.",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds to wait before retrying.",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Limit" : {
+                "description" : "Requests allowed in the window (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Remaining" : {
+                "description" : "Requests left in the window (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Reset" : {
+                "description" : "Seconds until the window resets (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              }
+            },
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/system/jobs" : {
       "get" : {
         "tags" : [ "jobs-controller" ],
@@ -16371,7 +17952,7 @@
     "/api/v1/subscriptions" : {
       "get" : {
         "tags" : [ "estate-subscription-controller" ],
-        "operationId" : "list_9",
+        "operationId" : "list_10",
         "parameters" : [ {
           "name" : "q",
           "in" : "query",
@@ -16599,7 +18180,7 @@
     "/api/v1/settings" : {
       "get" : {
         "tags" : [ "settings-controller" ],
-        "operationId" : "list_10",
+        "operationId" : "list_11",
         "responses" : {
           "200" : {
             "description" : "OK",
@@ -17117,7 +18698,7 @@
     "/api/v1/mcp/tools" : {
       "get" : {
         "tags" : [ "mcp-tools-controller" ],
-        "operationId" : "list_11",
+        "operationId" : "list_12",
         "parameters" : [ {
           "name" : "page",
           "in" : "query",
@@ -17290,7 +18871,7 @@
     "/api/v1/inbox" : {
       "get" : {
         "tags" : [ "inbox-controller" ],
-        "operationId" : "list_12",
+        "operationId" : "list_13",
         "parameters" : [ {
           "name" : "unread",
           "in" : "query",
@@ -17472,7 +19053,7 @@
     "/api/v1/held-operations" : {
       "get" : {
         "tags" : [ "held-operation-controller" ],
-        "operationId" : "list_13",
+        "operationId" : "list_14",
         "parameters" : [ {
           "name" : "scope",
           "in" : "query",
@@ -18743,6 +20324,107 @@
         }
       }
     },
+    "/api/v1/clusters/{clusterId}/subscriptions/{kind}/{path}/backlog" : {
+      "get" : {
+        "tags" : [ "cluster-resource-controller" ],
+        "operationId" : "backlog",
+        "parameters" : [ {
+          "name" : "clusterId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "name" : "kind",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "path",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Breakdown"
+                }
+              }
+            }
+          },
+          "4XX" : {
+            "description" : "Client error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "5XX" : {
+            "description" : "Server error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "429" : {
+            "description" : "Too many requests. Wait for Retry-After seconds.",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds to wait before retrying.",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Limit" : {
+                "description" : "Requests allowed in the window (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Remaining" : {
+                "description" : "Requests left in the window (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Reset" : {
+                "description" : "Seconds until the window resets (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              }
+            },
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/clusters/{clusterId}/sql/stream" : {
       "get" : {
         "tags" : [ "sql-stream-controller" ],
@@ -19397,6 +21079,14 @@
           "schema" : {
             "type" : "string"
           }
+        }, {
+          "name" : "partition",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
         } ],
         "responses" : {
           "200" : {
@@ -19926,6 +21616,622 @@
         }
       }
     },
+    "/api/v1/clusters/{clusterId}/kafka/transactions" : {
+      "get" : {
+        "tags" : [ "kafka-controller" ],
+        "operationId" : "transactions",
+        "parameters" : [ {
+          "name" : "clusterId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "name" : "cursor",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "limit",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/TransactionPage"
+                }
+              }
+            }
+          },
+          "4XX" : {
+            "description" : "Client error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "5XX" : {
+            "description" : "Server error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "429" : {
+            "description" : "Too many requests. Wait for Retry-After seconds.",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds to wait before retrying.",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Limit" : {
+                "description" : "Requests allowed in the window (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Remaining" : {
+                "description" : "Requests left in the window (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Reset" : {
+                "description" : "Seconds until the window resets (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              }
+            },
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/clusters/{clusterId}/kafka/topics/{topic}/config" : {
+      "get" : {
+        "tags" : [ "kafka-controller" ],
+        "operationId" : "topicConfig",
+        "parameters" : [ {
+          "name" : "clusterId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "name" : "topic",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/TopicConfig"
+                }
+              }
+            }
+          },
+          "4XX" : {
+            "description" : "Client error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "5XX" : {
+            "description" : "Server error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "429" : {
+            "description" : "Too many requests. Wait for Retry-After seconds.",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds to wait before retrying.",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Limit" : {
+                "description" : "Requests allowed in the window (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Remaining" : {
+                "description" : "Requests left in the window (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Reset" : {
+                "description" : "Seconds until the window resets (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              }
+            },
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/clusters/{clusterId}/kafka/groups" : {
+      "get" : {
+        "tags" : [ "kafka-controller" ],
+        "operationId" : "groups",
+        "parameters" : [ {
+          "name" : "clusterId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "name" : "type",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "state",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "q",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "cursor",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "limit",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/GroupPage"
+                }
+              }
+            }
+          },
+          "4XX" : {
+            "description" : "Client error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "5XX" : {
+            "description" : "Server error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "429" : {
+            "description" : "Too many requests. Wait for Retry-After seconds.",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds to wait before retrying.",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Limit" : {
+                "description" : "Requests allowed in the window (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Remaining" : {
+                "description" : "Requests left in the window (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Reset" : {
+                "description" : "Seconds until the window resets (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              }
+            },
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/clusters/{clusterId}/kafka/groups/{group}" : {
+      "get" : {
+        "tags" : [ "kafka-controller" ],
+        "operationId" : "group",
+        "parameters" : [ {
+          "name" : "clusterId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "name" : "group",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/GroupDetail"
+                }
+              }
+            }
+          },
+          "4XX" : {
+            "description" : "Client error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "5XX" : {
+            "description" : "Server error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "429" : {
+            "description" : "Too many requests. Wait for Retry-After seconds.",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds to wait before retrying.",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Limit" : {
+                "description" : "Requests allowed in the window (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Remaining" : {
+                "description" : "Requests left in the window (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Reset" : {
+                "description" : "Seconds until the window resets (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              }
+            },
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/clusters/{clusterId}/kafka/brokers" : {
+      "get" : {
+        "tags" : [ "kafka-controller" ],
+        "operationId" : "brokers",
+        "parameters" : [ {
+          "name" : "clusterId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Brokers"
+                }
+              }
+            }
+          },
+          "4XX" : {
+            "description" : "Client error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "5XX" : {
+            "description" : "Server error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "429" : {
+            "description" : "Too many requests. Wait for Retry-After seconds.",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds to wait before retrying.",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Limit" : {
+                "description" : "Requests allowed in the window (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Remaining" : {
+                "description" : "Requests left in the window (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Reset" : {
+                "description" : "Seconds until the window resets (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              }
+            },
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/clusters/{clusterId}/kafka/acls" : {
+      "get" : {
+        "tags" : [ "kafka-controller" ],
+        "operationId" : "acls",
+        "parameters" : [ {
+          "name" : "clusterId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "name" : "principal",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "resource",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "cursor",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "limit",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AclPage"
+                }
+              }
+            }
+          },
+          "4XX" : {
+            "description" : "Client error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "5XX" : {
+            "description" : "Server error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "429" : {
+            "description" : "Too many requests. Wait for Retry-After seconds.",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds to wait before retrying.",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Limit" : {
+                "description" : "Requests allowed in the window (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Remaining" : {
+                "description" : "Requests left in the window (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              },
+              "RateLimit-Reset" : {
+                "description" : "Seconds until the window resets (API tokens).",
+                "schema" : {
+                  "type" : "integer",
+                  "format" : "int32"
+                }
+              }
+            },
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/clusters/{clusterId}/health" : {
       "get" : {
         "tags" : [ "cluster-controller" ],
@@ -20161,7 +22467,7 @@
     "/api/v1/clusters/{clusterId}/events" : {
       "get" : {
         "tags" : [ "event-controller" ],
-        "operationId" : "list_14",
+        "operationId" : "list_15",
         "parameters" : [ {
           "name" : "clusterId",
           "in" : "path",
@@ -21182,7 +23488,7 @@
     "/api/v1/clusters/{clusterId}/audit" : {
       "get" : {
         "tags" : [ "audit-controller" ],
-        "operationId" : "list_15",
+        "operationId" : "list_16",
         "parameters" : [ {
           "name" : "clusterId",
           "in" : "path",
@@ -23757,7 +26063,7 @@
     "/api/v1/admin/tokens" : {
       "get" : {
         "tags" : [ "admin-tokens-controller" ],
-        "operationId" : "list_16",
+        "operationId" : "list_17",
         "parameters" : [ {
           "name" : "page",
           "in" : "query",
@@ -23948,7 +26254,7 @@
     "/api/v1/admin/plugins" : {
       "get" : {
         "tags" : [ "plugin-admin-controller" ],
-        "operationId" : "list_17",
+        "operationId" : "list_18",
         "responses" : {
           "200" : {
             "description" : "OK",
@@ -28436,6 +30742,51 @@
         },
         "required" : [ "bytes", "rows" ]
       },
+      "ArtemisConnection" : {
+        "type" : "object",
+        "properties" : {
+          "system" : {
+            "type" : "string",
+            "enum" : [ "artemis" ],
+            "minLength" : 1
+          },
+          "seedUrls" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string",
+              "minLength" : 1
+            },
+            "minItems" : 1
+          },
+          "credentials" : {
+            "$ref" : "#/components/schemas/Credentials"
+          },
+          "coreCredentials" : {
+            "$ref" : "#/components/schemas/Credentials"
+          },
+          "tlsBundle" : {
+            "type" : "string"
+          },
+          "managementUrlPattern" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "seedUrls", "system" ]
+      },
+      "Connection" : {
+        "discriminator" : {
+          "propertyName" : "system",
+          "mapping" : {
+            "artemis" : "#/components/schemas/ArtemisConnection",
+            "kafka" : "#/components/schemas/KafkaConnection"
+          }
+        },
+        "oneOf" : [ {
+          "$ref" : "#/components/schemas/ArtemisConnection"
+        }, {
+          "$ref" : "#/components/schemas/KafkaConnection"
+        } ]
+      },
       "Credentials" : {
         "type" : "object",
         "properties" : {
@@ -28450,10 +30801,15 @@
         },
         "required" : [ "password", "username" ]
       },
-      "RegisterClusterRequest" : {
+      "KafkaConnection" : {
         "type" : "object",
         "properties" : {
-          "seedUrls" : {
+          "system" : {
+            "type" : "string",
+            "enum" : [ "kafka" ],
+            "minLength" : 1
+          },
+          "bootstrapServers" : {
             "type" : "array",
             "items" : {
               "type" : "string",
@@ -28461,22 +30817,50 @@
             },
             "minItems" : 1
           },
-          "name" : {
-            "type" : "string"
+          "securityProtocol" : {
+            "type" : "string",
+            "minLength" : 1
           },
-          "description" : {
+          "saslMechanism" : {
             "type" : "string"
           },
           "credentials" : {
-            "$ref" : "#/components/schemas/Credentials"
-          },
-          "coreCredentials" : {
-            "$ref" : "#/components/schemas/Credentials"
+            "$ref" : "#/components/schemas/KafkaCredentials"
           },
           "tlsBundle" : {
             "type" : "string"
           },
-          "managementUrlPattern" : {
+          "clientId" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "bootstrapServers", "securityProtocol", "system" ]
+      },
+      "KafkaCredentials" : {
+        "type" : "object",
+        "properties" : {
+          "username" : {
+            "type" : "string"
+          },
+          "password" : {
+            "type" : "string"
+          },
+          "token" : {
+            "type" : "string"
+          }
+        }
+      },
+      "RegisterClusterRequest" : {
+        "type" : "object",
+        "properties" : {
+          "system" : {
+            "type" : "string",
+            "minLength" : 1
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "description" : {
             "type" : "string"
           },
           "environmentId" : {
@@ -28485,9 +30869,56 @@
           },
           "adopt" : {
             "type" : "boolean"
+          },
+          "connection" : {
+            "$ref" : "#/components/schemas/Connection"
           }
         },
-        "required" : [ "seedUrls" ]
+        "required" : [ "connection", "system" ]
+      },
+      "AccessFinding" : {
+        "type" : "object",
+        "properties" : {
+          "capability" : {
+            "type" : "string"
+          },
+          "status" : {
+            "type" : "string",
+            "description" : "AVAILABLE, UNAVAILABLE or UNKNOWN."
+          },
+          "reason" : {
+            "type" : "string"
+          },
+          "snippet" : {
+            "type" : [ "string", "null" ],
+            "description" : "What to change on the broker so the capability is available: the broker.xml snippet for Artemis, the command for Kafka."
+          },
+          "remedy" : {
+            "anyOf" : [ {
+              "$ref" : "#/components/schemas/AccessRemedy"
+            }, {
+              "type" : "null"
+            } ],
+            "description" : "The driver's remedy, with its media type, where it gives one."
+          }
+        },
+        "required" : [ "capability", "reason", "status" ]
+      },
+      "AccessRemedy" : {
+        "type" : "object",
+        "properties" : {
+          "text" : {
+            "type" : "string"
+          },
+          "snippet" : {
+            "type" : "string"
+          },
+          "mediaType" : {
+            "type" : "string",
+            "description" : "Such as application/xml or text/x-shellscript."
+          }
+        },
+        "required" : [ "mediaType", "snippet", "text" ]
       },
       "AdoptionCountsView" : {
         "type" : "object",
@@ -28533,6 +30964,239 @@
         },
         "required" : [ "counts", "disagreements", "notes" ]
       },
+      "ArtemisNodeDetail" : {
+        "type" : "object",
+        "properties" : {
+          "nativeNodeId" : {
+            "type" : [ "string", "null" ],
+            "description" : "The broker's own node id."
+          },
+          "haRole" : {
+            "type" : "string"
+          },
+          "urlSource" : {
+            "type" : [ "string", "null" ],
+            "enum" : [ "SEED", "DERIVED", "MANUAL", null ]
+          },
+          "urlProblem" : {
+            "type" : [ "string", "null" ],
+            "enum" : [ "NO_PATTERN", "UNREACHABLE", "CREDENTIALS_REJECTED", "WRONG_ENDPOINT", "TLS_FAILED", "OTHER_BROKER", null ]
+          },
+          "management" : {
+            "type" : "string",
+            "enum" : [ "ACCEPTED", "REJECTED", "UNREACHABLE", "NOT_TRIED" ]
+          },
+          "core" : {
+            "type" : "string",
+            "enum" : [ "ACCEPTED", "REJECTED", "UNREACHABLE", "NOT_TRIED" ]
+          }
+        },
+        "required" : [ "core", "haRole", "management" ]
+      },
+      "ConnectionCheck" : {
+        "type" : "object",
+        "properties" : {
+          "system" : {
+            "type" : "string",
+            "description" : "The system's id, such as kafka."
+          },
+          "version" : {
+            "anyOf" : [ {
+              "$ref" : "#/components/schemas/VersionFound"
+            }, {
+              "type" : "null"
+            } ],
+            "description" : "The version found; null when the check never reached a broker."
+          },
+          "supported" : {
+            "type" : "boolean",
+            "description" : "Whether the driver supports what was found."
+          },
+          "clusterId" : {
+            "type" : [ "string", "null" ],
+            "description" : "The cluster's own id as the brokers report it."
+          },
+          "alreadyRegistered" : {
+            "anyOf" : [ {
+              "$ref" : "#/components/schemas/RegisteredRef"
+            }, {
+              "type" : "null"
+            } ],
+            "description" : "The registered cluster that already holds this one, when the caller may read it."
+          },
+          "nodes" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/NodeReach"
+            }
+          },
+          "quorum" : {
+            "anyOf" : [ {
+              "$ref" : "#/components/schemas/Quorum"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "access" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/AccessFinding"
+            }
+          },
+          "failure" : {
+            "anyOf" : [ {
+              "$ref" : "#/components/schemas/Failure"
+            }, {
+              "type" : "null"
+            } ],
+            "description" : "Why the check failed, or null when it passed."
+          },
+          "adoption" : {
+            "anyOf" : [ {
+              "$ref" : "#/components/schemas/AdoptionPreviewView"
+            }, {
+              "type" : "null"
+            } ],
+            "description" : "Artemis only: what adopting the running configuration would declare. Absent when the caller may not declare configuration, or the configuration feature is off."
+          },
+          "managementUrlPattern" : {
+            "type" : [ "string", "null" ],
+            "description" : "Artemis only: the pattern the check derived management URLs from."
+          },
+          "contributions" : {
+            "type" : "object",
+            "additionalProperties" : { },
+            "description" : "What each enabled feature adds to the check, keyed by feature id and read from a reachable node. Empty where a system has none."
+          }
+        },
+        "required" : [ "access", "contributions", "nodes", "supported", "system" ]
+      },
+      "Failure" : {
+        "type" : "object",
+        "properties" : {
+          "cause" : {
+            "type" : "string",
+            "description" : "DNS, REFUSED, TIMEOUT, TLS, AUTHENTICATION, AUTHORIZATION, UNSUPPORTED_VERSION or, for a Kafka cluster whose bootstrap server answered but whose brokers advertise addresses Rahdar cannot reach, ADVERTISED_UNREACHABLE."
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "next" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "cause", "message", "next" ]
+      },
+      "NodeReach" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string"
+          },
+          "address" : {
+            "type" : [ "string", "null" ],
+            "description" : "The address the node advertises; null when it was never learned."
+          },
+          "functions" : {
+            "type" : "array",
+            "description" : "BROKER, CONTROLLER or STORAGE.",
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "outcome" : {
+            "type" : "string",
+            "description" : "OK or UNREACHABLE."
+          },
+          "cause" : {
+            "type" : [ "string", "null" ],
+            "description" : "DNS, REFUSED, TIMEOUT, TLS or AUTHENTICATION when unreachable."
+          },
+          "message" : {
+            "type" : [ "string", "null" ]
+          },
+          "version" : {
+            "anyOf" : [ {
+              "$ref" : "#/components/schemas/NodeVersion"
+            }, {
+              "type" : "null"
+            } ],
+            "description" : "The node's release and whether it is supported; null when unknown."
+          },
+          "artemis" : {
+            "anyOf" : [ {
+              "$ref" : "#/components/schemas/ArtemisNodeDetail"
+            }, {
+              "type" : "null"
+            } ],
+            "description" : "Artemis only: the node's pair role and how each account fared."
+          }
+        },
+        "required" : [ "functions", "id", "outcome" ]
+      },
+      "NodeVersion" : {
+        "type" : "object",
+        "properties" : {
+          "text" : {
+            "type" : "string"
+          },
+          "support" : {
+            "type" : "string",
+            "description" : "Where the release sits against the supported range.",
+            "enum" : [ "SUPPORTED", "BELOW_MINIMUM", "NEWER_THAN_TESTED", "UNKNOWN" ]
+          }
+        },
+        "required" : [ "support", "text" ]
+      },
+      "Quorum" : {
+        "type" : "object",
+        "properties" : {
+          "available" : {
+            "type" : "boolean"
+          },
+          "reason" : {
+            "type" : [ "string", "null" ]
+          },
+          "leader" : {
+            "type" : [ "string", "null" ]
+          },
+          "voters" : {
+            "type" : [ "integer", "null" ],
+            "format" : "int32"
+          }
+        },
+        "required" : [ "available" ]
+      },
+      "RegisteredRef" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "name" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "id", "name" ]
+      },
+      "VersionFound" : {
+        "type" : "object",
+        "properties" : {
+          "text" : {
+            "type" : "string",
+            "description" : "Such as \"at least 3.5\" or \"4.0.2\"."
+          },
+          "mode" : {
+            "type" : [ "string", "null" ],
+            "description" : "The cluster's metadata mode, such as KRaft or ZooKeeper."
+          },
+          "exact" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "exact", "text" ]
+      },
       "CapabilitiesView" : {
         "type" : "object",
         "properties" : {
@@ -28557,9 +31221,16 @@
             "items" : {
               "$ref" : "#/components/schemas/VersionGateView"
             }
+          },
+          "findings" : {
+            "type" : "array",
+            "description" : "Every capability the system's driver assessed for the account, with its own reason. Empty for a system whose capabilities are the fixed ones above.",
+            "items" : {
+              "$ref" : "#/components/schemas/AccessFinding"
+            }
           }
         },
-        "required" : [ "managementRead", "managementWrite", "messageIo", "notifications", "slowConsumerDetection", "versionGates" ]
+        "required" : [ "findings", "managementRead", "managementWrite", "messageIo", "notifications", "slowConsumerDetection", "versionGates" ]
       },
       "CapabilityView" : {
         "type" : "object",
@@ -28575,6 +31246,215 @@
           }
         },
         "required" : [ "reason", "status" ]
+      },
+      "ClusterConnectionDetail" : {
+        "type" : "object",
+        "properties" : {
+          "managementUrlPattern" : {
+            "type" : [ "string", "null" ]
+          },
+          "seedUrls" : {
+            "type" : "array",
+            "description" : "The management URLs the operator gave as seeds, from the nodes that hold one",
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "tlsBundle" : {
+            "type" : [ "string", "null" ]
+          },
+          "managementUsername" : {
+            "type" : [ "string", "null" ]
+          },
+          "coreUsername" : {
+            "type" : [ "string", "null" ],
+            "description" : "The Core account's user name, or null while Core uses the management account"
+          },
+          "kafka" : {
+            "anyOf" : [ {
+              "$ref" : "#/components/schemas/KafkaConnectionDetail"
+            }, {
+              "type" : "null"
+            } ],
+            "description" : "A Kafka cluster's connection; null for other systems."
+          }
+        },
+        "required" : [ "seedUrls" ]
+      },
+      "ClusterDetail" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "description" : {
+            "type" : [ "string", "null" ]
+          },
+          "topology" : {
+            "$ref" : "#/components/schemas/TopologyView"
+          },
+          "capabilities" : {
+            "$ref" : "#/components/schemas/CapabilitiesView"
+          },
+          "health" : {
+            "$ref" : "#/components/schemas/HealthView"
+          },
+          "environmentId" : {
+            "type" : [ "string", "null" ],
+            "format" : "uuid"
+          },
+          "connection" : {
+            "anyOf" : [ {
+              "$ref" : "#/components/schemas/ClusterConnectionDetail"
+            }, {
+              "type" : "null"
+            } ],
+            "description" : "How Rahdar reaches the cluster. Absent for a caller who sees the cluster only through a team's subscriptions"
+          },
+          "system" : {
+            "$ref" : "#/components/schemas/SystemView"
+          },
+          "kinds" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/KindView"
+            }
+          }
+        },
+        "required" : [ "capabilities", "health", "id", "kinds", "name", "system", "topology" ]
+      },
+      "CredentialRejectionView" : {
+        "type" : "object",
+        "properties" : {
+          "account" : {
+            "type" : "string",
+            "enum" : [ "MANAGEMENT", "CORE" ]
+          },
+          "nodeNames" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          }
+        },
+        "required" : [ "account", "nodeNames" ]
+      },
+      "HealthView" : {
+        "type" : "object",
+        "properties" : {
+          "clusterId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "level" : {
+            "type" : "string"
+          },
+          "liveEndpointNames" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "splitBrain" : {
+            "type" : "string"
+          },
+          "replicationBehind" : {
+            "type" : "boolean"
+          },
+          "notes" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "credentialRejections" : {
+            "type" : "array",
+            "description" : "The accounts a broker rejected, and on which nodes, so the view can link to where the account is edited",
+            "items" : {
+              "$ref" : "#/components/schemas/CredentialRejectionView"
+            }
+          }
+        },
+        "required" : [ "clusterId", "credentialRejections", "level", "liveEndpointNames", "notes", "replicationBehind", "splitBrain" ]
+      },
+      "KafkaConnectionDetail" : {
+        "type" : "object",
+        "properties" : {
+          "bootstrapServers" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "securityProtocol" : {
+            "type" : "string"
+          },
+          "saslMechanism" : {
+            "type" : [ "string", "null" ]
+          },
+          "username" : {
+            "type" : [ "string", "null" ],
+            "description" : "The account's user name; null for a token or no account."
+          },
+          "secretStored" : {
+            "type" : "boolean",
+            "description" : "Whether a password or token is stored."
+          },
+          "tlsBundle" : {
+            "type" : [ "string", "null" ]
+          },
+          "clientId" : {
+            "type" : [ "string", "null" ]
+          }
+        },
+        "required" : [ "bootstrapServers", "secretStored", "securityProtocol" ]
+      },
+      "KindName" : {
+        "type" : "object",
+        "properties" : {
+          "singular" : {
+            "type" : "string",
+            "description" : "The name of one, such as Queue."
+          },
+          "plural" : {
+            "type" : "string",
+            "description" : "The name of several, such as Queues."
+          }
+        },
+        "required" : [ "plural", "singular" ]
+      },
+      "KindView" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "description" : "The kind's id, such as artemis.queue."
+          },
+          "resourceClass" : {
+            "type" : "string",
+            "description" : "The role the kind plays: SUBSCRIPTION, DESTINATION, ROUTE, CONSUMER and so on."
+          },
+          "label" : {
+            "$ref" : "#/components/schemas/KindName",
+            "description" : "The kind's name for people, singular and plural."
+          },
+          "partitioned" : {
+            "type" : "boolean",
+            "description" : "Whether the kind reads a partitioned log: browsing is by partition and offset or time."
+          },
+          "verbs" : {
+            "type" : "array",
+            "description" : "What the system can do to this kind (create, delete, pause, purge, ...), plus what Rahdar adds when the system provides it (reset-counters, expire).",
+            "items" : {
+              "type" : "string"
+            }
+          }
+        },
+        "required" : [ "id", "label", "partitioned", "resourceClass", "verbs" ]
       },
       "LogicalNodeView" : {
         "type" : "object",
@@ -28667,43 +31547,6 @@
         },
         "required" : [ "active", "coreUrlManual", "haRole", "id", "manageable", "name", "state", "versionSupport" ]
       },
-      "NodeProbeView" : {
-        "type" : "object",
-        "properties" : {
-          "name" : {
-            "type" : "string"
-          },
-          "haRole" : {
-            "type" : "string"
-          },
-          "artemisNodeId" : {
-            "type" : [ "string", "null" ]
-          },
-          "version" : {
-            "type" : [ "string", "null" ]
-          },
-          "managementUrl" : {
-            "type" : [ "string", "null" ]
-          },
-          "urlSource" : {
-            "type" : [ "string", "null" ],
-            "enum" : [ "SEED", "DERIVED", "MANUAL", null ]
-          },
-          "urlProblem" : {
-            "type" : [ "string", "null" ],
-            "enum" : [ "NO_PATTERN", "UNREACHABLE", "CREDENTIALS_REJECTED", "WRONG_ENDPOINT", "TLS_FAILED", "OTHER_BROKER", null ]
-          },
-          "management" : {
-            "type" : "string",
-            "enum" : [ "ACCEPTED", "REJECTED", "UNREACHABLE", "NOT_TRIED" ]
-          },
-          "core" : {
-            "type" : "string",
-            "enum" : [ "ACCEPTED", "REJECTED", "UNREACHABLE", "NOT_TRIED" ]
-          }
-        },
-        "required" : [ "core", "haRole", "management", "name" ]
-      },
       "NodeVersionView" : {
         "type" : "object",
         "properties" : {
@@ -28723,48 +31566,19 @@
         },
         "required" : [ "nodeId", "nodeName", "supported" ]
       },
-      "RegisterPreview" : {
+      "SystemView" : {
         "type" : "object",
         "properties" : {
-          "capabilities" : {
-            "$ref" : "#/components/schemas/CapabilitiesView"
-          },
-          "reachableSeeds" : {
-            "type" : "integer",
-            "format" : "int32"
-          },
-          "discoveredNodes" : {
-            "type" : "integer",
-            "format" : "int32"
-          },
-          "topology" : {
-            "$ref" : "#/components/schemas/TopologyView"
-          },
-          "managementUrlPattern" : {
+          "id" : {
             "type" : "string",
-            "description" : "The pattern the check derived management URLs from"
+            "description" : "The system's id, such as artemis."
           },
-          "nodes" : {
-            "type" : "array",
-            "description" : "One row per node the check found",
-            "items" : {
-              "$ref" : "#/components/schemas/NodeProbeView"
-            }
-          },
-          "adoption" : {
-            "anyOf" : [ {
-              "$ref" : "#/components/schemas/AdoptionPreviewView"
-            }, {
-              "type" : "null"
-            } ]
-          },
-          "contributions" : {
-            "type" : "object",
-            "additionalProperties" : { },
-            "description" : "What each enabled feature adds to the check, keyed by feature id and read from the reachable node. brokerconfig contributes a ConfigRecommendationsView: what to declare once the cluster is registered"
+          "name" : {
+            "type" : "string",
+            "description" : "The system's name for people."
           }
         },
-        "required" : [ "capabilities", "contributions", "discoveredNodes", "managementUrlPattern", "nodes", "reachableSeeds", "topology" ]
+        "required" : [ "id", "name" ]
       },
       "TopologyView" : {
         "type" : "object",
@@ -28811,170 +31625,6 @@
           }
         },
         "required" : [ "feature", "label", "nodes", "reason", "requiredVersion", "status" ]
-      },
-      "ClusterConnectionDetail" : {
-        "type" : "object",
-        "properties" : {
-          "managementUrlPattern" : {
-            "type" : [ "string", "null" ]
-          },
-          "seedUrls" : {
-            "type" : "array",
-            "description" : "The management URLs the operator gave as seeds, from the nodes that hold one",
-            "items" : {
-              "type" : "string"
-            }
-          },
-          "tlsBundle" : {
-            "type" : [ "string", "null" ]
-          },
-          "managementUsername" : {
-            "type" : [ "string", "null" ]
-          },
-          "coreUsername" : {
-            "type" : [ "string", "null" ],
-            "description" : "The Core account's user name, or null while Core uses the management account"
-          }
-        },
-        "required" : [ "seedUrls" ]
-      },
-      "ClusterDetail" : {
-        "type" : "object",
-        "properties" : {
-          "id" : {
-            "type" : "string",
-            "format" : "uuid"
-          },
-          "name" : {
-            "type" : "string"
-          },
-          "description" : {
-            "type" : [ "string", "null" ]
-          },
-          "topology" : {
-            "$ref" : "#/components/schemas/TopologyView"
-          },
-          "capabilities" : {
-            "$ref" : "#/components/schemas/CapabilitiesView"
-          },
-          "health" : {
-            "$ref" : "#/components/schemas/HealthView"
-          },
-          "environmentId" : {
-            "type" : [ "string", "null" ],
-            "format" : "uuid"
-          },
-          "connection" : {
-            "anyOf" : [ {
-              "$ref" : "#/components/schemas/ClusterConnectionDetail"
-            }, {
-              "type" : "null"
-            } ]
-          },
-          "system" : {
-            "$ref" : "#/components/schemas/SystemView"
-          },
-          "kinds" : {
-            "type" : "array",
-            "items" : {
-              "$ref" : "#/components/schemas/KindView"
-            }
-          }
-        },
-        "required" : [ "capabilities", "health", "id", "kinds", "name", "system", "topology" ]
-      },
-      "CredentialRejectionView" : {
-        "type" : "object",
-        "properties" : {
-          "account" : {
-            "type" : "string",
-            "enum" : [ "MANAGEMENT", "CORE" ]
-          },
-          "nodeNames" : {
-            "type" : "array",
-            "items" : {
-              "type" : "string"
-            }
-          }
-        },
-        "required" : [ "account", "nodeNames" ]
-      },
-      "HealthView" : {
-        "type" : "object",
-        "properties" : {
-          "clusterId" : {
-            "type" : "string",
-            "format" : "uuid"
-          },
-          "level" : {
-            "type" : "string"
-          },
-          "liveEndpointNames" : {
-            "type" : "array",
-            "items" : {
-              "type" : "string"
-            }
-          },
-          "splitBrain" : {
-            "type" : "string"
-          },
-          "replicationBehind" : {
-            "type" : "boolean"
-          },
-          "notes" : {
-            "type" : "array",
-            "items" : {
-              "type" : "string"
-            }
-          },
-          "credentialRejections" : {
-            "type" : "array",
-            "description" : "The accounts a broker rejected, and on which nodes, so the view can link to where the account is edited",
-            "items" : {
-              "$ref" : "#/components/schemas/CredentialRejectionView"
-            }
-          }
-        },
-        "required" : [ "clusterId", "credentialRejections", "level", "liveEndpointNames", "notes", "replicationBehind", "splitBrain" ]
-      },
-      "KindView" : {
-        "type" : "object",
-        "properties" : {
-          "id" : {
-            "type" : "string",
-            "description" : "The kind's id, such as artemis.queue."
-          },
-          "resourceClass" : {
-            "type" : "string",
-            "description" : "The role the kind plays: SUBSCRIPTION, DESTINATION, ROUTE, CONSUMER and so on."
-          },
-          "label" : {
-            "type" : "string",
-            "description" : "The kind's name for people, such as Queue."
-          },
-          "verbs" : {
-            "type" : "array",
-            "description" : "What the system can do to this kind (create, delete, pause, purge, ...), plus what Rahdar adds when the system provides it (reset-counters, expire).",
-            "items" : {
-              "type" : "string"
-            }
-          }
-        },
-        "required" : [ "id", "label", "resourceClass", "verbs" ]
-      },
-      "SystemView" : {
-        "type" : "object",
-        "properties" : {
-          "id" : {
-            "type" : "string",
-            "description" : "The system's id, such as artemis."
-          },
-          "name" : {
-            "type" : "string",
-            "description" : "The system's name for people."
-          }
-        },
-        "required" : [ "id", "name" ]
       },
       "Finding" : {
         "type" : "object",
@@ -29443,7 +32093,7 @@
           }
         }
       },
-      "PlanView" : {
+      "QueryPlanView" : {
         "type" : "object",
         "description" : "What a query will do, worked out without contacting a broker.",
         "properties" : {
@@ -29523,11 +32173,11 @@
             "description" : "The id of the destination the subscription is bound to."
           },
           "messageCount" : {
-            "type" : "integer",
-            "format" : "int64"
+            "type" : [ "integer", "null" ],
+            "format" : "int64",
+            "description" : "Null when the node reported no depth: unknown, not empty."
           }
-        },
-        "required" : [ "messageCount" ]
+        }
       },
       "IndexSubscriptionRequest" : {
         "type" : "object",
@@ -29777,17 +32427,24 @@
         "properties" : {
           "affectedCount" : {
             "type" : "integer",
-            "format" : "int64"
+            "format" : "int64",
+            "description" : "Messages destroyed; 0 for a purge of a log."
           },
           "dryRun" : {
             "type" : "boolean"
           },
           "node" : {
-            "type" : "string",
-            "format" : "uuid"
+            "type" : [ "string", "null" ],
+            "format" : "uuid",
+            "description" : "The node acted on; null where the system has none."
+          },
+          "skippedCount" : {
+            "type" : "integer",
+            "format" : "int64",
+            "description" : "Records a purge of a log passed over without deleting them; 0 otherwise."
           }
         },
-        "required" : [ "affectedCount", "dryRun", "node" ]
+        "required" : [ "affectedCount", "dryRun", "skippedCount" ]
       },
       "DryRunView" : {
         "type" : "object",
@@ -29804,11 +32461,16 @@
             "type" : "boolean"
           },
           "node" : {
-            "type" : "string",
+            "type" : [ "string", "null" ],
             "format" : "uuid"
+          },
+          "skippedCount" : {
+            "type" : "integer",
+            "format" : "int64",
+            "description" : "Records a purge of a log would pass over without deleting them; 0 otherwise. The cap counts destroyed messages only, so it never applies to these."
           }
         },
-        "required" : [ "affectedCount", "cap", "node", "overCap" ]
+        "required" : [ "affectedCount", "cap", "overCap", "skippedCount" ]
       },
       "PartialView" : {
         "type" : "object",
@@ -29954,6 +32616,518 @@
           }
         }
       },
+      "AbortRequest" : {
+        "type" : "object",
+        "properties" : {
+          "etag" : {
+            "type" : "string",
+            "description" : "The preview's etag; required to abort."
+          }
+        }
+      },
+      "AbortResult" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string"
+          },
+          "aborted" : {
+            "type" : "boolean",
+            "description" : "False where it had ended already."
+          }
+        },
+        "required" : [ "aborted", "id" ]
+      },
+      "AbortPreview" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string"
+          },
+          "state" : {
+            "type" : "string"
+          },
+          "released" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/BlockedPartition"
+            }
+          },
+          "effect" : {
+            "type" : "string",
+            "description" : "What the abort does, in words, naming the fenced producer."
+          },
+          "abortable" : {
+            "type" : "boolean",
+            "description" : "True only for an open transaction that has outlived its timeout; any other is refused, since aborting a live one would fence a producer that is working."
+          },
+          "etag" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "abortable", "effect", "etag", "id", "released", "state" ]
+      },
+      "BlockedPartition" : {
+        "type" : "object",
+        "properties" : {
+          "topic" : {
+            "type" : "string"
+          },
+          "partition" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        },
+        "required" : [ "partition", "topic" ]
+      },
+      "ConfigChangeRequest" : {
+        "type" : "object",
+        "properties" : {
+          "set" : {
+            "type" : "object",
+            "additionalProperties" : {
+              "type" : "string"
+            },
+            "description" : "Settings to override, by name."
+          },
+          "remove" : {
+            "type" : "array",
+            "description" : "Overrides to remove, by name.",
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "etag" : {
+            "type" : "string",
+            "description" : "The preview's etag; required to apply."
+          }
+        }
+      },
+      "ConfigChangeRow" : {
+        "type" : "object",
+        "properties" : {
+          "name" : {
+            "type" : "string"
+          },
+          "before" : {
+            "type" : [ "string", "null" ]
+          },
+          "after" : {
+            "type" : [ "string", "null" ],
+            "description" : "Absent when the override is removed."
+          },
+          "fallback" : {
+            "type" : [ "string", "null" ],
+            "description" : "The value the setting falls back to, for a removal."
+          },
+          "error" : {
+            "type" : [ "string", "null" ],
+            "description" : "The broker's validation message; nothing is applied then."
+          }
+        },
+        "required" : [ "name" ]
+      },
+      "ConfigPreview" : {
+        "type" : "object",
+        "properties" : {
+          "changes" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/ConfigChangeRow"
+            }
+          },
+          "valid" : {
+            "type" : "boolean"
+          },
+          "etag" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "changes", "etag", "valid" ]
+      },
+      "HangingPage" : {
+        "type" : "object",
+        "properties" : {
+          "items" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/HangingTransaction"
+            }
+          },
+          "next" : {
+            "type" : [ "string", "null" ]
+          }
+        },
+        "required" : [ "items" ]
+      },
+      "HangingTransaction" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "description" : "Its canonical id, such as kafka.hanging-transaction/orders/0/4711; what kafka_abort_transaction takes."
+          },
+          "topic" : {
+            "type" : "string"
+          },
+          "partition" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "producerId" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "producerEpoch" : {
+            "type" : [ "integer", "null" ],
+            "format" : "int64"
+          },
+          "startOffset" : {
+            "type" : [ "integer", "null" ],
+            "format" : "int64"
+          },
+          "recordsHeldBack" : {
+            "type" : [ "integer", "null" ],
+            "format" : "int64",
+            "description" : "Records after its start that a read-committed consumer cannot reach."
+          },
+          "ageMs" : {
+            "type" : [ "integer", "null" ],
+            "format" : "int64",
+            "description" : "Milliseconds since the producer last wrote."
+          }
+        },
+        "required" : [ "id", "partition", "producerId", "topic" ]
+      },
+      "HangingAbortRequest" : {
+        "type" : "object",
+        "properties" : {
+          "topic" : {
+            "type" : "string"
+          },
+          "partition" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "producerId" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "etag" : {
+            "type" : "string",
+            "description" : "The preview's etag; required to abort."
+          }
+        },
+        "required" : [ "partition", "producerId", "topic" ]
+      },
+      "HangingAbortResult" : {
+        "type" : "object",
+        "properties" : {
+          "topic" : {
+            "type" : "string"
+          },
+          "partition" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "producerId" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "aborted" : {
+            "type" : "boolean",
+            "description" : "False where it had closed already."
+          }
+        },
+        "required" : [ "aborted", "partition", "producerId", "topic" ]
+      },
+      "HangingAbortPreview" : {
+        "type" : "object",
+        "properties" : {
+          "topic" : {
+            "type" : "string"
+          },
+          "partition" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "producerId" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "effect" : {
+            "type" : "string",
+            "description" : "What the abort does, naming the fenced producer."
+          },
+          "recordsHeldBack" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "etag" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "effect", "etag", "partition", "producerId", "recordsHeldBack", "topic" ]
+      },
+      "OffsetRequest" : {
+        "type" : "object",
+        "properties" : {
+          "topics" : {
+            "type" : "array",
+            "description" : "The topics to move; every topic of the group when absent.",
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "to" : {
+            "type" : "string",
+            "enum" : [ "earliest", "latest", "time", "offset" ]
+          },
+          "value" : {
+            "type" : "string",
+            "description" : "An ISO-8601 instant for time, an offset for offset."
+          },
+          "etag" : {
+            "type" : "string",
+            "description" : "The preview's etag; required to reset."
+          }
+        },
+        "required" : [ "to" ]
+      },
+      "OffsetResult" : {
+        "type" : "object",
+        "properties" : {
+          "partitions" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/OffsetRow"
+            }
+          },
+          "moved" : {
+            "type" : "integer",
+            "format" : "int64",
+            "description" : "Partitions moved."
+          },
+          "movedTopics" : {
+            "type" : "array",
+            "description" : "The topics whose offsets were moved.",
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "notMovedTopics" : {
+            "type" : "array",
+            "description" : "The topics left where they were; empty when all moved.",
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "failure" : {
+            "type" : [ "string", "null" ],
+            "description" : "Why the reset stopped part way; absent when every topic moved."
+          }
+        },
+        "required" : [ "moved", "movedTopics", "notMovedTopics", "partitions" ]
+      },
+      "OffsetRow" : {
+        "type" : "object",
+        "properties" : {
+          "topic" : {
+            "type" : "string"
+          },
+          "partition" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "current" : {
+            "type" : [ "integer", "null" ],
+            "format" : "int64"
+          },
+          "next" : {
+            "type" : [ "integer", "null" ],
+            "format" : "int64",
+            "description" : "Absent where the partition is refused."
+          },
+          "skipped" : {
+            "type" : "integer",
+            "format" : "int64",
+            "description" : "Records the group will no longer read."
+          },
+          "reread" : {
+            "type" : "integer",
+            "format" : "int64",
+            "description" : "Records the group will read again."
+          },
+          "note" : {
+            "type" : [ "string", "null" ]
+          },
+          "refused" : {
+            "type" : [ "string", "null" ],
+            "description" : "Why this partition cannot be moved, such as an offset out of range."
+          }
+        },
+        "required" : [ "partition", "reread", "skipped", "topic" ]
+      },
+      "OffsetPreview" : {
+        "type" : "object",
+        "properties" : {
+          "partitions" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/OffsetRow"
+            }
+          },
+          "members" : {
+            "type" : "array",
+            "description" : "Active members, as client@host (id).",
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "blocked" : {
+            "type" : [ "string", "null" ],
+            "description" : "Why the reset is refused now: members, rebalancing, read-only."
+          },
+          "etag" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "etag", "members", "partitions" ]
+      },
+      "Acl" : {
+        "type" : "object",
+        "properties" : {
+          "principal" : {
+            "type" : "string",
+            "example" : "User:app"
+          },
+          "host" : {
+            "type" : "string",
+            "example" : "*"
+          },
+          "operation" : {
+            "type" : "string",
+            "example" : "read"
+          },
+          "permission" : {
+            "type" : "string",
+            "enum" : [ "allow", "deny" ]
+          },
+          "resourceType" : {
+            "type" : "string",
+            "example" : "topic"
+          },
+          "pattern" : {
+            "type" : "string",
+            "enum" : [ "literal", "prefixed" ]
+          },
+          "name" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "host", "name", "operation", "pattern", "permission", "principal", "resourceType" ]
+      },
+      "AclChangeRequest" : {
+        "type" : "object",
+        "properties" : {
+          "add" : {
+            "type" : "array",
+            "description" : "ACLs to add.",
+            "items" : {
+              "$ref" : "#/components/schemas/Acl"
+            }
+          },
+          "remove" : {
+            "type" : "array",
+            "description" : "ACLs to remove.",
+            "items" : {
+              "$ref" : "#/components/schemas/Acl"
+            }
+          },
+          "etag" : {
+            "type" : "string",
+            "description" : "The preview's etag; required to apply."
+          }
+        }
+      },
+      "AclPreview" : {
+        "type" : "object",
+        "properties" : {
+          "access" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/EffectiveAccess"
+            }
+          },
+          "losses" : {
+            "type" : "array",
+            "description" : "In words, such as: User:app loses READ on topic orders.",
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "notes" : {
+            "type" : "array",
+            "description" : "Where a deny rule wins, and what is not evaluated.",
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "added" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "removed" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "etag" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "access", "added", "etag", "losses", "notes", "removed" ]
+      },
+      "EffectiveAccess" : {
+        "type" : "object",
+        "properties" : {
+          "principal" : {
+            "type" : "string"
+          },
+          "resourceType" : {
+            "type" : "string"
+          },
+          "resource" : {
+            "type" : "string"
+          },
+          "before" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "after" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          }
+        },
+        "required" : [ "after", "before", "principal", "resource", "resourceType" ]
+      },
+      "AclResult" : {
+        "type" : "object",
+        "properties" : {
+          "added" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "removed" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        },
+        "required" : [ "added", "removed" ]
+      },
       "CreateDestinationRequest" : {
         "type" : "object",
         "properties" : {
@@ -29974,6 +33148,66 @@
           }
         },
         "required" : [ "kind", "name" ]
+      },
+      "Before" : {
+        "type" : "object",
+        "properties" : {
+          "offsets" : {
+            "type" : "object",
+            "additionalProperties" : {
+              "type" : "integer",
+              "format" : "int64"
+            }
+          },
+          "time" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
+      "TruncateRequest" : {
+        "type" : "object",
+        "properties" : {
+          "before" : {
+            "$ref" : "#/components/schemas/Before"
+          },
+          "etag" : {
+            "type" : "string",
+            "description" : "The dry run's etag; a real run needs it, and is refused as stale if the log moved."
+          }
+        },
+        "required" : [ "before" ]
+      },
+      "GroupLoss" : {
+        "type" : "object",
+        "properties" : {
+          "group" : {
+            "type" : "string"
+          },
+          "records" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        },
+        "required" : [ "records" ]
+      },
+      "TruncateEffect" : {
+        "type" : "object",
+        "properties" : {
+          "records" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "groups" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/GroupLoss"
+            }
+          },
+          "etag" : {
+            "type" : "string"
+          }
+        }
       },
       "BulkRunView" : {
         "type" : "object",
@@ -30071,7 +33305,7 @@
       "BulkSelection" : {
         "type" : "object",
         "properties" : {
-          "names" : {
+          "ids" : {
             "type" : [ "array", "null" ],
             "items" : {
               "type" : "string"
@@ -30104,7 +33338,7 @@
             "type" : "string",
             "enum" : [ "PAUSE", "RESUME", "PURGE", "DELETE" ]
           },
-          "names" : {
+          "ids" : {
             "type" : [ "array", "null" ],
             "items" : {
               "type" : "string"
@@ -30136,8 +33370,8 @@
             "description" : "The id of the subscription's kind, such as artemis.queue."
           },
           "kindLabel" : {
-            "type" : "string",
-            "description" : "The kind's name for people, such as Queue."
+            "$ref" : "#/components/schemas/KindName",
+            "description" : "The kind's name for people, singular and plural."
           },
           "status" : {
             "type" : "string",
@@ -30151,7 +33385,13 @@
           },
           "affected" : {
             "type" : [ "integer", "null" ],
-            "format" : "int64"
+            "format" : "int64",
+            "description" : "Messages destroyed; 0 for a purge of a log."
+          },
+          "skipped" : {
+            "type" : [ "integer", "null" ],
+            "format" : "int64",
+            "description" : "Records a purge of a log passes over (expected in the preview, passed over once run) without deleting them; absent for every other action."
           },
           "nodes" : {
             "type" : "array",
@@ -30235,6 +33475,10 @@
           },
           "error" : {
             "type" : "string"
+          },
+          "skipped" : {
+            "type" : "integer",
+            "format" : "int64"
           }
         }
       },
@@ -31125,7 +34369,8 @@
               "$ref" : "#/components/schemas/MeView"
             }, {
               "type" : "null"
-            } ]
+            } ],
+            "description" : "The signed-in user; set when the status is AUTHENTICATED."
           },
           "methods" : {
             "type" : [ "array", "null" ],
@@ -31552,14 +34797,12 @@
           }
         }
       },
-      "UpdateClusterRequest" : {
+      "ArtemisConnectionUpdate" : {
         "type" : "object",
         "properties" : {
-          "name" : {
-            "type" : "string"
-          },
-          "description" : {
-            "type" : "string"
+          "system" : {
+            "type" : "string",
+            "enum" : [ "artemis" ]
           },
           "seedUrls" : {
             "type" : "array",
@@ -31578,24 +34821,77 @@
             "$ref" : "#/components/schemas/AccountUpdate"
           },
           "core" : {
-            "$ref" : "#/components/schemas/AccountUpdate"
+            "anyOf" : [ {
+              "$ref" : "#/components/schemas/AccountUpdate"
+            }, {
+              "type" : "null"
+            } ],
+            "description" : "Null clears the Core account, so Core uses the management account. Leave the field out to keep it."
           }
         }
       },
-      "ConnectionCheck" : {
-        "type" : "object",
-        "properties" : {
-          "managementUrlPattern" : {
-            "type" : "string"
-          },
-          "nodes" : {
-            "type" : "array",
-            "items" : {
-              "$ref" : "#/components/schemas/NodeProbeView"
-            }
+      "ConnectionUpdate" : {
+        "discriminator" : {
+          "propertyName" : "system",
+          "mapping" : {
+            "artemis" : "#/components/schemas/ArtemisConnectionUpdate",
+            "kafka" : "#/components/schemas/KafkaConnectionUpdate"
           }
         },
-        "required" : [ "managementUrlPattern", "nodes" ]
+        "oneOf" : [ {
+          "$ref" : "#/components/schemas/ArtemisConnectionUpdate"
+        }, {
+          "$ref" : "#/components/schemas/KafkaConnectionUpdate"
+        } ]
+      },
+      "KafkaConnectionUpdate" : {
+        "type" : "object",
+        "properties" : {
+          "system" : {
+            "type" : "string",
+            "enum" : [ "kafka" ]
+          },
+          "bootstrapServers" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string",
+              "minLength" : 1
+            }
+          },
+          "securityProtocol" : {
+            "type" : "string"
+          },
+          "saslMechanism" : {
+            "type" : "string"
+          },
+          "credentials" : {
+            "$ref" : "#/components/schemas/KafkaCredentials"
+          },
+          "tlsBundle" : {
+            "type" : "string"
+          },
+          "clientId" : {
+            "type" : "string"
+          }
+        }
+      },
+      "UpdateClusterRequest" : {
+        "type" : "object",
+        "properties" : {
+          "name" : {
+            "type" : "string"
+          },
+          "description" : {
+            "type" : "string"
+          },
+          "environmentId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "connection" : {
+            "$ref" : "#/components/schemas/ConnectionUpdate"
+          }
+        }
       },
       "ClusterConnectionView" : {
         "type" : "object",
@@ -32233,6 +35529,52 @@
         },
         "required" : [ "permissions", "roles" ]
       },
+      "PagedViewSupportedSystemView" : {
+        "type" : "object",
+        "properties" : {
+          "data" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/SupportedSystemView"
+            }
+          },
+          "page" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "pageSize" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "count" : {
+            "type" : [ "integer", "null" ],
+            "format" : "int64",
+            "description" : "The total across all pages; null when it is not known."
+          },
+          "hasNext" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "data", "hasNext", "page", "pageSize" ]
+      },
+      "SupportedSystemView" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "supportedVersions" : {
+            "type" : "string"
+          },
+          "connection" : {
+            "type" : "string",
+            "enum" : [ "jolokia-seeds", "bootstrap" ]
+          }
+        }
+      },
       "JobStatusView" : {
         "type" : "object",
         "properties" : {
@@ -32531,6 +35873,30 @@
         },
         "required" : [ "degraded", "heartbeatAgeMillis", "host", "id", "ownedClusters", "self", "startedAt", "state", "version" ]
       },
+      "Backlog" : {
+        "type" : "object",
+        "properties" : {
+          "value" : {
+            "type" : [ "integer", "null" ],
+            "format" : "int64",
+            "description" : "The figure; null when the accuracy is UNAVAILABLE."
+          },
+          "accuracy" : {
+            "type" : "string",
+            "description" : "EXACT, ESTIMATE or UNAVAILABLE.",
+            "enum" : [ "EXACT", "ESTIMATE", "UNAVAILABLE" ]
+          },
+          "reason" : {
+            "type" : [ "string", "null" ],
+            "description" : "Why it is an estimate or unavailable."
+          },
+          "breakdown" : {
+            "type" : "boolean",
+            "description" : "Whether the subscription has a per-partition breakdown to read."
+          }
+        },
+        "required" : [ "accuracy", "breakdown" ]
+      },
       "ClusterRef" : {
         "type" : "object",
         "properties" : {
@@ -32605,8 +35971,9 @@
             "format" : "date-time"
           },
           "messageCount" : {
-            "type" : "integer",
-            "format" : "int64"
+            "type" : [ "integer", "null" ],
+            "format" : "int64",
+            "description" : "Null when the node reported no backlog: unknown, not empty."
           },
           "consumerCount" : {
             "type" : "integer",
@@ -32624,7 +35991,7 @@
             "type" : "boolean"
           }
         },
-        "required" : [ "consumerCount", "deliveringCount", "messageCount", "nodeId", "nodeName", "paused", "scheduledCount", "stale" ]
+        "required" : [ "consumerCount", "deliveringCount", "nodeId", "nodeName", "paused", "scheduledCount", "stale" ]
       },
       "SubscriptionView" : {
         "type" : "object",
@@ -32638,8 +36005,8 @@
             "description" : "The id of the resource's kind, such as artemis.queue."
           },
           "kindLabel" : {
-            "type" : "string",
-            "description" : "The kind's name for people, such as Queue."
+            "$ref" : "#/components/schemas/KindName",
+            "description" : "The kind's name for people, singular and plural."
           },
           "name" : {
             "type" : "string"
@@ -32658,9 +36025,8 @@
           "durable" : {
             "type" : "boolean"
           },
-          "totalMessageCount" : {
-            "type" : "integer",
-            "format" : "int64"
+          "backlog" : {
+            "$ref" : "#/components/schemas/Backlog"
           },
           "totalConsumerCount" : {
             "type" : "integer",
@@ -32704,10 +36070,11 @@
               "$ref" : "#/components/schemas/TeamRef"
             }, {
               "type" : "null"
-            } ]
+            } ],
+            "description" : "The team whose patterns own this subscription; null when no team does."
           }
         },
-        "required" : [ "allowedActions", "destination", "durable", "id", "kind", "kindLabel", "name", "nativeAttributes", "nodesPresent", "nodesTotal", "paused", "perNode", "totalConsumerCount", "totalDeliveringCount", "totalMessageCount", "totalScheduledCount" ]
+        "required" : [ "allowedActions", "backlog", "destination", "durable", "id", "kind", "kindLabel", "name", "nativeAttributes", "nodesPresent", "nodesTotal", "paused", "perNode", "totalConsumerCount", "totalDeliveringCount", "totalScheduledCount" ]
       },
       "TeamRef" : {
         "type" : "object",
@@ -33836,6 +37203,79 @@
         },
         "required" : [ "data", "hasNext", "page", "pageSize" ]
       },
+      "Breakdown" : {
+        "type" : "object",
+        "properties" : {
+          "sampledAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "partitions" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/PartitionLag"
+            }
+          },
+          "destination" : {
+            "$ref" : "#/components/schemas/ResourceId"
+          }
+        }
+      },
+      "KindId" : {
+        "type" : "object",
+        "properties" : {
+          "value" : {
+            "type" : "string"
+          }
+        }
+      },
+      "PartitionLag" : {
+        "type" : "object",
+        "properties" : {
+          "partition" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "committed" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "end" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "lag" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "reason" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "partition" ]
+      },
+      "ResourceId" : {
+        "type" : "object",
+        "properties" : {
+          "kind" : {
+            "$ref" : "#/components/schemas/KindId"
+          },
+          "path" : {
+            "$ref" : "#/components/schemas/ResourcePath"
+          }
+        }
+      },
+      "ResourcePath" : {
+        "type" : "object",
+        "properties" : {
+          "segments" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          }
+        }
+      },
       "BoundView" : {
         "type" : "object",
         "description" : "A limit the query ran into, which is why it stopped.",
@@ -34013,7 +37453,7 @@
             "description" : "True when a bound was hit or a node did not answer."
           },
           "plan" : {
-            "$ref" : "#/components/schemas/PlanView"
+            "$ref" : "#/components/schemas/QueryPlanView"
           }
         },
         "required" : [ "partial" ]
@@ -34054,8 +37494,9 @@
             "format" : "int32"
           },
           "timestamp" : {
-            "type" : "integer",
-            "format" : "int64"
+            "type" : [ "integer", "null" ],
+            "format" : "int64",
+            "description" : "When the producer stamped it, epoch milliseconds; null when it carries no time."
           },
           "expiration" : {
             "type" : "integer",
@@ -34127,7 +37568,7 @@
             }
           }
         },
-        "required" : [ "bodyTruncated", "durable", "expiration", "messageId", "messageType", "priority", "size", "timestamp" ]
+        "required" : [ "bodyTruncated", "durable", "expiration", "messageId", "messageType", "priority", "size" ]
       },
       "SqlNodeOutcomeView" : {
         "type" : "object",
@@ -34702,8 +38143,8 @@
             "description" : "The id of the route's kind, such as artemis.divert."
           },
           "kindLabel" : {
-            "type" : "string",
-            "description" : "The kind's name for people, such as Divert."
+            "$ref" : "#/components/schemas/KindName",
+            "description" : "The kind's name for people, singular and plural."
           },
           "name" : {
             "type" : "string"
@@ -34782,7 +38223,7 @@
             "type" : "string"
           },
           "kindLabel" : {
-            "type" : "string"
+            "$ref" : "#/components/schemas/KindName"
           },
           "name" : {
             "type" : "string"
@@ -34803,6 +38244,42 @@
             }
           }
         }
+      },
+      "LogView" : {
+        "type" : "object",
+        "properties" : {
+          "partition" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "start" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "end" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "next" : {
+            "type" : [ "integer", "null" ],
+            "format" : "int64",
+            "description" : "The offset the next page starts at; null at the end."
+          },
+          "retentionMoved" : {
+            "type" : "boolean",
+            "description" : "The offset asked for was already removed by retention."
+          },
+          "uncommittedHidden" : {
+            "type" : "boolean",
+            "description" : "Records of open or aborted transactions are not shown, as a read-committed consumer would not see them."
+          },
+          "subscriptionPosition" : {
+            "type" : [ "integer", "null" ],
+            "format" : "int64",
+            "description" : "Where the group stands on this partition, when the log is read through a group's subscription: its committed offset (a share group's start offset). Absent when the log is read as a topic, or the group has no position on the partition."
+          }
+        },
+        "required" : [ "end", "partition", "retentionMoved", "start", "uncommittedHidden" ]
       },
       "MessagePageView" : {
         "type" : "object",
@@ -34835,11 +38312,28 @@
             "description" : "Why count is null. Null whenever count is present."
           },
           "node" : {
-            "type" : "string",
-            "format" : "uuid"
+            "type" : [ "string", "null" ],
+            "format" : "uuid",
+            "description" : "The node the page was read from; null for a log, which has none."
+          },
+          "log" : {
+            "anyOf" : [ {
+              "$ref" : "#/components/schemas/LogView"
+            }, {
+              "type" : "null"
+            } ],
+            "description" : "Where in the log the page sits; null for a queue."
+          },
+          "truncated" : {
+            "type" : "boolean",
+            "description" : "The page was cut short at its byte budget: messages the broker returned are not in it. Ask for a smaller page, or, on a log, continue from log.next."
+          },
+          "notice" : {
+            "type" : [ "string", "null" ],
+            "description" : "Something worth saying about this page, such as why it is empty."
           }
         },
-        "required" : [ "data", "hasNext", "node", "page", "pageSize" ]
+        "required" : [ "data", "hasNext", "page", "pageSize", "truncated" ]
       },
       "MessageSummaryView" : {
         "type" : "object",
@@ -34860,8 +38354,9 @@
             "format" : "int32"
           },
           "timestamp" : {
-            "type" : "integer",
-            "format" : "int64"
+            "type" : [ "integer", "null" ],
+            "format" : "int64",
+            "description" : "When the producer stamped it, epoch milliseconds; null when it carries no time."
           },
           "expiration" : {
             "type" : "integer",
@@ -34892,9 +38387,22 @@
             "items" : {
               "$ref" : "#/components/schemas/RedactionView"
             }
+          },
+          "tombstone" : {
+            "type" : "boolean",
+            "description" : "A log record with no value: it deletes its key on compaction. Never true on a queue."
+          },
+          "key" : {
+            "type" : [ "string", "null" ],
+            "description" : "A log record's key as text, or base64 when it is not text."
+          },
+          "keyEncoding" : {
+            "type" : [ "string", "null" ],
+            "description" : "How key is written; null with no key.",
+            "enum" : [ "TEXT", "BASE64", null ]
           }
         },
-        "required" : [ "bodyTruncated", "durable", "expiration", "position", "priority", "propertyCount", "redactions", "size", "timestamp", "type" ]
+        "required" : [ "bodyTruncated", "durable", "expiration", "position", "priority", "propertyCount", "redactions", "size", "tombstone", "type" ]
       },
       "MessageDetailView" : {
         "type" : "object",
@@ -34915,8 +38423,9 @@
             "format" : "int32"
           },
           "timestamp" : {
-            "type" : "integer",
-            "format" : "int64"
+            "type" : [ "integer", "null" ],
+            "format" : "int64",
+            "description" : "When the producer stamped it, epoch milliseconds; null when it carries no time."
           },
           "expiration" : {
             "type" : "integer",
@@ -34956,8 +38465,9 @@
             "format" : "int32"
           },
           "node" : {
-            "type" : "string",
-            "format" : "uuid"
+            "type" : [ "string", "null" ],
+            "format" : "uuid",
+            "description" : "The node the message was read from; null for a log, which has none."
           },
           "stringProperties" : {
             "type" : "object",
@@ -35003,9 +38513,20 @@
             "items" : {
               "$ref" : "#/components/schemas/WithheldView"
             }
+          },
+          "tombstone" : {
+            "type" : "boolean"
+          },
+          "key" : {
+            "type" : [ "string", "null" ]
+          },
+          "keyEncoding" : {
+            "type" : [ "string", "null" ],
+            "description" : "How key is written; null with no key.",
+            "enum" : [ "TEXT", "BASE64", null ]
           }
         },
-        "required" : [ "bodyEncoding", "bodyTruncated", "booleanProperties", "doubleProperties", "durable", "expiration", "intProperties", "longProperties", "node", "position", "priority", "redactions", "size", "stringProperties", "timestamp", "type", "withheld" ]
+        "required" : [ "bodyEncoding", "bodyTruncated", "booleanProperties", "doubleProperties", "durable", "expiration", "intProperties", "longProperties", "position", "priority", "redactions", "size", "stringProperties", "tombstone", "type", "withheld" ]
       },
       "ResourceAccessView" : {
         "type" : "object",
@@ -35016,7 +38537,8 @@
               "$ref" : "#/components/schemas/TeamRef"
             }, {
               "type" : "null"
-            } ]
+            } ],
+            "description" : "The team whose patterns own the name; null when none does."
           },
           "grants" : {
             "type" : "array",
@@ -35108,8 +38630,8 @@
             "description" : "The id of the resource's kind, such as artemis.queue."
           },
           "kindLabel" : {
-            "type" : "string",
-            "description" : "The kind's name for people, such as Queue."
+            "$ref" : "#/components/schemas/KindName",
+            "description" : "The kind's name for people, singular and plural."
           },
           "clientId" : {
             "type" : [ "string", "null" ]
@@ -35233,6 +38755,369 @@
           }
         },
         "required" : [ "from", "series", "step", "to", "truncated" ]
+      },
+      "TransactionPage" : {
+        "type" : "object",
+        "properties" : {
+          "items" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/TransactionRow"
+            }
+          },
+          "next" : {
+            "type" : [ "string", "null" ]
+          }
+        },
+        "required" : [ "items" ]
+      },
+      "TransactionRow" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string"
+          },
+          "state" : {
+            "type" : "string"
+          },
+          "startedAt" : {
+            "type" : [ "string", "null" ],
+            "format" : "date-time"
+          },
+          "timeoutMs" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "hanging" : {
+            "type" : "boolean",
+            "description" : "Open past its timeout and the coordinator's cleanup: the coordinator aborts an open transaction by itself within seconds of its timeout, so one still open has been missed."
+          },
+          "blocked" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/BlockedPartition"
+            }
+          }
+        },
+        "required" : [ "blocked", "hanging", "id", "state", "timeoutMs" ]
+      },
+      "ConfigEntry" : {
+        "type" : "object",
+        "properties" : {
+          "name" : {
+            "type" : "string"
+          },
+          "value" : {
+            "type" : [ "string", "null" ],
+            "description" : "Never sent for a sensitive setting."
+          },
+          "source" : {
+            "type" : "string",
+            "enum" : [ "TOPIC", "BROKER_DEFAULT", "STATIC", "DEFAULT" ]
+          },
+          "defaultValue" : {
+            "type" : [ "string", "null" ],
+            "description" : "The value the setting falls back to."
+          },
+          "readOnly" : {
+            "type" : "boolean"
+          },
+          "sensitive" : {
+            "type" : "boolean"
+          },
+          "unit" : {
+            "type" : [ "string", "null" ],
+            "description" : "ms, bytes or the like, when the value is a quantity."
+          }
+        },
+        "required" : [ "name", "readOnly", "sensitive", "source" ]
+      },
+      "TopicConfig" : {
+        "type" : "object",
+        "properties" : {
+          "internal" : {
+            "type" : "boolean"
+          },
+          "readOnlyReason" : {
+            "type" : [ "string", "null" ],
+            "description" : "Why every setting is read-only."
+          },
+          "entries" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/ConfigEntry"
+            }
+          }
+        },
+        "required" : [ "entries", "internal" ]
+      },
+      "GroupPage" : {
+        "type" : "object",
+        "properties" : {
+          "items" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/GroupRow"
+            }
+          },
+          "next" : {
+            "type" : [ "string", "null" ],
+            "description" : "The cursor of the next page; absent on the last."
+          }
+        },
+        "required" : [ "items" ]
+      },
+      "GroupRow" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string"
+          },
+          "type" : {
+            "type" : "string",
+            "description" : "classic, consumer, share, streams or unknown."
+          },
+          "state" : {
+            "type" : "string"
+          },
+          "members" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "lag" : {
+            "$ref" : "#/components/schemas/Backlog",
+            "description" : "Total lag over the group's topics, an estimate."
+          },
+          "readOnly" : {
+            "type" : [ "string", "null" ],
+            "description" : "Why the group's offsets cannot be changed; absent when they can."
+          }
+        },
+        "required" : [ "id", "lag", "members", "state", "type" ]
+      },
+      "GroupDetail" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string"
+          },
+          "type" : {
+            "type" : "string"
+          },
+          "state" : {
+            "type" : "string"
+          },
+          "readOnly" : {
+            "type" : [ "string", "null" ]
+          },
+          "topics" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/GroupTopic"
+            }
+          },
+          "members" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/GroupMember"
+            }
+          },
+          "sampledAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        },
+        "required" : [ "id", "members", "sampledAt", "state", "topics", "type" ]
+      },
+      "GroupMember" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string"
+          },
+          "clientId" : {
+            "type" : "string"
+          },
+          "host" : {
+            "type" : "string"
+          },
+          "assignments" : {
+            "type" : "array",
+            "description" : "Partitions as topic-partition.",
+            "items" : {
+              "type" : "string"
+            }
+          }
+        },
+        "required" : [ "assignments", "clientId", "host", "id" ]
+      },
+      "GroupPartitionLag" : {
+        "type" : "object",
+        "properties" : {
+          "partition" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "committed" : {
+            "type" : [ "integer", "null" ],
+            "format" : "int64",
+            "description" : "The group's committed (or start) offset; absent when it has none."
+          },
+          "end" : {
+            "type" : [ "integer", "null" ],
+            "format" : "int64",
+            "description" : "The partition's end offset; absent when it could not be read."
+          },
+          "lag" : {
+            "type" : [ "integer", "null" ],
+            "format" : "int64",
+            "description" : "Absent, with the reason, where the lag is not known."
+          },
+          "reason" : {
+            "type" : [ "string", "null" ]
+          }
+        },
+        "required" : [ "partition" ]
+      },
+      "GroupTopic" : {
+        "type" : "object",
+        "properties" : {
+          "topic" : {
+            "type" : "string"
+          },
+          "deleted" : {
+            "type" : "boolean",
+            "description" : "The group has offsets on a topic that no longer exists."
+          },
+          "partitions" : {
+            "type" : "array",
+            "description" : "Slowest first.",
+            "items" : {
+              "$ref" : "#/components/schemas/GroupPartitionLag"
+            }
+          }
+        },
+        "required" : [ "deleted", "partitions", "topic" ]
+      },
+      "BrokerQuorum" : {
+        "type" : "object",
+        "properties" : {
+          "available" : {
+            "type" : "boolean",
+            "description" : "False on a ZooKeeper-mode cluster."
+          },
+          "reason" : {
+            "type" : [ "string", "null" ]
+          },
+          "leader" : {
+            "type" : [ "string", "null" ]
+          },
+          "voters" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/QuorumVoter"
+            }
+          },
+          "majority" : {
+            "type" : "boolean",
+            "description" : "Whether the voters that are caught up are a majority."
+          }
+        },
+        "required" : [ "available", "majority", "voters" ]
+      },
+      "BrokerRow" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string"
+          },
+          "rack" : {
+            "type" : [ "string", "null" ]
+          },
+          "address" : {
+            "type" : [ "string", "null" ]
+          },
+          "reachable" : {
+            "type" : "boolean",
+            "description" : "Whether Rahdar reaches it on the address it advertises."
+          },
+          "reason" : {
+            "type" : [ "string", "null" ],
+            "description" : "Why it is not reachable or not serving."
+          },
+          "leaders" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "underReplicated" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "offline" : {
+            "type" : "integer",
+            "format" : "int64",
+            "description" : "Partitions it replicates that have no leader."
+          }
+        },
+        "required" : [ "id", "leaders", "offline", "reachable", "underReplicated" ]
+      },
+      "Brokers" : {
+        "type" : "object",
+        "properties" : {
+          "mode" : {
+            "type" : "string",
+            "description" : "KRaft or ZooKeeper."
+          },
+          "brokers" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/BrokerRow"
+            }
+          },
+          "quorum" : {
+            "$ref" : "#/components/schemas/BrokerQuorum"
+          }
+        },
+        "required" : [ "brokers", "mode", "quorum" ]
+      },
+      "QuorumVoter" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string"
+          },
+          "lag" : {
+            "type" : [ "integer", "null" ],
+            "format" : "int64",
+            "description" : "Records behind the quorum leader."
+          },
+          "caughtUp" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "caughtUp", "id" ]
+      },
+      "AclPage" : {
+        "type" : "object",
+        "properties" : {
+          "available" : {
+            "type" : "boolean",
+            "description" : "False where the cluster has no authorizer."
+          },
+          "reason" : {
+            "type" : [ "string", "null" ]
+          },
+          "items" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/Acl"
+            }
+          },
+          "next" : {
+            "type" : [ "string", "null" ]
+          }
+        },
+        "required" : [ "available", "items" ]
       },
       "FlowBrokerNodeView" : {
         "type" : "object",
@@ -35749,8 +39634,8 @@
             "description" : "The id of the resource's kind, such as artemis.queue."
           },
           "kindLabel" : {
-            "type" : "string",
-            "description" : "The kind's name for people, such as Queue."
+            "$ref" : "#/components/schemas/KindName",
+            "description" : "The kind's name for people, singular and plural."
           },
           "name" : {
             "type" : "string"
@@ -35783,7 +39668,8 @@
               "$ref" : "#/components/schemas/TeamRef"
             }, {
               "type" : "null"
-            } ]
+            } ],
+            "description" : "The team whose patterns own this destination; null when none does."
           }
         },
         "required" : [ "allowedActions", "delivery", "id", "kind", "kindLabel", "messageCount", "name", "nodeId", "nodeName", "subscriptionCount" ]
@@ -35827,11 +39713,12 @@
             "type" : "string"
           },
           "depth" : {
-            "type" : "integer",
-            "format" : "int64"
+            "type" : [ "integer", "null" ],
+            "format" : "int64",
+            "description" : "Null when the node reported no depth: unknown, not empty."
           }
         },
-        "required" : [ "depth", "nodeId", "nodeName" ]
+        "required" : [ "nodeId", "nodeName" ]
       },
       "DeadLetterDestination" : {
         "type" : "object",
@@ -35845,8 +39732,8 @@
             "description" : "The id of its kind, such as artemis.address."
           },
           "kindLabel" : {
-            "type" : "string",
-            "description" : "The kind's name for people, such as Address."
+            "$ref" : "#/components/schemas/KindName",
+            "description" : "The kind's name for people, singular and plural."
           },
           "name" : {
             "type" : "string"
@@ -35876,8 +39763,8 @@
             "description" : "The id of its kind, such as artemis.queue."
           },
           "kindLabel" : {
-            "type" : "string",
-            "description" : "The kind's name for people, such as Queue."
+            "$ref" : "#/components/schemas/KindName",
+            "description" : "The kind's name for people, singular and plural."
           },
           "name" : {
             "type" : "string"
@@ -35887,8 +39774,14 @@
             "description" : "The id of the destination it is bound to."
           },
           "totalDepth" : {
+            "type" : [ "integer", "null" ],
+            "format" : "int64",
+            "description" : "The depth over the nodes that reported one; null when none did."
+          },
+          "unknownDepthNodes" : {
             "type" : "integer",
-            "format" : "int64"
+            "format" : "int32",
+            "description" : "How many nodes reported no depth, which the total leaves out rather than counts as 0."
           },
           "perNode" : {
             "type" : "array",
@@ -35897,7 +39790,7 @@
             }
           }
         },
-        "required" : [ "destination", "id", "kind", "kindLabel", "name", "perNode", "totalDepth" ]
+        "required" : [ "destination", "id", "kind", "kindLabel", "name", "perNode", "unknownDepthNodes" ]
       },
       "DeadLetterView" : {
         "type" : "object",
@@ -35933,8 +39826,8 @@
             "description" : "The id of the resource's kind, such as artemis.queue."
           },
           "kindLabel" : {
-            "type" : "string",
-            "description" : "The kind's name for people, such as Queue."
+            "$ref" : "#/components/schemas/KindName",
+            "description" : "The kind's name for people, singular and plural."
           },
           "channel" : {
             "type" : [ "string", "null" ],
@@ -36018,8 +39911,8 @@
             "description" : "The id of the subscription's kind, such as artemis.queue."
           },
           "kindLabel" : {
-            "type" : "string",
-            "description" : "The kind's name for people, such as Queue."
+            "$ref" : "#/components/schemas/KindName",
+            "description" : "The kind's name for people, singular and plural."
           },
           "verdict" : {
             "type" : "string",
@@ -36157,8 +40050,8 @@
             "description" : "The id of the resource's kind, such as artemis.queue."
           },
           "kindLabel" : {
-            "type" : "string",
-            "description" : "The kind's name for people, such as Queue."
+            "$ref" : "#/components/schemas/KindName",
+            "description" : "The kind's name for people, singular and plural."
           },
           "remoteAddress" : {
             "type" : [ "string", "null" ]
@@ -36233,8 +40126,8 @@
             "description" : "The id of the resource's kind, such as artemis.queue."
           },
           "kindLabel" : {
-            "type" : "string",
-            "description" : "The kind's name for people, such as Queue."
+            "$ref" : "#/components/schemas/KindName",
+            "description" : "The kind's name for people, singular and plural."
           },
           "connection" : {
             "type" : [ "string", "null" ],
@@ -36600,7 +40493,8 @@
               "$ref" : "#/components/schemas/ConfigRolesSource"
             }, {
               "type" : "null"
-            } ]
+            } ],
+            "description" : "For a security setting: where the prefilled roles came from. Null for any other recommendation"
           },
           "keys" : {
             "type" : "array",

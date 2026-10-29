@@ -740,7 +740,23 @@ class BrokerConfigServiceTest {
 
     private static QueueSnapshot snapshot(String queue, String address, String routingType, boolean durable) {
         return new QueueSnapshot(
-                CLUSTER, NODE_A, queue, address, routingType, durable, false, Instant.now(), 0, 0, 0, 0, 0, 0, 0);
+                CLUSTER,
+                NODE_A,
+                queue,
+                address,
+                routingType,
+                durable,
+                false,
+                Instant.now(),
+                0L,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                "artemis.queue",
+                Map.of());
     }
 
     @Test

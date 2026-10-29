@@ -25,6 +25,7 @@ import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterR
 import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshotUpsert;
 import io.github.sudoitir.rahdar.support.FixtureJolokia;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisModule;
 import java.net.CookieManager;
 import java.net.HttpCookie;
 import java.net.URI;
@@ -99,14 +100,29 @@ class ResourceIdRoutingTest extends PostgresIntegrationTest {
 
     @BeforeEach
     void setUp() throws Exception {
-        clusterId = clusters.save(new ClusterEntity("c-" + UUID.randomUUID(), null, null))
+        clusterId = clusters.save(new ClusterEntity(ArtemisModule.SYSTEM, "c-" + UUID.randomUUID(), null, null))
                 .getId();
         BrokerNodeEntity node = BrokerNodeEntity.fromSeed(
                 clusterId, "node-a", "PRIMARY", UUID.randomUUID().toString());
         node.attachSeedUrl("http://localhost:8161/console/jolokia");
         UUID nodeId = nodes.save(node).getId();
         upsert.upsertBatch(List.of(new QueueRow(
-                clusterId, nodeId, "orders.addr", NAME, "ANYCAST", true, 3, 1, 0, 0, 0, 0, 0, false, "artemis.queue")));
+                clusterId,
+                nodeId,
+                "orders.addr",
+                NAME,
+                "ANYCAST",
+                true,
+                3L,
+                1,
+                0,
+                0,
+                0,
+                0,
+                0,
+                false,
+                "artemis.queue",
+                Map.of())));
         ClusterConnection connection = FixtureJolokia.cluster(Map.of(nodeId, new FixtureJolokia()));
         when(gateway.cluster(clusterId)).thenReturn(connection);
 

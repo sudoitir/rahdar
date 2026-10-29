@@ -44,6 +44,7 @@ import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshotUpsert;
 import io.github.sudoitir.rahdar.support.AdminAuthenticationExtension;
 import io.github.sudoitir.rahdar.support.ArtemisIntegrationTest;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
+import io.github.sudoitir.rahdar.support.Registrations;
 import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
 import io.github.sudoitir.rahdar.system.artemis.DivertOperations;
 import io.github.sudoitir.rahdar.system.artemis.MBeanNames;
@@ -182,7 +183,7 @@ class PluginMessagingRealBrokerTest extends PostgresIntegrationTest {
 
     @BeforeEach
     void setUp() throws Exception {
-        var attempt = clusterService.register(new RegisterClusterRequest(
+        var attempt = clusterService.register(Registrations.artemis(
                 List.of(ArtemisIntegrationTest.jolokiaUrl()),
                 "plugin-messaging-" + run,
                 null,
@@ -234,7 +235,12 @@ class PluginMessagingRealBrokerTest extends PostgresIntegrationTest {
         String plugin = activate("tap");
         MessageRegistration reg = messaging(plugin)
                 .register(new RegistrationSpec(
-                        "orders", clusterId, ResourceRef.subscription(queue), RegistrationMode.TAP, 1, operator));
+                        "orders",
+                        clusterId,
+                        SubscriptionId.of("artemis.queue", queue),
+                        RegistrationMode.TAP,
+                        1,
+                        operator));
         assertThat(reg.state()).isEqualTo(RegistrationState.ACTIVE);
         assertThat(tapQueues()).hasSize(1);
 
@@ -263,7 +269,12 @@ class PluginMessagingRealBrokerTest extends PostgresIntegrationTest {
         MessagingProbe.GATE.put(plugin, new Semaphore(0));
         messaging(plugin)
                 .register(new RegistrationSpec(
-                        "slow", clusterId, ResourceRef.subscription(queue), RegistrationMode.TAP, 1, operator));
+                        "slow",
+                        clusterId,
+                        SubscriptionId.of("artemis.queue", queue),
+                        RegistrationMode.TAP,
+                        1,
+                        operator));
 
         long started = System.nanoTime();
         send(queue, 100, 64 * 1024);
@@ -284,7 +295,12 @@ class PluginMessagingRealBrokerTest extends PostgresIntegrationTest {
         MessagingProbe.ANSWER.put(plugin, Disposition.REJECT);
         messaging(plugin)
                 .register(new RegistrationSpec(
-                        "work", clusterId, ResourceRef.subscription(queue), RegistrationMode.CONSUME, 1, operator));
+                        "work",
+                        clusterId,
+                        SubscriptionId.of("artemis.queue", queue),
+                        RegistrationMode.CONSUME,
+                        1,
+                        operator));
 
         send(queue, 1, 16);
         PluginMessage first = MessagingProbe.inbox(plugin).poll(10, TimeUnit.SECONDS);
@@ -313,7 +329,12 @@ class PluginMessagingRealBrokerTest extends PostgresIntegrationTest {
         });
         messaging(plugin)
                 .register(new RegistrationSpec(
-                        "work", clusterId, ResourceRef.subscription(queue), RegistrationMode.CONSUME, 1, operator));
+                        "work",
+                        clusterId,
+                        SubscriptionId.of("artemis.queue", queue),
+                        RegistrationMode.CONSUME,
+                        1,
+                        operator));
 
         send(queue, 1, 16);
 
@@ -333,7 +354,12 @@ class PluginMessagingRealBrokerTest extends PostgresIntegrationTest {
         MessagingProbe.ANSWER.put(plugin, Disposition.RELEASE);
         messaging(plugin)
                 .register(new RegistrationSpec(
-                        "work", clusterId, ResourceRef.subscription(queue), RegistrationMode.CONSUME, 1, operator));
+                        "work",
+                        clusterId,
+                        SubscriptionId.of("artemis.queue", queue),
+                        RegistrationMode.CONSUME,
+                        1,
+                        operator));
 
         send(queue, 1, 16);
         for (int i = 0; i < DELIVERY_ATTEMPTS + 5; i++) {
@@ -352,7 +378,12 @@ class PluginMessagingRealBrokerTest extends PostgresIntegrationTest {
         MessagingProbe.ANSWER.put(plugin, Disposition.REJECT);
         messaging(plugin)
                 .register(new RegistrationSpec(
-                        "work", clusterId, ResourceRef.subscription(queue), RegistrationMode.CONSUME, 1, operator));
+                        "work",
+                        clusterId,
+                        SubscriptionId.of("artemis.queue", queue),
+                        RegistrationMode.CONSUME,
+                        1,
+                        operator));
 
         send(queue, 1, 16);
         int last = 0;
@@ -371,7 +402,12 @@ class PluginMessagingRealBrokerTest extends PostgresIntegrationTest {
         MessagingProbe.GATE.put(plugin, gate);
         messaging(plugin)
                 .register(new RegistrationSpec(
-                        "work", clusterId, ResourceRef.subscription(queue), RegistrationMode.CONSUME, 1, operator));
+                        "work",
+                        clusterId,
+                        SubscriptionId.of("artemis.queue", queue),
+                        RegistrationMode.CONSUME,
+                        1,
+                        operator));
         send(queue, 2, 16);
         assertThat(MessagingProbe.inbox(plugin).poll(10, TimeUnit.SECONDS)).isNotNull();
 
@@ -392,7 +428,12 @@ class PluginMessagingRealBrokerTest extends PostgresIntegrationTest {
         String again = activate("stop2");
         messaging(again)
                 .register(new RegistrationSpec(
-                        "work", clusterId, ResourceRef.subscription(queue), RegistrationMode.CONSUME, 1, operator));
+                        "work",
+                        clusterId,
+                        SubscriptionId.of("artemis.queue", queue),
+                        RegistrationMode.CONSUME,
+                        1,
+                        operator));
         PluginMessage redelivered = MessagingProbe.inbox(again).poll(10, TimeUnit.SECONDS);
         assertThat(redelivered).isNotNull();
         awaitQueueCount(queue, 0);
@@ -408,10 +449,20 @@ class PluginMessagingRealBrokerTest extends PostgresIntegrationTest {
         MessagingProbe.GATE.put(plugin, gate);
         messaging(plugin)
                 .register(new RegistrationSpec(
-                        "work", clusterId, ResourceRef.subscription(queue), RegistrationMode.CONSUME, 2, operator));
+                        "work",
+                        clusterId,
+                        SubscriptionId.of("artemis.queue", queue),
+                        RegistrationMode.CONSUME,
+                        2,
+                        operator));
         MessageRegistration reg = messaging(plugin)
                 .register(new RegistrationSpec(
-                        "work", clusterId, ResourceRef.subscription(queue), RegistrationMode.CONSUME, 4, operator));
+                        "work",
+                        clusterId,
+                        SubscriptionId.of("artemis.queue", queue),
+                        RegistrationMode.CONSUME,
+                        4,
+                        operator));
         assertThat(reg.concurrency()).isEqualTo(4);
         assertThat(reg.state()).isEqualTo(RegistrationState.ACTIVE);
 
@@ -437,7 +488,12 @@ class PluginMessagingRealBrokerTest extends PostgresIntegrationTest {
         MessagingProbe.GATE.put(plugin, gate);
         messaging(plugin)
                 .register(new RegistrationSpec(
-                        "work", clusterId, ResourceRef.subscription(queue), RegistrationMode.CONSUME, 3, operator));
+                        "work",
+                        clusterId,
+                        SubscriptionId.of("artemis.queue", queue),
+                        RegistrationMode.CONSUME,
+                        3,
+                        operator));
 
         send(queue, 100, 16);
         for (int i = 0; i < 3; i++) {
@@ -462,7 +518,12 @@ class PluginMessagingRealBrokerTest extends PostgresIntegrationTest {
         MessagingProbe.GATE.put(plugin, gate);
         messaging(plugin)
                 .register(new RegistrationSpec(
-                        "work", clusterId, ResourceRef.subscription(queue), RegistrationMode.CONSUME, 4, operator));
+                        "work",
+                        clusterId,
+                        SubscriptionId.of("artemis.queue", queue),
+                        RegistrationMode.CONSUME,
+                        4,
+                        operator));
 
         try (Session session = jms.createSession(false, Session.AUTO_ACKNOWLEDGE)) {
             MessageProducer producer = session.createProducer(session.createQueue(queue));
@@ -507,7 +568,7 @@ class PluginMessagingRealBrokerTest extends PostgresIntegrationTest {
                     .register(new RegistrationSpec(
                             "work" + i,
                             clusterId,
-                            ResourceRef.subscription(queue),
+                            SubscriptionId.of("artemis.queue", queue),
                             RegistrationMode.CONSUME,
                             32,
                             operator));
@@ -529,7 +590,7 @@ class PluginMessagingRealBrokerTest extends PostgresIntegrationTest {
                 captured,
                 "ANYCAST",
                 true,
-                0,
+                0L,
                 0,
                 0,
                 0,
@@ -537,7 +598,8 @@ class PluginMessagingRealBrokerTest extends PostgresIntegrationTest {
                 0,
                 0,
                 false,
-                "artemis.queue")));
+                "artemis.queue",
+                Map.of())));
         UUID subscription = indexes.create(
                         clusterId,
                         new MessageIndexService.Spec(
@@ -563,11 +625,11 @@ class PluginMessagingRealBrokerTest extends PostgresIntegrationTest {
         String queue = queue("RANGE");
         PluginMessaging messaging = messaging(activate("range"));
         RegistrationSpec none = new RegistrationSpec(
-                "x", clusterId, ResourceRef.subscription(queue), RegistrationMode.CONSUME, 0, operator);
+                "x", clusterId, SubscriptionId.of("artemis.queue", queue), RegistrationMode.CONSUME, 0, operator);
         RegistrationSpec tooMany = new RegistrationSpec(
-                "x", clusterId, ResourceRef.subscription(queue), RegistrationMode.CONSUME, 33, operator);
+                "x", clusterId, SubscriptionId.of("artemis.queue", queue), RegistrationMode.CONSUME, 33, operator);
         RegistrationSpec tapped = new RegistrationSpec(
-                "x", clusterId, ResourceRef.subscription(queue), RegistrationMode.TAP, 2, operator);
+                "x", clusterId, SubscriptionId.of("artemis.queue", queue), RegistrationMode.TAP, 2, operator);
         assertThatThrownBy(() -> messaging.register(none))
                 .isInstanceOf(RegistrationRefusedException.class)
                 .hasMessageContaining("1 to 32");
@@ -698,7 +760,12 @@ class PluginMessagingRealBrokerTest extends PostgresIntegrationTest {
         String plugin = activate("gone");
         messaging(plugin)
                 .register(new RegistrationSpec(
-                        "orders", clusterId, ResourceRef.subscription(queue), RegistrationMode.TAP, 1, operator));
+                        "orders",
+                        clusterId,
+                        SubscriptionId.of("artemis.queue", queue),
+                        RegistrationMode.TAP,
+                        1,
+                        operator));
         assertThat(tapQueues()).hasSize(1);
         PluginMessaging handle = messaging(plugin);
 
@@ -723,7 +790,12 @@ class PluginMessagingRealBrokerTest extends PostgresIntegrationTest {
         String plugin = activate("unreg");
         messaging(plugin)
                 .register(new RegistrationSpec(
-                        "orders", clusterId, ResourceRef.subscription(queue), RegistrationMode.TAP, 1, operator));
+                        "orders",
+                        clusterId,
+                        SubscriptionId.of("artemis.queue", queue),
+                        RegistrationMode.TAP,
+                        1,
+                        operator));
         assertThat(tapQueues()).hasSize(1);
         assertThat(messaging(plugin).unregister("orders")).isTrue();
         assertThat(tapQueues()).isEmpty();
@@ -741,7 +813,12 @@ class PluginMessagingRealBrokerTest extends PostgresIntegrationTest {
         Thread pass = holdTheLock(Duration.ofSeconds(2));
         MessageRegistration reg = messaging(plugin)
                 .register(new RegistrationSpec(
-                        "orders", clusterId, ResourceRef.subscription(queue), RegistrationMode.TAP, 1, operator));
+                        "orders",
+                        clusterId,
+                        SubscriptionId.of("artemis.queue", queue),
+                        RegistrationMode.TAP,
+                        1,
+                        operator));
         pass.join();
         assertThat(reg.state()).isEqualTo(RegistrationState.ACTIVE);
         assertThat(tapQueues()).hasSize(1);
@@ -757,7 +834,12 @@ class PluginMessagingRealBrokerTest extends PostgresIntegrationTest {
         String plugin = activate("busyoff");
         messaging(plugin)
                 .register(new RegistrationSpec(
-                        "orders", clusterId, ResourceRef.subscription(queue), RegistrationMode.TAP, 1, operator));
+                        "orders",
+                        clusterId,
+                        SubscriptionId.of("artemis.queue", queue),
+                        RegistrationMode.TAP,
+                        1,
+                        operator));
         Thread pass = holdTheLock(Duration.ofSeconds(2));
         assertThat(messaging(plugin).unregister("orders")).isTrue();
         pass.join();
@@ -773,16 +855,26 @@ class PluginMessagingRealBrokerTest extends PostgresIntegrationTest {
         String plugin = activate("move");
         messaging(plugin)
                 .register(new RegistrationSpec(
-                        "orders", clusterId, ResourceRef.subscription(first), RegistrationMode.TAP, 1, operator));
+                        "orders",
+                        clusterId,
+                        SubscriptionId.of("artemis.queue", first),
+                        RegistrationMode.TAP,
+                        1,
+                        operator));
         MessageRegistration moved = messaging(plugin)
                 .register(new RegistrationSpec(
-                        "orders", clusterId, ResourceRef.subscription(second), RegistrationMode.TAP, 1, operator));
+                        "orders",
+                        clusterId,
+                        SubscriptionId.of("artemis.queue", second),
+                        RegistrationMode.TAP,
+                        1,
+                        operator));
 
         assertThat(moved.state()).isEqualTo(RegistrationState.ACTIVE);
         assertThat(tapQueues()).hasSize(1);
         assertThat(messaging(plugin).registrations())
                 .singleElement()
-                .satisfies(r -> assertThat(r.source().name()).isEqualTo(second));
+                .satisfies(r -> assertThat(r.source().path()).isEqualTo(second));
     }
 
     /** Holds the cluster's plugin messaging lock for {@code hold}, as a pass would; returns once it is held. */
@@ -809,7 +901,12 @@ class PluginMessagingRealBrokerTest extends PostgresIntegrationTest {
         UUID reader = user(Set.of("message:read"));
         messaging(plugin)
                 .register(new RegistrationSpec(
-                        "orders", clusterId, ResourceRef.subscription(queue), RegistrationMode.TAP, 1, reader));
+                        "orders",
+                        clusterId,
+                        SubscriptionId.of("artemis.queue", queue),
+                        RegistrationMode.TAP,
+                        1,
+                        reader));
         assertThat(tapQueues()).hasSize(1);
 
         List<UserRoleEntity> grants = tx.execute(s -> userRoles.findByIdUserId(reader));
@@ -841,12 +938,17 @@ class PluginMessagingRealBrokerTest extends PostgresIntegrationTest {
         PluginMessaging messaging = messaging(activate("deny"));
         UUID nobody = user(Set.of());
         UUID reader = user(Set.of("message:read"));
-        RegistrationSpec unreadable =
-                new RegistrationSpec("x", clusterId, ResourceRef.subscription(queue), RegistrationMode.TAP, 1, nobody);
+        RegistrationSpec unreadable = new RegistrationSpec(
+                "x", clusterId, SubscriptionId.of("artemis.queue", queue), RegistrationMode.TAP, 1, nobody);
         RegistrationSpec unpurgeable = new RegistrationSpec(
-                "x", clusterId, ResourceRef.subscription(queue), RegistrationMode.CONSUME, 1, reader);
+                "x", clusterId, SubscriptionId.of("artemis.queue", queue), RegistrationMode.CONSUME, 1, reader);
         RegistrationSpec reserved = new RegistrationSpec(
-                "x", clusterId, ResourceRef.subscription("rahdar.capture.abc"), RegistrationMode.TAP, 1, operator);
+                "x",
+                clusterId,
+                SubscriptionId.of("artemis.queue", "rahdar.capture.abc"),
+                RegistrationMode.TAP,
+                1,
+                operator);
         assertThatThrownBy(() -> messaging.register(unreadable))
                 .isInstanceOf(RegistrationRefusedException.class)
                 .hasMessageContaining("message:read");
@@ -867,16 +969,26 @@ class PluginMessagingRealBrokerTest extends PostgresIntegrationTest {
         String b = activate("isob");
         messaging(a)
                 .register(new RegistrationSpec(
-                        "same", clusterId, ResourceRef.subscription(queueA), RegistrationMode.TAP, 1, operator));
+                        "same",
+                        clusterId,
+                        SubscriptionId.of("artemis.queue", queueA),
+                        RegistrationMode.TAP,
+                        1,
+                        operator));
         messaging(b)
                 .register(new RegistrationSpec(
-                        "same", clusterId, ResourceRef.subscription(queueB), RegistrationMode.TAP, 1, operator));
+                        "same",
+                        clusterId,
+                        SubscriptionId.of("artemis.queue", queueB),
+                        RegistrationMode.TAP,
+                        1,
+                        operator));
 
         assertThat(messaging(a).registrations())
-                .extracting(r -> r.source().name())
+                .extracting(r -> r.source().segments().getFirst())
                 .containsExactly(queueA);
         assertThat(messaging(b).registrations())
-                .extracting(r -> r.source().name())
+                .extracting(r -> r.source().segments().getFirst())
                 .containsExactly(queueB);
 
         send(queueA, 1, 16);

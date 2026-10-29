@@ -25,6 +25,8 @@ import io.github.sudoitir.openbroker.messaging.MessageField;
 import io.github.sudoitir.openbroker.messaging.MessageFilter;
 import io.github.sudoitir.openbroker.messaging.MessageRef;
 import io.github.sudoitir.openbroker.messaging.OutboundMessage;
+import io.github.sudoitir.openbroker.messaging.Position;
+import io.github.sudoitir.openbroker.model.PartitionId;
 import io.github.sudoitir.openbroker.model.ResourceId;
 import io.github.sudoitir.openbroker.model.Shard;
 import io.github.sudoitir.rahdar.feature.messages.MessageActionParams.MessageDeleteParams;
@@ -39,6 +41,7 @@ import io.github.sudoitir.rahdar.feature.messages.web.MessageViews.MessageDetail
 import io.github.sudoitir.rahdar.feature.messages.web.MessageViews.MessagePageView;
 import io.github.sudoitir.rahdar.kernel.audit.AuditEvent;
 import io.github.sudoitir.rahdar.kernel.audit.AuditService;
+import io.github.sudoitir.rahdar.kernel.core.ConflictException;
 import io.github.sudoitir.rahdar.kernel.core.NotFoundException;
 import io.github.sudoitir.rahdar.kernel.gate.Operation;
 import io.github.sudoitir.rahdar.kernel.gate.OperationGate;
@@ -61,9 +64,12 @@ import io.github.sudoitir.rahdar.platform.broker.BrowsePage;
 import io.github.sudoitir.rahdar.platform.broker.BrowsedMessage;
 import io.github.sudoitir.rahdar.platform.broker.BulkCapExceededException;
 import io.github.sudoitir.rahdar.platform.broker.BulkResult;
+import io.github.sudoitir.rahdar.platform.broker.LogBounds;
+import io.github.sudoitir.rahdar.platform.broker.LogPage;
 import io.github.sudoitir.rahdar.platform.broker.MessageExpiry;
 import io.github.sudoitir.rahdar.platform.broker.MessageKind;
 import io.github.sudoitir.rahdar.platform.broker.SendInDoubtException;
+import io.github.sudoitir.rahdar.platform.broker.SystemExtensions;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
 import io.github.sudoitir.rahdar.platform.governance.ClearViewAudit;
@@ -113,6 +119,8 @@ class MessageServiceTest {
     private final ContentPolicy policy = mock(ContentPolicy.class);
     private final ClearViewAudit clearViews = mock(ClearViewAudit.class);
     private final OperationGate gate = mock(OperationGate.class);
+    private final SystemExtensions extensions = mock(SystemExtensions.class);
+    private final LogBounds logBounds = mock(LogBounds.class);
     private final AuditEvent event = mock(AuditEvent.class);
     private final ClusterNode nodeA = node(NODE_A, "node-a", "http://a/jolokia", "tcp://a", true);
     private final ClusterNode nodeB = node(NODE_B, "node-b", "http://b/jolokia", "tcp://b", true);
@@ -125,14 +133,26 @@ class MessageServiceTest {
         // No provider is armed: the gate runs every action as it is.
         when(gate.run(any(), any())).thenAnswer(call -> ((Supplier<Object>) call.getArgument(1)).get());
         service = new MessageService(
-                locator, directory, messages, expiry, audit, actors, settings, hub, access, policy, clearViews, gate);
+                locator,
+                directory,
+                messages,
+                expiry,
+                audit,
+                actors,
+                settings,
+                hub,
+                access,
+                policy,
+                clearViews,
+                gate,
+                extensions);
         when(locator.locate(CLUSTER, "target"))
-                .thenReturn(List.of(new QueueLocation(NODE_A, "target", "target", "ANYCAST", 1)));
-        when(locator.locate(CLUSTER, "t")).thenReturn(List.of(new QueueLocation(NODE_A, "t", "t", "ANYCAST", 1)));
+                .thenReturn(List.of(new QueueLocation(NODE_A, "target", "target", "ANYCAST", 1L)));
+        when(locator.locate(CLUSTER, "t")).thenReturn(List.of(new QueueLocation(NODE_A, "t", "t", "ANYCAST", 1L)));
         when(locator.locate(CLUSTER, "orders"))
                 .thenReturn(List.of(
-                        new QueueLocation(NODE_A, "orders", "orders.addr", "ANYCAST", 5),
-                        new QueueLocation(NODE_B, "orders", "orders.addr", "ANYCAST", 50)));
+                        new QueueLocation(NODE_A, "orders", "orders.addr", "ANYCAST", 5L),
+                        new QueueLocation(NODE_B, "orders", "orders.addr", "ANYCAST", 50L)));
         when(directory.nodes(CLUSTER)).thenReturn(List.of(nodeA, nodeB));
         when(actors.resolve()).thenReturn(new Actor("alice", "127.0.0.1", "req", null));
         when(audit.begin(any(), anyString(), anyString(), anyString(), any(), any(), any(), any(Boolean.class)))
@@ -204,6 +224,24 @@ class MessageServiceTest {
     }
 
     // ---- browse and detail ------------------------------------------------------
+
+    @Test
+    void everyPerRecordActionOnALogIsRefusedWithTheSystemsReasonBeforeAnyBrokerCall() {
+        when(messages.unavailableBecause(eq(CLUSTER), anyString()))
+                .thenReturn(Optional.of("A partitioned log is append-only."));
+
+        MessageActionRequest one = ids(1L);
+        for (MessageAction action : MessageAction.values()) {
+            for (boolean dryRun : new boolean[] {true, false}) {
+                assertThatThrownBy(() -> service.execute(CLUSTER, "orders", null, action, one, dryRun, false))
+                        .isInstanceOf(ConflictException.class)
+                        .hasMessageContaining("append-only");
+            }
+        }
+
+        verify(messages, never()).count(any(), any(), any(), any());
+        verify(access, never()).requireAll(any(), any());
+    }
 
     @Test
     void browseReadsTheBusiestNode() {
@@ -885,7 +923,7 @@ class MessageServiceTest {
     @Test
     void movingNeedsMessageMoveOnTheSourceAndMessageSendOnTheTargetsAddress() {
         when(locator.locate(CLUSTER, "billing"))
-                .thenReturn(List.of(new QueueLocation(NODE_A, "billing", "billing.addr", "ANYCAST", 1)));
+                .thenReturn(List.of(new QueueLocation(NODE_A, "billing", "billing.addr", "ANYCAST", 1L)));
 
         service.execute(CLUSTER, "orders", null, MessageAction.MOVE, filter("f", "billing"), true, false);
 
@@ -1144,6 +1182,162 @@ class MessageServiceTest {
         }
         when(messages.countBy(CLUSTER, NODE_B, "orders", MessageField.header("origin")))
                 .thenReturn(byOrigin);
+    }
+
+    // ---- a partition of a log -------------------------------------------------------------------------
+
+    private static final ResourceId TOPIC = ResourceId.of("kafka.topic", "orders");
+
+    private void logOf(long start, long end, LogPage page) {
+        when(extensions.require(CLUSTER, LogBounds.class)).thenReturn(logBounds);
+        when(logBounds.of(CLUSTER, TOPIC, 0)).thenReturn(new LogBounds.Bounds(start, end));
+        when(messages.browseLog(eq(CLUSTER), eq(TOPIC), eq(0), any(), anyInt(), any()))
+                .thenReturn(page);
+    }
+
+    private static LogPage.LogRecord record(long offset, boolean tombstone) {
+        return new LogPage.LogRecord(message(offset, tombstone ? "" : "v" + offset, BodyEncoding.TEXT), tombstone, "k");
+    }
+
+    private Position positionOfTheLogRead() {
+        ArgumentCaptor<Position> at = ArgumentCaptor.forClass(Position.class);
+        verify(messages).browseLog(eq(CLUSTER), eq(TOPIC), eq(0), at.capture(), anyInt(), any());
+        return at.getValue();
+    }
+
+    private static Position.AtOffsets at(long offset) {
+        return new Position.AtOffsets(Map.of(Shard.partition(PartitionId.of("0")), offset));
+    }
+
+    @Test
+    void anOffsetBeforeTheStartIsReadFromTheStartAndSaysRetentionMovedIt() {
+        logOf(100, 200, new LogPage(List.of(record(100, false)), 101L));
+
+        MessagePageView page =
+                service.browseLog(CLUSTER, TOPIC, 0, MessageService.LogStart.parse("offset", "40"), null, 50);
+
+        assertThat(positionOfTheLogRead()).isEqualTo(at(100));
+        assertThat(page.log().retentionMoved()).isTrue();
+        assertThat(page.log().start()).isEqualTo(100);
+        assertThat(page.log().end()).isEqualTo(200);
+        assertThat(page.log().next()).isEqualTo(101L);
+        assertThat(page.log().uncommittedHidden()).isTrue();
+        assertThat(page.hasNext()).isTrue();
+        assertThat(page.node()).isNull();
+    }
+
+    @Test
+    void anOffsetPastTheEndIsAnEmptyPageThatStatesTheEnd() {
+        logOf(0, 120, new LogPage(List.of(), null));
+
+        MessagePageView page =
+                service.browseLog(CLUSTER, TOPIC, 0, MessageService.LogStart.parse("offset", "500"), null, 50);
+
+        assertThat(page.data()).isEmpty();
+        assertThat(page.log().end()).isEqualTo(120);
+        assertThat(page.log().retentionMoved()).isFalse();
+        assertThat(page.hasNext()).isFalse();
+        verify(messages, never()).browseLog(any(), any(), anyInt(), any(), anyInt(), any());
+    }
+
+    @Test
+    void latestIsTheLastPage() {
+        logOf(0, 120, new LogPage(List.of(record(70, false)), null));
+
+        service.browseLog(CLUSTER, TOPIC, 0, MessageService.LogStart.parse("latest", null), null, 50);
+
+        assertThat(positionOfTheLogRead()).isEqualTo(at(70));
+    }
+
+    @Test
+    void aTimeIsAskedOfTheBrokerAndATombstoneSaysSo() {
+        logOf(0, 120, new LogPage(List.of(record(7, true)), null));
+
+        MessagePageView page = service.browseLog(
+                CLUSTER, TOPIC, 0, MessageService.LogStart.parse("time", "2026-10-01T00:00:00Z"), null, 50);
+
+        assertThat(positionOfTheLogRead())
+                .isEqualTo(new Position.AtTime(java.time.Instant.parse("2026-10-01T00:00:00Z")));
+        assertThat(page.data()).singleElement().satisfies(row -> {
+            assertThat(row.tombstone()).isTrue();
+            assertThat(row.key()).isEqualTo("k");
+            assertThat(row.position()).isEqualTo("7");
+        });
+    }
+
+    @Test
+    void aStartTimeInTheFutureIsRefusedWithTheReason() {
+        logOf(0, 120, new LogPage(List.of(), null));
+
+        MessageService.LogStart future = MessageService.LogStart.parse("time", "2999-01-01T00:00:00Z");
+        assertThatThrownBy(() -> service.browseLog(CLUSTER, TOPIC, 0, future, null, 50))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("in the future");
+    }
+
+    @Test
+    void anEmptyPageFromATimeSaysWhenThePartitionsLastRecordIs() {
+        logOf(0, 120, new LogPage(List.of(), null));
+        when(messages.browseLog(eq(CLUSTER), eq(TOPIC), eq(0), eq(at(119)), eq(1), any()))
+                .thenReturn(new LogPage(List.of(record(119, false)), null));
+
+        MessagePageView page = service.browseLog(
+                CLUSTER, TOPIC, 0, MessageService.LogStart.parse("time", "2026-10-01T00:00:00Z"), null, 50);
+
+        assertThat(page.data()).isEmpty();
+        assertThat(page.notice())
+                .isEqualTo("No record at or after 2026-10-01T00:00:00Z; the partition's last record is at"
+                        + " 1970-01-01T00:00:01Z.");
+    }
+
+    @Test
+    void aRecordWithNoTimeIsNullNotAnEpochAndAKeyNamesItsEncoding() {
+        BrowsedMessage m = message(5, "v", BodyEncoding.TEXT);
+        BrowsedMessage untimed = new BrowsedMessage(
+                m.messageId(),
+                m.type(),
+                m.durable(),
+                m.priority(),
+                0L,
+                m.expiration(),
+                m.size(),
+                m.groupId(),
+                m.correlationId(),
+                m.replyTo(),
+                m.userId(),
+                m.body(),
+                m.bodyEncoding(),
+                m.bodyCompression(),
+                m.contentType(),
+                false,
+                null,
+                m.stringProperties(),
+                m.intProperties(),
+                m.longProperties(),
+                m.doubleProperties(),
+                m.booleanProperties());
+        logOf(
+                0,
+                120,
+                new LogPage(List.of(new LogPage.LogRecord(untimed, false, "/wD+", BodyEncoding.BASE64)), null, false));
+
+        MessagePageView page =
+                service.browseLog(CLUSTER, TOPIC, 0, MessageService.LogStart.parse("earliest", null), null, 50);
+
+        assertThat(page.data()).singleElement().satisfies(row -> {
+            assertThat(row.timestamp()).isNull();
+            assertThat(row.key()).isEqualTo("/wD+");
+            assertThat(row.keyEncoding()).isEqualTo("BASE64");
+        });
+    }
+
+    @Test
+    void aFromThatNeedsAValueWithoutOneIsRefused() {
+        assertThatThrownBy(() -> MessageService.LogStart.parse("offset", null)).hasMessageContaining("offset");
+        assertThatThrownBy(() -> MessageService.LogStart.parse("time", "yesterday"))
+                .hasMessageContaining("ISO-8601");
+        assertThatThrownBy(() -> MessageService.LogStart.parse("sideways", null))
+                .hasMessageContaining("earliest");
     }
 
     private static MessageFilter fromOrigin(String address) {

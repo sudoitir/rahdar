@@ -11,6 +11,7 @@ import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterE
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterRepository;
 import io.github.sudoitir.rahdar.support.AdminAuthenticationExtension;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisModule;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.HashMap;
@@ -54,7 +55,8 @@ class ConsumerHealthServiceTest extends PostgresIntegrationTest {
     private UUID nodeId;
 
     private void givenCluster() {
-        ClusterEntity cluster = clusters.save(new ClusterEntity("c-" + UUID.randomUUID(), null, null));
+        ClusterEntity cluster =
+                clusters.save(new ClusterEntity(ArtemisModule.SYSTEM, "c-" + UUID.randomUUID(), null, null));
         clusterId = cluster.getId();
         nodeId = nodes.save(BrokerNodeEntity.fromSeed(clusterId, "n1", "NONE", "node-1"))
                 .getId();
@@ -84,6 +86,26 @@ class ConsumerHealthServiceTest extends PostgresIntegrationTest {
         assertThat(health.verdict().known()).isFalse();
         // The distinction the whole feature exists for: unmeasured is not zero.
         assertThat(health.ackRate()).isNull();
+    }
+
+    @Test
+    void anUnavailableBacklogIsNeverCaughtUp() {
+        givenCluster();
+        jdbc.update("""
+                INSERT INTO subscription_snapshot
+                  (node_id, subscription, cluster_id, destination, kind, native_attributes,
+                   consumer_count, backlog, in_flight, paused)
+                VALUES (:n, 'orders', :c, 'orders', 'artemis.queue',
+                        '{"rahdar.backlog_reason":"no committed offsets"}',
+                        2, NULL, 0, false)
+                """, Map.of("n", nodeId, "c", clusterId));
+        // Rates that would read as healthy if the placeholder zero were taken for a backlog.
+        counterSamples("orders", 100, 200, 100, 200);
+
+        ConsumerHealth health = verdictFor("orders");
+
+        assertThat(health.verdict()).isEqualTo(Verdict.INSUFFICIENT_DATA);
+        assertThat(health.cause()).contains("no committed offsets");
     }
 
     @Test

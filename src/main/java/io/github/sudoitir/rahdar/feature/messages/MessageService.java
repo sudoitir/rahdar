@@ -6,6 +6,11 @@ import io.github.sudoitir.openbroker.messaging.MessageAction.Move;
 import io.github.sudoitir.openbroker.messaging.MessageAction.Retry;
 import io.github.sudoitir.openbroker.messaging.MessageField;
 import io.github.sudoitir.openbroker.messaging.MessageFilter;
+import io.github.sudoitir.openbroker.messaging.Position;
+import io.github.sudoitir.openbroker.model.PartitionId;
+import io.github.sudoitir.openbroker.model.ResourceId;
+import io.github.sudoitir.openbroker.model.Shard;
+import io.github.sudoitir.rahdar.feature.messages.MessageActionParams.LogPurgeParams;
 import io.github.sudoitir.rahdar.feature.messages.MessageActionParams.MessageDeleteParams;
 import io.github.sudoitir.rahdar.feature.messages.MessageActionParams.MessageExpireParams;
 import io.github.sudoitir.rahdar.feature.messages.MessageActionParams.MessageMoveParams;
@@ -13,11 +18,13 @@ import io.github.sudoitir.rahdar.feature.messages.MessageActionParams.MessageRet
 import io.github.sudoitir.rahdar.feature.messages.MessageActionParams.QueuePurgeParams;
 import io.github.sudoitir.rahdar.feature.messages.web.MessageRequests.MessageActionRequest;
 import io.github.sudoitir.rahdar.feature.messages.web.MessageRequests.SendMessageRequest;
+import io.github.sudoitir.rahdar.feature.messages.web.MessageViews.LogView;
 import io.github.sudoitir.rahdar.feature.messages.web.MessageViews.MessageDetailView;
 import io.github.sudoitir.rahdar.feature.messages.web.MessageViews.MessagePageView;
 import io.github.sudoitir.rahdar.feature.messages.web.MessageViews.MessageSummaryView;
 import io.github.sudoitir.rahdar.kernel.audit.AuditEvent;
 import io.github.sudoitir.rahdar.kernel.audit.AuditService;
+import io.github.sudoitir.rahdar.kernel.core.ConflictException;
 import io.github.sudoitir.rahdar.kernel.core.NotFoundException;
 import io.github.sudoitir.rahdar.kernel.gate.Gated;
 import io.github.sudoitir.rahdar.kernel.gate.Operation;
@@ -31,6 +38,7 @@ import io.github.sudoitir.rahdar.kernel.security.ResourceRef;
 import io.github.sudoitir.rahdar.kernel.settings.SettingsService;
 import io.github.sudoitir.rahdar.kernel.stream.SseHub;
 import io.github.sudoitir.rahdar.platform.broker.Attempt;
+import io.github.sudoitir.rahdar.platform.broker.BacklogBreakdown;
 import io.github.sudoitir.rahdar.platform.broker.BodyEncoding;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
 import io.github.sudoitir.rahdar.platform.broker.BrokerMessages;
@@ -39,11 +47,14 @@ import io.github.sudoitir.rahdar.platform.broker.BrowsePage;
 import io.github.sudoitir.rahdar.platform.broker.BrowsedMessage;
 import io.github.sudoitir.rahdar.platform.broker.BulkCapExceededException;
 import io.github.sudoitir.rahdar.platform.broker.BulkResult;
+import io.github.sudoitir.rahdar.platform.broker.LogBounds;
+import io.github.sudoitir.rahdar.platform.broker.LogPage;
 import io.github.sudoitir.rahdar.platform.broker.MessageExpiry;
 import io.github.sudoitir.rahdar.platform.broker.MessageKind;
 import io.github.sudoitir.rahdar.platform.broker.SendInDoubtException;
 import io.github.sudoitir.rahdar.platform.broker.SendNames;
 import io.github.sudoitir.rahdar.platform.broker.SentMessages;
+import io.github.sudoitir.rahdar.platform.broker.SystemExtensions;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
 import io.github.sudoitir.rahdar.platform.governance.ClearViewAudit;
@@ -54,6 +65,8 @@ import io.github.sudoitir.rahdar.platform.governance.GovernedMessage;
 import io.github.sudoitir.rahdar.platform.governance.MessageContent;
 import io.github.sudoitir.rahdar.platform.scrape.QueueLocator;
 import io.github.sudoitir.rahdar.platform.scrape.QueueLocator.QueueLocation;
+import java.time.Instant;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Comparator;
@@ -62,6 +75,7 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
@@ -105,6 +119,7 @@ public class MessageService {
     private final ContentPolicy contentPolicy;
     private final ClearViewAudit clearViews;
     private final OperationGate gate;
+    private final SystemExtensions extensions;
 
     /** Resolved (node, address, routingType) for a queue name on a cluster. */
     record ResolvedQueue(ClusterNode node, String address, String routingType) {}
@@ -119,6 +134,15 @@ public class MessageService {
         record Affected(long count, UUID node) implements Outcome {}
 
         record DryRun(long count, long cap, boolean overCap, UUID node) implements Outcome {}
+
+        /**
+         * A purge of a partitioned log moves a group's position and deletes nothing: {@code skipped} records are passed
+         * over, none is destroyed, so the bulk cap, which counts destroyed messages, does not apply to it.
+         */
+        record LogPurged(long skipped, UUID node) implements Outcome {}
+
+        /** What a purge of a partitioned log would skip, point in time: it destroys nothing and is not capped. */
+        record LogPurgeDryRun(long skipped, long cap, UUID node) implements Outcome {}
 
         /**
          * An operation by ids that stopped part-way: {@code count} were acted on, and
@@ -149,7 +173,7 @@ public class MessageService {
                 .toList();
         List<MessageSummaryView> rows = new ArrayList<>(browsed.size());
         for (int i = 0; i < browsed.size(); i++) {
-            rows.add(toSummary(browsed.get(i), governed.get(i)));
+            rows.add(toSummary(browsed.get(i), governed.get(i), false, null, null));
         }
         clearViews.recordClear(context, "SUBSCRIPTION", queueName, governed);
         Long total = result.total();
@@ -162,7 +186,210 @@ public class MessageService {
                 total,
                 hasNext,
                 result.totalUnavailable(),
-                resolved.node().getId());
+                resolved.node().getId(),
+                null,
+                result.truncated(),
+                result.truncated()
+                        ? "The page was cut short at its " + (BrokerMessages.PAGE_BYTE_BUDGET >> 20)
+                                + " MB budget: ask for a smaller page to see every message."
+                        : null);
+    }
+
+    // ---- browse a partition of a log --------------------------------------
+
+    /** Where a read of a partition of a log starts. */
+    public record LogStart(Kind kind, long offset, Instant time) {
+
+        public enum Kind {
+            EARLIEST,
+            LATEST,
+            OFFSET,
+            TIME
+        }
+
+        /** {@code from} is earliest, latest, offset or time; the last two take a {@code value}. */
+        public static LogStart parse(String from, String value) {
+            String kind = from == null || from.isBlank() ? "earliest" : from;
+            try {
+                return switch (kind) {
+                    case "earliest" -> new LogStart(Kind.EARLIEST, 0, null);
+                    case "latest" -> new LogStart(Kind.LATEST, 0, null);
+                    case "offset" -> new LogStart(Kind.OFFSET, Long.parseLong(value), null);
+                    case "time" -> new LogStart(Kind.TIME, 0, Instant.parse(value));
+                    default -> throw new IllegalArgumentException("from must be earliest, latest, offset or time.");
+                };
+            } catch (NumberFormatException | NullPointerException | DateTimeParseException _) {
+                throw new IllegalArgumentException("from=" + kind + " needs a value that is "
+                        + (kind.equals("offset") ? "an offset." : "an ISO-8601 time."));
+            }
+        }
+    }
+
+    /**
+     * One page of a partition of a log (ADR-0216), read without joining a group. The request is placed against the
+     * partition's start and end first: before the start it is read from the start and says retention moved it, and
+     * past the end it is an empty page that states the end. {@code latest} is the last page. A filter is refused
+     * with the driver's reason.
+     */
+    public MessagePageView browseLog(
+            UUID clusterId, ResourceId log, int partition, LogStart from, String filter, int requestedSize) {
+        return browseLog(clusterId, log, null, partition, from, filter, requestedSize);
+    }
+
+    /**
+     * The same, through a group's subscription of the log: its records are those of the topic the subscription
+     * reads, and the page says where the group stands on the partition.
+     */
+    public MessagePageView browseSubscriptionLog(
+            UUID clusterId, ResourceId subscription, int partition, LogStart from, String filter, int requestedSize) {
+        BacklogBreakdown.Breakdown breakdown = subscriptionLog(clusterId, subscription);
+        return browseLog(clusterId, breakdown.destination(), breakdown, partition, from, filter, requestedSize);
+    }
+
+    /** One record of the log a group's subscription reads. */
+    public MessageDetailView detailSubscriptionLog(
+            UUID clusterId, ResourceId subscription, int partition, long offset) {
+        return detailLog(clusterId, subscriptionLog(clusterId, subscription).destination(), partition, offset);
+    }
+
+    /** The subscription's breakdown, which names the destination whose log it reads; the caller may read both. */
+    private BacklogBreakdown.Breakdown subscriptionLog(UUID clusterId, ResourceId subscription) {
+        clusterAccess.requireResource(
+                clusterId,
+                ResourceRef.subscription(subscription.path().segments().getFirst()),
+                MessagePermissions.MESSAGE_READ);
+        BacklogBreakdown.Breakdown breakdown =
+                extensions.require(clusterId, BacklogBreakdown.class).read(clusterId, subscription);
+        if (breakdown.destination() == null) {
+            throw new NotFoundException("destination of subscription", subscription.format());
+        }
+        return breakdown;
+    }
+
+    private MessagePageView browseLog(
+            UUID clusterId,
+            ResourceId log,
+            BacklogBreakdown.Breakdown through,
+            int partition,
+            LogStart from,
+            String filter,
+            int requestedSize) {
+        clusterAccess.requireResource(clusterId, ResourceRef.destination(log.name()), MessagePermissions.MESSAGE_READ);
+        LogBounds.Bounds bounds = extensions.require(clusterId, LogBounds.class).of(clusterId, log, partition);
+        int size = Math.min(requestedSize, BROKER_PAGE_CAP);
+        Shard shard = Shard.partition(PartitionId.of(String.valueOf(partition)));
+        boolean moved = false;
+        long offset = bounds.start();
+        switch (from.kind()) {
+            case LATEST -> offset = Math.max(bounds.start(), bounds.end() - size);
+            case OFFSET -> {
+                moved = from.offset() < bounds.start();
+                offset = Math.clamp(from.offset(), bounds.start(), bounds.end());
+            }
+            case EARLIEST, TIME -> {
+                // Earliest stays at the partition start. A time is placed by Position.AtTime below.
+            }
+        }
+        if (from.kind() == LogStart.Kind.TIME && from.time().isAfter(Instant.now())) {
+            throw new IllegalArgumentException("The start time " + from.time()
+                    + " is in the future, so no record can be at or after it. Choose a time that has passed, or"
+                    + " read from latest.");
+        }
+        Position at = from.kind() == LogStart.Kind.TIME
+                ? new Position.AtTime(from.time())
+                : new Position.AtOffsets(Map.of(shard, offset));
+        LogPage page = from.kind() != LogStart.Kind.TIME && offset >= bounds.end()
+                ? new LogPage(List.of(), null)
+                : messages.browseLog(clusterId, log, partition, at, size, filter);
+        GovernContext context = contentPolicy.context(clusterId, log.name(), log.name());
+        List<GovernedMessage> governed = page.records().stream()
+                .map(r -> contentPolicy.govern(context, content(r.message())))
+                .toList();
+        List<MessageSummaryView> rows = new ArrayList<>(governed.size());
+        for (int i = 0; i < governed.size(); i++) {
+            LogPage.LogRecord record = page.records().get(i);
+            rows.add(toSummary(
+                    record.message(), governed.get(i), record.tombstone(), record.key(), record.keyEncoding()));
+        }
+        clearViews.recordClear(context, "DESTINATION", log.name(), governed);
+        String notice =
+                from.kind() == LogStart.Kind.TIME ? timeNotice(clusterId, log, partition, from, bounds, page) : null;
+        return new MessagePageView(
+                rows,
+                1,
+                size,
+                null,
+                page.next() != null,
+                "A log is read by offset: its size is its end offset less its start, and compaction leaves gaps.",
+                null,
+                new LogView(
+                        partition,
+                        bounds.start(),
+                        bounds.end(),
+                        page.next(),
+                        moved,
+                        true,
+                        through == null
+                                ? null
+                                : through.partitions().stream()
+                                        .filter(p -> p.partition() == partition)
+                                        .map(BacklogBreakdown.PartitionLag::committed)
+                                        .filter(Objects::nonNull)
+                                        .findFirst()
+                                        .orElse(null)),
+                page.truncated(),
+                notice);
+    }
+
+    /**
+     * Why a read from a time found nothing, or what it could not match: an empty page says where the partition's
+     * records end in time, and records with no timestamp are named as unmatchable by time.
+     */
+    private String timeNotice(
+            UUID clusterId, ResourceId log, int partition, LogStart from, LogBounds.Bounds bounds, LogPage page) {
+        if (!page.records().isEmpty()) {
+            return page.records().stream().anyMatch(r -> r.message().timestamp() <= 0)
+                    ? "Some records carry no timestamp, so a start time cannot place them."
+                    : null;
+        }
+        if (bounds.end() <= bounds.start()) {
+            return "The partition holds no records.";
+        }
+        LogPage last = messages.browseLog(
+                clusterId,
+                log,
+                partition,
+                new Position.AtOffsets(
+                        Map.of(Shard.partition(PartitionId.of(String.valueOf(partition))), bounds.end() - 1)),
+                1,
+                null);
+        long at = last.records().isEmpty()
+                ? 0
+                : last.records().getFirst().message().timestamp();
+        return "No record at or after " + from.time() + "; the partition's last record "
+                + (at > 0
+                        ? "is at " + Instant.ofEpochMilli(at) + "."
+                        : "carries no timestamp, so it cannot be placed by time.");
+    }
+
+    /** One record of a partition of a log, expanded. */
+    public MessageDetailView detailLog(UUID clusterId, ResourceId log, int partition, long offset) {
+        clusterAccess.requireResource(clusterId, ResourceRef.destination(log.name()), MessagePermissions.MESSAGE_READ);
+        LogPage page = messages.browseLog(
+                clusterId,
+                log,
+                partition,
+                new Position.AtOffsets(Map.of(Shard.partition(PartitionId.of(String.valueOf(partition))), offset)),
+                1,
+                null);
+        LogPage.LogRecord record = page.records().stream()
+                .filter(r -> r.message().messageId() == offset)
+                .findFirst()
+                .orElseThrow(() -> new NotFoundException("record", offset));
+        GovernContext context = contentPolicy.context(clusterId, log.name(), log.name());
+        GovernedMessage governed = contentPolicy.govern(context, content(record.message()));
+        clearViews.recordClear(context, "MESSAGE", log.name() + "/" + partition + "/" + offset, List.of(governed));
+        return toDetail(record.message(), governed, null, record.tombstone(), record.key(), record.keyEncoding());
     }
 
     /** An action request that moves into the queue of this name, for a caller that holds names rather than ids. */
@@ -187,6 +414,21 @@ public class MessageService {
         GovernedMessage governed = contentPolicy.govern(context, content(message));
         clearViews.recordClear(context, "MESSAGE", queueName + "/" + messageId, List.of(governed));
         return toDetail(message, governed, resolved.node().getId());
+    }
+
+    /**
+     * Refuses a per-message action the cluster's system does not offer, with the system's own reason: a
+     * partitioned log is append-only, so a single record is neither moved nor deleted (409).
+     */
+    public void requireOffered(UUID clusterId, MessageAction action) {
+        String capability =
+                switch (action) {
+                    case MOVE, RETRY -> "messages.move";
+                    case DELETE, EXPIRE -> "messages.delete";
+                };
+        messages.unavailableBecause(clusterId, capability).ifPresent(reason -> {
+            throw new ConflictException("action-unavailable", reason);
+        });
     }
 
     // ---- send (Slice 4) -------------------------------------------------
@@ -265,6 +507,9 @@ public class MessageService {
             MessageActionRequest req,
             boolean dryRun,
             boolean override) {
+        // Every caller, the screens, the tool and a replay alike, is refused a per-record action on a log before any
+        // broker call.
+        requireOffered(clusterId, action);
         requireAllowed(clusterId, queueName, action, req);
         if (dryRun) {
             return run(clusterId, queueName, nodeId, action, req, true, override);
@@ -447,6 +692,51 @@ public class MessageService {
             return runPurge(clusterId, queueName, nodeId, true, override);
         }
         return gatedPurge(new QueuePurgeParams(clusterId, queueName, nodeId, override));
+    }
+
+    /**
+     * Purges the subscription of a partitioned log: its position moves to the end, which the driver refuses for a
+     * group that has members or is rebalancing, naming them (409). The records are not deleted.
+     */
+    public Attempt<Outcome> purgeLog(UUID clusterId, ResourceId subscription, boolean dryRun) {
+        clusterAccess.requireResource(
+                clusterId,
+                ResourceRef.subscription(subscription.path().segments().getFirst()),
+                MessagePermissions.SUBSCRIPTION_PURGE);
+        if (dryRun) {
+            return runPurgeLog(clusterId, subscription, true);
+        }
+        return gatedPurgeLog(new LogPurgeParams(clusterId, subscription.format()));
+    }
+
+    @Gated("subscription.purge-log")
+    private Attempt<Outcome> gatedPurgeLog(LogPurgeParams p) {
+        return gate.run(Operation.of(p), () -> runPurgeLog(p.clusterId(), ResourceId.parse(p.subscription()), false));
+    }
+
+    /** What purging the subscription would skip and the state it was counted against, for the gate's estimate. */
+    public Reach reachOfLogPurge(LogPurgeParams p) {
+        BrokerMessages.LogPurge preview = messages.previewLogPurge(p.clusterId(), ResourceId.parse(p.subscription()));
+        return new Reach(preview.records(), preview.etag());
+    }
+
+    private Attempt<Outcome> runPurgeLog(UUID clusterId, ResourceId subscription, boolean dryRun) {
+        AuditEvent event = begin("PURGE_SUBSCRIPTION", subscription.format(), clusterId, null, Map.of(), dryRun);
+        try {
+            BrokerMessages.LogPurge preview = messages.previewLogPurge(clusterId, subscription);
+            if (dryRun) {
+                audit.succeed(event, preview.records());
+                return new Attempt.Ok<>(new Outcome.LogPurgeDryRun(
+                        preview.records(), settings.intValue(BrokerSettings.BULK_CAP), null));
+            }
+            // The driver counts the partitions it moved; the operator is told the records they skip.
+            messages.purgeLog(clusterId, subscription, preview.etag());
+            audit.succeed(event, preview.records());
+            return new Attempt.Ok<>(new Outcome.LogPurged(preview.records(), null));
+        } catch (RuntimeException e) {
+            audit.fail(event, e.getMessage());
+            throw e;
+        }
     }
 
     @Gated("subscription.purge")
@@ -738,14 +1028,15 @@ public class MessageService {
                 headers, properties, m.body(), m.bodyEncoding() == BodyEncoding.BASE64, m.contentType());
     }
 
-    private static MessageSummaryView toSummary(BrowsedMessage m, GovernedMessage g) {
+    private static MessageSummaryView toSummary(
+            BrowsedMessage m, GovernedMessage g, boolean tombstone, String key, BodyEncoding keyEncoding) {
         String body = g.body();
         return new MessageSummaryView(
                 String.valueOf(m.messageId()),
                 m.type(),
                 m.durable(),
                 m.priority(),
-                m.timestamp(),
+                producedAt(m),
                 m.expiration(),
                 m.size(),
                 g.headers().get(GROUP_ID),
@@ -753,7 +1044,15 @@ public class MessageService {
                 preview(body),
                 m.bodyTruncated(),
                 m.propertyCount(),
-                GovernanceViews.redactions(g));
+                GovernanceViews.redactions(g),
+                tombstone,
+                key,
+                keyEncoding == null ? null : keyEncoding.name());
+    }
+
+    /** When the producer stamped the message, or null: a message with no time is not one from 1970. */
+    private static Long producedAt(BrowsedMessage m) {
+        return m.timestamp() > 0 ? m.timestamp() : null;
     }
 
     private static String preview(String body) {
@@ -764,6 +1063,11 @@ public class MessageService {
     }
 
     private static MessageDetailView toDetail(BrowsedMessage m, GovernedMessage g, UUID node) {
+        return toDetail(m, g, node, false, null, null);
+    }
+
+    private static MessageDetailView toDetail(
+            BrowsedMessage m, GovernedMessage g, UUID node, boolean tombstone, String key, BodyEncoding keyEncoding) {
         // A masked value is a marker string whatever its original type, so it is listed with the strings.
         Map<String, String> strings = new LinkedHashMap<>();
         Map<String, Long> ints = new LinkedHashMap<>();
@@ -784,7 +1088,7 @@ public class MessageService {
                 m.type(),
                 m.durable(),
                 m.priority(),
-                m.timestamp(),
+                producedAt(m),
                 m.expiration(),
                 m.size(),
                 g.headers().get(GROUP_ID),
@@ -803,6 +1107,9 @@ public class MessageService {
                 doubles,
                 booleans,
                 GovernanceViews.redactions(g),
-                GovernanceViews.withheld(g));
+                GovernanceViews.withheld(g),
+                tombstone,
+                key,
+                keyEncoding == null ? null : keyEncoding.name());
     }
 }

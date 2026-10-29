@@ -20,6 +20,7 @@ import io.github.sudoitir.rahdar.kernel.security.OperatorHandoff.Operator;
 import io.github.sudoitir.rahdar.kernel.security.ResourceRef;
 import io.github.sudoitir.rahdar.kernel.stream.SseHub;
 import io.github.sudoitir.rahdar.platform.broker.Attempt;
+import io.github.sudoitir.rahdar.platform.clusters.ClusterKinds;
 import io.github.sudoitir.rahdar.platform.clusters.LifecycleOutcome;
 import io.github.sudoitir.rahdar.platform.clusters.LifecycleOutcome.NodeOutcome;
 import io.github.sudoitir.rahdar.platform.clusters.LifecycleOutcome.NodeStatus;
@@ -60,6 +61,7 @@ class BulkRunner {
     private final BulkRunItemRepository items;
     private final QueueLifecycleService queues;
     private final MessageService messages;
+    private final ClusterKinds kinds;
     private final OperatorHandoff handoff;
     private final AuditService audit;
     private final SseHub sse;
@@ -67,6 +69,9 @@ class BulkRunner {
     private final BackgroundRuns background;
     private final ReplicaRegistry replicas;
     private final TransactionTemplate tx;
+
+    /** The node name of the one outcome of a subscription read for the whole cluster. */
+    private static final String WHOLE_CLUSTER = "whole cluster";
 
     /** This replica no longer holds the run: someone else marked it, or this replica cannot prove it is alive. */
     private static final class RunLost extends RuntimeException {
@@ -179,7 +184,10 @@ class BulkRunner {
         String[] failure = new String[1];
         String permission = run.getOperation().permission();
         if (!handoff.stillHolds(
-                operator, run.getClusterId(), ResourceRef.subscription(item.getSubscription()), permission)) {
+                operator,
+                run.getClusterId(),
+                ResourceRef.subscription(BulkItemIds.name(item.getSubscription())),
+                permission)) {
             failure[0] =
                     "The permission %s on this queue is no longer held, so it was not acted on.".formatted(permission);
         } else {
@@ -211,7 +219,7 @@ class BulkRunner {
     /** The single-queue command for this operation, with the run's override and options. */
     private LifecycleOutcome command(BulkRunEntity run, BulkRunItemEntity item) {
         UUID clusterId = run.getClusterId();
-        String queue = item.getSubscription();
+        String queue = BulkItemIds.name(item.getSubscription());
         return switch (run.getOperation()) {
             case PAUSE -> unwrap(queues.setPaused(clusterId, queue, true, false));
             case RESUME -> unwrap(queues.setPaused(clusterId, queue, false, false));
@@ -226,15 +234,26 @@ class BulkRunner {
         };
     }
 
-    /** A purge is one node per call, so it is issued on every node hosting the queue and folded into one outcome. */
+    /**
+     * A queue's purge is one node per call, so it is issued on every node hosting the queue and folded into one
+     * outcome. A subscription of a partitioned log is moved to the end of the log once for the cluster, through the
+     * log purge and its gate, which refuses a group that has members or is rebalancing with the driver's detail.
+     */
     private LifecycleOutcome purge(BulkRunEntity run, BulkRunItemEntity item) {
+        if (kinds.partitioned(run.getClusterId(), BulkItemIds.kind(item.getSubscription()))) {
+            return purgeLog(run, item);
+        }
         List<NodeOutcome> nodes = new ArrayList<>();
         for (NodeFigure node :
                 json.readValue(item.getEstimate(), ItemEstimate.class).nodes()) {
             NodeOutcome outcome;
             try {
                 outcome = switch (messages.purge(
-                        run.getClusterId(), item.getSubscription(), node.nodeId(), false, run.isOverrideCap())) {
+                        run.getClusterId(),
+                        BulkItemIds.name(item.getSubscription()),
+                        node.nodeId(),
+                        false,
+                        run.isOverrideCap())) {
                     case Attempt.Ok<MessageService.Outcome>(MessageService.Outcome.Affected affected) ->
                         new NodeOutcome(node.nodeId(), node.nodeName(), NodeStatus.APPLIED, affected.count(), null);
                     case Attempt.Ok<MessageService.Outcome>(var other) ->
@@ -250,10 +269,28 @@ class BulkRunner {
         return new LifecycleOutcome(false, 0, false, nodes);
     }
 
+    private LifecycleOutcome purgeLog(BulkRunEntity run, BulkRunItemEntity item) {
+        // One outcome for the whole cluster, so it names no node.
+        NodeOutcome outcome;
+        try {
+            outcome = switch (messages.purgeLog(run.getClusterId(), BulkItemIds.parse(item.getSubscription()), false)) {
+                case Attempt.Ok<MessageService.Outcome>(MessageService.Outcome.LogPurged purged) ->
+                    new NodeOutcome(null, WHOLE_CLUSTER, NodeStatus.APPLIED, 0L, null, purged.skipped());
+                case Attempt.Ok<MessageService.Outcome>(var other) ->
+                    NodeOutcome.failed(null, WHOLE_CLUSTER, "Unexpected purge result: " + other);
+                case Attempt.Failed<MessageService.Outcome> failed ->
+                    NodeOutcome.failed(null, WHOLE_CLUSTER, failed.detail());
+            };
+        } catch (RuntimeException e) {
+            outcome = NodeOutcome.failed(null, WHOLE_CLUSTER, e.getMessage());
+        }
+        return new LifecycleOutcome(false, 0, false, List.of(outcome));
+    }
+
     private static LifecycleOutcome unwrap(Attempt<LifecycleOutcome> attempt) {
         return switch (attempt) {
             case Attempt.Ok<LifecycleOutcome>(var value) -> value;
-            case Attempt.Failed<LifecycleOutcome>(var _, var detail) -> throw new IllegalStateException(detail);
+            case Attempt.Failed<LifecycleOutcome> failed -> throw new IllegalStateException(failed.detail());
         };
     }
 
@@ -294,7 +331,7 @@ class BulkRunner {
                 run.getClusterId(),
                 TOPIC,
                 new BulkProgress(run.getId(), status, succeeded, failed, skipped, run.getTotalItems()),
-                rows.stream().map(BulkRunItemEntity::getSubscription).toList(),
+                rows.stream().map(i -> BulkItemIds.name(i.getSubscription())).toList(),
                 List.of());
     }
 

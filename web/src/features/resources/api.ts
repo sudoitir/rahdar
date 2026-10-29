@@ -8,7 +8,7 @@ import {
   request,
 } from '../../kernel/api/request.ts';
 import { type PagedView, type ResourceParams, resourceSearch, useResource } from '../../kernel/api/paging.ts';
-import { nameOf, resourcePath } from '../../kernel/api/resourceId.ts';
+import { nameOf, resourcePath, subscriptionNameOf } from '../../kernel/api/resourceId.ts';
 import { useRoleIds } from '../clusters/index.ts';
 import type { components } from '../../kernel/api/schema.d.ts';
 
@@ -79,28 +79,30 @@ export function useDestinationOptions(
 }
 
 /**
- * One subscription by name, exactly. The listing is the only read of a subscription, so this asks it for the name
- * and keeps the exact match: a filter is a substring match on subscription or destination, and `orders` also
- * matches `orders.dlq`. `snapshot`, when the caller already has the row, answers without a request.
+ * One subscription by its id, exactly. The listing is the only read of a subscription, so this asks it for the
+ * name the id carries and keeps the row with that id: a filter is a substring match on subscription or
+ * destination, `orders` also matches `orders.dlq`, and a group that reads two topics is two rows of one name.
+ * `snapshot`, when the caller already has the row, answers without a request.
  */
 export function useSubscription(
   clusterId: string,
-  subscriptionName: string | undefined,
+  subscriptionId: string | undefined,
   snapshot?: SubscriptionView,
 ): { subscription: SubscriptionView | undefined; isPending: boolean; isError: boolean; error: Error | null } {
+  const name = subscriptionId ? subscriptionNameOf(subscriptionId) : undefined;
   const lookup = useQuery({
-    queryKey: keys.resource(clusterId, 'subscriptions', { q: subscriptionName, size: 50 }),
+    queryKey: keys.resource(clusterId, 'subscriptions', { q: name, size: 50 }),
     queryFn: () =>
       request<PagedView<SubscriptionView>>(
-        `/clusters/${clusterId}/subscriptions${resourceSearch({ q: subscriptionName, size: 50 })}`,
+        `/clusters/${clusterId}/subscriptions${resourceSearch({ q: name, size: 50 })}`,
       ),
-    enabled: !snapshot && clusterId !== '' && Boolean(subscriptionName),
+    enabled: !snapshot && clusterId !== '' && Boolean(subscriptionId),
     refetchInterval: 5_000,
   });
   if (snapshot) return { subscription: snapshot, isPending: false, isError: false, error: null };
   return {
-    subscription: lookup.data?.data.find((q) => q.name === subscriptionName),
-    isPending: Boolean(subscriptionName) && lookup.isPending,
+    subscription: lookup.data?.data.find((q) => q.id === subscriptionId),
+    isPending: Boolean(subscriptionId) && lookup.isPending,
     isError: lookup.isError,
     error: lookup.error,
   };

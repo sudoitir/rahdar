@@ -1,6 +1,10 @@
 /** Every permission the console checks, which a wildcard in a test's grants stands for. */
 const UNIVERSE = [
+  'access-rule:read',
+  'access-rule:write',
   'destination:create',
+  'destination:truncate',
+  'destination:update',
   'destination:read',
   'alert:read',
   'alert:write',
@@ -32,11 +36,14 @@ const UNIVERSE = [
   'subscription:pause',
   'subscription:purge',
   'subscription:read',
+  'subscription:seek',
   'subscription:update',
   'rr:write',
   'settings:read',
   'settings:write',
   'team:admin',
+  'transaction:abort',
+  'transaction:read',
   'token:admin',
   'user:admin',
 ];

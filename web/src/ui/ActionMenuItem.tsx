@@ -78,7 +78,13 @@ export function ActionMenuItem({
   const shared = {
     className,
     leftSection: icon,
-    'aria-disabled': blocked || undefined,
+    // Set on the element, not as a prop: from Mantine 9.7.4 `Menu.Item` writes `aria-disabled` itself, from its own
+    // `disabled`, after the props it is given, and `disabled` would take the item out of keyboard navigation.
+    ref: (element: HTMLElement | null) => {
+      if (!element) return;
+      if (blocked) element.setAttribute('aria-disabled', 'true');
+      else element.removeAttribute('aria-disabled');
+    },
     'aria-describedby': hint ? hintId : undefined,
     onClick: activate,
   };

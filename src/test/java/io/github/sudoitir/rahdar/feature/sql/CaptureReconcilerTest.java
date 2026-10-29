@@ -350,7 +350,7 @@ class CaptureReconcilerTest {
 
     private static QueryPlan plan() {
         QueryPlan.Target target =
-                new QueryPlan.Target(NODE, "primary", "ORDER.IN", "ORDER.IN", "ANYCAST", 0, Instant.now(), true);
+                new QueryPlan.Target(NODE, "primary", "ORDER.IN", "ORDER.IN", "ANYCAST", 0L, Instant.now(), true);
         return new QueryPlan(
                 null,
                 QueryAst.Source.BROKER,

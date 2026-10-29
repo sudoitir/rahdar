@@ -18,6 +18,7 @@ import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterE
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterRepository;
 import io.github.sudoitir.rahdar.support.McpFixture;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisModule;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -167,7 +168,7 @@ class McpGateIntegrationTest extends PostgresIntegrationTest {
 
     @Test
     void aSystemToolOnAClusterOfAnotherSystemIsAToolErrorAndIsAudited() throws Exception {
-        ClusterEntity entity = new ClusterEntity("gate-other-system", null, null);
+        ClusterEntity entity = new ClusterEntity(ArtemisModule.SYSTEM, "gate-other-system", null, null);
         ReflectionTestUtils.setField(entity, "system", "other");
         UUID cluster = clusters.save(entity).getId();
         try {

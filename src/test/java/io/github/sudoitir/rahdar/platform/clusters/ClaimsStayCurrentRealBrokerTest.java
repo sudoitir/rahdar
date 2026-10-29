@@ -23,6 +23,7 @@ import io.github.sudoitir.rahdar.support.AdminAuthenticationExtension;
 import io.github.sudoitir.rahdar.support.ArtemisBrokers;
 import io.github.sudoitir.rahdar.support.ArtemisIntegrationTest;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
+import io.github.sudoitir.rahdar.support.Registrations;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -74,7 +75,7 @@ class ClaimsStayCurrentRealBrokerTest extends PostgresIntegrationTest {
     }
 
     private UUID registered(String name, String seed) {
-        var attempt = service.register(new RegisterClusterRequest(
+        var attempt = service.register(Registrations.artemis(
                 List.of(seed),
                 run + "-" + name,
                 null,

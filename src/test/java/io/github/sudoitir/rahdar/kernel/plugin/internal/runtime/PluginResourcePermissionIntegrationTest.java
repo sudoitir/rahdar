@@ -23,6 +23,7 @@ import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterE
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterRepository;
 import io.github.sudoitir.rahdar.support.AdminAuthenticationExtension;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisModule;
 import java.nio.file.Path;
 import java.security.SecureRandom;
 import java.util.List;
@@ -88,7 +89,7 @@ class PluginResourcePermissionIntegrationTest extends PostgresIntegrationTest {
     void aTeamRoleHoldingAPluginsResourcePermissionGivesItOnTheTeamsQueuesOnly() throws Exception {
         String id = "acme-peek-" + Math.abs(new SecureRandom().nextInt());
         activate(id);
-        UUID cluster = clusters.save(new ClusterEntity("peek-" + UUID.randomUUID(), null, null))
+        UUID cluster = clusters.save(new ClusterEntity(ArtemisModule.SYSTEM, "peek-" + UUID.randomUUID(), null, null))
                 .getId();
         var role = roleService.create(new RoleRequest(
                 "peek-reader-" + UUID.randomUUID(), List.of("subscription:read", id + ":read"), false, true));

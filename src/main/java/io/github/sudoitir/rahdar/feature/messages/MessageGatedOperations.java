@@ -1,5 +1,7 @@
 package io.github.sudoitir.rahdar.feature.messages;
 
+import io.github.sudoitir.openbroker.model.ResourceId;
+import io.github.sudoitir.rahdar.feature.messages.MessageActionParams.LogPurgeParams;
 import io.github.sudoitir.rahdar.feature.messages.MessageActionParams.MessageDeleteParams;
 import io.github.sudoitir.rahdar.feature.messages.MessageActionParams.MessageExpireParams;
 import io.github.sudoitir.rahdar.feature.messages.MessageActionParams.MessageMoveParams;
@@ -29,6 +31,8 @@ import org.springframework.context.annotation.Configuration;
  */
 @Configuration(proxyBeanMethods = false)
 class MessageGatedOperations {
+
+    private static final String LABEL_CLUSTER = "Cluster";
 
     @Bean
     GatedOperation<QueuePurgeParams> queuePurgeOperation(MessageService messages, ClusterEnvironmentIndex clusters) {
@@ -71,7 +75,7 @@ class MessageGatedOperations {
             @Override
             public List<DisplayRow> display(QueuePurgeParams p) {
                 return List.of(
-                        DisplayRow.of("Cluster", clusters.labelOf(p.clusterId())),
+                        DisplayRow.of(LABEL_CLUSTER, clusters.labelOf(p.clusterId())),
                         DisplayRow.of("Queue", p.queue()),
                         DisplayRow.of("Removes", "every message"));
             }
@@ -90,6 +94,70 @@ class MessageGatedOperations {
             @Override
             public void replay(QueuePurgeParams p) {
                 succeeded(messages.purge(p.clusterId(), p.queue(), p.nodeId(), false, p.override()));
+            }
+        };
+    }
+
+    @Bean
+    GatedOperation<LogPurgeParams> logPurgeOperation(MessageService messages, ClusterEnvironmentIndex clusters) {
+        return new GatedOperation<>() {
+            @Override
+            public String type() {
+                return "subscription.purge-log";
+            }
+
+            @Override
+            public int version() {
+                return 1;
+            }
+
+            @Override
+            public Class<LogPurgeParams> paramsType() {
+                return LogPurgeParams.class;
+            }
+
+            @Override
+            public Set<Trait> traits(LogPurgeParams p) {
+                return Set.of(Trait.DESTRUCTIVE);
+            }
+
+            @Override
+            public ExecutionMode mode() {
+                return ExecutionMode.ON_APPROVAL;
+            }
+
+            @Override
+            public OperationScope scope(LogPurgeParams p) {
+                return OperationScope.cluster(p.clusterId(), clusters.environmentOf(p.clusterId()));
+            }
+
+            @Override
+            public String summary(LogPurgeParams p) {
+                return "Purge " + p.subscription() + " on " + clusters.labelOf(p.clusterId());
+            }
+
+            @Override
+            public List<DisplayRow> display(LogPurgeParams p) {
+                return List.of(
+                        DisplayRow.of(LABEL_CLUSTER, clusters.labelOf(p.clusterId())),
+                        DisplayRow.of("Subscription", p.subscription()),
+                        DisplayRow.of("Skips", "every record it has not read"));
+            }
+
+            @Override
+            public Set<String> redactedPaths() {
+                return Set.of();
+            }
+
+            @Override
+            public Effect estimate(LogPurgeParams p) {
+                Reach reach = messages.reachOfLogPurge(p);
+                return new Effect(reach.count(), "records", reach.identity(), null);
+            }
+
+            @Override
+            public void replay(LogPurgeParams p) {
+                succeeded(messages.purgeLog(p.clusterId(), ResourceId.parse(p.subscription()), false));
             }
         };
     }
@@ -166,7 +234,7 @@ class MessageGatedOperations {
         @Override
         public List<DisplayRow> display(P p) {
             List<DisplayRow> rows = new ArrayList<>();
-            rows.add(DisplayRow.of("Cluster", clusters.labelOf(p.clusterId())));
+            rows.add(DisplayRow.of(LABEL_CLUSTER, clusters.labelOf(p.clusterId())));
             rows.add(DisplayRow.of("Queue", p.queue()));
             rows.add(DisplayRow.of(verb, selection(p.request())));
             if (p.request().byFilter()) {

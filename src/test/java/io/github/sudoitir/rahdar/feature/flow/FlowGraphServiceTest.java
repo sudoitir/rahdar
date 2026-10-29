@@ -14,9 +14,9 @@ import io.github.sudoitir.rahdar.feature.flow.FlowQuery.GroupBy;
 import io.github.sudoitir.rahdar.feature.flow.FlowQuery.Rank;
 import io.github.sudoitir.rahdar.feature.flow.FlowStore.NodeSample;
 import io.github.sudoitir.rahdar.feature.flow.FlowStore.StoredEdge;
-import io.github.sudoitir.rahdar.feature.flow.web.FlowViews.Delivery;
 import io.github.sudoitir.rahdar.feature.flow.web.FlowViews.EdgeKind;
 import io.github.sudoitir.rahdar.feature.flow.web.FlowViews.Fault;
+import io.github.sudoitir.rahdar.feature.flow.web.FlowViews.FlowDelivery;
 import io.github.sudoitir.rahdar.feature.flow.web.FlowViews.FlowEdgeView;
 import io.github.sudoitir.rahdar.feature.flow.web.FlowViews.FlowGraphView;
 import io.github.sudoitir.rahdar.feature.flow.web.FlowViews.FlowNodeView;
@@ -128,7 +128,7 @@ class FlowGraphServiceTest {
                 .containsExactlyInAnyOrder(
                         "destination:orders", "subscription:orders", "producer:order-svc", "consumer:billing");
         FlowEdgeView route = edge(graph, EdgeKind.ROUTE);
-        assertThat(route.delivery()).isEqualTo(Delivery.SHARED);
+        assertThat(route.delivery()).isEqualTo(FlowDelivery.SHARED);
         assertThat(route.rate()).isEqualTo(42.0);
         assertThat(route.averagedOverSeconds()).isNull();
         assertThat(edge(graph, EdgeKind.CONSUME).members()).isEqualTo(3);
@@ -154,7 +154,7 @@ class FlowGraphServiceTest {
                 .findFirst()
                 .orElseThrow();
         assertThat(orders.rate()).isNull();
-        assertThat(orders.delivery()).isEqualTo(Delivery.COPY);
+        assertThat(orders.delivery()).isEqualTo(FlowDelivery.COPY);
         assertThat(audit.averagedOverSeconds()).isEqualTo(300);
         assertThat(graph.kpis().inRate()).isEqualTo(2.0);
         assertThat(graph.measuring()).isTrue();
@@ -593,9 +593,41 @@ class FlowGraphServiceTest {
         when(directory.nodes(clusterId)).thenReturn(both);
         // Stranded: node-b holds the backlog and has no consumer.
         queues.add(new QueueSnapshot(
-                clusterId, nodeA, "orders", "orders", "ANYCAST", true, false, now, 10, 2, 0, 0, 0, 0, 0));
+                clusterId,
+                nodeA,
+                "orders",
+                "orders",
+                "ANYCAST",
+                true,
+                false,
+                now,
+                10L,
+                2,
+                0,
+                0,
+                0,
+                0,
+                0,
+                "artemis.queue",
+                Map.of()));
         queues.add(new QueueSnapshot(
-                clusterId, nodeB, "orders", "orders", "ANYCAST", true, false, now, 9_000, 0, 0, 0, 0, 0, 0));
+                clusterId,
+                nodeB,
+                "orders",
+                "orders",
+                "ANYCAST",
+                true,
+                false,
+                now,
+                9_000L,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                "artemis.queue",
+                Map.of()));
         Map<String, Map<UUID, SubjectRate>> addedByNode = Map.of(
                 "orders",
                 Map.of(
@@ -648,9 +680,59 @@ class FlowGraphServiceTest {
         });
     }
 
+    @Test
+    void aQueueWithNoBacklogIsDrawnUnknownNeverEmptyAndKnownQueuesAreStillSummed() {
+        queue("known", "orders", "MULTICAST", 10, 1);
+        queues.add(new QueueSnapshot(
+                clusterId,
+                nodeA,
+                "unknown",
+                "orders",
+                "MULTICAST",
+                true,
+                false,
+                now,
+                null,
+                1,
+                0,
+                0,
+                0,
+                0,
+                0,
+                "kafka.group-topic",
+                Map.of()));
+
+        FlowGraphView graph = service.graph(clusterId, query(null, 40));
+
+        assertThat(graph.nodes())
+                .filteredOn(n -> n.id().equals("subscription:unknown"))
+                .singleElement()
+                .satisfies(n -> assertThat(n.messageCount()).isNull());
+        assertThat(graph.nodes())
+                .filteredOn(n -> n.id().equals("subscription:known"))
+                .singleElement()
+                .satisfies(n -> assertThat(n.messageCount()).isEqualTo(10));
+    }
+
     private void queue(String name, String address, String routingType, long messages, long consumers) {
         queues.add(new QueueSnapshot(
-                clusterId, nodeA, name, address, routingType, true, false, now, messages, consumers, 0, 0, 0, 0, 0));
+                clusterId,
+                nodeA,
+                name,
+                address,
+                routingType,
+                true,
+                false,
+                now,
+                messages,
+                consumers,
+                0,
+                0,
+                0,
+                0,
+                0,
+                "artemis.queue",
+                Map.of()));
     }
 
     private void rate(Map<String, SubjectRate> map, String queue, double rate, Duration span) {
@@ -1003,8 +1085,24 @@ class FlowGraphServiceTest {
         UUID gone = UUID.randomUUID();
         queue("q1", "orders", "MULTICAST", 10, 1);
         queue("q2", "orders", "MULTICAST", 5, 2);
-        queues.add(
-                new QueueSnapshot(clusterId, gone, "q1", "orders", "MULTICAST", true, false, now, 1, 1, 0, 0, 0, 0, 0));
+        queues.add(new QueueSnapshot(
+                clusterId,
+                gone,
+                "q1",
+                "orders",
+                "MULTICAST",
+                true,
+                false,
+                now,
+                1L,
+                1,
+                0,
+                0,
+                0,
+                0,
+                0,
+                "artemis.queue",
+                Map.of()));
         when(metrics.latestRateWithTimeBySubjectAndNode(eq(clusterId), eq("openbroker.enqueued"), any(), any()))
                 .thenReturn(Map.of(
                         "q1", Map.of(nodeA, new SubjectRate(1.0, now.minusSeconds(5), Duration.ofSeconds(15))),

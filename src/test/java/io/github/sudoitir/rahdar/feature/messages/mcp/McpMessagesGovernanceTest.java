@@ -23,6 +23,7 @@ import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshotUpsert;
 import io.github.sudoitir.rahdar.support.FixtureJolokia;
 import io.github.sudoitir.rahdar.support.McpFixture;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisModule;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -88,7 +89,7 @@ class McpMessagesGovernanceTest extends PostgresIntegrationTest {
         mvc = MockMvcBuilders.webAppContextSetup(webContext)
                 .apply(springSecurity())
                 .build();
-        clusterId = clusters.save(new ClusterEntity("c-" + UUID.randomUUID(), null, null))
+        clusterId = clusters.save(new ClusterEntity(ArtemisModule.SYSTEM, "c-" + UUID.randomUUID(), null, null))
                 .getId();
         BrokerNodeEntity a = BrokerNodeEntity.fromSeed(
                 clusterId, "node-a", "PRIMARY", UUID.randomUUID().toString());
@@ -101,7 +102,7 @@ class McpMessagesGovernanceTest extends PostgresIntegrationTest {
                 "PHASE3.SRC",
                 "ANYCAST",
                 true,
-                1,
+                1L,
                 0,
                 0,
                 0,
@@ -109,7 +110,8 @@ class McpMessagesGovernanceTest extends PostgresIntegrationTest {
                 0,
                 0,
                 false,
-                "artemis.queue")));
+                "artemis.queue",
+                Map.of())));
     }
 
     @AfterEach

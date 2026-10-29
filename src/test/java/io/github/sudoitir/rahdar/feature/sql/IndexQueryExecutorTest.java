@@ -99,7 +99,7 @@ class IndexQueryExecutorTest extends PostgresIntegrationTest {
 
     private QueryPlan plan(String sql) {
         QueryAst ast = parser.parse(sql);
-        Target target = new Target(NODE, "primary", "ORDER.IN", "ORDER.IN", "ANYCAST", 0, Instant.now(), true);
+        Target target = new Target(NODE, "primary", "ORDER.IN", "ORDER.IN", "ANYCAST", 0L, Instant.now(), true);
         return new QueryPlan(
                 ast,
                 Source.INDEX,
@@ -497,9 +497,9 @@ class IndexQueryExecutorTest extends PostgresIntegrationTest {
         writer.observe(CLUSTER, messageWith(3, "ORDER.OUT", 4, 1, null, Map.of()), Instant.now());
         QueryAst ast = parser.parse("SELECT * FROM index.\"ORDER.*\" LIMIT 10");
         List<Target> targets = List.of(
-                new Target(NODE, "primary", "ORDER.IN", "ORDER.IN", "ANYCAST", 0, Instant.now(), true),
-                new Target(NODE, "primary", "ORDER.OUT", "ORDER.OUT", "ANYCAST", 0, Instant.now(), true),
-                new Target(NODE, "primary", "ORDER.EMPTY", "ORDER.EMPTY", "ANYCAST", 0, Instant.now(), true));
+                new Target(NODE, "primary", "ORDER.IN", "ORDER.IN", "ANYCAST", 0L, Instant.now(), true),
+                new Target(NODE, "primary", "ORDER.OUT", "ORDER.OUT", "ANYCAST", 0L, Instant.now(), true),
+                new Target(NODE, "primary", "ORDER.EMPTY", "ORDER.EMPTY", "ANYCAST", 0L, Instant.now(), true));
         QueryPlan multi =
                 new QueryPlan(ast, Source.INDEX, targets, null, false, List.of(), List.of(), 0, 10, false, List.of());
 

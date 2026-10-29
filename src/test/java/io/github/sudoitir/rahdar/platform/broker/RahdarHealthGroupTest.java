@@ -10,6 +10,7 @@ import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNo
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterEntity;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterRepository;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisModule;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -48,7 +49,7 @@ class RahdarHealthGroupTest extends PostgresIntegrationTest {
     @Test
     void anUnreachableNodeDegradesRahdarHealthAndLeavesTheProbesUp() throws Exception {
         String url = "http://unreachable-" + UUID.randomUUID() + ":8161/console/jolokia";
-        clusterId = clusters.save(new ClusterEntity("health-" + UUID.randomUUID(), null, null))
+        clusterId = clusters.save(new ClusterEntity(ArtemisModule.SYSTEM, "health-" + UUID.randomUUID(), null, null))
                 .getId();
         BrokerNodeEntity node = BrokerNodeEntity.fromSeed(
                 clusterId, "down-node", "PRIMARY", UUID.randomUUID().toString());

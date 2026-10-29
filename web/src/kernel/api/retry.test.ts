@@ -12,11 +12,11 @@ describe('shouldRetry', () => {
     expect(shouldRetry(3, new TypeError('Failed to fetch'))).toBe(false);
   });
 
-  it('tries a server error, a timeout and a rate limit again', () => {
-    for (const status of [500, 502, 503, 408, 429]) expect(shouldRetry(0, api(status))).toBe(true);
+  it('tries a timeout and a rate limit again', () => {
+    for (const status of [408, 429]) expect(shouldRetry(0, api(status))).toBe(true);
   });
 
-  it('does not try a client error again', () => {
-    for (const status of [400, 401, 403, 404, 409, 422]) expect(shouldRetry(0, api(status))).toBe(false);
+  it('does not try an answer again, whether a refusal or a server error that states its cause', () => {
+    for (const status of [400, 401, 403, 404, 409, 422, 500, 502, 503]) expect(shouldRetry(0, api(status))).toBe(false);
   });
 });

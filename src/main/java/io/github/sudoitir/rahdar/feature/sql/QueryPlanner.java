@@ -23,6 +23,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -335,7 +336,11 @@ public class QueryPlanner {
      * reason the estimate is shown before the query runs.
      */
     private long estimate(List<Target> targets, Split split, int limit) {
-        long depth = targets.stream().mapToLong(Target::messageCount).sum();
+        long depth = targets.stream()
+                .map(Target::messageCount)
+                .filter(Objects::nonNull)
+                .mapToLong(Long::longValue)
+                .sum();
         if (!split.requiresScan()) {
             return Math.min(depth, (long) limit * Math.max(1, targets.size()));
         }

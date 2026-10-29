@@ -2,6 +2,12 @@ package io.github.sudoitir.rahdar.feature.resources.web;
 
 import static io.swagger.v3.oas.annotations.media.Schema.RequiredMode.REQUIRED;
 
+import io.github.sudoitir.openbroker.model.Condition;
+import io.github.sudoitir.openbroker.model.ConditionStatus;
+import io.github.sudoitir.openbroker.model.MetricKeys;
+import io.github.sudoitir.openbroker.model.Precision;
+import io.github.sudoitir.openbroker.model.Resource;
+import io.github.sudoitir.rahdar.kernel.core.KindName;
 import io.github.sudoitir.rahdar.kernel.security.TeamRef;
 import io.github.sudoitir.rahdar.platform.broker.ResourceIds;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -31,9 +37,68 @@ public final class ResourceViews {
             + " caller holds on it, such as subscription:purge. The console gates its controls from this.";
     private static final String ID = "The resource's canonical id, such as artemis.queue/orders.";
     private static final String KIND = "The id of the resource's kind, such as artemis.queue.";
-    private static final String KIND_LABEL = "The kind's name for people, such as Queue.";
+    private static final String KIND_LABEL = "The kind's name for people, singular and plural.";
 
     // ---- subscriptions (aggregated from subscription_snapshot) --------------------
+
+    /**
+     * How many messages a subscription has yet to deliver, and how far to trust the figure (ADR-0216). Artemis counts
+     * them exactly. Where a system can only estimate (a log's lag is read from committed offsets, sampled at one
+     * moment), the figure says so, and where it cannot be known it is absent: {@code UNAVAILABLE} is never a zero.
+     */
+    public record Backlog(
+            @Schema(nullable = true, description = "The figure; null when the accuracy is UNAVAILABLE.")
+            Long value,
+
+            @Schema(requiredMode = REQUIRED, description = "EXACT, ESTIMATE or UNAVAILABLE.")
+            Accuracy accuracy,
+
+            @Schema(nullable = true, description = "Why it is an estimate or unavailable.")
+            String reason,
+
+            @Schema(
+                    requiredMode = REQUIRED,
+                    description = "Whether the subscription has a per-partition breakdown to read.")
+            boolean breakdown) {
+
+        public enum Accuracy {
+            EXACT,
+            ESTIMATE,
+            UNAVAILABLE
+        }
+
+        public static Backlog exact(long value) {
+            return new Backlog(value, Accuracy.EXACT, null, false);
+        }
+
+        /**
+         * The backlog a resource reports as its backlog metric. A precision of ESTIMATE is an estimate, with the reason
+         * the system gives for it; a resource without the metric has no figure, and says so.
+         */
+        public static Backlog of(Resource resource) {
+            return resource.attributes()
+                    .get(MetricKeys.BACKLOG)
+                    .map(metric -> new Backlog(
+                            metric.asLong(),
+                            metric.precision() == Precision.EXACT ? Accuracy.EXACT : Accuracy.ESTIMATE,
+                            metric.precision() == Precision.EXACT ? null : estimateReason(resource),
+                            !metric.breakdown().isEmpty()))
+                    .orElseGet(() -> new Backlog(null, Accuracy.UNAVAILABLE, "The system reported no backlog.", false));
+        }
+
+        private static String estimateReason(Resource resource) {
+            return resource.conditions().stream()
+                    .filter(c -> c.type().endsWith(".backlog_estimate") && c.status() == ConditionStatus.TRUE)
+                    .map(Condition::message)
+                    .findFirst()
+                    .orElse("The figure is an estimate.");
+        }
+
+        /** The figure for ranking and thresholds only: an unavailable backlog counts as nothing there, never on screen. */
+        public long valueOrZero() {
+            return value == null ? 0 : value;
+        }
+    }
 
     public record SubscriptionView(
             @Schema(requiredMode = REQUIRED, description = ID)
@@ -43,7 +108,7 @@ public final class ResourceViews {
             String kind,
 
             @Schema(requiredMode = REQUIRED, description = KIND_LABEL)
-            String kindLabel,
+            KindName kindLabel,
 
             @Schema(requiredMode = REQUIRED) String name,
 
@@ -56,7 +121,7 @@ public final class ResourceViews {
             Map<String, String> nativeAttributes,
 
             @Schema(requiredMode = REQUIRED) boolean durable,
-            @Schema(requiredMode = REQUIRED) long totalMessageCount,
+            @Schema(requiredMode = REQUIRED) Backlog backlog,
             @Schema(requiredMode = REQUIRED) long totalConsumerCount,
             @Schema(requiredMode = REQUIRED) long totalDeliveringCount,
             @Schema(requiredMode = REQUIRED) long totalScheduledCount,
@@ -89,7 +154,7 @@ public final class ResourceViews {
                     destination,
                     nativeAttributes,
                     durable,
-                    totalMessageCount,
+                    backlog,
                     totalConsumerCount,
                     totalDeliveringCount,
                     totalScheduledCount,
@@ -118,7 +183,10 @@ public final class ResourceViews {
             @Schema(requiredMode = REQUIRED) String nodeName,
             @Schema(requiredMode = REQUIRED) boolean stale,
             @Schema(nullable = true) Instant lastSeenAt,
-            @Schema(requiredMode = REQUIRED) long messageCount,
+
+            @Schema(nullable = true, description = "Null when the node reported no backlog: unknown, not empty.")
+            Long messageCount,
+
             @Schema(requiredMode = REQUIRED) long consumerCount,
             @Schema(requiredMode = REQUIRED) long deliveringCount,
             @Schema(requiredMode = REQUIRED) long scheduledCount,
@@ -156,7 +224,7 @@ public final class ResourceViews {
             String kind,
 
             @Schema(requiredMode = REQUIRED, description = KIND_LABEL)
-            String kindLabel,
+            KindName kindLabel,
 
             @Schema(requiredMode = REQUIRED) String name,
 
@@ -201,7 +269,7 @@ public final class ResourceViews {
             String kind,
 
             @Schema(requiredMode = REQUIRED, description = KIND_LABEL)
-            String kindLabel,
+            KindName kindLabel,
 
             @Schema(nullable = true, description = "The id of the channel the consumer runs in.")
             String channel,
@@ -258,7 +326,7 @@ public final class ResourceViews {
             String kind,
 
             @Schema(requiredMode = REQUIRED, description = KIND_LABEL)
-            String kindLabel,
+            KindName kindLabel,
 
             @Schema(nullable = true, description = "The id of the connection the channel belongs to.")
             String connection,
@@ -314,7 +382,7 @@ public final class ResourceViews {
             String kind,
 
             @Schema(requiredMode = REQUIRED, description = KIND_LABEL)
-            String kindLabel,
+            KindName kindLabel,
 
             @Schema(nullable = true) String remoteAddress,
             @Schema(nullable = true) String protocol,
@@ -368,7 +436,7 @@ public final class ResourceViews {
             String kind,
 
             @Schema(requiredMode = REQUIRED, description = KIND_LABEL)
-            String kindLabel,
+            KindName kindLabel,
 
             @Schema(nullable = true) String clientId,
 

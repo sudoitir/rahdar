@@ -5,7 +5,7 @@ import io.github.sudoitir.rahdar.feature.sql.QueryResult;
 import io.github.sudoitir.rahdar.feature.sql.SqlTailPoller;
 import io.github.sudoitir.rahdar.feature.sql.web.SqlViews.BoundView;
 import io.github.sudoitir.rahdar.feature.sql.web.SqlViews.NoticeView;
-import io.github.sudoitir.rahdar.feature.sql.web.SqlViews.PlanView;
+import io.github.sudoitir.rahdar.feature.sql.web.SqlViews.QueryPlanView;
 import io.github.sudoitir.rahdar.feature.sql.web.SqlViews.ResultView;
 import io.github.sudoitir.rahdar.feature.sql.web.SqlViews.RowView;
 import io.github.sudoitir.rahdar.feature.sql.web.SqlViews.SqlNodeOutcomeView;
@@ -26,8 +26,8 @@ import org.springframework.stereotype.Component;
 @Component
 public class SqlViewMapper {
 
-    public PlanView toView(Of ids, QueryPlan plan) {
-        return new PlanView(
+    public QueryPlanView toView(Of ids, QueryPlan plan) {
+        return new QueryPlanView(
                 plan.resolvedSource().name(),
                 plan.targets().stream()
                         .map(t -> new TargetView(
@@ -69,7 +69,7 @@ public class SqlViewMapper {
                 row.messageType(),
                 row.durable(),
                 row.priority(),
-                row.timestamp(),
+                row.timestamp() > 0 ? row.timestamp() : null,
                 row.expiration(),
                 row.size(),
                 row.jmsType(),

@@ -27,6 +27,7 @@ import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterE
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterRepository;
 import io.github.sudoitir.rahdar.support.AdminAuthenticationExtension;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisModule;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
@@ -78,9 +79,9 @@ class TeamServiceIntegrationTest extends PostgresIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        prod = clusters.save(new ClusterEntity("prod-" + UUID.randomUUID(), null, null))
+        prod = clusters.save(new ClusterEntity(ArtemisModule.SYSTEM, "prod-" + UUID.randomUUID(), null, null))
                 .getId();
-        staging = clusters.save(new ClusterEntity("staging-" + UUID.randomUUID(), null, null))
+        staging = clusters.save(new ClusterEntity(ArtemisModule.SYSTEM, "staging-" + UUID.randomUUID(), null, null))
                 .getId();
     }
 
@@ -721,7 +722,8 @@ class TeamServiceIntegrationTest extends PostgresIntegrationTest {
         for (int round = 0; round < 8; round++) {
             UUID a = team("race-a");
             UUID b = team("race-b");
-            UUID cluster = clusters.save(new ClusterEntity("race-" + UUID.randomUUID(), null, null))
+            UUID cluster = clusters.save(
+                            new ClusterEntity(ArtemisModule.SYSTEM, "race-" + UUID.randomUUID(), null, null))
                     .getId();
             CountDownLatch start = new CountDownLatch(1);
             var pool = Executors.newFixedThreadPool(2);

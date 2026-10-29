@@ -173,4 +173,19 @@ describe('ConfirmDialog', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     await waitFor(() => expect(trigger).toHaveFocus());
   });
+
+  it('gives focus to Cancel when the dialog opened while the caller was busy, once the caller settles', async () => {
+    const user = userEvent.setup();
+    const { rerender } = renderWithProviders(<Host pending />);
+    await user.click(screen.getByRole('button', { name: 'Open' }));
+    await screen.findByRole('dialog', { name: 'Delete queue' });
+    // An inert Cancel cannot hold focus; nothing in the dialog has it.
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled();
+    expect(screen.getByRole('dialog', { name: 'Delete queue' })).not.toContainElement(
+      document.activeElement as HTMLElement,
+    );
+
+    rerender(<Host pending={false} />);
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Cancel' })).toHaveFocus());
+  });
 });

@@ -1,4 +1,4 @@
-import { subscriptionIdentity } from '../../test/wire.ts';
+import { subscriptionId, subscriptionIdentity } from '../../test/wire.ts';
 import { describe, expect, it, vi } from 'vitest';
 import { http, HttpResponse } from 'msw';
 import { screen } from '@testing-library/react';
@@ -56,7 +56,7 @@ function mockApi(permissions: string[] = ['*']) {
           {
             ...subscriptionIdentity('ORDERS', 'ORDERS'),
             durable: true,
-            totalMessageCount: 7,
+            backlog: { value: 7, accuracy: 'EXACT', reason: null, breakdown: false },
             totalConsumerCount: 1,
             totalDeliveringCount: 0,
             totalScheduledCount: 0,
@@ -113,7 +113,10 @@ describe('CommandPalette', () => {
     await user.click(action);
 
     expect(subscriptionRequests.every((q) => q.includes('q=ORDERS'))).toBe(true);
-    expect(navigate).toHaveBeenCalledWith({ to: '/clusters/c1/subscriptions', search: { subscription: 'ORDERS' } });
+    expect(navigate).toHaveBeenCalledWith({
+      to: '/clusters/c1/subscriptions',
+      search: { subscription: subscriptionId('ORDERS') },
+    });
   });
 
   it('offers to search the live views without reading them', async () => {

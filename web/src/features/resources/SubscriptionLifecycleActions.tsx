@@ -20,8 +20,7 @@ import { EditSubscriptionForm } from './EditSubscriptionForm.tsx';
 /**
  * Pause, resume, edit and delete for one subscription, across every live node.
  *
- * <p>Each action previews before it acts. The delete additionally requires the
- * subscription's name typed exactly, because it destroys messages that no dry run can
+ * <p>Each action previews before it acts. The delete additionally requires a press and hold, because it destroys messages that no dry run can
  * bring back — and the confirmation names the nodes and the message count first,
  * so what is being agreed to is a real number rather than a warning adjective.
  */
@@ -161,7 +160,7 @@ export function SubscriptionLifecycleActions({
 }
 
 /**
- * The destructive flow. Opens on a preview, so the typed confirmation is armed
+ * The destructive flow. Opens on a preview, so the held confirmation is armed
  * only once the operator has been shown the blast radius: which nodes, how many
  * messages will be destroyed on each, and which routes go with the subscription.
  *
@@ -233,7 +232,7 @@ export function DeleteSubscriptionDialog({
       title={result ? `Result of deleting ${subscription.name}` : `Delete ${subscription.name}`}
       tone="danger"
       confirmLabel={overCap ? 'Delete anyway, over the cap' : 'Delete this subscription'}
-      // Also locked while the preview is being taken, so the typed name cannot arm a delete that
+      // Also locked while the preview is being taken, so the hold cannot arm a delete that
       // has not been shown its blast radius.
       pending={remove.isPending}
       onConfirm={() =>

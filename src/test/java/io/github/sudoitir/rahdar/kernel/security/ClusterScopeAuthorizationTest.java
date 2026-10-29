@@ -12,6 +12,7 @@ import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNo
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterEntity;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterRepository;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisModule;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -129,9 +130,9 @@ class ClusterScopeAuthorizationTest extends PostgresIntegrationTest {
     void aClusterAddressedReadIsInvisibleWithoutAGrantOnThatCluster() throws Exception {
         // Two real clusters. Both must exist, or every endpoint would 404 for
         // absence rather than for authorization and the test would pass vacuously.
-        visible = clusters.save(new ClusterEntity("visible-" + UUID.randomUUID(), null, null))
+        visible = clusters.save(new ClusterEntity(ArtemisModule.SYSTEM, "visible-" + UUID.randomUUID(), null, null))
                 .getId();
-        hidden = clusters.save(new ClusterEntity("hidden-" + UUID.randomUUID(), null, null))
+        hidden = clusters.save(new ClusterEntity(ArtemisModule.SYSTEM, "hidden-" + UUID.randomUUID(), null, null))
                 .getId();
         // No management URL on purpose: the read then answers "unavailable, and here
         // is why" with a 200 rather than reaching for a broker that is not there,

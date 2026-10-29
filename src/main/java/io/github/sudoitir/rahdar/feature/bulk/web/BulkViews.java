@@ -5,6 +5,7 @@ import static io.swagger.v3.oas.annotations.media.Schema.RequiredMode.REQUIRED;
 import io.github.sudoitir.rahdar.feature.bulk.BulkItemStatus;
 import io.github.sudoitir.rahdar.feature.bulk.BulkOperation;
 import io.github.sudoitir.rahdar.feature.bulk.BulkRunStatus;
+import io.github.sudoitir.rahdar.kernel.core.KindName;
 import io.github.sudoitir.rahdar.platform.clusters.LifecycleOutcome.NodeOutcome;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
@@ -18,12 +19,13 @@ public final class BulkViews {
     private BulkViews() {}
 
     /**
-     * What to preview: explicit {@code names}, in the order given, or, when {@code names} is null, every
-     * queue whose name or address contains {@code q} (every queue when {@code q} is blank).
+     * What to preview: explicit subscription {@code ids} ({@code artemis.queue/orders}), in the order given, or,
+     * when {@code ids} is null, every subscription whose name or destination contains {@code q} (every
+     * subscription when {@code q} is blank).
      */
     public record BulkPreviewRequest(
             @Schema(requiredMode = REQUIRED) @NotNull BulkOperation operation,
-            @Schema(nullable = true) List<String> names,
+            @Schema(nullable = true) List<String> ids,
             @Schema(nullable = true) String q,
 
             @Schema(description = "Delete only: close attached consumers instead of refusing the queue.")
@@ -33,9 +35,9 @@ public final class BulkViews {
     public record BulkExecuteRequest(
             @Schema(requiredMode = REQUIRED) @NotNull String planHash, boolean override, boolean continueOnFailure) {}
 
-    /** How the operator chose the queues: the names, or the filter. */
+    /** How the operator chose the subscriptions: their ids, or the filter. */
     public record BulkSelection(
-            @Schema(nullable = true) List<String> names,
+            @Schema(nullable = true) List<String> ids,
             @Schema(nullable = true) String q) {}
 
     /** One node's figures for a queue at preview; null where the node has not answered recently. */
@@ -93,13 +95,22 @@ public final class BulkViews {
             @Schema(requiredMode = REQUIRED, description = "The id of the subscription's kind, such as artemis.queue.")
             String kind,
 
-            @Schema(requiredMode = REQUIRED, description = "The kind's name for people, such as Queue.")
-            String kindLabel,
+            @Schema(requiredMode = REQUIRED, description = "The kind's name for people, singular and plural.")
+            KindName kindLabel,
 
             @Schema(requiredMode = REQUIRED) BulkItemStatus status,
             @Schema(nullable = true) String error,
             @Schema(nullable = true) String warning,
-            @Schema(nullable = true) Long affected,
+
+            @Schema(nullable = true, description = "Messages destroyed; 0 for a purge of a log.")
+            Long affected,
+
+            @Schema(
+                    nullable = true,
+                    description = "Records a purge of a log passes over (expected in the preview, passed over once run)"
+                            + " without deleting them; absent for every other action.")
+            Long skipped,
+
             @Schema(requiredMode = REQUIRED) List<NodeFigure> nodes,
             @Schema(nullable = true) List<NodeOutcome> outcome,
             @Schema(nullable = true) Instant startedAt,

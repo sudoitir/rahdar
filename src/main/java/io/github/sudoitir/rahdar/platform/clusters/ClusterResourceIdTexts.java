@@ -4,6 +4,7 @@ import io.github.sudoitir.openbroker.ClusterConnection;
 import io.github.sudoitir.openbroker.model.Kind;
 import io.github.sudoitir.openbroker.model.ResourceClass;
 import io.github.sudoitir.openbroker.model.ResourceId;
+import io.github.sudoitir.rahdar.kernel.core.KindName;
 import io.github.sudoitir.rahdar.kernel.plugin.ResourceType;
 import io.github.sudoitir.rahdar.kernel.security.ResourceIdTexts;
 import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
@@ -42,6 +43,11 @@ class ClusterResourceIdTexts implements ResourceIdTexts {
             @Override
             public String destination(String name) {
                 return id(connection, ResourceClass.DESTINATION, name);
+            }
+
+            @Override
+            public KindName kindLabel(String id) {
+                return ResourceIds.labelOf(connection, id);
             }
         };
     }

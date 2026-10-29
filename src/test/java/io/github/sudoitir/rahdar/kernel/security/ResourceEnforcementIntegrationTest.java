@@ -29,6 +29,7 @@ import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshotUpsert;
 import io.github.sudoitir.rahdar.support.AdminAuthenticationExtension;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
 import io.github.sudoitir.rahdar.support.TeamAccessFixture;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisModule;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -98,7 +99,7 @@ class ResourceEnforcementIntegrationTest extends PostgresIntegrationTest {
         mvc = webAppContextSetup(webContext).apply(springSecurity()).build();
         fixture = new TeamAccessFixture(teamService, roles, users);
 
-        cluster = clusters.save(new ClusterEntity("team-" + UUID.randomUUID(), null, null))
+        cluster = clusters.save(new ClusterEntity(ArtemisModule.SYSTEM, "team-" + UUID.randomUUID(), null, null))
                 .getId();
         // A node with a management URL that is not live: a dry run reports it skipped, with no broker to reach.
         BrokerNodeEntity node = BrokerNodeEntity.fromSeed(
@@ -126,7 +127,22 @@ class ResourceEnforcementIntegrationTest extends PostgresIntegrationTest {
 
     private QueueRow row(UUID node, String name, long messages) {
         return new QueueRow(
-                cluster, node, name, name, "ANYCAST", true, messages, 0, 0, 0, 0, 0, 0, false, "artemis.queue");
+                cluster,
+                node,
+                name,
+                name,
+                "ANYCAST",
+                true,
+                messages,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                false,
+                "artemis.queue",
+                Map.of());
     }
 
     /** A user whose only access is the built-in Operator role, granted on every cluster. */
@@ -237,7 +253,7 @@ class ResourceEnforcementIntegrationTest extends PostgresIntegrationTest {
         UsernamePasswordAuthenticationToken stranger = fixture.session(fixture.member(
                 fixture.team(
                         "elsewhere",
-                        clusters.save(new ClusterEntity("other-" + UUID.randomUUID(), null, null))
+                        clusters.save(new ClusterEntity(ArtemisModule.SYSTEM, "other-" + UUID.randomUUID(), null, null))
                                 .getId(),
                         "x.#"),
                 "TEAM_VIEWER"));
@@ -333,8 +349,10 @@ class ResourceEnforcementIntegrationTest extends PostgresIntegrationTest {
 
     @Test
     void aBulkPlanWithAForeignQueueIsRefusedAndNothingIsPlanned() throws Exception {
-        MockHttpServletResponse response =
-                postJson(base() + "/bulk/preview", bulk("\"names\":[\"orders.in\",\"billing.in\"]"), ordersOperator);
+        MockHttpServletResponse response = postJson(
+                base() + "/bulk/preview",
+                bulk("\"ids\":[\"artemis.queue/orders.in\",\"artemis.queue/billing.in\"]"),
+                ordersOperator);
 
         assertThat(response.getStatus()).isEqualTo(404);
         assertThat(call(get(base() + "/bulk/runs"), ordersOperator).getContentAsString())
@@ -343,8 +361,10 @@ class ResourceEnforcementIntegrationTest extends PostgresIntegrationTest {
 
     @Test
     void aBulkPlanOfTheCallersOwnQueuesIsPlanned() throws Exception {
-        MockHttpServletResponse response =
-                postJson(base() + "/bulk/preview", bulk("\"names\":[\"orders.in\",\"orders.out\"]"), ordersOperator);
+        MockHttpServletResponse response = postJson(
+                base() + "/bulk/preview",
+                bulk("\"ids\":[\"artemis.queue/orders.in\",\"artemis.queue/orders.out\"]"),
+                ordersOperator);
 
         assertThat(response.getStatus())
                 .describedAs(response.getContentAsString())
@@ -627,8 +647,10 @@ class ResourceEnforcementIntegrationTest extends PostgresIntegrationTest {
 
     @Test
     void aRunOfAnotherTeamsQueuesIsNotFoundByItsOwnIdWithoutNamingAQueue() throws Exception {
-        MockHttpServletResponse planned =
-                postJson(base() + "/bulk/preview", bulk("\"names\":[\"orders.in\",\"billing.in\"]"), platformOperator);
+        MockHttpServletResponse planned = postJson(
+                base() + "/bulk/preview",
+                bulk("\"ids\":[\"artemis.queue/orders.in\",\"artemis.queue/billing.in\"]"),
+                platformOperator);
         String run = body(planned).get("run").get("id").asString();
 
         for (MockHttpServletResponse response : List.of(

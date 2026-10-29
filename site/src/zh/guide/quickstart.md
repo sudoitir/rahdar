@@ -62,7 +62,25 @@ docker compose -f compose.prod.yaml logs rahdar | grep -A4 'Created administrato
 
 ## 注册一个集群
 
-登录后进入 **Clusters → Add**。你只需提供一个种子节点的管理端点及其凭据；拓扑中的其余部分会从 Broker 自身发现。凭据以 `RAHDAR_SECRET_KEY` 加密存储。
+登录后进入 **Clusters → Register cluster**（或空概览页上的按钮）。注册是一个独立的页面，地址为 `/clusters/new`，可以直接链接：`/clusters/new?system=kafka` 会直接打开 Apache Kafka。先选择 Broker 系统：Rahdar 列出它拥有驱动的系统，之后只询问该系统的连接信息。**Check connection** 对你填写的这组信息通过之后，再填写集群的名称、描述与环境，**Register cluster** 才会可用。在此之前它保持禁用，并在旁边写明原因；检查之后只要有任何一项改动，它会再次禁用。
+
+凭据以 `RAHDAR_SECRET_KEY` 加密存储，之后不会再显示。
+
+### Apache Kafka
+
+填写一个或多个 **bootstrap servers**，格式为 `host:port`，可用逗号、空格或换行分隔。端口默认为 9092，每个地址在输入框下方各显示为一项；带协议（`PLAINTEXT://k1:9092`）或带账号的地址会被拒绝，并说明要去掉什么。一个地址就够了：Rahdar 会向它询问其余的 Broker。
+
+选择**安全协议**：明文、TLS、明文 SASL 或 TLS 上的 SASL。SASL 协议还要求选择**机制**：`PLAIN`、`SCRAM-SHA-256`、`SCRAM-SHA-512` 需要用户名与密码（要么都填，要么都不填），`OAUTHBEARER` 需要令牌。明文 SASL 会以明文传输凭据，表单会发出警告，但仍允许注册。TLS 协议可以指定 **TLS bundle**（Spring SSL bundle），用于信任库与客户端证书。主机名校验始终开启：证书没有写明其所通告地址的 Broker 会被拒绝。客户端 id 在 *Advanced* 中。
+
+**Check connection** 报告 Kafka 版本（Broker 无法给出更多信息时显示为下限）与模式、每个 Broker 及其**通告**的地址和 Rahdar 是否在该地址连上了它、控制器仲裁（或其不可用的原因），以及该账号能做什么。检查失败时会写明原因与下一步：域名无法解析、连接被拒绝、连接超时、证书不受信任或与主机名不符、认证失败、账号已通过认证但无权描述集群（这与密码被拒绝不同），以及 Kafka 版本不受支持（低于 3.0）。
+
+Bootstrap 服务器可能已经应答，而某个 Broker 通告了 Rahdar 无法到达的地址，例如只在集群内网才能解析的名称。此时检查会把该 Broker 及其通告地址列为未连上：Broker 的**通告监听器（advertised listeners）**必须能从 Rahdar 访问。如果只连上了部分 Broker，你仍可在看到警告（集群将显示为降级）后注册。
+
+Kafka 集群只能注册一次，以其 Broker 报告的集群 id 为准。如果检查发现该集群已经注册（即使名称不同），会给出指向它的链接，且 **Register cluster** 保持禁用。
+
+### Apache Artemis
+
+只需提供一个种子节点的管理端点及其凭据；拓扑中的其余部分会从 Broker 自身发现。要提供多个种子，可在同一输入框中用逗号、空格或换行分隔多个 URL，每一个都会按 Rahdar 实际使用的形式显示出来。
 
 如果某项能力缺失——Core 客户端不可达，或某个管理操作未暴露——Rahdar 会告诉你缺的是哪一项，并给出可以启用它的确切 `broker.xml` 片段，而不是把功能藏起来。
 
@@ -94,7 +112,7 @@ just dev-up                          # Postgres + 一对 Artemis + Rahdar
 ADMIN_PASSWORD=… just demo           # 第二对节点，加上真实流量
 ```
 
-`just dev-up` 打印的密码是一次性的。第一次运行时，种子脚本需要 `NEW_ADMIN_PASSWORD=…`（你选的新密码），它会替你改掉密码，并为 `admin` 设置其角色所要求的验证器应用，然后打印 `ADMIN_TOTP_SECRET`。之后再运行（包括 `just shots` 和 `just demo-gif`）需要把 `ADMIN_PASSWORD` 设为新密码，并把 `ADMIN_TOTP_SECRET` 设为该密钥。
+`just dev-up` 打印的密码是一次性的。第一次运行时，种子脚本需要 `NEW_ADMIN_PASSWORD=…`（你选的新密码），它会替你改掉密码，并为 `admin` 设置其角色所要求的验证器应用，然后打印 `ADMIN_TOTP_SECRET`。之后再运行（包括 `just shots`）需要把 `ADMIN_PASSWORD` 设为新密码，并把 `ADMIN_TOTP_SECRET` 设为该密钥。
 
 这套种子脚本不会直接写 `metric_sample` 或 `subscription_snapshot`——流量是通过 Broker 自带的 CLI 真实生产与消费的，所以图表是测量结果，而不是编造的。
 

@@ -9,15 +9,10 @@ import { ErrorState } from '../../ui/ErrorState.tsx';
 import { FieldRow } from '../../ui/FieldRow.tsx';
 import { focusFirstInvalid } from '../../ui/formErrors.ts';
 import { notify, type ActionVerb } from '../../ui/notify.ts';
-import {
-  useCheckConnectionEdit,
-  useUpdateConnection,
-  type ClusterDetail,
-  type ConnectionCheck,
-  type UpdateClusterRequest,
-} from './api.ts';
+import { useCheckConnectionEdit, useUpdateConnection, type ClusterDetail, type UpdateClusterRequest } from './api.ts';
 import classes from './Clusters.module.css';
-import { NodeProbeTable } from './NodeProbeTable.tsx';
+import { ConnectionCheckPanel } from './ConnectionCheckPanel.tsx';
+import { checkPassed, rejectedAccounts } from './connectionCheck.ts';
 import { hostPort, isValidPattern } from './pattern.ts';
 import { normaliseSeeds, seedRow, type SeedRow } from './normaliseSeeds.ts';
 
@@ -75,12 +70,15 @@ function requestOf(f: Fields, connection: Connection): UpdateClusterRequest {
   return {
     name: f.name.trim(),
     description: f.description,
-    seedUrls: seedsOf(f).urls,
-    managementUrlPattern: f.pattern || undefined,
-    // An empty bundle clears the stored one; leaving it out would keep it.
-    tlsBundle: f.tlsBundle || (connection.tlsBundle ? '' : undefined),
-    management: { username: f.username, password: f.password },
-    core: f.separateCore ? { username: f.coreUsername, password: f.corePassword } : null,
+    connection: {
+      system: 'artemis',
+      seedUrls: seedsOf(f).urls,
+      managementUrlPattern: f.pattern || undefined,
+      // An empty bundle clears the stored one; leaving it out would keep it.
+      tlsBundle: f.tlsBundle || (connection.tlsBundle ? '' : undefined),
+      management: { username: f.username, password: f.password },
+      core: f.separateCore ? { username: f.coreUsername, password: f.corePassword } : null,
+    },
   };
 }
 
@@ -110,16 +108,6 @@ function changesCredentials(f: Fields, connection: Connection): boolean {
   if (f.username !== (connection.managementUsername ?? '') || f.password !== '') return true;
   if (f.separateCore !== Boolean(core)) return true;
   return f.separateCore && (f.coreUsername !== core || f.corePassword !== '');
-}
-
-/** What a check found that saving would make worse: an account a broker rejected. */
-function rejections(check: ConnectionCheck): string[] {
-  return check.nodes.flatMap((n) => {
-    const found: string[] = [];
-    if (n.management === 'REJECTED') found.push(`${n.name} rejected the management account`);
-    if (n.core === 'REJECTED') found.push(`${n.name} rejected the Core account`);
-    return found;
-  });
 }
 
 /**
@@ -158,8 +146,16 @@ export function ConnectionForm({ cluster, connection }: Readonly<{ cluster: Clus
   const request = requestOf(f, connection);
   const signature = JSON.stringify(request);
   const credentials = changesCredentials(f, connection);
-  const found = check.isSuccess && checkedFor === signature ? rejections(check.data) : [];
-  const passed = check.isSuccess && checkedFor === signature && found.length === 0;
+  const checked = check.isSuccess && checkedFor === signature ? check.data : null;
+  const found = checked ? rejectedAccounts(checked) : [];
+  // The cluster being edited is not "another cluster" to itself.
+  const passed =
+    checked !== null &&
+    found.length === 0 &&
+    checkPassed({
+      ...checked,
+      alreadyRegistered: checked.alreadyRegistered?.id === cluster.id ? null : checked.alreadyRegistered,
+    });
 
   function reason(): string | null {
     if (passed) return null;
@@ -299,9 +295,7 @@ export function ConnectionForm({ cluster, connection }: Readonly<{ cluster: Clus
 
       <div aria-live="polite" className={classes.form}>
         {check.isError ? <ErrorState variant="inline" error={check.error} /> : null}
-        {check.isSuccess && checkedFor === signature ? (
-          <NodeProbeTable nodes={check.data.nodes} label="Nodes found by the check" />
-        ) : null}
+        {checked ? <ConnectionCheckPanel check={checked} selfId={cluster.id} /> : null}
         {found.map((line) => (
           <Text key={line} size="sm">
             {line}

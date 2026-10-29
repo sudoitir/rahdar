@@ -20,11 +20,13 @@ import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshotUpsert;
 import io.github.sudoitir.rahdar.support.AdminAuthenticationExtension;
 import io.github.sudoitir.rahdar.support.FixtureJolokia;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisModule;
 import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
 import io.github.sudoitir.rahdar.system.artemis.ArtemisNodes;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.hamcrest.Matchers;
 import org.junit.jupiter.api.AfterEach;
@@ -71,7 +73,7 @@ class DeadLetterControllerTest extends PostgresIntegrationTest {
     @BeforeEach
     void setUp() {
         mvc = webAppContextSetup(webContext).build();
-        clusterId = clusters.save(new ClusterEntity("c-" + UUID.randomUUID(), null, null))
+        clusterId = clusters.save(new ClusterEntity(ArtemisModule.SYSTEM, "c-" + UUID.randomUUID(), null, null))
                 .getId();
         BrokerNodeEntity a = BrokerNodeEntity.fromSeed(
                 clusterId, "node-a", "PRIMARY", UUID.randomUUID().toString());
@@ -79,7 +81,22 @@ class DeadLetterControllerTest extends PostgresIntegrationTest {
         nodeId = nodes.save(a).getId();
         // DLQ fixture reports deadLetterAddress "DLQ"; seed a queue on it.
         upsert.upsertBatch(List.of(new QueueRow(
-                clusterId, nodeId, "DLQ", "DLQ", "ANYCAST", true, 7, 0, 0, 0, 0, 0, 0, false, "artemis.queue")));
+                clusterId,
+                nodeId,
+                "DLQ",
+                "DLQ",
+                "ANYCAST",
+                true,
+                7L,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                false,
+                "artemis.queue",
+                Map.of())));
     }
 
     @AfterEach
@@ -124,6 +141,36 @@ class DeadLetterControllerTest extends PostgresIntegrationTest {
                         jsonPath("$.destinations[?(@.name == 'DLQ')].purpose").value(Matchers.hasItem("dead-letter")))
                 .andExpect(jsonPath("$..subscriptions[?(@.name == 'DLQ')].totalDepth")
                         .value(Matchers.hasItem(7)));
+    }
+
+    @Test
+    void aDeadLetterQueueWithNoDepthIsUnknownAndLeftOutOfTheTotalNotCountedAsZero() throws Exception {
+        upsert.upsertBatch(List.of(new QueueRow(
+                clusterId,
+                nodeId,
+                "DLQ",
+                "DLQ",
+                "ANYCAST",
+                true,
+                null,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                false,
+                "artemis.queue",
+                Map.of())));
+        when(artemisNodes.on(eq(clusterId), any(UUID.class)))
+                .thenReturn(client(SEARCH, fixture("address-settings.json")));
+
+        mvc.perform(get("/api/v1/clusters/{c}/dead-letters", clusterId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$..subscriptions[?(@.name == 'DLQ')].totalDepth")
+                        .value(Matchers.hasItem(Matchers.nullValue())))
+                .andExpect(jsonPath("$..subscriptions[?(@.name == 'DLQ')].unknownDepthNodes")
+                        .value(Matchers.hasItem(1)));
     }
 
     @Test

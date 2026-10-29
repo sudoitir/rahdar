@@ -11,10 +11,10 @@ import io.github.sudoitir.rahdar.feature.flow.FlowStore.Route;
 import io.github.sudoitir.rahdar.feature.flow.FlowStore.RouteKind;
 import io.github.sudoitir.rahdar.feature.flow.FlowStore.StoredEdge;
 import io.github.sudoitir.rahdar.feature.flow.FlowStore.StoredRoute;
-import io.github.sudoitir.rahdar.feature.flow.web.FlowViews.Delivery;
 import io.github.sudoitir.rahdar.feature.flow.web.FlowViews.EdgeKind;
 import io.github.sudoitir.rahdar.feature.flow.web.FlowViews.Fault;
 import io.github.sudoitir.rahdar.feature.flow.web.FlowViews.FlowBrokerNodeView;
+import io.github.sudoitir.rahdar.feature.flow.web.FlowViews.FlowDelivery;
 import io.github.sudoitir.rahdar.feature.flow.web.FlowViews.FlowEdgeView;
 import io.github.sudoitir.rahdar.feature.flow.web.FlowViews.FlowFocusView;
 import io.github.sudoitir.rahdar.feature.flow.web.FlowViews.FlowGraphView;
@@ -1106,11 +1106,11 @@ public class FlowGraphService {
         return name != null && name.startsWith(RahdarNames.CAPTURE_PREFIX);
     }
 
-    private static Delivery delivery(String routingType) {
+    private static FlowDelivery delivery(String routingType) {
         if ("MULTICAST".equalsIgnoreCase(routingType)) {
-            return Delivery.COPY;
+            return FlowDelivery.COPY;
         }
-        return "ANYCAST".equalsIgnoreCase(routingType) ? Delivery.SHARED : null;
+        return "ANYCAST".equalsIgnoreCase(routingType) ? FlowDelivery.SHARED : null;
     }
 
     private static Double rate(SubjectRate r) {
@@ -1169,7 +1169,17 @@ public class FlowGraphService {
             return r == null ? null : r.rate();
         }
 
-        /** Sums two rates where either may be unknown; a ternary here would unbox a null. */
+        /** A sum of per-node counts where a node that gave none leaves the other's count as it is. */
+        private static Long plusCount(Long a, Long b) {
+            if (a == null) {
+                return b;
+            }
+            if (b == null) {
+                return a;
+            }
+            return Long.valueOf(a + b);
+        }
+
         private static Double plus(Double a, Double b) {
             if (a == null) {
                 return b;
@@ -1204,7 +1214,7 @@ public class FlowGraphService {
                                     : new FlowNodeShare(
                                             prev.nodeId(),
                                             prev.node(),
-                                            prev.messageCount() + s.messageCount(),
+                                            plusCount(prev.messageCount(), s.messageCount()),
                                             prev.consumerCount() + s.consumerCount(),
                                             plus(prev.inRate(), in),
                                             plus(prev.outRate(), outRate),
@@ -1272,7 +1282,9 @@ public class FlowGraphService {
                 }
                 QueueSnapshot s = q.perNode.get(node);
                 if (s != null) {
-                    backlog = (backlog == null ? 0 : backlog) + s.messageCount();
+                    if (s.backlogKnown()) {
+                        backlog = (backlog == null ? 0 : backlog) + s.messageCount();
+                    }
                     consumerTotal = (consumerTotal == null ? 0 : consumerTotal) + s.consumerCount();
                 }
                 in = plus(in, rateOf(added, q.name, node));
@@ -1411,7 +1423,9 @@ public class FlowGraphService {
         void add(QueueSnapshot s, String nodeName) {
             perNode.put(s.nodeId(), s);
             routingType = s.routingType();
-            messageCount = (messageCount == null ? 0 : messageCount) + s.messageCount();
+            if (s.backlogKnown()) {
+                messageCount = (messageCount == null ? 0 : messageCount) + s.messageCount();
+            }
             consumerCount = (consumerCount == null ? 0 : consumerCount) + s.consumerCount();
             if (nodeName != null) {
                 brokerNodes.add(nodeName);

@@ -16,6 +16,7 @@ import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshots;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -58,7 +59,7 @@ class MessageIndexCoverageTest {
     }
 
     private Target target(String queueName) {
-        return new Target(UUID.randomUUID(), "primary", queueName, queueName, "ANYCAST", 10, Instant.now(), true);
+        return new Target(UUID.randomUUID(), "primary", queueName, queueName, "ANYCAST", 10L, Instant.now(), true);
     }
 
     private QueryAst ast(String sql) {
@@ -189,13 +190,15 @@ class MessageIndexCoverageTest {
                 true,
                 false,
                 Instant.now(),
+                0L,
                 0,
                 0,
                 0,
                 0,
                 0,
                 0,
-                0);
+                "artemis.queue",
+                Map.of());
     }
 
     private MessageIndexSubscriptionEntity capturing(String pattern) {
@@ -206,7 +209,7 @@ class MessageIndexCoverageTest {
     }
 
     private static Target onAddress(String queue, String address, String nodeName) {
-        return new Target(UUID.randomUUID(), nodeName, queue, address, "MULTICAST", 10, Instant.now(), true);
+        return new Target(UUID.randomUUID(), nodeName, queue, address, "MULTICAST", 10L, Instant.now(), true);
     }
 
     @Test

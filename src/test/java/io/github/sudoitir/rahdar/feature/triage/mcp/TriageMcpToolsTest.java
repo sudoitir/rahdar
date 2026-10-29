@@ -381,6 +381,33 @@ class TriageMcpToolsTest {
     }
 
     @Test
+    void aDeliveredRowIsReadAsACountOverAnIntervalNotOneDelivery() {
+        BrokerEventView summary = new BrokerEventView(
+                1,
+                AT,
+                AT,
+                "openbroker.message.delivered",
+                "ORDERS",
+                "inbound",
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                java.util.Map.of("count", 42, "from", "2026-10-29T01:00:00Z", "to", "2026-10-29T01:00:05Z"));
+        when(brokerEvents.page(eq(CLUSTER), any()))
+                .thenReturn(new BrokerEventPageView(List.of(summary), 1, 26, 1L, false, null, false, 0, null));
+
+        McpViews.Page<McpViews.ActivityRow> page = page(tools.activityLog(CLUSTER.toString(), null, null, null));
+
+        assertThat(page.items())
+                .extracting(McpViews.ActivityRow::detail)
+                .containsExactly(
+                        "42 messages delivered on ORDERS/inbound between 2026-10-29T01:00:00Z and 2026-10-29T01:00:05Z");
+    }
+
+    @Test
     void brokerEventsAreTheDefaultSourceAndFallBackToTheRoutingName() {
         when(brokerEvents.page(eq(CLUSTER), any()))
                 .thenReturn(new BrokerEventPageView(

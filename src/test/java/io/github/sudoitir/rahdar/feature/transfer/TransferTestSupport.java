@@ -32,6 +32,7 @@ import io.github.sudoitir.rahdar.support.ArtemisBrokers.Broker;
 import io.github.sudoitir.rahdar.support.ArtemisIntegrationTest;
 import io.github.sudoitir.rahdar.support.OperatorFixture;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
+import io.github.sudoitir.rahdar.support.Registrations;
 import io.github.sudoitir.rahdar.system.artemis.StagingQueues;
 import java.time.Duration;
 import java.time.Instant;
@@ -186,7 +187,7 @@ abstract class TransferTestSupport extends PostgresIntegrationTest {
 
     /** Register {@code brokers} as one cluster, each node with its host-reachable Core URL. */
     Registered register(String name, Broker... brokers) {
-        Attempt<ClusterDetail> attempt = clusterService.register(new RegisterClusterRequest(
+        Attempt<ClusterDetail> attempt = clusterService.register(Registrations.artemis(
                 List.of(brokers).stream().map(Broker::jolokiaUrl).toList(),
                 name + "-" + sfx,
                 null,

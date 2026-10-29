@@ -28,7 +28,7 @@ public class RouteMcpRows implements McpRouteRows {
         return new McpViews.ResourceRow(
                 r.id(),
                 r.kind(),
-                r.kindLabel(),
+                r.kindLabel().singular(),
                 r.name(),
                 r.nodesPresent() + "/" + r.nodesTotal() + " nodes",
                 null,

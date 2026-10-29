@@ -36,6 +36,7 @@ _Others_
 * `i.g.s.r.p.c.ClusterOwnership` (in Clusters)
 * `i.g.s.r.p.c.ClusterService` (in Clusters)
 * `i.g.s.r.p.b.BrokerNotifications` (in Broker connectivity)
+* `i.g.s.r.p.b.BrokerSystems` (in Broker connectivity)
 * `i.g.s.r.k.s.SseHub` (in Event stream)
 |Events listened to
 |* `i.g.s.r.p.s.ScrapeTierCompleted` 

@@ -41,7 +41,7 @@ public record QueryPlan(
             String subscription,
             String destination,
             String routingType,
-            long messageCount,
+            Long messageCount,
             Instant brokerNow,
             boolean clockOffsetKnown) {}
 

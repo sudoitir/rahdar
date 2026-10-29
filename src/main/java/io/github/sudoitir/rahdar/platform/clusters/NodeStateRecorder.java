@@ -1,5 +1,6 @@
 package io.github.sudoitir.rahdar.platform.clusters;
 
+import io.github.sudoitir.openbroker.Endpoint;
 import io.github.sudoitir.openbroker.model.ConditionTypes;
 import io.github.sudoitir.openbroker.model.NodeDescription;
 import io.github.sudoitir.openbroker.model.Serving;
@@ -9,6 +10,7 @@ import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNo
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNodeEntity.HaObservation;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNodeRepository;
 import java.time.Instant;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -38,9 +40,11 @@ public class NodeStateRecorder {
     public void applyTierA(UUID nodeId, NodeDescription ha, long cycle) {
         nodes.findById(nodeId).ifPresent(node -> {
             String nodeIdBefore = node.getNativeNodeId();
+            // A node that reports serving rather than started (a Kafka broker) is started while it serves.
             String state = ha.conditions().stream()
-                    .filter(c -> c.type().equals(ConditionTypes.STARTED))
-                    .findFirst()
+                    .filter(c ->
+                            c.type().equals(ConditionTypes.STARTED) || c.type().equals(ConditionTypes.SERVING))
+                    .min(Comparator.comparing(c -> c.type().equals(ConditionTypes.STARTED) ? 0 : 1))
                     .map(c -> switch (c.status()) {
                         case TRUE -> "STARTED";
                         case FALSE -> "STOPPED";
@@ -61,6 +65,31 @@ public class NodeStateRecorder {
             if (!Objects.equals(nodeIdBefore, node.getNativeNodeId())) {
                 identityClaims.sync(node.getClusterId());
             }
+        });
+    }
+
+    /**
+     * A broker the cluster reports that is not stored yet joins the cluster's nodes, so the nodes stay true without a
+     * re-registration. Nothing happens when a node of that name or broker id is already there.
+     */
+    @Transactional
+    public void adopt(UUID clusterId, String name, String nativeNodeId, List<Endpoint> endpoints) {
+        boolean known = nodes.findByClusterIdOrderByNameAsc(clusterId).stream()
+                .anyMatch(n -> name.equals(n.getName()) || nativeNodeId.equals(n.getNativeNodeId()));
+        if (!known) {
+            nodes.save(BrokerNodeEntity.reported(clusterId, name, nativeNodeId, endpoints));
+        }
+    }
+
+    /**
+     * Remove a node the cluster no longer has, with the rows that hang on it (they go with it by cascade), and
+     * release its identity claims so an unrelated broker may take the address.
+     */
+    @Transactional
+    public void retire(UUID nodeId) {
+        nodes.findById(nodeId).ifPresent(node -> {
+            nodes.delete(node);
+            identityClaims.sync(node.getClusterId());
         });
     }
 

@@ -18,6 +18,10 @@ import io.github.sudoitir.rahdar.platform.clusters.EnvironmentService.Environmen
 import io.github.sudoitir.rahdar.platform.clusters.EnvironmentService.EnvironmentUpdateParams;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterRequests.AccountUpdate;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterRequests.RegisterClusterRequest;
+import io.github.sudoitir.rahdar.platform.clusters.web.ClusterRequests.RegisterClusterRequest.ArtemisConnection;
+import io.github.sudoitir.rahdar.platform.clusters.web.ClusterRequests.RegisterClusterRequest.KafkaConnection;
+import io.github.sudoitir.rahdar.platform.clusters.web.ClusterRequests.RegisterClusterRequest.UnknownConnection;
+import io.github.sudoitir.rahdar.platform.clusters.web.ClusterRequests.UpdateClusterRequest.KafkaConnectionUpdate;
 import io.github.sudoitir.rahdar.platform.clusters.web.EnvironmentViews.EnvironmentRequest;
 import java.util.ArrayList;
 import java.util.List;
@@ -180,6 +184,15 @@ class ClusterGatedOperations {
         };
     }
 
+    /** What the request reaches the cluster at: its seed URLs or its bootstrap servers. */
+    private static List<String> targets(RegisterClusterRequest p) {
+        return switch (p.connection()) {
+            case ArtemisConnection a -> a.seedUrls();
+            case KafkaConnection k -> k.bootstrapServers();
+            case UnknownConnection _ -> List.of(p.system());
+        };
+    }
+
     @Bean
     GatedOperation<RegisterClusterRequest> clusterRegisterOperation(
             ClusterService service, EnvironmentService environments) {
@@ -192,29 +205,20 @@ class ClusterGatedOperations {
             @Override
             public String summary(RegisterClusterRequest p) {
                 return "Register cluster "
-                        + (p.name() != null ? p.name() : p.seedUrls().getFirst());
+                        + (p.name() != null ? p.name() : targets(p).getFirst());
             }
 
             @Override
             public List<DisplayRow> display(RegisterClusterRequest p) {
-                List<DisplayRow> rows = new ArrayList<>();
-                rows.add(DisplayRow.of("Name", p.name()));
-                rows.add(DisplayRow.of("Seed URLs", String.join(", ", p.seedUrls())));
-                rows.add(DisplayRow.of(LABEL_ENVIRONMENT, environments.labelOf(p.environmentId())));
-                if (p.hasCredentials()) {
-                    rows.add(DisplayRow.of("Management account", p.credentials().username()));
-                }
-                if (p.hasCoreCredentials()) {
-                    rows.add(DisplayRow.of(
-                            LABEL_CORE_ACCOUNT, p.coreCredentials().username()));
-                }
-                rows.add(DisplayRow.of("Adopt the running configuration", p.adopts() ? "yes" : "no"));
-                return rows;
+                return registerDisplay(environments, p);
             }
 
             @Override
             public Set<String> redactedPaths() {
-                return Set.of("/credentials/password", "/coreCredentials/password");
+                return Set.of(
+                        "/connection/credentials/password",
+                        "/connection/credentials/token",
+                        "/connection/coreCredentials/password");
             }
 
             @Override
@@ -222,9 +226,8 @@ class ClusterGatedOperations {
                 return new Effect(
                         1,
                         UNIT_CLUSTERS,
-                        "seeds:"
-                                + String.join(
-                                        ",", p.seedUrls().stream().sorted().toList()),
+                        "targets:"
+                                + String.join(",", targets(p).stream().sorted().toList()),
                         null);
             }
 
@@ -239,7 +242,10 @@ class ClusterGatedOperations {
 
     @Bean
     GatedOperation<ClusterUpdateParams> clusterUpdateOperation(
-            ClusterService service, ClusterDirectory directory, ClusterEnvironmentIndex clusters) {
+            ClusterService service,
+            ClusterDirectory directory,
+            ClusterEnvironmentIndex clusters,
+            EnvironmentService environments) {
         return new Operations.Base<>("cluster.update", ClusterUpdateParams.class, Set.of(Trait.ACCESS_CONTROL)) {
             @Override
             public OperationScope scope(ClusterUpdateParams p) {
@@ -253,27 +259,16 @@ class ClusterGatedOperations {
 
             @Override
             public List<DisplayRow> display(ClusterUpdateParams p) {
-                List<DisplayRow> rows = new ArrayList<>();
-                rows.add(DisplayRow.of(LABEL_CLUSTER, clusters.labelOf(p.clusterId())));
-                addIfSet(rows, "Name", p.name());
-                addIfSet(rows, "Description", p.description());
-                if (p.seedUrls() != null) {
-                    rows.add(DisplayRow.of("Seed URLs", String.join(", ", p.seedUrls())));
-                }
-                addIfSet(rows, "Management URL pattern", p.managementUrlPattern());
-                addIfSet(rows, "TLS bundle", p.tlsBundle());
-                account(rows, "Management account", p.management());
-                if (p.clearCore()) {
-                    rows.add(new DisplayRow(LABEL_CORE_ACCOUNT, null, "cleared"));
-                } else {
-                    account(rows, LABEL_CORE_ACCOUNT, p.core());
-                }
-                return rows;
+                return updateDisplay(clusters, environments, p);
             }
 
             @Override
             public Set<String> redactedPaths() {
-                return Set.of("/management/password", "/core/password");
+                return Set.of(
+                        "/management/password",
+                        "/core/password",
+                        "/connection/credentials/password",
+                        "/connection/credentials/token");
             }
 
             @Override
@@ -284,16 +279,6 @@ class ClusterGatedOperations {
             @Override
             public void replay(ClusterUpdateParams p) {
                 service.updateConnection(p.clusterId(), p.toRequest());
-            }
-
-            private void account(List<DisplayRow> rows, String label, AccountUpdate account) {
-                if (account == null) {
-                    return;
-                }
-                rows.add(DisplayRow.of(label, account.username()));
-                if (account.password() != null && !account.password().isEmpty()) {
-                    rows.add(DisplayRow.of(label + " password", REDACTED_PASSWORD));
-                }
             }
         };
     }
@@ -387,6 +372,86 @@ class ClusterGatedOperations {
                 service.delete(p.clusterId());
             }
         };
+    }
+
+    private static List<DisplayRow> registerDisplay(EnvironmentService environments, RegisterClusterRequest p) {
+        List<DisplayRow> rows = new ArrayList<>();
+        rows.add(DisplayRow.of("Name", p.name()));
+        rows.add(DisplayRow.of("System", p.system()));
+        rows.add(DisplayRow.of(
+                p.connection() instanceof KafkaConnection ? "Bootstrap servers" : "Seed URLs",
+                String.join(", ", targets(p))));
+        rows.add(DisplayRow.of(LABEL_ENVIRONMENT, environments.labelOf(p.environmentId())));
+        switch (p.connection()) {
+            case ArtemisConnection a -> {
+                if (a.credentials() != null) {
+                    rows.add(DisplayRow.of("Management account", a.credentials().username()));
+                }
+                if (a.coreCredentials() != null) {
+                    rows.add(DisplayRow.of(
+                            LABEL_CORE_ACCOUNT, a.coreCredentials().username()));
+                }
+                rows.add(DisplayRow.of("Adopt the running configuration", p.adopts() ? "yes" : "no"));
+            }
+            case KafkaConnection k -> {
+                rows.add(DisplayRow.of("Security protocol", k.securityProtocol()));
+                if (k.saslMechanism() != null) {
+                    rows.add(DisplayRow.of("SASL mechanism", k.saslMechanism()));
+                }
+                if (k.credentials() != null && k.credentials().username() != null) {
+                    rows.add(DisplayRow.of("Account", k.credentials().username()));
+                }
+            }
+            case UnknownConnection _ -> {
+                // An unknown system has no account or protocol rows to show.
+            }
+        }
+        return rows;
+    }
+
+    private static List<DisplayRow> updateDisplay(
+            ClusterEnvironmentIndex clusters, EnvironmentService environments, ClusterUpdateParams p) {
+        List<DisplayRow> rows = new ArrayList<>();
+        rows.add(DisplayRow.of(LABEL_CLUSTER, clusters.labelOf(p.clusterId())));
+        addIfSet(rows, "Name", p.name());
+        addIfSet(rows, "Description", p.description());
+        if (p.seedUrls() != null) {
+            rows.add(DisplayRow.of("Seed URLs", String.join(", ", p.seedUrls())));
+        }
+        addIfSet(rows, "Management URL pattern", p.managementUrlPattern());
+        addIfSet(rows, "TLS bundle", p.tlsBundle());
+        if (p.connection() instanceof KafkaConnectionUpdate k) {
+            addIfSet(
+                    rows,
+                    "Bootstrap servers",
+                    k.bootstrapServers() == null ? null : String.join(", ", k.bootstrapServers()));
+            addIfSet(rows, "Security protocol", k.securityProtocol());
+            addIfSet(rows, "SASL mechanism", k.saslMechanism());
+            if (k.credentials() != null) {
+                addIfSet(rows, "Account", k.credentials().username());
+                rows.add(DisplayRow.of("Account secret", REDACTED_PASSWORD));
+            }
+        }
+        if (p.environmentId() != null) {
+            rows.add(DisplayRow.of(LABEL_ENVIRONMENT, environments.labelOf(p.environmentId())));
+        }
+        account(rows, "Management account", p.management());
+        if (p.clearCore()) {
+            rows.add(new DisplayRow(LABEL_CORE_ACCOUNT, null, "cleared"));
+        } else {
+            account(rows, LABEL_CORE_ACCOUNT, p.core());
+        }
+        return rows;
+    }
+
+    private static void account(List<DisplayRow> rows, String label, AccountUpdate account) {
+        if (account == null) {
+            return;
+        }
+        rows.add(DisplayRow.of(label, account.username()));
+        if (account.password() != null && !account.password().isEmpty()) {
+            rows.add(DisplayRow.of(label + " password", REDACTED_PASSWORD));
+        }
     }
 
     /** The cluster as the gate pins it: its id and when it was registered, so one registered again is a different one. */

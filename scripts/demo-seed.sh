@@ -4,7 +4,7 @@
 #
 # Everything here goes through the product's own surfaces: the cluster is
 # registered over Rahdar's REST API, and the messages are produced and consumed
-# by the Artemis CLI that already ships inside the broker image. Nothing writes to
+# by the Artemis and Kafka CLIs that already ship inside the broker images. Nothing writes to
 # `metric_sample`, `queue_snapshot` or any other table directly — a chart of
 # invented samples tells you nothing about whether the product works, and it is
 # the one thing a screenshot must not contain.
@@ -15,7 +15,9 @@
 #     ingress/egress lines diverge — the picture an operator actually comes for;
 #   - a real dead-letter backlog, produced by messages that were rejected;
 #   - one stopped node, so the topology has a genuine warning rather than a staged
-#     one.
+#     one;
+#   - a three-broker Kafka cluster, "events": keyed and compacted topics, a consumer group that keeps up, one
+#     that lags and one that is empty and behind, a share group, ACLs and one transaction left open.
 #
 # Metrics need real time to exist: tier B samples every 15s, so a credible 15m
 # chart needs about that long. TRAFFIC_MINUTES controls it.
@@ -69,20 +71,33 @@ fi
 # be scraped — it would render as an unreachable node in a cluster that is in fact
 # healthy.
 cluster=$(api POST /clusters -d '{
-  "seedUrls": [
-    "http://artemis-primary:8161/console/jolokia",
-    "http://artemis-backup:8161/console/jolokia",
-    "http://artemis-secondary:8161/console/jolokia",
-    "http://artemis-secondary-backup:8161/console/jolokia",
-    "http://artemis-tertiary:8161/console/jolokia",
-    "http://artemis-tertiary-backup:8161/console/jolokia"
-  ],
+  "system": "artemis",
   "name": "demo",
   "description": "Six-node replication estate — three live/backup pairs",
-  "credentials": {"username": "artemis", "password": "artemis"},
-  "coreCredentials": {"username": "artemis", "password": "artemis"}
+  "connection": {
+    "system": "artemis",
+    "seedUrls": [
+      "http://artemis-primary:8161/console/jolokia",
+      "http://artemis-backup:8161/console/jolokia",
+      "http://artemis-secondary:8161/console/jolokia",
+      "http://artemis-secondary-backup:8161/console/jolokia",
+      "http://artemis-tertiary:8161/console/jolokia",
+      "http://artemis-tertiary-backup:8161/console/jolokia"
+    ],
+    "credentials": {"username": "artemis", "password": "artemis"},
+    "coreCredentials": {"username": "artemis", "password": "artemis"}
+  }
 }' | python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])')
 echo "registered: $cluster"
+
+say "registering the Kafka cluster"
+# Every broker advertises kafka-N:9092 on the compose network, which is where Rahdar reaches them from;
+# the EXTERNAL listener is for a tool on the host and is not used here.
+# shellcheck source=lib/kafka-seed.sh
+. "$(dirname "${BASH_SOURCE[0]}")/lib/kafka-seed.sh"
+kafka_init
+kafka_register
+kafka_seed_data
 
 # Rates chosen so the four addresses are visibly different on one axis rather than
 # one line and three flat ones.
@@ -265,7 +280,7 @@ api POST "/users/$analyst/grants" -d "{\"roleId\": \"$reader\", \"scopeType\": \
 say "stopping one node, so the topology carries a real warning"
 $COMPOSE stop artemis-secondary-backup
 
-say "seeded. Rahdar: $RAHDAR — cluster $cluster"
+say "seeded. Rahdar: $RAHDAR — Artemis cluster $cluster, Kafka cluster $kafka_cluster"
 
 # Last, so the screens above are complete while the traffic runs: a long demo
 # (TRAFFIC_MINUTES in the hours) must not hold the users, the DLQ and the stopped
@@ -287,7 +302,17 @@ while [ "$(date +%s)" -lt "$deadline" ]; do
 
   # Low, steady, never drained — a queue that is simply accumulating.
   produce artemis-primary AUDIT.trail 40 20 &
+
+  # Kafka: steady writes, so billing keeps up while analytics and reporting fall further behind.
+  kafka_produce orders 400 100 &
+  kafka_produce payments 200 50 &
   wait
+
+  # The open transaction times out after fifteen minutes; open another before it does.
+  if [ $(( $(date +%s) - hanging_at )) -ge 600 ]; then
+    open_hanging_transaction
+    hanging_at=$(date +%s)
+  fi
 done
 
 say "done"

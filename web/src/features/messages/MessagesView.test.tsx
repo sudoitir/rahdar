@@ -375,6 +375,32 @@ describe('the purge estimate', () => {
   });
 });
 
+describe('a purge the system refuses', () => {
+  it('names the cause from the system, and leaves the confirmation disabled with it', async () => {
+    mockCluster([endpoint('n1', 'primary')]);
+    server.use(
+      http.post('*/api/v1/clusters/c1/resources/artemis.queue/PHASE3.SRC:purge', () =>
+        HttpResponse.json(
+          {
+            title: 'Failed precondition',
+            detail: 'The group has 2 members (consumer-1, consumer-2). Stop them before purging.',
+          },
+          { status: 409 },
+        ),
+      ),
+    );
+    const user = userEvent.setup();
+    renderWithProviders(<MessagesView />);
+
+    await user.click(await screen.findByRole('button', { name: 'Purge subscription' }));
+    const dialog = await screen.findByRole('dialog');
+
+    expect(await within(dialog).findByText('The system refuses this purge right now')).toBeInTheDocument();
+    expect(within(dialog).getAllByText(/The group has 2 members/).length).toBeGreaterThan(0);
+    expect(within(dialog).getByRole('button', { name: 'Purge subscription' })).toBeDisabled();
+  });
+});
+
 describe('the purge and the bulk safety cap', () => {
   it('does not override the cap when the depth is unknown', async () => {
     mockCluster([endpoint('n1', 'primary')]);

@@ -19,6 +19,12 @@ public final class ResourcePermissions {
 
     public static final String SUBSCRIPTION_PAUSE = "subscription:pause";
 
+    public static final String DESTINATION_UPDATE = "destination:update";
+
+    public static final String DESTINATION_TRUNCATE = "destination:truncate";
+
+    public static final String SUBSCRIPTION_SEEK = "subscription:seek";
+
     public static final String ROUTE_WRITE = "route:write";
 
     private ResourcePermissions() {}

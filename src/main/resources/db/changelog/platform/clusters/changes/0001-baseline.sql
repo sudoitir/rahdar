@@ -17,7 +17,7 @@ CREATE TABLE broker_identity (
     kind text NOT NULL,
     identity text NOT NULL,
     cluster_id uuid NOT NULL,
-    CONSTRAINT ck_broker_identity_kind CHECK ((kind = ANY (ARRAY['NODE_ID'::text, 'URL'::text])))
+    CONSTRAINT ck_broker_identity_kind CHECK ((kind = ANY (ARRAY['NODE_ID'::text, 'URL'::text, 'CLUSTER_ID'::text])))
 );
 
 CREATE TABLE broker_node (

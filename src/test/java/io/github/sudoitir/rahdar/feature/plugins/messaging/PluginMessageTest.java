@@ -2,7 +2,6 @@ package io.github.sudoitir.rahdar.feature.plugins.messaging;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import io.github.sudoitir.rahdar.kernel.security.ResourceRef;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.UUID;
@@ -12,7 +11,7 @@ class PluginMessageTest {
 
     private static final UUID CLUSTER = UUID.randomUUID();
     private static final UUID NODE = UUID.randomUUID();
-    private static final ResourceRef SOURCE = ResourceRef.subscription("q");
+    private static final SubscriptionId SOURCE = SubscriptionId.of("artemis.queue", "q");
 
     private static PluginMessage message(byte[] body) {
         return new PluginMessage(
@@ -65,7 +64,7 @@ class PluginMessageTest {
                 .isNotEqualTo(new PluginMessage(
                         "k",
                         CLUSTER,
-                        ResourceRef.subscription("other"),
+                        SubscriptionId.of("artemis.queue", "other"),
                         new MessageRef(NODE, "1"),
                         new byte[] {1},
                         true,

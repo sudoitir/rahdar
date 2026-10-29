@@ -1,7 +1,6 @@
 package io.github.sudoitir.rahdar.feature.plugins.messaging;
 
 import io.github.sudoitir.rahdar.kernel.plugin.PluginApi;
-import io.github.sudoitir.rahdar.kernel.security.ResourceRef;
 import java.util.UUID;
 
 /**
@@ -10,7 +9,8 @@ import java.util.UUID;
  * @param key the plugin's own name for the registration, 1 to 200 characters of letters, digits,
  *     {@code . _ : -}; registering the same key again replaces the registration
  * @param clusterId a registered cluster
- * @param source the subscription, on every serving node of the cluster
+ * @param source the subscription: on every serving node of the cluster when its kind keeps messages per
+ *     node (Artemis queues), once for the whole cluster when its kind is a partitioned log (Kafka groups)
  * @param mode tap or consume
  * @param concurrency how many messages the plugin handles at once on each serving node: 1 to 32 for
  *     {@link RegistrationMode#CONSUME}, exactly 1 for {@link RegistrationMode#TAP}. Rahdar opens that
@@ -23,4 +23,4 @@ import java.util.UUID;
  */
 @PluginApi
 public record RegistrationSpec(
-        String key, UUID clusterId, ResourceRef source, RegistrationMode mode, int concurrency, UUID actingUserId) {}
+        String key, UUID clusterId, SubscriptionId source, RegistrationMode mode, int concurrency, UUID actingUserId) {}

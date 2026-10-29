@@ -41,6 +41,7 @@ Rel(RahdarApplication.RahdarApplication.Approvals, RahdarApplication.RahdarAppli
 Rel(RahdarApplication.RahdarApplication.Approvals, RahdarApplication.RahdarApplication.Eventstream, "uses", $techn="", $tags="", $link="")
 Rel(RahdarApplication.RahdarApplication.Approvals, RahdarApplication.RahdarApplication.Inbox, "uses", $techn="", $tags="", $link="")
 Rel(RahdarApplication.RahdarApplication.Approvals, RahdarApplication.RahdarApplication.Plugincontract, "listens to", $techn="", $tags="", $link="")
+Rel(RahdarApplication.RahdarApplication.Approvals, RahdarApplication.RahdarApplication.Replicas, "listens to", $techn="", $tags="", $link="")
 Rel(RahdarApplication.RahdarApplication.Approvals, RahdarApplication.RahdarApplication.Replicas, "uses", $techn="", $tags="", $link="")
 Rel(RahdarApplication.RahdarApplication.Approvals, RahdarApplication.RahdarApplication.Scheduledjobs, "uses", $techn="", $tags="", $link="")
 Rel(RahdarApplication.RahdarApplication.Approvals, RahdarApplication.RahdarApplication.Security, "uses", $techn="", $tags="", $link="")

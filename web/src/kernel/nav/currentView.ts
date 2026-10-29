@@ -13,7 +13,8 @@ export interface CurrentView {
   groupLabel?: string;
 }
 
-const CLUSTER_PATH = /^\/clusters\/([^/]+)(?:\/(.*))?$/;
+/** `/clusters/new` is the registration page, not a cluster with the id "new". */
+const CLUSTER_PATH = /^\/clusters\/(?!new(?:\/|$))([^/]+)(?:\/(.*))?$/;
 
 function trimTrailingSlashes(path: string): string {
   let end = path.length;

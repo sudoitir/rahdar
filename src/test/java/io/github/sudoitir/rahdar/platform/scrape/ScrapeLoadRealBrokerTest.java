@@ -9,6 +9,7 @@ import io.github.sudoitir.rahdar.kernel.stream.SseHub;
 import io.github.sudoitir.rahdar.platform.broker.Attempt;
 import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
 import io.github.sudoitir.rahdar.platform.broker.BrokerNotifications;
+import io.github.sudoitir.rahdar.platform.broker.BrokerSystems;
 import io.github.sudoitir.rahdar.platform.broker.NodeAddress;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterOwnership;
@@ -20,6 +21,7 @@ import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.ClusterDetai
 import io.github.sudoitir.rahdar.support.AdminAuthenticationExtension;
 import io.github.sudoitir.rahdar.support.ArtemisIntegrationTest;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
+import io.github.sudoitir.rahdar.support.Registrations;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import java.time.Duration;
@@ -79,7 +81,7 @@ class ScrapeLoadRealBrokerTest extends PostgresIntegrationTest {
 
     @BeforeEach
     void register() {
-        Attempt<ClusterDetail> attempt = clusterService.register(new RegisterClusterRequest(
+        Attempt<ClusterDetail> attempt = clusterService.register(Registrations.artemis(
                 List.of(ArtemisIntegrationTest.jolokiaUrl()),
                 name,
                 null,
@@ -103,7 +105,9 @@ class ScrapeLoadRealBrokerTest extends PostgresIntegrationTest {
                 samples,
                 new StreamSignals(mock(SseHub.class)),
                 mock(BrokerNotifications.class),
-                events);
+                events,
+                List.of(),
+                mock(BrokerSystems.class));
     }
 
     @AfterEach

@@ -108,7 +108,9 @@ class OpenApiConfig {
     /**
      * A nullable reference is "the object or null", and a nullable enum lists {@code null}: springdoc renders the
      * first as {@code type: null} beside the {@code $ref} (nothing can satisfy that) and the second without the
-     * {@code null} value, so a client generated from the document would reject a response the API sends.
+     * {@code null} value, so a client generated from the document would reject a response the API sends. Union
+     * members hide those properties inside {@code allOf} until {@link #unionMembersStandAlone()} flattens them, so
+     * this walks composed schemas and that flattener runs it again on the schema it publishes.
      */
     @Bean
     OpenApiCustomizer nullableReferencesAndEnums() {
@@ -132,6 +134,7 @@ class OpenApiConfig {
                         property.getTypes() != null && property.getTypes().contains("null");
                 if (nullable && property.get$ref() != null) {
                     return new Schema<>()
+                            .description(property.getDescription())
                             .anyOf(List.of(
                                     new Schema<>().$ref(property.get$ref()), new Schema<>().types(Set.of("null"))));
                 }
@@ -148,6 +151,79 @@ class OpenApiConfig {
         fixNullable(schema.getItems());
         if (schema.getAdditionalProperties() instanceof Schema additional) {
             fixNullable(additional);
+        }
+        walkComposed(schema.getAllOf());
+        walkComposed(schema.getAnyOf());
+        walkComposed(schema.getOneOf());
+    }
+
+    @SuppressWarnings("rawtypes")
+    private static void walkComposed(List<Schema> composed) {
+        if (composed != null) {
+            composed.forEach(OpenApiConfig::fixNullable);
+        }
+    }
+
+    /**
+     * A union keyed by a discriminator ({@code oneOf} with a discriminator) lists members that each say they are the
+     * union too ({@code allOf} of the union), which is a cycle: openapi-generator makes every member extend the union
+     * and override the other members' properties, and the Java client does not compile. A member stands alone here,
+     * with its own properties and required list, and the union keeps only its {@code oneOf} and discriminator.
+     */
+    @Bean
+    OpenApiCustomizer unionMembersStandAlone() {
+        return OpenApiConfig::flattenUnions;
+    }
+
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    private static void flattenUnions(OpenAPI openApi) {
+        Map<String, Schema> schemas = openApi.getComponents().getSchemas();
+        new ArrayList<>(schemas.entrySet()).forEach(union -> flattenUnion(schemas, union.getKey(), union.getValue()));
+    }
+
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    private static void flattenUnion(Map<String, Schema> schemas, String name, Schema<?> parent) {
+        if (parent.getOneOf() == null || parent.getDiscriminator() == null) {
+            return;
+        }
+        String parentRef = "#/components/schemas/" + name;
+        for (Object member : parent.getOneOf()) {
+            flattenMember(schemas, parentRef, (Schema<?>) member);
+        }
+        parent.setProperties(null);
+        parent.setRequired(null);
+    }
+
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    private static void flattenMember(Map<String, Schema> schemas, String parentRef, Schema<?> member) {
+        String ref = member.get$ref();
+        Schema<?> child = ref == null ? null : schemas.get(ref.substring(ref.lastIndexOf('/') + 1));
+        if (child == null || child.getAllOf() == null) {
+            return;
+        }
+        Schema<?> flat = flattened(parentRef, child);
+        // Flattening copies properties out of allOf after the nullable pass, including a
+        // type:null beside a $ref. Rewrite those on the schema this publishes.
+        fixNullable(flat);
+        schemas.put(ref.substring(ref.lastIndexOf('/') + 1), flat);
+    }
+
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    private static Schema<?> flattened(String parentRef, Schema<?> child) {
+        Schema<?> flat = new ObjectSchema();
+        for (Object part : child.getAllOf()) {
+            copyOwnProperties(parentRef, flat, (Schema<?>) part);
+        }
+        if (child.getRequired() != null) {
+            child.getRequired().forEach(flat::addRequiredItem);
+        }
+        flat.setDescription(child.getDescription());
+        return flat;
+    }
+
+    private static void copyOwnProperties(String parentRef, Schema<?> flat, Schema<?> piece) {
+        if (!parentRef.equals(piece.get$ref()) && piece.getProperties() != null) {
+            piece.getProperties().forEach(flat::addProperty);
         }
     }
 

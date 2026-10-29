@@ -106,3 +106,27 @@
     transition: none;
   }
 }
+
+/* The registration page's choice of system: one card per loaded driver, side by side while they fit. */
+.systems {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  gap: var(--mantine-spacing-sm);
+  max-inline-size: 40rem;
+}
+
+.systemCard {
+  padding: var(--mantine-spacing-sm) var(--mantine-spacing-md);
+  border: 1px solid var(--as-border);
+  border-radius: var(--mantine-radius-md);
+  background: var(--as-surface);
+}
+
+.systemCard[data-checked] {
+  border-color: var(--as-accent);
+}
+
+.systemCard:focus-within {
+  outline: var(--as-focus-ring);
+  outline-offset: var(--as-focus-offset);
+}

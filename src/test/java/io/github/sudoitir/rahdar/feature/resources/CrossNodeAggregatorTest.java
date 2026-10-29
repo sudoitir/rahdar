@@ -2,6 +2,7 @@ package io.github.sudoitir.rahdar.feature.resources;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import io.github.sudoitir.rahdar.feature.resources.web.ResourceViews.Backlog;
 import io.github.sudoitir.rahdar.feature.resources.web.ResourceViews.SubscriptionView;
 import io.github.sudoitir.rahdar.kernel.core.ResourceQuery;
 import io.github.sudoitir.rahdar.kernel.security.AccessChanges;
@@ -18,6 +19,7 @@ import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterR
 import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshotUpsert;
 import io.github.sudoitir.rahdar.support.AdminAuthenticationExtension;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisModule;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -71,7 +73,7 @@ class CrossNodeAggregatorTest extends PostgresIntegrationTest {
 
     /** A cluster with a live/backup pair (shared NodeID) plus a standalone node. */
     private Fixture pairPlusStandalone() {
-        clusterId = clusters.save(new ClusterEntity("c-" + UUID.randomUUID(), null, null))
+        clusterId = clusters.save(new ClusterEntity(ArtemisModule.SYSTEM, "c-" + UUID.randomUUID(), null, null))
                 .getId();
         String sharedNodeId = UUID.randomUUID().toString();
         BrokerNodeEntity live = nodes.save(BrokerNodeEntity.fromSeed(clusterId, "live", "PRIMARY", sharedNodeId));
@@ -97,7 +99,8 @@ class CrossNodeAggregatorTest extends PostgresIntegrationTest {
                 0,
                 0,
                 false,
-                "artemis.queue");
+                "artemis.queue",
+                Map.of());
     }
 
     @Test
@@ -112,7 +115,9 @@ class CrossNodeAggregatorTest extends PostgresIntegrationTest {
         assertThat(rows).hasSize(1);
         SubscriptionView orders = rows.get(0);
         assertThat(orders.perNode()).hasSize(2);
-        assertThat(orders.totalMessageCount()).isEqualTo(15);
+        assertThat(orders.backlog().value()).isEqualTo(15);
+        assertThat(orders.backlog().accuracy()).isEqualTo(Backlog.Accuracy.EXACT);
+        assertThat(orders.backlog().breakdown()).isFalse();
         assertThat(orders.totalConsumerCount()).isEqualTo(2);
         assertThat(orders.nodesPresent()).isEqualTo(2);
         assertThat(orders.nodesTotal()).isEqualTo(2); // the pair is one logical node + the standalone
@@ -158,7 +163,7 @@ class CrossNodeAggregatorTest extends PostgresIntegrationTest {
                 row(f.nodeA(), "A", "alpha", 1), row(f.nodeA(), "B", "beta", 99), row(f.nodeA(), "C", "gamma", 50)));
 
         List<SubscriptionView> byDepthDesc = aggregator
-                .subscriptions(clusterId, ResourceQuery.of(null, 1, 50, "-depth"))
+                .subscriptions(clusterId, ResourceQuery.of(null, 1, 50, "-backlog"))
                 .data();
         assertThat(byDepthDesc).extracting(SubscriptionView::name).containsExactly("beta", "gamma", "alpha");
 

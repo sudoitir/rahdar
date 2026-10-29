@@ -7,7 +7,7 @@
   "vendor": { "name": "Rahdar QA" },
   "basePackage": "com.example.qaapprovals",
   "configuration": "com.example.qaapprovals.PluginConfig",
-  "contract": 13,
+  "contract": 18,
   "rahdar": { "since": "2026.01.0" },
   "ui": false,
   "activation": "AUTO",

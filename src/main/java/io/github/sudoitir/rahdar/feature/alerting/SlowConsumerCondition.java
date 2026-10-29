@@ -95,7 +95,8 @@ public class SlowConsumerCondition implements AlertCondition {
     }
 
     private static boolean hasBacklogWithConsumers(QueueSnapshot row) {
-        return row.consumerCount() > 0 && row.messageCount() > 0 && !row.paused();
+        // An unknown backlog is not a backlog: the rule fires on evidence of one, never on a placeholder.
+        return row.consumerCount() > 0 && row.backlogKnown() && row.messageCount() > 0 && !row.paused();
     }
 
     private static boolean inScope(QueueSnapshot row, AlertScope scope, boolean nodeScoped) {

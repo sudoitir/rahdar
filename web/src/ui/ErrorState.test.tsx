@@ -244,4 +244,20 @@ describe('ErrorState', () => {
     expect(alert).toHaveTextContent(detail);
     expect(alert).toHaveTextContent('Nothing was changed.');
   });
+
+  it("reads a list the cluster's system does not have as that, not as a conflict", () => {
+    renderWithProviders(
+      <ErrorState
+        error={apiError(
+          409,
+          { detail: "This cluster's system has no connection resources to list." },
+          { type: 'https://rahdar.dev/problems/unavailable-on-system' },
+        )}
+      />,
+    );
+    const alert = screen.getByRole('alert');
+    expect(alert).toHaveTextContent('This system does not have this');
+    expect(alert).toHaveTextContent("This cluster's system has no connection resources to list.");
+    expect(alert).not.toHaveTextContent('conflicts with the current state');
+  });
 });

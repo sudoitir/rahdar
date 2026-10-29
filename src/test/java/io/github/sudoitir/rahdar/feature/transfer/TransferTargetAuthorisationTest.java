@@ -45,7 +45,7 @@ class TransferTargetAuthorisationTest {
     }
 
     private static Optional<QueueLocation> boundTo(String queue, String address) {
-        return Optional.of(new QueueLocation(UUID.randomUUID(), queue, address, "ANYCAST", 0));
+        return Optional.of(new QueueLocation(UUID.randomUUID(), queue, address, "ANYCAST", 0L));
     }
 
     @Test

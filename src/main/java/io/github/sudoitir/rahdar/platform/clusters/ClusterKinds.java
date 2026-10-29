@@ -2,6 +2,7 @@ package io.github.sudoitir.rahdar.platform.clusters;
 
 import io.github.sudoitir.openbroker.BrokerSystem;
 import io.github.sudoitir.openbroker.model.Kind;
+import io.github.sudoitir.openbroker.model.KindId;
 import io.github.sudoitir.openbroker.model.ResourceClass;
 import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
 import io.github.sudoitir.rahdar.platform.broker.BrokerSystems;
@@ -14,7 +15,9 @@ import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.SystemView;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -29,9 +32,27 @@ public class ClusterKinds {
     private final BrokerGateway gateway;
     private final SystemExtensions extensions;
 
+    /** Whether the cluster's kind of this id reads a partitioned log, so its messages are browsed by partition. */
+    public boolean partitioned(UUID clusterId, String kind) {
+        return kindsOf(clusterId).stream().anyMatch(k -> k.id().equals(kind) && k.partitioned());
+    }
+
+    /** The ids of the cluster's kinds that are subscriptions, which messages are received from. */
+    public List<String> subscriptionKinds(UUID clusterId) {
+        return kindsOf(clusterId).stream()
+                .filter(k -> ResourceClass.SUBSCRIPTION.name().equals(k.resourceClass()))
+                .map(KindView::id)
+                .toList();
+    }
+
     /** The id of the system the cluster runs. */
     public String systemId(UUID clusterId) {
         return systems.idOf(clusterId);
+    }
+
+    /** The name of the system the cluster runs, for messages to people. */
+    public String systemName(UUID clusterId) {
+        return systemOf(clusterId).name();
     }
 
     public SystemView systemOf(UUID clusterId) {
@@ -48,11 +69,18 @@ public class ClusterKinds {
                 extensions.forCluster(clusterId, QueueCounters.class).isPresent();
         boolean expire = extensions.forCluster(clusterId, MessageExpiry.class).isPresent();
         try {
-            return gateway.cluster(clusterId).resources().kinds().stream()
+            List<Kind> all = gateway.cluster(clusterId).resources().kinds();
+            Set<KindId> logs = all.stream()
+                    .filter(k -> k.resourceClass() == ResourceClass.PARTITION)
+                    .flatMap(k -> k.parent().stream())
+                    .collect(Collectors.toSet());
+            return all.stream()
                     .map(kind -> new KindView(
                             kind.id().value(),
                             kind.resourceClass().name(),
-                            ResourceIds.label(kind.id()),
+                            ResourceIds.name(kind.label()),
+                            logs.contains(kind.id())
+                                    || (!logs.isEmpty() && kind.resourceClass() == ResourceClass.SUBSCRIPTION),
                             verbs(kind, resetCounters, expire)))
                     .toList();
         } catch (RuntimeException e) {

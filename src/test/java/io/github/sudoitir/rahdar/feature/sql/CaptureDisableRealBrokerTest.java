@@ -17,11 +17,13 @@ import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshotUpsert;
 import io.github.sudoitir.rahdar.support.AdminAuthenticationExtension;
 import io.github.sudoitir.rahdar.support.ArtemisIntegrationTest;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
+import io.github.sudoitir.rahdar.support.Registrations;
 import io.github.sudoitir.rahdar.system.artemis.ArtemisNode;
 import io.github.sudoitir.rahdar.system.artemis.DivertOperations;
 import io.github.sudoitir.rahdar.system.artemis.ManagementRequest;
 import io.github.sudoitir.rahdar.system.artemis.QueueLifecycleOperations;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
@@ -83,7 +85,7 @@ class CaptureDisableRealBrokerTest extends PostgresIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        var attempt = clusterService.register(new RegisterClusterRequest(
+        var attempt = clusterService.register(Registrations.artemis(
                 List.of(ArtemisIntegrationTest.jolokiaUrl()),
                 "capture-disable-" + run,
                 null,
@@ -113,7 +115,7 @@ class CaptureDisableRealBrokerTest extends PostgresIntegrationTest {
                 address,
                 "ANYCAST",
                 true,
-                0,
+                0L,
                 0,
                 0,
                 0,
@@ -121,7 +123,8 @@ class CaptureDisableRealBrokerTest extends PostgresIntegrationTest {
                 0,
                 0,
                 false,
-                "artemis.queue")));
+                "artemis.queue",
+                Map.of())));
     }
 
     @AfterEach

@@ -1,6 +1,7 @@
 package io.github.sudoitir.rahdar.platform.scrape;
 
 import java.time.Instant;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -16,10 +17,18 @@ public record QueueSnapshot(
         boolean durable,
         boolean paused,
         Instant ts,
-        long messageCount,
+        Long messageCount,
         long consumerCount,
         long deliveringCount,
         long scheduledCount,
         long messagesAdded,
         long messagesAcked,
-        long messagesExpired) {}
+        long messagesExpired,
+        String kind,
+        Map<String, String> attributes) {
+
+    /** False when the system gave no backlog: {@link #messageCount} is then null, never zero. */
+    public boolean backlogKnown() {
+        return messageCount != null;
+    }
+}

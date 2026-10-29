@@ -8,6 +8,7 @@ import io.github.sudoitir.rahdar.feature.rr.internal.persistence.RrFlowRepositor
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterEntity;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterRepository;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisModule;
 import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
@@ -39,7 +40,7 @@ class RrDeadlineSweepTest extends PostgresIntegrationTest {
     }
 
     private UUID cluster() {
-        clusterId = clusters.save(new ClusterEntity("rr-sweep-" + UUID.randomUUID(), null, null))
+        clusterId = clusters.save(new ClusterEntity(ArtemisModule.SYSTEM, "rr-sweep-" + UUID.randomUUID(), null, null))
                 .getId();
         return clusterId;
     }

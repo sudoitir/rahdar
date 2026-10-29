@@ -4,8 +4,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.times;
@@ -46,14 +50,19 @@ import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
 import io.github.sudoitir.rahdar.platform.broker.BrokerFailures;
 import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
 import io.github.sudoitir.rahdar.platform.broker.BrokerNotifications;
+import io.github.sudoitir.rahdar.platform.broker.BrokerSystems;
+import io.github.sudoitir.rahdar.platform.broker.ClusterScrape;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDutyAcquired;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDutyReleased;
+import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterOwnership;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterService;
 import io.github.sudoitir.rahdar.platform.clusters.NodeStateRecorder;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNodeEntity;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterEntity;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisModule;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -121,6 +130,12 @@ class ScrapeSchedulerTest {
     @Mock
     ClusterOwnership ownership;
 
+    @Mock
+    ClusterScrape systemScrape;
+
+    @Mock
+    BrokerSystems systems;
+
     ScrapeCycle scrapeCycle;
     ScrapeScheduler scheduler;
     ListAppender<ILoggingEvent> logs;
@@ -134,6 +149,7 @@ class ScrapeSchedulerTest {
         when(gateway.cluster(any())).thenReturn(connection);
         when(connection.nodes()).thenReturn(nodes);
         when(connection.resources()).thenReturn(resources);
+        Mockito.lenient().when(systemScrape.system()).thenReturn("kafka");
         scrapeCycle = new ScrapeCycle(persist);
         scheduler = new ScrapeScheduler(
                 settings,
@@ -147,7 +163,9 @@ class ScrapeSchedulerTest {
                 metrics,
                 new StreamSignals(Mockito.mock(SseHub.class)),
                 notifications,
-                eventPublisher);
+                eventPublisher,
+                List.of(systemScrape),
+                systems);
     }
 
     @AfterEach
@@ -204,7 +222,7 @@ class ScrapeSchedulerTest {
     }
 
     private static ClusterEntity cluster(String name) {
-        ClusterEntity c = new ClusterEntity(name, null, null);
+        ClusterEntity c = new ClusterEntity(ArtemisModule.SYSTEM, name, null, null);
         setId(c, UUID.randomUUID());
         return c;
     }
@@ -231,6 +249,56 @@ class ScrapeSchedulerTest {
 
         verify(clusterService).rediscover(broken.getId());
         verify(clusterService).rediscover(fine.getId());
+    }
+
+    @Test
+    void aClusterWhoseSystemScrapesAsAWholeIsHandedToItAndItsNodesAreNotProbed() {
+        ClusterEntity cluster = cluster("kafka");
+        when(systems.idOf(cluster.getId())).thenReturn("kafka");
+        when(clusters.owned()).thenReturn(List.of(cluster));
+
+        scheduler.tierA();
+
+        verify(systemScrape).nodes(eq(cluster.getId()), anyLong());
+        verify(gateway, never()).cluster(any());
+        verify(eventPublisher).publishEvent(any(ScrapeTierCompleted.class));
+    }
+
+    @Test
+    void aClusterThatNeverAnswersHoldsNeitherTheOtherClustersNorTheNextTickAndIsMarkedNotAnswering() {
+        ClusterEntity stuck = cluster("stuck");
+        ClusterEntity fine = cluster("fine");
+        when(systems.idOf(any())).thenReturn("kafka");
+        when(clusters.owned()).thenReturn(List.of(stuck, fine));
+        ClusterNode node = mock(ClusterNode.class);
+        when(node.getId()).thenReturn(UUID.randomUUID());
+        when(clusters.nodes(stuck.getId())).thenReturn(List.of(node));
+        CountDownLatch release = new CountDownLatch(1);
+        doAnswer(call -> {
+                    release.await();
+                    return null;
+                })
+                .when(systemScrape)
+                .nodes(eq(stuck.getId()), anyLong());
+        scheduler.systemScrapeLimit = Duration.ofMillis(300);
+
+        try {
+            long started = System.nanoTime();
+            scheduler.tierA();
+            long tookMillis = (System.nanoTime() - started) / 1_000_000;
+            scheduler.tierA();
+
+            assertThat(tookMillis).isLessThan(5_000);
+            verify(systemScrape, times(2)).nodes(eq(fine.getId()), anyLong());
+            verify(systemScrape, times(1)).nodes(eq(stuck.getId()), anyLong());
+            verify(persist, atLeastOnce())
+                    .recordNodeError(
+                            eq(node.getId()),
+                            contains("did not answer"),
+                            eq(BrokerConnectionException.Kind.UNREACHABLE));
+        } finally {
+            release.countDown();
+        }
     }
 
     @Test

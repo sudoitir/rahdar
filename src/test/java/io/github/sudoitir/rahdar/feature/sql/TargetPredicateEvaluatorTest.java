@@ -22,7 +22,7 @@ import org.junit.jupiter.params.provider.CsvSource;
 class TargetPredicateEvaluatorTest {
 
     private static final Target TARGET =
-            new Target(UUID.randomUUID(), "node-a", "ORDERS", "orders.addr", "ANYCAST", 3, Instant.EPOCH, true);
+            new Target(UUID.randomUUID(), "node-a", "ORDERS", "orders.addr", "ANYCAST", 3L, Instant.EPOCH, true);
 
     private static Term.ColumnTerm col(Column column) {
         return new Term.ColumnTerm(column);

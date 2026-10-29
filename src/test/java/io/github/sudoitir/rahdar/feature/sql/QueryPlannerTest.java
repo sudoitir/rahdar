@@ -27,6 +27,7 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -103,7 +104,23 @@ class QueryPlannerTest {
 
     private QueueSnapshot snapshot(BrokerNodeEntity node, String queue, long depth) {
         return new QueueSnapshot(
-                CLUSTER, node.getId(), queue, queue, "ANYCAST", false, false, null, depth, 0, 0, 0, 0, 0, 0);
+                CLUSTER,
+                node.getId(),
+                queue,
+                queue,
+                "ANYCAST",
+                false,
+                false,
+                null,
+                depth,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                "artemis.queue",
+                Map.of());
     }
 
     /** Both entities keep a protected no-arg constructor for JPA; tests use the same one. */
@@ -189,7 +206,7 @@ class QueryPlannerTest {
         BrokerNodeEntity a = node("broker-1", "node-a");
         given(List.of(a), List.of(snapshot(a, "ORDER.IN", 10)));
         when(locator.locate(CLUSTER, "FRESH"))
-                .thenReturn(List.of(new QueueLocation(a.getId(), "FRESH", "FRESH", "ANYCAST", 3)));
+                .thenReturn(List.of(new QueueLocation(a.getId(), "FRESH", "FRESH", "ANYCAST", 3L)));
 
         QueryPlan plan = plan("SELECT * FROM \"FRESH\"");
 
@@ -199,6 +216,21 @@ class QueryPlannerTest {
             assertThat(t.messageCount()).isEqualTo(3);
         });
         assertThat(plan.notices()).extracting(Notice::kind).doesNotContain(Notice.Kind.NO_SUBSCRIPTION_MATCHED);
+    }
+
+    @Test
+    void aQueueWithNoDepthIsATargetWithAnUnknownDepthAndAddsNothingToTheEstimate() {
+        BrokerNodeEntity a = node("broker-1", "node-a");
+        given(List.of(a), List.of(snapshot(a, "ORDER.IN", 10)));
+        when(locator.locate(CLUSTER, "FRESH"))
+                .thenReturn(List.of(new QueueLocation(a.getId(), "FRESH", "FRESH", "ANYCAST", null)));
+
+        QueryPlan plan = plan("SELECT * FROM \"FRESH\"");
+
+        assertThat(plan.targets())
+                .singleElement()
+                .satisfies(t -> assertThat(t.messageCount()).isNull());
+        assertThat(plan.estimatedMessagesExamined()).isZero();
     }
 
     @Test

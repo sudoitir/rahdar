@@ -14,7 +14,8 @@ import { TransferDialog } from './TransferDialog.tsx';
  */
 export function TransferSubscriptionMessages({ clusterId, target, host }: Readonly<ActionProps<SubscriptionTarget>>) {
   const cluster = useCluster(clusterId);
-  const total = target.snapshot ? target.snapshot.totalMessageCount : null;
+  const backlog = target.snapshot?.backlog;
+  const total = backlog?.accuracy === 'EXACT' ? (backlog.value ?? null) : null;
   const move = useResourceGate({
     clusterId,
     noun: 'subscription',

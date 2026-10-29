@@ -3,7 +3,7 @@ import { Button, Group, Progress, Stack, Text } from '@mantine/core';
 import { Link, useParams } from '@tanstack/react-router';
 
 import { useCan } from '../../kernel/auth/useCan.ts';
-import { nameOf } from '../../kernel/api/resourceId.ts';
+import { subscriptionLabel } from '../../kernel/api/resourceId.ts';
 import { absoluteLabel } from '../../kernel/time/time.ts';
 import { useDisplayZone } from '../../kernel/time/timezone.ts';
 import { CapabilityGate } from '../../ui/CapabilityGate.tsx';
@@ -82,7 +82,7 @@ function SubscriptionDetail({
 }>) {
   return (
     <Section
-      title={nameOf(item.subscription)}
+      title={subscriptionLabel(item.subscription)}
       headingLevel={3}
       actions={
         <Button size="xs" variant="subtle" onClick={onHide}>

@@ -64,7 +64,7 @@ function subscription(over: Partial<SubscriptionView> = {}): SubscriptionView {
       'message:move',
     ],
     durable: true,
-    totalMessageCount: 12,
+    backlog: { value: 12, accuracy: 'EXACT', reason: null, breakdown: false },
     totalConsumerCount: 0,
     totalDeliveringCount: 0,
     totalScheduledCount: 0,

@@ -32,6 +32,7 @@ import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterR
 import io.github.sudoitir.rahdar.support.McpFixture;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
 import io.github.sudoitir.rahdar.support.Targets;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisModule;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -111,7 +112,7 @@ class McpConnectionControlIntegrationTest extends PostgresIntegrationTest {
         mvc = MockMvcBuilders.webAppContextSetup(webContext)
                 .apply(springSecurity())
                 .build();
-        clusterId = clusters.save(new ClusterEntity("conn-" + UUID.randomUUID(), null, null))
+        clusterId = clusters.save(new ClusterEntity(ArtemisModule.SYSTEM, "conn-" + UUID.randomUUID(), null, null))
                 .getId();
         BrokerNodeEntity node = BrokerNodeEntity.fromSeed(
                 clusterId, "node-a", "PRIMARY", UUID.randomUUID().toString());

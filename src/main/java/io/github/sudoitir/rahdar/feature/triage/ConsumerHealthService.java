@@ -5,6 +5,7 @@ import io.github.sudoitir.openbroker.notification.EventTypes;
 import io.github.sudoitir.rahdar.feature.events.BrokerEventService;
 import io.github.sudoitir.rahdar.feature.events.web.EventViews.BrokerEventView;
 import io.github.sudoitir.rahdar.feature.resources.CrossNodeAggregator;
+import io.github.sudoitir.rahdar.feature.resources.web.ResourceViews.Backlog;
 import io.github.sudoitir.rahdar.feature.resources.web.ResourceViews.SubscriptionNodeCell;
 import io.github.sudoitir.rahdar.feature.resources.web.ResourceViews.SubscriptionView;
 import io.github.sudoitir.rahdar.feature.triage.ConsumerHealth.Source;
@@ -30,7 +31,6 @@ import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 /**
  * The consumer-health verdict ladder (ADR-0089) — the one place it is evaluated.
@@ -71,7 +71,6 @@ public class ConsumerHealthService {
      * Every queue in the cluster, ranked worst-first unless the caller asked for another
      * order. A request path, so it keeps to the queues the caller may read before ranking, paging or counting.
      */
-    @Transactional(readOnly = true)
     public PagedView<ConsumerHealth> page(UUID clusterId, ResourceQuery query) {
         clusterAccess.requireVisible(clusterId);
         ResourceFilter readable = permissions.filter(clusterId, ResourceType.SUBSCRIPTION);
@@ -90,7 +89,6 @@ public class ConsumerHealthService {
     }
 
     /** One queue's verdict, for the drawer panel and the {@code diagnose} tool. */
-    @Transactional(readOnly = true)
     public Optional<ConsumerHealth> forSubscription(UUID clusterId, String queueName) {
         clusterAccess.requireResource(clusterId, ResourceRef.subscription(queueName), Permissions.SUBSCRIPTION_READ);
         return evaluated(clusterId).stream()
@@ -105,7 +103,6 @@ public class ConsumerHealthService {
      * {@code SlowConsumerCondition} — wide enough that a queue swept on the slow tier has
      * two samples in it, narrow enough that the rate still describes now.
      */
-    @Transactional(readOnly = true)
     public List<ConsumerHealth> evaluate(UUID clusterId) {
         return evaluated(clusterId);
     }
@@ -141,7 +138,17 @@ public class ConsumerHealthService {
 
         Builder b = new Builder(row, addRates.get(row.name()), ackRates.get(row.name()), slopes.get(row.name()));
 
-        boolean backlog = row.totalMessageCount() >= properties.minBacklog();
+        // An unknown backlog is not an empty one: nothing below can say "caught up" about a figure it does not have.
+        if (row.backlog().accuracy() == Backlog.Accuracy.UNAVAILABLE) {
+            return b.verdict(
+                    Verdict.INSUFFICIENT_DATA,
+                    "The system gave no backlog for this subscription"
+                            + (row.backlog().reason() == null
+                                    ? "."
+                                    : ": " + row.backlog().reason()));
+        }
+
+        boolean backlog = row.backlog().valueOrZero() >= properties.minBacklog();
         boolean acking = b.ackRate != null && b.ackRate > properties.idleAckRate();
 
         ConsumerHealth verdict = unmeasuredOrUnattended(b, backlog, brokerSlow.get(row.destinationName()));
@@ -237,7 +244,7 @@ public class ConsumerHealthService {
         // 8. Recovering. Reported rather than hidden: an operator watching an incident
         //    needs to know it is ending, and when.
         if (netRate != null && netRate < 0 && backlog) {
-            Duration eta = Duration.ofSeconds((long) (b.row.totalMessageCount() / -netRate));
+            Duration eta = Duration.ofSeconds((long) (b.row.backlog().valueOrZero() / -netRate));
             return b.eta(eta)
                     .verdict(
                             Verdict.DRAINING,
@@ -385,7 +392,7 @@ public class ConsumerHealthService {
                     cause,
                     verdict == Verdict.BROKER_SLOW ? Source.BROKER : Source.DERIVED,
                     brokerConsumerName,
-                    row.totalMessageCount(),
+                    row.backlog().valueOrZero(),
                     row.totalConsumerCount(),
                     row.totalDeliveringCount(),
                     row.totalScheduledCount(),

@@ -1,5 +1,6 @@
 package io.github.sudoitir.rahdar.kernel.security;
 
+import io.github.sudoitir.rahdar.kernel.core.KindName;
 import io.github.sudoitir.rahdar.kernel.plugin.ResourceType;
 import java.util.Optional;
 import java.util.UUID;
@@ -30,5 +31,8 @@ public interface ResourceIdTexts {
         String subscription(String name);
 
         String destination(String name);
+
+        /** The name for people of the kind a canonical id text names, as the cluster's driver gives it; null for no id. */
+        KindName kindLabel(String id);
     }
 }

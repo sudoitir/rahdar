@@ -4,7 +4,7 @@ import io.github.sudoitir.rahdar.kernel.plugin.FeatureDescriptor;
 import io.github.sudoitir.rahdar.kernel.plugin.McpToolDef;
 import io.github.sudoitir.rahdar.kernel.plugin.PermissionDef;
 import io.github.sudoitir.rahdar.kernel.plugin.TopicDef;
-import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisModule;
 import java.util.List;
 
 /** Declared configuration, apply, drift and config diff. Module descriptor (ADR-0070). */
@@ -36,7 +36,7 @@ public final class BrokerConfigModule {
                                     "nodes",
                                     "Comma-separated node ids, at least two, from cluster://{clusterId}/topology. "
                                             + "Omit to compare every node.")))
-                    .forSystem(BrokerGateway.SYSTEM))
+                    .forSystem(ArtemisModule.SYSTEM))
             .mcpTool(new McpToolDef(
                             "artemis_config",
                             McpToolDef.Posture.READ,
@@ -47,7 +47,7 @@ public final class BrokerConfigModule {
                                     "Default declaration. drift is the last stored evaluation per node; it "
                                             + "compares every node with the declaration, not nodes with each other "
                                             + "(that is artemis_config_diff).")))
-                    .forSystem(BrokerGateway.SYSTEM))
+                    .forSystem(ArtemisModule.SYSTEM))
             .mcpTool(new McpToolDef(
                             "artemis_config_change",
                             McpToolDef.Posture.MUTATE,
@@ -87,7 +87,7 @@ public final class BrokerConfigModule {
                                     McpToolDef.Param.note(
                                             "confirm", "Required to turn dryRun off; must equal the cluster's name."),
                                     McpToolDef.Param.note("override", McpToolDef.OVERRIDE)))
-                    .forSystem(BrokerGateway.SYSTEM))
+                    .forSystem(ArtemisModule.SYSTEM))
             .build();
 
     private BrokerConfigModule() {}

@@ -53,7 +53,7 @@ Rel(RahdarApplication.RahdarApplication.Alerting, RahdarApplication.RahdarApplic
 Rel(RahdarApplication.RahdarApplication.Alerting, RahdarApplication.RahdarApplication.Security, "uses", $techn="", $tags="", $link="")
 Rel(RahdarApplication.RahdarApplication.Alerting, RahdarApplication.RahdarApplication.Settings, "uses", $techn="", $tags="", $link="")
 Rel(RahdarApplication.RahdarApplication.Artemis, RahdarApplication.RahdarApplication.Brokerconnectivity, "uses", $techn="", $tags="", $link="")
-Rel(RahdarApplication.RahdarApplication.Artemis, RahdarApplication.RahdarApplication.Clusters, "depends on", $techn="", $tags="", $link="")
+Rel(RahdarApplication.RahdarApplication.Artemis, RahdarApplication.RahdarApplication.Clusters, "uses", $techn="", $tags="", $link="")
 Rel(RahdarApplication.RahdarApplication.Artemis, RahdarApplication.RahdarApplication.Core, "depends on", $techn="", $tags="", $link="")
 Rel(RahdarApplication.RahdarApplication.Artemis, RahdarApplication.RahdarApplication.Plugincontract, "depends on", $techn="", $tags="", $link="")
 Rel(RahdarApplication.RahdarApplication.Artemis, RahdarApplication.RahdarApplication.Scraping, "uses", $techn="", $tags="", $link="")

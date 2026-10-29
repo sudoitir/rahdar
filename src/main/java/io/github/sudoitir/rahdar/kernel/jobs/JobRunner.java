@@ -324,27 +324,27 @@ public class JobRunner implements SmartInitializingSingleton, DisposableBean {
         JobStatus before = statuses.get(id);
         boolean failing = before != null && before.lastError() != null;
         Stop stop = entry.stop.get();
-        JobStatus.Outcome outcome;
+        JobStatus.JobOutcome outcome;
         String error;
         switch (stop) {
             case TIMEOUT -> {
-                outcome = JobStatus.Outcome.TIMED_OUT;
+                outcome = JobStatus.JobOutcome.TIMED_OUT;
                 error = "Timed out after " + timeout;
             }
             case LOCK_LOST -> {
-                outcome = JobStatus.Outcome.LOCK_LOST;
+                outcome = JobStatus.JobOutcome.LOCK_LOST;
                 error = "Lost its lock while running";
             }
             case SHUTDOWN -> {
-                outcome = JobStatus.Outcome.INTERRUPTED;
+                outcome = JobStatus.JobOutcome.INTERRUPTED;
                 error = "Interrupted at shutdown";
             }
             default -> {
-                outcome = failure == null ? JobStatus.Outcome.SUCCEEDED : JobStatus.Outcome.FAILED;
+                outcome = failure == null ? JobStatus.JobOutcome.SUCCEEDED : JobStatus.JobOutcome.FAILED;
                 error = failure == null ? null : String.valueOf(failure.getMessage());
             }
         }
-        if (outcome == JobStatus.Outcome.SUCCEEDED) {
+        if (outcome == JobStatus.JobOutcome.SUCCEEDED) {
             statuses.succeeded(id, at);
             if (failing) {
                 log.info("Job {} succeeded again", id);

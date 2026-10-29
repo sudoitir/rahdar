@@ -21,8 +21,10 @@ import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshotUpsert;
 import io.github.sudoitir.rahdar.support.ArtemisIds;
 import io.github.sudoitir.rahdar.support.OperatorFixture;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisModule;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -81,7 +83,7 @@ abstract class BulkTestSupport extends PostgresIntegrationTest {
 
     @BeforeEach
     void cluster() {
-        clusterId = clusters.save(new ClusterEntity("c-" + UUID.randomUUID(), null, null))
+        clusterId = clusters.save(new ClusterEntity(ArtemisModule.SYSTEM, "c-" + UUID.randomUUID(), null, null))
                 .getId();
         nodeA = node("a");
         nodeB = node("b");
@@ -121,7 +123,8 @@ abstract class BulkTestSupport extends PostgresIntegrationTest {
                 0,
                 0,
                 paused,
-                "artemis.queue")));
+                "artemis.queue",
+                Map.of())));
     }
 
     /** The node stops answering: its last snapshot is older than the freshness window. */
@@ -133,7 +136,11 @@ abstract class BulkTestSupport extends PostgresIntegrationTest {
         return bulk.preview(clusterId, new BulkPreviewRequest(operation, null, q, false));
     }
 
+    /** Previews the Artemis queues of these names, as a client names a subscription by its id. */
     BulkRunDetailView preview(BulkOperation operation, List<String> names) {
-        return bulk.preview(clusterId, new BulkPreviewRequest(operation, names, null, false));
+        return bulk.preview(
+                clusterId,
+                new BulkPreviewRequest(
+                        operation, names.stream().map(n -> "artemis.queue/" + n).toList(), null, false));
     }
 }

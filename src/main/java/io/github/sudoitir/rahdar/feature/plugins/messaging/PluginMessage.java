@@ -1,7 +1,6 @@
 package io.github.sudoitir.rahdar.feature.plugins.messaging;
 
 import io.github.sudoitir.rahdar.kernel.plugin.PluginApi;
-import io.github.sudoitir.rahdar.kernel.security.ResourceRef;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Map;
@@ -28,7 +27,7 @@ import java.util.UUID;
 public record PluginMessage(
         String registrationKey,
         UUID clusterId,
-        ResourceRef source,
+        SubscriptionId source,
         MessageRef message,
         byte[] body,
         boolean text,

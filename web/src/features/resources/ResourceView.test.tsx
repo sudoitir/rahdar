@@ -46,7 +46,7 @@ function consumer(id: string) {
     nodeName: 'node-a',
     id: `artemis.consumer/s1/${id}`,
     kind: 'artemis.consumer',
-    kindLabel: 'Consumer',
+    kindLabel: { singular: 'Consumer', plural: 'Consumers' },
     channel: 'artemis.session/s1',
     subscription: 'artemis.queue/orders',
     destination: 'artemis.address/orders',

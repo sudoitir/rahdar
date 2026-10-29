@@ -9,7 +9,7 @@ import { OPERATIONS } from './words.ts';
 
 /**
  * "Purge messages…" on a subscription's row. A cluster-wide purge with a per-node outcome is a bulk run of
- * one subscription (ADR-0093): the same preview, blast radius, cap and audit, confirmed by the subscription's name.
+ * one subscription (ADR-0093): the same preview, blast radius, cap and audit, confirmed by pressing and holding (ADR-0186).
  * Accepting it opens the run, so focus is not handed back to a row the operator has left.
  */
 export function PurgeSubscription({ clusterId, target, host }: Readonly<ActionProps<SubscriptionTarget>>) {
@@ -37,7 +37,7 @@ export function PurgeSubscription({ clusterId, target, host }: Readonly<ActionPr
         host.open(BulkPreviewDialog, {
           clusterId,
           operation: 'PURGE',
-          selection: { kind: 'names', names: [target.name] },
+          selection: { kind: 'ids', ids: [target.id] },
           onStarted: () => {},
         })
       }

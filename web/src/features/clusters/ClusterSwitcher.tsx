@@ -15,7 +15,6 @@ import { useNavigate } from '@tanstack/react-router';
 import { sameViewOn, useCurrentView } from '../../kernel/nav/currentView.ts';
 import { useClusters, useEnvironments, type ClusterSummary, type EnvironmentView } from './api.ts';
 import { HEALTH_WORD } from './clusterHealth.ts';
-import { RegisterClusterDialog } from './RegisterClusterButton.tsx';
 import styles from './ClusterSwitcher.module.css';
 
 const REGISTER = 'register';
@@ -168,7 +167,6 @@ export function ClusterSwitcher({ collapsed }: Readonly<{ collapsed: boolean }>)
   const view = useCurrentView();
   const navigate = useNavigate();
   const [search, setSearch] = useState('');
-  const [registering, setRegistering] = useState(false);
   const combobox = useCombobox({
     onDropdownOpen: () => {
       combobox.focusSearchInput();
@@ -207,9 +205,9 @@ export function ClusterSwitcher({ collapsed }: Readonly<{ collapsed: boolean }>)
 
   function choose(value: string) {
     combobox.closeDropdown();
-    // Back on the trigger first: the dialog returns focus to it, and a hidden list cannot hold it.
+    // Back on the trigger first: a hidden list cannot hold focus.
     combobox.targetRef.current?.focus();
-    if (value === REGISTER) setRegistering(true);
+    if (value === REGISTER) void navigate({ to: '/clusters/new' });
     else if (value === RETRY) void clusters.refetch();
     else if (value === ALL) void navigate({ to: '/' });
     else void navigate({ to: sameViewOn(value, view, all.find((c) => c.id === value)?.system.id) });
@@ -221,87 +219,84 @@ export function ClusterSwitcher({ collapsed }: Readonly<{ collapsed: boolean }>)
   else if (groups.length === 0) empty = 'No cluster matches this search.';
 
   return (
-    <>
-      <Combobox
-        store={combobox}
-        onOptionSubmit={choose}
-        width="max-content"
-        position={collapsed ? 'right-start' : 'bottom-start'}
-        classNames={{ dropdown: styles.dropdown, search: styles.search, option: styles.row }}
-      >
-        {/* The target's own props would clear `aria-expanded`: it is given here, where they are merged last. */}
-        <Combobox.Target targetType="button" {...{ 'aria-expanded': combobox.dropdownOpened }}>
-          <button
-            type="button"
-            className={styles.face}
-            data-collapsed={collapsed || undefined}
-            aria-label={collapsed ? label : undefined}
-            onClick={() => combobox.toggleDropdown()}
-          >
-            <Face collapsed={collapsed} entry={entry} />
-          </button>
-        </Combobox.Target>
-        <Combobox.Dropdown>
-          <Combobox.Search
-            value={search}
-            onChange={(event) => setSearch(event.currentTarget.value)}
-            placeholder="Search clusters"
-            aria-label="Search clusters"
-            onKeyDown={(event) => {
-              if (event.key === 'Tab') {
-                event.preventDefault();
-                combobox.closeDropdown('keyboard');
+    <Combobox
+      store={combobox}
+      onOptionSubmit={choose}
+      width="max-content"
+      position={collapsed ? 'right-start' : 'bottom-start'}
+      classNames={{ dropdown: styles.dropdown, search: styles.search, option: styles.row }}
+    >
+      {/* The target's own props would clear `aria-expanded`: it is given here, where they are merged last. */}
+      <Combobox.Target targetType="button" {...{ 'aria-expanded': combobox.dropdownOpened }}>
+        <button
+          type="button"
+          className={styles.face}
+          data-collapsed={collapsed || undefined}
+          aria-label={collapsed ? label : undefined}
+          onClick={() => combobox.toggleDropdown()}
+        >
+          <Face collapsed={collapsed} entry={entry} />
+        </button>
+      </Combobox.Target>
+      <Combobox.Dropdown>
+        <Combobox.Search
+          value={search}
+          onChange={(event) => setSearch(event.currentTarget.value)}
+          placeholder="Search clusters"
+          aria-label="Search clusters"
+          onKeyDown={(event) => {
+            if (event.key === 'Tab') {
+              event.preventDefault();
+              combobox.closeDropdown('keyboard');
+            }
+          }}
+        />
+        <Combobox.Options aria-label="Clusters">
+          {groups.map(({ environment, entries }) => (
+            <Combobox.Group
+              key={environment?.id ?? 'none'}
+              label={
+                <span className={styles.groupLabel}>
+                  {environment ? <Environment environment={environment} /> : 'No environment'}
+                </span>
               }
-            }}
-          />
-          <Combobox.Options aria-label="Clusters">
-            {groups.map(({ environment, entries }) => (
-              <Combobox.Group
-                key={environment?.id ?? 'none'}
-                label={
-                  <span className={styles.groupLabel}>
-                    {environment ? <Environment environment={environment} /> : 'No environment'}
-                  </span>
-                }
-              >
-                {entries.map(({ cluster }) => (
-                  <Combobox.Option
-                    key={cluster.id}
-                    value={cluster.id}
-                    active={cluster.id === current?.id}
-                    aria-selected={cluster.id === current?.id}
-                  >
-                    <span className={styles.option}>
-                      <span className={styles.line}>
-                        <span className={`${styles.name} ${styles.ellipsis}`}>{cluster.name}</span>
-                        {cluster.id === current?.id ? <IconCheck className={styles.icon} aria-hidden /> : null}
-                        <span className={styles.count}>{nodes(cluster.nodeCount)}</span>
-                      </span>
-                      <span className={styles.line}>
-                        {environment ? <span className={styles.ellipsis}>{environment.name}</span> : null}
-                        <Health level={cluster.health} />
-                      </span>
+            >
+              {entries.map(({ cluster }) => (
+                <Combobox.Option
+                  key={cluster.id}
+                  value={cluster.id}
+                  active={cluster.id === current?.id}
+                  aria-selected={cluster.id === current?.id}
+                >
+                  <span className={styles.option}>
+                    <span className={styles.line}>
+                      <span className={`${styles.name} ${styles.ellipsis}`}>{cluster.name}</span>
+                      {cluster.id === current?.id ? <IconCheck className={styles.icon} aria-hidden /> : null}
+                      <span className={styles.count}>{nodes(cluster.nodeCount)}</span>
                     </span>
-                  </Combobox.Option>
-                ))}
-              </Combobox.Group>
-            ))}
-            {search.trim() === '' ? (
-              <Combobox.Option value={ALL} className={styles.all}>
-                <IconLayoutList className={styles.icon} aria-hidden />
-                All clusters
-              </Combobox.Option>
-            ) : null}
-            {empty ? <Combobox.Empty>{empty}</Combobox.Empty> : null}
-            {clusters.isError ? <Combobox.Option value={RETRY}>Try again</Combobox.Option> : null}
-            <Combobox.Option value={REGISTER} className={styles.register}>
-              <IconPlus className={styles.icon} aria-hidden />
-              Register cluster
+                    <span className={styles.line}>
+                      {environment ? <span className={styles.ellipsis}>{environment.name}</span> : null}
+                      <Health level={cluster.health} />
+                    </span>
+                  </span>
+                </Combobox.Option>
+              ))}
+            </Combobox.Group>
+          ))}
+          {search.trim() === '' ? (
+            <Combobox.Option value={ALL} className={styles.all}>
+              <IconLayoutList className={styles.icon} aria-hidden />
+              All clusters
             </Combobox.Option>
-          </Combobox.Options>
-        </Combobox.Dropdown>
-      </Combobox>
-      <RegisterClusterDialog opened={registering} onClose={() => setRegistering(false)} />
-    </>
+          ) : null}
+          {empty ? <Combobox.Empty>{empty}</Combobox.Empty> : null}
+          {clusters.isError ? <Combobox.Option value={RETRY}>Try again</Combobox.Option> : null}
+          <Combobox.Option value={REGISTER} className={styles.register}>
+            <IconPlus className={styles.icon} aria-hidden />
+            Register cluster
+          </Combobox.Option>
+        </Combobox.Options>
+      </Combobox.Dropdown>
+    </Combobox>
   );
 }

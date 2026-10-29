@@ -15,6 +15,7 @@ import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNo
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterEntity;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterRepository;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisModule;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
@@ -63,7 +64,7 @@ class RrCorrelatorTest extends PostgresIntegrationTest {
     }
 
     private UUID cluster() {
-        clusterId = clusters.save(new ClusterEntity("rr-corr-" + UUID.randomUUID(), null, null))
+        clusterId = clusters.save(new ClusterEntity(ArtemisModule.SYSTEM, "rr-corr-" + UUID.randomUUID(), null, null))
                 .getId();
         return clusterId;
     }

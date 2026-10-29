@@ -116,6 +116,25 @@ class BrokerEventWriterTest extends PostgresIntegrationTest {
     }
 
     @Test
+    void aBurstOfDeliveriesIsOneSummaryRowPerDestinationNotOnePerMessage() {
+        for (int i = 0; i < 10_000; i++) {
+            writer.accept(event("openbroker.message.delivered"));
+        }
+        writer.accept(event("openbroker.consumer.attached"));
+
+        writer.flush();
+
+        assertThat(persisted()).isEqualTo(2);
+        Integer count = jdbc.queryForObject(
+                "SELECT (data->>'count')::int FROM broker_event WHERE cluster_id = :c AND type = 'openbroker.message.delivered'",
+                Map.of("c", clusterId),
+                Integer.class);
+        assertThat(count).isEqualTo(10_000);
+        writer.flush();
+        assertThat(persisted()).isEqualTo(2);
+    }
+
+    @Test
     void aBatchWhoseWriteFailsIsKeptInOrderForTheNextFlush() {
         NamedParameterJdbcTemplate failingOnce = Mockito.spy(jdbc);
         Mockito.doThrow(new DataAccessResourceFailureException("database down"))

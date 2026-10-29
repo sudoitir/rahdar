@@ -499,7 +499,23 @@ class SqlTailPollerTest {
 
     private QueueSnapshot snapshot(String queue, long depth, long added) {
         return new QueueSnapshot(
-                CLUSTER, node.getId(), queue, queue, "ANYCAST", false, false, null, depth, 0, 0, 0, added, 0, 0);
+                CLUSTER,
+                node.getId(),
+                queue,
+                queue,
+                "ANYCAST",
+                false,
+                false,
+                null,
+                depth,
+                0,
+                0,
+                0,
+                added,
+                0,
+                0,
+                "artemis.queue",
+                Map.of());
     }
 
     private static <T> T instantiate(Class<T> type) {

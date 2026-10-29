@@ -4,8 +4,8 @@ import { Link, useNavigate, useParams, useSearch } from '@tanstack/react-router'
 import { useDebouncedValue } from '@mantine/hooks';
 
 import { CapabilityLedger, useCluster, useRoleIds } from '../clusters/index.ts';
-import { refOf } from '../../kernel/api/resourceId.ts';
-import { useMessages, type MessageSummaryView } from './api.ts';
+import { kindOf, refOf, subscriptionRefWords } from '../../kernel/api/resourceId.ts';
+import { useMessages, type MessagePageView, type MessageSummaryView } from './api.ts';
 import { CapabilityGate } from '../../ui/CapabilityGate.tsx';
 import { EmptyState } from '../../ui/EmptyState.tsx';
 import { ErrorState } from '../../ui/ErrorState.tsx';
@@ -16,6 +16,8 @@ import { PageHeader } from '../../ui/PageHeader.tsx';
 import { Toolbar } from '../../ui/Toolbar.tsx';
 import { DataTable } from '../../ui/table/index.ts';
 import { messageColumns } from './columns.ts';
+import { browseOf, SELECTOR_REFUSAL, type PartitionBrowse } from './partitionBrowse.ts';
+import { PartitionControls, PartitionNotices } from './PartitionControls.tsx';
 import { useMessageGate } from './gates.ts';
 import { MessageDetailPanel } from './MessageDetailPanel.tsx';
 import { MessageActions } from './MessageActions.tsx';
@@ -56,7 +58,17 @@ function MessagesEmpty({
   filtered,
   unreachable,
   onClearSelector,
-}: Readonly<{ filtered: boolean; unreachable: string[]; onClearSelector: () => void }>) {
+  partitioned,
+}: Readonly<{ filtered: boolean; unreachable: string[]; onClearSelector: () => void; partitioned: boolean }>) {
+  if (partitioned && unreachable.length === 0) {
+    return (
+      <EmptyState
+        kind="empty"
+        title="No records from here"
+        description="This partition has no committed record at or after the start you chose. Choose the earliest record, another partition or an earlier time."
+      />
+    );
+  }
   if (filtered) {
     return (
       <EmptyState
@@ -79,6 +91,61 @@ function MessagesEmpty({
   );
 }
 
+/** The page the header describes: a partition of a log, or a count read from one node. */
+function messagesHeading(
+  page: MessagePageView | undefined,
+  partitioned: boolean,
+  partition: number,
+  endpoints: readonly { id: string; name: string }[],
+): string {
+  if (!page) return 'Reading the subscription…';
+  if (!partitioned) {
+    const node = endpoints.find((endpoint) => endpoint.id === page.node)?.name ?? 'the live node';
+    return `${countLabel(page)} · read from ${node}`;
+  }
+  const hidden =
+    page.log?.uncommittedHidden === false
+      ? ''
+      : '. Only committed records are shown: those of a transaction that is still open or was aborted are not.';
+  return `Partition ${partition}${hidden}`;
+}
+
+/** What the browse asks for: one partition and a start, or a node, a selector and a page. */
+function messageQuery(
+  partitioned: boolean,
+  browse: PartitionBrowse,
+  search: { node?: string; filter?: string },
+  page: number,
+) {
+  if (partitioned) return { ...browse, size: PAGE_SIZE };
+  return { node: search.node, filter: search.filter, page, size: PAGE_SIZE };
+}
+
+/** The selector field of a queue, or the explanation that a log has no selector. */
+function selectorField(partitioned: boolean, filter: string) {
+  if (partitioned) return { placeholder: undefined, description: SELECTOR_REFUSAL, value: '', width: '22rem' };
+  return { placeholder: "Selector, e.g. region = 'eu'", description: undefined, value: filter, width: '17.5rem' };
+}
+
+/** Where the browse stands: the group's offset on a log, or the page of a queue. */
+function browsePosition(partitioned: boolean, log: MessagePageView['log'], page: number, lastPage: number | null) {
+  if (partitioned) {
+    // Said in the toolbar, where its arrival moves nothing: the controls keep their place.
+    if (log?.subscriptionPosition == null) return null;
+    return (
+      <Text size="xs">
+        {`The group stands at offset ${log.subscriptionPosition.toLocaleString()} on partition ${log.partition}: records from there on it has not read yet.`}
+      </Text>
+    );
+  }
+  const pages = lastPage == null ? `page ${page} · total unavailable` : `page ${page} of ${lastPage}`;
+  return (
+    <Text size="xs" c="dimmed">
+      {pages}
+    </Text>
+  );
+}
+
 /**
  * Browse one subscription's messages (ADR-0021). Reached from a subscription row, not a
  * top-level tab. Node, filter and page are URL-owned (non-negotiable #9);
@@ -98,7 +165,15 @@ export function MessagesView() {
     clusterId: string;
     subscriptionName: string;
   };
-  const search = useSearch({ strict: false }) as { node?: string; filter?: string; page?: number; message?: string };
+  const search = useSearch({ strict: false }) as {
+    node?: string;
+    filter?: string;
+    page?: number;
+    message?: string;
+    partition?: number;
+    from?: string;
+    value?: string;
+  };
   const navigate = useNavigate();
 
   const cluster = useCluster(clusterId);
@@ -109,7 +184,11 @@ export function MessagesView() {
     [roleIds, subscriptionName],
   );
   const sendGate = useMessageGate(clusterId, 'message:send', 'Send messages', 'messageIo');
-  const columns = useMemo(() => messageColumns(zone), [zone]);
+  // A partitioned log is read from one partition and a start, not by selector, node and page.
+  const subscriptionKind = roleIds.loaded ? kindOf(roleIds.subscription(subscriptionName)) : undefined;
+  const partitioned = cluster.data?.kinds?.find((k) => k.id === subscriptionKind)?.partitioned === true;
+  const browse = browseOf(search);
+  const columns = useMemo(() => messageColumns(zone, partitioned), [zone, partitioned]);
   const [filter, setFilter] = useState(search.filter ?? '');
   const [debounced] = useDebouncedValue(filter, 250);
   // The open message is in the destination, so a link to one message opens it (non-negotiable #9).
@@ -156,12 +235,18 @@ export function MessagesView() {
     [cluster.data],
   );
 
-  const messages = useMessages(clusterId, subscriptionName, {
-    node: search.node,
-    filter: search.filter,
-    page,
-    size: PAGE_SIZE,
-  });
+  const messages = useMessages(clusterId, subscriptionName, messageQuery(partitioned, browse, search, page));
+  const setBrowse = (next: PartitionBrowse) =>
+    navigate({
+      to: '.',
+      search: (prev: Record<string, unknown>) => ({
+        ...prev,
+        partition: next.partition,
+        from: next.from === 'earliest' ? undefined : next.from,
+        value: next.value,
+        message: undefined,
+      }),
+    });
 
   const messageIo = cluster.data?.capabilities.messageIo;
   // Block only on a known refusal. Since ADR-0049 D5 this capability is UNKNOWN
@@ -179,16 +264,10 @@ export function MessagesView() {
           <Link to={`/clusters/${clusterId}/subscriptions`} className={linkClasses.link}>
             All subscriptions
           </Link>
-          <span className={classes.subscription}>{subscriptionName}</span>
+          <span className={classes.subscription}>{subscriptionRefWords(subscriptionName)}</span>
         </>
       }
-      description={
-        messages.data
-          ? `${countLabel(messages.data)} · read from ${
-              endpoints.find((e) => e.id === messages.data.node)?.name ?? 'the live node'
-            }`
-          : 'Reading the subscription…'
-      }
+      description={messagesHeading(messages.data, partitioned, browse.partition, endpoints)}
       actions={
         <>
           <CapabilityGate verdict={sendGate} what="sending a message">
@@ -196,7 +275,12 @@ export function MessagesView() {
               Send
             </Button>
           </CapabilityGate>
-          <PurgeSubscription clusterId={clusterId} subscriptionName={subscriptionName} node={search.node} />
+          <PurgeSubscription
+            clusterId={clusterId}
+            subscriptionName={subscriptionName}
+            node={search.node}
+            moves={partitioned}
+          />
         </>
       }
     />
@@ -245,6 +329,7 @@ export function MessagesView() {
     .map((e) => e.name);
   // The destination follows the field once typing pauses, so clearing the field clears the selector.
   const clearSelector = () => setFilter('');
+  const selector = selectorField(partitioned, filter);
 
   const setNode = (node: string | null) =>
     navigate({
@@ -256,21 +341,25 @@ export function MessagesView() {
     <Page fill>
       {header}
       {uncertainty}
-
       <Toolbar
         label="Message filters"
         start={
           <>
+            {partitioned ? (
+              <PartitionControls browse={browse} onBrowse={setBrowse} next={messages.data?.log?.next ?? null} />
+            ) : null}
             <TextInput
               ref={filterRef}
               label="Message selector"
-              placeholder="Selector, e.g. region = 'eu'"
-              value={filter}
+              placeholder={selector.placeholder}
+              description={selector.description}
+              disabled={partitioned}
+              value={selector.value}
               onChange={(e) => setFilter(e.currentTarget.value)}
-              w="17.5rem"
+              w={selector.width}
               size="xs"
             />
-            {endpoints.length > 1 ? (
+            {endpoints.length > 1 && !partitioned ? (
               <Select
                 size="xs"
                 w="11.25rem"
@@ -286,9 +375,7 @@ export function MessagesView() {
         }
         end={
           <>
-            <Text size="xs" c="dimmed">
-              {lastPage == null ? `page ${page} · total unavailable` : `page ${page} of ${lastPage}`}
-            </Text>
+            {browsePosition(partitioned, messages.data?.log, page, lastPage)}
             {subscription
               ? selectionSlot.map(({ id, Component }) => (
                   <Component
@@ -313,6 +400,9 @@ export function MessagesView() {
         selected={selected}
         onCleared={() => setSelected(new Set())}
       />
+
+      {/* Below the controls, so what the read has to say arrives under them and never pushes them down. */}
+      {partitioned ? <PartitionNotices page={messages.data} browse={browse} /> : null}
 
       <DataTable
         label="Messages"
@@ -343,7 +433,12 @@ export function MessagesView() {
             ) : null,
         }}
         empty={
-          <MessagesEmpty filtered={Boolean(search.filter)} unreachable={unreachable} onClearSelector={clearSelector} />
+          <MessagesEmpty
+            filtered={Boolean(search.filter)}
+            unreachable={unreachable}
+            onClearSelector={clearSelector}
+            partitioned={partitioned}
+          />
         }
       />
 
@@ -353,6 +448,7 @@ export function MessagesView() {
         messageId={openId}
         node={search.node}
         filter={search.filter}
+        partition={partitioned ? browse.partition : undefined}
         onClose={() => setOpenId(null)}
       />
 

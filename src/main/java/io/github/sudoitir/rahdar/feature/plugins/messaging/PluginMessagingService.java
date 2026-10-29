@@ -12,16 +12,18 @@ import io.github.sudoitir.rahdar.kernel.audit.AuditEvent;
 import io.github.sudoitir.rahdar.kernel.audit.AuditService;
 import io.github.sudoitir.rahdar.kernel.plugin.PluginPurged;
 import io.github.sudoitir.rahdar.kernel.plugin.PluginScopedBeans;
-import io.github.sudoitir.rahdar.kernel.plugin.ResourceType;
 import io.github.sudoitir.rahdar.kernel.security.Actor;
 import io.github.sudoitir.rahdar.kernel.security.ActorResolver;
 import io.github.sudoitir.rahdar.kernel.security.ResourceRef;
 import io.github.sudoitir.rahdar.platform.broker.BrokerMessages;
 import io.github.sudoitir.rahdar.platform.broker.MessageKind;
+import io.github.sudoitir.rahdar.platform.broker.ReservedNames;
 import io.github.sudoitir.rahdar.platform.broker.SendInDoubtException;
 import io.github.sudoitir.rahdar.platform.broker.SendNames;
 import io.github.sudoitir.rahdar.platform.broker.SentMessages;
+import io.github.sudoitir.rahdar.platform.broker.SystemExtensions;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
+import io.github.sudoitir.rahdar.platform.clusters.ClusterKinds;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
 import java.time.Clock;
 import java.util.ArrayList;
@@ -55,12 +57,17 @@ public class PluginMessagingService implements PluginScopedBeans {
     private static final int MAX_NAME = 1000;
     private static final int MAX_CONCURRENCY = 32;
 
+    /** The node name of a row that stands for the whole cluster, as a partitioned log is read once. */
+    private static final String WHOLE_CLUSTER = "whole cluster";
+
     private final RegistrationRepository registrations;
     private final RegistrationNodeRepository nodeStates;
     private final AccessCheck access;
     private final PluginMessagingReconciler reconciler;
     private final PluginDrains drains;
     private final ClusterDirectory clusters;
+    private final ClusterKinds kinds;
+    private final SystemExtensions extensions;
     private final BrokerMessages messages;
     private final AuditService audit;
     private final ActorResolver actors;
@@ -74,10 +81,7 @@ public class PluginMessagingService implements PluginScopedBeans {
 
     MessageRegistration register(String pluginId, RegistrationSpec spec) {
         validate(spec);
-        access.denial(
-                        spec.actingUserId(),
-                        spec.clusterId(),
-                        AccessCheck.needsOf(spec.mode(), spec.source().name()))
+        access.denial(spec.actingUserId(), spec.clusterId(), AccessCheck.needsOf(spec.mode(), spec.source()))
                 .ifPresent(why -> {
                     throw new RegistrationRefusedException(why);
                 });
@@ -92,7 +96,7 @@ public class PluginMessagingService implements PluginScopedBeans {
                         PLUGIN,
                         pluginId,
                         "source",
-                        spec.source().name(),
+                        spec.source().id(),
                         "mode",
                         spec.mode().name(),
                         "concurrency",
@@ -107,7 +111,8 @@ public class PluginMessagingService implements PluginScopedBeans {
                     if (existing.isPresent()) {
                         RegistrationEntity e = existing.get();
                         boolean sameTarget = e.getClusterId().equals(spec.clusterId())
-                                && e.getSubscription().equals(spec.source().name())
+                                && e.getSourceKind().equals(spec.source().kind())
+                                && e.getSourcePath().equals(spec.source().path())
                                 && e.getMode() == spec.mode();
                         if (sameTarget) {
                             // A changed concurrency is converged by the pass below, which restarts the drains.
@@ -127,7 +132,8 @@ public class PluginMessagingService implements PluginScopedBeans {
                     row.setPluginId(pluginId);
                     row.setKey(spec.key());
                     row.setClusterId(spec.clusterId());
-                    row.setSubscription(spec.source().name());
+                    row.setSourceKind(spec.source().kind());
+                    row.setSourcePath(spec.source().path());
                     row.setMode(spec.mode());
                     row.setConcurrency(spec.concurrency());
                     row.setActingUserId(spec.actingUserId());
@@ -160,7 +166,7 @@ public class PluginMessagingService implements PluginScopedBeans {
                         PLUGIN,
                         pluginId,
                         "source",
-                        reg.getSubscription(),
+                        reg.getSourceKind() + "/" + reg.getSourcePath(),
                         "mode",
                         reg.getMode().name()),
                 false);
@@ -188,12 +194,16 @@ public class PluginMessagingService implements PluginScopedBeans {
         if (target.name().length() > MAX_NAME) {
             return Optional.of("The target's name is longer than " + MAX_NAME + " characters.");
         }
-        String reserved = Reservations.reason(target.name());
-        if (reserved != null) {
-            return Optional.of(reserved);
+        String own = Reservations.reason(target.name());
+        if (own != null) {
+            return Optional.of(own);
         }
         if (clusters.cluster(clusterId).isEmpty()) {
             return Optional.of("The cluster " + clusterId + " is not registered.");
+        }
+        String reserved = reservedReason(clusterId, target.name());
+        if (reserved != null) {
+            return Optional.of(reserved);
         }
         return access.denial(actingUserId, clusterId, AccessCheck.sendNeeds(target));
     }
@@ -285,17 +295,47 @@ public class PluginMessagingService implements PluginScopedBeans {
         if (spec.clusterId() == null || clusters.cluster(spec.clusterId()).isEmpty()) {
             throw new RegistrationRefusedException("The cluster " + spec.clusterId() + " is not registered.");
         }
-        if (spec.source() == null
-                || spec.source().type() != ResourceType.SUBSCRIPTION
-                || blank(spec.source().name())
-                || spec.source().name().length() > MAX_NAME) {
-            throw new RegistrationRefusedException(
-                    "A registration names one subscription, by its name, in at most " + MAX_NAME + " characters.");
+        if (spec.source() == null) {
+            throw new RegistrationRefusedException("A registration names one subscription, by its id.");
         }
-        String reserved = Reservations.reason(spec.source().name());
+        validateSource(spec);
+    }
+
+    /** The source is a subscription of a kind this cluster's system has, and no name Rahdar reserves. */
+    private void validateSource(RegistrationSpec spec) {
+        SubscriptionId source = spec.source();
+        List<String> subscriptionKinds = kinds.subscriptionKinds(spec.clusterId());
+        if (!subscriptionKinds.contains(source.kind())) {
+            throw new RegistrationRefusedException("The cluster has no subscription kind '" + source.kind()
+                    + "'; its subscription kinds are " + String.join(", ", subscriptionKinds) + ".");
+        }
+        if (source.id().length() > MAX_NAME) {
+            throw new RegistrationRefusedException("A subscription's id is at most " + MAX_NAME + " characters, not "
+                    + source.id().length() + ".");
+        }
+        for (String segment : source.segments()) {
+            String reserved = reservedReason(spec.clusterId(), segment);
+            if (reserved != null) {
+                throw new RegistrationRefusedException(reserved);
+            }
+        }
+        if (spec.mode() == RegistrationMode.TAP) {
+            reconciler.tapRefusal(spec.clusterId()).ifPresent(why -> {
+                throw new RegistrationRefusedException(why);
+            });
+        }
+    }
+
+    /** Why a plugin may not use the name: Rahdar's own, or one the cluster's system keeps for itself. */
+    private String reservedReason(UUID clusterId, String name) {
+        String reserved = Reservations.reason(name);
         if (reserved != null) {
-            throw new RegistrationRefusedException(reserved);
+            return reserved;
         }
+        return extensions
+                .forCluster(clusterId, ReservedNames.class)
+                .flatMap(names -> names.reason(name))
+                .orElse(null);
     }
 
     private ClusterNode servingWithCore(UUID clusterId) {
@@ -317,10 +357,13 @@ public class PluginMessagingService implements PluginScopedBeans {
 
     private MessageRegistration view(RegistrationEntity reg) {
         List<MessageRegistration.NodeState> nodes = new ArrayList<>();
-        for (RegistrationNodeEntity row : nodeStates.findByIdRegistrationId(reg.getId())) {
-            String name = clusters.node(row.getNodeId())
-                    .map(ClusterNode::getName)
-                    .orElse(row.getNodeId().toString());
+        List<RegistrationNodeEntity> rows = nodeStates.findByRegistrationId(reg.getId());
+        for (RegistrationNodeEntity row : rows) {
+            String name = row.getNodeId() == null
+                    ? WHOLE_CLUSTER
+                    : clusters.node(row.getNodeId())
+                            .map(ClusterNode::getName)
+                            .orElse(row.getNodeId().toString());
             nodes.add(new MessageRegistration.NodeState(
                     row.getNodeId(), name, row.getState(), row.getDetail(), row.getDroppedCopies()));
         }
@@ -339,13 +382,14 @@ public class PluginMessagingService implements PluginScopedBeans {
         return new MessageRegistration(
                 reg.getKey(),
                 reg.getClusterId(),
-                ResourceRef.subscription(reg.getSubscription()),
+                new SubscriptionId(reg.getSourceKind(), reg.getSourcePath()),
                 reg.getMode(),
                 reg.getConcurrency(),
                 reg.getActingUserId(),
                 overall,
                 detail,
                 dropped,
+                rows.stream().anyMatch(RegistrationNodeEntity::isReleasesCounted),
                 List.copyOf(nodes),
                 reg.getUpdatedAt());
     }

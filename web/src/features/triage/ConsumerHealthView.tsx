@@ -153,7 +153,7 @@ export function ConsumerHealthView() {
         }
         end={
           // Stated in words.
-          <Text size="xs" c="dimmed" role="status">
+          <Text size="xs" c="dimmed" role="status" data-fit="" truncate maw="100%" miw={0}>
             {attentionWords(needingAttention, rows.length, query.isPending)}
             {unmeasured > 0 ? ` · ${unmeasured} not yet measured` : ''}
           </Text>

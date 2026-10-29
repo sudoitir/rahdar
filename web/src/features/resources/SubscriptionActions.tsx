@@ -71,7 +71,7 @@ function WithSubscription({
   target: SubscriptionTarget;
   render: (subscription: SubscriptionView, dialog: HostedDialogProps) => ReactNode;
 }) {
-  const { subscription, isPending, isError, error } = useSubscription(clusterId, target.name, target.snapshot);
+  const { subscription, isPending, isError, error } = useSubscription(clusterId, target.id, target.snapshot);
   const [ready, setReady] = useState(false);
   useEffect(() => {
     if (!subscription || !opened) return;
@@ -167,8 +167,8 @@ export function OpenSubscription({ clusterId, target }: Readonly<ActionProps<Sub
     <ActionMenuItem
       label="Open details"
       icon={<IconListDetails size={16} aria-hidden />}
-      href={subscriptionHref(clusterId, target.name)}
-      onSelect={() => navigate({ to: `/clusters/${clusterId}/subscriptions`, search: { subscription: target.name } })}
+      href={subscriptionHref(clusterId, target.id)}
+      onSelect={() => navigate({ to: `/clusters/${clusterId}/subscriptions`, search: { subscription: target.id } })}
     />
   );
 }
@@ -188,7 +188,7 @@ export function CopySubscriptionLink({ clusterId, target, host }: Readonly<Actio
     <ActionMenuItem
       label="Copy link to this subscription"
       icon={<IconLink size={16} aria-hidden />}
-      onSelect={() => host.copy(absoluteHref(subscriptionHref(clusterId, target.name)), 'link to the subscription')}
+      onSelect={() => host.copy(absoluteHref(subscriptionHref(clusterId, target.id)), 'link to the subscription')}
     />
   );
 }
@@ -207,7 +207,7 @@ export function PauseResumeSubscription({ clusterId, target, host }: Readonly<Ac
     'subscription:pause',
     'Pause and resume subscriptions',
   );
-  const { subscription } = useSubscription(clusterId, target.name, target.snapshot);
+  const { subscription } = useSubscription(clusterId, target.id, target.snapshot);
   const paused = subscription ? subscription.perNode.some((n) => n.paused) : undefined;
   const label = pauseLabel(paused);
   if (hidden) return null;
@@ -286,11 +286,7 @@ export function DeleteSubscription({ clusterId, target, host }: Readonly<ActionP
 /** A subscription's name as a link to its detail (ADR-0107). */
 export function SubscriptionLink({ clusterId, target, children }: Readonly<LinkProps<SubscriptionTarget>>) {
   return (
-    <Link
-      to={`/clusters/${clusterId}/subscriptions`}
-      search={{ subscription: target.name }}
-      className={linkClasses.link}
-    >
+    <Link to={`/clusters/${clusterId}/subscriptions`} search={{ subscription: target.id }} className={linkClasses.link}>
       {children}
     </Link>
   );
@@ -305,8 +301,11 @@ export function ConsumerOpenSubscription({ clusterId, target }: Readonly<ActionP
       label={name ? `Open subscription ${name}` : 'Open its subscription'}
       icon={<IconListDetails size={16} aria-hidden />}
       verdict={name ? undefined : { kind: 'blocked', reason: 'The broker reported no subscription for this consumer.' }}
-      href={name ? subscriptionHref(clusterId, name) : undefined}
-      onSelect={() => name && navigate({ to: `/clusters/${clusterId}/subscriptions`, search: { subscription: name } })}
+      href={target.subscription ? subscriptionHref(clusterId, target.subscription) : undefined}
+      onSelect={() =>
+        target.subscription &&
+        navigate({ to: `/clusters/${clusterId}/subscriptions`, search: { subscription: target.subscription } })
+      }
     />
   );
 }

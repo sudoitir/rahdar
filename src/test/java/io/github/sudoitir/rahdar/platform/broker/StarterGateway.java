@@ -1,6 +1,7 @@
 package io.github.sudoitir.rahdar.platform.broker;
 
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import io.github.sudoitir.openbroker.BrokerDrivers;
 import io.github.sudoitir.openbroker.spring.boot.autoconfigure.OpenBrokerAutoConfiguration;
@@ -8,6 +9,7 @@ import io.github.sudoitir.openbroker.spring.boot.autoconfigure.OpenBrokerConnect
 import io.github.sudoitir.openbroker.spring.boot.autoconfigure.OpenBrokerProperties;
 import io.github.sudoitir.openbroker.spring.boot.autoconfigure.SslBundleTls;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import java.util.List;
 import org.springframework.boot.ssl.SslBundles;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 
@@ -15,6 +17,14 @@ import org.springframework.context.annotation.AnnotationConfigApplicationContext
 final class StarterGateway {
 
     private StarterGateway() {}
+
+    /** Artemis's connection options, which is what the seed and data-plane probes need to know. */
+    private static ConnectionOptions jolokiaSeeded() {
+        ConnectionOptions options = mock(ConnectionOptions.class);
+        when(options.system()).thenReturn("artemis");
+        when(options.entry()).thenReturn(ConnectionOptions.Entry.JOLOKIA_SEEDS);
+        return options;
+    }
 
     /** The gateway over {@code bundles}, with a node directory and settings source nobody fills. */
     static BrokerGateway of(SslBundles bundles, BrokerTimeouts timeouts) {
@@ -30,7 +40,7 @@ final class StarterGateway {
         return new BrokerGateway(
                 context.getBean(BrokerDrivers.class),
                 mock(NodeDirectory.class),
-                mock(ConnectionSettingsSource.class),
+                List.of(jolokiaSeeded()),
                 context.getBean(SslBundleTls.class),
                 options,
                 context.getBean(OpenBrokerProperties.class),

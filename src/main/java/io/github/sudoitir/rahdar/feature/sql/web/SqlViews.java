@@ -30,7 +30,7 @@ public final class SqlViews {
     public record SqlQueryTicketView(UUID queryId, String expiresAt) {}
 
     @Schema(description = "What a query will do, worked out without contacting a broker.")
-    public record PlanView(
+    public record QueryPlanView(
             @Schema(description = "BROKER or INDEX — which backend will answer.")
             String source,
 
@@ -72,7 +72,8 @@ public final class SqlViews {
             @Schema(description = "The id of the destination the subscription is bound to.")
             String destination,
 
-            long messageCount) {}
+            @Schema(nullable = true, description = "Null when the node reported no depth: unknown, not empty.")
+            Long messageCount) {}
 
     @Schema(description = "Something true about a plan or result that changes how it should be read.")
     public record NoticeView(String kind, String detail) {}
@@ -92,7 +93,12 @@ public final class SqlViews {
             int messageType,
             boolean durable,
             int priority,
-            long timestamp,
+
+            @Schema(
+                    nullable = true,
+                    description = "When the producer stamped it, epoch milliseconds; null when it carries no time.")
+            Long timestamp,
+
             long expiration,
             long size,
             String jmsType,
@@ -163,7 +169,7 @@ public final class SqlViews {
             @Schema(description = "True when a bound was hit or a node did not answer.")
             boolean partial,
 
-            PlanView plan) {}
+            QueryPlanView plan) {}
 
     @Schema(description = "What a live tail has seen, and what it can prove it missed.")
     public record TailStatusView(

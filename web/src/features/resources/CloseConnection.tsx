@@ -119,7 +119,7 @@ export function CloseConnectionAction({
 }
 
 /**
- * The destructive flow. It opens on a preview, so the typed confirmation is
+ * The destructive flow. It opens on a preview, so the held confirmation is
  * armed only once the operator has been shown who is about to be disconnected
  * and what happens to the messages that client is holding.
  *
@@ -326,7 +326,7 @@ export function CloseDestinationConsumers({
       title={result ? `Result of closing the consumers on ${destination}` : title}
       tone="danger"
       confirmLabel={overCap ? 'Close them anyway, over the cap' : 'Close these consumers'}
-      // Also locked while the count is being taken, so the typed name cannot arm a close that has
+      // Also locked while the count is being taken, so the hold cannot arm a close that has
       // not been shown how many consumers it reaches.
       pending={close.isPending}
       onConfirm={() => close.mutate({ override: overCap }, { onSuccess: setResult })}

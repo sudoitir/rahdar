@@ -56,6 +56,8 @@ public class QueueSnapshots {
                 e.getScheduledCount(),
                 e.getMessagesAdded(),
                 e.getMessagesAcked(),
-                e.getMessagesExpired());
+                e.getMessagesExpired(),
+                e.getKind(),
+                e.getNativeAttributes());
     }
 }

@@ -52,7 +52,7 @@ class QueueLocatorBrokerTest extends ArtemisIntegrationTest {
 
         List<QueueLocation> found = new QueueLocator(snapshots, clusters, gateway).locate(clusterId, queueName);
 
-        assertThat(found).containsExactly(new QueueLocation(nodeId, queueName, address, "MULTICAST", 3));
+        assertThat(found).containsExactly(new QueueLocation(nodeId, queueName, address, "MULTICAST", 3L));
     }
 
     private static void seed(String address, int messages) throws Exception {

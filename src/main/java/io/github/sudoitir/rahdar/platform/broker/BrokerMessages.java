@@ -5,9 +5,11 @@ import io.github.sudoitir.openbroker.ClusterConnection;
 import io.github.sudoitir.openbroker.Dispatch;
 import io.github.sudoitir.openbroker.ErrorReasons;
 import io.github.sudoitir.openbroker.NodeId;
+import io.github.sudoitir.openbroker.Status;
 import io.github.sudoitir.openbroker.messaging.BrowseRequest;
 import io.github.sudoitir.openbroker.messaging.BulkOutcome;
 import io.github.sudoitir.openbroker.messaging.Count;
+import io.github.sudoitir.openbroker.messaging.Message;
 import io.github.sudoitir.openbroker.messaging.MessageAction;
 import io.github.sudoitir.openbroker.messaging.MessageField;
 import io.github.sudoitir.openbroker.messaging.MessageFilter;
@@ -22,21 +24,28 @@ import io.github.sudoitir.openbroker.messaging.ReceiverOptions;
 import io.github.sudoitir.openbroker.messaging.Selection;
 import io.github.sudoitir.openbroker.messaging.SendReceipt;
 import io.github.sudoitir.openbroker.messaging.SendTarget;
+import io.github.sudoitir.openbroker.messaging.SubscriptionCapabilities;
 import io.github.sudoitir.openbroker.messaging.Total;
 import io.github.sudoitir.openbroker.messaging.Transport;
+import io.github.sudoitir.openbroker.model.KindId;
+import io.github.sudoitir.openbroker.model.PartitionId;
 import io.github.sudoitir.openbroker.model.ResourceClass;
 import io.github.sudoitir.openbroker.model.ResourceId;
 import io.github.sudoitir.openbroker.model.Scope;
 import io.github.sudoitir.openbroker.model.Shard;
 import io.github.sudoitir.openbroker.operation.Operation;
+import io.github.sudoitir.openbroker.operation.Precondition;
+import io.github.sudoitir.rahdar.kernel.core.ConflictException;
 import io.github.sudoitir.rahdar.kernel.security.ResourceRef;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
 import java.util.function.Supplier;
 import org.springframework.stereotype.Component;
 
@@ -52,6 +61,11 @@ public class BrokerMessages {
 
     /** The most body bytes a browse reads of one message; a longer body is marked truncated. */
     public static final long MAX_BODY_BYTES = 1024L * 1024;
+
+    /** The most body bytes one page holds in all; a page that would hold more stops there and says so. */
+    public static final long PAGE_BYTE_BUDGET = 8L * 1024 * 1024;
+
+    private static final String RECEIVE_PURPOSE = "receive messages over";
 
     private final BrokerGateway gateway;
 
@@ -72,14 +86,69 @@ public class BrokerMessages {
                             queueId(c, queue),
                             Scope.node(node),
                             new BrowseRequest(at, size, filter(c, filter), MAX_BODY_BYTES));
-            List<BrowsedMessage> messages =
-                    result.messages().stream().map(BrowsedMessages::of).toList();
+            Within<BrowsedMessage> kept = within(result.messages(), BrowsedMessages::of);
             return switch (result.total().count()) {
-                case Count.Exact(var e) -> new BrowsePage(messages, e);
-                case Count.Estimate(var e) -> new BrowsePage(messages, e);
-                case Count.Unavailable(var u) -> new BrowsePage(messages, null, u);
+                case Count.Exact(var e) -> new BrowsePage(kept.items(), e, null, kept.truncated());
+                case Count.Estimate(var e) -> new BrowsePage(kept.items(), e, null, kept.truncated());
+                case Count.Unavailable(var u) -> new BrowsePage(kept.items(), null, u, kept.truncated());
             };
         });
+    }
+
+    /**
+     * One page of a partition of a log, read from {@code at} without joining a group or committing anything. A
+     * filter is refused with the driver's reason, because a log cannot be filtered where it is kept.
+     */
+    public LogPage browseLog(UUID clusterId, ResourceId log, int partition, Position at, int size, String filter) {
+        return translated(() -> {
+            ClusterConnection c = gateway.cluster(clusterId);
+            io.github.sudoitir.openbroker.messaging.BrowsePage result;
+            try {
+                result = c.messages()
+                        .browse(
+                                log,
+                                Scope.shards(Set.of(Shard.partition(PartitionId.of(String.valueOf(partition))))),
+                                new BrowseRequest(at, size, filter(c, filter), MAX_BODY_BYTES));
+            } catch (BrokerException e) {
+                if (ErrorReasons.NOT_SUPPORTED.equals(e.reason())) {
+                    throw new IllegalArgumentException(e.getMessage(), e);
+                }
+                throw e;
+            }
+            Within<LogPage.LogRecord> kept = within(result.messages(), m -> {
+                BrowsedMessages.Key key = BrowsedMessages.keyOf(m);
+                return new LogPage.LogRecord(
+                        BrowsedMessages.of(m),
+                        m.body().isTombstone(),
+                        key == null ? null : key.text(),
+                        key == null ? null : key.encoding());
+            });
+            Long next = kept.truncated()
+                    ? Long.valueOf(
+                            result.messages().get(kept.items().size()).ref().position())
+                    : result.next()
+                            .map(cursor -> Long.parseLong(
+                                    cursor.token().substring(cursor.token().indexOf(':') + 1)))
+                            .orElse(null);
+            return new LogPage(kept.items(), next, kept.truncated());
+        });
+    }
+
+    /** What was kept of a page, and whether the budget stopped it short. */
+    private record Within<R>(List<R> items, boolean truncated) {}
+
+    /** Converts messages in order until their bodies add up to {@link #PAGE_BYTE_BUDGET}; the first is always kept. */
+    private static <R> Within<R> within(List<Message> messages, Function<Message, R> convert) {
+        List<R> out = new ArrayList<>();
+        long bytes = 0;
+        for (Message m : messages) {
+            bytes += Math.min(m.body().size(), MAX_BODY_BYTES);
+            if (bytes > PAGE_BYTE_BUDGET && !out.isEmpty()) {
+                return new Within<>(List.copyOf(out), true);
+            }
+            out.add(convert.apply(m));
+        }
+        return new Within<>(List.copyOf(out), false);
     }
 
     /**
@@ -205,6 +274,74 @@ public class BrokerMessages {
         });
     }
 
+    /**
+     * Why the cluster's system offers no such action on messages, in its own words, or empty when it does or when it
+     * cannot say. {@code capability} is the SDK's id, such as {@code messages.move}.
+     */
+    public Optional<String> unavailableBecause(UUID clusterId, String capability) {
+        return translated(() -> {
+            var assessment = gateway.cluster(clusterId)
+                    .access()
+                    .check(new io.github.sudoitir.openbroker.access.Capability(capability), Optional.empty());
+            return assessment.status() == io.github.sudoitir.openbroker.access.Assessment.Status.UNAVAILABLE
+                    ? Optional.of(assessment.reason())
+                    : Optional.<String>empty();
+        });
+    }
+
+    /** What purging a subscription of a log would skip, and the state it was counted against. */
+    public record LogPurge(long records, String etag) {}
+
+    /**
+     * What purging the subscription of a log (moving its position to the end) would skip. The driver refuses a
+     * group that has members or is rebalancing, naming them, and that refusal is a conflict with its reason.
+     */
+    public LogPurge previewLogPurge(UUID clusterId, ResourceId subscription) {
+        try {
+            var preview =
+                    gateway.cluster(clusterId).operations().preview(subscription, new Operation.Purge(), Scope.whole());
+            // The driver names a group's active members in the preview; moving a busy group's position is refused.
+            for (var change : preview.diff()) {
+                if (change.key().endsWith(".members") && change.before().isPresent()) {
+                    throw new ConflictException(
+                            "purge-refused",
+                            "Cannot purge " + subscription + " while its group has active members: "
+                                    + change.before().get() + ". Stop them first.");
+                }
+            }
+            long records =
+                    switch (preview.estimate().count()) {
+                        case Count.Exact(var n) -> n;
+                        case Count.Estimate(var n) -> n;
+                        case Count.Unavailable(var _) -> 0L;
+                    };
+            return new LogPurge(records, preview.etag());
+        } catch (BrokerException e) {
+            throw refusedPurge(e);
+        }
+    }
+
+    /** Moves the subscription's position to the end of the log, if its state is still the one counted. */
+    public long purgeLog(UUID clusterId, ResourceId subscription, String etag) {
+        try {
+            return gateway.cluster(clusterId)
+                    .operations()
+                    .execute(subscription, new Operation.Purge(), Scope.whole(), Precondition.ifMatch(etag))
+                    .orThrow()
+                    .affected()
+                    .orElse(0L);
+        } catch (BrokerException e) {
+            throw refusedPurge(e);
+        }
+    }
+
+    private static RuntimeException refusedPurge(BrokerException e) {
+        if (e.status() == Status.FAILED_PRECONDITION || ErrorReasons.PRECONDITION_FAILED.equals(e.reason())) {
+            return new ConflictException("purge-refused", e.getMessage());
+        }
+        return BrokerFailures.translate(e);
+    }
+
     /** Removes every message of the queue on the node; returns how many the broker removed. */
     public long purge(UUID clusterId, UUID nodeId, String queue) {
         return translated(() -> {
@@ -251,24 +388,39 @@ public class BrokerMessages {
      */
     public Receiver receiver(UUID clusterId, UUID nodeId, String queue, ReceiverOptions options, String owner) {
         ClusterConnection c = gateway.cluster(clusterId);
-        Receiver receiver = transport(c, "receive messages over")
+        Receiver receiver = transport(c, RECEIVE_PURPOSE)
                 .receiver(queueId(c, queue), Scope.node(BrokerGateway.idOf(nodeId)), options);
         gateway.label(receiver.id(), owner);
         return receiver;
     }
 
     /**
-     * Runs {@code handler} on the queue's messages on the node, in the options' lanes, until the
-     * returned processor is closed; named {@code owner} in diagnostics. Failures, opening included,
+     * Runs {@code handler} on the subscription's messages, in the options' lanes, until the returned
+     * processor is closed; named {@code owner} in diagnostics. A {@code nodeId} reads that node's copy of the
+     * subscription, and none reads it for the whole cluster (a partitioned log). Failures, opening included,
      * are the SDK's own {@link BrokerException}, as for {@link #receiver}.
      */
     public Processor process(
-            UUID clusterId, UUID nodeId, String queue, ProcessorOptions options, MessageHandler handler, String owner) {
+            UUID clusterId,
+            UUID nodeId,
+            String kind,
+            String path,
+            ProcessorOptions options,
+            MessageHandler handler,
+            String owner) {
         ClusterConnection c = gateway.cluster(clusterId);
-        Processor processor = transport(c, "receive messages over")
-                .process(queueId(c, queue), Scope.node(BrokerGateway.idOf(nodeId)), options, handler);
+        Scope scope = nodeId == null ? Scope.whole() : Scope.node(BrokerGateway.idOf(nodeId));
+        Processor processor =
+                transport(c, RECEIVE_PURPOSE).process(ResourceIds.parse(kind, path), scope, options, handler);
         gateway.label(processor.id(), owner);
         return processor;
+    }
+
+    /** What the cluster's system can do with a subscription of this kind: its orderings, retry and release counting. */
+    public SubscriptionCapabilities subscriptionCapabilities(UUID clusterId, String kind) {
+        return transport(gateway.cluster(clusterId), RECEIVE_PURPOSE)
+                .capabilities()
+                .subscription(KindId.of(kind));
     }
 
     private static Transport transport(ClusterConnection c, String purpose) {

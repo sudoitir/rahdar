@@ -49,6 +49,7 @@ import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshots;
 import io.github.sudoitir.rahdar.support.AdminAuthenticationExtension;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
 import io.github.sudoitir.rahdar.support.Targets;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisModule;
 import io.github.sudoitir.rahdar.system.artemis.ArtemisNodes;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -133,7 +134,7 @@ class QueueLifecycleServiceTest extends PostgresIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        clusterId = clusters.save(new ClusterEntity("c-" + UUID.randomUUID(), null, null))
+        clusterId = clusters.save(new ClusterEntity(ArtemisModule.SYSTEM, "c-" + UUID.randomUUID(), null, null))
                 .getId();
         liveId = node("live", LIVE_URL, true);
         deadId = node("dead", DEAD_URL, false);
@@ -179,7 +180,7 @@ class QueueLifecycleServiceTest extends PostgresIntegrationTest {
                 QUEUE,
                 "ANYCAST",
                 true,
-                5,
+                5L,
                 0,
                 0,
                 0,
@@ -187,7 +188,8 @@ class QueueLifecycleServiceTest extends PostgresIntegrationTest {
                 0,
                 0,
                 false,
-                "artemis.queue")));
+                "artemis.queue",
+                Map.of())));
     }
 
     @AfterEach

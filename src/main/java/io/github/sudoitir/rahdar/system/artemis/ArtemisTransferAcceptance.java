@@ -1,6 +1,5 @@
 package io.github.sudoitir.rahdar.system.artemis;
 
-import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
 import io.github.sudoitir.rahdar.platform.broker.TransferAcceptance;
 import io.github.sudoitir.rahdar.platform.broker.TransferStaging.TransferSource;
 import java.util.List;
@@ -22,7 +21,7 @@ class ArtemisTransferAcceptance implements TransferAcceptance {
 
     @Override
     public String system() {
-        return BrokerGateway.SYSTEM;
+        return ArtemisModule.SYSTEM;
     }
 
     @Override

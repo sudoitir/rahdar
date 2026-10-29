@@ -12,6 +12,7 @@ import { Page } from '../../ui/Page.tsx';
 import { PageHeader } from '../../ui/PageHeader.tsx';
 import { Pager } from '../../ui/Pager.tsx';
 import { Toolbar } from '../../ui/Toolbar.tsx';
+import { BacklogDrawer, type BacklogTarget } from '../../kernel/backlog/BacklogDrawer.tsx';
 import { SubscriptionDetailDrawer } from './SubscriptionDetailDrawer.tsx';
 import { CreateSubscriptionForm } from './CreateSubscriptionForm.tsx';
 import { useCan } from '../../kernel/auth/useCan.ts';
@@ -166,21 +167,21 @@ function useSubscriptionSelection(rows: SubscriptionView[], total: number, q: st
     setPicked(new Map());
     setAllMatching(false);
   }, [q]);
-  // "All matching" is a filter, not a list of names: the subscriptions on the other pages were never loaded.
-  // Changing any one row turns it back into names, starting from this page.
-  const pageNames = () => new Map(rows.map((r) => [rowKey(r), r.name]));
+  // "All matching" is a filter, not a list of ids: the subscriptions on the other pages were never loaded.
+  // Changing any one row turns it back into ids, starting from this page.
+  const pageIds = () => new Map(rows.map((r) => [rowKey(r), r.id]));
   const toggleRow = (key: string) => {
-    const next = allMatching ? pageNames() : new Map(picked);
+    const next = allMatching ? pageIds() : new Map(picked);
     setAllMatching(false);
     if (next.has(key)) next.delete(key);
-    else next.set(key, rows.find((r) => rowKey(r) === key)?.name ?? key);
+    else next.set(key, rows.find((r) => rowKey(r) === key)?.id ?? key);
     setPicked(next);
   };
   const toggleAll = (keys: string[], allSelected: boolean) => {
-    const next = allMatching ? pageNames() : new Map(picked);
+    const next = allMatching ? pageIds() : new Map(picked);
     setAllMatching(false);
     if (allSelected) keys.forEach((k) => next.delete(k));
-    else rows.forEach((r) => next.set(rowKey(r), r.name));
+    else rows.forEach((r) => next.set(rowKey(r), r.id));
     setPicked(next);
   };
   const selectedKeys: ReadonlySet<string> = allMatching ? new Set(rows.map(rowKey)) : new Set(picked.keys());
@@ -189,7 +190,7 @@ function useSubscriptionSelection(rows: SubscriptionView[], total: number, q: st
   const matching = q ? ` matching "${q}"` : ' on this cluster';
   const selection: SubscriptionSelection = allMatching
     ? { kind: 'filter', q: q ?? '', total }
-    : { kind: 'names', names: [...picked.values()] };
+    : { kind: 'ids', ids: [...picked.values()] };
 
   return {
     picked,
@@ -251,14 +252,14 @@ export function SubscriptionsView() {
     size: PAGE_SIZE,
   });
 
-  // The open subscription is an destination, not a copy: held as a name and looked up in the
+  // The open subscription is an destination, not a copy: held as its id and looked up in the
   // rows each render, so a pause, an edit or a delete that refetches the listing is
   // reflected in the panel instead of leaving it showing the subscription as it was when
   // it was opened (non-negotiable #9).
   //
   // A shared or palette link can name a subscription that is not on the loaded page; it is looked up by
-  // name then, rather than the link silently opening nothing.
-  const onPage = (query.data?.data ?? []).find((q) => q.name === search.subscription);
+  // id then, rather than the link silently opening nothing.
+  const onPage = (query.data?.data ?? []).find((q) => q.id === search.subscription);
   const offPage = useSubscription(clusterId, onPage ? undefined : search.subscription);
   const selected = onPage ?? offPage.subscription ?? null;
   // Neither the page nor an exact lookup has it: gone, or no longer visible to the caller. Not while still asking.
@@ -266,7 +267,7 @@ export function SubscriptionsView() {
     !selected && search.subscription && !offPage.isPending && !offPage.isError ? search.subscription : undefined;
   useTitlePart('resource', selected?.name);
   const setSelected = (subscription: SubscriptionView | null) =>
-    navigate({ to: '.', search: (prev: Record<string, unknown>) => ({ ...prev, subscription: subscription?.name }) });
+    navigate({ to: '.', search: (prev: Record<string, unknown>) => ({ ...prev, subscription: subscription?.id }) });
   const [createOpen, setCreateOpen] = useState(false);
   const { can, reach, createPatterns, loading: grantsLoading } = useCan();
   // Through a team or a share the caller may create under their patterns; only with neither is the control not theirs.
@@ -296,7 +297,11 @@ export function SubscriptionsView() {
   const setPage = (next: number) =>
     navigate({ to: '.', search: (prev: Record<string, unknown>) => ({ ...prev, page: next > 1 ? next : undefined }) });
 
-  const columns = useMemo(subscriptionColumns, []);
+  const [backlogOf, setBacklogOf] = useState<BacklogTarget | null>(null);
+  const columns = useMemo(
+    () => subscriptionColumns((row) => setBacklogOf({ clusterId, id: row.id, name: row.name })),
+    [clusterId],
+  );
   const rows = query.data?.data ?? [];
   const total = query.data?.count ?? 0;
 
@@ -317,7 +322,7 @@ export function SubscriptionsView() {
     <Page fill>
       <PageHeader
         title="Subscriptions"
-        description="Every subscription across the cluster's nodes, with its depth and consumers. Select a row to open its detail and actions."
+        description="Every subscription across the cluster's nodes, with its backlog and consumers. Select a row to open its detail and actions."
       />
       <Toolbar
         label="Subscription filters"
@@ -405,6 +410,7 @@ export function SubscriptionsView() {
       />
 
       <SubscriptionDetailDrawer subscription={selected} missing={missing} onClose={() => setSelected(null)} />
+      <BacklogDrawer target={backlogOf} onClose={() => setBacklogOf(null)} />
       <CreateSubscriptionForm clusterId={clusterId} opened={createOpen} onClose={() => setCreateOpen(false)} />
     </Page>
   );

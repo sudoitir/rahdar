@@ -79,7 +79,7 @@ while [ "$c" -lt "$LOAD_CLUSTERS" ]; do
     n=$((n + 1))
   done
   name="load-$c"
-  reply=$(api POST /clusters -d "{\"seedUrls\":[$seeds],\"name\":\"$name\",\"description\":\"Load test cluster $c\",\"credentials\":{\"username\":\"artemis\",\"password\":\"artemis\"},\"coreCredentials\":{\"username\":\"artemis\",\"password\":\"artemis\"}}")
+  reply=$(api POST /clusters -d "{\"system\":\"artemis\",\"name\":\"$name\",\"description\":\"Load test cluster $c\",\"connection\":{\"system\":\"artemis\",\"seedUrls\":[$seeds],\"credentials\":{\"username\":\"artemis\",\"password\":\"artemis\"},\"coreCredentials\":{\"username\":\"artemis\",\"password\":\"artemis\"}}}")
   id=$(json 'd["id"]' <<<"$reply" 2>/dev/null) || { echo "registering $name failed: $reply" >&2; exit 1; }
   echo "  $name: $id"
   cluster_ids+=("$id")

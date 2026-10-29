@@ -21,8 +21,14 @@ export type SendMessageRequest = Schemas['SendMessageRequest'];
 export type MessageActionKind = 'move' | 'retry' | 'delete' | 'expire';
 
 export const keys = {
-  message: (id: string, subscriptionName: string, messageId: string, node?: string, filter?: string) =>
-    clusterKey(id, 'subscriptions', subscriptionName, 'messages', messageId, { node, filter }),
+  message: (
+    id: string,
+    subscriptionName: string,
+    messageId: string,
+    node?: string,
+    filter?: string,
+    partition?: number,
+  ) => clusterKey(id, 'subscriptions', subscriptionName, 'messages', messageId, { node, filter, partition }),
   messages: (id: string, subscriptionName: string, params: MessageBrowseParams = {}) =>
     clusterKey(id, 'subscriptions', subscriptionName, 'messages', params),
   topic: (id: string, topic: string) => clusterKey(id, topic),
@@ -33,6 +39,10 @@ export interface MessageBrowseParams {
   filter?: string;
   page?: number;
   size?: number;
+  /** A partitioned log is read from one partition, from a start; there are no pages. */
+  partition?: number;
+  from?: string;
+  value?: string;
 }
 
 function messageSearch(params: MessageBrowseParams): string {
@@ -41,6 +51,9 @@ function messageSearch(params: MessageBrowseParams): string {
   if (params.filter) sp.set('filter', params.filter);
   if (params.page && params.page > 1) sp.set('page', String(params.page));
   if (params.size) sp.set('size', String(params.size));
+  if (params.partition !== undefined) sp.set('partition', String(params.partition));
+  if (params.from) sp.set('from', params.from);
+  if (params.value) sp.set('value', params.value);
   const s = sp.toString();
   return s ? `?${s}` : '';
 }
@@ -73,14 +86,17 @@ export function useMessageDetail(
   messageId: string | null,
   node?: string,
   filter?: string,
+  /** The partition a record of a log is read from, whose offset is the record's id. */
+  partition?: number,
 ): UseQueryResult<MessageDetailView, ApiError> {
   const ids = useRoleIds(clusterId);
   return useQuery({
-    queryKey: keys.message(clusterId, subscriptionName, messageId ?? 'none', node, filter),
+    queryKey: keys.message(clusterId, subscriptionName, messageId ?? 'none', node, filter, partition),
     queryFn: () => {
       const sp = new URLSearchParams();
       if (node) sp.set('node', node);
       if (filter) sp.set('filter', filter);
+      if (partition !== undefined) sp.set('partition', String(partition));
       const qs = sp.toString();
       const query = qs ? `?${qs}` : '';
       return request<MessageDetailView>(

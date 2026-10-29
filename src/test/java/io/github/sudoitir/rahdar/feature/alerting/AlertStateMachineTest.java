@@ -21,11 +21,11 @@ class AlertStateMachineTest {
     @Test
     void briefBreachDoesNotFire() {
         AlertStateEntity state = fresh();
-        assertThat(AlertStateMachine.advance(state, true, 10.0, 30, T0)).isNull();
+        assertThat(AlertStateMachine.advance(state, true, 10.0, 30, 0, T0)).isNull();
         assertThat(state.getState()).isEqualTo("PENDING");
 
         // Condition clears before the duration elapses.
-        Transition t = AlertStateMachine.advance(state, false, null, 30, T0.plusSeconds(10));
+        Transition t = AlertStateMachine.advance(state, false, null, 30, 0, T0.plusSeconds(10));
         assertThat(t).isNull();
         assertThat(state.getState()).isEqualTo("OK");
         assertThat(state.getSince()).isNull();
@@ -34,11 +34,11 @@ class AlertStateMachineTest {
     @Test
     void sustainedBreachFiresOnceDurationElapses() {
         AlertStateEntity state = fresh();
-        AlertStateMachine.advance(state, true, 10.0, 30, T0);
-        assertThat(AlertStateMachine.advance(state, true, 10.0, 30, T0.plusSeconds(15)))
+        AlertStateMachine.advance(state, true, 10.0, 30, 0, T0);
+        assertThat(AlertStateMachine.advance(state, true, 10.0, 30, 0, T0.plusSeconds(15)))
                 .isNull();
 
-        Transition t = AlertStateMachine.advance(state, true, 12.0, 30, T0.plusSeconds(31));
+        Transition t = AlertStateMachine.advance(state, true, 12.0, 30, 0, T0.plusSeconds(31));
         assertThat(t).isEqualTo(new Transition("subscription:orders", TransitionKind.FIRED, 12.0));
         assertThat(state.getState()).isEqualTo("FIRING");
     }
@@ -46,7 +46,7 @@ class AlertStateMachineTest {
     @Test
     void zeroDurationFiresImmediately() {
         AlertStateEntity state = fresh();
-        Transition t = AlertStateMachine.advance(state, true, 5.0, 0, T0);
+        Transition t = AlertStateMachine.advance(state, true, 5.0, 0, 0, T0);
         assertThat(t).isEqualTo(new Transition("subscription:orders", TransitionKind.FIRED, 5.0));
         assertThat(state.getState()).isEqualTo("FIRING");
     }
@@ -54,20 +54,44 @@ class AlertStateMachineTest {
     @Test
     void firingResolvesWhenConditionClears() {
         AlertStateEntity state = fresh();
-        AlertStateMachine.advance(state, true, 5.0, 0, T0);
+        AlertStateMachine.advance(state, true, 5.0, 0, 0, T0);
 
-        Transition t = AlertStateMachine.advance(state, false, null, 0, T0.plusSeconds(5));
+        Transition t = AlertStateMachine.advance(state, false, null, 0, 0, T0.plusSeconds(5));
         assertThat(t).isEqualTo(new Transition("subscription:orders", TransitionKind.RESOLVED, 5.0));
         assertThat(state.getState()).isEqualTo("OK");
         assertThat(state.getSince()).isNull();
     }
 
     @Test
+    void aFlappingStateStaysOneFiringUntilItHasBeenClearForTheResolveTime() {
+        AlertStateEntity state = fresh();
+        AlertStateMachine.advance(state, true, 1.0, 0, 120, T0);
+
+        // Down, up, down, up each minute: never clear for two minutes, so it never resolves.
+        for (int minute = 1; minute <= 6; minute++) {
+            boolean active = minute % 2 == 0;
+            Transition t =
+                    AlertStateMachine.advance(state, active, active ? 1.0 : null, 0, 120, T0.plusSeconds(60L * minute));
+            assertThat(t).isNull();
+            assertThat(state.getState()).isEqualTo("FIRING");
+        }
+
+        // Then it stays clear: resolved once the resolve time has passed since it first read clear.
+        assertThat(AlertStateMachine.advance(state, false, null, 0, 120, T0.plusSeconds(400)))
+                .isNull();
+        assertThat(AlertStateMachine.advance(state, false, null, 0, 120, T0.plusSeconds(519)))
+                .isNull();
+        Transition t = AlertStateMachine.advance(state, false, null, 0, 120, T0.plusSeconds(520));
+        assertThat(t).isEqualTo(new Transition("subscription:orders", TransitionKind.RESOLVED, 1.0));
+        assertThat(state.getState()).isEqualTo("OK");
+    }
+
+    @Test
     void firingStaysFiringWhileConditionHolds() {
         AlertStateEntity state = fresh();
-        AlertStateMachine.advance(state, true, 5.0, 0, T0);
+        AlertStateMachine.advance(state, true, 5.0, 0, 0, T0);
 
-        Transition t = AlertStateMachine.advance(state, true, 7.0, 0, T0.plusSeconds(5));
+        Transition t = AlertStateMachine.advance(state, true, 7.0, 0, 0, T0.plusSeconds(5));
         assertThat(t).isNull();
         assertThat(state.getState()).isEqualTo("FIRING");
         assertThat(state.getLastValue()).isEqualTo(7.0);
@@ -76,20 +100,20 @@ class AlertStateMachineTest {
     @Test
     void okStaysOkWhenNeverActive() {
         AlertStateEntity state = fresh();
-        assertThat(AlertStateMachine.advance(state, false, null, 30, T0)).isNull();
+        assertThat(AlertStateMachine.advance(state, false, null, 30, 0, T0)).isNull();
         assertThat(state.getState()).isEqualTo("OK");
     }
 
     @Test
     void pendingResetsElapsedTimeOnEachReEntry() {
         AlertStateEntity state = fresh();
-        AlertStateMachine.advance(state, true, 1.0, 30, T0);
-        AlertStateMachine.advance(state, false, null, 30, T0.plusSeconds(20));
+        AlertStateMachine.advance(state, true, 1.0, 30, 0, T0);
+        AlertStateMachine.advance(state, false, null, 30, 0, T0.plusSeconds(20));
         assertThat(state.getState()).isEqualTo("OK");
 
         // Re-entering PENDING starts the clock over, not from the earlier `since`.
-        AlertStateMachine.advance(state, true, 1.0, 30, T0.plusSeconds(25));
-        Transition t = AlertStateMachine.advance(state, true, 1.0, 30, T0.plusSeconds(50));
+        AlertStateMachine.advance(state, true, 1.0, 30, 0, T0.plusSeconds(25));
+        Transition t = AlertStateMachine.advance(state, true, 1.0, 30, 0, T0.plusSeconds(50));
         assertThat(t).isNull();
         assertThat(state.getState()).isEqualTo("PENDING");
     }

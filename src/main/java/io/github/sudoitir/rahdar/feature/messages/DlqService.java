@@ -16,6 +16,7 @@ import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
 import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
 import io.github.sudoitir.rahdar.platform.broker.DeadLetterDestinations;
 import io.github.sudoitir.rahdar.platform.broker.ResourceIds;
+import io.github.sudoitir.rahdar.platform.broker.SystemExtensions;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
 import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshot;
@@ -24,6 +25,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -46,11 +48,16 @@ public class DlqService {
     private final BrokerConnections connections;
     private final ClusterAccessGuard clusterAccess;
     private final PermissionResolver permissions;
-    private final DeadLetterDestinations deadLetters;
+    private final SystemExtensions extensions;
     private final BrokerGateway gateway;
 
     public DeadLetterView view(UUID clusterId) {
         clusterAccess.requireVisible(clusterId);
+        // A system that keeps no default dead-letter destinations in its brokers' configuration has none to show.
+        Optional<DeadLetterDestinations> own = extensions.forCluster(clusterId, DeadLetterDestinations.class);
+        if (own.isEmpty()) {
+            return new DeadLetterView(List.of(), false);
+        }
         ResourceFilter readableQueues = permissions.filter(clusterId, ResourceType.SUBSCRIPTION);
         ResourceFilter readableAddresses = permissions.filter(clusterId, ResourceType.DESTINATION);
         ClusterNode manageable = brokerNodes.nodes(clusterId).stream()
@@ -60,7 +67,7 @@ public class DlqService {
                         BrokerConnectionException.Kind.UNREACHABLE,
                         "This cluster has no node with a management URL yet."));
 
-        Optional<Map<String, String>> kinds = deadLetters.defaults(clusterId, manageable.getId());
+        Optional<Map<String, String>> kinds = own.get().defaults(clusterId, manageable.getId());
         if (kinds.isEmpty()) {
             return new DeadLetterView(List.of(), false);
         }
@@ -79,7 +86,7 @@ public class DlqService {
                 destinations.add(new DeadLetterDestination(
                         id.format(),
                         id.kind().value(),
-                        ResourceIds.label(id.kind()),
+                        ResourceIds.label(connection, id.kind()),
                         address,
                         entry.getValue(),
                         queues));
@@ -109,16 +116,23 @@ public class DlqService {
                     .map(r -> new DeadLetterDepth(
                             r.nodeId(), nodeNames.getOrDefault(r.nodeId(), "unknown"), r.messageCount()))
                     .toList();
-            long totalDepth = perNode.stream().mapToLong(DeadLetterDepth::depth).sum();
+            List<Long> known = perNode.stream()
+                    .map(DeadLetterDepth::depth)
+                    .filter(Objects::nonNull)
+                    .toList();
+            Long totalDepth = known.isEmpty()
+                    ? null
+                    : Long.valueOf(known.stream().mapToLong(Long::longValue).sum());
             ResourceId id = ResourceIds.of(connection, ResourceClass.SUBSCRIPTION, queueName);
             queues.add(new DeadLetterSubscription(
                     id.format(),
                     id.kind().value(),
-                    ResourceIds.label(id.kind()),
+                    ResourceIds.label(connection, id.kind()),
                     queueName,
                     ResourceIds.of(connection, ResourceClass.DESTINATION, address)
                             .format(),
                     totalDepth,
+                    perNode.size() - known.size(),
                     perNode));
         });
         return queues;

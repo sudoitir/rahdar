@@ -26,7 +26,7 @@ public class StreamSignals {
     private final SseHub hub;
 
     private final Map<UUID, String> topologySignature = new ConcurrentHashMap<>();
-    private final Map<UUID, Map<String, Long>> queueState = new ConcurrentHashMap<>();
+    private final Map<UUID, Map<String, String>> queueState = new ConcurrentHashMap<>();
 
     /** After a tier-A tick: publish topology + health if the endpoint set / roles / liveness moved. */
     public void afterTierA(UUID clusterId, List<NodeEndpoint> endpoints) {
@@ -51,13 +51,16 @@ public class StreamSignals {
         if (rows.isEmpty()) {
             return;
         }
-        Map<String, Long> seen = queueState.computeIfAbsent(clusterId, k -> new ConcurrentHashMap<>());
+        Map<String, String> seen = queueState.computeIfAbsent(clusterId, k -> new ConcurrentHashMap<>());
         boolean first = seen.isEmpty();
         Set<String> moved = new LinkedHashSet<>();
         for (QueueRow r : rows) {
-            long counters = r.messageCount() + r.consumerCount() + r.deliveringCount() + r.scheduledCount();
-            Long previous = seen.put(r.nodeId() + "|" + r.queueName(), counters);
-            if (previous == null || previous != counters) {
+            String counters = (r.backlogKnown() ? r.messageCount() : "unknown")
+                    + "/" + r.consumerCount()
+                    + "/" + r.deliveringCount()
+                    + "/" + r.scheduledCount();
+            String previous = seen.put(r.nodeId() + "|" + r.queueName(), counters);
+            if (!counters.equals(previous)) {
                 moved.add(r.queueName());
             }
         }

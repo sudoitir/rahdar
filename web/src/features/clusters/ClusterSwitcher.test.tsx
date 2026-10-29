@@ -8,6 +8,7 @@ import { createRoute } from '@tanstack/react-router';
 
 import { CONTRACT, defineFeature } from '../../kernel/feature.ts';
 import { clusterRoute } from '../../kernel/routing/roots.ts';
+import { clustersFeature } from './feature.ts';
 import { renderAppAt } from '../../test/render.tsx';
 import { server } from '../../test/setup.ts';
 import { paged } from '../../kernel/api/paging.ts';
@@ -267,18 +268,16 @@ describe('ClusterSwitcher', () => {
     expect(within(list).getAllByRole('option')).toHaveLength(11);
   });
 
-  it('opens registration from the end of the list', async () => {
+  it('opens the registration page from the end of the list', async () => {
     mockApi();
     const user = userEvent.setup();
-    renderAppAt('/clusters/c1/subscriptions', [QUEUES]);
+    renderAppAt('/clusters/c1/subscriptions', [QUEUES, clustersFeature]);
     await user.click(await screen.findByRole('button', { name: /prod-emea/ }));
 
     await user.click(await option('Register cluster'));
 
-    const dialog = await screen.findByRole('dialog', { name: 'Register cluster' });
-    // The form is a chunk of its own, loaded when the dialog first opens; the wait is on the dialog, not the page.
-    await waitFor(() => expect(dialog.querySelector('input')).not.toBeNull(), { timeout: 15_000 });
-    expect(within(dialog).getByLabelText('Broker management URL')).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Register a cluster', level: 1 })).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
   it('in the collapsed rail is the cluster monogram, named by the cluster and its environment', async () => {

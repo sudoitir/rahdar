@@ -32,6 +32,7 @@ import io.github.sudoitir.rahdar.kernel.security.web.UserViews.GrantRequest;
 import io.github.sudoitir.rahdar.kernel.security.web.UserViews.RoleRequest;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterEntity;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterRepository;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisModule;
 import java.util.List;
 import java.util.UUID;
 import java.util.function.BooleanSupplier;
@@ -353,7 +354,7 @@ class AccessGatingIntegrationTest extends GatedAccessTestBase {
     @Test
     void teamsPatternsMembersAndSharesAreHeldThenRun() {
         setUp();
-        UUID cluster = clusters.save(new ClusterEntity("gate-" + UUID.randomUUID(), null, null))
+        UUID cluster = clusters.save(new ClusterEntity(ArtemisModule.SYSTEM, "gate-" + UUID.randomUUID(), null, null))
                 .getId();
         String name = "gate-team-" + UUID.randomUUID().toString().substring(0, 8);
         String renamed = name + "-renamed";

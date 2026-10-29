@@ -54,7 +54,7 @@ const QUEUE = {
     'message:move',
   ],
   durable: true,
-  totalMessageCount: 42,
+  backlog: { value: 42, accuracy: 'EXACT', reason: null, breakdown: false },
   totalConsumerCount: 4,
   totalDeliveringCount: 2,
   totalScheduledCount: 0,

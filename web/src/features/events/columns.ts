@@ -12,6 +12,21 @@ export function subjectOf(e: BrokerEventView): string {
   return e.consumerName ?? e.sessionName ?? e.connectionName ?? e.routingName ?? '—';
 }
 
+/**
+ * What a delivery summary says, in words: a `openbroker.message.delivered` event is the deliveries on one
+ * destination and subscription over one flush interval, not one delivery. `null` for every other event, and for a
+ * summary whose properties lack the figures.
+ */
+export function summaryOf(e: BrokerEventView): string | null {
+  if (e.type !== 'openbroker.message.delivered') return null;
+  const { count, from, to } = e.props ?? {};
+  if (typeof count !== 'number' || typeof from !== 'string' || typeof to !== 'string') return null;
+  const where = e.routingName
+    ? `${e.destination ?? 'a destination'}/${e.routingName}`
+    : (e.destination ?? 'a destination');
+  return `${count.toLocaleString()} ${count === 1 ? 'message' : 'messages'} delivered on ${where} between ${absoluteLabel(from)} and ${absoluteLabel(to)}`;
+}
+
 /** What an event is about, from the middle of its `openbroker.<family>.<verb>` type, so the grid can be read by family. */
 const FAMILIES: Record<string, string> = {
   consumer: 'consumer',
@@ -52,6 +67,14 @@ export function eventColumns(zone: string): Column<BrokerEventView>[] {
       priority: 'high',
     },
     { id: 'subject', header: 'Subject', accessor: subjectOf, kind: 'identifier', priority: 'high' },
+    {
+      id: 'summary',
+      header: 'What happened',
+      accessor: (e) => summaryOf(e) ?? '',
+      kind: 'text',
+      wrap: true,
+      priority: 'high',
+    },
     { id: 'remote', header: 'Remote', accessor: (e) => e.remoteAddress ?? '—', kind: 'code', priority: 'low' },
   ];
 }

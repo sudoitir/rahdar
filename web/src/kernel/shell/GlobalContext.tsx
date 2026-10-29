@@ -11,6 +11,7 @@ const HERE: Record<string, string> = {
   account: 'Account',
   inbox: 'Inbox',
   approvals: 'Approvals',
+  'clusters/new': 'Register a cluster',
 };
 
 /**
@@ -22,8 +23,10 @@ const HERE: Record<string, string> = {
 export function GlobalContext() {
   const { pathname } = useLocation();
   const place = useLastPlace();
-  const here = HERE[pathname.split('/')[1] ?? ''];
-  const nested = pathname.split('/').filter(Boolean).length > 1;
+  const segments = pathname.split('/').filter(Boolean);
+  const root = HERE[segments.slice(0, 2).join('/')] ? segments.slice(0, 2).join('/') : (segments[0] ?? '');
+  const here = HERE[root];
+  const nested = segments.length > root.split('/').length;
 
   return (
     <nav aria-label="Where you are" className={classes.line}>
@@ -46,7 +49,7 @@ export function GlobalContext() {
             ›
           </span>
           {nested ? (
-            <Anchor component={Link} to={`/${pathname.split('/')[1]}`} size="sm" c="dimmed">
+            <Anchor component={Link} to={`/${root}`} size="sm" c="dimmed">
               {here}
             </Anchor>
           ) : (

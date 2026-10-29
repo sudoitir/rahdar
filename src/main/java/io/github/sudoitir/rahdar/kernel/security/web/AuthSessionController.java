@@ -4,6 +4,7 @@ import static io.swagger.v3.oas.annotations.media.Schema.RequiredMode.REQUIRED;
 
 import io.github.sudoitir.rahdar.kernel.core.PagedView;
 import io.github.sudoitir.rahdar.kernel.core.ResourceQuery;
+import io.github.sudoitir.rahdar.kernel.core.SecretRedactor;
 import io.github.sudoitir.rahdar.kernel.plugin.IdentityProviderListing;
 import io.github.sudoitir.rahdar.kernel.security.PermissionResolver;
 import io.github.sudoitir.rahdar.kernel.security.RahdarPrincipal;
@@ -107,7 +108,14 @@ public class AuthSessionController {
             @Schema(nullable = true) Instant authenticatedAt,
             @Schema(requiredMode = REQUIRED) long windowSeconds) {}
 
-    public record ReauthenticateRequest(@NotBlank String password) {}
+    public record ReauthenticateRequest(@NotBlank String password) {
+
+        /** The password is never printed. */
+        @Override
+        public String toString() {
+            return "ReauthenticateRequest[password=" + SecretRedactor.MASK + "]";
+        }
+    }
 
     public enum AuthStatus {
         AUTHENTICATED,

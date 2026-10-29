@@ -19,8 +19,8 @@ import type { HeldOperationDetail } from './approvals/api.ts';
 import { useFeatures } from './features.ts';
 import type { MetricRange } from './time/ranges.ts';
 
-/** Subscriptions picked by name, or every subscription matching the subscriptions screen's filter (`q`, blank for all). */
-export type SubscriptionSelection = { kind: 'names'; names: string[] } | { kind: 'filter'; q: string; total: number };
+/** Subscriptions picked by id (`kind/path`), or every subscription matching the subscriptions screen's filter (`q`, blank for all). */
+export type SubscriptionSelection = { kind: 'ids'; ids: string[] } | { kind: 'filter'; q: string; total: number };
 
 /** Messages picked by id, every message matching the messages screen's selector, or the whole subscription. */
 export type MessageSelection = { kind: 'ids'; ids: number[] } | { kind: 'filter'; filter: string } | { kind: 'all' };

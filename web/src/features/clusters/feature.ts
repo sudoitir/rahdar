@@ -2,7 +2,7 @@ import { IconSitemap } from '@tabler/icons-react';
 import { createRoute, redirect } from '@tanstack/react-router';
 
 import { CONTRACT, defineFeature } from '../../kernel/feature.ts';
-import { clusterRoute } from '../../kernel/routing/roots.ts';
+import { clusterRoute, rootRoute } from '../../kernel/routing/roots.ts';
 import { lazyFeatureView, lazySlot } from '../../kernel/routing/lazy.tsx';
 import { keys } from './api.ts';
 import { ClusterHeader } from './ClusterHeader.tsx';
@@ -29,11 +29,20 @@ const topologyRoute = createRoute({
   component: lazyFeatureView('clusters', () => import('./TopologyView.tsx'), 'TopologyView'),
 });
 
+/** Registering a cluster: a page of its own outside any cluster, with the chosen system in its address. */
+const registerRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: 'clusters/new',
+  validateSearch: (raw: Record<string, unknown>): { system?: string } =>
+    typeof raw.system === 'string' && raw.system ? { system: raw.system } : {},
+  component: lazyFeatureView('clusters', () => import('./RegisterClusterPage.tsx'), 'RegisterClusterPage'),
+});
+
 /** Registered clusters, their topology and environments: the platform every other feature works on. */
 export const clustersFeature = defineFeature({
   contract: CONTRACT,
   id: 'clusters',
-  routes: { cluster: [clusterIndexRoute, topologyRoute] },
+  routes: { root: [registerRoute], cluster: [clusterIndexRoute, topologyRoute] },
   nav: [
     {
       group: 'observe',

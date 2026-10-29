@@ -6,6 +6,7 @@ import io.github.sudoitir.rahdar.kernel.core.HeavyTimeoutException;
 import io.github.sudoitir.rahdar.kernel.core.NotFoundException;
 import io.github.sudoitir.rahdar.kernel.core.Problems;
 import io.github.sudoitir.rahdar.kernel.core.ResourceForbiddenException;
+import io.github.sudoitir.rahdar.kernel.core.StalePreviewException;
 import java.net.URI;
 import java.util.List;
 import java.util.Map;
@@ -57,6 +58,11 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler(HeavyTimeoutException.class)
     ProblemDetail onHeavyTimeout(HeavyTimeoutException e) {
         return Problems.heavyTimeout(e);
+    }
+
+    @ExceptionHandler(StalePreviewException.class)
+    ProblemDetail onStale(StalePreviewException e) {
+        return Problems.of(HttpStatus.PRECONDITION_FAILED, "stale-preview", "The preview is stale", e.getMessage());
     }
 
     @ExceptionHandler(ConflictException.class)

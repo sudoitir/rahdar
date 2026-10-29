@@ -19,19 +19,33 @@ export type LogicalNodeView = Schemas['LogicalNodeView'];
 export type NodeEndpointView = Schemas['NodeEndpointView'];
 export type ProblemDetail = Schemas['ProblemDetail'];
 export type VersionGateView = Schemas['VersionGateView'];
-export type RegisterClusterRequest = Schemas['RegisterClusterRequest'];
-export type RegisterPreview = Schemas['RegisterPreview'];
-export type NodeProbeView = Schemas['NodeProbeView'];
-export type AdoptionPreviewView = Schemas['AdoptionPreviewView'];
 export type ConnectionCheck = Schemas['ConnectionCheck'];
+export type CheckNode = Schemas['NodeReach'];
+export type AdoptionPreviewView = Schemas['AdoptionPreviewView'];
 export type ConnectionView = Schemas['ConnectionView'];
 export type ClusterConnectionView = Schemas['ClusterConnectionView'];
-/** The edit: `core: null` clears the Core account, which the generated type cannot say. */
-export type UpdateClusterRequest = Omit<Schemas['UpdateClusterRequest'], 'core'> & {
-  core?: Schemas['AccountUpdate'] | null;
-};
 export type TopologyView = Schemas['TopologyView'];
 export type EstateSubscription = Schemas['EstateSubscriptionView'];
+
+// The registration contract of design D2. The types up to `UpdateClusterRequest` are hand-written until the
+// generated schema carries them; replace them with `Schemas[...]` then.
+
+/** A broker system Rahdar loads, from `GET /systems`. `connection` says which form the system's connection takes. */
+export interface LoadedSystem {
+  id: string;
+  name: string;
+  supportedVersions: string;
+  connection: 'jolokia-seeds' | 'bootstrap';
+}
+
+export type SecurityProtocol = 'PLAINTEXT' | 'SSL' | 'SASL_PLAINTEXT' | 'SASL_SSL';
+export type SaslMechanism = 'PLAIN' | 'SCRAM-SHA-256' | 'SCRAM-SHA-512' | 'OAUTHBEARER';
+
+export type RegisterClusterRequest = Schemas['RegisterClusterRequest'];
+export type UpdateClusterRequest = Schemas['UpdateClusterRequest'];
+export type ArtemisConnection = Schemas['ArtemisConnection'];
+export type KafkaConnection = Schemas['KafkaConnection'];
+export type ArtemisConnectionUpdate = Schemas['ArtemisConnectionUpdate'];
 
 /** String enums the backend serialises as bare strings; narrowed here for the UI. */
 export type CapabilityStatus = 'AVAILABLE' | 'UNAVAILABLE' | 'UNKNOWN';
@@ -104,8 +118,17 @@ export function useHealth(id: string): UseQueryResult<HealthView, ApiError> {
   });
 }
 
+/** The broker systems Rahdar loads, for the registration page's choice. */
+export function useSystems(): UseQueryResult<LoadedSystem[], ApiError> {
+  return useQuery({
+    queryKey: ['systems'],
+    queryFn: () => request<PagedView<LoadedSystem>>('/systems').then((page) => page.data),
+    staleTime: Infinity,
+  });
+}
+
 export function useCheckConnection() {
-  return useMutation<RegisterPreview, ApiError, RegisterClusterRequest>({
+  return useMutation<ConnectionCheck, ApiError, RegisterClusterRequest>({
     mutationFn: (body) =>
       request('/clusters?dryRun=true', {
         method: 'POST',

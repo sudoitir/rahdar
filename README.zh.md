@@ -6,12 +6,12 @@
 
 <sub><em>Rahdar</em>（波斯语 راهدار，意为“守路人”）= <em>rah</em>（路）+ <em>dar</em>（守护者）：守护消息走过的每一条路，让它畅通而安全。</sub>
 
-**一个控制台，管好你所有的 Apache ActiveMQ Artemis 集群。**
+**一个开源控制台，管好你的 Apache ActiveMQ® Artemis 与 Apache Kafka® 集群。**
 
-实时拓扑、所有节点的队列尽收一表、看得见的消息流向、安全的消息操作，还能用 SQL 查消息——一个实例全部搞定。
+你运行的每一个集群都在同一个资产视图中，延迟如实标为估算值，破坏性操作先预览，审批闸门对人和助手一视同仁。
 
-<a href="https://rahdar.dev/zh/"><img src="https://img.shields.io/badge/Play%20the%20story-Find%20the%20backed--up%20queue%20across%208%20brokers-0b7285?style=for-the-badge&labelColor=0b1418&logo=data:image/svg%2Bxml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNDAgMjQwIiByb2xlPSJpbWciIGFyaWEtbGFiZWw9IlJhaGRhciI+PHBhdGggZmlsbD0iIzBjODU5OSIgZD0iTTAgOTAgQTkwIDkwIDAgMCAxIDkwIDAgSDI0MCBWNjAgSDE1MCBBOTAgOTAgMCAwIDAgNjAgMTUwIFYyNDAgSDAgWiBNMTA1IDI0MCBWMTUwIEE0NSA0NSAwIDAgMSAxNTAgMTA1IEgyNDAgVjE1MCBBOTAgOTAgMCAwIDEgMTUwIDI0MCBIMTA1IFoiLz48L3N2Zz4K" alt="Play the story: find the backed-up queue across 8 brokers" height="36"></a><br>
-<sub>一场凌晨 3 点的交互式故障排查 · 约 2 分钟 · 直接在浏览器里运行</sub>
+<a href="https://rahdar.dev/"><img src="https://img.shields.io/badge/Play%20the%20story-One%20night%20on%20call%20across%20Artemis%20and%20Kafka-0b7285?style=for-the-badge&labelColor=0b1418&logo=data:image/svg%2Bxml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNDAgMjQwIiByb2xlPSJpbWciIGFyaWEtbGFiZWw9IlJhaGRhciI+PHBhdGggZmlsbD0iIzBjODU5OSIgZD0iTTAgOTAgQTkwIDkwIDAgMCAxIDkwIDAgSDI0MCBWNjAgSDE1MCBBOTAgOTAgMCAwIDAgNjAgMTUwIFYyNDAgSDAgWiBNMTA1IDI0MCBWMTUwIEE0NSA0NSAwIDAgMSAxNTAgMTA1IEgyNDAgVjE1MCBBOTAgOTAgMCAwIDEgMTUwIDI0MCBIMTA1IFoiLz48L3N2Zz4K" alt="Play the story: one night on call across Artemis and Kafka" height="36"></a><br>
+<sub>一场交互式的值班之夜 · 约 2 分钟 · 直接在浏览器里运行</sub>
 
 [English](README.md) · **简体中文** · [فارسی](README.fa.md)
 
@@ -28,6 +28,7 @@
 
 [文档](https://rahdar.dev/zh/guide/) ·
 [快速开始](#快速开始) ·
+[Kafka](https://rahdar.dev/guide/kafka) ·
 [Flow](https://rahdar.dev/guide/flow) ·
 [SQL Console](https://rahdar.dev/zh/guide/sql-console) ·
 [MCP](https://rahdar.dev/zh/guide/mcp) ·
@@ -39,7 +40,9 @@
 > **Alpha 阶段。** 项目仍在快速迭代，功能尚不完整。目前发布的镜像都是稳定版之前的 dev 构建
 > （`sudoit1/rahdar:dev`，还没有 `:latest`），后续版本可能包含不兼容的变更。
 
-![Rahdar：拓扑、跨节点队列表、死信队列、消息流向与图表](docs/img/demo.gif)
+<picture><source media="(prefers-color-scheme: dark)" srcset="docs/img/readme/estate-dark.webp"><img src="docs/img/readme/estate-light.webp" alt="资产视图：一个 Apache Artemis 集群和一个 Apache Kafka 集群及其健康状况，下方是一张按积压排序的订阅表，Kafka 的延迟标为估算值。"></picture>
+
+<sub>所有集群在同一个资产视图中：Artemis 与 Kafka 并列，积压最严重的排在最前。</sub>
 
 ## 快速开始
 
@@ -82,23 +85,46 @@ docker run -p 8080:8080 \
 
 ## 为什么做这个
 
-凌晨 3 点，集群里某个地方的 `ORDERS.DLQ` 正在堆积。Artemis 自带的控制台一次只能管一个 Broker，根本不知道集群的存在。于是你只能每个节点开一个标签页，在每个页面里逐层展开 JMX 树，一个个属性看过去，直到找到它为止。
+凌晨 02:51，两条告警同时响起：Kafka 的一个消费者组在 `payments` 上越落越远，Artemis 的一对节点上 `ORDERS.DLQ` 正在堆积。没有 Rahdar 的话，就是每个 Artemis Broker 开一个管理控制台标签页，终端里跑 `kafka-consumer-groups.sh` 和 `kafka-transactions.sh`，中间还得自己心算。
 
-Rahdar 则**把集群当作一切的基本单位**。所有集群的所有节点都画在同一张拓扑图上，HA 角色实时轮询；所有节点上的所有队列都汇总在一张表里、按深度排序，你要找的那个队列就在第一行。一个实例就能管理你运行的所有集群，直接对接你现有的 Broker。
+Rahdar 把**你运行的每一个集群放进同一个资产视图**，不论 Broker 是哪种。健康状况按同一标尺判断，所有积压汇总在一张表里、最严重的排最前：Artemis 队列与 Kafka 消费者组并列，各自使用自己的名称。每个数字都会说明它有多确定：Artemis 队列的深度是精确值，Kafka 消费者组的延迟是估算值，并附逐分区明细；Rahdar 读不到的数字会如实说明，而不是显示为 0。任何破坏性操作在你看到它将做什么之前都不会执行；启用审批闸门后，还需要第二个人批准。
 
-<a href="https://rahdar.dev/zh/"><img src="docs/img/story.webp" width="1600" height="900" alt="故事从 03:07 的一条告警开始：2 个集群、8 个 Broker 中，某处的 ORDERS.DLQ 深度正在上涨。在浏览器里亲自体验。"></a>
+<a href="https://rahdar.dev/"><img src="docs/img/story.webp" width="1600" height="900" alt="故事从 02:51 的两条告警开始：Kafka 的一个消费者组在 payments 上越落越远，Artemis 的一对节点上 ORDERS.DLQ 正在上涨。在浏览器里亲自体验。"></a>
 
-**[▶ 体验这个故事](https://rahdar.dev/zh/)**：先亲手找一遍这个队列，每个 Broker 一个标签页；再看 Rahdar 如何在一个屏幕上把它找出来。
+**[▶ 体验这个故事（英文）](https://rahdar.dev/)**：找出延迟背后那个挂起的事务并中止它，用一次按住确认的审批重置一个消费者组，再清空 Artemis 的死信队列，全部在同一个资产视图里完成。
 
 ## 功能一览
 
-| 集群拓扑 | 跨节点队列 |
+| | |
 |---|---|
-| [![主备拓扑，含复制状态与共享 NodeID 轴](docs/img/topology.png)](docs/img/topology.png) | [![所有节点上的所有队列，汇总在一张虚拟滚动表格里](docs/img/queues.png)](docs/img/queues.png) |
-| **客户端与消息流向** | **SQL Console** |
-| [![Flow：流动的圆点表示每条路径的速率，悬停某个队列即可高亮它的完整链路](docs/img/flow.gif)](docs/img/flow.gif) | [![SQL Console：跨集群所有队列查询，执行前先标明代价，随后实时追踪](docs/img/sql-console.gif)](docs/img/sql-console.gif) |
-| **插件** | **设置** |
-| [![安装插件：它能做什么、它的数据库变更 SQL，都在输入确认之前一一审阅](docs/img/plugin-install.gif)](docs/img/plugin-install.gif) | [![设置：显示偏好、Rahdar 的运行配置、当前集群及各插件的配置项](docs/img/settings.png)](docs/img/settings.png) |
+| <picture><source media="(prefers-color-scheme: dark)" srcset="docs/img/readme/subscriptions-dark.webp"><img src="docs/img/readme/subscriptions-light.webp" alt="Kafka 集群上的订阅表，展开了一个消费者组的积压明细：每个分区的已提交偏移量、末尾偏移量与延迟，最慢的在前，并注明采样时间。"></picture> | <picture><source media="(prefers-color-scheme: dark)" srcset="docs/img/readme/kafka-group-dark.webp"><img src="docs/img/readme/kafka-group-light.webp" alt="Kafka 消费者组页面：类型与状态、按 topic 列出的每个分区的延迟，以及成员。"></picture> |
+| Kafka 的延迟是估算值，展开即可看到每个分区，最慢的在前。 | 一个消费者组每个分区的延迟及其成员。 |
+| <picture><source media="(prefers-color-scheme: dark)" srcset="docs/img/readme/offset-reset-dark.webp"><img src="docs/img/readme/offset-reset-light.webp" alt="重置偏移量的预览：每个分区当前与新的偏移量、将跳过的记录数，以及写明分区数量的按住确认按钮。"></picture> | <picture><source media="(prefers-color-scheme: dark)" srcset="docs/img/readme/transactions-dark.webp"><img src="docs/img/readme/transactions-light.webp" alt="事务页面标出了一个挂起的事务，中止预览列出它将解除阻塞的分区，并说明生产者会被隔离（fenced）。"></picture> |
+| 偏移量重置先逐分区预览，再按住按钮确认。 | 找到挂起的事务，先说明影响范围，再中止它。 |
+| <picture><source media="(prefers-color-scheme: dark)" srcset="docs/img/readme/register-kafka-dark.webp"><img src="docs/img/readme/register-kafka-light.webp" alt="检查通过后的 Kafka 注册页面：版本与模式、每个 Broker 及其通告地址均已连通，以及控制器仲裁。"></picture> | <picture><source media="(prefers-color-scheme: dark)" srcset="docs/img/readme/artemis-topology-dark.webp"><img src="docs/img/readme/artemis-topology-light.webp" alt="Artemis 拓扑：主备节点对及其复制状态，其中一个节点已停止。"></picture> |
+| 注册时会检查每一个 Broker 在其通告地址上是否可达。 | Artemis 拓扑，HA 角色从每个节点轮询得到。 |
+
+Rahdar 通过 [OpenBroker](https://github.com/sudoitir/openbroker) 与 Broker 通信，这是一个开源的 Broker SDK，每个系统一个驱动。各系统共有的界面（资产视图、订阅与目的地、消息浏览、清空、审计记录、API 与 MCP）在每个系统上都能用，并使用该系统自己的术语；某个系统做不到的操作依然可见，置灰并说明原因。
+
+| 系统 | 支持版本 | 指南 |
+| --- | --- | --- |
+| Apache ActiveMQ® Artemis | 2.33.0 及以上 | [指南](https://rahdar.dev/zh/guide/) |
+| Apache Kafka® | 3.0 及以上，KRaft 与 ZooKeeper 模式 | [Kafka](https://rahdar.dev/guide/kafka) |
+| RabbitMQ | 即将推出；目前尚不支持 | |
+
+详情，以及超出这些范围时会发生什么：[支持的 Broker 版本](https://rahdar.dev/guide/supported-versions)。
+
+### Apache Kafka
+
+- **[消费者组](https://rahdar.dev/guide/kafka#consumer-groups)**——classic、consumer 和 share 消费者组，含状态、成员和延迟。延迟是估算值，并明确标出：展开即可看到每个分区，最慢的在前，附已提交偏移量、末尾偏移量和采样时间。
+- **[重置偏移量](https://rahdar.dev/guide/kafka#reset-offsets)**——重置到最早、最新、某个时间或某个偏移量，逐分区预览消费者组将跳过或重读多少记录。有成员的消费者组会被拒绝，并列出成员；重置针对的是预览时的状态，通过按住确认，启用闸门时等待审批，并在审计中记录前后的偏移量。
+- **[Topic 配置](https://rahdar.dev/guide/kafka#topic-configuration)**——每项设置都标明其值的来源，通过审查来修改，Broker 会在任何改动生效之前先行校验。
+- **[ACL](https://rahdar.dev/guide/kafka#acls)**——列出、添加和删除，并展示变更前后每个主体的有效权限。
+- **[事务](https://rahdar.dev/guide/kafka#transactions)**——会拖住 read-committed 消费者的挂起事务会被标出，中止它之前先预览、按住确认并写入审计。
+- **[Broker 与仲裁](https://rahdar.dev/guide/kafka#brokers-and-the-quorum)**——每个 Broker，Rahdar 是否通过其宣告的地址连上了它，以及 KRaft controller 仲裁。
+- **在共用界面上**——按分区与偏移量或时间浏览 topic，无需加入消费者组；清空消费者组未读的记录，或截断 topic，并说明影响范围，包括每个会丢失未读记录的消费者组。
+
+### Apache Artemis
 
 - **拓扑**——展示主备节点对及其复制状态。HA 角色每个周期都从各节点实时轮询，从不依赖配置文件；同一对节点里出现两个 live，就会触发脑裂告警。
 - **[Flow](https://rahdar.dev/guide/flow)（消息流向）**——一眼看清哪个应用往哪个地址发消息，消息如何经过 divert、bridge 和集群跳转进入队列，又被谁以什么速率消费。没有消费者、消息持续堆积之类的问题会直接用文字标出来；而且只有在有人查看时才会采样客户端。
@@ -119,31 +145,31 @@ Rahdar 则**把集群当作一切的基本单位**。所有集群的所有节点
 - **[告警投递](https://rahdar.dev/guide/alert-delivery)**——支持 Slack、Microsoft Teams、PagerDuty（事件随告警自动开启和解决）、邮件和带签名的 webhook。每个渠道保存前都会先测试，投递日志会告诉你通知为什么发送失败。
 - **[数据治理](https://rahdar.dev/guide/data-governance)**——自动遮蔽敏感的消息头和属性，自动识别个人敏感信息（PII），并按查看者的角色决定是否脱敏。
 - **治理**——全面强制认证；角色与权限按“全局 → 环境 → 集群”分级授予；支持 API 令牌和可选的 OIDC/SSO；审计记录每一次变更及其结果。
-- **[MCP 服务器](https://rahdar.dev/zh/guide/mcp)**——把同样的能力开放给 AI 助手，适用同样的授权，留下同样的审计记录。
+- **[MCP 服务器](https://rahdar.dev/zh/guide/mcp)**——把同样的能力开放给 AI 助手，适用同样的授权，留下同样的审计记录。它的八个 `kafka_*` 工具不会改动任何事先没有预览过的内容，并在启用审批闸门时等待人来批准。
 - **[插件](https://rahdar.dev/guide/plugins)**——在界面里直接安装插件的 `.jar`：它可以带来自己的页面、API、助手工具和数据。确认之前，它能做的一切都会展示给你；除非确有需要，否则无需重启。更新时会列出变化并支持回滚；插件出错也绝不会拖垮 Rahdar。可以从[插件模板](examples/plugin-template)开始写一个。
 
 ## 工作原理
 
 四条原则贯穿整个产品：
 
-- **从设计上就对 Broker 友好。** 批量读取（每个节点一次 Jolokia POST，绝不按队列逐个请求）、分层轮询、按节点限流。Rahdar 绝不能成为压垮 Broker 的那根稻草。
-- **默认安全。** 所有破坏性操作都可以先 dry run；清空和删除必须手动输入资源名称才能执行。
-- **HA 状态只问节点，不看配置。** 谁是 live，只有 live 节点自己知道。
+- **从设计上就对 Broker 友好。** 批量读取（在 Artemis 上，每个节点一次 Jolokia POST，绝不按队列逐个请求）、分层轮询、按节点限流。Rahdar 绝不能成为压垮 Broker 的那根稻草。
+- **默认安全。** 所有破坏性操作都可以先 dry run 并说明影响范围；清空、删除、截断和重置都要按住一个写明数量的按钮来确认。
+- **状态只问 Broker，不看配置。** Artemis 的 HA 角色从每个节点轮询得到，Kafka 集群的健康状况则由它的 Broker 和仲裁形成。
 - **能力限制坦诚相告。** 某项功能不可用时会明确说明，并给出启用它所需的确切 `broker.xml` 配置。绝不让功能悄无声息地消失。
 
-Java 25 · Spring Boot 4.1 · PostgreSQL + Liquibase · React 19 + Vite + Mantine 9 · TanStack Router/Query/Table · React Flow · 以 Jolokia HTTP 为主、Artemis Core 客户端为辅 · SSE · 单一容器镜像。详见[架构说明](https://rahdar.dev/reference/architecture)和[全部架构决策记录](https://rahdar.dev/reference/adr/)。
+Java 25 · Spring Boot 4.1 · PostgreSQL + Liquibase · React 19 + Vite + Mantine 9 · TanStack Router/Query/Table · React Flow · [OpenBroker](https://github.com/sudoitir/openbroker) SDK 及其 Artemis 与 Kafka 驱动 · SSE · 单一容器镜像。详见[架构说明](https://rahdar.dev/reference/architecture)和[全部架构决策记录](https://rahdar.dev/reference/adr/)。
 
 ## 参与贡献
 
 问题和想法请发到[讨论区](https://github.com/sudoitir/rahdar/discussions)，bug 请提 [issue](https://github.com/sudoitir/rahdar/issues/new/choose)，安全漏洞请走[私密报告](https://github.com/sudoitir/rahdar/security/advisories/new)（见 [SECURITY.md](SECURITY.md)）。自行构建需要 JDK 25、Node 24、Docker 和 [`just`](https://github.com/casey/just#packages)；仓库自带 dev container。
 
 ```bash
-just dev-up          # Postgres + 一对真实的 Artemis 主备节点 + 从源码构建的 Rahdar
+just dev-up          # Postgres + 一对真实的 Artemis 主备节点 + 一个 Kafka 节点 + 从源码构建的 Rahdar
 just dev             # 或者：同时启动后端 :8080 和 Vite :5173，支持热重载
 just verify          # 运行 CI 的全部检查
 ```
 
-`ADMIN_PASSWORD=… just demo`（首次运行还需要 `NEW_ADMIN_PASSWORD=…`，之后需要 `ADMIN_TOTP_SECRET=…`）会再加两对主备节点，并给全部六个节点灌入贴近生产的流量：divert、一个 bridge、集群跳转、一个没有消费者且不断增长的积压、一批真实的死信积压，以及一个被停掉的节点。上面的截图和动图都是 `just shots` 和 `just demo-gif` 在这套环境里实录的，没有任何摆拍。
+`ADMIN_PASSWORD=… just demo`（首次运行还需要 `NEW_ADMIN_PASSWORD=…`，之后需要 `ADMIN_TOTP_SECRET=…`）会再加两对主备节点，并给全部六个节点灌入贴近生产的流量：divert、一个 bridge、集群跳转、一个没有消费者且不断增长的积压、一批真实的死信积压，以及一个被停掉的节点。它还会注册一个三 Broker 的 Kafka 集群 `events`，其中有跟得上和落后的消费者组、一个压缩 topic、ACL 和一个挂起的事务。上面的截图都是在这套环境里实录的，没有任何摆拍。
 
 每个功能都要走 **OpenSpec** 流程，重要决策都记录为 [**ADR**](docs/adr/)。从 [`CONTRIBUTING.md`](CONTRIBUTING.md) 开始。
 
@@ -153,9 +179,9 @@ just verify          # 运行 CI 的全部检查
 
 ## 许可证
 
-[Apache-2.0](LICENSE)，与 Artemis 本身使用相同的许可证。
+[Apache-2.0](LICENSE)，与 Artemis 和 Kafka 本身使用相同的许可证。
 
-Apache ActiveMQ 和 Apache ActiveMQ Artemis 是 Apache 软件基金会的商标。Rahdar 是独立项目，并非由 Apache 软件基金会出品或认可，也与其没有任何隶属关系。文中提到的 “Artemis” 均指本工具所管理的 Broker。
+Apache、Apache Kafka、Kafka、Apache ActiveMQ、ActiveMQ 与 Artemis 是 Apache 软件基金会的商标；RabbitMQ 是其所有者的商标。Rahdar 与它们没有关联，也未获得它们的认可。这些名称仅用于描述 Rahdar 所对接的 Broker。
 
 ---
 

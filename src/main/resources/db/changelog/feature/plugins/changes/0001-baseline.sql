@@ -11,7 +11,8 @@ CREATE TABLE plugin_message_registration (
     concurrency integer DEFAULT 1 NOT NULL,
     plugin_id text NOT NULL,
     reg_key text NOT NULL,
-    subscription text NOT NULL,
+    source_kind text NOT NULL,
+    source_path text NOT NULL,
     mode text NOT NULL,
     id uuid DEFAULT uuidv7() NOT NULL,
     cluster_id uuid NOT NULL,
@@ -25,8 +26,10 @@ CREATE TABLE plugin_message_registration_node (
     dropped_copies bigint,
     state text NOT NULL,
     detail text,
+    id uuid DEFAULT uuidv7() NOT NULL,
     registration_id uuid NOT NULL,
-    node_id uuid NOT NULL
+    node_id uuid,
+    releases_counted boolean DEFAULT false NOT NULL
 )
 WITH (fillfactor='80', autovacuum_vacuum_scale_factor='0.05');
 
@@ -59,7 +62,10 @@ ALTER TABLE ONLY plugin_message_registration
     ADD CONSTRAINT pk_plugin_message_registration PRIMARY KEY (id);
 
 ALTER TABLE ONLY plugin_message_registration_node
-    ADD CONSTRAINT pk_plugin_message_registration_node PRIMARY KEY (registration_id, node_id);
+    ADD CONSTRAINT pk_plugin_message_registration_node PRIMARY KEY (id);
+
+ALTER TABLE ONLY plugin_message_registration_node
+    ADD CONSTRAINT uq_plugin_message_registration_node UNIQUE NULLS NOT DISTINCT (registration_id, node_id);
 
 ALTER TABLE ONLY plugin_owner_work
     ADD CONSTRAINT pk_plugin_owner_work PRIMARY KEY (id);
@@ -69,6 +75,11 @@ ALTER TABLE ONLY plugin_message_registration
 
 ALTER TABLE ONLY plugin_owner_work
     ADD CONSTRAINT uq_plugin_owner_work_key UNIQUE (plugin_id, work_key);
+
+CREATE INDEX ix_plugin_message_registration_node_node_id ON plugin_message_registration_node USING btree (node_id);
+
+ALTER TABLE ONLY plugin_message_registration_node
+    ADD CONSTRAINT fk_plugin_message_registration_node_node FOREIGN KEY (node_id) REFERENCES broker_node(id) ON DELETE CASCADE;
 
 ALTER TABLE ONLY plugin_message_registration_node
     ADD CONSTRAINT fk_plugin_message_registration_node_registration FOREIGN KEY (registration_id) REFERENCES plugin_message_registration(id) ON DELETE CASCADE;

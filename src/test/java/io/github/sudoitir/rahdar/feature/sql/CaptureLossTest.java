@@ -15,6 +15,7 @@ import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshot;
 import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshots;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
@@ -209,7 +210,23 @@ class CaptureLossTest {
     private QueueSnapshot captureQueue(long depth) {
         String name = "rahdar.capture.abc12345.ORDERS." + subscription.getId() + ".q";
         return new QueueSnapshot(
-                CLUSTER, NODE, name, name, "ANYCAST", false, false, Instant.now(), depth, 1, 0, 0, 0, 0, 0);
+                CLUSTER,
+                NODE,
+                name,
+                name,
+                "ANYCAST",
+                false,
+                false,
+                Instant.now(),
+                depth,
+                1,
+                0,
+                0,
+                0,
+                0,
+                0,
+                "artemis.queue",
+                Map.of());
     }
 
     private static QueueSnapshot queue(String name, long messagesAdded) {
@@ -222,12 +239,14 @@ class CaptureLossTest {
                 false,
                 false,
                 Instant.now(),
-                0,
+                0L,
                 0,
                 0,
                 0,
                 messagesAdded,
                 0,
-                0);
+                0,
+                "artemis.queue",
+                Map.of());
     }
 }

@@ -12,6 +12,7 @@ import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterE
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterRepository;
 import io.github.sudoitir.rahdar.support.AdminAuthenticationExtension;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisModule;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -45,9 +46,9 @@ class SystemNamespaceTest extends PostgresIntegrationTest {
     @BeforeEach
     void setUp() {
         mvc = webAppContextSetup(webContext).build();
-        artemis = clusters.save(new ClusterEntity("a-" + UUID.randomUUID(), null, null))
+        artemis = clusters.save(new ClusterEntity(ArtemisModule.SYSTEM, "a-" + UUID.randomUUID(), null, null))
                 .getId();
-        other = clusters.save(new ClusterEntity("o-" + UUID.randomUUID(), null, null))
+        other = clusters.save(new ClusterEntity(ArtemisModule.SYSTEM, "o-" + UUID.randomUUID(), null, null))
                 .getId();
         jdbc.update("UPDATE cluster SET system = 'kafka' WHERE id = ?", other);
     }
@@ -66,6 +67,15 @@ class SystemNamespaceTest extends PostgresIntegrationTest {
                 .andExpect(jsonPath("$.detail").value(containsString("does not run artemis")));
         mvc.perform(get("/api/v1/clusters/{c}/artemis/config-diff", other)).andExpect(status().isNotFound());
         mvc.perform(get("/api/v1/clusters/{c}/artemis/setup-review", other)).andExpect(status().isNotFound());
+    }
+
+    @Test
+    void aClusterThatRunsAnotherSystemHasNoKafkaScreens() throws Exception {
+        mvc.perform(get("/api/v1/clusters/{c}/kafka/groups", artemis))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.detail").value(containsString("does not run kafka")));
+        mvc.perform(get("/api/v1/clusters/{c}/kafka/brokers", artemis)).andExpect(status().isNotFound());
+        mvc.perform(get("/api/v1/clusters/{c}/kafka/acls", artemis)).andExpect(status().isNotFound());
     }
 
     @Test

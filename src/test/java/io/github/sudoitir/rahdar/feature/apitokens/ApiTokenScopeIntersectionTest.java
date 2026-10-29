@@ -24,6 +24,7 @@ import io.github.sudoitir.rahdar.kernel.security.internal.persistence.UserRoleRe
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterEntity;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterRepository;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisModule;
 import java.time.Instant;
 import java.util.List;
 import java.util.Set;
@@ -100,7 +101,7 @@ class ApiTokenScopeIntersectionTest extends PostgresIntegrationTest {
 
     @Test
     void aGlobalOwnerCanMintAKeyNarrowedToOneCluster() {
-        UUID cluster = clusters.save(new ClusterEntity("narrow-" + UUID.randomUUID(), null, null))
+        UUID cluster = clusters.save(new ClusterEntity(ArtemisModule.SYSTEM, "narrow-" + UUID.randomUUID(), null, null))
                 .getId();
         UUID user = owner(Grant.ScopeType.GLOBAL, null, Permissions.CLUSTER_READ);
 
@@ -117,7 +118,8 @@ class ApiTokenScopeIntersectionTest extends PostgresIntegrationTest {
 
     @Test
     void aClusterScopedOwnerCannotMintAGlobalKey() {
-        UUID cluster = clusters.save(new ClusterEntity("bounded-" + UUID.randomUUID(), null, null))
+        UUID cluster = clusters.save(
+                        new ClusterEntity(ArtemisModule.SYSTEM, "bounded-" + UUID.randomUUID(), null, null))
                 .getId();
         UUID user = owner(Grant.ScopeType.CLUSTER, cluster, Permissions.CLUSTER_READ);
 
@@ -134,9 +136,9 @@ class ApiTokenScopeIntersectionTest extends PostgresIntegrationTest {
 
     @Test
     void aClusterScopedOwnerCannotReachAnotherCluster() {
-        UUID mine = clusters.save(new ClusterEntity("mine-" + UUID.randomUUID(), null, null))
+        UUID mine = clusters.save(new ClusterEntity(ArtemisModule.SYSTEM, "mine-" + UUID.randomUUID(), null, null))
                 .getId();
-        UUID theirs = clusters.save(new ClusterEntity("theirs-" + UUID.randomUUID(), null, null))
+        UUID theirs = clusters.save(new ClusterEntity(ArtemisModule.SYSTEM, "theirs-" + UUID.randomUUID(), null, null))
                 .getId();
         UUID user = owner(Grant.ScopeType.CLUSTER, mine, Permissions.CLUSTER_READ);
 
@@ -151,7 +153,7 @@ class ApiTokenScopeIntersectionTest extends PostgresIntegrationTest {
 
     @Test
     void aPermissionTheOwnerLacksIsStillStripped() {
-        UUID cluster = clusters.save(new ClusterEntity("strip-" + UUID.randomUUID(), null, null))
+        UUID cluster = clusters.save(new ClusterEntity(ArtemisModule.SYSTEM, "strip-" + UUID.randomUUID(), null, null))
                 .getId();
         UUID user = owner(Grant.ScopeType.GLOBAL, null, Permissions.CLUSTER_READ);
 
@@ -167,7 +169,8 @@ class ApiTokenScopeIntersectionTest extends PostgresIntegrationTest {
 
     @Test
     void aGrantLimitedToAPatternIsKeptAndIsTheKeysOwn() {
-        UUID cluster = clusters.save(new ClusterEntity("pattern-" + UUID.randomUUID(), null, null))
+        UUID cluster = clusters.save(
+                        new ClusterEntity(ArtemisModule.SYSTEM, "pattern-" + UUID.randomUUID(), null, null))
                 .getId();
         UUID user = owner(Grant.ScopeType.GLOBAL, null, Permissions.WILDCARD);
         TokenGrant limited = new TokenGrant(
@@ -189,7 +192,7 @@ class ApiTokenScopeIntersectionTest extends PostgresIntegrationTest {
 
     @Test
     void revokingAScopeRemovesTheGrantsOfKeysScopedToIt() {
-        UUID cluster = clusters.save(new ClusterEntity("gone-" + UUID.randomUUID(), null, null))
+        UUID cluster = clusters.save(new ClusterEntity(ArtemisModule.SYSTEM, "gone-" + UUID.randomUUID(), null, null))
                 .getId();
         UUID user = owner(Grant.ScopeType.GLOBAL, null, Permissions.WILDCARD);
         TokenGrant here = TokenGrant.of(Grant.ScopeType.CLUSTER, cluster, Permissions.CLUSTER_READ);

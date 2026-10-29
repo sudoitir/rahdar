@@ -30,5 +30,6 @@ _Others_
 * `i.g.s.r.k.g.GatedOperationCatalogue` (in Approval gate contract)
 |Events listened to
 |* `org.springframework.boot.context.event.ApplicationReadyEvent` 
+* `i.g.s.r.k.r.ReplicaSignal` 
 * `i.g.s.r.k.p.PluginStatusChanged` 
 |===

@@ -13,7 +13,9 @@ import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterR
 import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshotUpsert;
 import io.github.sudoitir.rahdar.support.AdminAuthenticationExtension;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisModule;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.hamcrest.Matchers;
 import org.junit.jupiter.api.AfterEach;
@@ -57,7 +59,7 @@ class SqlControllerTest extends PostgresIntegrationTest {
     @BeforeEach
     void setUp() {
         mvc = webAppContextSetup(webContext).build();
-        clusterId = clusters.save(new ClusterEntity("c-" + UUID.randomUUID(), null, null))
+        clusterId = clusters.save(new ClusterEntity(ArtemisModule.SYSTEM, "c-" + UUID.randomUUID(), null, null))
                 .getId();
         BrokerNodeEntity node = BrokerNodeEntity.fromSeed(
                 clusterId, "node-a", "PRIMARY", UUID.randomUUID().toString());
@@ -71,7 +73,7 @@ class SqlControllerTest extends PostgresIntegrationTest {
                         "ORDER.IN",
                         "ANYCAST",
                         true,
-                        120,
+                        120L,
                         0,
                         0,
                         0,
@@ -79,7 +81,8 @@ class SqlControllerTest extends PostgresIntegrationTest {
                         0,
                         0,
                         false,
-                        "artemis.queue"),
+                        "artemis.queue",
+                        Map.of()),
                 new QueueRow(
                         clusterId,
                         nodeId,
@@ -87,7 +90,7 @@ class SqlControllerTest extends PostgresIntegrationTest {
                         "ORDER.OUT",
                         "ANYCAST",
                         true,
-                        5,
+                        5L,
                         0,
                         0,
                         0,
@@ -95,7 +98,8 @@ class SqlControllerTest extends PostgresIntegrationTest {
                         0,
                         0,
                         false,
-                        "artemis.queue")));
+                        "artemis.queue",
+                        Map.of())));
     }
 
     @AfterEach

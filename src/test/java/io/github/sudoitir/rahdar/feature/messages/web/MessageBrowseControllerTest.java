@@ -21,6 +21,7 @@ import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshotUpsert;
 import io.github.sudoitir.rahdar.support.AdminAuthenticationExtension;
 import io.github.sudoitir.rahdar.support.FixtureJolokia;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisModule;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
@@ -73,7 +74,7 @@ class MessageBrowseControllerTest extends PostgresIntegrationTest {
         mvc = webAppContextSetup(webContext).build();
         when(gateway.cluster(any()))
                 .thenReturn(FixtureJolokia.cluster(Map.of(UUID.randomUUID(), new FixtureJolokia())));
-        clusterId = clusters.save(new ClusterEntity("c-" + UUID.randomUUID(), null, null))
+        clusterId = clusters.save(new ClusterEntity(ArtemisModule.SYSTEM, "c-" + UUID.randomUUID(), null, null))
                 .getId();
         BrokerNodeEntity a = BrokerNodeEntity.fromSeed(
                 clusterId, "node-a", "PRIMARY", UUID.randomUUID().toString());
@@ -86,7 +87,7 @@ class MessageBrowseControllerTest extends PostgresIntegrationTest {
                 "PHASE3.SRC",
                 "ANYCAST",
                 true,
-                4,
+                4L,
                 0,
                 0,
                 0,
@@ -94,7 +95,8 @@ class MessageBrowseControllerTest extends PostgresIntegrationTest {
                 0,
                 0,
                 false,
-                "artemis.queue")));
+                "artemis.queue",
+                Map.of())));
     }
 
     @AfterEach
@@ -217,7 +219,7 @@ class MessageBrowseControllerTest extends PostgresIntegrationTest {
                         "SPLIT",
                         "ANYCAST",
                         true,
-                        0,
+                        0L,
                         0,
                         0,
                         0,
@@ -225,7 +227,8 @@ class MessageBrowseControllerTest extends PostgresIntegrationTest {
                         0,
                         0,
                         false,
-                        "artemis.queue"),
+                        "artemis.queue",
+                        Map.of()),
                 new QueueRow(
                         clusterId,
                         nodeBId,
@@ -233,7 +236,7 @@ class MessageBrowseControllerTest extends PostgresIntegrationTest {
                         "SPLIT",
                         "ANYCAST",
                         true,
-                        4,
+                        4L,
                         0,
                         0,
                         0,
@@ -241,7 +244,8 @@ class MessageBrowseControllerTest extends PostgresIntegrationTest {
                         0,
                         0,
                         false,
-                        "artemis.queue")));
+                        "artemis.queue",
+                        Map.of())));
 
         serving(nodeBId, "SPLIT", batch("browse.json", 4));
 

@@ -10,6 +10,7 @@ import { flowFeature } from '../features/flow/feature.ts';
 import { governanceFeature } from '../features/governance/feature.ts';
 import { identityLocalFeature } from '../features/identity-local/feature.ts';
 import { mcpFeature } from '../features/mcp/feature.ts';
+import { kafkaFeature } from '../features/kafka/feature.ts';
 import { lifecycleFeature } from '../features/lifecycle/feature.ts';
 import { pluginsFeature } from '../features/plugins/feature.ts';
 import { messagesFeature } from '../features/messages/feature.ts';
@@ -44,6 +45,7 @@ export const FEATURES: RahdarFeature[] = [
   resourcesFeature,
   routingFeature,
   setupreviewFeature,
+  kafkaFeature,
   brokerconfigFeature,
   settingsFeature,
   lifecycleFeature,

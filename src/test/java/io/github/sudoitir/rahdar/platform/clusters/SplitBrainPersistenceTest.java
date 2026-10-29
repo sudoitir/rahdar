@@ -7,6 +7,7 @@ import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNo
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterEntity;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterRepository;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisModule;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -42,7 +43,7 @@ class SplitBrainPersistenceTest extends PostgresIntegrationTest {
     }
 
     private void seed() {
-        clusterId = clusters.save(new ClusterEntity("sb-" + UUID.randomUUID(), null, null))
+        clusterId = clusters.save(new ClusterEntity(ArtemisModule.SYSTEM, "sb-" + UUID.randomUUID(), null, null))
                 .getId();
         nodes.save(BrokerNodeEntity.fromSeed(clusterId, "a-live", "PRIMARY", PAIR));
         nodes.save(BrokerNodeEntity.fromSeed(clusterId, "b-backup", "BACKUP", PAIR));

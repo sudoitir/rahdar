@@ -33,6 +33,7 @@ import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshotUpsert;
 import io.github.sudoitir.rahdar.support.AdminAuthenticationExtension;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
 import io.github.sudoitir.rahdar.support.Targets;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisModule;
 import io.github.sudoitir.rahdar.system.artemis.ArtemisNodes;
 import java.time.Duration;
 import java.time.Instant;
@@ -108,7 +109,7 @@ class QueueGateTest extends PostgresIntegrationTest {
 
     @BeforeEach
     void seed() {
-        clusterId = clusters.save(new ClusterEntity("c-" + UUID.randomUUID(), null, null))
+        clusterId = clusters.save(new ClusterEntity(ArtemisModule.SYSTEM, "c-" + UUID.randomUUID(), null, null))
                 .getId();
         BrokerNodeEntity node = BrokerNodeEntity.fromSeed(
                 clusterId, "live", "PRIMARY", UUID.randomUUID().toString());
@@ -126,7 +127,7 @@ class QueueGateTest extends PostgresIntegrationTest {
                 QUEUE,
                 "ANYCAST",
                 true,
-                5,
+                5L,
                 0,
                 0,
                 0,
@@ -134,7 +135,8 @@ class QueueGateTest extends PostgresIntegrationTest {
                 0,
                 0,
                 false,
-                "artemis.queue")));
+                "artemis.queue",
+                Map.of())));
     }
 
     @AfterEach

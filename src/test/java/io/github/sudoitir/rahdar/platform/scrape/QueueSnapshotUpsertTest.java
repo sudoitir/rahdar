@@ -11,9 +11,11 @@ import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterR
 import io.github.sudoitir.rahdar.platform.scrape.internal.persistence.QueueSnapshotEntity;
 import io.github.sudoitir.rahdar.platform.scrape.internal.persistence.QueueSnapshotRepository;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisModule;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -50,7 +52,7 @@ class QueueSnapshotUpsertTest extends PostgresIntegrationTest {
     }
 
     private void givenClusterAndNode() {
-        clusterId = clusters.save(new ClusterEntity("c-" + UUID.randomUUID(), null, null))
+        clusterId = clusters.save(new ClusterEntity(ArtemisModule.SYSTEM, "c-" + UUID.randomUUID(), null, null))
                 .getId();
         nodeId = nodes.save(BrokerNodeEntity.fromSeed(clusterId, "n-" + UUID.randomUUID(), "PRIMARY", null))
                 .getId();
@@ -72,7 +74,8 @@ class QueueSnapshotUpsertTest extends PostgresIntegrationTest {
                 0,
                 0,
                 false,
-                "artemis.queue");
+                "artemis.queue",
+                Map.of());
     }
 
     @Test

@@ -19,6 +19,7 @@ import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshotUpsert;
 import io.github.sudoitir.rahdar.support.AdminAuthenticationExtension;
 import io.github.sudoitir.rahdar.support.FixtureJolokia;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisModule;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
@@ -72,7 +73,7 @@ class ClusterResourceControllerTest extends PostgresIntegrationTest {
     @BeforeEach
     void setUp() {
         mvc = webAppContextSetup(webContext).build();
-        clusterId = clusters.save(new ClusterEntity("c-" + UUID.randomUUID(), null, null))
+        clusterId = clusters.save(new ClusterEntity(ArtemisModule.SYSTEM, "c-" + UUID.randomUUID(), null, null))
                 .getId();
         BrokerNodeEntity a = BrokerNodeEntity.fromSeed(
                 clusterId, "node-a", "PRIMARY", UUID.randomUUID().toString());
@@ -122,7 +123,22 @@ class ClusterResourceControllerTest extends PostgresIntegrationTest {
 
     private QueueRow row(UUID node, String queue, long messageCount) {
         return new QueueRow(
-                clusterId, node, queue, queue, "ANYCAST", true, messageCount, 1, 0, 0, 0, 0, 0, false, "artemis.queue");
+                clusterId,
+                node,
+                queue,
+                queue,
+                "ANYCAST",
+                true,
+                messageCount,
+                1,
+                0,
+                0,
+                0,
+                0,
+                0,
+                false,
+                "artemis.queue",
+                Map.of());
     }
 
     @Test
@@ -135,8 +151,11 @@ class ClusterResourceControllerTest extends PostgresIntegrationTest {
                 .andExpect(jsonPath("$.count").value(1))
                 .andExpect(jsonPath("$.data[0].name").value("ORDERS"))
                 .andExpect(jsonPath("$.data[0].id").value("artemis.queue/ORDERS"))
-                .andExpect(jsonPath("$.data[0].kindLabel").value("Queue"))
-                .andExpect(jsonPath("$.data[0].totalMessageCount").value(15))
+                .andExpect(jsonPath("$.data[0].kindLabel.singular").value("Queue"))
+                .andExpect(jsonPath("$.data[0].kindLabel.plural").value("Queues"))
+                .andExpect(jsonPath("$.data[0].backlog.value").value(15))
+                .andExpect(jsonPath("$.data[0].backlog.accuracy").value("EXACT"))
+                .andExpect(jsonPath("$.data[0].backlog.breakdown").value(false))
                 .andExpect(jsonPath("$.data[0].nodesPresent").value(2));
     }
 

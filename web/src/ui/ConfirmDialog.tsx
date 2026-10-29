@@ -35,6 +35,8 @@ export function ConfirmDialog({
   pending = false,
   blocked,
   result,
+  size = 'md',
+  align = 'center',
   onConfirm,
 }: ConfirmDialogProps) {
   const theme = useMantineTheme();
@@ -46,8 +48,24 @@ export function ConfirmDialog({
   useEffect(() => {
     if (done) outcome.current?.focus();
   }, [done]);
+  const cancelRef = useRef<HTMLButtonElement>(null);
+  // Cancel is inert while the caller is busy, such as while the estimate the dialog states is taken, and an
+  // inert button cannot hold focus: the dialog that opened in that moment gave it to the page. When the caller
+  // settles and focus is not in the dialog, it is Cancel's, as it is when the dialog opens idle.
+  useEffect(() => {
+    if (!opened || pending || done) return;
+    const button = cancelRef.current;
+    const dialog = button?.closest('[role="dialog"]');
+    if (button && dialog && !dialog.contains(document.activeElement)) button.focus();
+  }, [opened, pending, done]);
   const cancel = (
-    <Button variant="default" data-autofocus={done ? undefined : true} disabled={pending} onClick={onClose}>
+    <Button
+      ref={cancelRef}
+      variant="default"
+      data-autofocus={done ? undefined : true}
+      disabled={pending}
+      onClick={onClose}
+    >
       {done ? 'Close' : dismissLabel}
     </Button>
   );
@@ -104,7 +122,8 @@ export function ConfirmDialog({
       opened={opened}
       onClose={onClose}
       title={title}
-      centered
+      size={size}
+      centered={align === 'center'}
       withCloseButton={false}
       closeOnEscape={!pending}
       closeOnClickOutside={!pending}
@@ -128,6 +147,10 @@ export type ConfirmDialogProps = Readonly<{
   consequence: ReactNode;
   /** The exact action, such as "Delete subscription". */
   confirmLabel: string;
+  /** A wider dialog for a consequence that holds a table. */
+  size?: 'md' | 'lg';
+  /** `top` keeps the top edge where it opened, for a consequence that grows as it is read; the default centres it. */
+  align?: 'center' | 'top';
   /**
    * The button that dismisses without acting; defaults to "Cancel". Name what is kept, such as "Keep
    * request", when the action itself is a cancel, so the two buttons never both read "Cancel".

@@ -1,9 +1,39 @@
 ---
 title: Supported broker versions
-description: Which Apache Artemis releases Rahdar supports, how that range was established, and what happens outside it.
+description: Which Apache Artemis and Apache Kafka releases Rahdar supports, how that range was established, and what happens outside it.
 ---
 
 # Supported broker versions
+
+Rahdar manages two broker systems. Each has its own range, and a cluster is checked against the range of the
+system it runs.
+
+## Apache Kafka
+
+| | Kafka release |
+| --- | --- |
+| Minimum | **3.0** |
+| Tested | 3.5 (ZooKeeper mode) and 4.x (KRaft mode, including share groups) |
+
+Every release from 3.0 on is supported, in **KRaft** and in **ZooKeeper** mode. A cluster older than 3.0 is
+refused: the check names the version it found and the supported range, and nothing is stored.
+
+Kafka brokers report their version only as far as their protocol goes, so Rahdar often cannot name the exact
+release. It then shows the version as a lower bound, **at least 3.5**, together with the mode, and never as an
+exact number.
+
+What a release or a mode cannot do is shown as unavailable, with its reason, and never read as healthy:
+
+| On | Unavailable | Why |
+| --- | --- | --- |
+| ZooKeeper mode | The controller quorum | The quorum is a KRaft concept. The brokers page says the quorum is unknown, and a cluster whose brokers all serve is healthy with a note. |
+| Before 4.0 | Share groups | They arrived with 4.0. The groups list shows only the group types the cluster has. |
+| A cluster without an authoriser | ACLs | There is nothing to list. The ACLs page says so, with the broker's reason. |
+| An account that may not describe a group or topic | That group's lag, or that topic's configuration | The figure says it could not be read and why, instead of showing 0. |
+
+Registering a cluster newer than the range Rahdar was built against is accepted, with a warning.
+
+## Apache Artemis
 
 | | Artemis release | Image CI tests |
 | --- | --- | --- |

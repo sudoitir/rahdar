@@ -6,6 +6,7 @@ import userEvent from '@testing-library/user-event';
 
 import { renderWithProviders } from '../../test/render.tsx';
 import { server } from '../../test/setup.ts';
+import { ARTEMIS_SYSTEM } from '../../test/wire.ts';
 import { CapabilitiesSection, ConnectionSection } from './ClusterSettings.tsx';
 import { holdButton } from '../../test/hold.ts';
 
@@ -23,6 +24,7 @@ function cluster(connection: object | null = {}) {
         id: CLUSTER,
         name: 'prod-eu',
         description: null,
+        system: ARTEMIS_SYSTEM,
         connection:
           connection === null
             ? null
@@ -41,17 +43,23 @@ function cluster(connection: object | null = {}) {
 
 const ROWS = [
   {
-    name: 'broker-1',
-    haRole: 'PRIMARY',
-    artemisNodeId: 'n1',
-    version: '2.40.0',
-    managementUrl: 'http://broker-1:8161/console/jolokia',
-    urlSource: 'SEED',
-    urlProblem: null,
-    management: 'ACCEPTED',
-    core: 'ACCEPTED',
+    id: 'broker-1',
+    address: 'http://broker-1:8161/console/jolokia',
+    functions: [],
+    outcome: 'OK',
+    artemis: {
+      nativeNodeId: 'n1',
+      version: '2.40.0',
+      haRole: 'PRIMARY',
+      urlSource: 'SEED',
+      management: 'ACCEPTED',
+      core: 'ACCEPTED',
+    },
   },
 ];
+
+/** A node that answered, with the Core account as given. */
+const withCore = (core: string) => [{ ...ROWS[0], artemis: { ...ROWS[0].artemis, core } }];
 
 /** The PATCH endpoint: every call recorded, a dry run answering with `rows` and a save with the cluster. */
 function patching(rows: object[] = ROWS) {
@@ -61,7 +69,15 @@ function patching(rows: object[] = ROWS) {
       const dryRun = new URL(request.url).searchParams.get('dryRun') === 'true';
       sent.push({ dryRun, body: (await request.json()) as Record<string, unknown> });
       return dryRun
-        ? HttpResponse.json({ managementUrlPattern: 'http://{host}:8161/console/jolokia', nodes: rows })
+        ? HttpResponse.json({
+            system: 'artemis',
+            version: { text: '2.40.0', exact: true },
+            supported: true,
+            nodes: rows,
+            access: [],
+            managementUrlPattern: 'http://{host}:8161/console/jolokia',
+            contributions: {},
+          })
         : HttpResponse.json({ id: CLUSTER, name: 'prod-eu', connection: {} });
     }),
   );
@@ -160,7 +176,10 @@ describe('ConnectionSection', () => {
     await holdButton(confirm);
 
     await waitFor(() => expect(sent.map((s) => s.dryRun)).toEqual([true, false]));
-    expect(sent[1].body.management).toEqual({ username: 'artemis', password: 'new-secret' });
+    expect((sent[1].body.connection as Record<string, unknown>).management).toEqual({
+      username: 'artemis',
+      password: 'new-secret',
+    });
   });
 
   it('sends an empty password to keep the stored one, and a null Core account to fall back', async () => {
@@ -172,13 +191,16 @@ describe('ConnectionSection', () => {
     await user.click(screen.getByRole('button', { name: 'Check connection' }));
     await screen.findByRole('table', { name: 'Nodes found by the check' });
 
-    expect(sent[0].body.management).toEqual({ username: 'artemis', password: '' });
-    expect(sent[0].body.core).toBeNull();
+    expect((sent[0].body.connection as Record<string, unknown>).management).toEqual({
+      username: 'artemis',
+      password: '',
+    });
+    expect((sent[0].body.connection as Record<string, unknown>).core).toBeNull();
   });
 
   it('will not offer the save while a broker rejects an account, and says which', async () => {
     cluster();
-    patching([{ ...ROWS[0], core: 'REJECTED' }]);
+    patching(withCore('REJECTED'));
     const user = open();
 
     await user.click(await screen.findByRole('button', { name: 'Check connection' }));
@@ -218,7 +240,10 @@ describe('ConnectionSection', () => {
     await user.type(screen.getByLabelText('Password'), 'old-secret');
     await user.click(screen.getByRole('button', { name: 'Check connection' }));
     await screen.findByRole('table', { name: 'Nodes found by the check' });
-    expect(sent[0].body.management).toEqual({ username: 'artemis', password: 'old-secret' });
+    expect((sent[0].body.connection as Record<string, unknown>).management).toEqual({
+      username: 'artemis',
+      password: 'old-secret',
+    });
   });
 
   it('asks for the password again for a seed on a new host, but not for one the cluster already uses', async () => {

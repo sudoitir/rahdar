@@ -22,6 +22,7 @@ import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterE
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterRepository;
 import io.github.sudoitir.rahdar.support.AdminAuthenticationExtension;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisModule;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -63,7 +64,7 @@ class ResourceAccessReportIntegrationTest extends PostgresIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        prod = clusters.save(new ClusterEntity("report-" + UUID.randomUUID(), null, null))
+        prod = clusters.save(new ClusterEntity(ArtemisModule.SYSTEM, "report-" + UUID.randomUUID(), null, null))
                 .getId();
         orders = teams.create("orders-" + UUID.randomUUID()).id();
         billing = teams.create("billing-" + UUID.randomUUID()).id();

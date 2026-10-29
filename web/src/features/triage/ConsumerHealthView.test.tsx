@@ -23,6 +23,7 @@ function row(over: Record<string, unknown> = {}) {
   return {
     destination: 'artemis.address/orders',
     subscription: 'artemis.queue/orders',
+    kindLabel: { singular: 'Queue', plural: 'Queues' },
     verdict: 'HEALTHY',
     severity: 0,
     cause: 'Keeping up with what arrives.',

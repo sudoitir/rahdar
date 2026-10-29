@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react';
-import { Select, TextInput } from '@mantine/core';
+import { Button, Select, TextInput } from '@mantine/core';
 import { useDebouncedCallback } from '@mantine/hooks';
-import { useNavigate, useSearch } from '@tanstack/react-router';
+import { Link, useNavigate, useSearch } from '@tanstack/react-router';
 
+import { BacklogDrawer, type BacklogTarget } from '../../kernel/backlog/BacklogDrawer.tsx';
 import { ResourceActions } from '../../kernel/actions/ResourceActions.tsx';
 import { useDisplayZone } from '../../kernel/time/timezone.ts';
 import { EmptyState } from '../../ui/EmptyState.tsx';
@@ -15,7 +16,6 @@ import { Toolbar } from '../../ui/Toolbar.tsx';
 import { DataTable } from '../../ui/table/index.ts';
 import { useClusters, useEnvironments, useEstateSubscriptions, type EstateSubscription } from './api.ts';
 import { clusterColumns, estateSubscriptionColumns } from './estateColumns.tsx';
-import { RegisterClusterForm } from './RegisterCluster.tsx';
 
 const PAGE_SIZE = 50;
 
@@ -31,16 +31,16 @@ const rowKey = (r: EstateSubscription) => `${r.cluster.id}:${r.subscription.id}`
 /** The landing page's content (`home.estate`) when no cluster is registered: what a cluster is, and the way to add one. */
 function NoClusters() {
   return (
-    <>
-      <EmptyState
-        kind="empty"
-        title="No clusters yet"
-        description="A cluster is a set of brokers of one system that Rahdar watches and manages together. Register the first one below; it appears here and in the cluster switcher once it is saved."
-      />
-      <Section title="Register a cluster">
-        <RegisterClusterForm />
-      </Section>
-    </>
+    <EmptyState
+      kind="empty"
+      title="No clusters yet"
+      description="A cluster is a set of brokers of one system, such as Apache Kafka or ActiveMQ Artemis, that Rahdar watches and manages together. Register the first one: choose its system, give the addresses Rahdar should connect to, and check the connection before saving. It appears here and in the cluster switcher once it is saved."
+      action={
+        <Button component={Link} to="/clusters/new">
+          Register a cluster
+        </Button>
+      }
+    />
   );
 }
 
@@ -54,7 +54,14 @@ function EstateSubscriptions({
   const [filter, setFilter] = useState(search.q ?? '');
   const page = search.page ?? 1;
   const query = useEstateSubscriptions({ ...search, page, size: PAGE_SIZE });
-  const columns = useMemo(estateSubscriptionColumns, []);
+  const [backlogOf, setBacklogOf] = useState<BacklogTarget | null>(null);
+  const columns = useMemo(
+    () =>
+      estateSubscriptionColumns((row) =>
+        setBacklogOf({ clusterId: row.cluster.id, id: row.subscription.id, name: row.subscription.name }),
+      ),
+    [],
+  );
 
   const write = (patch: EstateSearch) =>
     void navigate({
@@ -172,6 +179,7 @@ function EstateSubscriptions({
           )
         }
       />
+      <BacklogDrawer target={backlogOf} onClose={() => setBacklogOf(null)} />
     </Section>
   );
 }

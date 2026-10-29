@@ -64,8 +64,8 @@ public class QueueSnapshotEntity {
     @Column(name = "ts", nullable = false)
     private Instant ts;
 
-    @Column(name = "backlog", nullable = false)
-    private long messageCount;
+    @Column(name = "backlog")
+    private Long messageCount;
 
     @Column(name = "consumer_count", nullable = false)
     private long consumerCount;
@@ -84,6 +84,11 @@ public class QueueSnapshotEntity {
 
     @Column(name = "expired", nullable = false)
     private long messagesExpired;
+
+    /** The system's own attributes of the subscription, by native name. */
+    public Map<String, String> getNativeAttributes() {
+        return Map.copyOf(nativeAttributes);
+    }
 
     /** An Artemis queue's routing type, {@code ANYCAST} or {@code MULTICAST}; {@code null} on another system. */
     public String getRoutingType() {

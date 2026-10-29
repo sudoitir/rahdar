@@ -181,7 +181,23 @@ class BrokerQueryExecutorTest {
 
     private QueueSnapshot snapshot(BrokerNodeEntity on, String queue, long depth) {
         return new QueueSnapshot(
-                CLUSTER, on.getId(), queue, queue, "ANYCAST", false, false, null, depth, 0, 0, 0, 0, 0, 0);
+                CLUSTER,
+                on.getId(),
+                queue,
+                queue,
+                "ANYCAST",
+                false,
+                false,
+                null,
+                depth,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                "artemis.queue",
+                Map.of());
     }
 
     private void given(List<BrokerNodeEntity> nodeList, List<QueueSnapshot> snapshotList) {

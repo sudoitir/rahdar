@@ -4,6 +4,11 @@ import io.github.sudoitir.rahdar.platform.broker.BrokerConnections;
 import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
 import io.github.sudoitir.rahdar.platform.broker.BrokerMessages;
 import io.github.sudoitir.rahdar.platform.broker.BrokerNotifications;
+import io.github.sudoitir.rahdar.platform.broker.BrokerSessions;
+import io.github.sudoitir.rahdar.platform.broker.BrokerSystems;
+import io.github.sudoitir.rahdar.platform.broker.ConnectionSettingsSource;
+import io.github.sudoitir.rahdar.platform.broker.DataPlaneCheck;
+import io.github.sudoitir.rahdar.platform.broker.NodeCallLimiter;
 import io.github.sudoitir.rahdar.platform.broker.SystemExtensions;
 import io.github.sudoitir.rahdar.platform.clusters.BrokerCommands;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
@@ -60,6 +65,10 @@ class BulkModuleTest extends ModuleIntegrationTest {
     @MockitoBean
     BrokerConnections brokerConnections;
 
+    /** The Artemis module's connection options read a cluster's stored accounts through the clusters module. */
+    @MockitoBean
+    ConnectionSettingsSource connectionSettings;
+
     /** Queue lifecycle runs its per-node fan-out through the clusters module. */
     @MockitoBean
     BrokerCommands brokerCommands;
@@ -71,6 +80,22 @@ class BulkModuleTest extends ModuleIntegrationTest {
     /** Messages reads and acts on a queue's messages through the broker module. */
     @MockitoBean
     BrokerMessages brokerMessages;
+
+    /** The clusters module's service reads each cluster's system through the broker module. */
+    @MockitoBean
+    BrokerSystems brokerSystems;
+
+    /** The clusters module's service opens sessions to the brokers through the broker module. */
+    @MockitoBean
+    BrokerSessions brokerSessions;
+
+    /** And limits its calls to a node through it. */
+    @MockitoBean
+    NodeCallLimiter nodeCallLimiter;
+
+    /** The clusters module's service checks the data plane through the broker module. */
+    @MockitoBean
+    DataPlaneCheck dataPlaneCheck;
 
     /** Queue lifecycle runs its broker calls through the Artemis module. */
     @MockitoBean

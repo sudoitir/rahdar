@@ -1,5 +1,6 @@
 package io.github.sudoitir.rahdar.platform.clusters;
 
+import io.github.sudoitir.rahdar.kernel.core.SecretRedactor;
 import io.github.sudoitir.rahdar.kernel.security.SecretVault;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerCredentialEntity;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerCredentialRepository;
@@ -34,7 +35,14 @@ public class ClusterSecrets {
     private final SecretVault vault;
 
     /** A stored credential. The password is only ever handed to a broker call. */
-    public record Credential(String ref, String username, String password) {}
+    public record Credential(String ref, String username, String password) {
+
+        /** The password is never printed. */
+        @Override
+        public String toString() {
+            return "Credential[ref=" + ref + ", username=" + username + ", password=" + SecretRedactor.MASK + "]";
+        }
+    }
 
     /** Store or replace the credential under {@code ref}. */
     @Transactional

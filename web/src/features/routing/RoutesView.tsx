@@ -27,10 +27,10 @@ const NO_ROWS: never[] = [];
 const routeKey = (r: RouteView) => r.id;
 
 /** What an empty list teaches: what a route is, and where one comes from on this cluster. */
-function routesIntro(hasBuilder: boolean, artemis: boolean): string {
+function routesIntro(hasBuilder: boolean, canCreate: boolean): string {
   const what =
     'A route copies, takes or carries the messages of one destination or subscription to another, without the producers knowing.';
-  if (!artemis) return what;
+  if (!canCreate) return what;
   return hasBuilder
     ? `${what} Create a divert above, or declare a bridge on the Builder tab and apply it with the rest of the declaration; the plan names the hazard, because a bridge rewires how this cluster reaches other brokers.`
     : `${what} Create a divert above; a bridge is declared in the cluster configuration, which is not enabled on this Rahdar.`;
@@ -145,8 +145,8 @@ function RoutesListing({ clusterId, hasBuilder }: Readonly<{ clusterId: string; 
     .flatMap((n) => n.endpoints)
     .filter((e) => e.lastError)
     .map((e) => e.name);
-  // Diverts are Artemis's own, so creating one is offered only on a cluster that runs it.
-  const artemis = cluster.data?.system.id === 'artemis';
+  // Creating a route is offered only where the cluster's system has a kind of route it can create.
+  const mayCreateRoute = cluster.data?.kinds.some((k) => k.resourceClass === 'ROUTE' && k.verbs.includes('create'));
 
   const total = query.data?.count ?? 0;
 
@@ -165,7 +165,7 @@ function RoutesListing({ clusterId, hasBuilder }: Readonly<{ clusterId: string; 
             size="xs"
           />
         }
-        end={artemis ? <CreateDivertAction clusterId={clusterId} /> : undefined}
+        end={mayCreateRoute ? <CreateDivertAction clusterId={clusterId} /> : undefined}
       />
 
       <DataTable
@@ -204,7 +204,7 @@ function RoutesListing({ clusterId, hasBuilder }: Readonly<{ clusterId: string; 
         }}
         empty={
           <RoutesEmpty
-            intro={routesIntro(hasBuilder, artemis)}
+            intro={routesIntro(hasBuilder, Boolean(mayCreateRoute))}
             filtered={Boolean(search.q)}
             unreachable={unreachable}
             // The address follows the field once typing pauses, so clearing the field clears the filter.

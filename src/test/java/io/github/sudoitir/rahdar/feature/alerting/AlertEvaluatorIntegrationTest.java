@@ -12,6 +12,7 @@ import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNo
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterEntity;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterRepository;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisModule;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -68,7 +69,8 @@ class AlertEvaluatorIntegrationTest extends PostgresIntegrationTest {
 
     @Test
     void aSustainedBreachFiresAfterTheDebounceAndResolvesWhenItClears() {
-        ClusterEntity cluster = clusters.save(new ClusterEntity("c-" + UUID.randomUUID(), null, null));
+        ClusterEntity cluster =
+                clusters.save(new ClusterEntity(ArtemisModule.SYSTEM, "c-" + UUID.randomUUID(), null, null));
         clusterId = cluster.getId();
         BrokerNodeEntity node = nodes.save(BrokerNodeEntity.fromSeed(clusterId, "n1", "NONE", "node-1"));
 
@@ -93,7 +95,8 @@ class AlertEvaluatorIntegrationTest extends PostgresIntegrationTest {
 
     @Test
     void aDisabledRuleNeverEvaluates() {
-        ClusterEntity cluster = clusters.save(new ClusterEntity("c-" + UUID.randomUUID(), null, null));
+        ClusterEntity cluster =
+                clusters.save(new ClusterEntity(ArtemisModule.SYSTEM, "c-" + UUID.randomUUID(), null, null));
         clusterId = cluster.getId();
         BrokerNodeEntity node = nodes.save(BrokerNodeEntity.fromSeed(clusterId, "n1", "NONE", "node-1"));
 

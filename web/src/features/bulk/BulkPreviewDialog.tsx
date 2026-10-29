@@ -17,6 +17,7 @@ import {
   type BulkOperation,
   type BulkRunDetailView,
 } from './api.ts';
+import { useCluster } from '../clusters/index.ts';
 import { previewColumns } from './columns.ts';
 import { OPERATIONS, plural } from './words.ts';
 
@@ -26,14 +27,29 @@ const rowKey = (i: BulkItemView) => i.subscription;
 
 const START = { verb: 'Start', past: 'Started', progressive: 'Starting' } as const;
 
-/** What the run would do, as one sentence an operator can check before arming it. */
-function blastRadius(operation: BulkOperation, preview: BulkRunDetailView): string {
+/**
+ * What the run would do, as one sentence an operator can check before arming it. A purge of subscriptions on a
+ * partitioned log moves each group to the end of its log and deletes no record, and says so.
+ */
+function blastRadius(operation: BulkOperation, preview: BulkRunDetailView, moves: boolean): string {
   const { run, items } = preview;
   const op = OPERATIONS[operation];
   const acting = items.filter((i) => i.status !== 'REFUSED');
   const nodes = new Set(acting.flatMap((i) => i.nodes.map((n) => n.nodeId))).size;
   const scope = `${op.verb} ${plural(acting.length, 'subscription')} on ${plural(nodes, 'node')}`;
   if (!op.destructive) return `${scope}.`;
+  if (moves) {
+    const to = `${plural(acting.length, 'group')} to the end of the log`;
+    const known = acting.filter((i) => i.skipped != null);
+    if (known.length === 0) {
+      return `Moves ${to}, skipping a number of records that is unavailable. No record is deleted; the groups will not read the records they skip.`;
+    }
+    const records = plural(
+      known.reduce((sum, i) => sum + (i.skipped ?? 0), 0),
+      'record',
+    );
+    return `Moves ${to}, skipping ${known.length === acting.length ? '' : 'at least '}${records}. No record is deleted; the groups will not read the records they skip.`;
+  }
   if (run.estimate == null || (acting.length > 0 && acting.every((i) => i.affected == null))) {
     return `${scope}. How many messages that destroys is unavailable. This cannot be undone.`;
   }
@@ -47,12 +63,14 @@ function blastRadius(operation: BulkOperation, preview: BulkRunDetailView): stri
 function PreviewStatus({
   preview,
   operation,
+  moves,
   unknown,
   refused,
   onRetry,
 }: Readonly<{
   preview: ReturnType<typeof useBulkPreview>;
   operation: BulkOperation;
+  moves: boolean;
   unknown: number;
   refused: number;
   onRetry: () => void;
@@ -74,7 +92,7 @@ function PreviewStatus({
       {data ? (
         <Stack gap="xs">
           <Text size="sm" fw={600}>
-            {blastRadius(operation, data)}
+            {blastRadius(operation, data, moves)}
           </Text>
           {unknown > 0 ? (
             <Text size="sm">
@@ -159,6 +177,51 @@ function RunControls({
   );
 }
 
+/** A purge of a partitioned log moves every group to the end; anything else destroys. */
+function movesLog(
+  operation: BulkOperation,
+  acting: BulkItemView[],
+  kinds: readonly { id: string; partitioned: boolean }[] | undefined,
+): boolean {
+  if (operation !== 'PURGE' || acting.length === 0) return false;
+  return acting.every((item) => kinds?.find((kind) => kind.id === item.kind)?.partitioned === true);
+}
+
+/** The button that starts the run: a skip for a log purge, the verb and the count otherwise. */
+function confirmWords(moves: boolean, skippedTotal: number | null, groups: number, verb: string): string {
+  if (!moves) return `${verb} ${plural(groups, 'subscription')}`;
+  const records = skippedTotal === null ? 'records' : plural(skippedTotal, 'record');
+  return `Skip ${records} for ${plural(groups, 'group')}`;
+}
+
+/** The figures the dialog decides with: what moves, what is unknown, and which rows to show. */
+function runFigures(
+  operation: BulkOperation,
+  data: BulkRunDetailView | undefined,
+  onlyProblems: boolean,
+  kinds: readonly { id: string; partitioned: boolean }[] | undefined,
+) {
+  const items = data?.items ?? [];
+  const acting = items.filter((item) => item.status !== 'REFUSED');
+  const shown = onlyProblems ? items.filter(hasProblem) : items;
+  const moves = movesLog(operation, acting, kinds);
+  const unknown = OPERATIONS[operation].destructive
+    ? acting.filter((item) => (moves ? item.skipped : item.affected) == null).length
+    : 0;
+  const skippedTotal = acting.some((item) => item.skipped != null)
+    ? acting.reduce((sum, item) => sum + (item.skipped ?? 0), 0)
+    : null;
+  return {
+    acting,
+    shown,
+    moves,
+    unknown,
+    refused: items.length - acting.length,
+    overCap: data?.run.overCap ?? false,
+    confirmLabel: confirmWords(moves, skippedTotal, acting.length, OPERATIONS[operation].verb),
+  };
+}
+
 /** The frozen subscription set, optionally narrowed to the ones with a refusal or warning. */
 function SubscriptionsInRun({
   destructive,
@@ -215,8 +278,8 @@ function SubscriptionsInRun({
 
 /**
  * Preview → confirm → execute for one bulk operation (ADR-0093). The preview freezes the subscription set
- * and states the blast radius; only that frozen plan can be confirmed, and a destroy is armed by
- * typing the action and the count. Once the run is accepted the operator is taken to it.
+ * and states the blast radius; only that frozen plan can be confirmed, and a destroy is confirmed by
+ * pressing and holding a button that names the action and the count. Once the run is accepted the operator is taken to it.
  */
 export function BulkPreviewDialog({
   clusterId,
@@ -245,7 +308,7 @@ export function BulkPreviewDialog({
     execute.reset();
     preview.mutate({
       operation,
-      names: selection.kind === 'names' ? selection.names : null,
+      ids: selection.kind === 'ids' ? selection.ids : null,
       q: selection.kind === 'filter' ? selection.q : null,
       // A bulk delete refuses a subscription with consumers; closing them is not offered in bulk yet.
       disconnectConsumers: false,
@@ -262,12 +325,10 @@ export function BulkPreviewDialog({
   };
 
   const data = preview.data;
-  const acting = data?.items.filter((i) => i.status !== 'REFUSED') ?? [];
-  const refused = (data?.items.length ?? 0) - acting.length;
-  const unknown = op.destructive ? acting.filter((i) => i.affected == null).length : 0;
-  const overCap = data?.run.overCap ?? false;
-  const shown = onlyProblems ? (data?.items.filter(hasProblem) ?? []) : (data?.items ?? []);
-  const confirmLabel = `${op.verb} ${plural(acting.length, 'subscription')}`;
+  const cluster = useCluster(clusterId);
+  // A purge of a partitioned log moves the groups to its end: nothing is destroyed, and the cap does not apply to it.
+  const plan = runFigures(operation, data, onlyProblems, cluster.data?.kinds);
+  const { acting, shown, moves, unknown, refused, overCap, confirmLabel } = plan;
 
   const start = () => {
     if (!data) return;
@@ -299,6 +360,7 @@ export function BulkPreviewDialog({
         <PreviewStatus
           preview={preview}
           operation={operation}
+          moves={moves}
           unknown={unknown}
           refused={refused}
           onRetry={takePreview}
@@ -308,9 +370,9 @@ export function BulkPreviewDialog({
           <Section title="Over the safety cap" headingLevel={3} variant="card">
             <Stack gap="xs">
               <Text size="sm">
-                This run would destroy {data.run.estimate?.toLocaleString()} messages, over the cap of{' '}
-                {data.run.cap.toLocaleString()}. It can run only with the cap overridden for this run, and the override
-                is recorded in the audit log.
+                This run would {moves ? 'skip' : 'destroy'} {data.run.estimate?.toLocaleString()}{' '}
+                {moves ? 'records' : 'messages'}, over the cap of {data.run.cap.toLocaleString()}. It can run only with
+                the cap overridden for this run, and the override is recorded in the audit log.
               </Text>
               <Checkbox
                 label="Override the safety cap for this run"

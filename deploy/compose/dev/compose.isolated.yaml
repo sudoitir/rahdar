@@ -23,6 +23,16 @@ services:
   postgres:
     ports: !reset []
 
+  # Not published: a tool on the host has no business here, and the listener a host tool would use
+  # advertises a fixed port that could not be this stack's.
+  kafka:
+    ports: !reset []
+    # QA only: a simulated stuck coordinator. The coordinator aborts a transaction that outlives its timeout within
+    # seconds; a day here keeps the seed's transaction hanging, so the sweep has one to show and abort. A demo does not
+    # do this: it shows what Kafka does.
+    environment:
+      KAFKA_TRANSACTION_ABORT_TIMED_OUT_TRANSACTION_CLEANUP_INTERVAL_MS: "86400000"
+
   artemis-primary:
     ports: !override
       - "127.0.0.1::8161"

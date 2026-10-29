@@ -167,9 +167,33 @@ class ClusterControllerTest extends PostgresIntegrationTest {
 
     private String registerBody() {
         return """
-                { "seedUrls": ["%s"], "name": "prod-emea",
-                  "credentials": { "username": "artemis", "password": "artemis" } }
+                { "system": "artemis", "name": "prod-emea",
+                  "connection": { "system": "artemis", "seedUrls": ["%s"],
+                    "credentials": { "username": "artemis", "password": "artemis" } } }
                 """.formatted(SEED);
+    }
+
+    @Test
+    void aSystemRahdarDoesNotLoadIsRefusedNamingTheSupportedOnes() throws Exception {
+        mvc.perform(post("/api/v1/clusters")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                { "system": "rabbitmq", "connection": { "system": "rabbitmq" } }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value(Matchers.endsWith("/problems/unsupported-system")))
+                .andExpect(jsonPath("$.detail").value(Matchers.containsString("Supported systems: artemis, kafka.")));
+    }
+
+    @Test
+    void aConnectionShapedForAnotherSystemIsRefused() throws Exception {
+        mvc.perform(post("/api/v1/clusters")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                { "system": "kafka", "connection": { "system": "artemis", "seedUrls": ["http://a:8161/console/jolokia"] } }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value(Matchers.endsWith("/problems/unsupported-system")));
     }
 
     @Test
@@ -210,8 +234,8 @@ class ClusterControllerTest extends PostgresIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(registerBody()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.reachableSeeds").value(1))
-                .andExpect(jsonPath("$.discoveredNodes").value(2))
+                .andExpect(jsonPath("$.system").value("artemis"))
+                .andExpect(jsonPath("$.nodes.length()").value(2))
                 .andExpect(jsonPath("$.managementUrlPattern").value("http://{host}:8161/console/jolokia"));
 
         assertThat(clusters.count()).isZero();
@@ -222,8 +246,8 @@ class ClusterControllerTest extends PostgresIntegrationTest {
         });
     }
 
-    private static final String PRIMARY = "$.nodes[?(@.name == 'artemis-primary:61616')]";
-    private static final String BACKUP = "$.nodes[?(@.name == 'artemis-backup:61616')]";
+    private static final String PRIMARY = "$.nodes[?(@.id == 'artemis-primary:61616')]";
+    private static final String BACKUP = "$.nodes[?(@.id == 'artemis-backup:61616')]";
 
     @Test
     void theCheckListsEveryNodeWithItsUrlAndWhereItCameFrom() throws Exception {
@@ -235,13 +259,13 @@ class ClusterControllerTest extends PostgresIntegrationTest {
                         .content(registerBody()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.nodes.length()").value(2))
-                .andExpect(jsonPath(PRIMARY + ".managementUrl").value(SEED))
-                .andExpect(jsonPath(PRIMARY + ".urlSource").value("SEED"))
-                .andExpect(jsonPath(PRIMARY + ".haRole").value("PRIMARY"))
-                .andExpect(jsonPath(BACKUP + ".managementUrl").value(BACKUP_URL))
-                .andExpect(jsonPath(BACKUP + ".urlSource").value("DERIVED"))
-                .andExpect(jsonPath(BACKUP + ".haRole").value("BACKUP"))
-                .andExpect(jsonPath(BACKUP + ".version").value("2.44.0"));
+                .andExpect(jsonPath(PRIMARY + ".address").value(SEED))
+                .andExpect(jsonPath(PRIMARY + ".artemis.urlSource").value("SEED"))
+                .andExpect(jsonPath(PRIMARY + ".artemis.haRole").value("PRIMARY"))
+                .andExpect(jsonPath(BACKUP + ".address").value(BACKUP_URL))
+                .andExpect(jsonPath(BACKUP + ".artemis.urlSource").value("DERIVED"))
+                .andExpect(jsonPath(BACKUP + ".artemis.haRole").value("BACKUP"))
+                .andExpect(jsonPath(BACKUP + ".version.text").value("2.44.0"));
         assertThat(nodes.count()).isZero();
     }
 
@@ -258,11 +282,11 @@ class ClusterControllerTest extends PostgresIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(registerBody()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath(PRIMARY + ".management").value("ACCEPTED"))
-                .andExpect(jsonPath(PRIMARY + ".core").value("REJECTED"))
+                .andExpect(jsonPath(PRIMARY + ".artemis.management").value("ACCEPTED"))
+                .andExpect(jsonPath(PRIMARY + ".artemis.core").value("REJECTED"))
                 // A passive backup opens no Core acceptor, so it is not asked.
-                .andExpect(jsonPath(BACKUP + ".management").value("ACCEPTED"))
-                .andExpect(jsonPath(BACKUP + ".core").value("NOT_TRIED"));
+                .andExpect(jsonPath(BACKUP + ".artemis.management").value("ACCEPTED"))
+                .andExpect(jsonPath(BACKUP + ".artemis.core").value("NOT_TRIED"));
     }
 
     @Test
@@ -275,10 +299,10 @@ class ClusterControllerTest extends PostgresIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(registerBody()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath(PRIMARY + ".core").value("ACCEPTED"))
-                .andExpect(jsonPath(BACKUP + ".management").value("REJECTED"))
-                .andExpect(jsonPath(BACKUP + ".managementUrl").value(Matchers.contains((String) null)))
-                .andExpect(jsonPath(BACKUP + ".urlProblem").value("CREDENTIALS_REJECTED"));
+                .andExpect(jsonPath(PRIMARY + ".artemis.core").value("ACCEPTED"))
+                .andExpect(jsonPath(BACKUP + ".artemis.management").value("REJECTED"))
+                .andExpect(jsonPath(BACKUP + ".address").value(Matchers.contains((String) null)))
+                .andExpect(jsonPath(BACKUP + ".artemis.urlProblem").value("CREDENTIALS_REJECTED"));
     }
 
     @Test
@@ -329,9 +353,10 @@ class ClusterControllerTest extends PostgresIntegrationTest {
 
     private String registerBody(boolean adopt) {
         return """
-                { "seedUrls": ["%s"], "name": "prod-emea", "adopt": %s,
-                  "credentials": { "username": "artemis", "password": "artemis" } }
-                """.formatted(SEED, adopt);
+                { "system": "artemis", "name": "prod-emea", "adopt": %s,
+                  "connection": { "system": "artemis", "seedUrls": ["%s"],
+                    "credentials": { "username": "artemis", "password": "artemis" } } }
+                """.formatted(adopt, SEED);
     }
 
     @Test
@@ -404,14 +429,23 @@ class ClusterControllerTest extends PostgresIntegrationTest {
     void aBrokerOlderThanTheMinimumIsRefusedAndNothingIsStored(boolean dryRun) throws Exception {
         when(session.node(SEED)).thenReturn(client("search-broker.json", "ha-read-too-old.json"));
 
-        mvc.perform(post("/api/v1/clusters")
-                        .param("dryRun", String.valueOf(dryRun))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(registerBody()))
-                .andExpect(status().isUnprocessableEntity())
-                .andExpect(jsonPath("$.brokerErrorKind").value("UNSUPPORTED_VERSION"))
-                .andExpect(jsonPath("$.detail").value(Matchers.containsString("2.31.2")))
-                .andExpect(jsonPath("$.detail").value(Matchers.containsString(BrokerVersion.MINIMUM + " and later")));
+        var response = mvc.perform(post("/api/v1/clusters")
+                .param("dryRun", String.valueOf(dryRun))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(registerBody()));
+        if (dryRun) {
+            // A check that ran answers with its findings (ADR-0219).
+            response.andExpect(status().isOk())
+                    .andExpect(jsonPath("$.failure.cause").value("UNSUPPORTED_VERSION"))
+                    .andExpect(jsonPath("$.supported").value(false))
+                    .andExpect(jsonPath("$.failure.message").value(Matchers.containsString("2.31.2")));
+        } else {
+            response.andExpect(status().isUnprocessableEntity())
+                    .andExpect(jsonPath("$.brokerErrorKind").value("UNSUPPORTED_VERSION"))
+                    .andExpect(jsonPath("$.detail").value(Matchers.containsString("2.31.2")))
+                    .andExpect(
+                            jsonPath("$.detail").value(Matchers.containsString(BrokerVersion.MINIMUM + " and later")));
+        }
 
         assertThat(clusters.count()).isZero();
         assertThat(audits.findAll()).singleElement().satisfies(e -> {
@@ -519,21 +553,28 @@ class ClusterControllerTest extends PostgresIntegrationTest {
         var existing = clusters.findAll().get(0).getId();
         audits.deleteAll();
 
-        mvc.perform(post("/api/v1/clusters")
-                        .param("dryRun", String.valueOf(dryRun))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                { "seedUrls": ["%s"], "name": "prod-emea-again",
-                                  "credentials": { "username": "artemis", "password": "artemis" } }
-                                """.formatted(alias)))
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.type").value(Matchers.endsWith("/problems/cluster-already-registered")))
-                .andExpect(jsonPath("$.title").value("These brokers are already registered"))
-                .andExpect(jsonPath("$.detail").value(Matchers.containsString("\"prod-emea\"")))
-                .andExpect(jsonPath("$.existingClusterId").value(existing.toString()))
-                .andExpect(jsonPath("$.existingClusterName").value("prod-emea"))
-                .andExpect(jsonPath("$.overlappingNodes")
-                        .value(Matchers.contains("artemis-backup:61616", "artemis-primary:61616")));
+        var response = mvc.perform(post("/api/v1/clusters")
+                .param("dryRun", String.valueOf(dryRun))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                                { "system": "artemis", "name": "prod-emea-again",
+                                  "connection": { "system": "artemis", "seedUrls": ["%s"],
+                                    "credentials": { "username": "artemis", "password": "artemis" } } }
+                                """.formatted(alias)));
+        if (dryRun) {
+            response.andExpect(status().isOk())
+                    .andExpect(jsonPath("$.alreadyRegistered.id").value(existing.toString()))
+                    .andExpect(jsonPath("$.alreadyRegistered.name").value("prod-emea"));
+        } else {
+            response.andExpect(status().isConflict())
+                    .andExpect(jsonPath("$.type").value(Matchers.endsWith("/problems/cluster-already-registered")))
+                    .andExpect(jsonPath("$.title").value("These brokers are already registered"))
+                    .andExpect(jsonPath("$.detail").value(Matchers.containsString("\"prod-emea\"")))
+                    .andExpect(jsonPath("$.existingClusterId").value(existing.toString()))
+                    .andExpect(jsonPath("$.existingClusterName").value("prod-emea"))
+                    .andExpect(jsonPath("$.overlappingNodes")
+                            .value(Matchers.contains("artemis-backup:61616", "artemis-primary:61616")));
+        }
 
         assertThat(clusters.findAll()).extracting(c -> c.getId()).containsExactly(existing);
         assertThat(audits.findAll()).singleElement().satisfies(e -> {

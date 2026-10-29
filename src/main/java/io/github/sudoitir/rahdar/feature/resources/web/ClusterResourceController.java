@@ -1,5 +1,6 @@
 package io.github.sudoitir.rahdar.feature.resources.web;
 
+import io.github.sudoitir.rahdar.feature.resources.BacklogService;
 import io.github.sudoitir.rahdar.feature.resources.CrossNodeAggregator;
 import io.github.sudoitir.rahdar.feature.resources.PagedListService;
 import io.github.sudoitir.rahdar.feature.resources.web.ResourceViews.ChannelView;
@@ -10,6 +11,7 @@ import io.github.sudoitir.rahdar.feature.resources.web.ResourceViews.ProducerVie
 import io.github.sudoitir.rahdar.feature.resources.web.ResourceViews.SubscriptionView;
 import io.github.sudoitir.rahdar.kernel.core.PagedView;
 import io.github.sudoitir.rahdar.kernel.core.ResourceQuery;
+import io.github.sudoitir.rahdar.platform.broker.BacklogBreakdown.Breakdown;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -33,10 +35,17 @@ public class ClusterResourceController {
 
     private final CrossNodeAggregator aggregator;
     private final PagedListService pagedList;
+    private final BacklogService backlogs;
 
     @GetMapping("/subscriptions")
     public PagedView<SubscriptionView> subscriptions(@PathVariable UUID clusterId, ResourceQuery query) {
         return aggregator.subscriptions(clusterId, query);
+    }
+
+    /** Where a subscription's backlog sits by partition, slowest first; for a partitioned log only. */
+    @GetMapping("/subscriptions/{kind}/{path}/backlog")
+    public Breakdown backlog(@PathVariable UUID clusterId, @PathVariable String kind, @PathVariable String path) {
+        return backlogs.breakdown(clusterId, kind, path);
     }
 
     @GetMapping("/destinations")

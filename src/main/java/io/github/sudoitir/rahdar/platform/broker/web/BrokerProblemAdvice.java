@@ -6,6 +6,7 @@ import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException.Kind;
 import io.github.sudoitir.rahdar.platform.broker.BulkCapExceededException;
 import io.github.sudoitir.rahdar.platform.broker.InvalidResourceIdException;
 import io.github.sudoitir.rahdar.platform.broker.ManagementRefusal;
+import io.github.sudoitir.rahdar.platform.broker.UnsupportedSystemException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -39,6 +40,11 @@ class BrokerProblemAdvice {
                 Problems.of(status, "management-refused", "The broker refused this operation", e.getMessage());
         problem.setProperty("refusalKind", e.kind().name());
         return problem;
+    }
+
+    @ExceptionHandler(UnsupportedSystemException.class)
+    ProblemDetail onUnsupportedSystem(UnsupportedSystemException e) {
+        return Problems.of(HttpStatus.BAD_REQUEST, "unsupported-system", "Unsupported system", e.getMessage());
     }
 
     @ExceptionHandler(InvalidResourceIdException.class)

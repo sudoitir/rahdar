@@ -4,6 +4,7 @@ import io.github.sudoitir.openbroker.ClusterConnection;
 import io.github.sudoitir.openbroker.model.KindId;
 import io.github.sudoitir.openbroker.model.ResourceClass;
 import io.github.sudoitir.rahdar.feature.resources.ResourceViewMapper.SubscriptionKey;
+import io.github.sudoitir.rahdar.feature.resources.ResourceViewMapper.SubscriptionKinds;
 import io.github.sudoitir.rahdar.feature.resources.web.ResourceViews.SubscriptionView;
 import io.github.sudoitir.rahdar.kernel.core.PagedView;
 import io.github.sudoitir.rahdar.kernel.core.ResourceQuery;
@@ -29,7 +30,6 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Builds the cross-node queue grid from {@code subscription_snapshot} (ADR-0017). A
@@ -51,7 +51,6 @@ public class CrossNodeAggregator {
     private final TeamIndex teams;
     private final BrokerGateway gateway;
 
-    @Transactional(readOnly = true)
     public PagedView<SubscriptionView> subscriptions(UUID clusterId, ResourceQuery query) {
         ResourceFilter readable = permissions.filter(clusterId, ResourceType.SUBSCRIPTION);
         List<SubscriptionView> rows = accessibleQueues(clusterId, readable).stream()
@@ -73,7 +72,6 @@ public class CrossNodeAggregator {
      * them — a consumer-health verdict that skipped the 501st queue could omit the worst
      * one in the cluster and still look complete (ADR-0089).
      */
-    @Transactional(readOnly = true)
     public List<SubscriptionView> allQueues(UUID clusterId) {
         return accessibleQueues(clusterId, permissions.filter(clusterId, ResourceType.SUBSCRIPTION));
     }
@@ -98,7 +96,6 @@ public class CrossNodeAggregator {
      *
      * <p><b>Never call this from a request path.</b> {@link #allQueues} is that entry point.
      */
-    @Transactional(readOnly = true)
     public List<SubscriptionView> rollUp(UUID clusterId) {
         return rolledUp(clusterId);
     }
@@ -125,8 +122,8 @@ public class CrossNodeAggregator {
         return byKey.entrySet().stream()
                 .map(e -> mapper.subscription(
                         e.getKey(),
-                        subscriptionKind,
-                        destinationKind,
+                        connection,
+                        new SubscriptionKinds(subscriptionKind, destinationKind),
                         e.getValue(),
                         nodeNames,
                         nodesTotal,
@@ -146,7 +143,7 @@ public class CrossNodeAggregator {
             case "name" -> Comparator.comparing(SubscriptionView::name, String.CASE_INSENSITIVE_ORDER);
             case "destination", "address" ->
                 Comparator.comparing(SubscriptionView::destinationName, String.CASE_INSENSITIVE_ORDER);
-            case "depth", "messageCount" -> Comparator.comparingLong(SubscriptionView::totalMessageCount);
+            case "backlog" -> Comparator.comparingLong(v -> v.backlog().valueOrZero());
             case "consumers", "consumerCount" -> Comparator.comparingLong(SubscriptionView::totalConsumerCount);
             case "delivering" -> Comparator.comparingLong(SubscriptionView::totalDeliveringCount);
             case "scheduled" -> Comparator.comparingLong(SubscriptionView::totalScheduledCount);

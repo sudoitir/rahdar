@@ -49,7 +49,7 @@ function divert(
   return {
     id: `artemis.divert/${name}`,
     kind: 'artemis.divert',
-    kindLabel: 'Divert',
+    kindLabel: { singular: 'Divert', plural: 'Diverts' },
     name,
     routeClass: 'FORWARD',
     source: 'artemis.address/orders',
@@ -81,7 +81,7 @@ function bridge(
   return {
     id: `artemis.bridge/${name}`,
     kind: 'artemis.bridge',
-    kindLabel: 'Bridge',
+    kindLabel: { singular: 'Bridge', plural: 'Bridges' },
     name,
     routeClass: 'LINK',
     source: queueName ? `artemis.queue/${queueName}` : null,

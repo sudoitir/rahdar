@@ -1,5 +1,5 @@
 /**
- * Capture the README screenshots against a running Rahdar.
+ * Capture the guides' screenshots against a running Rahdar.
  *
  *   ADMIN_PASSWORD=… ADMIN_TOTP_SECRET=… npm --prefix web run shots      (or: just shots)
  *
@@ -8,10 +8,8 @@
  * never a fixed sleep, which produces a screenshot of a skeleton often enough to
  * matter — and writes over `docs/img/*.png`.
  *
- * The viewport is fixed so the images crop identically in the README table, and
- * `deviceScaleFactor: 2` so they stay legible when GitHub scales them down.
- *
- * The moving demo is `demo.ts`.
+ * The viewport is fixed so the images crop identically on the guide pages, and
+ * `deviceScaleFactor: 2` so they stay legible when a page scales them down.
  */
 import { chromium } from '@playwright/test';
 import { mkdir } from 'node:fs/promises';
@@ -82,16 +80,20 @@ async function main() {
       ready: () => page.getByRole('heading', { name: 'Its pair' }).waitFor({ timeout: 10_000 }),
     },
     {
+      file: 'queues.png',
+      path: `/clusters/${clusterId}/subscriptions`,
+      ready: () => page.getByRole('row').nth(1).waitFor({ timeout: 30_000 }),
+    },
+    {
       file: 'flow.png',
       // The flow view samples clients only while it is open, and rates need two samples: open it,
       // wait for real nodes, then give the sampler two sweeps before photographing.
-      // Routing layers on, Rahdar's capture tap included; dead-letter edges stay off (one per queue).
-      path: `/clusters/${clusterId}/flow?layers=BRIDGES,CAPTURE,CLUSTER,DIVERTS`,
-      // Wide: five columns and their routing hops only fit side by side at a legible zoom on a wide screen.
+      path: `/clusters/${clusterId}/flow`,
+      // Wide: the columns and their routing hops only fit side by side at a legible zoom on a wide screen.
       width: 1920,
       height: 1300,
       ready: async () => {
-        await page.locator('.react-flow__node-queue').first().waitFor({ timeout: 60_000 });
+        await page.locator('.react-flow__node-subscription').first().waitFor({ timeout: 60_000 });
         // Client nodes arrive with the sampler's first sweep and their rates with the second. Reload
         // once both exist, so the layout orders every column busiest first.
         await page
@@ -101,22 +103,16 @@ async function main() {
           .catch(() => console.warn('flow.png: no sampled clients yet — the seed may not be running'));
         await page.waitForTimeout(35_000);
         await page.reload();
-        await page.locator('.react-flow__node-client').first().waitFor({ timeout: 60_000 });
+        await page.locator('.react-flow__node-subscription').first().waitFor({ timeout: 60_000 });
         await page.waitForTimeout(2_000);
       },
-    },
-    {
-      file: 'queues.png',
-      path: `/clusters/${clusterId}/queues`,
-      ready: () => page.getByRole('row').nth(1).waitFor({ timeout: 30_000 }),
     },
     {
       file: 'sql.png',
       path: `/clusters/${clusterId}/sql`,
       height: 1100,
       // The console is an empty form until a query has been run, so this one is
-      // driven rather than merely visited: an empty editor is a screenshot of
-      // nothing.
+      // driven rather than merely visited: an empty editor is a screenshot of nothing.
       before: async () => {
         await page.getByRole('textbox', { name: /query/i }).click();
         // The console restores the last query, so a click leaves the cursor in
@@ -128,27 +124,22 @@ async function main() {
       // Longer than the console's own 30 s query bound, so a slow broker still yields its rows.
       ready: () => page.getByRole('row').nth(1).waitFor({ timeout: 60_000 }),
     },
-    {
-      file: 'settings.png',
-      path: `/clusters/${clusterId}/settings?tab=settings-operational`,
-      ready: () => page.getByRole('heading', { name: 'Operational configuration' }).waitFor({ timeout: 30_000 }),
-    },
     // ── declared configuration (ADR-0067) ────────────────────────────────
     // Ordered on purpose: the first-run offer only exists while the cluster has
     // no declaration, so it is photographed before anything declares one.
     {
       file: 'config-first-run.png',
-      path: `/clusters/${clusterId}/configuration`,
+      path: `/clusters/${clusterId}/artemis/configuration`,
       optional: true,
       ready: () =>
         page
-          .getByText(/would be declared|Adopt what this cluster runs/)
+          .getByText(/entr(y|ies) would be declared/)
           .first()
           .waitFor({ timeout: 30_000 }),
     },
     {
       file: 'config-recommended.png',
-      path: `/clusters/${clusterId}/configuration?tab=recommended`,
+      path: `/clusters/${clusterId}/artemis/configuration?tab=recommended`,
       height: 1100,
       ready: () =>
         page
@@ -158,7 +149,7 @@ async function main() {
     },
     {
       file: 'config-plan.png',
-      path: `/clusters/${clusterId}/configuration`,
+      path: `/clusters/${clusterId}/artemis/configuration`,
       height: 1200,
       // A declaration the brokers do not yet run, so the plan has something to
       // show. Declaring writes to Rahdar only, and the review drawer only plans:
@@ -182,7 +173,7 @@ async function main() {
             note: 'Screenshot fixture',
           },
         });
-        await page.goto(`${BASE}/clusters/${clusterId}/configuration`);
+        await page.goto(`${BASE}/clusters/${clusterId}/artemis/configuration`);
         await page.getByRole('button', { name: 'Review & apply' }).click();
       },
       // The drawer plans as it opens; the step count is the plan having arrived.
@@ -195,7 +186,7 @@ async function main() {
     },
     {
       file: 'config-drift.png',
-      path: `/clusters/${clusterId}/configuration`,
+      path: `/clusters/${clusterId}/artemis/configuration`,
       height: 1100,
       // Each node's drift is on the declared tab once the nodes are evaluated.
       before: async () => {

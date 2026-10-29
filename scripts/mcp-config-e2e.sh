@@ -50,8 +50,9 @@ existing=$(api GET /clusters | py "next((c['id'] for c in d if c['name']=='$CLUS
 if [ -n "$existing" ]; then
   CLUSTER=$existing
 else
-  registered=$(api POST /clusters -d "{\"seedUrls\": [\"$SEED\"], \"name\": \"$CLUSTER_NAME\",
-    \"credentials\": {\"username\": \"$BROKER_USER\", \"password\": \"$BROKER_PASSWORD\"}}")
+  registered=$(api POST /clusters -d "{\"system\": \"artemis\", \"name\": \"$CLUSTER_NAME\",
+    \"connection\": {\"system\": \"artemis\", \"seedUrls\": [\"$SEED\"],
+      \"credentials\": {\"username\": \"$BROKER_USER\", \"password\": \"$BROKER_PASSWORD\"}}}")
   CLUSTER=$(py "d['id']" <<<"$registered" 2>/dev/null) || die "register failed: $registered"
 fi
 note "cluster $CLUSTER"

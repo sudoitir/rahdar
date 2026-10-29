@@ -44,7 +44,7 @@ public class QueueLocator {
      * {@code null} on a system without one; {@code messageCount} is the scraped depth, or the depth
      * read live for a queue the scrape has not reached.
      */
-    public record QueueLocation(UUID nodeId, String queueName, String address, String routingType, long messageCount) {}
+    public record QueueLocation(UUID nodeId, String queueName, String address, String routingType, Long messageCount) {}
 
     /** Every node's copy of the queue; empty when no node has it. */
     public List<QueueLocation> locate(UUID clusterId, String queueName) {

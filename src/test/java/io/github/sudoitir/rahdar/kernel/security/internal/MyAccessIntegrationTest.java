@@ -26,6 +26,7 @@ import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.Environm
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.EnvironmentRepository;
 import io.github.sudoitir.rahdar.support.AdminAuthenticationExtension;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisModule;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -95,7 +96,8 @@ class MyAccessIntegrationTest extends PostgresIntegrationTest {
     }
 
     private UUID cluster(UUID environmentId) {
-        UUID id = clusters.save(new ClusterEntity("summary-" + UUID.randomUUID(), null, environmentId))
+        UUID id = clusters.save(
+                        new ClusterEntity(ArtemisModule.SYSTEM, "summary-" + UUID.randomUUID(), null, environmentId))
                 .getId();
         environmentIndex.invalidate();
         return id;

@@ -8,6 +8,7 @@ import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNo
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterEntity;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterRepository;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisModule;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.HashMap;
@@ -49,7 +50,8 @@ class SlowConsumerConditionTest extends PostgresIntegrationTest {
     private UUID nodeId;
 
     private void givenCluster() {
-        ClusterEntity cluster = clusters.save(new ClusterEntity("c-" + UUID.randomUUID(), null, null));
+        ClusterEntity cluster =
+                clusters.save(new ClusterEntity(ArtemisModule.SYSTEM, "c-" + UUID.randomUUID(), null, null));
         clusterId = cluster.getId();
         nodeId = nodes.save(BrokerNodeEntity.fromSeed(clusterId, "n1", "NONE", "node-1"))
                 .getId();
@@ -114,6 +116,20 @@ class SlowConsumerConditionTest extends PostgresIntegrationTest {
 
         assertThat(result.universe()).isEmpty();
         assertThat(result.active()).isEmpty();
+    }
+
+    @Test
+    void anUnknownBacklogIsNotEvidenceOfOne() {
+        givenCluster();
+        jdbc.update("""
+                INSERT INTO subscription_snapshot
+                  (node_id, subscription, cluster_id, destination, kind, native_attributes,
+                   consumer_count, backlog, paused)
+                VALUES (:n, 'orders', :c, 'orders', 'artemis.queue', '{"artemis.routing_type":"ANYCAST"}', 3, NULL, false)
+                """, Map.of("n", nodeId, "c", clusterId));
+        ackSamples("orders", 100, 100);
+
+        assertThat(condition.evaluate(clusterId, rule(1.0, null)).universe()).isEmpty();
     }
 
     @Test

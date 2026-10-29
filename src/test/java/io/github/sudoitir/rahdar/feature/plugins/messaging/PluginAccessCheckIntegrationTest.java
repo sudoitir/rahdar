@@ -17,6 +17,7 @@ import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterE
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterRepository;
 import io.github.sudoitir.rahdar.support.AdminAuthenticationExtension;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisModule;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -54,7 +55,7 @@ class PluginAccessCheckIntegrationTest extends PostgresIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        cluster = clusters.save(new ClusterEntity("msg-" + UUID.randomUUID(), null, null))
+        cluster = clusters.save(new ClusterEntity(ArtemisModule.SYSTEM, "msg-" + UUID.randomUUID(), null, null))
                 .getId();
         UUID orders = teams.create("orders-" + UUID.randomUUID()).id();
         teams.addPattern(orders, new PatternRequest(cluster, PatternKind.ANY, "orders.#"));
@@ -73,10 +74,16 @@ class PluginAccessCheckIntegrationTest extends PostgresIntegrationTest {
 
     @Test
     void aTapIsAllowedOnATeamsQueueAndRefusedOnAnotherTeamsQueueNamingBoth() {
-        assertThat(access.denial(operator, cluster, AccessCheck.needsOf(RegistrationMode.TAP, "orders.in")))
+        assertThat(access.denial(
+                        operator,
+                        cluster,
+                        AccessCheck.needsOf(RegistrationMode.TAP, SubscriptionId.of("artemis.queue", "orders.in"))))
                 .isEmpty();
 
-        assertThat(access.denial(operator, cluster, AccessCheck.needsOf(RegistrationMode.TAP, "billing.in")))
+        assertThat(access.denial(
+                        operator,
+                        cluster,
+                        AccessCheck.needsOf(RegistrationMode.TAP, SubscriptionId.of("artemis.queue", "billing.in"))))
                 .get()
                 .asString()
                 .contains("message:read")
@@ -85,9 +92,12 @@ class PluginAccessCheckIntegrationTest extends PostgresIntegrationTest {
 
     @Test
     void aConsumerNeedsPurgeToo() {
-        assertThat(access.denial(operator, cluster, AccessCheck.needsOf(RegistrationMode.CONSUME, "orders.in")))
+        assertThat(access.denial(
+                        operator,
+                        cluster,
+                        AccessCheck.needsOf(RegistrationMode.CONSUME, SubscriptionId.of("artemis.queue", "orders.in"))))
                 .isEmpty();
-        assertThat(AccessCheck.needsOf(RegistrationMode.CONSUME, "orders.in"))
+        assertThat(AccessCheck.needsOf(RegistrationMode.CONSUME, SubscriptionId.of("artemis.queue", "orders.in")))
                 .extracting(AccessCheck.Need::permission)
                 .containsExactly("message:read", "subscription:purge");
     }

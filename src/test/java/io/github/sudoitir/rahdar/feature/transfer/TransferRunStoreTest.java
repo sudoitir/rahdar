@@ -18,6 +18,7 @@ import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterE
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterRepository;
 import io.github.sudoitir.rahdar.support.AdminAuthenticationExtension;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
+import io.github.sudoitir.rahdar.system.artemis.ArtemisModule;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -77,9 +78,9 @@ class TransferRunStoreTest extends PostgresIntegrationTest {
     @BeforeEach
     void clusters() {
         mvc = webAppContextSetup(webContext).build();
-        source = clusters.save(new ClusterEntity("src-" + UUID.randomUUID(), null, null))
+        source = clusters.save(new ClusterEntity(ArtemisModule.SYSTEM, "src-" + UUID.randomUUID(), null, null))
                 .getId();
-        target = clusters.save(new ClusterEntity("dst-" + UUID.randomUUID(), null, null))
+        target = clusters.save(new ClusterEntity(ArtemisModule.SYSTEM, "dst-" + UUID.randomUUID(), null, null))
                 .getId();
     }
 
@@ -371,7 +372,7 @@ class TransferRunStoreTest extends PostgresIntegrationTest {
     void aRunIsListedOnBothClustersAndHiddenElsewhere() throws Exception {
         TransferRunEntity run = preview(TransferMode.MOVE, "orders");
         state(run, TransferState.STOPPED);
-        UUID other = clusters.save(new ClusterEntity("x-" + UUID.randomUUID(), null, null))
+        UUID other = clusters.save(new ClusterEntity(ArtemisModule.SYSTEM, "x-" + UUID.randomUUID(), null, null))
                 .getId();
         try {
             for (UUID cluster : List.of(source, target)) {

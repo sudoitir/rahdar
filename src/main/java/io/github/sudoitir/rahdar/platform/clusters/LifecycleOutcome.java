@@ -51,8 +51,14 @@ public record LifecycleOutcome(boolean dryRun, long cap, boolean overCap, List<N
      * @param affected messages that were, or would be, destroyed here; null when the
      *     command destroys nothing or the count could not be established
      * @param error why this node failed, or null
+     * @param skipped records a purge of a log passed over without deleting them, or null
      */
-    public record NodeOutcome(UUID nodeId, String nodeName, NodeStatus status, Long affected, String error) {
+    public record NodeOutcome(
+            UUID nodeId, String nodeName, NodeStatus status, Long affected, String error, Long skipped) {
+
+        public NodeOutcome(UUID nodeId, String nodeName, NodeStatus status, Long affected, String error) {
+            this(nodeId, nodeName, status, affected, error, null);
+        }
 
         public static NodeOutcome skipped(UUID nodeId, String nodeName) {
             return new NodeOutcome(nodeId, nodeName, NodeStatus.SKIPPED_NOT_LIVE, null, null);

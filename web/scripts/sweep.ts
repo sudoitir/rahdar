@@ -164,7 +164,14 @@ async function contextFor(browser: Browser, { width, scheme, auth }: Job): Promi
 
 /** The pattern of one `DataCall`, as a test on a request's path. */
 const matcher = (call: DataCall, clusterId: string) =>
-  new RegExp(`^/api/v1${call.path.replaceAll(':cluster', clusterId).replaceAll('*', '[^/]+')}$`);
+  new RegExp(`^/api/v1${ids(call.path, clusterId).replaceAll('*', '[^/]+')}$`);
+
+/** The Kafka cluster's id (`events`), for the routes that name it as `:kafka`; empty on a stack with none. */
+let kafkaCluster = '';
+
+/** A path with the seeded clusters' ids in it: `:cluster` is the Artemis one, `:kafka` the Kafka one. */
+const ids = (path: string, clusterId: string) =>
+  path.replaceAll(':cluster', clusterId).replaceAll(':kafka', kafkaCluster);
 
 type Answer = 'hang' | 'error' | 'empty';
 
@@ -195,7 +202,7 @@ async function answer(page: Page, route: RouteSpec, mode: Answer, clusterId: str
       return request.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify(hit.call.empty).replaceAll(':cluster', clusterId),
+        body: ids(JSON.stringify(hit.call.empty), clusterId),
       });
     },
   );
@@ -264,9 +271,7 @@ async function capture(context: BrowserContext, job: Job, clusterId: string): Pr
   const file = `${width === 'zoom' ? 'zoom200' : width}-${scheme}-${state}.png`;
   const png = resolve(OUT, route.area, route.id, file);
   const path =
-    route.path
-      .replaceAll(':cluster', clusterId)
-      .replaceAll(/:held:([A-Z]+)/g, (_, held: string) => heldIds.get(held) ?? held) +
+    ids(route.path, clusterId).replaceAll(/:held:([A-Z]+)/g, (_, held: string) => heldIds.get(held) ?? held) +
     (state === 'filtered-empty' ? (route.filter ?? '') : '');
   const result: Capture = {
     area: route.area,
@@ -394,6 +399,15 @@ async function clusterId(browser: Browser): Promise<string> {
   return found?.id ?? '';
 }
 
+/** The Kafka cluster's id: the one named `events`, or empty. */
+async function kafkaId(browser: Browser): Promise<string> {
+  const context = await browser.newContext({ storageState: await sessionOf('admin') });
+  const response = await context.request.get(`${BASE}/api/v1/clusters?size=500`);
+  const body = (await response.json()) as { data?: { id: string; name: string }[] };
+  await context.close();
+  return body.data?.find((c) => c.name === 'events')?.id ?? '';
+}
+
 /** The requester's newest request in each state, for the routes that name one as `:held:<STATE>`. */
 const heldIds = new Map<string, string>();
 
@@ -423,7 +437,10 @@ async function main() {
     });
   }
   const cluster = await clusterId(browser);
-  const needing = jobs.find((job) => !cluster && job.route.path.includes(':cluster'));
+  kafkaCluster = await kafkaId(browser);
+  const needing = jobs.find(
+    (job) => (!cluster && job.route.path.includes(':cluster')) || (!kafkaCluster && job.route.path.includes(':kafka')),
+  );
   if (needing) throw new Error(`${needing.route.id} needs a registered cluster at ${BASE}`);
   if (jobs.some((job) => job.route.path.includes(':held:'))) await loadHeldIds(browser);
   const contexts = new Map<string, Promise<BrowserContext>>();

@@ -63,7 +63,7 @@ public final class FlowViews {
     }
 
     /** How an address hands messages to its queues. */
-    public enum Delivery {
+    public enum FlowDelivery {
         /** Multicast: every bound queue receives a copy. */
         COPY,
         /** Anycast: the queues share the messages. */
@@ -218,7 +218,7 @@ public final class FlowViews {
             @Schema(nullable = true) Instant asOf,
             @Schema(nullable = true) Long averagedOverSeconds,
             boolean stale,
-            @Schema(nullable = true) Delivery delivery,
+            @Schema(nullable = true) FlowDelivery delivery,
             @Schema(nullable = true) Integer members,
             @Schema(nullable = true) Boolean exclusive,
             @Schema(nullable = true) String filter,
@@ -240,7 +240,7 @@ public final class FlowViews {
                 Instant asOf,
                 Long averagedOverSeconds,
                 boolean stale,
-                Delivery delivery,
+                FlowDelivery delivery,
                 Integer members,
                 Boolean exclusive,
                 String filter,

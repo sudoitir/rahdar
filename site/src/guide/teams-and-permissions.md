@@ -16,6 +16,14 @@ permission acts at one of three levels, shown as a badge in the role editor:
 - **Resource**: one subscription or destination. A grant gives it on every resource the grant covers; a team
   role or a share gives it only on the names the team owns or receives.
 
+Kafka clusters add permissions of their own, which work like the rest: `subscription:seek` (reset a
+group's offsets) and `destination:update` and `destination:truncate` (change and truncate a topic) act on
+resources; `access-rule:read` and `access-rule:write` (ACLs) and `transaction:read` and `transaction:abort`
+(transactions) act on the cluster. **Operator** gains `subscription:seek`, `destination:update`,
+`destination:truncate`, `transaction:read`, `transaction:abort` and `access-rule:read`; **Administrator** also
+`access-rule:write`; **Viewer** gains `transaction:read` and `access-rule:read`. What each does is on
+[Apache Kafka](/guide/kafka#permissions).
+
 Some permissions need others: `subscription:purge` needs `subscription:read`, `message:send` needs
 `destination:read`. The role editor adds what is required and says so, and Rahdar refuses a role that
 lacks it.

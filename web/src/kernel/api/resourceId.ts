@@ -72,9 +72,56 @@ export function kindOfRole(kinds: ClusterKinds | undefined, role: Role): string 
   return kind.id;
 }
 
-/** The id of the subscription of this name; for a screen that holds a name and no row (a URL param, a picker). */
-export const subscriptionId = (kinds: ClusterKinds | undefined, name: string): string =>
-  resourceId(kindOfRole(kinds, 'SUBSCRIPTION'), name);
+/**
+ * The id of the subscription of this name; for a screen that holds a name and no row (a URL param, a picker).
+ * A subscription whose id has more segments than its name (a group on a topic) is named by its whole id
+ * ({@link subscriptionRef}), which is returned as it is.
+ */
+export const subscriptionId = (kinds: ClusterKinds | undefined, name: string): string => {
+  const kind = kinds?.find((k) => k.resourceClass === 'SUBSCRIPTION' && name.startsWith(`${k.id}/`));
+  return kind ? name : resourceId(kindOfRole(kinds, 'SUBSCRIPTION'), name);
+};
+
+/**
+ * What names a subscription in an address: its name, or its whole id when the name alone does not say which it
+ * is (a Kafka group reads several topics, and its id ends with the topic).
+ */
+export function subscriptionRef(subscription: { id: string; name: string }): string {
+  const rest = subscription.id.slice(subscription.id.indexOf('/') + 1);
+  return rest.includes('/') ? subscription.id : subscription.name;
+}
+
+/** The name a subscription id carries: its first path segment, decoded (a Kafka group, an Artemis queue). */
+export function subscriptionNameOf(id: string): string {
+  const rest = id.slice(id.indexOf('/') + 1);
+  const first = rest.split('/', 1)[0] ?? '';
+  try {
+    return decodeURIComponent(first);
+  } catch {
+    return first;
+  }
+}
+
+/** A subscription id for people: its path with each segment decoded, so a group on a topic reads "group/topic". */
+export function subscriptionLabel(id: string): string {
+  return id
+    .slice(id.indexOf('/') + 1)
+    .split('/')
+    .map((segment) => {
+      try {
+        return decodeURIComponent(segment);
+      } catch {
+        return segment;
+      }
+    })
+    .join('/');
+}
+
+/** A subscription reference for people: its name, or for a whole id the group and topic without the kind. */
+export function subscriptionRefWords(ref: string): string {
+  const slash = ref.indexOf('/');
+  return slash > 0 && /^[a-z][a-z0-9.-]*$/.test(ref.slice(0, slash)) ? ref.slice(slash + 1) : ref;
+}
 
 /** The id of the destination of this name, built as {@link subscriptionId} builds a subscription's. */
 export const destinationId = (kinds: ClusterKinds | undefined, name: string): string =>
