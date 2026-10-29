@@ -30,8 +30,8 @@ with the commit that fixes it and its test. Owner names are the agents of this s
 | E9 | live run | Old "Artemis Studio" product screenshots | web + site-story | fixed 34db7cd54, 21abc295f, 98637af38, cafe1729c |
 | E10 | live run | Stale approval-provider fixture | web | fixed |
 | S1 | storage | broker_event stores every delivered message | backend | open: ADR-0218 in test |
-| S2 | storage | broker_event bounded in time but not rows: enforce a row cap | backend | open |
-| S3 | storage | metric_sample ≈45 GB/day at 4000 Kafka subscriptions | backend | open: change-only + heartbeat |
+| S2 | storage | broker_event bounded in time but not rows: enforce a row cap | backend | moved to 19e4b |
+| S3 | storage | metric_sample ≈45 GB/day at 4000 Kafka subscriptions | backend | moved to 19e4b |
 | A1 | audit 1 | Cluster re-provisioned at the same bootstrap not detected | kafka-hardening | fixed d99cf67a7, 76ab9251d |
 | A2 | audit 1 | Unavailable lag stored and shown as 0 | backend | open |
 | A3 | audit 1 | Replaced broker's node row never retired | kafka-hardening | fixed 2a3a4fc9e |
@@ -41,8 +41,8 @@ with the commit that fixes it and its test. Owner names are the agents of this s
 | A7 | audit 1 | Per-cluster meters never removed | kafka-hardening | fixed a40cefb33 |
 | A8 | audit 1 | Whole ACL set loaded per preview | kafka-hardening | fixed 4d00b5f0a |
 | A9 | audit 1 | Inline qualified names in NodeStateRecorder | kafka-hardening | fixed 2215dfc07 |
-| A10 | audit 1 | Scrape reads subscriptions twice | backend | open |
-| B1 | audit 2 | One blackholed Kafka cluster stalls the scrape of all others | backend | open |
+| A10 | audit 1 | Scrape reads subscriptions twice | backend | moved to 19e4b |
+| B1 | audit 2 | One blackholed Kafka cluster stalls the scrape of all others | backend | moved to 19e4b |
 | B2 | audit 2 | MCP describe-group and reset-preview unbounded (3000 partitions) | kafka-hardening | fixed 0aadb35f1 |
 | B3 | audit 2 | Offset-reset audit row grows with partition count | kafka-hardening | fixed 5c797e316 |
 | B4 | audit 2 | kafka_topic_config returns every entry | kafka-hardening | fixed 0aadb35f1 |
@@ -60,5 +60,5 @@ with the commit that fixes it and its test. Owner names are the agents of this s
 | C9 | audit 3 | Alert/notification flapping (a broker flapping every minute): dedup and cooldown unverified | kafka-hardening | open: investigate and fix |
 | D1 | Dependabot | react-virtual 3.14.22 broke 40 DataTable tests (jsdom setup gave no clientHeight) | web | fixed dae5e7301 |
 | D2 | Dependabot | Mantine 9.7.4 Menu.Item overwrote aria-disabled on unavailable actions | web | fixed dae5e7301 |
-| E11 | live run | A reader without destination:read gets 404 for an existing topic's configuration, not 403 naming the permission | backend | open |
+| E11 | live run | A reader without destination:read gets 404 for an existing topic's configuration, not 403 naming the permission | backend | moved to 19e4b |
 | C10 | audit 3 | SSE payload bytes of one scrape tick over 4000 subscriptions unmeasured | backend (perf run) | open: measure in 6.2d |
