@@ -72,6 +72,10 @@ class KafkaHealth implements ClusterHealthEvaluator {
         return health;
     }
 
+    void forget(UUID clusterId) {
+        readings.remove(clusterId);
+    }
+
     private ClusterHealth read(UUID clusterId) {
         Partial<List<NodeDescription>> described;
         try {

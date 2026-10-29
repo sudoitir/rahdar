@@ -12,6 +12,7 @@
             "kernel.core",
             "kernel.gate",
             "kernel.plugin",
+            "kernel.replica",
             "kernel.security",
             "platform.broker",
             "platform.clusters",

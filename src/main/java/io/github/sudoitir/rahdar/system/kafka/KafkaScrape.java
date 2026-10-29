@@ -63,8 +63,8 @@ class KafkaScrape implements ClusterScrape {
     private final ActorResolver actors;
     private final Clock clock;
 
-    /** Since when each stored broker the cluster does not list has been missing. */
-    private final Map<UUID, Instant> unlistedSince = new ConcurrentHashMap<>();
+    /** Since when each stored broker the cluster does not list has been missing, by cluster. */
+    private final Map<UUID, Map<UUID, Instant>> unlistedSince = new ConcurrentHashMap<>();
 
     @Override
     public String system() {
@@ -118,12 +118,11 @@ class KafkaScrape implements ClusterScrape {
                 .filter(node -> node.getNativeNodeId() != null && !answered.contains(node.getNativeNodeId()))
                 .filter(node -> !described.failures().containsKey(NodeId.of(node.getNativeNodeId())))
                 .toList();
-        unlistedSince
-                .keySet()
-                .retainAll(unlisted.stream().map(ClusterNode::getId).toList());
+        Map<UUID, Instant> missing = unlistedSince.computeIfAbsent(clusterId, id -> new ConcurrentHashMap<>());
+        missing.keySet().retainAll(unlisted.stream().map(ClusterNode::getId).toList());
         Instant now = clock.instant();
         for (ClusterNode node : unlisted) {
-            Instant since = unlistedSince.computeIfAbsent(node.getId(), id -> now);
+            Instant since = missing.computeIfAbsent(node.getId(), id -> now);
             if (!described.value().isEmpty() && Duration.between(since, now).compareTo(RETIRE_AFTER) >= 0) {
                 retire(clusterId, node);
             } else {
@@ -137,6 +136,15 @@ class KafkaScrape implements ClusterScrape {
             round(clusterId, "partitions");
             partitions.refresh(clusterId);
         }
+    }
+
+    /** Drops the cluster's per-cluster meters and the brokers it was waiting on. */
+    void forget(UUID clusterId) {
+        meters.find("rahdar.kafka.scrape.rounds")
+                .tag("cluster", clusterId.toString())
+                .meters()
+                .forEach(meters::remove);
+        unlistedSince.remove(clusterId);
     }
 
     /** Removes a broker the cluster dropped, and records that it left. */
@@ -157,7 +165,7 @@ class KafkaScrape implements ClusterScrape {
                 false);
         try {
             recorder.retire(node.getId());
-            unlistedSince.remove(node.getId());
+            unlistedSince.getOrDefault(clusterId, Map.of()).remove(node.getId());
             audit.succeed(event, 1);
         } catch (RuntimeException e) {
             audit.fail(event, e.getMessage());

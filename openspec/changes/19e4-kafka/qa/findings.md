@@ -37,8 +37,8 @@ with the commit that fixes it and its test. Owner names are the agents of this s
 | A3 | audit 1 | Replaced broker's node row never retired | kafka-hardening | fixed |
 | A4 | audit 1 | Health pages every partition on the caller's thread | kafka-hardening | fixed |
 | A5 | audit 1 | Plugin registration node rows orphaned on node delete | kafka-hardening | fixed |
-| A6 | audit 1 | Health and partition readings never evicted | kafka-hardening | open |
-| A7 | audit 1 | Per-cluster meters never removed | kafka-hardening | open |
+| A6 | audit 1 | Health and partition readings never evicted | kafka-hardening | fixed |
+| A7 | audit 1 | Per-cluster meters never removed | kafka-hardening | fixed |
 | A8 | audit 1 | Whole ACL set loaded per preview | kafka-hardening | open |
 | A9 | audit 1 | Inline qualified names in NodeStateRecorder | kafka-hardening | fixed |
 | A10 | audit 1 | Scrape reads subscriptions twice | backend | open |
