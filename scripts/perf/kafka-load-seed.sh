@@ -203,6 +203,10 @@ rahdar_sign_in "" || exit 1
 existing=$(api GET "/clusters?size=500" | python3 -c 'import json,sys; print(next((c["id"] for c in json.load(sys.stdin)["data"] if c["name"]=="'"$PERF_CLUSTER"'"), ""))')
 [ -n "$existing" ] && api DELETE "/clusters/$existing" >/dev/null
 servers=$(printf '%s' "$KAFKA_BOOTSTRAP" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read().split(",")))')
-cluster=$(api POST /clusters -d "{\"system\":\"kafka\",\"name\":\"$PERF_CLUSTER\",\"description\":\"Performance at scale (task 6.2d)\",\"connection\":{\"system\":\"kafka\",\"bootstrapServers\":$servers,\"securityProtocol\":\"PLAINTEXT\"}}" \
-  | python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])')
+response=$(api POST /clusters -d "{\"system\":\"kafka\",\"name\":\"$PERF_CLUSTER\",\"description\":\"Performance at scale (task 6.2d)\",\"connection\":{\"system\":\"kafka\",\"bootstrapServers\":$servers,\"securityProtocol\":\"PLAINTEXT\"}}")
+cluster=$(printf '%s' "$response" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("id") or "")')
+if [ -z "$cluster" ]; then
+  printf '%s\n' "$response" | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d.get("detail") or d, file=sys.stderr)'
+  exit 1
+fi
 say "seeded. $PERF_CLUSTER is $cluster. Wait one scrape tier B interval, then: scripts/perf/kafka-measure.sh"
