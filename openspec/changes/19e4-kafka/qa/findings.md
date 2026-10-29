@@ -40,7 +40,7 @@ with the commit that fixes it and its test. Owner names are the agents of this s
 | A6 | audit 1 | Health and partition readings never evicted | kafka-hardening | open |
 | A7 | audit 1 | Per-cluster meters never removed | kafka-hardening | open |
 | A8 | audit 1 | Whole ACL set loaded per preview | kafka-hardening | open |
-| A9 | audit 1 | Inline qualified names in NodeStateRecorder | kafka-hardening | open |
+| A9 | audit 1 | Inline qualified names in NodeStateRecorder | kafka-hardening | fixed |
 | A10 | audit 1 | Scrape reads subscriptions twice | backend | open |
 | B1 | audit 2 | One blackholed Kafka cluster stalls the scrape of all others | backend | open |
 | B2 | audit 2 | MCP describe-group and reset-preview unbounded (3000 partitions) | kafka-hardening | open |

@@ -1,5 +1,6 @@
 package io.github.sudoitir.rahdar.platform.clusters;
 
+import io.github.sudoitir.openbroker.Endpoint;
 import io.github.sudoitir.openbroker.model.ConditionTypes;
 import io.github.sudoitir.openbroker.model.NodeDescription;
 import io.github.sudoitir.openbroker.model.Serving;
@@ -9,6 +10,7 @@ import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNo
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNodeEntity.HaObservation;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNodeRepository;
 import java.time.Instant;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -42,7 +44,7 @@ public class NodeStateRecorder {
             String state = ha.conditions().stream()
                     .filter(c ->
                             c.type().equals(ConditionTypes.STARTED) || c.type().equals(ConditionTypes.SERVING))
-                    .min(java.util.Comparator.comparing(c -> c.type().equals(ConditionTypes.STARTED) ? 0 : 1))
+                    .min(Comparator.comparing(c -> c.type().equals(ConditionTypes.STARTED) ? 0 : 1))
                     .map(c -> switch (c.status()) {
                         case TRUE -> "STARTED";
                         case FALSE -> "STOPPED";
@@ -71,11 +73,7 @@ public class NodeStateRecorder {
      * re-registration. Nothing happens when a node of that name or broker id is already there.
      */
     @Transactional
-    public void adopt(
-            UUID clusterId,
-            String name,
-            String nativeNodeId,
-            java.util.List<io.github.sudoitir.openbroker.Endpoint> endpoints) {
+    public void adopt(UUID clusterId, String name, String nativeNodeId, List<Endpoint> endpoints) {
         boolean known = nodes.findByClusterIdOrderByNameAsc(clusterId).stream()
                 .anyMatch(n -> name.equals(n.getName()) || nativeNodeId.equals(n.getNativeNodeId()));
         if (!known) {
