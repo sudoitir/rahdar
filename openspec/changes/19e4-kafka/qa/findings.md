@@ -59,3 +59,4 @@ with the commit that fixes it and its test. Owner names are the agents of this s
 | C8 | audit 3 | Held operations / approval requests: retention and orphans on cluster delete unverified | kafka-hardening | fixed 65359360d |
 | C9 | audit 3 | Alert/notification flapping (a broker flapping every minute): dedup and cooldown unverified | kafka-hardening | fixed 15a090b03 |
 | C10 | audit 3 | SSE payload bytes of one scrape tick over 4000 subscriptions unmeasured | backend (perf run) | open: measure in 6.2d |
+| D1 | tests | McpApprovalGateTest failed on the branch: the purge tool asks the cluster's kinds, and the test registers no cluster | kafka-hardening | fixed 197aa3aff |
