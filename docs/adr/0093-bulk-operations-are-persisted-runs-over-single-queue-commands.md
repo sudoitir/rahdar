@@ -1,10 +1,10 @@
 # ADR-0093: Bulk operations are persisted runs over the single-queue commands
 
-- **Status**: accepted; partly superseded by [ADR-0152](0152-replicas-coordinate-through-postgres.md)
+- **Status**: accepted; partly superseded by [ADR-0152](0152-replicas-coordinate-through-postgres.md) and [ADR-0221](0221-a-log-purge-preview-asks-the-driver.md)
 - **Date**: 2026-09-21
 - **Deciders**: Artemis Studio maintainers
 
-> **Partly superseded.** [ADR-0152](0152-replicas-coordinate-through-postgres.md) replaces in-process stops and startup recovery: stops reach the executing replica and recovery interrupts only runs of a gone replica.
+> **Partly superseded.** [ADR-0152](0152-replicas-coordinate-through-postgres.md) replaces in-process stops and startup recovery: stops reach the executing replica and recovery interrupts only runs of a gone replica. [ADR-0221](0221-a-log-purge-preview-asks-the-driver.md) replaces decision 2 for a purge of a partitioned log: that preview asks the driver once per group.
 
 ## Context
 

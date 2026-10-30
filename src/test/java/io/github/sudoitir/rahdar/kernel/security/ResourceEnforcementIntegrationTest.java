@@ -30,6 +30,7 @@ import io.github.sudoitir.rahdar.support.AdminAuthenticationExtension;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
 import io.github.sudoitir.rahdar.support.TeamAccessFixture;
 import io.github.sudoitir.rahdar.system.artemis.ArtemisModule;
+import io.github.sudoitir.rahdar.system.kafka.KafkaModule;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -274,6 +275,43 @@ class ResourceEnforcementIntegrationTest extends PostgresIntegrationTest {
         assertThat(body(foreign).get("type")).isEqualTo(body(missing).get("type"));
         assertThat(body(foreign).get("detail").asString())
                 .isEqualTo(body(missing).get("detail").asString().replace("nowhere.at.all", "billing.payments"));
+    }
+
+    @Test
+    void aKafkaTopicTheCallerCannotReadIsNotFoundAndOneTheyMayReadButNotChangeIsForbidden() throws Exception {
+        UUID kafka = clusters.save(new ClusterEntity(KafkaModule.SYSTEM, "kafka-" + UUID.randomUUID(), null, null))
+                .getId();
+        try {
+            UsernamePasswordAuthenticationToken viewer =
+                    fixture.session(fixture.member(fixture.team("korders", kafka, "orders.#"), "TEAM_VIEWER"));
+            String root = "/api/v1/clusters/" + kafka;
+            assertThat(call(get(root + "/kafka/topics/billing.payments/config"), viewer)
+                            .getStatus())
+                    .isEqualTo(404);
+            assertThat(call(
+                                    post(root + "/kafka/topics/orders.in/config:preview")
+                                            .contentType(MediaType.APPLICATION_JSON)
+                                            .content("{\"set\":{\"retention.ms\":\"60000\"}}"),
+                                    viewer)
+                            .getStatus())
+                    .isEqualTo(403);
+            assertThat(call(
+                                    post(root + "/kafka/groups/billing.payments/offsets:preview")
+                                            .contentType(MediaType.APPLICATION_JSON)
+                                            .content("{\"to\":\"latest\"}"),
+                                    viewer)
+                            .getStatus())
+                    .isEqualTo(404);
+            assertThat(call(
+                                    post(root + "/kafka/groups/orders.in/offsets:preview")
+                                            .contentType(MediaType.APPLICATION_JSON)
+                                            .content("{\"to\":\"latest\"}"),
+                                    viewer)
+                            .getStatus())
+                    .isEqualTo(403);
+        } finally {
+            clusters.deleteById(kafka);
+        }
     }
 
     @Test

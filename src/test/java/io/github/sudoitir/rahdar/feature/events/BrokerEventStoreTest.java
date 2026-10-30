@@ -83,4 +83,23 @@ class BrokerEventStoreTest extends PostgresIntegrationTest {
         assertThat(remaining()).isEqualTo(2);
         assertThat(store.purgeBatch(cutoff, 2)).isZero();
     }
+
+    @Test
+    void trimmingDeletesTheOldestRowsOfTheCurrentDayWhenNoOlderPartitionIsLeft() {
+        event(1);
+        event(2);
+        event(3);
+        // An earlier test may have left an older day. Housekeeping drops that first, then today's oldest rows.
+        long before = remaining();
+        long left = before;
+        for (int i = 0; i < 30 && left >= before; i++) {
+            if (store.trimOldest(2, 1000) == 0) {
+                break;
+            }
+            left = remaining();
+        }
+
+        assertThat(left).isLessThan(before);
+        assertThat(store.defaultQuota()).isEqualTo(20_000);
+    }
 }

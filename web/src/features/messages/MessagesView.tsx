@@ -91,6 +91,20 @@ function MessagesEmpty({
   );
 }
 
+/**
+ * Whether this subscription is read as a partitioned log. The cluster's kind list is the authority
+ * once it has loaded. Before that, a Kafka group on a topic is already known to be one, so the browse
+ * controls are in the first paint instead of replacing the queue toolbar when the cluster arrives.
+ */
+export function isPartitionedLog(
+  kind: string | undefined,
+  kinds: readonly { id: string; partitioned?: boolean }[] | undefined,
+): boolean {
+  const listed = kind ? kinds?.find((item) => item.id === kind) : undefined;
+  if (listed) return listed.partitioned === true;
+  return kind === 'kafka.group-topic';
+}
+
 /** The page the header describes: a partition of a log, or a count read from one node. */
 function messagesHeading(
   page: MessagePageView | undefined,
@@ -131,7 +145,9 @@ function selectorField(partitioned: boolean, filter: string) {
 function browsePosition(partitioned: boolean, log: MessagePageView['log'], page: number, lastPage: number | null) {
   if (partitioned) {
     // Said in the toolbar, where its arrival moves nothing: the controls keep their place.
-    if (log?.subscriptionPosition == null) return null;
+    if (log?.subscriptionPosition == null) {
+      return <Text size="xs">The group's position on this partition is unavailable.</Text>;
+    }
     return (
       <Text size="xs">
         {`The group stands at offset ${log.subscriptionPosition.toLocaleString()} on partition ${log.partition}: records from there on it has not read yet.`}
@@ -186,7 +202,7 @@ export function MessagesView() {
   const sendGate = useMessageGate(clusterId, 'message:send', 'Send messages', 'messageIo');
   // A partitioned log is read from one partition and a start, not by selector, node and page.
   const subscriptionKind = roleIds.loaded ? kindOf(roleIds.subscription(subscriptionName)) : undefined;
-  const partitioned = cluster.data?.kinds?.find((k) => k.id === subscriptionKind)?.partitioned === true;
+  const partitioned = isPartitionedLog(subscriptionKind ?? kindOf(subscriptionName), cluster.data?.kinds);
   const browse = browseOf(search);
   const columns = useMemo(() => messageColumns(zone, partitioned), [zone, partitioned]);
   const [filter, setFilter] = useState(search.filter ?? '');
@@ -267,7 +283,11 @@ export function MessagesView() {
           <span className={classes.subscription}>{subscriptionRefWords(subscriptionName)}</span>
         </>
       }
-      description={messagesHeading(messages.data, partitioned, browse.partition, endpoints)}
+      description={
+        <span className={partitioned ? classes.stableHeading : undefined}>
+          {messagesHeading(messages.data, partitioned, browse.partition, endpoints)}
+        </span>
+      }
       actions={
         <>
           <CapabilityGate verdict={sendGate} what="sending a message">

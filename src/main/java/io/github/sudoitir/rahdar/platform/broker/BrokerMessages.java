@@ -292,6 +292,35 @@ public class BrokerMessages {
     /** What purging a subscription of a log would skip, and the state it was counted against. */
     public record LogPurge(long records, String etag) {}
 
+    static final String UNCOUNTED =
+            "Rahdar could not count the records this group would skip, so the purge is not offered."
+                    + " No record is deleted, and nothing was moved.";
+
+    static final String NOTHING_TO_SKIP =
+            "This group is already at the last record it can read, so a purge would skip nothing."
+                    + " Records an open transaction still holds stay. No record is deleted, and nothing was moved.";
+
+    /** The records a purge would skip, or null when the driver did not report a count. Zero is a real zero. */
+    static Long recordsToSkip(Count count) {
+        if (count instanceof Count.Exact exact) {
+            return exact.value();
+        }
+        if (count instanceof Count.Estimate estimate) {
+            return estimate.value();
+        }
+        return null;
+    }
+
+    /** A purge is offered only when the driver reported a count of records it would skip. */
+    static void refuseUnlessCounted(Long records) {
+        if (records == null) {
+            throw new ConflictException("purge-uncounted", UNCOUNTED);
+        }
+        if (records == 0L) {
+            throw new ConflictException("purge-nothing-to-skip", NOTHING_TO_SKIP);
+        }
+    }
+
     /**
      * What purging the subscription of a log (moving its position to the end) would skip. The driver refuses a
      * group that has members or is rebalancing, naming them, and that refusal is a conflict with its reason.
@@ -309,12 +338,8 @@ public class BrokerMessages {
                                     + change.before().get() + ". Stop them first.");
                 }
             }
-            long records =
-                    switch (preview.estimate().count()) {
-                        case Count.Exact(var n) -> n;
-                        case Count.Estimate(var n) -> n;
-                        case Count.Unavailable(var _) -> 0L;
-                    };
+            Long records = recordsToSkip(preview.estimate().count());
+            refuseUnlessCounted(records);
             return new LogPurge(records, preview.etag());
         } catch (BrokerException e) {
             throw refusedPurge(e);

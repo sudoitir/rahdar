@@ -42,7 +42,7 @@ Format: `NNNN-kebab-title.md`, English, Nygard style (`000-template.md`).
 | [0030](0030-request-reply-correlation-strategy.md) | Request-reply correlation is notification-anchored and browse-sampled, with a disclosed coverage ceiling |
 | [0031](0031-pooled-core-connections.md) | Pooled Core connections via `pooled-jms`, superseding connect-per-call (superseded by 0203) |
 | [0032](0032-rr-latency-micrometer-percentiles.md) | Request-reply latency via Micrometer time-windowed percentiles, no persisted history in Phase 5 |
-| [0033](0033-metric-read-model.md) | Metric read model — `date_bin` bucketing, gauge vs. counter-rate, server-clamped step/range |
+| [0033](0033-metric-read-model.md) | Metric read model — `date_bin` bucketing, gauge vs. counter-rate, server-clamped step/range (bucket floor superseded by 0220) |
 | [0034](0034-collapsible-sidebar.md) | Two-section collapsible sidebar (cluster switcher + per-cluster view nav), replacing the horizontal view strip |
 | [0035](0035-alert-rule-model-and-evaluation-timing.md) | Alert rules are a discriminated union (metric threshold / cluster state); evaluation rides the scrape tiers, not an independent timer |
 | [0036](0036-notification-delivery-queue-and-channel-signing.md) | Notification delivery is a durable Postgres queue, batched per rule per tick, with Standard Webhooks signing |
@@ -227,3 +227,5 @@ Format: `NNNN-kebab-title.md`, English, Nygard style (`000-template.md`).
 | [0217](0217-the-site-home-tells-a-mixed-estate-story-with-no-third-party-origins.md) | The site home stays one hand-written page and tells a mixed Artemis and Kafka estate; no third-party origin (no CDN script, self-hosted fonts), light and dark, motion in CSS and WAAPI (supersedes 0121) |
 | [0218](0218-message-deliveries-are-counted-not-stored-one-by-one.md) | Message deliveries are counted per destination and subscription and stored as one summary row per flush interval, not one row per message; other event types stay verbatim (amends 0026) |
 | [0219](0219-cluster-registration-is-per-system-on-its-own-page.md) | Cluster registration is per system, on its own page: a sealed connection by system, a check that reaches every node and names each failure's cause, and the system list from the loaded drivers |
+| [0220](0220-metric-samples-are-stored-at-a-heartbeat.md) | Metric samples are stored at a 60-second heartbeat and never faster; the chart bucket floor and the rate-alert window follow it (supersedes the bucket-floor clause of 0033) |
+| [0221](0221-a-log-purge-preview-asks-the-driver.md) | A purge of a partitioned log confirms the driver's live skip count, not the scraped lag (supersedes decision 2 of 0093 for that purge only) |

@@ -3,3 +3,10 @@
 .subscription {
   overflow-wrap: anywhere;
 }
+
+/* The committed-records sentence is longer than "Reading the subscription…". The height is reserved
+   so the sentence arriving does not push the grid. */
+.stableHeading {
+  display: block;
+  min-block-size: 6.5rem;
+}

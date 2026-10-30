@@ -38,6 +38,11 @@
   font-family: var(--mantine-font-family-monospace);
 }
 
+/* One row of parsed servers, present before any are typed, so the first entry does not push the form. */
+.serverPills {
+  min-block-size: 2rem;
+}
+
 /* A form of a settings section: its groups of fields side by side across the panel, each a column of fields,
    stacking when there is no room for two. What the form reports and its actions run across the whole form. */
 .settingsForm {
@@ -79,11 +84,20 @@
   position: sticky;
   inset-block-end: 0;
   z-index: var(--as-z-sticky);
+  flex-wrap: nowrap;
+  align-items: flex-start;
   padding: var(--mantine-spacing-sm) var(--mantine-spacing-md);
   background: var(--as-surface-raised);
   border: 1px solid var(--as-border-strong);
   border-radius: var(--mantine-radius-md);
   box-shadow: var(--mantine-shadow-md);
+}
+
+/* The reason takes the spare width and wraps inside it. The buttons stay on this row, so a longer
+   reason does not drop them onto a new line and shift the bar. */
+.stickyActions .reason {
+  flex: 1 1 auto;
+  min-inline-size: 8rem;
 }
 
 /* A field that takes focus scrolls clear of the sticky actions, so the bar never hides it (WCAG 2.4.11). */

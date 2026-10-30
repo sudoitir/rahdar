@@ -17,7 +17,12 @@
 # PERF_CLUSTER (default perf-kafka), N (calls per measure, default 30), N_HEAVY (default 10, for the calls that read
 # the cluster live), WARMUP (default 3), WINDOW (seconds the scrape is observed, default 120), and the tier intervals
 # TIER_A, TIER_B (seconds, default 5 and 15; set them to the installation's settings if they were changed).
-# DRY_RUN=1 prints the plan (the calls and the budgets) and signs in to nothing. Bash 3.2.
+# DRY_RUN=1 prints the plan (the calls and the budgets) and signs in to nothing.
+# HOURS (default 0) keeps a producer running for that many hours and then records metric_sample and
+# broker_event growth. COMPOSE is the stack's docker compose invocation; Postgres is not published.
+# SSE_BUDGET (default 8192) is the most bytes one subscriptions tick may be. A tick that names every
+# subscription fails it: past 100 names the frame is a signal about the cluster, and the client refetches.
+# Bash 3.2.
 set -euo pipefail
 
 here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
@@ -33,6 +38,10 @@ WINDOW=${WINDOW:-120}
 TIER_A=${TIER_A:-5}
 TIER_B=${TIER_B:-15}
 DRY_RUN=${DRY_RUN:-0}
+HOURS=${HOURS:-0}
+SSE_BUDGET=${SSE_BUDGET:-8192}
+METRICS_PER_SUBSCRIPTION=${METRICS_PER_SUBSCRIPTION:-8}
+COMPOSE=${COMPOSE:-}
 P95_BUDGET_MS=500
 MAX_BYTES=1048576
 FAILED=0
@@ -164,8 +173,7 @@ say "the scrape over $WINDOW s (rahdar.scrape.cycle, rahdar.kafka.scrape.rounds)
 if [ "$DRY_RUN" = 1 ]; then
   echo "  reads actuator/prometheus before and after the window and prints, per tier, the cycles, the longest pass and"
   echo "  the interval, and per call the driver reads per cycle against the budget of one."
-  exit 0
-fi
+else
 cl="cluster=\"$C\""
 a0=$(metric rahdar_scrape_cycle_seconds_count 'tier="A"')
 b0=$(metric rahdar_scrape_cycle_seconds_count 'tier="B"')
@@ -198,6 +206,77 @@ for row in "nodes reads per tier A cycle|$(per "$(awk -v a="$n1" -v b="$n0" 'BEG
   printf '%-44s %12s %10s  %s\n' "$name" "$measured" "$budget" "$v"
 done
 echo "(tier A cycles in the window: $cyclesA, tier B: $cyclesB; a pass covers every cluster of this replica)"
+fi
+
+# ---- one scrape tick, and storage over an hour of traffic ---------------------------------------------------------
+
+row_count() {
+  if [ -z "$COMPOSE" ]; then
+    echo "n/a"
+    return
+  fi
+  # shellcheck disable=SC2086
+  $COMPOSE exec -T postgres psql -U rahdar -d rahdar -tAc "select count(*) from $1" | tr -d '[:space:]'
+}
+
+say "one subscriptions tick on the stream"
+if [ "$DRY_RUN" = 1 ]; then
+  echo "  curl the cluster stream and print the longest data: frame, budget $SSE_BUDGET bytes"
+else
+  # The stream stays open. curl's max-time closes it with status 28 after the frames it already received.
+  tick=$(curl -sS -N --max-time 25 -b "$COOKIES" -c "$COOKIES" \
+    -H "X-XSRF-TOKEN: $(csrf)" \
+    "$RAHDAR/api/v1/stream?clusterId=$C&topics=subscriptions" \
+    | awk 'BEGIN { max = 0 } /^data:/ { n = length($0); if (n > max) max = n } END { print max + 0 }' || true)
+  v=$(awk -v n="$tick" -v budget="$SSE_BUDGET" 'BEGIN { print (n > 0 && n <= budget) ? "ok" : "OVER BUDGET" }')
+  [ "$v" != ok ] && FAILED=1
+  printf '%-44s %12s %10s  %s\n' "longest subscriptions tick (bytes)" "$tick" "$SSE_BUDGET" "$v"
+fi
+
+if [ "$HOURS" != 0 ]; then
+  say "storage over $HOURS hour(s) of traffic"
+  if [ "$DRY_RUN" = 1 ]; then
+    echo "  count metric_sample and broker_event, produce for the hour, count again"
+  elif [ -z "$COMPOSE" ]; then
+    echo "  COMPOSE is unset, so the unpublished Postgres cannot be counted"
+    FAILED=1
+  else
+    before_m=$(row_count metric_sample)
+    before_e=$(row_count broker_event)
+    subs=$(api GET "/clusters/$C/subscriptions?size=1" | json "d.get('count') or 0")
+    seconds=$((HOURS * 3600))
+    if $COMPOSE config --services 2>/dev/null | grep -qx kafka-1; then
+      boot=kafka-1:9092
+      svc=kafka-1
+    else
+      boot=kafka:9092
+      svc=kafka
+    fi
+    # One topic, a thousand records a second. The storage bound is what the hour is for.
+    # shellcheck disable=SC2086
+    $COMPOSE exec -T -e 'KAFKA_HEAP_OPTS=-Xms16m -Xmx128m' "$svc" \
+      /opt/kafka/bin/kafka-producer-perf-test.sh \
+      --topic perf-t-0001 \
+      --num-records $((seconds * 1000)) \
+      --record-size 100 \
+      --throughput 1000 \
+      --producer-props "bootstrap.servers=$boot" >/dev/null
+    after_m=$(row_count metric_sample)
+    after_e=$(row_count broker_event)
+    grew_m=$((after_m - before_m))
+    grew_e=$((after_e - before_e))
+    # One stored row per metric per subscription per minute.
+    budget_m=$((subs * METRICS_PER_SUBSCRIPTION * HOURS * 60))
+    [ "$budget_m" -lt 1 ] && budget_m=1
+    vm=$(awk -v n="$grew_m" -v budget="$budget_m" 'BEGIN { print (n <= budget) ? "ok" : "OVER BUDGET" }')
+    ve=$(awk -v n="$after_e" 'BEGIN { print (n <= 20000000) ? "ok" : "OVER BUDGET" }')
+    [ "$vm" != ok ] && FAILED=1
+    [ "$ve" != ok ] && FAILED=1
+    printf '%-44s %12s %10s  %s\n' "metric_sample rows gained" "$grew_m" "$budget_m" "$vm"
+    printf '%-44s %12s %10s  %s\n' "broker_event rows now" "$after_e" "20000000" "$ve"
+    echo "broker_event gained $grew_e rows; subscriptions counted for the budget: $subs"
+  fi
+fi
 
 [ "$FAILED" = 0 ] && say "every budget met" || say "a budget was not met: see above"
 exit "$FAILED"

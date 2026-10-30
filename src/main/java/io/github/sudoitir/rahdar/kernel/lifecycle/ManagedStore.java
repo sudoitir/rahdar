@@ -26,4 +26,21 @@ public interface ManagedStore {
      * @return how many rows it removed
      */
     long purgeBatch(Instant cutoff, int limit);
+
+    /** The quota the store starts with, in its quota unit; 0 means none until an operator sets one. */
+    default int defaultQuota() {
+        return 0;
+    }
+
+    /**
+     * Removes at most one bounded batch of the oldest data, whatever its age, to bring a store that is over its
+     * quota under it (rows only). A store that cannot trim by count leaves it to retention.
+     *
+     * @param excessRows how many rows the store holds beyond its quota
+     * @param limit the most rows one batch should touch
+     * @return how many rows it removed; 0 when it removed nothing
+     */
+    default long trimOldest(long excessRows, int limit) {
+        return 0;
+    }
 }

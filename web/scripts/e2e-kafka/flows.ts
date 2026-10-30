@@ -449,9 +449,11 @@ const purgeGroup: Flow = {
     await rowMenu(t, 'reporting', /^Actions for /);
     await t.page.getByRole('menuitem', { name: /Purge messages/ }).click();
     await dialog(t).waitFor();
-    await t.page.waitForTimeout(1500);
+    await dialog(t)
+      .getByText(/No record is deleted/)
+      .waitFor({ timeout: 30_000 });
     const text = (await dialog(t).innerText()).replace(/\s+/g, ' ');
-    t.note(`purge dialog: ${text.slice(0, 300)}`);
+    t.note(`purge dialog: ${text.slice(0, 500)}`);
     // The purge moves the group to the last stable offset: records of the open transaction above it stay to read.
     const skipping = Number(/skipping ([\d,]+) records/.exec(text)?.[1]?.replace(/,/g, '') ?? NaN);
     t.check(
@@ -550,7 +552,10 @@ const bulkPurge: Flow = {
     await t.page.getByRole('checkbox', { name: 'Select all on this page' }).check();
     await press(t, 'Purge…');
     await dialog(t).waitFor();
-    await t.page.waitForTimeout(2500);
+    await dialog(t)
+      .getByText(/No record is deleted|refused/)
+      .first()
+      .waitFor({ timeout: 30_000 });
     const text = (await dialog(t).innerText()).replace(/\s+/g, ' ');
     t.note(`bulk dialog: ${text.slice(0, 900)}`);
     t.check(
@@ -802,6 +807,7 @@ const browse: Flow = {
     await t.open(subscriptionPath('billing', 'orders'));
     const table = t.page.getByRole('grid').or(t.page.getByRole('table')).first();
     await table.waitFor({ timeout: 30_000 });
+    await t.page.getByText(/The group stands at offset/).waitFor({ timeout: 30_000 });
     const body = async () => (await t.page.locator('main').innerText()).replace(/\s+/g, ' ');
     const first = await body();
     t.check(/The group stands at offset/.test(first), 'the page says where the group stands on the partition');

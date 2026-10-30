@@ -48,10 +48,13 @@
   gap: var(--mantine-spacing-xs);
   min-inline-size: 0;
   overflow: hidden;
+  white-space: nowrap;
 }
 
 .headerStart > * {
   flex: none;
+  min-inline-size: max-content;
+  white-space: nowrap;
 }
 
 .headerStart > .brand {
@@ -142,6 +145,18 @@
   flex: 1;
   text-align: start;
   white-space: nowrap;
+}
+
+/* 200% zoom is a 640px layout. The search field's 14rem minimum then squeezes the brand and wraps the
+   firing count onto a second line, which pushes the page. The words go; the icon and the shortcut stay. */
+@media (max-width: 40rem) {
+  .search {
+    min-inline-size: 0;
+  }
+
+  .searchText {
+    display: none;
+  }
 }
 
 /* A key hint is a label, not a key cap: flat, without Mantine's raised lower edge. */

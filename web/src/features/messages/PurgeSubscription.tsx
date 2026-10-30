@@ -10,7 +10,10 @@ import { usePurgeSubscription, type DryRunView } from './api.ts';
 import { useMessageGate } from './gates.ts';
 import { announceFailure, announceResult, messageCount } from './outcomes.ts';
 
-const records = (n: number): string => `${n.toLocaleString()} record${n === 1 ? '' : 's'}`;
+const records = (n: number | null | undefined): string =>
+  n == null || Number.isNaN(n)
+    ? 'an unavailable number of records'
+    : `${n.toLocaleString()} record${n === 1 ? '' : 's'}`;
 
 /**
  * The system's own refusal of the purge, such as a group that still has members or is rebalancing (a 409
@@ -58,7 +61,7 @@ function Consequence({
         <Text size="sm">
           This moves the position of {subscriptionName} to the end of its log, skipping approximately{' '}
           {records(preview.skippedCount)} (point-in-time estimate). No record is deleted: the group will not read those
-          records, and can be reset back.
+          records, and can be reset back. Records an open transaction still holds stay.
         </Text>
       ) : (
         <Text size="sm">

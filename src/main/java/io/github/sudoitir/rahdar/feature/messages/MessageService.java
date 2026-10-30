@@ -698,6 +698,18 @@ public class MessageService {
      * Purges the subscription of a partitioned log: its position moves to the end, which the driver refuses for a
      * group that has members or is rebalancing, naming them (409). The records are not deleted.
      */
+    /**
+     * How many records purging this subscription would skip, with no audit row. Throws when the driver did not report
+     * a count, when the count is zero, or when the group cannot be moved, and nothing is changed.
+     */
+    public long previewLogSkip(UUID clusterId, ResourceId subscription) {
+        clusterAccess.requireResource(
+                clusterId,
+                ResourceRef.subscription(subscription.path().segments().getFirst()),
+                MessagePermissions.SUBSCRIPTION_PURGE);
+        return messages.previewLogPurge(clusterId, subscription).records();
+    }
+
     public Attempt<Outcome> purgeLog(UUID clusterId, ResourceId subscription, boolean dryRun) {
         clusterAccess.requireResource(
                 clusterId,

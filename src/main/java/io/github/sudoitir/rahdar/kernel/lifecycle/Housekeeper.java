@@ -44,6 +44,73 @@ public class Housekeeper {
             if (retention.isPresent()) {
                 purge(store, retention.get());
             }
+            trimToQuota(store);
+        }
+    }
+
+    /** The most batches one housekeeping run removes to bring a store under its quota. */
+    static final int MAX_TRIM_BATCHES = 100;
+
+    /**
+     * A store over its row quota loses its oldest data first, in batches, audited as one {@code TRIM_STORE} event. A
+     * store whose row estimate does not move after a batch stops there, and is looked at again by the next run.
+     */
+    void trimToQuota(RegisteredStore store) {
+        int quota = registry.quota(store.id());
+        if (quota <= 0 || store.def().quotaUnit() != StoreDef.QuotaUnit.ROWS) {
+            return;
+        }
+        long allowed = quota * 1000L;
+        StoreUsage usage;
+        try {
+            usage = store.call(ManagedStore::usage);
+        } catch (RuntimeException e) {
+            log.warn("Reading the usage of store {} failed: {}", store.id(), e.toString());
+            return;
+        }
+        if (usage.rows() <= allowed) {
+            return;
+        }
+        AuditEvent event = audit.begin(
+                Actor.ofSystem(),
+                "TRIM_STORE",
+                "STORE",
+                store.id(),
+                null,
+                null,
+                Map.of("quotaThousandRows", quota, "rowsBefore", usage.rows()),
+                false);
+        long trimmed = 0;
+        try {
+            for (int batches = 0;
+                    usage.rows() > allowed
+                            && batches < MAX_TRIM_BATCHES
+                            && !Thread.currentThread().isInterrupted();
+                    batches++) {
+                long excess = usage.rows() - allowed;
+                long batch = store.call(s -> s.trimOldest(excess, BATCH));
+                if (batch <= 0) {
+                    break;
+                }
+                trimmed += batch;
+                long before = usage.rows();
+                usage = store.call(ManagedStore::usage);
+                if (usage.rows() >= before) {
+                    break;
+                }
+            }
+            audit.succeed(event, trimmed);
+            if (trimmed > 0) {
+                log.warn(
+                        "Store {} was over its quota of {} thousand rows: removed its oldest {} rows",
+                        store.id(),
+                        quota,
+                        trimmed);
+            }
+        } catch (RuntimeException e) {
+            String error = e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
+            log.warn("Trimming store {} to its quota failed after {} rows", store.id(), trimmed, e);
+            audit.failPartial(event, trimmed, error);
         }
     }
 

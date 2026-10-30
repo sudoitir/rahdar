@@ -191,6 +191,20 @@ class SlowConsumerConditionTest extends PostgresIntegrationTest {
     }
 
     @Test
+    void aFlatSeriesSampledOnceAMinuteIsAZeroRateNotAbsent() {
+        givenCluster();
+        queue("orders", 2, 5_000, false);
+        // Outside two tier-B intervals (30s) and inside two heartbeats (120s).
+        sample("orders", 100, Instant.now().minusSeconds(100));
+        sample("orders", 100, Instant.now().minusSeconds(40));
+
+        Evaluation result = condition.evaluate(clusterId, rule(1.0, null));
+
+        assertThat(result.universe()).containsExactly("subscription:orders");
+        assertThat(result.active().get("subscription:orders")).isZero();
+    }
+
+    @Test
     void aCounterResetIsClampedAndCannotProduceANegativeRate() {
         givenCluster();
         queue("orders", 2, 5_000, false);

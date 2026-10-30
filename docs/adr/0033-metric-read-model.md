@@ -1,6 +1,6 @@
 # ADR-0033: Metric read model — server-side `date_bin` bucketing, gauge vs. counter
 
-- **Status**: accepted
+- **Status**: accepted. The bucket-floor clause (the floor is the 15-second scrape) is superseded by [ADR-0220](0220-metric-samples-are-stored-at-a-heartbeat.md).
 - **Date**: 2026-09-05
 - **Deciders**: Mahdi Amirabdollahi
 

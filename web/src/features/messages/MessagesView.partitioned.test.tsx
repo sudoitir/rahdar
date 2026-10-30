@@ -37,7 +37,7 @@ vi.mock('@tanstack/react-router', async (importOriginal) => {
   };
 });
 
-const { MessagesView } = await import('./MessagesView.tsx');
+const { MessagesView, isPartitionedLog } = await import('./MessagesView.tsx');
 
 const AVAILABLE = { status: 'AVAILABLE', reason: 'ok', brokerXmlSnippet: null };
 
@@ -111,6 +111,14 @@ const page = (data: object[], log: object | null = null) => ({
   hasNext: false,
   node: 'n1',
   log,
+});
+
+describe('isPartitionedLog', () => {
+  it('knows a Kafka group on a topic is a log before the cluster kinds have loaded', () => {
+    expect(isPartitionedLog('kafka.group-topic', undefined)).toBe(true);
+    expect(isPartitionedLog('artemis.queue', undefined)).toBe(false);
+    expect(isPartitionedLog('kafka.group-topic', [{ id: 'kafka.group-topic', partitioned: false }])).toBe(false);
+  });
 });
 
 describe('MessagesView on a partitioned log', () => {
@@ -199,6 +207,25 @@ describe('MessagesView on a partitioned log', () => {
     renderWithProviders(<MessagesView />);
 
     expect(await screen.findByText(/The group stands at offset 640 on partition 0/)).toBeInTheDocument();
+  });
+
+  it('says the group position is unavailable when the read did not report one', async () => {
+    mockKafka(() =>
+      page([record(0)], {
+        partition: 0,
+        start: 0,
+        end: 900,
+        next: null,
+        retentionMoved: false,
+        uncommittedHidden: true,
+        subscriptionPosition: null,
+      }),
+    );
+    renderWithProviders(<MessagesView />);
+
+    expect(await screen.findByText(/The group's position on this partition is unavailable/)).toBeInTheDocument();
+    expect(screen.queryByText(/undefined/)).toBeNull();
+    expect(screen.queryByText(/stands at offset 0/)).toBeNull();
   });
 
   it("keeps move, retry, delete and expire visible but disabled, with the system's own words", async () => {

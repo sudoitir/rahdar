@@ -21,6 +21,7 @@ import io.github.sudoitir.rahdar.platform.scrape.MetricSamples;
 import io.github.sudoitir.rahdar.platform.scrape.MetricSamples.Bucket;
 import io.github.sudoitir.rahdar.platform.scrape.MetricSamples.NodeBucket;
 import io.github.sudoitir.rahdar.platform.scrape.PluginMetrics;
+import io.github.sudoitir.rahdar.platform.scrape.SampleGate;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -101,7 +102,21 @@ class MetricQueryServiceTest {
                 clusterId, new MetricQuery(List.of("openbroker.backlog"), null, from, to, Duration.ofSeconds(1), null));
 
         assertThat(response.truncated()).isTrue();
-        assertThat(Duration.parse(response.step())).isGreaterThan(Duration.ofSeconds(1));
+        assertThat(Duration.parse(response.step())).isGreaterThanOrEqualTo(SampleGate.HEARTBEAT);
+    }
+
+    @Test
+    void aStepFinerThanTheHeartbeatIsWidenedToIt() {
+        when(repository.gaugeSeries(any(), anyString(), any(), any(), any(), any()))
+                .thenReturn(List.of());
+
+        Instant to = Instant.now();
+        Instant from = to.minus(Duration.ofMinutes(30));
+        MetricSeriesResponse response = service.query(
+                clusterId, new MetricQuery(List.of("openbroker.backlog"), null, from, to, Duration.ofSeconds(1), null));
+
+        assertThat(response.truncated()).isTrue();
+        assertThat(Duration.parse(response.step())).isEqualTo(SampleGate.HEARTBEAT);
     }
 
     @Test

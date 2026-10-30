@@ -20,6 +20,13 @@ const kafka = (rest: string) => `/clusters/:kafka/${rest}`;
 
 const exact = (page: Page, label: string) => page.getByLabel(label, { exact: true });
 const press = (page: Page, name: string) => page.getByRole('button', { name, exact: true }).click();
+
+/** Clicks a control that may sit under the sticky header or below the first screen of a grid. */
+async function clickShown(page: Page, name: string) {
+  const button = page.getByRole('button', { name }).first();
+  await button.scrollIntoViewIfNeeded();
+  await button.click();
+}
 const dialogOf = (page: Page) => page.getByRole('dialog');
 
 /** The seeded subscriptions the browse and purge captures open: a group on a topic is addressed by its whole id. */
@@ -506,11 +513,11 @@ export const KAFKA_ROUTES: RouteSpec[] = [
     data: [{ path: kafka('kafka/topics/orders/config'), empty: { internal: false, entries: [] } }],
     forbidden: true,
     scenes: [
-      { id: 'change-dialog', act: (page) => page.getByRole('button', { name: 'Change retention.ms' }).click() },
+      { id: 'change-dialog', act: (page) => clickShown(page, 'Change retention.ms') },
       {
         id: 'review',
         act: async (page) => {
-          await page.getByRole('button', { name: 'Change retention.ms' }).click();
+          await clickShown(page, 'Change retention.ms');
           await dialogOf(page).getByRole('textbox', { name: 'New value' }).fill('86400000');
           await press(page, 'Keep this change');
           await press(page, 'Review changes');
@@ -520,7 +527,7 @@ export const KAFKA_ROUTES: RouteSpec[] = [
       {
         id: 'review-rejected',
         act: async (page) => {
-          await page.getByRole('button', { name: 'Change retention.ms' }).click();
+          await clickShown(page, 'Change retention.ms');
           await dialogOf(page).getByRole('textbox', { name: 'New value' }).fill('soon');
           await press(page, 'Keep this change');
           await press(page, 'Review changes');
@@ -802,7 +809,7 @@ export const KAFKA_ROUTES: RouteSpec[] = [
       {
         id: 'truncate-dialog',
         act: async (page) => {
-          await page.getByRole('button', { name: 'Actions for orders' }).first().click();
+          await clickShown(page, 'Actions for orders');
           await page.getByRole('menuitem', { name: /Truncate/ }).click();
           await dialogOf(page).waitFor();
         },
@@ -810,7 +817,7 @@ export const KAFKA_ROUTES: RouteSpec[] = [
       {
         id: 'truncate-preview',
         act: async (page) => {
-          await page.getByRole('button', { name: 'Actions for orders' }).first().click();
+          await clickShown(page, 'Actions for orders');
           await page.getByRole('menuitem', { name: /Truncate/ }).click();
           await dialogOf(page)
             .getByRole('textbox', { name: /Delete records before/ })
@@ -839,7 +846,7 @@ export const KAFKA_ROUTES: RouteSpec[] = [
             isDryRun,
           );
           await stubCall(page, 'POST', /:truncate$/, answer.status, answer.json, answer.headers, isRun);
-          await page.getByRole('button', { name: 'Actions for orders' }).first().click();
+          await clickShown(page, 'Actions for orders');
           await page.getByRole('menuitem', { name: /Truncate/ }).click();
           await dialogOf(page)
             .getByRole('textbox', { name: /Delete records before/ })
@@ -852,7 +859,7 @@ export const KAFKA_ROUTES: RouteSpec[] = [
       {
         id: 'truncate-compacted-refused',
         act: async (page) => {
-          await page.getByRole('button', { name: 'Actions for customer-state' }).first().click();
+          await clickShown(page, 'Actions for customer-state');
           await page.getByRole('menuitem', { name: /Truncate/ }).click();
           await dialogOf(page)
             .getByRole('textbox', { name: /Delete records before/ })
@@ -979,6 +986,9 @@ export const KAFKA_ROUTES: RouteSpec[] = [
     area: 'kafka-shared',
     id: 'bulk-run-stub',
     path: kafka('bulk/00000000-0000-4000-8000-00000000b001'),
+    // The page asks for the run before the scene can stub it. Nothing has that run, so the first answer
+    // is 404; the scene then installs the run and loads the page again.
+    expectedStatus: [404],
     scenes: [
       {
         id: 'run-with-rebalancing-failure-stub',

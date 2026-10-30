@@ -2,6 +2,7 @@ package io.github.sudoitir.rahdar.feature.alerting;
 
 import io.github.sudoitir.openbroker.model.MetricKeys;
 import io.github.sudoitir.rahdar.platform.scrape.MetricSamples;
+import io.github.sudoitir.rahdar.platform.scrape.SampleGate;
 import io.github.sudoitir.rahdar.platform.scrape.ScrapeProperties;
 import java.time.Instant;
 import java.util.HashMap;
@@ -15,8 +16,8 @@ import org.springframework.stereotype.Component;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * Reads the current per-queue rate from {@code metric_sample} over a
- * 2×tier-B window (design.md decision 2) — one query per {@code (cluster, metric)}
+ * Reads the current per-queue rate from {@code metric_sample} over two heartbeats, or two
+ * tier-B intervals when the scrape is slower (ADR-0220) — one query per {@code (cluster, metric)}
  * per tick regardless of rule count. Uses {@link MetricSamples}'s
  * restart-safe, never-negative rate derivation; a subject with fewer than two
  * samples in the window is simply absent, not zero.
@@ -44,7 +45,7 @@ public class RateCondition implements AlertCondition {
         }
         AlertScope scope = AlertScope.parse(rule.scope(), mapper);
         Instant to = Instant.now();
-        Instant from = to.minus(properties.tierBInterval().multipliedBy(2));
+        Instant from = to.minus(SampleGate.rateWindow(properties.tierBInterval()));
 
         Map<String, Double> ratesByQueue = series.latestRateBySubject(clusterId, rule.metric(), from, to);
         Set<String> universe = new HashSet<>();

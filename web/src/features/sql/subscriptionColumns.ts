@@ -40,7 +40,7 @@ export function subscriptionColumns({
     {
       id: 'held',
       header: 'Held',
-      accessor: (s) => s.messagesHeld ?? 0,
+      accessor: (s) => (s.messagesHeld == null ? 'Unavailable' : s.messagesHeld),
       cell: (s) => createElement(HeldCell, { subscription: s }),
       kind: 'number',
       priority: 'high',

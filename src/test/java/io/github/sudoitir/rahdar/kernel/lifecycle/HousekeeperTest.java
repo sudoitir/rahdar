@@ -128,4 +128,75 @@ class HousekeeperTest {
         assertThat(fine.backlog).isZero();
         verify(status).recordRun(eq("events"), eq(NOW), anyLong(), isNull());
     }
+
+    /** A store that holds {@code rows} and gives up {@code perBatch} of its oldest on each trim. */
+    private static final class Capped implements ManagedStore {
+        long rows;
+        final int perBatch;
+        final List<Long> excesses = new ArrayList<>();
+
+        Capped(long rows, int perBatch) {
+            this.rows = rows;
+            this.perBatch = perBatch;
+        }
+
+        @Override
+        public StoreDef def() {
+            return new StoreDef(
+                    "capped", "capped", List.of("capped"), StoreDef.QuotaUnit.ROWS, null, Duration.ofDays(1), null);
+        }
+
+        @Override
+        public StoreUsage usage() {
+            return new StoreUsage(rows, 0);
+        }
+
+        @Override
+        public PurgeEstimate preview(Instant cutoff) {
+            return new PurgeEstimate(0, 0);
+        }
+
+        @Override
+        public long purgeBatch(Instant cutoff, int limit) {
+            return 0;
+        }
+
+        @Override
+        public long trimOldest(long excessRows, int limit) {
+            excesses.add(excessRows);
+            long n = Math.min(perBatch, rows);
+            rows -= n;
+            return n;
+        }
+    }
+
+    @Test
+    void aStoreOverItsRowQuotaLosesItsOldestFirstUntilItIsUnderAndIsAudited() {
+        Capped capped = new Capped(12_500, 1_000);
+        RegisteredStore store = new RegisteredStore("capped", RegisteredStore.CORE, capped, null);
+        when(registry.quota("capped")).thenReturn(10);
+        when(audit.begin(any(), eq("TRIM_STORE"), eq("STORE"), eq("capped"), isNull(), isNull(), anyMap(), eq(false)))
+                .thenReturn(event);
+
+        housekeeper.trimToQuota(store);
+
+        assertThat(capped.rows).isLessThanOrEqualTo(10_000);
+        assertThat(capped.rows).isGreaterThan(9_000);
+        assertThat(capped.excesses).startsWith(2_500L);
+        verify(audit).succeed(eq(event), eq(12_500L - capped.rows));
+    }
+
+    @Test
+    void aStoreUnderItsQuotaOrWithNoneIsLeftAlone() {
+        Capped capped = new Capped(5_000, 1_000);
+        RegisteredStore store = new RegisteredStore("capped", RegisteredStore.CORE, capped, null);
+        when(registry.quota("capped")).thenReturn(10);
+        housekeeper.trimToQuota(store);
+        when(registry.quota("capped")).thenReturn(0);
+        capped.rows = 50_000;
+        housekeeper.trimToQuota(store);
+
+        assertThat(capped.excesses).isEmpty();
+        verify(audit, never()).begin(any(), eq("TRIM_STORE"), any(), any(), any(), any(), any(), eq(false));
+    }
 }

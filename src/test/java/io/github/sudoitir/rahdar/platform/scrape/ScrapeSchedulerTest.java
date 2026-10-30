@@ -302,6 +302,47 @@ class ScrapeSchedulerTest {
     }
 
     @Test
+    void aClusterStuckReadingSubscriptionsDoesNotHoldTheClusterBesideIt() {
+        ClusterEntity stuck = cluster("stuck");
+        ClusterEntity fine = cluster("fine");
+        when(systems.idOf(any())).thenReturn("kafka");
+        when(clusters.owned()).thenReturn(List.of(stuck, fine));
+        CountDownLatch release = new CountDownLatch(1);
+        doAnswer(call -> {
+                    release.await();
+                    return List.of();
+                })
+                .when(systemScrape)
+                .subscriptions(stuck.getId());
+        when(systemScrape.subscriptions(fine.getId())).thenReturn(List.of());
+        scheduler.systemScrapeLimit = Duration.ofMillis(300);
+
+        try {
+            long started = System.nanoTime();
+            scheduler.tierB();
+            long tookMillis = (System.nanoTime() - started) / 1_000_000;
+
+            assertThat(tookMillis).isLessThan(5_000);
+            verify(systemScrape, times(1)).subscriptions(fine.getId());
+            verify(metrics).appendQueueSamples(List.of());
+        } finally {
+            release.countDown();
+        }
+    }
+
+    @Test
+    void aTierBTickReadsSubscriptionsOnce() {
+        ClusterEntity cluster = cluster("kafka");
+        when(systems.idOf(cluster.getId())).thenReturn("kafka");
+        when(clusters.owned()).thenReturn(List.of(cluster));
+        when(systemScrape.subscriptions(cluster.getId())).thenReturn(List.of());
+
+        scheduler.tierB();
+
+        verify(systemScrape, times(1)).subscriptions(cluster.getId());
+    }
+
+    @Test
     void tierARefreshesEachManageableNodeOncePerTickWithTheCycleNumber() {
         UUID clusterId = UUID.randomUUID();
         ClusterEntity cluster = cluster("c");
