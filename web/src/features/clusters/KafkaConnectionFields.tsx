@@ -39,15 +39,17 @@ export function KafkaConnectionFields({
         spellCheck={false}
         {...form.getInputProps('bootstrap')}
       />
-      {entries.length > 0 ? (
-        <Pill.Group role="group" aria-label="Servers entered">
-          {entries.map((e) => (
-            <Pill key={e.original} className={classes.mono} data-invalid={e.problem ? '' : undefined}>
-              {e.address ?? `${e.original} (refused)`}
-            </Pill>
-          ))}
-        </Pill.Group>
-      ) : null}
+      <div className={classes.serverPills}>
+        {entries.length > 0 ? (
+          <Pill.Group role="group" aria-label="Servers entered">
+            {entries.map((e) => (
+              <Pill key={e.original} className={classes.mono} data-invalid={e.problem ? '' : undefined}>
+                {e.address ?? `${e.original} (refused)`}
+              </Pill>
+            ))}
+          </Pill.Group>
+        ) : null}
+      </div>
 
       <Select
         label="Security protocol"

@@ -37,7 +37,7 @@ vi.mock('@tanstack/react-router', async (importOriginal) => {
   };
 });
 
-const { MessagesView } = await import('./MessagesView.tsx');
+const { MessagesView, isPartitionedLog } = await import('./MessagesView.tsx');
 
 const AVAILABLE = { status: 'AVAILABLE', reason: 'ok', brokerXmlSnippet: null };
 
@@ -111,6 +111,14 @@ const page = (data: object[], log: object | null = null) => ({
   hasNext: false,
   node: 'n1',
   log,
+});
+
+describe('isPartitionedLog', () => {
+  it('knows a Kafka group on a topic is a log before the cluster kinds have loaded', () => {
+    expect(isPartitionedLog('kafka.group-topic', undefined)).toBe(true);
+    expect(isPartitionedLog('artemis.queue', undefined)).toBe(false);
+    expect(isPartitionedLog('kafka.group-topic', [{ id: 'kafka.group-topic', partitioned: false }])).toBe(false);
+  });
 });
 
 describe('MessagesView on a partitioned log', () => {

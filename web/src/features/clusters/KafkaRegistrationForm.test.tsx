@@ -75,6 +75,12 @@ async function fillAndCheck(user: ReturnType<typeof userEvent.setup>, servers = 
 }
 
 describe('KafkaRegistrationForm', () => {
+  it('keeps the row where parsed servers appear before any are typed', () => {
+    const { container } = renderWithProviders(<KafkaRegistrationForm />);
+    expect(container.querySelector('[class*="serverPills"]')).not.toBeNull();
+    expect(screen.queryByRole('group', { name: 'Servers entered' })).not.toBeInTheDocument();
+  });
+
   it('shows every server typed in one field as its own entry, the port defaulted', async () => {
     const user = userEvent.setup();
     renderWithProviders(<KafkaRegistrationForm />);
