@@ -149,6 +149,80 @@ Postgres stayed under 560 MB resident (512 MB of it `shared_buffers`) and peaked
 The first resources to run out are CPU (sign-in bursts) and then the cluster-wide reads' latency, not memory
 or database size.
 
+## Kafka at scale
+
+Measured 2026-10-30, on a different machine from the Artemis runs above. The Mac has 8 CPU and 16 GB of memory
+(macOS 26.6.2). Docker Desktop gives the containers 6 CPU and 12 GB. The stack is one Rahdar replica, one
+Postgres, one Kafka broker and one Artemis pair. Rahdar is `2026.10.65` at `506a77d0` (eight commits after that tag).
+
+**Profile.** Kafka cluster `events`: 208 topics, 3,079 partitions, 311 consumer groups in the list, and 350
+group-on-topic series. Traffic was 3,600,000 records of 100 bytes at 1,000 records a second on one topic
+(`perf-t-0001`), from 2026-10-29 22:26 UTC to 23:26 UTC. The quiet hour is 2026-10-30 02:00–03:00 UTC, after
+that producer had finished. The Artemis pair is the same stack's other cluster and is not part of the Kafka figures.
+
+### Lists and detail
+
+Thirty calls after a short warm-up, ten for the calls that read the broker live. A 95th percentile under 500 ms,
+and a list asked for far more than its maximum returns at most 500 rows and at most 1 MiB.
+
+| Call | p95 | max | bytes |
+| --- | ---: | ---: | ---: |
+| Estate subscriptions | 37 ms | 55 ms | 91,134 |
+| Cluster subscriptions | 36 ms | 41 ms | 108,053 |
+| Groups, first page of 100 | 143 ms | 147 ms | 29,542 |
+| Groups, page of 500 | 147 ms | 148 ms | 92,031 |
+| Groups, a later page | 142 ms | 167 ms | 29,467 |
+| A group on 40 topics | 455 ms | 455 ms | 40,473 |
+| Offset-reset preview, 50 partitions | 486 ms | 486 ms | 5,476 |
+| Topic configuration | 29 ms | 29 ms | 5,236 |
+| ACLs | 41 ms | 112 ms | 74,967 |
+| Transactions | 32 ms | 78 ms | 1,236 |
+| Brokers | 405 ms | 536 ms | 269 |
+| Browse one partition, 50 records | 383 ms | 507 ms | 23,593 |
+| Backlog breakdown | 139 ms | 139 ms | 1,155 |
+
+Asked for 100,000 rows: the group list returned 311 (the whole list), the ACL list returned 500, and transactions
+returned 4. Every body above is under 1 MiB.
+
+### The scrape
+
+Over 120 seconds: 23 tier-A cycles and 8 tier-B cycles. One pass covers every cluster this replica owns.
+
+| | Measured | Budget |
+| --- | ---: | ---: |
+| Node reads per tier-A cycle | 1.00 | 1 |
+| Partition reads per tier-A cycle | 0.17 | 1 |
+| Subscription sweeps per tier-B cycle | 1.00 | 1 |
+| Longest tier-A pass | 0.231957 s | 5 s |
+| Longest tier-B pass | 0.592722 s | 15 s |
+
+Partitions are one batched read at most every 30 seconds (the count of partitions with no leader), so a
+5-second tier-A cycle sees that read about once every six cycles, never once per partition. A window taken in
+the minute after this replica restarted swept subscriptions 1.14 times per tier-B cycle, because a replica
+scrapes a cluster as soon as it takes ownership. The steady window above is one sweep.
+
+### Storage
+
+Six metrics on each of the 350 group-on-topic series: `openbroker.acknowledged`, `backlog`, `consumer.count`,
+`enqueued`, `expired` and `in_flight`. One row per metric per series per minute.
+
+| Hour | `metric_sample` rows on the Kafka cluster | Series |
+| --- | ---: | ---: |
+| Traffic (22:26–23:26 UTC) | 123,510 | 350 |
+| Quiet, after the producer stopped (02:00–03:00 UTC) | 123,900 | 350 |
+
+123,900 is 59 samples of each series. A clock hour holds 59 or 60 heartbeats, so nothing was stored faster than
+the heartbeat, and the hour of traffic stored fewer rows, not more. The ceiling is 350 × 6 × 60 = 126,000 rows
+an hour. The Artemis cluster in the same stack wrote 21,240 rows in the quiet hour (60 queues); those are not
+in the Kafka count. `broker_event` gained nothing during the traffic hour. The table holds 114 rows, all of
+them on the Artemis cluster and all written before that hour. The quota is 20,000,000 rows.
+
+### One subscriptions tick
+
+Past 100 names the stream sends a signal about the cluster, and the client refetches. The budget is 8,192
+bytes. The steady 25-second read's longest frame was 18 bytes. The longest frame observed on this build, in
+the window just after the replica took the cluster, was 549 bytes.
+
 ## Rerun it
 
 ```bash

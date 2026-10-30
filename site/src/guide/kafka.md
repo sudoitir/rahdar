@@ -72,10 +72,13 @@ holding when it removes access, and needs `access-rule:write`; reading needs `ac
 ## Transactions
 
 **Activity → Transactions** lists the transactional producers with their state, timeout and the partitions a
-transaction holds back. A **hanging** transaction (past its timeout, or its producer is gone) stops consumers
-that read only committed records from reading past it, and is flagged at the top. **Abort…** previews what the
-abort does, names the partitions it unblocks and that the producer is fenced, and is confirmed by holding. It
-needs `transaction:abort`.
+transaction holds back. One that is past its timeout is flagged at the top: the coordinator aborts it by
+itself, and until it does it blocks those partitions. **Abort…** previews what the abort does, names the
+partitions it unblocks and that the producer is fenced, and is confirmed by holding. It needs `transaction:abort`.
+
+Below that list, **Hanging transactions** looks only when you ask, and only for an open transaction the
+coordinator does not know. No timeout ends that one, so it holds back every consumer that reads committed
+records. The page header says which of the two a sentence is about.
 
 ## Brokers and the quorum
 
@@ -127,3 +130,22 @@ and the API refuses them with the same reason. The same holds for any action the
 | `transaction:abort` | Abort a transaction. |
 
 See [Teams and permissions](/guide/teams-and-permissions) for how roles carry them.
+
+## How large a cluster this covers
+
+Measured on 2026-10-30 with Rahdar `2026.10.65` (`506a77d0`), one Kafka broker, 208 topics, 3,079 partitions
+and 311 consumer groups (350 group-on-topic series). The machine, the method and every raw figure are in the
+sizing guide.
+
+At that size the Kafka lists, a group on 40 topics, an offset-reset preview, a topic's configuration, the ACL
+list, transactions, brokers, a browse of 50 records and a backlog breakdown all answer within half a second
+at the 95th percentile. A list asked for more rows than it will return stops at 500, and the body stays under
+1 MiB. The scrape reads each cluster's nodes once a cycle and its subscriptions once a cycle, and reads
+partitions as one batch at most every 30 seconds. A pass finishes inside its interval.
+
+Metric history for a group on a topic is one sample a minute for each of six series, whether or not records
+are being produced. An hour at 1,000 records a second stored 123,510 of those rows; a quiet hour stored
+123,900. Both are under the ceiling of one row per metric per series per minute (126,000). The broker-event
+store gained no Kafka rows in that hour. The live update for the subscription list is a signal about the
+cluster once the names would pass 100. The steady read's longest frame was 18 bytes, and the longest frame
+observed on this build was 549 bytes, both under the 8,192 byte budget.
