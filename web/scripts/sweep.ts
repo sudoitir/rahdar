@@ -337,7 +337,9 @@ async function capture(context: BrowserContext, job: Job, clusterId: string): Pr
     // The answers the sweep gave, and the 403s a read-only account is meant to get, are not findings.
     const expected = (r: { url: string; status?: number }) =>
       answered.has(r.url) ||
-      (state === 'forbidden' && r.status === 403) ||
+      // A Kafka resource the reader may not read is not found (404), which is the denial. A 403 is the
+      // denial of a change to something they can read. Neither is a broken page.
+      (state === 'forbidden' && (r.status === 403 || r.status === 404)) ||
       (r.status !== undefined &&
         [...(route.expectedStatus ?? []), ...(scene?.expectedStatus ?? [])].includes(r.status));
     result.failedRequests = failed.filter((r) => !expected(r));
