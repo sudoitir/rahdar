@@ -27,9 +27,15 @@ RUN mvn -q -B clean package -DskipTests
 FROM eclipse-temurin:25-jre-resolute@sha256:41d9263c0d5b2a74d89af6e29e73b04298bc65e3cb705d03e9e2271ef49fef84 AS runtime
 # The distribution's security updates are applied at build time: a fix often reaches the Ubuntu
 # archive days before a new base image does, and the image scan fails on a fixable high finding.
+# The base image's release pocket does not carry those fixes (libbrotli1 CVE-2026-111497 is in
+# resolute-security), so the updates and security pockets are enabled before the upgrade.
 # Ubuntu's base also ships Pebble, a service manager outside any package, so no upgrade patches it;
 # Rahdar never runs it, so it is removed with its Go runtime and that runtime's vulnerabilities.
 RUN groupadd -r rahdar && useradd -r -g rahdar rahdar \
+    && printf '%s\n' \
+        'deb http://archive.ubuntu.com/ubuntu resolute-updates main universe' \
+        'deb http://security.ubuntu.com/ubuntu resolute-security main universe' \
+        > /etc/apt/sources.list.d/rahdar-security.list \
     && apt-get update && apt-get upgrade -y --no-install-recommends \
     && apt-get install -y --no-install-recommends curl \
     && rm -rf /var/lib/apt/lists/* \
