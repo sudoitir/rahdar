@@ -449,7 +449,9 @@ const purgeGroup: Flow = {
     await rowMenu(t, 'reporting', /^Actions for /);
     await t.page.getByRole('menuitem', { name: /Purge messages/ }).click();
     await dialog(t).waitFor();
-    await dialog(t).getByText(/No record is deleted/).waitFor({ timeout: 30_000 });
+    await dialog(t)
+      .getByText(/No record is deleted/)
+      .waitFor({ timeout: 30_000 });
     const text = (await dialog(t).innerText()).replace(/\s+/g, ' ');
     t.note(`purge dialog: ${text.slice(0, 500)}`);
     // The purge moves the group to the last stable offset: records of the open transaction above it stay to read.
@@ -550,7 +552,10 @@ const bulkPurge: Flow = {
     await t.page.getByRole('checkbox', { name: 'Select all on this page' }).check();
     await press(t, 'Purge…');
     await dialog(t).waitFor();
-    await dialog(t).getByText(/No record is deleted|refused/).first().waitFor({ timeout: 30_000 });
+    await dialog(t)
+      .getByText(/No record is deleted|refused/)
+      .first()
+      .waitFor({ timeout: 30_000 });
     const text = (await dialog(t).innerText()).replace(/\s+/g, ' ');
     t.note(`bulk dialog: ${text.slice(0, 900)}`);
     t.check(
