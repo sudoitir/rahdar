@@ -591,9 +591,13 @@ class KafkaRegistrar implements ClusterRegistrar {
     // ---- failures -----------------------------------------------------------------------------------------------
 
     private ConnectionCheck failed(BrokerException e, List<String> bootstrap) {
-        String detail = e == null ? "" : Objects.toString(e.getMessage(), "");
+        String detail = Objects.toString(e.getMessage(), "");
         String reached = causeOf(e);
-        boolean advertised = (reached.equals(TIMEOUT) || reached.equals(REFUSED)) && anyAccepts(bootstrap);
+        // The hint is for a failure on an address the cluster only named, never on one it was handed: when the
+        // brokers advertise the bootstrap addresses themselves, nothing was advertised that Rahdar could not reach.
+        boolean advertised = (reached.equals(TIMEOUT) || reached.equals(REFUSED))
+                && anyAccepts(bootstrap)
+                && namedByTheCluster(e, bootstrap);
         // The bootstrap server answered and the brokers it named did not: a cause of its own, not a timeout.
         String cause = advertised ? ADVERTISED_UNREACHABLE : reached;
         String next = advertised
@@ -621,12 +625,24 @@ class KafkaRegistrar implements ClusterRegistrar {
             case "DNS" -> "Check the bootstrap server's host name resolves from Rahdar.";
             case REFUSED -> "Check the host and port, that the broker listens there and that no firewall blocks it.";
             case TIMEOUT ->
-                "Check the host and port are reachable from Rahdar and that a firewall is not dropping the traffic.";
+                "Check the host and port are reachable from Rahdar and that a firewall is not dropping the traffic."
+                        + " When the address answers a TCP connection but the check still times out, the broker's name"
+                        + " lookup or SASL login is outlasting the connection setup: a reverse DNS with no zone behind it"
+                        + " and a stopped policy server both do this.";
             case "TLS" -> "Check the TLS bundle trusts the broker's certificate and that the host name matches it.";
             case "AUTHENTICATION" -> "Check the user name, password or token and the SASL mechanism.";
             case AUTHORIZATION -> "Grant the account permission to describe the cluster.";
             default -> "Register a cluster that runs a supported version.";
         };
+    }
+
+    /**
+     * Whether the address the failure names was one the cluster reported rather than one the check was given. A
+     * failure on a bootstrap server is about that server, whatever it might have advertised.
+     */
+    private static boolean namedByTheCluster(BrokerException e, List<String> bootstrap) {
+        String endpoint = e.info().metadata().get(ENDPOINT);
+        return endpoint == null || !bootstrap.contains(endpoint);
     }
 
     private static String failureMessage(boolean advertised, String cause, String detail) {
