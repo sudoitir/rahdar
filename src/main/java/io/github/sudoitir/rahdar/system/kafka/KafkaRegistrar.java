@@ -591,7 +591,7 @@ class KafkaRegistrar implements ClusterRegistrar {
     // ---- failures -----------------------------------------------------------------------------------------------
 
     private ConnectionCheck failed(BrokerException e, List<String> bootstrap) {
-        String detail = e == null ? "" : Objects.toString(e.getMessage(), "");
+        String detail = Objects.toString(e.getMessage(), "");
         String reached = causeOf(e);
         // The hint is for a failure on an address the cluster only named, never on one it was handed: when the
         // brokers advertise the bootstrap addresses themselves, nothing was advertised that Rahdar could not reach.
@@ -641,7 +641,7 @@ class KafkaRegistrar implements ClusterRegistrar {
      * failure on a bootstrap server is about that server, whatever it might have advertised.
      */
     private static boolean namedByTheCluster(BrokerException e, List<String> bootstrap) {
-        String endpoint = e == null ? null : e.info().metadata().get(ENDPOINT);
+        String endpoint = e.info().metadata().get(ENDPOINT);
         return endpoint == null || !bootstrap.contains(endpoint);
     }
 

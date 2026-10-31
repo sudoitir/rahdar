@@ -55,7 +55,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 
         <!-- The broker SDK and its Artemis driver (ADR-0203). Never a SNAPSHOT on main: CI refuses one. -->
-        <openbroker.version>0.7.0</openbroker.version>
+        <openbroker.version>0.7.1</openbroker.version>
         <testcontainers.version>2.0.5</testcontainers.version>
         <spotless.version>3.10.4</spotless.version>
         <!-- Publishing the plugin API (ADR-0102); verified against Maven Central 2026-09-23. -->
@@ -565,6 +565,15 @@
                 <groupId>org.jacoco</groupId>
                 <artifactId>jacoco-maven-plugin</artifactId>
                 <version>0.8.15</version>
+                <configuration>
+                    <!-- A fixed session id keeps the agent from calling InetAddress.getLocalHost().getHostName()
+                         in premain, which is where it otherwise takes its default id. That call runs before the
+                         agent has installed its transformer, and on the way it loads every InetAddressResolverProvider
+                         through the service loader: NumericReverseDns was therefore loaded uninstrumented and its
+                         tests counted as no coverage at all. A session id is a label in the exec file; fixing it
+                         costs nothing and makes coverage of that provider measurable. -->
+                    <sessionId>rahdar</sessionId>
+                </configuration>
                 <executions>
                     <execution>
                         <id>agent</id>

@@ -1,6 +1,7 @@
 package io.github.sudoitir.rahdar.kernel.core.internal;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.net.InetAddress;
 import java.net.spi.InetAddressResolverProvider;
@@ -31,6 +32,13 @@ class NumericReverseDnsTest {
         addr[15] = 1;
 
         assertThat(NumericReverseDns.literal(addr)).isEqualTo("0:0:0:0:0:0:0:1");
+    }
+
+    @Test
+    void anArrayThatIsNotAnAddressIsRefused() {
+        // A resolver is handed four or sixteen bytes; anything else is a programming error, not a name.
+        assertThatThrownBy(() -> NumericReverseDns.literal(new byte[] {1, 2, 3}))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
