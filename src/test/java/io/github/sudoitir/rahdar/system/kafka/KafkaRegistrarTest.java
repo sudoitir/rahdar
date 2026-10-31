@@ -156,6 +156,17 @@ class KafkaRegistrarTest {
                 cause);
     }
 
+    /** A failure the driver attributed to {@code endpoint}, as {@code Reach} does for a broker it could not reach. */
+    private static BrokerException refused(String reason, String endpoint, Throwable cause) {
+        return new BrokerException(
+                Status.UNAVAILABLE,
+                new ErrorInfo(reason, ErrorReasons.DOMAIN, Map.of("kafka.endpoint", endpoint)),
+                Dispatch.NOT_SENT,
+                null,
+                "broker said no",
+                cause);
+    }
+
     @Test
     void aPartlyReachedClusterNamesTheNodeItCouldNotReach() {
         NodeDescription one = broker("1", "k1:9092", true, true);
@@ -307,9 +318,27 @@ class KafkaRegistrarTest {
         assertThat(checked.view().supported()).isEqualTo(!cause.equals("UNSUPPORTED_VERSION"));
     }
 
+    /**
+     * The hint is for a failure on an address the cluster named. Here the brokers advertise the bootstrap
+     * addresses themselves, so the timeout is in reaching them, not in what they advertise.
+     */
     @Test
-    void aTimeoutAfterTheBootstrapServerAcceptedSaysTheBrokersAdvertiseAnUnreachableAddress() {
-        doThrow(refused(ErrorReasons.UNREACHABLE, new java.net.SocketTimeoutException("timed out")))
+    void aTimeoutOnTheBootstrapAddressIsNotBlamedOnAdvertisedListeners() {
+        doThrow(refused(ErrorReasons.UNREACHABLE, "k1:9092", new java.net.SocketTimeoutException("timed out")))
+                .when(gateway)
+                .verify(any(), any(), any(), any());
+        accepts = true;
+
+        var failure = registrar.check(plaintext("k1")).view().failure();
+
+        assertThat(failure.cause()).isEqualTo("TIMEOUT");
+        assertThat(failure.message()).doesNotContain("advertise");
+        assertThat(failure.next()).doesNotContain("advertised.listeners");
+    }
+
+    @Test
+    void aTimeoutOnAnAddressTheClusterNamedSaysTheBrokersAdvertiseAnUnreachableAddress() {
+        doThrow(refused(ErrorReasons.UNREACHABLE, "elsewhere:9092", new java.net.SocketTimeoutException("timed out")))
                 .when(gateway)
                 .verify(any(), any(), any(), any());
         accepts = true;
@@ -319,6 +348,20 @@ class KafkaRegistrarTest {
         assertThat(failure.cause()).isEqualTo("ADVERTISED_UNREACHABLE");
         assertThat(failure.message()).startsWith("Brokers advertise addresses Rahdar cannot reach.");
         assertThat(failure.next()).contains("bootstrap server answered").contains("advertised.listeners");
+    }
+
+    /** A broker whose SASL login fails is never described as one that advertises an unreachable address. */
+    @Test
+    void aRejectedLoginIsNotAnAdvertisedAddress() {
+        doThrow(refused(ErrorReasons.CREDENTIALS_REJECTED, "k1:9092", null))
+                .when(gateway)
+                .verify(any(), any(), any(), any());
+        accepts = true;
+
+        var failure = registrar.check(plaintext("k1")).view().failure();
+
+        assertThat(failure.cause()).isEqualTo("AUTHENTICATION");
+        assertThat(failure.next()).contains("user name").doesNotContain("advertised.listeners");
     }
 
     @Test
