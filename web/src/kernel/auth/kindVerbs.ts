@@ -4,6 +4,7 @@ import { useClusterKinds } from '../shell/useClusterSystem.ts';
 /** What each verb a kind can lack says, about a subject such as "Artemis addresses". */
 const REFUSALS: Record<string, (subject: string) => string> = {
   create: (s) => `${s} cannot be created`,
+  browse: (s) => `${s} cannot be browsed`,
   update: (s) => `${s} cannot be edited`,
   delete: (s) => `${s} cannot be deleted`,
   pause: (s) => `${s} cannot be paused`,

@@ -306,6 +306,27 @@ describe('PurgeSubscription', () => {
     );
   });
 
+  it('says a recreated resource is not told apart only when the preview rests on the configuration', async () => {
+    signedInWith(['*']);
+    let basis = 'INCARNATION';
+    server.use(
+      http.post('*/api/v1/clusters/c1/resources/artemis.queue/ORDERS:purge', () =>
+        HttpResponse.json({ affectedCount: 4, cap: 10, overCap: false, node: 'n1', identityBasis: basis }),
+      ),
+    );
+    const user = userEvent.setup();
+    const { unmount } = renderWithProviders(withToasts(<PurgeSubscription clusterId="c1" subscriptionName="ORDERS" />));
+    await user.click(await screen.findByRole('button', { name: 'Purge subscription' }));
+    await screen.findByRole('dialog', { name: 'Purge subscription ORDERS' });
+    expect(screen.queryByText('A recreated resource is not told apart')).not.toBeInTheDocument();
+    unmount();
+
+    basis = 'CONFIGURATION';
+    renderWithProviders(withToasts(<PurgeSubscription clusterId="c1" subscriptionName="ORDERS" />));
+    await user.click(await screen.findByRole('button', { name: 'Purge subscription' }));
+    expect(await screen.findByText('A recreated resource is not told apart')).toBeInTheDocument();
+  });
+
   it('keeps the dialog open and states the cause when the purge itself fails', async () => {
     signedInWith(['*']);
     server.use(
@@ -474,5 +495,37 @@ describe('SendMessage', () => {
     expect(alert).toHaveTextContent('Could not send a message to subscription "ORDERS"');
     expect(alert).toHaveTextContent('The destination is full. Check the audit log for what ran, then try again.');
     expect(screen.getByLabelText(/^Content/)).toHaveValue('hello');
+  });
+
+  it('names the exchange and routing key inline when no queue was bound for them, and keeps the dialog open', async () => {
+    const bodies: { routingKey?: string }[] = [];
+    server.use(
+      http.post('*/api/v1/clusters/c1/resources/artemis.queue/orders/messages', async ({ request }) => {
+        bodies.push((await request.json()) as { routingKey?: string });
+        return HttpResponse.json(
+          { type: 'https://rahdar.dev/problems/not-routed', title: 'Not routed', detail: 'No queue received it.' },
+          { status: 409 },
+        );
+      }),
+    );
+    const user = userEvent.setup();
+    renderWithProviders(
+      withToasts(<SendMessage clusterId="c1" subscriptionName="orders" routing opened onClose={vi.fn()} />),
+    );
+
+    await user.type(screen.getByLabelText(/^Content/), 'hello');
+    await user.type(screen.getByLabelText('Routing key'), ' invoices.eu ');
+    await user.click(screen.getByRole('button', { name: 'Send' }));
+
+    expect(await screen.findByText('No queue received the message')).toBeInTheDocument();
+    expect(screen.getByText(/orders has no binding that matches routing key "invoices.eu"/)).toBeInTheDocument();
+    expect(bodies[0].routingKey).toBe('invoices.eu');
+    expect(screen.queryByText(/Could not send/)).not.toBeInTheDocument();
+  });
+
+  it('offers no routing key unless the target routes', () => {
+    open();
+
+    expect(screen.queryByLabelText('Routing key')).not.toBeInTheDocument();
   });
 });

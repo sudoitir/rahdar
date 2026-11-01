@@ -6,7 +6,9 @@ import { IconPlus, IconTrash } from '@tabler/icons-react';
 import { FieldRow } from '../../ui/FieldRow.tsx';
 import { focusFirstInvalid } from '../../ui/formErrors.ts';
 import { notify } from '../../ui/notify.ts';
+import { Notice } from '../../ui/Notice.tsx';
 import { KindField } from '../../ui/KindField.tsx';
+import { ApiError } from '../../kernel/api/request.ts';
 import { useSendMessage, type SendMessageRequest } from './api.ts';
 import { announceFailure, VERBS } from './outcomes.ts';
 
@@ -20,6 +22,7 @@ interface FormState {
   durable: boolean;
   body: string;
   props: Pair[];
+  routingKey: string;
 }
 
 const KINDS: { value: MessageKind; label: string }[] = [
@@ -44,6 +47,10 @@ function check({ kind, body, props }: FormState): Record<string, string> {
   return errors;
 }
 
+/** The system refused the message because no queue was bound for its routing key (a 409 `not-routed`). */
+const isNotRouted = (error: Error | null): boolean =>
+  error instanceof ApiError && error.status === 409 && error.type.endsWith('/not-routed');
+
 /** Enqueue one message, as text or as bytes given in base64. */
 export function SendMessage({
   clusterId,
@@ -51,24 +58,37 @@ export function SendMessage({
   node,
   opened,
   onClose,
+  routing = false,
 }: Readonly<{
   clusterId: string;
   subscriptionName: string;
   node?: string;
+  /** The target is an exchange: offer an optional routing key, and name it when nothing is bound for it. */
+  routing?: boolean;
   opened: boolean;
   onClose: () => void;
 }>) {
   const send = useSendMessage(clusterId, subscriptionName);
   const form = useForm<FormState>({
-    initialValues: { kind: 'TEXT', durable: true, body: '', props: [] },
+    initialValues: { kind: 'TEXT', durable: true, body: '', props: [], routingKey: '' },
     validateInputOnBlur: true,
     validate: check,
   });
 
-  const submit = form.onSubmit(({ kind, durable, body, props }) => {
+  const submit = form.onSubmit(({ kind, durable, body, props, routingKey }) => {
     const properties = Object.fromEntries(props.map((p) => [p.k.trim(), p.v]));
     send.mutate(
-      { body: { kind, durable, body, headers: {}, properties }, node },
+      {
+        body: {
+          kind,
+          durable,
+          body,
+          headers: {},
+          properties,
+          ...(routing && routingKey.trim() ? { routingKey: routingKey.trim() } : {}),
+        },
+        node,
+      },
       {
         onSuccess: (result) => {
           const subject = `a message to subscription "${subscriptionName}"`;
@@ -83,7 +103,11 @@ export function SendMessage({
           form.setFieldValue('props', []);
           form.clearErrors();
         },
-        onError: (e) => announceFailure('send', `a message to subscription "${subscriptionName}"`, e),
+        onError: (e) => {
+          // Not routed stays in the dialog, beside the routing key it names, so the key can be corrected.
+          if (isNotRouted(e)) return;
+          announceFailure('send', `a message to subscription "${subscriptionName}"`, e);
+        },
       },
     );
   }, focusFirstInvalid(form.getInputNode));
@@ -120,6 +144,18 @@ export function SendMessage({
             autosize
             minRows={4}
           />
+          {routing ? (
+            <TextInput
+              label="Routing key"
+              description="Optional. Which bindings of the exchange match decides which queues receive the message."
+              {...form.getInputProps('routingKey')}
+            />
+          ) : null}
+          {isNotRouted(send.error) ? (
+            <Notice tone="danger" title="No queue received the message">
+              {`${subscriptionName} has no binding that matches routing key "${form.values.routingKey.trim()}". Nothing was stored.`}
+            </Notice>
+          ) : null}
           <Fieldset legend="Properties">
             <Stack gap="xs">
               {form.values.props.length === 0 ? (

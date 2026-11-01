@@ -17,6 +17,7 @@ const node = (status: NodeOutcomeView['status']): NodeOutcomeView => ({
 const outcome = (over: Partial<LifecycleOutcomeView>): LifecycleOutcomeView => ({
   dryRun: false,
   cap: 1000,
+  identityBasis: 'INCARNATION',
   overCap: false,
   partial: false,
   totalAffected: 0,

@@ -263,6 +263,32 @@ describe('the destructive flow is keyboard-complete', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
   });
 
+  it('says a recreated resource is not told apart when the preview rests on the configuration', async () => {
+    server.use(
+      meHandler(),
+      clusterHandler(AVAILABLE),
+      http.delete('*/api/v1/clusters/c1/resources/artemis.queue/orders', () =>
+        HttpResponse.json({
+          dryRun: true,
+          cap: 1000,
+          overCap: false,
+          partial: false,
+          totalAffected: 12,
+          identityBasis: 'CONFIGURATION',
+          nodes: [{ nodeId: 'n1', nodeName: 'node-a', status: 'WOULD_APPLY', affected: 12, error: null }],
+        }),
+      ),
+    );
+    const user = userEvent.setup();
+    renderWithProviders(<Harness />);
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Delete subscription' })).toBeEnabled());
+    await user.click(screen.getByRole('button', { name: 'Delete subscription' }));
+
+    const dialog = await screen.findByRole('dialog');
+    expect(await within(dialog).findByText('A recreated resource is not told apart')).toBeInTheDocument();
+  });
+
   it('names the consumers and dependent diverts, and disconnects only when asked, by keyboard alone', async () => {
     const urls: string[] = [];
     server.use(
