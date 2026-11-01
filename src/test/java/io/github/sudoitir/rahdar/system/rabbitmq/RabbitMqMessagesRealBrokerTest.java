@@ -18,7 +18,6 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -108,11 +107,6 @@ class RabbitMqMessagesRealBrokerTest extends PostgresIntegrationTest {
                 .getResponse();
     }
 
-    // OpenBroker 0.9.0-SNAPSHOT: reading the stream with ResourceQuery.of(rabbitmq.stream).where(vhost).named(name)
-    // .project({rabbitmq.committed_offset, openbroker.backlog}) answers the stream with no attributes at all (the
-    // driver lists with disable_stats=true), so RabbitMqLogBounds sees a stream of nothing: end 0, an empty page.
-    // Without .project(...) this test passes. Enable it when the driver answers the projection.
-    @Disabled("The driver answers a projected stream read with no attributes; see the comment above")
     @Test
     void aStreamIsBrowsedAsOnePartitionWithTheBoundsOfItsLog() throws Exception {
         MockHttpServletResponse response = browse(STREAM, stream, "?from=earliest&size=10");
