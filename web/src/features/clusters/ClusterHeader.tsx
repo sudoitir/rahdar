@@ -19,15 +19,20 @@ function capabilityGaps(caps: CapabilitiesView | undefined): string[] {
   );
 }
 
-/** The line's summary: how many nodes, whether they replicate, and whether they were reached. */
-function clusterMeta({ topology, health }: ClusterDetail): string {
+/**
+ * The line's summary: how many nodes, whether they replicate, and whether they were reached. Replication in live and
+ * backup pairs is Artemis's: a Kafka cluster replicates per partition, so its line does not call it standalone.
+ */
+function clusterMeta({ topology, health, system }: ClusterDetail): string {
   const nodeCount = topology.nodes.reduce((n, node) => n + node.endpoints.length, 0);
   const hasPair = topology.nodes.some((n) => n.endpoints.length > 1);
   return [
     `${nodeCount} node${nodeCount === 1 ? '' : 's'}`,
-    hasPair ? 'replication' : 'standalone',
+    system?.id === 'artemis' ? (hasPair ? 'replication' : 'standalone') : null,
     health.level === 'UNKNOWN' ? 'not yet contacted' : 'reachable',
-  ].join(' · ');
+  ]
+    .filter((part) => part !== null)
+    .join(' · ');
 }
 
 /**

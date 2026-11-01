@@ -6,6 +6,7 @@ import { renderWithProviders } from '../../test/render.tsx';
 import { holding } from '../../test/access.ts';
 import { server } from '../../test/setup.ts';
 import { paged } from '../../kernel/api/paging.ts';
+import { ARTEMIS_SYSTEM, KAFKA_SYSTEM } from '../../test/wire.ts';
 
 // A plain anchor: the router is not under test.
 vi.mock('@tanstack/react-router', async (importOriginal) => ({
@@ -27,6 +28,7 @@ function mockCluster(over: object = {}) {
       HttpResponse.json({
         id: 'c1',
         name: 'prod-eu',
+        system: ARTEMIS_SYSTEM,
         environmentId: 'e1',
         topology: { nodes: [{ endpoints: [{}, {}] }] },
         health: { level: 'OK', splitBrain: 'NONE', notes: [], credentialRejections: [] },
@@ -54,6 +56,18 @@ describe('ClusterHeader', () => {
     expect(strip).toHaveTextContent('2 nodes · replication · reachable');
     // Each view's page header is the page's one h1.
     expect(screen.queryAllByRole('heading')).toHaveLength(0);
+  });
+
+  it('does not call a Kafka cluster standalone: it replicates per partition, not in live and backup pairs', async () => {
+    mockCluster({
+      system: KAFKA_SYSTEM,
+      topology: { nodes: [{ endpoints: [{}] }, { endpoints: [{}] }, { endpoints: [{}] }] },
+    });
+    renderWithProviders(<ClusterHeader clusterId="c1" />);
+
+    const strip = await screen.findByRole('group', { name: 'Cluster prod-eu' });
+    await waitFor(() => expect(strip).toHaveTextContent('3 nodes · reachable'));
+    expect(strip).not.toHaveTextContent('standalone');
   });
 
   it('leaves the environment out for a cluster that has none', async () => {
