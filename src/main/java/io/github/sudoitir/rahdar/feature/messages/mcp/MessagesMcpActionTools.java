@@ -185,7 +185,7 @@ public class MessagesMcpActionTools {
             case Attempt.Failed<Outcome>(var kind, var detail) -> throw new BrokerConnectionException(kind, detail);
             case Attempt.Ok<Outcome>(var value) ->
                 switch (value) {
-                    case Outcome.DryRun(var count, var cap, var overCap, var node) ->
+                    case Outcome.DryRun(var count, var cap, var overCap, var node, var _) ->
                         new McpViews.MutationOutcome(
                                 action,
                                 subject,

@@ -240,7 +240,15 @@ public final class MessageViews {
                     requiredMode = REQUIRED,
                     description = "Records a purge of a log would pass over without deleting them; 0 otherwise."
                             + " The cap counts destroyed messages only, so it never applies to these.")
-            long skippedCount) {}
+            long skippedCount,
+
+            @Schema(
+                    requiredMode = REQUIRED,
+                    description = "What the preview's etag holds: INCARNATION, so a resource deleted and created"
+                            + " again since is refused; CONFIGURATION, so one created again with the same"
+                            + " configuration is not told apart.",
+                    allowableValues = {"INCARNATION", "CONFIGURATION"})
+            String identityBasis) {}
 
     // ---- dead letters (Slice 9) -----------------------------------------
 

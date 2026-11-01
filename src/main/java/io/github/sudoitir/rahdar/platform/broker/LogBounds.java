@@ -1,6 +1,8 @@
 package io.github.sudoitir.rahdar.platform.broker;
 
+import io.github.sudoitir.openbroker.model.KindId;
 import io.github.sudoitir.openbroker.model.ResourceId;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -14,4 +16,12 @@ public interface LogBounds extends SystemExtension {
     record Bounds(long start, long end) {}
 
     Bounds of(UUID clusterId, ResourceId log, int partition);
+
+    /**
+     * The kinds that are themselves one log, read as a single partition 0 (a stream), as against a kind whose log
+     * is its partitions' parent. Empty by default.
+     */
+    default Set<KindId> logs(UUID clusterId) {
+        return Set.of();
+    }
 }

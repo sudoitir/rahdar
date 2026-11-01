@@ -14,6 +14,7 @@ import io.github.sudoitir.openbroker.model.ResourceId;
 import io.github.sudoitir.rahdar.feature.bulk.web.BulkViews.BulkExecuteRequest;
 import io.github.sudoitir.rahdar.feature.bulk.web.BulkViews.BulkPreviewRequest;
 import io.github.sudoitir.rahdar.feature.bulk.web.BulkViews.BulkRunDetailView;
+import io.github.sudoitir.rahdar.feature.messages.MessageService;
 import io.github.sudoitir.rahdar.feature.resources.CrossNodeAggregator;
 import io.github.sudoitir.rahdar.feature.resources.QueueLifecycleService;
 import io.github.sudoitir.rahdar.feature.resources.web.ResourceViews.Backlog;
@@ -52,6 +53,9 @@ class BulkWholeClusterTest extends BulkTestSupport {
     @MockitoBean
     ClusterKinds kinds;
 
+    @MockitoBean
+    MessageService messages;
+
     @Test
     void aSubscriptionOfAClusterReadAsOneIsDeletedByItsId() {
         when(kinds.readAsOne(clusterId)).thenReturn(true);
@@ -76,6 +80,27 @@ class BulkWholeClusterTest extends BulkTestSupport {
         assertThat(run.items().getFirst().affected()).isEqualTo(3L);
         verify(lifecycle).deleteQueue(clusterId, target, false, false, false);
         verify(lifecycle, never()).deleteQueue(clusterId, "orders", false, false, false);
+    }
+
+    @Test
+    void aQueueOfAClusterReadAsOneIsPurgedOnceByItsId() {
+        when(kinds.readAsOne(clusterId)).thenReturn(true);
+        when(aggregator.allQueues(clusterId)).thenReturn(List.of(view(ID, "orders", 3)));
+        when(messages.purge(clusterId, ResourceId.parse(ID), false, false))
+                .thenReturn(new Attempt.Ok<>(new MessageService.Outcome.Affected(3, null)));
+
+        BulkRunDetailView preview =
+                bulk.preview(clusterId, new BulkPreviewRequest(BulkOperation.PURGE, List.of(ID), null, false));
+        bulk.execute(
+                clusterId,
+                preview.run().id(),
+                new BulkExecuteRequest(preview.run().planHash(), false, true));
+        BulkRunDetailView run = awaitFinished(preview.run().id());
+
+        assertThat(run.items().getFirst().status()).isEqualTo(BulkItemStatus.SUCCEEDED);
+        assertThat(run.items().getFirst().affected()).isEqualTo(3L);
+        verify(messages).purge(clusterId, ResourceId.parse(ID), false, false);
+        verify(messages, never()).purge(eq(clusterId), anyString(), any(), anyBoolean(), anyBoolean());
     }
 
     @Test

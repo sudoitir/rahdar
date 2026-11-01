@@ -97,6 +97,30 @@ class BrowsedMessagesBoundsTest {
     }
 
     @Test
+    void theNextPageStartsAfterTheLastMessageWhateverTheDriversTokenIs() {
+        List<Message> served = List.of(
+                record(7, MessageBody.of(new byte[1]), MessageHeaders.builder().build()),
+                record(9, MessageBody.of(new byte[1]), MessageHeaders.builder().build()));
+        BrokerMessages messages = serving(served, Optional.of(new Cursor("opaque-token")));
+
+        LogPage page = messages.browseLog(CLUSTER, LOG, 0, Position.earliest(), 2, null);
+
+        assertThat(page.next()).isEqualTo(10L);
+    }
+
+    @Test
+    void thereIsNoNextPageWhenTheDriverNamesNone() {
+        BrokerMessages messages = serving(
+                List.of(record(
+                        7, MessageBody.of(new byte[1]), MessageHeaders.builder().build())),
+                Optional.empty());
+
+        assertThat(messages.browseLog(CLUSTER, LOG, 0, Position.earliest(), 2, null)
+                        .next())
+                .isNull();
+    }
+
+    @Test
     void aStreamedValueLargerThanTheLimitIsReadOnlyToTheLimitAndMarkedTruncated() {
         byte[] huge = new byte[(int) BrokerMessages.MAX_BODY_BYTES + 5];
         Message streamed = record(

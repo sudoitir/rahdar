@@ -8,6 +8,7 @@ import io.github.sudoitir.openbroker.ErrorInfo;
 import io.github.sudoitir.openbroker.ErrorReasons;
 import io.github.sudoitir.openbroker.Plane;
 import io.github.sudoitir.openbroker.Status;
+import io.github.sudoitir.rahdar.kernel.core.ConflictException;
 import java.util.Map;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
@@ -81,6 +82,23 @@ class BrokerFailuresTest {
                 Map.of("artemis.code", "InstanceNotFoundException", "artemis.error", "javax.management.X")));
 
         assertThat(translated).hasMessageContaining("no longer on this node").hasMessageContaining("Refresh");
+    }
+
+    @Test
+    void aMessageNoQueueReceivedIsAConflictThatSaysNothingWasStored() {
+        assertThat(BrokerFailures.translate(failure(ErrorReasons.NOT_ROUTED, Map.of())))
+                .isInstanceOfSatisfying(
+                        ConflictException.class, e -> assertThat(e.slug()).isEqualTo("not-routed"));
+        assertThat(BrokerFailures.notRouted("orders", "eu"))
+                .hasMessage("No queue received the message: the exchange 'orders' has no binding that matches"
+                        + " routing key 'eu'. Nothing was stored.");
+    }
+
+    @Test
+    void aFullDestinationIsAConflict() {
+        assertThat(BrokerFailures.translate(failure(ErrorReasons.DESTINATION_FULL, Map.of())))
+                .isInstanceOfSatisfying(
+                        ConflictException.class, e -> assertThat(e.slug()).isEqualTo("destination-full"));
     }
 
     @Test

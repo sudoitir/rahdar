@@ -15,6 +15,7 @@ import io.github.sudoitir.rahdar.kernel.gate.ExecutionMode;
 import io.github.sudoitir.rahdar.kernel.gate.GatedOperation;
 import io.github.sudoitir.rahdar.kernel.gate.OperationScope;
 import io.github.sudoitir.rahdar.kernel.gate.Trait;
+import io.github.sudoitir.rahdar.kernel.security.ResourceIdTexts;
 import io.github.sudoitir.rahdar.platform.broker.Attempt;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterEnvironmentIndex;
@@ -35,7 +36,8 @@ class MessageGatedOperations {
     private static final String LABEL_CLUSTER = "Cluster";
 
     @Bean
-    GatedOperation<QueuePurgeParams> queuePurgeOperation(MessageService messages, ClusterEnvironmentIndex clusters) {
+    GatedOperation<QueuePurgeParams> queuePurgeOperation(
+            MessageService messages, ClusterEnvironmentIndex clusters, ResourceIdTexts ids) {
         return new GatedOperation<>() {
             @Override
             public String type() {
@@ -44,7 +46,7 @@ class MessageGatedOperations {
 
             @Override
             public int version() {
-                return 1;
+                return 2;
             }
 
             @Override
@@ -74,10 +76,15 @@ class MessageGatedOperations {
 
             @Override
             public List<DisplayRow> display(QueuePurgeParams p) {
-                return List.of(
-                        DisplayRow.of(LABEL_CLUSTER, clusters.labelOf(p.clusterId())),
-                        DisplayRow.of("Queue", p.queue()),
-                        DisplayRow.of("Removes", "every message"));
+                List<DisplayRow> rows = new ArrayList<>();
+                rows.add(DisplayRow.of(LABEL_CLUSTER, clusters.labelOf(p.clusterId())));
+                rows.add(DisplayRow.of("Queue", p.queue()));
+                if (p.id() != null) {
+                    rows.add(DisplayRow.of(
+                            "Kind", ids.of(p.clusterId()).kindLabel(p.id()).singular()));
+                }
+                rows.add(DisplayRow.of("Removes", "every message"));
+                return rows;
             }
 
             @Override
@@ -87,13 +94,18 @@ class MessageGatedOperations {
 
             @Override
             public Effect estimate(QueuePurgeParams p) {
-                Reach reach = messages.reachOfPurge(p.clusterId(), p.queue(), p.nodeId());
-                return new Effect(reach.count(), "messages", reach.identity(), null);
+                Reach reach = p.id() == null
+                        ? messages.reachOfPurge(p.clusterId(), p.queue(), p.nodeId())
+                        : messages.reachOfPurge(p.clusterId(), ResourceId.parse(p.id()));
+                return new Effect(reach.count(), "messages", reach.identity(), reach.detail());
             }
 
             @Override
             public void replay(QueuePurgeParams p) {
-                succeeded(messages.purge(p.clusterId(), p.queue(), p.nodeId(), false, p.override()));
+                succeeded(
+                        p.id() == null
+                                ? messages.purge(p.clusterId(), p.queue(), p.nodeId(), false, p.override())
+                                : messages.purge(p.clusterId(), ResourceId.parse(p.id()), false, p.override()));
             }
         };
     }
