@@ -16,6 +16,8 @@
 #   - a real dead-letter backlog, produced by messages that were rejected;
 #   - one stopped node, so the topology has a genuine warning rather than a staged
 #     one;
+#   - a three-node RabbitMQ cluster, "rabbit": two virtual hosts, a topic and a fanout exchange, a classic, a quorum
+#     (lagging, no consumer) and a stream queue with 200 messages, a policy, a permission and a shovel;
 #   - a three-broker Kafka cluster, "events": keyed and compacted topics, a consumer group that keeps up, one
 #     that lags and one that is empty and behind, a share group, ACLs and one transaction left open.
 #
@@ -98,6 +100,14 @@ say "registering the Kafka cluster"
 kafka_init
 kafka_register
 kafka_seed_data
+
+say "registering the RabbitMQ cluster"
+# The nodes are rabbitmq-1 to rabbitmq-3 on the compose network, which is where Rahdar reaches them from.
+# shellcheck source=lib/rabbitmq-seed.sh
+. "$(dirname "${BASH_SOURCE[0]}")/lib/rabbitmq-seed.sh"
+rabbitmq_init
+rabbitmq_register
+rabbitmq_seed_data
 
 # Rates chosen so the four addresses are visibly different on one axis rather than
 # one line and three flat ones.
@@ -280,7 +290,7 @@ api POST "/users/$analyst/grants" -d "{\"roleId\": \"$reader\", \"scopeType\": \
 say "stopping one node, so the topology carries a real warning"
 $COMPOSE stop artemis-secondary-backup
 
-say "seeded. Rahdar: $RAHDAR — Artemis cluster $cluster, Kafka cluster $kafka_cluster"
+say "seeded. Rahdar: $RAHDAR — Artemis cluster $cluster, Kafka cluster $kafka_cluster, RabbitMQ cluster $rabbitmq_cluster"
 
 # Last, so the screens above are complete while the traffic runs: a long demo
 # (TRAFFIC_MINUTES in the hours) must not hold the users, the DLQ and the stopped

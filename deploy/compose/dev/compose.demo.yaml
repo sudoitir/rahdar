@@ -14,6 +14,10 @@
 # groups on), kafka-1 to kafka-3, which `just demo` registers as the cluster "events". The dev stack's
 # single `kafka` node is switched off here by a profile, so only one Kafka cluster runs.
 #
+# It also adds a three-node RabbitMQ cluster (classic peer discovery, one Erlang cookie), rabbitmq-1 to rabbitmq-3,
+# which `just demo` registers as the cluster "rabbit". The dev stack's single `rabbitmq` node is switched off here by
+# a profile in the same way.
+#
 # Not hardened, not for anywhere public.
 
 name: rahdar-dev
@@ -42,6 +46,22 @@ x-kafka-healthcheck: &kafka-healthcheck
   interval: 10s
   timeout: 10s
   retries: 12
+
+x-rabbitmq-node: &rabbitmq-node
+  image: rabbitmq:4.4.0-management
+  environment: &rabbitmq-environment
+    RABBITMQ_DEFAULT_USER: rahdar
+    RABBITMQ_DEFAULT_PASS: rahdar
+    RABBITMQ_ERLANG_COOKIE: rahdar-demo-rabbitmq-cookie
+    RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS: "-rabbit vm_memory_high_watermark_absolute 805306368"
+  volumes:
+    - ./rabbitmq/enabled_plugins:/etc/rabbitmq/enabled_plugins:ro
+    - ./rabbitmq/cluster.conf:/etc/rabbitmq/conf.d/20-cluster.conf:ro
+  healthcheck:
+    test: ["CMD-SHELL", "rabbitmq-diagnostics -q ping"]
+    interval: 10s
+    timeout: 10s
+    retries: 12
 
 services:
   # The dev stack's one-node Kafka gives way to the three below.
@@ -80,6 +100,31 @@ services:
     ports:
       - "9096:9094"
     healthcheck: *kafka-healthcheck
+
+  # The dev stack's one-node RabbitMQ gives way to the three below.
+  rabbitmq:
+    profiles: ["single-rabbitmq"]
+
+  rabbitmq-1:
+    <<: *rabbitmq-node
+    hostname: rabbitmq-1
+    ports:
+      - "15672:15672"
+      - "5672:5672"
+
+  rabbitmq-2:
+    <<: *rabbitmq-node
+    hostname: rabbitmq-2
+    ports:
+      - "15673:15672"
+      - "5673:5672"
+
+  rabbitmq-3:
+    <<: *rabbitmq-node
+    hostname: rabbitmq-3
+    ports:
+      - "15674:15672"
+      - "5674:5672"
 
   artemis-secondary:
     image: apache/artemis:2.57.0
