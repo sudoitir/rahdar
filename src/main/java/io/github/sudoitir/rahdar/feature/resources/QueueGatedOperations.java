@@ -1,5 +1,7 @@
 package io.github.sudoitir.rahdar.feature.resources;
 
+import io.github.sudoitir.openbroker.model.ResourceClass;
+import io.github.sudoitir.openbroker.model.ResourceId;
 import io.github.sudoitir.rahdar.feature.resources.QueueLifecycleService.AddressDeleteParams;
 import io.github.sudoitir.rahdar.feature.resources.QueueLifecycleService.QueueDeleteParams;
 import io.github.sudoitir.rahdar.feature.resources.QueueLifecycleService.Reach;
@@ -9,12 +11,16 @@ import io.github.sudoitir.rahdar.kernel.gate.ExecutionMode;
 import io.github.sudoitir.rahdar.kernel.gate.GatedOperation;
 import io.github.sudoitir.rahdar.kernel.gate.OperationScope;
 import io.github.sudoitir.rahdar.kernel.gate.Trait;
+import io.github.sudoitir.rahdar.kernel.security.ResourceIdTexts;
 import io.github.sudoitir.rahdar.platform.broker.Attempt;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterEnvironmentIndex;
 import io.github.sudoitir.rahdar.platform.clusters.LifecycleOutcome;
+import io.github.sudoitir.rahdar.platform.clusters.ResourceTargets.Target;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -29,7 +35,7 @@ class QueueGatedOperations {
 
     @Bean
     GatedOperation<QueueDeleteParams> queueDeleteOperation(
-            QueueLifecycleService lifecycle, ClusterEnvironmentIndex clusters) {
+            QueueLifecycleService lifecycle, ClusterEnvironmentIndex clusters, ResourceIdTexts ids) {
         return new GatedOperation<>() {
             @Override
             public String type() {
@@ -38,7 +44,7 @@ class QueueGatedOperations {
 
             @Override
             public int version() {
-                return 1;
+                return 2;
             }
 
             @Override
@@ -68,10 +74,14 @@ class QueueGatedOperations {
 
             @Override
             public List<DisplayRow> display(QueueDeleteParams p) {
-                return List.of(
-                        DisplayRow.of("Cluster", clusters.labelOf(p.clusterId())),
-                        DisplayRow.of("Queue", p.queue()),
-                        DisplayRow.of("Consumers", p.disconnectConsumers() ? "disconnected" : "must be gone"));
+                List<DisplayRow> rows = new ArrayList<>();
+                rows.add(DisplayRow.of("Cluster", clusters.labelOf(p.clusterId())));
+                rows.add(DisplayRow.of("Queue", p.queue()));
+                if (p.id() != null) {
+                    rows.add(DisplayRow.of("Kind", kindOf(ids, p.clusterId(), p.id())));
+                }
+                rows.add(DisplayRow.of("Consumers", p.disconnectConsumers() ? "disconnected" : "must be gone"));
+                return rows;
             }
 
             @Override
@@ -81,6 +91,14 @@ class QueueGatedOperations {
 
             @Override
             public Effect estimate(QueueDeleteParams p) {
+                if (p.id() != null) {
+                    Reach whole = lifecycle.reachOfDelete(
+                            p.clusterId(),
+                            ResourceId.parse(p.id()),
+                            LifecycleKind.DELETE_SUBSCRIPTION,
+                            p.disconnectConsumers());
+                    return new Effect(whole.count(), "messages", whole.identity(), whole.detail());
+                }
                 Reach reach = lifecycle.reachOfQueueDelete(p.clusterId(), p.queue());
                 return new Effect(reach.count(), "messages", reach.identity(), null);
             }
@@ -88,14 +106,22 @@ class QueueGatedOperations {
             @Override
             public void replay(QueueDeleteParams p) {
                 succeeded(
-                        lifecycle.deleteQueue(p.clusterId(), p.queue(), false, p.override(), p.disconnectConsumers()));
+                        p.id() == null
+                                ? lifecycle.deleteQueue(
+                                        p.clusterId(), p.queue(), false, p.override(), p.disconnectConsumers())
+                                : lifecycle.deleteQueue(
+                                        p.clusterId(),
+                                        new Target(ResourceId.parse(p.id()), ResourceClass.SUBSCRIPTION),
+                                        false,
+                                        p.override(),
+                                        p.disconnectConsumers()));
             }
         };
     }
 
     @Bean
     GatedOperation<AddressDeleteParams> addressDeleteOperation(
-            QueueLifecycleService lifecycle, ClusterEnvironmentIndex clusters) {
+            QueueLifecycleService lifecycle, ClusterEnvironmentIndex clusters, ResourceIdTexts ids) {
         return new GatedOperation<>() {
             @Override
             public String type() {
@@ -104,7 +130,7 @@ class QueueGatedOperations {
 
             @Override
             public int version() {
-                return 1;
+                return 2;
             }
 
             @Override
@@ -134,9 +160,13 @@ class QueueGatedOperations {
 
             @Override
             public List<DisplayRow> display(AddressDeleteParams p) {
-                return List.of(
-                        DisplayRow.of("Cluster", clusters.labelOf(p.clusterId())),
-                        DisplayRow.of("Address", p.address()));
+                List<DisplayRow> rows = new ArrayList<>();
+                rows.add(DisplayRow.of("Cluster", clusters.labelOf(p.clusterId())));
+                rows.add(DisplayRow.of("Address", p.address()));
+                if (p.id() != null) {
+                    rows.add(DisplayRow.of("Kind", kindOf(ids, p.clusterId(), p.id())));
+                }
+                return rows;
             }
 
             @Override
@@ -146,14 +176,30 @@ class QueueGatedOperations {
 
             @Override
             public Effect estimate(AddressDeleteParams p) {
+                if (p.id() != null) {
+                    Reach whole = lifecycle.reachOfDelete(
+                            p.clusterId(), ResourceId.parse(p.id()), LifecycleKind.DELETE_DESTINATION, false);
+                    return new Effect(Math.max(1, whole.count()), "resources", whole.identity(), whole.detail());
+                }
                 return new Effect(1, "addresses", p.clusterId() + "|" + p.address(), null);
             }
 
             @Override
             public void replay(AddressDeleteParams p) {
-                succeeded(lifecycle.deleteAddress(p.clusterId(), p.address(), false));
+                succeeded(
+                        p.id() == null
+                                ? lifecycle.deleteAddress(p.clusterId(), p.address(), false)
+                                : lifecycle.deleteAddress(
+                                        p.clusterId(),
+                                        new Target(ResourceId.parse(p.id()), ResourceClass.DESTINATION),
+                                        false));
             }
         };
+    }
+
+    /** The kind's name for people, singular, from the cluster's driver. */
+    private static String kindOf(ResourceIdTexts ids, UUID clusterId, String id) {
+        return ids.of(clusterId).kindLabel(id).singular();
     }
 
     /** A replay that failed on a node, or that no broker answered, is a failed request, not a success. */
