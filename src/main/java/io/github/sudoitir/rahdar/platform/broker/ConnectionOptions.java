@@ -30,7 +30,8 @@ public interface ConnectionOptions extends SystemExtension {
     /** How a cluster of the system is addressed when it is registered. */
     enum Entry {
         JOLOKIA_SEEDS("jolokia-seeds"),
-        BOOTSTRAP("bootstrap");
+        BOOTSTRAP("bootstrap"),
+        MANAGEMENT_API("management-api");
 
         private final String wire;
 

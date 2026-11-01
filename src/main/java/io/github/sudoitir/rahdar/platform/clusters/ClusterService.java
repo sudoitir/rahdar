@@ -62,10 +62,13 @@ import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.ClusterDetai
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.ClusterSummary;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.ConnectionCheck;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.HealthView;
+import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.KafkaConnectionDetail;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.KindView;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.NodeEndpointView;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.NodeProbeView;
+import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.RabbitMqConnectionDetail;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.RegisterPreview;
+import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.SystemConnectionDetail;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.TopologyView;
 import java.net.URI;
 import java.util.ArrayList;
@@ -697,6 +700,8 @@ public class ClusterService {
                 .map(BrokerNodeEntity::getManagementUrl)
                 .toList();
         BrokerTlsEntity tls = tlsRepository.findByClusterId(clusterId).orElse(null);
+        SystemConnectionDetail detail =
+                systemRegistration.handles(cluster.getSystem()) ? systemRegistration.detail(clusterId) : null;
         return new ClusterConnectionDetail(
                 cluster.getManagementUrlPattern(),
                 seeds,
@@ -709,7 +714,8 @@ public class ClusterService {
                         .findByClusterIdAndKind(clusterId, DATA)
                         .map(BrokerCredentialEntity::getUsername)
                         .orElse(null),
-                systemRegistration.handles(cluster.getSystem()) ? systemRegistration.detail(clusterId) : null);
+                detail instanceof KafkaConnectionDetail kafka ? kafka : null,
+                detail instanceof RabbitMqConnectionDetail rabbitmq ? rabbitmq : null);
     }
 
     /**

@@ -115,7 +115,43 @@ public interface ClusterViews {
                     requiredMode = REQUIRED,
                     description = "What each enabled feature adds to the check, keyed by feature id and read from a"
                             + " reachable node. Empty where a system has none.")
-            Map<String, Object> contributions) {
+            Map<String, Object> contributions,
+
+            @Schema(
+                    nullable = true,
+                    description = "Every endpoint the check tried, one row each, so one that is down is named even when"
+                            + " another answered. Null where a system reports only its nodes.")
+            List<EndpointReach> endpoints) {
+
+        /** A check that names no endpoints separately. */
+        public ConnectionCheck(
+                String system,
+                VersionFound version,
+                boolean supported,
+                String clusterId,
+                RegisteredRef alreadyRegistered,
+                List<NodeReach> nodes,
+                Quorum quorum,
+                List<AccessFinding> access,
+                Failure failure,
+                AdoptionPreviewView adoption,
+                String managementUrlPattern,
+                Map<String, Object> contributions) {
+            this(
+                    system,
+                    version,
+                    supported,
+                    clusterId,
+                    alreadyRegistered,
+                    nodes,
+                    quorum,
+                    access,
+                    failure,
+                    adoption,
+                    managementUrlPattern,
+                    contributions,
+                    null);
+        }
 
         public ConnectionCheck withAlreadyRegistered(RegisteredRef ref) {
             return new ConnectionCheck(
@@ -130,9 +166,26 @@ public interface ClusterViews {
                     failure,
                     adoption,
                     managementUrlPattern,
-                    contributions);
+                    contributions,
+                    endpoints);
         }
     }
+
+    /** One endpoint of a checked connection and whether Rahdar reached it. */
+    record EndpointReach(
+            @Schema(requiredMode = REQUIRED, description = "MANAGEMENT or DATA.")
+            String plane,
+
+            @Schema(requiredMode = REQUIRED, description = "The address as given, without an account.")
+            String address,
+
+            @Schema(requiredMode = REQUIRED, description = "OK or UNREACHABLE.")
+            String outcome,
+
+            @Schema(nullable = true, description = "The Failure causes, when unreachable.")
+            String cause,
+
+            @Schema(nullable = true) String message) {}
 
     /** A version as far as it is known: {@code exact} is false when only a lower bound could be read. */
     record VersionFound(
@@ -231,7 +284,9 @@ public interface ClusterViews {
                     description =
                             "DNS, REFUSED, TIMEOUT, TLS, AUTHENTICATION, AUTHORIZATION, UNSUPPORTED_VERSION or, for a Kafka"
                                     + " cluster whose bootstrap server answered but whose brokers advertise addresses Rahdar cannot reach,"
-                                    + " ADVERTISED_UNREACHABLE.")
+                                    + " ADVERTISED_UNREACHABLE. For a RabbitMQ cluster, WRONG_ENDPOINT when a management address answers"
+                                    + " but is not a RabbitMQ management API, and DATA_UNREACHABLE when AMQP endpoints were given and none"
+                                    + " accepts a connection.")
             String cause,
 
             @Schema(requiredMode = REQUIRED) String message,
@@ -284,7 +339,34 @@ public interface ClusterViews {
             String coreUsername,
 
             @Schema(nullable = true, description = "A Kafka cluster's connection; null for other systems.")
-            KafkaConnectionDetail kafka) {}
+            KafkaConnectionDetail kafka,
+
+            @Schema(nullable = true, description = "A RabbitMQ cluster's connection; null for other systems.")
+            RabbitMqConnectionDetail rabbitmq) {}
+
+    /** How a cluster of a driver-reached system is connected, as stored: never a secret. */
+    sealed interface SystemConnectionDetail permits KafkaConnectionDetail, RabbitMqConnectionDetail {}
+
+    /** How a RabbitMQ cluster is reached, as stored: never a secret. */
+    record RabbitMqConnectionDetail(
+            @Schema(requiredMode = REQUIRED) List<String> managementUrls,
+
+            @Schema(requiredMode = REQUIRED, description = "Empty when the cluster is managed without a data plane.")
+            List<String> amqpEndpoints,
+
+            @Schema(nullable = true, description = "The account's user name; null for a token or no account.")
+            String username,
+
+            @Schema(requiredMode = REQUIRED, description = "Whether the account signs in with a bearer token.")
+            boolean tokenAuth,
+
+            @Schema(requiredMode = REQUIRED, description = "Whether a password or token is stored.")
+            boolean secretStored,
+
+            @Schema(nullable = true) String tlsBundle,
+            @Schema(requiredMode = REQUIRED) String eventVhost,
+            @Schema(requiredMode = REQUIRED) int watchIntervalSeconds)
+            implements SystemConnectionDetail {}
 
     /** How a Kafka cluster is reached, as stored: never a secret. */
     record KafkaConnectionDetail(
@@ -299,7 +381,8 @@ public interface ClusterViews {
             boolean secretStored,
 
             @Schema(nullable = true) String tlsBundle,
-            @Schema(nullable = true) String clientId) {}
+            @Schema(nullable = true) String clientId)
+            implements SystemConnectionDetail {}
 
     /** One broker endpoint — a {@code broker_node} row, minus anything secret. */
     record NodeEndpointView(

@@ -35,8 +35,8 @@ import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.AccessRemedy
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.CapabilitiesView;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.CapabilityView;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.ConnectionCheck;
-import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.KafkaConnectionDetail;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.RegisteredRef;
+import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.SystemConnectionDetail;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
@@ -169,7 +169,7 @@ class SystemRegistration {
     }
 
     /** How the cluster is reached, as stored. */
-    KafkaConnectionDetail detail(UUID clusterId) {
+    SystemConnectionDetail detail(UUID clusterId) {
         return registrarOf(clusterId).detail(clusterId);
     }
 

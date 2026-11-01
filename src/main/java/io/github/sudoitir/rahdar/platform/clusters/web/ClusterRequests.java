@@ -9,10 +9,13 @@ import io.swagger.v3.oas.annotations.media.DiscriminatorMapping;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.AssertTrue;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 import tools.jackson.core.JsonParser;
 import tools.jackson.databind.DeserializationContext;
@@ -119,16 +122,19 @@ public final class ClusterRequests {
                 defaultImpl = UnknownConnection.class)
         @JsonSubTypes({
             @JsonSubTypes.Type(value = ArtemisConnection.class, name = "artemis"),
-            @JsonSubTypes.Type(value = KafkaConnection.class, name = "kafka")
+            @JsonSubTypes.Type(value = KafkaConnection.class, name = "kafka"),
+            @JsonSubTypes.Type(value = RabbitMqConnection.class, name = "rabbitmq")
         })
         @Schema(
                 discriminatorProperty = "system",
                 discriminatorMapping = {
                     @DiscriminatorMapping(value = "artemis", schema = ArtemisConnection.class),
-                    @DiscriminatorMapping(value = "kafka", schema = KafkaConnection.class)
+                    @DiscriminatorMapping(value = "kafka", schema = KafkaConnection.class),
+                    @DiscriminatorMapping(value = "rabbitmq", schema = RabbitMqConnection.class)
                 },
-                oneOf = {ArtemisConnection.class, KafkaConnection.class})
-        public sealed interface Connection permits ArtemisConnection, KafkaConnection, UnknownConnection {
+                oneOf = {ArtemisConnection.class, KafkaConnection.class, RabbitMqConnection.class})
+        public sealed interface Connection
+                permits ArtemisConnection, KafkaConnection, RabbitMqConnection, UnknownConnection {
 
             String system();
 
@@ -207,6 +213,83 @@ public final class ClusterRequests {
                 String tlsBundle,
                 String clientId)
                 implements Connection {}
+
+        /**
+         * A RabbitMQ cluster is reached at its management API and, for browsing, sending and receiving, its AMQP
+         * listeners (ADR-0222). One account serves both planes.
+         *
+         * @param managementUrls {@code http(s)://host:port[/prefix]}, tried in order; no account in the URL
+         * @param amqpEndpoints {@code amqp(s)://host:port}; none registers the cluster for management only
+         * @param credentials a user name and password, or a token
+         * @param tlsBundle optional Spring SSL bundle: the trust store and a client certificate
+         * @param eventVhost the virtual host whose event exchange is watched; {@code /} when left out
+         * @param watchIntervalSeconds how often the cluster is read, at least 1; 10 when left out
+         */
+        public record RabbitMqConnection(
+                @NotBlank @Schema(allowableValues = "rabbitmq")
+                String system,
+
+                @NotEmpty @Size(max = RabbitMqLimits.MAX_MANAGEMENT_URLS) List<@NotBlank String> managementUrls,
+
+                @Size(max = RabbitMqLimits.MAX_AMQP_ENDPOINTS) List<@NotBlank String> amqpEndpoints,
+
+                @Valid RabbitMqCredentials credentials,
+                String tlsBundle,
+                String eventVhost,
+                @Min(1) Integer watchIntervalSeconds)
+                implements Connection {
+
+            @JsonIgnore
+            @Schema(hidden = true)
+            @AssertTrue(message = "Put the account in the credentials, not in a URL.") public boolean isWithoutAccountInUrl() {
+                return RabbitMqLimits.noUserInfo(managementUrls) && RabbitMqLimits.noUserInfo(amqpEndpoints);
+            }
+
+            @JsonIgnore
+            @Schema(hidden = true)
+            @AssertTrue(message = "Management URLs are http or https; AMQP endpoints are amqp or amqps.") public boolean isSchemesValid() {
+                return RabbitMqLimits.schemesIn(managementUrls, "http", "https")
+                        && RabbitMqLimits.schemesIn(amqpEndpoints, "amqp", "amqps");
+            }
+        }
+    }
+
+    /** Limits and checks the RabbitMQ connection shares with the module that reaches the cluster. */
+    static final class RabbitMqLimits {
+
+        static final int MAX_MANAGEMENT_URLS = 16;
+        static final int MAX_AMQP_ENDPOINTS = 32;
+
+        private RabbitMqLimits() {}
+
+        static boolean noUserInfo(List<String> addresses) {
+            return addresses == null
+                    || addresses.stream()
+                            .noneMatch(a -> a != null && a.matches("(?s)^[A-Za-z][A-Za-z0-9+.-]*://[^/?#]*@.*"));
+        }
+
+        static boolean schemesIn(List<String> addresses, String... schemes) {
+            if (addresses == null) {
+                return true;
+            }
+            List<String> allowed = List.of(schemes);
+            return addresses.stream().allMatch(a -> {
+                int at = a == null ? -1 : a.indexOf("://");
+                return at > 0 && allowed.contains(a.substring(0, at).toLowerCase(Locale.ROOT));
+            });
+        }
+    }
+
+    /** A RabbitMQ account: a user name and password, or a bearer token. Never returned. */
+    public record RabbitMqCredentials(String username, String password, String token) {
+
+        /** The password and the token are never printed; whether each is set is. */
+        @Override
+        public String toString() {
+            return "RabbitMqCredentials[username=" + username + PASSWORD_FIELD
+                    + (password == null ? "none" : SecretRedactor.MASK) + ", token="
+                    + (token == null ? "none" : SecretRedactor.MASK) + "]";
+        }
     }
 
     /** A Kafka account: a user name and password, or a bearer token. Never returned. */
@@ -284,17 +367,22 @@ public final class ClusterRequests {
                 defaultImpl = UnknownConnectionUpdate.class)
         @JsonSubTypes({
             @JsonSubTypes.Type(value = ArtemisConnectionUpdate.class, name = "artemis"),
-            @JsonSubTypes.Type(value = KafkaConnectionUpdate.class, name = "kafka")
+            @JsonSubTypes.Type(value = KafkaConnectionUpdate.class, name = "kafka"),
+            @JsonSubTypes.Type(value = RabbitMqConnectionUpdate.class, name = "rabbitmq")
         })
         @Schema(
                 discriminatorProperty = "system",
                 discriminatorMapping = {
                     @DiscriminatorMapping(value = "artemis", schema = ArtemisConnectionUpdate.class),
-                    @DiscriminatorMapping(value = "kafka", schema = KafkaConnectionUpdate.class)
+                    @DiscriminatorMapping(value = "kafka", schema = KafkaConnectionUpdate.class),
+                    @DiscriminatorMapping(value = "rabbitmq", schema = RabbitMqConnectionUpdate.class)
                 },
-                oneOf = {ArtemisConnectionUpdate.class, KafkaConnectionUpdate.class})
+                oneOf = {ArtemisConnectionUpdate.class, KafkaConnectionUpdate.class, RabbitMqConnectionUpdate.class})
         public sealed interface ConnectionUpdate
-                permits ArtemisConnectionUpdate, KafkaConnectionUpdate, UnknownConnectionUpdate {
+                permits ArtemisConnectionUpdate,
+                        KafkaConnectionUpdate,
+                        RabbitMqConnectionUpdate,
+                        UnknownConnectionUpdate {
 
             String system();
         }
@@ -364,6 +452,38 @@ public final class ClusterRequests {
                 String tlsBundle,
                 String clientId)
                 implements ConnectionUpdate {}
+
+        /**
+         * A RabbitMQ cluster's edit: a field left out is left as it is, and a secret left out keeps the stored one,
+         * unless the management URLs, the AMQP endpoints or the user name changed, which need it again so a stored
+         * secret never reaches a server the cluster did not already use.
+         */
+        public record RabbitMqConnectionUpdate(
+                @Schema(allowableValues = "rabbitmq") String system,
+
+                @Size(max = RabbitMqLimits.MAX_MANAGEMENT_URLS) List<@NotBlank String> managementUrls,
+
+                @Size(max = RabbitMqLimits.MAX_AMQP_ENDPOINTS) List<@NotBlank String> amqpEndpoints,
+
+                @Valid RabbitMqCredentials credentials,
+                String tlsBundle,
+                String eventVhost,
+                @Min(1) Integer watchIntervalSeconds)
+                implements ConnectionUpdate {
+
+            @JsonIgnore
+            @Schema(hidden = true)
+            @AssertTrue(message = "Put the account in the credentials, not in a URL.") public boolean isWithoutAccountInUrl() {
+                return RabbitMqLimits.noUserInfo(managementUrls) && RabbitMqLimits.noUserInfo(amqpEndpoints);
+            }
+
+            @JsonIgnore
+            @Schema(hidden = true)
+            @AssertTrue(message = "Management URLs are http or https; AMQP endpoints are amqp or amqps.") public boolean isSchemesValid() {
+                return RabbitMqLimits.schemesIn(managementUrls, "http", "https")
+                        && RabbitMqLimits.schemesIn(amqpEndpoints, "amqp", "amqps");
+            }
+        }
 
         @JsonIgnore
         @Schema(hidden = true)
