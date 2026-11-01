@@ -13,10 +13,18 @@ import { ArtemisRegistrationForm } from './ArtemisRegistrationForm.tsx';
 import classes from './Clusters.module.css';
 import { versionRangeWords } from './versionRange.ts';
 import { KafkaRegistrationForm } from './KafkaRegistrationForm.tsx';
+import { RabbitMqRegistrationForm } from './RabbitMqRegistrationForm.tsx';
 
 /** The system's connection form; one per kind of connection the drivers take. */
 function ConnectionForm({ system }: Readonly<{ system: LoadedSystem }>) {
-  return system.connection === 'bootstrap' ? <KafkaRegistrationForm /> : <ArtemisRegistrationForm />;
+  switch (system.connection) {
+    case 'bootstrap':
+      return <KafkaRegistrationForm />;
+    case 'management-api':
+      return <RabbitMqRegistrationForm />;
+    default:
+      return <ArtemisRegistrationForm />;
+  }
 }
 
 /** The system the address names, or the only loaded one when the address names none. */
