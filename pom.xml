@@ -287,7 +287,7 @@
             <artifactId>postgresql</artifactId>
         </dependency>
 
-        <!-- Every broker is reached through the broker SDK (ADR-0203). The Artemis and Kafka drivers bring
+        <!-- Every broker is reached through the broker SDK (ADR-0203). The Artemis, Kafka and RabbitMQ drivers bring
              their clients; no Rahdar code may use it (BoundaryRulesTest), and the tests drive the
              broker with it. -->
         <dependency>
@@ -308,6 +308,11 @@
         <dependency>
             <groupId>io.github.sudoitir</groupId>
             <artifactId>openbroker-kafka</artifactId>
+            <version>${openbroker.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.github.sudoitir</groupId>
+            <artifactId>openbroker-rabbitmq</artifactId>
             <version>${openbroker.version}</version>
         </dependency>
         <dependency>

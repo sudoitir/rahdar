@@ -95,6 +95,13 @@ class BrokerFailuresTest {
     }
 
     @Test
+    void anOperationTheKindDoesNotHaveIsAConflictWithTheDriversReason() {
+        assertThat(BrokerFailures.translate(failure(ErrorReasons.NOT_SUPPORTED, Map.of())))
+                .isInstanceOfSatisfying(
+                        ConflictException.class, e -> assertThat(e.slug()).isEqualTo("unsupported-on-kind"));
+    }
+
+    @Test
     void aFullDestinationIsAConflict() {
         assertThat(BrokerFailures.translate(failure(ErrorReasons.DESTINATION_FULL, Map.of())))
                 .isInstanceOfSatisfying(
