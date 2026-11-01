@@ -80,6 +80,14 @@ public final class ResourcesModule {
                     "Create and delete routes",
                     ResourceType.DESTINATION,
                     Permissions.DESTINATION_READ))
+            .permission(PermissionDef.cluster(
+                    ResourcePermissions.ACCESS_RULE_READ,
+                    "See who may do what on a cluster: its ACLs, users and permissions",
+                    Permissions.CLUSTER_READ))
+            .permission(PermissionDef.cluster(
+                    ResourcePermissions.ACCESS_RULE_WRITE,
+                    "Change who may do what on a cluster: its ACLs and permissions",
+                    ResourcePermissions.ACCESS_RULE_READ))
             .apiPrefix("/api/v1/clusters/{clusterId}/subscriptions")
             .apiPrefix("/api/v1/clusters/{clusterId}/destinations")
             .apiPrefix("/api/v1/clusters/{clusterId}/consumers")

@@ -15,10 +15,6 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 @ApplicationModuleTest(mode = BootstrapMode.DIRECT_DEPENDENCIES)
 class RabbitMqModuleTest extends ModuleIntegrationTest {
 
-    /** The kernel's permission checks walk the scope hierarchy the clusters module implements. */
-    @MockitoBean
-    ClusterEnvironmentIndex scopeHierarchy;
-
     /** The broker platform reads the nodes of a cluster from the clusters module, which is not started here. */
     @MockitoBean
     NodeDirectory nodeDirectory;
@@ -35,4 +31,11 @@ class RabbitMqModuleTest extends ModuleIntegrationTest {
 
     @MockitoBean
     ReplicaDirectory replicaDirectory;
+
+    /**
+     * The kernel's permission checks walk the scope hierarchy the clusters module implements, and the gated operations
+     * name a cluster by its label and environment: the clusters module's index is both.
+     */
+    @MockitoBean
+    ClusterEnvironmentIndex clusterEnvironments;
 }

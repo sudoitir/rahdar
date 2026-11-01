@@ -6,8 +6,10 @@
 @ApplicationModule(
         displayName = "RabbitMQ",
         allowedDependencies = {
+            "feature.resources",
             "kernel.audit",
             "kernel.core",
+            "kernel.gate",
             "kernel.plugin",
             "kernel.replica",
             "kernel.security",

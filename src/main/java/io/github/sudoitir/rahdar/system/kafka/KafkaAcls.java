@@ -7,6 +7,7 @@ import io.github.sudoitir.openbroker.model.ResourceId;
 import io.github.sudoitir.openbroker.model.ResourcePage;
 import io.github.sudoitir.openbroker.model.ResourcePath;
 import io.github.sudoitir.openbroker.model.ResourceQuery;
+import io.github.sudoitir.rahdar.feature.resources.ResourcePermissions;
 import io.github.sudoitir.rahdar.kernel.core.ConflictException;
 import io.github.sudoitir.rahdar.kernel.security.ClusterAccessGuard;
 import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
@@ -58,7 +59,7 @@ public class KafkaAcls {
     private final ClusterAccessGuard access;
 
     public AclPage list(UUID clusterId, String principal, String resource, String cursor, Integer limit) {
-        access.requireCluster(clusterId, KafkaModule.ACCESS_RULE_READ);
+        access.requireCluster(clusterId, ResourcePermissions.ACCESS_RULE_READ);
         Map<String, String> selector = new LinkedHashMap<>();
         if (principal != null && !principal.isBlank()) {
             selector.put(PRINCIPAL, principal);
@@ -139,7 +140,7 @@ public class KafkaAcls {
     }
 
     public AclPreview preview(UUID clusterId, AclChangeRequest request) {
-        access.requireCluster(clusterId, KafkaModule.ACCESS_RULE_WRITE);
+        access.requireCluster(clusterId, ResourcePermissions.ACCESS_RULE_WRITE);
         List<Acl> add = normalised(request.add());
         List<Acl> remove = normalised(request.remove());
         Held held = held(clusterId, concat(add, remove));
