@@ -1,5 +1,6 @@
 package io.github.sudoitir.rahdar.feature.messages;
 
+import io.github.sudoitir.openbroker.access.Capability;
 import io.github.sudoitir.openbroker.messaging.BulkOutcome;
 import io.github.sudoitir.openbroker.messaging.MessageAction.Delete;
 import io.github.sudoitir.openbroker.messaging.MessageAction.Move;
@@ -423,8 +424,8 @@ public class MessageService {
     public void requireOffered(UUID clusterId, MessageAction action) {
         String capability =
                 switch (action) {
-                    case MOVE, RETRY -> "messages.move";
-                    case DELETE, EXPIRE -> "messages.delete";
+                    case MOVE, RETRY -> Capability.MOVE_MESSAGES.id();
+                    case DELETE, EXPIRE -> Capability.DELETE_MESSAGES.id();
                 };
         messages.unavailableBecause(clusterId, capability).ifPresent(reason -> {
             throw new ConflictException("action-unavailable", reason);

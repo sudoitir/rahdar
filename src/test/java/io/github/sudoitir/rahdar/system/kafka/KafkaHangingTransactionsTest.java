@@ -20,6 +20,7 @@ import io.github.sudoitir.openbroker.model.ResourcePage;
 import io.github.sudoitir.openbroker.model.ResourceQuery;
 import io.github.sudoitir.openbroker.model.Resources;
 import io.github.sudoitir.openbroker.operation.Estimate;
+import io.github.sudoitir.openbroker.operation.EtagBasis;
 import io.github.sudoitir.openbroker.operation.OperationResult;
 import io.github.sudoitir.openbroker.operation.Operations;
 import io.github.sudoitir.openbroker.operation.PreconditionEnforcement;
@@ -85,6 +86,7 @@ class KafkaHangingTransactionsTest {
                         Set.of(),
                         new Estimate(Count.exact(heldBack), "{record}"),
                         etag,
+                        EtagBasis.CONFIGURATION,
                         PreconditionEnforcement.CHECKED_BEFORE));
     }
 
