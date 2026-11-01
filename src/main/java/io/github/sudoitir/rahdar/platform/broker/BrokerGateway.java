@@ -90,13 +90,18 @@ public class BrokerGateway implements DisposableBean {
 
     /** The cluster's connection, following its registered nodes. */
     public ClusterConnection cluster(UUID clusterId) {
-        ClusterSpec spec = specFor(clusterId);
+        String system = directory.system(clusterId);
+        ConnectionOptions how = optionsFor(system);
         Held held = clusters.compute(clusterId, (id, existing) -> {
+            // The spec kept for comparison is the one the driver is given, options included. Keeping the bare
+            // node list made the guard disagree on every call, so each one reconfigured the connection with no
+            // options and the driver fell back to its defaults — plaintext for a SASL cluster.
+            ClusterSpec spec = how.spec(id, specFor(id).nodes());
             if (existing == null) {
-                ClusterConnection connection = drivers.connect(request(id, spec));
+                ClusterConnection connection = drivers.connect(request(id, system, how, spec));
                 AutoCloseable watch = connection
                         .transport()
-                        .map(t -> t.watch(telemetry.listener(id, directory.system(id))))
+                        .map(t -> t.watch(telemetry.listener(id, system)))
                         .orElse(() -> {});
                 return new Held(connection, spec, watch);
             }
@@ -111,7 +116,11 @@ public class BrokerGateway implements DisposableBean {
 
     /** Addresses that are not registered nodes, reached with a registered cluster's credentials and TLS. */
     public ProbeSession probe(UUID clusterId) {
-        return new ProbeSession(spec -> drivers.connect(request(clusterId, spec)));
+        String system = directory.system(clusterId);
+        ConnectionOptions how = optionsFor(system);
+        return new ProbeSession(
+                spec -> drivers.connect(request(clusterId, system, how, spec)),
+                spec -> how.spec(clusterId, spec.nodes()));
     }
 
     /**
@@ -213,6 +222,23 @@ public class BrokerGateway implements DisposableBean {
         return ClusterSpec.ofNodes(nodes);
     }
 
+    /**
+     * How this cluster's system is reached: its bootstrap endpoints, security settings and TLS. The spec it builds is
+     * the one the connection is held against, because a reconfiguration replaces the connection's spec outright: a
+     * bare node list kept for comparison would make the guard disagree on every call and drop the options.
+     */
+    private ConnectionOptions optionsFor(UUID clusterId) {
+        return optionsFor(directory.system(clusterId));
+    }
+
+    private ConnectionOptions optionsFor(String system) {
+        return connections.stream()
+                .filter(c -> c.system().equals(system))
+                .findFirst()
+                .orElseThrow(() -> new ConflictException(
+                        "unsupported-on-system", "No connection options for the system " + system + "."));
+    }
+
     /** The system whose clusters are registered from Jolokia seeds, which the seed and data-plane probes speak. */
     private String seedSystem() {
         return connections.stream()
@@ -245,21 +271,12 @@ public class BrokerGateway implements DisposableBean {
         };
     }
 
-    private ConnectRequest request(UUID clusterId, ClusterSpec spec) {
-        String system = directory.system(clusterId);
-        ConnectionOptions how = connections.stream()
-                .filter(c -> c.system().equals(system))
-                .findFirst()
-                .orElseThrow(() -> new ConflictException(
-                        "unsupported-on-system", "No connection options for the system " + system + "."));
+    private ConnectRequest request(UUID clusterId, String system, ConnectionOptions how, ClusterSpec spec) {
         TlsProvider clusterTls = how.tls(clusterId)
                 .map(b -> tls(true, b.name(), b.verifyHostname()))
                 .orElseGet(TlsProvider::none);
         return new ConnectRequest(
-                system,
-                how.spec(clusterId, spec.nodes()),
-                guarded(how.credentials(clusterId)),
-                options(clusterId, system, clusterTls));
+                system, spec, guarded(how.credentials(clusterId)), options(clusterId, system, clusterTls));
     }
 
     private ConnectOptions options(UUID clusterId, String system, TlsProvider clusterTls) {
