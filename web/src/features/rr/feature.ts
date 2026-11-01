@@ -19,7 +19,7 @@ function validateRrSearch(raw: Record<string, unknown>): Record<string, unknown>
 const rrRoute = createRoute({
   getParentRoute: () => clusterRoute,
   path: 'rr',
-  component: lazyFeatureView('rr', () => import('./FlowsView.tsx'), 'FlowsView'),
+  component: lazyFeatureView('rr', () => import('./FlowsView.tsx'), 'FlowsView', 'artemis'),
   validateSearch: validateRrSearch,
 });
 
@@ -35,13 +35,19 @@ export const rrFeature = defineFeature({
       label: 'Requests',
       icon: IconArrowsExchange,
       path: 'rr',
+      system: 'artemis',
       hotkey: 'r',
       permission: 'cluster:read',
     },
   ],
   slots: {
     'metrics.panels': [
-      { id: 'rr-latency', order: 10, Component: lazySlot(() => import('./LatencyCard.tsx'), 'LatencyCard') },
+      {
+        id: 'rr-latency',
+        system: 'artemis',
+        order: 10,
+        Component: lazySlot(() => import('./LatencyCard.tsx'), 'LatencyCard'),
+      },
     ],
   },
   streamTopics: {

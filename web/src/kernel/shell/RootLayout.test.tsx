@@ -4,6 +4,7 @@ import { http, HttpResponse } from 'msw';
 import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
+import { ARTEMIS_SYSTEM } from '../../test/wire.ts';
 import { renderWithProviders } from '../../test/render.tsx';
 import { manifestHandler } from '../../test/manifest.ts';
 import { server } from '../../test/setup.ts';
@@ -95,7 +96,7 @@ describe('RootLayout sidebar collapse', () => {
     mockEmptySubscriptions();
     server.use(
       http.get('*/api/v1/clusters', () =>
-        HttpResponse.json(paged([{ id: 'c1', name: 'prod-emea', health: 'OK', nodeCount: 3 }])),
+        HttpResponse.json(paged([{ id: 'c1', name: 'prod-emea', system: ARTEMIS_SYSTEM, health: 'OK', nodeCount: 3 }])),
       ),
     );
     localStorage.setItem('as:nav:collapsed', 'true');
@@ -126,7 +127,7 @@ describe('RootLayout in a narrow window', () => {
     mockEmptySubscriptions();
     server.use(
       http.get('*/api/v1/clusters', () =>
-        HttpResponse.json(paged([{ id: 'c1', name: 'prod-emea', health: 'OK', nodeCount: 3 }])),
+        HttpResponse.json(paged([{ id: 'c1', name: 'prod-emea', system: ARTEMIS_SYSTEM, health: 'OK', nodeCount: 3 }])),
       ),
     );
     localStorage.setItem('as:nav:collapsed', 'false');

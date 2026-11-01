@@ -165,8 +165,8 @@ export interface SlotContribution<P> {
    */
   group?: string;
   /**
-   * `routes.tabs` only: the id of the broker system the tab is for (`artemis`). The tab is listed only on a
-   * cluster that runs that system.
+   * The id of the broker system the contribution is for (`artemis`). A cluster-scoped slot lists it only on a
+   * cluster that runs that system (`useClusterSlot`); without it the contribution applies to every system.
    */
   system?: string;
   /** `*.actions` only: the menu section the item is listed under. */

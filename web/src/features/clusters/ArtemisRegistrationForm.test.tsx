@@ -419,7 +419,7 @@ describe('ArtemisRegistrationForm', () => {
     await user.click(screen.getByRole('button', { name: 'Register cluster' }));
 
     expect(await screen.findByText('Registered cluster prod-eu')).toBeInTheDocument();
-    expect(navigateSpy).toHaveBeenCalledWith({ to: '/clusters/c1/topology' });
+    expect(navigateSpy).toHaveBeenCalledWith({ to: '/clusters/c1' });
   });
 
   it('lists each node with what the management and the Core account each did there', async () => {

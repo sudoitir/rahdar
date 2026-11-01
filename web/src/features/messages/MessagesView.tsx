@@ -24,7 +24,8 @@ import { MessageActions } from './MessageActions.tsx';
 import { PurgeSubscription } from './PurgeSubscription.tsx';
 import { SendMessage } from './SendMessage.tsx';
 import { useDisplayZone } from '../../kernel/time/timezone.ts';
-import { useSlot, type MessageSelection } from '../../kernel/slots.ts';
+import { useClusterSlot } from '../../kernel/shell/useClusterSlot.ts';
+import type { MessageSelection } from '../../kernel/slots.ts';
 import { ResourceActions } from '../../kernel/actions/ResourceActions.tsx';
 import { useTitlePart } from '../../kernel/shell/pageTitle.ts';
 import { useFilterShortcut } from '../../kernel/keyboard/filterShortcut.ts';
@@ -215,7 +216,7 @@ export function MessagesView() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [sendOpen, setSendOpen] = useState(false);
   const page = search.page ?? 1;
-  const selectionSlot = useSlot('messages.selection');
+  const selectionSlot = useClusterSlot('messages.selection', clusterId);
 
   // Selection is ephemeral (D10) — reset on any navigation of node / filter / page.
   useEffect(() => setSelected(new Set()), [search.node, search.filter, page]);

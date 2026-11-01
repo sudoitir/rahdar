@@ -18,7 +18,7 @@ import { MetricsTable, type WindowMetric } from './MetricsTable.tsx';
 import { NodeSplitCharts } from './NodeSplitPanels.tsx';
 import { StatRow, type Figure } from './StatRow.tsx';
 import { earliest, formatCount, formatExact, formatRate, latest } from '../../kernel/metrics/axis.ts';
-import { useSlot } from '../../kernel/slots.ts';
+import { useClusterSlot } from '../../kernel/shell/useClusterSlot.ts';
 import { LoadingState } from '../../ui/LoadingState.tsx';
 import { Page } from '../../ui/Page.tsx';
 import { PageHeader } from '../../ui/PageHeader.tsx';
@@ -103,7 +103,7 @@ function formatCell(name: string, value: number): string {
  */
 export function MetricsView() {
   const { clusterId } = useParams({ strict: false }) as { clusterId: string };
-  const panels = useSlot('metrics.panels');
+  const panels = useClusterSlot('metrics.panels', clusterId);
   const search = useSearch({ strict: false }) as {
     range?: MetricRange;
     from?: string;

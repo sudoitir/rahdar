@@ -1,10 +1,11 @@
 import { IconSitemap } from '@tabler/icons-react';
-import { createRoute, redirect } from '@tanstack/react-router';
+import { createRoute } from '@tanstack/react-router';
 
 import { CONTRACT, defineFeature } from '../../kernel/feature.ts';
 import { clusterRoute, rootRoute } from '../../kernel/routing/roots.ts';
 import { lazyFeatureView, lazySlot } from '../../kernel/routing/lazy.tsx';
 import { keys } from './api.ts';
+import { ClusterLanding } from './ClusterLanding.tsx';
 import { ClusterHeader } from './ClusterHeader.tsx';
 import { ClusterPalette } from './ClusterPalette.tsx';
 import { RemoveClusterSection } from './RemoveClusterSection.tsx';
@@ -13,20 +14,18 @@ import { CapabilitiesSection, ConnectionSection, RegisterSection } from './Clust
 import { EnvironmentsPanel } from './EnvironmentsPanel.tsx';
 import { validateTopologySearch } from './topologySearch.ts';
 
-/** A cluster's own address opens its topology. */
+/** A cluster's own address opens the first view its system offers. */
 const clusterIndexRoute = createRoute({
   getParentRoute: () => clusterRoute,
   path: '/',
-  beforeLoad: ({ params }) => {
-    throw redirect({ to: `/clusters/${params.clusterId}/topology` });
-  },
+  component: ClusterLanding,
 });
 
 const topologyRoute = createRoute({
   getParentRoute: () => clusterRoute,
   path: 'topology',
   validateSearch: validateTopologySearch,
-  component: lazyFeatureView('clusters', () => import('./TopologyView.tsx'), 'TopologyView'),
+  component: lazyFeatureView('clusters', () => import('./TopologyView.tsx'), 'TopologyView', 'artemis'),
 });
 
 /** Registering a cluster: a page of its own outside any cluster, with the chosen system in its address. */
@@ -50,6 +49,7 @@ export const clustersFeature = defineFeature({
       label: 'Topology',
       icon: IconSitemap,
       path: 'topology',
+      system: 'artemis',
       hotkey: 't',
       permission: 'cluster:read',
     },

@@ -29,7 +29,7 @@ function validateSqlSearch(raw: Record<string, unknown>): SqlSearch {
 const sqlRoute = createRoute({
   getParentRoute: () => clusterRoute,
   path: 'sql',
-  component: lazyFeatureView('sql', () => import('./SqlConsoleView.tsx'), 'SqlConsoleView'),
+  component: lazyFeatureView('sql', () => import('./SqlConsoleView.tsx'), 'SqlConsoleView', 'artemis'),
   validateSearch: validateSqlSearch,
 });
 
@@ -45,6 +45,7 @@ export const sqlFeature = defineFeature({
       label: 'SQL Console',
       icon: IconTerminal2,
       path: 'sql',
+      system: 'artemis',
       hotkey: 's',
       permission: 'message:read',
     },

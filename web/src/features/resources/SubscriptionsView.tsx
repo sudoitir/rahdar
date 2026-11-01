@@ -16,7 +16,8 @@ import { BacklogDrawer, type BacklogTarget } from '../../kernel/backlog/BacklogD
 import { SubscriptionDetailDrawer } from './SubscriptionDetailDrawer.tsx';
 import { CreateSubscriptionForm } from './CreateSubscriptionForm.tsx';
 import { useCan } from '../../kernel/auth/useCan.ts';
-import { useSlot, type SubscriptionSelection } from '../../kernel/slots.ts';
+import { useClusterSlot } from '../../kernel/shell/useClusterSlot.ts';
+import type { SubscriptionSelection } from '../../kernel/slots.ts';
 import { ResourceActions } from '../../kernel/actions/ResourceActions.tsx';
 import { useTitlePart } from '../../kernel/shell/pageTitle.ts';
 import { CapabilityGate } from '../../ui/CapabilityGate.tsx';
@@ -290,7 +291,7 @@ export function SubscriptionsView() {
     .filter((e) => e.lastError)
     .map((e) => e.name);
 
-  const selectionSlot = useSlot('subscriptions.selection');
+  const selectionSlot = useClusterSlot('subscriptions.selection', clusterId);
 
   const setSort = (sort: string | undefined) =>
     navigate({ to: '.', search: (prev: Record<string, unknown>) => ({ ...prev, sort, page: undefined }) });

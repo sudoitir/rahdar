@@ -35,7 +35,7 @@ export function validateRoutesSearch(raw: Record<string, unknown>): RoutesSearch
 const routesRoute = createRoute({
   getParentRoute: () => clusterRoute,
   path: 'routes',
-  component: lazyFeatureView('routing', () => import('./RoutesView.tsx'), 'RoutesView'),
+  component: lazyFeatureView('routing', () => import('./RoutesView.tsx'), 'RoutesView', 'artemis'),
   validateSearch: validateRoutesSearch,
 });
 
@@ -51,14 +51,15 @@ export const routingFeature = defineFeature({
       label: 'Routes',
       icon: IconRoute,
       path: 'routes',
+      system: 'artemis',
       hotkey: 'o',
       permission: 'cluster:read',
     },
   ],
   slots: {
     'route.actions': [
-      { id: 'routing.route.copy', order: 10, section: 'copy', Component: CopyRouteName },
-      { id: 'routing.divert.delete', order: 10, section: 'destroy', Component: DeleteDivert },
+      { id: 'routing.route.copy', system: 'artemis', order: 10, section: 'copy', Component: CopyRouteName },
+      { id: 'routing.divert.delete', system: 'artemis', order: 10, section: 'destroy', Component: DeleteDivert },
     ],
   },
 });

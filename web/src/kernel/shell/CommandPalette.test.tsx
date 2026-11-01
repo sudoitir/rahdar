@@ -1,4 +1,4 @@
-import { subscriptionId, subscriptionIdentity } from '../../test/wire.ts';
+import { ARTEMIS_SYSTEM, subscriptionId, subscriptionIdentity } from '../../test/wire.ts';
 import { describe, expect, it, vi } from 'vitest';
 import { http, HttpResponse } from 'msw';
 import { screen } from '@testing-library/react';
@@ -42,6 +42,7 @@ function mockApi(permissions: string[] = ['*']) {
             id: 'c1',
             name: 'prod-eu',
             description: null,
+            system: ARTEMIS_SYSTEM,
             health: 'OK',
             nodeCount: 2,
             updatedAt: new Date().toISOString(),
