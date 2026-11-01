@@ -30,9 +30,9 @@ public final class Branding {
      * Mandatory disclaimer. Rendered in the About dialog and the docs footer.
      */
     public static final String TRADEMARK_NOTICE = "Apache ActiveMQ and Apache ActiveMQ Artemis are trademarks of the "
-            + "Apache Software Foundation. " + PRODUCT_NAME + " is an independent "
-            + "project and is not produced by, endorsed by, or affiliated with the "
-            + "Apache Software Foundation.";
+            + "Apache Software Foundation. RabbitMQ is a trademark of its owner. " + PRODUCT_NAME
+            + " is an independent project and is not produced by, endorsed by, or affiliated with the "
+            + "Apache Software Foundation or the owner of RabbitMQ.";
 
     public static final String PROJECT_URL = "https://github.com/sudoitir/rahdar";
 }

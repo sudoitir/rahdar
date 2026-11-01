@@ -121,7 +121,7 @@ quorum or why it is unavailable, and what the account may do. A failed check nam
 | The certificate is not trusted, or does not match the host name | TLS failed. | Give a TLS bundle that trusts the broker's certificate, and check that it names the advertised address. |
 | Authentication failed | The broker rejected the credentials. | Check the mechanism, the username and the secret. |
 | The account may not describe the cluster | The credentials were accepted, but the account lacks the permission. | Grant `Describe` on the cluster. This is different from a rejected password. |
-| This Kafka version is not supported | The cluster is older than 3.0. | See [Supported broker versions](/guide/supported-versions). |
+| This Kafka version is not supported | The cluster is older than 2.8. | See [Supported broker versions](/guide/supported-versions). |
 
 A bootstrap server may answer while a broker advertises an address Rahdar cannot reach, for example a name
 that only resolves inside the cluster's network. The check then names that broker and its advertised address as

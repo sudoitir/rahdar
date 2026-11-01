@@ -11,7 +11,8 @@ export const branding = {
   tagline: 'Cluster-wide management and observability for Apache ActiveMQ Artemis',
   trademarkNotice:
     'Apache ActiveMQ and Apache ActiveMQ Artemis are trademarks of the Apache ' +
-    'Software Foundation. Rahdar is an independent project and is not ' +
-    'produced by, endorsed by, or affiliated with the Apache Software Foundation.',
+    'Software Foundation. RabbitMQ is a trademark of its owner. Rahdar is an ' +
+    'independent project and is not produced by, endorsed by, or affiliated with ' +
+    'the Apache Software Foundation or the owner of RabbitMQ.',
   projectUrl: 'https://github.com/sudoitir/rahdar',
 } as const;

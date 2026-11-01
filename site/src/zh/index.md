@@ -1,15 +1,15 @@
 ---
 layout: home
 title: Rahdar
-titleTemplate: 一个控制台，管理你的 Artemis 与 Kafka 集群
+titleTemplate: 一个控制台，管理你的 Artemis、Kafka 与 RabbitMQ 集群
 head:
   - - meta
     - name: description
-      content: 面向 Apache ActiveMQ Artemis 与 Apache Kafka 的开源运维控制台：所有集群在同一个资产视图中，延迟如实标为估算值，破坏性操作先预览，人和助手的变更都要经过审批闸门。
+      content: 面向 Apache ActiveMQ Artemis、Apache Kafka 与 RabbitMQ 的开源运维控制台：所有集群在同一个资产视图中，延迟如实标为估算值，破坏性操作先预览，人和助手的变更都要经过审批闸门。
 
 hero:
   name: Rahdar
-  text: 一个控制台，管理你的 Artemis 与 Kafka 集群
+  text: 一个控制台，管理你的 Artemis、Kafka 与 RabbitMQ 集群
   tagline: 开源的消息 Broker 运维控制台。你运行的每一个集群都在同一个资产视图中，每个数字都说明它有多确定，任何破坏性操作在执行之前都会先让你看到它将做什么。
   actions:
     - theme: brand
@@ -46,8 +46,8 @@ features:
 ## 支持的系统
 
 - **Apache ActiveMQ Artemis** 2.33.0 及以上。
-- **Apache Kafka** 3.0 及以上，KRaft 与 ZooKeeper 模式。见 [Kafka 指南](/guide/kafka)（英文）与[支持的 Broker 版本](/guide/supported-versions)（英文）。
-- **RabbitMQ**：即将推出，目前尚不支持。
+- **Apache Kafka** 2.8 及以上，KRaft 与 ZooKeeper 模式。见 [Kafka 指南](/guide/kafka)（英文）与[支持的 Broker 版本](/guide/supported-versions)（英文）。
+- **RabbitMQ** 3.13 及以上（已测试 4.x）。见 [RabbitMQ 指南](/guide/rabbitmq)（英文）。
 
 Rahdar 通过开源的 Broker SDK [OpenBroker](https://github.com/sudoitir/openbroker) 与 Broker 通信，每个系统一个驱动。
 
@@ -58,7 +58,7 @@ git clone https://github.com/sudoitir/rahdar && cd rahdar
 just up          # 两个 Rahdar 副本 + HAProxy + Postgres，自动生成密钥，并固定到最新发布版本
 ```
 
-你的 Broker 本来就存在：Rahdar 只负责纳管，不会去启动它们。在界面中用 Artemis 管理 URL 或 Kafka 引导服务器注册集群，保存之前会检查能否连到每一个 Broker。[完整快速开始 →](/zh/guide/quickstart)
+你的 Broker 本来就存在：Rahdar 只负责纳管，不会去启动它们。在界面中用 Artemis 管理 URL、Kafka 引导服务器或 RabbitMQ 管理 URL 注册集群，保存之前会检查能否连到每一个 Broker。[完整快速开始 →](/zh/guide/quickstart)
 
 ::: warning Alpha 阶段
 仍在积极开发中，功能尚未完备。已发布的镜像都是预发布的 dev 构建（`sudoit1/rahdar:dev`，暂无 `:latest`）。请预期会有破坏性变更。

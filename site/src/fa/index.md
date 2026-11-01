@@ -1,15 +1,15 @@
 ---
 layout: home
 title: Rahdar
-titleTemplate: یک کنسول برای کلاسترهای Artemis و Kafka شما
+titleTemplate: یک کنسول برای کلاسترهای Artemis، Kafka و RabbitMQ شما
 head:
   - - meta
     - name: description
-      content: کنسول متن‌باز عملیات برای Apache ActiveMQ Artemis و Apache Kafka؛ همهٔ کلاسترها در یک estate، lag صادقانه به‌عنوان تخمین، پیش‌نمایش پیش از هر کار مخرب، و دروازهٔ تأیید برای انسان و دستیار.
+      content: کنسول متن‌باز عملیات برای Apache ActiveMQ Artemis، Apache Kafka و RabbitMQ؛ همهٔ کلاسترها در یک estate، lag صادقانه به‌عنوان تخمین، پیش‌نمایش پیش از هر کار مخرب، و دروازهٔ تأیید برای انسان و دستیار.
 
 hero:
   name: Rahdar
-  text: یک کنسول برای کلاسترهای Artemis و Kafka شما
+  text: یک کنسول برای کلاسترهای Artemis، Kafka و RabbitMQ شما
   tagline: کنسول متن‌باز عملیات برای بروکرهای پیام. هر کلاستری که اجرا می‌کنید در یک estate است، هر عددی می‌گوید چقدر مطمئن است، و هیچ کار مخربی پیش از آن‌که ببینید چه می‌کند اجرا نمی‌شود.
   actions:
     - theme: brand
@@ -46,8 +46,8 @@ features:
 ## سیستم‌های پشتیبانی‌شده
 
 - **Apache ActiveMQ Artemis** نسخهٔ ۲٫۳۳٫۰ و بالاتر.
-- **Apache Kafka** نسخهٔ ۳٫۰ و بالاتر، در حالت KRaft و ZooKeeper. [راهنمای Kafka](/guide/kafka) و [نسخه‌های پشتیبانی‌شدهٔ بروکر](/guide/supported-versions) را ببینید (انگلیسی).
-- **RabbitMQ**: به‌زودی؛ هنوز پشتیبانی نمی‌شود.
+- **Apache Kafka** نسخهٔ ۲٫۸ و بالاتر، در حالت KRaft و ZooKeeper. [راهنمای Kafka](/guide/kafka) و [نسخه‌های پشتیبانی‌شدهٔ بروکر](/guide/supported-versions) را ببینید (انگلیسی).
+- **RabbitMQ** نسخهٔ ۳٫۱۳ و بالاتر (۴.x آزمایش شده). [راهنمای RabbitMQ](/guide/rabbitmq) را ببینید (انگلیسی).
 
 Rahdar از طریق [OpenBroker](https://github.com/sudoitir/openbroker)، یک SDK متن‌باز بروکر با یک درایور برای هر سیستم، با بروکرها صحبت می‌کند.
 
@@ -58,7 +58,7 @@ git clone https://github.com/sudoitir/rahdar && cd rahdar
 just up          # دو replica از Rahdar + HAProxy + Postgres، با کلیدهای تولیدشده و پین‌شده به آخرین انتشار
 ```
 
-بروکرهای شما از پیش وجود دارند؛ Rahdar آن‌ها را ثبت می‌کند، اجرا نمی‌کند. کلاستر را در رابط کاربری با URL مدیریتی Artemis یا bootstrap serverهای Kafka ثبت کنید؛ پیش از ذخیره، بررسی می‌شود که به تک‌تک بروکرها می‌رسد. [شروع سریع کامل ←](/fa/guide/quickstart)
+بروکرهای شما از پیش وجود دارند؛ Rahdar آن‌ها را ثبت می‌کند، اجرا نمی‌کند. کلاستر را در رابط کاربری با URL مدیریتی Artemis، bootstrap serverهای Kafka یا URLهای مدیریت RabbitMQ ثبت کنید؛ پیش از ذخیره، بررسی می‌شود که به تک‌تک بروکرها می‌رسد. [شروع سریع کامل ←](/fa/guide/quickstart)
 
 ::: warning مرحلهٔ Alpha
 در حال توسعهٔ فعال و هنوز کامل نیست. ایمیج‌های منتشرشده buildهای پیش‌پایدار dev هستند (`sudoit1/rahdar:dev`؛ هنوز `:latest` وجود ندارد). منتظر تغییرات ناسازگار باشید.
