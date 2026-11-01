@@ -12,6 +12,8 @@
 #   - the Kafka cluster "events" beside it (when demo-seed.sh has not already registered one), with topics,
 #     one compacted and one with a tombstone, consumer groups (one active, one empty and far behind, one empty and
 #     a little behind, a share group), ACLs, one transaction left open, and a group and topic with 200-character names;
+#   - the RabbitMQ cluster "rabbit" beside it (when demo-seed.sh has not already registered one), with the demo's
+#     queues and a queue name of 200 characters;
 #   - the cluster the sweep opens, named "demo" (registered over the dev stack's two brokers when
 #     demo-seed.sh has not already registered the six-node one);
 #   - 60 queues: three with names past 120 characters, one on a 200-character address, anycast and
@@ -265,6 +267,24 @@ if [ -n "${COMPOSE:-}" ]; then
   api POST "/users/$reader_id/grants" -d "{\"roleId\":\"$reader\",\"scopeType\":\"CLUSTER\",\"scopeId\":\"$(find_id /clusters name events)\"}" -o /dev/null || true
 else
   echo "  COMPOSE is not set: no Kafka cluster is registered or seeded" >&2
+fi
+
+# The RabbitMQ cluster, the same way: demo-seed.sh registers "rabbit" itself when the stack is the demo's.
+if [ -n "${COMPOSE:-}" ]; then
+  # shellcheck source=lib/rabbitmq-seed.sh
+  . "$(dirname "${BASH_SOURCE[0]}")/lib/rabbitmq-seed.sh"
+  rabbitmq_init
+  if [ -z "$(find_id /clusters name rabbit)" ]; then
+    say "registering the RabbitMQ cluster"
+    rabbitmq_register
+    rabbitmq_seed_data
+  else
+    echo "  the RabbitMQ cluster is registered already"
+  fi
+  rabbitmq_seed_long
+  api POST "/users/$reader_id/grants" -d "{\"roleId\":\"$reader\",\"scopeType\":\"CLUSTER\",\"scopeId\":\"$(find_id /clusters name rabbit)\"}" -o /dev/null || true
+else
+  echo "  COMPOSE is not set: no RabbitMQ cluster is registered or seeded" >&2
 fi
 
 if [ "$failed" -gt 0 ]; then

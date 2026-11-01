@@ -33,6 +33,10 @@ services:
     environment:
       KAFKA_TRANSACTION_ABORT_TIMED_OUT_TRANSACTION_CLEANUP_INTERVAL_MS: "86400000"
 
+  # Not published, like Kafka: the seed and Rahdar reach it on the compose network.
+  rabbitmq:
+    ports: !reset []
+
   artemis-primary:
     ports: !override
       - "127.0.0.1::8161"
