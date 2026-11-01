@@ -319,7 +319,7 @@ const REGISTER_KAFKA_SCENES: Scene[] = [
   ),
   stubbed(
     'cause-unsupported-version-stub',
-    failure('UNSUPPORTED_VERSION', 'The cluster runs Kafka 2.8.', 'Rahdar supports Kafka 3.0 and later.'),
+    failure('UNSUPPORTED_VERSION', 'The cluster runs Kafka 2.6.', 'Rahdar supports Kafka 2.8 and later.'),
   ),
 ];
 

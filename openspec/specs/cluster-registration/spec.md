@@ -358,7 +358,7 @@ Registration SHALL start from a choice of system, listed from the broker drivers
 - **THEN** the request is refused as an unsupported system, naming the systems it supports, and nothing is persisted
 
 ### Requirement: A Kafka cluster is registered from bootstrap servers
-The system SHALL register a Kafka cluster from one or more bootstrap servers, written as `host:port` in one field separated by commas, spaces or new lines, with the port defaulting to 9092, and SHALL refuse a server written with a scheme or an account. Kafka 3.0 and later SHALL be supported, in ZooKeeper and KRaft mode; an older cluster SHALL be refused, naming what was found and the supported range.
+The system SHALL register a Kafka cluster from one or more bootstrap servers, written as `host:port` in one field separated by commas, spaces or new lines, with the port defaulting to 9092, and SHALL refuse a server written with a scheme or an account. Kafka 2.8 and later SHALL be supported, in ZooKeeper and KRaft mode; an older cluster SHALL be refused, naming what was found and the supported range.
 
 #### Scenario: Registering a SASL cluster
 - **WHEN** an operator registers a cluster from one bootstrap server with SCRAM-SHA-512 credentials

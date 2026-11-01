@@ -152,7 +152,7 @@ disabled, with the reason.
 | System | Supported | Guide |
 | --- | --- | --- |
 | Apache ActiveMQ® Artemis | 2.33.0 and later | [Guide](https://rahdar.dev/guide/) |
-| Apache Kafka® | 3.0 and later, KRaft and ZooKeeper mode | [Kafka](https://rahdar.dev/guide/kafka) |
+| Apache Kafka® | 2.8 and later, KRaft and ZooKeeper mode | [Kafka](https://rahdar.dev/guide/kafka) |
 | RabbitMQ | Coming next; not supported yet | |
 
 Details and what happens outside those ranges: [supported broker versions](https://rahdar.dev/guide/supported-versions).
