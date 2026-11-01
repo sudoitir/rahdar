@@ -15,6 +15,7 @@ import { lifecycleFeature } from '../features/lifecycle/feature.ts';
 import { pluginsFeature } from '../features/plugins/feature.ts';
 import { messagesFeature } from '../features/messages/feature.ts';
 import { metricsFeature } from '../features/metrics/feature.ts';
+import { rabbitmqFeature } from '../features/rabbitmq/feature.ts';
 import { resourcesFeature } from '../features/resources/feature.ts';
 import { routingFeature } from '../features/routing/feature.ts';
 import { rrFeature } from '../features/rr/feature.ts';
@@ -46,6 +47,7 @@ export const FEATURES: RahdarFeature[] = [
   routingFeature,
   setupreviewFeature,
   kafkaFeature,
+  rabbitmqFeature,
   brokerconfigFeature,
   settingsFeature,
   lifecycleFeature,
