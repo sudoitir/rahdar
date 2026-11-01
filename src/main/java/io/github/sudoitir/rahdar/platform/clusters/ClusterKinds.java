@@ -31,10 +31,21 @@ public class ClusterKinds {
     private final BrokerSystems systems;
     private final BrokerGateway gateway;
     private final SystemExtensions extensions;
+    private final ClusterDirectory nodes;
 
     /** Whether the cluster's kind of this id reads a partitioned log, so its messages are browsed by partition. */
     public boolean partitioned(UUID clusterId, String kind) {
         return kindsOf(clusterId).stream().anyMatch(k -> k.id().equals(kind) && k.partitioned());
+    }
+
+    /**
+     * Whether the cluster is read and changed as one: it has nodes, and none of them has a management URL, so its
+     * driver answers for the cluster as a whole (Kafka, RabbitMQ) and there is no node to fan out to (ADR-0224).
+     * An Artemis cluster is not, and a cluster with no stored node is not either.
+     */
+    public boolean readAsOne(UUID clusterId) {
+        List<ClusterNode> stored = nodes.nodes(clusterId);
+        return !stored.isEmpty() && stored.stream().noneMatch(n -> n.getManagementUrl() != null);
     }
 
     /** The ids of the cluster's kinds that are subscriptions, which messages are received from. */

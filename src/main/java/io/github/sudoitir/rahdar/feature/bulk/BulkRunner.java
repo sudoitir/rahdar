@@ -1,5 +1,6 @@
 package io.github.sudoitir.rahdar.feature.bulk;
 
+import io.github.sudoitir.openbroker.model.ResourceClass;
 import io.github.sudoitir.rahdar.feature.bulk.BulkRunMapper.ItemEstimate;
 import io.github.sudoitir.rahdar.feature.bulk.BulkRunMapper.RunOptions;
 import io.github.sudoitir.rahdar.feature.bulk.internal.persistence.BulkRunEntity;
@@ -24,6 +25,7 @@ import io.github.sudoitir.rahdar.platform.clusters.ClusterKinds;
 import io.github.sudoitir.rahdar.platform.clusters.LifecycleOutcome;
 import io.github.sudoitir.rahdar.platform.clusters.LifecycleOutcome.NodeOutcome;
 import io.github.sudoitir.rahdar.platform.clusters.LifecycleOutcome.NodeStatus;
+import io.github.sudoitir.rahdar.platform.clusters.ResourceTargets.Target;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -223,13 +225,22 @@ class BulkRunner {
         return switch (run.getOperation()) {
             case PAUSE -> unwrap(queues.setPaused(clusterId, queue, true, false));
             case RESUME -> unwrap(queues.setPaused(clusterId, queue, false, false));
-            case DELETE ->
-                unwrap(queues.deleteQueue(
-                        clusterId,
-                        queue,
-                        false,
-                        run.isOverrideCap(),
-                        json.readValue(run.getOptions(), RunOptions.class).disconnectConsumers()));
+            case DELETE -> {
+                boolean disconnectConsumers =
+                        json.readValue(run.getOptions(), RunOptions.class).disconnectConsumers();
+                // A cluster read as one deletes the subscription by its id, as the single delete does.
+                yield unwrap(
+                        kinds.readAsOne(clusterId)
+                                ? queues.deleteQueue(
+                                        clusterId,
+                                        new Target(
+                                                BulkItemIds.parse(item.getSubscription()), ResourceClass.SUBSCRIPTION),
+                                        false,
+                                        run.isOverrideCap(),
+                                        disconnectConsumers)
+                                : queues.deleteQueue(
+                                        clusterId, queue, false, run.isOverrideCap(), disconnectConsumers));
+            }
             case PURGE -> purge(run, item);
         };
     }

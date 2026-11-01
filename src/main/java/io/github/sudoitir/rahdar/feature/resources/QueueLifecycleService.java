@@ -1,6 +1,8 @@
 package io.github.sudoitir.rahdar.feature.resources;
 
 import io.github.sudoitir.openbroker.model.Attributes;
+import io.github.sudoitir.openbroker.model.ResourceId;
+import io.github.sudoitir.openbroker.model.StandardAttributes;
 import io.github.sudoitir.rahdar.feature.resources.LifecycleRequests.CreateDestinationRequest;
 import io.github.sudoitir.rahdar.feature.resources.LifecycleRequests.CreateSubscriptionRequest;
 import io.github.sudoitir.rahdar.feature.resources.LifecycleRequests.UpdateResourceRequest;
@@ -23,13 +25,16 @@ import io.github.sudoitir.rahdar.platform.broker.DivertRoute;
 import io.github.sudoitir.rahdar.platform.broker.ManagementRefusal;
 import io.github.sudoitir.rahdar.platform.broker.QueueCounters;
 import io.github.sudoitir.rahdar.platform.broker.RahdarNames;
+import io.github.sudoitir.rahdar.platform.broker.ResourceIds;
 import io.github.sudoitir.rahdar.platform.clusters.BrokerCommands;
 import io.github.sudoitir.rahdar.platform.clusters.BrokerCommands.Check;
 import io.github.sudoitir.rahdar.platform.clusters.BrokerCommands.Command;
 import io.github.sudoitir.rahdar.platform.clusters.BrokerCommands.Estimate;
 import io.github.sudoitir.rahdar.platform.clusters.BrokerCommands.NodeAction;
+import io.github.sudoitir.rahdar.platform.clusters.ClusterKinds;
 import io.github.sudoitir.rahdar.platform.clusters.LifecycleOutcome;
 import io.github.sudoitir.rahdar.platform.clusters.LifecycleOutcome.NodeStatus;
+import io.github.sudoitir.rahdar.platform.clusters.ResourceTargets.Target;
 import io.github.sudoitir.rahdar.platform.scrape.QueueLocator;
 import io.github.sudoitir.rahdar.platform.scrape.QueueLocator.QueueLocation;
 import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshotUpsert;
@@ -82,15 +87,25 @@ public class QueueLifecycleService {
     private final OperationGate gate;
     private final BrokerMessages messages;
     private final QueueCounters counters;
+    private final ClusterKinds kinds;
+    private final WholeClusterLifecycle wholeCluster;
 
     /** What a delete would touch: how many messages, and the target's identity for the gate's state key. */
-    public record Reach(long count, String identity) {}
+    public record Reach(long count, String identity, String detail) {
 
-    /** What the gate holds of a queue delete. */
-    record QueueDeleteParams(UUID clusterId, String queue, boolean override, boolean disconnectConsumers) {}
+        public Reach(long count, String identity) {
+            this(count, identity, null);
+        }
+    }
 
-    /** What the gate holds of an address delete. */
-    record AddressDeleteParams(UUID clusterId, String address) {}
+    /**
+     * What the gate holds of a queue delete. {@code id} is the resource's canonical id on a cluster read as one,
+     * and null on a per-node system.
+     */
+    record QueueDeleteParams(UUID clusterId, String queue, String id, boolean override, boolean disconnectConsumers) {}
+
+    /** What the gate holds of an address delete. {@code id} is as on {@link QueueDeleteParams}. */
+    record AddressDeleteParams(UUID clusterId, String address, String id) {}
 
     // ---- entry points ----------------------------------------------------
 
@@ -100,6 +115,9 @@ public class QueueLifecycleService {
         access.requireCreate(clusterId, ResourceRef.subscription(req.name()), ResourcePermissions.SUBSCRIPTION_CREATE);
         access.requireCreate(
                 clusterId, ResourceRef.destination(req.destinationName()), ResourcePermissions.DESTINATION_CREATE);
+        if (kinds.readAsOne(clusterId)) {
+            return createWhole(clusterId, req, dryRun);
+        }
         return run(clusterId, LifecycleKind.CREATE_SUBSCRIPTION, req.name(), params(req), dryRun, false, node -> {
             // A queue that exists as asked is ALREADY; one that exists differently is refused, naming how.
             return QueueCalls.createQueue(node, req);
@@ -139,14 +157,67 @@ public class QueueLifecycleService {
         if (dryRun) {
             return runDeleteQueue(clusterId, queueName, true, override, disconnectConsumers);
         }
-        return gatedDeleteQueue(new QueueDeleteParams(clusterId, queueName, override, disconnectConsumers));
+        return gatedDeleteQueue(new QueueDeleteParams(clusterId, queueName, null, override, disconnectConsumers));
+    }
+
+    /**
+     * Delete a subscription by the id the route resolved. A cluster read as one changes it as a whole through its
+     * driver (ADR-0224); any other cluster deletes it by name on every node.
+     */
+    public Attempt<LifecycleOutcome> deleteQueue(
+            UUID clusterId, Target target, boolean dryRun, boolean override, boolean disconnectConsumers) {
+        if (!kinds.readAsOne(clusterId)) {
+            return deleteQueue(clusterId, target.name(), dryRun, override, disconnectConsumers);
+        }
+        LifecycleKind kind = LifecycleKind.DELETE_SUBSCRIPTION;
+        access.requireResource(clusterId, ResourceRef.subscription(target.name()), kind.permission());
+        if (dryRun) {
+            return runWholeDelete(clusterId, target.id(), kind, true, override, disconnectConsumers);
+        }
+        return gatedDeleteQueue(
+                new QueueDeleteParams(clusterId, target.name(), target.id().format(), override, disconnectConsumers));
     }
 
     @Gated("subscription.delete")
     private Attempt<LifecycleOutcome> gatedDeleteQueue(QueueDeleteParams p) {
-        return gate.run(
-                Operation.of(p),
-                () -> runDeleteQueue(p.clusterId(), p.queue(), false, p.override(), p.disconnectConsumers()));
+        return gate.run(Operation.of(p), () -> {
+            if (p.id() == null) {
+                return runDeleteQueue(p.clusterId(), p.queue(), false, p.override(), p.disconnectConsumers());
+            }
+            return runWholeDelete(
+                    p.clusterId(),
+                    ResourceId.parse(p.id()),
+                    LifecycleKind.DELETE_SUBSCRIPTION,
+                    false,
+                    p.override(),
+                    p.disconnectConsumers());
+        });
+    }
+
+    private Attempt<LifecycleOutcome> runWholeDelete(
+            UUID clusterId,
+            ResourceId id,
+            LifecycleKind kind,
+            boolean dryRun,
+            boolean override,
+            boolean disconnectConsumers) {
+        return wholeCluster.delete(clusterId, id, kind, dryRun, override, disconnectConsumers, () -> {
+            if (kind == LifecycleKind.DELETE_SUBSCRIPTION) {
+                snapshotWriter.forget(clusterId, id.name());
+            }
+            sseHub.publishAbout(clusterId, QUEUES_TOPIC, List.of(kind.resource(id.name())));
+        });
+    }
+
+    /**
+     * What deleting the resource would remove now on a cluster read as one, from the driver's preview: the messages
+     * when it counts them, and the etag of what it saw as the gate's state key.
+     */
+    public Reach reachOfDelete(UUID clusterId, ResourceId id, LifecycleKind kind, boolean disconnectConsumers) {
+        access.requireResource(clusterId, kind.resource(id.name()), kind.permission());
+        WholeClusterLifecycle.Reach reach = wholeCluster.reachOfDelete(clusterId, id, disconnectConsumers);
+        return new Reach(
+                reach.messages().orElse(0L), reach.etag(), reach.basis().note());
     }
 
     /**
@@ -407,6 +478,9 @@ public class QueueLifecycleService {
     public Attempt<LifecycleOutcome> createAddress(UUID clusterId, CreateDestinationRequest req, boolean dryRun) {
         access.requireCreate(
                 clusterId, ResourceRef.destination(req.name()), LifecycleKind.CREATE_DESTINATION.permission());
+        if (kinds.readAsOne(clusterId)) {
+            return createWhole(clusterId, req, dryRun);
+        }
         return run(
                 clusterId,
                 LifecycleKind.CREATE_DESTINATION,
@@ -430,12 +504,32 @@ public class QueueLifecycleService {
         if (dryRun) {
             return runDeleteAddress(clusterId, address, true);
         }
-        return gatedDeleteAddress(new AddressDeleteParams(clusterId, address));
+        return gatedDeleteAddress(new AddressDeleteParams(clusterId, address, null));
+    }
+
+    /** Delete a destination by the id the route resolved, as {@link #deleteQueue(UUID, Target, boolean, boolean, boolean)}. */
+    public Attempt<LifecycleOutcome> deleteAddress(UUID clusterId, Target target, boolean dryRun) {
+        if (!kinds.readAsOne(clusterId)) {
+            return deleteAddress(clusterId, target.name(), dryRun);
+        }
+        access.requireResource(
+                clusterId, ResourceRef.destination(target.name()), LifecycleKind.DELETE_DESTINATION.permission());
+        if (dryRun) {
+            return runWholeDelete(clusterId, target.id(), LifecycleKind.DELETE_DESTINATION, true, false, false);
+        }
+        return gatedDeleteAddress(
+                new AddressDeleteParams(clusterId, target.name(), target.id().format()));
     }
 
     @Gated("destination.delete")
     private Attempt<LifecycleOutcome> gatedDeleteAddress(AddressDeleteParams p) {
-        return gate.run(Operation.of(p), () -> runDeleteAddress(p.clusterId(), p.address(), false));
+        return gate.run(Operation.of(p), () -> {
+            if (p.id() == null) {
+                return runDeleteAddress(p.clusterId(), p.address(), false);
+            }
+            return runWholeDelete(
+                    p.clusterId(), ResourceId.parse(p.id()), LifecycleKind.DELETE_DESTINATION, false, false, false);
+        });
     }
 
     private Attempt<LifecycleOutcome> runDeleteAddress(UUID clusterId, String address, boolean dryRun) {
@@ -452,6 +546,47 @@ public class QueueLifecycleService {
                 throw e;
             }
         });
+    }
+
+    // ---- a cluster read as one --------------------------------------------
+
+    private Attempt<LifecycleOutcome> createWhole(UUID clusterId, CreateSubscriptionRequest req, boolean dryRun) {
+        ResourceId id = createdId(req.kind(), req.name());
+        Attributes.Builder attributes = Attributes.builder();
+        req.attributes().forEach(attributes::putRaw);
+        attributes.put(StandardAttributes.DESTINATION, ResourceId.parse(req.destination()));
+        Map<String, Object> audited = new LinkedHashMap<>(req.attributes());
+        audited.put("id", id.format());
+        audited.put("destination", req.destination());
+        return wholeCluster.create(
+                clusterId,
+                id,
+                LifecycleKind.CREATE_SUBSCRIPTION,
+                attributes.build(),
+                audited,
+                dryRun,
+                () -> sseHub.publishAbout(clusterId, QUEUES_TOPIC, List.of(ResourceRef.subscription(id.name()))));
+    }
+
+    private Attempt<LifecycleOutcome> createWhole(UUID clusterId, CreateDestinationRequest req, boolean dryRun) {
+        ResourceId id = createdId(req.kind(), req.name());
+        Map<String, Object> audited = new LinkedHashMap<>(req.attributes());
+        audited.put("id", id.format());
+        Attributes.Builder attributes = Attributes.builder();
+        req.attributes().forEach(attributes::putRaw);
+        return wholeCluster.create(
+                clusterId,
+                id,
+                LifecycleKind.CREATE_DESTINATION,
+                attributes.build(),
+                audited,
+                dryRun,
+                () -> sseHub.publishAbout(clusterId, QUEUES_TOPIC, List.of(ResourceRef.destination(id.name()))));
+    }
+
+    /** A name with a slash is a path of several segments, such as a virtual host and a queue; any other is one. */
+    private static ResourceId createdId(String kind, String name) {
+        return name.contains("/") ? ResourceIds.parse(kind, name) : ResourceId.of(kind, name);
     }
 
     // ---- the fan-out -----------------------------------------------------

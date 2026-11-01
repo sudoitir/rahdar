@@ -1,5 +1,6 @@
 package io.github.sudoitir.rahdar.platform.clusters;
 
+import io.github.sudoitir.rahdar.platform.broker.IdentityBasis;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -17,8 +18,19 @@ import java.util.UUID;
  * @param cap the bulk safety cap in force (ADR-0022), for a destructive command
  * @param overCap whether the summed estimate exceeds the cap
  * @param nodes one entry per node considered — including the ones skipped
+ * @param identityBasis what the preview's etag holds, so a view can say when a recreated resource is not told apart
  */
-public record LifecycleOutcome(boolean dryRun, long cap, boolean overCap, List<NodeOutcome> nodes) {
+public record LifecycleOutcome(
+        boolean dryRun, long cap, boolean overCap, List<NodeOutcome> nodes, IdentityBasis identityBasis) {
+
+    public LifecycleOutcome {
+        Objects.requireNonNull(identityBasis, "identityBasis");
+    }
+
+    /** An outcome of a per-node command, whose etag holds the incarnation the node reports. */
+    public LifecycleOutcome(boolean dryRun, long cap, boolean overCap, List<NodeOutcome> nodes) {
+        this(dryRun, cap, overCap, nodes, IdentityBasis.INCARNATION);
+    }
 
     public enum NodeStatus {
         /** Dry run: the command would be applied here. */
