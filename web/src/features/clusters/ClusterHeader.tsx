@@ -26,9 +26,10 @@ function capabilityGaps(caps: CapabilitiesView | undefined): string[] {
 function clusterMeta({ topology, health, system }: ClusterDetail): string {
   const nodeCount = topology.nodes.reduce((n, node) => n + node.endpoints.length, 0);
   const hasPair = topology.nodes.some((n) => n.endpoints.length > 1);
+  const pairs = hasPair ? 'replication' : 'standalone';
   return [
     `${nodeCount} node${nodeCount === 1 ? '' : 's'}`,
-    system?.id === 'artemis' ? (hasPair ? 'replication' : 'standalone') : null,
+    system?.id === 'artemis' ? pairs : null,
     health.level === 'UNKNOWN' ? 'not yet contacted' : 'reachable',
   ]
     .filter((part) => part !== null)
