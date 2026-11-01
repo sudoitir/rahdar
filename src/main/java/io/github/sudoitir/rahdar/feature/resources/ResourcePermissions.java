@@ -27,5 +27,9 @@ public final class ResourcePermissions {
 
     public static final String ROUTE_WRITE = "route:write";
 
+    public static final String ACCESS_RULE_READ = "access-rule:read";
+
+    public static final String ACCESS_RULE_WRITE = "access-rule:write";
+
     private ResourcePermissions() {}
 }
