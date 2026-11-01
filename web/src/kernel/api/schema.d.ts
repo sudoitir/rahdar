@@ -5633,8 +5633,11 @@ export interface components {
             identityBasis: "INCARNATION" | "CONFIGURATION";
         };
         NodeOutcomeView: {
-            /** Format: uuid */
-            nodeId: string;
+            /**
+             * Format: uuid
+             * @description Absent on a cluster changed as one, which has no node to name.
+             */
+            nodeId?: string | null;
             nodeName: string;
             /**
              * @description WOULD_APPLY on a preview; APPLIED when the node was changed; ALREADY when it was already in the requested state; SKIPPED_NOT_LIVE when the node was not live and never received the command; UNSUPPORTED_VERSION when its Artemis release lacks the operation and it was not called; FAILED when it refused.
@@ -7435,8 +7438,8 @@ export interface components {
             /** @description The kind's name for people, singular and plural. */
             kindLabel: components["schemas"]["KindName"];
             name: string;
-            /** @description The id of the destination this subscription is bound to. */
-            destination: string;
+            /** @description The id of the destination this subscription is bound to; absent for a system whose queues are fed through routes, such as RabbitMQ. */
+            destination?: string | null;
             /** @description What the system calls the subscription's own properties, such as its routing type. */
             nativeAttributes: {
                 [key: string]: string;

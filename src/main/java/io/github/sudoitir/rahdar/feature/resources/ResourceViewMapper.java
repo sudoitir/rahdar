@@ -23,6 +23,7 @@ import io.github.sudoitir.rahdar.feature.resources.web.ResourceViews.ProducerVie
 import io.github.sudoitir.rahdar.feature.resources.web.ResourceViews.SubscriptionNodeCell;
 import io.github.sudoitir.rahdar.feature.resources.web.ResourceViews.SubscriptionView;
 import io.github.sudoitir.rahdar.platform.broker.QueueRow;
+import io.github.sudoitir.rahdar.platform.broker.ResourceIds;
 import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshot;
 import java.time.Instant;
 import java.util.List;
@@ -85,9 +86,18 @@ public class ResourceViewMapper {
                 id.format(),
                 kind.value(),
                 label(connection, kind),
-                // The group or queue is what a team owns, so it is the name; the destination says which topic.
-                path == null ? key.name() : id.path().segments().getFirst(),
-                ResourceId.of(kinds.destination().value(), key.destination()).format(),
+                // The group or queue is what a team owns, so it is the name; the destination says which topic. A queue
+                // in a
+                // virtual host is named by the queue, not the host.
+                path == null
+                        ? key.name()
+                        : ResourceIds.inNamespace(connection, id)
+                                ? id.name()
+                                : id.path().segments().getFirst(),
+                key.destination() == null
+                        ? null
+                        : ResourceId.of(kinds.destination().value(), key.destination())
+                                .format(),
                 key.routingType() == null ? Map.of() : Map.of("routingType", key.routingType()),
                 rows.stream().anyMatch(QueueSnapshot::durable),
                 backlogOf(rows, total),

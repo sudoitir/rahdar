@@ -103,6 +103,16 @@ public final class ResourceIds {
                         () -> new InvalidResourceIdException("This cluster has no resource kind '" + id.kind() + "'."));
     }
 
+    /**
+     * Whether the id's first segment names a container of the resource, such as a RabbitMQ virtual host, so that the
+     * resource's own name is its last segment.
+     */
+    public static boolean inNamespace(ClusterConnection connection, ResourceId id) {
+        return kindOf(connection, id).parent().stream()
+                .flatMap(parent -> kinds(connection).stream().filter(k -> k.id().equals(parent)))
+                .anyMatch(k -> k.resourceClass() == ResourceClass.NAMESPACE);
+    }
+
     /** A text attribute, or {@code null} when the resource does not carry it. */
     public static String text(Resource r, AttributeKey<String> key) {
         return r.attributes().get(key).orElse(null);

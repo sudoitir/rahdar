@@ -25,7 +25,9 @@ public final class LifecycleViews {
 
     /** What happened on one node. */
     public record NodeOutcomeView(
-            @Schema(requiredMode = REQUIRED) UUID nodeId,
+            @Schema(nullable = true, description = "Absent on a cluster changed as one, which has no node to name.")
+            UUID nodeId,
+
             @Schema(requiredMode = REQUIRED) String nodeName,
 
             @Schema(

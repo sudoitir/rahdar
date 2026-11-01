@@ -36567,8 +36567,9 @@
         "type" : "object",
         "properties" : {
           "nodeId" : {
-            "type" : "string",
-            "format" : "uuid"
+            "type" : [ "string", "null" ],
+            "format" : "uuid",
+            "description" : "Absent on a cluster changed as one, which has no node to name."
           },
           "nodeName" : {
             "type" : "string"
@@ -36588,7 +36589,7 @@
             "description" : "Why this node failed; otherwise what the preview warned about this node, which a real run repeats on its result."
           }
         },
-        "required" : [ "nodeId", "nodeName", "status" ]
+        "required" : [ "nodeName", "status" ]
       },
       "VerifyRequest" : {
         "type" : "object",
@@ -40773,8 +40774,8 @@
             "type" : "string"
           },
           "destination" : {
-            "type" : "string",
-            "description" : "The id of the destination this subscription is bound to."
+            "type" : [ "string", "null" ],
+            "description" : "The id of the destination this subscription is bound to; absent for a system whose queues are fed through routes, such as RabbitMQ."
           },
           "nativeAttributes" : {
             "type" : "object",
@@ -40835,7 +40836,7 @@
             "description" : "The team whose patterns own this subscription; null when no team does."
           }
         },
-        "required" : [ "allowedActions", "backlog", "destination", "durable", "id", "kind", "kindLabel", "name", "nativeAttributes", "nodesPresent", "nodesTotal", "paused", "perNode", "totalConsumerCount", "totalDeliveringCount", "totalScheduledCount" ]
+        "required" : [ "allowedActions", "backlog", "durable", "id", "kind", "kindLabel", "name", "nativeAttributes", "nodesPresent", "nodesTotal", "paused", "perNode", "totalConsumerCount", "totalDeliveringCount", "totalScheduledCount" ]
       },
       "TeamRef" : {
         "type" : "object",

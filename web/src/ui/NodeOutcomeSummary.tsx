@@ -57,7 +57,7 @@ export function NodeOutcomeSummary({
       rows={outcome.nodes.map((node) => {
         const { text, tone } = statusWords(node.status, alreadyLabel);
         return {
-          key: node.nodeId,
+          key: node.nodeId ?? node.nodeName,
           name: node.nodeName,
           count: destructive && node.affected != null ? node.affected.toLocaleString() : undefined,
           status: text,
