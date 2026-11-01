@@ -11,6 +11,7 @@ import {
 import { useResourceGate } from '../../kernel/auth/useResourceGate.ts';
 import { CapabilityGate } from '../../ui/CapabilityGate.tsx';
 import { ConfirmDialog } from '../../ui/ConfirmDialog.tsx';
+import { IdentityBasisNote } from '../../ui/IdentityBasisNote.tsx';
 import { ErrorState } from '../../ui/ErrorState.tsx';
 import { appliedEverywhere } from '../../ui/nodeOutcome.ts';
 import { NodeOutcomeSummary } from '../../ui/NodeOutcomeSummary.tsx';
@@ -320,6 +321,8 @@ function DeleteConsequence({
 
         {preview ? <NodeOutcomeSummary outcome={preview} destructive /> : null}
       </div>
+
+      <IdentityBasisNote basis={preview?.identityBasis} />
 
       {preview?.overCap ? (
         <Notice tone="warning" title="Over the safety cap">

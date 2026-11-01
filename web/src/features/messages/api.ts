@@ -62,6 +62,8 @@ export function useMessages(
   clusterId: string,
   subscriptionName: string,
   params: MessageBrowseParams = {},
+  /** False when the subscription's kind cannot be browsed: nothing is asked of the system. */
+  allowed = true,
 ): UseQueryResult<MessagePageView, ApiError> {
   const ids = useRoleIds(clusterId);
   return useQuery({
@@ -74,7 +76,7 @@ export function useMessages(
     // screen is open, and a browse that never refreshes shows an arrangement of
     // the subscription that stopped being true the moment it was drawn. One bounded
     // page read per interval, pausable with every other poll (ADR-0052).
-    enabled: ids.loaded,
+    enabled: ids.loaded && allowed,
     refetchInterval: 10_000,
     placeholderData: (prev) => prev,
   });

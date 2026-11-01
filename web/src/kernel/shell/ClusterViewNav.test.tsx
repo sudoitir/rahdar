@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { http, HttpResponse } from 'msw';
 import { screen, waitFor, within } from '@testing-library/react';
 
-import { KAFKA_KINDS, KAFKA_SYSTEM } from '../../test/wire.ts';
+import { KAFKA_KINDS, KAFKA_SYSTEM, RABBITMQ_KINDS, RABBITMQ_SYSTEM } from '../../test/wire.ts';
 import { manifestHandler } from '../../test/manifest.ts';
 import { renderWithProviders } from '../../test/render.tsx';
 import { server } from '../../test/setup.ts';
@@ -150,5 +150,37 @@ describe('ClusterViewNav', () => {
     expect(screen.queryByRole('link', { name: 'Config diff' })).not.toBeInTheDocument();
     // Everything that is not tied to a system stays.
     expect(screen.getByRole('link', { name: 'Subscriptions' })).toBeInTheDocument();
+  });
+
+  it('lists the shared views of a RabbitMQ cluster and neither the Artemis-only nor the Kafka-only ones', async () => {
+    mockApi();
+    server.use(
+      http.get('*/api/v1/clusters/c1', () =>
+        HttpResponse.json({ id: 'c1', name: 'c1', system: RABBITMQ_SYSTEM, kinds: RABBITMQ_KINDS }),
+      ),
+    );
+    renderWithProviders(<ClusterViewNav clusterId="c1" collapsed={false} />);
+
+    await screen.findByRole('link', { name: 'Channels' });
+    for (const name of ['Subscriptions', 'Destinations', 'Consumers', 'Channels', 'Connections']) {
+      expect(screen.getByRole('link', { name })).toBeInTheDocument();
+    }
+    // A RabbitMQ cluster has no producers, and none of the views that read one other system.
+    for (const name of [
+      'Producers',
+      'Routes',
+      'Topology',
+      'Requests',
+      'Dead letters',
+      'SQL Console',
+      'Flow',
+      'Configuration',
+      'Setup review',
+      'Consumer groups',
+      'ACLs',
+      'Brokers',
+    ]) {
+      expect(screen.queryByRole('link', { name })).not.toBeInTheDocument();
+    }
   });
 });

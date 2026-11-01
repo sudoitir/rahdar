@@ -5,6 +5,7 @@ import { useDebouncedValue } from '@mantine/hooks';
 
 import { CapabilityLedger, useCluster, useRoleIds } from '../clusters/index.ts';
 import { kindOf, refOf, subscriptionRefWords } from '../../kernel/api/resourceId.ts';
+import { verbRefusal } from '../../kernel/auth/kindVerbs.ts';
 import { useMessages, type MessagePageView, type MessageSummaryView } from './api.ts';
 import { CapabilityGate } from '../../ui/CapabilityGate.tsx';
 import { EmptyState } from '../../ui/EmptyState.tsx';
@@ -106,14 +107,34 @@ export function isPartitionedLog(
   return kind === 'kafka.group-topic';
 }
 
+/** The kind a subscription is, from the cluster's kind list, when both are known. */
+function kindOfSubscription(
+  kind: string | undefined,
+  kinds:
+    | readonly { id: string; resourceClass: string; verbs: string[]; label: { singular: string; plural: string } }[]
+    | undefined,
+) {
+  return kind ? kinds?.find((item) => item.id === kind) : undefined;
+}
+
+/**
+ * Whether the subscription's log is one stream rather than the partitions of a topic: a partitioned kind of the
+ * subscription class that is not a consumer group's position on a topic. It has no partition to choose.
+ */
+function isSingleLog(kind: { id: string; resourceClass: string } | undefined, partitioned: boolean): boolean {
+  return partitioned && kind?.resourceClass === 'SUBSCRIPTION' && kind.id !== 'kafka.group-topic';
+}
+
 /** The page the header describes: a partition of a log, or a count read from one node. */
 function messagesHeading(
   page: MessagePageView | undefined,
   partitioned: boolean,
   partition: number,
   endpoints: readonly { id: string; name: string }[],
+  singleLog?: string,
 ): string {
   if (!page) return 'Reading the subscription…';
+  if (singleLog) return singleLog;
   if (!partitioned) {
     const node = endpoints.find((endpoint) => endpoint.id === page.node)?.name ?? 'the live node';
     return `${countLabel(page)} · read from ${node}`;
@@ -204,6 +225,14 @@ export function MessagesView() {
   // A partitioned log is read from one partition and a start, not by selector, node and page.
   const subscriptionKind = roleIds.loaded ? kindOf(roleIds.subscription(subscriptionName)) : undefined;
   const partitioned = isPartitionedLog(subscriptionKind ?? kindOf(subscriptionName), cluster.data?.kinds);
+  const kindInfo = kindOfSubscription(subscriptionKind ?? kindOf(subscriptionName), cluster.data?.kinds);
+  const singleLog = isSingleLog(kindInfo, partitioned);
+  // A kind the system cannot browse is refused before anything is read: the reason is the driver's when it gave one.
+  const browseRefusal =
+    cluster.data?.system && kindInfo && !kindInfo.verbs.includes('browse')
+      ? (cluster.data.capabilities.findings.find((f) => f.capability === 'messages.browse')?.reason ??
+        verbRefusal(cluster.data.system.name, kindInfo.label, 'browse'))
+      : undefined;
   const browse = browseOf(search);
   const columns = useMemo(() => messageColumns(zone, partitioned), [zone, partitioned]);
   const [filter, setFilter] = useState(search.filter ?? '');
@@ -252,7 +281,12 @@ export function MessagesView() {
     [cluster.data],
   );
 
-  const messages = useMessages(clusterId, subscriptionName, messageQuery(partitioned, browse, search, page));
+  const messages = useMessages(
+    clusterId,
+    subscriptionName,
+    messageQuery(partitioned, browse, search, page),
+    !browseRefusal,
+  );
   const setBrowse = (next: PartitionBrowse) =>
     navigate({
       to: '.',
@@ -286,7 +320,15 @@ export function MessagesView() {
       }
       description={
         <span className={partitioned ? classes.stableHeading : undefined}>
-          {messagesHeading(messages.data, partitioned, browse.partition, endpoints)}
+          {browseRefusal
+            ? 'This kind of queue cannot be read, only sent to and purged.'
+            : messagesHeading(
+                messages.data,
+                partitioned,
+                browse.partition,
+                endpoints,
+                singleLog ? kindInfo?.label.singular : undefined,
+              )}
         </span>
       }
       actions={
@@ -313,6 +355,15 @@ export function MessagesView() {
       work. They are offered anyway — the first one settles it.
     </Notice>
   ) : null;
+
+  if (browseRefusal) {
+    return (
+      <Page>
+        {header}
+        <EmptyState kind="empty" title="These messages cannot be browsed" description={browseRefusal} />
+      </Page>
+    );
+  }
 
   if (cluster.data && gated) {
     return (
@@ -367,7 +418,12 @@ export function MessagesView() {
         start={
           <>
             {partitioned ? (
-              <PartitionControls browse={browse} onBrowse={setBrowse} next={messages.data?.log?.next ?? null} />
+              <PartitionControls
+                browse={browse}
+                partitions={singleLog ? 1 : undefined}
+                onBrowse={setBrowse}
+                next={messages.data?.log?.next ?? null}
+              />
             ) : null}
             <TextInput
               ref={filterRef}

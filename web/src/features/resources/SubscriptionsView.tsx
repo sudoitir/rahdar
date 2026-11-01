@@ -16,6 +16,7 @@ import { BacklogDrawer, type BacklogTarget } from '../../kernel/backlog/BacklogD
 import { SubscriptionDetailDrawer } from './SubscriptionDetailDrawer.tsx';
 import { CreateSubscriptionForm } from './CreateSubscriptionForm.tsx';
 import { useCan } from '../../kernel/auth/useCan.ts';
+import { verbRefusal } from '../../kernel/auth/kindVerbs.ts';
 import { useClusterSlot } from '../../kernel/shell/useClusterSlot.ts';
 import type { SubscriptionSelection } from '../../kernel/slots.ts';
 import { ResourceActions } from '../../kernel/actions/ResourceActions.tsx';
@@ -280,12 +281,21 @@ export function SubscriptionsView() {
   // rows, which looks exactly like a cluster with no subscriptions.
   const cluster = useCluster(clusterId);
   // Offered while grants load, and never hidden: an operator without the grant sees why (non-negotiable #5).
-  const createGate = gateFor(
+  const capabilityGate = gateFor(
     mayCreate,
     'Create subscriptions and destinations',
     cluster.data?.capabilities.managementWrite,
     grantsLoading || cluster.isPending,
   );
+  // A system with its own create form contributes it; the Artemis form is only for a system that does not. A
+  // system none of whose subscription kinds can be created says so, instead of offering a form that cannot work.
+  const createSlot = useClusterSlot('subscriptions.create', clusterId);
+  const subscriptionKinds = (cluster.data?.kinds ?? []).filter((k) => k.resourceClass === 'SUBSCRIPTION');
+  const createRefusal =
+    cluster.data?.system && subscriptionKinds.length > 0 && !subscriptionKinds.some((k) => k.verbs.includes('create'))
+      ? verbRefusal(cluster.data.system.name, subscriptionKinds[0].label, 'create')
+      : undefined;
+  const createGate = createRefusal ? ({ kind: 'blocked', reason: createRefusal } as const) : capabilityGate;
   const unreachable = (cluster.data?.topology.nodes ?? [])
     .flatMap((n) => n.endpoints)
     .filter((e) => e.lastError)
@@ -412,7 +422,13 @@ export function SubscriptionsView() {
 
       <SubscriptionDetailDrawer subscription={selected} missing={missing} onClose={() => setSelected(null)} />
       <BacklogDrawer target={backlogOf} onClose={() => setBacklogOf(null)} />
-      <CreateSubscriptionForm clusterId={clusterId} opened={createOpen} onClose={() => setCreateOpen(false)} />
+      {createSlot.length > 0 ? (
+        createSlot.map(({ id, Component }) => (
+          <Component key={id} clusterId={clusterId} opened={createOpen} onClose={() => setCreateOpen(false)} />
+        ))
+      ) : (
+        <CreateSubscriptionForm clusterId={clusterId} opened={createOpen} onClose={() => setCreateOpen(false)} />
+      )}
     </Page>
   );
 }

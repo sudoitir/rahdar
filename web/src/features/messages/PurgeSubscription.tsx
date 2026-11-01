@@ -5,6 +5,7 @@ import type { ApiError } from '../../kernel/api/request.ts';
 import { CapabilityGate } from '../../ui/CapabilityGate.tsx';
 import { ConfirmDialog } from '../../ui/ConfirmDialog.tsx';
 import { ErrorState } from '../../ui/ErrorState.tsx';
+import { IdentityBasisNote } from '../../ui/IdentityBasisNote.tsx';
 import { Notice } from '../../ui/Notice.tsx';
 import { usePurgeSubscription, type DryRunView } from './api.ts';
 import { useMessageGate } from './gates.ts';
@@ -69,6 +70,7 @@ function Consequence({
           estimate). This cannot be undone.
         </Text>
       )}
+      <IdentityBasisNote basis={preview.identityBasis} />
       {preview.overCap ? (
         <Notice tone="warning" title="Over the safety cap">
           This would remove {preview.affectedCount.toLocaleString()} messages, over the cap of{' '}

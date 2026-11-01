@@ -43,6 +43,10 @@ export interface SlotProps {
   'cluster.registration.afterProbe': { contributions: Record<string, unknown> };
   /** In a subscription's detail drawer, below its per-node breakdown. `onClose` closes the drawer before navigating. */
   'subscription.detail.panels': { clusterId: string; subscription: ResourceRef; onClose: () => void };
+  /** The create-subscription dialog, for a system that has its own form: the Artemis one is shown otherwise. */
+  'subscriptions.create': { clusterId: string; opened: boolean; onClose: () => void };
+  /** The create-destination dialog, for a system that has its own form: the Artemis one is shown otherwise. */
+  'destinations.create': { clusterId: string; opened: boolean; onClose: () => void };
   /**
    * Beside the subscriptions screen's selection: what can be done to the selected subscriptions. `count` is how
    * many are selected, and may be zero: an action then stays visible and disabled. `clear` empties

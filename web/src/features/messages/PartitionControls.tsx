@@ -24,7 +24,7 @@ export function PartitionControls({
   onBrowse,
 }: Readonly<{
   browse: PartitionBrowse;
-  /** How many partitions the destination has, when known: the choice is then a list. */
+  /** How many partitions the destination has, when known: the choice is then a list, and one partition needs no choice. */
   partitions?: number;
   /** The offset after the records on this page, when the log has more. */
   next?: number | null;
@@ -50,7 +50,7 @@ export function PartitionControls({
   );
   return (
     <form noValidate onSubmit={submit} style={{ display: 'contents' }}>
-      {partitions ? (
+      {partitions === 1 ? null : partitions ? (
         <Select
           size="xs"
           w="7rem"

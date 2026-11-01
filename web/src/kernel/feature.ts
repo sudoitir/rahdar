@@ -45,6 +45,7 @@ export const FEATURE_IDS = [
   'plugins',
   'identity-local',
   'identity-oidc',
+  'rabbitmq',
 ] as const;
 
 export type FeatureId = (typeof FEATURE_IDS)[number];
