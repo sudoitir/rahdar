@@ -19,9 +19,12 @@ import io.github.sudoitir.rahdar.platform.clusters.EnvironmentService.Environmen
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterRequests.AccountUpdate;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterRequests.RegisterClusterRequest;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterRequests.RegisterClusterRequest.ArtemisConnection;
+import io.github.sudoitir.rahdar.platform.clusters.web.ClusterRequests.RegisterClusterRequest.Connection;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterRequests.RegisterClusterRequest.KafkaConnection;
+import io.github.sudoitir.rahdar.platform.clusters.web.ClusterRequests.RegisterClusterRequest.RabbitMqConnection;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterRequests.RegisterClusterRequest.UnknownConnection;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterRequests.UpdateClusterRequest.KafkaConnectionUpdate;
+import io.github.sudoitir.rahdar.platform.clusters.web.ClusterRequests.UpdateClusterRequest.RabbitMqConnectionUpdate;
 import io.github.sudoitir.rahdar.platform.clusters.web.EnvironmentViews.EnvironmentRequest;
 import java.util.ArrayList;
 import java.util.List;
@@ -189,6 +192,7 @@ class ClusterGatedOperations {
         return switch (p.connection()) {
             case ArtemisConnection a -> a.seedUrls();
             case KafkaConnection k -> k.bootstrapServers();
+            case RabbitMqConnection r -> r.managementUrls();
             case UnknownConnection _ -> List.of(p.system());
         };
     }
@@ -378,9 +382,7 @@ class ClusterGatedOperations {
         List<DisplayRow> rows = new ArrayList<>();
         rows.add(DisplayRow.of("Name", p.name()));
         rows.add(DisplayRow.of("System", p.system()));
-        rows.add(DisplayRow.of(
-                p.connection() instanceof KafkaConnection ? "Bootstrap servers" : "Seed URLs",
-                String.join(", ", targets(p))));
+        rows.add(DisplayRow.of(registerTargetLabel(p.connection()), String.join(", ", targets(p))));
         rows.add(DisplayRow.of(LABEL_ENVIRONMENT, environments.labelOf(p.environmentId())));
         switch (p.connection()) {
             case ArtemisConnection a -> {
@@ -402,11 +404,27 @@ class ClusterGatedOperations {
                     rows.add(DisplayRow.of("Account", k.credentials().username()));
                 }
             }
+            case RabbitMqConnection r -> {
+                if (r.amqpEndpoints() != null && !r.amqpEndpoints().isEmpty()) {
+                    rows.add(DisplayRow.of("AMQP endpoints", String.join(", ", r.amqpEndpoints())));
+                }
+                if (r.credentials() != null && r.credentials().username() != null) {
+                    rows.add(DisplayRow.of("Account", r.credentials().username()));
+                }
+            }
             case UnknownConnection _ -> {
                 // An unknown system has no account or protocol rows to show.
             }
         }
         return rows;
+    }
+
+    private static String registerTargetLabel(Connection connection) {
+        return switch (connection) {
+            case KafkaConnection _ -> "Bootstrap servers";
+            case RabbitMqConnection _ -> "Management URLs";
+            default -> "Seed URLs";
+        };
     }
 
     private static List<DisplayRow> updateDisplay(
@@ -429,6 +447,15 @@ class ClusterGatedOperations {
             addIfSet(rows, "SASL mechanism", k.saslMechanism());
             if (k.credentials() != null) {
                 addIfSet(rows, "Account", k.credentials().username());
+                rows.add(DisplayRow.of("Account secret", REDACTED_PASSWORD));
+            }
+        }
+        if (p.connection() instanceof RabbitMqConnectionUpdate r) {
+            addIfSet(
+                    rows, "Management URLs", r.managementUrls() == null ? null : String.join(", ", r.managementUrls()));
+            addIfSet(rows, "AMQP endpoints", r.amqpEndpoints() == null ? null : String.join(", ", r.amqpEndpoints()));
+            if (r.credentials() != null) {
+                addIfSet(rows, "Account", r.credentials().username());
                 rows.add(DisplayRow.of("Account secret", REDACTED_PASSWORD));
             }
         }

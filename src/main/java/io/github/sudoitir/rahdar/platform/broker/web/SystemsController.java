@@ -22,7 +22,7 @@ public class SystemsController {
     /**
      * @param id the broker SDK's id of the system, such as {@code kafka}
      * @param supportedVersions the version range the driver is tested against, in Maven range syntax
-     * @param connection whether a cluster is registered from Jolokia seeds or from bootstrap servers
+     * @param connection whether a cluster is registered from Jolokia seeds, from bootstrap servers or from a management API
      */
     public record SupportedSystemView(String id, String name, String supportedVersions, Entry connection) {}
 
