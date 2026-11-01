@@ -25,6 +25,9 @@ public final class BrokerFailures {
     private static final String DIFFERING = "differing";
     private static final String MBEAN_ABSENT = "InstanceNotFoundException";
 
+    /** The problem type of an operation the resource's kind does not have, such as purging a stream. */
+    public static final String UNSUPPORTED_ON_KIND = "unsupported-on-kind";
+
     /** The problem type of a send no queue received. */
     public static final String NOT_ROUTED = "not-routed";
 
@@ -90,6 +93,7 @@ public final class BrokerFailures {
                         : new IllegalArgumentException(e.getMessage(), e);
             case ErrorReasons.NOT_ROUTED -> new ConflictException(NOT_ROUTED, e.getMessage());
             case ErrorReasons.DESTINATION_FULL -> new ConflictException("destination-full", e.getMessage());
+            case ErrorReasons.NOT_SUPPORTED -> new ConflictException(UNSUPPORTED_ON_KIND, e.getMessage());
             case ErrorReasons.CALL_REFUSED ->
                 metadata.containsKey(GUARD)
                         ? new IllegalStateException(e.getMessage(), e)
