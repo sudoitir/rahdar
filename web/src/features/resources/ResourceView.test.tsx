@@ -1,7 +1,7 @@
-import { destinationIdentity } from '../../test/wire.ts';
+import { destinationIdentity, KAFKA_KINDS, KAFKA_SYSTEM, RABBITMQ_KINDS, RABBITMQ_SYSTEM } from '../../test/wire.ts';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { delay, http, HttpResponse } from 'msw';
-import { screen, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { renderWithProviders } from '../../test/render.tsx';
@@ -61,7 +61,9 @@ function serve({
   consumers = [],
   nodes = [],
   permissions = ['*'],
-}: { consumers?: object[]; nodes?: object[]; permissions?: string[] } = {}) {
+  system,
+  kinds,
+}: { consumers?: object[]; nodes?: object[]; permissions?: string[]; system?: object; kinds?: object[] } = {}) {
   server.use(
     http.get('*/api/v1/auth/me', () =>
       HttpResponse.json({
@@ -75,9 +77,14 @@ function serve({
       HttpResponse.json({
         id: 'c1',
         name: 'c1',
+        system,
+        kinds,
         topology: { nodes },
         capabilities: { managementWrite: AVAILABLE },
       }),
+    ),
+    http.get('*/api/v1/clusters/c1/destinations', () =>
+      HttpResponse.json({ data: [], count: 0, page: 1, pageSize: 200, hasNext: false }),
     ),
     http.get('*/api/v1/clusters/c1/consumers', () =>
       HttpResponse.json({ data: consumers, count: consumers.length, page: 1, pageSize: 200, hasNext: false }),
@@ -242,5 +249,49 @@ describe('ResourceView page structure', () => {
     await screen.findByRole('grid', { name: 'Consumers' });
     expect(screen.queryByText(/^No consumers$/)).not.toBeInTheDocument();
     expect(screen.queryByText('No consumers right now')).not.toBeInTheDocument();
+  });
+
+  describe('the New destination action', () => {
+    it("opens the cluster system's own form when it contributes one", async () => {
+      serve({ system: RABBITMQ_SYSTEM, kinds: RABBITMQ_KINDS });
+      const user = userEvent.setup();
+      renderWithProviders(<ResourceView kind="destinations" />);
+
+      await waitFor(() => expect(screen.getByRole('button', { name: 'New destination' })).toBeEnabled());
+      await user.click(screen.getByRole('button', { name: 'New destination' }));
+
+      expect(await screen.findByRole('dialog')).toBeInTheDocument();
+    });
+
+    it('is disabled with the reason when the system has no destination it can create', async () => {
+      const kinds = KAFKA_KINDS.map((k) => (k.resourceClass === 'DESTINATION' ? { ...k, verbs: [] } : k));
+      serve({ system: KAFKA_SYSTEM, kinds });
+      const user = userEvent.setup();
+      renderWithProviders(<ResourceView kind="destinations" />);
+
+      expect(await screen.findByRole('button', { name: 'New destination' })).toBeDisabled();
+      await user.click(screen.getByRole('button', { name: 'Why creating a destination is unavailable' }));
+      expect(await screen.findByText(/Apache Kafka topics cannot be created/)).toBeInTheDocument();
+    });
+
+    it('is disabled when the caller may not create destinations', async () => {
+      serve({ system: RABBITMQ_SYSTEM, kinds: RABBITMQ_KINDS, permissions: ['destination:read'] });
+      renderWithProviders(<ResourceView kind="destinations" />);
+
+      await waitFor(() => expect(screen.getByRole('button', { name: 'New destination' })).toBeDisabled());
+    });
+
+    it('is not offered by a system with no form, nor on the other views', async () => {
+      serve({ system: KAFKA_SYSTEM, kinds: KAFKA_KINDS });
+      const { unmount } = renderWithProviders(<ResourceView kind="destinations" />);
+      await screen.findAllByText(/No destinations/);
+      expect(screen.queryByRole('button', { name: 'New destination' })).not.toBeInTheDocument();
+      unmount();
+
+      serve({ system: RABBITMQ_SYSTEM, kinds: RABBITMQ_KINDS });
+      renderWithProviders(<ResourceView kind="consumers" />);
+      await screen.findByText('No consumers right now');
+      expect(screen.queryByRole('button', { name: 'New destination' })).not.toBeInTheDocument();
+    });
   });
 });

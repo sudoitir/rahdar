@@ -1,6 +1,6 @@
 import { nameOf, refOf } from '../../kernel/api/resourceId.ts';
 import { useEffect, useMemo, useState, useRef } from 'react';
-import { TextInput } from '@mantine/core';
+import { Button, TextInput } from '@mantine/core';
 import { useNavigate, useParams, useSearch } from '@tanstack/react-router';
 import { useDebouncedValue } from '@mantine/hooks';
 
@@ -31,6 +31,9 @@ import type { ActionKind, ActionTargets } from '../../kernel/actions/types.ts';
 import type { ApiError } from '../../kernel/api/request.ts';
 import type { UseQueryResult } from '@tanstack/react-query';
 import { useCan } from '../../kernel/auth/useCan.ts';
+import { verbRefusal } from '../../kernel/auth/kindVerbs.ts';
+import { useClusterSlot } from '../../kernel/shell/useClusterSlot.ts';
+import { CapabilityGate } from '../../ui/CapabilityGate.tsx';
 import { useFilterShortcut } from '../../kernel/keyboard/filterShortcut.ts';
 
 const PAGE_SIZE = 200;
@@ -275,7 +278,23 @@ export function ResourceView({ kind }: Readonly<{ kind: Kind }>) {
     size: PAGE_SIZE,
   });
   const unreachable = useUnreachableNodes(clusterId);
-  const { reach } = useCan();
+  const { reach, can, createPatterns } = useCan();
+  const [createOpen, setCreateOpen] = useState(false);
+  // A system with a destination form contributes it. A system none of whose destination kinds can be created says
+  // so on a disabled button, instead of offering a form that cannot work; one with neither gets no button.
+  const createSlot = useClusterSlot('destinations.create', kind === 'destinations' ? clusterId : undefined);
+  const cluster = useCluster(clusterId);
+  const destinationKinds = (cluster.data?.kinds ?? []).filter((k) => k.resourceClass === 'DESTINATION');
+  const createRefusal =
+    cluster.data?.system && destinationKinds.length > 0 && !destinationKinds.some((k) => k.verbs.includes('create'))
+      ? verbRefusal(cluster.data.system.name, destinationKinds[0].label, 'create')
+      : undefined;
+  const offerCreate = kind === 'destinations' && (createSlot.length > 0 || createRefusal !== undefined);
+  const createGate = createRefusal
+    ? ({ kind: 'blocked', reason: createRefusal } as const)
+    : can('destination:create', clusterId) || (createPatterns(clusterId, 'destination')?.length ?? 0) > 0
+      ? ({ kind: 'allowed', uncertain: false } as const)
+      : ({ kind: 'blocked', reason: 'Creating a destination needs the destination:create permission.' } as const);
 
   const fetchedAt = query.dataUpdatedAt > 0 ? query.dataUpdatedAt : null;
   const columns = useMemo(() => config.columns({ clusterId, fetchedAt }), [config, clusterId, fetchedAt]);
@@ -309,6 +328,15 @@ export function ResourceView({ kind }: Readonly<{ kind: Kind }>) {
             w="17.5rem"
             size="xs"
           />
+        }
+        end={
+          offerCreate ? (
+            <CapabilityGate verdict={createGate} what="creating a destination">
+              <Button size="xs" disabled={createGate.kind === 'blocked'} onClick={() => setCreateOpen(true)}>
+                New destination
+              </Button>
+            </CapabilityGate>
+          ) : undefined
         }
       />
 
@@ -357,6 +385,9 @@ export function ResourceView({ kind }: Readonly<{ kind: Kind }>) {
           />
         }
       />
+      {createSlot.map(({ id, Component }) => (
+        <Component key={id} clusterId={clusterId} opened={createOpen} onClose={() => setCreateOpen(false)} />
+      ))}
     </Page>
   );
 }
