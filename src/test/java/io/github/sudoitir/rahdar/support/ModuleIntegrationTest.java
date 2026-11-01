@@ -116,8 +116,9 @@ public abstract class ModuleIntegrationTest {
     void startsWithItsModuleAndDirectDependenciesOnly() {
         Set<String> bootstrapped = bootstrappedPackages(execution);
         String own = execution.getModule().getBasePackage().getName();
-        // A platform module is checked against platform beans, a feature against feature beans.
-        String layer = own.startsWith(ROOT + ".platform.") ? ROOT + ".platform." : FEATURES;
+        // A platform module is checked against platform beans, a system against system beans, a feature against feature
+        // beans.
+        String layer = layerOf(own);
         List<String> featureBeanPackages = Arrays.stream(context.getBeanDefinitionNames())
                 .map(context.getBeanFactory()::getSingleton)
                 .filter(Objects::nonNull)
@@ -128,6 +129,13 @@ public abstract class ModuleIntegrationTest {
 
         assertThat(featureBeanPackages).anyMatch(name -> within(name, own));
         assertThat(featureBeanPackages).allMatch(name -> bootstrapped.stream().anyMatch(base -> within(name, base)));
+    }
+
+    private static String layerOf(String own) {
+        if (own.startsWith(ROOT + ".platform.")) {
+            return ROOT + ".platform.";
+        }
+        return own.startsWith(ROOT + ".system.") ? ROOT + ".system." : FEATURES;
     }
 
     private static boolean within(String name, String basePackage) {

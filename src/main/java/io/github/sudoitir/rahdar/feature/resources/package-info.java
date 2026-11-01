@@ -12,6 +12,7 @@
             "kernel.stream",
             "platform.broker",
             "platform.clusters",
+            "platform.clusters::web",
             "platform.mcp",
             "platform.scrape"
         })
