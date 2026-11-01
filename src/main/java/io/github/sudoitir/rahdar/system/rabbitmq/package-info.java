@@ -6,8 +6,11 @@
 @ApplicationModule(
         displayName = "RabbitMQ",
         allowedDependencies = {
+            "kernel.audit",
             "kernel.core",
             "kernel.plugin",
+            "kernel.replica",
+            "kernel.security",
             "platform.broker",
             "platform.clusters",
             "platform.clusters::web"

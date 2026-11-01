@@ -1,9 +1,11 @@
 package io.github.sudoitir.rahdar.system.rabbitmq;
 
-import io.github.sudoitir.rahdar.kernel.security.ScopeHierarchy;
 import io.github.sudoitir.rahdar.platform.broker.ConnectionSettingsSource;
 import io.github.sudoitir.rahdar.platform.broker.NodeDirectory;
 import io.github.sudoitir.rahdar.platform.broker.ReplicaDirectory;
+import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
+import io.github.sudoitir.rahdar.platform.clusters.ClusterEnvironmentIndex;
+import io.github.sudoitir.rahdar.platform.clusters.NodeStateRecorder;
 import io.github.sudoitir.rahdar.support.ModuleIntegrationTest;
 import org.springframework.modulith.test.ApplicationModuleTest;
 import org.springframework.modulith.test.ApplicationModuleTest.BootstrapMode;
@@ -15,7 +17,7 @@ class RabbitMqModuleTest extends ModuleIntegrationTest {
 
     /** The kernel's permission checks walk the scope hierarchy the clusters module implements. */
     @MockitoBean
-    ScopeHierarchy scopeHierarchy;
+    ClusterEnvironmentIndex scopeHierarchy;
 
     /** The broker platform reads the nodes of a cluster from the clusters module, which is not started here. */
     @MockitoBean
@@ -23,6 +25,13 @@ class RabbitMqModuleTest extends ModuleIntegrationTest {
 
     @MockitoBean
     ConnectionSettingsSource connectionSettings;
+
+    /** The scrape reads and records the clusters module's nodes; the clusters module is not started here. */
+    @MockitoBean
+    ClusterDirectory clusterDirectory;
+
+    @MockitoBean
+    NodeStateRecorder nodeStateRecorder;
 
     @MockitoBean
     ReplicaDirectory replicaDirectory;
