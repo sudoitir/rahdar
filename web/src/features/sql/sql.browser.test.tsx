@@ -21,6 +21,7 @@ import { manifestView } from '../../test/manifest.ts';
 import { axeViolations, contentWidth, renderThemed, SCHEMES, settle, type Scheme } from '../../test/browser.tsx';
 import { keys } from './api.ts';
 import { SqlConsoleView } from './SqlConsoleView.tsx';
+import { ARTEMIS_SYSTEM } from '../../test/wire.ts';
 
 /**
  * The SQL Console in a real browser at the narrowest window the console is designed for, in both colour
@@ -159,6 +160,9 @@ function seeded(permissions: string[]): QueryClient {
     id: 'c1',
     name: 'prod',
     description: null,
+    // The console is an Artemis view: the shell offers it only once the cluster says it runs Artemis.
+    system: ARTEMIS_SYSTEM,
+    kinds: [],
     topology: { clusterId: 'c1', nodes: [] },
     capabilities: {
       managementRead: AVAILABLE,
