@@ -42975,6 +42975,20 @@
           }
         }
       },
+      "PlacementView" : {
+        "type" : "object",
+        "properties" : {
+          "node" : {
+            "type" : "string"
+          },
+          "role" : {
+            "type" : "string"
+          },
+          "inSync" : {
+            "type" : "boolean"
+          }
+        }
+      },
       "SubscriptionConfiguration" : {
         "type" : "object",
         "properties" : {
@@ -42997,6 +43011,12 @@
             "type" : "object",
             "additionalProperties" : {
               "type" : "string"
+            }
+          },
+          "placements" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/PlacementView"
             }
           },
           "nodes" : {

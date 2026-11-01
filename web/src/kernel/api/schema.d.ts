@@ -8362,6 +8362,11 @@ export interface components {
             };
             unavailableReason?: string;
         };
+        PlacementView: {
+            node?: string;
+            role?: string;
+            inSync?: boolean;
+        };
         SubscriptionConfiguration: {
             id?: string;
             kind?: string;
@@ -8371,6 +8376,7 @@ export interface components {
             nativeAttributes?: {
                 [key: string]: string;
             };
+            placements?: components["schemas"]["PlacementView"][];
             nodes?: components["schemas"]["NodeConfiguration"][];
         };
         LogView: {

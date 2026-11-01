@@ -1,3 +1,4 @@
+import type { components } from '../../kernel/api/schema.d.ts';
 import type { ResourceRef } from '../../kernel/api/resourceId.ts';
 import { Stack, Text } from '@mantine/core';
 
@@ -17,28 +18,18 @@ const TYPE_OF_KIND: Record<string, QueueType> = {
   'rabbitmq.stream': 'stream',
 };
 
-const list = (text: string | undefined) =>
-  (text ?? '')
-    .split(',')
-    .map((s) => s.trim())
-    .filter(Boolean);
+type Placement = NonNullable<components['schemas']['SubscriptionConfiguration']['placements']>[number];
 
-/** The members of a replicated queue, the leader first, each marked in sync when it is online. */
-function Members({
-  members,
-  online,
-  leader,
-}: Readonly<{ members: string[]; online: string[] | null; leader?: string }>) {
+/** The replicas of a replicated queue, each marked with its role, and in sync or not where the broker says. */
+function Members({ placements }: Readonly<{ placements: Placement[] }>) {
   return (
     <Stack gap={2} component="ul" m={0} pl={0} style={{ listStyle: 'none' }} aria-label="Members">
-      {members.map((m) => (
-        <Text key={m} component="li" size="sm">
-          {m} {m === leader ? <StatusBadge tone="info">Leader</StatusBadge> : null}{' '}
-          {online ? (
-            <StatusBadge tone={online.includes(m) ? 'neutral' : 'warning'}>
-              {online.includes(m) ? 'In sync' : 'Not in sync'}
-            </StatusBadge>
-          ) : null}
+      {placements.map((m) => (
+        <Text key={m.node} component="li" size="sm">
+          {m.node} {m.role === 'leader' ? <StatusBadge tone="info">Leader</StatusBadge> : null}{' '}
+          {m.inSync == null ? null : (
+            <StatusBadge tone={m.inSync ? 'neutral' : 'warning'}>{m.inSync ? 'In sync' : 'Not in sync'}</StatusBadge>
+          )}
         </Text>
       ))}
     </Stack>
@@ -51,13 +42,14 @@ function Panel({ clusterId, subscription }: Readonly<{ clusterId: string; subscr
   if (!queue.data) return <LoadingState label="Loading the queue" blockSize="6rem" />;
   const attrs = queue.data.nativeAttributes ?? {};
   const type = TYPE_OF_KIND[subscription.kind];
-  const members = list(attrs['rabbitmq.members']);
-  const online = 'rabbitmq.online' in attrs ? list(attrs['rabbitmq.online']) : null;
+  const placements = queue.data.placements ?? [];
+  const leader = attrs['rabbitmq.leader'] ?? placements.find((m) => m.role === 'leader')?.node;
   const args = Object.entries(attrs).filter(([k]) => k.startsWith(ARGUMENT_PREFIX));
   const items = [
     { term: 'Type', value: `${type.charAt(0).toUpperCase()}${type.slice(1)}: ${QUEUE_TYPE_MEANING[type]}` },
-    { term: 'Effective policy', value: attrs['rabbitmq.policy'] ?? 'None applies' },
-    ...(attrs['rabbitmq.leader'] ? [{ term: 'Leader', value: attrs['rabbitmq.leader'] }] : []),
+    // The broker names the policy only when it reports one; an unreported policy is not claimed absent.
+    ...(attrs['rabbitmq.policy'] ? [{ term: 'Effective policy', value: attrs['rabbitmq.policy'] }] : []),
+    ...(leader ? [{ term: 'Leader', value: leader }] : []),
     ...(attrs['rabbitmq.delivery_limit'] ? [{ term: 'Delivery limit', value: attrs['rabbitmq.delivery_limit'] }] : []),
     ...(attrs['rabbitmq.max_age'] ? [{ term: 'Maximum age', value: attrs['rabbitmq.max_age'] }] : []),
     ...(attrs['rabbitmq.committed_offset']
@@ -70,9 +62,9 @@ function Panel({ clusterId, subscription }: Readonly<{ clusterId: string; subscr
   return (
     <Stack gap="md">
       <DescriptionList label="Queue" columns={1} items={items} />
-      {members.length > 0 ? (
+      {placements.length > 0 ? (
         <Section title="Members">
-          <Members members={members} online={online} leader={attrs['rabbitmq.leader']} />
+          <Members placements={placements} />
         </Section>
       ) : null}
       <Section title="Arguments">

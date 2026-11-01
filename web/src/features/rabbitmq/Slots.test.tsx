@@ -57,10 +57,13 @@ describe('the queue panel', () => {
     server.use(
       http.get('*/api/v1/clusters/r1/resources/rabbitmq.quorum-queue/*', () =>
         HttpResponse.json({
+          placements: [
+            { node: 'rabbit@a', role: 'leader', inSync: true },
+            { node: 'rabbit@b', role: 'follower', inSync: false },
+            { node: 'rabbit@c', role: 'follower' },
+          ],
           nativeAttributes: {
             'rabbitmq.leader': 'rabbit@a',
-            'rabbitmq.members': 'rabbit@a, rabbit@b',
-            'rabbitmq.online': 'rabbit@a',
             'rabbitmq.policy': 'limit',
             'rabbitmq.delivery_limit': '20',
             'rabbitmq.argument.x-max-length': '1000',
@@ -87,7 +90,9 @@ describe('the queue panel', () => {
     );
     show();
     expect(await screen.findByText(/No arguments/)).toBeInTheDocument();
-    expect(screen.getByText('None applies')).toBeInTheDocument();
+    // A policy the broker does not report is not claimed absent.
+    expect(screen.queryByText('Effective policy')).not.toBeInTheDocument();
+    expect(screen.queryByRole('list', { name: 'Members' })).not.toBeInTheDocument();
   });
 
   it('shows the error of a failed read', async () => {
