@@ -3,6 +3,7 @@ package io.github.sudoitir.rahdar.system.rabbitmq;
 import io.github.sudoitir.rahdar.kernel.plugin.FeatureDescriptor;
 import io.github.sudoitir.rahdar.kernel.plugin.PermissionDef;
 import io.github.sudoitir.rahdar.kernel.security.Permissions;
+import io.github.sudoitir.rahdar.system.rabbitmq.mcp.RabbitMqMcpToolDefs;
 
 /** What only RabbitMQ has: its registration, health and the RabbitMQ namespace (ADR-0223). Module descriptor (ADR-0070). */
 public final class RabbitMqModule {
@@ -34,6 +35,7 @@ public final class RabbitMqModule {
             .permission(
                     PermissionDef.cluster(POLICY_READ, "See a RabbitMQ cluster's policies", Permissions.CLUSTER_READ))
             .permission(PermissionDef.cluster(POLICY_WRITE, "Set and clear a RabbitMQ cluster's policies", POLICY_READ))
+            .mcpTools(RabbitMqMcpToolDefs.ALL)
             .build();
 
     private RabbitMqModule() {}
