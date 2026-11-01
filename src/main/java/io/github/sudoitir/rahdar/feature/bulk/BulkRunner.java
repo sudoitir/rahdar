@@ -247,12 +247,15 @@ class BulkRunner {
 
     /**
      * A queue's purge is one node per call, so it is issued on every node hosting the queue and folded into one
-     * outcome. A subscription of a partitioned log is moved to the end of the log once for the cluster, through the
+     * outcome, except on a cluster read as one, where it is purged once for the cluster by its id. A subscription of a partitioned log is moved to the end of the log once for the cluster, through the
      * log purge and its gate, which refuses a group that has members or is rebalancing with the driver's detail.
      */
     private LifecycleOutcome purge(BulkRunEntity run, BulkRunItemEntity item) {
         if (kinds.partitioned(run.getClusterId(), BulkItemIds.kind(item.getSubscription()))) {
             return purgeLog(run, item);
+        }
+        if (kinds.readAsOne(run.getClusterId())) {
+            return purgeWhole(run, item);
         }
         List<NodeOutcome> nodes = new ArrayList<>();
         for (NodeFigure node :
@@ -278,6 +281,25 @@ class BulkRunner {
             nodes.add(outcome);
         }
         return new LifecycleOutcome(false, 0, false, nodes);
+    }
+
+    /** A queue of a cluster read as one is purged once for the cluster, by its id: one outcome, naming no node. */
+    private LifecycleOutcome purgeWhole(BulkRunEntity run, BulkRunItemEntity item) {
+        NodeOutcome outcome;
+        try {
+            outcome = switch (messages.purge(
+                    run.getClusterId(), BulkItemIds.parse(item.getSubscription()), false, run.isOverrideCap())) {
+                case Attempt.Ok<MessageService.Outcome>(MessageService.Outcome.Affected affected) ->
+                    new NodeOutcome(null, WHOLE_CLUSTER, NodeStatus.APPLIED, affected.count(), null);
+                case Attempt.Ok<MessageService.Outcome>(var other) ->
+                    NodeOutcome.failed(null, WHOLE_CLUSTER, "Unexpected purge result: " + other);
+                case Attempt.Failed<MessageService.Outcome> failed ->
+                    NodeOutcome.failed(null, WHOLE_CLUSTER, failed.detail());
+            };
+        } catch (RuntimeException e) {
+            outcome = NodeOutcome.failed(null, WHOLE_CLUSTER, e.getMessage());
+        }
+        return new LifecycleOutcome(false, 0, false, List.of(outcome));
     }
 
     private LifecycleOutcome purgeLog(BulkRunEntity run, BulkRunItemEntity item) {

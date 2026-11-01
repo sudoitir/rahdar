@@ -3,6 +3,7 @@ package io.github.sudoitir.rahdar.platform.broker;
 import io.github.sudoitir.openbroker.BrokerException;
 import io.github.sudoitir.openbroker.ErrorReasons;
 import io.github.sudoitir.openbroker.Plane;
+import io.github.sudoitir.rahdar.kernel.core.ConflictException;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Supplier;
@@ -24,7 +25,18 @@ public final class BrokerFailures {
     private static final String DIFFERING = "differing";
     private static final String MBEAN_ABSENT = "InstanceNotFoundException";
 
+    /** The problem type of a send no queue received. */
+    public static final String NOT_ROUTED = "not-routed";
+
     private BrokerFailures() {}
+
+    /** The refusal of a send the exchange could not route: it names the exchange and the request's routing key. */
+    public static ConflictException notRouted(String exchange, String routingKey) {
+        return new ConflictException(
+                NOT_ROUTED,
+                "No queue received the message: the exchange '" + exchange
+                        + "' has no binding that matches routing key '" + routingKey + "'. Nothing was stored.");
+    }
 
     /** The call's result, or the Rahdar exception for the failure it raised. */
     public static <T> T translated(Supplier<T> call) {
@@ -76,6 +88,8 @@ public final class BrokerFailures {
                 metadata.containsKey(NATIVE_CODE)
                         ? new ManagementRefusal(ManagementRefusal.Kind.ARGUMENT, e.getMessage())
                         : new IllegalArgumentException(e.getMessage(), e);
+            case ErrorReasons.NOT_ROUTED -> new ConflictException(NOT_ROUTED, e.getMessage());
+            case ErrorReasons.DESTINATION_FULL -> new ConflictException("destination-full", e.getMessage());
             case ErrorReasons.CALL_REFUSED ->
                 metadata.containsKey(GUARD)
                         ? new IllegalStateException(e.getMessage(), e)

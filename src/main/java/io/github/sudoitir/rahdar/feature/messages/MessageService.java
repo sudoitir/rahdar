@@ -1,5 +1,6 @@
 package io.github.sudoitir.rahdar.feature.messages;
 
+import io.github.sudoitir.openbroker.BrokerException;
 import io.github.sudoitir.openbroker.access.Capability;
 import io.github.sudoitir.openbroker.messaging.BulkOutcome;
 import io.github.sudoitir.openbroker.messaging.MessageAction.Delete;
@@ -9,8 +10,11 @@ import io.github.sudoitir.openbroker.messaging.MessageField;
 import io.github.sudoitir.openbroker.messaging.MessageFilter;
 import io.github.sudoitir.openbroker.messaging.Position;
 import io.github.sudoitir.openbroker.model.PartitionId;
+import io.github.sudoitir.openbroker.model.ResourceClass;
 import io.github.sudoitir.openbroker.model.ResourceId;
 import io.github.sudoitir.openbroker.model.Shard;
+import io.github.sudoitir.openbroker.operation.OperationResult;
+import io.github.sudoitir.openbroker.operation.Preview;
 import io.github.sudoitir.rahdar.feature.messages.MessageActionParams.LogPurgeParams;
 import io.github.sudoitir.rahdar.feature.messages.MessageActionParams.MessageDeleteParams;
 import io.github.sudoitir.rahdar.feature.messages.MessageActionParams.MessageExpireParams;
@@ -27,6 +31,7 @@ import io.github.sudoitir.rahdar.kernel.audit.AuditEvent;
 import io.github.sudoitir.rahdar.kernel.audit.AuditService;
 import io.github.sudoitir.rahdar.kernel.core.ConflictException;
 import io.github.sudoitir.rahdar.kernel.core.NotFoundException;
+import io.github.sudoitir.rahdar.kernel.core.StalePreviewException;
 import io.github.sudoitir.rahdar.kernel.gate.Gated;
 import io.github.sudoitir.rahdar.kernel.gate.Operation;
 import io.github.sudoitir.rahdar.kernel.gate.OperationGate;
@@ -42,12 +47,14 @@ import io.github.sudoitir.rahdar.platform.broker.Attempt;
 import io.github.sudoitir.rahdar.platform.broker.BacklogBreakdown;
 import io.github.sudoitir.rahdar.platform.broker.BodyEncoding;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
+import io.github.sudoitir.rahdar.platform.broker.BrokerFailures;
 import io.github.sudoitir.rahdar.platform.broker.BrokerMessages;
 import io.github.sudoitir.rahdar.platform.broker.BrokerSettings;
 import io.github.sudoitir.rahdar.platform.broker.BrowsePage;
 import io.github.sudoitir.rahdar.platform.broker.BrowsedMessage;
 import io.github.sudoitir.rahdar.platform.broker.BulkCapExceededException;
 import io.github.sudoitir.rahdar.platform.broker.BulkResult;
+import io.github.sudoitir.rahdar.platform.broker.IdentityBasis;
 import io.github.sudoitir.rahdar.platform.broker.LogBounds;
 import io.github.sudoitir.rahdar.platform.broker.LogPage;
 import io.github.sudoitir.rahdar.platform.broker.MessageExpiry;
@@ -56,6 +63,7 @@ import io.github.sudoitir.rahdar.platform.broker.SendInDoubtException;
 import io.github.sudoitir.rahdar.platform.broker.SendNames;
 import io.github.sudoitir.rahdar.platform.broker.SentMessages;
 import io.github.sudoitir.rahdar.platform.broker.SystemExtensions;
+import io.github.sudoitir.rahdar.platform.broker.WholeClusterOperations;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
 import io.github.sudoitir.rahdar.platform.governance.ClearViewAudit;
@@ -105,8 +113,17 @@ public class MessageService {
 
     static final int BROKER_PAGE_CAP = BrokerMessages.PAGE_CAP;
 
+    private static final String BROWSE_CAPABILITY = "messages.browse";
+    private static final String LOG_NOTE =
+            "A log is read by offset: its size is its end offset less its start, and compaction leaves gaps.";
+    private static final String STREAM_NOTE = "A stream is read by offset; reading never removes a message.";
+
     private static final String CORRELATION_ID = "correlationId";
     private static final String GROUP_ID = "groupId";
+
+    /** The SDK's purge, named in full because the gate has an {@code Operation} of its own. */
+    private static final io.github.sudoitir.openbroker.operation.Operation PURGE =
+            new io.github.sudoitir.openbroker.operation.Operation.Purge();
 
     private final QueueLocator queueLocator;
     private final ClusterDirectory brokerNodes;
@@ -121,12 +138,17 @@ public class MessageService {
     private final ClearViewAudit clearViews;
     private final OperationGate gate;
     private final SystemExtensions extensions;
+    private final WholeClusterOperations wholeCluster;
 
     /** Resolved (node, address, routingType) for a queue name on a cluster. */
     record ResolvedQueue(ClusterNode node, String address, String routingType) {}
 
     /** What an operation would touch: how many messages, and the queue's identity for the gate's state key. */
-    public record Reach(long count, String identity) {}
+    public record Reach(long count, String identity, String detail) {
+        public Reach(long count, String identity) {
+            this(count, identity, null);
+        }
+    }
 
     /** A mutation result: an executed affected-count, or a point-in-time dry-run estimate. */
     public sealed interface Outcome {
@@ -134,7 +156,11 @@ public class MessageService {
 
         record Affected(long count, UUID node) implements Outcome {}
 
-        record DryRun(long count, long cap, boolean overCap, UUID node) implements Outcome {}
+        record DryRun(long count, long cap, boolean overCap, UUID node, IdentityBasis basis) implements Outcome {
+            public DryRun(long count, long cap, boolean overCap, UUID node) {
+                this(count, cap, overCap, node, IdentityBasis.INCARNATION);
+            }
+        }
 
         /**
          * A purge of a partitioned log moves a group's position and deletes nothing: {@code skipped} records are passed
@@ -267,6 +293,30 @@ public class MessageService {
         return breakdown;
     }
 
+    /**
+     * One page of a stream, a subscription that is itself one log read as partition 0 (ADR-0224). Reading never
+     * removes a message, and a stream has no transactions to hide.
+     */
+    public MessagePageView browseStream(
+            UUID clusterId, ResourceId stream, int partition, LogStart from, String filter, int requestedSize) {
+        return browseLog(
+                clusterId,
+                stream,
+                null,
+                partition,
+                from,
+                filter,
+                requestedSize,
+                ResourceRef.subscription(stream.name()),
+                STREAM_NOTE,
+                false);
+    }
+
+    /** One record of a stream, expanded. */
+    public MessageDetailView detailStream(UUID clusterId, ResourceId stream, int partition, long offset) {
+        return detailLog(clusterId, stream, partition, offset, ResourceRef.subscription(stream.name()));
+    }
+
     private MessagePageView browseLog(
             UUID clusterId,
             ResourceId log,
@@ -275,7 +325,31 @@ public class MessageService {
             LogStart from,
             String filter,
             int requestedSize) {
-        clusterAccess.requireResource(clusterId, ResourceRef.destination(log.name()), MessagePermissions.MESSAGE_READ);
+        return browseLog(
+                clusterId,
+                log,
+                through,
+                partition,
+                from,
+                filter,
+                requestedSize,
+                ResourceRef.destination(log.name()),
+                LOG_NOTE,
+                true);
+    }
+
+    private MessagePageView browseLog(
+            UUID clusterId,
+            ResourceId log,
+            BacklogBreakdown.Breakdown through,
+            int partition,
+            LogStart from,
+            String filter,
+            int requestedSize,
+            ResourceRef readOf,
+            String note,
+            boolean uncommittedHidden) {
+        clusterAccess.requireResource(clusterId, readOf, MessagePermissions.MESSAGE_READ);
         LogBounds.Bounds bounds = extensions.require(clusterId, LogBounds.class).of(clusterId, log, partition);
         int size = Math.min(requestedSize, BROKER_PAGE_CAP);
         Shard shard = Shard.partition(PartitionId.of(String.valueOf(partition)));
@@ -321,7 +395,7 @@ public class MessageService {
                 size,
                 null,
                 page.next() != null,
-                "A log is read by offset: its size is its end offset less its start, and compaction leaves gaps.",
+                note,
                 null,
                 new LogView(
                         partition,
@@ -329,7 +403,7 @@ public class MessageService {
                         bounds.end(),
                         page.next(),
                         moved,
-                        true,
+                        uncommittedHidden,
                         through == null
                                 ? null
                                 : through.partitions().stream()
@@ -375,7 +449,12 @@ public class MessageService {
 
     /** One record of a partition of a log, expanded. */
     public MessageDetailView detailLog(UUID clusterId, ResourceId log, int partition, long offset) {
-        clusterAccess.requireResource(clusterId, ResourceRef.destination(log.name()), MessagePermissions.MESSAGE_READ);
+        return detailLog(clusterId, log, partition, offset, ResourceRef.destination(log.name()));
+    }
+
+    private MessageDetailView detailLog(
+            UUID clusterId, ResourceId log, int partition, long offset, ResourceRef readOf) {
+        clusterAccess.requireResource(clusterId, readOf, MessagePermissions.MESSAGE_READ);
         LogPage page = messages.browseLog(
                 clusterId,
                 log,
@@ -415,6 +494,16 @@ public class MessageService {
         GovernedMessage governed = contentPolicy.govern(context, content(message));
         clearViews.recordClear(context, "MESSAGE", queueName + "/" + messageId, List.of(governed));
         return toDetail(message, governed, resolved.node().getId());
+    }
+
+    /**
+     * Refuses a browse of a kind the system cannot browse, with the driver's own reason (409), before anything is
+     * read from the broker: a classic or quorum queue's messages are not read without taking them.
+     */
+    public void requireBrowsable(UUID clusterId, ResourceId id) {
+        messages.unavailableBecause(clusterId, BROWSE_CAPABILITY, id).ifPresent(reason -> {
+            throw new ConflictException("unavailable-on-kind", reason);
+        });
     }
 
     /**
@@ -480,6 +569,52 @@ public class MessageService {
         } catch (BrokerConnectionException e) {
             audit.fail(event, e.getMessage());
             return new Attempt.Failed<>(e.kind(), e.getMessage());
+        }
+    }
+
+    /**
+     * Sends a message to a resource of a cluster read as one, by id: straight to a queue, or to an exchange with an
+     * optional routing key. An exchange that routes it nowhere is a {@code 409 not-routed}.
+     */
+    public Attempt<Outcome> sendById(
+            UUID clusterId, ResourceId target, ResourceClass resourceClass, SendMessageRequest req, boolean dryRun) {
+        boolean queue = resourceClass == ResourceClass.SUBSCRIPTION;
+        if (queue && req.routingKey() != null) {
+            throw new IllegalArgumentException(
+                    "A routing key goes to an exchange; a message sent straight to a queue is not routed.");
+        }
+        ResourceRef ref = queue ? ResourceRef.subscription(target.name()) : ResourceRef.destination(target.name());
+        clusterAccess.requireResource(clusterId, ref, MessagePermissions.MESSAGE_SEND);
+        SendNames.validate(req.headers(), req.properties());
+        requireDecodableBody(req);
+        Map<String, Object> params = new LinkedHashMap<>();
+        params.put("kind", req.kind().name());
+        params.put("id", target.format());
+        AuditEvent event = begin("SEND_MESSAGE", target.name(), clusterId, null, params, dryRun);
+        if (dryRun) {
+            audit.succeed(event, 1);
+            return new Attempt.Ok<>(new Outcome.DryRun(1, settings.intValue(BrokerSettings.BULK_CAP), false, null));
+        }
+        try {
+            messages.sendById(
+                    clusterId,
+                    target,
+                    resourceClass,
+                    req.routingKey(),
+                    SentMessages.of(req.kind(), req.durable(), req.body(), req.headers(), req.properties()));
+            audit.succeed(event, 1);
+            publishQueuesAfterCommit(clusterId, target.name());
+            return new Attempt.Ok<>(new Outcome.Affected(1, null));
+        } catch (SendInDoubtException e) {
+            audit.inDoubt(event, e.getMessage());
+            publishQueuesAfterCommit(clusterId, target.name());
+            return new Attempt.Ok<>(new Outcome.InDoubt(e.getMessage(), null));
+        } catch (BrokerConnectionException e) {
+            audit.fail(event, e.getMessage());
+            return new Attempt.Failed<>(e.kind(), e.getMessage());
+        } catch (RuntimeException e) {
+            audit.fail(event, e.getMessage());
+            throw e;
         }
     }
 
@@ -692,7 +827,68 @@ public class MessageService {
         if (dryRun) {
             return runPurge(clusterId, queueName, nodeId, true, override);
         }
-        return gatedPurge(new QueuePurgeParams(clusterId, queueName, nodeId, override));
+        return gatedPurge(new QueuePurgeParams(clusterId, queueName, null, nodeId, override));
+    }
+
+    /**
+     * Purges a queue of a cluster read as one, by id and over the whole cluster. The estimate is the ready
+     * messages, and the bulk cap applies to it as it does to a per-node purge.
+     */
+    public Attempt<Outcome> purge(UUID clusterId, ResourceId id, boolean dryRun, boolean override) {
+        clusterAccess.requireResource(
+                clusterId, ResourceRef.subscription(id.name()), MessagePermissions.SUBSCRIPTION_PURGE);
+        if (dryRun) {
+            return runPurgeWhole(clusterId, id, true, override);
+        }
+        return gatedPurge(new QueuePurgeParams(clusterId, id.name(), id.format(), null, override));
+    }
+
+    /** What purging the queue would remove now, and what its etag holds, read with no audit row or broker change. */
+    public Reach reachOfPurge(UUID clusterId, ResourceId id) {
+        clusterAccess.requireResource(
+                clusterId, ResourceRef.subscription(id.name()), MessagePermissions.SUBSCRIPTION_PURGE);
+        try {
+            Preview preview = wholeCluster.preview(clusterId, id, PURGE);
+            return new Reach(
+                    WholeClusterOperations.messages(preview).orElse(0L),
+                    preview.etag(),
+                    wholeCluster.basis(preview).note());
+        } catch (BrokerException e) {
+            throw BrokerFailures.translate(e);
+        }
+    }
+
+    private Attempt<Outcome> runPurgeWhole(UUID clusterId, ResourceId id, boolean dryRun, boolean override) {
+        AuditEvent event = begin("PURGE_QUEUE", id.name(), clusterId, null, Map.of("id", id.format()), dryRun);
+        try {
+            long cap = settings.intValue(BrokerSettings.BULK_CAP);
+            Preview preview = wholeCluster.preview(clusterId, id, PURGE);
+            long estimate = WholeClusterOperations.messages(preview).orElse(0L);
+            if (dryRun) {
+                audit.succeed(event, estimate);
+                return new Attempt.Ok<>(
+                        new Outcome.DryRun(estimate, cap, estimate > cap, null, wholeCluster.basis(preview)));
+            }
+            if (estimate > cap && !override) {
+                audit.fail(event, "Over the safety cap (" + estimate + " > " + cap + ").");
+                throw new BulkCapExceededException(estimate, cap);
+            }
+            OperationResult result = wholeCluster.execute(clusterId, id, PURGE, preview.etag());
+            long removed = result.affected().isPresent() ? result.affected().getAsLong() : estimate;
+            audit.succeed(event, removed);
+            publishQueuesAfterCommit(clusterId, id.name());
+            return new Attempt.Ok<>(new Outcome.Affected(removed, null));
+        } catch (BrokerException e) {
+            RuntimeException translated = BrokerFailures.translate(e);
+            audit.fail(event, translated.getMessage());
+            if (translated instanceof BrokerConnectionException connection) {
+                return new Attempt.Failed<>(connection.kind(), connection.getMessage());
+            }
+            throw translated;
+        } catch (StalePreviewException e) {
+            audit.fail(event, e.getMessage());
+            throw e;
+        }
     }
 
     /**
@@ -754,7 +950,11 @@ public class MessageService {
 
     @Gated("subscription.purge")
     private Attempt<Outcome> gatedPurge(QueuePurgeParams p) {
-        return gate.run(Operation.of(p), () -> runPurge(p.clusterId(), p.queue(), p.nodeId(), false, p.override()));
+        return gate.run(
+                Operation.of(p),
+                () -> p.id() == null
+                        ? runPurge(p.clusterId(), p.queue(), p.nodeId(), false, p.override())
+                        : runPurgeWhole(p.clusterId(), ResourceId.parse(p.id()), false, p.override()));
     }
 
     private Attempt<Outcome> runPurge(UUID clusterId, String queueName, UUID nodeId, boolean dryRun, boolean override) {

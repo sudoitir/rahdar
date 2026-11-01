@@ -190,6 +190,10 @@ public class BrokerMessages {
         });
     }
 
+    static final String IN_DOUBT =
+            "The message was sent, but the broker's confirmation never came back: it may or may not"
+                    + " be on the broker. Look for it before sending it again, or it may be there twice.";
+
     /**
      * Sends one message through a node to a destination, which routes it, or straight to a subscription;
      * returns its id, when the system gives one.
@@ -205,14 +209,44 @@ public class BrokerMessages {
                 receipt = c.messages().send(sendTarget(c, target), Scope.node(BrokerGateway.idOf(nodeId)), message);
             } catch (BrokerException e) {
                 if (e.dispatch() == Dispatch.IN_DOUBT) {
-                    throw new SendInDoubtException(
-                            "The message was sent, but the broker's confirmation never came back: it may or may not"
-                                    + " be on the broker. Look for it before sending it again, or it may be there twice.",
-                            e);
+                    throw new SendInDoubtException(IN_DOUBT, e);
                 }
                 throw e;
             }
             return receipt.messageId();
+        });
+    }
+
+    /**
+     * Sends one message to a resource of a cluster read as one, by id, over the whole cluster. A routing key goes to
+     * a destination only. An exchange that routes the message nowhere is a {@code 409 not-routed} naming the exchange
+     * and the key the caller gave.
+     *
+     * @throws SendInDoubtException when the broker's confirmation never came back
+     */
+    public Optional<String> sendById(
+            UUID clusterId,
+            ResourceId target,
+            ResourceClass resourceClass,
+            String routingKey,
+            OutboundMessage message) {
+        return translated(() -> {
+            ClusterConnection c = gateway.cluster(clusterId);
+            SendTarget to = resourceClass == ResourceClass.SUBSCRIPTION
+                    ? SendTarget.subscription(target)
+                    : new SendTarget.ToDestination(
+                            target, Optional.ofNullable(routingKey), Optional.<PartitionId>empty());
+            try {
+                return c.messages().send(to, Scope.whole(), message).messageId();
+            } catch (BrokerException e) {
+                if (e.dispatch() == Dispatch.IN_DOUBT) {
+                    throw new SendInDoubtException(IN_DOUBT, e);
+                }
+                if (ErrorReasons.NOT_ROUTED.equals(e.reason())) {
+                    throw BrokerFailures.notRouted(target.name(), routingKey == null ? "" : routingKey);
+                }
+                throw e;
+            }
         });
     }
 
@@ -292,6 +326,21 @@ public class BrokerMessages {
             var assessment = gateway.cluster(clusterId)
                     .access()
                     .check(new io.github.sudoitir.openbroker.access.Capability(capability), Optional.empty());
+            return assessment.status() == io.github.sudoitir.openbroker.access.Assessment.Status.UNAVAILABLE
+                    ? Optional.of(assessment.reason())
+                    : Optional.<String>empty();
+        });
+    }
+
+    /**
+     * Why the cluster's system offers no such action on this resource, in its own words, or empty when it does. It
+     * is answered from the resource's kind, with no read from the broker.
+     */
+    public Optional<String> unavailableBecause(UUID clusterId, String capability, ResourceId resource) {
+        return translated(() -> {
+            var assessment = gateway.cluster(clusterId)
+                    .access()
+                    .check(new io.github.sudoitir.openbroker.access.Capability(capability), Optional.of(resource));
             return assessment.status() == io.github.sudoitir.openbroker.access.Assessment.Status.UNAVAILABLE
                     ? Optional.of(assessment.reason())
                     : Optional.<String>empty();

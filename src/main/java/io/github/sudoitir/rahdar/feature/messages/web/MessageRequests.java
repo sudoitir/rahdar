@@ -19,14 +19,25 @@ public final class MessageRequests {
      * {@code groupSeq}, the names the message detail shows; any other header is refused.
      * {@code properties} are the application properties, each named by a Java identifier that is not
      * a selector keyword and does not start with {@code JMS}. Over a Core connection
-     * a property keeps its type; over the management channel it is sent as its text.
+     * a property keeps its type; over the management channel it is sent as its text. {@code routingKey} is sent
+     * with a message to an exchange of a cluster read as one; it is refused for a queue.
      */
     public record SendMessageRequest(
             @NotNull MessageKind kind,
             boolean durable,
             String body,
             Map<String, Object> headers,
-            Map<String, Object> properties) {
+            Map<String, Object> properties,
+            String routingKey) {
+
+        public SendMessageRequest(
+                MessageKind kind,
+                boolean durable,
+                String body,
+                Map<String, Object> headers,
+                Map<String, Object> properties) {
+            this(kind, durable, body, headers, properties, null);
+        }
 
         public SendMessageRequest {
             headers = headers == null ? Map.of() : headers;
