@@ -126,12 +126,21 @@ public class BrokerMessages {
             Long next = kept.truncated()
                     ? Long.valueOf(
                             result.messages().get(kept.items().size()).ref().position())
-                    : result.next()
-                            .map(cursor -> Long.parseLong(
-                                    cursor.token().substring(cursor.token().indexOf(':') + 1)))
-                            .orElse(null);
+                    : afterLast(result);
             return new LogPage(kept.items(), next, kept.truncated());
         });
+    }
+
+    /**
+     * Where the next page of a log starts: one past the last message returned, when the driver says more follows.
+     * The driver's cursor token is opaque, so it is never parsed; reading forward from the last position also
+     * crosses the gaps compaction leaves.
+     */
+    private static Long afterLast(io.github.sudoitir.openbroker.messaging.BrowsePage result) {
+        if (result.next().isEmpty() || result.messages().isEmpty()) {
+            return null;
+        }
+        return Long.parseLong(result.messages().getLast().ref().position()) + 1;
     }
 
     /** What was kept of a page, and whether the budget stopped it short. */
