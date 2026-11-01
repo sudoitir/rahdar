@@ -5,6 +5,7 @@ import io.github.sudoitir.openbroker.ClusterConnection;
 import io.github.sudoitir.openbroker.messaging.BrowseRequest;
 import io.github.sudoitir.openbroker.messaging.Position;
 import io.github.sudoitir.openbroker.model.KindId;
+import io.github.sudoitir.openbroker.model.MetricKeys;
 import io.github.sudoitir.openbroker.model.MetricValue;
 import io.github.sudoitir.openbroker.model.PartitionId;
 import io.github.sudoitir.openbroker.model.Resource;
@@ -26,7 +27,8 @@ import org.springframework.stereotype.Component;
 
 /**
  * A stream is one log, read as partition 0: it starts at the first message still kept, found by a one-message browse
- * from the earliest, and ends after the committed offset the stream reports.
+ * from the earliest, and ends after the committed offset the stream reports. A RabbitMQ that reports no committed
+ * offset (4.x) ends it at the start plus the messages the stream holds, which the management statistics sample.
  */
 @Component
 @RequiredArgsConstructor
@@ -55,30 +57,39 @@ class RabbitMqLogBounds implements LogBounds {
         }
         try {
             ClusterConnection cluster = gateway.cluster(clusterId);
-            long end = end(cluster, log);
-            long start = start(cluster, log).orElse(end);
-            return new Bounds(Math.min(start, end), end);
+            Resource stream = stream(cluster, log);
+            Optional<Long> start = start(cluster, log);
+            long end = end(stream, start);
+            long first = start.orElse(end);
+            return new Bounds(Math.min(first, end), end);
         } catch (BrokerException e) {
             throw BrokerFailures.translate(e);
         }
     }
 
-    private static long end(ClusterConnection cluster, ResourceId log) {
+    private static Resource stream(ClusterConnection cluster, ResourceId log) {
         List<String> segments = log.path().segments();
         ResourceQuery query = ResourceQuery.of(STREAM)
                 .where(Map.of("vhost", segments.getFirst()))
                 .named(log.name())
-                .project(Set.of(COMMITTED_OFFSET));
-        Resource found = cluster.resources().read(query).orThrow().items().stream()
+                .project(Set.of(COMMITTED_OFFSET, MetricKeys.BACKLOG.name()));
+        return cluster.resources().read(query).orThrow().items().stream()
                 .filter(r -> r.id().equals(log))
                 .findFirst()
                 .orElseThrow(() -> new NotFoundException("stream", log.name()));
-        // A stream that has never held a message reports no committed offset, so it ends where it starts.
-        return found.attributes()
-                        .raw(COMMITTED_OFFSET)
-                        .map(RabbitMqLogBounds::number)
-                        .orElse(-1L)
-                + 1;
+    }
+
+    private static long end(Resource found, Optional<Long> start) {
+        Optional<Long> committed = found.attributes().raw(COMMITTED_OFFSET).map(RabbitMqLogBounds::number);
+        if (committed.isPresent()) {
+            return committed.get() + 1;
+        }
+        // No committed offset: the start plus what the stream holds; a stream that holds nothing ends where it starts.
+        long held = found.attributes()
+                .get(MetricKeys.BACKLOG)
+                .map(MetricValue::asLong)
+                .orElse(0L);
+        return start.map(first -> first + held).orElse(0L);
     }
 
     private static Optional<Long> start(ClusterConnection cluster, ResourceId log) {

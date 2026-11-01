@@ -15,6 +15,7 @@ import io.github.sudoitir.openbroker.messaging.Messages;
 import io.github.sudoitir.openbroker.messaging.Total;
 import io.github.sudoitir.openbroker.model.Attributes;
 import io.github.sudoitir.openbroker.model.KindId;
+import io.github.sudoitir.openbroker.model.MetricKeys;
 import io.github.sudoitir.openbroker.model.MetricValue;
 import io.github.sudoitir.openbroker.model.PartitionId;
 import io.github.sudoitir.openbroker.model.Resource;
@@ -95,6 +96,18 @@ class RabbitMqLogBoundsTest {
                 .thenReturn(new BrowsePage(List.of(), Optional.empty(), mock(Total.class)));
 
         assertThat(bounds.of(CLUSTER, STREAM, 0)).isEqualTo(new Bounds(0, 0));
+    }
+
+    @Test
+    void withoutACommittedOffsetItEndsAfterTheMessagesTheStreamHolds() {
+        Attributes.Builder attributes = Attributes.builder();
+        attributes.put(MetricKeys.BACKLOG, MetricValue.estimate(200));
+        Resource found = new Resource(STREAM, attributes.build(), List.of(), List.of(), Instant.now());
+        when(resources.read(any(ResourceQuery.class)))
+                .thenReturn(Partial.complete(new ResourcePage(List.of(found), Optional.empty()), List.of()));
+        firstMessageIs("40");
+
+        assertThat(bounds.of(CLUSTER, STREAM, 0)).isEqualTo(new Bounds(40, 240));
     }
 
     @Test
