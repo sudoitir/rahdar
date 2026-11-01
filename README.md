@@ -6,7 +6,7 @@
 
 <sub><em>Rahdar</em> (Persian راهدار, "road-keeper") is <em>rah</em> (route) + <em>dar</em> (keeper): it keeps every route your messages travel open and safe.</sub>
 
-**One open-source console for your Apache ActiveMQ® Artemis and Apache Kafka® clusters.**
+**One open-source console for your Apache ActiveMQ® Artemis, Apache Kafka® and RabbitMQ clusters.**
 
 Every cluster you run in one estate, lag shown as the estimate it is, a preview before
 anything destructive, and an approval gate that holds people and assistants alike.
@@ -30,6 +30,7 @@ anything destructive, and an approval gate that holds people and assistants alik
 [Docs](https://rahdar.dev/guide/) ·
 [Quickstart](#quickstart) ·
 [Kafka](https://rahdar.dev/guide/kafka) ·
+[RabbitMQ](https://rahdar.dev/guide/rabbitmq) ·
 [Flow](https://rahdar.dev/guide/flow) ·
 [SQL Console](https://rahdar.dev/guide/sql-console) ·
 [MCP](https://rahdar.dev/guide/mcp) ·
@@ -152,8 +153,8 @@ disabled, with the reason.
 | System | Supported | Guide |
 | --- | --- | --- |
 | Apache ActiveMQ® Artemis | 2.33.0 and later | [Guide](https://rahdar.dev/guide/) |
-| Apache Kafka® | 2.8 and later, KRaft and ZooKeeper mode | [Kafka](https://rahdar.dev/guide/kafka) |
-| RabbitMQ | Coming next; not supported yet | |
+| Apache Kafka® | 3.0 and later, KRaft and ZooKeeper mode | [Kafka](https://rahdar.dev/guide/kafka) |
+| RabbitMQ | 3.13 and later (4.x tested) | [RabbitMQ](https://rahdar.dev/guide/rabbitmq) |
 
 Details and what happens outside those ranges: [supported broker versions](https://rahdar.dev/guide/supported-versions).
 
@@ -177,6 +178,23 @@ Details and what happens outside those ranges: [supported broker versions](https
 - **On the shared screens** — browse a topic by partition and offset or time, without joining a group;
   purge a group's unread records or truncate a topic with its reach stated, including every group that
   would lose records it has not read.
+
+### RabbitMQ
+
+- **[Registration](https://rahdar.dev/guide/rabbitmq#register-a-cluster)** — management URLs and optional
+  AMQP endpoints with one account; the check reaches every endpoint on its own and names each node, its
+  alarms and any partition.
+- **[Nodes](https://rahdar.dev/guide/rabbitmq#nodes)** — version, uptime, listeners and plugins, with a
+  memory or disk alarm flagged because it blocks every publisher.
+- **[Virtual hosts, bindings, policies and permissions](https://rahdar.dev/guide/rabbitmq#virtual-hosts)** —
+  each change previewed first, confirmed by holding for the destructive ones, held for approval where the
+  gate is on, and audited. A policy's preview lists the queues and exchanges it matches.
+- **[Shovels and federation](https://rahdar.dev/guide/rabbitmq#shovels-and-federation)** — dynamic shovels
+  and federation links with their state, addresses shown without credentials.
+- **On the shared screens** — classic, quorum and stream queues with their backlog marked as an estimate
+  (a stream has none); browse a stream by offset, without removing a message; publish through an exchange and
+  be told when no queue received it. A resource recreated with the same configuration is not told apart,
+  and the confirmation says so.
 
 ### Apache Artemis
 
@@ -241,7 +259,7 @@ Details and what happens outside those ranges: [supported broker versions](https
 - **[MCP server](https://rahdar.dev/guide/mcp)** — the same
   capabilities for an AI assistant, under the same grants and the same audit trail. Its
   eight `kafka_*` tools change nothing that was not previewed first, and wait for a person
-  wherever the approval gate is on.
+  wherever the approval gate is on; six `rabbitmq_*` tools read a RabbitMQ cluster.
 - **[Plugins](https://rahdar.dev/guide/plugins)** — install a
   plugin's `.jar` from the UI: screens, API, assistant tools and data of its own, with
   everything it can do shown before you confirm, and no restart unless it needs one.
@@ -259,13 +277,14 @@ Four rules hold everywhere in the product:
   and purge, delete, truncate and resets are confirmed by pressing and holding a button
   that names the count.
 - **State comes from the brokers, not from config.** Artemis HA roles are polled from
-  every node, and a Kafka cluster's health is formed from its brokers and its quorum.
+  every node, a Kafka cluster's health is formed from its brokers and its quorum, and a RabbitMQ
+  cluster's from its nodes, their alarms and its replicated queues.
 - **Honest capability gating.** An unavailable feature says so and shows the exact
   `broker.xml` that enables it. Nothing silently disappears.
 
 Java 25 · Spring Boot 4.1 · PostgreSQL with Liquibase · React 19 + Vite + Mantine 9 ·
 TanStack Router/Query/Table · React Flow · the [OpenBroker](https://github.com/sudoitir/openbroker)
-SDK and its Artemis and Kafka drivers · SSE · one container image. Read the
+SDK and its Artemis, Kafka and RabbitMQ drivers · SSE · one container image. Read the
 [architecture](https://rahdar.dev/reference/architecture) and
 [every recorded decision](https://rahdar.dev/reference/adr/).
 

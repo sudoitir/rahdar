@@ -1,11 +1,11 @@
 ---
 title: Supported broker versions
-description: Which Apache Artemis and Apache Kafka releases Rahdar supports, how that range was established, and what happens outside it.
+description: Which Apache Artemis, Apache Kafka and RabbitMQ releases Rahdar supports, how that range was established, and what happens outside it.
 ---
 
 # Supported broker versions
 
-Rahdar manages two broker systems. Each has its own range, and a cluster is checked against the range of the
+Rahdar manages three broker systems. Each has its own range, and a cluster is checked against the range of the
 system it runs.
 
 ## Apache Kafka
@@ -30,6 +30,29 @@ What a release or a mode cannot do is shown as unavailable, with its reason, and
 | Before 4.0 | Share groups | They arrived with 4.0. The groups list shows only the group types the cluster has. |
 | A cluster without an authoriser | ACLs | There is nothing to list. The ACLs page says so, with the broker's reason. |
 | An account that may not describe a group or topic | That group's lag, or that topic's configuration | The figure says it could not be read and why, instead of showing 0. |
+
+Registering a cluster newer than the range Rahdar was built against is accepted, with a warning.
+
+## RabbitMQ
+
+| | RabbitMQ release |
+| --- | --- |
+| Minimum | **3.13** |
+| Tested | 4.x |
+
+Every release from 3.13 on is supported. A cluster older than 3.13 is refused: the check names the version it
+found and the supported range, and nothing is stored. Rahdar reads the version of every node and shows the
+lowest, so a cluster in the middle of a rolling upgrade is shown at its oldest node.
+
+What a cluster or an account cannot do is shown as unavailable, with its reason and the remedy:
+
+| On | Unavailable | Why |
+| --- | --- | --- |
+| A cluster without the shovel plugins | The shovels list | The plugin is not enabled. The page names the plugins. |
+| A cluster without the federation plugins | Federation links | The plugin is not enabled. The page names the plugins. |
+| A cluster without the stream plugin | Browsing streams | Reading a stream needs the stream plugin. |
+| Classic and quorum queues | Browsing messages | RabbitMQ can only hand their messages to a consumer, so only streams are browsed. |
+| An account without the `monitoring` tag | The whole cluster | The check says so and gives `rabbitmqctl set_user_tags <user> monitoring`. |
 
 Registering a cluster newer than the range Rahdar was built against is accepted, with a warning.
 

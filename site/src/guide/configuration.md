@@ -204,6 +204,7 @@ API and never written to the audit log.
 | System | A connection stores |
 | --- | --- |
 | Apache Kafka | The bootstrap servers, the security protocol, the SASL mechanism, the account (a username and password, or a token), the TLS bundle and the client id. |
+| RabbitMQ | The management URLs, the optional AMQP endpoints, the account (a username and password, or a token) used for both, the TLS bundle, the virtual host of the event exchange and the watch interval. |
 | Apache Artemis | The seed management endpoints, the management URL pattern that gives every other node its own, the management and Core credentials, and the TLS bundle. |
 
 Edit all of it under **Settings → Connection**, which shows the fields of the cluster's own system.
