@@ -12,8 +12,6 @@ import io.github.sudoitir.rahdar.system.rabbitmq.RabbitMqShovels;
 import io.github.sudoitir.rahdar.system.rabbitmq.RabbitMqVhosts;
 import io.github.sudoitir.rahdar.system.rabbitmq.web.RabbitMqViews.BindingPage;
 import io.github.sudoitir.rahdar.system.rabbitmq.web.RabbitMqViews.BindingRequest;
-import io.github.sudoitir.rahdar.system.rabbitmq.web.RabbitMqViews.ChangePreview;
-import io.github.sudoitir.rahdar.system.rabbitmq.web.RabbitMqViews.ChangeResult;
 import io.github.sudoitir.rahdar.system.rabbitmq.web.RabbitMqViews.CreatedView;
 import io.github.sudoitir.rahdar.system.rabbitmq.web.RabbitMqViews.ExchangeRequest;
 import io.github.sudoitir.rahdar.system.rabbitmq.web.RabbitMqViews.FederationPage;
@@ -24,6 +22,8 @@ import io.github.sudoitir.rahdar.system.rabbitmq.web.RabbitMqViews.PolicyPage;
 import io.github.sudoitir.rahdar.system.rabbitmq.web.RabbitMqViews.PolicyPreview;
 import io.github.sudoitir.rahdar.system.rabbitmq.web.RabbitMqViews.PolicyRequest;
 import io.github.sudoitir.rahdar.system.rabbitmq.web.RabbitMqViews.QueueRequest;
+import io.github.sudoitir.rahdar.system.rabbitmq.web.RabbitMqViews.RabbitMqChangePreview;
+import io.github.sudoitir.rahdar.system.rabbitmq.web.RabbitMqViews.RabbitMqChangeResult;
 import io.github.sudoitir.rahdar.system.rabbitmq.web.RabbitMqViews.ShovelPage;
 import io.github.sudoitir.rahdar.system.rabbitmq.web.RabbitMqViews.TopicPermissionRequest;
 import io.github.sudoitir.rahdar.system.rabbitmq.web.RabbitMqViews.UserPage;
@@ -80,37 +80,37 @@ public class RabbitMqController {
     }
 
     @PostMapping("/vhosts:preview")
-    public ChangePreview previewCreateVhost(@PathVariable UUID clusterId, @RequestBody VhostRequest request) {
+    public RabbitMqChangePreview previewCreateVhost(@PathVariable UUID clusterId, @RequestBody VhostRequest request) {
         return vhosts.previewCreate(clusterId, request);
     }
 
     @HeldResponse
     @PostMapping("/vhosts")
-    public ChangeResult createVhost(@PathVariable UUID clusterId, @RequestBody VhostRequest request) {
+    public RabbitMqChangeResult createVhost(@PathVariable UUID clusterId, @RequestBody VhostRequest request) {
         return vhosts.create(clusterId, request);
     }
 
     @PatchMapping("/vhosts/{vhost}:preview")
-    public ChangePreview previewUpdateVhost(
+    public RabbitMqChangePreview previewUpdateVhost(
             @PathVariable UUID clusterId, @PathVariable String vhost, @RequestBody VhostRequest request) {
         return vhosts.previewUpdate(clusterId, vhost, request);
     }
 
     @HeldResponse
     @PatchMapping("/vhosts/{vhost}")
-    public ChangeResult updateVhost(
+    public RabbitMqChangeResult updateVhost(
             @PathVariable UUID clusterId, @PathVariable String vhost, @RequestBody VhostRequest request) {
         return vhosts.update(clusterId, vhost, request);
     }
 
     @DeleteMapping("/vhosts/{vhost}:preview")
-    public ChangePreview previewDeleteVhost(@PathVariable UUID clusterId, @PathVariable String vhost) {
+    public RabbitMqChangePreview previewDeleteVhost(@PathVariable UUID clusterId, @PathVariable String vhost) {
         return vhosts.previewDelete(clusterId, vhost);
     }
 
     @HeldResponse
     @DeleteMapping("/vhosts/{vhost}")
-    public ChangeResult deleteVhost(
+    public RabbitMqChangeResult deleteVhost(
             @PathVariable UUID clusterId, @PathVariable String vhost, @RequestParam(required = false) String etag) {
         return vhosts.delete(clusterId, vhost, etag);
     }
@@ -118,7 +118,7 @@ public class RabbitMqController {
     // ---- queues and exchanges -----------------------------------------------------------------------------------
 
     @PostMapping("/queues:preview")
-    public ChangePreview previewCreateQueue(@PathVariable UUID clusterId, @RequestBody QueueRequest request) {
+    public RabbitMqChangePreview previewCreateQueue(@PathVariable UUID clusterId, @RequestBody QueueRequest request) {
         return queues.preview(clusterId, request);
     }
 
@@ -128,7 +128,8 @@ public class RabbitMqController {
     }
 
     @PostMapping("/exchanges:preview")
-    public ChangePreview previewCreateExchange(@PathVariable UUID clusterId, @RequestBody ExchangeRequest request) {
+    public RabbitMqChangePreview previewCreateExchange(
+            @PathVariable UUID clusterId, @RequestBody ExchangeRequest request) {
         return exchanges.preview(clusterId, request);
     }
 
@@ -151,24 +152,25 @@ public class RabbitMqController {
     }
 
     @PostMapping("/bindings:preview")
-    public ChangePreview previewCreateBinding(@PathVariable UUID clusterId, @RequestBody BindingRequest request) {
+    public RabbitMqChangePreview previewCreateBinding(
+            @PathVariable UUID clusterId, @RequestBody BindingRequest request) {
         return bindings.previewCreate(clusterId, request);
     }
 
     @HeldResponse
     @PostMapping("/bindings")
-    public ChangeResult createBinding(@PathVariable UUID clusterId, @RequestBody BindingRequest request) {
+    public RabbitMqChangeResult createBinding(@PathVariable UUID clusterId, @RequestBody BindingRequest request) {
         return bindings.create(clusterId, request);
     }
 
     @DeleteMapping("/bindings/{id}:preview")
-    public ChangePreview previewDeleteBinding(@PathVariable UUID clusterId, @PathVariable String id) {
+    public RabbitMqChangePreview previewDeleteBinding(@PathVariable UUID clusterId, @PathVariable String id) {
         return bindings.previewDelete(clusterId, id);
     }
 
     @HeldResponse
     @DeleteMapping("/bindings/{id}")
-    public ChangeResult deleteBinding(
+    public RabbitMqChangeResult deleteBinding(
             @PathVariable UUID clusterId, @PathVariable String id, @RequestParam(required = false) String etag) {
         return bindings.delete(clusterId, id, etag);
     }
@@ -195,7 +197,7 @@ public class RabbitMqController {
 
     @HeldResponse
     @PutMapping("/policies/{vhost}/{name}")
-    public ChangeResult setPolicy(
+    public RabbitMqChangeResult setPolicy(
             @PathVariable UUID clusterId,
             @PathVariable String vhost,
             @PathVariable String name,
@@ -211,7 +213,7 @@ public class RabbitMqController {
 
     @HeldResponse
     @DeleteMapping("/policies/{vhost}/{name}")
-    public ChangeResult clearPolicy(
+    public RabbitMqChangeResult clearPolicy(
             @PathVariable UUID clusterId,
             @PathVariable String vhost,
             @PathVariable String name,
@@ -240,7 +242,7 @@ public class RabbitMqController {
     }
 
     @PutMapping("/permissions/{vhost}/{user}:preview")
-    public ChangePreview previewSetPermission(
+    public RabbitMqChangePreview previewSetPermission(
             @PathVariable UUID clusterId,
             @PathVariable String vhost,
             @PathVariable String user,
@@ -250,7 +252,7 @@ public class RabbitMqController {
 
     @HeldResponse
     @PutMapping("/permissions/{vhost}/{user}")
-    public ChangeResult setPermission(
+    public RabbitMqChangeResult setPermission(
             @PathVariable UUID clusterId,
             @PathVariable String vhost,
             @PathVariable String user,
@@ -259,14 +261,14 @@ public class RabbitMqController {
     }
 
     @DeleteMapping("/permissions/{vhost}/{user}:preview")
-    public ChangePreview previewClearPermission(
+    public RabbitMqChangePreview previewClearPermission(
             @PathVariable UUID clusterId, @PathVariable String vhost, @PathVariable String user) {
         return permissions.previewClear(clusterId, vhost, user);
     }
 
     @HeldResponse
     @DeleteMapping("/permissions/{vhost}/{user}")
-    public ChangeResult clearPermission(
+    public RabbitMqChangeResult clearPermission(
             @PathVariable UUID clusterId,
             @PathVariable String vhost,
             @PathVariable String user,
@@ -275,7 +277,7 @@ public class RabbitMqController {
     }
 
     @PutMapping("/topic-permissions/{vhost}/{user}/{exchange}:preview")
-    public ChangePreview previewSetTopicPermission(
+    public RabbitMqChangePreview previewSetTopicPermission(
             @PathVariable UUID clusterId,
             @PathVariable String vhost,
             @PathVariable String user,
@@ -286,7 +288,7 @@ public class RabbitMqController {
 
     @HeldResponse
     @PutMapping("/topic-permissions/{vhost}/{user}/{exchange}")
-    public ChangeResult setTopicPermission(
+    public RabbitMqChangeResult setTopicPermission(
             @PathVariable UUID clusterId,
             @PathVariable String vhost,
             @PathVariable String user,
@@ -296,7 +298,7 @@ public class RabbitMqController {
     }
 
     @DeleteMapping("/topic-permissions/{vhost}/{user}/{exchange}:preview")
-    public ChangePreview previewClearTopicPermission(
+    public RabbitMqChangePreview previewClearTopicPermission(
             @PathVariable UUID clusterId,
             @PathVariable String vhost,
             @PathVariable String user,
@@ -306,7 +308,7 @@ public class RabbitMqController {
 
     @HeldResponse
     @DeleteMapping("/topic-permissions/{vhost}/{user}/{exchange}")
-    public ChangeResult clearTopicPermission(
+    public RabbitMqChangeResult clearTopicPermission(
             @PathVariable UUID clusterId,
             @PathVariable String vhost,
             @PathVariable String user,
@@ -327,13 +329,13 @@ public class RabbitMqController {
     }
 
     @DeleteMapping("/shovels/{id}:preview")
-    public ChangePreview previewDeleteShovel(@PathVariable UUID clusterId, @PathVariable String id) {
+    public RabbitMqChangePreview previewDeleteShovel(@PathVariable UUID clusterId, @PathVariable String id) {
         return bindings.previewDelete(clusterId, id);
     }
 
     @HeldResponse
     @DeleteMapping("/shovels/{id}")
-    public ChangeResult deleteShovel(
+    public RabbitMqChangeResult deleteShovel(
             @PathVariable UUID clusterId, @PathVariable String id, @RequestParam(required = false) String etag) {
         return bindings.delete(clusterId, id, etag);
     }

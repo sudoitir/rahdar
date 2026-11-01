@@ -17,7 +17,7 @@ import io.github.sudoitir.openbroker.model.ResourceQuery;
 import io.github.sudoitir.openbroker.model.Resources;
 import io.github.sudoitir.openbroker.operation.Operation;
 import io.github.sudoitir.rahdar.system.rabbitmq.RabbitMqOps.Verb;
-import io.github.sudoitir.rahdar.system.rabbitmq.web.RabbitMqViews.ChangePreview;
+import io.github.sudoitir.rahdar.system.rabbitmq.web.RabbitMqViews.RabbitMqChangePreview;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -99,9 +99,9 @@ class RabbitMqReadsTest {
 
     @Test
     void aDeletionCountsMessagesAndOtherChangesCountAttributes() {
-        ChangePreview deletion =
+        RabbitMqChangePreview deletion =
                 RabbitMqOps.view(preview("e", 40, change("k", "a", null)), Verb.DELETE, "Delete it.", List.of("x"));
-        ChangePreview creation = RabbitMqOps.view(
+        RabbitMqChangePreview creation = RabbitMqOps.view(
                 preview("e", 0, change("k", null, "a"), change("j", null, "b")), Verb.CREATE, "Make it.", List.of());
 
         assertThat(deletion.effect().count()).isEqualTo(40);

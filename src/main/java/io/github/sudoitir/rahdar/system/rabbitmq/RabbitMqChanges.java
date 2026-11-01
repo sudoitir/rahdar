@@ -12,9 +12,9 @@ import io.github.sudoitir.rahdar.kernel.gate.OperationGate;
 import io.github.sudoitir.rahdar.kernel.security.ActorResolver;
 import io.github.sudoitir.rahdar.platform.broker.IdentityBasis;
 import io.github.sudoitir.rahdar.system.rabbitmq.RabbitMqOps.Verb;
-import io.github.sudoitir.rahdar.system.rabbitmq.web.RabbitMqViews.ChangeResult;
 import io.github.sudoitir.rahdar.system.rabbitmq.web.RabbitMqViews.CreatedView;
-import io.github.sudoitir.rahdar.system.rabbitmq.web.RabbitMqViews.Diff;
+import io.github.sudoitir.rahdar.system.rabbitmq.web.RabbitMqViews.RabbitMqChangeResult;
+import io.github.sudoitir.rahdar.system.rabbitmq.web.RabbitMqViews.RabbitMqDiff;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -162,52 +162,52 @@ public class RabbitMqChanges {
     private final ActorResolver actors;
 
     @Gated("namespace.create")
-    ChangeResult namespaceCreate(NamespaceCreate change) {
+    RabbitMqChangeResult namespaceCreate(NamespaceCreate change) {
         return gate.run(Operation.of(change), () -> run(change));
     }
 
     @Gated("namespace.update")
-    ChangeResult namespaceUpdate(NamespaceUpdate change) {
+    RabbitMqChangeResult namespaceUpdate(NamespaceUpdate change) {
         return gate.run(Operation.of(change), () -> run(change));
     }
 
     @Gated("namespace.delete")
-    ChangeResult namespaceDelete(NamespaceDelete change) {
+    RabbitMqChangeResult namespaceDelete(NamespaceDelete change) {
         return gate.run(Operation.of(change), () -> run(change));
     }
 
     @Gated("route.create")
-    ChangeResult routeCreate(RouteCreate change) {
+    RabbitMqChangeResult routeCreate(RouteCreate change) {
         return gate.run(Operation.of(change), () -> run(change));
     }
 
     @Gated("route.delete")
-    ChangeResult routeDelete(RouteDelete change) {
+    RabbitMqChangeResult routeDelete(RouteDelete change) {
         return gate.run(Operation.of(change), () -> run(change));
     }
 
     @Gated("policy.set")
-    ChangeResult policySet(PolicySet change) {
+    RabbitMqChangeResult policySet(PolicySet change) {
         return gate.run(Operation.of(change), () -> run(change));
     }
 
     @Gated("policy.clear")
-    ChangeResult policyClear(PolicyClear change) {
+    RabbitMqChangeResult policyClear(PolicyClear change) {
         return gate.run(Operation.of(change), () -> run(change));
     }
 
     @Gated("access-rule.set")
-    ChangeResult accessRuleSet(AccessRuleSet change) {
+    RabbitMqChangeResult accessRuleSet(AccessRuleSet change) {
         return gate.run(Operation.of(change), () -> run(change));
     }
 
     @Gated("access-rule.clear")
-    ChangeResult accessRuleClear(AccessRuleClear change) {
+    RabbitMqChangeResult accessRuleClear(AccessRuleClear change) {
         return gate.run(Operation.of(change), () -> run(change));
     }
 
     /** Previews the change, refuses an etag that is not the preview's, and hands it to the gate. */
-    ChangeResult apply(Change change) {
+    RabbitMqChangeResult apply(Change change) {
         Preview preview = ops.preview(
                 change.clusterId(), ResourceId.parse(change.id()), change.type().verb(), change.attributes());
         RabbitMqOps.require(change.etag(), preview.etag());
@@ -287,7 +287,7 @@ public class RabbitMqChanges {
         }
     }
 
-    private ChangeResult run(Change change) {
+    private RabbitMqChangeResult run(Change change) {
         ResourceId id = ResourceId.parse(change.id());
         Type type = change.type();
         AuditEvent event = audit.begin(
@@ -302,7 +302,7 @@ public class RabbitMqChanges {
         try {
             Preview preview = ops.preview(change.clusterId(), id, type.verb(), change.attributes());
             RabbitMqOps.require(change.etag(), preview.etag());
-            List<Diff> changes = RabbitMqOps.diff(preview);
+            List<RabbitMqDiff> changes = RabbitMqOps.diff(preview);
             OperationResult result =
                     ops.execute(change.clusterId(), id, type.verb(), change.attributes(), change.etag());
             audit.finish(
@@ -311,7 +311,7 @@ public class RabbitMqChanges {
                     result.affected().orElse(changes.size()),
                     null,
                     Map.of("changes", changes, "identityBasis", IdentityBasis.of(preview.basis())));
-            return new ChangeResult(
+            return new RabbitMqChangeResult(
                     change.id(), IdentityBasis.of(preview.basis()).name(), changes);
         } catch (RuntimeException e) {
             audit.fail(event, e.getMessage());

@@ -13,8 +13,8 @@ import io.github.sudoitir.rahdar.system.rabbitmq.RabbitMqOps.Verb;
 import io.github.sudoitir.rahdar.system.rabbitmq.web.RabbitMqViews.Binding;
 import io.github.sudoitir.rahdar.system.rabbitmq.web.RabbitMqViews.BindingPage;
 import io.github.sudoitir.rahdar.system.rabbitmq.web.RabbitMqViews.BindingRequest;
-import io.github.sudoitir.rahdar.system.rabbitmq.web.RabbitMqViews.ChangePreview;
-import io.github.sudoitir.rahdar.system.rabbitmq.web.RabbitMqViews.ChangeResult;
+import io.github.sudoitir.rahdar.system.rabbitmq.web.RabbitMqViews.RabbitMqChangePreview;
+import io.github.sudoitir.rahdar.system.rabbitmq.web.RabbitMqViews.RabbitMqChangeResult;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -73,7 +73,7 @@ public class RabbitMqBindings {
                 RabbitMqReads.members(resource, RabbitMqIds.ARGUMENT_PREFIX));
     }
 
-    public ChangePreview previewCreate(UUID clusterId, BindingRequest request) {
+    public RabbitMqChangePreview previewCreate(UUID clusterId, BindingRequest request) {
         access.requireCluster(clusterId, ResourcePermissions.ROUTE_WRITE);
         return RabbitMqOps.view(
                 ops.preview(clusterId, id(request), Verb.CREATE, attributes(request)),
@@ -83,13 +83,13 @@ public class RabbitMqBindings {
                 List.of());
     }
 
-    public ChangeResult create(UUID clusterId, BindingRequest request) {
+    public RabbitMqChangeResult create(UUID clusterId, BindingRequest request) {
         access.requireCluster(clusterId, ResourcePermissions.ROUTE_WRITE);
         return changes.apply(new RouteCreate(clusterId, id(request).format(), attributes(request), request.etag()));
     }
 
     /** What deleting a binding or a shovel would do. */
-    public ChangePreview previewDelete(UUID clusterId, String id) {
+    public RabbitMqChangePreview previewDelete(UUID clusterId, String id) {
         access.requireCluster(clusterId, ResourcePermissions.ROUTE_WRITE);
         ResourceId target = target(id);
         return RabbitMqOps.view(
@@ -99,7 +99,7 @@ public class RabbitMqBindings {
                 List.of());
     }
 
-    public ChangeResult delete(UUID clusterId, String id, String etag) {
+    public RabbitMqChangeResult delete(UUID clusterId, String id, String etag) {
         access.requireCluster(clusterId, ResourcePermissions.ROUTE_WRITE);
         return changes.apply(new RouteDelete(clusterId, target(id).format(), Map.of(), etag));
     }

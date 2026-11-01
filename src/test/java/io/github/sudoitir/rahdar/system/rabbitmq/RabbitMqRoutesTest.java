@@ -47,10 +47,10 @@ import io.github.sudoitir.rahdar.system.rabbitmq.RabbitMqChanges.RouteDelete;
 import io.github.sudoitir.rahdar.system.rabbitmq.RabbitMqOps.Verb;
 import io.github.sudoitir.rahdar.system.rabbitmq.web.RabbitMqViews.BindingPage;
 import io.github.sudoitir.rahdar.system.rabbitmq.web.RabbitMqViews.BindingRequest;
-import io.github.sudoitir.rahdar.system.rabbitmq.web.RabbitMqViews.ChangePreview;
 import io.github.sudoitir.rahdar.system.rabbitmq.web.RabbitMqViews.FederationPage;
 import io.github.sudoitir.rahdar.system.rabbitmq.web.RabbitMqViews.NodeView;
 import io.github.sudoitir.rahdar.system.rabbitmq.web.RabbitMqViews.NodesView;
+import io.github.sudoitir.rahdar.system.rabbitmq.web.RabbitMqViews.RabbitMqChangePreview;
 import io.github.sudoitir.rahdar.system.rabbitmq.web.RabbitMqViews.ShovelPage;
 import java.net.URI;
 import java.time.Instant;
@@ -140,7 +140,7 @@ class RabbitMqRoutesTest {
         BindingRequest keyed = new BindingRequest("/", "events", "orders", "queue", "created", Map.of("x-a", 1), "e1");
         BindingRequest keyless = new BindingRequest("/", "events", "archive", "exchange", null, null, "e2");
 
-        ChangePreview preview = bindings.previewCreate(CLUSTER, keyed);
+        RabbitMqChangePreview preview = bindings.previewCreate(CLUSTER, keyed);
         bindings.create(CLUSTER, keyed);
         bindings.create(CLUSTER, keyless);
 
@@ -171,7 +171,7 @@ class RabbitMqRoutesTest {
     void aBindingOrAShovelIsDeletedByItsIdAndNothingElse() {
         when(ops.preview(eq(CLUSTER), any(), eq(Verb.DELETE), any())).thenReturn(preview(ETAG, 0));
 
-        ChangePreview preview = bindings.previewDelete(CLUSTER, SHOVEL);
+        RabbitMqChangePreview preview = bindings.previewDelete(CLUSTER, SHOVEL);
         bindings.delete(CLUSTER, BINDING, "e1");
 
         assertThat(preview.effect().detail()).startsWith("Delete shovel / / mirror.");

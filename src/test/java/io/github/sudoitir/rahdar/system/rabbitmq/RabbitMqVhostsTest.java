@@ -27,9 +27,9 @@ import io.github.sudoitir.rahdar.system.rabbitmq.RabbitMqChanges.NamespaceCreate
 import io.github.sudoitir.rahdar.system.rabbitmq.RabbitMqChanges.NamespaceDelete;
 import io.github.sudoitir.rahdar.system.rabbitmq.RabbitMqChanges.NamespaceUpdate;
 import io.github.sudoitir.rahdar.system.rabbitmq.RabbitMqOps.Verb;
-import io.github.sudoitir.rahdar.system.rabbitmq.web.RabbitMqViews.ChangePreview;
 import io.github.sudoitir.rahdar.system.rabbitmq.web.RabbitMqViews.ExchangeRequest;
 import io.github.sudoitir.rahdar.system.rabbitmq.web.RabbitMqViews.QueueRequest;
+import io.github.sudoitir.rahdar.system.rabbitmq.web.RabbitMqViews.RabbitMqChangePreview;
 import io.github.sudoitir.rahdar.system.rabbitmq.web.RabbitMqViews.VhostPage;
 import io.github.sudoitir.rahdar.system.rabbitmq.web.RabbitMqViews.VhostRequest;
 import java.util.ArrayList;
@@ -102,7 +102,7 @@ class RabbitMqVhostsTest {
     void aDeletePreviewNamesEveryQueueAndItsMessages() {
         when(ops.preview(eq(CLUSTER), any(), eq(Verb.DELETE), any())).thenReturn(preview(ETAG, 12));
 
-        ChangePreview preview = vhosts.previewDelete(CLUSTER, "orders");
+        RabbitMqChangePreview preview = vhosts.previewDelete(CLUSTER, "orders");
 
         verify(access).requireCluster(CLUSTER, RabbitMqModule.NAMESPACE_DELETE);
         assertThat(preview.effect().count()).isEqualTo(12);
@@ -135,8 +135,8 @@ class RabbitMqVhostsTest {
                 .thenReturn(preview(ETAG, 0, change(RabbitMqIds.DESCRIPTION, null, "Orders")));
         VhostRequest request = new VhostRequest("orders", "Orders", List.of("a", "b"), "quorum", null);
 
-        ChangePreview created = vhosts.previewCreate(CLUSTER, request);
-        ChangePreview changed = vhosts.previewUpdate(CLUSTER, "orders", request);
+        RabbitMqChangePreview created = vhosts.previewCreate(CLUSTER, request);
+        RabbitMqChangePreview changed = vhosts.previewUpdate(CLUSTER, "orders", request);
 
         verify(access, times(2)).requireCluster(CLUSTER, RabbitMqModule.NAMESPACE_WRITE);
         assertThat(created.effect().unit()).isEqualTo("changes");
@@ -181,7 +181,7 @@ class RabbitMqVhostsTest {
         QueueRequest request =
                 new QueueRequest("/", "q", "stream", null, true, Map.of("x-max-length-bytes", 100), null);
 
-        ChangePreview preview = creates.preview(CLUSTER, request);
+        RabbitMqChangePreview preview = creates.preview(CLUSTER, request);
         creates.create(CLUSTER, request);
 
         verify(access, times(2)).requireCluster(CLUSTER, ResourcePermissions.SUBSCRIPTION_CREATE);

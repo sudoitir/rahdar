@@ -13,7 +13,7 @@ public final class RabbitMqViews {
 
     // ---- changes ------------------------------------------------------------------------------------------------
 
-    public record Diff(
+    public record RabbitMqDiff(
             @Schema(requiredMode = REQUIRED) String key,
 
             @Schema(nullable = true, description = "The value now; absent when the resource has none.")
@@ -22,7 +22,7 @@ public final class RabbitMqViews {
             @Schema(nullable = true, description = "The value after the change; absent when the change removes it.")
             String after) {}
 
-    public record EffectView(
+    public record RabbitMqEffect(
             @Schema(requiredMode = REQUIRED, description = "How much the change affects, in the unit.")
             long count,
 
@@ -35,7 +35,7 @@ public final class RabbitMqViews {
             String detail,
 
             @Schema(requiredMode = REQUIRED, description = "Each attribute the change sets, with its value now.")
-            List<Diff> changes,
+            List<RabbitMqDiff> changes,
 
             @Schema(
                     requiredMode = REQUIRED,
@@ -43,8 +43,8 @@ public final class RabbitMqViews {
                             + " the resources a policy matches, a user's rights before and after.")
             List<String> lines) {}
 
-    public record ChangePreview(
-            @Schema(requiredMode = REQUIRED) EffectView effect,
+    public record RabbitMqChangePreview(
+            @Schema(requiredMode = REQUIRED) RabbitMqEffect effect,
 
             @Schema(requiredMode = REQUIRED, description = "Send it back with the change.")
             String etag,
@@ -56,7 +56,7 @@ public final class RabbitMqViews {
                             + " and created again with the same configuration is not told apart.")
             String identityBasis) {}
 
-    public record ChangeResult(
+    public record RabbitMqChangeResult(
             @Schema(requiredMode = REQUIRED, description = "The resource id.")
             String id,
 
@@ -65,7 +65,7 @@ public final class RabbitMqViews {
                     allowableValues = {"CONFIGURATION", "INCARNATION"})
             String identityBasis,
 
-            @Schema(requiredMode = REQUIRED) List<Diff> changes) {}
+            @Schema(requiredMode = REQUIRED) List<RabbitMqDiff> changes) {}
 
     // ---- nodes --------------------------------------------------------------------------------------------------
 
@@ -272,7 +272,7 @@ public final class RabbitMqViews {
             String shadowedBy) {}
 
     public record PolicyPreview(
-            @Schema(requiredMode = REQUIRED) EffectView effect,
+            @Schema(requiredMode = REQUIRED) RabbitMqEffect effect,
             @Schema(requiredMode = REQUIRED) String etag,
 
             @Schema(

@@ -13,13 +13,13 @@ import io.github.sudoitir.rahdar.system.rabbitmq.PolicyMatches.Match;
 import io.github.sudoitir.rahdar.system.rabbitmq.RabbitMqChanges.PolicyClear;
 import io.github.sudoitir.rahdar.system.rabbitmq.RabbitMqChanges.PolicySet;
 import io.github.sudoitir.rahdar.system.rabbitmq.RabbitMqOps.Verb;
-import io.github.sudoitir.rahdar.system.rabbitmq.web.RabbitMqViews.ChangePreview;
-import io.github.sudoitir.rahdar.system.rabbitmq.web.RabbitMqViews.ChangeResult;
 import io.github.sudoitir.rahdar.system.rabbitmq.web.RabbitMqViews.Policy;
 import io.github.sudoitir.rahdar.system.rabbitmq.web.RabbitMqViews.PolicyMatch;
 import io.github.sudoitir.rahdar.system.rabbitmq.web.RabbitMqViews.PolicyPage;
 import io.github.sudoitir.rahdar.system.rabbitmq.web.RabbitMqViews.PolicyPreview;
 import io.github.sudoitir.rahdar.system.rabbitmq.web.RabbitMqViews.PolicyRequest;
+import io.github.sudoitir.rahdar.system.rabbitmq.web.RabbitMqViews.RabbitMqChangePreview;
+import io.github.sudoitir.rahdar.system.rabbitmq.web.RabbitMqViews.RabbitMqChangeResult;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -165,7 +165,7 @@ public class RabbitMqPolicies {
         return withMatches(RabbitMqOps.view(preview, Verb.CREATE, summary, List.of()), matches, candidates.partial());
     }
 
-    public ChangeResult set(UUID clusterId, String vhost, String name, PolicyRequest request) {
+    public RabbitMqChangeResult set(UUID clusterId, String vhost, String name, PolicyRequest request) {
         access.requireCluster(clusterId, RabbitMqModule.POLICY_WRITE);
         return changes.apply(new PolicySet(clusterId, id(vhost, name).format(), attributes(request), request.etag()));
     }
@@ -187,12 +187,12 @@ public class RabbitMqPolicies {
         return withMatches(RabbitMqOps.view(preview, Verb.DELETE, summary, List.of()), matches, candidates.partial());
     }
 
-    public ChangeResult clear(UUID clusterId, String vhost, String name, String etag) {
+    public RabbitMqChangeResult clear(UUID clusterId, String vhost, String name, String etag) {
         access.requireCluster(clusterId, RabbitMqModule.POLICY_WRITE);
         return changes.apply(new PolicyClear(clusterId, id(vhost, name).format(), Map.of(), etag));
     }
 
-    private static PolicyPreview withMatches(ChangePreview preview, List<Match> matches, boolean partial) {
+    private static PolicyPreview withMatches(RabbitMqChangePreview preview, List<Match> matches, boolean partial) {
         List<PolicyMatch> listed = matches.stream()
                 .limit(LISTED)
                 .map(m -> new PolicyMatch(m.kind(), m.name(), m.shadowedBy()))

@@ -11,11 +11,11 @@ import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
 import io.github.sudoitir.rahdar.system.rabbitmq.RabbitMqChanges.AccessRuleClear;
 import io.github.sudoitir.rahdar.system.rabbitmq.RabbitMqChanges.AccessRuleSet;
 import io.github.sudoitir.rahdar.system.rabbitmq.RabbitMqOps.Verb;
-import io.github.sudoitir.rahdar.system.rabbitmq.web.RabbitMqViews.ChangePreview;
-import io.github.sudoitir.rahdar.system.rabbitmq.web.RabbitMqViews.ChangeResult;
 import io.github.sudoitir.rahdar.system.rabbitmq.web.RabbitMqViews.Permission;
 import io.github.sudoitir.rahdar.system.rabbitmq.web.RabbitMqViews.PermissionPage;
 import io.github.sudoitir.rahdar.system.rabbitmq.web.RabbitMqViews.PermissionRequest;
+import io.github.sudoitir.rahdar.system.rabbitmq.web.RabbitMqViews.RabbitMqChangePreview;
+import io.github.sudoitir.rahdar.system.rabbitmq.web.RabbitMqViews.RabbitMqChangeResult;
 import io.github.sudoitir.rahdar.system.rabbitmq.web.RabbitMqViews.TopicPermission;
 import io.github.sudoitir.rahdar.system.rabbitmq.web.RabbitMqViews.TopicPermissionRequest;
 import io.github.sudoitir.rahdar.system.rabbitmq.web.RabbitMqViews.User;
@@ -99,7 +99,7 @@ public class RabbitMqPermissions {
 
     // ---- a user's permission in a virtual host ------------------------------------------------------------------
 
-    public ChangePreview previewSet(UUID clusterId, String vhost, String user, PermissionRequest request) {
+    public RabbitMqChangePreview previewSet(UUID clusterId, String vhost, String user, PermissionRequest request) {
         access.requireCluster(clusterId, ResourcePermissions.ACCESS_RULE_WRITE);
         ResourceId id = permission(vhost, user);
         Map<String, Object> attributes = attributes(request);
@@ -111,13 +111,13 @@ public class RabbitMqPermissions {
                 "Set the permission of user " + user + " in virtual host " + vhost + ".");
     }
 
-    public ChangeResult set(UUID clusterId, String vhost, String user, PermissionRequest request) {
+    public RabbitMqChangeResult set(UUID clusterId, String vhost, String user, PermissionRequest request) {
         access.requireCluster(clusterId, ResourcePermissions.ACCESS_RULE_WRITE);
         return changes.apply(
                 new AccessRuleSet(clusterId, permission(vhost, user).format(), attributes(request), request.etag()));
     }
 
-    public ChangePreview previewClear(UUID clusterId, String vhost, String user) {
+    public RabbitMqChangePreview previewClear(UUID clusterId, String vhost, String user) {
         access.requireCluster(clusterId, ResourcePermissions.ACCESS_RULE_WRITE);
         return preview(
                 clusterId,
@@ -127,7 +127,7 @@ public class RabbitMqPermissions {
                 "Remove the permission of user " + user + " in virtual host " + vhost + ".");
     }
 
-    public ChangeResult clear(UUID clusterId, String vhost, String user, String etag) {
+    public RabbitMqChangeResult clear(UUID clusterId, String vhost, String user, String etag) {
         access.requireCluster(clusterId, ResourcePermissions.ACCESS_RULE_WRITE);
         return changes.apply(
                 new AccessRuleClear(clusterId, permission(vhost, user).format(), Map.of(), etag));
@@ -135,7 +135,7 @@ public class RabbitMqPermissions {
 
     // ---- a user's topic permission on an exchange ---------------------------------------------------------------
 
-    public ChangePreview previewSetTopic(
+    public RabbitMqChangePreview previewSetTopic(
             UUID clusterId, String vhost, String user, String exchange, TopicPermissionRequest request) {
         access.requireCluster(clusterId, ResourcePermissions.ACCESS_RULE_WRITE);
         return preview(
@@ -146,14 +146,14 @@ public class RabbitMqPermissions {
                 "Set the topic permission of user " + user + " on exchange " + exchange + ".");
     }
 
-    public ChangeResult setTopic(
+    public RabbitMqChangeResult setTopic(
             UUID clusterId, String vhost, String user, String exchange, TopicPermissionRequest request) {
         access.requireCluster(clusterId, ResourcePermissions.ACCESS_RULE_WRITE);
         return changes.apply(new AccessRuleSet(
                 clusterId, topic(vhost, user, exchange).format(), attributes(request), request.etag()));
     }
 
-    public ChangePreview previewClearTopic(UUID clusterId, String vhost, String user, String exchange) {
+    public RabbitMqChangePreview previewClearTopic(UUID clusterId, String vhost, String user, String exchange) {
         access.requireCluster(clusterId, ResourcePermissions.ACCESS_RULE_WRITE);
         return preview(
                 clusterId,
@@ -163,13 +163,13 @@ public class RabbitMqPermissions {
                 "Remove the topic permission of user " + user + " on exchange " + exchange + ".");
     }
 
-    public ChangeResult clearTopic(UUID clusterId, String vhost, String user, String exchange, String etag) {
+    public RabbitMqChangeResult clearTopic(UUID clusterId, String vhost, String user, String exchange, String etag) {
         access.requireCluster(clusterId, ResourcePermissions.ACCESS_RULE_WRITE);
         return changes.apply(
                 new AccessRuleClear(clusterId, topic(vhost, user, exchange).format(), Map.of(), etag));
     }
 
-    private ChangePreview preview(
+    private RabbitMqChangePreview preview(
             UUID clusterId, ResourceId id, Verb verb, Map<String, Object> attributes, String summary) {
         Preview preview = ops.preview(clusterId, id, verb, attributes);
         String before = current(gateway.cluster(clusterId), id)

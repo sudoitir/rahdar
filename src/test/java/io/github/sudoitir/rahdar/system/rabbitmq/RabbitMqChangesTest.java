@@ -29,8 +29,8 @@ import io.github.sudoitir.rahdar.system.rabbitmq.RabbitMqChanges.NamespaceCreate
 import io.github.sudoitir.rahdar.system.rabbitmq.RabbitMqChanges.NamespaceDelete;
 import io.github.sudoitir.rahdar.system.rabbitmq.RabbitMqChanges.RouteDelete;
 import io.github.sudoitir.rahdar.system.rabbitmq.RabbitMqOps.Verb;
-import io.github.sudoitir.rahdar.system.rabbitmq.web.RabbitMqViews.ChangeResult;
 import io.github.sudoitir.rahdar.system.rabbitmq.web.RabbitMqViews.CreatedView;
+import io.github.sudoitir.rahdar.system.rabbitmq.web.RabbitMqViews.RabbitMqChangeResult;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -61,7 +61,7 @@ class RabbitMqChangesTest {
                 .thenReturn(preview(ETAG, 12, change(RabbitMqIds.DESCRIPTION, "old", null)));
         when(ops.execute(eq(CLUSTER), any(), eq(Verb.DELETE), any(), eq(ETAG))).thenReturn(OperationResult.done());
 
-        ChangeResult result = changes.apply(new NamespaceDelete(CLUSTER, VHOST, Map.of(), ETAG));
+        RabbitMqChangeResult result = changes.apply(new NamespaceDelete(CLUSTER, VHOST, Map.of(), ETAG));
 
         assertThat(result.id()).isEqualTo(VHOST);
         assertThat(result.identityBasis()).isEqualTo("CONFIGURATION");

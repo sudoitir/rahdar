@@ -15,8 +15,8 @@ import io.github.sudoitir.rahdar.system.rabbitmq.RabbitMqChanges.NamespaceCreate
 import io.github.sudoitir.rahdar.system.rabbitmq.RabbitMqChanges.NamespaceDelete;
 import io.github.sudoitir.rahdar.system.rabbitmq.RabbitMqChanges.NamespaceUpdate;
 import io.github.sudoitir.rahdar.system.rabbitmq.RabbitMqOps.Verb;
-import io.github.sudoitir.rahdar.system.rabbitmq.web.RabbitMqViews.ChangePreview;
-import io.github.sudoitir.rahdar.system.rabbitmq.web.RabbitMqViews.ChangeResult;
+import io.github.sudoitir.rahdar.system.rabbitmq.web.RabbitMqViews.RabbitMqChangePreview;
+import io.github.sudoitir.rahdar.system.rabbitmq.web.RabbitMqViews.RabbitMqChangeResult;
 import io.github.sudoitir.rahdar.system.rabbitmq.web.RabbitMqViews.Vhost;
 import io.github.sudoitir.rahdar.system.rabbitmq.web.RabbitMqViews.VhostPage;
 import io.github.sudoitir.rahdar.system.rabbitmq.web.RabbitMqViews.VhostRequest;
@@ -86,7 +86,7 @@ public class RabbitMqVhosts {
                         .toList();
     }
 
-    public ChangePreview previewCreate(UUID clusterId, VhostRequest request) {
+    public RabbitMqChangePreview previewCreate(UUID clusterId, VhostRequest request) {
         access.requireCluster(clusterId, RabbitMqModule.NAMESPACE_WRITE);
         ResourceId id = id(request.name());
         Map<String, Object> attributes = attributes(request);
@@ -94,26 +94,26 @@ public class RabbitMqVhosts {
         return RabbitMqOps.view(preview, Verb.CREATE, "Create virtual host " + id.name() + ".", List.of());
     }
 
-    public ChangeResult create(UUID clusterId, VhostRequest request) {
+    public RabbitMqChangeResult create(UUID clusterId, VhostRequest request) {
         access.requireCluster(clusterId, RabbitMqModule.NAMESPACE_WRITE);
         return changes.apply(
                 new NamespaceCreate(clusterId, id(request.name()).format(), attributes(request), request.etag()));
     }
 
-    public ChangePreview previewUpdate(UUID clusterId, String name, VhostRequest request) {
+    public RabbitMqChangePreview previewUpdate(UUID clusterId, String name, VhostRequest request) {
         access.requireCluster(clusterId, RabbitMqModule.NAMESPACE_WRITE);
         ResourceId id = id(name);
         Preview preview = ops.preview(clusterId, id, Verb.UPDATE, attributes(request));
         return RabbitMqOps.view(preview, Verb.UPDATE, "Change virtual host " + name + ".", List.of());
     }
 
-    public ChangeResult update(UUID clusterId, String name, VhostRequest request) {
+    public RabbitMqChangeResult update(UUID clusterId, String name, VhostRequest request) {
         access.requireCluster(clusterId, RabbitMqModule.NAMESPACE_WRITE);
         return changes.apply(new NamespaceUpdate(clusterId, id(name).format(), attributes(request), request.etag()));
     }
 
     /** The effect names every queue the virtual host holds and the messages that go with them. */
-    public ChangePreview previewDelete(UUID clusterId, String name) {
+    public RabbitMqChangePreview previewDelete(UUID clusterId, String name) {
         access.requireCluster(clusterId, RabbitMqModule.NAMESPACE_DELETE);
         ResourceId id = id(name);
         Preview preview = ops.preview(clusterId, id, Verb.DELETE, Map.of());
@@ -126,7 +126,7 @@ public class RabbitMqVhosts {
                 preview, Verb.DELETE, "Delete virtual host " + name + " and everything in it.", lines(queues));
     }
 
-    public ChangeResult delete(UUID clusterId, String name, String etag) {
+    public RabbitMqChangeResult delete(UUID clusterId, String name, String etag) {
         access.requireCluster(clusterId, RabbitMqModule.NAMESPACE_DELETE);
         return changes.apply(new NamespaceDelete(clusterId, id(name).format(), Map.of(), etag));
     }

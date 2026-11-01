@@ -4,9 +4,9 @@ import io.github.sudoitir.openbroker.model.ResourceId;
 import io.github.sudoitir.rahdar.feature.resources.ResourcePermissions;
 import io.github.sudoitir.rahdar.kernel.security.ClusterAccessGuard;
 import io.github.sudoitir.rahdar.system.rabbitmq.RabbitMqOps.Verb;
-import io.github.sudoitir.rahdar.system.rabbitmq.web.RabbitMqViews.ChangePreview;
 import io.github.sudoitir.rahdar.system.rabbitmq.web.RabbitMqViews.CreatedView;
 import io.github.sudoitir.rahdar.system.rabbitmq.web.RabbitMqViews.ExchangeRequest;
+import io.github.sudoitir.rahdar.system.rabbitmq.web.RabbitMqViews.RabbitMqChangePreview;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -23,7 +23,7 @@ public class RabbitMqExchanges {
     private final RabbitMqOps ops;
     private final RabbitMqChanges changes;
 
-    public ChangePreview preview(UUID clusterId, ExchangeRequest request) {
+    public RabbitMqChangePreview preview(UUID clusterId, ExchangeRequest request) {
         access.requireCluster(clusterId, ResourcePermissions.DESTINATION_CREATE);
         return RabbitMqOps.view(
                 ops.preview(clusterId, id(request), Verb.CREATE, attributes(request)),

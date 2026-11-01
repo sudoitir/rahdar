@@ -8,9 +8,9 @@ import io.github.sudoitir.openbroker.operation.Preview;
 import io.github.sudoitir.rahdar.kernel.core.StalePreviewException;
 import io.github.sudoitir.rahdar.platform.broker.IdentityBasis;
 import io.github.sudoitir.rahdar.platform.broker.WholeClusterOperations;
-import io.github.sudoitir.rahdar.system.rabbitmq.web.RabbitMqViews.ChangePreview;
-import io.github.sudoitir.rahdar.system.rabbitmq.web.RabbitMqViews.Diff;
-import io.github.sudoitir.rahdar.system.rabbitmq.web.RabbitMqViews.EffectView;
+import io.github.sudoitir.rahdar.system.rabbitmq.web.RabbitMqViews.RabbitMqChangePreview;
+import io.github.sudoitir.rahdar.system.rabbitmq.web.RabbitMqViews.RabbitMqDiff;
+import io.github.sudoitir.rahdar.system.rabbitmq.web.RabbitMqViews.RabbitMqEffect;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -53,13 +53,13 @@ class RabbitMqOps {
     }
 
     /** The preview as the API answers it: what it would do, the etag to send back and what the etag holds. */
-    static ChangePreview view(Preview preview, Verb verb, String summary, List<String> lines) {
+    static RabbitMqChangePreview view(Preview preview, Verb verb, String summary, List<String> lines) {
         Optional<Long> messages = verb == Verb.DELETE ? WholeClusterOperations.messages(preview) : Optional.empty();
         IdentityBasis basis = IdentityBasis.of(preview.basis());
         long count = messages.orElse((long) preview.diff().size());
-        EffectView effect = new EffectView(
+        RabbitMqEffect effect = new RabbitMqEffect(
                 count, messages.isPresent() ? "messages" : "changes", detail(summary, basis), diff(preview), lines);
-        return new ChangePreview(effect, preview.etag(), basis.name());
+        return new RabbitMqChangePreview(effect, preview.etag(), basis.name());
     }
 
     /** The sentence for the approver: what is done, and what the etag does not tell apart. */
@@ -67,9 +67,9 @@ class RabbitMqOps {
         return basis.note() == null ? summary : summary + " " + basis.note();
     }
 
-    static List<Diff> diff(Preview preview) {
+    static List<RabbitMqDiff> diff(Preview preview) {
         return preview.diff().stream()
-                .map(c -> new Diff(
+                .map(c -> new RabbitMqDiff(
                         c.key(),
                         c.before().map(String::valueOf).orElse(null),
                         c.after().map(String::valueOf).orElse(null)))

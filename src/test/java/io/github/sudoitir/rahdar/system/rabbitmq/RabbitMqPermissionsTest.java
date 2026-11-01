@@ -23,9 +23,9 @@ import io.github.sudoitir.rahdar.system.rabbitmq.RabbitMqChanges.AccessRuleClear
 import io.github.sudoitir.rahdar.system.rabbitmq.RabbitMqChanges.AccessRuleSet;
 import io.github.sudoitir.rahdar.system.rabbitmq.RabbitMqChanges.Change;
 import io.github.sudoitir.rahdar.system.rabbitmq.RabbitMqOps.Verb;
-import io.github.sudoitir.rahdar.system.rabbitmq.web.RabbitMqViews.ChangePreview;
 import io.github.sudoitir.rahdar.system.rabbitmq.web.RabbitMqViews.PermissionPage;
 import io.github.sudoitir.rahdar.system.rabbitmq.web.RabbitMqViews.PermissionRequest;
+import io.github.sudoitir.rahdar.system.rabbitmq.web.RabbitMqViews.RabbitMqChangePreview;
 import io.github.sudoitir.rahdar.system.rabbitmq.web.RabbitMqViews.TopicPermissionRequest;
 import io.github.sudoitir.rahdar.system.rabbitmq.web.RabbitMqViews.User;
 import io.github.sudoitir.rahdar.system.rabbitmq.web.RabbitMqViews.UserPage;
@@ -97,7 +97,7 @@ class RabbitMqPermissionsTest {
         when(ops.preview(eq(CLUSTER), any(), eq(Verb.CREATE), any()))
                 .thenReturn(preview(ETAG, 0, change(RabbitMqIds.READ, ".*", "^q$")));
 
-        ChangePreview preview =
+        RabbitMqChangePreview preview =
                 permissions.previewSet(CLUSTER, "/", "app", new PermissionRequest("^app\\..*", ".*", "^q$", null));
 
         verify(access).requireCluster(CLUSTER, ResourcePermissions.ACCESS_RULE_WRITE);
@@ -112,7 +112,7 @@ class RabbitMqPermissionsTest {
     void aClearPreviewSaysTheUserKeepsNoAccess() {
         when(ops.preview(eq(CLUSTER), any(), eq(Verb.DELETE), any())).thenReturn(preview(ETAG, 0));
 
-        ChangePreview preview = permissions.previewClear(CLUSTER, "/", "app");
+        RabbitMqChangePreview preview = permissions.previewClear(CLUSTER, "/", "app");
 
         assertThat(preview.effect().lines().getLast()).isEqualTo("After: none");
         assertThat(permissions
@@ -127,9 +127,9 @@ class RabbitMqPermissionsTest {
     void aTopicPermissionPreviewShowsItsOwnRights() {
         when(ops.preview(eq(CLUSTER), any(), any(), any())).thenReturn(preview(ETAG, 0));
 
-        ChangePreview preview = permissions.previewSetTopic(
+        RabbitMqChangePreview preview = permissions.previewSetTopic(
                 CLUSTER, "/", "app", "events", new TopicPermissionRequest("^new$", "", null));
-        ChangePreview cleared = permissions.previewClearTopic(CLUSTER, "/", "app", "events");
+        RabbitMqChangePreview cleared = permissions.previewClearTopic(CLUSTER, "/", "app", "events");
 
         assertThat(preview.effect().lines())
                 .containsExactly("Before: write '^app\\..*', read ''", "After: write '^new$', read ''");
