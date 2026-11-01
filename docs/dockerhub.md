@@ -10,7 +10,7 @@ before its preview, and where the approval gate is on, a second person approves 
 - **Apache Artemis** 2.33.0 and later: live/backup topology with HA roles polled from every
   node, cross-node queues and addresses, message flow, safe message operations,
   request-reply tracing and SQL over your messages.
-- **Apache Kafka** 3.0 and later, KRaft and ZooKeeper mode: consumer, share and classic
+- **Apache Kafka** 2.8 and later, KRaft and ZooKeeper mode: consumer, share and classic
   groups with per-partition lag, previewed offset resets, topic configuration, ACLs,
   hanging transactions, brokers and the controller quorum.
 - **RabbitMQ** 3.13 and later (4.x tested): nodes with their alarms and partitions, virtual hosts,

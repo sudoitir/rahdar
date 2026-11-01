@@ -12,11 +12,12 @@ system it runs.
 
 | | Kafka release |
 | --- | --- |
-| Minimum | **3.0** |
-| Tested | 3.5 (ZooKeeper mode) and 4.x (KRaft mode, including share groups) |
+| Minimum | **2.8** |
+| Tested | 2.8 and 3.5 (ZooKeeper mode) and 4.x (KRaft mode, including share groups) |
 
-Every release from 3.0 on is supported, in **KRaft** and in **ZooKeeper** mode. A cluster older than 3.0 is
-refused: the check names the version it found and the supported range, and nothing is stored.
+Every release from 2.8 on is supported, in **KRaft** and in **ZooKeeper** mode. A Kafka 2.8 cluster cannot list
+transactions (that needs 3.0, KIP-664), so its open and hanging transactions are not shown and the capability says
+why; everything else works. A cluster older than 2.8 is refused: the check names the version it found and the supported range, and nothing is stored.
 
 Kafka brokers report their version only as far as their protocol goes, so Rahdar often cannot name the exact
 release. It then shows the version as a lower bound, **at least 3.5**, together with the mode, and never as an

@@ -110,7 +110,7 @@ Rahdar 通过 [OpenBroker](https://github.com/sudoitir/openbroker) 与 Broker �
 | 系统 | 支持版本 | 指南 |
 | --- | --- | --- |
 | Apache ActiveMQ® Artemis | 2.33.0 及以上 | [指南](https://rahdar.dev/zh/guide/) |
-| Apache Kafka® | 3.0 及以上，KRaft 与 ZooKeeper 模式 | [Kafka](https://rahdar.dev/guide/kafka) |
+| Apache Kafka® | 2.8 及以上，KRaft 与 ZooKeeper 模式 | [Kafka](https://rahdar.dev/guide/kafka) |
 | RabbitMQ | 3.13 及以上（已测试 4.x） | [RabbitMQ](https://rahdar.dev/guide/rabbitmq) |
 
 详情，以及超出这些范围时会发生什么：[支持的 Broker 版本](https://rahdar.dev/guide/supported-versions)。

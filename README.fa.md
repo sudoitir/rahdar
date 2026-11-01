@@ -125,7 +125,7 @@ Rahdar از طریق [OpenBroker](https://github.com/sudoitir/openbroker)، یک
 | سیستم | پشتیبانی‌شده | راهنما |
 | --- | --- | --- |
 | Apache ActiveMQ® Artemis | نسخهٔ ۲٫۳۳٫۰ و بالاتر | [راهنما](https://rahdar.dev/fa/guide/) |
-| Apache Kafka® | نسخهٔ ۳٫۰ و بالاتر، در حالت KRaft و ZooKeeper | [Kafka](https://rahdar.dev/guide/kafka) |
+| Apache Kafka® | نسخهٔ ۲٫۸ و بالاتر، در حالت KRaft و ZooKeeper | [Kafka](https://rahdar.dev/guide/kafka) |
 | RabbitMQ | نسخهٔ ۳٫۱۳ و بالاتر (۴.x آزمایش شده) | [RabbitMQ](https://rahdar.dev/guide/rabbitmq) |
 
 <div dir="rtl" align="right">

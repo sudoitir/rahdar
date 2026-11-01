@@ -46,7 +46,7 @@ features:
 ## سیستم‌های پشتیبانی‌شده
 
 - **Apache ActiveMQ Artemis** نسخهٔ ۲٫۳۳٫۰ و بالاتر.
-- **Apache Kafka** نسخهٔ ۳٫۰ و بالاتر، در حالت KRaft و ZooKeeper. [راهنمای Kafka](/guide/kafka) و [نسخه‌های پشتیبانی‌شدهٔ بروکر](/guide/supported-versions) را ببینید (انگلیسی).
+- **Apache Kafka** نسخهٔ ۲٫۸ و بالاتر، در حالت KRaft و ZooKeeper. [راهنمای Kafka](/guide/kafka) و [نسخه‌های پشتیبانی‌شدهٔ بروکر](/guide/supported-versions) را ببینید (انگلیسی).
 - **RabbitMQ** نسخهٔ ۳٫۱۳ و بالاتر (۴.x آزمایش شده). [راهنمای RabbitMQ](/guide/rabbitmq) را ببینید (انگلیسی).
 
 Rahdar از طریق [OpenBroker](https://github.com/sudoitir/openbroker)، یک SDK متن‌باز بروکر با یک درایور برای هر سیستم، با بروکرها صحبت می‌کند.

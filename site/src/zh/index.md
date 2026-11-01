@@ -46,7 +46,7 @@ features:
 ## 支持的系统
 
 - **Apache ActiveMQ Artemis** 2.33.0 及以上。
-- **Apache Kafka** 3.0 及以上，KRaft 与 ZooKeeper 模式。见 [Kafka 指南](/guide/kafka)（英文）与[支持的 Broker 版本](/guide/supported-versions)（英文）。
+- **Apache Kafka** 2.8 及以上，KRaft 与 ZooKeeper 模式。见 [Kafka 指南](/guide/kafka)（英文）与[支持的 Broker 版本](/guide/supported-versions)（英文）。
 - **RabbitMQ** 3.13 及以上（已测试 4.x）。见 [RabbitMQ 指南](/guide/rabbitmq)（英文）。
 
 Rahdar 通过开源的 Broker SDK [OpenBroker](https://github.com/sudoitir/openbroker) 与 Broker 通信，每个系统一个驱动。
