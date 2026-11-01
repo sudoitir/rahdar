@@ -126,7 +126,8 @@ class BoundaryRulesTest {
     void onlyASystemModuleUnwrapsTheConnection() {
         noClasses()
                 .that()
-                .resideOutsideOfPackages(ROOT + ".system.artemis..", ROOT + ".system.kafka..")
+                .resideOutsideOfPackages(
+                        ROOT + ".system.artemis..", ROOT + ".system.kafka..", ROOT + ".system.rabbitmq..")
                 .should()
                 .callMethod(ClusterConnection.class, "unwrap", Class.class)
                 .check(CLASSES);

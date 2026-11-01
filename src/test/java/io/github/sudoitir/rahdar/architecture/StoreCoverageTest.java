@@ -33,6 +33,10 @@ class StoreCoverageTest extends PostgresIntegrationTest {
             Map.entry(
                     "kafka_health",
                     "current state: one row per Kafka cluster, rewritten in place and removed with the cluster"),
+            Map.entry("rabbitmq_connection", "configuration: one row per RabbitMQ cluster, removed with its cluster"),
+            Map.entry(
+                    "rabbitmq_health",
+                    "current state: one row per RabbitMQ cluster, rewritten in place and removed with the cluster"),
             Map.entry("role", "configuration"),
             Map.entry("role_permission", "configuration"),
             Map.entry("user_role", "configuration"),
