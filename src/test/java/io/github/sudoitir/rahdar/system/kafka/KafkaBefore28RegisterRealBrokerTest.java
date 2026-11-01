@@ -18,13 +18,14 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 
 /**
- * A Kafka 2.8 cluster (Confluent Platform 6.2) is refused: the check fails naming what it found and the supported
- * range, and nothing is stored (ADR-0219).
+ * A Kafka cluster before 2.8 (Confluent Platform 6.0 carries Kafka 2.6) is refused: the check fails naming what it
+ * found and the supported range, and nothing is stored (ADR-0219, ADR-0032). Kafka 2.8 itself is supported; see
+ * {@link Kafka28RegisterRealBrokerTest}.
  */
 @ExtendWith(AdminAuthenticationExtension.class)
-class KafkaBefore30RegisterRealBrokerTest extends PostgresIntegrationTest {
+class KafkaBefore28RegisterRealBrokerTest extends PostgresIntegrationTest {
 
-    private static final String IMAGE = System.getProperty("kafka.before30.image", "confluentinc/cp-kafka:6.2.15");
+    private static final String IMAGE = System.getProperty("kafka.before28.image", "confluentinc/cp-kafka:6.0.14");
 
     private static ZooKeeperCluster kafka;
 
@@ -47,7 +48,7 @@ class KafkaBefore30RegisterRealBrokerTest extends PostgresIntegrationTest {
     private RegisterClusterRequest request() {
         return new RegisterClusterRequest(
                 KafkaModule.SYSTEM,
-                "kafka-2-8",
+                "kafka-2-6",
                 null,
                 null,
                 false,
@@ -63,9 +64,9 @@ class KafkaBefore30RegisterRealBrokerTest extends PostgresIntegrationTest {
 
         assertThat(check.failure()).isNotNull();
         assertThat(check.failure().cause()).isEqualTo("UNSUPPORTED_VERSION");
-        assertThat(check.failure().message()).contains("before 3.0").contains("[3.0.0,)");
+        assertThat(check.failure().message()).contains("before 2.8").contains("[2.8.0,)");
         assertThat(check.supported()).isFalse();
-        assertThatThrownBy(() -> service.register(request())).hasMessageContaining("before 3.0");
+        assertThatThrownBy(() -> service.register(request())).hasMessageContaining("before 2.8");
         assertThat(clusters.count()).isEqualTo(before);
     }
 }

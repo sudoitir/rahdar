@@ -3,7 +3,8 @@ import { Menu, Text } from '@mantine/core';
 
 import type { ComponentType } from 'react';
 
-import { useSlot, type SlotName } from '../slots.ts';
+import { useClusterSlot } from '../shell/useClusterSlot.ts';
+import type { SlotName } from '../slots.ts';
 import { useActionHost } from './hostContext.ts';
 import classes from './ResourceActions.module.css';
 import { ACTION_SECTIONS, type ActionHost, type ActionKind, type ActionMode, type ActionTargets } from './types.ts';
@@ -30,7 +31,7 @@ export function ResourceActions<K extends ActionKind>({
   mode?: ActionMode;
   restoreFocus?: () => void;
 }>) {
-  const contributions = useSlot(`${kind}.actions` as ActionSlot<K>);
+  const contributions = useClusterSlot(`${kind}.actions` as ActionSlot<K>, clusterId);
   const base = useActionHost();
   const host = useMemo<ActionHost>(
     () => ({

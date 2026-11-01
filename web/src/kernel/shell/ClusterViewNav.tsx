@@ -17,7 +17,11 @@ import styles from './ClusterViewNav.module.css';
  */
 export function ClusterViewNav({ clusterId, collapsed }: Readonly<{ clusterId: string; collapsed: boolean }>) {
   const cluster = useClusterKinds(clusterId);
-  const groups = navGroups(useFeatures(), cluster?.system?.id);
+  const groups = navGroups(
+    useFeatures(),
+    cluster?.system?.id,
+    cluster?.kinds?.map((k) => k.resourceClass),
+  );
   // While grants are still loading the entries are offered: refusing before the answer arrives
   // would claim something that has not been checked.
   const { canAnywhere, loading } = useCan();

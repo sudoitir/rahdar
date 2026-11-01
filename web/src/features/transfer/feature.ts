@@ -11,13 +11,13 @@ import { TransferSubscriptionMessages } from './rowActions.tsx';
 const runsRoute = createRoute({
   getParentRoute: () => clusterRoute,
   path: 'transfers',
-  component: lazyFeatureView('transfer', () => import('./TransfersView.tsx'), 'TransfersView'),
+  component: lazyFeatureView('transfer', () => import('./TransfersView.tsx'), 'TransfersView', 'artemis'),
 });
 
 const runRoute = createRoute({
   getParentRoute: () => clusterRoute,
   path: 'transfers/$runId',
-  component: lazyFeatureView('transfer', () => import('./TransferRunView.tsx'), 'TransferRunView'),
+  component: lazyFeatureView('transfer', () => import('./TransferRunView.tsx'), 'TransferRunView', 'artemis'),
 });
 
 /** Move or copy messages to a subscription on another node or another cluster, as a resumable run (ADR-0097). */
@@ -32,15 +32,22 @@ export const transferFeature = defineFeature({
       label: 'Transfers',
       icon: IconTransfer,
       path: 'transfers',
+      system: 'artemis',
       hotkey: 'x',
       permission: 'message:read',
     },
   ],
   slots: {
     'subscription.actions': [
-      { id: 'transfer.subscription', order: 30, section: 'operate', Component: TransferSubscriptionMessages },
+      {
+        id: 'transfer.subscription',
+        system: 'artemis',
+        order: 30,
+        section: 'operate',
+        Component: TransferSubscriptionMessages,
+      },
     ],
-    'messages.selection': [{ id: 'transfer-actions', order: 10, Component: TransferActions }],
+    'messages.selection': [{ id: 'transfer-actions', system: 'artemis', order: 10, Component: TransferActions }],
   },
   streamTopics: {
     transfer: ({ clusterId, invalidate }) => invalidate(keys.all(clusterId)),

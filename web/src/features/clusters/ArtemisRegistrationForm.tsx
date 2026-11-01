@@ -428,7 +428,7 @@ export function ArtemisRegistrationForm() {
                 onSuccess: (detail) => {
                   notify.succeeded({ action: REGISTER, subject: `cluster ${detail.name}` });
                   form.reset();
-                  void navigate({ to: `/clusters/${detail.id}/topology` });
+                  void navigate({ to: `/clusters/${detail.id}` });
                 },
               })
             }

@@ -61,11 +61,11 @@ const subscriptionsRoute = createRoute({
 });
 
 const KINDS = [
-  { kind: 'destinations', label: 'Destinations', icon: IconAt, hotkey: 'a' },
-  { kind: 'consumers', label: 'Consumers', icon: IconUsers, hotkey: 'c' },
-  { kind: 'channels', label: 'Channels', icon: IconPlugConnected, hotkey: 'i' },
-  { kind: 'connections', label: 'Connections', icon: IconNetwork, hotkey: 'n' },
-  { kind: 'producers', label: 'Producers', icon: IconSend, hotkey: 'p' },
+  { kind: 'destinations', resourceClass: 'DESTINATION', label: 'Destinations', icon: IconAt, hotkey: 'a' },
+  { kind: 'consumers', resourceClass: 'CONSUMER', label: 'Consumers', icon: IconUsers, hotkey: 'c' },
+  { kind: 'channels', resourceClass: 'CHANNEL', label: 'Channels', icon: IconPlugConnected, hotkey: 'i' },
+  { kind: 'connections', resourceClass: 'CONNECTION', label: 'Connections', icon: IconNetwork, hotkey: 'n' },
+  { kind: 'producers', resourceClass: 'PRODUCER', label: 'Producers', icon: IconSend, hotkey: 'p' },
 ] as const;
 
 /** One kind's view: the shared `ResourceView`, loaded on first visit and bound to the kind. */
@@ -149,9 +149,10 @@ export const resourcesFeature = defineFeature({
       hotkey: 'q',
       permission: 'cluster:read',
     },
-    ...KINDS.map(({ kind, label, icon, hotkey }, i) => ({
+    ...KINDS.map(({ kind, resourceClass, label, icon, hotkey }, i) => ({
       group: 'resources' as const,
       order: (i + 1) * 10,
+      resourceClass,
       label,
       icon,
       path: kind,

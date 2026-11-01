@@ -5,7 +5,6 @@ import { useDebouncedValue } from '@mantine/hooks';
 
 import { useRoutes, type RouteView } from './api.ts';
 import type { RoutesSearch } from './feature.ts';
-import { useSlot } from '../../kernel/slots.ts';
 import { DataTable } from '../../ui/table/index.ts';
 import { EmptyState } from '../../ui/EmptyState.tsx';
 import { ErrorState } from '../../ui/ErrorState.tsx';
@@ -17,7 +16,7 @@ import { useCluster } from '../clusters/index.ts';
 import { routeColumns } from './columns.ts';
 import { CreateDivertAction } from './DivertActions.tsx';
 import { ResourceActions } from '../../kernel/actions/ResourceActions.tsx';
-import { useClusterSystem } from '../../kernel/shell/useClusterSystem.ts';
+import { useClusterSlot } from '../../kernel/shell/useClusterSlot.ts';
 import { useFilterShortcut } from '../../kernel/keyboard/filterShortcut.ts';
 
 const PAGE_SIZE = 200;
@@ -70,9 +69,8 @@ export function RoutesView() {
   const { clusterId } = useParams({ strict: false }) as { clusterId: string };
   const search = useSearch({ strict: false }) as RoutesSearch;
   const navigate = useNavigate();
-  const systemId = useClusterSystem(clusterId);
   // A tab that exists for one broker system (the builder) is listed only on a cluster that runs it.
-  const contributed = useSlot('routes.tabs').filter((c) => !c.system || c.system === systemId);
+  const contributed = useClusterSlot('routes.tabs', clusterId);
   const slot = contributed.find((c) => c.id === search.tab);
   const tab: string = slot?.id ?? 'routes';
 

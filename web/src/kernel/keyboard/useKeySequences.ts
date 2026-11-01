@@ -3,7 +3,8 @@ import { useNavigate, useParams } from '@tanstack/react-router';
 
 import { FEATURE_IDS, type NavContribution } from '../feature.ts';
 import { useFeatures } from '../features.ts';
-import { useClusterSystem } from '../shell/useClusterSystem.ts';
+import { offeredOn } from '../registry.ts';
+import { useClusterKinds } from '../shell/useClusterSystem.ts';
 import { focusFilter } from './filterShortcut.ts';
 import { ignoredForShortcuts, latinKey } from './keys.ts';
 import { setShortcutsHelpOpen, singleKeyShortcutsEnabled } from './shortcuts.ts';
@@ -21,12 +22,13 @@ const BUILT_IN = new Set<string>(FEATURE_IDS);
 export function viewHotkeys(
   features: { id: string; nav?: NavContribution[] }[],
   systemId?: string,
+  classes?: readonly string[],
 ): Map<string, NavContribution> {
   const out = new Map<string, NavContribution>();
   for (const feature of features) {
     if (!BUILT_IN.has(feature.id)) continue;
     for (const item of feature.nav ?? []) {
-      if (item.system && systemId && item.system !== systemId) continue;
+      if (systemId && !offeredOn(item, systemId, classes)) continue;
       if (item.hotkey && !out.has(item.hotkey)) out.set(item.hotkey, item);
     }
   }
@@ -43,10 +45,12 @@ export function useKeySequences() {
   const navigate = useNavigate();
   const { clusterId } = useParams({ strict: false }) as { clusterId?: string };
   const features = useFeatures();
-  const systemId = useClusterSystem(clusterId);
+  const cluster = useClusterKinds(clusterId);
+  const systemId = cluster?.system?.id;
+  const classes = cluster?.kinds?.map((k) => k.resourceClass);
   const pendingUntil = useRef(0);
-  const state = useRef({ navigate, clusterId, hotkeys: viewHotkeys(features, systemId) });
-  state.current = { navigate, clusterId, hotkeys: viewHotkeys(features, systemId) };
+  const state = useRef({ navigate, clusterId, hotkeys: viewHotkeys(features, systemId, classes) });
+  state.current = { navigate, clusterId, hotkeys: viewHotkeys(features, systemId, classes) };
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {

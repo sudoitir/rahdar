@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { http, HttpResponse } from 'msw';
 import { screen, waitFor, within } from '@testing-library/react';
 
+import { KAFKA_KINDS, KAFKA_SYSTEM } from '../../test/wire.ts';
 import { manifestHandler } from '../../test/manifest.ts';
 import { renderWithProviders } from '../../test/render.tsx';
 import { server } from '../../test/setup.ts';
@@ -130,12 +131,20 @@ describe('ClusterViewNav', () => {
 
     server.use(
       http.get('*/api/v1/clusters/c1', () =>
-        HttpResponse.json({ id: 'c1', name: 'c1', system: { id: 'kafka', name: 'Kafka' }, kinds: [] }),
+        HttpResponse.json({ id: 'c1', name: 'c1', system: KAFKA_SYSTEM, kinds: KAFKA_KINDS }),
       ),
     );
     renderWithProviders(<ClusterViewNav clusterId="c1" collapsed={false} />);
 
-    await screen.findByRole('link', { name: 'Topology' });
+    await screen.findByRole('link', { name: 'Brokers' });
+    // A Kafka cluster is reached by bootstrap servers: no Artemis-shaped view is listed for it.
+    for (const name of ['Topology', 'Routes', 'Requests', 'Dead letters', 'SQL Console', 'Flow', 'Connections']) {
+      expect(screen.queryByRole('link', { name })).not.toBeInTheDocument();
+    }
+    // What the Kafka system does have is listed.
+    for (const name of ['Destinations', 'Consumers', 'Channels', 'Producers', 'Consumer groups', 'ACLs']) {
+      expect(screen.getByRole('link', { name })).toBeInTheDocument();
+    }
     await waitFor(() => expect(screen.queryByRole('link', { name: 'Configuration' })).not.toBeInTheDocument());
     expect(screen.queryByRole('link', { name: 'Setup review' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Config diff' })).not.toBeInTheDocument();

@@ -283,7 +283,7 @@ describe('KafkaRegistrationForm', () => {
     await user.click(screen.getByRole('button', { name: 'Register cluster' }));
 
     expect(await screen.findByText('Registered cluster events')).toBeInTheDocument();
-    expect(navigateSpy).toHaveBeenCalledWith({ to: '/clusters/c9/topology' });
+    expect(navigateSpy).toHaveBeenCalledWith({ to: '/clusters/c9' });
     expect(bodies.at(-1)).toMatchObject({
       system: 'kafka',
       name: 'events',

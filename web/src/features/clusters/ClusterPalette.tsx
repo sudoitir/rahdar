@@ -20,12 +20,16 @@ export function ClusterPalette({ report }: { report: (groups: SpotlightActionGro
         group: 'Clusters',
         actions: (clusters.data ?? []).map((c) => {
           const nodes = `${c.nodeCount} node${c.nodeCount === 1 ? '' : 's'}`;
+          const sameView = view?.item ? sameViewOn(c.id, view, c.system?.id) : `/clusters/${c.id}`;
+          const keepsView = sameView !== `/clusters/${c.id}`;
           return {
             id: `cluster-${c.id}`,
             label: c.name,
             description:
-              view?.item && view.clusterId !== c.id ? `${view.item.label} on this cluster · ${nodes}` : nodes,
-            onClick: () => navigate({ to: view?.item ? sameViewOn(c.id, view) : `/clusters/${c.id}/topology` }),
+              view?.item && keepsView && view.clusterId !== c.id
+                ? `${view.item.label} on this cluster · ${nodes}`
+                : nodes,
+            onClick: () => navigate({ to: sameView }),
           };
         }),
       },

@@ -5,6 +5,7 @@ import userEvent from '@testing-library/user-event';
 
 import { renderWithProviders } from '../../test/render.tsx';
 import { server } from '../../test/setup.ts';
+import { ARTEMIS_SYSTEM } from '../../test/wire.ts';
 
 let currentSearch: Record<string, unknown> = {};
 const navigateSpy = vi.fn();
@@ -149,6 +150,8 @@ describe('MetricsView', () => {
         });
       }),
       http.get('*/api/v1/clusters/c1/rr/stats', () => HttpResponse.json({ destinations: [] })),
+      // The view asks which system the cluster runs, to offer only that system's panels.
+      http.get('*/api/v1/clusters/c1', () => HttpResponse.json({ id: 'c1', system: ARTEMIS_SYSTEM, kinds: [] })),
     );
 
     try {
@@ -157,10 +160,13 @@ describe('MetricsView', () => {
       await waitFor(() => expect(windows.length).toBeGreaterThan(0));
       const firstTo = windows[0].to;
 
-      // One bucket (PT1M) later the window must have moved on by exactly one.
+      // One bucket (PT1M) later the window must have moved on by exactly one. The bucket tick and the refetch
+      // interval are both a minute, so the old window may be asked once more in the same instant: the newest window
+      // asked for is what moved.
+      const newest = () => Math.max(...windows.map((w) => Date.parse(w.to)));
       await vi.advanceTimersByTimeAsync(61_000);
-      await waitFor(() => expect(windows.at(-1)!.to).not.toBe(firstTo));
-      expect(Date.parse(windows.at(-1)!.to) - Date.parse(firstTo)).toBe(60_000);
+      await waitFor(() => expect(newest()).not.toBe(Date.parse(firstTo)));
+      expect(newest() - Date.parse(firstTo)).toBe(60_000);
       unmount();
 
       windows.length = 0;

@@ -9,6 +9,7 @@ import io.github.sudoitir.openbroker.Plane;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Function;
+import java.util.function.UnaryOperator;
 
 /**
  * Management addresses that are not registered nodes yet (a seed, a derived URL, a node about to be
@@ -18,11 +19,21 @@ import java.util.function.Function;
 public final class ProbeSession implements AutoCloseable {
 
     private final Function<ClusterSpec, ClusterConnection> connect;
+    private final UnaryOperator<ClusterSpec> complete;
     private final List<NodeSpec> nodes = new ArrayList<>();
     private ClusterConnection connection;
 
     ProbeSession(Function<ClusterSpec, ClusterConnection> connect) {
+        this(connect, UnaryOperator.identity());
+    }
+
+    /**
+     * A session whose every spec is completed first — the connection's options and bootstrap endpoints added — so
+     * that a {@link ClusterConnection#reconfigure} with a new node set keeps them.
+     */
+    ProbeSession(Function<ClusterSpec, ClusterConnection> connect, UnaryOperator<ClusterSpec> complete) {
         this.connect = connect;
+        this.complete = complete;
     }
 
     /** The node at this management address, added to the session on first use. */
@@ -30,7 +41,7 @@ public final class ProbeSession implements AutoCloseable {
         NodeId id = NodeId.of(managementUrl);
         if (nodes.stream().noneMatch(n -> n.id().equals(id))) {
             nodes.add(new NodeSpec(id, List.of(new Endpoint(Plane.MANAGEMENT, BrokerGateway.JOLOKIA, managementUrl))));
-            ClusterSpec spec = ClusterSpec.ofNodes(nodes);
+            ClusterSpec spec = complete.apply(ClusterSpec.ofNodes(nodes));
             if (connection == null) {
                 connection = connect.apply(spec);
             } else {

@@ -78,7 +78,7 @@ export const kafkaFeature = defineFeature({
     },
     {
       group: 'observe',
-      order: 40,
+      order: 10,
       label: 'Brokers',
       icon: IconBuildingBroadcastTower,
       path: 'kafka/brokers',

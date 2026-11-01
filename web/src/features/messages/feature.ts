@@ -44,7 +44,7 @@ const messagesRoute = createRoute({
 const deadLettersRoute = createRoute({
   getParentRoute: () => clusterRoute,
   path: 'dead-letters',
-  component: lazyFeatureView('messages', () => import('./DeadLettersView.tsx'), 'DeadLettersView'),
+  component: lazyFeatureView('messages', () => import('./DeadLettersView.tsx'), 'DeadLettersView', 'artemis'),
 });
 
 /** Browsing, sending, moving and deleting messages, and the dead-letter view. */
@@ -59,6 +59,7 @@ export const messagesFeature = defineFeature({
       label: 'Dead letters',
       icon: IconAlertTriangle,
       path: 'dead-letters',
+      system: 'artemis',
       hotkey: 'd',
       permission: 'message:read',
     },

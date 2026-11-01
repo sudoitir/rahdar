@@ -86,6 +86,11 @@ export interface NavContribution {
    */
   system?: string;
   /**
+   * The resource class (`CONNECTION`) the view lists. The navigation offers the view only on a cluster whose
+   * system has a kind of that class, so a system without connections has no empty Connections page.
+   */
+  resourceClass?: string;
+  /**
    * The permission the view reads with. Without it the entry stays visible and disabled,
    * and says why; the server enforces it regardless.
    */

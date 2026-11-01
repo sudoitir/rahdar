@@ -110,7 +110,7 @@ export function KafkaRegistrationForm() {
               register.mutate(request(), {
                 onSuccess: (detail) => {
                   notify.succeeded({ action: REGISTER, subject: `cluster ${detail.name}` });
-                  void navigate({ to: `/clusters/${detail.id}/topology` });
+                  void navigate({ to: `/clusters/${detail.id}` });
                 },
               })
             }

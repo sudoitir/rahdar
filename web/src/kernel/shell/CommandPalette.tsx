@@ -8,7 +8,7 @@ import { isPollingPaused, setPollingPaused, usePollingPaused } from '../api/poll
 import { useCan } from '../auth/useCan.ts';
 import type { ModuleId, PaletteSource } from '../feature.ts';
 import { useFeatures } from '../features.ts';
-import { useClusterSystem } from './useClusterSystem.ts';
+import { useClusterKinds } from './useClusterSystem.ts';
 import { navGroups } from '../registry.ts';
 import { densityToggleLabel, useDensity } from '../../ui/table/density.ts';
 import { useColorSchemeToggle } from './useColorSchemeToggle.ts';
@@ -58,7 +58,9 @@ export function CommandPalette() {
   const scheme = useColorSchemeToggle();
   const [density, setDensity] = useDensity();
   const features = useFeatures();
-  const systemId = useClusterSystem(clusterId);
+  const cluster = useClusterKinds(clusterId);
+  const systemId = cluster?.system?.id;
+  const classes = useMemo(() => cluster?.kinds?.map((k) => k.resourceClass), [cluster?.kinds]);
   const { canAnywhere, loading: grantsLoading } = useCan();
   const [query, setQuery] = useState('');
   const [debounced] = useDebouncedValue(query.trim(), 200);
@@ -113,7 +115,7 @@ export function CommandPalette() {
 
     // The views under the rail's own groups, so a view is found where the rail shows it.
     if (clusterId) {
-      for (const navGroup of navGroups(features, systemId)) {
+      for (const navGroup of navGroups(features, systemId, classes)) {
         out.push({
           group: navGroup.label,
           actions: navGroup.items.map((item): SpotlightActionData => {
@@ -143,6 +145,7 @@ export function CommandPalette() {
     setDensity,
     features,
     systemId,
+    classes,
     contributed,
     recents,
     canAnywhere,
