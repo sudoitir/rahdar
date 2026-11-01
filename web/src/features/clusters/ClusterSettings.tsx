@@ -9,6 +9,7 @@ import { CapabilityLedger } from './CapabilityLedger.tsx';
 import { ConnectionForm } from './ConnectionSettings.tsx';
 import { KafkaConnectionForm } from './KafkaConnectionSettings.tsx';
 import { storedKafka } from './kafkaConnection.ts';
+import { RabbitMqConnectionForm } from './RabbitMqConnectionSettings.tsx';
 import classes from './Clusters.module.css';
 
 /** Settings section: register another cluster. */
@@ -47,9 +48,13 @@ function SectionBody({
 
 /** What each system's connection is made of, for the section's opening line. */
 function connectionWords(system: string | undefined): ReactNode {
-  return system === 'kafka'
-    ? 'the bootstrap servers, the security protocol and mechanism, the credentials and the TLS bundle. A secret left empty keeps the stored one.'
-    : 'the management address you gave, the pattern that gives every other node its own, and the management and Core accounts, which are stored separately.';
+  if (system === 'kafka') {
+    return 'the bootstrap servers, the security protocol and mechanism, the credentials and the TLS bundle. A secret left empty keeps the stored one.';
+  }
+  if (system === 'rabbitmq') {
+    return 'the management URLs, the AMQP endpoints, the account or token and the TLS bundle. A secret left empty keeps the stored one, unless the URLs, endpoints or account change.';
+  }
+  return 'the management address you gave, the pattern that gives every other node its own, and the management and Core accounts, which are stored separately.';
 }
 
 /** Settings section: how Rahdar connects to this cluster, checked before it is saved. */
@@ -69,6 +74,8 @@ export function ConnectionSection({ clusterId }: Readonly<{ clusterId: string }>
           if (data.connection.kafka) {
             return <KafkaConnectionForm cluster={data} stored={storedKafka(data.connection.kafka)} />;
           }
+          if (data.connection.rabbitmq)
+            return <RabbitMqConnectionForm cluster={data} stored={data.connection.rabbitmq} />;
           return <ConnectionForm cluster={data} connection={data.connection} />;
         }}
       </SectionBody>

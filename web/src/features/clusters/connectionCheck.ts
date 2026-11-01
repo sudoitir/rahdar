@@ -1,4 +1,5 @@
 import type { ConnectionCheck } from './api.ts';
+import { nodeName } from './checkColumns.tsx';
 
 /** Whether a check says the cluster may be registered: nothing failed, it is new and some node answered. */
 export function checkPassed(check: ConnectionCheck): boolean {
@@ -9,7 +10,7 @@ export function checkPassed(check: ConnectionCheck): boolean {
 export function unreachedNodes(check: ConnectionCheck): string[] {
   return check.nodes
     .filter((n) => n.outcome === 'UNREACHABLE')
-    .map((n) => (n.artemis ? n.id : `Broker ${n.id}`) + ` (${n.address ?? 'address not learned'})`);
+    .map((n) => nodeName(n) + ` (${n.address ?? 'address not learned'})`);
 }
 
 /** The accounts a check found rejected, one sentence each: saving would make them worse. */
@@ -24,6 +25,7 @@ export function rejectedAccounts(check: ConnectionCheck): string[] {
 
 const SYSTEM_NAMES: Record<string, string> = {
   kafka: 'Apache Kafka',
+  rabbitmq: 'RabbitMQ',
   artemis: 'Apache ActiveMQ Artemis',
 };
 

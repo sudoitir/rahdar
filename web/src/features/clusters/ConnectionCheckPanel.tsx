@@ -8,7 +8,7 @@ import { Notice } from '../../ui/Notice.tsx';
 import { Section } from '../../ui/Section.tsx';
 import { DataTable } from '../../ui/table/index.ts';
 import type { ConnectionCheck } from './api.ts';
-import { CAUSE_WORDS, CHECK_NODE_COLUMNS } from './checkColumns.tsx';
+import { CAUSE_WORDS, CHECK_ENDPOINT_COLUMNS, CHECK_NODE_COLUMNS } from './checkColumns.tsx';
 import { GATE_PREFIX, systemWords, unreachedNodes, untestedNodes } from './connectionCheck.ts';
 
 function quorumWords(check: ConnectionCheck): string {
@@ -29,7 +29,8 @@ function facts(check: ConnectionCheck): DescriptionItem[] {
     },
   ];
   if (check.version?.mode || kafka) items.push({ term: 'Mode', value: check.version?.mode ?? 'Not reported' });
-  if (check.clusterId || kafka) items.push({ term: 'Cluster id', value: check.clusterId ?? 'Not reported' });
+  const named = check.system === 'rabbitmq' ? 'Cluster name' : 'Cluster id';
+  if (check.clusterId || kafka) items.push({ term: named, value: check.clusterId ?? 'Not reported' });
   if (check.quorum || kafka) items.push({ term: 'Controller quorum', value: quorumWords(check) });
   return items;
 }
@@ -42,6 +43,9 @@ function facts(check: ConnectionCheck): DescriptionItem[] {
  */
 export function ConnectionCheckPanel({ check, selfId }: Readonly<{ check: ConnectionCheck; selfId?: string }>) {
   const unreached = unreachedNodes(check);
+  const endpoints = check.endpoints ?? [];
+  const downEndpoints = endpoints.filter((e) => e.outcome !== 'OK');
+  const rabbit = check.system === 'rabbitmq';
   const lacking = check.access.filter((a) => a.status !== 'AVAILABLE');
   const other = check.alreadyRegistered && check.alreadyRegistered.id !== selfId ? check.alreadyRegistered : null;
   const untested = untestedNodes(check);
@@ -74,12 +78,20 @@ export function ConnectionCheckPanel({ check, selfId }: Readonly<{ check: Connec
       ) : null}
       {!check.failure && unreached.length > 0 && unreached.length < check.nodes.length ? (
         <Notice title="Some nodes were not reached" tone="warning">
-          {`${unreached.join(', ')} did not answer at the address Rahdar was given for it. If it is a Kafka broker, its advertised listeners must be reachable from Rahdar. You can still register the cluster; it will be shown degraded.`}
+          {`${unreached.join(', ')} did not answer at the address Rahdar was given for it. ${rabbit ? '' : 'If it is a Kafka broker, its advertised listeners must be reachable from Rahdar. '}You can still register the cluster; it will be shown degraded.`}
         </Notice>
       ) : null}
       {!check.failure && unreached.length > 0 && unreached.length === check.nodes.length ? (
         <Notice title="No node was reached" tone="danger">
-          Fix the addresses, the advertised listeners or the network, then check again.
+          {rabbit
+            ? 'Fix the management URLs or the network, then check again.'
+            : 'Fix the addresses, the advertised listeners or the network, then check again.'}
+        </Notice>
+      ) : null}
+
+      {!check.failure && downEndpoints.length > 0 && downEndpoints.length < endpoints.length ? (
+        <Notice title="Some endpoints were not reached" tone="warning">
+          {`${downEndpoints.map((e) => e.address).join(', ')} did not answer. The endpoints that did are enough to register the cluster; fix the others or remove them from the connection.`}
         </Notice>
       ) : null}
 
@@ -101,6 +113,18 @@ export function ConnectionCheckPanel({ check, selfId }: Readonly<{ check: Connec
         height={{ maxRows: Math.max(check.nodes.length, 1) }}
         empty={<EmptyState kind="empty" title="No node was found" description="The check reached no node." />}
       />
+      {endpoints.length > 0 ? (
+        <DataTable
+          variant="static"
+          label="Endpoints tried by the check"
+          storageKey="clusters.check.endpoints"
+          columns={CHECK_ENDPOINT_COLUMNS}
+          data={endpoints}
+          rowKey={(e) => `${e.plane}:${e.address}`}
+          height={{ maxRows: endpoints.length }}
+          empty={<EmptyState kind="empty" title="No endpoint was tried" description="The check tried none." />}
+        />
+      ) : null}
       {passiveBackup ? (
         <Text size="xs" c="dimmed">
           A passive backup opens no Core acceptor, so its Core account is not asked. It is tried once the backup takes

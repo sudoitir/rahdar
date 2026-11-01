@@ -45,6 +45,15 @@ describe('RegisterClusterPage', () => {
     expect(screen.queryByRole('textbox', { name: /Bootstrap servers/ })).not.toBeInTheDocument();
   });
 
+  it('shows the RabbitMQ form for RabbitMQ, with no bootstrap or Artemis field', async () => {
+    renderAppAt('/clusters/new?system=rabbitmq');
+
+    expect(await screen.findByRole('textbox', { name: /Management URLs/ })).toBeInTheDocument();
+    expect(screen.queryByRole('textbox', { name: /Bootstrap servers/ })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/Broker management URL/)).not.toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: /RabbitMQ/ })).toBeChecked();
+  });
+
   it('changes the form and the address when another system is chosen, by keyboard', async () => {
     const user = userEvent.setup();
     const { router } = renderAppAt('/clusters/new?system=artemis');
@@ -71,10 +80,10 @@ describe('RegisterClusterPage', () => {
   });
 
   it('names the systems Rahdar supports when the address names one it does not load', async () => {
-    renderAppAt('/clusters/new?system=rabbitmq');
+    renderAppAt('/clusters/new?system=pulsar');
 
     expect(await screen.findByText('That system is not loaded')).toBeInTheDocument();
-    expect(screen.getByText(/Rahdar has no driver for "rabbitmq"/)).toHaveTextContent('Apache Kafka');
+    expect(screen.getByText(/Rahdar has no driver for "pulsar"/)).toHaveTextContent('Apache Kafka');
   });
 
   it('says why the systems could not be read, and retries', async () => {

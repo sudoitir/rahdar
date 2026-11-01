@@ -3,7 +3,7 @@ import { Stack, Text } from '@mantine/core';
 
 import { StatusBadge } from '../../ui/StatusBadge.tsx';
 import type { Column } from '../../ui/table/index.ts';
-import type { CheckNode } from './api.ts';
+import type { CheckNode, EndpointReach } from './api.ts';
 import classes from './Clusters.module.css';
 import { accountResultWords, urlProblemWords, urlSourceWords, type AccountResult } from './connectionWords.ts';
 
@@ -17,12 +17,17 @@ export const CAUSE_WORDS: Record<string, string> = {
   AUTHORIZATION: 'The account may not describe the cluster',
   UNSUPPORTED_VERSION: 'This version is not supported',
   ADVERTISED_UNREACHABLE: 'The brokers advertise addresses Rahdar cannot reach',
+  WRONG_ENDPOINT: 'A management URL does not answer as a RabbitMQ management API',
+  DATA_UNREACHABLE: 'No AMQP endpoint accepts a connection',
 };
 
 const ROLE: Record<string, string> = { PRIMARY: 'Primary', BACKUP: 'Backup', NONE: 'Standalone' };
 
-/** A node's name: an Artemis node by its own name, a Kafka broker by its id. */
-export const nodeName = (n: CheckNode): string => (n.artemis ? n.id : `Broker ${n.id}`);
+/**
+ * A node's name: an Artemis node by its own name, a Kafka broker by its number ("Broker 1"), and any other node,
+ * such as `rabbit@host`, by its id.
+ */
+export const nodeName = (n: CheckNode): string => (!n.artemis && /^\d+$/.test(n.id) ? `Broker ${n.id}` : n.id);
 
 /** Who the node is, in one line under its name. */
 function nodeFacts(n: CheckNode): string {
@@ -141,6 +146,45 @@ export const CHECK_NODE_COLUMNS: Column<CheckNode>[] = [
           : null,
       );
     },
+    kind: 'text',
+    priority: 'essential',
+    wrap: true,
+  },
+];
+
+const PLANE: Record<string, string> = { MANAGEMENT: 'Management', DATA: 'AMQP' };
+
+/** What a connection check found at each endpoint it tried: the address, its plane and whether it answered. */
+export const CHECK_ENDPOINT_COLUMNS: Column<EndpointReach>[] = [
+  {
+    id: 'address',
+    header: 'Endpoint',
+    description: 'The address as given, without an account',
+    accessor: (e) => e.address,
+    cell: (e) =>
+      twoLines(
+        <Text size="sm" className={classes.mono}>
+          {e.address}
+        </Text>,
+        PLANE[e.plane] ?? e.plane,
+      ),
+    kind: 'code',
+    priority: 'essential',
+    wrap: true,
+  },
+  {
+    id: 'reach',
+    header: 'Reach',
+    accessor: (e) => `${e.outcome} ${e.cause ?? ''} ${e.message ?? ''}`,
+    cell: (e) =>
+      twoLines(
+        <StatusBadge tone={e.outcome === 'OK' ? 'neutral' : 'warning'}>
+          {e.outcome === 'OK' ? 'Reached' : 'Not reached'}
+        </StatusBadge>,
+        e.outcome === 'OK'
+          ? null
+          : [e.cause ? (CAUSE_WORDS[e.cause] ?? e.cause) : null, e.message].filter(Boolean).join(': '),
+      ),
     kind: 'text',
     priority: 'essential',
     wrap: true,
