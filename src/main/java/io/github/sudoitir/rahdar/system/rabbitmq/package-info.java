@@ -15,7 +15,8 @@
             "kernel.security",
             "platform.broker",
             "platform.clusters",
-            "platform.clusters::web"
+            "platform.clusters::web",
+            "platform.mcp"
         })
 package io.github.sudoitir.rahdar.system.rabbitmq;
 
