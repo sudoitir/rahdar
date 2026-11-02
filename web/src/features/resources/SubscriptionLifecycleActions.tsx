@@ -191,7 +191,7 @@ export function DeleteSubscriptionDialog({
   onDeleted: () => void;
 }>) {
   const remove = useDeleteSubscription(clusterId, subscription.id);
-  const forwardRoutes = useCluster(clusterId).data?.system.id === 'artemis';
+  const forwardRoutes = useCluster(clusterId).data?.system?.id === 'artemis';
   const [preview, setPreview] = useState<LifecycleOutcomeView | null>(null);
   const [result, setResult] = useState<LifecycleOutcomeView | null>(null);
   const [previewFailed, setPreviewFailed] = useState<Error | null>(null);
