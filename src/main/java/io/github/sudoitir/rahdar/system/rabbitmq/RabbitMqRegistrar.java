@@ -81,6 +81,7 @@ class RabbitMqRegistrar implements ClusterRegistrar {
     static final String DATA_UNREACHABLE = "DATA_UNREACHABLE";
 
     private static final String TIMEOUT = "TIMEOUT";
+    private static final String DNS = "DNS";
     private static final String REFUSED = "REFUSED";
     private static final String UNREACHABLE = "UNREACHABLE";
     private static final String AUTHORIZATION = "AUTHORIZATION";
@@ -199,7 +200,7 @@ class RabbitMqRegistrar implements ClusterRegistrar {
     private static EndpointReach managementReach(String url, BrokerException failure) {
         return failure == null
                 ? new EndpointReach(Plane.MANAGEMENT.name(), url, OK, null, null)
-                : new EndpointReach(Plane.MANAGEMENT.name(), url, UNREACHABLE, causeOf(failure), failure.getMessage());
+                : new EndpointReach(Plane.MANAGEMENT.name(), url, UNREACHABLE, causeOf(failure), wordsOf(failure));
     }
 
     private static EndpointReach dataReach(String endpoint, String cause) {
@@ -242,7 +243,7 @@ class RabbitMqRegistrar implements ClusterRegistrar {
                         List.of(),
                         UNREACHABLE,
                         causeOf(failure.getValue()),
-                        failure.getValue().getMessage(),
+                        wordsOf(failure.getValue()),
                         null,
                         null));
             }
@@ -294,7 +295,7 @@ class RabbitMqRegistrar implements ClusterRegistrar {
     private NodeReach reach(NodeDescription node, boolean running, BrokerException failure) {
         String message;
         if (failure != null) {
-            message = failure.getMessage();
+            message = wordsOf(failure);
         } else if (!running) {
             message = "The node is not running.";
         } else {
@@ -411,8 +412,7 @@ class RabbitMqRegistrar implements ClusterRegistrar {
                 List.of(),
                 null,
                 List.of(),
-                new Failure(
-                        cause, failureMessage(cause, Objects.toString(e.getMessage(), "")), nextStep(cause, account)),
+                new Failure(cause, failureMessage(cause, Objects.toString(wordsOf(e), "")), nextStep(cause, account)),
                 null,
                 null,
                 Map.of(),
@@ -429,7 +429,7 @@ class RabbitMqRegistrar implements ClusterRegistrar {
 
     private static String nextStep(String cause, String account) {
         return switch (cause) {
-            case "DNS" -> "Check the management URL's host name resolves from Rahdar.";
+            case DNS -> "Check the management URL's host name resolves from Rahdar.";
             case REFUSED ->
                 "Check the host and port, that the management plugin listens there and that no firewall blocks it.";
             case TIMEOUT ->
@@ -444,6 +444,14 @@ class RabbitMqRegistrar implements ClusterRegistrar {
                         + " the API is served under to the URL.";
             default -> "Register a cluster that runs a supported version.";
         };
+    }
+
+    /**
+     * The failure's message. The driver words a connect failure as a refusal even when the host name never resolved
+     * (the JDK client reports an unresolvable host as a connect failure), so a name that does not resolve says so.
+     */
+    private static String wordsOf(BrokerException e) {
+        return DNS.equals(causeOf(e)) ? "The host name of the address does not resolve." : e.getMessage();
     }
 
     /** What went wrong reaching the cluster, from the driver's reason and, for an unreachable one, the cause chain. */
@@ -463,11 +471,16 @@ class RabbitMqRegistrar implements ClusterRegistrar {
             default:
                 break;
         }
+        // A host name that does not resolve outranks a refusal anywhere in the chain: the driver words it as a refused
+        // connection, and the JDK client wraps the resolution failure in a connect failure.
         for (Throwable t = e; t != null; t = t.getCause()) {
             String text = (t.getClass().getName() + " " + t.getMessage()).toLowerCase(Locale.ROOT);
             if (text.contains("unknownhost") || text.contains("unresolved") || text.contains("resolve")) {
-                return "DNS";
+                return DNS;
             }
+        }
+        for (Throwable t = e; t != null; t = t.getCause()) {
+            String text = (t.getClass().getName() + " " + t.getMessage()).toLowerCase(Locale.ROOT);
             if (text.contains("refused")) {
                 return REFUSED;
             }
