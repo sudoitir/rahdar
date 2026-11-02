@@ -29,6 +29,12 @@ const topicConfigRoute = createRoute({
   component: view(() => import('./TopicConfigView.tsx'), 'TopicConfigView'),
 });
 
+const brokerConfigRoute = createRoute({
+  getParentRoute: () => clusterRoute,
+  path: 'kafka/brokers/$broker/config',
+  component: view(() => import('./BrokerConfigView.tsx'), 'BrokerConfigView'),
+});
+
 const aclsRoute = createRoute({
   getParentRoute: () => clusterRoute,
   path: 'kafka/acls',
@@ -49,14 +55,16 @@ const brokersRoute = createRoute({
 });
 
 /**
- * Apache Kafka (ADR-0216): consumer groups with their offsets and the reset of them, topic configuration,
+ * Apache Kafka (ADR-0216): consumer groups with their offsets and the reset of them, topic and broker configuration,
  * ACLs, transactions and brokers. Every view is for a Kafka cluster; another system's cluster answers its
  * addresses with the not-found page.
  */
 export const kafkaFeature = defineFeature({
   contract: CONTRACT,
   id: 'kafka',
-  routes: { cluster: [groupsRoute, groupRoute, topicConfigRoute, aclsRoute, transactionsRoute, brokersRoute] },
+  routes: {
+    cluster: [groupsRoute, groupRoute, topicConfigRoute, aclsRoute, transactionsRoute, brokersRoute, brokerConfigRoute],
+  },
   nav: [
     {
       group: 'messaging',

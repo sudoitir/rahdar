@@ -18,6 +18,7 @@ export const keys = {
   groups: (c: string, filter: GroupFilter) => clusterKey(c, 'kafka', 'groups', filter),
   group: (c: string, g: string) => clusterKey(c, 'kafka', 'group', g),
   config: (c: string, t: string) => clusterKey(c, 'kafka', 'config', t),
+  brokerConfig: (c: string, b: string) => clusterKey(c, 'kafka', 'broker-config', b),
   acls: (c: string, f: AclFilter) => clusterKey(c, 'kafka', 'acls', f),
   transactions: (c: string) => clusterKey(c, 'kafka', 'transactions'),
   brokers: (c: string) => clusterKey(c, 'kafka', 'brokers'),
@@ -116,6 +117,41 @@ export function useApplyTopicConfig(clusterId: string, topic: string) {
     mutationFn: (body) =>
       request(`${base(clusterId)}/topics/${seg(topic)}/config:apply`, { method: 'POST', body: JSON.stringify(body) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: keys.config(clusterId, topic) }),
+  });
+}
+
+// ── Broker configuration ─────────────────────────────────────────────────────
+
+export type BrokerConfig = Schemas['BrokerConfig'];
+export type BrokerConfigEntry = Schemas['BrokerConfigEntry'];
+
+/** A broker's settings by its number, or `default` for the cluster-wide default. */
+export function useBrokerConfig(clusterId: string, broker: string): UseQueryResult<BrokerConfig, ApiError> {
+  return useQuery({
+    queryKey: keys.brokerConfig(clusterId, broker),
+    queryFn: () => request<BrokerConfig>(`${base(clusterId)}/brokers/${seg(broker)}/config`),
+  });
+}
+
+export function usePreviewBrokerConfig(clusterId: string, broker: string) {
+  return useMutation<ConfigPreview, ApiError, ConfigChange>({
+    mutationFn: (body) =>
+      request(`${base(clusterId)}/brokers/${seg(broker)}/config:preview`, {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
+  });
+}
+
+export function useApplyBrokerConfig(clusterId: string, broker: string) {
+  const qc = useQueryClient();
+  return useMutation<ConfigPreview, ApiError, ConfigChange & { etag: string }>({
+    mutationFn: (body) =>
+      request(`${base(clusterId)}/brokers/${seg(broker)}/config:apply`, {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.brokerConfig(clusterId, broker) }),
   });
 }
 

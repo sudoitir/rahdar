@@ -203,6 +203,42 @@ public final class KafkaViews {
             @Schema(requiredMode = REQUIRED) boolean valid,
             @Schema(requiredMode = REQUIRED) String etag) {}
 
+    public enum BrokerConfigSource {
+        NODE,
+        CLUSTER,
+        STATIC,
+        DEFAULT
+    }
+
+    public record BrokerConfigEntry(
+            @Schema(requiredMode = REQUIRED) String name,
+            @Schema(requiredMode = REQUIRED) String value,
+
+            @Schema(
+                    requiredMode = REQUIRED,
+                    description = "Where the value is set: this broker, the cluster default, its file or built in.")
+            BrokerConfigSource source,
+
+            @Schema(requiredMode = REQUIRED, description = "Whether only a restart of the broker changes it.")
+            boolean readOnly,
+
+            @Schema(nullable = true, description = "ms, bytes or the like, when the value is a quantity.")
+            String unit) {}
+
+    public record BrokerConfig(
+            @Schema(requiredMode = REQUIRED, description = "The broker id, or default for the cluster-wide default.")
+            String broker,
+
+            @Schema(requiredMode = REQUIRED) boolean clusterDefault,
+
+            @Schema(requiredMode = REQUIRED, description = "Settings with a value; secrets are never listed.")
+            List<BrokerConfigEntry> entries,
+
+            @Schema(
+                    nullable = true,
+                    description = "Why the restart-only settings are not marked, when the cluster does not say.")
+            String note) {}
+
     // ---- ACLs ---------------------------------------------------------------------------------------------------
 
     public record Acl(
