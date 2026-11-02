@@ -4,6 +4,28 @@ import { DescriptionList } from '../../ui/DescriptionList.tsx';
 import { Section } from '../../ui/Section.tsx';
 import { COLUMNS, EVALUATION_WORDS, EXAMPLES, FULL_TEXT, FUNCTIONS } from './catalogue.ts';
 
+/** What differs on a system that keeps its messages in logs and cannot filter them where they are kept. */
+const LOG_NOTES: Record<string, { title: string; paragraphs: string[] }> = {
+  kafka: {
+    title: 'On this Kafka cluster',
+    paragraphs: [
+      'FROM names a topic. Its records are read from the log, partition by partition, and every predicate is evaluated ' +
+        'by Rahdar over what was read, up to the scan cap. Narrow a query with a LIMIT or a timestamp window.',
+      'messageId is the record offset, timestamp is the record time, and the partition is props.partition. The message index ' +
+        'captures Artemis queues only: a Kafka topic is queried directly, because its log is kept.',
+    ],
+  },
+  rabbitmq: {
+    title: 'On this RabbitMQ cluster',
+    paragraphs: [
+      'FROM names a stream. Streams are the only RabbitMQ queues that can be read without taking their messages: classic and ' +
+        'quorum queues can only be consumed, so a query that names one is refused. Every predicate is evaluated by Rahdar ' +
+        'over what was read, up to the scan cap.',
+      'messageId is the stream offset. The message index captures Artemis queues only: a stream is queried directly.',
+    ],
+  },
+};
+
 /**
  * The dialect, in the page rather than behind a documentation link. An operator
  * writing a query at 3am should not have to leave the console to find out what
@@ -17,12 +39,16 @@ export function SyntaxHelp({
   opened,
   onClose,
   onLoadExample,
+  system,
 }: Readonly<{
+  /** The id of the system the cluster runs; a Kafka or RabbitMQ cluster is read from its logs, not by selector. */
+  system?: string;
   opened: boolean;
   onClose: () => void;
   /** Loads an example into the editor and closes — one action, per the spec. */
   onLoadExample: (sql: string) => void;
 }>) {
+  const logNote = LOG_NOTES[system ?? ''];
   return (
     <Modal opened={opened} onClose={onClose} title="The console's dialect" size="xl">
       <Stack gap="lg">
@@ -38,6 +64,16 @@ export function SyntaxHelp({
             level and <Code>#</Code> matches many.
           </Text>
         </Stack>
+
+        {logNote ? (
+          <Section title={logNote.title} headingLevel={3}>
+            {logNote.paragraphs.map((paragraph) => (
+              <Text size="sm" key={paragraph}>
+                {paragraph}
+              </Text>
+            ))}
+          </Section>
+        ) : null}
 
         <Section title="Where the query reads" headingLevel={3}>
           <Text size="sm">

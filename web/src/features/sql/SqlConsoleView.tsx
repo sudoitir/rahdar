@@ -234,7 +234,12 @@ export function SqlConsoleView() {
         </Notice>
       ) : null}
 
-      <SyntaxHelp opened={helpOpen} onClose={() => setHelpOpen(false)} onLoadExample={setText} />
+      <SyntaxHelp
+        opened={helpOpen}
+        onClose={() => setHelpOpen(false)}
+        onLoadExample={setText}
+        system={cluster.data?.system?.id}
+      />
 
       {/* Identity is (node, subscription, messageId), so the detail request carries all three. An indexed row may
           already be gone from the broker — the panel reports that as the read failure it is, rather than as
