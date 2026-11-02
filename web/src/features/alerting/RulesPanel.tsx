@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Text } from '@mantine/core';
 
 import { useCan } from '../../kernel/auth/useCan.ts';
+import { useClusterSystem } from '../../kernel/shell/useClusterSystem.ts';
 import { ConfirmDialog } from '../../ui/ConfirmDialog.tsx';
 import { EmptyState } from '../../ui/EmptyState.tsx';
 import { ErrorState } from '../../ui/ErrorState.tsx';
@@ -55,6 +56,7 @@ function channelsPhrase(count: number): string {
 /** Rule CRUD — thresholds and cluster-state conditions share one form and table (alerting spec). */
 export function RulesPanel({ clusterId }: Readonly<{ clusterId: string }>) {
   const rules = useAlertRules(clusterId);
+  const system = useClusterSystem(clusterId);
   const channels = useNotificationChannels();
   const pluginMetrics = usePluginMetrics(clusterId);
   const create = useCreateAlertRule(clusterId);
@@ -170,6 +172,7 @@ export function RulesPanel({ clusterId }: Readonly<{ clusterId: string }>) {
           initial={editing ?? undefined}
           submitting={create.isPending || update.isPending}
           disabled={!canWrite}
+          system={system}
           onCancel={editing ? () => setEditing(null) : undefined}
           onSubmit={submit}
         />

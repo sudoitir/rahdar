@@ -311,7 +311,7 @@ function ChannelForm({
           <TextInput
             label="Receiver URL"
             {...form.getInputProps('url')}
-            placeholder="https://alerts.example.com/hooks/artemis"
+            placeholder="https://alerts.example.com/hooks/brokers"
             required
           />
         ) : null}

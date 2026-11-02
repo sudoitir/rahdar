@@ -5,6 +5,8 @@ import { focusFirstInvalid } from '../../ui/formErrors.ts';
 
 import type { AlertRuleRequest, AlertRuleView, NotificationChannelView, PluginMetricView } from './api.ts';
 import {
+  BACKLOG_TEMPLATES,
+  CLUSTER_DEGRADED_TEMPLATE,
   COMPARATORS,
   DERIVED_METRICS,
   GAUGE_METRICS,
@@ -15,15 +17,25 @@ import {
   SETUP_RISK_TEMPLATE,
   SLOW_CONSUMER_TEMPLATE,
   STATE_CONDITIONS,
+  artemisOnlyNote,
   metricKind,
   metricLabel,
+  systemName,
+  unavailableOn,
 } from './severity.ts';
 import classes from './Alerting.module.css';
 
-const RAHDAR_METRIC_OPTIONS = [...GAUGE_METRICS, ...RATE_METRICS, ...DERIVED_METRICS].map((m) => ({
-  value: m,
-  label: `${metricLabel(m)} (${metricKind(m)})`,
-}));
+/** Rahdar's own metrics; one the cluster's system cannot answer stays listed, disabled, with its system named. */
+function rahdarMetricOptions(system: string | undefined) {
+  return [...GAUGE_METRICS, ...RATE_METRICS, ...DERIVED_METRICS].map((m) => {
+    const unavailable = unavailableOn(system, m);
+    return {
+      value: m,
+      label: `${metricLabel(m)} (${unavailable ? 'Artemis only' : metricKind(m)})`,
+      disabled: unavailable,
+    };
+  });
+}
 
 const UNIT_WORDS: Record<string, string> = { count: 'count', per_second: 'per second', ms: 'ms', ratio: 'ratio 0–1' };
 
@@ -32,7 +44,8 @@ const UNIT_WORDS: Record<string, string> = { count: 'count', per_second: 'per se
  * whose plugin is not running keeps its metric on the list, marked, so the form never shows it
  * blank.
  */
-function metricOptions(pluginMetrics: PluginMetricView[], current: string | null) {
+function metricOptions(pluginMetrics: PluginMetricView[], current: string | null, system: string | undefined) {
+  const rahdar = rahdarMetricOptions(system);
   const plugin = pluginMetrics.map((m) => ({
     value: m.metric,
     label: `${m.metric} (${UNIT_WORDS[m.unit] ?? m.unit}, per ${m.subject})`,
@@ -42,12 +55,20 @@ function metricOptions(pluginMetrics: PluginMetricView[], current: string | null
   }
   return plugin.length
     ? [
-        { group: 'Rahdar', items: RAHDAR_METRIC_OPTIONS },
+        { group: 'Rahdar', items: rahdar },
         { group: 'Plugins', items: plugin },
       ]
-    : RAHDAR_METRIC_OPTIONS;
+    : rahdar;
 }
-const STATE_OPTIONS = STATE_CONDITIONS.map((c) => ({ value: c, label: c.replaceAll('_', ' ').toLowerCase() }));
+
+/** The state conditions, with those the cluster's system cannot answer disabled and marked. */
+function stateOptions(system: string | undefined) {
+  return STATE_CONDITIONS.map((c) => {
+    const unavailable = unavailableOn(system, c);
+    const words = c.replaceAll('_', ' ').toLowerCase();
+    return { value: c, label: unavailable ? `${words} (Artemis only)` : words, disabled: unavailable };
+  });
+}
 const INSTALLATION_OPTIONS = INSTALLATION_CONDITIONS.map((c) => ({
   value: c,
   label: c.replaceAll('_', ' ').toLowerCase(),
@@ -62,19 +83,33 @@ function TemplateLink({ label, onClick }: Readonly<{ label: string; onClick: () 
   );
 }
 
-/** The prefilled starting points that fit the chosen kind. */
+/** The prefilled starting points that fit the chosen kind and the cluster's system. */
 function TemplateLinks({
   kind,
+  system,
   onSlowConsumer,
+  onBacklog,
   onConfigDrift,
   onSetupRisk,
+  onClusterDegraded,
 }: Readonly<{
   kind: 'METRIC_THRESHOLD' | 'STATE';
+  system: string | undefined;
   onSlowConsumer: () => void;
+  onBacklog: () => void;
   onConfigDrift: () => void;
   onSetupRisk: () => void;
+  onClusterDegraded: () => void;
 }>) {
-  if (kind === 'METRIC_THRESHOLD') return <TemplateLink label="slow-consumer" onClick={onSlowConsumer} />;
+  const backlog = system ? BACKLOG_TEMPLATES[system] : undefined;
+  if (kind === 'METRIC_THRESHOLD') {
+    return backlog ? (
+      <TemplateLink label={backlog.label} onClick={onBacklog} />
+    ) : (
+      <TemplateLink label="slow-consumer" onClick={onSlowConsumer} />
+    );
+  }
+  if (backlog) return <TemplateLink label="cluster-degraded" onClick={onClusterDegraded} />;
   return (
     <>
       <TemplateLink label="configuration-drift" onClick={onConfigDrift} />
@@ -127,6 +162,7 @@ export function RuleForm({
   submitting,
   onCancel,
   disabled = false,
+  system,
 }: Readonly<{
   channels: NotificationChannelView[];
   /** The metrics running plugins publish. */
@@ -137,6 +173,8 @@ export function RuleForm({
   onCancel?: () => void;
   /** The caller may not change rules; the form stays visible and the view says why beside it. */
   disabled?: boolean;
+  /** The cluster's system (`artemis`, `kafka`, `rabbitmq`); undefined while it loads, which disables nothing. */
+  system?: string;
 }>) {
   // A rule with no cluster is about Rahdar itself: always a state rule, on a storage condition (ADR-0135).
   const installation = initial !== undefined && !initial.clusterId;
@@ -201,7 +239,29 @@ export function RuleForm({
       severity: SETUP_RISK_TEMPLATE.severity,
     });
 
+  const applyBacklogTemplate = () => {
+    const backlog = system ? BACKLOG_TEMPLATES[system] : undefined;
+    if (!backlog) return;
+    form.setValues({
+      name: backlog.name,
+      metric: backlog.metric,
+      comparator: backlog.comparator,
+      threshold: backlog.threshold,
+      forSeconds: backlog.forSeconds,
+      severity: backlog.severity,
+    });
+  };
+
+  const applyClusterDegradedTemplate = () =>
+    form.setValues({
+      name: CLUSTER_DEGRADED_TEMPLATE.name,
+      stateCondition: CLUSTER_DEGRADED_TEMPLATE.stateCondition,
+      forSeconds: CLUSTER_DEGRADED_TEMPLATE.forSeconds,
+      severity: CLUSTER_DEGRADED_TEMPLATE.severity,
+    });
+
   const pluginMetric = pluginMetrics.find((m) => m.metric === metric);
+  const limited = system !== undefined && system !== 'artemis' && !installation;
 
   const submit = form.onSubmit((values) => onSubmit(ruleRequest(values)), focusFirstInvalid(form.getInputNode));
 
@@ -230,7 +290,7 @@ export function RuleForm({
               <Select
                 label="Metric"
                 placeholder="Choose a metric"
-                data={metricOptions(pluginMetrics, metric)}
+                data={metricOptions(pluginMetrics, metric, system)}
                 {...form.getInputProps('metric')}
               />
               <Select
@@ -245,7 +305,7 @@ export function RuleForm({
             <Select
               label="State condition"
               placeholder="Choose a condition"
-              data={installation ? INSTALLATION_OPTIONS : STATE_OPTIONS}
+              data={installation ? INSTALLATION_OPTIONS : stateOptions(system)}
               {...form.getInputProps('stateCondition')}
             />
           )}
@@ -265,6 +325,18 @@ export function RuleForm({
             disabled={channels.length === 0}
           />
 
+          {limited ? (
+            <Text size="xs" c="dimmed" className={`${classes.wide} ${classes.help}`}>
+              {artemisOnlyNote(system ?? '')}
+            </Text>
+          ) : null}
+          {kind === 'METRIC_THRESHOLD' && limited && metric === 'openbroker.backlog' ? (
+            <Text size="xs" c="dimmed" className={`${classes.wide} ${classes.help}`}>
+              {system === 'kafka'
+                ? 'On Kafka the backlog is a consumer group’s lag on a topic: the records written that the group has not committed.'
+                : `On ${systemName(system ?? '')} the backlog is the messages ready in a queue, waiting for a consumer.`}
+            </Text>
+          ) : null}
           {metric && METRIC_NOTES[metric] ? (
             <Text size="xs" c="dimmed" className={`${classes.wide} ${classes.help}`}>
               {METRIC_NOTES[metric]}
@@ -290,9 +362,12 @@ export function RuleForm({
             {initial ? null : (
               <TemplateLinks
                 kind={kind}
+                system={installation ? undefined : system}
                 onSlowConsumer={applySlowConsumerTemplate}
+                onBacklog={applyBacklogTemplate}
                 onConfigDrift={applyConfigDriftTemplate}
                 onSetupRisk={applySetupRiskTemplate}
+                onClusterDegraded={applyClusterDegradedTemplate}
               />
             )}
           </div>

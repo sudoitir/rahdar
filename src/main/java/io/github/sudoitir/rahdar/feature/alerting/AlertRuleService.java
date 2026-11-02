@@ -16,6 +16,7 @@ import io.github.sudoitir.rahdar.kernel.security.ActorResolver;
 import io.github.sudoitir.rahdar.kernel.security.ClusterAccessGuard;
 import io.github.sudoitir.rahdar.kernel.security.PermissionResolver;
 import io.github.sudoitir.rahdar.kernel.security.Permissions;
+import io.github.sudoitir.rahdar.platform.clusters.ClusterKinds;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -58,6 +59,7 @@ public class AlertRuleService {
     private final AlertViewMapper mapper;
     private final ClusterAccessGuard clusterAccess;
     private final PermissionResolver perm;
+    private final ClusterKinds clusterKinds;
     private final PluginMetricCondition pluginMetrics;
     private final ObjectMapper json;
 
@@ -95,6 +97,7 @@ public class AlertRuleService {
     public AlertRuleView create(UUID clusterId, AlertRuleRequest request) {
         clusterAccess.requireCluster(clusterId, AlertPermissions.ALERT_WRITE);
         AlertRuleEntity rule = validated(request, false);
+        SystemRules.requireOn(clusterKinds.systemId(clusterId), rule);
         requireMayWatch(clusterId, rule);
         rule.setClusterId(clusterId);
         rules.save(rule);
@@ -118,6 +121,9 @@ public class AlertRuleService {
         clusterAccess.requireCluster(clusterId, AlertPermissions.ALERT_WRITE);
         AlertRuleEntity existing = requireRule(clusterId, ruleId);
         AlertRuleEntity updated = validated(request, existing.getClusterId() == null);
+        if (existing.getClusterId() != null) {
+            SystemRules.requireOn(clusterKinds.systemId(clusterId), updated);
+        }
         requireMayWatch(clusterId, updated);
 
         AuditEvent event = audit.begin(
