@@ -28,6 +28,8 @@ import io.github.sudoitir.rahdar.kernel.security.ClusterAccessGuard;
 import io.github.sudoitir.rahdar.kernel.security.PermissionResolver;
 import io.github.sudoitir.rahdar.kernel.security.ResourceFilter;
 import io.github.sudoitir.rahdar.kernel.settings.SettingsService;
+import io.github.sudoitir.rahdar.platform.broker.FlowSampler;
+import io.github.sudoitir.rahdar.platform.broker.SystemExtensions;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
 import io.github.sudoitir.rahdar.platform.scrape.MetricSamples;
@@ -70,6 +72,7 @@ class FlowGraphServiceTest {
     private final Map<String, SubjectRate> added = new HashMap<>();
     private final Map<String, SubjectRate> acked = new HashMap<>();
 
+    private final FlowSampler sampler = mock(FlowSampler.class);
     private FlowGraphService service;
 
     @BeforeEach
@@ -93,6 +96,9 @@ class FlowGraphServiceTest {
         when(everything.readable(any())).thenReturn(true);
         PermissionResolver permissions = mock(PermissionResolver.class);
         when(permissions.filter(eq(clusterId), any())).thenReturn(everything);
+        SystemExtensions extensions = mock(SystemExtensions.class);
+        when(extensions.forCluster(clusterId, FlowSampler.class)).thenReturn(java.util.Optional.of(sampler));
+        when(sampler.wildcardAddresses()).thenReturn(true);
         service = new FlowGraphService(
                 store,
                 snapshots,
@@ -102,6 +108,7 @@ class FlowGraphServiceTest {
                 demand,
                 access,
                 permissions,
+                extensions,
                 Clock.fixed(now, ZoneOffset.UTC));
     }
 
@@ -257,6 +264,7 @@ class FlowGraphServiceTest {
 
     @Test
     void aNodeThatRefusedTheListingIsNamedWithTheAccessThatGrantsIt() {
+        when(sampler.accessSnippet()).thenReturn("<role-access/>");
         samples.add(sample("PERMISSION_DENIED", 0, 0));
 
         FlowGraphView graph = service.graph(clusterId, query(null, 40));
@@ -448,6 +456,56 @@ class FlowGraphServiceTest {
         assertThat(wildcard.source()).isEqualTo("destination:orders.eu");
         assertThat(wildcard.target()).isEqualTo("destination:orders.#");
         assertThat(graph.assumptions()).containsExactly(FlowGraphService.WILDCARD_ASSUMPTION);
+    }
+
+    @Test
+    void aKafkaGroupOnATopicIsDrawnWithoutProducersAndTheGraphSaysSo() {
+        when(sampler.wildcardAddresses()).thenReturn(false);
+        when(sampler.producersNote()).thenReturn("Kafka does not list producers.");
+        queue("billing/orders", "orders", null, 120, 2);
+        edge(Kind.CONSUME, "billing", "orders", "billing/orders", null, 2, false);
+        samples.add(sample(null, 0, 1));
+
+        FlowGraphView graph = service.graph(clusterId, query(null, 40));
+
+        assertThat(graph.nodes())
+                .extracting(FlowNodeView::id)
+                .contains("destination:orders", "subscription:billing/orders");
+        assertThat(graph.nodes()).noneMatch(n -> n.kind() == NodeKind.PRODUCER);
+        assertThat(edge(graph, EdgeKind.CONSUME).rate()).isNull();
+        assertThat(graph.assumptions()).containsExactly("Kafka does not list producers.");
+    }
+
+    @Test
+    void aRabbitMqQueueTakesItsAddressFromItsBindingAndShowsTheRoutingKey() {
+        when(sampler.wildcardAddresses()).thenReturn(false);
+        queue("%2F/orders.q", null, null, 5, 1);
+        route(nodeA, FlowStore.RouteKind.BINDING, "b1", "%2F/orders", "%2F/orders.q", "eu.#", false, true, null);
+        route(nodeA, FlowStore.RouteKind.BINDING, "b2", "%2F/audit", "%2F/orders.q", "#", false, true, null);
+        route(nodeA, FlowStore.RouteKind.EXCHANGE_BINDING, "e1", "%2F/audit", "%2F/orders", "", false, true, null);
+        route(
+                nodeA,
+                FlowStore.RouteKind.SHOVEL,
+                "%2F/s1",
+                "%2F/orders.q",
+                "amqp://other:5672",
+                null,
+                false,
+                true,
+                null);
+        edge(Kind.CONSUME, "svc", "", "%2F/orders.q", null, 1, false);
+        samples.add(sample(null, 0, 1));
+
+        FlowGraphView graph = service.graph(clusterId, query(null, 40));
+
+        assertThat(graph.edges())
+                .filteredOn(e -> e.kind() == EdgeKind.ROUTE)
+                .extracting(FlowEdgeView::filter)
+                .containsExactly("#");
+        assertThat(graph.nodes())
+                .extracting(FlowNodeView::id)
+                .contains("destination:%2F/audit", "remote:link:amqp://other:5672");
+        assertThat(graph.edges()).extracting(FlowEdgeView::kind).contains(EdgeKind.ROUTE, EdgeKind.LINK);
     }
 
     @Test

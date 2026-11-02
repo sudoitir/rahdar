@@ -60,7 +60,13 @@ public class FlowStore {
         TEMPORARY_QUEUE(RouteClass.BINDING),
         QUEUE_FILTER(RouteClass.BINDING),
         DEAD_LETTER(RouteClass.FORWARD),
-        EXPIRY(RouteClass.FORWARD);
+        EXPIRY(RouteClass.FORWARD),
+        /** An exchange routing to a queue under a routing key (RabbitMQ). */
+        BINDING(RouteClass.BINDING),
+        /** An exchange routing to another exchange (RabbitMQ). */
+        EXCHANGE_BINDING(RouteClass.FORWARD),
+        SHOVEL(RouteClass.LINK),
+        FEDERATION(RouteClass.LINK);
 
         private final RouteClass routeClass;
 

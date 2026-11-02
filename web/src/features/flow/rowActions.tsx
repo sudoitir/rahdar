@@ -6,6 +6,7 @@ import type {
   DestinationTarget,
   ClientTarget,
   ConnectionTarget,
+  ResourceRef,
   RouteTarget,
   SubscriptionTarget,
 } from '../../kernel/actions/types.ts';
@@ -34,12 +35,21 @@ function ShowInFlow({
   );
 }
 
+/**
+ * What Flow names a resource by: its id without the kind, so a group on a topic (`billing/orders`) or a queue of a
+ * virtual host is found by the whole path, and a resource with one segment by its name.
+ */
+function flowName(target: ResourceRef): string {
+  const path = target.id.slice(target.kind.length + 1);
+  return path.includes('/') ? path : target.name;
+}
+
 export function SubscriptionInFlow({ clusterId, target }: Readonly<ActionProps<SubscriptionTarget>>) {
-  return <ShowInFlow clusterId={clusterId} focus={`subscription:${target.name}`} />;
+  return <ShowInFlow clusterId={clusterId} focus={`subscription:${flowName(target)}`} />;
 }
 
 export function DestinationInFlow({ clusterId, target }: Readonly<ActionProps<DestinationTarget>>) {
-  return <ShowInFlow clusterId={clusterId} focus={`destination:${target.name}`} />;
+  return <ShowInFlow clusterId={clusterId} focus={`destination:${flowName(target)}`} />;
 }
 
 export function ConnectionInFlow({ clusterId, target }: Readonly<ActionProps<ConnectionTarget>>) {

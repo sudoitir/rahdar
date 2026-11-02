@@ -65,4 +65,36 @@ public interface FlowSampler extends SystemExtension {
 
     /** Everything flow reads from one node. Broker I/O only. */
     FlowSample sample(UUID clusterId, UUID nodeId, int rowCap);
+
+    /**
+     * Whether one read answers for the whole cluster, whichever node it is asked through (Kafka, RabbitMQ). Flow
+     * then samples the cluster once, through its first node, instead of once per node, which would count every
+     * client as many times as there are nodes.
+     */
+    default boolean clusterWide() {
+        return false;
+    }
+
+    /**
+     * Whether a member carries a lifetime counter its rate can be taken from. A system without one has its
+     * members' rates shown as unavailable, never as zero.
+     */
+    default boolean memberCounters() {
+        return true;
+    }
+
+    /** Why producers are not shown, in words, or null when the system lists them. */
+    default String producersNote() {
+        return null;
+    }
+
+    /** What an operator changes so the user Rahdar connects with can list clients, or null when there is no snippet. */
+    default String accessSnippet() {
+        return null;
+    }
+
+    /** Whether addresses can be wildcards that match other addresses (Artemis), which the graph then joins. */
+    default boolean wildcardAddresses() {
+        return false;
+    }
 }
