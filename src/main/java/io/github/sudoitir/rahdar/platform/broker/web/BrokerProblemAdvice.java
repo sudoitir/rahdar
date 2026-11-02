@@ -104,7 +104,7 @@ class BrokerProblemAdvice {
         try {
             String id = nodes.system(UUID.fromString(m.group(1)));
             return id == null ? null : SYSTEM_NAMES.getOrDefault(id, id);
-        } catch (RuntimeException unknown) {
+        } catch (RuntimeException _) {
             return null;
         }
     }

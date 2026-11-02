@@ -74,7 +74,7 @@ class KafkaFlowSampler implements FlowSampler {
             }
             more |= page.continueToken().isPresent();
         }
-        long total = consumers.size() + (more ? 1 : 0);
+        long total = (long) consumers.size() + (more ? 1 : 0);
         return new FlowSample(List.of(), 0, consumers, total, List.of(), null, null);
     }
 

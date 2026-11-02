@@ -56,6 +56,12 @@ function pendingValue(entry: BrokerConfigEntry, edit: Edit | undefined): string 
   return `${entry.value || 'Not set'}${unit}`;
 }
 
+function currentValueWords(entry: BrokerConfigEntry | null): string {
+  const value = entry?.value || 'not set';
+  const unit = entry?.unit ? ` ${entry.unit}` : '';
+  return `Now ${value}${unit}.`;
+}
+
 function pendingWords(pending: number): string {
   if (pending === 0) return 'No changes yet';
   return `${pending} change${pending === 1 ? '' : 's'} to review`;
@@ -278,7 +284,7 @@ export function BrokerConfigView() {
           <Stack gap="sm">
             <TextInput
               label="New value"
-              description={`Now ${editing?.value || 'not set'}${editing?.unit ? ` ${editing.unit}` : ''}.`}
+              description={currentValueWords(editing)}
               value={draft}
               onChange={(e) => setDraft(e.currentTarget.value)}
               data-autofocus

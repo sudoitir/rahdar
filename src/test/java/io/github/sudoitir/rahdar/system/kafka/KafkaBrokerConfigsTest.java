@@ -160,8 +160,9 @@ class KafkaBrokerConfigsTest {
     void aSettingOnlyARestartChangesIsRefusedAsAConflictWithTheDriversWords() {
         when(operations.preview(any(), any(), any())).thenThrow(restartRequired());
 
-        assertThatThrownBy(() ->
-                        configs.preview(CLUSTER, "1", new ConfigChangeRequest(Map.of("node.id", "2"), null, null)))
+        ConfigChangeRequest request = new ConfigChangeRequest(Map.of("node.id", "2"), null, null);
+
+        assertThatThrownBy(() -> configs.preview(CLUSTER, "1", request))
                 .isInstanceOf(ConflictException.class)
                 .hasMessageContaining("node.id is read-only")
                 .hasCauseInstanceOf(BrokerException.class);
@@ -203,9 +204,9 @@ class KafkaBrokerConfigsTest {
         assertThatThrownBy(() -> changes.replay(params)).isInstanceOf(ConflictException.class);
         verify(audit).fail(any(), any());
 
-        assertThatThrownBy(() -> changes.replay(
-                        new BrokerConfigParams(CLUSTER, "default", Map.of("message.max.bytes", "2"), null, "other")))
-                .isInstanceOf(KafkaStaleException.class);
+        BrokerConfigParams other =
+                new BrokerConfigParams(CLUSTER, "default", Map.of("message.max.bytes", "2"), null, "other");
+        assertThatThrownBy(() -> changes.replay(other)).isInstanceOf(KafkaStaleException.class);
         verify(operations, times(1)).execute(any(ResourceId.class), any(Update.class), any(), any());
     }
 }

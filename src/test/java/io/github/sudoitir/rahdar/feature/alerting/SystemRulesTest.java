@@ -32,33 +32,27 @@ class SystemRulesTest {
     @ParameterizedTest
     @ValueSource(strings = {"kafka", "rabbitmq"})
     void anArtemisOnlyConditionIsRefusedOnAnotherSystemNamingIt(String system) {
-        assertThatThrownBy(() -> SystemRules.requireOn(system, state("SPLIT_BRAIN")))
+        AlertRuleEntity splitBrain = state("SPLIT_BRAIN");
+        AlertRuleEntity slowConsumers = AlertRuleEntity.threshold(
+                null, "r", new Condition(SlowConsumerCondition.METRIC, "LT", 1), 0, "WARNING", "QUEUE");
+
+        assertThatThrownBy(() -> SystemRules.requireOn(system, splitBrain))
                 .isInstanceOf(ConflictException.class)
                 .hasMessageContaining("SPLIT_BRAIN")
                 .hasMessageContaining(system.equals("kafka") ? "Kafka" : "RabbitMQ")
                 .hasMessageContaining("CLUSTER_DEGRADED");
-        assertThatThrownBy(() -> SystemRules.requireOn(
-                        system,
-                        AlertRuleEntity.threshold(
-                                null,
-                                "r",
-                                new Condition(SlowConsumerCondition.METRIC, "LT", 1),
-                                0,
-                                "WARNING",
-                                "QUEUE")))
-                .isInstanceOf(ConflictException.class);
+        assertThatThrownBy(() -> SystemRules.requireOn(system, slowConsumers)).isInstanceOf(ConflictException.class);
     }
 
     @ParameterizedTest
     @ValueSource(strings = {"kafka", "rabbitmq", "artemis"})
     void healthAndBacklogRulesWatchEverySystem(String system) {
-        assertThatCode(() -> SystemRules.requireOn(system, state("CLUSTER_DEGRADED")))
-                .doesNotThrowAnyException();
-        assertThatCode(() -> SystemRules.requireOn(
-                        system,
-                        AlertRuleEntity.threshold(
-                                null, "r", new Condition("BACKLOG", "GT", 1000), 0, "WARNING", "QUEUE")))
-                .doesNotThrowAnyException();
+        AlertRuleEntity degraded = state("CLUSTER_DEGRADED");
+        AlertRuleEntity backlog =
+                AlertRuleEntity.threshold(null, "r", new Condition("BACKLOG", "GT", 1000), 0, "WARNING", "QUEUE");
+
+        assertThatCode(() -> SystemRules.requireOn(system, degraded)).doesNotThrowAnyException();
+        assertThatCode(() -> SystemRules.requireOn(system, backlog)).doesNotThrowAnyException();
     }
 
     @Test

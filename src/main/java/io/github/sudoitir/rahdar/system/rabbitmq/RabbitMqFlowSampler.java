@@ -76,7 +76,7 @@ class RabbitMqFlowSampler implements FlowSampler {
         }
         List<FlowMember> consumers =
                 consumerRows.items().stream().map(c -> consumer(c, connections)).toList();
-        long total = consumers.size() + (consumerRows.truncated() ? 1 : 0);
+        long total = (long) consumers.size() + (consumerRows.truncated() ? 1 : 0);
 
         List<String> routingErrors = new ArrayList<>();
         List<FlowRoute> routes = new ArrayList<>();

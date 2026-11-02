@@ -20,6 +20,9 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 class BuiltinAlertRules {
 
+    private static final String CRITICAL = "CRITICAL";
+    private static final String WARNING = "WARNING";
+
     private final AlertRuleRepository rules;
     private final ClusterKinds clusterKinds;
 
@@ -27,15 +30,15 @@ class BuiltinAlertRules {
     void onClusterRegistered(ClusterRegistered event) {
         UUID clusterId = event.clusterId();
         if (!SystemRules.ARTEMIS.equals(clusterKinds.systemId(clusterId))) {
-            rules.save(AlertRuleEntity.state(clusterId, "Cluster degraded", "CLUSTER_DEGRADED", 60, "CRITICAL"));
+            rules.save(AlertRuleEntity.state(clusterId, "Cluster degraded", "CLUSTER_DEGRADED", 60, CRITICAL));
             return;
         }
-        rules.save(AlertRuleEntity.state(clusterId, "Split-brain", "SPLIT_BRAIN", 0, "CRITICAL"));
+        rules.save(AlertRuleEntity.state(clusterId, "Split-brain", "SPLIT_BRAIN", 0, CRITICAL));
         // Warning, not critical: a wrong clock does not stop the brokers, but it does
         // make Rahdar's own deadlines and latencies wrong, so it must not be silent
         // (ADR-0053). An ordinary rule like any other — editable and silenceable.
-        rules.save(AlertRuleEntity.state(clusterId, "Clock skew", "CLOCK_SKEW", 0, "WARNING"));
-        rules.save(AlertRuleEntity.state(clusterId, "Node down", "NODE_DOWN", 30, "CRITICAL"));
-        rules.save(AlertRuleEntity.state(clusterId, "Replication behind", "REPLICATION_BEHIND", 120, "WARNING"));
+        rules.save(AlertRuleEntity.state(clusterId, "Clock skew", "CLOCK_SKEW", 0, WARNING));
+        rules.save(AlertRuleEntity.state(clusterId, "Node down", "NODE_DOWN", 30, CRITICAL));
+        rules.save(AlertRuleEntity.state(clusterId, "Replication behind", "REPLICATION_BEHIND", 120, WARNING));
     }
 }

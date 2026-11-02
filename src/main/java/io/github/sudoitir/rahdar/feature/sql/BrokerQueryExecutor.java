@@ -14,6 +14,7 @@ import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
 import io.github.sudoitir.rahdar.platform.broker.BrokerMessages;
 import io.github.sudoitir.rahdar.platform.broker.BrowsePage;
 import io.github.sudoitir.rahdar.platform.broker.BrowsedMessage;
+import io.github.sudoitir.rahdar.platform.broker.LogBounds;
 import io.github.sudoitir.rahdar.platform.broker.LogPage;
 import io.github.sudoitir.rahdar.platform.broker.NodeCallLimiter;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
@@ -291,38 +292,8 @@ public class BrokerQueryExecutor {
                                     target.destination(),
                                     target.nodeName(),
                                     target.brokerNow())));
-            ResourceId source = ResourceId.parse(target.log());
-            boolean partitioned = logs.partitioned(clusterId);
-            int pages = 0;
             try {
-                for (var partition : logs.partitions(clusterId, source).entrySet()) {
-                    long offset = partition.getValue().start();
-                    while (offset < partition.getValue().end()) {
-                        if (sink.isCancelled()) {
-                            return read.outcome(NodeOutcome.Status.NOT_READ, "The query was abandoned.");
-                        }
-                        Bound stop = boundReached();
-                        if (stop != null || pages >= maxPagesPerTarget || rows.size() >= plan.effectiveLimit()) {
-                            if (stop != null) {
-                                recordBound(stop);
-                            }
-                            return read.outcome(NodeOutcome.Status.ANSWERED, null);
-                        }
-                        LogPage page = logs.page(clusterId, source, partition.getKey(), offset, PAGE_SIZE);
-                        scan(
-                                read,
-                                page.records().stream()
-                                        .map(r -> partitioned
-                                                ? r.message().withLongProperty("partition", partition.getKey())
-                                                : r.message())
-                                        .toList());
-                        pages++;
-                        if (page.next() == null || page.records().isEmpty()) {
-                            break;
-                        }
-                        offset = page.next();
-                    }
-                }
+                return scanLog(read, ResourceId.parse(target.log()));
             } catch (BrokerConnectionException e) {
                 return read.outcome(NodeOutcome.Status.FAILED, e.getMessage());
             } catch (RuntimeException e) {
@@ -331,7 +302,59 @@ public class BrokerQueryExecutor {
                         NodeOutcome.Status.FAILED,
                         e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage());
             }
+        }
+
+        private NodeOutcome scanLog(TargetRead read, ResourceId source) {
+            boolean partitioned = logs.partitioned(clusterId);
+            int pages = 0;
+            for (var partition : logs.partitions(clusterId, source).entrySet()) {
+                PartitionScan scanned = scanPartition(read, source, partition, partitioned, pages);
+                if (scanned.ended() != null) {
+                    return scanned.ended();
+                }
+                pages = scanned.pages();
+            }
             return read.outcome(NodeOutcome.Status.ANSWERED, null);
+        }
+
+        /** Where a partition's scan stopped: the pages read so far, and the outcome when the whole target ended. */
+        private record PartitionScan(int pages, NodeOutcome ended) {}
+
+        private PartitionScan scanPartition(
+                TargetRead read,
+                ResourceId source,
+                Map.Entry<Integer, LogBounds.Bounds> partition,
+                boolean partitioned,
+                int pagesRead) {
+            int pages = pagesRead;
+            long offset = partition.getValue().start();
+            while (offset < partition.getValue().end()) {
+                if (sink.isCancelled()) {
+                    return new PartitionScan(
+                            pages, read.outcome(NodeOutcome.Status.NOT_READ, "The query was abandoned."));
+                }
+                Bound stop = boundReached();
+                if (stop != null || pages >= maxPagesPerTarget || rows.size() >= plan.effectiveLimit()) {
+                    if (stop != null) {
+                        recordBound(stop);
+                    }
+                    return new PartitionScan(pages, read.outcome(NodeOutcome.Status.ANSWERED, null));
+                }
+                LogPage page = logs.page(clusterId, source, partition.getKey(), offset, PAGE_SIZE);
+                scan(
+                        read,
+                        page.records().stream()
+                                .map(r -> partitioned
+                                        ? r.message().withLongProperty("partition", partition.getKey())
+                                        : r.message())
+                                .toList());
+                pages++;
+                if (page.next() == null || page.records().isEmpty()) {
+                    break;
+                }
+                offset = page.next();
+            }
+            return new PartitionScan(pages, null);
         }
 
         /** A page of one target, or the outcome that ends the target because it could not be read. */

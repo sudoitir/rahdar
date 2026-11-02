@@ -1,5 +1,6 @@
 import { Button, Checkbox, MultiSelect, NumberInput, Select, Text, TextInput } from '@mantine/core';
 import { useForm } from '@mantine/form';
+import type { ReactNode } from 'react';
 
 import { focusFirstInvalid } from '../../ui/formErrors.ts';
 
@@ -118,6 +119,53 @@ function TemplateLinks({
   );
 }
 
+function Note({ children }: Readonly<{ children: ReactNode }>) {
+  return (
+    <Text size="xs" c="dimmed" className={`${classes.wide} ${classes.help}`}>
+      {children}
+    </Text>
+  );
+}
+
+/** What backlog means on a system whose brokers are not Artemis. */
+function backlogNote(system: string): string {
+  if (system === 'kafka') {
+    return 'On Kafka the backlog is a consumer group’s lag on a topic: the records written that the group has not committed.';
+  }
+  return `On ${systemName(system)} the backlog is the messages ready in a queue, waiting for a consumer.`;
+}
+
+/** The explanations under the form's fields: what the chosen system, metric or plugin metric really watches. */
+function RuleNotes({
+  kind,
+  limited,
+  system,
+  metric,
+  pluginMetric,
+}: Readonly<{
+  kind: 'METRIC_THRESHOLD' | 'STATE';
+  limited: boolean;
+  system: string | undefined;
+  metric: string | null;
+  pluginMetric: PluginMetricView | undefined;
+}>) {
+  const metricRule = kind === 'METRIC_THRESHOLD';
+  const metricNote = metric ? METRIC_NOTES[metric] : undefined;
+  return (
+    <>
+      {limited ? <Note>{artemisOnlyNote(system ?? '')}</Note> : null}
+      {metricRule && limited && metric === 'openbroker.backlog' ? <Note>{backlogNote(system ?? '')}</Note> : null}
+      {metricNote ? <Note>{metricNote}</Note> : null}
+      {metricRule && pluginMetric ? (
+        <Note>
+          {pluginMetric.description} Published by the {pluginMetric.plugin} plugin and sampled on every subscription
+          scrape; the rule fires per {pluginMetric.subject}.
+        </Note>
+      ) : null}
+    </>
+  );
+}
+
 type RuleDraft = {
   name: string;
   kind: 'METRIC_THRESHOLD' | 'STATE';
@@ -213,31 +261,11 @@ export function RuleForm({
    * is created on cluster registration, because a meaningful threshold is
    * workload-specific and any shipped value would be wrong for most deployments.
    */
-  const applySlowConsumerTemplate = () =>
-    form.setValues({
-      name: SLOW_CONSUMER_TEMPLATE.name,
-      metric: SLOW_CONSUMER_TEMPLATE.metric,
-      comparator: SLOW_CONSUMER_TEMPLATE.comparator,
-      threshold: SLOW_CONSUMER_TEMPLATE.threshold,
-      forSeconds: SLOW_CONSUMER_TEMPLATE.forSeconds,
-      severity: SLOW_CONSUMER_TEMPLATE.severity,
-    });
+  const applySlowConsumerTemplate = () => form.setValues(SLOW_CONSUMER_TEMPLATE);
 
-  const applyConfigDriftTemplate = () =>
-    form.setValues({
-      name: CONFIG_DRIFT_TEMPLATE.name,
-      stateCondition: CONFIG_DRIFT_TEMPLATE.stateCondition,
-      forSeconds: CONFIG_DRIFT_TEMPLATE.forSeconds,
-      severity: CONFIG_DRIFT_TEMPLATE.severity,
-    });
+  const applyConfigDriftTemplate = () => form.setValues(CONFIG_DRIFT_TEMPLATE);
 
-  const applySetupRiskTemplate = () =>
-    form.setValues({
-      name: SETUP_RISK_TEMPLATE.name,
-      stateCondition: SETUP_RISK_TEMPLATE.stateCondition,
-      forSeconds: SETUP_RISK_TEMPLATE.forSeconds,
-      severity: SETUP_RISK_TEMPLATE.severity,
-    });
+  const applySetupRiskTemplate = () => form.setValues(SETUP_RISK_TEMPLATE);
 
   const applyBacklogTemplate = () => {
     const backlog = system ? BACKLOG_TEMPLATES[system] : undefined;
@@ -252,13 +280,7 @@ export function RuleForm({
     });
   };
 
-  const applyClusterDegradedTemplate = () =>
-    form.setValues({
-      name: CLUSTER_DEGRADED_TEMPLATE.name,
-      stateCondition: CLUSTER_DEGRADED_TEMPLATE.stateCondition,
-      forSeconds: CLUSTER_DEGRADED_TEMPLATE.forSeconds,
-      severity: CLUSTER_DEGRADED_TEMPLATE.severity,
-    });
+  const applyClusterDegradedTemplate = () => form.setValues(CLUSTER_DEGRADED_TEMPLATE);
 
   const pluginMetric = pluginMetrics.find((m) => m.metric === metric);
   const limited = system !== undefined && system !== 'artemis' && !installation;
@@ -325,29 +347,7 @@ export function RuleForm({
             disabled={channels.length === 0}
           />
 
-          {limited ? (
-            <Text size="xs" c="dimmed" className={`${classes.wide} ${classes.help}`}>
-              {artemisOnlyNote(system ?? '')}
-            </Text>
-          ) : null}
-          {kind === 'METRIC_THRESHOLD' && limited && metric === 'openbroker.backlog' ? (
-            <Text size="xs" c="dimmed" className={`${classes.wide} ${classes.help}`}>
-              {system === 'kafka'
-                ? 'On Kafka the backlog is a consumer group’s lag on a topic: the records written that the group has not committed.'
-                : `On ${systemName(system ?? '')} the backlog is the messages ready in a queue, waiting for a consumer.`}
-            </Text>
-          ) : null}
-          {metric && METRIC_NOTES[metric] ? (
-            <Text size="xs" c="dimmed" className={`${classes.wide} ${classes.help}`}>
-              {METRIC_NOTES[metric]}
-            </Text>
-          ) : null}
-          {kind === 'METRIC_THRESHOLD' && pluginMetric ? (
-            <Text size="xs" c="dimmed" className={`${classes.wide} ${classes.help}`}>
-              {pluginMetric.description} Published by the {pluginMetric.plugin} plugin and sampled on every subscription
-              scrape; the rule fires per {pluginMetric.subject}.
-            </Text>
-          ) : null}
+          <RuleNotes kind={kind} limited={limited} system={system} metric={metric} pluginMetric={pluginMetric} />
 
           <div className={`${classes.wide} ${classes.actions}`}>
             <Checkbox label="Enabled" {...form.getInputProps('enabled', { type: 'checkbox' })} />

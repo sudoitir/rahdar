@@ -226,8 +226,9 @@ class LogQueryTest {
                         "RabbitMQ can browse only streams; classic and quorum queues can only be"
                                 + " consumed, which would take the messages."));
         QueryPlanner planner = planner(props(50_000));
+        var query = parser.parse("SELECT * FROM jobs");
 
-        assertThatThrownBy(() -> planner.plan(CLUSTER, parser.parse("SELECT * FROM jobs")))
+        assertThatThrownBy(() -> planner.plan(CLUSTER, query))
                 .isInstanceOf(ConflictException.class)
                 .hasMessageContaining("can browse only streams");
     }

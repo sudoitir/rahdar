@@ -254,9 +254,8 @@ public class ClientSampler {
             Reading reading = m.kind() == Kind.PRODUCE
                     ? result.producerReadings().get(p++)
                     : result.consumerReadings().get(c++);
-            MemberRate rate = result.counters()
-                    ? (m.kind() == Kind.PRODUCE ? producerRates : consumerRates).get(reading.memberId())
-                    : null;
+            Map<String, MemberRate> rates = m.kind() == Kind.PRODUCE ? producerRates : consumerRates;
+            MemberRate rate = result.counters() ? rates.get(reading.memberId()) : null;
             rated.add(new Member(
                     m.kind(),
                     m.clientId(),

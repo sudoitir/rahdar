@@ -90,8 +90,7 @@ class ClientSamplerTest {
         UUID first = UUID.randomUUID();
         UUID second = UUID.randomUUID();
         serving(node(first, "a", null, null, null), node(second, "b", null, null, null));
-        when(extensions.forCluster(eq(clusterId), eq(FlowSampler.class)))
-                .thenReturn(java.util.Optional.of(flowSampler));
+        when(extensions.forCluster(clusterId, FlowSampler.class)).thenReturn(java.util.Optional.of(flowSampler));
         when(flowSampler.clusterWide()).thenReturn(true);
         when(flowSampler.memberCounters()).thenReturn(false);
         when(flowSampler.sample(eq(clusterId), any(UUID.class), anyInt())).thenAnswer(inv -> stable());

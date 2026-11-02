@@ -149,7 +149,7 @@ public class FlowGraphService {
         drawHops(routing.hops.values(), names.byArtemisId(), fresh, drawing);
         drawBindings(routing.bindings, drawing);
         drawExchangeBindings(routing.exchangeBindings.values(), sampledNodes, drawing);
-        drawLinks(routing.links.values(), sampledNodes, fresh, drawing);
+        drawLinks(routing.links.values(), sampledNodes, drawing);
         List<String> assumptions = new ArrayList<>();
         if (sampler != null && sampler.wildcardAddresses()) {
             assumptions.addAll(drawWildcards(drawing));
@@ -883,8 +883,7 @@ public class FlowGraphService {
                         destinationId(r.source()),
                         subscriptionId(r.target()),
                         r.filter(),
-                        null,
-                        null,
+                        Presence.NONE,
                         List.of()));
             }
         }
@@ -901,8 +900,7 @@ public class FlowGraphService {
                         destinationId(r.source()),
                         destinationId(r.target()),
                         r.filter(),
-                        b.nodes.size(),
-                        sampledNodes,
+                        new Presence(b.nodes.size(), sampledNodes),
                         b.nodes.size() < sampledNodes ? List.of(Fault.PARTIAL_PRESENCE) : List.of()));
             }
         }
@@ -912,7 +910,7 @@ public class FlowGraphService {
      * Shovels and federation links between a shown queue or exchange and another one or another broker. An end
      * that is not shown is drawn as a link target by its name, so the operator sees where messages go or come from.
      */
-    private static void drawLinks(Collection<RoutingAgg> links, int sampledNodes, Fresh fresh, Drawing drawing) {
+    private static void drawLinks(Collection<RoutingAgg> links, int sampledNodes, Drawing drawing) {
         for (RoutingAgg l : links) {
             Route r = l.route;
             String source = shownEnd(r.source(), drawing);
@@ -935,8 +933,7 @@ public class FlowGraphService {
                     from,
                     to,
                     r.filter(),
-                    l.nodes.size(),
-                    sampledNodes,
+                    new Presence(l.nodes.size(), sampledNodes),
                     List.copyOf(faults)));
         }
     }
@@ -975,8 +972,7 @@ public class FlowGraphService {
             String source,
             String target,
             String filter,
-            Integer presentOn,
-            Integer presentOf,
+            Presence presence,
             List<Fault> faults) {
         return new FlowEdgeView(
                 id,
@@ -994,8 +990,8 @@ public class FlowGraphService {
                 filter,
                 null,
                 false,
-                presentOn,
-                presentOf,
+                presence.on(),
+                presence.of(),
                 false,
                 faults);
     }
@@ -1481,6 +1477,11 @@ public class FlowGraphService {
 
     private record NodeNames(Map<UUID, String> byId, Map<String, String> byArtemisId) {}
 
+    /** On how many of the sampled nodes an edge was seen; null counts when the system keeps no such count. */
+    private record Presence(Integer on, Integer of) {
+        static final Presence NONE = new Presence(null, null);
+    }
+
     private record Selection(List<Path> chosen, FlowFocusView focusView, boolean limited) {}
 
     /** The store-and-forward hops, diverts, bridges and failure addresses the routes add up to. */
@@ -1500,11 +1501,7 @@ public class FlowGraphService {
                 case STORE_AND_FORWARD -> addHop(stored, nodeName, layers);
                 case DIVERT -> addDivert(stored, layers, capture);
                 case BRIDGE -> addBridge(stored, layers);
-                case BINDING -> {
-                    if (layers.contains(Layer.ROUTES)) {
-                        bindings.add(r);
-                    }
-                }
+                case BINDING -> addBinding(r, layers);
                 case EXCHANGE_BINDING -> addTo(exchangeBindings, stored, layers, r.filter());
                 case SHOVEL, FEDERATION -> addTo(links, stored, layers, r.kind());
                 case DEAD_LETTER -> deadLetter = r.target();
@@ -1512,6 +1509,12 @@ public class FlowGraphService {
                 default -> {
                     // Temporary and filtered queues are read separately.
                 }
+            }
+        }
+
+        private void addBinding(Route r, Set<Layer> layers) {
+            if (layers.contains(Layer.ROUTES)) {
+                bindings.add(r);
             }
         }
 
