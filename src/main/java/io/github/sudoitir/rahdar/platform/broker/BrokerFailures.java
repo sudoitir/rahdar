@@ -72,12 +72,15 @@ public final class BrokerFailures {
             case ErrorReasons.CREDENTIALS_REJECTED ->
                 BrokerConnectionException.credentialsRejected(account(metadata), e.getMessage(), e, system);
             case ErrorReasons.NOT_AUTHORIZED -> connection(BrokerConnectionException.Kind.NOT_AUTHORIZED, e);
-            // Only an Artemis agent can be the wrong system: Kafka and RabbitMQ answered, just not in a way known.
+            // A RabbitMQ address that answers as something else is a wrong address; Kafka answered with an error
+            // Rahdar does not map. Only an Artemis agent without a broker is "not Artemis".
             case ErrorReasons.UNEXPECTED_SYSTEM ->
                 connection(
-                        system == null || ARTEMIS.equals(system)
-                                ? BrokerConnectionException.Kind.NOT_ARTEMIS
-                                : BrokerConnectionException.Kind.BAD_RESPONSE,
+                        switch (system == null ? ARTEMIS : system) {
+                            case RABBITMQ -> BrokerConnectionException.Kind.WRONG_PATH;
+                            case KAFKA -> BrokerConnectionException.Kind.BAD_RESPONSE;
+                            default -> BrokerConnectionException.Kind.NOT_ARTEMIS;
+                        },
                         e);
             case ErrorReasons.ENDPOINT_NOT_FOUND -> connection(BrokerConnectionException.Kind.WRONG_PATH, e);
             case ErrorReasons.TLS_HANDSHAKE_FAILED -> connection(BrokerConnectionException.Kind.TLS_FAILED, e);

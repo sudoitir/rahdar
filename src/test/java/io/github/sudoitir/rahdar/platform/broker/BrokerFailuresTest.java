@@ -64,7 +64,7 @@ class BrokerFailuresTest {
         BrokerConnectionException connection = (BrokerConnectionException) BrokerFailures.translate(
                 failure(ErrorReasons.UNEXPECTED_SYSTEM, Map.of("rabbitmq.http_status", "500")));
 
-        assertThat(connection.kind()).isEqualTo(BrokerConnectionException.Kind.BAD_RESPONSE);
+        assertThat(connection.kind()).isEqualTo(BrokerConnectionException.Kind.WRONG_PATH);
         assertThat(connection.system()).isEqualTo("RabbitMQ");
     }
 
