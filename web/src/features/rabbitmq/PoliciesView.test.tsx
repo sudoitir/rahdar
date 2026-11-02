@@ -52,6 +52,20 @@ describe('the policies', () => {
     expect(within(grid).queryByRole('button', { name: 'Clear policy op' })).not.toBeInTheDocument();
   });
 
+  it('reads a virtual host the broker does not know as an empty list, not a failure', async () => {
+    mockRabbitMqCluster();
+    server.use(
+      http.get(BASE, () =>
+        HttpResponse.json(
+          { title: 'Resource not found', status: 404, type: 'https://rahdar.dev/problems/not-found' },
+          { status: 404 },
+        ),
+      ),
+    );
+    renderAppAt('/clusters/r1/rabbitmq/policies?vhost=nowhere');
+    expect(await screen.findByText('No policies')).toBeInTheDocument();
+  });
+
   it('says there is none', async () => {
     serve([]);
     renderAppAt('/clusters/r1/rabbitmq/policies');
