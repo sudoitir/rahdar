@@ -86,14 +86,7 @@ public class ResourceViewMapper {
                 id.format(),
                 kind.value(),
                 label(connection, kind),
-                // The group or queue is what a team owns, so it is the name; the destination says which topic. A queue
-                // in a
-                // virtual host is named by the queue, not the host.
-                path == null
-                        ? key.name()
-                        : ResourceIds.inNamespace(connection, id)
-                                ? id.name()
-                                : id.path().segments().getFirst(),
+                ownerName(connection, id, key, path),
                 key.destination() == null
                         ? null
                         : ResourceId.of(kinds.destination().value(), key.destination())
@@ -113,6 +106,19 @@ public class ResourceViewMapper {
                 cells,
                 List.of(),
                 null);
+    }
+
+    /**
+     * The group or queue is what a team owns, so it is the name; the destination says which topic. A queue in a
+     * namespace is named by the queue, not the namespace.
+     */
+    private static String ownerName(ClusterConnection connection, ResourceId id, SubscriptionKey key, String path) {
+        if (path == null) {
+            return key.name();
+        }
+        return ResourceIds.inNamespace(connection, id)
+                ? id.name()
+                : id.path().segments().getFirst();
     }
 
     /**

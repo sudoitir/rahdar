@@ -17,6 +17,7 @@ import io.github.sudoitir.rahdar.kernel.security.ResourceIdTexts;
 import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
 import io.github.sudoitir.rahdar.platform.broker.BrokerSystems;
 import io.github.sudoitir.rahdar.platform.broker.SystemExtensions;
+import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.KindView;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -59,7 +60,7 @@ class ClusterKindsTest {
                 kind("kafka.group", ResourceClass.SUBSCRIPTION, KindLabel.of("Consumer group", "Consumer groups")));
 
         assertThat(kinds.kindsOf(CLUSTER))
-                .extracting(k -> k.label())
+                .extracting(KindView::label)
                 .containsExactly(new KindName("Topic", "Topics"), new KindName("Consumer group", "Consumer groups"));
     }
 

@@ -74,7 +74,7 @@ function WithSubscription({
   const { subscription, isPending, isError, error } = useSubscription(clusterId, target.id, target.snapshot);
   const [ready, setReady] = useState(false);
   useEffect(() => {
-    if (!subscription || !opened) return;
+    if (!subscription || !opened) return undefined;
     const frame = requestAnimationFrame(() => setReady(true));
     return () => cancelAnimationFrame(frame);
   }, [subscription, opened]);

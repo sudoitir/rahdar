@@ -184,7 +184,7 @@ function PolicyDialog({
     validate: {
       vhost: (v) => (v.trim() ? null : 'Enter the virtual host.'),
       name: (v) => (v.trim() ? null : 'Enter the name of the policy.'),
-      pattern: (v) => (v ? null : 'Enter a regular expression over the names, such as ^orders\\.'),
+      pattern: (v) => (v ? null : String.raw`Enter a regular expression over the names, such as ^orders\.`),
       definition: {
         key: (v) => (v.trim() ? null : 'Name the setting, or remove the row.'),
         value: (v) => (isJson(v) ? null : 'Write the value as JSON, such as 1000 or "reject-publish".'),
@@ -332,6 +332,9 @@ function Matches({ preview }: Readonly<{ preview: PolicyPreview }>) {
   );
 }
 
+/** The extra the change dialogs show under a policy preview, a stable function so the dialogs do not redefine it. */
+const matchesOf = (preview: PolicyPreview) => <Matches preview={preview} />;
+
 /**
  * The policies of a RabbitMQ cluster. Setting or clearing one is previewed with the names it reaches, as Rahdar
  * matches them and with those a policy of higher priority wins; clearing is held. Operator policies are listed only.
@@ -428,7 +431,7 @@ export function PoliciesView() {
         action={SET}
         confirmLabel="Set the policy"
         subject={`policy "${chosen?.name ?? ''}"`}
-        extra={(preview) => <Matches preview={preview} />}
+        extra={matchesOf}
       />
       <ChangeDialog
         change={clear}
@@ -437,7 +440,7 @@ export function PoliciesView() {
         confirmLabel="Clear 1 policy"
         destructive
         subject={`policy "${cleared?.name ?? ''}"`}
-        extra={(preview) => <Matches preview={preview} />}
+        extra={matchesOf}
       />
     </Page>
   );

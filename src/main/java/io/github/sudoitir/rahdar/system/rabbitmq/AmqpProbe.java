@@ -5,7 +5,6 @@ import java.net.ConnectException;
 import java.net.InetSocketAddress;
 import java.net.NoRouteToHostException;
 import java.net.Socket;
-import java.net.SocketTimeoutException;
 import java.net.UnknownHostException;
 import java.time.Duration;
 import java.util.Optional;
@@ -31,20 +30,25 @@ interface AmqpProbe {
         @Override
         public Optional<String> unreachable(String hostAndPort) {
             int colon = hostAndPort.lastIndexOf(':');
-            String host = hostAndPort.substring(0, colon).replaceAll("^\\[|]$", "");
+            String host = unbracketed(hostAndPort.substring(0, colon));
             try (Socket socket = new Socket()) {
                 socket.connect(new InetSocketAddress(host, Integer.parseInt(hostAndPort.substring(colon + 1))), (int)
                         CONNECT_WAIT.toMillis());
                 return Optional.empty();
             } catch (UnknownHostException _) {
                 return Optional.of("DNS");
-            } catch (SocketTimeoutException _) {
-                return Optional.of("TIMEOUT");
             } catch (ConnectException | NoRouteToHostException _) {
                 return Optional.of("REFUSED");
             } catch (IOException | RuntimeException _) {
+                // A timeout, and anything else that stops the socket, is told as a timeout.
                 return Optional.of("TIMEOUT");
             }
+        }
+
+        /** An IPv6 literal without the brackets that wrap it in an address. */
+        private static String unbracketed(String host) {
+            String start = host.startsWith("[") ? host.substring(1) : host;
+            return start.endsWith("]") ? start.substring(0, start.length() - 1) : start;
         }
     }
 }

@@ -297,8 +297,8 @@ class QueueLifecycleServiceWholeClusterTest {
                 .thenReturn(preview(Count.exact(2), "message", EtagBasis.INCARNATION));
         when(driver.execute(eq(QUEUE), any(), any(), any())).thenThrow(refused(ErrorReasons.PRECONDITION_FAILED));
 
-        assertThatThrownBy(() -> lifecycle.deleteQueue(
-                        CLUSTER, new Target(QUEUE, ResourceClass.SUBSCRIPTION), false, false, false))
+        var target = new Target(QUEUE, ResourceClass.SUBSCRIPTION);
+        assertThatThrownBy(() -> lifecycle.deleteQueue(CLUSTER, target, false, false, false))
                 .isInstanceOf(StalePreviewException.class);
         verify(audit).fail(eq(event), any());
     }
@@ -308,8 +308,8 @@ class QueueLifecycleServiceWholeClusterTest {
         when(driver.preview(eq(QUEUE), any(), any()))
                 .thenReturn(preview(Count.exact(CAP + 1L), "message", EtagBasis.INCARNATION));
 
-        assertThatThrownBy(() -> lifecycle.deleteQueue(
-                        CLUSTER, new Target(QUEUE, ResourceClass.SUBSCRIPTION), false, false, false))
+        var target = new Target(QUEUE, ResourceClass.SUBSCRIPTION);
+        assertThatThrownBy(() -> lifecycle.deleteQueue(CLUSTER, target, false, false, false))
                 .isInstanceOf(BulkCapExceededException.class);
         verify(driver, never()).execute(any(), any(), any(), any());
 

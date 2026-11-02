@@ -85,9 +85,10 @@ class RabbitMqChangesTest {
     void aChangeWhoseEtagIsNotThePreviewsNeverReachesTheGate() {
         when(ops.preview(eq(CLUSTER), any(), any(), any())).thenReturn(preview("etag-2", 0));
 
-        assertThatThrownBy(() -> changes.apply(new NamespaceCreate(CLUSTER, VHOST, Map.of(), ETAG)))
-                .isInstanceOf(StalePreviewException.class);
-        assertThatThrownBy(() -> changes.apply(new NamespaceCreate(CLUSTER, VHOST, Map.of(), null)))
+        var namespaceCreate = new NamespaceCreate(CLUSTER, VHOST, Map.of(), ETAG);
+        assertThatThrownBy(() -> changes.apply(namespaceCreate)).isInstanceOf(StalePreviewException.class);
+        var namespaceCreate2 = new NamespaceCreate(CLUSTER, VHOST, Map.of(), null);
+        assertThatThrownBy(() -> changes.apply(namespaceCreate2))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Preview first");
 
@@ -144,8 +145,9 @@ class RabbitMqChangesTest {
 
         assertThat(created.id()).isEqualTo(queue.format());
         verify(ops).execute(CLUSTER, queue, Verb.CREATE, Map.of(), null);
+        Map<String, Object> entries = Map.of();
         assertThatThrownBy(
-                        () -> changes.create(CLUSTER, queue, Map.of(), "stale", "CREATE_SUBSCRIPTION", "SUBSCRIPTION"))
+                        () -> changes.create(CLUSTER, queue, entries, "stale", "CREATE_SUBSCRIPTION", "SUBSCRIPTION"))
                 .isInstanceOf(StalePreviewException.class);
     }
 

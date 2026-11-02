@@ -15,6 +15,7 @@ public final class RabbitMqMcpToolDefs {
     private static final String CURSOR = "cursor";
 
     private static final String VHOST = "vhost";
+    private static final String VHOST_NAME = "A virtual host's name.";
 
     private static final String NEXT = "The next value of the previous page; absent for the first.";
 
@@ -27,7 +28,7 @@ public final class RabbitMqMcpToolDefs {
             read(
                     "rabbitmq_list_bindings",
                     "A page of a RabbitMQ cluster's bindings, filtered by virtual host, source or destination.",
-                    Param.note(VHOST, "A virtual host's name."),
+                    Param.note(VHOST, VHOST_NAME),
                     Param.note("source", "The exchange the binding starts at."),
                     Param.note("destination", "The queue or exchange the binding ends at."),
                     Param.note(CURSOR, NEXT)),
@@ -35,19 +36,19 @@ public final class RabbitMqMcpToolDefs {
                     "rabbitmq_list_policies",
                     "A page of a RabbitMQ cluster's policies with their pattern, settings and how many queues and"
                             + " exchanges they match now.",
-                    Param.note(VHOST, "A virtual host's name."),
+                    Param.note(VHOST, VHOST_NAME),
                     Param.note(CURSOR, NEXT)),
             read(
                     "rabbitmq_list_permissions",
                     "A page of a RabbitMQ cluster's users' permissions on its virtual hosts.",
-                    Param.note(VHOST, "A virtual host's name."),
+                    Param.note(VHOST, VHOST_NAME),
                     Param.note("user", "A user's name."),
                     Param.note(CURSOR, NEXT)),
             read(
                     "rabbitmq_list_shovels",
                     "A RabbitMQ cluster's shovels and federation links; their addresses never carry a credential.",
                     Param.values("kind", List.of("shovel", "federation"), "Omit for the first page of both."),
-                    Param.note(VHOST, "A virtual host's name."),
+                    Param.note(VHOST, VHOST_NAME),
                     Param.note(CURSOR, "As above; it pages the one kind named in kind.")));
 
     private RabbitMqMcpToolDefs() {}

@@ -40,6 +40,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -347,7 +348,7 @@ class RabbitMqScrape implements ClusterScrape {
         return queue.placements().stream()
                 .filter(p -> p.role() == PlacementRole.LEADER || p.role() == PlacementRole.INSTANCE)
                 .map(p -> byNode.get(p.node().value()))
-                .filter(node -> node != null)
+                .filter(Objects::nonNull)
                 .findFirst()
                 .orElse(first);
     }

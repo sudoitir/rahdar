@@ -324,7 +324,8 @@ class KafkaRegistrar implements ClusterRegistrar {
                 null,
                 null,
                 null,
-                Map.of());
+                Map.of(),
+                null);
         return new Checked(view, scan.reached);
     }
 
@@ -617,7 +618,8 @@ class KafkaRegistrar implements ClusterRegistrar {
                 new Failure(cause, message, next),
                 null,
                 null,
-                Map.of());
+                Map.of(),
+                null);
     }
 
     private static String nextStep(String cause) {

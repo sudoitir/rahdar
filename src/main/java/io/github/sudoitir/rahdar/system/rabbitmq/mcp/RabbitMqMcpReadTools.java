@@ -38,7 +38,7 @@ public class RabbitMqMcpReadTools {
     private final RabbitMqPolicies policies;
     private final RabbitMqAccessRules permissions;
     private final RabbitMqShovels shovels;
-    private final RabbitMqFederation federation;
+    private final RabbitMqFederation federationLinks;
 
     @McpTool(
             name = "rabbitmq_nodes",
@@ -156,11 +156,11 @@ public class RabbitMqMcpReadTools {
                 return RabbitMqMcpViews.shovels(shovels.list(id, vhost, cursor, size));
             }
             if (FEDERATION.equals(which)) {
-                return RabbitMqMcpViews.federation(federation.list(id, vhost, cursor, size));
+                return RabbitMqMcpViews.federation(federationLinks.list(id, vhost, cursor, size));
             }
             return new Links(
                     RabbitMqMcpViews.shovels(shovels.list(id, vhost, null, size)),
-                    RabbitMqMcpViews.federation(federation.list(id, vhost, null, size)));
+                    RabbitMqMcpViews.federation(federationLinks.list(id, vhost, null, size)));
         });
     }
 }

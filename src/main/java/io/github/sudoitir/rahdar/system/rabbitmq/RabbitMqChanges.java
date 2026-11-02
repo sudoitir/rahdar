@@ -30,11 +30,13 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class RabbitMqChanges {
 
+    private static final String NAMESPACE = "NAMESPACE";
+
     /** Which gated operation a change is, and how it is audited. */
     public enum Type {
-        NAMESPACE_CREATE("namespace.create", "CREATE_NAMESPACE", "NAMESPACE", Verb.CREATE, "Create"),
-        NAMESPACE_UPDATE("namespace.update", "UPDATE_NAMESPACE", "NAMESPACE", Verb.UPDATE, "Change"),
-        NAMESPACE_DELETE("namespace.delete", "DELETE_NAMESPACE", "NAMESPACE", Verb.DELETE, "Delete"),
+        NAMESPACE_CREATE("namespace.create", "CREATE_NAMESPACE", NAMESPACE, Verb.CREATE, "Create"),
+        NAMESPACE_UPDATE("namespace.update", "UPDATE_NAMESPACE", NAMESPACE, Verb.UPDATE, "Change"),
+        NAMESPACE_DELETE("namespace.delete", "DELETE_NAMESPACE", NAMESPACE, Verb.DELETE, "Delete"),
         ROUTE_CREATE("route.create", "CREATE_ROUTE", "ROUTE", Verb.CREATE, "Create"),
         ROUTE_DELETE("route.delete", "DELETE_ROUTE", "ROUTE", Verb.DELETE, "Delete"),
         POLICY_SET("policy.set", "SET_POLICY", "POLICY", Verb.CREATE, "Set"),

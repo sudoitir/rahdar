@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { Button, NumberInput, Select, TextInput } from '@mantine/core';
 import { useForm } from '@mantine/form';
 
@@ -48,28 +49,32 @@ export function PartitionControls({
       }),
     focusFirstInvalid(form.getInputNode),
   );
+  let partitionField: ReactNode = null;
+  if (partitions !== 1) {
+    partitionField = partitions ? (
+      <Select
+        size="xs"
+        w="7rem"
+        label="Partition"
+        allowDeselect={false}
+        data={Array.from({ length: partitions }, (_, i) => String(i))}
+        value={String(form.values.partition)}
+        onChange={(v) => form.setFieldValue('partition', Number(v ?? 0))}
+      />
+    ) : (
+      <NumberInput
+        size="xs"
+        w="7rem"
+        label="Partition"
+        min={0}
+        allowDecimal={false}
+        {...form.getInputProps('partition')}
+      />
+    );
+  }
   return (
     <form noValidate onSubmit={submit} style={{ display: 'contents' }}>
-      {partitions === 1 ? null : partitions ? (
-        <Select
-          size="xs"
-          w="7rem"
-          label="Partition"
-          allowDeselect={false}
-          data={Array.from({ length: partitions }, (_, i) => String(i))}
-          value={String(form.values.partition)}
-          onChange={(v) => form.setFieldValue('partition', Number(v ?? 0))}
-        />
-      ) : (
-        <NumberInput
-          size="xs"
-          w="7rem"
-          label="Partition"
-          min={0}
-          allowDecimal={false}
-          {...form.getInputProps('partition')}
-        />
-      )}
+      {partitionField}
       <Select
         size="xs"
         w="13rem"

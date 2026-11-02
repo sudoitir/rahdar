@@ -9,7 +9,7 @@ export interface ArgumentRow {
 export const newArgument = (): ArgumentRow => ({ id: randomId(), k: '', v: '' });
 
 /** An argument's value as the broker takes it: a number or a flag when it reads as one, else the text. */
-function valueOf(text: string): string | number | boolean {
+function argumentValue(text: string): string | number | boolean {
   const t = text.trim();
   if (t === 'true' || t === 'false') return t === 'true';
   if (t !== '' && Number.isFinite(Number(t))) return Number(t);
@@ -18,5 +18,5 @@ function valueOf(text: string): string | number | boolean {
 
 /** The arguments the rows name, by name; a row with no name is dropped. */
 export function argumentsOf(rows: ArgumentRow[]): Record<string, string | number | boolean> {
-  return Object.fromEntries(rows.filter((r) => r.k.trim()).map((r) => [r.k.trim(), valueOf(r.v)]));
+  return Object.fromEntries(rows.filter((r) => r.k.trim()).map((r) => [r.k.trim(), argumentValue(r.v)]));
 }

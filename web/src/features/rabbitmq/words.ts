@@ -59,5 +59,7 @@ export const bindingWords = (b: {
   routingKey?: string;
   destination: string;
   destinationType: string;
-}) =>
-  `${b.source || 'the default exchange'} to ${b.destinationType} ${b.destination}${b.routingKey ? ` with key ${b.routingKey}` : ''}`;
+}) => {
+  const key = b.routingKey ? ` with key ${b.routingKey}` : '';
+  return `${b.source || 'the default exchange'} to ${b.destinationType} ${b.destination}${key}`;
+};

@@ -17,7 +17,7 @@ final class RabbitMqMcpViews {
     /** The most entries a tool answers in one page. */
     static final int PAGE = 100;
 
-    private static final Pattern USER_INFO = Pattern.compile("(?i)([a-z][a-z0-9+.-]*://)[^/@\\s]*@");
+    private static final Pattern USER_INFO = Pattern.compile("(?i)(?<![a-z0-9+.-])([a-z][a-z0-9+.-]*://)[^/@\\s]*@");
 
     private RabbitMqMcpViews() {}
 

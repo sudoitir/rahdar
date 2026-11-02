@@ -163,7 +163,8 @@ class RabbitMqAccessRulesTest {
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> permissions.clearTopic(CLUSTER, "/", "app", null, null))
                 .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> permissions.set(CLUSTER, "/", "app", new PermissionRequest("(", ".*", ".*", null)))
+        var request = new PermissionRequest("(", ".*", ".*", null);
+        assertThatThrownBy(() -> permissions.set(CLUSTER, "/", "app", request))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("regular expression");
     }
