@@ -33,6 +33,7 @@ function shell() {
     http.get('*/api/v1/clusters/c1', () =>
       HttpResponse.json({
         id: 'c1',
+        system: { id: 'artemis' },
         name: 'prod',
         description: null,
         topology: { clusterId: 'c1', nodes: [], unmanaged: [] },
@@ -58,6 +59,7 @@ describe('the consumer health destination', () => {
             {
               destination: 'artemis.address/orders',
               subscription: 'artemis.queue/orders',
+              name: 'orders',
               kindLabel: { singular: 'Queue', plural: 'Queues' },
               verdict: 'NO_CONSUMERS',
               severity: 4,

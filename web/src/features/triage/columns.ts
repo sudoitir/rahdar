@@ -1,6 +1,6 @@
 import { createElement } from 'react';
 
-import { nameOf } from '../../kernel/api/resourceId.ts';
+import { nameOf, virtualHostOf } from '../../kernel/api/resourceId.ts';
 import { kindColumn, type Column } from '../../ui/table/index.ts';
 import type { ConsumerHealthView } from './api.ts';
 import { SubscriptionLink } from './cells.tsx';
@@ -15,7 +15,9 @@ import { formatRate, trendPhrase, verdictText } from './verdict.ts';
  * An unmeasured rate or trend reads "not measured", never 0: on this screen the two mean opposite
  * things and lead to opposite actions.
  */
-export function consumerHealthColumns(): Column<ConsumerHealthView>[] {
+export function consumerHealthColumns(system?: string): Column<ConsumerHealthView>[] {
+  // A RabbitMQ queue lives in a virtual host, not under a destination, and the same name can exist in two of them.
+  const rabbit = system === 'rabbitmq';
   return [
     {
       id: 'verdict',
@@ -30,21 +32,32 @@ export function consumerHealthColumns(): Column<ConsumerHealthView>[] {
     {
       id: 'subscription',
       header: 'Subscription',
-      accessor: (r) => nameOf(r.subscription),
+      accessor: (r) => r.name,
       cell: (r) => createElement(SubscriptionLink, { row: r }),
       kind: 'identifier',
       priority: 'essential',
       sortKey: 'subscription',
     },
     kindColumn<ConsumerHealthView>(),
-    {
-      id: 'destination',
-      header: 'Destination',
-      accessor: (r) => nameOf(r.destination),
-      kind: 'identifier',
-      priority: 'low',
-      sortKey: 'destination',
-    },
+    rabbit
+      ? {
+          id: 'vhost',
+          header: 'Virtual host',
+          accessor: (r) => virtualHostOf(r.subscription),
+          kind: 'identifier',
+          priority: 'essential',
+          min: 12,
+          max: 24,
+          grow: false,
+        }
+      : {
+          id: 'destination',
+          header: 'Destination',
+          accessor: (r) => nameOf(r.destination),
+          kind: 'identifier',
+          priority: 'low',
+          sortKey: 'destination',
+        },
     { id: 'depth', header: 'Depth', accessor: (r) => r.depth, kind: 'number', priority: 'high', sortKey: 'depth' },
     {
       id: 'consumers',

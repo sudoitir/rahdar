@@ -45093,12 +45093,16 @@
         "type" : "object",
         "properties" : {
           "destination" : {
-            "type" : "string",
-            "description" : "The destination's id."
+            "type" : [ "string", "null" ],
+            "description" : "The destination's id; absent for a system whose queues are fed through routes."
           },
           "subscription" : {
             "type" : "string",
-            "description" : "The subscription's id."
+            "description" : "The subscription's own id: its kind and its whole path, such as a queue's virtual host and name."
+          },
+          "name" : {
+            "type" : "string",
+            "description" : "The subscription's name, without its path."
           },
           "kind" : {
             "type" : "string",
@@ -45195,7 +45199,7 @@
             "format" : "int32"
           }
         },
-        "required" : [ "cause", "consumers", "delivering", "depth", "destination", "kind", "kindLabel", "nodesPresent", "nodesTotal", "paused", "scheduled", "severity", "source", "stale", "subscription", "verdict" ]
+        "required" : [ "cause", "consumers", "delivering", "depth", "kind", "kindLabel", "name", "nodesPresent", "nodesTotal", "paused", "scheduled", "severity", "source", "stale", "subscription", "verdict" ]
       },
       "PagedViewConsumerHealthView" : {
         "type" : "object",
