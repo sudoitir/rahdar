@@ -4,7 +4,7 @@ import { useDebouncedValue, useElementSize, useHotkeys, type UseSplitterReturnVa
 import { useNavigate, useParams, useSearch } from '@tanstack/react-router';
 
 import { CapabilityLedger, useCluster } from '../clusters/index.ts';
-import { useSubscriptions } from '../resources/index.ts';
+import { useDestinationOptions, useSubscriptions } from '../resources/index.ts';
 import { MessageDetailPanel } from '../messages/index.ts';
 import { nameOf } from '../../kernel/api/resourceId.ts';
 import { useCan } from '../../kernel/auth/useCan.ts';
@@ -124,14 +124,27 @@ export function SqlConsoleView() {
   const [maximised, setMaximised] = useState(false);
 
   const cluster = useCluster(clusterId);
-  const subscriptions = useSubscriptions(clusterId, { size: QUEUE_COMPLETION_LIMIT });
+  // What FROM names depends on the system: a Kafka topic, a RabbitMQ stream (the only queue it can browse
+  // without taking the messages), an Artemis queue.
+  const system = cluster.data?.system?.id;
+  const topics = system === 'kafka';
+  const queues = useSubscriptions(clusterId, { size: QUEUE_COMPLETION_LIMIT }, { enabled: !topics });
+  const kafkaTopics = useDestinationOptions(clusterId, { size: QUEUE_COMPLETION_LIMIT }, topics);
+  const subscriptions = topics ? kafkaTopics : queues;
   const { can, loading: grantsLoading } = useCan();
   const run = useSqlTail(clusterId);
   const [history, setHistory] = useQueryHistory(run);
 
   const subscriptionNames = useMemo(
-    () => Array.from(new Set((subscriptions.data?.data ?? []).map((q) => q.name))).sort((a, b) => a.localeCompare(b)),
-    [subscriptions.data],
+    () =>
+      Array.from(
+        new Set(
+          (subscriptions.data?.data ?? [])
+            .filter((q) => system !== 'rabbitmq' || ('kind' in q && q.kind === 'rabbitmq.stream'))
+            .map((q) => q.name),
+        ),
+      ).sort((a, b) => a.localeCompare(b)),
+    [subscriptions.data, system],
   );
   // An absent completion entry reads as "there is no such subscription". Say when the list is short because it was
   // capped rather than because the cluster is small.
@@ -234,12 +247,7 @@ export function SqlConsoleView() {
         </Notice>
       ) : null}
 
-      <SyntaxHelp
-        opened={helpOpen}
-        onClose={() => setHelpOpen(false)}
-        onLoadExample={setText}
-        system={cluster.data?.system?.id}
-      />
+      <SyntaxHelp opened={helpOpen} onClose={() => setHelpOpen(false)} onLoadExample={setText} system={system} />
 
       {/* Identity is (node, subscription, messageId), so the detail request carries all three. An indexed row may
           already be gone from the broker — the panel reports that as the read failure it is, rather than as
