@@ -1,5 +1,6 @@
 package io.github.sudoitir.rahdar.system.rabbitmq;
 
+import java.time.Duration;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
@@ -12,6 +13,9 @@ import java.util.regex.PatternSyntaxException;
  * Which queues and exchanges a policy applies to, as Rahdar matches it: the policy's pattern is a Java regular expression
  * found anywhere in the name, over the kinds its {@code apply-to} names. A match that another policy of higher
  * priority also covers is shadowed by it. RabbitMQ's own matching is the broker's; this is the preview an operator reads.
+ *
+ * <p>A pattern comes from whoever may write policies on the broker, so matching it is bounded: one preview spends at
+ * most {@link #BUDGET} on its patterns, and a pattern that backtracks past that is not run to the end.
  */
 final class PolicyMatches {
 
@@ -29,7 +33,47 @@ final class PolicyMatches {
     /** A candidate the policy matches, and the policy of higher priority that wins it, if any. */
     record Match(String kind, String name, String shadowedBy) {}
 
+    /** The time one preview may spend matching the policy's own pattern against names. */
+    static final Duration BUDGET = Duration.ofMillis(250);
+
+    /** The time one rival policy's pattern may spend on one name before that rival is left out. */
+    static final Duration RIVAL_BUDGET = Duration.ofMillis(25);
+
     private PolicyMatches() {}
+
+    /** The budget ran out while a pattern was being matched. */
+    static final class TooSlow extends RuntimeException {
+        TooSlow() {
+            super("A policy's pattern took too long to match.", null, false, false);
+        }
+    }
+
+    /** A name read by the regular-expression engine, which stops the match once the preview's budget is spent. */
+    private record Bounded(CharSequence text, long deadline) implements CharSequence {
+
+        @Override
+        public int length() {
+            return text.length();
+        }
+
+        @Override
+        public char charAt(int index) {
+            if (System.nanoTime() > deadline) {
+                throw new TooSlow();
+            }
+            return text.charAt(index);
+        }
+
+        @Override
+        public CharSequence subSequence(int start, int end) {
+            return new Bounded(text.subSequence(start, end), deadline);
+        }
+
+        @Override
+        public String toString() {
+            return text.toString();
+        }
+    }
 
     /** What {@code apply-to} covers; a value RabbitMQ does not know is refused. */
     static boolean covers(String applyTo, String kind) {
@@ -64,18 +108,29 @@ final class PolicyMatches {
         Pattern own = compile(policy.pattern());
         Map<Policy, Optional<Pattern>> rivals = new HashMap<>();
         others.stream().filter(o -> !o.name().equals(policy.name())).forEach(o -> rivals.put(o, lenient(o.pattern())));
-        return candidates.stream()
-                .filter(c -> covers(policy.applyTo(), c.kind())
-                        && own.matcher(c.name()).find())
-                .map(c -> new Match(c.kind(), c.name(), shadow(policy, c, rivals)))
-                .sorted(Comparator.comparing(Match::kind).thenComparing(Match::name))
-                .toList();
+        long deadline = System.nanoTime() + BUDGET.toNanos();
+        try {
+            return candidates.stream()
+                    .filter(c -> covers(policy.applyTo(), c.kind()) && found(own, c.name(), deadline))
+                    .map(c -> new Match(c.kind(), c.name(), shadow(policy, c, rivals)))
+                    .sorted(Comparator.comparing(Match::kind).thenComparing(Match::name))
+                    .toList();
+        } catch (TooSlow e) {
+            throw new IllegalArgumentException(
+                    "The pattern takes too long to match the cluster's names, so its matches cannot be previewed;"
+                            + " a pattern that backtracks this much also slows the broker.",
+                    e);
+        }
+    }
+
+    private static boolean found(Pattern pattern, String name, long deadline) {
+        return pattern.matcher(new Bounded(name, deadline)).find();
     }
 
     private static String shadow(Policy policy, Candidate candidate, Map<Policy, Optional<Pattern>> rivals) {
-        return rivals.entrySet().stream()
+        return List.copyOf(rivals.entrySet()).stream()
                 .filter(e -> e.getKey().priority() > policy.priority())
-                .filter(e -> applies(e.getKey(), e.getValue(), candidate))
+                .filter(e -> applies(e.getKey(), e.getValue(), candidate, rivals))
                 .max(Comparator.comparingLong((Map.Entry<Policy, Optional<Pattern>> e) ->
                                 e.getKey().priority())
                         .thenComparing(e -> e.getKey().name()))
@@ -83,10 +138,21 @@ final class PolicyMatches {
                 .orElse(null);
     }
 
-    private static boolean applies(Policy policy, Optional<Pattern> pattern, Candidate candidate) {
-        return pattern.isPresent()
-                && coversLeniently(policy.applyTo(), candidate.kind())
-                && pattern.get().matcher(candidate.name()).find();
+    /**
+     * Whether a rival policy covers the candidate. A rival whose pattern runs out of time does not compete, here or
+     * for any later name, so a pattern that backtracks costs one short budget at most.
+     */
+    private static boolean applies(
+            Policy policy, Optional<Pattern> pattern, Candidate candidate, Map<Policy, Optional<Pattern>> rivals) {
+        if (pattern.isEmpty() || !coversLeniently(policy.applyTo(), candidate.kind())) {
+            return false;
+        }
+        try {
+            return found(pattern.get(), candidate.name(), System.nanoTime() + RIVAL_BUDGET.toNanos());
+        } catch (TooSlow _) {
+            rivals.put(policy, Optional.empty());
+            return false;
+        }
     }
 
     private static boolean coversLeniently(String applyTo, String kind) {

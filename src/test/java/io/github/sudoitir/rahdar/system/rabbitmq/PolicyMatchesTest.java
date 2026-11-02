@@ -95,4 +95,37 @@ class PolicyMatchesTest {
                 .map(Match::name)
                 .toList();
     }
+
+    /** A pattern a Java engine backtracks on exponentially: its back reference defeats loop memoisation. */
+    private static final String EVIL_PATTERN = "^(\\w|\\w\\w)*\\1$";
+
+    /** Many word characters and one that fails the end, which takes {@link #EVIL_PATTERN} minutes to refuse. */
+    private static final String EVIL_NAME = "a".repeat(40) + "!";
+
+    @Test
+    void aPatternThatBacktracksWithoutEndIsRefusedInsteadOfHoldingTheRequest() {
+        Policy evil = new Policy("evil", EVIL_PATTERN, "all", 0);
+        List<Candidate> names = List.of(new Candidate(PolicyMatches.CLASSIC_QUEUE, EVIL_NAME));
+        long started = System.nanoTime();
+
+        assertThatThrownBy(() -> PolicyMatches.of(evil, names, List.of()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("takes too long");
+        assertThat(System.nanoTime() - started).isLessThan(5_000_000_000L);
+    }
+
+    @Test
+    void aRivalThatBacktracksWithoutEndDoesNotCompeteAndDoesNotSpendThePreview() {
+        Policy mine = new Policy("mine", "^a", "all", 0);
+        Policy evil = new Policy("evil", EVIL_PATTERN, "all", 10);
+        List<Candidate> names = List.of(
+                new Candidate(PolicyMatches.CLASSIC_QUEUE, EVIL_NAME),
+                new Candidate(PolicyMatches.CLASSIC_QUEUE, EVIL_NAME + "b"));
+
+        List<Match> matches = PolicyMatches.of(mine, names, List.of(evil));
+
+        assertThat(matches)
+                .hasSize(2)
+                .allSatisfy(m -> assertThat(m.shadowedBy()).isNull());
+    }
 }
