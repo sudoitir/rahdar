@@ -16,6 +16,7 @@ import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.NodeReach;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.NodeVersion;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.RegisterPreview;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.RegisteredRef;
+import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.VersionFound;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -99,10 +100,7 @@ final class ArtemisChecks {
                 .orElse(null);
         return new ConnectionCheck(
                 ARTEMIS,
-                version == null
-                        ? null
-                        : new io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.VersionFound(
-                                version, null, true),
+                version == null ? null : new VersionFound(version, null, true),
                 failure == null || !CAUSE_UNSUPPORTED_VERSION.equals(failure.cause()),
                 null,
                 null,
@@ -112,7 +110,8 @@ final class ArtemisChecks {
                 failure,
                 adoption,
                 pattern,
-                contributions);
+                contributions,
+                null);
     }
 
     private static NodeReach node(NodeProbeView n) {

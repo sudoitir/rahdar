@@ -75,6 +75,8 @@ class BulkRunner {
     /** The node name of the one outcome of a subscription read for the whole cluster. */
     private static final String WHOLE_CLUSTER = "whole cluster";
 
+    private static final String UNEXPECTED_PURGE = "Unexpected purge result: ";
+
     /** This replica no longer holds the run: someone else marked it, or this replica cannot prove it is alive. */
     private static final class RunLost extends RuntimeException {
         RunLost(String why) {
@@ -271,7 +273,7 @@ class BulkRunner {
                     case Attempt.Ok<MessageService.Outcome>(MessageService.Outcome.Affected affected) ->
                         new NodeOutcome(node.nodeId(), node.nodeName(), NodeStatus.APPLIED, affected.count(), null);
                     case Attempt.Ok<MessageService.Outcome>(var other) ->
-                        NodeOutcome.failed(node.nodeId(), node.nodeName(), "Unexpected purge result: " + other);
+                        NodeOutcome.failed(node.nodeId(), node.nodeName(), UNEXPECTED_PURGE + other);
                     case Attempt.Failed<MessageService.Outcome> failed ->
                         NodeOutcome.failed(node.nodeId(), node.nodeName(), failed.detail());
                 };
@@ -292,7 +294,7 @@ class BulkRunner {
                 case Attempt.Ok<MessageService.Outcome>(MessageService.Outcome.Affected affected) ->
                     new NodeOutcome(null, WHOLE_CLUSTER, NodeStatus.APPLIED, affected.count(), null);
                 case Attempt.Ok<MessageService.Outcome>(var other) ->
-                    NodeOutcome.failed(null, WHOLE_CLUSTER, "Unexpected purge result: " + other);
+                    NodeOutcome.failed(null, WHOLE_CLUSTER, UNEXPECTED_PURGE + other);
                 case Attempt.Failed<MessageService.Outcome> failed ->
                     NodeOutcome.failed(null, WHOLE_CLUSTER, failed.detail());
             };
@@ -310,7 +312,7 @@ class BulkRunner {
                 case Attempt.Ok<MessageService.Outcome>(MessageService.Outcome.LogPurged purged) ->
                     new NodeOutcome(null, WHOLE_CLUSTER, NodeStatus.APPLIED, 0L, null, purged.skipped());
                 case Attempt.Ok<MessageService.Outcome>(var other) ->
-                    NodeOutcome.failed(null, WHOLE_CLUSTER, "Unexpected purge result: " + other);
+                    NodeOutcome.failed(null, WHOLE_CLUSTER, UNEXPECTED_PURGE + other);
                 case Attempt.Failed<MessageService.Outcome> failed ->
                     NodeOutcome.failed(null, WHOLE_CLUSTER, failed.detail());
             };

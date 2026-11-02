@@ -57,6 +57,10 @@ final class AmqpEndpoints {
         return entry.substring(entry.indexOf("://") + 3);
     }
 
+    private static int defaultPort(String scheme) {
+        return AMQPS.equals(scheme) ? AMQPS_PORT : AMQP_PORT;
+    }
+
     private static String normalised(String token) {
         URI uri;
         try {
@@ -81,7 +85,7 @@ final class AmqpEndpoints {
             throw new IllegalArgumentException(
                     "'" + token + "' must be amqp(s)://host:port, without a path, a query or a fragment.");
         }
-        int port = uri.getPort() < 0 ? (AMQPS.equals(scheme) ? AMQPS_PORT : AMQP_PORT) : uri.getPort();
+        int port = uri.getPort() < 0 ? defaultPort(scheme) : uri.getPort();
         if (port < 1 || port > 65535) {
             throw invalid(token);
         }

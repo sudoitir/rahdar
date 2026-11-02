@@ -951,8 +951,8 @@ class MessageServiceTest {
         NotFoundException unknown = new NotFoundException("A queue or address named in the request does not exist.");
         when(access.unreadableAmongSeveral(CLUSTER)).thenReturn(unknown);
 
-        assertThatThrownBy(() -> service.execute(
-                        CLUSTER, "orders", null, MessageAction.MOVE, filter("f", "ghost"), false, false))
+        var filter2 = filter("f", "ghost");
+        assertThatThrownBy(() -> service.execute(CLUSTER, "orders", null, MessageAction.MOVE, filter2, false, false))
                 .isSameAs(unknown);
         verify(access, never()).requireAll(any(), any());
         verify(messages, never()).byFilter(any(), any(), anyString(), anyString(), any(), any());
@@ -1319,12 +1319,9 @@ class MessageServiceTest {
     void anUnroutedSendIsAuditedAsFailedAndStaysAConflict() {
         doThrow(BrokerFailures.notRouted("orders", "eu")).when(messages).sendById(any(), any(), any(), any(), any());
 
-        assertThatThrownBy(() -> service.sendById(
-                        CLUSTER,
-                        EXCHANGE,
-                        ResourceClass.DESTINATION,
-                        new SendMessageRequest(MessageKind.TEXT, true, "{}", Map.of(), Map.of(), "eu"),
-                        false))
+        var sendMessageRequest = new SendMessageRequest(MessageKind.TEXT, true, "{}", Map.of(), Map.of(), "eu");
+        assertThatThrownBy(
+                        () -> service.sendById(CLUSTER, EXCHANGE, ResourceClass.DESTINATION, sendMessageRequest, false))
                 .isInstanceOf(ConflictException.class);
 
         verify(audit).fail(eq(event), anyString());

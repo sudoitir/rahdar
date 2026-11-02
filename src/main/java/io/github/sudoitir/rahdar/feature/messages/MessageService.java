@@ -302,14 +302,11 @@ public class MessageService {
         return browseLog(
                 clusterId,
                 stream,
-                null,
                 partition,
                 from,
                 filter,
                 requestedSize,
-                ResourceRef.subscription(stream.name()),
-                STREAM_NOTE,
-                false);
+                new LogRead(null, ResourceRef.subscription(stream.name()), STREAM_NOTE, false));
     }
 
     /** One record of a stream, expanded. */
@@ -328,28 +325,34 @@ public class MessageService {
         return browseLog(
                 clusterId,
                 log,
-                through,
                 partition,
                 from,
                 filter,
                 requestedSize,
-                ResourceRef.destination(log.name()),
-                LOG_NOTE,
-                true);
+                new LogRead(through, ResourceRef.destination(log.name()), LOG_NOTE, true));
     }
+
+    private static String overCap(Object estimate, Object cap) {
+        return "Over the safety cap (" + estimate + " > " + cap + ").";
+    }
+
+    /**
+     * What differs between reading a destination's log and a stream: the breakdown it is read through, the access it
+     * needs, the note it carries and whether uncommitted records are hidden.
+     */
+    private record LogRead(
+            BacklogBreakdown.Breakdown through, ResourceRef readOf, String note, boolean uncommittedHidden) {}
 
     private MessagePageView browseLog(
             UUID clusterId,
             ResourceId log,
-            BacklogBreakdown.Breakdown through,
             int partition,
             LogStart from,
             String filter,
             int requestedSize,
-            ResourceRef readOf,
-            String note,
-            boolean uncommittedHidden) {
-        clusterAccess.requireResource(clusterId, readOf, MessagePermissions.MESSAGE_READ);
+            LogRead read) {
+        BacklogBreakdown.Breakdown through = read.through();
+        clusterAccess.requireResource(clusterId, read.readOf(), MessagePermissions.MESSAGE_READ);
         LogBounds.Bounds bounds = extensions.require(clusterId, LogBounds.class).of(clusterId, log, partition);
         int size = Math.min(requestedSize, BROKER_PAGE_CAP);
         Shard shard = Shard.partition(PartitionId.of(String.valueOf(partition)));
@@ -395,7 +398,7 @@ public class MessageService {
                 size,
                 null,
                 page.next() != null,
-                note,
+                read.note(),
                 null,
                 new LogView(
                         partition,
@@ -403,7 +406,7 @@ public class MessageService {
                         bounds.end(),
                         page.next(),
                         moved,
-                        uncommittedHidden,
+                        read.uncommittedHidden(),
                         through == null
                                 ? null
                                 : through.partitions().stream()
@@ -758,7 +761,7 @@ public class MessageService {
                 return new Attempt.Ok<>(new Outcome.DryRun(estimate, cap, over, node));
             }
             if (over && !override) {
-                audit.fail(event, "Over the safety cap (" + estimate + " > " + cap + ").");
+                audit.fail(event, overCap(estimate, cap));
                 throw new BulkCapExceededException(estimate, cap);
             }
 
@@ -870,7 +873,7 @@ public class MessageService {
                         new Outcome.DryRun(estimate, cap, estimate > cap, null, wholeCluster.basis(preview)));
             }
             if (estimate > cap && !override) {
-                audit.fail(event, "Over the safety cap (" + estimate + " > " + cap + ").");
+                audit.fail(event, overCap(estimate, cap));
                 throw new BulkCapExceededException(estimate, cap);
             }
             OperationResult result = wholeCluster.execute(clusterId, id, PURGE, preview.etag());
@@ -972,7 +975,7 @@ public class MessageService {
 
             long estimate = messages.count(clusterId, node, queueName, null);
             if (estimate > cap && !override) {
-                audit.fail(event, "Over the safety cap (" + estimate + " > " + cap + ").");
+                audit.fail(event, overCap(estimate, cap));
                 throw new BulkCapExceededException(estimate, cap);
             }
             long removed = messages.purge(clusterId, node, queueName);

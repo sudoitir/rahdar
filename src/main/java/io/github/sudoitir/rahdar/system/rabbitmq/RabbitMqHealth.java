@@ -31,6 +31,8 @@ import org.springframework.stereotype.Component;
 @Component
 class RabbitMqHealth implements ClusterHealthEvaluator {
 
+    private static final String NODE = "Node ";
+
     /** A verdict older than this is the scrape's silence, not a reading. */
     static final Duration STALE = Duration.ofMinutes(2);
 
@@ -97,7 +99,7 @@ class RabbitMqHealth implements ClusterHealthEvaluator {
             level = worst(level, node(node, notes, serving));
         }
         described.failures().forEach((node, failure) -> {
-            notes.add("Node " + node.value() + " is unreachable: " + failure.getMessage());
+            notes.add(NODE + node.value() + " is unreachable: " + failure.getMessage());
         });
         if (!described.failures().isEmpty()) {
             level = worst(level, Level.DEGRADED);
@@ -130,13 +132,13 @@ class RabbitMqHealth implements ClusterHealthEvaluator {
             if (ConditionTypes.SERVING.equals(condition.type()) && condition.status() == ConditionStatus.FALSE) {
                 running = false;
                 level = worst(level, Level.DEGRADED);
-                notes.add("Node " + name + " is not running.");
+                notes.add(NODE + name + " is not running.");
             } else if (holds && ConditionTypes.OUT_OF_SYNC.equals(condition.type())) {
                 level = Level.CRITICAL;
-                notes.add("Node " + name + " has a network partition: " + condition.message());
+                notes.add(NODE + name + " has a network partition: " + condition.message());
             } else if (holds && ConditionTypes.FULL.equals(condition.type())) {
                 level = Level.CRITICAL;
-                notes.add("Node " + name + " raised a "
+                notes.add(NODE + name + " raised a "
                         + ("mem_alarm".equals(condition.reason()) ? "memory" : "disk space")
                         + " alarm, so every publisher in the cluster is blocked.");
             }

@@ -79,6 +79,77 @@ function Unavailable({ what, remedy }: Readonly<{ what: string; remedy?: string 
   );
 }
 
+type ShovelsQuery = ReturnType<typeof useShovels>;
+type LinksQuery = ReturnType<typeof useFederationLinks>;
+
+/** The shovels table, or what to enable when their plugin is missing. */
+function ShovelsSection({ shovels, columns }: Readonly<{ shovels: ShovelsQuery; columns: Column<Shovel>[] }>) {
+  const first = shovels.data?.pages[0];
+  const rows = shovels.data?.pages.flatMap((p) => p.items) ?? [];
+  return (
+    <Section title="Shovels">
+      {first && !first.available ? (
+        <Unavailable what="Shovels" remedy={first.remedy} />
+      ) : (
+        <Stack gap="sm">
+          <DataTable
+            variant="static"
+            label="Shovels"
+            storageKey="rabbitmq.shovels"
+            columns={columns}
+            data={rows}
+            rowKey={(s) => s.id}
+            height={{ maxRows: 12 }}
+            loading={shovels.isPending}
+            error={
+              shovels.isError ? <ErrorState error={shovels.error} onRetry={() => void shovels.refetch()} /> : undefined
+            }
+            empty={
+              <EmptyState
+                kind="empty"
+                title="No shovels"
+                description="A shovel reads messages from one queue or exchange and writes them to another."
+              />
+            }
+          />
+          {shovels.hasNextPage ? (
+            <Button size="xs" variant="default" onClick={() => void shovels.fetchNextPage()}>
+              Load more shovels
+            </Button>
+          ) : null}
+        </Stack>
+      )}
+    </Section>
+  );
+}
+
+/** The body of the federation section: the remedy, the loading frame, or the table. */
+function FederationBody({ links }: Readonly<{ links: LinksQuery }>) {
+  const first = links.data?.pages[0];
+  const rows = links.data?.pages.flatMap((p) => p.items) ?? [];
+  if (first && !first.available) return <Unavailable what="Federation links" remedy={first.remedy} />;
+  if (links.isPending) return <LoadingState label="Loading the federation links" blockSize="6rem" />;
+  return (
+    <DataTable
+      variant="static"
+      label="Federation links"
+      storageKey="rabbitmq.federation"
+      columns={LINK_COLUMNS}
+      data={rows}
+      rowKey={(l) => `${l.vhost}/${l.type}/${l.name}/${l.upstream}`}
+      height={{ maxRows: 12 }}
+      error={links.isError ? <ErrorState error={links.error} onRetry={() => void links.refetch()} /> : undefined}
+      empty={
+        <EmptyState
+          kind="empty"
+          title="No federation links"
+          description="A federated exchange or queue reads from an upstream broker."
+        />
+      }
+    />
+  );
+}
+
 /**
  * The shovels and federation links of a RabbitMQ cluster. Each lives in a plugin; when it is not enabled the
  * section says what to enable. A shovel the node's configuration defines is listed and cannot be deleted here.
@@ -92,10 +163,6 @@ export function LinksView() {
   const remove = useChange<Shovel>(clusterId, (s) => op(clusterId, 'DELETE', `shovels/${encodeURIComponent(s.id)}`));
   const { start: startRemove } = remove;
   const cols = useMemo(() => shovelColumns(gate, startRemove), [gate, startRemove]);
-  const shovelRows = shovels.data?.pages.flatMap((p) => p.items) ?? [];
-  const linkRows = links.data?.pages.flatMap((p) => p.items) ?? [];
-  const firstShovels = shovels.data?.pages[0];
-  const firstLinks = links.data?.pages[0];
   const doomed = remove.reviewed?.vars;
 
   return (
@@ -105,69 +172,11 @@ export function LinksView() {
         description="The links that move messages between brokers and between virtual hosts."
       />
       <FilterBar label="Link filters" fields={[{ name: 'vhost', label: 'Virtual host' }]} />
-      <Section title="Shovels">
-        {firstShovels && !firstShovels.available ? (
-          <Unavailable what="Shovels" remedy={firstShovels.remedy} />
-        ) : (
-          <Stack gap="sm">
-            <DataTable
-              variant="static"
-              label="Shovels"
-              storageKey="rabbitmq.shovels"
-              columns={cols}
-              data={shovelRows}
-              rowKey={(s) => s.id}
-              height={{ maxRows: 12 }}
-              loading={shovels.isPending}
-              error={
-                shovels.isError ? (
-                  <ErrorState error={shovels.error} onRetry={() => void shovels.refetch()} />
-                ) : undefined
-              }
-              empty={
-                <EmptyState
-                  kind="empty"
-                  title="No shovels"
-                  description="A shovel reads messages from one queue or exchange and writes them to another."
-                />
-              }
-            />
-            {shovels.hasNextPage ? (
-              <Button size="xs" variant="default" onClick={() => void shovels.fetchNextPage()}>
-                Load more shovels
-              </Button>
-            ) : null}
-          </Stack>
-        )}
-      </Section>
+      <ShovelsSection shovels={shovels} columns={cols} />
       {/* Below the shovels, shown once they have settled: its own loading rows would otherwise move when the shovels above shrink. */}
       {shovels.isPending ? null : (
         <Section title="Federation links">
-          {firstLinks && !firstLinks.available ? (
-            <Unavailable what="Federation links" remedy={firstLinks.remedy} />
-          ) : links.isPending ? (
-            <LoadingState label="Loading the federation links" blockSize="6rem" />
-          ) : (
-            <DataTable
-              variant="static"
-              label="Federation links"
-              storageKey="rabbitmq.federation"
-              columns={LINK_COLUMNS}
-              data={linkRows}
-              rowKey={(l) => `${l.vhost}/${l.type}/${l.name}/${l.upstream}`}
-              height={{ maxRows: 12 }}
-              error={
-                links.isError ? <ErrorState error={links.error} onRetry={() => void links.refetch()} /> : undefined
-              }
-              empty={
-                <EmptyState
-                  kind="empty"
-                  title="No federation links"
-                  description="A federated exchange or queue reads from an upstream broker."
-                />
-              }
-            />
-          )}
+          <FederationBody links={links} />
         </Section>
       )}
       <ChangeDialog

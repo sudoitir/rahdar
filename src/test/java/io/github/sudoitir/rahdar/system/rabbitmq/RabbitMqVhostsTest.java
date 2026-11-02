@@ -30,6 +30,7 @@ import io.github.sudoitir.rahdar.system.rabbitmq.RabbitMqOps.Verb;
 import io.github.sudoitir.rahdar.system.rabbitmq.web.RabbitMqViews.ExchangeRequest;
 import io.github.sudoitir.rahdar.system.rabbitmq.web.RabbitMqViews.QueueRequest;
 import io.github.sudoitir.rahdar.system.rabbitmq.web.RabbitMqViews.RabbitMqChangePreview;
+import io.github.sudoitir.rahdar.system.rabbitmq.web.RabbitMqViews.Vhost;
 import io.github.sudoitir.rahdar.system.rabbitmq.web.RabbitMqViews.VhostPage;
 import io.github.sudoitir.rahdar.system.rabbitmq.web.RabbitMqViews.VhostRequest;
 import java.util.ArrayList;
@@ -88,7 +89,7 @@ class RabbitMqVhostsTest {
 
         verify(access).requireCluster(CLUSTER, RabbitMqModule.NAMESPACE_READ);
         assertThat(page.countsComplete()).isTrue();
-        assertThat(page.items()).extracting(v -> v.name()).containsExactly("orders", "empty");
+        assertThat(page.items()).extracting(Vhost::name).containsExactly("orders", "empty");
         assertThat(page.items().getFirst().queues()).isEqualTo(2);
         assertThat(page.items().getFirst().messages()).isEqualTo(12);
         assertThat(page.items().getFirst().tags()).containsExactly("prod", "eu");
@@ -168,8 +169,8 @@ class RabbitMqVhostsTest {
 
     @Test
     void aVhostNeedsAName() {
-        assertThatThrownBy(() -> vhosts.create(CLUSTER, new VhostRequest(" ", null, null, null, null)))
-                .isInstanceOf(IllegalArgumentException.class);
+        var vhostRequest = new VhostRequest(" ", null, null, null, null);
+        assertThatThrownBy(() -> vhosts.create(CLUSTER, vhostRequest)).isInstanceOf(IllegalArgumentException.class);
     }
 
     // ---- queues and exchanges -----------------------------------------------------------------------------------
@@ -205,11 +206,10 @@ class RabbitMqVhostsTest {
     void aQueueNeedsAKnownTypeAVhostAndAName() {
         RabbitMqQueues creates = new RabbitMqQueues(access, ops, changes);
 
-        assertThatThrownBy(() -> creates.create(CLUSTER, new QueueRequest("/", "q", "lazy", null, null, null, null)))
-                .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(
-                        () -> creates.create(CLUSTER, new QueueRequest(null, "q", "classic", null, null, null, null)))
-                .isInstanceOf(IllegalArgumentException.class);
+        var queueRequest = new QueueRequest("/", "q", "lazy", null, null, null, null);
+        assertThatThrownBy(() -> creates.create(CLUSTER, queueRequest)).isInstanceOf(IllegalArgumentException.class);
+        var queueRequest2 = new QueueRequest(null, "q", "classic", null, null, null, null);
+        assertThatThrownBy(() -> creates.create(CLUSTER, queueRequest2)).isInstanceOf(IllegalArgumentException.class);
         assertThat(RabbitMqIds.queueKind("classic")).isEqualTo(RabbitMqIds.CLASSIC_QUEUE);
         assertThat(RabbitMqIds.queueKind("quorum")).isEqualTo(RabbitMqIds.QUORUM_QUEUE);
     }
@@ -236,11 +236,10 @@ class RabbitMqVhostsTest {
         assertThat(attributes.getValue())
                 .containsEntry(RabbitMqIds.EXCHANGE_TYPE, "topic")
                 .containsEntry(RabbitMqIds.INTERNAL, false);
-        assertThatThrownBy(() ->
-                        creates.create(CLUSTER, new ExchangeRequest("/", "e", null, null, null, null, null, null)))
-                .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() ->
-                        creates.create(CLUSTER, new ExchangeRequest("/", " ", "fanout", null, null, null, null, null)))
+        var exchangeRequest = new ExchangeRequest("/", "e", null, null, null, null, null, null);
+        assertThatThrownBy(() -> creates.create(CLUSTER, exchangeRequest)).isInstanceOf(IllegalArgumentException.class);
+        var exchangeRequest2 = new ExchangeRequest("/", " ", "fanout", null, null, null, null, null);
+        assertThatThrownBy(() -> creates.create(CLUSTER, exchangeRequest2))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 }

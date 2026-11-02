@@ -34,6 +34,7 @@ import { useCan } from '../../kernel/auth/useCan.ts';
 import { verbRefusal } from '../../kernel/auth/kindVerbs.ts';
 import { useClusterSlot } from '../../kernel/shell/useClusterSlot.ts';
 import { CapabilityGate } from '../../ui/CapabilityGate.tsx';
+import type { GateVerdict } from '../../ui/capabilityGate.ts';
 import { useFilterShortcut } from '../../kernel/keyboard/filterShortcut.ts';
 
 const PAGE_SIZE = 200;
@@ -244,6 +245,13 @@ function ResourceEmpty({
   );
 }
 
+/** Whether the create button works: refused for the cluster, allowed by a permission, or blocked for want of one. */
+function createGateOf(refusal: string | undefined, allowed: boolean): GateVerdict {
+  if (refusal) return { kind: 'blocked', reason: refusal };
+  if (allowed) return { kind: 'allowed', uncertain: false };
+  return { kind: 'blocked', reason: 'Creating a destination needs the destination:create permission.' };
+}
+
 /** The remaining five cross-node views, all from one column-spec-driven grid (ADR-0017). */
 export function ResourceView({ kind }: Readonly<{ kind: Kind }>) {
   // `/` focuses this view's filter (ADR-0109).
@@ -290,11 +298,8 @@ export function ResourceView({ kind }: Readonly<{ kind: Kind }>) {
       ? verbRefusal(cluster.data.system.name, destinationKinds[0].label, 'create')
       : undefined;
   const offerCreate = kind === 'destinations' && (createSlot.length > 0 || createRefusal !== undefined);
-  const createGate = createRefusal
-    ? ({ kind: 'blocked', reason: createRefusal } as const)
-    : can('destination:create', clusterId) || (createPatterns(clusterId, 'destination')?.length ?? 0) > 0
-      ? ({ kind: 'allowed', uncertain: false } as const)
-      : ({ kind: 'blocked', reason: 'Creating a destination needs the destination:create permission.' } as const);
+  const mayCreate = can('destination:create', clusterId) || (createPatterns(clusterId, 'destination')?.length ?? 0) > 0;
+  const createGate = createGateOf(createRefusal, mayCreate);
 
   const fetchedAt = query.dataUpdatedAt > 0 ? query.dataUpdatedAt : null;
   const system = cluster.data?.system?.id;

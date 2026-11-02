@@ -123,36 +123,6 @@ public interface ClusterViews {
                             + " another answered. Null where a system reports only its nodes.")
             List<EndpointReach> endpoints) {
 
-        /** A check that names no endpoints separately. */
-        public ConnectionCheck(
-                String system,
-                VersionFound version,
-                boolean supported,
-                String clusterId,
-                RegisteredRef alreadyRegistered,
-                List<NodeReach> nodes,
-                Quorum quorum,
-                List<AccessFinding> access,
-                Failure failure,
-                AdoptionPreviewView adoption,
-                String managementUrlPattern,
-                Map<String, Object> contributions) {
-            this(
-                    system,
-                    version,
-                    supported,
-                    clusterId,
-                    alreadyRegistered,
-                    nodes,
-                    quorum,
-                    access,
-                    failure,
-                    adoption,
-                    managementUrlPattern,
-                    contributions,
-                    null);
-        }
-
         public ConnectionCheck withAlreadyRegistered(RegisteredRef ref) {
             return new ConnectionCheck(
                     system,

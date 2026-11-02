@@ -22,6 +22,8 @@ import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
 import io.github.sudoitir.rahdar.system.rabbitmq.RabbitMqChanges.PolicyClear;
 import io.github.sudoitir.rahdar.system.rabbitmq.RabbitMqChanges.PolicySet;
 import io.github.sudoitir.rahdar.system.rabbitmq.RabbitMqOps.Verb;
+import io.github.sudoitir.rahdar.system.rabbitmq.web.RabbitMqViews.Policy;
+import io.github.sudoitir.rahdar.system.rabbitmq.web.RabbitMqViews.PolicyMatch;
 import io.github.sudoitir.rahdar.system.rabbitmq.web.RabbitMqViews.PolicyPage;
 import io.github.sudoitir.rahdar.system.rabbitmq.web.RabbitMqViews.PolicyPreview;
 import io.github.sudoitir.rahdar.system.rabbitmq.web.RabbitMqViews.PolicyRequest;
@@ -86,9 +88,9 @@ class RabbitMqPoliciesTest {
         PolicyPage page = policies.list(CLUSTER, "/", null, null);
 
         verify(access).requireCluster(CLUSTER, RabbitMqModule.POLICY_READ);
-        assertThat(page.items()).extracting(p -> p.name()).containsExactly("cap", "ha", "loud");
-        assertThat(page.items()).extracting(p -> p.operator()).containsExactly(true, false, false);
-        assertThat(page.items()).extracting(p -> p.matches()).containsExactly(1L, 2L, 1L);
+        assertThat(page.items()).extracting(Policy::name).containsExactly("cap", "ha", "loud");
+        assertThat(page.items()).extracting(Policy::operator).containsExactly(true, false, false);
+        assertThat(page.items()).extracting(Policy::matches).containsExactly(1L, 2L, 1L);
         assertThat(page.items().get(1).definition()).containsEntry("max-length", "1000");
         assertThat(page.next()).isNull();
     }
@@ -100,7 +102,7 @@ class RabbitMqPoliciesTest {
 
         assertThat(first.items()).hasSize(2);
         assertThat(first.next()).isEqualTo("2");
-        assertThat(second.items()).extracting(p -> p.name()).containsExactly("loud");
+        assertThat(second.items()).extracting(Policy::name).containsExactly("loud");
         assertThat(second.next()).isNull();
     }
 
@@ -116,8 +118,8 @@ class RabbitMqPoliciesTest {
         assertThat(preview.etag()).isEqualTo(ETAG);
         assertThat(preview.identityBasis()).isEqualTo("CONFIGURATION");
         assertThat(preview.effect().detail()).contains("as Rahdar matches it").contains("does not tell a recreated");
-        assertThat(preview.matches()).extracting(m -> m.name()).containsExactly("orders.eu", "orders.us");
-        assertThat(preview.matches()).extracting(m -> m.shadowedBy()).containsExactly("loud", null);
+        assertThat(preview.matches()).extracting(PolicyMatch::name).containsExactly("orders.eu", "orders.us");
+        assertThat(preview.matches()).extracting(PolicyMatch::shadowedBy).containsExactly("loud", null);
         assertThat(preview.partial()).isFalse();
     }
 
@@ -127,7 +129,7 @@ class RabbitMqPoliciesTest {
 
         PolicyPreview preview = policies.previewClear(CLUSTER, "/", "ha");
 
-        assertThat(preview.matches()).extracting(m -> m.name()).containsExactly("orders.eu", "orders.us");
+        assertThat(preview.matches()).extracting(PolicyMatch::name).containsExactly("orders.eu", "orders.us");
         assertThat(preview.effect().detail()).contains("2 queues and exchanges stop matching");
     }
 
@@ -159,17 +161,18 @@ class RabbitMqPoliciesTest {
 
     @Test
     void aPolicyMustBeWellFormed() {
-        assertThatThrownBy(() ->
-                        policies.set(CLUSTER, "/", "p", new PolicyRequest("(", null, null, Map.of("a", "1"), null)))
+        var malformed = new PolicyRequest("(", null, null, Map.of("a", "1"), null);
+        assertThatThrownBy(() -> policies.set(CLUSTER, "/", "p", malformed))
                 .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() ->
-                        policies.set(CLUSTER, "/", "p", new PolicyRequest("a", "bogus", null, Map.of("a", "1"), null)))
+        var policyRequest = new PolicyRequest("a", "bogus", null, Map.of("a", "1"), null);
+        assertThatThrownBy(() -> policies.set(CLUSTER, "/", "p", policyRequest))
                 .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> policies.set(CLUSTER, "/", "p", new PolicyRequest("a", null, null, Map.of(), null)))
+        var policyRequest2 = new PolicyRequest("a", null, null, Map.of(), null);
+        assertThatThrownBy(() -> policies.set(CLUSTER, "/", "p", policyRequest2))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("setting");
-        assertThatThrownBy(() ->
-                        policies.set(CLUSTER, "/", "p", new PolicyRequest(" ", null, null, Map.of("a", "1"), null)))
+        var policyRequest3 = new PolicyRequest(" ", null, null, Map.of("a", "1"), null);
+        assertThatThrownBy(() -> policies.set(CLUSTER, "/", "p", policyRequest3))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("pattern");
         assertThatThrownBy(() -> policies.clear(CLUSTER, "/", " ", null)).isInstanceOf(IllegalArgumentException.class);

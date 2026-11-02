@@ -35,26 +35,19 @@ function facts(check: ConnectionCheck): DescriptionItem[] {
   return items;
 }
 
-/**
- * What a connection check found, for any system, in registering and in editing: why it failed and what to
- * do, the version with its bound and mode, every node with where Rahdar reached it and how, the quorum, what
- * the account may do, and the capabilities the cluster lacks, each with its reason. `selfId` is the cluster
- * being edited, which is not "another cluster" to itself.
- */
-export function ConnectionCheckPanel({ check, selfId }: Readonly<{ check: ConnectionCheck; selfId?: string }>) {
+/** What the check warns of before the facts: the failure, a cluster already registered, and nodes or endpoints not reached. */
+function CheckNotices({ check, selfId }: Readonly<{ check: ConnectionCheck; selfId?: string }>) {
   const unreached = unreachedNodes(check);
   const endpoints = check.endpoints ?? [];
   const downEndpoints = endpoints.filter((e) => e.outcome !== 'OK');
   const rabbit = check.system === 'rabbitmq';
-  const lacking = check.access.filter((a) => a.status !== 'AVAILABLE');
   const other = check.alreadyRegistered && check.alreadyRegistered.id !== selfId ? check.alreadyRegistered : null;
   const untested = untestedNodes(check);
   const newerThanTested = untested
     .map((node) => `${node.id} runs ${systemWords(check.system)} ${node.version}`)
     .join('; ');
-  const passiveBackup = check.nodes.some((n) => n.artemis?.core === 'NOT_TRIED' && n.artemis.haRole === 'BACKUP');
   return (
-    <Stack gap="sm" aria-live="polite">
+    <>
       {check.failure ? (
         <Notice title={CAUSE_WORDS[check.failure.cause] ?? check.failure.cause} tone="danger">
           <Stack gap={4}>
@@ -88,19 +81,33 @@ export function ConnectionCheckPanel({ check, selfId }: Readonly<{ check: Connec
             : 'Fix the addresses, the advertised listeners or the network, then check again.'}
         </Notice>
       ) : null}
-
       {!check.failure && downEndpoints.length > 0 && downEndpoints.length < endpoints.length ? (
         <Notice title="Some endpoints were not reached" tone="warning">
           {`${downEndpoints.map((e) => e.address).join(', ')} did not answer. The endpoints that did are enough to register the cluster; fix the others or remove them from the connection.`}
         </Notice>
       ) : null}
-
       {untested.length > 0 ? (
         <Notice title={`Newer ${systemWords(check.system)} than Rahdar has tested`} tone="warning">
           {`${newerThanTested}. Registration will go ahead, but this release is outside the range Rahdar's tests cover, so a management call may behave differently. The supported versions page lists the tested range.`}
         </Notice>
       ) : null}
+    </>
+  );
+}
 
+/**
+ * What a connection check found, for any system, in registering and in editing: why it failed and what to
+ * do, the version with its bound and mode, every node with where Rahdar reached it and how, the quorum, what
+ * the account may do, and the capabilities the cluster lacks, each with its reason. `selfId` is the cluster
+ * being edited, which is not "another cluster" to itself.
+ */
+export function ConnectionCheckPanel({ check, selfId }: Readonly<{ check: ConnectionCheck; selfId?: string }>) {
+  const endpoints = check.endpoints ?? [];
+  const lacking = check.access.filter((a) => a.status !== 'AVAILABLE');
+  const passiveBackup = check.nodes.some((n) => n.artemis?.core === 'NOT_TRIED' && n.artemis.haRole === 'BACKUP');
+  return (
+    <Stack gap="sm" aria-live="polite">
+      <CheckNotices check={check} selfId={selfId} />
       <DescriptionList label="What the check found" columns={2} items={facts(check)} />
 
       <DataTable

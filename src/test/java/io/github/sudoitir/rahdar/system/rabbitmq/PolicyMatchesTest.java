@@ -76,7 +76,9 @@ class PolicyMatchesTest {
 
     @Test
     void aPatternThatIsNotARegularExpressionIsRefused() {
-        assertThatThrownBy(() -> PolicyMatches.of(new Policy("p", "(", "all", 0), CANDIDATES, List.of()))
+        var policy = new Policy("p", "(", "all", 0);
+        var none = List.<Policy>of();
+        assertThatThrownBy(() -> PolicyMatches.of(policy, CANDIDATES, none))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("regular expression");
     }

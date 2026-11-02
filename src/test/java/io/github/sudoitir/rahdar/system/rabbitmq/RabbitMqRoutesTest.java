@@ -158,12 +158,13 @@ class RabbitMqRoutesTest {
 
     @Test
     void aBindingNeedsEverythingAndAKnownDestinationType() {
-        assertThatThrownBy(
-                        () -> bindings.create(CLUSTER, new BindingRequest("/", "e", null, "queue", null, null, null)))
+        var bindingRequest = new BindingRequest("/", "e", null, "queue", null, null, null);
+        assertThatThrownBy(() -> bindings.create(CLUSTER, bindingRequest)).isInstanceOf(IllegalArgumentException.class);
+        var bindingRequest2 = new BindingRequest("/", "e", "q", "topic", null, null, null);
+        assertThatThrownBy(() -> bindings.create(CLUSTER, bindingRequest2))
                 .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> bindings.create(CLUSTER, new BindingRequest("/", "e", "q", "topic", null, null, null)))
-                .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> bindings.create(CLUSTER, new BindingRequest("/", "e", "q", null, null, null, null)))
+        var bindingRequest3 = new BindingRequest("/", "e", "q", null, null, null, null);
+        assertThatThrownBy(() -> bindings.create(CLUSTER, bindingRequest3))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
@@ -234,7 +235,8 @@ class RabbitMqRoutesTest {
         BrokerGateway other = mock(BrokerGateway.class);
         when(other.cluster(CLUSTER)).thenReturn(broken);
 
-        assertThatThrownBy(() -> new RabbitMqFederation(other, access).list(CLUSTER, null, null, null))
+        var rabbitMqFederation = new RabbitMqFederation(other, access);
+        assertThatThrownBy(() -> rabbitMqFederation.list(CLUSTER, null, null, null))
                 .isNotInstanceOf(BrokerException.class);
     }
 

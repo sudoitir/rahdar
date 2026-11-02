@@ -46,8 +46,8 @@ class RabbitMqAuditClosureTest {
     void aPreviewThatFailsClosesTheRow() {
         when(ops.preview(eq(CLUSTER), any(), any(), any())).thenThrow(new IllegalStateException("the broker failed"));
 
-        assertThatThrownBy(() -> changes.replay(new NamespaceDelete(CLUSTER, VHOST, Map.of(), ETAG)))
-                .isInstanceOf(IllegalStateException.class);
+        var namespaceDelete = new NamespaceDelete(CLUSTER, VHOST, Map.of(), ETAG);
+        assertThatThrownBy(() -> changes.replay(namespaceDelete)).isInstanceOf(IllegalStateException.class);
 
         verify(audit).fail(any(), any());
         verify(audit, never()).finish(any(), anyBoolean(), anyLong(), any(), any());
@@ -58,8 +58,8 @@ class RabbitMqAuditClosureTest {
         when(ops.preview(eq(CLUSTER), any(), any(), any())).thenReturn(preview(ETAG, 3));
         when(ops.execute(eq(CLUSTER), any(), any(), any(), any())).thenThrow(new IllegalStateException("went away"));
 
-        assertThatThrownBy(() -> changes.replay(new NamespaceDelete(CLUSTER, VHOST, Map.of(), ETAG)))
-                .isInstanceOf(IllegalStateException.class);
+        var namespaceDelete = new NamespaceDelete(CLUSTER, VHOST, Map.of(), ETAG);
+        assertThatThrownBy(() -> changes.replay(namespaceDelete)).isInstanceOf(IllegalStateException.class);
 
         verify(audit).fail(any(), any());
     }
@@ -68,9 +68,9 @@ class RabbitMqAuditClosureTest {
     void aChangeWhoseEtagMovedIsRefusedAsStaleAndClosesTheRow() {
         when(ops.preview(eq(CLUSTER), any(), eq(Verb.CREATE), any())).thenReturn(preview("etag-2", 0));
 
-        assertThatThrownBy(() -> changes.replay(new PolicySet(
-                        CLUSTER, ResourceId.of(RabbitMqIds.POLICY, "/", "ha").format(), Map.of(), ETAG)))
-                .isInstanceOf(StalePreviewException.class);
+        var policySet = new PolicySet(
+                CLUSTER, ResourceId.of(RabbitMqIds.POLICY, "/", "ha").format(), Map.of(), ETAG);
+        assertThatThrownBy(() -> changes.replay(policySet)).isInstanceOf(StalePreviewException.class);
 
         verify(audit).fail(any(), any());
         verify(ops, never()).execute(any(), any(), any(), any(), any());
@@ -81,7 +81,8 @@ class RabbitMqAuditClosureTest {
         when(ops.execute(eq(CLUSTER), any(), any(), any(), any())).thenThrow(new IllegalStateException("went away"));
         ResourceId queue = ResourceId.of(RabbitMqIds.CLASSIC_QUEUE, "/", "q");
 
-        assertThatThrownBy(() -> changes.create(CLUSTER, queue, Map.of(), null, "CREATE_SUBSCRIPTION", "SUBSCRIPTION"))
+        Map<String, Object> entries = Map.of();
+        assertThatThrownBy(() -> changes.create(CLUSTER, queue, entries, null, "CREATE_SUBSCRIPTION", "SUBSCRIPTION"))
                 .isInstanceOf(IllegalStateException.class);
 
         verify(audit).fail(any(), any());

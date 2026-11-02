@@ -78,10 +78,10 @@ public class RabbitMqShovels {
     static String endpoint(Resource resource, String key) {
         Optional<Object> value = resource.attributes().raw(key);
         return switch (value.orElse(null)) {
-            case RouteEndpoint.Local local ->
-                String.join(" / ", local.resource().path().segments());
-            case RouteEndpoint.Remote remote ->
-                withoutCredentials(remote.uri()) + (remote.name().isEmpty() ? "" : " " + remote.name());
+            case RouteEndpoint.Local(var resourceId) ->
+                String.join(" / ", resourceId.path().segments());
+            case RouteEndpoint.Remote(var uri, var name) ->
+                withoutCredentials(uri) + (name.isEmpty() ? "" : " " + name);
             case null, default -> "";
         };
     }

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useRef } from 'react';
+import { useEffect, useMemo, useState, useRef, type Dispatch, type SetStateAction } from 'react';
 import { Button, Select, Text, TextInput } from '@mantine/core';
 import { Link, useNavigate, useParams, useSearch } from '@tanstack/react-router';
 import { useDebouncedValue } from '@mantine/hooks';
@@ -8,6 +8,7 @@ import { kindOf, refOf, subscriptionRefWords } from '../../kernel/api/resourceId
 import { verbRefusal } from '../../kernel/auth/kindVerbs.ts';
 import { useMessages, type MessagePageView, type MessageSummaryView } from './api.ts';
 import { CapabilityGate } from '../../ui/CapabilityGate.tsx';
+import type { GateVerdict } from '../../ui/capabilityGate.ts';
 import { EmptyState } from '../../ui/EmptyState.tsx';
 import { ErrorState } from '../../ui/ErrorState.tsx';
 import { Notice } from '../../ui/Notice.tsx';
@@ -48,6 +49,11 @@ function countLabel(page: { count?: number | null; countUnavailable?: string | n
 function selectionOf(pickedIds: number[], filter: string | undefined): MessageSelection {
   if (pickedIds.length > 0) return { kind: 'ids', ids: pickedIds };
   return filter ? { kind: 'filter', filter } : { kind: 'all' };
+}
+
+/** The last page of a total, or none while the total is not known. */
+function lastPageOf(total: number | null | undefined): number | null {
+  return total == null ? null : Math.max(1, Math.ceil(total / PAGE_SIZE));
 }
 
 function selectionTotalOf(selection: MessageSelection, total: number | null | undefined): number | null {
@@ -141,6 +147,53 @@ function isSingleLog(kind: { id: string; resourceClass: string } | undefined, pa
   return partitioned && kind?.resourceClass === 'SUBSCRIPTION' && kind.id !== 'kafka.group-topic';
 }
 
+/** What kind of log a subscription is read as, from its kind and the cluster's kind list. */
+function logShapeOf(
+  kind: string,
+  kinds: Parameters<typeof kindOfSubscription>[1],
+): { partitioned: boolean; kindInfo: ReturnType<typeof kindOfSubscription>; singleLog: boolean } {
+  const partitioned = isPartitionedLog(kind, kinds);
+  const kindInfo = kindOfSubscription(kind, kinds);
+  const singleLog = kindInfo ? isSingleLog(kindInfo, partitioned) : partitioned && kind !== 'kafka.group-topic';
+  return { partitioned, kindInfo, singleLog };
+}
+
+/** Why a kind the system cannot browse is refused before anything is read: the driver's reason when it gave one. */
+function browseRefusalOf(
+  cluster: ReturnType<typeof useCluster>['data'],
+  kindInfo: ReturnType<typeof kindOfSubscription>,
+): string | undefined {
+  if (!cluster?.system || !kindInfo || kindInfo.verbs.includes('browse')) return undefined;
+  return (
+    cluster.capabilities.findings.find((f) => f.capability === 'messages.browse')?.reason ??
+    verbRefusal(cluster.system.name, kindInfo.label, 'browse')
+  );
+}
+
+/** The set of picked rows, which the view empties when the node, the filter or the page changes (D10). */
+function useRowSelection(): {
+  selected: Set<string>;
+  setSelected: Dispatch<SetStateAction<Set<string>>>;
+  toggleRow: (key: string) => void;
+  toggleAll: (keys: string[], allSelected: boolean) => void;
+} {
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const toggleRow = (key: string) =>
+    setSelected((s) => {
+      const next = new Set(s);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  const toggleAll = (keys: string[], allSelected: boolean) =>
+    setSelected((s) => {
+      const next = new Set(s);
+      keys.forEach((k) => (allSelected ? next.delete(k) : next.add(k)));
+      return next;
+    });
+  return { selected, setSelected, toggleRow, toggleAll };
+}
+
 /** The page the header describes: a partition of a log, or a count read from one node. */
 function messagesHeading(
   page: MessagePageView | undefined,
@@ -216,6 +269,127 @@ function browsePosition(
   );
 }
 
+/** The node to browse, offered when more than one is manageable and the subscription is not a log. */
+function NodePicker({
+  endpoints,
+  partitioned,
+  value,
+  onChange,
+}: Readonly<{
+  endpoints: readonly { id: string; name: string }[];
+  partitioned: boolean;
+  value: string | undefined;
+  onChange: (node: string | null) => void;
+}>) {
+  if (endpoints.length <= 1 || partitioned) return null;
+  return (
+    <Select
+      size="xs"
+      w="11.25rem"
+      label="Node to browse"
+      placeholder="Live node"
+      clearable
+      value={value ?? null}
+      onChange={onChange}
+      data={endpoints.map((e) => ({ value: e.id, label: e.name }))}
+    />
+  );
+}
+
+/** What other features add beside the selection, once the subscription's reference is known. */
+function SelectionSlots({
+  clusterId,
+  subscription,
+  node,
+  selection,
+  total,
+  onClear,
+}: Readonly<{
+  clusterId: string;
+  subscription: ReturnType<typeof refOf> | undefined;
+  node: string | undefined;
+  selection: MessageSelection;
+  total: number | null;
+  onClear: () => void;
+}>) {
+  const slots = useClusterSlot('messages.selection', clusterId);
+  if (!subscription) return null;
+  return slots.map(({ id, Component }) => (
+    <Component
+      key={id}
+      clusterId={clusterId}
+      subscription={subscription}
+      node={node}
+      selection={selection}
+      total={total}
+      clear={onClear}
+    />
+  ));
+}
+
+/** What the header says of the page: the refusal, or the partition or node the page was read from. */
+interface HeaderDescription {
+  /** Whether the kind cannot be browsed. */
+  refused: boolean;
+  page: MessagePageView | undefined;
+  partition: number;
+  endpoints: readonly { id: string; name: string }[];
+  logNoun: string | undefined;
+  /** Whether the line keeps its height while the page loads. */
+  stable: boolean;
+}
+
+function MessagesHeader({
+  clusterId,
+  subscriptionName,
+  node,
+  partitioned,
+  description,
+  sendGate,
+  onSend,
+}: Readonly<{
+  clusterId: string;
+  subscriptionName: string;
+  node: string | undefined;
+  partitioned: boolean;
+  description: HeaderDescription;
+  sendGate: GateVerdict;
+  onSend: () => void;
+}>) {
+  const text = description.refused
+    ? 'This kind of queue cannot be read, only sent to and purged.'
+    : messagesHeading(description.page, partitioned, description.partition, description.endpoints, description.logNoun);
+  return (
+    <PageHeader
+      title="Messages"
+      meta={
+        <>
+          <Link to={`/clusters/${clusterId}/subscriptions`} className={linkClasses.link}>
+            All subscriptions
+          </Link>
+          <span className={classes.subscription}>{subscriptionRefWords(subscriptionName)}</span>
+        </>
+      }
+      description={<span className={description.stable ? classes.stableHeading : undefined}>{text}</span>}
+      actions={
+        <>
+          <CapabilityGate verdict={sendGate} what="sending a message">
+            <Button disabled={sendGate.kind === 'blocked'} onClick={onSend}>
+              Send
+            </Button>
+          </CapabilityGate>
+          <PurgeSubscription
+            clusterId={clusterId}
+            subscriptionName={subscriptionName}
+            node={node}
+            moves={partitioned}
+          />
+        </>
+      }
+    />
+  );
+}
+
 /**
  * Browse one subscription's messages (ADR-0021). Reached from a subscription row, not a
  * top-level tab. Node, filter and page are URL-owned (non-negotiable #9);
@@ -256,17 +430,12 @@ export function MessagesView() {
   const sendGate = useMessageGate(clusterId, 'message:send', 'Send messages', 'messageIo');
   // A partitioned log is read from one partition and a start, not by selector, node and page.
   const subscriptionKind = roleIds.loaded ? kindOf(roleIds.subscription(subscriptionName)) : undefined;
-  const partitioned = isPartitionedLog(subscriptionKind ?? kindOf(subscriptionName), cluster.data?.kinds);
-  const kindInfo = kindOfSubscription(subscriptionKind ?? kindOf(subscriptionName), cluster.data?.kinds);
-  const singleLog = kindInfo
-    ? isSingleLog(kindInfo, partitioned)
-    : partitioned && (subscriptionKind ?? kindOf(subscriptionName)) !== 'kafka.group-topic';
-  // A kind the system cannot browse is refused before anything is read: the reason is the driver's when it gave one.
-  const browseRefusal =
-    cluster.data?.system && kindInfo && !kindInfo.verbs.includes('browse')
-      ? (cluster.data.capabilities.findings.find((f) => f.capability === 'messages.browse')?.reason ??
-        verbRefusal(cluster.data.system.name, kindInfo.label, 'browse'))
-      : undefined;
+  const { partitioned, kindInfo, singleLog } = logShapeOf(
+    subscriptionKind ?? kindOf(subscriptionName),
+    cluster.data?.kinds,
+  );
+  // A kind the system cannot browse is refused before anything is read.
+  const browseRefusal = browseRefusalOf(cluster.data, kindInfo);
   const browse = browseOf(search);
   const columns = useMemo(() => messageColumns(zone, partitioned), [zone, partitioned]);
   const [filter, setFilter] = useState(search.filter ?? '');
@@ -279,27 +448,12 @@ export function MessagesView() {
   );
   const setOpenId = (id: string | null) =>
     navigate({ to: '.', search: (prev: Record<string, unknown>) => ({ ...prev, message: id ?? undefined }) });
-  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const { selected, setSelected, toggleRow, toggleAll } = useRowSelection();
   const [sendOpen, setSendOpen] = useState(false);
   const page = search.page ?? 1;
-  const selectionSlot = useClusterSlot('messages.selection', clusterId);
 
   // Selection is ephemeral (D10) — reset on any navigation of node / filter / page.
-  useEffect(() => setSelected(new Set()), [search.node, search.filter, page]);
-
-  const toggleRow = (key: string) =>
-    setSelected((s) => {
-      const next = new Set(s);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
-  const toggleAll = (keys: string[], allSelected: boolean) =>
-    setSelected((s) => {
-      const next = new Set(s);
-      keys.forEach((k) => (allSelected ? next.delete(k) : next.add(k)));
-      return next;
-    });
+  useEffect(() => setSelected(new Set()), [search.node, search.filter, page, setSelected]);
 
   useEffect(() => {
     if ((search.filter ?? '') === debounced) return;
@@ -346,44 +500,21 @@ export function MessagesView() {
   const unproven = messageIo?.status === 'UNKNOWN' && !partitioned;
 
   const header = (
-    <PageHeader
-      title="Messages"
-      meta={
-        <>
-          <Link to={`/clusters/${clusterId}/subscriptions`} className={linkClasses.link}>
-            All subscriptions
-          </Link>
-          <span className={classes.subscription}>{subscriptionRefWords(subscriptionName)}</span>
-        </>
-      }
-      description={
-        <span className={partitioned && !singleLog ? classes.stableHeading : undefined}>
-          {browseRefusal
-            ? 'This kind of queue cannot be read, only sent to and purged.'
-            : messagesHeading(
-                messages.data,
-                partitioned,
-                browse.partition,
-                endpoints,
-                singleLog ? kindInfo?.label.singular : undefined,
-              )}
-        </span>
-      }
-      actions={
-        <>
-          <CapabilityGate verdict={sendGate} what="sending a message">
-            <Button disabled={sendGate.kind === 'blocked'} onClick={() => setSendOpen(true)}>
-              Send
-            </Button>
-          </CapabilityGate>
-          <PurgeSubscription
-            clusterId={clusterId}
-            subscriptionName={subscriptionName}
-            node={search.node}
-            moves={partitioned}
-          />
-        </>
-      }
+    <MessagesHeader
+      clusterId={clusterId}
+      subscriptionName={subscriptionName}
+      node={search.node}
+      partitioned={partitioned}
+      description={{
+        refused: browseRefusal !== undefined,
+        page: messages.data,
+        partition: browse.partition,
+        endpoints,
+        logNoun: singleLog ? kindInfo?.label.singular : undefined,
+        stable: partitioned && !singleLog,
+      }}
+      sendGate={sendGate}
+      onSend={() => setSendOpen(true)}
     />
   );
 
@@ -424,7 +555,7 @@ export function MessagesView() {
   const rows = messages.data?.data ?? NO_ROWS;
   // An unavailable total is stated, never read as zero: the page count is then unknown too.
   const total = messages.data?.count;
-  const lastPage = total == null ? null : Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const lastPage = lastPageOf(total);
 
   // Picked rows win; otherwise the selector in force, otherwise the whole subscription.
   const pickedIds = [...selected].map(Number).filter((n) => Number.isFinite(n));
@@ -474,36 +605,20 @@ export function MessagesView() {
               w={selector.width}
               size="xs"
             />
-            {endpoints.length > 1 && !partitioned ? (
-              <Select
-                size="xs"
-                w="11.25rem"
-                label="Node to browse"
-                placeholder="Live node"
-                clearable
-                value={search.node ?? null}
-                onChange={setNode}
-                data={endpoints.map((e) => ({ value: e.id, label: e.name }))}
-              />
-            ) : null}
+            <NodePicker endpoints={endpoints} partitioned={partitioned} value={search.node} onChange={setNode} />
           </>
         }
         end={
           <>
             {browsePosition(partitioned, singleLog, messages.data?.log, page, lastPage)}
-            {subscription
-              ? selectionSlot.map(({ id, Component }) => (
-                  <Component
-                    key={id}
-                    clusterId={clusterId}
-                    subscription={subscription}
-                    node={search.node}
-                    selection={selection}
-                    total={selectionTotal}
-                    clear={() => setSelected(new Set())}
-                  />
-                ))
-              : null}
+            <SelectionSlots
+              clusterId={clusterId}
+              subscription={subscription}
+              node={search.node}
+              selection={selection}
+              total={selectionTotal}
+              onClear={() => setSelected(new Set())}
+            />
           </>
         }
       />
