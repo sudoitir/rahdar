@@ -33,8 +33,8 @@ public class SqlViewMapper {
                         .map(t -> new TargetView(
                                 t.nodeId(),
                                 t.nodeName(),
-                                ids.subscription(t.subscription()),
-                                ids.destination(t.destination()),
+                                subscription(ids, t.log(), t.subscription()),
+                                destination(ids, t.log(), t.destination()),
                                 t.messageCount()))
                         .toList(),
                 plan.selector(),
@@ -63,8 +63,8 @@ public class SqlViewMapper {
         return new RowView(
                 row.nodeId(),
                 row.nodeName(),
-                ids.subscription(row.subscription()),
-                ids.destination(row.destination()),
+                subscription(ids, row.log(), row.subscription()),
+                destination(ids, row.log(), row.destination()),
                 row.messageId(),
                 row.messageType(),
                 row.durable(),
@@ -93,7 +93,7 @@ public class SqlViewMapper {
         return new SqlNodeOutcomeView(
                 outcome.nodeId(),
                 outcome.nodeName(),
-                ids.subscription(outcome.subscription()),
+                subscription(ids, outcome.log(), outcome.subscription()),
                 outcome.status().name(),
                 outcome.examined(),
                 outcome.matched(),
@@ -107,6 +107,18 @@ public class SqlViewMapper {
                 status.polls(),
                 text(status.lastPollAt()),
                 status.everyMessageMatches());
+    }
+
+    /**
+     * A log read as a target is its own resource, a Kafka topic or a RabbitMQ stream, so its id is the log's and
+     * not the name built under the first subscription kind of the system.
+     */
+    private static String subscription(Of ids, String log, String name) {
+        return log != null ? log : ids.subscription(name);
+    }
+
+    private static String destination(Of ids, String log, String name) {
+        return log != null ? log : ids.destination(name);
     }
 
     private List<NoticeView> notices(List<QueryPlan.Notice> notices) {

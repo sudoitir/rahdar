@@ -461,7 +461,8 @@ public class BrokerQueryExecutor {
                     null,
                     null,
                     null,
-                    null);
+                    null,
+                    target.log());
         }
     }
 
@@ -483,7 +484,14 @@ public class BrokerQueryExecutor {
 
         NodeOutcome outcome(NodeOutcome.Status status, String detail) {
             return new NodeOutcome(
-                    node.getId(), target.nodeName(), target.subscription(), status, examinedHere, matched, detail);
+                    node.getId(),
+                    target.nodeName(),
+                    target.subscription(),
+                    status,
+                    examinedHere,
+                    matched,
+                    detail,
+                    target.log());
         }
     }
 
