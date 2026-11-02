@@ -102,27 +102,41 @@ export function subscriptionNameOf(id: string): string {
   }
 }
 
-/** A subscription id for people: its path with each segment decoded, so a group on a topic reads "group/topic". */
-export function subscriptionLabel(id: string): string {
-  return id
-    .slice(id.indexOf('/') + 1)
-    .split('/')
-    .map((segment) => {
-      try {
-        return decodeURIComponent(segment);
-      } catch {
-        return segment;
-      }
-    })
-    .join('/');
+/** The segments of a path decoded and joined: by `/`, or by ` · ` when a segment holds a slash itself (the default virtual host). */
+function joinDecoded(path: string): string {
+  const segments = path.split('/').map((segment) => {
+    try {
+      return decodeURIComponent(segment);
+    } catch {
+      return segment;
+    }
+  });
+  return segments.join(segments.some((s) => s.includes('/')) ? ' · ' : '/');
 }
 
-/** A subscription reference for people: its name, or for a whole id the group and topic without the kind. */
+/** A subscription id for people: its path with each segment decoded, so a group on a topic reads "group/topic". */
+export function subscriptionLabel(id: string): string {
+  return joinDecoded(id.slice(id.indexOf('/') + 1));
+}
+
+/** A subscription reference for people: its name, or for a whole id its path without the kind. */
 export function subscriptionRefWords(ref: string): string {
   const slash = ref.indexOf('/');
-  return slash > 0 && /^[a-z][a-z0-9.-]*$/.test(ref.slice(0, slash)) ? ref.slice(slash + 1) : ref;
+  return slash > 0 && /^[a-z][a-z0-9.-]*$/.test(ref.slice(0, slash)) ? joinDecoded(ref.slice(slash + 1)) : ref;
 }
 
 /** The id of the destination of this name, built as {@link subscriptionId} builds a subscription's. */
 export const destinationId = (kinds: ClusterKinds | undefined, name: string): string =>
   resourceId(kindOfRole(kinds, 'DESTINATION'), name);
+
+/** The virtual host a RabbitMQ queue or exchange id names (`rabbitmq.<kind>/<vhost>/<name>`), or empty for any other id. */
+export function virtualHostOf(id: string): string {
+  if (!id.startsWith('rabbitmq.')) return '';
+  const segments = id.split('/');
+  if (segments.length !== 3) return '';
+  try {
+    return decodeURIComponent(segments[1] ?? '');
+  } catch {
+    return segments[1] ?? '';
+  }
+}

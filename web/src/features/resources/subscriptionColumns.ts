@@ -3,6 +3,7 @@ import { createElement } from 'react';
 import { BacklogCell } from '../../ui/BacklogCell.tsx';
 import { backlogWords } from '../../ui/backlog.ts';
 import { kindColumn, type Column } from '../../ui/table/index.ts';
+import { virtualHostOf } from '../../kernel/api/resourceId.ts';
 import { destinationOf, routingTypeOf, type SubscriptionView } from './api.ts';
 import { OwnerChip } from '../../kernel/auth/OwnerChip.tsx';
 import { StaleBadge } from './subscriptionCells.tsx';
@@ -25,16 +26,30 @@ export function pausedLabel(r: SubscriptionView): string {
  * name on hover, and a routing type is in lower case, the way the destination picker writes it. `onBreakdown`
  * opens the backlog by partition, offered from the backlog figure of a row whose system has one.
  */
-export function subscriptionColumns(onBreakdown?: (row: SubscriptionView) => void): Column<SubscriptionView>[] {
-  return [
-    {
-      id: 'destination',
-      header: 'Destination',
-      accessor: (r) => destinationOf(r),
-      kind: 'identifier',
-      priority: 'essential',
-      sortKey: 'destination',
-    },
+export function subscriptionColumns(
+  onBreakdown?: (row: SubscriptionView) => void,
+  system?: string,
+): Column<SubscriptionView>[] {
+  // A RabbitMQ queue lives in a virtual host, not under a destination, and has no routing type: the same name can
+  // exist in two virtual hosts, so the host is what tells the rows apart.
+  const rabbit = system === 'rabbitmq';
+  const columns: Column<SubscriptionView>[] = [
+    rabbit
+      ? {
+          id: 'vhost',
+          header: 'Virtual host',
+          accessor: (r) => virtualHostOf(r.id),
+          kind: 'identifier',
+          priority: 'essential',
+        }
+      : {
+          id: 'destination',
+          header: 'Destination',
+          accessor: (r) => destinationOf(r),
+          kind: 'identifier',
+          priority: 'essential',
+          sortKey: 'destination',
+        },
     {
       id: 'subscription',
       header: 'Subscription',
@@ -135,6 +150,7 @@ export function subscriptionColumns(onBreakdown?: (row: SubscriptionView) => voi
       priority: 'high',
     },
   ];
+  return rabbit ? columns.filter((c) => c.id !== 'routingType') : columns;
 }
 
 /**

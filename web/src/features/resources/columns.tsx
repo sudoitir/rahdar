@@ -1,4 +1,4 @@
-import { nameOf, refOf } from '../../kernel/api/resourceId.ts';
+import { nameOf, refOf, virtualHostOf } from '../../kernel/api/resourceId.ts';
 import type { ReactNode } from 'react';
 
 import { OwnerChip } from '../../kernel/auth/OwnerChip.tsx';
@@ -12,6 +12,8 @@ export interface ColumnDeps {
   clusterId: string;
   /** When the rows on screen were fetched, in epoch ms. A close depends on it. */
   fetchedAt: number | null;
+  /** The id of the cluster's system, for the columns only one system has. */
+  system?: string;
 }
 
 /**
@@ -64,7 +66,7 @@ const DELIVERY: Record<DestinationView['delivery'][number], string> = {
 
 /** Each resource's columns. The first column identifies a row; the node column is never hidden. */
 export const resourceColumns = {
-  destinations: ({ clusterId }: ColumnDeps): Column<DestinationView>[] => [
+  destinations: ({ clusterId, system }: ColumnDeps): Column<DestinationView>[] => [
     {
       id: 'name',
       header: 'Destination',
@@ -73,6 +75,18 @@ export const resourceColumns = {
       priority: 'essential',
       sortKey: 'name',
     },
+    // The same exchange name exists in each virtual host, so the host is part of what a row is.
+    ...(system === 'rabbitmq'
+      ? [
+          {
+            id: 'vhost',
+            header: 'Virtual host',
+            accessor: (r: DestinationView) => virtualHostOf(r.id),
+            kind: 'identifier' as const,
+            priority: 'essential' as const,
+          },
+        ]
+      : []),
     kindColumn<DestinationView>(),
     {
       id: 'owner',
