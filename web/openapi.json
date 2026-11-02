@@ -42095,6 +42095,10 @@
           "brokerErrorKind" : {
             "type" : "string"
           },
+          "system" : {
+            "type" : "string",
+            "description" : "Kafka, RabbitMQ or Artemis: the system a broker failure is of."
+          },
           "account" : {
             "type" : "string",
             "description" : "MANAGEMENT or CORE: the account a broker rejected."

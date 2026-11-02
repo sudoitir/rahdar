@@ -21,6 +21,17 @@ public final class BrokerFailures {
     /** The Artemis driver's native error text, present when the broker answered with an error. */
     public static final String NATIVE_ERROR = "artemis.error";
 
+    private static final String KAFKA_ERROR = "kafka.error";
+    private static final String KAFKA_CODE = "kafka.code";
+    private static final String RABBITMQ_ERROR = "rabbitmq.error";
+    private static final String KAFKA = "Kafka";
+    private static final String RABBITMQ = "RabbitMQ";
+    private static final String ARTEMIS = "Artemis";
+    private static final String UNSUPPORTED_REQUEST = "UnsupportedVersionException";
+
+    /** The problem type of a request the broker's release is too old to answer, such as Kafka's LIST_TRANSACTIONS. */
+    public static final String UNSUPPORTED_BY_RELEASE = "unsupported-by-release";
+
     private static final String NATIVE_CODE = "artemis.code";
     private static final String DIFFERING = "differing";
     private static final String MBEAN_ABSENT = "InstanceNotFoundException";
@@ -54,15 +65,31 @@ public final class BrokerFailures {
     public static RuntimeException translate(BrokerException e) {
         Map<String, String> metadata = e.info().metadata();
         String nativeError = metadata.getOrDefault(NATIVE_ERROR, "");
+        String system = systemOf(e);
         return switch (e.reason()) {
             case ErrorReasons.UNREACHABLE -> connection(BrokerConnectionException.Kind.UNREACHABLE, e);
             case ErrorReasons.RATE_LIMITED -> connection(BrokerConnectionException.Kind.THROTTLED, e);
             case ErrorReasons.CREDENTIALS_REJECTED ->
-                BrokerConnectionException.credentialsRejected(account(metadata), e.getMessage(), e);
-            case ErrorReasons.UNEXPECTED_SYSTEM -> connection(BrokerConnectionException.Kind.NOT_ARTEMIS, e);
+                BrokerConnectionException.credentialsRejected(account(metadata), e.getMessage(), e, system);
+            case ErrorReasons.NOT_AUTHORIZED -> connection(BrokerConnectionException.Kind.NOT_AUTHORIZED, e);
+            // Only an Artemis agent can be the wrong system: Kafka and RabbitMQ answered, just not in a way known.
+            case ErrorReasons.UNEXPECTED_SYSTEM ->
+                connection(
+                        system == null || ARTEMIS.equals(system)
+                                ? BrokerConnectionException.Kind.NOT_ARTEMIS
+                                : BrokerConnectionException.Kind.BAD_RESPONSE,
+                        e);
             case ErrorReasons.ENDPOINT_NOT_FOUND -> connection(BrokerConnectionException.Kind.WRONG_PATH, e);
             case ErrorReasons.TLS_HANDSHAKE_FAILED -> connection(BrokerConnectionException.Kind.TLS_FAILED, e);
-            case ErrorReasons.UNSUPPORTED_VERSION -> connection(BrokerConnectionException.Kind.UNSUPPORTED_VERSION, e);
+            // A Kafka request one broker's release does not know is a gap in that feature, not an unsupported cluster.
+            case ErrorReasons.UNSUPPORTED_VERSION ->
+                UNSUPPORTED_REQUEST.equals(metadata.get(KAFKA_CODE))
+                        ? new ConflictException(
+                                UNSUPPORTED_BY_RELEASE,
+                                "This Kafka cluster's brokers are too old for this request ("
+                                        + metadata.getOrDefault(KAFKA_ERROR, e.getMessage())
+                                        + "). Upgrade the brokers to use it.")
+                        : connection(BrokerConnectionException.Kind.UNSUPPORTED_VERSION, e);
             case ErrorReasons.RESOURCE_GONE ->
                 MBEAN_ABSENT.equals(metadata.get(NATIVE_CODE))
                         ? new ManagementRefusal(
@@ -104,13 +131,40 @@ public final class BrokerFailures {
 
     /** The broker's own error text, when a translated failure is an answer that carried an error. */
     public static Optional<String> answeredError(Throwable translated) {
-        return translated.getCause() instanceof BrokerException b
-                ? Optional.ofNullable(b.info().metadata().get(NATIVE_ERROR))
-                : Optional.empty();
+        if (!(translated.getCause() instanceof BrokerException b)) {
+            return Optional.empty();
+        }
+        Map<String, String> metadata = b.info().metadata();
+        return Optional.ofNullable(metadata.get(NATIVE_ERROR))
+                .or(() -> Optional.ofNullable(metadata.get(KAFKA_ERROR)))
+                .or(() -> Optional.ofNullable(metadata.get(RABBITMQ_ERROR)));
     }
 
     private static BrokerConnectionException connection(BrokerConnectionException.Kind kind, BrokerException e) {
-        return new BrokerConnectionException(kind, e.getMessage(), e);
+        return BrokerConnectionException.of(kind, e.getMessage(), e, systemOf(e));
+    }
+
+    /**
+     * The system a failure came from, read from the driver's namespaced metadata ({@code kafka.*}), else
+     * from the system it names in its own words; {@code null} when it says neither.
+     */
+    static String systemOf(BrokerException e) {
+        for (String key : e.info().metadata().keySet()) {
+            if (key.startsWith("kafka.")) {
+                return KAFKA;
+            }
+            if (key.startsWith("rabbitmq.")) {
+                return RABBITMQ;
+            }
+            if (key.startsWith("artemis.")) {
+                return ARTEMIS;
+            }
+        }
+        String message = String.valueOf(e.getMessage());
+        if (message.contains(KAFKA)) {
+            return KAFKA;
+        }
+        return message.contains(RABBITMQ) ? RABBITMQ : null;
     }
 
     private static BrokerAccount account(Map<String, String> metadata) {

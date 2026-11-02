@@ -57,7 +57,7 @@ final class ArtemisChecks {
     static ConnectionCheck failed(BrokerConnectionException.Kind kind, String detail) {
         String cause =
                 switch (kind) {
-                    case CREDENTIALS_REJECTED -> AUTHENTICATION;
+                    case CREDENTIALS_REJECTED, NOT_AUTHORIZED -> AUTHENTICATION;
                     case TLS_FAILED -> "TLS";
                     case UNSUPPORTED_VERSION -> CAUSE_UNSUPPORTED_VERSION;
                     case NOT_ARTEMIS, WRONG_PATH, BAD_RESPONSE -> REFUSED;

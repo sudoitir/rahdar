@@ -7962,6 +7962,8 @@ export interface components {
                 message?: string;
             }[];
             brokerErrorKind?: string;
+            /** @description Kafka, RabbitMQ or Artemis: the system a broker failure is of. */
+            system?: string;
             /** @description MANAGEMENT or CORE: the account a broker rejected. */
             account?: string;
             refusalKind?: string;

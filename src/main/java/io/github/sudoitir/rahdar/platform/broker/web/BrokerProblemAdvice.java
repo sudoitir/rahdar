@@ -18,9 +18,12 @@ class BrokerProblemAdvice {
 
     @ExceptionHandler(BrokerConnectionException.class)
     ProblemDetail onBrokerConnection(BrokerConnectionException e) {
-        ProblemDetail problem =
-                Problems.of(statusFor(e.kind()), "broker-" + kebab(e.kind()), titleFor(e.kind()), e.getMessage());
+        ProblemDetail problem = Problems.of(
+                statusFor(e.kind()), "broker-" + kebab(e.kind()), titleFor(e.kind(), e.system()), e.getMessage());
         problem.setProperty("brokerErrorKind", e.kind().name());
+        if (e.system() != null) {
+            problem.setProperty("system", e.system());
+        }
         if (e.account() != null) {
             problem.setProperty("account", e.account().name());
         }
@@ -63,22 +66,28 @@ class BrokerProblemAdvice {
 
     private static HttpStatus statusFor(Kind kind) {
         return switch (kind) {
-            case CREDENTIALS_REJECTED, NOT_ARTEMIS, WRONG_PATH, UNSUPPORTED_VERSION -> HttpStatus.UNPROCESSABLE_ENTITY;
+            case CREDENTIALS_REJECTED, NOT_AUTHORIZED, NOT_ARTEMIS, WRONG_PATH, UNSUPPORTED_VERSION ->
+                HttpStatus.UNPROCESSABLE_ENTITY;
             case UNREACHABLE, TLS_FAILED, BAD_RESPONSE -> HttpStatus.BAD_GATEWAY;
             case THROTTLED -> HttpStatus.SERVICE_UNAVAILABLE;
         };
     }
 
-    private static String titleFor(Kind kind) {
+    private static String titleFor(Kind kind, String system) {
+        String broker = system == null ? "Broker" : system;
         return switch (kind) {
-            case UNREACHABLE -> "Broker unreachable";
+            case UNREACHABLE -> broker + " unreachable";
             case THROTTLED -> "Rahdar is throttling calls to this broker";
-            case CREDENTIALS_REJECTED -> "Broker rejected the credentials";
+            case CREDENTIALS_REJECTED -> broker + " rejected the credentials";
+            case NOT_AUTHORIZED -> broker + " refused this account";
             case NOT_ARTEMIS -> "No Artemis broker at this agent";
-            case WRONG_PATH -> "No Jolokia agent at this address";
+            case WRONG_PATH ->
+                system == null || "Artemis".equals(system)
+                        ? "No Jolokia agent at this address"
+                        : "No " + system + " management endpoint at this address";
             case TLS_FAILED -> "TLS handshake failed";
-            case BAD_RESPONSE -> "Unexpected broker response";
-            case UNSUPPORTED_VERSION -> "Artemis version not supported";
+            case BAD_RESPONSE -> broker + " sent a response Rahdar cannot use";
+            case UNSUPPORTED_VERSION -> broker + " version not supported";
         };
     }
 
