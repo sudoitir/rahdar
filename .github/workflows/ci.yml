@@ -174,7 +174,7 @@ jobs:
             \( -name '*Test.java' -o -name '*Tests.java' -o -name 'Test*.java' -o -name '*TestCase.java' \) \
             | sort > "$RUNNER_TEMP/tests.txt"
           xargs grep -l -e ArtemisIntegrationTest -e ArtemisBrokers < "$RUNNER_TEMP/tests.txt" > "$RUNNER_TEMP/artemis.txt" || true
-          xargs grep -l -e KafkaContainer -e '"kafka.image"' < "$RUNNER_TEMP/tests.txt" > "$RUNNER_TEMP/kafka.txt" || true
+          xargs grep -l -e KafkaContainer -e '"kafka.image"' -e 'confluentinc/cp-kafka' < "$RUNNER_TEMP/tests.txt" > "$RUNNER_TEMP/kafka.txt" || true
           xargs grep -l -e RabbitMqBrokers -e '"rabbitmq.image"' < "$RUNNER_TEMP/tests.txt" > "$RUNNER_TEMP/rabbitmq.txt" || true
           case "$SHARD" in
             artemis|kafka|rabbitmq) cp "$RUNNER_TEMP/$SHARD.txt" "$RUNNER_TEMP/picked.txt" ;;
