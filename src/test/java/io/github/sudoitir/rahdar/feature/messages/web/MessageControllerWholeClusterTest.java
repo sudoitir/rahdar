@@ -17,6 +17,7 @@ import static org.springframework.test.web.servlet.setup.MockMvcBuilders.standal
 import io.github.sudoitir.openbroker.model.ResourceClass;
 import io.github.sudoitir.openbroker.model.ResourceId;
 import io.github.sudoitir.rahdar.feature.messages.MessageService;
+import io.github.sudoitir.rahdar.feature.messages.WholeClusterPurge;
 import io.github.sudoitir.rahdar.kernel.audit.AuditEvent;
 import io.github.sudoitir.rahdar.kernel.audit.AuditService;
 import io.github.sudoitir.rahdar.kernel.core.web.ApiExceptionHandler;
@@ -30,7 +31,6 @@ import io.github.sudoitir.rahdar.platform.broker.BrokerMessages;
 import io.github.sudoitir.rahdar.platform.broker.BrokerSettings;
 import io.github.sudoitir.rahdar.platform.broker.MessageExpiry;
 import io.github.sudoitir.rahdar.platform.broker.SystemExtensions;
-import io.github.sudoitir.rahdar.platform.broker.WholeClusterOperations;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterKinds;
 import io.github.sudoitir.rahdar.platform.clusters.ResourceTargets;
@@ -82,7 +82,7 @@ class MessageControllerWholeClusterTest {
                 mock(ClearViewAudit.class),
                 mock(OperationGate.class),
                 mock(SystemExtensions.class),
-                mock(WholeClusterOperations.class));
+                mock(WholeClusterPurge.class));
         when(kinds.readAsOne(CLUSTER)).thenReturn(true);
         mvc = standaloneSetup(new MessageController(service, targets, kinds))
                 .setControllerAdvice(new ApiExceptionHandler())

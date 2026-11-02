@@ -157,7 +157,7 @@ class MessageServiceTest {
                 clearViews,
                 gate,
                 extensions,
-                wholeCluster);
+                new WholeClusterPurge(wholeCluster));
         when(locator.locate(CLUSTER, "target"))
                 .thenReturn(List.of(new QueueLocation(NODE_A, "target", "target", "ANYCAST", 1L)));
         when(locator.locate(CLUSTER, "t")).thenReturn(List.of(new QueueLocation(NODE_A, "t", "t", "ANYCAST", 1L)));

@@ -72,6 +72,17 @@ final class ManagementUrls {
             throw invalid(token);
         }
         String scheme = uri.getScheme() == null ? "" : uri.getScheme().toLowerCase(Locale.ROOT);
+        requirePlain(uri, scheme, token);
+        int port = uri.getPort() < 0 ? defaultPort(scheme) : uri.getPort();
+        if (port < 1 || port > 65535) {
+            throw invalid(token);
+        }
+        String path = withoutTrailingSlashes(uri.getRawPath());
+        return scheme + "://" + uri.getHost().toLowerCase(Locale.ROOT) + ":" + port + path;
+    }
+
+    /** An HTTP or HTTPS URL with a host, and with no account, query or fragment. */
+    private static void requirePlain(URI uri, String scheme, String token) {
         if (!HTTP.equals(scheme) && !HTTPS.equals(scheme)
                 || uri.getHost() == null
                 || uri.getHost().isEmpty()) {
@@ -84,12 +95,6 @@ final class ManagementUrls {
         if (uri.getRawQuery() != null || uri.getRawFragment() != null) {
             throw new IllegalArgumentException("'" + token + "' must not carry a query or a fragment.");
         }
-        int port = uri.getPort() < 0 ? defaultPort(scheme) : uri.getPort();
-        if (port < 1 || port > 65535) {
-            throw invalid(token);
-        }
-        String path = withoutTrailingSlashes(uri.getRawPath());
-        return scheme + "://" + uri.getHost().toLowerCase(Locale.ROOT) + ":" + port + path;
     }
 
     /** The path without the slashes at its end, found by a scan so a long run of them costs only its length. */

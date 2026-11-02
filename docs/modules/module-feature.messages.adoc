@@ -11,6 +11,7 @@
 _Others_
 
 * `i.g.s.r.f.m.MessagesFeature`
+* `i.g.s.r.f.m.WholeClusterPurge`
 |Bean references
 |* `i.g.s.r.p.s.QueueSnapshots` (in Scraping)
 * `i.g.s.r.p.c.ClusterDirectory` (in Clusters)

@@ -13,8 +13,6 @@ import io.github.sudoitir.openbroker.model.PartitionId;
 import io.github.sudoitir.openbroker.model.ResourceClass;
 import io.github.sudoitir.openbroker.model.ResourceId;
 import io.github.sudoitir.openbroker.model.Shard;
-import io.github.sudoitir.openbroker.operation.OperationResult;
-import io.github.sudoitir.openbroker.operation.Preview;
 import io.github.sudoitir.rahdar.feature.messages.MessageActionParams.LogPurgeParams;
 import io.github.sudoitir.rahdar.feature.messages.MessageActionParams.MessageDeleteParams;
 import io.github.sudoitir.rahdar.feature.messages.MessageActionParams.MessageExpireParams;
@@ -63,7 +61,6 @@ import io.github.sudoitir.rahdar.platform.broker.SendInDoubtException;
 import io.github.sudoitir.rahdar.platform.broker.SendNames;
 import io.github.sudoitir.rahdar.platform.broker.SentMessages;
 import io.github.sudoitir.rahdar.platform.broker.SystemExtensions;
-import io.github.sudoitir.rahdar.platform.broker.WholeClusterOperations;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
 import io.github.sudoitir.rahdar.platform.governance.ClearViewAudit;
@@ -121,10 +118,6 @@ public class MessageService {
     private static final String CORRELATION_ID = "correlationId";
     private static final String GROUP_ID = "groupId";
 
-    /** The SDK's purge, named in full because the gate has an {@code Operation} of its own. */
-    private static final io.github.sudoitir.openbroker.operation.Operation PURGE =
-            new io.github.sudoitir.openbroker.operation.Operation.Purge();
-
     private final QueueLocator queueLocator;
     private final ClusterDirectory brokerNodes;
     private final BrokerMessages messages;
@@ -138,7 +131,7 @@ public class MessageService {
     private final ClearViewAudit clearViews;
     private final OperationGate gate;
     private final SystemExtensions extensions;
-    private final WholeClusterOperations wholeCluster;
+    private final WholeClusterPurge wholeClusterPurge;
 
     /** Resolved (node, address, routingType) for a queue name on a cluster. */
     record ResolvedQueue(ClusterNode node, String address, String routingType) {}
@@ -851,11 +844,9 @@ public class MessageService {
         clusterAccess.requireResource(
                 clusterId, ResourceRef.subscription(id.name()), MessagePermissions.SUBSCRIPTION_PURGE);
         try {
-            Preview preview = wholeCluster.preview(clusterId, id, PURGE);
+            WholeClusterPurge.Estimate estimate = wholeClusterPurge.estimate(clusterId, id);
             return new Reach(
-                    WholeClusterOperations.messages(preview).orElse(0L),
-                    preview.etag(),
-                    wholeCluster.basis(preview).note());
+                    estimate.messages(), estimate.etag(), estimate.basis().note());
         } catch (BrokerException e) {
             throw BrokerFailures.translate(e);
         }
@@ -865,19 +856,17 @@ public class MessageService {
         AuditEvent event = begin("PURGE_QUEUE", id.name(), clusterId, null, Map.of("id", id.format()), dryRun);
         try {
             long cap = settings.intValue(BrokerSettings.BULK_CAP);
-            Preview preview = wholeCluster.preview(clusterId, id, PURGE);
-            long estimate = WholeClusterOperations.messages(preview).orElse(0L);
+            WholeClusterPurge.Estimate reach = wholeClusterPurge.estimate(clusterId, id);
+            long estimate = reach.messages();
             if (dryRun) {
                 audit.succeed(event, estimate);
-                return new Attempt.Ok<>(
-                        new Outcome.DryRun(estimate, cap, estimate > cap, null, wholeCluster.basis(preview)));
+                return new Attempt.Ok<>(new Outcome.DryRun(estimate, cap, estimate > cap, null, reach.basis()));
             }
             if (estimate > cap && !override) {
                 audit.fail(event, overCap(estimate, cap));
                 throw new BulkCapExceededException(estimate, cap);
             }
-            OperationResult result = wholeCluster.execute(clusterId, id, PURGE, preview.etag());
-            long removed = result.affected().isPresent() ? result.affected().getAsLong() : estimate;
+            long removed = wholeClusterPurge.run(clusterId, id, reach);
             audit.succeed(event, removed);
             publishQueuesAfterCommit(clusterId, id.name());
             return new Attempt.Ok<>(new Outcome.Affected(removed, null));

@@ -133,11 +133,12 @@ public class RabbitMqVhosts {
 
     static List<String> lines(RabbitMqReads.Found queues) {
         List<String> out = new ArrayList<>();
-        out.add(
-                queues.items().isEmpty()
-                        ? "It holds no queue."
-                        : "It holds " + queues.items().size() + (queues.truncated() ? " or more" : "")
-                                + " queues, and they go with it.");
+        if (queues.items().isEmpty()) {
+            out.add("It holds no queue.");
+        } else {
+            String more = queues.truncated() ? " or more" : "";
+            out.add("It holds " + queues.items().size() + more + " queues, and they go with it.");
+        }
         queues.items().stream()
                 .limit(NAMED)
                 .forEach(q -> out.add("Queue " + q.id().name() + ": "
