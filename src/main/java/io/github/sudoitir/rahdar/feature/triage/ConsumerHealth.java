@@ -18,6 +18,8 @@ import java.time.Instant;
 public record ConsumerHealth(
         String destination,
         String subscription,
+        /** The subscription's own id, kind and full path, such as {@code rabbitmq.classic-queue/%2F/orders}. */
+        String subscriptionId,
         Verdict verdict,
         /** The likely cause and what to do about it, in words. Never null. */
         String cause,

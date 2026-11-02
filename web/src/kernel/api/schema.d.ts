@@ -9220,10 +9220,12 @@ export interface components {
             hasNext: boolean;
         };
         ConsumerHealthView: {
-            /** @description The destination's id. */
-            destination: string;
-            /** @description The subscription's id. */
+            /** @description The destination's id; absent for a system whose queues are fed through routes. */
+            destination?: string | null;
+            /** @description The subscription's own id: its kind and its whole path, such as a queue's virtual host and name. */
             subscription: string;
+            /** @description The subscription's name, without its path. */
+            name: string;
             /** @description The id of the subscription's kind, such as artemis.queue. */
             kind: string;
             /** @description The kind's name for people, singular and plural. */

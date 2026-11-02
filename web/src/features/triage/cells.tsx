@@ -1,4 +1,4 @@
-import { nameOf, refOf } from '../../kernel/api/resourceId.ts';
+import { refOf } from '../../kernel/api/resourceId.ts';
 import { ResourceLink } from '../../kernel/actions/ResourceLink.tsx';
 import { MiddleTruncate } from '../../ui/table/index.ts';
 import type { ConsumerHealthView } from './api.ts';
@@ -7,7 +7,7 @@ import type { ConsumerHealthView } from './api.ts';
 export function SubscriptionLink({ row }: Readonly<{ row: ConsumerHealthView }>) {
   return (
     <ResourceLink kind="subscription" target={{ ...refOf(row.subscription), destination: row.destination }}>
-      <MiddleTruncate text={nameOf(row.subscription)} />
+      <MiddleTruncate text={row.name} />
     </ResourceLink>
   );
 }

@@ -20,7 +20,9 @@ vi.mock('@tanstack/react-router', async (importOriginal) => ({
 const { ConsumerHealthView } = await import('./ConsumerHealthView.tsx');
 
 function row(over: Record<string, unknown> = {}) {
+  const subscription = (over.subscription as string | undefined) ?? 'artemis.queue/orders';
   return {
+    name: subscription.slice(subscription.lastIndexOf('/') + 1),
     destination: 'artemis.address/orders',
     subscription: 'artemis.queue/orders',
     kindLabel: { singular: 'Queue', plural: 'Queues' },
@@ -53,8 +55,10 @@ function page(rows: unknown[]) {
   return { data: rows, count: rows.length, page: 1, pageSize: 200 };
 }
 
-function withCluster() {
-  server.use(http.get('*/api/v1/clusters/c1', () => HttpResponse.json({ topology: { nodes: [] } })));
+function withCluster(system = 'artemis') {
+  server.use(
+    http.get('*/api/v1/clusters/c1', () => HttpResponse.json({ system: { id: system }, topology: { nodes: [] } })),
+  );
 }
 
 describe('ConsumerHealthView', () => {
@@ -82,6 +86,39 @@ describe('ConsumerHealthView', () => {
 
     expect(await screen.findByText('No consumers')).toBeInTheDocument();
     expect(screen.getByText('Stalled')).toBeInTheDocument();
+  });
+
+  it('tells a RabbitMQ queue of one name in two virtual hosts apart, by kind, host and whole id', async () => {
+    currentSearch = {};
+    withCluster('rabbitmq');
+    server.use(
+      http.get('*/api/v1/clusters/c1/consumer-health', () =>
+        HttpResponse.json(
+          page([
+            row({
+              subscription: 'rabbitmq.quorum-queue/%2F/orders',
+              destination: null,
+              kindLabel: { singular: 'Quorum queue', plural: 'Quorum queues' },
+            }),
+            row({
+              subscription: 'rabbitmq.classic-queue/shop/orders',
+              destination: null,
+              kindLabel: { singular: 'Classic queue', plural: 'Classic queues' },
+            }),
+          ]),
+        ),
+      ),
+    );
+
+    renderWithProviders(<ConsumerHealthView />);
+
+    expect(await screen.findByText('Quorum queue')).toBeInTheDocument();
+    expect(screen.getByText('Classic queue')).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: /Virtual host/ })).toBeInTheDocument();
+    expect(screen.queryByRole('columnheader', { name: /Destination/ })).not.toBeInTheDocument();
+    expect(screen.getByText('shop')).toBeInTheDocument();
+    expect(screen.getByText('/')).toBeInTheDocument();
+    expect(screen.getAllByText('orders')).toHaveLength(2);
   });
 
   it('is one page with a single h1, and says it is reading while the rows load', async () => {
@@ -150,6 +187,7 @@ describe('ConsumerHealthView', () => {
     server.use(
       http.get('*/api/v1/clusters/c1', () =>
         HttpResponse.json({
+          system: { id: 'artemis' },
           topology: { nodes: [{ endpoints: [{ name: 'node-2', lastError: 'connection refused' }] }] },
         }),
       ),

@@ -391,6 +391,30 @@ class RabbitMqRegistrarTest {
                 "firewall");
     }
 
+    @Test
+    void aHostThatDoesNotResolveIsNotReportedAsARefusal() {
+        // The JDK client reports an unresolvable host as a connect failure, and the driver words that as a refusal.
+        java.net.ConnectException connect = new java.net.ConnectException();
+        connect.initCause(new java.net.UnknownHostException("nope.invalid"));
+        BrokerException failure = new BrokerException(
+                Status.UNAVAILABLE,
+                new ErrorInfo(ErrorReasons.UNREACHABLE, ErrorReasons.DOMAIN, Map.of()),
+                Dispatch.NOT_SENT,
+                null,
+                "Connection refused: nothing is listening at the address.",
+                connect);
+        doThrow(failure).when(gateway).verify(any(), any(), any(), any());
+
+        Checked checked = registrar.check(connection(List.of("http://nope.invalid"), List.of()));
+
+        assertThat(checked.view().failure().cause()).isEqualTo("DNS");
+        assertThat(checked.view().failure().message()).isEqualTo("The host name of the address does not resolve.");
+        assertThat(checked.view().endpoints()).singleElement().satisfies(e -> {
+            assertThat(e.cause()).isEqualTo("DNS");
+            assertThat(e.message()).doesNotContain("refused").contains("does not resolve");
+        });
+    }
+
     private void assertCause(BrokerException failure, String cause, String next) {
         doThrow(failure).when(gateway).verify(any(), any(), any(), any());
 

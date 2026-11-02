@@ -255,7 +255,7 @@ class QueueLifecycleServiceWholeClusterTest {
         NodeOutcome node = only(attempt);
         assertThat(node.status()).isEqualTo(NodeStatus.WOULD_APPLY);
         assertThat(node.affected()).isEqualTo(12L);
-        assertThat(node.error()).contains("does not tell a recreated resource apart");
+        assertThat(node.error()).isNull();
         assertThat(outcome(attempt).identityBasis()).isEqualTo(IdentityBasis.CONFIGURATION);
         verify(driver, never()).execute(any(), any(), any(), any());
     }

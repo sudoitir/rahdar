@@ -14,7 +14,7 @@ import { PageHeader } from '../../ui/PageHeader.tsx';
 import { Pager } from '../../ui/Pager.tsx';
 import { Toolbar } from '../../ui/Toolbar.tsx';
 import { ResourceActions } from '../../kernel/actions/ResourceActions.tsx';
-import { nameOf, refOf } from '../../kernel/api/resourceId.ts';
+import { refOf } from '../../kernel/api/resourceId.ts';
 import { useFilterShortcut } from '../../kernel/keyboard/filterShortcut.ts';
 
 const PAGE_SIZE = 200;
@@ -126,7 +126,8 @@ export function ConsumerHealthView() {
   const setPage = (next: number) =>
     navigate({ to: '.', search: (prev: Record<string, unknown>) => ({ ...prev, page: next > 1 ? next : undefined }) });
 
-  const columns = useMemo(consumerHealthColumns, []);
+  const system = cluster.data?.system.id;
+  const columns = useMemo(() => consumerHealthColumns(system), [system]);
   const rows = query.data?.data ?? [];
   const total = query.data?.count ?? 0;
   const needingAttention = rows.filter((r) => r.severity >= 2).length;
@@ -176,7 +177,7 @@ export function ConsumerHealthView() {
           end: <Pager page={page} pageSize={PAGE_SIZE} total={total} onChange={setPage} label="subscriptions" />,
         }}
         rowMenu={{
-          label: (r) => nameOf(r.subscription),
+          label: (r) => r.name,
           render: (r, menu) => (
             <ResourceActions
               kind="subscription"

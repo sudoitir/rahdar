@@ -460,6 +460,7 @@ const transfer = (f: Fixture, i: number): TransferRunView => ({
 const health = (f: Fixture, i: number): ConsumerHealthView => ({
   destination: resourceId('artemis.address', address(f, i)),
   subscription: resourceId('artemis.queue', name(f, 'orders', i)),
+  name: name(f, 'orders', i),
   kind: 'artemis.queue',
   kindLabel: { singular: 'Queue', plural: 'Queues' },
   verdict: ['NO_CONSUMERS', 'STALLED', 'FALLING_BEHIND', 'DRAINING', 'HEALTHY', 'INSUFFICIENT_DATA'][i],

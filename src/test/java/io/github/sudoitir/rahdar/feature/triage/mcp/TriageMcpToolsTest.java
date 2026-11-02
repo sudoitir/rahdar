@@ -146,6 +146,7 @@ class TriageMcpToolsTest {
         return new ConsumerHealth(
                 address,
                 "ORDERS",
+                "artemis.queue/ORDERS",
                 Verdict.STALLED,
                 "no acks",
                 Source.DERIVED,
@@ -272,7 +273,7 @@ class TriageMcpToolsTest {
 
     @Test
     void diagnoseOfAQueueReadsTheSharedVerdictAndCarriesItsFindings() {
-        when(consumerHealth.forSubscription(CLUSTER, "ORDERS.DLQ"))
+        when(consumerHealth.forSubscription(CLUSTER, "artemis.queue/ORDERS.DLQ"))
                 .thenReturn(
                         Optional.of(health("orders", 3, true, 1, 2, Duration.ofSeconds(90), Duration.ofSeconds(30))));
         when(brokerEvents.page(eq(CLUSTER), any()))
@@ -330,7 +331,7 @@ class TriageMcpToolsTest {
 
     @Test
     void aHealthyFullyReportedQueueHasNoFindingsAndNoDeadLetterHint() {
-        when(consumerHealth.forSubscription(CLUSTER, "ORDERS"))
+        when(consumerHealth.forSubscription(CLUSTER, "artemis.queue/ORDERS"))
                 .thenReturn(Optional.of(health("orders", 0, false, 2, 2, null, null)));
         when(brokerEvents.page(eq(CLUSTER), any()))
                 .thenReturn(new BrokerEventPageView(List.of(), 1, 10, 0L, false, null, false, 0, null));
@@ -350,7 +351,7 @@ class TriageMcpToolsTest {
         when(brokerEvents.page(eq(CLUSTER), any()))
                 .thenReturn(new BrokerEventPageView(List.of(), 1, 10, 0L, false, null, false, 0, null));
         for (String name : List.of("DLQ", "orders.DLQ", "orders.dlq")) {
-            when(consumerHealth.forSubscription(CLUSTER, name))
+            when(consumerHealth.forSubscription(CLUSTER, "artemis.queue/" + name))
                     .thenReturn(Optional.of(health("a", 0, false, 1, 1, null, null)));
 
             McpViews.SubscriptionDiagnosis d = (McpViews.SubscriptionDiagnosis)
@@ -362,7 +363,7 @@ class TriageMcpToolsTest {
 
     @Test
     void anUnknownQueueIsTheHiddenDenial() {
-        when(consumerHealth.forSubscription(CLUSTER, "nope")).thenReturn(Optional.empty());
+        when(consumerHealth.forSubscription(CLUSTER, "artemis.queue/nope")).thenReturn(Optional.empty());
 
         McpSchema.CallToolResult result = tools.diagnose(CLUSTER.toString(), "artemis.queue/nope");
 

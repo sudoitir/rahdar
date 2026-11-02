@@ -9,7 +9,7 @@ import { ConfirmDialog } from '../../ui/ConfirmDialog.tsx';
 import { EmptyState } from '../../ui/EmptyState.tsx';
 import { ErrorState } from '../../ui/ErrorState.tsx';
 import { focusFirstInvalid } from '../../ui/formErrors.ts';
-import { Notice } from '../../ui/Notice.tsx';
+import { StatusBadge } from '../../ui/StatusBadge.tsx';
 import type { ActionVerb } from '../../ui/notify.ts';
 import { Page } from '../../ui/Page.tsx';
 import { PageHeader } from '../../ui/PageHeader.tsx';
@@ -239,13 +239,18 @@ export function VhostsView() {
         title="Virtual hosts"
         description="Separate namespaces of queues, exchanges, bindings and permissions on one cluster."
       />
-      {complete ? null : (
-        <Notice tone="warning" title="The counts are not complete">
-          The read was cut short, so the queue and message counts are lower bounds.
-        </Notice>
-      )}
       <Toolbar
         label="Virtual host actions"
+        // The notice sits on the toolbar's own row, beside the action that already sets its height, so it arriving
+        // with the data moves nothing below it.
+        start={
+          complete ? null : (
+            <Text size="xs" role="status" truncate miw={0}>
+              <StatusBadge tone="warning">The counts are not complete</StatusBadge> The read was cut short, so the queue
+              and message counts are lower bounds.
+            </Text>
+          )
+        }
         end={
           <CapabilityGate verdict={gate} what="creating a virtual host">
             <Button size="xs" disabled={gate.kind === 'blocked'} onClick={() => open(null)}>

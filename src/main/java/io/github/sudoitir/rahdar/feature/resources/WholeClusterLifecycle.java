@@ -80,8 +80,9 @@ class WholeClusterLifecycle {
             long total = messages.orElse(0L);
             boolean overCap = total > cap;
             if (dryRun) {
-                NodeOutcome node = new NodeOutcome(
-                        null, WHOLE_CLUSTER, NodeStatus.WOULD_APPLY, messages.orElse(null), basis.note());
+                // The identity basis travels on the preview itself, so the screen states it once.
+                NodeOutcome node =
+                        new NodeOutcome(null, WHOLE_CLUSTER, NodeStatus.WOULD_APPLY, messages.orElse(null), null);
                 audit.finish(event, false, total, null, List.of(node));
                 return ok(true, cap, overCap, node, basis);
             }

@@ -12,6 +12,9 @@ import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterR
 import io.github.sudoitir.rahdar.support.AdminAuthenticationExtension;
 import io.github.sudoitir.rahdar.support.PostgresIntegrationTest;
 import io.github.sudoitir.rahdar.system.artemis.ArtemisModule;
+import io.github.sudoitir.rahdar.system.rabbitmq.RabbitMqModule;
+import io.github.sudoitir.rahdar.system.rabbitmq.internal.persistence.RabbitMqConnectionEntity;
+import io.github.sudoitir.rahdar.system.rabbitmq.internal.persistence.RabbitMqConnectionRepository;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.HashMap;
@@ -47,6 +50,9 @@ class ConsumerHealthServiceTest extends PostgresIntegrationTest {
 
     @Autowired
     BrokerNodeRepository nodes;
+
+    @Autowired
+    RabbitMqConnectionRepository rabbitConnections;
 
     @Autowired
     NamedParameterJdbcTemplate jdbc;
@@ -241,10 +247,63 @@ class ConsumerHealthServiceTest extends PostgresIntegrationTest {
         assertThat(order).containsExactly("broken", "unsampled", "healthy");
     }
 
+    @Test
+    void queuesOfOneNameInTwoVirtualHostsAreTwoSubscriptionsWithTheirOwnRates() {
+        ClusterEntity cluster =
+                clusters.save(new ClusterEntity(RabbitMqModule.SYSTEM, "r-" + UUID.randomUUID(), null, null));
+        clusterId = cluster.getId();
+        rabbitConnections.save(
+                new RabbitMqConnectionEntity(clusterId, 10, "http://localhost:15672", null, "PASSWORD", "/"));
+        nodeId = nodes.save(BrokerNodeEntity.fromSeed(clusterId, "n1", "NONE", "node-1"))
+                .getId();
+        rabbitQueue("%2F/orders", 5_000, 0);
+        rabbitQueue("shop/orders", 5_000, 3);
+        // Only the default virtual host's queue is being acknowledged.
+        counterSamples("%2F/orders", 100, 100, 100, 200);
+        counterSamples("shop/orders", 100, 200, 100, 100);
+
+        ConsumerHealth plain = service.forSubscription(clusterId, "rabbitmq.classic-queue/%2F/orders")
+                .orElseThrow();
+        ConsumerHealth shop = service.forSubscription(clusterId, "rabbitmq.classic-queue/shop/orders")
+                .orElseThrow();
+
+        assertThat(plain.subscription()).isEqualTo("orders");
+        assertThat(plain.subscriptionId()).isEqualTo("rabbitmq.classic-queue/%2F/orders");
+        assertThat(plain.verdict()).isEqualTo(Verdict.NO_CONSUMERS);
+        assertThat(shop.subscriptionId()).isEqualTo("rabbitmq.classic-queue/shop/orders");
+        assertThat(shop.verdict()).isEqualTo(Verdict.STALLED);
+        assertThat(shop.ackRate()).isEqualTo(0.0);
+        assertThat(plain.ackRate()).isGreaterThan(0.0);
+    }
+
     // ---- helpers ----------------------------------------------------------
 
     private ConsumerHealth verdictFor(String queue) {
-        return service.forSubscription(clusterId, queue).orElseThrow();
+        return service.forSubscription(clusterId, "artemis.queue/" + queue).orElseThrow();
+    }
+
+    private void rabbitQueue(String path, long messages, long delivering) {
+        jdbc.update(
+                """
+                INSERT INTO subscription_snapshot
+                  (node_id, subscription, cluster_id, destination, kind, native_attributes,
+                   consumer_count, backlog, in_flight, paused)
+                VALUES (:n, :p, :c, NULL, 'rabbitmq.classic-queue', jsonb_build_object('rahdar.path', cast(:p as text)),
+                        :cc, :mc, :dc, false)
+                """,
+                Map.of(
+                        "n",
+                        nodeId,
+                        "p",
+                        path,
+                        "c",
+                        clusterId,
+                        "cc",
+                        delivering > 0 ? 1 : 0,
+                        "mc",
+                        messages,
+                        "dc",
+                        delivering));
     }
 
     private void queue(String name, long consumers, long messages, long delivering, boolean paused) {
