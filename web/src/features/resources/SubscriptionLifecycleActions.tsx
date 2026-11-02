@@ -191,6 +191,7 @@ export function DeleteSubscriptionDialog({
   onDeleted: () => void;
 }>) {
   const remove = useDeleteSubscription(clusterId, subscription.id);
+  const forwardRoutes = useCluster(clusterId).data?.system.id === 'artemis';
   const [preview, setPreview] = useState<LifecycleOutcomeView | null>(null);
   const [result, setResult] = useState<LifecycleOutcomeView | null>(null);
   const [previewFailed, setPreviewFailed] = useState<Error | null>(null);
@@ -251,6 +252,7 @@ export function DeleteSubscriptionDialog({
         result ? null : (
           <DeleteConsequence
             consumers={subscription.totalConsumerCount}
+            forwardRoutes={forwardRoutes}
             disconnectConsumers={disconnectConsumers}
             pending={remove.isPending}
             preview={preview}
@@ -270,6 +272,7 @@ export function DeleteSubscriptionDialog({
 /** What deleting a subscription destroys, as the confirmation states it: the preview, the cap and the consumer choice. */
 function DeleteConsequence({
   consumers,
+  forwardRoutes,
   disconnectConsumers,
   pending,
   preview,
@@ -278,6 +281,7 @@ function DeleteConsequence({
   onDisconnectChange,
 }: Readonly<{
   consumers: number;
+  forwardRoutes: boolean;
   disconnectConsumers: boolean;
   pending: boolean;
   preview: LifecycleOutcomeView | null;
@@ -291,11 +295,14 @@ function DeleteConsequence({
         This destroys the subscription on every live node of the cluster, along with every message it holds. Nothing
         here can be undone, and a subscription recreated afterwards is a new, empty one.
       </Text>
-      <Text size="sm">
-        A forward route into this subscription&apos;s destination is removed with it when the delete leaves nothing
-        bound there — otherwise the route would bring the subscription back, or break its producers. Each node below
-        names the routes it removes and the ones it keeps.
-      </Text>
+      {/* Only Artemis forwards a route into a subscription's destination; a RabbitMQ queue is fed by bindings. */}
+      {forwardRoutes ? (
+        <Text size="sm">
+          A forward route into this subscription&apos;s destination is removed with it when the delete leaves nothing
+          bound there — otherwise the route would bring the subscription back, or break its producers. Each node below
+          names the routes it removes and the ones it keeps.
+        </Text>
+      ) : null}
 
       <Checkbox
         label="Disconnect this subscription's consumers"
