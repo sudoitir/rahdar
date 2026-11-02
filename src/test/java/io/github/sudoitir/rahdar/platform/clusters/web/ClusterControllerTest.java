@@ -178,11 +178,12 @@ class ClusterControllerTest extends PostgresIntegrationTest {
         mvc.perform(post("/api/v1/clusters")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                { "system": "rabbitmq", "connection": { "system": "rabbitmq" } }
+                                { "system": "pulsar", "connection": { "system": "pulsar" } }
                                 """))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.type").value(Matchers.endsWith("/problems/unsupported-system")))
-                .andExpect(jsonPath("$.detail").value(Matchers.containsString("Supported systems: artemis, kafka.")));
+                .andExpect(jsonPath("$.detail")
+                        .value(Matchers.containsString("Supported systems: artemis, kafka, rabbitmq.")));
     }
 
     @Test

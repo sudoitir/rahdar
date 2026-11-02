@@ -89,6 +89,7 @@ Rel(RahdarApplication.RahdarApplication.Resources, RahdarApplication.RahdarAppli
 Rel(RahdarApplication.RahdarApplication.Resources, RahdarApplication.RahdarApplication.Plugincontract, "depends on", $techn="", $tags="", $link="")
 Rel(RahdarApplication.RahdarApplication.Resources, RahdarApplication.RahdarApplication.Scraping, "uses", $techn="", $tags="", $link="")
 Rel(RahdarApplication.RahdarApplication.Resources, RahdarApplication.RahdarApplication.Security, "uses", $techn="", $tags="", $link="")
+Rel(RahdarApplication.RahdarApplication.Resources, RahdarApplication.RahdarApplication.Settings, "uses", $techn="", $tags="", $link="")
 Rel(RahdarApplication.RahdarApplication.SQLconsole, RahdarApplication.RahdarApplication.Auditlog, "uses", $techn="", $tags="", $link="")
 Rel(RahdarApplication.RahdarApplication.SQLconsole, RahdarApplication.RahdarApplication.Brokerconnectivity, "uses", $techn="", $tags="", $link="")
 Rel(RahdarApplication.RahdarApplication.SQLconsole, RahdarApplication.RahdarApplication.Clusters, "listens to", $techn="", $tags="", $link="")

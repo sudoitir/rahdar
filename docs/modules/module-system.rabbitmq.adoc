@@ -1,0 +1,34 @@
+[%autowidth.stretch, cols="h,a"]
+|===
+|Base package
+|`io.github.sudoitir.rahdar.system.rabbitmq`
+|Spring components
+|_Services_
+
+* `i.g.s.r.s.r.RabbitMqAccessRules`
+* `i.g.s.r.s.r.RabbitMqBindings`
+* `i.g.s.r.s.r.RabbitMqChanges`
+* `i.g.s.r.s.r.RabbitMqExchanges`
+* `i.g.s.r.s.r.RabbitMqFederation`
+* `i.g.s.r.s.r.RabbitMqNodes`
+* `i.g.s.r.s.r.RabbitMqPolicies`
+* `i.g.s.r.s.r.RabbitMqQueues`
+* `i.g.s.r.s.r.RabbitMqShovels`
+* `i.g.s.r.s.r.RabbitMqVhosts`
+
+_Others_
+
+* `i.g.s.r.s.r.AmqpProbe` (via `i.g.s.r.s.r.AmqpProbe.Socketed`)
+|Bean references
+|* `i.g.s.r.p.b.BrokerGateway` (in Broker connectivity)
+* `i.g.s.r.k.s.ClusterAccessGuard` (in Security)
+* `i.g.s.r.k.g.OperationGate` (in Approval gate contract)
+* `i.g.s.r.k.a.AuditService` (in Audit log)
+* `i.g.s.r.k.s.ActorResolver` (in Security)
+* `i.g.s.r.p.b.ConnectionSettingsSource` (in Broker connectivity)
+* `i.g.s.r.p.b.WholeClusterOperations` (in Broker connectivity)
+* `i.g.s.r.p.c.ClusterDirectory` (in Clusters)
+* `i.g.s.r.p.c.NodeStateRecorder` (in Clusters)
+|Events listened to
+|* `i.g.s.r.k.r.ReplicaSignal` 
+|===

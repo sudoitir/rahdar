@@ -14,6 +14,7 @@ import { FeatureProvider } from '../../kernel/FeatureProvider.tsx';
 import { axeViolations, contentWidth, Frame, renderThemed, SCHEMES, settle } from '../../test/browser.tsx';
 import { ConsumerHealthView } from './ConsumerHealthView.tsx';
 import { SubscriptionHealthPanel } from './SubscriptionHealthPanel.tsx';
+import { ARTEMIS_SYSTEM } from '../../test/wire.ts';
 
 /**
  * Consumer health in a real browser: one h1, no accessibility violations in either colour scheme, and no
@@ -23,6 +24,7 @@ import { SubscriptionHealthPanel } from './SubscriptionHealthPanel.tsx';
 const row = (subscriptionName: string, verdict: string, severity: number, over: Record<string, unknown> = {}) => ({
   destination: `artemis.address/${subscriptionName}`,
   subscription: `artemis.queue/${subscriptionName}`,
+  name: subscriptionName,
   kind: 'artemis.queue',
   kindLabel: { singular: 'Queue', plural: 'Queues' },
   verdict,
@@ -63,7 +65,14 @@ const ME = {
   grants: [{ scopeType: 'GLOBAL', scopeId: null, permissions: ['*'] }],
 };
 
-const CLUSTER = { id: 'c1', name: 'prod', topology: { nodes: [] }, capabilities: {} };
+const CLUSTER = {
+  id: 'c1',
+  name: 'prod',
+  system: ARTEMIS_SYSTEM,
+  kinds: [],
+  topology: { nodes: [] },
+  capabilities: {},
+};
 
 function bodyFor(path: string, query: string): unknown {
   if (path.endsWith('/auth/me')) return ME;
