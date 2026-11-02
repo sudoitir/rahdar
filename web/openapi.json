@@ -2,7 +2,7 @@
   "openapi" : "3.1.0",
   "info" : {
     "title" : "Rahdar API",
-    "description" : "Cluster-wide management and observability for Apache ActiveMQ Artemis",
+    "description" : "Cluster-wide management and observability for Apache Kafka, RabbitMQ and Apache ActiveMQ Artemis",
     "version" : "0.0.0"
   },
   "servers" : [ {
@@ -34554,7 +34554,7 @@
           },
           "resourcePattern" : {
             "type" : [ "string", "null" ],
-            "description" : "An Artemis wildcard pattern, with resourceType; absent for the whole scope"
+            "description" : "A wildcard pattern over resource names (. separates words, * matches one word, # any number of words), with resourceType; absent for the whole scope"
           }
         },
         "required" : [ "action", "scopeType" ]
@@ -35741,7 +35741,7 @@
           },
           "versionGates" : {
             "type" : "array",
-            "description" : "Operations that need a newer Artemis release than some node runs",
+            "description" : "Operations that need a newer broker release than some node runs",
             "items" : {
               "$ref" : "#/components/schemas/VersionGateView"
             }
@@ -36045,7 +36045,7 @@
           },
           "versionSupport" : {
             "type" : "string",
-            "description" : "Where version sits against the supported Artemis range",
+            "description" : "Where version sits against the range Rahdar supports for the node's system",
             "enum" : [ "SUPPORTED", "BELOW_MINIMUM", "NEWER_THAN_TESTED", "UNKNOWN" ]
           },
           "lastError" : {

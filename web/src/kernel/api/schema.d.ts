@@ -4863,7 +4863,7 @@ export interface components {
             scopeId?: string | null;
             /** @description SUBSCRIPTION or DESTINATION: limits the grant to names matching resourcePattern */
             resourceType?: string | null;
-            /** @description An Artemis wildcard pattern, with resourceType; absent for the whole scope */
+            /** @description A wildcard pattern over resource names (. separates words, * matches one word, # any number of words), with resourceType; absent for the whole scope */
             resourcePattern?: string | null;
         };
         CreatedTokenView: {
@@ -5313,7 +5313,7 @@ export interface components {
             notifications: components["schemas"]["CapabilityView"];
             messageIo: components["schemas"]["CapabilityView"];
             slowConsumerDetection: components["schemas"]["CapabilityView"];
-            /** @description Operations that need a newer Artemis release than some node runs */
+            /** @description Operations that need a newer broker release than some node runs */
             versionGates: components["schemas"]["VersionGateView"][];
             /** @description Every capability the system's driver assessed for the account, with its own reason. Empty for a system whose capabilities are the fixed ones above. */
             findings: components["schemas"]["AccessFinding"][];
@@ -5415,7 +5415,7 @@ export interface components {
             replicaSync?: boolean | null;
             version?: string | null;
             /**
-             * @description Where version sits against the supported Artemis range
+             * @description Where version sits against the range Rahdar supports for the node's system
              * @enum {string}
              */
             versionSupport: "SUPPORTED" | "BELOW_MINIMUM" | "NEWER_THAN_TESTED" | "UNKNOWN";
