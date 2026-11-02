@@ -195,7 +195,9 @@ class SystemRegistration {
                 of.apply(Capability.NOTIFICATIONS.id()),
                 io,
                 new CapabilityView(
-                        UNKNOWN, "Slow-consumer detection reads Artemis consumers; it does not apply here.", null),
+                        UNKNOWN,
+                        "Slow-consumer detection reads Artemis consumers. Alert on this system's backlog or lag metrics instead.",
+                        null),
                 List.of(),
                 found.entrySet().stream()
                         .map(e -> new AccessFinding(

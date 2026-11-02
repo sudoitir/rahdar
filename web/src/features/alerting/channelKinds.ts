@@ -93,7 +93,7 @@ export const EMPTY_FIELDS: ChannelFields = {
   username: '',
   from: '',
   to: '',
-  subjectPrefix: '[Artemis]',
+  subjectPrefix: '[Rahdar]',
 };
 
 function parse(config: string): Record<string, unknown> {

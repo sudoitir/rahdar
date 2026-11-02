@@ -204,7 +204,7 @@ export function MintKeyForm({
         {limitKind === NO_LIMIT ? null : (
           <TextInput
             label="Name pattern"
-            description="Artemis wildcards: * stands for one word and # for any number of words, words are separated by a dot."
+            description="Wildcards: * stands for one word and # for any number of words, words are separated by a dot."
             placeholder="orders.#"
             {...form.getInputProps('pattern')}
             required

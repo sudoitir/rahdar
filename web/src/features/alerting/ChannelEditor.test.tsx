@@ -174,7 +174,7 @@ describe('ChannelEditor: adding', () => {
     await fill(user, d.getByLabelText(/^SMTP server/), 'smtp.example.com');
     await fill(user, d.getByLabelText(/^From/), 'artemis@example.com');
     await fill(user, d.getByLabelText(/^Recipients/), 'a@example.com, b@example.com');
-    expect(d.getByLabelText(/^Subject prefix/)).toHaveValue('[Artemis]');
+    expect(d.getByLabelText(/^Subject prefix/)).toHaveValue('[Rahdar]');
     await user.clear(d.getByLabelText(/^Subject prefix/));
     await fill(user, d.getByLabelText(/^Subject prefix/), '[Ops]');
     await user.click(d.getByRole('button', { name: 'Add channel' }));
