@@ -1,6 +1,6 @@
 # Rahdar — project instructions
 
-Cluster-wide management and observability for Apache ActiveMQ Artemis. One instance,
+Cluster-wide management and observability for Apache Kafka, RabbitMQ and Apache ActiveMQ Artemis. One instance,
 many clusters: topology, cross-node resource views, safe message operations, and
 first-class request-reply tracing. Open source, Apache-2.0.
 

@@ -130,7 +130,14 @@ export function ClusterHeader({ clusterId }: Readonly<{ clusterId: string }>) {
           <Stack gap="xs">
             <Text size="sm">
               One or more features are limited by this connection. Each row below expands with the reason and the{' '}
-              <code>broker.xml</code> change that closes the gap.
+              {data.system?.id === 'artemis' ? (
+                <>
+                  <code>broker.xml</code> change
+                </>
+              ) : (
+                'broker change'
+              )}{' '}
+              that closes the gap.
             </Text>
             <CapabilityLedger capabilities={data.capabilities} clusterId={clusterId} />
           </Stack>

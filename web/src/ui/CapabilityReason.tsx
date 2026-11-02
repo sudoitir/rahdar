@@ -1,9 +1,10 @@
 import { Code, Stack, Text } from '@mantine/core';
 
 /**
- * Why a control is unavailable, in full: the reason, and the `broker.xml` that enables it where one
- * exists (non-negotiable #5). The one rendering of it, shared by the {@link CapabilityGate} popover
- * and the explanation a blocked menu item opens, so both say the same thing the same way.
+ * Why a control is unavailable, in full: the reason, and the change that enables it where one exists
+ * (non-negotiable #5): the `broker.xml` snippet on Artemis, the command or setting on Kafka and RabbitMQ.
+ * The one rendering of it, shared by the {@link CapabilityGate} popover and the explanation a blocked
+ * menu item opens, so both say the same thing the same way.
  */
 export function CapabilityReason({
   reason,
@@ -21,7 +22,13 @@ export function CapabilityReason({
       {snippet ? (
         <>
           <Text size="xs" fw={600}>
-            Add this to <Code>broker.xml</Code>:
+            {snippet.trimStart().startsWith('<') ? (
+              <>
+                Add this to <Code>broker.xml</Code>:
+              </>
+            ) : (
+              'Make this change on the broker:'
+            )}
           </Text>
           <Code block fz="xs" style={{ whiteSpace: 'pre-wrap' }}>
             {snippet}

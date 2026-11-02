@@ -367,7 +367,9 @@ public interface ClusterViews {
             @Schema(nullable = true) Boolean replicaSync,
             @Schema(nullable = true) String version,
 
-            @Schema(requiredMode = REQUIRED, description = "Where version sits against the supported Artemis range")
+            @Schema(
+                    requiredMode = REQUIRED,
+                    description = "Where version sits against the range Rahdar supports for the node's system")
             BrokerVersion.Support versionSupport,
 
             @Schema(nullable = true) String lastError,
@@ -464,7 +466,7 @@ public interface ClusterViews {
 
             @Schema(
                     requiredMode = REQUIRED,
-                    description = "Operations that need a newer Artemis release than some node runs")
+                    description = "Operations that need a newer broker release than some node runs")
             List<VersionGateView> versionGates,
 
             @Schema(

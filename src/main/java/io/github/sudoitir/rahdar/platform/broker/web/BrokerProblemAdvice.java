@@ -6,7 +6,15 @@ import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException.Kind;
 import io.github.sudoitir.rahdar.platform.broker.BulkCapExceededException;
 import io.github.sudoitir.rahdar.platform.broker.InvalidResourceIdException;
 import io.github.sudoitir.rahdar.platform.broker.ManagementRefusal;
+import io.github.sudoitir.rahdar.platform.broker.NodeDirectory;
 import io.github.sudoitir.rahdar.platform.broker.UnsupportedSystemException;
+import jakarta.servlet.http.HttpServletRequest;
+import java.util.Map;
+import java.util.UUID;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -14,15 +22,24 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 /** Broker transport failures and the safety cap, as problem details. */
 @RestControllerAdvice
+@RequiredArgsConstructor
 class BrokerProblemAdvice {
 
+    private static final Pattern CLUSTER_PATH = Pattern.compile("/clusters/([0-9a-fA-F-]{36})(?:/|$)");
+
+    private static final Map<String, String> SYSTEM_NAMES =
+            Map.of("kafka", "Kafka", "rabbitmq", "RabbitMQ", "artemis", "Artemis");
+
+    private final ObjectProvider<NodeDirectory> directory;
+
     @ExceptionHandler(BrokerConnectionException.class)
-    ProblemDetail onBrokerConnection(BrokerConnectionException e) {
+    ProblemDetail onBrokerConnection(BrokerConnectionException e, HttpServletRequest request) {
+        String system = e.system() != null ? e.system() : systemOf(request);
         ProblemDetail problem = Problems.of(
-                statusFor(e.kind()), "broker-" + kebab(e.kind()), titleFor(e.kind(), e.system()), e.getMessage());
+                statusFor(e.kind()), "broker-" + kebab(e.kind()), titleFor(e.kind(), system), e.getMessage());
         problem.setProperty("brokerErrorKind", e.kind().name());
-        if (e.system() != null) {
-            problem.setProperty("system", e.system());
+        if (system != null) {
+            problem.setProperty("system", system);
         }
         if (e.account() != null) {
             problem.setProperty("account", e.account().name());
@@ -71,6 +88,25 @@ class BrokerProblemAdvice {
             case UNREACHABLE, TLS_FAILED, BAD_RESPONSE -> HttpStatus.BAD_GATEWAY;
             case THROTTLED -> HttpStatus.SERVICE_UNAVAILABLE;
         };
+    }
+
+    /**
+     * The system of the cluster the request is about, for a failure whose own words do not name it: a driver error
+     * without native metadata would otherwise read as the generic, Artemis-worded failure on a Kafka or RabbitMQ
+     * cluster. Null outside a cluster's path, or for a cluster that is not registered.
+     */
+    private String systemOf(HttpServletRequest request) {
+        Matcher m = CLUSTER_PATH.matcher(request.getRequestURI());
+        NodeDirectory nodes = directory.getIfAvailable();
+        if (nodes == null || !m.find()) {
+            return null;
+        }
+        try {
+            String id = nodes.system(UUID.fromString(m.group(1)));
+            return id == null ? null : SYSTEM_NAMES.getOrDefault(id, id);
+        } catch (RuntimeException unknown) {
+            return null;
+        }
     }
 
     private static String titleFor(Kind kind, String system) {

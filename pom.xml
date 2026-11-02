@@ -15,7 +15,7 @@
     <artifactId>rahdar</artifactId>
     <version>0.1.0-SNAPSHOT</version>
     <name>Rahdar</name>
-    <description>Cluster-wide management and observability for Apache ActiveMQ Artemis</description>
+    <description>Cluster-wide management and observability for Apache Kafka, RabbitMQ and Apache ActiveMQ Artemis</description>
     <url>https://github.com/sudoitir/rahdar</url>
 
     <licenses>

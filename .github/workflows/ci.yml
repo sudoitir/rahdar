@@ -853,7 +853,7 @@ jobs:
             ${{ secrets.DOCKERHUB_USERNAME }}/rahdar:dev
           labels: |
             org.opencontainers.image.title=Rahdar
-            org.opencontainers.image.description=Cluster-wide management and observability for Apache ActiveMQ Artemis
+            org.opencontainers.image.description=Cluster-wide management and observability for Apache Kafka, RabbitMQ and Apache ActiveMQ Artemis
             org.opencontainers.image.version=${{ steps.ver.outputs.version }}
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.created=${{ steps.ver.outputs.date }}
@@ -946,7 +946,7 @@ jobs:
           # contributing notes and a trademark section that mean nothing to
           # someone reading a tag list.
           readme-filepath: docs/dockerhub.md
-          short-description: Cluster-wide management and observability for Apache ActiveMQ Artemis
+          short-description: Cluster-wide management and observability for Apache Kafka, RabbitMQ and Apache ActiveMQ Artemis
           # Docker Hub does not resolve repo-relative paths, so without this the
           # screenshots render broken even when the push succeeds.
           enable-url-completion: true

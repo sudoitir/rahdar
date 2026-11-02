@@ -2,7 +2,7 @@
 
 ## What this is
 
-Cluster-wide management and observability for Apache ActiveMQ Artemis. One
+Cluster-wide management and observability for Apache Kafka, RabbitMQ and Apache ActiveMQ Artemis. One
 instance manages many clusters: live/backup topology, cross-node resource views,
 safe message operations, and first-class request-reply tracing. Works against
 existing brokers via their standard management endpoints — no `broker.xml` rewrite

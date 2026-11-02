@@ -13,11 +13,11 @@ used under the MIT License.
 
 ---
 
-Apache ActiveMQ and Apache ActiveMQ Artemis are trademarks of the Apache
-Software Foundation. Rahdar is an independent project. It is not
+Apache Kafka, Apache ActiveMQ and Apache ActiveMQ Artemis are trademarks
+of the Apache Software Foundation. Rahdar is an independent project. It is not
 produced by, endorsed by, or affiliated with the Apache Software Foundation.
-References to "Artemis" in this project describe the broker that Rahdar
-manages, as nominative use under trademark law.
+References to "Kafka" and "Artemis" in this project describe the brokers
+that Rahdar manages, as nominative use under trademark law.
 
 RabbitMQ is a trademark of its owner. Rahdar is not affiliated with or
 endorsed by it. References to "RabbitMQ" in this project describe the broker
