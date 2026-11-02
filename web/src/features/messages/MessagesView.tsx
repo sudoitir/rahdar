@@ -337,7 +337,8 @@ export function MessagesView() {
   // of evidence would lock every operator out of a working broker until something
   // else happened to write to it first.
   const gated = messageIo?.status === 'UNAVAILABLE';
-  const unproven = messageIo?.status === 'UNKNOWN';
+  // Reading a log needs no write, so the notice about writes is not said over one, and its late arrival moves nothing.
+  const unproven = messageIo?.status === 'UNKNOWN' && !partitioned;
 
   const header = (
     <PageHeader
