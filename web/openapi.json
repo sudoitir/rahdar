@@ -36053,7 +36053,7 @@
           },
           "lastErrorKind" : {
             "type" : [ "string", "null" ],
-            "enum" : [ "UNREACHABLE", "THROTTLED", "CREDENTIALS_REJECTED", "NOT_ARTEMIS", "WRONG_PATH", "TLS_FAILED", "BAD_RESPONSE", "UNSUPPORTED_VERSION", null ]
+            "enum" : [ "UNREACHABLE", "THROTTLED", "CREDENTIALS_REJECTED", "NOT_AUTHORIZED", "NOT_ARTEMIS", "WRONG_PATH", "TLS_FAILED", "BAD_RESPONSE", "UNSUPPORTED_VERSION", null ]
           },
           "lastSeenAt" : {
             "type" : [ "string", "null" ],
