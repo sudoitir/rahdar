@@ -11,7 +11,10 @@ import io.github.sudoitir.rahdar.platform.broker.BrokerFailures;
 import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
 import io.github.sudoitir.rahdar.platform.broker.LogBounds;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
+import java.util.SortedMap;
+import java.util.TreeMap;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -47,6 +50,35 @@ class KafkaLogBounds implements LogBounds {
                     .findFirst()
                     .orElseThrow(() -> new NotFoundException("partition", log.name() + "/" + partition));
             return new Bounds(number(found, LOG_START_OFFSET), number(found, LOG_END_OFFSET));
+        } catch (BrokerException e) {
+            throw BrokerFailures.translate(e);
+        }
+    }
+
+    @Override
+    public SortedMap<Integer, Bounds> partitions(UUID clusterId, ResourceId log) {
+        try {
+            SortedMap<Integer, Bounds> found = new TreeMap<>();
+            Optional<String> next = Optional.empty();
+            do {
+                ResourceQuery query = ResourceQuery.of(KindId.of("kafka.partition"))
+                        .where(Map.of("topic", log.name()))
+                        .project(Set.of(LOG_START_OFFSET, LOG_END_OFFSET));
+                var page = gateway.cluster(clusterId)
+                        .resources()
+                        .read(next.map(query::continueFrom).orElse(query))
+                        .orThrow();
+                for (Resource partition : page.items()) {
+                    found.put(
+                            Integer.parseInt(partition.id().name()),
+                            new Bounds(number(partition, LOG_START_OFFSET), number(partition, LOG_END_OFFSET)));
+                }
+                next = page.continueToken();
+            } while (next.isPresent());
+            if (found.isEmpty()) {
+                throw new NotFoundException("topic", log.name());
+            }
+            return found;
         } catch (BrokerException e) {
             throw BrokerFailures.translate(e);
         }

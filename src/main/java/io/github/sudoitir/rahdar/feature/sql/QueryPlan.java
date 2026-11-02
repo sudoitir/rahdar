@@ -43,7 +43,39 @@ public record QueryPlan(
             String routingType,
             Long messageCount,
             Instant brokerNow,
-            boolean clockOffsetKnown) {}
+            boolean clockOffsetKnown,
+            /**
+             * The log this target reads, as a resource id text, on a system that keeps messages in logs (Kafka,
+             * RabbitMQ streams); null for a queue read through the broker's selector.
+             */
+            String log) {
+
+        /** A queue on a node, read through the broker's selector. */
+        public Target(
+                UUID nodeId,
+                String nodeName,
+                String subscription,
+                String destination,
+                String routingType,
+                Long messageCount,
+                Instant brokerNow,
+                boolean clockOffsetKnown) {
+            this(
+                    nodeId,
+                    nodeName,
+                    subscription,
+                    destination,
+                    routingType,
+                    messageCount,
+                    brokerNow,
+                    clockOffsetKnown,
+                    null);
+        }
+
+        public boolean isLog() {
+            return log != null;
+        }
+    }
 
     /**
      * Something true about this plan the operator has to be told. A notice is never a
@@ -92,7 +124,12 @@ public record QueryPlan(
              * The query compares a field the index stores masked (ADR-0075 D4), so the predicate matches
              * masked text and cannot find an original value. The live broker holds the originals.
              */
-            MASKED_AT_REST
+            MASKED_AT_REST,
+            /**
+             * The pattern matched queues that can only be consumed, which would take their messages, so they
+             * were not read. The notice names them.
+             */
+            NOT_BROWSABLE
         }
     }
 
