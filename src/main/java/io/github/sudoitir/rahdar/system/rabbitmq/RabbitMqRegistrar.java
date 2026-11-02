@@ -503,8 +503,7 @@ class RabbitMqRegistrar implements ClusterRegistrar {
                 return "AUTHENTICATION";
             case ErrorReasons.NOT_AUTHORIZED:
                 return AUTHORIZATION;
-            case ErrorReasons.ENDPOINT_NOT_FOUND:
-            case ErrorReasons.UNEXPECTED_SYSTEM:
+            case ErrorReasons.ENDPOINT_NOT_FOUND, ErrorReasons.UNEXPECTED_SYSTEM:
                 return WRONG_ENDPOINT;
             case ErrorReasons.UNSUPPORTED_VERSION:
                 return UNSUPPORTED_VERSION;

@@ -56,10 +56,7 @@ const ALPHANUMERIC = /^[A-Za-z0-9]$/;
 function isHostName(host: string): boolean {
   return host
     .split('.')
-    .every(
-      (label) =>
-        LABEL.test(label) && ALPHANUMERIC.test(label.charAt(0)) && ALPHANUMERIC.test(label.charAt(label.length - 1)),
-    );
+    .every((label) => LABEL.test(label) && ALPHANUMERIC.test(label.charAt(0)) && ALPHANUMERIC.test(label.at(-1) ?? ''));
 }
 
 /** Where the first of `stops` is in the text, or its length. */
