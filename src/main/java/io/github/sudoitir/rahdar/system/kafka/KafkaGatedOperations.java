@@ -8,6 +8,7 @@ import io.github.sudoitir.rahdar.kernel.gate.OperationScope;
 import io.github.sudoitir.rahdar.kernel.gate.Trait;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterEnvironmentIndex;
 import io.github.sudoitir.rahdar.system.kafka.KafkaAclChanges.AclChangeParams;
+import io.github.sudoitir.rahdar.system.kafka.KafkaBrokerConfigChanges.BrokerConfigParams;
 import io.github.sudoitir.rahdar.system.kafka.KafkaHangingAborts.HangingAbortParams;
 import io.github.sudoitir.rahdar.system.kafka.KafkaOffsetResets.OffsetResetParams;
 import io.github.sudoitir.rahdar.system.kafka.KafkaTopicConfigChanges.ConfigChangeParams;
@@ -72,6 +73,33 @@ class KafkaGatedOperations {
                 changes::replay,
                 clusters,
                 Set.of("/set"));
+    }
+
+    @Bean
+    GatedOperation<BrokerConfigParams> brokerConfigChange(
+            KafkaBrokerConfigChanges changes, ClusterEnvironmentIndex clusters) {
+        return new Operation<>(
+                "broker.update-config",
+                BrokerConfigParams.class,
+                BrokerConfigParams::clusterId,
+                p -> "Change settings of " + broker(p) + " on " + clusters.labelOf(p.clusterId()),
+                p -> List.of(
+                        DisplayRow.of(CLUSTER, clusters.labelOf(p.clusterId())),
+                        DisplayRow.of("Broker", broker(p)),
+                        DisplayRow.of("Set", changes.shown(p)),
+                        DisplayRow.of(
+                                "Remove overrides",
+                                p.remove() == null || p.remove().isEmpty()
+                                        ? "none"
+                                        : p.remove().toString())),
+                changes::estimate,
+                changes::replay,
+                clusters,
+                Set.of("/set"));
+    }
+
+    private static String broker(BrokerConfigParams p) {
+        return KafkaBrokerConfigs.DEFAULT.equals(p.broker()) ? "the cluster default" : "broker " + p.broker();
     }
 
     @Bean
