@@ -168,10 +168,12 @@ const matcher = (call: DataCall, clusterId: string) =>
 
 /** The Kafka cluster's id (`events`), for the routes that name it as `:kafka`; empty on a stack with none. */
 let kafkaCluster = '';
+/** The RabbitMQ cluster's id (`rabbit`), for the routes that name it as `:rabbit`; empty on a stack with none. */
+let rabbitCluster = '';
 
-/** A path with the seeded clusters' ids in it: `:cluster` is the Artemis one, `:kafka` the Kafka one. */
+/** A path with the seeded clusters' ids in it: `:cluster` is the Artemis one, `:kafka` the Kafka one, `:rabbit` the RabbitMQ one. */
 const ids = (path: string, clusterId: string) =>
-  path.replaceAll(':cluster', clusterId).replaceAll(':kafka', kafkaCluster);
+  path.replaceAll(':cluster', clusterId).replaceAll(':kafka', kafkaCluster).replaceAll(':rabbit', rabbitCluster);
 
 type Answer = 'hang' | 'error' | 'empty';
 
@@ -401,13 +403,13 @@ async function clusterId(browser: Browser): Promise<string> {
   return found?.id ?? '';
 }
 
-/** The Kafka cluster's id: the one named `events`, or empty. */
-async function kafkaId(browser: Browser): Promise<string> {
+/** The id of the cluster with this name, or empty. */
+async function idNamed(browser: Browser, name: string): Promise<string> {
   const context = await browser.newContext({ storageState: await sessionOf('admin') });
   const response = await context.request.get(`${BASE}/api/v1/clusters?size=500`);
   const body = (await response.json()) as { data?: { id: string; name: string }[] };
   await context.close();
-  return body.data?.find((c) => c.name === 'events')?.id ?? '';
+  return body.data?.find((c) => c.name === name)?.id ?? '';
 }
 
 /** The requester's newest request in each state, for the routes that name one as `:held:<STATE>`. */
@@ -439,9 +441,13 @@ async function main() {
     });
   }
   const cluster = await clusterId(browser);
-  kafkaCluster = await kafkaId(browser);
+  kafkaCluster = await idNamed(browser, 'events');
+  rabbitCluster = await idNamed(browser, 'rabbit');
   const needing = jobs.find(
-    (job) => (!cluster && job.route.path.includes(':cluster')) || (!kafkaCluster && job.route.path.includes(':kafka')),
+    (job) =>
+      (!cluster && job.route.path.includes(':cluster')) ||
+      (!kafkaCluster && job.route.path.includes(':kafka')) ||
+      (!rabbitCluster && job.route.path.includes(':rabbit')),
   );
   if (needing) throw new Error(`${needing.route.id} needs a registered cluster at ${BASE}`);
   if (jobs.some((job) => job.route.path.includes(':held:'))) await loadHeldIds(browser);

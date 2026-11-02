@@ -25,6 +25,7 @@ import {
   TEAMS_SCENES,
 } from './scenes.ts';
 import { ESTATE_UNREACHABLE_SCENES, KAFKA_ROUTES, REGISTRATION_ROUTES } from './kafka.ts';
+import { RABBITMQ_ROUTES, REGISTER_RABBITMQ_ROUTES } from './rabbitmq.ts';
 
 export interface DataCall {
   path: string;
@@ -174,6 +175,7 @@ export const ROUTES: RouteSpec[] = [
   // outcomes (kafka.ts) do not: a cluster already registered is one of them.
   { area: 'onboarding', id: 'register', path: '/clusters/new?system=artemis', scenes: REGISTER_SCENES },
   ...REGISTRATION_ROUTES,
+  ...REGISTER_RABBITMQ_ROUTES,
   {
     area: 'onboarding',
     id: 'register-again',
@@ -183,6 +185,9 @@ export const ROUTES: RouteSpec[] = [
 
   // A Kafka cluster's own screens, and the shared ones on it (kafka.ts)
   ...KAFKA_ROUTES,
+
+  // A RabbitMQ cluster's own screens, and the shared ones on it (rabbitmq.ts)
+  ...RABBITMQ_ROUTES,
 
   // Cluster views
   {

@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import { ActionIcon, Button, Fieldset, NumberInput, Select, Stack, Text, TextInput } from '@mantine/core';
+import { ActionIcon, Button, Fieldset, Group, NumberInput, Select, Stack, Text, TextInput } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { randomId } from '@mantine/hooks';
 import { IconPlus, IconTrash } from '@tabler/icons-react';
@@ -113,14 +113,14 @@ function columns(gate: GateVerdict, onEdit: (p: Policy) => void, onClear: (p: Po
     {
       id: 'change',
       header: 'Change',
-      accessor: (p) => (p.operator ? 'Not changed here' : ''),
+      accessor: (p) => (p.operator ? 'Not changed here' : 'Edit Clear'),
       cell: (p) =>
         p.operator ? (
           <Text size="xs" c="dimmed">
             Set by an operator; Rahdar lists it and does not change it.
           </Text>
         ) : (
-          <Stack gap={0} align="flex-start">
+          <Group gap={4} wrap="nowrap">
             <CapabilityGate verdict={gate} what="changing a policy">
               <Button
                 size="compact-xs"
@@ -141,10 +141,12 @@ function columns(gate: GateVerdict, onEdit: (p: Policy) => void, onClear: (p: Po
                 Clear
               </Button>
             </CapabilityGate>
-          </Stack>
+          </Group>
         ),
       kind: 'text',
       wrap: true,
+      min: 18,
+      grow: false,
       priority: 'essential',
     },
   ];

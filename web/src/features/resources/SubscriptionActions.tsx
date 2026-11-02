@@ -130,7 +130,7 @@ function PauseSubscriptionDialog({
   clusterId,
   subscription,
 }: HostedDialogProps & { clusterId: string; subscription: SubscriptionView }) {
-  const setPaused = useSetSubscriptionPaused(clusterId, subscription.name);
+  const setPaused = useSetSubscriptionPaused(clusterId, subscription.id);
   const [outcome, setOutcome] = useState<LifecycleOutcomeView | null>(null);
   const paused = subscription.perNode.some((n) => n.paused);
   const verb = paused ? 'Resume' : 'Pause';

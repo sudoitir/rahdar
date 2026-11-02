@@ -309,9 +309,10 @@ export function SubscriptionsView() {
     navigate({ to: '.', search: (prev: Record<string, unknown>) => ({ ...prev, page: next > 1 ? next : undefined }) });
 
   const [backlogOf, setBacklogOf] = useState<BacklogTarget | null>(null);
+  const system = cluster.data?.system?.id;
   const columns = useMemo(
-    () => subscriptionColumns((row) => setBacklogOf({ clusterId, id: row.id, name: row.name })),
-    [clusterId],
+    () => subscriptionColumns((row) => setBacklogOf({ clusterId, id: row.id, name: row.name }), system),
+    [clusterId, system],
   );
   const rows = query.data?.data ?? [];
   const total = query.data?.count ?? 0;

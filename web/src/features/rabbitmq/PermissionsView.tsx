@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import { Button, Select, Stack, Text, TextInput } from '@mantine/core';
+import { Button, Group, Select, Stack, Text, TextInput } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { useParams, useSearch } from '@tanstack/react-router';
 
@@ -63,9 +63,9 @@ function columns(
     {
       id: 'change',
       header: 'Change',
-      accessor: () => '',
+      accessor: () => 'Edit Clear',
       cell: (p) => (
-        <Stack gap={0} align="flex-start">
+        <Group gap={4} wrap="nowrap">
           <CapabilityGate verdict={gate} what="changing permissions">
             <Button
               size="compact-xs"
@@ -86,9 +86,11 @@ function columns(
               Clear
             </Button>
           </CapabilityGate>
-        </Stack>
+        </Group>
       ),
       kind: 'status',
+      min: 18,
+      grow: false,
       priority: 'essential',
     },
   ];

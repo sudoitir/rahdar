@@ -297,7 +297,11 @@ export function ResourceView({ kind }: Readonly<{ kind: Kind }>) {
       : ({ kind: 'blocked', reason: 'Creating a destination needs the destination:create permission.' } as const);
 
   const fetchedAt = query.dataUpdatedAt > 0 ? query.dataUpdatedAt : null;
-  const columns = useMemo(() => config.columns({ clusterId, fetchedAt }), [config, clusterId, fetchedAt]);
+  const system = cluster.data?.system?.id;
+  const columns = useMemo(
+    () => config.columns({ clusterId, fetchedAt, system }),
+    [config, clusterId, fetchedAt, system],
+  );
 
   const setSort = (sort: string | undefined) =>
     navigate({

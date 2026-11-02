@@ -61,7 +61,23 @@ function MessagesEmpty({
   unreachable,
   onClearSelector,
   partitioned,
-}: Readonly<{ filtered: boolean; unreachable: string[]; onClearSelector: () => void; partitioned: boolean }>) {
+  singleLog,
+}: Readonly<{
+  filtered: boolean;
+  unreachable: string[];
+  onClearSelector: () => void;
+  partitioned: boolean;
+  singleLog: boolean;
+}>) {
+  if (singleLog && unreachable.length === 0) {
+    return (
+      <EmptyState
+        kind="empty"
+        title="No records from here"
+        description="This stream has no record at or after the start you chose. Choose the earliest record or an earlier time."
+      />
+    );
+  }
   if (partitioned && unreachable.length === 0) {
     return (
       <EmptyState
@@ -104,7 +120,7 @@ export function isPartitionedLog(
 ): boolean {
   const listed = kind ? kinds?.find((item) => item.id === kind) : undefined;
   if (listed) return listed.partitioned === true;
-  return kind === 'kafka.group-topic';
+  return kind === 'kafka.group-topic' || kind === 'rabbitmq.stream';
 }
 
 /** The kind a subscription is, from the cluster's kind list, when both are known. */
@@ -158,13 +174,29 @@ function messageQuery(
 }
 
 /** The selector field of a queue, or the explanation that a log has no selector. */
-function selectorField(partitioned: boolean, filter: string) {
+function selectorField(partitioned: boolean, singleLog: boolean, filter: string) {
+  if (singleLog) {
+    return {
+      placeholder: undefined,
+      description: 'A stream has no selector. Choose where to start reading, an offset or a time.',
+      value: '',
+      width: '22rem',
+    };
+  }
   if (partitioned) return { placeholder: undefined, description: SELECTOR_REFUSAL, value: '', width: '22rem' };
   return { placeholder: "Selector, e.g. region = 'eu'", description: undefined, value: filter, width: '17.5rem' };
 }
 
 /** Where the browse stands: the group's offset on a log, or the page of a queue. */
-function browsePosition(partitioned: boolean, log: MessagePageView['log'], page: number, lastPage: number | null) {
+function browsePosition(
+  partitioned: boolean,
+  singleLog: boolean,
+  log: MessagePageView['log'],
+  page: number,
+  lastPage: number | null,
+) {
+  // A stream is read by offset; no consumer group stands anywhere on it.
+  if (singleLog) return null;
   if (partitioned) {
     // Said in the toolbar, where its arrival moves nothing: the controls keep their place.
     if (log?.subscriptionPosition == null) {
@@ -226,7 +258,9 @@ export function MessagesView() {
   const subscriptionKind = roleIds.loaded ? kindOf(roleIds.subscription(subscriptionName)) : undefined;
   const partitioned = isPartitionedLog(subscriptionKind ?? kindOf(subscriptionName), cluster.data?.kinds);
   const kindInfo = kindOfSubscription(subscriptionKind ?? kindOf(subscriptionName), cluster.data?.kinds);
-  const singleLog = isSingleLog(kindInfo, partitioned);
+  const singleLog = kindInfo
+    ? isSingleLog(kindInfo, partitioned)
+    : partitioned && (subscriptionKind ?? kindOf(subscriptionName)) !== 'kafka.group-topic';
   // A kind the system cannot browse is refused before anything is read: the reason is the driver's when it gave one.
   const browseRefusal =
     cluster.data?.system && kindInfo && !kindInfo.verbs.includes('browse')
@@ -239,7 +273,10 @@ export function MessagesView() {
   const [debounced] = useDebouncedValue(filter, 250);
   // The open message is in the destination, so a link to one message opens it (non-negotiable #9).
   const openId = search.message ?? null;
-  useTitlePart('resource', openId ? `${subscriptionName} › message ${openId}` : subscriptionName);
+  useTitlePart(
+    'resource',
+    openId ? `${subscriptionRefWords(subscriptionName)} › message ${openId}` : subscriptionRefWords(subscriptionName),
+  );
   const setOpenId = (id: string | null) =>
     navigate({ to: '.', search: (prev: Record<string, unknown>) => ({ ...prev, message: id ?? undefined }) });
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -305,7 +342,8 @@ export function MessagesView() {
   // of evidence would lock every operator out of a working broker until something
   // else happened to write to it first.
   const gated = messageIo?.status === 'UNAVAILABLE';
-  const unproven = messageIo?.status === 'UNKNOWN';
+  // Reading a log needs no write, so the notice about writes is not said over one, and its late arrival moves nothing.
+  const unproven = messageIo?.status === 'UNKNOWN' && !partitioned;
 
   const header = (
     <PageHeader
@@ -319,7 +357,7 @@ export function MessagesView() {
         </>
       }
       description={
-        <span className={partitioned ? classes.stableHeading : undefined}>
+        <span className={partitioned && !singleLog ? classes.stableHeading : undefined}>
           {browseRefusal
             ? 'This kind of queue cannot be read, only sent to and purged.'
             : messagesHeading(
@@ -401,7 +439,7 @@ export function MessagesView() {
     .map((e) => e.name);
   // The destination follows the field once typing pauses, so clearing the field clears the selector.
   const clearSelector = () => setFilter('');
-  const selector = selectorField(partitioned, filter);
+  const selector = selectorField(partitioned, singleLog, filter);
 
   const setNode = (node: string | null) =>
     navigate({
@@ -452,7 +490,7 @@ export function MessagesView() {
         }
         end={
           <>
-            {browsePosition(partitioned, messages.data?.log, page, lastPage)}
+            {browsePosition(partitioned, singleLog, messages.data?.log, page, lastPage)}
             {subscription
               ? selectionSlot.map(({ id, Component }) => (
                   <Component
@@ -515,6 +553,7 @@ export function MessagesView() {
             unreachable={unreachable}
             onClearSelector={clearSelector}
             partitioned={partitioned}
+            singleLog={singleLog}
           />
         }
       />

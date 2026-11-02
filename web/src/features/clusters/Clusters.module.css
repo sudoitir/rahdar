@@ -95,6 +95,10 @@
 
 /* The reason takes the spare width and wraps inside it. The buttons stay on this row, so a longer
    reason does not drop them onto a new line and shift the bar. */
+.stickyActions > :not(.reason) {
+  flex: none;
+}
+
 .stickyActions .reason {
   flex: 1 1 auto;
   min-inline-size: 8rem;

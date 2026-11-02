@@ -56,7 +56,15 @@ function usePaged<P extends { next?: string | null }>(
 ) {
   return useInfiniteQuery({
     queryKey: keys.list(clusterId, what, filter),
-    queryFn: ({ pageParam }) => request<P>(withQuery(`${base(clusterId)}/${path}`, { ...filter, cursor: pageParam })),
+    queryFn: ({ pageParam }) =>
+      request<P>(withQuery(`${base(clusterId)}/${path}`, { ...filter, cursor: pageParam })).catch((error: unknown) => {
+        // A virtual host that does not exist has nothing in it: a filter typed to a name the broker does not know
+        // is an empty list, not a failure.
+        if (filter.vhost && error instanceof ApiError && error.status === 404) {
+          return { available: true, items: [], next: null } as unknown as P;
+        }
+        throw error;
+      }),
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (last) => last.next ?? undefined,
   });
