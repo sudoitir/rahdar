@@ -121,9 +121,9 @@ public final class BrokerFailures {
                 metadata.containsKey(NATIVE_CODE)
                         ? new ManagementRefusal(ManagementRefusal.Kind.ARGUMENT, e.getMessage())
                         : new IllegalArgumentException(e.getMessage(), e);
-            case ErrorReasons.NOT_ROUTED -> new ConflictException(NOT_ROUTED, e.getMessage());
-            case ErrorReasons.DESTINATION_FULL -> new ConflictException("destination-full", e.getMessage());
-            case ErrorReasons.NOT_SUPPORTED -> new ConflictException(UNSUPPORTED_ON_KIND, e.getMessage());
+            case ErrorReasons.NOT_ROUTED -> new ConflictException(NOT_ROUTED, e.getMessage(), e);
+            case ErrorReasons.DESTINATION_FULL -> new ConflictException("destination-full", e.getMessage(), e);
+            case ErrorReasons.NOT_SUPPORTED -> new ConflictException(UNSUPPORTED_ON_KIND, e.getMessage(), e);
             case ErrorReasons.CALL_REFUSED ->
                 metadata.containsKey(GUARD)
                         ? new IllegalStateException(e.getMessage(), e)

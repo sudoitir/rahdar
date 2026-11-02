@@ -195,7 +195,7 @@ export default defineConfig({
     socialLinks: [{ icon: 'github', link: REPO }],
     footer: {
       message:
-        'Apache-2.0. Apache ActiveMQ and Apache ActiveMQ Artemis are trademarks of the Apache Software Foundation. Rahdar is an independent project, not produced by, endorsed by, or affiliated with the ASF.',
+        'Apache-2.0. Apache Kafka, Apache ActiveMQ and Apache ActiveMQ Artemis are trademarks of the Apache Software Foundation. RabbitMQ is a trademark of its owner. Rahdar is an independent project, not produced by, endorsed by, or affiliated with the ASF or the owner of RabbitMQ.',
       copyright: `<a href="${REPO}">github.com/sudoitir/rahdar</a>`,
     },
   },

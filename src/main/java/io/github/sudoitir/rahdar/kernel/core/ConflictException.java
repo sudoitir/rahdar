@@ -10,6 +10,12 @@ public class ConflictException extends RuntimeException {
         this.slug = slug;
     }
 
+    /** One the broker answered, keeping its failure so a caller can still read what the broker said. */
+    public ConflictException(String slug, String message, Throwable cause) {
+        super(message, cause);
+        this.slug = slug;
+    }
+
     public String slug() {
         return slug;
     }

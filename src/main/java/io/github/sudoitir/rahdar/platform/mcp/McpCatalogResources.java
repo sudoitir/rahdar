@@ -115,15 +115,15 @@ public class McpCatalogResources {
 
     /**
      * Per non-negotiable #5, a capability the connection cannot reach comes back
-     * <em>named</em>, with the exact {@code broker.xml} that would enable it. A
+     * <em>named</em>, with the exact change that would enable it. A
      * silently absent capability would leave a model concluding the product cannot
      * do something, when the truth is that this broker is not configured for it.
      */
     @McpResource(
             uri = "cluster://{clusterId}/capabilities",
             name = "Cluster capabilities",
-            description = "Which operations this cluster's connection supports, and the broker.xml "
-                    + "needed to enable any it does not.",
+            description = "Which operations this cluster's connection supports, and the change "
+                    + "(broker.xml on Artemis, a command on Kafka) that enables any it does not.",
             mimeType = "application/json")
     public McpSchema.ReadResourceResult capabilities(String clusterId) {
         UUID id = McpArgs.uuid("clusterId", clusterId);

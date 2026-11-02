@@ -775,6 +775,14 @@ public class ClusterService {
         return withheld(clusterId, viewMapper.topology(topologyDiscovery.currentTopology(clusterId)));
     }
 
+    /**
+     * The cluster's health as its system judges it, for a background reader such as alert evaluation: no access
+     * check, since no caller is signed in, and no broker call, since every system's judge reads what was scraped.
+     */
+    public ClusterHealth healthFor(UUID clusterId) {
+        return healthOf(clusterId, topologyDiscovery.currentTopology(clusterId).nodes());
+    }
+
     public HealthView health(UUID clusterId) {
         clusterAccess.requireVisible(clusterId);
         requireCluster(clusterId);

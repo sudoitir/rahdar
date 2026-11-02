@@ -3,6 +3,7 @@ package io.github.sudoitir.rahdar.feature.sql;
 import io.github.sudoitir.rahdar.feature.sql.QueryPlan.Target;
 import io.github.sudoitir.rahdar.feature.sql.QueryResult.NodeOutcome;
 import io.github.sudoitir.rahdar.feature.sql.QueryResult.Row;
+import io.github.sudoitir.rahdar.kernel.core.ConflictException;
 import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshot;
 import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshots;
 import java.time.Duration;
@@ -59,6 +60,7 @@ public class SqlTailPoller {
     private final BrokerQueryExecutor executor;
     private final IndexQueryExecutor indexExecutor;
     private final QueueSnapshots snapshots;
+    private final LogTargets logs;
 
     /** Live tails. A tail is removed when its client goes away. */
     private final Set<Tail> tails = ConcurrentHashMap.newKeySet();
@@ -303,6 +305,12 @@ public class SqlTailPoller {
      * runs at the console's cadence; a tail that is not due is skipped.
      */
     public Tail start(UUID clusterId, QueryPlan plan, Listener listener, Duration minInterval, boolean fromBeginning) {
+        if (logs.applies(clusterId)) {
+            throw new ConflictException(
+                    "unsupported-on-system",
+                    "A live tail follows a queue's enqueue counter, which this cluster's system does not keep."
+                            + " Run the query again to read the log as it is now.");
+        }
         Tail tail = new Tail(clusterId, plan, listener, minInterval, fromBeginning);
         tails.add(tail);
         return tail;

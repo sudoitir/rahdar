@@ -8,9 +8,9 @@
 export const branding = {
   productName: 'Rahdar',
   productShortName: 'Rahdar',
-  tagline: 'Cluster-wide management and observability for Apache ActiveMQ Artemis',
+  tagline: 'Cluster-wide management and observability for Apache Kafka, RabbitMQ and Apache ActiveMQ Artemis',
   trademarkNotice:
-    'Apache ActiveMQ and Apache ActiveMQ Artemis are trademarks of the Apache ' +
+    'Apache Kafka, Apache ActiveMQ and Apache ActiveMQ Artemis are trademarks of the Apache ' +
     'Software Foundation. RabbitMQ is a trademark of its owner. Rahdar is an ' +
     'independent project and is not produced by, endorsed by, or affiliated with ' +
     'the Apache Software Foundation or the owner of RabbitMQ.',

@@ -25,6 +25,9 @@ import org.testcontainers.images.builder.Transferable;
 final class RabbitMqBrokers implements AutoCloseable {
 
     static final String IMAGE = System.getProperty("rabbitmq.image", "rabbitmq:4.4.0-management");
+    /** The release the image runs, such as {@code 3.13.7} for {@code rabbitmq:3.13.7-management}. */
+    static final String RELEASE = IMAGE.substring(IMAGE.lastIndexOf(':') + 1).replace("-management", "");
+
     static final String USER = "rahdar";
     static final String PASSWORD = "rahdar-secret";
 

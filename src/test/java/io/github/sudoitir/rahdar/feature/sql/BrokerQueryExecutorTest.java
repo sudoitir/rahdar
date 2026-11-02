@@ -94,6 +94,7 @@ class BrokerQueryExecutorTest {
                 clocks,
                 properties,
                 coverage,
+                mock(LogTargets.class),
                 Clock.fixed(NOW, ZoneOffset.UTC));
     }
 
@@ -104,8 +105,8 @@ class BrokerQueryExecutorTest {
     private QueryResult run(
             String sql, BrokerMessages transport, SqlProperties properties, BrokerQueryExecutor.Sink sink) {
         QueryPlanner planner = planner(properties);
-        BrokerQueryExecutor executor =
-                new BrokerQueryExecutor(nodes, residuals, planner, properties, clearGovernance(), transport);
+        BrokerQueryExecutor executor = new BrokerQueryExecutor(
+                nodes, residuals, planner, properties, clearGovernance(), transport, mock(LogTargets.class));
         QueryPlan plan = planner.plan(CLUSTER, parser.parse(sql));
         return executor.execute(CLUSTER, plan, sink);
     }
@@ -277,8 +278,8 @@ class BrokerQueryExecutorTest {
         });
         SqlProperties properties = props(50_000, 2_000, Duration.ofSeconds(30));
         QueryPlanner planner = planner(properties);
-        BrokerQueryExecutor executor =
-                new BrokerQueryExecutor(nodes, residuals, planner, properties, masked, transportServing(5, false));
+        BrokerQueryExecutor executor = new BrokerQueryExecutor(
+                nodes, residuals, planner, properties, masked, transportServing(5, false), mock(LogTargets.class));
 
         QueryResult result = executor.execute(
                 CLUSTER,
@@ -493,8 +494,8 @@ class BrokerQueryExecutorTest {
             filters.add(filter);
             return fullPage(1);
         });
-        BrokerQueryExecutor executor =
-                new BrokerQueryExecutor(nodes, residuals, planner, properties, clearGovernance(), capturing);
+        BrokerQueryExecutor executor = new BrokerQueryExecutor(
+                nodes, residuals, planner, properties, clearGovernance(), capturing, mock(LogTargets.class));
 
         executor.execute(
                 CLUSTER,
@@ -527,10 +528,16 @@ class BrokerQueryExecutorTest {
         QueryPlanner planner = planner(properties);
         AtomicInteger browses = new AtomicInteger();
         BrokerQueryExecutor executor = new BrokerQueryExecutor(
-                nodes, residuals, planner, properties, clearGovernance(), transport((queue, page, size, filter) -> {
+                nodes,
+                residuals,
+                planner,
+                properties,
+                clearGovernance(),
+                transport((queue, page, size, filter) -> {
                     browses.incrementAndGet();
                     return fullPage(size);
-                }));
+                }),
+                mock(LogTargets.class));
 
         QueryResult result = executor.execute(
                 CLUSTER,
@@ -610,7 +617,13 @@ class BrokerQueryExecutorTest {
         SqlProperties properties = props(50_000, 2_000, Duration.ofSeconds(30));
         QueryPlanner planner = planner(properties);
         BrokerQueryExecutor executor = new BrokerQueryExecutor(
-                nodes, residuals, planner, properties, clearGovernance(), transportServing(2, false));
+                nodes,
+                residuals,
+                planner,
+                properties,
+                clearGovernance(),
+                transportServing(2, false),
+                mock(LogTargets.class));
         QueryPlan plan = planner.plan(CLUSTER, parser.parse("SELECT * FROM \"ORDER.IN\""));
 
         QueryResult result = executor.execute(CLUSTER, plan, new CountingSink(), t -> null);

@@ -119,7 +119,7 @@ public class ClientSampler {
     void sweep(UUID clusterId) {
         Timer.Sample timing = Timer.start(meters);
         int cap = Math.max(1, settings.intValue(FlowSettings.MAX_ROWS_PER_NODE));
-        List<ClusterNode> nodes = servingManageableNodes(clusterId);
+        List<ClusterNode> nodes = sampledNodes(clusterId);
         Map<ClusterNode, Future<NodeResult>> pending = new LinkedHashMap<>();
         try (ExecutorService pool = Executors.newVirtualThreadPerTaskExecutor()) {
             for (ClusterNode node : nodes) {
@@ -175,8 +175,8 @@ public class ClientSampler {
     NodeResult sampleNode(UUID clusterId, ClusterNode node, int cap) {
         Instant at = clock.instant();
         try {
-            FlowSample sampled =
-                    extensions.require(clusterId, FlowSampler.class).sample(clusterId, node.getId(), cap);
+            FlowSampler sampler = extensions.require(clusterId, FlowSampler.class);
+            FlowSample sampled = sampler.sample(clusterId, node.getId(), cap);
             List<Member> members = new ArrayList<>();
             List<Reading> producerReadings = new ArrayList<>();
             List<Reading> consumerReadings = new ArrayList<>();
@@ -209,7 +209,15 @@ public class ClientSampler {
                     || !sampled.consumers().isEmpty();
             boolean truncated = sampled.producersTotal() > sampled.producers().size()
                     || sampled.consumersTotal() > sampled.consumers().size();
-            return new NodeResult(sample, members, producerReadings, consumerReadings, routes, partial, truncated);
+            return new NodeResult(
+                    sample,
+                    members,
+                    producerReadings,
+                    consumerReadings,
+                    routes,
+                    partial,
+                    truncated,
+                    sampler.memberCounters());
         } catch (BrokerConnectionException e) {
             return failed(clusterId, node, at, e.kind().name(), e.getMessage());
         } catch (RuntimeException e) {
@@ -246,7 +254,8 @@ public class ClientSampler {
             Reading reading = m.kind() == Kind.PRODUCE
                     ? result.producerReadings().get(p++)
                     : result.consumerReadings().get(c++);
-            MemberRate rate = (m.kind() == Kind.PRODUCE ? producerRates : consumerRates).get(reading.memberId());
+            Map<String, MemberRate> rates = m.kind() == Kind.PRODUCE ? producerRates : consumerRates;
+            MemberRate rate = result.counters() ? rates.get(reading.memberId()) : null;
             rated.add(new Member(
                     m.kind(),
                     m.clientId(),
@@ -317,7 +326,20 @@ public class ClientSampler {
                 List.of(),
                 List.of(),
                 false,
-                false);
+                false,
+                true);
+    }
+
+    /**
+     * The nodes to sample: each serving node with a management endpoint, or, for a system whose one read answers
+     * for the whole cluster, its first node alone, so no client is counted once per node.
+     */
+    private List<ClusterNode> sampledNodes(UUID clusterId) {
+        boolean clusterWide = extensions
+                .forCluster(clusterId, FlowSampler.class)
+                .map(FlowSampler::clusterWide)
+                .orElse(false);
+        return clusterWide ? directory.nodes(clusterId).stream().limit(1).toList() : servingManageableNodes(clusterId);
     }
 
     /** One manageable endpoint per NodeID: the active one when the pair reports one. */
@@ -348,5 +370,6 @@ public class ClientSampler {
             List<Reading> consumerReadings,
             List<Route> routes,
             boolean partial,
-            boolean truncated) {}
+            boolean truncated,
+            boolean counters) {}
 }

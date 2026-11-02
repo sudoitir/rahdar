@@ -1,11 +1,11 @@
 package io.github.sudoitir.rahdar.feature.alerting;
 
 import io.github.sudoitir.rahdar.platform.broker.ClockOffsetService;
-import io.github.sudoitir.rahdar.platform.broker.NodeEndpoint;
 import io.github.sudoitir.rahdar.platform.clusters.BrokerNodeMapper;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterHealth;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
+import io.github.sudoitir.rahdar.platform.clusters.ClusterService;
 import io.github.sudoitir.rahdar.platform.clusters.HaStateEvaluator;
 import io.github.sudoitir.rahdar.platform.clusters.LogicalNode;
 import io.github.sudoitir.rahdar.platform.clusters.SplitBrainStatus;
@@ -41,6 +41,7 @@ public class StateCondition implements AlertCondition {
     private final BrokerNodeMapper nodeMapper;
     private final HaStateEvaluator evaluator;
     private final List<AlertSignalSource> signals;
+    private final ClusterService clusters;
 
     @Override
     public boolean supports(AlertRuleSpec rule) {
@@ -54,7 +55,7 @@ public class StateCondition implements AlertCondition {
             case "SPLIT_BRAIN" -> splitBrain(rows);
             case "NODE_DOWN" -> nodeDown(rows);
             case "REPLICATION_BEHIND" -> replicationBehind(rows);
-            case "CLUSTER_DEGRADED" -> clusterDegraded(clusterId, rows);
+            case "CLUSTER_DEGRADED" -> clusterDegraded(clusterId);
             case "CLOCK_SKEW" -> clockSkew(clusterId);
             default -> signal(rule.stateCondition(), clusterId);
         };
@@ -133,10 +134,9 @@ public class StateCondition implements AlertCondition {
         return new Evaluation(Set.copyOf(universe), Map.copyOf(active));
     }
 
-    private Evaluation clusterDegraded(UUID clusterId, List<ClusterNode> rows) {
-        List<NodeEndpoint> endpoints = nodeMapper.toEndpoints(rows);
-        List<LogicalNode> logical = evaluator.toLogicalNodes(endpoints, SplitBrainStatus.byNodeId(rows));
-        ClusterHealth health = evaluator.toHealth(clusterId, logical);
+    /** The cluster's own health, judged by its system: Artemis HA pairs, Kafka partitions and quorum, RabbitMQ alarms. */
+    private Evaluation clusterDegraded(UUID clusterId) {
+        ClusterHealth health = clusters.healthFor(clusterId);
         Set<String> universe = Set.of(CLUSTER_SUBJECT);
         boolean degraded =
                 health.level() == ClusterHealth.Level.DEGRADED || health.level() == ClusterHealth.Level.CRITICAL;

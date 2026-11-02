@@ -28,6 +28,7 @@ _Others_
 * `i.g.s.r.f.s.CaptureLoss`
 * `i.g.s.r.f.s.CaptureTap`
 * `i.g.s.r.f.s.IndexQueryExecutor`
+* `i.g.s.r.f.s.LogTargets`
 * `i.g.s.r.f.s.MessageIndexCoverage`
 * `i.g.s.r.f.s.MessageIndexRetention`
 * `i.g.s.r.f.s.MessageIndexStore`
@@ -52,6 +53,8 @@ _Others_
 * `i.g.s.r.k.a.AuditService` (in Audit log)
 * `i.g.s.r.p.b.SystemExtensions` (in Broker connectivity)
 * `i.g.s.r.p.g.ContentSealer` (in Data governance)
+* `i.g.s.r.p.c.ClusterKinds` (in Clusters)
+* `i.g.s.r.p.b.BrokerGateway` (in Broker connectivity)
 * `i.g.s.r.k.l.LifecycleRegistry` (in Data lifecycle)
 * `i.g.s.r.k.s.ClusterAccessGuard` (in Security)
 * `i.g.s.r.k.s.ActorResolver` (in Security)

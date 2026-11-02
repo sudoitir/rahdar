@@ -7,7 +7,8 @@ import { useMe } from '../../kernel/auth/api.ts';
 import { useCan } from '../../kernel/auth/useCan.ts';
 import { useManifest } from '../../kernel/manifest.ts';
 import { SectionNav, type SectionTab } from '../../kernel/shell/SectionNav.tsx';
-import { SETTINGS_GROUPS, useSlot } from '../../kernel/slots.ts';
+import { useClusterSlot } from '../../kernel/shell/useClusterSlot.ts';
+import { SETTINGS_GROUPS } from '../../kernel/slots.ts';
 import { EmptyState } from '../../ui/EmptyState.tsx';
 import { ErrorState } from '../../ui/ErrorState.tsx';
 import { LoadingState } from '../../ui/LoadingState.tsx';
@@ -260,7 +261,7 @@ function SettingsTabs({
   onClearFilters,
 }: Readonly<{ search: SettingsSearch; categoryTabs: CategoryTab[]; onClearFilters: () => void }>) {
   const { clusterId } = useParams({ strict: false }) as { clusterId: string };
-  const sections = useSlot('settings.sections');
+  const sections = useClusterSlot('settings.sections', clusterId);
   const terms = searchTerms(search.q);
   const filtering = terms.length > 0 || Boolean(search.modified);
 

@@ -33,7 +33,9 @@ import io.github.sudoitir.rahdar.kernel.security.ClusterAccessGuard;
 import io.github.sudoitir.rahdar.kernel.security.PermissionResolver;
 import io.github.sudoitir.rahdar.kernel.security.ResourceFilter;
 import io.github.sudoitir.rahdar.kernel.settings.SettingsService;
+import io.github.sudoitir.rahdar.platform.broker.FlowSampler;
 import io.github.sudoitir.rahdar.platform.broker.RahdarNames;
+import io.github.sudoitir.rahdar.platform.broker.SystemExtensions;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
 import io.github.sudoitir.rahdar.platform.scrape.MetricSamples;
@@ -75,18 +77,6 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class FlowGraphService {
 
-    /** The management access that lets Rahdar's broker user list producers and consumers. */
-    static final String LIST_ACCESS_SNIPPET = """
-            <!-- etc/management.xml: allow the role Rahdar connects with to call list operations -->
-            <authorisation>
-               <role-access>
-                  <match domain="org.apache.activemq.artemis">
-                     <access method="list*" roles="amq"/>
-                     <access method="get*" roles="amq"/>
-                  </match>
-               </role-access>
-            </authorisation>""";
-
     static final String WILDCARD_ASSUMPTION = "Wildcard matches assume the broker's default syntax: words separated"
             + " by '.', '*' matching one word and '#' any number. A broker.xml that redefines these is not"
             + " readable over management.";
@@ -106,6 +96,7 @@ public class FlowGraphService {
     private final FlowDemand demand;
     private final ClusterAccessGuard access;
     private final PermissionResolver permissions;
+    private final SystemExtensions extensions;
     private final Clock clock;
 
     public FlowGraphView graph(UUID clusterId, FlowQuery query) {
@@ -121,15 +112,19 @@ public class FlowGraphService {
         Set<Layer> layers = query.layers();
         boolean capture = layers.contains(Layer.CAPTURE);
         NodeNames names = nodeNames(clusterId);
+        FlowSampler sampler =
+                extensions.forCluster(clusterId, FlowSampler.class).orElse(null);
 
         List<NodeSample> samples = store.nodeSamples(clusterId);
         List<StoredRoute> routes = store.routes(clusterId);
         Set<String> temporaryQueues = temporaryQueues(routes);
 
-        Map<String, QueueAgg> queues = queueAggregates(clusterId, names.byId(), temporaryQueues, capture, readable);
+        Map<String, String> boundExchanges = boundExchanges(routes);
+        Map<String, QueueAgg> queues =
+                queueAggregates(clusterId, names.byId(), temporaryQueues, boundExchanges, capture, readable);
         Rates rates = rates(clusterId, query.byNode(), now.minus(tierC.multipliedBy(3)), now);
         Picture picture = new Picture(queues, new TreeMap<>(), new TreeMap<>(), rates.added(), rates.acked());
-        addClients(clusterId, query, names.byId(), temporaryQueues, picture, readable);
+        addClients(clusterId, query, names.byId(), temporaryQueues, boundExchanges, picture, readable);
 
         Routing routing = new Routing();
         routes.stream()
@@ -148,18 +143,27 @@ public class FlowGraphService {
         int sampledNodes = samples.size();
         Freshness fresh = new Freshness(now, sampleInterval, tierC);
         Drawing drawing = new Drawing();
-        draw(chosen, picture, queueFilters(routes), fresh, drawing);
+        draw(chosen, picture, queueFilters(routes, boundExchanges), fresh, drawing);
         drawDiverts(routing.diverts.values(), sampledNodes, drawing, queues);
         drawBridges(routing.bridges.values(), sampledNodes, knownAddresses(picture), fresh, drawing);
         drawHops(routing.hops.values(), names.byArtemisId(), fresh, drawing);
-        List<String> assumptions = drawWildcards(drawing);
+        drawBindings(routing.bindings, drawing);
+        drawExchangeBindings(routing.exchangeBindings.values(), sampledNodes, drawing);
+        drawLinks(routing.links.values(), sampledNodes, drawing);
+        List<String> assumptions = new ArrayList<>();
+        if (sampler != null && sampler.wildcardAddresses()) {
+            assumptions.addAll(drawWildcards(drawing));
+        }
+        if (sampler != null && sampler.producersNote() != null) {
+            assumptions.add(sampler.producersNote());
+        }
         if (layers.contains(Layer.DEAD_LETTER)) {
             drawFailureRoutes(drawing, queues, routing.deadLetter, EdgeKind.DEAD_LETTER, NodeRole.DEAD_LETTER);
             drawFailureRoutes(drawing, queues, routing.expiry, EdgeKind.EXPIRY, NodeRole.EXPIRY);
         }
 
         List<FlowBrokerNodeView> brokerNodes = samples.stream()
-                .map(s -> brokerNode(s, names.byId().get(s.nodeId())))
+                .map(s -> brokerNode(s, names.byId().get(s.nodeId()), sampler))
                 .sorted(Comparator.comparing(FlowBrokerNodeView::name, Comparator.nullsLast(String::compareTo)))
                 .toList();
         Instant sampledAt = samples.stream()
@@ -196,7 +200,7 @@ public class FlowGraphService {
                 samples.isEmpty(),
                 sampleInterval.toSeconds(),
                 layers.stream().map(Enum::name).sorted().toList(),
-                assumptions,
+                List.copyOf(assumptions),
                 brokerNodes);
     }
 
@@ -241,7 +245,10 @@ public class FlowGraphService {
                 case DEAD_LETTER, EXPIRY ->
                     addresses.readable(route.target())
                             && (isPattern(route.source()) || addresses.readable(route.source()));
-                case STORE_AND_FORWARD, TEMPORARY_QUEUE -> queues.everything() && addresses.everything();
+                case BINDING -> addresses.readable(route.source()) && queues.readable(route.target());
+                case EXCHANGE_BINDING -> addresses.readable(route.source()) && addresses.readable(route.target());
+                case SHOVEL, FEDERATION, STORE_AND_FORWARD, TEMPORARY_QUEUE ->
+                    queues.everything() && addresses.everything();
             };
         }
 
@@ -251,6 +258,11 @@ public class FlowGraphService {
         }
     }
 
+    /** The address the system reports for a queue, else the exchange the queue is bound to. */
+    private static String addressOf(String reported, String bound) {
+        return reported == null || reported.isBlank() ? bound : reported;
+    }
+
     private static Set<String> temporaryQueues(List<StoredRoute> routes) {
         return routes.stream()
                 .filter(r -> r.route().kind() == RouteKind.TEMPORARY_QUEUE)
@@ -258,20 +270,38 @@ public class FlowGraphService {
                 .collect(Collectors.toCollection(TreeSet::new));
     }
 
-    private static Map<String, String> queueFilters(List<StoredRoute> routes) {
+    private static Map<String, String> queueFilters(List<StoredRoute> routes, Map<String, String> boundExchanges) {
         Map<String, String> queueFilters = new HashMap<>();
         for (StoredRoute r : routes) {
             if (r.route().kind() == RouteKind.QUEUE_FILTER) {
                 queueFilters.put(r.route().target(), r.route().filter());
+            } else if (r.route().kind() == RouteKind.BINDING
+                    && r.route().source().equals(boundExchanges.get(r.route().target()))) {
+                queueFilters.putIfAbsent(r.route().target(), r.route().filter());
             }
         }
         return queueFilters;
+    }
+
+    /**
+     * The exchange a queue is bound to, for a system whose queues name no address of their own (RabbitMQ). A queue
+     * bound to several takes the first by name; its other bindings are drawn as routes of their own.
+     */
+    private static Map<String, String> boundExchanges(List<StoredRoute> routes) {
+        Map<String, String> bound = new HashMap<>();
+        routes.stream()
+                .map(StoredRoute::route)
+                .filter(r -> r.kind() == RouteKind.BINDING)
+                .sorted(Comparator.comparing(Route::source))
+                .forEach(r -> bound.putIfAbsent(r.target(), r.source()));
+        return bound;
     }
 
     private Map<String, QueueAgg> queueAggregates(
             UUID clusterId,
             Map<UUID, String> nodeNames,
             Set<String> temporaryQueues,
+            Map<String, String> boundExchanges,
             boolean capture,
             Readable readable) {
         Map<String, QueueAgg> queues = new TreeMap<>();
@@ -282,7 +312,9 @@ public class FlowGraphService {
                     || temporaryQueues.contains(s.queueName())
                     || (captureOwned(s.queueName()) && !capture);
             if (!hidden) {
-                queues.computeIfAbsent(s.queueName(), name -> new QueueAgg(name, s.address()))
+                queues.computeIfAbsent(
+                                s.queueName(),
+                                name -> new QueueAgg(name, addressOf(s.address(), boundExchanges.get(name))))
                         .add(s, nodeNames.get(s.nodeId()));
             }
         }
@@ -314,6 +346,7 @@ public class FlowGraphService {
             FlowQuery query,
             Map<UUID, String> nodeNames,
             Set<String> temporaryQueues,
+            Map<String, String> boundExchanges,
             Picture picture,
             Readable readable) {
         boolean capture = query.layers().contains(Layer.CAPTURE);
@@ -324,13 +357,18 @@ public class FlowGraphService {
                     || internal(e.subscription())
                     || ((captureOwned(e.subscription()) || captureOwned(e.destination())) && !capture);
             if (!hidden) {
-                addClient(stored, query, nodeNames.get(stored.nodeId()), temporaryQueues, picture);
+                addClient(stored, query, nodeNames.get(stored.nodeId()), temporaryQueues, boundExchanges, picture);
             }
         }
     }
 
     private static void addClient(
-            StoredEdge stored, FlowQuery query, String nodeName, Set<String> temporaryQueues, Picture picture) {
+            StoredEdge stored,
+            FlowQuery query,
+            String nodeName,
+            Set<String> temporaryQueues,
+            Map<String, String> boundExchanges,
+            Picture picture) {
         Edge e = stored.edge();
         String label = label(e, query.groupBy());
         if (e.kind() == Kind.PRODUCE) {
@@ -350,7 +388,10 @@ public class FlowGraphService {
             picture.consumers().computeIfAbsent(label, ClientAgg::new).add(stored, nodeName, e.subscription());
             if (!e.subscription().isEmpty()) {
                 // A queue can be consumed before the slow queue sweep has seen it.
-                picture.queues().computeIfAbsent(e.subscription(), name -> new QueueAgg(name, e.destination()));
+                picture.queues()
+                        .computeIfAbsent(
+                                e.subscription(),
+                                name -> new QueueAgg(name, addressOf(e.destination(), boundExchanges.get(name))));
             }
         }
     }
@@ -829,6 +870,132 @@ public class FlowGraphService {
         }
     }
 
+    /**
+     * The bindings of a shown queue beyond the one its path drew: each other exchange it is bound to, when that
+     * exchange is shown too, with the routing key as the edge's filter.
+     */
+    private static void drawBindings(List<Route> bindings, Drawing drawing) {
+        for (Route r : bindings) {
+            if (drawing.addresses.contains(r.source()) && drawing.queues.contains(r.target())) {
+                drawing.edge(plainEdge(
+                        "route:" + r.source() + "->" + r.target(),
+                        EdgeKind.ROUTE,
+                        destinationId(r.source()),
+                        subscriptionId(r.target()),
+                        r.filter(),
+                        Presence.NONE,
+                        List.of()));
+            }
+        }
+    }
+
+    /** An exchange routing to another exchange, drawn when both are shown. */
+    private static void drawExchangeBindings(Collection<RoutingAgg> bindings, int sampledNodes, Drawing drawing) {
+        for (RoutingAgg b : bindings) {
+            Route r = b.route;
+            if (drawing.addresses.contains(r.source()) && drawing.addresses.contains(r.target())) {
+                drawing.edge(plainEdge(
+                        "forward:" + r.name(),
+                        EdgeKind.FORWARD,
+                        destinationId(r.source()),
+                        destinationId(r.target()),
+                        r.filter(),
+                        new Presence(b.nodes.size(), sampledNodes),
+                        b.nodes.size() < sampledNodes ? List.of(Fault.PARTIAL_PRESENCE) : List.of()));
+            }
+        }
+    }
+
+    /**
+     * Shovels and federation links between a shown queue or exchange and another one or another broker. An end
+     * that is not shown is drawn as a link target by its name, so the operator sees where messages go or come from.
+     */
+    private static void drawLinks(Collection<RoutingAgg> links, int sampledNodes, Drawing drawing) {
+        for (RoutingAgg l : links) {
+            Route r = l.route;
+            String source = shownEnd(r.source(), drawing);
+            String target = shownEnd(r.target(), drawing);
+            if (source == null && target == null) {
+                continue;
+            }
+            String from = source != null ? source : remoteEnd(r.source(), drawing);
+            String to = target != null ? target : remoteEnd(r.target(), drawing);
+            List<Fault> faults = new ArrayList<>();
+            if (l.connectedOn < l.nodes.size()) {
+                faults.add(Fault.LINK_DOWN);
+            }
+            if (l.nodes.size() < sampledNodes) {
+                faults.add(Fault.PARTIAL_PRESENCE);
+            }
+            drawing.edge(plainEdge(
+                    "link:" + r.kind().name().toLowerCase(Locale.ROOT) + ":" + r.name(),
+                    EdgeKind.LINK,
+                    from,
+                    to,
+                    r.filter(),
+                    new Presence(l.nodes.size(), sampledNodes),
+                    List.copyOf(faults)));
+        }
+    }
+
+    /** The node id of a queue or exchange the drawing shows by this name, else null. */
+    private static String shownEnd(String name, Drawing drawing) {
+        if (drawing.queues.contains(name)) {
+            return subscriptionId(name);
+        }
+        return drawing.addresses.contains(name) ? destinationId(name) : null;
+    }
+
+    private static String remoteEnd(String name, Drawing drawing) {
+        String id = "remote:link:" + name;
+        drawing.node(new FlowNodeView(
+                id,
+                NodeKind.REMOTE,
+                NodeRole.LINK_TARGET,
+                name,
+                null,
+                null,
+                null,
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of()));
+        return id;
+    }
+
+    /** An edge that carries no rate: the system keeps no counter for it. */
+    private static FlowEdgeView plainEdge(
+            String id,
+            EdgeKind kind,
+            String source,
+            String target,
+            String filter,
+            Presence presence,
+            List<Fault> faults) {
+        return new FlowEdgeView(
+                id,
+                kind,
+                source,
+                target,
+                null,
+                RateSource.NONE,
+                null,
+                null,
+                false,
+                null,
+                null,
+                null,
+                filter,
+                null,
+                false,
+                presence.on(),
+                presence.of(),
+                false,
+                faults);
+    }
+
     private static void drawHops(
             Collection<HopAgg> hops, Map<String, String> nodeNamesByArtemisId, Fresh fresh, Drawing drawing) {
         for (HopAgg hop : hops) {
@@ -1035,7 +1202,7 @@ public class FlowGraphService {
         return faults;
     }
 
-    private static FlowBrokerNodeView brokerNode(NodeSample s, String name) {
+    private static FlowBrokerNodeView brokerNode(NodeSample s, String name, FlowSampler sampler) {
         NodeSampleState state = state(s.errorKind());
         String message =
                 switch (state) {
@@ -1062,7 +1229,7 @@ public class FlowGraphService {
                 s.consumersSeen(),
                 s.consumersTotal(),
                 s.producersTotal() > s.producersSeen() || s.consumersTotal() > s.consumersSeen(),
-                state == NodeSampleState.PERMISSION_DENIED ? LIST_ACCESS_SNIPPET : null);
+                state == NodeSampleState.PERMISSION_DENIED && sampler != null ? sampler.accessSnippet() : null);
     }
 
     private static NodeSampleState state(String errorKind) {
@@ -1310,6 +1477,11 @@ public class FlowGraphService {
 
     private record NodeNames(Map<UUID, String> byId, Map<String, String> byArtemisId) {}
 
+    /** On how many of the sampled nodes an edge was seen; null counts when the system keeps no such count. */
+    private record Presence(Integer on, Integer of) {
+        static final Presence NONE = new Presence(null, null);
+    }
+
     private record Selection(List<Path> chosen, FlowFocusView focusView, boolean limited) {}
 
     /** The store-and-forward hops, diverts, bridges and failure addresses the routes add up to. */
@@ -1317,6 +1489,9 @@ public class FlowGraphService {
         final Map<String, HopAgg> hops = new TreeMap<>();
         final Map<List<Object>, RoutingAgg> diverts = new LinkedHashMap<>();
         final Map<List<Object>, RoutingAgg> bridges = new LinkedHashMap<>();
+        final List<Route> bindings = new ArrayList<>();
+        final Map<List<Object>, RoutingAgg> exchangeBindings = new LinkedHashMap<>();
+        final Map<List<Object>, RoutingAgg> links = new LinkedHashMap<>();
         String deadLetter;
         String expiry;
 
@@ -1326,11 +1501,20 @@ public class FlowGraphService {
                 case STORE_AND_FORWARD -> addHop(stored, nodeName, layers);
                 case DIVERT -> addDivert(stored, layers, capture);
                 case BRIDGE -> addBridge(stored, layers);
+                case BINDING -> addBinding(r, layers);
+                case EXCHANGE_BINDING -> addTo(exchangeBindings, stored, layers, r.filter());
+                case SHOVEL, FEDERATION -> addTo(links, stored, layers, r.kind());
                 case DEAD_LETTER -> deadLetter = r.target();
                 case EXPIRY -> expiry = r.target();
                 default -> {
                     // Temporary and filtered queues are read separately.
                 }
+            }
+        }
+
+        private void addBinding(Route r, Set<Layer> layers) {
+            if (layers.contains(Layer.ROUTES)) {
+                bindings.add(r);
             }
         }
 
@@ -1356,6 +1540,16 @@ public class FlowGraphService {
             Route r = stored.route();
             if (layers.contains(Layer.ROUTES)) {
                 bridges.computeIfAbsent(List.of(r.name(), r.source(), r.target()), k -> new RoutingAgg(r))
+                        .add(r, stored.sampledAt(), stored.nodeId());
+            }
+        }
+
+        private void addTo(Map<List<Object>, RoutingAgg> into, StoredRoute stored, Set<Layer> layers, Object extra) {
+            Route r = stored.route();
+            if (layers.contains(Layer.ROUTES)) {
+                into.computeIfAbsent(
+                                List.of(r.kind(), r.name(), r.source(), r.target(), String.valueOf(extra)),
+                                k -> new RoutingAgg(r))
                         .add(r, stored.sampledAt(), stored.nodeId());
             }
         }

@@ -114,7 +114,7 @@ class RabbitMqRegisterRealBrokerTest extends PostgresIntegrationTest {
         assertThat((String) JsonPath.read(check, "$.clusterId")).startsWith("rabbit@");
         assertThat((Integer) JsonPath.read(check, "$.nodes.length()")).isEqualTo(1);
         assertThat((String) JsonPath.read(check, "$.nodes[0].outcome")).isEqualTo("OK");
-        assertThat((String) JsonPath.read(check, "$.version.text")).startsWith("4.");
+        assertThat((String) JsonPath.read(check, "$.version.text")).isEqualTo(RabbitMqBrokers.RELEASE);
         assertThat((Integer) JsonPath.read(check, "$.endpoints.length()")).isEqualTo(2);
         assertThat(first(check, "$.endpoints[?(@.plane=='MANAGEMENT')].outcome"))
                 .isEqualTo("OK");

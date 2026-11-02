@@ -1,5 +1,6 @@
 package io.github.sudoitir.rahdar.feature.sql;
 
+import io.github.sudoitir.openbroker.model.ResourceId;
 import io.github.sudoitir.rahdar.feature.sql.MessagePredicate.EvalContext;
 import io.github.sudoitir.rahdar.feature.sql.PredicateSplitter.Split;
 import io.github.sudoitir.rahdar.feature.sql.QueryAst.Source;
@@ -13,6 +14,8 @@ import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
 import io.github.sudoitir.rahdar.platform.broker.BrokerMessages;
 import io.github.sudoitir.rahdar.platform.broker.BrowsePage;
 import io.github.sudoitir.rahdar.platform.broker.BrowsedMessage;
+import io.github.sudoitir.rahdar.platform.broker.LogBounds;
+import io.github.sudoitir.rahdar.platform.broker.LogPage;
 import io.github.sudoitir.rahdar.platform.broker.NodeCallLimiter;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
@@ -63,6 +66,7 @@ public class BrokerQueryExecutor {
     private final SqlProperties properties;
     private final SqlGovernance governance;
     private final BrokerMessages messages;
+    private final LogTargets logs;
 
     /** Where a caller receives rows and per-node outcomes as they happen. */
     public interface Sink {
@@ -136,7 +140,7 @@ public class BrokerQueryExecutor {
             this.sink = sink;
             this.extraSelector = extraSelector;
             this.maxPagesPerTarget = maxPagesPerTarget;
-            this.split = planner.splitOf(plan.ast());
+            this.split = planner.splitFor(clusterId, plan.ast());
             // Resolved here, on the caller's thread: the per-node threads below carry no security context.
             // A tail poll has none either, so it evaluates over masked content — the safe side.
             this.clearAccess = governance.clearAccess(clusterId, plan.ast().subscriptionPattern());
@@ -229,6 +233,9 @@ public class BrokerQueryExecutor {
         // ---- one target ----------------------------------------------------
 
         private NodeOutcome readTarget(ClusterNode node, Target target) {
+            if (target.isLog()) {
+                return readLog(node, target);
+            }
             // The selector is re-rendered per node, because a relative window means
             // something different on a node whose clock is measurably offset (ADR-0053).
             String selector =
@@ -266,6 +273,88 @@ public class BrokerQueryExecutor {
                 }
             }
             return read.outcome(NodeOutcome.Status.ANSWERED, null);
+        }
+
+        /**
+         * A log, partition by partition from the start of each, unfiltered. The broker cannot evaluate a predicate
+         * over a log, so every record read is examined here, and the scan cap, the row limit, the timeout and the
+         * page limit stop it.
+         */
+        private NodeOutcome readLog(ClusterNode node, Target target) {
+            TargetRead read = new TargetRead(
+                    node,
+                    target,
+                    null,
+                    residuals.compile(
+                            split.scan(),
+                            new EvalContext(
+                                    target.subscription(),
+                                    target.destination(),
+                                    target.nodeName(),
+                                    target.brokerNow())));
+            try {
+                return scanLog(read, ResourceId.parse(target.log()));
+            } catch (BrokerConnectionException e) {
+                return read.outcome(NodeOutcome.Status.FAILED, e.getMessage());
+            } catch (RuntimeException e) {
+                log.debug("SQL console read of {} failed", target.subscription(), e);
+                return read.outcome(
+                        NodeOutcome.Status.FAILED,
+                        e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage());
+            }
+        }
+
+        private NodeOutcome scanLog(TargetRead read, ResourceId source) {
+            boolean partitioned = logs.partitioned(clusterId);
+            int pages = 0;
+            for (var partition : logs.partitions(clusterId, source).entrySet()) {
+                PartitionScan scanned = scanPartition(read, source, partition, partitioned, pages);
+                if (scanned.ended() != null) {
+                    return scanned.ended();
+                }
+                pages = scanned.pages();
+            }
+            return read.outcome(NodeOutcome.Status.ANSWERED, null);
+        }
+
+        /** Where a partition's scan stopped: the pages read so far, and the outcome when the whole target ended. */
+        private record PartitionScan(int pages, NodeOutcome ended) {}
+
+        private PartitionScan scanPartition(
+                TargetRead read,
+                ResourceId source,
+                Map.Entry<Integer, LogBounds.Bounds> partition,
+                boolean partitioned,
+                int pagesRead) {
+            int pages = pagesRead;
+            long offset = partition.getValue().start();
+            while (offset < partition.getValue().end()) {
+                if (sink.isCancelled()) {
+                    return new PartitionScan(
+                            pages, read.outcome(NodeOutcome.Status.NOT_READ, "The query was abandoned."));
+                }
+                Bound stop = boundReached();
+                if (stop != null || pages >= maxPagesPerTarget || rows.size() >= plan.effectiveLimit()) {
+                    if (stop != null) {
+                        recordBound(stop);
+                    }
+                    return new PartitionScan(pages, read.outcome(NodeOutcome.Status.ANSWERED, null));
+                }
+                LogPage page = logs.page(clusterId, source, partition.getKey(), offset, PAGE_SIZE);
+                scan(
+                        read,
+                        page.records().stream()
+                                .map(r -> partitioned
+                                        ? r.message().withLongProperty("partition", partition.getKey())
+                                        : r.message())
+                                .toList());
+                pages++;
+                if (page.next() == null || page.records().isEmpty()) {
+                    break;
+                }
+                offset = page.next();
+            }
+            return new PartitionScan(pages, null);
         }
 
         /** A page of one target, or the outcome that ends the target because it could not be read. */
@@ -395,7 +484,8 @@ public class BrokerQueryExecutor {
                     null,
                     null,
                     null,
-                    null);
+                    null,
+                    target.log());
         }
     }
 
@@ -417,7 +507,14 @@ public class BrokerQueryExecutor {
 
         NodeOutcome outcome(NodeOutcome.Status status, String detail) {
             return new NodeOutcome(
-                    node.getId(), target.nodeName(), target.subscription(), status, examinedHere, matched, detail);
+                    node.getId(),
+                    target.nodeName(),
+                    target.subscription(),
+                    status,
+                    examinedHere,
+                    matched,
+                    detail,
+                    target.log());
         }
     }
 

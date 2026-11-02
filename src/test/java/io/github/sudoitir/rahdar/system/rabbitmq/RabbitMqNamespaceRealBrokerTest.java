@@ -130,7 +130,7 @@ class RabbitMqNamespaceRealBrokerTest extends PostgresIntegrationTest {
         assertThat((String) JsonPath.read(nodes, "$.clusterName")).startsWith("rabbit@");
         assertThat((String) JsonPath.read(nodes, "$.nodes[0].name")).startsWith("rabbit@");
         assertThat((Boolean) JsonPath.read(nodes, "$.nodes[0].running")).isTrue();
-        assertThat(nodes).as(nodes).contains("\"version\":\"4.");
+        assertThat(nodes).as(nodes).contains("\"version\":\"" + RabbitMqBrokers.RELEASE + "\"");
         assertThat((Integer) JsonPath.read(nodes, "$.nodes[0].listeners.length()"))
                 .isPositive();
     }

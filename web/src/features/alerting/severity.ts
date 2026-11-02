@@ -153,3 +153,83 @@ const STATE_LABELS: Record<string, string> = {
 export function stateConditionLabel(condition: string): string {
   return STATE_LABELS[condition] ?? condition;
 }
+
+/**
+ * What only an Artemis cluster reports: live/backup pairs, the broker's clock, a management URL per node, its
+ * `broker.xml` and its consumer acknowledgements per subscription. A Kafka or RabbitMQ cluster is watched through its
+ * own health and the backlog metrics every system records; the server refuses these rules there too.
+ */
+const ARTEMIS_ONLY: ReadonlySet<string> = new Set([
+  'SPLIT_BRAIN',
+  'NODE_DOWN',
+  'REPLICATION_BEHIND',
+  'CLOCK_SKEW',
+  'CONFIG_DRIFT',
+  'SETUP_RISK',
+  'ackRatePerConsumer',
+]);
+
+const SYSTEM_NAMES: Readonly<Record<string, string>> = { kafka: 'Kafka', rabbitmq: 'RabbitMQ', artemis: 'Artemis' };
+
+/** The system's name in words. */
+export function systemName(system: string): string {
+  return SYSTEM_NAMES[system] ?? system;
+}
+
+/** True when the cluster is known to be of a system that cannot answer the condition or metric. Unknown is not unavailable. */
+export function unavailableOn(system: string | undefined, conditionOrMetric: string): boolean {
+  return system !== undefined && system !== 'artemis' && ARTEMIS_ONLY.has(conditionOrMetric);
+}
+
+/** Why the Artemis-only choices are disabled on this system, and what to watch instead. */
+export function artemisOnlyNote(system: string): string {
+  const name = systemName(system);
+  return `Split-brain, node down, replication behind, clock skew, configuration drift, setup risk and slow consumers read what only Artemis reports, so they are unavailable on ${name}. Watch cluster degraded, which ${name}'s own health answers, or a backlog metric.`;
+}
+
+/** The cluster's own health, the state rule every system answers. */
+export const CLUSTER_DEGRADED_TEMPLATE = {
+  name: 'Cluster degraded',
+  stateCondition: 'CLUSTER_DEGRADED',
+  forSeconds: 60,
+  severity: 'CRITICAL',
+} as const;
+
+/**
+ * A backlog threshold in the system's own words: a Kafka backlog is a consumer group's lag on a topic, a RabbitMQ one
+ * the messages ready in a queue. Like the slow-consumer template the number is workload-specific, so it is a starting
+ * point the operator changes.
+ */
+export const BACKLOG_TEMPLATES: Readonly<
+  Record<
+    string,
+    {
+      label: string;
+      name: string;
+      metric: string;
+      comparator: string;
+      threshold: number;
+      forSeconds: number;
+      severity: string;
+    }
+  >
+> = {
+  kafka: {
+    label: 'consumer-lag',
+    name: 'Consumer lag',
+    metric: 'openbroker.backlog',
+    comparator: 'GT',
+    threshold: 10000,
+    forSeconds: 300,
+    severity: 'WARNING',
+  },
+  rabbitmq: {
+    label: 'queue-depth',
+    name: 'Queue depth',
+    metric: 'openbroker.backlog',
+    comparator: 'GT',
+    threshold: 10000,
+    forSeconds: 300,
+    severity: 'WARNING',
+  },
+};

@@ -123,10 +123,10 @@ jobs:
 
   # Backend and frontend are coupled through the OpenAPI snapshot (web/openapi.json,
   # written by a backend test) and the schema generated from it, so a change on
-  # either side runs both. The whole suite runs as three shards on separate runners against the
-  # newest tested Artemis, and a fourth runner runs only the tests that start a real broker against
-  # the oldest supported one (ADR-0142). BrokerVersionTest keeps the two images and
-  # BrokerVersion.MINIMUM / LATEST_TESTED in step.
+  # either side runs both. The tests that start no broker run as three shards on separate runners;
+  # each system's real-broker tests run on two more, one per end of its supported range (ADR-0142):
+  # Artemis, Kafka (KRaft 3.9 and 4.x) and RabbitMQ (3.13 and 4.x). BrokerVersionTest keeps the two
+  # Artemis images and BrokerVersion.MINIMUM / LATEST_TESTED in step.
   backend:
     needs: changes
     if: >-
@@ -138,11 +138,18 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { shard: "0", artemis: "apache/artemis:2.57.0" }
-          - { shard: "1", artemis: "apache/artemis:2.57.0" }
-          - { shard: "2", artemis: "apache/artemis:2.57.0" }
-          - { shard: broker, artemis: "apache/activemq-artemis:2.33.0" }
-    name: backend (${{ matrix.artemis }}, shard ${{ matrix.shard }})
+          # Unit and Spring-context tests, a third each; none of them starts a broker.
+          - { shard: "0" }
+          - { shard: "1" }
+          - { shard: "2" }
+          # Every real-broker test, against both ends of each system's supported range.
+          - { shard: artemis, artemis: "apache/artemis:2.57.0" }
+          - { shard: artemis, artemis: "apache/activemq-artemis:2.33.0" }
+          - { shard: kafka, kafka: "apache/kafka:4.4.0" }
+          - { shard: kafka, kafka: "apache/kafka:3.9.2" }
+          - { shard: rabbitmq, rabbitmq: "rabbitmq:4.4.0-management" }
+          - { shard: rabbitmq, rabbitmq: "rabbitmq:3.13.7-management" }
+    name: backend (${{ matrix.shard }}${{ matrix.artemis && format(' {0}', matrix.artemis) || '' }}${{ matrix.kafka && format(' {0}', matrix.kafka) || '' }}${{ matrix.rabbitmq && format(' {0}', matrix.rabbitmq) || '' }})
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -152,12 +159,12 @@ jobs:
           distribution: temurin
           java-version: "25"
           cache: maven
-      # Round-robin over the sorted paths of every class Surefire would run by default, so each
-      # shard gets a third and neighbouring heavy suites (Transfer*) land on different runners.
-      # The `broker` shard is every class that starts a real broker (through ArtemisIntegrationTest
-      # or ArtemisBrokers); nothing else depends on the broker's version.
-      # The shard goes in as -Dtest, which replaces the pom's includes; an includesFile would be
-      # appended to them and every shard would run the whole suite.
+      # Each system's real-broker tests run in that system's shards, once per end of its supported range: Artemis
+      # through ArtemisIntegrationTest or ArtemisBrokers, Kafka through a Kafka container, RabbitMQ through
+      # RabbitMqBrokers. Every other class runs in the numbered shards, round-robin over the sorted paths so each
+      # gets a third and neighbouring heavy suites (Transfer*) land on different runners; no broker image matters
+      # there. The shard goes in as -Dtest, which replaces the pom's includes; an includesFile would be appended to
+      # them and every shard would run the whole suite.
       # ponytail: count-balanced, not time-balanced; weigh by surefire report times if a shard lags.
       - name: Pick shard ${{ matrix.shard }}
         env:
@@ -166,15 +173,31 @@ jobs:
           find src/test/java -type f \
             \( -name '*Test.java' -o -name '*Tests.java' -o -name 'Test*.java' -o -name '*TestCase.java' \) \
             | sort > "$RUNNER_TEMP/tests.txt"
-          if [ "$SHARD" = broker ]; then
-            xargs grep -l -e ArtemisIntegrationTest -e ArtemisBrokers < "$RUNNER_TEMP/tests.txt" > "$RUNNER_TEMP/picked.txt"
-          else
-            awk -v n=3 -v i="$SHARD" 'NR % n == i' "$RUNNER_TEMP/tests.txt" > "$RUNNER_TEMP/picked.txt"
-          fi
+          xargs grep -l -e ArtemisIntegrationTest -e ArtemisBrokers < "$RUNNER_TEMP/tests.txt" > "$RUNNER_TEMP/artemis.txt" || true
+          xargs grep -l -e KafkaContainer -e '"kafka.image"' -e 'confluentinc/cp-kafka' < "$RUNNER_TEMP/tests.txt" > "$RUNNER_TEMP/kafka.txt" || true
+          xargs grep -l -e RabbitMqBrokers -e '"rabbitmq.image"' < "$RUNNER_TEMP/tests.txt" > "$RUNNER_TEMP/rabbitmq.txt" || true
+          case "$SHARD" in
+            artemis|kafka|rabbitmq) cp "$RUNNER_TEMP/$SHARD.txt" "$RUNNER_TEMP/picked.txt" ;;
+            *)
+              sort -u "$RUNNER_TEMP/artemis.txt" "$RUNNER_TEMP/kafka.txt" "$RUNNER_TEMP/rabbitmq.txt" > "$RUNNER_TEMP/brokers.txt"
+              comm -23 "$RUNNER_TEMP/tests.txt" "$RUNNER_TEMP/brokers.txt" \
+                | awk -v n=3 -v i="$SHARD" 'NR % n == i' > "$RUNNER_TEMP/picked.txt" ;;
+          esac
           sed 's|^src/test/java/||; s|\.java$||; s|/|.|g' "$RUNNER_TEMP/picked.txt" > "$RUNNER_TEMP/shard.txt"
           echo "$(wc -l < "$RUNNER_TEMP/shard.txt") test classes in this shard"
+          test -s "$RUNNER_TEMP/shard.txt"
       - name: Verify (Spotless check, Liquibase vs Testcontainers Postgres, tests)
-        run: ./mvnw -B verify -Dtest="$(paste -sd, "$RUNNER_TEMP/shard.txt")" -Dsurefire.failIfNoSpecifiedTests=false -Dartemis.image="${{ matrix.artemis }}"
+        env:
+          ARTEMIS_IMAGE: ${{ matrix.artemis }}
+          KAFKA_IMAGE: ${{ matrix.kafka }}
+          RABBITMQ_IMAGE: ${{ matrix.rabbitmq }}
+        run: |
+          images=""
+          if [ -n "$ARTEMIS_IMAGE" ]; then images="$images -Dartemis.image=$ARTEMIS_IMAGE"; fi
+          if [ -n "$KAFKA_IMAGE" ]; then images="$images -Dkafka.image=$KAFKA_IMAGE"; fi
+          if [ -n "$RABBITMQ_IMAGE" ]; then images="$images -Drabbitmq.image=$RABBITMQ_IMAGE"; fi
+          # shellcheck disable=SC2086 # the image flags are meant to split
+          ./mvnw -B verify -Dtest="$(paste -sd, "$RUNNER_TEMP/shard.txt")" -Dsurefire.failIfNoSpecifiedTests=false $images
       - name: Fail on unformatted sources or a stale OpenAPI snapshot
         run: git diff --exit-code
       # This shard's coverage; the `coverage` job merges them all (ADR-0128).
@@ -853,7 +876,7 @@ jobs:
             ${{ secrets.DOCKERHUB_USERNAME }}/rahdar:dev
           labels: |
             org.opencontainers.image.title=Rahdar
-            org.opencontainers.image.description=Cluster-wide management and observability for Apache ActiveMQ Artemis
+            org.opencontainers.image.description=Cluster-wide management and observability for Apache Kafka, RabbitMQ and Apache ActiveMQ Artemis
             org.opencontainers.image.version=${{ steps.ver.outputs.version }}
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.created=${{ steps.ver.outputs.date }}
@@ -946,7 +969,7 @@ jobs:
           # contributing notes and a trademark section that mean nothing to
           # someone reading a tag list.
           readme-filepath: docs/dockerhub.md
-          short-description: Cluster-wide management and observability for Apache ActiveMQ Artemis
+          short-description: Cluster-wide management and observability for Apache Kafka, RabbitMQ and Apache ActiveMQ Artemis
           # Docker Hub does not resolve repo-relative paths, so without this the
           # screenshots render broken even when the push succeeds.
           enable-url-completion: true

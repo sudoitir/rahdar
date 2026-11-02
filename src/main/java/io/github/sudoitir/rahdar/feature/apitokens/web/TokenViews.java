@@ -28,7 +28,8 @@ public final class TokenViews {
             String resourceType,
 
             @Schema(
-                    description = "An Artemis wildcard pattern, with resourceType; absent for the whole scope",
+                    description = "A wildcard pattern over resource names (. separates words, * matches one word, # any"
+                            + " number of words), with resourceType; absent for the whole scope",
                     nullable = true)
             String resourcePattern) {}
 

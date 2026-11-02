@@ -1,6 +1,7 @@
 package io.github.sudoitir.rahdar.feature.sql.web;
 
 import io.github.sudoitir.rahdar.feature.sql.CaptureMode;
+import io.github.sudoitir.rahdar.feature.sql.LogTargets;
 import io.github.sudoitir.rahdar.feature.sql.MessageIndexService;
 import io.github.sudoitir.rahdar.feature.sql.MessageIndexService.Subscription;
 import io.github.sudoitir.rahdar.feature.sql.internal.persistence.MessageCaptureNodeEntity;
@@ -41,6 +42,7 @@ public class SqlIndexController {
 
     private final MessageIndexService index;
     private final ResourceIdTexts ids;
+    private final LogTargets logs;
 
     @GetMapping
     public PagedView<IndexSubscriptionView> list(
@@ -57,6 +59,7 @@ public class SqlIndexController {
 
     @PostMapping
     public IndexSubscriptionView create(@PathVariable UUID clusterId, @RequestBody IndexSubscriptionRequest request) {
+        logs.requireIndexable(clusterId);
         return toView(index.create(clusterId, toSpec(request)));
     }
 
@@ -67,6 +70,7 @@ public class SqlIndexController {
      */
     @PostMapping(params = "dryRun=true")
     public CapturePreviewView preview(@PathVariable UUID clusterId, @RequestBody IndexSubscriptionRequest request) {
+        logs.requireIndexable(clusterId);
         MessageIndexService.Preview p = index.preview(clusterId, toSpec(request));
         return new CapturePreviewView(
                 p.destinations().stream()
@@ -83,6 +87,7 @@ public class SqlIndexController {
     @PatchMapping("/{id}")
     public IndexSubscriptionView update(
             @PathVariable UUID clusterId, @PathVariable UUID id, @RequestBody IndexSubscriptionRequest request) {
+        logs.requireIndexable(clusterId);
         return toView(index.update(clusterId, id, toSpec(request)));
     }
 

@@ -39,6 +39,7 @@ public class MessageVerifier {
     private final QueueSnapshots snapshots;
     private final ClusterAccessGuard clusterAccess;
     private final BrokerMessages messages;
+    private final LogTargets logs;
 
     public enum Presence {
         /** The broker still holds it. */
@@ -55,6 +56,11 @@ public class MessageVerifier {
     public Verdict verify(UUID clusterId, UUID nodeId, String queueName, long messageId, long timestamp) {
         clusterAccess.requireResource(clusterId, ResourceRef.subscription(queueName), MessagePermissions.MESSAGE_READ);
 
+        if (logs.applies(clusterId)) {
+            return new Verdict(
+                    Presence.UNKNOWN,
+                    "This cluster's system has no selectors, so a single message cannot be looked for on it.");
+        }
         Optional<ClusterNode> node = nodes.nodes(clusterId).stream()
                 .filter(n -> n.getId().equals(nodeId))
                 .findFirst();

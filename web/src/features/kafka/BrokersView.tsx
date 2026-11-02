@@ -1,10 +1,11 @@
 import { Stack, Text } from '@mantine/core';
-import { useParams } from '@tanstack/react-router';
+import { Link, useParams } from '@tanstack/react-router';
 
 import { DescriptionList } from '../../ui/DescriptionList.tsx';
 import { EmptyState } from '../../ui/EmptyState.tsx';
 import { ErrorState } from '../../ui/ErrorState.tsx';
 import { LoadingState } from '../../ui/LoadingState.tsx';
+import linkClasses from '../../ui/InlineLink.module.css';
 import { Notice } from '../../ui/Notice.tsx';
 import { Page } from '../../ui/Page.tsx';
 import { PageHeader } from '../../ui/PageHeader.tsx';
@@ -13,7 +14,7 @@ import { StatusBadge } from '../../ui/StatusBadge.tsx';
 import { DataTable, type Column } from '../../ui/table/index.ts';
 import { useKafkaBrokers, type KafkaBroker, type QuorumVoter } from './api.ts';
 
-const BROKER_COLUMNS: Column<KafkaBroker>[] = [
+const brokerColumns = (clusterId: string): Column<KafkaBroker>[] => [
   { id: 'id', header: 'Broker', accessor: (b) => `Broker ${b.id}`, kind: 'identifier', priority: 'essential' },
   {
     id: 'address',
@@ -59,6 +60,22 @@ const BROKER_COLUMNS: Column<KafkaBroker>[] = [
     priority: 'high',
   },
   { id: 'offline', header: 'Offline', accessor: (b) => b.offline, kind: 'number', priority: 'high' },
+  {
+    id: 'config',
+    header: 'Configuration',
+    accessor: () => '',
+    cell: (b) => (
+      <Link
+        to={`/clusters/${clusterId}/kafka/brokers/${encodeURIComponent(b.id)}/config`}
+        className={linkClasses.link}
+        aria-label={`Configuration of broker ${b.id}`}
+      >
+        Configuration
+      </Link>
+    ),
+    kind: 'status',
+    priority: 'essential',
+  },
 ];
 
 const VOTER_COLUMNS: Column<QuorumVoter>[] = [
@@ -109,6 +126,11 @@ export function BrokersView() {
     <Page>
       <PageHeader
         title="Brokers"
+        meta={
+          <Link to={`/clusters/${clusterId}/kafka/brokers/default/config`} className={linkClasses.link}>
+            Cluster default configuration
+          </Link>
+        }
         description="The brokers of the cluster, and the controllers that elect their leaders."
       />
       <Section title="Brokers">
@@ -116,7 +138,7 @@ export function BrokersView() {
           variant="static"
           label="Kafka brokers"
           storageKey="kafka.brokers"
-          columns={BROKER_COLUMNS}
+          columns={brokerColumns(clusterId)}
           data={brokers.data.brokers}
           rowKey={(b) => b.id}
           height={{ maxRows: 16 }}

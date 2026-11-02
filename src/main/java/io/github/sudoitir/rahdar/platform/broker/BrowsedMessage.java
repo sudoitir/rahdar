@@ -1,5 +1,6 @@
 package io.github.sudoitir.rahdar.platform.broker;
 
+import java.util.HashMap;
 import java.util.Map;
 
 /** One decoded message: the header set plus five typed property maps and the body. */
@@ -33,6 +34,35 @@ public record BrowsedMessage(
                 + longProperties.size()
                 + doubleProperties.size()
                 + booleanProperties.size();
+    }
+
+    /** The same message with one more integer property, such as the partition a record was read from. */
+    public BrowsedMessage withLongProperty(String name, long value) {
+        Map<String, Long> extended = new HashMap<>(longProperties);
+        extended.put(name, value);
+        return new BrowsedMessage(
+                messageId,
+                type,
+                durable,
+                priority,
+                timestamp,
+                expiration,
+                size,
+                groupId,
+                correlationId,
+                replyTo,
+                userId,
+                body,
+                bodyEncoding,
+                bodyCompression,
+                contentType,
+                bodyTruncated,
+                observedLimitBytes,
+                stringProperties,
+                intProperties,
+                Map.copyOf(extended),
+                doubleProperties,
+                booleanProperties);
     }
 
     /** First ~200 chars of the body, for the grid cell. */

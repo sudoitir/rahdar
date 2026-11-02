@@ -138,11 +138,19 @@ describe('ClusterViewNav', () => {
 
     await screen.findByRole('link', { name: 'Brokers' });
     // A Kafka cluster is reached by bootstrap servers: no Artemis-shaped view is listed for it.
-    for (const name of ['Topology', 'Routes', 'Requests', 'Dead letters', 'SQL Console', 'Flow', 'Connections']) {
+    for (const name of ['Topology', 'Routes', 'Requests', 'Dead letters', 'Connections']) {
       expect(screen.queryByRole('link', { name })).not.toBeInTheDocument();
     }
     // What the Kafka system does have is listed.
-    for (const name of ['Destinations', 'Consumers', 'Channels', 'Producers', 'Consumer groups', 'ACLs']) {
+    for (const name of [
+      'Destinations',
+      'Consumers',
+      'Channels',
+      'Producers',
+      'Consumer groups',
+      'ACLs',
+      'SQL Console',
+    ]) {
       expect(screen.getByRole('link', { name })).toBeInTheDocument();
     }
     await waitFor(() => expect(screen.queryByRole('link', { name: 'Configuration' })).not.toBeInTheDocument());
@@ -162,7 +170,7 @@ describe('ClusterViewNav', () => {
     renderWithProviders(<ClusterViewNav clusterId="c1" collapsed={false} />);
 
     await screen.findByRole('link', { name: 'Channels' });
-    for (const name of ['Subscriptions', 'Destinations', 'Consumers', 'Channels', 'Connections']) {
+    for (const name of ['Subscriptions', 'Destinations', 'Consumers', 'Channels', 'Connections', 'SQL Console']) {
       expect(screen.getByRole('link', { name })).toBeInTheDocument();
     }
     // A RabbitMQ cluster has no producers, and none of the views that read one other system.
@@ -172,8 +180,6 @@ describe('ClusterViewNav', () => {
       'Topology',
       'Requests',
       'Dead letters',
-      'SQL Console',
-      'Flow',
       'Configuration',
       'Setup review',
       'Consumer groups',

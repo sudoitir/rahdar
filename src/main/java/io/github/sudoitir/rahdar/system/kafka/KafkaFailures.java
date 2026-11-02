@@ -27,7 +27,7 @@ final class KafkaFailures {
                 ErrorReasons.PRECONDITION_FAILED.equals(e.reason())
                         ? new KafkaStaleException(e.getMessage())
                         : new ConflictException(
-                                e.reason().toLowerCase(Locale.ROOT).replace('_', '-'), e.getMessage());
+                                e.reason().toLowerCase(Locale.ROOT).replace('_', '-'), e.getMessage(), e);
             case INVALID_ARGUMENT, OUT_OF_RANGE -> new IllegalArgumentException(e.getMessage(), e);
             case NOT_FOUND -> new NotFoundException(e.getMessage());
             default -> BrokerFailures.translate(e);

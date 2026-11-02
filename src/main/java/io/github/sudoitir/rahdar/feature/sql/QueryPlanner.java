@@ -29,12 +29,11 @@ import java.util.Set;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Turns a validated {@link QueryAst} into a {@link QueryPlan} (ADR-0058 D6).
  *
- * <p>Planning contacts no broker. Targets come from {@code subscription_snapshot}, the cost
+ * <p>Planning contacts no broker on Artemis. Targets come from {@code subscription_snapshot}, the cost
  * estimate from the message counts already in it, and the per-node "now" from the
  * measured clock offsets. That is what lets the console state the cost of a query
  * while the operator is still typing — the only moment at which stating it is
@@ -51,6 +50,7 @@ public class QueryPlanner {
     private final ClockOffsetService clocks;
     private final SqlProperties properties;
     private final MessageIndexCoverage coverage;
+    private final LogTargets logs;
     private final Clock clock;
 
     /** Two constructors, so the container is told which one is the injectable one. */
@@ -63,8 +63,9 @@ public class QueryPlanner {
             SelectorRenderer selectors,
             ClockOffsetService clocks,
             SqlProperties properties,
-            MessageIndexCoverage coverage) {
-        this(snapshots, locator, nodes, splitter, selectors, clocks, properties, coverage, Clock.systemUTC());
+            MessageIndexCoverage coverage,
+            LogTargets logs) {
+        this(snapshots, locator, nodes, splitter, selectors, clocks, properties, coverage, logs, Clock.systemUTC());
     }
 
     QueryPlanner(
@@ -76,6 +77,7 @@ public class QueryPlanner {
             ClockOffsetService clocks,
             SqlProperties properties,
             MessageIndexCoverage coverage,
+            LogTargets logs,
             Clock clock) {
         this.snapshots = snapshots;
         this.locator = locator;
@@ -85,12 +87,19 @@ public class QueryPlanner {
         this.clocks = clocks;
         this.properties = properties;
         this.coverage = coverage;
+        this.logs = logs;
         this.clock = clock;
     }
 
-    @Transactional(readOnly = true)
+    /**
+     * Not in a transaction: a cluster read as one lists its logs from the broker while it plans, and a broker
+     * call is refused inside one. The reads of snapshots and nodes each carry their own.
+     */
     public QueryPlan plan(UUID clusterId, QueryAst ast) {
-        Split split = splitter.split(ast.where());
+        if (ast.source() == Source.INDEX) {
+            logs.requireIndexable(clusterId);
+        }
+        Split split = splitFor(clusterId, ast);
         List<Notice> notices = new ArrayList<>();
 
         List<Target> targets = resolveTargets(clusterId, ast, split, notices);
@@ -158,6 +167,9 @@ public class QueryPlanner {
     private static final String SEPARATOR = "\u0000";
 
     private List<Target> resolveTargets(UUID clusterId, QueryAst ast, Split split, List<Notice> notices) {
+        if (logs.applies(clusterId)) {
+            return resolveLogs(clusterId, ast, split, notices);
+        }
         Map<UUID, ClusterNode> nodesById = new LinkedHashMap<>();
         nodes.nodes(clusterId).forEach(n -> nodesById.put(n.getId(), n));
 
@@ -221,6 +233,44 @@ public class QueryPlanner {
     }
 
     /**
+     * The logs a cluster read as one holds, as targets answered by its first node. The cluster has one clock for
+     * this purpose, Rahdar's: a record's time is the producer's, not a node's.
+     */
+    private List<Target> resolveLogs(UUID clusterId, QueryAst ast, Split split, List<Notice> notices) {
+        List<LogTargets.Log> matched = logs.resolve(clusterId, ast.subscriptionPattern(), notices);
+        if (matched.isEmpty()) {
+            notices.add(new Notice(
+                    Notice.Kind.NO_SUBSCRIPTION_MATCHED,
+                    "Nothing on this cluster matches " + ast.subscriptionPattern() + "."));
+            return List.of();
+        }
+        ClusterNode node = logs.node(clusterId);
+        Instant now = clock.instant();
+        List<Target> targets = matched.stream()
+                .map(l -> new Target(
+                        node.getId(),
+                        node.getName(),
+                        l.name(),
+                        l.name(),
+                        null,
+                        l.messageCount(),
+                        now,
+                        true,
+                        l.id().format()))
+                .filter(t -> split.target() == null || TargetPredicateEvaluator.matches(split.target(), t))
+                .sorted(Comparator.comparing(Target::subscription))
+                .toList();
+        if (targets.size() > properties.maxTargets()) {
+            notices.add(new Notice(
+                    Notice.Kind.TARGET_CAPPED,
+                    "The pattern matched " + targets.size() + " targets; only the first " + properties.maxTargets()
+                            + " were read."));
+            return targets.subList(0, properties.maxTargets());
+        }
+        return targets;
+    }
+
+    /**
      * A relative window resolved against an unmeasured clock is a guess. Saying so
      * beats returning nothing and letting the operator conclude the messages are not
      * there (ADR-0053).
@@ -255,7 +305,7 @@ public class QueryPlanner {
         }
         // Only capture active on every target's node makes the index the answer to the plain
         // query; a sampled index is read when the operator names it (ADR-0086).
-        return coverage.isCaptured(clusterId, targets) ? Source.INDEX : Source.BROKER;
+        return !logs.applies(clusterId) && coverage.isCaptured(clusterId, targets) ? Source.INDEX : Source.BROKER;
     }
 
     /**
@@ -383,9 +433,18 @@ public class QueryPlanner {
         }
     }
 
-    /** Exposed for the executor, which needs the same split the plan was built from. */
-    public Split splitOf(QueryAst ast) {
-        return splitter.split(ast.where());
+    /**
+     * Exposed for the executor, which needs the same split the plan was built from. A cluster read as one has no
+     * selector, so what a broker would have filtered is scanned in Rahdar with the rest.
+     */
+    public Split splitFor(UUID clusterId, QueryAst ast) {
+        Split split = splitter.split(ast.where());
+        if (!logs.applies(clusterId) || split.pushdown() == null) {
+            return split;
+        }
+        Predicate scan =
+                split.scan() == null ? split.pushdown() : new Predicate.And(List.of(split.pushdown(), split.scan()));
+        return new Split(split.target(), null, scan);
     }
 
     /** Exposed for the executor: a selector rendered against one node's own clock. */

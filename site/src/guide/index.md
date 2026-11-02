@@ -1,6 +1,6 @@
 ---
 title: What Rahdar is
-description: Cluster-wide management and observability for Apache ActiveMQ Artemis — what it does, what it deliberately does not, and how it treats your brokers.
+description: Cluster-wide management and observability for Apache Kafka, RabbitMQ and Apache ActiveMQ Artemis — what it does, what it deliberately does not, and how it treats your brokers.
 ---
 
 # What Rahdar is

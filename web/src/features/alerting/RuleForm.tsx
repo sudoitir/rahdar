@@ -1,10 +1,13 @@
 import { Button, Checkbox, MultiSelect, NumberInput, Select, Text, TextInput } from '@mantine/core';
 import { useForm } from '@mantine/form';
+import type { ReactNode } from 'react';
 
 import { focusFirstInvalid } from '../../ui/formErrors.ts';
 
 import type { AlertRuleRequest, AlertRuleView, NotificationChannelView, PluginMetricView } from './api.ts';
 import {
+  BACKLOG_TEMPLATES,
+  CLUSTER_DEGRADED_TEMPLATE,
   COMPARATORS,
   DERIVED_METRICS,
   GAUGE_METRICS,
@@ -15,15 +18,25 @@ import {
   SETUP_RISK_TEMPLATE,
   SLOW_CONSUMER_TEMPLATE,
   STATE_CONDITIONS,
+  artemisOnlyNote,
   metricKind,
   metricLabel,
+  systemName,
+  unavailableOn,
 } from './severity.ts';
 import classes from './Alerting.module.css';
 
-const RAHDAR_METRIC_OPTIONS = [...GAUGE_METRICS, ...RATE_METRICS, ...DERIVED_METRICS].map((m) => ({
-  value: m,
-  label: `${metricLabel(m)} (${metricKind(m)})`,
-}));
+/** Rahdar's own metrics; one the cluster's system cannot answer stays listed, disabled, with its system named. */
+function rahdarMetricOptions(system: string | undefined) {
+  return [...GAUGE_METRICS, ...RATE_METRICS, ...DERIVED_METRICS].map((m) => {
+    const unavailable = unavailableOn(system, m);
+    return {
+      value: m,
+      label: `${metricLabel(m)} (${unavailable ? 'Artemis only' : metricKind(m)})`,
+      disabled: unavailable,
+    };
+  });
+}
 
 const UNIT_WORDS: Record<string, string> = { count: 'count', per_second: 'per second', ms: 'ms', ratio: 'ratio 0–1' };
 
@@ -32,7 +45,8 @@ const UNIT_WORDS: Record<string, string> = { count: 'count', per_second: 'per se
  * whose plugin is not running keeps its metric on the list, marked, so the form never shows it
  * blank.
  */
-function metricOptions(pluginMetrics: PluginMetricView[], current: string | null) {
+function metricOptions(pluginMetrics: PluginMetricView[], current: string | null, system: string | undefined) {
+  const rahdar = rahdarMetricOptions(system);
   const plugin = pluginMetrics.map((m) => ({
     value: m.metric,
     label: `${m.metric} (${UNIT_WORDS[m.unit] ?? m.unit}, per ${m.subject})`,
@@ -42,12 +56,20 @@ function metricOptions(pluginMetrics: PluginMetricView[], current: string | null
   }
   return plugin.length
     ? [
-        { group: 'Rahdar', items: RAHDAR_METRIC_OPTIONS },
+        { group: 'Rahdar', items: rahdar },
         { group: 'Plugins', items: plugin },
       ]
-    : RAHDAR_METRIC_OPTIONS;
+    : rahdar;
 }
-const STATE_OPTIONS = STATE_CONDITIONS.map((c) => ({ value: c, label: c.replaceAll('_', ' ').toLowerCase() }));
+
+/** The state conditions, with those the cluster's system cannot answer disabled and marked. */
+function stateOptions(system: string | undefined) {
+  return STATE_CONDITIONS.map((c) => {
+    const unavailable = unavailableOn(system, c);
+    const words = c.replaceAll('_', ' ').toLowerCase();
+    return { value: c, label: unavailable ? `${words} (Artemis only)` : words, disabled: unavailable };
+  });
+}
 const INSTALLATION_OPTIONS = INSTALLATION_CONDITIONS.map((c) => ({
   value: c,
   label: c.replaceAll('_', ' ').toLowerCase(),
@@ -62,23 +84,84 @@ function TemplateLink({ label, onClick }: Readonly<{ label: string; onClick: () 
   );
 }
 
-/** The prefilled starting points that fit the chosen kind. */
+/** The prefilled starting points that fit the chosen kind and the cluster's system. */
 function TemplateLinks({
   kind,
+  system,
   onSlowConsumer,
+  onBacklog,
   onConfigDrift,
   onSetupRisk,
+  onClusterDegraded,
 }: Readonly<{
   kind: 'METRIC_THRESHOLD' | 'STATE';
+  system: string | undefined;
   onSlowConsumer: () => void;
+  onBacklog: () => void;
   onConfigDrift: () => void;
   onSetupRisk: () => void;
+  onClusterDegraded: () => void;
 }>) {
-  if (kind === 'METRIC_THRESHOLD') return <TemplateLink label="slow-consumer" onClick={onSlowConsumer} />;
+  const backlog = system ? BACKLOG_TEMPLATES[system] : undefined;
+  if (kind === 'METRIC_THRESHOLD') {
+    return backlog ? (
+      <TemplateLink label={backlog.label} onClick={onBacklog} />
+    ) : (
+      <TemplateLink label="slow-consumer" onClick={onSlowConsumer} />
+    );
+  }
+  if (backlog) return <TemplateLink label="cluster-degraded" onClick={onClusterDegraded} />;
   return (
     <>
       <TemplateLink label="configuration-drift" onClick={onConfigDrift} />
       <TemplateLink label="setup-risk" onClick={onSetupRisk} />
+    </>
+  );
+}
+
+function Note({ children }: Readonly<{ children: ReactNode }>) {
+  return (
+    <Text size="xs" c="dimmed" className={`${classes.wide} ${classes.help}`}>
+      {children}
+    </Text>
+  );
+}
+
+/** What backlog means on a system whose brokers are not Artemis. */
+function backlogNote(system: string): string {
+  if (system === 'kafka') {
+    return 'On Kafka the backlog is a consumer group’s lag on a topic: the records written that the group has not committed.';
+  }
+  return `On ${systemName(system)} the backlog is the messages ready in a queue, waiting for a consumer.`;
+}
+
+/** The explanations under the form's fields: what the chosen system, metric or plugin metric really watches. */
+function RuleNotes({
+  kind,
+  limited,
+  system,
+  metric,
+  pluginMetric,
+}: Readonly<{
+  kind: 'METRIC_THRESHOLD' | 'STATE';
+  limited: boolean;
+  system: string | undefined;
+  metric: string | null;
+  pluginMetric: PluginMetricView | undefined;
+}>) {
+  const metricRule = kind === 'METRIC_THRESHOLD';
+  const metricNote = metric ? METRIC_NOTES[metric] : undefined;
+  return (
+    <>
+      {limited ? <Note>{artemisOnlyNote(system ?? '')}</Note> : null}
+      {metricRule && limited && metric === 'openbroker.backlog' ? <Note>{backlogNote(system ?? '')}</Note> : null}
+      {metricNote ? <Note>{metricNote}</Note> : null}
+      {metricRule && pluginMetric ? (
+        <Note>
+          {pluginMetric.description} Published by the {pluginMetric.plugin} plugin and sampled on every subscription
+          scrape; the rule fires per {pluginMetric.subject}.
+        </Note>
+      ) : null}
     </>
   );
 }
@@ -127,6 +210,7 @@ export function RuleForm({
   submitting,
   onCancel,
   disabled = false,
+  system,
 }: Readonly<{
   channels: NotificationChannelView[];
   /** The metrics running plugins publish. */
@@ -137,6 +221,8 @@ export function RuleForm({
   onCancel?: () => void;
   /** The caller may not change rules; the form stays visible and the view says why beside it. */
   disabled?: boolean;
+  /** The cluster's system (`artemis`, `kafka`, `rabbitmq`); undefined while it loads, which disables nothing. */
+  system?: string;
 }>) {
   // A rule with no cluster is about Rahdar itself: always a state rule, on a storage condition (ADR-0135).
   const installation = initial !== undefined && !initial.clusterId;
@@ -175,33 +261,29 @@ export function RuleForm({
    * is created on cluster registration, because a meaningful threshold is
    * workload-specific and any shipped value would be wrong for most deployments.
    */
-  const applySlowConsumerTemplate = () =>
-    form.setValues({
-      name: SLOW_CONSUMER_TEMPLATE.name,
-      metric: SLOW_CONSUMER_TEMPLATE.metric,
-      comparator: SLOW_CONSUMER_TEMPLATE.comparator,
-      threshold: SLOW_CONSUMER_TEMPLATE.threshold,
-      forSeconds: SLOW_CONSUMER_TEMPLATE.forSeconds,
-      severity: SLOW_CONSUMER_TEMPLATE.severity,
-    });
+  const applySlowConsumerTemplate = () => form.setValues(SLOW_CONSUMER_TEMPLATE);
 
-  const applyConfigDriftTemplate = () =>
-    form.setValues({
-      name: CONFIG_DRIFT_TEMPLATE.name,
-      stateCondition: CONFIG_DRIFT_TEMPLATE.stateCondition,
-      forSeconds: CONFIG_DRIFT_TEMPLATE.forSeconds,
-      severity: CONFIG_DRIFT_TEMPLATE.severity,
-    });
+  const applyConfigDriftTemplate = () => form.setValues(CONFIG_DRIFT_TEMPLATE);
 
-  const applySetupRiskTemplate = () =>
+  const applySetupRiskTemplate = () => form.setValues(SETUP_RISK_TEMPLATE);
+
+  const applyBacklogTemplate = () => {
+    const backlog = system ? BACKLOG_TEMPLATES[system] : undefined;
+    if (!backlog) return;
     form.setValues({
-      name: SETUP_RISK_TEMPLATE.name,
-      stateCondition: SETUP_RISK_TEMPLATE.stateCondition,
-      forSeconds: SETUP_RISK_TEMPLATE.forSeconds,
-      severity: SETUP_RISK_TEMPLATE.severity,
+      name: backlog.name,
+      metric: backlog.metric,
+      comparator: backlog.comparator,
+      threshold: backlog.threshold,
+      forSeconds: backlog.forSeconds,
+      severity: backlog.severity,
     });
+  };
+
+  const applyClusterDegradedTemplate = () => form.setValues(CLUSTER_DEGRADED_TEMPLATE);
 
   const pluginMetric = pluginMetrics.find((m) => m.metric === metric);
+  const limited = system !== undefined && system !== 'artemis' && !installation;
 
   const submit = form.onSubmit((values) => onSubmit(ruleRequest(values)), focusFirstInvalid(form.getInputNode));
 
@@ -230,7 +312,7 @@ export function RuleForm({
               <Select
                 label="Metric"
                 placeholder="Choose a metric"
-                data={metricOptions(pluginMetrics, metric)}
+                data={metricOptions(pluginMetrics, metric, system)}
                 {...form.getInputProps('metric')}
               />
               <Select
@@ -245,7 +327,7 @@ export function RuleForm({
             <Select
               label="State condition"
               placeholder="Choose a condition"
-              data={installation ? INSTALLATION_OPTIONS : STATE_OPTIONS}
+              data={installation ? INSTALLATION_OPTIONS : stateOptions(system)}
               {...form.getInputProps('stateCondition')}
             />
           )}
@@ -265,17 +347,7 @@ export function RuleForm({
             disabled={channels.length === 0}
           />
 
-          {metric && METRIC_NOTES[metric] ? (
-            <Text size="xs" c="dimmed" className={`${classes.wide} ${classes.help}`}>
-              {METRIC_NOTES[metric]}
-            </Text>
-          ) : null}
-          {kind === 'METRIC_THRESHOLD' && pluginMetric ? (
-            <Text size="xs" c="dimmed" className={`${classes.wide} ${classes.help}`}>
-              {pluginMetric.description} Published by the {pluginMetric.plugin} plugin and sampled on every subscription
-              scrape; the rule fires per {pluginMetric.subject}.
-            </Text>
-          ) : null}
+          <RuleNotes kind={kind} limited={limited} system={system} metric={metric} pluginMetric={pluginMetric} />
 
           <div className={`${classes.wide} ${classes.actions}`}>
             <Checkbox label="Enabled" {...form.getInputProps('enabled', { type: 'checkbox' })} />
@@ -290,9 +362,12 @@ export function RuleForm({
             {initial ? null : (
               <TemplateLinks
                 kind={kind}
+                system={installation ? undefined : system}
                 onSlowConsumer={applySlowConsumerTemplate}
+                onBacklog={applyBacklogTemplate}
                 onConfigDrift={applyConfigDriftTemplate}
                 onSetupRisk={applySetupRiskTemplate}
+                onClusterDegraded={applyClusterDegradedTemplate}
               />
             )}
           </div>

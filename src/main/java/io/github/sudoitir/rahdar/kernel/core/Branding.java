@@ -24,15 +24,17 @@ public final class Branding {
     /** Short name for compact UI (tab titles, breadcrumbs). */
     public static final String PRODUCT_SHORT_NAME = "Rahdar";
 
-    public static final String TAGLINE = "Cluster-wide management and observability for Apache ActiveMQ Artemis";
+    public static final String TAGLINE =
+            "Cluster-wide management and observability for Apache Kafka, RabbitMQ and Apache ActiveMQ Artemis";
 
     /**
      * Mandatory disclaimer. Rendered in the About dialog and the docs footer.
      */
-    public static final String TRADEMARK_NOTICE = "Apache ActiveMQ and Apache ActiveMQ Artemis are trademarks of the "
-            + "Apache Software Foundation. RabbitMQ is a trademark of its owner. " + PRODUCT_NAME
-            + " is an independent project and is not produced by, endorsed by, or affiliated with the "
-            + "Apache Software Foundation or the owner of RabbitMQ.";
+    public static final String TRADEMARK_NOTICE =
+            "Apache Kafka, Apache ActiveMQ and Apache ActiveMQ Artemis are trademarks of the "
+                    + "Apache Software Foundation. RabbitMQ is a trademark of its owner. " + PRODUCT_NAME
+                    + " is an independent project and is not produced by, endorsed by, or affiliated with the "
+                    + "Apache Software Foundation or the owner of RabbitMQ.";
 
     public static final String PROJECT_URL = "https://github.com/sudoitir/rahdar";
 }
