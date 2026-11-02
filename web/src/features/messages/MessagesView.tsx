@@ -61,7 +61,23 @@ function MessagesEmpty({
   unreachable,
   onClearSelector,
   partitioned,
-}: Readonly<{ filtered: boolean; unreachable: string[]; onClearSelector: () => void; partitioned: boolean }>) {
+  singleLog,
+}: Readonly<{
+  filtered: boolean;
+  unreachable: string[];
+  onClearSelector: () => void;
+  partitioned: boolean;
+  singleLog: boolean;
+}>) {
+  if (singleLog && unreachable.length === 0) {
+    return (
+      <EmptyState
+        kind="empty"
+        title="No records from here"
+        description="This stream has no record at or after the start you chose. Choose the earliest record or an earlier time."
+      />
+    );
+  }
   if (partitioned && unreachable.length === 0) {
     return (
       <EmptyState
@@ -158,13 +174,29 @@ function messageQuery(
 }
 
 /** The selector field of a queue, or the explanation that a log has no selector. */
-function selectorField(partitioned: boolean, filter: string) {
+function selectorField(partitioned: boolean, singleLog: boolean, filter: string) {
+  if (singleLog) {
+    return {
+      placeholder: undefined,
+      description: 'A stream has no selector. Choose where to start reading, an offset or a time.',
+      value: '',
+      width: '22rem',
+    };
+  }
   if (partitioned) return { placeholder: undefined, description: SELECTOR_REFUSAL, value: '', width: '22rem' };
   return { placeholder: "Selector, e.g. region = 'eu'", description: undefined, value: filter, width: '17.5rem' };
 }
 
 /** Where the browse stands: the group's offset on a log, or the page of a queue. */
-function browsePosition(partitioned: boolean, log: MessagePageView['log'], page: number, lastPage: number | null) {
+function browsePosition(
+  partitioned: boolean,
+  singleLog: boolean,
+  log: MessagePageView['log'],
+  page: number,
+  lastPage: number | null,
+) {
+  // A stream is read by offset; no consumer group stands anywhere on it.
+  if (singleLog) return null;
   if (partitioned) {
     // Said in the toolbar, where its arrival moves nothing: the controls keep their place.
     if (log?.subscriptionPosition == null) {
@@ -401,7 +433,7 @@ export function MessagesView() {
     .map((e) => e.name);
   // The destination follows the field once typing pauses, so clearing the field clears the selector.
   const clearSelector = () => setFilter('');
-  const selector = selectorField(partitioned, filter);
+  const selector = selectorField(partitioned, singleLog, filter);
 
   const setNode = (node: string | null) =>
     navigate({
@@ -452,7 +484,7 @@ export function MessagesView() {
         }
         end={
           <>
-            {browsePosition(partitioned, messages.data?.log, page, lastPage)}
+            {browsePosition(partitioned, singleLog, messages.data?.log, page, lastPage)}
             {subscription
               ? selectionSlot.map(({ id, Component }) => (
                   <Component
@@ -515,6 +547,7 @@ export function MessagesView() {
             unreachable={unreachable}
             onClearSelector={clearSelector}
             partitioned={partitioned}
+            singleLog={singleLog}
           />
         }
       />
