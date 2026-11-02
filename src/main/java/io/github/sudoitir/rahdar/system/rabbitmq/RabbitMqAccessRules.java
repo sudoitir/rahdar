@@ -36,7 +36,7 @@ import org.springframework.stereotype.Service;
  */
 @Service
 @RequiredArgsConstructor
-public class RabbitMqPermissions {
+public class RabbitMqAccessRules {
 
     private static final String NONE = "none";
 
@@ -173,7 +173,7 @@ public class RabbitMqPermissions {
             UUID clusterId, ResourceId id, Verb verb, Map<String, Object> attributes, String summary) {
         Preview preview = ops.preview(clusterId, id, verb, attributes);
         String before = current(gateway.cluster(clusterId), id)
-                .map(RabbitMqPermissions::rights)
+                .map(RabbitMqAccessRules::rights)
                 .orElse(NONE);
         String after = verb == Verb.DELETE ? NONE : rights(attributes);
         return RabbitMqOps.view(preview, verb, summary, List.of("Before: " + before, "After: " + after));

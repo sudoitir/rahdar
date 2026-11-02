@@ -9,11 +9,11 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import io.github.sudoitir.rahdar.kernel.plugin.McpToolDef;
+import io.github.sudoitir.rahdar.system.rabbitmq.RabbitMqAccessRules;
 import io.github.sudoitir.rahdar.system.rabbitmq.RabbitMqBindings;
 import io.github.sudoitir.rahdar.system.rabbitmq.RabbitMqFederation;
 import io.github.sudoitir.rahdar.system.rabbitmq.RabbitMqModule;
 import io.github.sudoitir.rahdar.system.rabbitmq.RabbitMqNodes;
-import io.github.sudoitir.rahdar.system.rabbitmq.RabbitMqPermissions;
 import io.github.sudoitir.rahdar.system.rabbitmq.RabbitMqPolicies;
 import io.github.sudoitir.rahdar.system.rabbitmq.RabbitMqShovels;
 import io.github.sudoitir.rahdar.system.rabbitmq.RabbitMqVhosts;
@@ -39,7 +39,7 @@ class RabbitMqMcpViewsTest {
     private final RabbitMqVhosts vhosts = mock(RabbitMqVhosts.class);
     private final RabbitMqBindings bindings = mock(RabbitMqBindings.class);
     private final RabbitMqPolicies policies = mock(RabbitMqPolicies.class);
-    private final RabbitMqPermissions permissions = mock(RabbitMqPermissions.class);
+    private final RabbitMqAccessRules permissions = mock(RabbitMqAccessRules.class);
     private final RabbitMqShovels shovels = mock(RabbitMqShovels.class);
     private final RabbitMqFederation federation = mock(RabbitMqFederation.class);
     private final RabbitMqMcpReadTools tools =

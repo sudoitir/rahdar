@@ -1,11 +1,11 @@
 package io.github.sudoitir.rahdar.system.rabbitmq.web;
 
 import io.github.sudoitir.rahdar.kernel.gate.HeldResponse;
+import io.github.sudoitir.rahdar.system.rabbitmq.RabbitMqAccessRules;
 import io.github.sudoitir.rahdar.system.rabbitmq.RabbitMqBindings;
 import io.github.sudoitir.rahdar.system.rabbitmq.RabbitMqExchanges;
 import io.github.sudoitir.rahdar.system.rabbitmq.RabbitMqFederation;
 import io.github.sudoitir.rahdar.system.rabbitmq.RabbitMqNodes;
-import io.github.sudoitir.rahdar.system.rabbitmq.RabbitMqPermissions;
 import io.github.sudoitir.rahdar.system.rabbitmq.RabbitMqPolicies;
 import io.github.sudoitir.rahdar.system.rabbitmq.RabbitMqQueues;
 import io.github.sudoitir.rahdar.system.rabbitmq.RabbitMqShovels;
@@ -60,7 +60,7 @@ public class RabbitMqController {
     private final RabbitMqExchanges exchanges;
     private final RabbitMqBindings bindings;
     private final RabbitMqPolicies policies;
-    private final RabbitMqPermissions permissions;
+    private final RabbitMqAccessRules permissions;
     private final RabbitMqShovels shovels;
     private final RabbitMqFederation federation;
 

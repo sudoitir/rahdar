@@ -2,10 +2,10 @@ package io.github.sudoitir.rahdar.system.rabbitmq.mcp;
 
 import io.github.sudoitir.rahdar.platform.mcp.McpArgs;
 import io.github.sudoitir.rahdar.platform.mcp.McpErrors;
+import io.github.sudoitir.rahdar.system.rabbitmq.RabbitMqAccessRules;
 import io.github.sudoitir.rahdar.system.rabbitmq.RabbitMqBindings;
 import io.github.sudoitir.rahdar.system.rabbitmq.RabbitMqFederation;
 import io.github.sudoitir.rahdar.system.rabbitmq.RabbitMqNodes;
-import io.github.sudoitir.rahdar.system.rabbitmq.RabbitMqPermissions;
 import io.github.sudoitir.rahdar.system.rabbitmq.RabbitMqPolicies;
 import io.github.sudoitir.rahdar.system.rabbitmq.RabbitMqShovels;
 import io.github.sudoitir.rahdar.system.rabbitmq.RabbitMqVhosts;
@@ -36,7 +36,7 @@ public class RabbitMqMcpReadTools {
     private final RabbitMqVhosts vhosts;
     private final RabbitMqBindings bindings;
     private final RabbitMqPolicies policies;
-    private final RabbitMqPermissions permissions;
+    private final RabbitMqAccessRules permissions;
     private final RabbitMqShovels shovels;
     private final RabbitMqFederation federation;
 

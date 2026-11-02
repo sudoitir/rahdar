@@ -35,7 +35,7 @@ class RabbitMqControllerTest {
     private final RabbitMqExchanges exchanges = mock(RabbitMqExchanges.class);
     private final RabbitMqBindings bindings = mock(RabbitMqBindings.class);
     private final RabbitMqPolicies policies = mock(RabbitMqPolicies.class);
-    private final RabbitMqPermissions permissions = mock(RabbitMqPermissions.class);
+    private final RabbitMqAccessRules permissions = mock(RabbitMqAccessRules.class);
     private final RabbitMqShovels shovels = mock(RabbitMqShovels.class);
     private final RabbitMqFederation federation = mock(RabbitMqFederation.class);
     private final MockMvc mvc = MockMvcBuilders.standaloneSetup(new RabbitMqController(

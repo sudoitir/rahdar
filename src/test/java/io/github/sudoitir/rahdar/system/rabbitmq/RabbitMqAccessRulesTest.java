@@ -38,7 +38,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
 /** Users and permissions are listed without a secret, and a change shows the user's rights before and after. */
-class RabbitMqPermissionsTest {
+class RabbitMqAccessRulesTest {
 
     private static final UUID CLUSTER = UUID.randomUUID();
 
@@ -51,13 +51,13 @@ class RabbitMqPermissionsTest {
     private final ClusterAccessGuard access = mock(ClusterAccessGuard.class);
     private final RabbitMqOps ops = mock(RabbitMqOps.class);
     private final RabbitMqChanges changes = mock(RabbitMqChanges.class);
-    private final RabbitMqPermissions permissions;
+    private final RabbitMqAccessRules permissions;
 
-    RabbitMqPermissionsTest() {
+    RabbitMqAccessRulesTest() {
         BrokerGateway gateway = mock(BrokerGateway.class);
-        ClusterConnection connection = RabbitMqFixtures.connection(RabbitMqPermissionsTest::answer);
+        ClusterConnection connection = RabbitMqFixtures.connection(RabbitMqAccessRulesTest::answer);
         when(gateway.cluster(CLUSTER)).thenReturn(connection);
-        permissions = new RabbitMqPermissions(gateway, access, ops, changes);
+        permissions = new RabbitMqAccessRules(gateway, access, ops, changes);
     }
 
     private static List<Resource> answer(ResourceQuery query) {
