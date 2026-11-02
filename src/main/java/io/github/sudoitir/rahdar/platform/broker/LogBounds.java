@@ -2,7 +2,10 @@ package io.github.sudoitir.rahdar.platform.broker;
 
 import io.github.sudoitir.openbroker.model.KindId;
 import io.github.sudoitir.openbroker.model.ResourceId;
+import java.util.Map;
 import java.util.Set;
+import java.util.SortedMap;
+import java.util.TreeMap;
 import java.util.UUID;
 
 /**
@@ -16,6 +19,11 @@ public interface LogBounds extends SystemExtension {
     record Bounds(long start, long end) {}
 
     Bounds of(UUID clusterId, ResourceId log, int partition);
+
+    /** Every partition of the log with its bounds, by partition number; a stream is partition 0 alone. */
+    default SortedMap<Integer, Bounds> partitions(UUID clusterId, ResourceId log) {
+        return new TreeMap<>(Map.of(0, of(clusterId, log, 0)));
+    }
 
     /**
      * The kinds that are themselves one log, read as a single partition 0 (a stream), as against a kind whose log

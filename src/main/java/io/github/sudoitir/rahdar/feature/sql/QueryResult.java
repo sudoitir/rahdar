@@ -64,7 +64,68 @@ public record QueryResult(
              * the row perfectly usable and only makes verifying it against the live
              * broker impossible — stated, never hidden.
              */
-            Long sourceMessageId) {}
+            Long sourceMessageId,
+            /** The log this row was read from, as a resource id text; null for a queue. */
+            String log) {
+
+        /** A row of a queue, or of the index. */
+        public Row(
+                UUID nodeId,
+                String nodeName,
+                String subscription,
+                String destination,
+                long messageId,
+                int messageType,
+                boolean durable,
+                int priority,
+                long timestamp,
+                long expiration,
+                long size,
+                String jmsType,
+                String correlationId,
+                String groupId,
+                String userId,
+                String replyTo,
+                String body,
+                boolean bodyTruncated,
+                boolean bodyBase64,
+                String bodyCompression,
+                Map<String, Object> properties,
+                Source source,
+                Instant observedAt,
+                Instant lastSeenAt,
+                String origin,
+                Long sourceMessageId) {
+            this(
+                    nodeId,
+                    nodeName,
+                    subscription,
+                    destination,
+                    messageId,
+                    messageType,
+                    durable,
+                    priority,
+                    timestamp,
+                    expiration,
+                    size,
+                    jmsType,
+                    correlationId,
+                    groupId,
+                    userId,
+                    replyTo,
+                    body,
+                    bodyTruncated,
+                    bodyBase64,
+                    bodyCompression,
+                    properties,
+                    source,
+                    observedAt,
+                    lastSeenAt,
+                    origin,
+                    sourceMessageId,
+                    null);
+        }
+    }
 
     /**
      * What one node contributed. A node that failed is reported here rather than
@@ -77,7 +138,21 @@ public record QueryResult(
             Status status,
             long examined,
             long matched,
-            String detail) {
+            String detail,
+            /** The log that was read, as a resource id text; null for a queue. */
+            String log) {
+
+        /** The outcome of a queue. */
+        public NodeOutcome(
+                UUID nodeId,
+                String nodeName,
+                String subscription,
+                Status status,
+                long examined,
+                long matched,
+                String detail) {
+            this(nodeId, nodeName, subscription, status, examined, matched, detail, null);
+        }
 
         public enum Status {
             ANSWERED,

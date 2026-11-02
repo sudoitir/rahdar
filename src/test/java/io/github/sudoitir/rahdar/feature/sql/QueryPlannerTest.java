@@ -78,6 +78,7 @@ class QueryPlannerTest {
                 clocks,
                 properties,
                 coverage,
+                mock(LogTargets.class),
                 Clock.fixed(NOW, ZoneOffset.UTC));
     }
 
@@ -693,7 +694,7 @@ class QueryPlannerTest {
     void theExecutorHelpersExposeTheSameSplitAndPerNodeSelectors() {
         QueryAst ast = parser.parse("SELECT * FROM \"ORDER.IN\" WHERE priority > 4 AND body LIKE '%x%'");
 
-        PredicateSplitter.Split split = planner.splitOf(ast);
+        PredicateSplitter.Split split = planner.splitFor(CLUSTER, ast);
 
         assertThat(split.hasPushdown()).isTrue();
         assertThat(split.requiresScan()).isTrue();
@@ -705,8 +706,8 @@ class QueryPlannerTest {
 
     @Test
     void theInjectablePlannerUsesTheSystemClock() {
-        QueryPlanner injected =
-                new QueryPlanner(snapshots, locator, nodes, splitter, renderer, clocks, defaults(), coverage);
+        QueryPlanner injected = new QueryPlanner(
+                snapshots, locator, nodes, splitter, renderer, clocks, defaults(), coverage, mock(LogTargets.class));
         BrokerNodeEntity a = oneQueue(10);
         Instant before = Instant.now();
 

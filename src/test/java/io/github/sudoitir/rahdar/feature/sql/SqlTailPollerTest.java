@@ -369,6 +369,7 @@ class SqlTailPollerTest {
                 clocks,
                 properties,
                 coverage,
+                Mockito.mock(LogTargets.class),
                 Clock.fixed(NOW, ZoneOffset.UTC));
         BrokerMessages messages = mock(BrokerMessages.class);
         when(messages.browse(any(), any(), any(), anyInt(), anyInt(), any()))
@@ -376,9 +377,16 @@ class SqlTailPollerTest {
                         i -> transport.browse(i.getArgument(2), i.getArgument(3), i.getArgument(4), i.getArgument(5)));
         return new SqlTailPoller(
                 new BrokerQueryExecutor(
-                        nodes, residuals, planner, properties, BrokerQueryExecutorTest.clearGovernance(), messages),
+                        nodes,
+                        residuals,
+                        planner,
+                        properties,
+                        BrokerQueryExecutorTest.clearGovernance(),
+                        messages,
+                        Mockito.mock(LogTargets.class)),
                 indexExecutor,
-                snapshots);
+                snapshots,
+                Mockito.mock(LogTargets.class));
     }
 
     private QueryPlan plan(String sql) {
@@ -400,6 +408,7 @@ class SqlTailPollerTest {
                 clocks,
                 properties,
                 coverage,
+                Mockito.mock(LogTargets.class),
                 Clock.fixed(NOW, ZoneOffset.UTC));
         return planner.plan(CLUSTER, parser.parse(sql));
     }
