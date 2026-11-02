@@ -29,12 +29,11 @@ import java.util.Set;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Turns a validated {@link QueryAst} into a {@link QueryPlan} (ADR-0058 D6).
  *
- * <p>Planning contacts no broker. Targets come from {@code subscription_snapshot}, the cost
+ * <p>Planning contacts no broker on Artemis. Targets come from {@code subscription_snapshot}, the cost
  * estimate from the message counts already in it, and the per-node "now" from the
  * measured clock offsets. That is what lets the console state the cost of a query
  * while the operator is still typing — the only moment at which stating it is
@@ -92,7 +91,10 @@ public class QueryPlanner {
         this.clock = clock;
     }
 
-    @Transactional(readOnly = true)
+    /**
+     * Not in a transaction: a cluster read as one lists its logs from the broker while it plans, and a broker
+     * call is refused inside one. The reads of snapshots and nodes each carry their own.
+     */
     public QueryPlan plan(UUID clusterId, QueryAst ast) {
         if (ast.source() == Source.INDEX) {
             logs.requireIndexable(clusterId);
