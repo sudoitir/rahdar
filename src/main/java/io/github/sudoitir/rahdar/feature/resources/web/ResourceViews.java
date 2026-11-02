@@ -112,7 +112,10 @@ public final class ResourceViews {
 
             @Schema(requiredMode = REQUIRED) String name,
 
-            @Schema(requiredMode = REQUIRED, description = "The id of the destination this subscription is bound to.")
+            @Schema(
+                    nullable = true,
+                    description = "The id of the destination this subscription is bound to; absent for a system whose"
+                            + " queues are fed through routes, such as RabbitMQ.")
             String destination,
 
             @Schema(

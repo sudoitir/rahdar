@@ -55,6 +55,7 @@ import io.github.sudoitir.rahdar.platform.mcp.McpModule;
 import io.github.sudoitir.rahdar.platform.scrape.ScrapeModule;
 import io.github.sudoitir.rahdar.system.artemis.ArtemisModule;
 import io.github.sudoitir.rahdar.system.kafka.KafkaModule;
+import io.github.sudoitir.rahdar.system.rabbitmq.RabbitMqModule;
 import java.util.List;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -106,6 +107,7 @@ public class RahdarFeatures {
                 ScrapeModule.DESCRIPTOR,
                 ArtemisModule.DESCRIPTOR,
                 KafkaModule.DESCRIPTOR,
+                RabbitMqModule.DESCRIPTOR,
                 McpModule.DESCRIPTOR,
                 ResourcesModule.DESCRIPTOR,
                 MessagesModule.DESCRIPTOR,

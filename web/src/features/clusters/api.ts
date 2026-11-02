@@ -35,7 +35,7 @@ export interface LoadedSystem {
   id: string;
   name: string;
   supportedVersions: string;
-  connection: 'jolokia-seeds' | 'bootstrap';
+  connection: 'jolokia-seeds' | 'bootstrap' | 'management-api';
 }
 
 export type SecurityProtocol = 'PLAINTEXT' | 'SSL' | 'SASL_PLAINTEXT' | 'SASL_SSL';
@@ -45,6 +45,10 @@ export type RegisterClusterRequest = Schemas['RegisterClusterRequest'];
 export type UpdateClusterRequest = Schemas['UpdateClusterRequest'];
 export type ArtemisConnection = Schemas['ArtemisConnection'];
 export type KafkaConnection = Schemas['KafkaConnection'];
+export type RabbitMqConnection = Schemas['RabbitMqConnection'];
+export type RabbitMqConnectionUpdate = Schemas['RabbitMqConnectionUpdate'];
+export type RabbitMqConnectionDetail = Schemas['RabbitMqConnectionDetail'];
+export type EndpointReach = Schemas['EndpointReach'];
 export type ArtemisConnectionUpdate = Schemas['ArtemisConnectionUpdate'];
 
 /** String enums the backend serialises as bare strings; narrowed here for the UI. */

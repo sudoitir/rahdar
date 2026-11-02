@@ -18,6 +18,7 @@ import io.github.sudoitir.rahdar.kernel.core.web.ApiExceptionHandler;
 import io.github.sudoitir.rahdar.kernel.gate.HeldResponse;
 import io.github.sudoitir.rahdar.platform.broker.Attempt;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
+import io.github.sudoitir.rahdar.platform.broker.IdentityBasis;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterKinds;
 import io.github.sudoitir.rahdar.platform.clusters.ResourceTargets;
 import io.github.sudoitir.rahdar.platform.clusters.ResourceTargets.Target;
@@ -67,6 +68,17 @@ public class MessageController {
             @RequestParam(required = false) String from,
             @RequestParam(required = false) String value) {
         ResourceQuery paging = ResourceQuery.ofPage(page, size);
+        if (kinds.log(clusterId, kind)) {
+            // A stream is one log, read by offset as partition 0.
+            Target stream = targets.require(clusterId, kind, path, ResourceClass.SUBSCRIPTION);
+            return messages.browseStream(
+                    clusterId,
+                    stream.id(),
+                    streamPartition(partition),
+                    LogStart.parse(from, value),
+                    filter,
+                    paging.size());
+        }
         if (kinds.partitioned(clusterId, kind)) {
             // A partitioned log is read one partition at a time, from an offset or a time (ADR-0216), through a
             // topic or through a group's subscription of it, which also says where the group stands.
@@ -78,6 +90,7 @@ public class MessageController {
                     : messages.browseLog(
                             clusterId, target.id(), requirePartition(partition), start, filter, paging.size());
         }
+        requireBrowsable(clusterId, kind, path);
         return messages.browse(
                 clusterId, subscription(clusterId, kind, path), node, filter, paging.page(), paging.size());
     }
@@ -91,6 +104,14 @@ public class MessageController {
             @RequestParam(required = false) UUID node,
             @RequestParam(required = false) String filter,
             @RequestParam(required = false) Integer partition) {
+        if (kinds.log(clusterId, kind)) {
+            return messages.detailStream(
+                    clusterId,
+                    targets.require(clusterId, kind, path, ResourceClass.SUBSCRIPTION)
+                            .id(),
+                    streamPartition(partition),
+                    Long.parseLong(position));
+        }
         if (kinds.partitioned(clusterId, kind)) {
             Target target = logTarget(clusterId, kind, path);
             return target.resourceClass() == ResourceClass.SUBSCRIPTION
@@ -98,6 +119,7 @@ public class MessageController {
                             clusterId, target.id(), requirePartition(partition), Long.parseLong(position))
                     : messages.detailLog(clusterId, target.id(), requirePartition(partition), Long.parseLong(position));
         }
+        requireBrowsable(clusterId, kind, path);
         return messages.detail(
                 clusterId, subscription(clusterId, kind, path), MessageActionRequest.number(position), node, filter);
     }
@@ -118,6 +140,12 @@ public class MessageController {
             @RequestParam(required = false) UUID node,
             @RequestParam(defaultValue = "false") boolean dryRun,
             @Valid @RequestBody SendMessageRequest request) {
+        if (kinds.readAsOne(clusterId)) {
+            // A cluster read as one is sent to by id: straight to a queue, or to an exchange with a routing key.
+            Target target =
+                    targets.require(clusterId, kind, path, ResourceClass.SUBSCRIPTION, ResourceClass.DESTINATION);
+            return respond(messages.sendById(clusterId, target.id(), target.resourceClass(), request, dryRun));
+        }
         return respond(messages.send(clusterId, subscription(clusterId, kind, path), node, request, dryRun));
     }
 
@@ -167,12 +195,42 @@ public class MessageController {
                             .id(),
                     dryRun));
         }
+        if (kinds.readAsOne(clusterId)) {
+            return respond(messages.purge(
+                    clusterId,
+                    targets.require(clusterId, kind, path, ResourceClass.SUBSCRIPTION)
+                            .id(),
+                    dryRun,
+                    override));
+        }
         return respond(messages.purge(clusterId, subscription(clusterId, kind, path), node, dryRun, override));
     }
 
     /** The destination whose log the route names, or the subscription that reads one. */
     private Target logTarget(UUID clusterId, String kind, String path) {
         return targets.require(clusterId, kind, path, ResourceClass.DESTINATION, ResourceClass.SUBSCRIPTION);
+    }
+
+    /** A stream is one log: its only partition is 0, whether or not the caller says so. */
+    private static int streamPartition(Integer partition) {
+        if (partition != null && partition != 0) {
+            throw new IllegalArgumentException(
+                    "A stream has one partition, 0; partition " + partition + " is not there.");
+        }
+        return 0;
+    }
+
+    /**
+     * On a cluster read as one, refuses a queue whose kind cannot be browsed (a classic or quorum queue) with the
+     * driver's reason, before anything is read from the broker.
+     */
+    private void requireBrowsable(UUID clusterId, String kind, String path) {
+        if (kinds.readAsOne(clusterId)) {
+            messages.requireBrowsable(
+                    clusterId,
+                    targets.require(clusterId, kind, path, ResourceClass.SUBSCRIPTION)
+                            .id());
+        }
     }
 
     private static int requirePartition(Integer partition) {
@@ -193,11 +251,11 @@ public class MessageController {
         Object body =
                 switch (outcome) {
                     case Outcome.Affected(var count, var node) -> new AffectedView(count, false, node, 0);
-                    case Outcome.DryRun(var count, var cap, var overCap, var node) ->
-                        new DryRunView(count, cap, overCap, node, 0);
+                    case Outcome.DryRun(var count, var cap, var overCap, var node, var basis) ->
+                        new DryRunView(count, cap, overCap, node, 0, basis.name());
                     case Outcome.LogPurged(var skipped, var node) -> new AffectedView(0, false, node, skipped);
                     case Outcome.LogPurgeDryRun(var skipped, var cap, var node) ->
-                        new DryRunView(0, cap, false, node, skipped);
+                        new DryRunView(0, cap, false, node, skipped, IdentityBasis.INCARNATION.name());
                     case Outcome.Partial(var count, var notDone, var error, var node) ->
                         new PartialView(
                                 count, notDone.stream().map(String::valueOf).toList(), error, true, node);

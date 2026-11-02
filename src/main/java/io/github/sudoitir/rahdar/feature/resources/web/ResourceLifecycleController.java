@@ -14,6 +14,7 @@ import io.github.sudoitir.rahdar.kernel.core.ConflictException;
 import io.github.sudoitir.rahdar.kernel.gate.HeldResponse;
 import io.github.sudoitir.rahdar.platform.broker.Attempt;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
+import io.github.sudoitir.rahdar.platform.clusters.ClusterKinds;
 import io.github.sudoitir.rahdar.platform.clusters.LifecycleOutcome;
 import io.github.sudoitir.rahdar.platform.clusters.LifecycleViews.LifecycleOutcomeView;
 import io.github.sudoitir.rahdar.platform.clusters.ResourceTargets;
@@ -58,11 +59,13 @@ import org.springframework.web.bind.annotation.RestController;
 public class ResourceLifecycleController {
 
     private static final String UNSUPPORTED = "unsupported-on-kind";
+    private static final String CREATE = "create";
 
     private final QueueLifecycleService lifecycle;
     private final SubscriptionConfigurationReader configurations;
     private final ResourceTargets targets;
     private final TruncateService truncates;
+    private final ClusterKinds clusters;
 
     // ---- create ---------------------------------------------------------
 
@@ -72,6 +75,7 @@ public class ResourceLifecycleController {
             @RequestParam(defaultValue = "false") boolean dryRun,
             @Valid @RequestBody CreateSubscriptionRequest request) {
         targets.requireKind(clusterId, request.kind(), ResourceClass.SUBSCRIPTION);
+        requireCreatable(clusterId, request.kind());
         return respond(lifecycle.createQueue(clusterId, request, dryRun));
     }
 
@@ -81,6 +85,7 @@ public class ResourceLifecycleController {
             @RequestParam(defaultValue = "false") boolean dryRun,
             @Valid @RequestBody CreateDestinationRequest request) {
         targets.requireKind(clusterId, request.kind(), ResourceClass.DESTINATION);
+        requireCreatable(clusterId, request.kind());
         return respond(lifecycle.createAddress(clusterId, request, dryRun));
     }
 
@@ -161,8 +166,8 @@ public class ResourceLifecycleController {
         return respond(
                 switch (target.resourceClass()) {
                     case SUBSCRIPTION ->
-                        lifecycle.deleteQueue(clusterId, target.name(), dryRun, override, disconnectConsumers);
-                    case DESTINATION -> lifecycle.deleteAddress(clusterId, target.name(), dryRun);
+                        lifecycle.deleteQueue(clusterId, target, dryRun, override, disconnectConsumers);
+                    case DESTINATION -> lifecycle.deleteAddress(clusterId, target, dryRun);
                     default -> throw new ConflictException(UNSUPPORTED, "This kind cannot be deleted here.");
                 });
     }
@@ -198,6 +203,15 @@ public class ResourceLifecycleController {
     }
 
     // ---- mapping --------------------------------------------------------
+
+    /** On a cluster read as one the driver creates the resource, so its kind must declare the verb (ADR-0224). */
+    private void requireCreatable(UUID clusterId, String kind) {
+        if (clusters.readAsOne(clusterId)
+                && clusters.kindsOf(clusterId).stream()
+                        .noneMatch(k -> k.id().equals(kind) && k.verbs().contains(CREATE))) {
+            throw new ConflictException(UNSUPPORTED, "This kind cannot be created here.");
+        }
+    }
 
     private static LifecycleOutcomeView respond(Attempt<LifecycleOutcome> attempt) {
         LifecycleOutcome outcome =

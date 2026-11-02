@@ -5,15 +5,17 @@ import type { ApiError } from '../../kernel/api/request.ts';
 import { CapabilityGate } from '../../ui/CapabilityGate.tsx';
 import { ConfirmDialog } from '../../ui/ConfirmDialog.tsx';
 import { ErrorState } from '../../ui/ErrorState.tsx';
+import { IdentityBasisNote } from '../../ui/IdentityBasisNote.tsx';
 import { Notice } from '../../ui/Notice.tsx';
 import { usePurgeSubscription, type DryRunView } from './api.ts';
 import { useMessageGate } from './gates.ts';
 import { announceFailure, announceResult, messageCount } from './outcomes.ts';
 
-const records = (n: number | null | undefined): string =>
-  n == null || Number.isNaN(n)
-    ? 'an unavailable number of records'
-    : `${n.toLocaleString()} record${n === 1 ? '' : 's'}`;
+const records = (n: number | null | undefined): string => {
+  if (n == null || Number.isNaN(n)) return 'an unavailable number of records';
+  const noun = n === 1 ? 'record' : 'records';
+  return `${n.toLocaleString()} ${noun}`;
+};
 
 /**
  * The system's own refusal of the purge, such as a group that still has members or is rebalancing (a 409
@@ -69,6 +71,7 @@ function Consequence({
           estimate). This cannot be undone.
         </Text>
       )}
+      <IdentityBasisNote basis={preview.identityBasis} />
       {preview.overCap ? (
         <Notice tone="warning" title="Over the safety cap">
           This would remove {preview.affectedCount.toLocaleString()} messages, over the cap of{' '}

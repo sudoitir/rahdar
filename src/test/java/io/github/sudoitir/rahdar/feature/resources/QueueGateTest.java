@@ -168,7 +168,7 @@ class QueueGateTest extends PostgresIntegrationTest {
 
         ArgumentCaptor<Operation> operation = ArgumentCaptor.forClass(Operation.class);
         verify(gate).run(operation.capture(), any());
-        assertThat(operation.getValue().params()).isEqualTo(new QueueDeleteParams(clusterId, QUEUE, true, true));
+        assertThat(operation.getValue().params()).isEqualTo(new QueueDeleteParams(clusterId, QUEUE, null, true, true));
     }
 
     @Test
@@ -190,7 +190,7 @@ class QueueGateTest extends PostgresIntegrationTest {
 
         ArgumentCaptor<Operation> operation = ArgumentCaptor.forClass(Operation.class);
         verify(gate).run(operation.capture(), any());
-        assertThat(operation.getValue().params()).isEqualTo(new AddressDeleteParams(clusterId, "orders.addr"));
+        assertThat(operation.getValue().params()).isEqualTo(new AddressDeleteParams(clusterId, "orders.addr", null));
     }
 
     @Test
@@ -198,10 +198,10 @@ class QueueGateTest extends PostgresIntegrationTest {
         when(messages.identity(clusterId, QUEUE)).thenReturn("etag-1");
         assertThat(lifecycle.reachOfQueueDelete(clusterId, QUEUE)).isEqualTo(new Reach(5, "etag-1"));
 
-        Effect effect = queueDeleteOperation.estimate(new QueueDeleteParams(clusterId, QUEUE, false, false));
+        Effect effect = queueDeleteOperation.estimate(new QueueDeleteParams(clusterId, QUEUE, null, false, false));
 
         assertThat(effect).isEqualTo(new Effect(5, "messages", "etag-1", null));
-        assertThat(queueDeleteOperation.traits(new QueueDeleteParams(clusterId, QUEUE, false, false)))
+        assertThat(queueDeleteOperation.traits(new QueueDeleteParams(clusterId, QUEUE, null, false, false)))
                 .isEqualTo(Set.of(Trait.DESTRUCTIVE));
     }
 
@@ -209,11 +209,11 @@ class QueueGateTest extends PostgresIntegrationTest {
     void aQueueRecreatedAfterTheRequestHasAnotherStateKey() {
         when(messages.identity(clusterId, QUEUE)).thenReturn("etag-1", "etag-2");
         String asked = queueDeleteOperation
-                .estimate(new QueueDeleteParams(clusterId, QUEUE, false, false))
+                .estimate(new QueueDeleteParams(clusterId, QUEUE, null, false, false))
                 .etag();
 
         String now = queueDeleteOperation
-                .estimate(new QueueDeleteParams(clusterId, QUEUE, false, false))
+                .estimate(new QueueDeleteParams(clusterId, QUEUE, null, false, false))
                 .etag();
 
         assertThat(now).isNotEqualTo(asked);
@@ -221,16 +221,16 @@ class QueueGateTest extends PostgresIntegrationTest {
 
     @Test
     void aQueueThatIsGoneCannotBeEstimated() {
-        QueueDeleteParams params = new QueueDeleteParams(clusterId, "gone", false, false);
+        QueueDeleteParams params = new QueueDeleteParams(clusterId, "gone", null, false, false);
 
         assertThatThrownBy(() -> queueDeleteOperation.estimate(params)).isInstanceOf(NotFoundException.class);
     }
 
     @Test
     void theOperatorReadsTheClusterByNameAndWhatIsDeleted() {
-        assertThat(queueDeleteOperation.summary(new QueueDeleteParams(clusterId, QUEUE, false, false)))
+        assertThat(queueDeleteOperation.summary(new QueueDeleteParams(clusterId, QUEUE, null, false, false)))
                 .startsWith("Delete queue orders on c-");
-        assertThat(addressDeleteOperation.summary(new AddressDeleteParams(clusterId, "orders.addr")))
+        assertThat(addressDeleteOperation.summary(new AddressDeleteParams(clusterId, "orders.addr", null)))
                 .startsWith("Delete address orders.addr on c-");
     }
 
@@ -240,7 +240,7 @@ class QueueGateTest extends PostgresIntegrationTest {
         when(Targets.operations(target).execute(any(), any(), any()))
                 .thenThrow(Targets.failure(ErrorReasons.HAS_CHILDREN, Map.of(), "bound"));
 
-        AddressDeleteParams params = new AddressDeleteParams(clusterId, "orders.addr");
+        AddressDeleteParams params = new AddressDeleteParams(clusterId, "orders.addr", null);
 
         assertThatThrownBy(() -> addressDeleteOperation.replay(params))
                 .isInstanceOf(IllegalStateException.class)

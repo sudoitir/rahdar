@@ -23,6 +23,7 @@ import io.github.sudoitir.rahdar.feature.resources.web.ResourceViews.ProducerVie
 import io.github.sudoitir.rahdar.feature.resources.web.ResourceViews.SubscriptionNodeCell;
 import io.github.sudoitir.rahdar.feature.resources.web.ResourceViews.SubscriptionView;
 import io.github.sudoitir.rahdar.platform.broker.QueueRow;
+import io.github.sudoitir.rahdar.platform.broker.ResourceIds;
 import io.github.sudoitir.rahdar.platform.scrape.QueueSnapshot;
 import java.time.Instant;
 import java.util.List;
@@ -85,9 +86,11 @@ public class ResourceViewMapper {
                 id.format(),
                 kind.value(),
                 label(connection, kind),
-                // The group or queue is what a team owns, so it is the name; the destination says which topic.
-                path == null ? key.name() : id.path().segments().getFirst(),
-                ResourceId.of(kinds.destination().value(), key.destination()).format(),
+                ownerName(connection, id, key, path),
+                key.destination() == null
+                        ? null
+                        : ResourceId.of(kinds.destination().value(), key.destination())
+                                .format(),
                 key.routingType() == null ? Map.of() : Map.of("routingType", key.routingType()),
                 rows.stream().anyMatch(QueueSnapshot::durable),
                 backlogOf(rows, total),
@@ -103,6 +106,19 @@ public class ResourceViewMapper {
                 cells,
                 List.of(),
                 null);
+    }
+
+    /**
+     * The group or queue is what a team owns, so it is the name; the destination says which topic. A queue in a
+     * namespace is named by the queue, not the namespace.
+     */
+    private static String ownerName(ClusterConnection connection, ResourceId id, SubscriptionKey key, String path) {
+        if (path == null) {
+            return key.name();
+        }
+        return ResourceIds.inNamespace(connection, id)
+                ? id.name()
+                : id.path().segments().getFirst();
     }
 
     /**

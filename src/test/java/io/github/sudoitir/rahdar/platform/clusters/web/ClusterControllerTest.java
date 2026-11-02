@@ -37,6 +37,7 @@ import io.github.sudoitir.rahdar.platform.clusters.ClusterService;
 import io.github.sudoitir.rahdar.platform.clusters.RegistrationAdoption;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerCredentialRepository;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNodeRepository;
+import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterEntity;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.ClusterRepository;
 import io.github.sudoitir.rahdar.support.AdminAuthenticationExtension;
 import io.github.sudoitir.rahdar.support.DataPlaneChecks;
@@ -178,11 +179,12 @@ class ClusterControllerTest extends PostgresIntegrationTest {
         mvc.perform(post("/api/v1/clusters")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                { "system": "rabbitmq", "connection": { "system": "rabbitmq" } }
+                                { "system": "pulsar", "connection": { "system": "pulsar" } }
                                 """))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.type").value(Matchers.endsWith("/problems/unsupported-system")))
-                .andExpect(jsonPath("$.detail").value(Matchers.containsString("Supported systems: artemis, kafka.")));
+                .andExpect(jsonPath("$.detail")
+                        .value(Matchers.containsString("Supported systems: artemis, kafka, rabbitmq.")));
     }
 
     @Test
@@ -576,7 +578,7 @@ class ClusterControllerTest extends PostgresIntegrationTest {
                             .value(Matchers.contains("artemis-backup:61616", "artemis-primary:61616")));
         }
 
-        assertThat(clusters.findAll()).extracting(c -> c.getId()).containsExactly(existing);
+        assertThat(clusters.findAll()).extracting(ClusterEntity::getId).containsExactly(existing);
         assertThat(audits.findAll()).singleElement().satisfies(e -> {
             assertThat(e.getAction()).isEqualTo("REGISTER_CLUSTER");
             assertThat(e.getOutcome()).isEqualTo("FAILURE");

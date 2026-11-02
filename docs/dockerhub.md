@@ -1,9 +1,9 @@
 # Rahdar
 
-**One open-source console for your Apache ActiveMQ® Artemis and Apache Kafka® clusters.**
+**One open-source console for your Apache ActiveMQ® Artemis, Apache Kafka® and RabbitMQ clusters.**
 
 One instance, every cluster you run, in one estate: health judged on one scale and every
-backlog in one table, Artemis queues and Kafka consumer groups side by side. Kafka lag is
+backlog in one table, Artemis queues, Kafka consumer groups and RabbitMQ queues side by side. Kafka lag is
 shown as the estimate it is, with its per-partition breakdown. Nothing destructive runs
 before its preview, and where the approval gate is on, a second person approves it.
 
@@ -13,10 +13,12 @@ before its preview, and where the approval gate is on, a second person approves 
 - **Apache Kafka** 2.8 and later, KRaft and ZooKeeper mode: consumer, share and classic
   groups with per-partition lag, previewed offset resets, topic configuration, ACLs,
   hanging transactions, brokers and the controller quorum.
-- **RabbitMQ** is coming next; it is not supported yet.
+- **RabbitMQ** 3.13 and later (4.x tested): nodes with their alarms and partitions, virtual hosts,
+  bindings, policies, permissions, shovels and federation, classic, quorum and stream queues, and
+  streams browsed by offset.
 
 It works against your **existing** brokers. Register an Artemis cluster from one
-management URL, or a Kafka cluster from its bootstrap servers; nothing here starts or
+management URL, a Kafka cluster from its bootstrap servers, or a RabbitMQ cluster from its management URLs; nothing here starts or
 reconfigures a broker.
 
 Extend it with **plugins**, installed from the UI: screens, API, assistant tools and
@@ -28,7 +30,7 @@ itself if the container has a restart policy — the compose file sets
 > **pre-stable dev builds** — the `:dev` tag is the moving pointer and there is no
 > `:latest` yet. Expect breaking changes.
 
-**Documentation:** [rahdar.dev](https://rahdar.dev/) ([Kafka guide](https://rahdar.dev/guide/kafka))
+**Documentation:** [rahdar.dev](https://rahdar.dev/) ([Kafka guide](https://rahdar.dev/guide/kafka), [RabbitMQ guide](https://rahdar.dev/guide/rabbitmq))
 &nbsp;·&nbsp; **Source and issues:**
 [github.com/sudoitir/rahdar](https://github.com/sudoitir/rahdar)
 
@@ -70,7 +72,7 @@ CycloneDX SBOM: [verify a release](https://rahdar.dev/guide/verify-releases).
 
 ## Run it
 
-Rahdar and its Postgres. Your Artemis and Kafka clusters already exist and are registered
+Rahdar and its Postgres. Your Artemis, Kafka and RabbitMQ clusters already exist and are registered
 through the UI — nothing here starts a broker.
 
 ```bash

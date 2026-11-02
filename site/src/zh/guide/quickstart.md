@@ -72,7 +72,7 @@ docker compose -f compose.prod.yaml logs rahdar | grep -A4 'Created administrato
 
 选择**安全协议**：明文、TLS、明文 SASL 或 TLS 上的 SASL。SASL 协议还要求选择**机制**：`PLAIN`、`SCRAM-SHA-256`、`SCRAM-SHA-512` 需要用户名与密码（要么都填，要么都不填），`OAUTHBEARER` 需要令牌。明文 SASL 会以明文传输凭据，表单会发出警告，但仍允许注册。TLS 协议可以指定 **TLS bundle**（Spring SSL bundle），用于信任库与客户端证书。主机名校验始终开启：证书没有写明其所通告地址的 Broker 会被拒绝。客户端 id 在 *Advanced* 中。
 
-**Check connection** 报告 Kafka 版本（Broker 无法给出更多信息时显示为下限）与模式、每个 Broker 及其**通告**的地址和 Rahdar 是否在该地址连上了它、控制器仲裁（或其不可用的原因），以及该账号能做什么。检查失败时会写明原因与下一步：域名无法解析、连接被拒绝、连接超时、证书不受信任或与主机名不符、认证失败、账号已通过认证但无权描述集群（这与密码被拒绝不同），以及 Kafka 版本不受支持（低于 3.0）。
+**Check connection** 报告 Kafka 版本（Broker 无法给出更多信息时显示为下限）与模式、每个 Broker 及其**通告**的地址和 Rahdar 是否在该地址连上了它、控制器仲裁（或其不可用的原因），以及该账号能做什么。检查失败时会写明原因与下一步：域名无法解析、连接被拒绝、连接超时、证书不受信任或与主机名不符、认证失败、账号已通过认证但无权描述集群（这与密码被拒绝不同），以及 Kafka 版本不受支持（低于 2.8）。
 
 Bootstrap 服务器可能已经应答，而某个 Broker 通告了 Rahdar 无法到达的地址，例如只在集群内网才能解析的名称。此时检查会把该 Broker 及其通告地址列为未连上：Broker 的**通告监听器（advertised listeners）**必须能从 Rahdar 访问。如果只连上了部分 Broker，你仍可在看到警告（集群将显示为降级）后注册。
 

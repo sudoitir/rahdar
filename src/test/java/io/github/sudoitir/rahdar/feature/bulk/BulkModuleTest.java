@@ -10,6 +10,7 @@ import io.github.sudoitir.rahdar.platform.broker.ConnectionSettingsSource;
 import io.github.sudoitir.rahdar.platform.broker.DataPlaneCheck;
 import io.github.sudoitir.rahdar.platform.broker.NodeCallLimiter;
 import io.github.sudoitir.rahdar.platform.broker.SystemExtensions;
+import io.github.sudoitir.rahdar.platform.broker.WholeClusterOperations;
 import io.github.sudoitir.rahdar.platform.clusters.BrokerCommands;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterEnvironmentIndex;
@@ -80,6 +81,9 @@ class BulkModuleTest extends ModuleIntegrationTest {
     /** Messages reads and acts on a queue's messages through the broker module. */
     @MockitoBean
     BrokerMessages brokerMessages;
+
+    @MockitoBean
+    WholeClusterOperations wholeClusterOperations;
 
     /** The clusters module's service reads each cluster's system through the broker module. */
     @MockitoBean

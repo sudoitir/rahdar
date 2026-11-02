@@ -74,7 +74,7 @@ function WithSubscription({
   const { subscription, isPending, isError, error } = useSubscription(clusterId, target.id, target.snapshot);
   const [ready, setReady] = useState(false);
   useEffect(() => {
-    if (!subscription || !opened) return;
+    if (!subscription || !opened) return undefined;
     const frame = requestAnimationFrame(() => setReady(true));
     return () => cancelAnimationFrame(frame);
   }, [subscription, opened]);
@@ -130,7 +130,7 @@ function PauseSubscriptionDialog({
   clusterId,
   subscription,
 }: HostedDialogProps & { clusterId: string; subscription: SubscriptionView }) {
-  const setPaused = useSetSubscriptionPaused(clusterId, subscription.name);
+  const setPaused = useSetSubscriptionPaused(clusterId, subscription.id);
   const [outcome, setOutcome] = useState<LifecycleOutcomeView | null>(null);
   const paused = subscription.perNode.some((n) => n.paused);
   const verb = paused ? 'Resume' : 'Pause';

@@ -54,3 +54,12 @@ services:
     # do this: it shows what Kafka does.
     environment:
       KAFKA_TRANSACTION_ABORT_TIMED_OUT_TRANSACTION_CLEANUP_INTERVAL_MS: "86400000"
+
+  rabbitmq-1:
+    ports: !reset []
+
+  rabbitmq-2:
+    ports: !reset []
+
+  rabbitmq-3:
+    ports: !reset []

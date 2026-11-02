@@ -1,5 +1,6 @@
 package io.github.sudoitir.rahdar.feature.bulk;
 
+import io.github.sudoitir.openbroker.model.ResourceClass;
 import io.github.sudoitir.rahdar.feature.bulk.BulkRunMapper.ItemEstimate;
 import io.github.sudoitir.rahdar.feature.bulk.BulkRunMapper.RunOptions;
 import io.github.sudoitir.rahdar.feature.bulk.internal.persistence.BulkRunEntity;
@@ -24,6 +25,7 @@ import io.github.sudoitir.rahdar.platform.clusters.ClusterKinds;
 import io.github.sudoitir.rahdar.platform.clusters.LifecycleOutcome;
 import io.github.sudoitir.rahdar.platform.clusters.LifecycleOutcome.NodeOutcome;
 import io.github.sudoitir.rahdar.platform.clusters.LifecycleOutcome.NodeStatus;
+import io.github.sudoitir.rahdar.platform.clusters.ResourceTargets.Target;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -72,6 +74,8 @@ class BulkRunner {
 
     /** The node name of the one outcome of a subscription read for the whole cluster. */
     private static final String WHOLE_CLUSTER = "whole cluster";
+
+    private static final String UNEXPECTED_PURGE = "Unexpected purge result: ";
 
     /** This replica no longer holds the run: someone else marked it, or this replica cannot prove it is alive. */
     private static final class RunLost extends RuntimeException {
@@ -223,25 +227,37 @@ class BulkRunner {
         return switch (run.getOperation()) {
             case PAUSE -> unwrap(queues.setPaused(clusterId, queue, true, false));
             case RESUME -> unwrap(queues.setPaused(clusterId, queue, false, false));
-            case DELETE ->
-                unwrap(queues.deleteQueue(
-                        clusterId,
-                        queue,
-                        false,
-                        run.isOverrideCap(),
-                        json.readValue(run.getOptions(), RunOptions.class).disconnectConsumers()));
+            case DELETE -> {
+                boolean disconnectConsumers =
+                        json.readValue(run.getOptions(), RunOptions.class).disconnectConsumers();
+                // A cluster read as one deletes the subscription by its id, as the single delete does.
+                yield unwrap(
+                        kinds.readAsOne(clusterId)
+                                ? queues.deleteQueue(
+                                        clusterId,
+                                        new Target(
+                                                BulkItemIds.parse(item.getSubscription()), ResourceClass.SUBSCRIPTION),
+                                        false,
+                                        run.isOverrideCap(),
+                                        disconnectConsumers)
+                                : queues.deleteQueue(
+                                        clusterId, queue, false, run.isOverrideCap(), disconnectConsumers));
+            }
             case PURGE -> purge(run, item);
         };
     }
 
     /**
      * A queue's purge is one node per call, so it is issued on every node hosting the queue and folded into one
-     * outcome. A subscription of a partitioned log is moved to the end of the log once for the cluster, through the
+     * outcome, except on a cluster read as one, where it is purged once for the cluster by its id. A subscription of a partitioned log is moved to the end of the log once for the cluster, through the
      * log purge and its gate, which refuses a group that has members or is rebalancing with the driver's detail.
      */
     private LifecycleOutcome purge(BulkRunEntity run, BulkRunItemEntity item) {
         if (kinds.partitioned(run.getClusterId(), BulkItemIds.kind(item.getSubscription()))) {
             return purgeLog(run, item);
+        }
+        if (kinds.readAsOne(run.getClusterId())) {
+            return purgeWhole(run, item);
         }
         List<NodeOutcome> nodes = new ArrayList<>();
         for (NodeFigure node :
@@ -257,7 +273,7 @@ class BulkRunner {
                     case Attempt.Ok<MessageService.Outcome>(MessageService.Outcome.Affected affected) ->
                         new NodeOutcome(node.nodeId(), node.nodeName(), NodeStatus.APPLIED, affected.count(), null);
                     case Attempt.Ok<MessageService.Outcome>(var other) ->
-                        NodeOutcome.failed(node.nodeId(), node.nodeName(), "Unexpected purge result: " + other);
+                        NodeOutcome.failed(node.nodeId(), node.nodeName(), UNEXPECTED_PURGE + other);
                     case Attempt.Failed<MessageService.Outcome> failed ->
                         NodeOutcome.failed(node.nodeId(), node.nodeName(), failed.detail());
                 };
@@ -269,6 +285,25 @@ class BulkRunner {
         return new LifecycleOutcome(false, 0, false, nodes);
     }
 
+    /** A queue of a cluster read as one is purged once for the cluster, by its id: one outcome, naming no node. */
+    private LifecycleOutcome purgeWhole(BulkRunEntity run, BulkRunItemEntity item) {
+        NodeOutcome outcome;
+        try {
+            outcome = switch (messages.purge(
+                    run.getClusterId(), BulkItemIds.parse(item.getSubscription()), false, run.isOverrideCap())) {
+                case Attempt.Ok<MessageService.Outcome>(MessageService.Outcome.Affected affected) ->
+                    new NodeOutcome(null, WHOLE_CLUSTER, NodeStatus.APPLIED, affected.count(), null);
+                case Attempt.Ok<MessageService.Outcome>(var other) ->
+                    NodeOutcome.failed(null, WHOLE_CLUSTER, UNEXPECTED_PURGE + other);
+                case Attempt.Failed<MessageService.Outcome> failed ->
+                    NodeOutcome.failed(null, WHOLE_CLUSTER, failed.detail());
+            };
+        } catch (RuntimeException e) {
+            outcome = NodeOutcome.failed(null, WHOLE_CLUSTER, e.getMessage());
+        }
+        return new LifecycleOutcome(false, 0, false, List.of(outcome));
+    }
+
     private LifecycleOutcome purgeLog(BulkRunEntity run, BulkRunItemEntity item) {
         // One outcome for the whole cluster, so it names no node.
         NodeOutcome outcome;
@@ -277,7 +312,7 @@ class BulkRunner {
                 case Attempt.Ok<MessageService.Outcome>(MessageService.Outcome.LogPurged purged) ->
                     new NodeOutcome(null, WHOLE_CLUSTER, NodeStatus.APPLIED, 0L, null, purged.skipped());
                 case Attempt.Ok<MessageService.Outcome>(var other) ->
-                    NodeOutcome.failed(null, WHOLE_CLUSTER, "Unexpected purge result: " + other);
+                    NodeOutcome.failed(null, WHOLE_CLUSTER, UNEXPECTED_PURGE + other);
                 case Attempt.Failed<MessageService.Outcome> failed ->
                     NodeOutcome.failed(null, WHOLE_CLUSTER, failed.detail());
             };

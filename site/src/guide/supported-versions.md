@@ -1,22 +1,23 @@
 ---
 title: Supported broker versions
-description: Which Apache Artemis and Apache Kafka releases Rahdar supports, how that range was established, and what happens outside it.
+description: Which Apache Artemis, Apache Kafka and RabbitMQ releases Rahdar supports, how that range was established, and what happens outside it.
 ---
 
 # Supported broker versions
 
-Rahdar manages two broker systems. Each has its own range, and a cluster is checked against the range of the
+Rahdar manages three broker systems. Each has its own range, and a cluster is checked against the range of the
 system it runs.
 
 ## Apache Kafka
 
 | | Kafka release |
 | --- | --- |
-| Minimum | **3.0** |
-| Tested | 3.5 (ZooKeeper mode) and 4.x (KRaft mode, including share groups) |
+| Minimum | **2.8** |
+| Tested | 2.8 and 3.5 (ZooKeeper mode) and 4.x (KRaft mode, including share groups) |
 
-Every release from 3.0 on is supported, in **KRaft** and in **ZooKeeper** mode. A cluster older than 3.0 is
-refused: the check names the version it found and the supported range, and nothing is stored.
+Every release from 2.8 on is supported, in **KRaft** and in **ZooKeeper** mode. A Kafka 2.8 cluster cannot list
+transactions (that needs 3.0, KIP-664), so its open and hanging transactions are not shown and the capability says
+why; everything else works. A cluster older than 2.8 is refused: the check names the version it found and the supported range, and nothing is stored.
 
 Kafka brokers report their version only as far as their protocol goes, so Rahdar often cannot name the exact
 release. It then shows the version as a lower bound, **at least 3.5**, together with the mode, and never as an
@@ -30,6 +31,29 @@ What a release or a mode cannot do is shown as unavailable, with its reason, and
 | Before 4.0 | Share groups | They arrived with 4.0. The groups list shows only the group types the cluster has. |
 | A cluster without an authoriser | ACLs | There is nothing to list. The ACLs page says so, with the broker's reason. |
 | An account that may not describe a group or topic | That group's lag, or that topic's configuration | The figure says it could not be read and why, instead of showing 0. |
+
+Registering a cluster newer than the range Rahdar was built against is accepted, with a warning.
+
+## RabbitMQ
+
+| | RabbitMQ release |
+| --- | --- |
+| Minimum | **3.13** |
+| Tested | 4.x |
+
+Every release from 3.13 on is supported. A cluster older than 3.13 is refused: the check names the version it
+found and the supported range, and nothing is stored. Rahdar reads the version of every node and shows the
+lowest, so a cluster in the middle of a rolling upgrade is shown at its oldest node.
+
+What a cluster or an account cannot do is shown as unavailable, with its reason and the remedy:
+
+| On | Unavailable | Why |
+| --- | --- | --- |
+| A cluster without the shovel plugins | The shovels list | The plugin is not enabled. The page names the plugins. |
+| A cluster without the federation plugins | Federation links | The plugin is not enabled. The page names the plugins. |
+| A cluster without the stream plugin | Browsing streams | Reading a stream needs the stream plugin. |
+| Classic and quorum queues | Browsing messages | RabbitMQ can only hand their messages to a consumer, so only streams are browsed. |
+| An account without the `monitoring` tag | The whole cluster | The check says so and gives `rabbitmqctl set_user_tags <user> monitoring`. |
 
 Registering a cluster newer than the range Rahdar was built against is accepted, with a warning.
 

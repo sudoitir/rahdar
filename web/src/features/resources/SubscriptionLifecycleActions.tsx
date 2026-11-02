@@ -11,6 +11,7 @@ import {
 import { useResourceGate } from '../../kernel/auth/useResourceGate.ts';
 import { CapabilityGate } from '../../ui/CapabilityGate.tsx';
 import { ConfirmDialog } from '../../ui/ConfirmDialog.tsx';
+import { IdentityBasisNote } from '../../ui/IdentityBasisNote.tsx';
 import { ErrorState } from '../../ui/ErrorState.tsx';
 import { appliedEverywhere } from '../../ui/nodeOutcome.ts';
 import { NodeOutcomeSummary } from '../../ui/NodeOutcomeSummary.tsx';
@@ -40,7 +41,7 @@ export function SubscriptionLifecycleActions({
   const [editOpen, setEditOpen] = useState(false);
   const [pauseOutcome, setPauseOutcome] = useState<LifecycleOutcomeView | null>(null);
 
-  const setPaused = useSetSubscriptionPaused(clusterId, subscription.name);
+  const setPaused = useSetSubscriptionPaused(clusterId, subscription.id);
 
   const base = {
     clusterId,
@@ -49,16 +50,23 @@ export function SubscriptionLifecycleActions({
     capability: write,
     pending: cluster.isPending,
   } as const;
-  const pause = useResourceGate({ ...base, permission: 'subscription:pause', label: 'Pause and resume subscriptions' });
+  const pause = useResourceGate({
+    ...base,
+    permission: 'subscription:pause',
+    label: 'Pause and resume subscriptions',
+    kind: { id: subscription.kind, verb: 'pause' },
+  });
   const update = useResourceGate({
     ...base,
     permission: 'subscription:update',
     label: "Change a subscription's configuration",
+    kind: { id: subscription.kind, verb: 'update' },
   });
   const remove = useResourceGate({
     ...base,
     permission: 'subscription:delete',
     label: 'Destroy subscriptions and destinations',
+    kind: { id: subscription.kind, verb: 'delete' },
   });
   const pauseGate = pause.verdict;
   const updateGate = update.verdict;
@@ -182,7 +190,8 @@ export function DeleteSubscriptionDialog({
   onClose: () => void;
   onDeleted: () => void;
 }>) {
-  const remove = useDeleteSubscription(clusterId, subscription.name);
+  const remove = useDeleteSubscription(clusterId, subscription.id);
+  const forwardRoutes = useCluster(clusterId).data?.system?.id === 'artemis';
   const [preview, setPreview] = useState<LifecycleOutcomeView | null>(null);
   const [result, setResult] = useState<LifecycleOutcomeView | null>(null);
   const [previewFailed, setPreviewFailed] = useState<Error | null>(null);
@@ -243,6 +252,7 @@ export function DeleteSubscriptionDialog({
         result ? null : (
           <DeleteConsequence
             consumers={subscription.totalConsumerCount}
+            forwardRoutes={forwardRoutes}
             disconnectConsumers={disconnectConsumers}
             pending={remove.isPending}
             preview={preview}
@@ -262,6 +272,7 @@ export function DeleteSubscriptionDialog({
 /** What deleting a subscription destroys, as the confirmation states it: the preview, the cap and the consumer choice. */
 function DeleteConsequence({
   consumers,
+  forwardRoutes,
   disconnectConsumers,
   pending,
   preview,
@@ -270,6 +281,7 @@ function DeleteConsequence({
   onDisconnectChange,
 }: Readonly<{
   consumers: number;
+  forwardRoutes: boolean;
   disconnectConsumers: boolean;
   pending: boolean;
   preview: LifecycleOutcomeView | null;
@@ -283,11 +295,14 @@ function DeleteConsequence({
         This destroys the subscription on every live node of the cluster, along with every message it holds. Nothing
         here can be undone, and a subscription recreated afterwards is a new, empty one.
       </Text>
-      <Text size="sm">
-        A forward route into this subscription&apos;s destination is removed with it when the delete leaves nothing
-        bound there — otherwise the route would bring the subscription back, or break its producers. Each node below
-        names the routes it removes and the ones it keeps.
-      </Text>
+      {/* Only Artemis forwards a route into a subscription's destination; a RabbitMQ queue is fed by bindings. */}
+      {forwardRoutes ? (
+        <Text size="sm">
+          A forward route into this subscription&apos;s destination is removed with it when the delete leaves nothing
+          bound there — otherwise the route would bring the subscription back, or break its producers. Each node below
+          names the routes it removes and the ones it keeps.
+        </Text>
+      ) : null}
 
       <Checkbox
         label="Disconnect this subscription's consumers"
@@ -320,6 +335,8 @@ function DeleteConsequence({
 
         {preview ? <NodeOutcomeSummary outcome={preview} destructive /> : null}
       </div>
+
+      <IdentityBasisNote basis={preview?.identityBasis} />
 
       {preview?.overCap ? (
         <Notice tone="warning" title="Over the safety cap">

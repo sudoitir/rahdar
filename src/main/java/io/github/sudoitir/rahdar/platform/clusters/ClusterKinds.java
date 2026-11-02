@@ -6,6 +6,7 @@ import io.github.sudoitir.openbroker.model.KindId;
 import io.github.sudoitir.openbroker.model.ResourceClass;
 import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
 import io.github.sudoitir.rahdar.platform.broker.BrokerSystems;
+import io.github.sudoitir.rahdar.platform.broker.LogBounds;
 import io.github.sudoitir.rahdar.platform.broker.MessageExpiry;
 import io.github.sudoitir.rahdar.platform.broker.QueueCounters;
 import io.github.sudoitir.rahdar.platform.broker.ResourceIds;
@@ -31,10 +32,33 @@ public class ClusterKinds {
     private final BrokerSystems systems;
     private final BrokerGateway gateway;
     private final SystemExtensions extensions;
+    private final ClusterDirectory nodes;
 
     /** Whether the cluster's kind of this id reads a partitioned log, so its messages are browsed by partition. */
     public boolean partitioned(UUID clusterId, String kind) {
         return kindsOf(clusterId).stream().anyMatch(k -> k.id().equals(kind) && k.partitioned());
+    }
+
+    /** Whether the kind is itself one log, such as a stream, which is read as a single partition (ADR-0224). */
+    public boolean log(UUID clusterId, String kind) {
+        return systemLogs(clusterId).contains(KindId.of(kind));
+    }
+
+    private Set<KindId> systemLogs(UUID clusterId) {
+        return extensions
+                .forCluster(clusterId, LogBounds.class)
+                .map(bounds -> bounds.logs(clusterId))
+                .orElse(Set.of());
+    }
+
+    /**
+     * Whether the cluster is read and changed as one: it has nodes, and none of them has a management URL, so its
+     * driver answers for the cluster as a whole (Kafka, RabbitMQ) and there is no node to fan out to (ADR-0224).
+     * An Artemis cluster is not, and a cluster with no stored node is not either.
+     */
+    public boolean readAsOne(UUID clusterId) {
+        List<ClusterNode> stored = nodes.nodes(clusterId);
+        return !stored.isEmpty() && stored.stream().noneMatch(n -> n.getManagementUrl() != null);
     }
 
     /** The ids of the cluster's kinds that are subscriptions, which messages are received from. */
@@ -74,12 +98,14 @@ public class ClusterKinds {
                     .filter(k -> k.resourceClass() == ResourceClass.PARTITION)
                     .flatMap(k -> k.parent().stream())
                     .collect(Collectors.toSet());
+            Set<KindId> systemLogs = systemLogs(clusterId);
             return all.stream()
                     .map(kind -> new KindView(
                             kind.id().value(),
                             kind.resourceClass().name(),
                             ResourceIds.name(kind.label()),
                             logs.contains(kind.id())
+                                    || systemLogs.contains(kind.id())
                                     || (!logs.isEmpty() && kind.resourceClass() == ResourceClass.SUBSCRIPTION),
                             verbs(kind, resetCounters, expire)))
                     .toList();

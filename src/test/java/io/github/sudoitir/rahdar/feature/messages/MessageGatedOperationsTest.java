@@ -8,6 +8,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import io.github.sudoitir.openbroker.model.ResourceId;
 import io.github.sudoitir.rahdar.feature.messages.MessageActionParams.MessageDeleteParams;
 import io.github.sudoitir.rahdar.feature.messages.MessageActionParams.MessageMoveParams;
 import io.github.sudoitir.rahdar.feature.messages.MessageActionParams.QueuePurgeParams;
@@ -20,6 +21,7 @@ import io.github.sudoitir.rahdar.kernel.gate.ExecutionMode;
 import io.github.sudoitir.rahdar.kernel.gate.GatedOperation;
 import io.github.sudoitir.rahdar.kernel.gate.OperationScope;
 import io.github.sudoitir.rahdar.kernel.gate.Trait;
+import io.github.sudoitir.rahdar.kernel.security.ResourceIdTexts;
 import io.github.sudoitir.rahdar.platform.broker.Attempt;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterEnvironmentIndex;
@@ -29,6 +31,7 @@ import java.util.UUID;
 import org.assertj.core.groups.Tuple;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.Answers;
 import tools.jackson.databind.json.JsonMapper;
 
 /** The gated message operations: what an approver reads, what is estimated and pinned, and what a replay runs. */
@@ -40,6 +43,7 @@ class MessageGatedOperationsTest {
 
     private final MessageService messages = mock(MessageService.class);
     private final ClusterEnvironmentIndex clusters = mock(ClusterEnvironmentIndex.class);
+    private final ResourceIdTexts ids = mock(ResourceIdTexts.class, Answers.RETURNS_DEEP_STUBS);
     private final MessageGatedOperations operations = new MessageGatedOperations();
 
     @BeforeEach
@@ -50,8 +54,8 @@ class MessageGatedOperationsTest {
 
     @Test
     void aPurgeIsDestructiveAndScopedToItsClusterAndEnvironment() {
-        GatedOperation<QueuePurgeParams> purge = operations.queuePurgeOperation(messages, clusters);
-        QueuePurgeParams params = new QueuePurgeParams(CLUSTER, "orders.dlq", null, false);
+        GatedOperation<QueuePurgeParams> purge = operations.queuePurgeOperation(messages, clusters, ids);
+        QueuePurgeParams params = new QueuePurgeParams(CLUSTER, "orders.dlq", null, null, false);
 
         assertThat(purge.type()).isEqualTo("subscription.purge");
         assertThat(purge.traits(params)).containsExactly(Trait.DESTRUCTIVE);
@@ -66,8 +70,8 @@ class MessageGatedOperationsTest {
         when(messages.reachOfPurge(CLUSTER, "orders", NODE)).thenReturn(new Reach(12, "orders.addr|ANYCAST"));
 
         Effect effect = operations
-                .queuePurgeOperation(messages, clusters)
-                .estimate(new QueuePurgeParams(CLUSTER, "orders", NODE, false));
+                .queuePurgeOperation(messages, clusters, ids)
+                .estimate(new QueuePurgeParams(CLUSTER, "orders", null, NODE, false));
 
         assertThat(effect).isEqualTo(new Effect(12, "messages", "orders.addr|ANYCAST", null));
     }
@@ -77,7 +81,9 @@ class MessageGatedOperationsTest {
         when(messages.purge(CLUSTER, "orders", NODE, false, true))
                 .thenReturn(new Attempt.Ok<>(new Outcome.Affected(3, NODE)));
 
-        operations.queuePurgeOperation(messages, clusters).replay(new QueuePurgeParams(CLUSTER, "orders", NODE, true));
+        operations
+                .queuePurgeOperation(messages, clusters, ids)
+                .replay(new QueuePurgeParams(CLUSTER, "orders", null, NODE, true));
 
         verify(messages).purge(CLUSTER, "orders", NODE, false, true);
     }
@@ -87,8 +93,8 @@ class MessageGatedOperationsTest {
         when(messages.purge(eq(CLUSTER), eq("orders"), any(), eq(false), eq(false)))
                 .thenReturn(new Attempt.Failed<>(BrokerConnectionException.Kind.UNREACHABLE, "down"));
 
-        var operation = operations.queuePurgeOperation(messages, clusters);
-        QueuePurgeParams params = new QueuePurgeParams(CLUSTER, "orders", null, false);
+        var operation = operations.queuePurgeOperation(messages, clusters, ids);
+        QueuePurgeParams params = new QueuePurgeParams(CLUSTER, "orders", null, null, false);
 
         assertThatThrownBy(() -> operation.replay(params))
                 .isInstanceOf(BrokerConnectionException.class)
@@ -152,7 +158,7 @@ class MessageGatedOperationsTest {
     void everyParameterRecordRoundTripsThroughCanonicalJson() {
         MessageActionRequest request = MessageRequestFixtures.of(List.of(1L, 2L), "a = 'b'", "orders");
         List<Record> all = List.of(
-                new QueuePurgeParams(CLUSTER, "orders", null, true),
+                new QueuePurgeParams(CLUSTER, "orders", null, null, true),
                 new MessageMoveParams(CLUSTER, "orders", NODE, request, true),
                 new MessageDeleteParams(CLUSTER, "orders", null, request, false),
                 new MessageActionParams.MessageRetryParams(CLUSTER, "orders", null, request, false),
@@ -167,7 +173,24 @@ class MessageGatedOperationsTest {
 
     @Test
     void noMessageOperationRedactsAnythingBecauseNoneCarriesASecret() {
-        assertThat(operations.queuePurgeOperation(messages, clusters).redactedPaths())
+        assertThat(operations.queuePurgeOperation(messages, clusters, ids).redactedPaths())
                 .isEqualTo(Set.of());
+    }
+
+    @Test
+    void aPurgeOfAClusterReadAsOneIsPinnedByIdAndCarriesTheIdentityNote() {
+        ResourceId id = ResourceId.parse("rabbitmq.classic-queue/orders");
+        QueuePurgeParams params = new QueuePurgeParams(CLUSTER, "orders", id.format(), null, false);
+        when(messages.reachOfPurge(CLUSTER, id)).thenReturn(new Reach(40, "etag-1", "same configuration"));
+        when(messages.purge(CLUSTER, id, false, false)).thenReturn(new Attempt.Ok<>(new Outcome.Affected(40, null)));
+        var purge = operations.queuePurgeOperation(messages, clusters, ids);
+
+        Effect effect = purge.estimate(params);
+        purge.replay(params);
+
+        assertThat(purge.version()).isEqualTo(2);
+        assertThat(effect.detail()).isEqualTo("same configuration");
+        assertThat(effect.count()).isEqualTo(40);
+        verify(messages).purge(CLUSTER, id, false, false);
     }
 }

@@ -1,4 +1,4 @@
-import { ARTEMIS_KINDS, subscriptionIdentity } from '../../test/wire.ts';
+import { ARTEMIS_KINDS, ARTEMIS_SYSTEM, RABBITMQ_SYSTEM, subscriptionIdentity } from '../../test/wire.ts';
 import { describe, expect, it, vi } from 'vitest';
 import { http, HttpResponse } from 'msw';
 import { screen, waitFor, within } from '@testing-library/react';
@@ -24,12 +24,13 @@ function capabilities(managementWrite: CapabilityView) {
 }
 
 /** The cluster detail carries the capability ledger the controls gate on. */
-function clusterHandler(managementWrite: CapabilityView) {
+function clusterHandler(managementWrite: CapabilityView, system: { id: string; name: string } = ARTEMIS_SYSTEM) {
   return http.get('*/api/v1/clusters/c1', () =>
     HttpResponse.json({
       id: 'c1',
       name: 'c1',
       description: null,
+      system,
       topology: { nodes: [] },
       kinds: ARTEMIS_KINDS,
       capabilities: capabilities(managementWrite),
@@ -261,6 +262,66 @@ describe('the destructive flow is keyboard-complete', () => {
 
     await user.keyboard('{Escape}');
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+  });
+
+  it('says a recreated resource is not told apart when the preview rests on the configuration', async () => {
+    server.use(
+      meHandler(),
+      clusterHandler(AVAILABLE),
+      http.delete('*/api/v1/clusters/c1/resources/artemis.queue/orders', () =>
+        HttpResponse.json({
+          dryRun: true,
+          cap: 1000,
+          overCap: false,
+          partial: false,
+          totalAffected: 12,
+          identityBasis: 'CONFIGURATION',
+          nodes: [{ nodeId: 'n1', nodeName: 'node-a', status: 'WOULD_APPLY', affected: 12, error: null }],
+        }),
+      ),
+    );
+    const user = userEvent.setup();
+    renderWithProviders(<Harness />);
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Delete subscription' })).toBeEnabled());
+    await user.click(screen.getByRole('button', { name: 'Delete subscription' }));
+
+    const dialog = await screen.findByRole('dialog');
+    expect(await within(dialog).findByText('A recreated resource is not told apart')).toBeInTheDocument();
+    // Stated once: the preview's node carries no copy of it.
+    expect(within(dialog).getAllByText(/does not tell a recreated resource apart/)).toHaveLength(1);
+  });
+
+  it.each([
+    ['artemis', ARTEMIS_SYSTEM, true],
+    ['rabbitmq', RABBITMQ_SYSTEM, false],
+  ])('states the forward route only where the system has them (%s)', async (_name, system, stated) => {
+    server.use(
+      meHandler(),
+      clusterHandler(AVAILABLE, system),
+      http.delete('*/api/v1/clusters/c1/resources/artemis.queue/orders', () =>
+        HttpResponse.json({
+          dryRun: true,
+          cap: 1000,
+          overCap: false,
+          partial: false,
+          totalAffected: 12,
+          identityBasis: 'INCARNATION',
+          nodes: [{ nodeId: 'n1', nodeName: 'node-a', status: 'WOULD_APPLY', affected: 12, error: null }],
+        }),
+      ),
+    );
+    const user = userEvent.setup();
+    renderWithProviders(<Harness />);
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Delete subscription' })).toBeEnabled());
+    await user.click(screen.getByRole('button', { name: 'Delete subscription' }));
+
+    const dialog = await screen.findByRole('dialog');
+    expect(await within(dialog).findByText('would destroy 12 messages')).toBeInTheDocument();
+    const route = within(dialog).queryByText(/forward route into this subscription/);
+    if (stated) expect(route).toBeInTheDocument();
+    else expect(route).not.toBeInTheDocument();
   });
 
   it('names the consumers and dependent diverts, and disconnects only when asked, by keyboard alone', async () => {

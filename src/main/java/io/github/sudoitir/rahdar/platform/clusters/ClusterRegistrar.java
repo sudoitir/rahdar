@@ -6,7 +6,7 @@ import io.github.sudoitir.rahdar.platform.broker.SystemExtension;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterRequests.RegisterClusterRequest.Connection;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterRequests.UpdateClusterRequest.ConnectionUpdate;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.ConnectionCheck;
-import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.KafkaConnectionDetail;
+import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.SystemConnectionDetail;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -66,7 +66,7 @@ public interface ClusterRegistrar extends SystemExtension {
     void store(UUID clusterId, Connection connection);
 
     /** How the registered cluster is reached, for the connection settings: never a secret. */
-    KafkaConnectionDetail detail(UUID clusterId);
+    SystemConnectionDetail detail(UUID clusterId);
 
     /**
      * The registered cluster's connection with the edit laid over it.

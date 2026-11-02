@@ -41,7 +41,8 @@ class BuiltInRolesCoverageTest extends PostgresIntegrationTest {
             Map.entry("config:apply", "applies declared configuration to brokers"),
             Map.entry("settings:write", "changes Rahdar settings and rotates stored broker credentials"),
             Map.entry("message:clear", "shows sensitive message values unmasked"),
-            Map.entry("access-rule:write", "changes who may read and write a Kafka cluster's topics"));
+            Map.entry("access-rule:write", "changes who may read and write a cluster's topics, queues and exchanges"),
+            Map.entry("namespace:delete", "deleting a RabbitMQ virtual host destroys every queue in it"));
 
     private static final Set<PermissionDef> CORE = RahdarFeatures.descriptors().stream()
             .flatMap(d -> d.permissions().stream())

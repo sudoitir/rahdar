@@ -25,7 +25,9 @@ public final class LifecycleViews {
 
     /** What happened on one node. */
     public record NodeOutcomeView(
-            @Schema(requiredMode = REQUIRED) UUID nodeId,
+            @Schema(nullable = true, description = "Absent on a cluster changed as one, which has no node to name.")
+            UUID nodeId,
+
             @Schema(requiredMode = REQUIRED) String nodeName,
 
             @Schema(
@@ -76,7 +78,15 @@ public final class LifecycleViews {
             @Schema(requiredMode = REQUIRED, description = "Total messages destroyed, or that would be.")
             long totalAffected,
 
-            @Schema(requiredMode = REQUIRED) List<NodeOutcomeView> nodes) {
+            @Schema(requiredMode = REQUIRED) List<NodeOutcomeView> nodes,
+
+            @Schema(
+                    requiredMode = REQUIRED,
+                    description = "What the preview's etag holds: INCARNATION, so a resource deleted and created"
+                            + " again since is refused; CONFIGURATION, so one created again with the same"
+                            + " configuration is not told apart.",
+                    allowableValues = {"INCARNATION", "CONFIGURATION"})
+            String identityBasis) {
 
         /**
          * The wire shape of one fan-out result. {@code partial} is computed here
@@ -100,7 +110,8 @@ public final class LifecycleViews {
                     outcome.nodes().stream()
                             .map(n -> new NodeOutcomeView(
                                     n.nodeId(), n.nodeName(), n.status().name(), n.affected(), n.error()))
-                            .toList());
+                            .toList(),
+                    outcome.identityBasis().name());
         }
     }
 }

@@ -92,6 +92,10 @@
     "kind" : "FEATURE",
     "required" : false
   }, {
+    "id" : "rabbitmq",
+    "kind" : "PLATFORM",
+    "required" : true
+  }, {
     "id" : "resources",
     "kind" : "FEATURE",
     "required" : false

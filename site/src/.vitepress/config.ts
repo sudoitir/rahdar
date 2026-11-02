@@ -29,7 +29,7 @@ export default defineConfig({
   lang: 'en',
   title: 'Rahdar',
   description:
-    'One open-source console for your Apache ActiveMQ Artemis and Apache Kafka clusters: one estate across systems, honest lag, previews before anything destructive, and an approval gate.',
+    'One open-source console for your Apache ActiveMQ Artemis, Apache Kafka and RabbitMQ clusters: one estate across systems, honest lag, previews before anything destructive, and an approval gate.',
   cleanUrls: true,
   lastUpdated: true,
   sitemap: { hostname: ORIGIN },
@@ -69,6 +69,7 @@ export default defineConfig({
               { text: 'Teams and permissions', link: '/guide/teams-and-permissions' },
               { text: 'Supported broker versions', link: '/guide/supported-versions' },
               { text: 'Apache Kafka', link: '/guide/kafka' },
+              { text: 'RabbitMQ', link: '/guide/rabbitmq' },
               { text: 'SQL Console', link: '/guide/sql-console' },
               { text: 'Flow', link: '/guide/flow' },
               { text: 'Keyboard shortcuts', link: '/guide/keyboard' },
@@ -103,7 +104,7 @@ export default defineConfig({
     zh: {
       label: '简体中文',
       lang: 'zh-Hans',
-      description: '一个开源控制台，管理你的 Apache ActiveMQ Artemis 与 Apache Kafka 集群：跨系统的同一个资产视图、如实的延迟、破坏性操作先预览，以及审批闸门。',
+      description: '一个开源控制台，管理你的 Apache ActiveMQ Artemis、Apache Kafka 与 RabbitMQ 集群：跨系统的同一个资产视图、如实的延迟、破坏性操作先预览，以及审批闸门。',
       themeConfig: {
         nav: [
           { text: '指南', link: '/zh/guide/quickstart' },
@@ -146,7 +147,7 @@ export default defineConfig({
       lang: 'fa',
       dir: 'rtl',
       description:
-        'یک کنسول متن‌باز برای کلاسترهای Apache ActiveMQ Artemis و Apache Kafka شما: یک estate برای همهٔ سیستم‌ها، lag صادقانه، پیش‌نمایش پیش از هر کار مخرب، و دروازهٔ تأیید.',
+        'یک کنسول متن‌باز برای کلاسترهای Apache ActiveMQ Artemis، Apache Kafka و RabbitMQ شما: یک estate برای همهٔ سیستم‌ها، lag صادقانه، پیش‌نمایش پیش از هر کار مخرب، و دروازهٔ تأیید.',
       themeConfig: {
         nav: [
           { text: 'راهنما', link: '/fa/guide/quickstart' },

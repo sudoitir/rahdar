@@ -163,9 +163,10 @@ public class PluginMessagingReconciler {
             verdicts.put(reg.getId(), verdict(reg));
         }
 
-        // A partitioned log is read once for the cluster, not once per node.
+        // A partitioned log, or any source of a cluster read as one, is read once for the cluster, not once per node.
+        boolean readAsOne = kinds.readAsOne(clusterId);
         List<RegistrationEntity> wholeCluster = regs.stream()
-                .filter(r -> kinds.partitioned(clusterId, r.getSourceKind()))
+                .filter(r -> readAsOne || kinds.partitioned(clusterId, r.getSourceKind()))
                 .toList();
         List<RegistrationEntity> perNode =
                 regs.stream().filter(r -> !wholeCluster.contains(r)).toList();

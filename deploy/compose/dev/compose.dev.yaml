@@ -4,7 +4,7 @@
 #
 # Brings up everything you need to see the product against a real cluster:
 # Postgres, an Artemis primary/backup replication pair, a single-node Apache Kafka
-# (KRaft, share groups on), and Rahdar pointed at them. Nothing here is hardened — plaintext credentials, no TLS,
+# (KRaft, share groups on), a single RabbitMQ node, and Rahdar pointed at them. Nothing here is hardened — plaintext credentials, no TLS,
 # ports published to localhost. Do not run this anywhere public.
 
 name: rahdar-dev
@@ -116,6 +116,33 @@ services:
       - "9094:9094"
     healthcheck:
       test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 10s
+      retries: 12
+
+  # One RabbitMQ node with the management, shovel, federation and event-exchange plugins on (the mounted
+  # enabled_plugins). Register it in Rahdar as RabbitMQ with the management URL http://rabbitmq:15672 and the AMQP
+  # endpoint amqp://rabbitmq:5672, the account rahdar / rahdar; a tool on the host reaches them at localhost:15672
+  # and localhost:5672. The memory high watermark is small, so a laptop's Docker VM can hold it beside the rest.
+  rabbitmq:
+    image: rabbitmq:4.4.0-management
+    hostname: rabbitmq
+    # The demo's nodes are rabbitmq-1 to rabbitmq-3; the sweep's scenes name rabbitmq-1 on either stack.
+    networks:
+      default:
+        aliases:
+          - rabbitmq-1
+    environment:
+      RABBITMQ_DEFAULT_USER: rahdar
+      RABBITMQ_DEFAULT_PASS: rahdar
+      RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS: "-rabbit vm_memory_high_watermark_absolute 805306368"
+    volumes:
+      - ./rabbitmq/enabled_plugins:/etc/rabbitmq/enabled_plugins:ro
+    ports:
+      - "15672:15672"
+      - "5672:5672"
+    healthcheck:
+      test: ["CMD-SHELL", "rabbitmq-diagnostics -q ping"]
       interval: 10s
       timeout: 10s
       retries: 12

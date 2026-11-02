@@ -15,6 +15,7 @@ import io.github.sudoitir.openbroker.model.ResourceClass;
 import io.github.sudoitir.openbroker.model.ResourceId;
 import io.github.sudoitir.openbroker.operation.AttributeChange;
 import io.github.sudoitir.openbroker.operation.Estimate;
+import io.github.sudoitir.openbroker.operation.EtagBasis;
 import io.github.sudoitir.openbroker.operation.Operations;
 import io.github.sudoitir.openbroker.operation.PreconditionEnforcement;
 import io.github.sudoitir.openbroker.operation.Preview;
@@ -54,6 +55,7 @@ class TruncateServiceTest {
                 Set.of(),
                 new Estimate(Count.estimate(6), "{message}"),
                 "etag",
+                EtagBasis.CONFIGURATION,
                 PreconditionEnforcement.CHECKED_BEFORE);
 
         TruncateEffect effect = TruncateService.effectOf(preview);
@@ -71,6 +73,7 @@ class TruncateServiceTest {
                 Set.of(),
                 new Estimate(new Count.Unavailable("not countable"), "{message}"),
                 "etag",
+                EtagBasis.CONFIGURATION,
                 PreconditionEnforcement.CHECKED_BEFORE);
 
         assertThat(TruncateService.effectOf(preview).records()).isNull();
@@ -154,6 +157,7 @@ class TruncateServiceTest {
                             Set.of(),
                             new Estimate(Count.exact(5), "{message}"),
                             "e1",
+                            EtagBasis.CONFIGURATION,
                             PreconditionEnforcement.CHECKED_BEFORE));
             OperationGate gate = mock(OperationGate.class);
             when(gate.run(any(), any())).thenAnswer(call -> ((Supplier<Object>) call.getArgument(1)).get());

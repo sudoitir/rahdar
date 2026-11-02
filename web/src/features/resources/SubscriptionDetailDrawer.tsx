@@ -41,7 +41,9 @@ export function SubscriptionDetailDrawer({
       onClose={onClose}
       position="right"
       size="lg"
-      title={subscription ? `${destinationOf(subscription)} / ${subscription.name}` : (missing ?? '')}
+      title={
+        subscription ? [destinationOf(subscription), subscription.name].filter(Boolean).join(' / ') : (missing ?? '')
+      }
     >
       {!subscription && missing ? (
         // Access lost while the subscription was open looks the same as a subscription that is gone: the listing no longer has it.

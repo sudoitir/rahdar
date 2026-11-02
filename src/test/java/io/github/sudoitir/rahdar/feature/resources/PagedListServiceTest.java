@@ -3,6 +3,7 @@ package io.github.sudoitir.rahdar.feature.resources;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withException;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
@@ -23,8 +24,11 @@ import io.github.sudoitir.rahdar.kernel.security.TeamIndex;
 import io.github.sudoitir.rahdar.kernel.security.TeamRef;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
 import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
+import io.github.sudoitir.rahdar.platform.broker.BrokerSystems;
 import io.github.sudoitir.rahdar.platform.broker.ResourceIds;
+import io.github.sudoitir.rahdar.platform.broker.SystemExtensions;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
+import io.github.sudoitir.rahdar.platform.clusters.ClusterKinds;
 import io.github.sudoitir.rahdar.platform.clusters.internal.persistence.BrokerNodeEntity;
 import io.github.sudoitir.rahdar.support.FixtureJolokia;
 import java.io.IOException;
@@ -89,7 +93,14 @@ class PagedListServiceTest {
         when(permissions.filter(any(), any())).thenReturn(everything);
         when(everything.readable(any())).thenReturn(true);
         when(everything.allowedActions(any())).thenReturn(List.of());
-        service = new PagedListService(nodes, new ResourceViewMapper(), clusterAccess, permissions, teams, gateway);
+        service = new PagedListService(
+                nodes,
+                new ResourceViewMapper(),
+                clusterAccess,
+                permissions,
+                teams,
+                gateway,
+                new ClusterKinds(mock(BrokerSystems.class), gateway, mock(SystemExtensions.class), nodes));
     }
 
     /** An agent that answers with these fixtures, in order. */

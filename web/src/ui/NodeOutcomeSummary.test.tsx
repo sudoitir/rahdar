@@ -22,6 +22,7 @@ function outcome(over: Partial<LifecycleOutcomeView> = {}): LifecycleOutcomeView
   return {
     dryRun: false,
     cap: 1000,
+    identityBasis: 'INCARNATION',
     overCap: false,
     partial: false,
     totalAffected: 0,

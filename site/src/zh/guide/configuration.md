@@ -110,6 +110,7 @@ Postgres 拥有配置、用户与审计链路。来自 Broker 的表——`subsc
 
 | 系统 | 连接保存的内容 |
 | --- | --- |
+| RabbitMQ | 管理 URL、可选的 AMQP 端点、两者共用的账号（用户名与密码，或令牌）、TLS bundle、事件交换机所在的虚拟主机与监视间隔。 |
 | Apache Kafka | bootstrap servers、安全协议、SASL 机制、账号（用户名与密码，或令牌）、TLS bundle 与客户端 id。 |
 | Apache Artemis | 种子管理端点、给出其余各节点管理地址的管理 URL 模式、管理与 Core 凭据，以及 TLS bundle。 |
 

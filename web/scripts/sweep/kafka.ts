@@ -15,19 +15,19 @@ import type { Page } from '@playwright/test';
 
 import type { DataCall, RouteSpec, Scene } from './routes.ts';
 
-const NO_MATCH = 'zz-nothing-matches-this';
+export const NO_MATCH = 'zz-nothing-matches-this';
 const kafka = (rest: string) => `/clusters/:kafka/${rest}`;
 
-const exact = (page: Page, label: string) => page.getByLabel(label, { exact: true });
-const press = (page: Page, name: string) => page.getByRole('button', { name, exact: true }).click();
+export const exact = (page: Page, label: string) => page.getByLabel(label, { exact: true });
+export const press = (page: Page, name: string) => page.getByRole('button', { name, exact: true }).click();
 
 /** Clicks a control that may sit under the sticky header or below the first screen of a grid. */
-async function clickShown(page: Page, name: string) {
+export async function clickShown(page: Page, name: string) {
   const button = page.getByRole('button', { name }).first();
   await button.scrollIntoViewIfNeeded();
   await button.click();
 }
-const dialogOf = (page: Page) => page.getByRole('dialog');
+export const dialogOf = (page: Page) => page.getByRole('dialog');
 
 /** The seeded subscriptions the browse and purge captures open: a group on a topic is addressed by its whole id. */
 const subscription = (group: string, topic: string) => encodeURIComponent(`kafka.group-topic/${group}/${topic}`);
@@ -68,10 +68,10 @@ export const ESTATE_UNREACHABLE_SCENES: Scene[] = [
 const LONG_GROUP = `qa.${Array.from({ length: 8 }, (_, i) => `consumer-group-segment-${String(i + 1).padStart(2, '0')}.`).join('')}terminal`;
 
 /** Waits for what a stub or an action changed to show. */
-const settle = (page: Page) => page.waitForTimeout(500);
+export const settle = (page: Page) => page.waitForTimeout(500);
 
 /** Answers GETs of a path with a body, then reloads so the page asks again. */
-async function stubGet(page: Page, path: RegExp, body: unknown) {
+export async function stubGet(page: Page, path: RegExp, body: unknown) {
   await page.route(
     (url) => path.test(url.pathname),
     (route) =>
@@ -84,9 +84,9 @@ async function stubGet(page: Page, path: RegExp, body: unknown) {
 }
 
 /** Answers a method on a path with a status and a body, on the real page; the rest of its calls are untouched. */
-async function stubCall(
+export async function stubCall(
   page: Page,
-  method: 'GET' | 'POST',
+  method: 'GET' | 'POST' | 'PUT' | 'DELETE',
   path: RegExp,
   status: number,
   json: unknown,
@@ -107,11 +107,11 @@ async function stubCall(
   );
 }
 
-const isDryRun = (url: URL) => url.searchParams.get('dryRun') === 'true';
-const isRun = (url: URL) => !isDryRun(url);
+export const isDryRun = (url: URL) => url.searchParams.get('dryRun') === 'true';
+export const isRun = (url: URL) => !isDryRun(url);
 
 /** What the server says of an operation it held for approval: a 202 whose header names the request. */
-const held = (summary: string) => ({
+export const held = (summary: string) => ({
   status: 202,
   headers: { 'X-Rahdar-Held-Operation': '00000000-0000-0000-0000-00000000a11d' },
   json: {
@@ -125,7 +125,7 @@ const held = (summary: string) => ({
 });
 
 /** Presses and holds the confirmation until it fills, as a person does. */
-async function holdConfirm(page: Page, name: string) {
+export async function holdConfirm(page: Page, name: string) {
   const button = dialogOf(page).getByRole('button', { name });
   await button.hover();
   await page.mouse.down();
@@ -332,7 +332,7 @@ export const REGISTRATION_ROUTES: RouteSpec[] = [
     data: [{ path: '/systems', empty: { data: [], page: 1, pageSize: 50, count: 0, hasNext: false } }],
   },
   { area: 'onboarding', id: 'register-kafka', path: '/clusters/new?system=kafka', scenes: REGISTER_KAFKA_SCENES },
-  { area: 'onboarding', id: 'register-unknown-system', path: '/clusters/new?system=rabbitmq' },
+  { area: 'onboarding', id: 'register-unknown-system', path: '/clusters/new?system=no-such-system' },
 ];
 
 // ── Kafka screens ─────────────────────────────────────────────────────────────────────────────────────────────────

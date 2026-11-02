@@ -24,6 +24,7 @@ import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
 import io.github.sudoitir.rahdar.platform.broker.BrokerFailures;
 import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
+import io.github.sudoitir.rahdar.platform.clusters.ClusterKinds;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -68,6 +69,7 @@ public class PagedListService {
     private final PermissionResolver permissions;
     private final TeamIndex teams;
     private final BrokerGateway gateway;
+    private final ClusterKinds kinds;
 
     public PagedView<DestinationView> destinations(UUID clusterId, ResourceQuery query) {
         clusterAccess.requireVisible(clusterId);
@@ -140,6 +142,11 @@ public class PagedListService {
 
     /** A producer is seen through its destination. */
     private List<ProducerView> readableProducers(UUID clusterId) {
+        // A system with no producers (RabbitMQ) has none to see, which is not an error for a caller that lists
+        // channels.
+        if (!offers(gateway.cluster(clusterId), ResourceClass.PRODUCER)) {
+            return List.of();
+        }
         ResourceFilter readable = permissions.filter(clusterId, ResourceType.DESTINATION);
         return gather(clusterId, ResourceClass.PRODUCER, mapper::producer).stream()
                 .filter(p -> readable.readable(p.destinationName()))
@@ -219,7 +226,7 @@ public class PagedListService {
             // A system whose brokers have no management URL is read as one cluster, by the first of its stored
             // nodes; a system whose nodes have one and none answers is unreachable.
             List<ClusterNode> stored = nodes.nodes(clusterId);
-            if (stored.isEmpty() || stored.stream().anyMatch(n -> n.getManagementUrl() != null)) {
+            if (!kinds.readAsOne(clusterId)) {
                 throw new BrokerConnectionException(
                         BrokerConnectionException.Kind.UNREACHABLE,
                         "This cluster has no reachable node with a management URL.");
@@ -309,10 +316,13 @@ public class PagedListService {
         }
     }
 
+    private static boolean offers(ClusterConnection connection, ResourceClass kind) {
+        return connection.resources().kinds().stream().anyMatch(k -> k.resourceClass() == kind);
+    }
+
     /** A system that has no kind of this class says so, as a conflict with its reason, never as an unreachable node. */
     private static void requireKind(ClusterConnection connection, ResourceClass kind) {
-        boolean offered = connection.resources().kinds().stream().anyMatch(k -> k.resourceClass() == kind);
-        if (!offered) {
+        if (!offers(connection, kind)) {
             throw new ConflictException(
                     "unavailable-on-system",
                     "This cluster's system has no " + kind.name().toLowerCase(Locale.ROOT) + " resources to list.");

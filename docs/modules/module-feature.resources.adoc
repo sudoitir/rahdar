@@ -46,6 +46,8 @@ _Others_
 * `i.g.s.r.k.g.OperationGate` (in Approval gate contract)
 * `i.g.s.r.p.b.BrokerMessages` (in Broker connectivity)
 * `i.g.s.r.p.b.QueueCounters` (in Broker connectivity)
+* `i.g.s.r.p.b.WholeClusterOperations` (in Broker connectivity)
+* `i.g.s.r.k.s.SettingsService` (in Settings)
 * `i.g.s.r.p.m.McpResources` (in MCP server)
 * `i.g.s.r.p.m.McpProperties` (in MCP server)
 |===

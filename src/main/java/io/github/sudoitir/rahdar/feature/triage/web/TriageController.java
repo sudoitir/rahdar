@@ -8,7 +8,6 @@ import io.github.sudoitir.rahdar.kernel.core.PagedView;
 import io.github.sudoitir.rahdar.kernel.core.ResourceQuery;
 import io.github.sudoitir.rahdar.kernel.security.ResourceIdTexts;
 import io.github.sudoitir.rahdar.kernel.security.ResourceIdTexts.Of;
-import io.github.sudoitir.rahdar.platform.broker.ResourceIds;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -45,7 +44,7 @@ public class TriageController {
         Of idTexts = ids.of(clusterId);
         if (subscription != null && !subscription.isBlank()) {
             ConsumerHealthView one = consumerHealth
-                    .forSubscription(clusterId, ResourceIds.nameOf(subscription.trim()))
+                    .forSubscription(clusterId, subscription.trim())
                     .map(h -> ConsumerHealthView.of(idTexts, h))
                     .orElseThrow(() -> new NotFoundException("subscription", subscription));
             return new PagedView<>(List.of(one), 1, 1, 1L, false);

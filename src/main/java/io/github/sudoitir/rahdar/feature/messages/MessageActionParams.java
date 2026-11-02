@@ -33,8 +33,11 @@ sealed interface MessageActionParams {
             UUID clusterId, String queue, UUID nodeId, MessageActionRequest request, boolean override)
             implements MessageActionParams {}
 
-    /** A purge removes every message, so it carries no selection. */
-    record QueuePurgeParams(UUID clusterId, String queue, UUID nodeId, boolean override) {}
+    /**
+     * A purge removes every message, so it carries no selection. {@code id} is the subscription's canonical id on a
+     * cluster read as one, which is purged as a whole with no node, or {@code null} on a per-node system.
+     */
+    record QueuePurgeParams(UUID clusterId, String queue, String id, UUID nodeId, boolean override) {}
 
     /** What the gate holds of a purge of a log's subscription: the subscription's canonical id. */
     record LogPurgeParams(UUID clusterId, String subscription) {}

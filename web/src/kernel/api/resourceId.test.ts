@@ -25,5 +25,7 @@ describe('subscription references', () => {
   it('are written for people without the kind', () => {
     expect(subscriptionRefWords('kafka.group-topic/billing/orders')).toBe('billing/orders');
     expect(subscriptionRefWords('orders')).toBe('orders');
+    expect(subscriptionRefWords('rabbitmq.classic-queue/%2F/orders.eu')).toBe('/ · orders.eu');
+    expect(subscriptionRefWords('rabbitmq.quorum-queue/payments/settle')).toBe('payments/settle');
   });
 });

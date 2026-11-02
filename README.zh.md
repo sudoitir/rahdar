@@ -6,7 +6,7 @@
 
 <sub><em>Rahdar</em>（波斯语 راهدار，意为“守路人”）= <em>rah</em>（路）+ <em>dar</em>（守护者）：守护消息走过的每一条路，让它畅通而安全。</sub>
 
-**一个开源控制台，管好你的 Apache ActiveMQ® Artemis 与 Apache Kafka® 集群。**
+**一个开源控制台，管好你的 Apache ActiveMQ® Artemis、Apache Kafka® 与 RabbitMQ 集群。**
 
 你运行的每一个集群都在同一个资产视图中，延迟如实标为估算值，破坏性操作先预览，审批闸门对人和助手一视同仁。
 
@@ -29,6 +29,7 @@
 [文档](https://rahdar.dev/zh/guide/) ·
 [快速开始](#快速开始) ·
 [Kafka](https://rahdar.dev/guide/kafka) ·
+[RabbitMQ](https://rahdar.dev/guide/rabbitmq) ·
 [Flow](https://rahdar.dev/guide/flow) ·
 [SQL Console](https://rahdar.dev/zh/guide/sql-console) ·
 [MCP](https://rahdar.dev/zh/guide/mcp) ·
@@ -109,8 +110,8 @@ Rahdar 通过 [OpenBroker](https://github.com/sudoitir/openbroker) 与 Broker �
 | 系统 | 支持版本 | 指南 |
 | --- | --- | --- |
 | Apache ActiveMQ® Artemis | 2.33.0 及以上 | [指南](https://rahdar.dev/zh/guide/) |
-| Apache Kafka® | 3.0 及以上，KRaft 与 ZooKeeper 模式 | [Kafka](https://rahdar.dev/guide/kafka) |
-| RabbitMQ | 即将推出；目前尚不支持 | |
+| Apache Kafka® | 2.8 及以上，KRaft 与 ZooKeeper 模式 | [Kafka](https://rahdar.dev/guide/kafka) |
+| RabbitMQ | 3.13 及以上（已测试 4.x） | [RabbitMQ](https://rahdar.dev/guide/rabbitmq) |
 
 详情，以及超出这些范围时会发生什么：[支持的 Broker 版本](https://rahdar.dev/guide/supported-versions)。
 
@@ -123,6 +124,14 @@ Rahdar 通过 [OpenBroker](https://github.com/sudoitir/openbroker) 与 Broker �
 - **[事务](https://rahdar.dev/guide/kafka#transactions)**——会拖住 read-committed 消费者的挂起事务会被标出，中止它之前先预览、按住确认并写入审计。
 - **[Broker 与仲裁](https://rahdar.dev/guide/kafka#brokers-and-the-quorum)**——每个 Broker，Rahdar 是否通过其宣告的地址连上了它，以及 KRaft controller 仲裁。
 - **在共用界面上**——按分区与偏移量或时间浏览 topic，无需加入消费者组；清空消费者组未读的记录，或截断 topic，并说明影响范围，包括每个会丢失未读记录的消费者组。
+
+### RabbitMQ
+
+- **[注册集群](https://rahdar.dev/guide/rabbitmq#register-a-cluster)**——管理 URL 与可选的 AMQP 端点，共用一个账号；检查会逐个端点单独连接，并点名每个节点、其告警和任何网络分区。
+- **[节点](https://rahdar.dev/guide/rabbitmq#nodes)**——版本、运行时长、监听器和插件；内存或磁盘告警会被标出，因为它会阻塞集群中所有的发布者。
+- **[虚拟主机、绑定、策略与权限](https://rahdar.dev/guide/rabbitmq#virtual-hosts)**——每项变更先预览，破坏性变更按住确认，审批闸门开启时需等待批准，并写入审计。策略的预览会列出它匹配的队列与交换机。
+- **[Shovel 与 Federation](https://rahdar.dev/guide/rabbitmq#shovels-and-federation)**——动态 shovel 与 federation 链路及其状态，地址中不含凭据。
+- **在共用页面上**——classic、quorum 与 stream 队列，积压标为估算值（stream 没有积压）；按偏移量浏览 stream 而不移除任何消息；通过交换机发布消息，并在没有队列收到时如实告知。以相同配置重建的资源无法与原资源区分，确认时会说明这一点。
 
 ### Apache Artemis
 
@@ -157,7 +166,7 @@ Rahdar 通过 [OpenBroker](https://github.com/sudoitir/openbroker) 与 Broker �
 - **状态只问 Broker，不看配置。** Artemis 的 HA 角色从每个节点轮询得到，Kafka 集群的健康状况则由它的 Broker 和仲裁形成。
 - **能力限制坦诚相告。** 某项功能不可用时会明确说明，并给出启用它所需的确切 `broker.xml` 配置。绝不让功能悄无声息地消失。
 
-Java 25 · Spring Boot 4.1 · PostgreSQL + Liquibase · React 19 + Vite + Mantine 9 · TanStack Router/Query/Table · React Flow · [OpenBroker](https://github.com/sudoitir/openbroker) SDK 及其 Artemis 与 Kafka 驱动 · SSE · 单一容器镜像。详见[架构说明](https://rahdar.dev/reference/architecture)和[全部架构决策记录](https://rahdar.dev/reference/adr/)。
+Java 25 · Spring Boot 4.1 · PostgreSQL + Liquibase · React 19 + Vite + Mantine 9 · TanStack Router/Query/Table · React Flow · [OpenBroker](https://github.com/sudoitir/openbroker) SDK 及其 Artemis、Kafka 与 RabbitMQ 驱动 · SSE · 单一容器镜像。详见[架构说明](https://rahdar.dev/reference/architecture)和[全部架构决策记录](https://rahdar.dev/reference/adr/)。
 
 ## 参与贡献
 

@@ -14,6 +14,7 @@ import io.github.sudoitir.rahdar.kernel.audit.web.AuditViews;
 import io.github.sudoitir.rahdar.kernel.core.NotFoundException;
 import io.github.sudoitir.rahdar.kernel.security.PermissionResolver;
 import io.github.sudoitir.rahdar.platform.broker.ClockOffsetService;
+import io.github.sudoitir.rahdar.platform.broker.ResourceIds;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterService;
 import io.github.sudoitir.rahdar.platform.clusters.RegisteredCluster;
@@ -92,7 +93,8 @@ public class TriageMcpTools {
                 id,
                 resources
                         .require(id, "subscription", subscription, ResourceClass.SUBSCRIPTION)
-                        .name()));
+                        .id()
+                        .format()));
     }
 
     private McpViews.ClusterHealth health(UUID clusterId) {
@@ -158,14 +160,15 @@ public class TriageMcpTools {
                 assessment.at());
     }
 
-    private McpViews.SubscriptionDiagnosis diagnose(UUID clusterId, String subscription) {
+    private McpViews.SubscriptionDiagnosis diagnose(UUID clusterId, String subscriptionId) {
         // The shared verdict (ADR-0089) — the same evaluation the console and the alert
         // condition read. This method used to derive its own trend from two points and its
         // own slow-consumer guess from a ratio, which is how an agent and a screen came to
         // describe one subscription differently.
         ConsumerHealth health = consumerHealth
-                .forSubscription(clusterId, subscription)
-                .orElseThrow(() -> new NotFoundException("subscription", subscription));
+                .forSubscription(clusterId, subscriptionId)
+                .orElseThrow(() -> new NotFoundException("subscription", subscriptionId));
+        String subscription = ResourceIds.nameOf(subscriptionId);
 
         List<String> findings = new ArrayList<>();
         if (health.nodesPresent() < health.nodesTotal()) {

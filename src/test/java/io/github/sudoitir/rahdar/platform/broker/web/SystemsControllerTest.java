@@ -1,5 +1,6 @@
 package io.github.sudoitir.rahdar.platform.broker.web;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -15,6 +16,7 @@ import io.github.sudoitir.rahdar.system.kafka.KafkaModule;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.web.servlet.MockMvc;
+import tools.jackson.databind.ObjectMapper;
 
 /** {@code GET /systems} lists the drivers on the class path, each with how its clusters are registered. */
 class SystemsControllerTest {
@@ -46,6 +48,11 @@ class SystemsControllerTest {
                 .perform(get("/systems"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.length()").value(1));
+    }
+
+    @Test
+    void aManagementApiEntryIsWrittenAsItsWireName() {
+        assertThat(new ObjectMapper().writeValueAsString(Entry.MANAGEMENT_API)).isEqualTo("\"management-api\"");
     }
 
     private static ConnectionOptions options(String system, Entry entry) {

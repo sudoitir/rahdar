@@ -43,6 +43,7 @@ function outcomeOf(item: BulkItemView, run: Run): LifecycleOutcomeView | null {
   return {
     dryRun: false,
     cap: run.cap,
+    identityBasis: 'INCARNATION',
     overCap: false,
     partial: landed && item.outcome.some((n) => n.status === 'FAILED'),
     totalAffected: item.affected ?? 0,

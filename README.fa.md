@@ -6,7 +6,7 @@
 
 <sub>«راهدار» از «راه» + «دار» (نگه‌دارنده) ساخته شده است: نگهبانی که همهٔ راه‌هایی را که پیام‌هایتان می‌پیمایند باز و امن نگه می‌دارد.</sub>
 
-**یک کنسول متن‌باز برای کلاسترهای Apache ActiveMQ® Artemis و Apache Kafka® شما.**
+**یک کنسول متن‌باز برای کلاسترهای Apache ActiveMQ® Artemis، Apache Kafka® و RabbitMQ شما.**
 
 هر کلاستری که اجرا می‌کنید در یک estate است، lag به‌عنوان همان تخمینی که هست نشان داده می‌شود، پیش از هر کار مخرب پیش‌نمایش می‌بینید، و دروازهٔ تأییدی که هم انسان‌ها و هم دستیارها را نگه می‌دارد.
 
@@ -29,6 +29,7 @@
 [مستندات](https://rahdar.dev/fa/guide/) ·
 [شروع سریع](#شروع-سریع) ·
 [Kafka](https://rahdar.dev/guide/kafka) ·
+[RabbitMQ](https://rahdar.dev/guide/rabbitmq) ·
 [Flow](https://rahdar.dev/guide/flow) ·
 [SQL Console](https://rahdar.dev/fa/guide/sql-console) ·
 [MCP](https://rahdar.dev/fa/guide/mcp) ·
@@ -124,8 +125,8 @@ Rahdar از طریق [OpenBroker](https://github.com/sudoitir/openbroker)، یک
 | سیستم | پشتیبانی‌شده | راهنما |
 | --- | --- | --- |
 | Apache ActiveMQ® Artemis | نسخهٔ ۲٫۳۳٫۰ و بالاتر | [راهنما](https://rahdar.dev/fa/guide/) |
-| Apache Kafka® | نسخهٔ ۳٫۰ و بالاتر، در حالت KRaft و ZooKeeper | [Kafka](https://rahdar.dev/guide/kafka) |
-| RabbitMQ | به‌زودی؛ هنوز پشتیبانی نمی‌شود | |
+| Apache Kafka® | نسخهٔ ۲٫۸ و بالاتر، در حالت KRaft و ZooKeeper | [Kafka](https://rahdar.dev/guide/kafka) |
+| RabbitMQ | نسخهٔ ۳٫۱۳ و بالاتر (۴.x آزمایش شده) | [RabbitMQ](https://rahdar.dev/guide/rabbitmq) |
 
 <div dir="rtl" align="right">
 
@@ -140,6 +141,14 @@ Rahdar از طریق [OpenBroker](https://github.com/sudoitir/openbroker)، یک
 - **[تراکنش‌ها](https://rahdar.dev/guide/kafka#transactions)**: تراکنش معلقی که consumerهای read-committed را عقب نگه می‌دارد علامت می‌خورد، و abort کردنش پیش‌نمایش دارد، با نگه‌داشتن دکمه تأیید و ممیزی می‌شود.
 - **[بروکرها و quorum](https://rahdar.dev/guide/kafka#brokers-and-the-quorum)**: هر بروکر، اینکه Rahdar از آدرس advertise‌شده‌اش به آن رسیده یا نه، و quorum کنترلرهای KRaft.
 - **روی صفحه‌های مشترک**: یک topic را بر اساس partition و offset یا زمان مرور کنید، بدون پیوستن به group؛ رکوردهای نخوانده یک group را purge کنید یا یک topic را truncate کنید، با گفتن دامنهٔ اثر، از جمله هر groupی که رکوردهای نخوانده‌اش را از دست می‌دهد.
+
+### RabbitMQ
+
+- **[ثبت کلاستر](https://rahdar.dev/guide/rabbitmq#register-a-cluster)**: URLهای مدیریت و endpointهای AMQP اختیاری با یک حساب؛ بررسی به هر endpoint جداگانه می‌رسد و هر نود، alarmهایش و هر partition شبکه را نام می‌برد.
+- **[نودها](https://rahdar.dev/guide/rabbitmq#nodes)**: نسخه، مدت کارکرد، listenerها و pluginها؛ alarm حافظه یا دیسک علامت می‌خورد چون همهٔ publisherها را مسدود می‌کند.
+- **[Virtual hostها، bindingها، policyها و permissionها](https://rahdar.dev/guide/rabbitmq#virtual-hosts)**: هر تغییر ابتدا پیش‌نمایش می‌شود، تغییرهای مخرب با نگه‌داشتن دکمه تأیید می‌شوند، هرجا دروازهٔ تأیید روشن است نگه داشته می‌شوند و در audit ثبت می‌شوند. پیش‌نمایش یک policy صف‌ها و exchangeهایی را که با آن می‌خوانند فهرست می‌کند.
+- **[Shovel و federation](https://rahdar.dev/guide/rabbitmq#shovels-and-federation)**: shovelهای پویا و لینک‌های federation با وضعیتشان، با نشانی‌های بدون اعتبارنامه.
+- **روی صفحه‌های مشترک**: صف‌های classic، quorum و stream با backlog که تخمین علامت‌گذاری می‌شود (stream backlog ندارد)؛ مرور یک stream با offset بدون برداشتن هیچ پیامی؛ انتشار پیام از راه یک exchange و اعلام اینکه هیچ صفی آن را نگرفته است. منبعی که با همان پیکربندی دوباره ساخته شود از قبلی تشخیص داده نمی‌شود، و تأیید همین را می‌گوید.
 
 ### Apache Artemis
 
@@ -179,7 +188,7 @@ LIMIT 50
 - **وضعیت از بروکرها می‌آید، نه از پیکربندی.** نقش‌های HA در Artemis از تک‌تک نودها poll می‌شود، و سلامت یک کلاستر Kafka از بروکرها و quorumش ساخته می‌شود.
 - **صداقت دربارهٔ قابلیت‌ها.** اگر قابلیتی در دسترس نباشد، همین را می‌گوید و دقیقاً همان `broker.xml` لازم برای فعال‌کردنش را نشان می‌دهد. هیچ‌چیز بی‌صدا ناپدید نمی‌شود.
 
-Java 25 · Spring Boot 4.1 · PostgreSQL با Liquibase · React 19 + Vite + Mantine 9 · TanStack Router/Query/Table · React Flow · SDK [OpenBroker](https://github.com/sudoitir/openbroker) با درایورهای Artemis و Kafka · SSE · یک ایمیج کانتینر. [معماری](https://rahdar.dev/reference/architecture) و [همهٔ تصمیم‌های ثبت‌شده](https://rahdar.dev/reference/adr/) را بخوانید.
+Java 25 · Spring Boot 4.1 · PostgreSQL با Liquibase · React 19 + Vite + Mantine 9 · TanStack Router/Query/Table · React Flow · SDK [OpenBroker](https://github.com/sudoitir/openbroker) با درایورهای Artemis، Kafka و RabbitMQ · SSE · یک ایمیج کانتینر. [معماری](https://rahdar.dev/reference/architecture) و [همهٔ تصمیم‌های ثبت‌شده](https://rahdar.dev/reference/adr/) را بخوانید.
 
 ## مشارکت
 

@@ -24,11 +24,19 @@ public final class TriageViews {
     private TriageViews() {}
 
     public record ConsumerHealthView(
-            @Schema(requiredMode = REQUIRED, description = "The destination's id.")
+            @Schema(
+                    nullable = true,
+                    description = "The destination's id; absent for a system whose queues are fed through routes.")
             String destination,
 
-            @Schema(requiredMode = REQUIRED, description = "The subscription's id.")
+            @Schema(
+                    requiredMode = REQUIRED,
+                    description = "The subscription's own id: its kind and its whole path, such as a queue's virtual"
+                            + " host and name.")
             String subscription,
+
+            @Schema(requiredMode = REQUIRED, description = "The subscription's name, without its path.")
+            String name,
 
             @Schema(requiredMode = REQUIRED, description = "The id of the subscription's kind, such as artemis.queue.")
             String kind,
@@ -80,10 +88,11 @@ public final class TriageViews {
             @Schema(requiredMode = REQUIRED) int nodesTotal) {
 
         public static ConsumerHealthView of(Of ids, ConsumerHealth h) {
-            String subscription = ids.subscription(h.subscription());
+            String subscription = h.subscriptionId();
             return new ConsumerHealthView(
                     ids.destination(h.destination()),
                     subscription,
+                    h.subscription(),
                     ResourceIds.kindOf(subscription),
                     ids.kindLabel(subscription),
                     h.verdict().name(),

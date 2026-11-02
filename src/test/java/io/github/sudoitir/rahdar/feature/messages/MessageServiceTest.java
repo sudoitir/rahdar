@@ -18,6 +18,7 @@ import static org.mockito.Mockito.when;
 
 import io.github.sudoitir.openbroker.NodeId;
 import io.github.sudoitir.openbroker.messaging.BulkOutcome;
+import io.github.sudoitir.openbroker.messaging.Count;
 import io.github.sudoitir.openbroker.messaging.MessageAction.Delete;
 import io.github.sudoitir.openbroker.messaging.MessageAction.Move;
 import io.github.sudoitir.openbroker.messaging.MessageAction.Retry;
@@ -27,8 +28,14 @@ import io.github.sudoitir.openbroker.messaging.MessageRef;
 import io.github.sudoitir.openbroker.messaging.OutboundMessage;
 import io.github.sudoitir.openbroker.messaging.Position;
 import io.github.sudoitir.openbroker.model.PartitionId;
+import io.github.sudoitir.openbroker.model.ResourceClass;
 import io.github.sudoitir.openbroker.model.ResourceId;
 import io.github.sudoitir.openbroker.model.Shard;
+import io.github.sudoitir.openbroker.operation.Estimate;
+import io.github.sudoitir.openbroker.operation.EtagBasis;
+import io.github.sudoitir.openbroker.operation.OperationResult;
+import io.github.sudoitir.openbroker.operation.PreconditionEnforcement;
+import io.github.sudoitir.openbroker.operation.Preview;
 import io.github.sudoitir.rahdar.feature.messages.MessageActionParams.MessageDeleteParams;
 import io.github.sudoitir.rahdar.feature.messages.MessageActionParams.MessageExpireParams;
 import io.github.sudoitir.rahdar.feature.messages.MessageActionParams.MessageMoveParams;
@@ -58,18 +65,21 @@ import io.github.sudoitir.rahdar.platform.broker.Attempt;
 import io.github.sudoitir.rahdar.platform.broker.BodyDecoder.Compression;
 import io.github.sudoitir.rahdar.platform.broker.BodyEncoding;
 import io.github.sudoitir.rahdar.platform.broker.BrokerConnectionException;
+import io.github.sudoitir.rahdar.platform.broker.BrokerFailures;
 import io.github.sudoitir.rahdar.platform.broker.BrokerMessages;
 import io.github.sudoitir.rahdar.platform.broker.BrokerSettings;
 import io.github.sudoitir.rahdar.platform.broker.BrowsePage;
 import io.github.sudoitir.rahdar.platform.broker.BrowsedMessage;
 import io.github.sudoitir.rahdar.platform.broker.BulkCapExceededException;
 import io.github.sudoitir.rahdar.platform.broker.BulkResult;
+import io.github.sudoitir.rahdar.platform.broker.IdentityBasis;
 import io.github.sudoitir.rahdar.platform.broker.LogBounds;
 import io.github.sudoitir.rahdar.platform.broker.LogPage;
 import io.github.sudoitir.rahdar.platform.broker.MessageExpiry;
 import io.github.sudoitir.rahdar.platform.broker.MessageKind;
 import io.github.sudoitir.rahdar.platform.broker.SendInDoubtException;
 import io.github.sudoitir.rahdar.platform.broker.SystemExtensions;
+import io.github.sudoitir.rahdar.platform.broker.WholeClusterOperations;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterDirectory;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterNode;
 import io.github.sudoitir.rahdar.platform.governance.ClearViewAudit;
@@ -120,6 +130,7 @@ class MessageServiceTest {
     private final ClearViewAudit clearViews = mock(ClearViewAudit.class);
     private final OperationGate gate = mock(OperationGate.class);
     private final SystemExtensions extensions = mock(SystemExtensions.class);
+    private final WholeClusterOperations wholeCluster = mock(WholeClusterOperations.class);
     private final LogBounds logBounds = mock(LogBounds.class);
     private final AuditEvent event = mock(AuditEvent.class);
     private final ClusterNode nodeA = node(NODE_A, "node-a", "http://a/jolokia", "tcp://a", true);
@@ -145,7 +156,8 @@ class MessageServiceTest {
                 policy,
                 clearViews,
                 gate,
-                extensions);
+                extensions,
+                wholeCluster);
         when(locator.locate(CLUSTER, "target"))
                 .thenReturn(List.of(new QueueLocation(NODE_A, "target", "target", "ANYCAST", 1L)));
         when(locator.locate(CLUSTER, "t")).thenReturn(List.of(new QueueLocation(NODE_A, "t", "t", "ANYCAST", 1L)));
@@ -939,8 +951,8 @@ class MessageServiceTest {
         NotFoundException unknown = new NotFoundException("A queue or address named in the request does not exist.");
         when(access.unreadableAmongSeveral(CLUSTER)).thenReturn(unknown);
 
-        assertThatThrownBy(() -> service.execute(
-                        CLUSTER, "orders", null, MessageAction.MOVE, filter("f", "ghost"), false, false))
+        var filter2 = filter("f", "ghost");
+        assertThatThrownBy(() -> service.execute(CLUSTER, "orders", null, MessageAction.MOVE, filter2, false, false))
                 .isSameAs(unknown);
         verify(access, never()).requireAll(any(), any());
         verify(messages, never()).byFilter(any(), any(), anyString(), anyString(), any(), any());
@@ -1111,7 +1123,7 @@ class MessageServiceTest {
 
         service.purge(CLUSTER, "orders", null, false, false);
 
-        assertThat(gatedOperation().params()).isEqualTo(new QueuePurgeParams(CLUSTER, "orders", null, false));
+        assertThat(gatedOperation().params()).isEqualTo(new QueuePurgeParams(CLUSTER, "orders", null, null, false));
     }
 
     @Test
@@ -1207,6 +1219,147 @@ class MessageServiceTest {
 
     private static Position.AtOffsets at(long offset) {
         return new Position.AtOffsets(Map.of(Shard.partition(PartitionId.of("0")), offset));
+    }
+
+    // ---- a cluster read as one ------------------------------------------------------------------------
+
+    private static final ResourceId QUEUE = ResourceId.of("rabbitmq.quorum-queue", "orders");
+    private static final ResourceId STREAM = ResourceId.of("rabbitmq.stream", "orders");
+    private static final ResourceId EXCHANGE = ResourceId.of("rabbitmq.exchange", "orders");
+
+    private Preview purgePreview(long ready, EtagBasis basis) {
+        return new Preview(
+                List.of(),
+                Set.of(),
+                new Estimate(Count.estimate(ready), "message"),
+                "etag-1",
+                basis,
+                PreconditionEnforcement.ATOMIC);
+    }
+
+    @Test
+    void aWholeClusterPurgeDryRunCountsTheReadyMessagesAndSaysWhatItsEtagHolds() {
+        when(wholeCluster.preview(eq(CLUSTER), eq(QUEUE), any())).thenReturn(purgePreview(40, EtagBasis.CONFIGURATION));
+        when(wholeCluster.basis(any())).thenReturn(IdentityBasis.CONFIGURATION);
+
+        Attempt<Outcome> attempt = service.purge(CLUSTER, QUEUE, true, false);
+
+        assertThat(attempt)
+                .isInstanceOfSatisfying(
+                        Attempt.Ok.class,
+                        ok -> assertThat(ok.value())
+                                .isEqualTo(new Outcome.DryRun(40, 100, false, null, IdentityBasis.CONFIGURATION)));
+        verify(wholeCluster, never()).execute(any(), any(), any(), any());
+        verify(audit).succeed(event, 40);
+    }
+
+    @Test
+    void aWholeClusterPurgePassesTheGateWithTheIdAndRunsUnderThePreviewedEtag() {
+        when(wholeCluster.preview(eq(CLUSTER), eq(QUEUE), any())).thenReturn(purgePreview(40, EtagBasis.CONFIGURATION));
+        when(wholeCluster.execute(eq(CLUSTER), eq(QUEUE), any(), eq("etag-1")))
+                .thenReturn(OperationResult.affected(38));
+
+        Attempt<Outcome> attempt = service.purge(CLUSTER, QUEUE, false, false);
+
+        assertThat(gatedOperation().params())
+                .isEqualTo(new QueuePurgeParams(CLUSTER, "orders", QUEUE.format(), null, false));
+        assertThat(attempt)
+                .isInstanceOfSatisfying(
+                        Attempt.Ok.class, ok -> assertThat(ok.value()).isEqualTo(new Outcome.Affected(38, null)));
+        verify(audit).succeed(event, 38);
+    }
+
+    @Test
+    void aWholeClusterPurgeOverTheCapNeedsAnOverride() {
+        when(wholeCluster.preview(eq(CLUSTER), eq(QUEUE), any()))
+                .thenReturn(purgePreview(150, EtagBasis.CONFIGURATION));
+
+        assertThatThrownBy(() -> service.purge(CLUSTER, QUEUE, false, false))
+                .isInstanceOf(BulkCapExceededException.class);
+
+        verify(wholeCluster, never()).execute(any(), any(), any(), any());
+        verify(audit).fail(eq(event), anyString());
+    }
+
+    @Test
+    void aWholeClusterPurgeReachIsTheReadyMessagesAndTheEtagWithItsNote() {
+        when(wholeCluster.preview(eq(CLUSTER), eq(QUEUE), any())).thenReturn(purgePreview(40, EtagBasis.CONFIGURATION));
+        when(wholeCluster.basis(any())).thenReturn(IdentityBasis.CONFIGURATION);
+
+        MessageService.Reach reach = service.reachOfPurge(CLUSTER, QUEUE);
+
+        assertThat(reach.count()).isEqualTo(40);
+        assertThat(reach.identity()).isEqualTo("etag-1");
+        assertThat(reach.detail()).contains("does not tell a recreated resource apart");
+    }
+
+    @Test
+    void aSendToAQueueByIdGoesStraightToItAndAnExchangeTakesTheRoutingKey() {
+        SendMessageRequest keyed = new SendMessageRequest(MessageKind.TEXT, true, "{}", Map.of(), Map.of(), "eu");
+
+        service.sendById(CLUSTER, EXCHANGE, ResourceClass.DESTINATION, keyed, false);
+        service.sendById(CLUSTER, QUEUE, ResourceClass.SUBSCRIPTION, sendRequest(), false);
+
+        verify(messages).sendById(eq(CLUSTER), eq(EXCHANGE), eq(ResourceClass.DESTINATION), eq("eu"), any());
+        verify(messages).sendById(eq(CLUSTER), eq(QUEUE), eq(ResourceClass.SUBSCRIPTION), any(), any());
+    }
+
+    @Test
+    void aRoutingKeyOnAQueueIsRefusedBeforeAnythingIsSent() {
+        SendMessageRequest keyed = new SendMessageRequest(MessageKind.TEXT, true, "{}", Map.of(), Map.of(), "eu");
+
+        assertThatThrownBy(() -> service.sendById(CLUSTER, QUEUE, ResourceClass.SUBSCRIPTION, keyed, false))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("routing key");
+
+        verify(messages, never()).sendById(any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void anUnroutedSendIsAuditedAsFailedAndStaysAConflict() {
+        doThrow(BrokerFailures.notRouted("orders", "eu")).when(messages).sendById(any(), any(), any(), any(), any());
+
+        var sendMessageRequest = new SendMessageRequest(MessageKind.TEXT, true, "{}", Map.of(), Map.of(), "eu");
+        assertThatThrownBy(
+                        () -> service.sendById(CLUSTER, EXCHANGE, ResourceClass.DESTINATION, sendMessageRequest, false))
+                .isInstanceOf(ConflictException.class);
+
+        verify(audit).fail(eq(event), anyString());
+    }
+
+    @Test
+    void aDryRunSendByIdTouchesNoBroker() {
+        service.sendById(CLUSTER, QUEUE, ResourceClass.SUBSCRIPTION, sendRequest(), true);
+
+        verify(messages, never()).sendById(any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void aKindTheSystemCannotBrowseIsRefusedWithItsOwnReason() {
+        when(messages.unavailableBecause(CLUSTER, "messages.browse", QUEUE))
+                .thenReturn(java.util.Optional.of("A quorum queue cannot be read without taking its messages."));
+
+        assertThatThrownBy(() -> service.requireBrowsable(CLUSTER, QUEUE))
+                .isInstanceOfSatisfying(ConflictException.class, e -> {
+                    assertThat(e.slug()).isEqualTo("unavailable-on-kind");
+                    assertThat(e.getMessage()).isEqualTo("A quorum queue cannot be read without taking its messages.");
+                });
+    }
+
+    @Test
+    void aStreamIsReadAsOneLogThatNeverHidesAnythingAndSaysReadingRemovesNothing() {
+        when(extensions.require(CLUSTER, LogBounds.class)).thenReturn(logBounds);
+        when(logBounds.of(CLUSTER, STREAM, 0)).thenReturn(new LogBounds.Bounds(0, 10));
+        when(messages.browseLog(eq(CLUSTER), eq(STREAM), eq(0), any(), anyInt(), any()))
+                .thenReturn(new LogPage(List.of(record(3, false)), 4L));
+
+        MessagePageView page =
+                service.browseStream(CLUSTER, STREAM, 0, MessageService.LogStart.parse(null, null), null, 50);
+
+        assertThat(page.countUnavailable()).isEqualTo("A stream is read by offset; reading never removes a message.");
+        assertThat(page.log().uncommittedHidden()).isFalse();
+        assertThat(page.log().next()).isEqualTo(4L);
+        verify(access).requireResource(CLUSTER, ResourceRef.subscription("orders"), MessagePermissions.MESSAGE_READ);
     }
 
     @Test

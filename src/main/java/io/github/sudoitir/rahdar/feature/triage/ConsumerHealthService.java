@@ -1,6 +1,7 @@
 package io.github.sudoitir.rahdar.feature.triage;
 
 import io.github.sudoitir.openbroker.model.MetricKeys;
+import io.github.sudoitir.openbroker.model.ResourceId;
 import io.github.sudoitir.openbroker.notification.EventTypes;
 import io.github.sudoitir.rahdar.feature.events.BrokerEventService;
 import io.github.sudoitir.rahdar.feature.events.web.EventViews.BrokerEventView;
@@ -18,6 +19,7 @@ import io.github.sudoitir.rahdar.kernel.security.PermissionResolver;
 import io.github.sudoitir.rahdar.kernel.security.Permissions;
 import io.github.sudoitir.rahdar.kernel.security.ResourceFilter;
 import io.github.sudoitir.rahdar.kernel.security.ResourceRef;
+import io.github.sudoitir.rahdar.platform.broker.ResourceIds;
 import io.github.sudoitir.rahdar.platform.scrape.MetricSamples;
 import io.github.sudoitir.rahdar.platform.scrape.MetricSamples.SubjectRate;
 import io.github.sudoitir.rahdar.platform.scrape.SampleGate;
@@ -89,11 +91,15 @@ public class ConsumerHealthService {
         return query.paginate(matched, comparatorFor(query.sortField()));
     }
 
-    /** One queue's verdict, for the drawer panel and the {@code diagnose} tool. */
-    public Optional<ConsumerHealth> forSubscription(UUID clusterId, String queueName) {
-        clusterAccess.requireResource(clusterId, ResourceRef.subscription(queueName), Permissions.SUBSCRIPTION_READ);
+    /**
+     * One subscription's verdict, for the drawer panel and the {@code diagnose} tool, by its id: two queues of one
+     * name in different virtual hosts are two subscriptions.
+     */
+    public Optional<ConsumerHealth> forSubscription(UUID clusterId, String subscriptionId) {
+        clusterAccess.requireResource(
+                clusterId, ResourceRef.subscription(ResourceIds.nameOf(subscriptionId)), Permissions.SUBSCRIPTION_READ);
         return evaluated(clusterId).stream()
-                .filter(h -> h.subscription().equals(queueName))
+                .filter(h -> h.subscriptionId().equals(subscriptionId))
                 .findFirst();
     }
 
@@ -137,7 +143,8 @@ public class ConsumerHealthService {
             Map<String, Double> slopes,
             Map<String, BrokerEventView> brokerSlow) {
 
-        Builder b = new Builder(row, addRates.get(row.name()), ackRates.get(row.name()), slopes.get(row.name()));
+        String subject = subjectOf(row);
+        Builder b = new Builder(row, addRates.get(subject), ackRates.get(subject), slopes.get(subject));
 
         // An unknown backlog is not an empty one: nothing below can say "caught up" about a figure it does not have.
         if (row.backlog().accuracy() == Backlog.Accuracy.UNAVAILABLE) {
@@ -157,6 +164,17 @@ public class ConsumerHealthService {
             verdict = notAcknowledging(b, backlog, acking);
         }
         return verdict != null ? verdict : trend(b, backlog);
+    }
+
+    /**
+     * The key the scrape sampled this subscription under: its path when the id has several segments (a queue in a
+     * virtual host), else its name.
+     */
+    private static String subjectOf(SubscriptionView row) {
+        ResourceId id = ResourceId.parse(row.id());
+        return id.path().segments().size() > 1
+                ? row.id().substring(id.kind().value().length() + 1)
+                : row.name();
     }
 
     /** Rungs 1-4 of the ladder: no rate to reason from, paused, nobody attached, or the broker's own word. */
@@ -389,6 +407,7 @@ public class ConsumerHealthService {
             return new ConsumerHealth(
                     row.destinationName(),
                     row.name(),
+                    row.id(),
                     verdict,
                     cause,
                     verdict == Verdict.BROKER_SLOW ? Source.BROKER : Source.DERIVED,

@@ -47,6 +47,9 @@ public record QueueRow(
 
     public static final String BACKLOG_REASON = "rahdar.backlog_reason";
 
+    /** Why an estimate is one when the system names no condition: its counters are sampled. */
+    static final String SAMPLED = "The system's counters are sampled, so this is an estimate.";
+
     /** Whether the subscription has a per-partition breakdown of its backlog to read. */
     public static final String BACKLOG_BREAKDOWN = "rahdar.backlog_breakdown";
 
@@ -73,7 +76,8 @@ public record QueueRow(
                 queue.conditions().stream()
                         .filter(c -> c.type().endsWith(".backlog_estimate") && c.status() == ConditionStatus.TRUE)
                         .findFirst()
-                        .ifPresent(c -> extra.put(BACKLOG_REASON, c.message()));
+                        .ifPresentOrElse(
+                                c -> extra.put(BACKLOG_REASON, c.message()), () -> extra.put(BACKLOG_REASON, SAMPLED));
             }
             if (!backlog.breakdown().isEmpty()) {
                 extra.put(BACKLOG_BREAKDOWN, "true");
@@ -100,6 +104,31 @@ public record QueueRow(
 
     private static long metric(Attributes a, AttributeKey<MetricValue> key) {
         return a.get(key).map(MetricValue::asLong).orElse(0L);
+    }
+
+    /** The same row with no backlog, and the reason there is none: the count is null, never zero. */
+    public QueueRow withoutBacklog(String reason) {
+        Map<String, String> kept = new LinkedHashMap<>(attributes);
+        kept.remove(BACKLOG_PRECISION);
+        kept.remove(BACKLOG_BREAKDOWN);
+        kept.put(BACKLOG_REASON, reason);
+        return new QueueRow(
+                clusterId,
+                nodeId,
+                address,
+                queueName,
+                routingType,
+                durable,
+                null,
+                consumerCount,
+                deliveringCount,
+                scheduledCount,
+                messagesAdded,
+                messagesAcked,
+                messagesExpired,
+                paused,
+                kind,
+                kept);
     }
 
     /** False when the system gave no backlog: {@link #messageCount} is then null, never zero. */

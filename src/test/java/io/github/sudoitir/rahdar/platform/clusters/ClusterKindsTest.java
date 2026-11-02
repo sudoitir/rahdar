@@ -17,6 +17,7 @@ import io.github.sudoitir.rahdar.kernel.security.ResourceIdTexts;
 import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
 import io.github.sudoitir.rahdar.platform.broker.BrokerSystems;
 import io.github.sudoitir.rahdar.platform.broker.SystemExtensions;
+import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.KindView;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -30,7 +31,8 @@ class ClusterKindsTest {
 
     private final BrokerGateway gateway = mock(BrokerGateway.class);
     private final SystemExtensions extensions = mock(SystemExtensions.class);
-    private final ClusterKinds kinds = new ClusterKinds(mock(BrokerSystems.class), gateway, extensions);
+    private final ClusterDirectory directory = mock(ClusterDirectory.class);
+    private final ClusterKinds kinds = new ClusterKinds(mock(BrokerSystems.class), gateway, extensions, directory);
 
     private static Kind kind(String id, ResourceClass resourceClass, KindLabel label) {
         return new Kind(
@@ -58,7 +60,7 @@ class ClusterKindsTest {
                 kind("kafka.group", ResourceClass.SUBSCRIPTION, KindLabel.of("Consumer group", "Consumer groups")));
 
         assertThat(kinds.kindsOf(CLUSTER))
-                .extracting(k -> k.label())
+                .extracting(KindView::label)
                 .containsExactly(new KindName("Topic", "Topics"), new KindName("Consumer group", "Consumer groups"));
     }
 
@@ -70,5 +72,36 @@ class ClusterKindsTest {
 
         assertThat(ids.kindLabel("kafka.group/billing")).isEqualTo(new KindName("Consumer group", "Consumer groups"));
         assertThat(ids.kindLabel(null)).isNull();
+    }
+
+    private static ClusterNode node(String managementUrl) {
+        ClusterNode node = mock(ClusterNode.class);
+        when(node.getManagementUrl()).thenReturn(managementUrl);
+        return node;
+    }
+
+    @Test
+    void aClusterWhoseNodesHaveNoManagementUrlIsReadAsOne() {
+        ClusterNode first = node(null);
+        ClusterNode second = node(null);
+        when(directory.nodes(CLUSTER)).thenReturn(List.of(first, second));
+
+        assertThat(kinds.readAsOne(CLUSTER)).isTrue();
+    }
+
+    @Test
+    void aClusterWithAManagementUrlOnANodeIsNot() {
+        ClusterNode plain = node(null);
+        ClusterNode managed = node("http://a:8161/console/jolokia");
+        when(directory.nodes(CLUSTER)).thenReturn(List.of(plain, managed));
+
+        assertThat(kinds.readAsOne(CLUSTER)).isFalse();
+    }
+
+    @Test
+    void aClusterWithNoStoredNodeIsNot() {
+        when(directory.nodes(CLUSTER)).thenReturn(List.of());
+
+        assertThat(kinds.readAsOne(CLUSTER)).isFalse();
     }
 }

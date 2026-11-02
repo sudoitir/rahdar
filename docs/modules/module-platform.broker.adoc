@@ -37,6 +37,7 @@ _Others_
 * `i.g.s.r.p.b.NodeCallLimiter`
 * `i.g.s.r.p.b.RahdarCallInterceptor`
 * `i.g.s.r.p.b.SystemExtensions`
+* `i.g.s.r.p.b.WholeClusterOperations`
 |Bean references
 |* `i.g.s.r.k.r.ReplicaRegistry` (in Replicas)
 * `i.g.s.r.k.j.JobStatuses` (in Scheduled jobs)

@@ -227,10 +227,6 @@ public class BrokerGateway implements DisposableBean {
      * the one the connection is held against, because a reconfiguration replaces the connection's spec outright: a
      * bare node list kept for comparison would make the guard disagree on every call and drop the options.
      */
-    private ConnectionOptions optionsFor(UUID clusterId) {
-        return optionsFor(directory.system(clusterId));
-    }
-
     private ConnectionOptions optionsFor(String system) {
         return connections.stream()
                 .filter(c -> c.system().equals(system))
