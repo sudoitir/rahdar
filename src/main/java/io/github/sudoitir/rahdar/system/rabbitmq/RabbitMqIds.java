@@ -24,6 +24,8 @@ final class RabbitMqIds {
     static final String PERMISSION = "rabbitmq.permission";
     static final String TOPIC_PERMISSION = "rabbitmq.topic-permission";
     static final String USER = "rabbitmq.user";
+    static final String CONNECTION = "rabbitmq.connection";
+    static final String CONSUMER = "rabbitmq.consumer";
 
     static final String ARGUMENT_PREFIX = "rabbitmq.argument.";
     static final String DEFINITION_PREFIX = "rabbitmq.definition.";

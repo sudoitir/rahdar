@@ -80,8 +80,33 @@ class ClientSamplerTest {
                 });
         when(ownership.owns(clusterId)).thenReturn(true);
         when(extensions.require(any(), eq(FlowSampler.class))).thenReturn(flowSampler);
+        when(flowSampler.memberCounters()).thenReturn(true);
         sampler = new ClientSampler(
                 store, directory, connections, lock, ownership, settings, hub, meters, clock, extensions);
+    }
+
+    @Test
+    void aSystemThatAnswersForTheWholeClusterIsSampledOnceThroughItsFirstNodeWithoutRates() {
+        UUID first = UUID.randomUUID();
+        UUID second = UUID.randomUUID();
+        serving(node(first, "a", null, null, null), node(second, "b", null, null, null));
+        when(extensions.forCluster(eq(clusterId), eq(FlowSampler.class)))
+                .thenReturn(java.util.Optional.of(flowSampler));
+        when(flowSampler.clusterWide()).thenReturn(true);
+        when(flowSampler.memberCounters()).thenReturn(false);
+        when(flowSampler.sample(eq(clusterId), any(UUID.class), anyInt())).thenAnswer(inv -> stable());
+
+        sampler.sweep(clusterId);
+        clock.advance(Duration.ofSeconds(10));
+        sampler.sweep(clusterId);
+
+        verify(flowSampler, times(2)).sample(eq(clusterId), eq(first), anyInt());
+        verify(flowSampler, never()).sample(eq(clusterId), eq(second), anyInt());
+        ArgumentCaptor<List<Edge>> edges = ArgumentCaptor.captor();
+        verify(store, times(2)).persistNode(any(NodeSample.class), edges.capture(), any());
+        assertThat(edges.getAllValues().get(1))
+                .isNotEmpty()
+                .allSatisfy(e -> assertThat(e.rate()).isNull());
     }
 
     // ---- fixtures ------------------------------------------------------

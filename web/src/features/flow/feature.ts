@@ -17,7 +17,7 @@ import {
 const flowRoute = createRoute({
   getParentRoute: () => clusterRoute,
   path: 'flow',
-  component: lazyFeatureView('flow', () => import('./FlowView.tsx'), 'FlowView', 'artemis'),
+  component: lazyFeatureView('flow', () => import('./FlowView.tsx'), 'FlowView'),
   validateSearch: validateFlowSearch,
 });
 
@@ -33,24 +33,19 @@ export const flowFeature = defineFeature({
       label: 'Flow',
       icon: IconChartSankey,
       path: 'flow',
-      system: 'artemis',
       hotkey: 'f',
       permission: 'cluster:read',
     },
   ],
   slots: {
-    'subscription.actions': [
-      { id: 'flow.subscription', system: 'artemis', order: 40, section: 'open', Component: SubscriptionInFlow },
-    ],
-    'destination.actions': [
-      { id: 'flow.destination', system: 'artemis', order: 40, section: 'open', Component: DestinationInFlow },
-    ],
+    'subscription.actions': [{ id: 'flow.subscription', order: 40, section: 'open', Component: SubscriptionInFlow }],
+    'destination.actions': [{ id: 'flow.destination', order: 40, section: 'open', Component: DestinationInFlow }],
     'connection.actions': [
       { id: 'flow.connection', system: 'artemis', order: 40, section: 'open', Component: ConnectionInFlow },
     ],
     'route.actions': [{ id: 'flow.route', system: 'artemis', order: 40, section: 'open', Component: RouteInFlow }],
     'client.actions': [
-      { id: 'flow.client.focus', system: 'artemis', order: 10, section: 'open', Component: FocusClient },
+      { id: 'flow.client.focus', order: 10, section: 'open', Component: FocusClient },
       { id: 'flow.client.connections', system: 'artemis', order: 20, section: 'open', Component: ClientConnections },
     ],
   },

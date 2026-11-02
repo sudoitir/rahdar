@@ -38,11 +38,33 @@ class ArtemisFlowSampler implements FlowSampler {
 
     private static final String ADDRESS = "address";
 
+    /** The management access that lets Rahdar's broker user list producers and consumers. */
+    static final String LIST_ACCESS_SNIPPET = """
+            <!-- etc/management.xml: allow the role Rahdar connects with to call list operations -->
+            <authorisation>
+               <role-access>
+                  <match domain="org.apache.activemq.artemis">
+                     <access method="list*" roles="amq"/>
+                     <access method="get*" roles="amq"/>
+                  </match>
+               </role-access>
+            </authorisation>""";
+
     private final ArtemisNodes nodes;
 
     @Override
     public String system() {
         return ArtemisModule.SYSTEM;
+    }
+
+    @Override
+    public String accessSnippet() {
+        return LIST_ACCESS_SNIPPET;
+    }
+
+    @Override
+    public boolean wildcardAddresses() {
+        return true;
     }
 
     @Override
