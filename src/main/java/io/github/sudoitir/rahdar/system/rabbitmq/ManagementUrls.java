@@ -26,7 +26,6 @@ final class ManagementUrls {
     static final int HTTPS_PORT = 15671;
 
     private static final Pattern SEPARATORS = Pattern.compile("[,\\s]+");
-    private static final Pattern TRAILING_SLASHES = Pattern.compile("/+$");
 
     private ManagementUrls() {}
 
@@ -85,12 +84,25 @@ final class ManagementUrls {
         if (uri.getRawQuery() != null || uri.getRawFragment() != null) {
             throw new IllegalArgumentException("'" + token + "' must not carry a query or a fragment.");
         }
-        int port = uri.getPort() < 0 ? (HTTPS.equals(scheme) ? HTTPS_PORT : HTTP_PORT) : uri.getPort();
+        int port = uri.getPort() < 0 ? defaultPort(scheme) : uri.getPort();
         if (port < 1 || port > 65535) {
             throw invalid(token);
         }
-        String path = TRAILING_SLASHES.matcher(uri.getRawPath()).replaceAll("");
+        String path = withoutTrailingSlashes(uri.getRawPath());
         return scheme + "://" + uri.getHost().toLowerCase(Locale.ROOT) + ":" + port + path;
+    }
+
+    /** The path without the slashes at its end, found by a scan so a long run of them costs only its length. */
+    private static String withoutTrailingSlashes(String path) {
+        int end = path.length();
+        while (end > 0 && path.charAt(end - 1) == '/') {
+            end--;
+        }
+        return path.substring(0, end);
+    }
+
+    private static int defaultPort(String scheme) {
+        return HTTPS.equals(scheme) ? HTTPS_PORT : HTTP_PORT;
     }
 
     /** The token without what stands before an {@code @}, so a mistaken password never reaches a message. */

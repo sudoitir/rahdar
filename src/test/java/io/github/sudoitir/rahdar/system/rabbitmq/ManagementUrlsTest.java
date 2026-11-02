@@ -2,9 +2,11 @@ package io.github.sudoitir.rahdar.system.rabbitmq;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 
 import io.github.sudoitir.openbroker.Endpoint;
 import io.github.sudoitir.openbroker.Plane;
+import java.time.Duration;
 import java.util.List;
 import java.util.stream.IntStream;
 import org.junit.jupiter.api.Test;
@@ -25,6 +27,18 @@ class ManagementUrlsTest {
     }
 
     @Test
+    void aLongRunOfSlashesCostsOnlyItsLength() {
+        String slashes = "/".repeat(200_000);
+        List<String> stripped = List.of("http://r1:15672" + slashes);
+        List<String> kept = List.of("http://r1:15672" + slashes + "x");
+
+        assertTimeoutPreemptively(Duration.ofSeconds(5), () -> {
+            assertThat(ManagementUrls.parse(stripped)).containsExactly("http://r1:15672");
+            assertThat(ManagementUrls.parse(kept).getFirst()).hasSize("http://r1:15672".length() + 200_001);
+        });
+    }
+
+    @Test
     void anAddressIsTheEndpointOfTheManagementPlane() {
         assertThat(ManagementUrls.endpoint("https://r2:15671"))
                 .isEqualTo(Endpoint.of(Plane.MANAGEMENT, "https", "https://r2:15671"));
@@ -33,27 +47,30 @@ class ManagementUrlsTest {
 
     @Test
     void anAccountInTheUrlIsRefusedWithoutEchoingIt() {
-        assertThatThrownBy(() -> ManagementUrls.parse(List.of("http://guest:secret@r1:15672")))
+        var values = List.of("http://guest:secret@r1:15672");
+        assertThatThrownBy(() -> ManagementUrls.parse(values))
                 .hasMessageContaining("must not carry an account")
                 .hasMessageNotContaining("secret");
     }
 
     @Test
     void aSchemeThatIsNotHttpOrAPortOutOfRangeIsRefused() {
-        assertThatThrownBy(() -> ManagementUrls.parse(List.of("amqp://r1")))
-                .hasMessageContaining("http(s)://host:port");
-        assertThatThrownBy(() -> ManagementUrls.parse(List.of("r1:15672"))).hasMessageContaining("http(s)://host:port");
-        assertThatThrownBy(() -> ManagementUrls.parse(List.of("http://r1:70000")))
-                .hasMessageContaining("port from 1 to 65535");
-        assertThatThrownBy(() -> ManagementUrls.parse(List.of("http://r1:15672/?a=b")))
-                .hasMessageContaining("query");
-        assertThatThrownBy(() -> ManagementUrls.parse(List.of("http://exa mple")))
-                .isInstanceOf(IllegalArgumentException.class);
+        var values = List.of("amqp://r1");
+        assertThatThrownBy(() -> ManagementUrls.parse(values)).hasMessageContaining("http(s)://host:port");
+        var values2 = List.of("r1:15672");
+        assertThatThrownBy(() -> ManagementUrls.parse(values2)).hasMessageContaining("http(s)://host:port");
+        var values3 = List.of("http://r1:70000");
+        assertThatThrownBy(() -> ManagementUrls.parse(values3)).hasMessageContaining("port from 1 to 65535");
+        var values4 = List.of("http://r1:15672/?a=b");
+        assertThatThrownBy(() -> ManagementUrls.parse(values4)).hasMessageContaining("query");
+        var values5 = List.of("http://exa mple");
+        assertThatThrownBy(() -> ManagementUrls.parse(values5)).isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
     void atLeastOneAndAtMostSixteenAreAllowed() {
-        assertThatThrownBy(() -> ManagementUrls.parse(List.of(" "))).hasMessageContaining("At least one");
+        var values = List.of(" ");
+        assertThatThrownBy(() -> ManagementUrls.parse(values)).hasMessageContaining("At least one");
         assertThatThrownBy(() -> ManagementUrls.parse(null)).hasMessageContaining("At least one");
         List<String> many =
                 IntStream.rangeClosed(1, 17).mapToObj(i -> "http://r" + i).toList();
@@ -77,13 +94,16 @@ class ManagementUrlsTest {
 
     @Test
     void anAmqpEndpointRefusesAnAccountAPathAndAWrongScheme() {
-        assertThatThrownBy(() -> AmqpEndpoints.parse(List.of("amqp://u:p@r1")))
+        var values = List.of("amqp://u:p@r1");
+        assertThatThrownBy(() -> AmqpEndpoints.parse(values))
                 .hasMessageContaining("must not carry an account")
                 .hasMessageNotContaining("u:p");
-        assertThatThrownBy(() -> AmqpEndpoints.parse(List.of("amqp://r1:5672/vhost")))
-                .hasMessageContaining("without a path");
-        assertThatThrownBy(() -> AmqpEndpoints.parse(List.of("http://r1"))).hasMessageContaining("amqp(s)://host:port");
-        assertThatThrownBy(() -> AmqpEndpoints.parse(List.of("amqp://r1:0"))).hasMessageContaining("port");
+        var values2 = List.of("amqp://r1:5672/vhost");
+        assertThatThrownBy(() -> AmqpEndpoints.parse(values2)).hasMessageContaining("without a path");
+        var values3 = List.of("http://r1");
+        assertThatThrownBy(() -> AmqpEndpoints.parse(values3)).hasMessageContaining("amqp(s)://host:port");
+        var values4 = List.of("amqp://r1:0");
+        assertThatThrownBy(() -> AmqpEndpoints.parse(values4)).hasMessageContaining("port");
         List<String> many =
                 IntStream.rangeClosed(1, 33).mapToObj(i -> "amqp://r" + i).toList();
         assertThatThrownBy(() -> AmqpEndpoints.parse(many)).hasMessageContaining("At most 32");

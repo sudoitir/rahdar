@@ -2,6 +2,7 @@ package io.github.sudoitir.rahdar.system.rabbitmq;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
@@ -41,6 +42,7 @@ import io.github.sudoitir.rahdar.platform.broker.BrokerVersion;
 import io.github.sudoitir.rahdar.platform.broker.ConnectionSettingsSource;
 import io.github.sudoitir.rahdar.platform.broker.CoreConnectionSettings;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterRegistrar.Checked;
+import io.github.sudoitir.rahdar.platform.clusters.ClusterRegistrar.DiscoveredNode;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterRegistrar.Resolved;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterRequests.RabbitMqCredentials;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterRequests.RegisterClusterRequest.RabbitMqConnection;
@@ -49,6 +51,7 @@ import io.github.sudoitir.rahdar.platform.clusters.web.ClusterRequests.UpdateClu
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.RabbitMqConnectionDetail;
 import io.github.sudoitir.rahdar.system.rabbitmq.internal.persistence.RabbitMqConnectionEntity;
 import io.github.sudoitir.rahdar.system.rabbitmq.internal.persistence.RabbitMqConnectionRepository;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -151,7 +154,7 @@ class RabbitMqRegistrarTest {
                         "MANAGEMENT http://r2:15672 OK",
                         "DATA amqp://r1:5672 OK",
                         "DATA amqp://r2:5672 OK");
-        assertThat(checked.nodes()).extracting(n -> n.nativeId()).containsExactly("rabbit@r1", "rabbit@r2");
+        assertThat(checked.nodes()).extracting(DiscoveredNode::nativeId).containsExactly("rabbit@r1", "rabbit@r2");
         assertThat(checked.nodes().getFirst().endpoints()).containsExactly(Endpoint.of(Plane.DATA, "amqp", "r1:5672"));
     }
 
@@ -204,7 +207,7 @@ class RabbitMqRegistrarTest {
 
         assertThat(checked.view().nodes().get(1).outcome()).isEqualTo("UNREACHABLE");
         assertThat(checked.view().nodes().get(1).message()).isEqualTo("The node is not running.");
-        assertThat(checked.nodes()).extracting(n -> n.nativeId()).containsExactly("rabbit@r1");
+        assertThat(checked.nodes()).extracting(DiscoveredNode::nativeId).containsExactly("rabbit@r1");
     }
 
     @Test
@@ -466,45 +469,51 @@ class RabbitMqRegistrarTest {
 
     @Test
     void theConnectionMustBeARabbitMqOneWithAnAccount() {
-        assertThatThrownBy(
-                        () -> RabbitMqRegistrar.validated(new io.github.sudoitir.rahdar.platform.clusters.web
-                                .ClusterRequests.RegisterClusterRequest.UnknownConnection("rabbitmq")))
-                .hasMessageContaining("RabbitMQ connection");
-        assertThatThrownBy(() -> RabbitMqRegistrar.validated(new RabbitMqConnection(
-                        RabbitMqModule.SYSTEM, List.of("http://r1"), null, null, null, null, null)))
+        var io2 =
+                new io.github.sudoitir.rahdar.platform.clusters.web.ClusterRequests.RegisterClusterRequest
+                        .UnknownConnection("rabbitmq");
+        assertThatThrownBy(() -> RabbitMqRegistrar.validated(io2)).hasMessageContaining("RabbitMQ connection");
+        var rabbitMqConnection =
+                new RabbitMqConnection(RabbitMqModule.SYSTEM, List.of("http://r1"), null, null, null, null, null);
+        assertThatThrownBy(() -> RabbitMqRegistrar.validated(rabbitMqConnection))
                 .hasMessageContaining("credentials are required");
-        assertThatThrownBy(() -> RabbitMqRegistrar.validated(new RabbitMqConnection(
-                        RabbitMqModule.SYSTEM,
-                        List.of("http://r1"),
-                        null,
-                        new RabbitMqCredentials(null, "pw", null),
-                        null,
-                        null,
-                        null)))
+        var rabbitMqConnection2 = new RabbitMqConnection(
+                RabbitMqModule.SYSTEM,
+                List.of("http://r1"),
+                null,
+                new RabbitMqCredentials(null, "pw", null),
+                null,
+                null,
+                null);
+        assertThatThrownBy(() -> RabbitMqRegistrar.validated(rabbitMqConnection2))
                 .hasMessageContaining("credentials.username");
-        assertThatThrownBy(() -> RabbitMqRegistrar.validated(new RabbitMqConnection(
-                        RabbitMqModule.SYSTEM,
-                        List.of("http://r1"),
-                        null,
-                        new RabbitMqCredentials("ops", null, null),
-                        null,
-                        null,
-                        null)))
+        var rabbitMqConnection3 = new RabbitMqConnection(
+                RabbitMqModule.SYSTEM,
+                List.of("http://r1"),
+                null,
+                new RabbitMqCredentials("ops", null, null),
+                null,
+                null,
+                null);
+        assertThatThrownBy(() -> RabbitMqRegistrar.validated(rabbitMqConnection3))
                 .hasMessageContaining("credentials.password");
-        assertThatThrownBy(() -> RabbitMqRegistrar.validated(new RabbitMqConnection(
-                        RabbitMqModule.SYSTEM,
-                        List.of("http://r1"),
-                        null,
-                        new RabbitMqCredentials("ops", null, "t"),
-                        null,
-                        null,
-                        null)))
+        var rabbitMqConnection4 = new RabbitMqConnection(
+                RabbitMqModule.SYSTEM,
+                List.of("http://r1"),
+                null,
+                new RabbitMqCredentials("ops", null, "t"),
+                null,
+                null,
+                null);
+        assertThatThrownBy(() -> RabbitMqRegistrar.validated(rabbitMqConnection4))
                 .hasMessageContaining("not both");
-        assertThatThrownBy(() -> RabbitMqRegistrar.validated(new RabbitMqConnection(
-                        RabbitMqModule.SYSTEM, List.of("http://r1"), null, LOGIN, null, null, 0)))
+        var rabbitMqConnection5 =
+                new RabbitMqConnection(RabbitMqModule.SYSTEM, List.of("http://r1"), null, LOGIN, null, null, 0);
+        assertThatThrownBy(() -> RabbitMqRegistrar.validated(rabbitMqConnection5))
                 .hasMessageContaining("at least 1");
-        assertThatThrownBy(() -> RabbitMqRegistrar.validated(
-                        new RabbitMqConnection(RabbitMqModule.SYSTEM, List.of(), null, LOGIN, null, null, null)))
+        var rabbitMqConnection6 =
+                new RabbitMqConnection(RabbitMqModule.SYSTEM, List.of(), null, LOGIN, null, null, null);
+        assertThatThrownBy(() -> RabbitMqRegistrar.validated(rabbitMqConnection6))
                 .hasMessageContaining("At least one management URL");
     }
 
@@ -688,13 +697,12 @@ class RabbitMqRegistrarTest {
     void aChangedUrlEndpointOrUserNeedsTheSecretAgain() {
         storedWith(stored("http://r1:15672", "amqp://r1:5672", "PASSWORD"), account("ops", "pw"));
 
-        assertThatThrownBy(() -> registrar.edited(CLUSTER, edit(List.of("http://other"), null, null, null, null, null)))
-                .hasMessageContaining("Enter the password again");
-        assertThatThrownBy(() -> registrar.edited(CLUSTER, edit(null, List.of("amqp://other"), null, null, null, null)))
-                .hasMessageContaining("Enter the password again");
-        assertThatThrownBy(() -> registrar.edited(
-                        CLUSTER, edit(null, null, new RabbitMqCredentials("someone", null, null), null, null, null)))
-                .hasMessageContaining("Enter the password again");
+        var edit2 = edit(List.of("http://other"), null, null, null, null, null);
+        assertThatThrownBy(() -> registrar.edited(CLUSTER, edit2)).hasMessageContaining("Enter the password again");
+        var edit3 = edit(null, List.of("amqp://other"), null, null, null, null);
+        assertThatThrownBy(() -> registrar.edited(CLUSTER, edit3)).hasMessageContaining("Enter the password again");
+        var edit4 = edit(null, null, new RabbitMqCredentials("someone", null, null), null, null, null);
+        assertThatThrownBy(() -> registrar.edited(CLUSTER, edit4)).hasMessageContaining("Enter the password again");
 
         Resolved given = registrar.edited(
                 CLUSTER,
@@ -718,16 +726,16 @@ class RabbitMqRegistrarTest {
         assertThat(((RabbitMqConnection) kept.connection()).credentials())
                 .isEqualTo(new RabbitMqCredentials(null, null, "tok"));
         assertThat(kept.account()).isNull();
-        assertThatThrownBy(() -> registrar.edited(CLUSTER, edit(List.of("http://other"), null, null, null, null, null)))
-                .hasMessageContaining("Enter the token again");
+        var edit2 = edit(List.of("http://other"), null, null, null, null, null);
+        assertThatThrownBy(() -> registrar.edited(CLUSTER, edit2)).hasMessageContaining("Enter the token again");
     }
 
     @Test
     void aStoredAccountWithoutASecretNeedsOneEvenWhenNothingMoved() {
         storedWith(stored("http://r1:15672", null, "PASSWORD"), account("ops", null));
 
-        assertThatThrownBy(() -> registrar.edited(CLUSTER, edit(null, null, null, null, null, null)))
-                .hasMessageContaining("again");
+        var edit2 = edit(null, null, null, null, null, null);
+        assertThatThrownBy(() -> registrar.edited(CLUSTER, edit2)).hasMessageContaining("again");
     }
 
     @Test
@@ -738,5 +746,22 @@ class RabbitMqRegistrarTest {
 
         assertThat(((RabbitMqConnection) resolved.connection()).managementUrls())
                 .containsExactly("http://r1:15672");
+    }
+
+    @Test
+    void aSupportedRangeIsReadWithoutBacktracking() {
+        assertThat(RabbitMqRegistrar.VersionRange.parse("[3.13.0, 5.0.0)"))
+                .contains(new RabbitMqRegistrar.VersionRange("3.13.0", "5.0.0"));
+        assertThat(RabbitMqRegistrar.VersionRange.parse(" (3.13,) "))
+                .contains(new RabbitMqRegistrar.VersionRange("3.13", null));
+        for (String unreadable : List.of("", "3.13", "[3.13]", "[3.,5)", "[a,5)", "[3,5,7)", "[,5)", "[3..1,5)")) {
+            assertThat(RabbitMqRegistrar.VersionRange.parse(unreadable))
+                    .as(unreadable)
+                    .isEmpty();
+        }
+        String adversarial = "[" + "1.".repeat(100_000) + "x,)";
+        assertTimeoutPreemptively(Duration.ofSeconds(5), () -> {
+            assertThat(RabbitMqRegistrar.VersionRange.parse(adversarial)).isEmpty();
+        });
     }
 }

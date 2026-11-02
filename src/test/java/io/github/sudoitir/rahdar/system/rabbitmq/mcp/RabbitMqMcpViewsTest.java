@@ -2,6 +2,7 @@ package io.github.sudoitir.rahdar.system.rabbitmq.mcp;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -27,6 +28,7 @@ import io.github.sudoitir.rahdar.system.rabbitmq.web.RabbitMqViews.Shovel;
 import io.github.sudoitir.rahdar.system.rabbitmq.web.RabbitMqViews.ShovelPage;
 import io.github.sudoitir.rahdar.system.rabbitmq.web.RabbitMqViews.VhostPage;
 import io.modelcontextprotocol.spec.McpSchema;
+import java.time.Duration;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -67,6 +69,10 @@ class RabbitMqMcpViewsTest {
         assertThat(RabbitMqMcpViews.address("amqp://user:secret@remote:5672/%2F"))
                 .isEqualTo("amqp://remote:5672/%2F");
         assertThat(RabbitMqMcpViews.address("amqp://remote")).isEqualTo("amqp://remote");
+        String longScheme = "a".repeat(100_000);
+        assertTimeoutPreemptively(Duration.ofSeconds(5), () -> {
+            RabbitMqMcpViews.address(longScheme);
+        });
         assertThat(RabbitMqMcpViews.address("queue:orders")).isEqualTo("queue:orders");
         assertThat(RabbitMqMcpViews.address(null)).isNull();
     }
@@ -118,7 +124,8 @@ class RabbitMqMcpViewsTest {
 
     @Test
     void anUnknownKindIsAMalformedCall() {
-        assertThatThrownBy(() -> tools.rabbitmqListShovels(CLUSTER.toString(), "queue", null, null, null))
+        var clusterText = CLUSTER.toString();
+        assertThatThrownBy(() -> tools.rabbitmqListShovels(clusterText, "queue", null, null, null))
                 .hasMessageContaining("kind");
     }
 

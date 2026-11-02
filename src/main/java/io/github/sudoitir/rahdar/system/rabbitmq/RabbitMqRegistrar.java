@@ -60,7 +60,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -88,8 +87,6 @@ class RabbitMqRegistrar implements ClusterRegistrar {
     private static final String OK = "OK";
     private static final String UNSUPPORTED_VERSION = "UNSUPPORTED_VERSION";
     private static final Duration TOKEN_VALIDITY = Duration.ofDays(1);
-    private static final Pattern RANGE =
-            Pattern.compile("^([\\[(])\\s*(\\d+(?:\\.\\d+)*)\\s*,\\s*(\\d+(?:\\.\\d+)*)?\\s*([\\])])\\s*$");
     private static final Pattern NUMBERS = Pattern.compile("\\d+");
 
     private final BrokerGateway gateway;
@@ -306,7 +303,7 @@ class RabbitMqRegistrar implements ClusterRegistrar {
                 node.endpoints().stream()
                         .filter(e -> e.plane() == Plane.DATA)
                         .findFirst()
-                        .map(e -> e.address())
+                        .map(Endpoint::address)
                         .orElse(null),
                 node.functions().stream().map(Enum::name).sorted().toList(),
                 running ? OK : UNREACHABLE,
@@ -372,14 +369,15 @@ class RabbitMqRegistrar implements ClusterRegistrar {
 
     private BrokerVersion.Support support(String text) {
         int[] found = numbers(text);
-        Matcher range = RANGE.matcher(rangeOfDriver());
-        if (found.length == 0 || !range.matches()) {
+        Optional<VersionRange> parsed = VersionRange.parse(rangeOfDriver());
+        if (found.length == 0 || parsed.isEmpty()) {
             return BrokerVersion.Support.UNKNOWN;
         }
-        if (compare(found, numbers(range.group(2))) < 0) {
+        VersionRange range = parsed.get();
+        if (compare(found, numbers(range.lower())) < 0) {
             return BrokerVersion.Support.BELOW_MINIMUM;
         }
-        return range.group(3) != null && compare(found, numbers(range.group(3))) >= 0
+        return range.upper() != null && compare(found, numbers(range.upper())) >= 0
                 ? BrokerVersion.Support.NEWER_THAN_TESTED
                 : BrokerVersion.Support.SUPPORTED;
     }
@@ -393,8 +391,50 @@ class RabbitMqRegistrar implements ClusterRegistrar {
     }
 
     private String lowerBound() {
-        Matcher range = RANGE.matcher(rangeOfDriver());
-        return range.matches() ? range.group(2) : "the supported minimum";
+        return VersionRange.parse(rangeOfDriver()).map(VersionRange::lower).orElse("the supported minimum");
+    }
+
+    /**
+     * A driver's supported versions as an interval such as {@code [3.13, 5.0)}, read without a regular expression so
+     * no input can make the read backtrack. The upper bound is absent for an open interval.
+     */
+    record VersionRange(String lower, String upper) {
+
+        static Optional<VersionRange> parse(String text) {
+            String trimmed = text.strip();
+            if (trimmed.length() < 3
+                    || "[(".indexOf(trimmed.charAt(0)) < 0
+                    || "])".indexOf(trimmed.charAt(trimmed.length() - 1)) < 0) {
+                return Optional.empty();
+            }
+            String inner = trimmed.substring(1, trimmed.length() - 1);
+            int comma = inner.indexOf(',');
+            if (comma < 0 || inner.indexOf(',', comma + 1) >= 0) {
+                return Optional.empty();
+            }
+            String lower = inner.substring(0, comma).strip();
+            String upper = inner.substring(comma + 1).strip();
+            if (!isVersion(lower) || !upper.isEmpty() && !isVersion(upper)) {
+                return Optional.empty();
+            }
+            return Optional.of(new VersionRange(lower, upper.isEmpty() ? null : upper));
+        }
+
+        /** Digits separated by single dots: {@code 3}, {@code 3.13}, {@code 4.0.2}. */
+        private static boolean isVersion(String text) {
+            boolean digitSeen = false;
+            for (int i = 0; i < text.length(); i++) {
+                char c = text.charAt(i);
+                if (c >= '0' && c <= '9') {
+                    digitSeen = true;
+                } else if (c == '.' && digitSeen && i < text.length() - 1) {
+                    digitSeen = false;
+                } else {
+                    return false;
+                }
+            }
+            return digitSeen;
+        }
     }
 
     // ---- failures -----------------------------------------------------------------------------------------------
@@ -506,6 +546,17 @@ class RabbitMqRegistrar implements ClusterRegistrar {
     private static String eventVhost(RabbitMqConnection rabbit) {
         return Optional.ofNullable(blankToNull(rabbit.eventVhost()))
                 .orElse(RabbitMqConnectionOptions.DEFAULT_EVENT_VHOST);
+    }
+
+    private static String usernameOf(RabbitMqCredentials given, String storedUser) {
+        return given != null && given.username() != null ? given.username() : storedUser;
+    }
+
+    private static String suppliedSecret(RabbitMqCredentials given, boolean token) {
+        if (given == null) {
+            return null;
+        }
+        return blankToNull(token ? given.token() : given.password());
     }
 
     private static boolean hasPassword(RabbitMqCredentials credentials) {
@@ -646,18 +697,16 @@ class RabbitMqRegistrar implements ClusterRegistrar {
                 : split(stored.getAmqpEndpoints());
         RabbitMqCredentials given = edit.credentials();
         boolean storedToken = RabbitMqConnectionEntity.TOKEN.equals(stored.getAuth());
-        boolean token = given != null && isToken(given) || storedToken && !(given != null && hasPassword(given));
+        boolean token = tokenAfter(given, storedToken);
         String storedUser = storedToken ? null : account.username();
-        String user = token ? null : given != null && given.username() != null ? given.username() : storedUser;
-        String supplied = given == null ? null : blankToNull(token ? given.token() : given.password());
+        String user = token ? null : usernameOf(given, storedUser);
+        String supplied = suppliedSecret(given, token);
         boolean destinationChanged = !urls.equals(split(stored.getManagementUrls()))
                 || !amqp.equals(split(stored.getAmqpEndpoints()))
                 || !Objects.equals(user, storedUser)
                 || token != storedToken;
         if (supplied == null && (destinationChanged || account.password() == null)) {
-            throw new IllegalArgumentException("Enter the " + (token ? "token" : "password")
-                    + " again: the stored one is never sent to a URL, endpoint or account the cluster did not"
-                    + " already use.");
+            throw secretAgain(token);
         }
         String secret = supplied != null ? supplied : account.password();
         RabbitMqCredentials credentials =
@@ -672,6 +721,20 @@ class RabbitMqRegistrar implements ClusterRegistrar {
                 edit.eventVhost() == null ? stored.getEventVhost() : blankToNull(edit.eventVhost()),
                 edit.watchIntervalSeconds() == null ? stored.getWatchIntervalSeconds() : edit.watchIntervalSeconds());
         return new Resolved(validated(connection), supplied == null ? null : new Account(user, supplied));
+    }
+
+    /** Whether the edited connection signs in with a token: the one given, else the stored kind unless a password is given. */
+    private static boolean tokenAfter(RabbitMqCredentials given, boolean storedToken) {
+        if (given == null) {
+            return storedToken;
+        }
+        return isToken(given) || storedToken && !hasPassword(given);
+    }
+
+    private static IllegalArgumentException secretAgain(boolean token) {
+        return new IllegalArgumentException("Enter the " + (token ? "token" : "password")
+                + " again: the stored one is never sent to a URL, endpoint or account the cluster did not"
+                + " already use.");
     }
 
     private RabbitMqConnectionEntity stored(UUID clusterId) {

@@ -48,8 +48,59 @@ export interface ParsedAddress {
   problem: string | null;
 }
 
-const HOST = /^(?:[A-Za-z0-9](?:[A-Za-z0-9_-]*[A-Za-z0-9])?)(?:\.[A-Za-z0-9](?:[A-Za-z0-9_-]*[A-Za-z0-9])?)*$/;
-const URL_SHAPE = /^([A-Za-z][A-Za-z0-9+.-]*):\/\/([^/?#]*)([^?#]*)(.*)$/;
+const SCHEME_NAME = /^[A-Za-z][A-Za-z0-9+.-]*$/;
+const LABEL = /^[A-Za-z0-9_-]+$/;
+const ALPHANUMERIC = /^[A-Za-z0-9]$/;
+
+/** Whether every dot-separated label is letters, digits, `_` and `-`, starting and ending with a letter or digit. */
+function isHostName(host: string): boolean {
+  return host
+    .split('.')
+    .every(
+      (label) =>
+        LABEL.test(label) && ALPHANUMERIC.test(label.charAt(0)) && ALPHANUMERIC.test(label.charAt(label.length - 1)),
+    );
+}
+
+/** Where the first of `stops` is in the text, or its length. */
+function firstStop(text: string, stops: string): number {
+  for (let i = 0; i < text.length; i += 1) {
+    if (stops.includes(text.charAt(i))) return i;
+  }
+  return text.length;
+}
+
+/** The text without the slashes at its end, found by a scan so a long run of them costs only its length. */
+function withoutTrailingSlashes(text: string): string {
+  let end = text.length;
+  while (end > 0 && text.charAt(end - 1) === '/') end -= 1;
+  return text.slice(0, end);
+}
+
+interface UrlParts {
+  scheme: string;
+  authority: string;
+  path: string;
+  rest: string;
+}
+
+/** An address cut into its scheme, authority, path and what follows (a query or fragment), or `null`. */
+function splitUrl(original: string): UrlParts | null {
+  const separator = original.indexOf('://');
+  if (separator < 1) return null;
+  const scheme = original.slice(0, separator);
+  if (!SCHEME_NAME.test(scheme)) return null;
+  const afterScheme = original.slice(separator + 3);
+  const authorityEnd = firstStop(afterScheme, '/?#');
+  const remainder = afterScheme.slice(authorityEnd);
+  const pathEnd = firstStop(remainder, '?#');
+  return {
+    scheme,
+    authority: afterScheme.slice(0, authorityEnd),
+    path: remainder.slice(0, pathEnd),
+    rest: remainder.slice(pathEnd),
+  };
+}
 
 interface Scheme {
   schemes: Record<string, number>;
@@ -62,34 +113,40 @@ interface Scheme {
 const MANAGEMENT: Scheme = { schemes: { http: 15672, https: 15671 }, shape: 'http(s)://host:port', prefix: true };
 const AMQP: Scheme = { schemes: { amqp: 5672, amqps: 5671 }, shape: 'amqp(s)://host:port', prefix: false };
 
+/** The host and the port text of an authority, or `null` when the host is not one. */
+function splitAuthority(authority: string): { host: string; port: string | undefined } | null {
+  const bracketed = /^(\[[0-9A-Fa-f:.]+])(?::(\d+))?$/.exec(authority);
+  if (bracketed) return { host: bracketed[1], port: bracketed[2] };
+  const colon = authority.lastIndexOf(':');
+  const host = colon < 0 ? authority : authority.slice(0, colon);
+  return isHostName(host) ? { host, port: colon < 0 ? undefined : authority.slice(colon + 1) } : null;
+}
+
+/** What is wrong with the scheme, the account, the query or the path of an address, or `null`. */
+function shapeProblem(original: string, scheme: string, parts: UrlParts, kind: Scheme): string | null {
+  if (parts.authority.includes('@')) return `Remove the account from ${original}: put it in the credentials fields.`;
+  if (!(scheme in kind.schemes)) return `${original} must start with ${kind.shape.split('://')[0]}://.`;
+  if (parts.rest) return `Remove the query or fragment from ${original}.`;
+  if (!kind.prefix && withoutTrailingSlashes(parts.path))
+    return `Remove the path from ${original}: write ${kind.shape}.`;
+  return null;
+}
+
 function parseOne(original: string, kind: Scheme): ParsedAddress {
   const refuse = (problem: string): ParsedAddress => ({ original, address: null, problem });
-  const parts = URL_SHAPE.exec(original);
+  const parts = splitUrl(original);
   if (!parts) return refuse(`${original} is not an address: write ${kind.shape}.`);
-  const [, rawScheme, authority, path, rest] = parts;
-  const scheme = rawScheme.toLowerCase();
-  if (authority.includes('@')) {
-    return refuse(`Remove the account from ${original}: put it in the credentials fields.`);
-  }
-  if (!(scheme in kind.schemes)) return refuse(`${original} must start with ${kind.shape.split('://')[0]}://.`);
-  if (rest) return refuse(`Remove the query or fragment from ${original}.`);
-  if (!kind.prefix && path.replace(/\/+$/, '')) return refuse(`Remove the path from ${original}: write ${kind.shape}.`);
-  const bracketed = /^(\[[0-9A-Fa-f:.]+])(?::(\d+))?$/.exec(authority);
-  let host: string;
-  let port: string | undefined;
-  if (bracketed) {
-    [, host, port] = bracketed;
-  } else {
-    const colon = authority.lastIndexOf(':');
-    host = colon < 0 ? authority : authority.slice(0, colon);
-    port = colon < 0 ? undefined : authority.slice(colon + 1);
-    if (!HOST.test(host)) return refuse(`${original} has no valid host name: write ${kind.shape}.`);
-  }
-  if (port !== undefined && !/^\d+$/.test(port)) return refuse(`The port of ${original} must be a number.`);
-  const number = Number(port ?? kind.schemes[scheme]);
+  const scheme = parts.scheme.toLowerCase();
+  const shape = shapeProblem(original, scheme, parts, kind);
+  if (shape) return refuse(shape);
+  const target = splitAuthority(parts.authority);
+  if (!target) return refuse(`${original} has no valid host name: write ${kind.shape}.`);
+  if (target.port !== undefined && !/^\d+$/.test(target.port))
+    return refuse(`The port of ${original} must be a number.`);
+  const number = Number(target.port ?? kind.schemes[scheme]);
   if (number < 1 || number > 65535) return refuse(`The port of ${original} must be between 1 and 65535.`);
-  const prefix = kind.prefix ? path.replace(/\/+$/, '') : '';
-  return { original, address: `${scheme}://${host.toLowerCase()}:${number}${prefix}`, problem: null };
+  const prefix = kind.prefix ? withoutTrailingSlashes(parts.path) : '';
+  return { original, address: `${scheme}://${target.host.toLowerCase()}:${number}${prefix}`, problem: null };
 }
 
 function parseAddresses(raw: string, kind: Scheme): ParsedAddress[] {
@@ -139,27 +196,16 @@ export function secretRequired(values: RabbitMqFields, stored: RabbitMqConnectio
   );
 }
 
-/** What is wrong with the values as they stand, by field; the form can be sent only when this is empty. */
-export function rabbitMqProblems(
+/** What is wrong with the account or the token, added to `problems`. */
+function credentialProblems(
   values: RabbitMqFields,
-  stored: RabbitMqConnectionDetail | null = null,
-): Record<string, string> {
-  const problems: Record<string, string> = {};
-  const urls = parseManagementUrls(values.managementUrls);
-  const urlProblem = problemOf(urls);
-  if (urlProblem) problems.managementUrls = urlProblem;
-  else if (addressesOf(urls).length === 0) problems.managementUrls = 'Add at least one management URL.';
-  const amqpProblem = problemOf(parseAmqpEndpoints(values.amqpEndpoints));
-  if (amqpProblem) problems.amqpEndpoints = amqpProblem;
-  const interval = values.watchIntervalSeconds.trim();
-  if (interval && !(/^\d+$/.test(interval) && Number(interval) >= 1)) {
-    problems.watchIntervalSeconds = 'Enter a whole number of seconds, at least 1.';
-  }
-
+  stored: RabbitMqConnectionDetail | null,
+  problems: Record<string, string>,
+): void {
   const again = secretRequired(values, stored);
   if (values.auth === 'token') {
     if (again && !values.token) problems.token = 'Enter the token.';
-    return problems;
+    return;
   }
   Object.assign(
     problems,
@@ -182,6 +228,26 @@ export function rabbitMqProblems(
   else if (again && !values.password) {
     problems.password ??= stored ? 'Enter the password again: the connection changed.' : 'Enter the password.';
   }
+}
+
+/** What is wrong with the values as they stand, by field; the form can be sent only when this is empty. */
+export function rabbitMqProblems(
+  values: RabbitMqFields,
+  stored: RabbitMqConnectionDetail | null = null,
+): Record<string, string> {
+  const problems: Record<string, string> = {};
+  const urls = parseManagementUrls(values.managementUrls);
+  const urlProblem = problemOf(urls);
+  if (urlProblem) problems.managementUrls = urlProblem;
+  else if (addressesOf(urls).length === 0) problems.managementUrls = 'Add at least one management URL.';
+  const amqpProblem = problemOf(parseAmqpEndpoints(values.amqpEndpoints));
+  if (amqpProblem) problems.amqpEndpoints = amqpProblem;
+  const interval = values.watchIntervalSeconds.trim();
+  if (interval && !(/^\d+$/.test(interval) && Number(interval) >= 1)) {
+    problems.watchIntervalSeconds = 'Enter a whole number of seconds, at least 1.';
+  }
+
+  credentialProblems(values, stored, problems);
   return problems;
 }
 
