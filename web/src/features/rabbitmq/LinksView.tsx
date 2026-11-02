@@ -140,31 +140,36 @@ export function LinksView() {
           </Stack>
         )}
       </Section>
-      <Section title="Federation links">
-        {firstLinks && !firstLinks.available ? (
-          <Unavailable what="Federation links" remedy={firstLinks.remedy} />
-        ) : links.isPending ? (
-          <LoadingState label="Loading the federation links" blockSize="6rem" />
-        ) : (
-          <DataTable
-            variant="static"
-            label="Federation links"
-            storageKey="rabbitmq.federation"
-            columns={LINK_COLUMNS}
-            data={linkRows}
-            rowKey={(l) => `${l.vhost}/${l.type}/${l.name}/${l.upstream}`}
-            height={{ maxRows: 12 }}
-            error={links.isError ? <ErrorState error={links.error} onRetry={() => void links.refetch()} /> : undefined}
-            empty={
-              <EmptyState
-                kind="empty"
-                title="No federation links"
-                description="A federated exchange or queue reads from an upstream broker."
-              />
-            }
-          />
-        )}
-      </Section>
+      {/* Below the shovels, shown once they have settled: its own loading rows would otherwise move when the shovels above shrink. */}
+      {shovels.isPending ? null : (
+        <Section title="Federation links">
+          {firstLinks && !firstLinks.available ? (
+            <Unavailable what="Federation links" remedy={firstLinks.remedy} />
+          ) : links.isPending ? (
+            <LoadingState label="Loading the federation links" blockSize="6rem" />
+          ) : (
+            <DataTable
+              variant="static"
+              label="Federation links"
+              storageKey="rabbitmq.federation"
+              columns={LINK_COLUMNS}
+              data={linkRows}
+              rowKey={(l) => `${l.vhost}/${l.type}/${l.name}/${l.upstream}`}
+              height={{ maxRows: 12 }}
+              error={
+                links.isError ? <ErrorState error={links.error} onRetry={() => void links.refetch()} /> : undefined
+              }
+              empty={
+                <EmptyState
+                  kind="empty"
+                  title="No federation links"
+                  description="A federated exchange or queue reads from an upstream broker."
+                />
+              }
+            />
+          )}
+        </Section>
+      )}
       <ChangeDialog
         change={remove}
         title="Delete a shovel"

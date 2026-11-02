@@ -41,6 +41,9 @@ export function subscriptionColumns(
           accessor: (r) => virtualHostOf(r.id),
           kind: 'identifier',
           priority: 'essential',
+          min: 12,
+          max: 24,
+          grow: false,
         }
       : {
           id: 'destination',

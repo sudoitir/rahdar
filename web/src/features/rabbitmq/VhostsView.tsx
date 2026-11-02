@@ -113,6 +113,8 @@ function columns(
         </Group>
       ),
       kind: 'status',
+      min: 18,
+      grow: false,
       priority: 'essential',
     },
   ];

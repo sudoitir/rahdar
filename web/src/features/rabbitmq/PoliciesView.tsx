@@ -145,6 +145,8 @@ function columns(gate: GateVerdict, onEdit: (p: Policy) => void, onClear: (p: Po
         ),
       kind: 'text',
       wrap: true,
+      min: 18,
+      grow: false,
       priority: 'essential',
     },
   ];

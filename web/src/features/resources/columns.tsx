@@ -84,6 +84,9 @@ export const resourceColumns = {
             accessor: (r: DestinationView) => virtualHostOf(r.id),
             kind: 'identifier' as const,
             priority: 'essential' as const,
+            min: 12,
+            max: 24,
+            grow: false,
           },
         ]
       : []),
