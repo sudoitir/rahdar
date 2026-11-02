@@ -36053,6 +36053,7 @@
           },
           "lastErrorKind" : {
             "type" : [ "string", "null" ],
+            "description" : "Why the last call to the node failed. NOT_AUTHORIZED means the broker knows the account but an ACL or permission refused the call.",
             "enum" : [ "UNREACHABLE", "THROTTLED", "CREDENTIALS_REJECTED", "NOT_AUTHORIZED", "NOT_ARTEMIS", "WRONG_PATH", "TLS_FAILED", "BAD_RESPONSE", "UNSUPPORTED_VERSION", null ]
           },
           "lastSeenAt" : {

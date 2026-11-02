@@ -371,7 +371,13 @@ public interface ClusterViews {
             BrokerVersion.Support versionSupport,
 
             @Schema(nullable = true) String lastError,
-            @Schema(nullable = true) BrokerConnectionException.Kind lastErrorKind,
+
+            @Schema(
+                    nullable = true,
+                    description = "Why the last call to the node failed. NOT_AUTHORIZED means the broker knows"
+                            + " the account but an ACL or permission refused the call.")
+            BrokerConnectionException.Kind lastErrorKind,
+
             @Schema(nullable = true) Instant lastSeenAt,
 
             @Schema(nullable = true, description = "Where the management URL came from; null while there is none")
