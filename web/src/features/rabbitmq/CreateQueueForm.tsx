@@ -84,10 +84,9 @@ export function CreateQueueForm({
               data={names}
               searchable
               placeholder="Choose a virtual host"
-              data-autofocus
               {...form.getInputProps('vhost')}
             />
-            <TextInput label="Name" {...form.getInputProps('name')} />
+            <TextInput label="Name" data-autofocus {...form.getInputProps('name')} />
             <Radio.Group label="Type" {...form.getInputProps('type')}>
               <Stack gap="xs" mt="xs">
                 {QUEUE_TYPES.map((t) => (
