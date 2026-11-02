@@ -120,7 +120,7 @@ export function isPartitionedLog(
 ): boolean {
   const listed = kind ? kinds?.find((item) => item.id === kind) : undefined;
   if (listed) return listed.partitioned === true;
-  return kind === 'kafka.group-topic';
+  return kind === 'kafka.group-topic' || kind === 'rabbitmq.stream';
 }
 
 /** The kind a subscription is, from the cluster's kind list, when both are known. */
@@ -258,7 +258,9 @@ export function MessagesView() {
   const subscriptionKind = roleIds.loaded ? kindOf(roleIds.subscription(subscriptionName)) : undefined;
   const partitioned = isPartitionedLog(subscriptionKind ?? kindOf(subscriptionName), cluster.data?.kinds);
   const kindInfo = kindOfSubscription(subscriptionKind ?? kindOf(subscriptionName), cluster.data?.kinds);
-  const singleLog = isSingleLog(kindInfo, partitioned);
+  const singleLog = kindInfo
+    ? isSingleLog(kindInfo, partitioned)
+    : partitioned && (subscriptionKind ?? kindOf(subscriptionName)) !== 'kafka.group-topic';
   // A kind the system cannot browse is refused before anything is read: the reason is the driver's when it gave one.
   const browseRefusal =
     cluster.data?.system && kindInfo && !kindInfo.verbs.includes('browse')
@@ -271,7 +273,10 @@ export function MessagesView() {
   const [debounced] = useDebouncedValue(filter, 250);
   // The open message is in the destination, so a link to one message opens it (non-negotiable #9).
   const openId = search.message ?? null;
-  useTitlePart('resource', openId ? `${subscriptionName} › message ${openId}` : subscriptionName);
+  useTitlePart(
+    'resource',
+    openId ? `${subscriptionRefWords(subscriptionName)} › message ${openId}` : subscriptionRefWords(subscriptionName),
+  );
   const setOpenId = (id: string | null) =>
     navigate({ to: '.', search: (prev: Record<string, unknown>) => ({ ...prev, message: id ?? undefined }) });
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -352,7 +357,7 @@ export function MessagesView() {
         </>
       }
       description={
-        <span className={partitioned ? classes.stableHeading : undefined}>
+        <span className={partitioned && !singleLog ? classes.stableHeading : undefined}>
           {browseRefusal
             ? 'This kind of queue cannot be read, only sent to and purged.'
             : messagesHeading(
