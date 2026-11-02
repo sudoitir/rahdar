@@ -37,8 +37,8 @@ export const routingTypeOf = (q: SubscriptionView): string => q.nativeAttributes
 export const keys = {
   resource: (id: string, kind: string, params: ResourceParams = {}) => clusterKey(id, kind, params),
   topic: (id: string, topic: string) => clusterKey(id, topic),
-  configuration: (id: string, subscriptionName: string) =>
-    clusterKey(id, 'subscriptions', subscriptionName, 'configuration'),
+  configuration: (id: string, subscriptionId: string) =>
+    clusterKey(id, 'subscriptions', subscriptionId, 'configuration'),
 };
 
 export function useSubscriptions(
@@ -115,15 +115,13 @@ export function useSubscription(
  */
 export function useSubscriptionConfiguration(
   clusterId: string,
-  subscriptionName: string,
+  subscriptionId: string,
   enabled = true,
 ): UseQueryResult<SubscriptionConfiguration, ApiError> {
-  const ids = useRoleIds(clusterId);
   return useQuery({
-    queryKey: keys.configuration(clusterId, subscriptionName),
-    queryFn: () =>
-      request<SubscriptionConfiguration>(`/clusters/${clusterId}${resourcePath(ids.subscription(subscriptionName))}`),
-    enabled: enabled && ids.loaded && subscriptionName !== '',
+    queryKey: keys.configuration(clusterId, subscriptionId),
+    queryFn: () => request<SubscriptionConfiguration>(`/clusters/${clusterId}${resourcePath(subscriptionId)}`),
+    enabled: enabled && subscriptionId !== '',
   });
 }
 
@@ -158,10 +156,9 @@ export function useCreateSubscription(clusterId: string) {
   );
 }
 
-export function useUpdateSubscription(clusterId: string, subscriptionName: string) {
-  const ids = useRoleIds(clusterId);
+export function useUpdateSubscription(clusterId: string, subscriptionId: string) {
   return useLifecycleMutation<LifecycleVars & { body: UpdateResourceRequest }>(clusterId, ({ body, dryRun }) =>
-    request(`${lifecycleBase(clusterId)}${resourcePath(ids.subscription(subscriptionName))}${lifecycleQuery(dryRun)}`, {
+    request(`${lifecycleBase(clusterId)}${resourcePath(subscriptionId)}${lifecycleQuery(dryRun)}`, {
       method: 'PATCH',
       body: JSON.stringify(body),
     }),
@@ -172,15 +169,14 @@ export function useUpdateSubscription(clusterId: string, subscriptionName: strin
  * Delete a subscription. `disconnectConsumers` closes its consumers so a node with any can delete it;
  * without it such a node refuses (ADR-0084).
  */
-export function useDeleteSubscription(clusterId: string, subscriptionName: string) {
-  const ids = useRoleIds(clusterId);
+export function useDeleteSubscription(clusterId: string, subscriptionId: string) {
   return useLifecycleMutation<LifecycleVars & { disconnectConsumers?: boolean }>(
     clusterId,
     ({ dryRun, override, disconnectConsumers }) => {
       const query = lifecycleQuery(dryRun, override);
       const separator = query ? '&' : '?';
       const flag = disconnectConsumers ? `${separator}disconnectConsumers=true` : '';
-      return request(`${lifecycleBase(clusterId)}${resourcePath(ids.subscription(subscriptionName))}${query}${flag}`, {
+      return request(`${lifecycleBase(clusterId)}${resourcePath(subscriptionId)}${query}${flag}`, {
         method: 'DELETE',
       });
     },
@@ -188,25 +184,20 @@ export function useDeleteSubscription(clusterId: string, subscriptionName: strin
 }
 
 /** Pause and resume are one hook: the same permission, and the UI toggles between them. */
-export function useSetSubscriptionPaused(clusterId: string, subscriptionName: string) {
-  const ids = useRoleIds(clusterId);
+export function useSetSubscriptionPaused(clusterId: string, subscriptionId: string) {
   return useLifecycleMutation<LifecycleVars & { paused: boolean }>(clusterId, ({ paused, dryRun }) =>
     request(
-      `${lifecycleBase(clusterId)}${resourcePath(ids.subscription(subscriptionName))}:${paused ? 'pause' : 'resume'}${lifecycleQuery(dryRun)}`,
+      `${lifecycleBase(clusterId)}${resourcePath(subscriptionId)}:${paused ? 'pause' : 'resume'}${lifecycleQuery(dryRun)}`,
       { method: 'POST' },
     ),
   );
 }
 
-export function useResetSubscriptionCounter(clusterId: string, subscriptionName: string) {
-  const ids = useRoleIds(clusterId);
+export function useResetSubscriptionCounter(clusterId: string, subscriptionId: string) {
   return useLifecycleMutation<LifecycleVars>(clusterId, ({ dryRun }) =>
-    request(
-      `${lifecycleBase(clusterId)}${resourcePath(ids.subscription(subscriptionName))}:reset-counters${lifecycleQuery(dryRun)}`,
-      {
-        method: 'POST',
-      },
-    ),
+    request(`${lifecycleBase(clusterId)}${resourcePath(subscriptionId)}:reset-counters${lifecycleQuery(dryRun)}`, {
+      method: 'POST',
+    }),
   );
 }
 

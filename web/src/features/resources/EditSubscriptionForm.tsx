@@ -95,11 +95,11 @@ export function EditSubscriptionForm({
   });
   const { setValues, resetDirty } = form;
 
-  const update = useUpdateSubscription(clusterId, subscription.name);
+  const update = useUpdateSubscription(clusterId, subscription.id);
   // What the subscription runs right now, per node. The form is seeded from it, so the
   // operator edits the real configuration rather than guessing at blank inputs —
   // and after an update the reopened form shows what was written.
-  const configuration = useSubscriptionConfiguration(clusterId, subscription.name, opened);
+  const configuration = useSubscriptionConfiguration(clusterId, subscription.id, opened);
   const current = currentValues(configuration.data);
   const seeded = configuration.data?.nodes?.find((n) => !n.unavailableReason);
   const seededFrom = seeded?.nodeName ?? '';

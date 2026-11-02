@@ -41,7 +41,7 @@ export function SubscriptionLifecycleActions({
   const [editOpen, setEditOpen] = useState(false);
   const [pauseOutcome, setPauseOutcome] = useState<LifecycleOutcomeView | null>(null);
 
-  const setPaused = useSetSubscriptionPaused(clusterId, subscription.name);
+  const setPaused = useSetSubscriptionPaused(clusterId, subscription.id);
 
   const base = {
     clusterId,
@@ -50,16 +50,23 @@ export function SubscriptionLifecycleActions({
     capability: write,
     pending: cluster.isPending,
   } as const;
-  const pause = useResourceGate({ ...base, permission: 'subscription:pause', label: 'Pause and resume subscriptions' });
+  const pause = useResourceGate({
+    ...base,
+    permission: 'subscription:pause',
+    label: 'Pause and resume subscriptions',
+    kind: { id: subscription.kind, verb: 'pause' },
+  });
   const update = useResourceGate({
     ...base,
     permission: 'subscription:update',
     label: "Change a subscription's configuration",
+    kind: { id: subscription.kind, verb: 'update' },
   });
   const remove = useResourceGate({
     ...base,
     permission: 'subscription:delete',
     label: 'Destroy subscriptions and destinations',
+    kind: { id: subscription.kind, verb: 'delete' },
   });
   const pauseGate = pause.verdict;
   const updateGate = update.verdict;
@@ -183,7 +190,7 @@ export function DeleteSubscriptionDialog({
   onClose: () => void;
   onDeleted: () => void;
 }>) {
-  const remove = useDeleteSubscription(clusterId, subscription.name);
+  const remove = useDeleteSubscription(clusterId, subscription.id);
   const [preview, setPreview] = useState<LifecycleOutcomeView | null>(null);
   const [result, setResult] = useState<LifecycleOutcomeView | null>(null);
   const [previewFailed, setPreviewFailed] = useState<Error | null>(null);
