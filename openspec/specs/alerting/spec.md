@@ -262,16 +262,21 @@ history and delivery ledger instead.
 
 ### Requirement: Built-in critical rules are seeded per cluster and remain ordinary rules
 
-When a cluster is registered, the system SHALL seed split-brain, node-down, and
-replication-behind state-condition rules for it. These seeded rules SHALL behave as
-ordinary rules — editable, routable to channels, and disableable — not as
-unconditional checks outside the rule model.
+When a cluster is registered, the system SHALL seed the state-condition rules the cluster's system can answer:
+split-brain, clock skew, node-down and replication-behind for an Artemis cluster, and cluster-degraded for a Kafka
+or RabbitMQ cluster. These seeded rules SHALL behave as ordinary rules (editable, routable to channels, and
+disableable), not as unconditional checks outside the rule model.
 
 #### Scenario: A newly registered cluster has built-in rules
 
-- **WHEN** a cluster is registered
-- **THEN** split-brain, node-down, and replication-behind rules exist for it,
-  unbound to any channel and enabled by default
+- **WHEN** an Artemis cluster is registered
+- **THEN** split-brain, clock-skew, node-down and replication-behind rules exist for it, unbound to any channel
+  and enabled by default
+
+#### Scenario: A newly registered Kafka cluster is watched through its own health
+
+- **WHEN** a Kafka or RabbitMQ cluster is registered
+- **THEN** one cluster-degraded rule exists for it, and no Artemis HA rule
 
 #### Scenario: A built-in rule can be silenced
 
@@ -732,3 +737,24 @@ A plugin SHALL be able to list the notification channels by name and kind, witho
 
 - **WHEN** a plugin lists the channels
 - **THEN** it receives no channel configuration or secret
+
+### Requirement: Cluster degraded reads the system's own health
+
+The cluster-degraded condition SHALL read the health the cluster's system judges, the same verdict the cluster
+screen shows.
+
+#### Scenario: Offline partitions fire cluster degraded
+
+- **WHEN** a Kafka cluster's health is degraded or critical
+- **THEN** its cluster-degraded rule becomes active
+
+### Requirement: An Artemis-only rule is refused on another system
+
+A rule on a condition or metric only Artemis reports SHALL be refused on a Kafka or RabbitMQ cluster with
+`unsupported-on-system`, naming the system and what to watch instead. The rule form SHALL list those choices
+disabled with the reason, and SHALL offer them while the system is unknown.
+
+#### Scenario: A split-brain rule on a Kafka cluster
+
+- **WHEN** an operator saves a split-brain rule on a Kafka cluster
+- **THEN** the request is refused with a 409 that names Kafka and cluster-degraded
