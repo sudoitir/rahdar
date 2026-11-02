@@ -25,8 +25,18 @@ type BrokerReading = Omit<Reading, 'requestId' | 'detail'>;
 const isArtemis = (system: string | undefined): boolean => system === undefined || system === 'Artemis';
 
 /** Where each system's management calls go, for the text of a misrouted address. */
-const managementOf = (system: string | undefined): string =>
-  system === 'Kafka' ? 'bootstrap server' : system === 'RabbitMQ' ? 'management API' : 'Jolokia agent';
+const MANAGEMENT: Readonly<Record<string, string>> = { Kafka: 'bootstrap server', RabbitMQ: 'management API' };
+const managementOf = (system: string | undefined): string => MANAGEMENT[system ?? ''] ?? 'Jolokia agent';
+
+/** Why an account the broker knows was still refused, by system. */
+const REFUSED: Readonly<Record<string, string>> = {
+  Kafka: 'The account signed in, but no Kafka ACL allows it to do this.',
+  RabbitMQ: 'The account signed in, but its RabbitMQ permissions or tags do not allow this.',
+};
+
+/** The management endpoint named with its system, such as `RabbitMQ management API`; plain for Artemis. */
+const endpointOf = (system: string | undefined): string =>
+  isArtemis(system) ? managementOf(system) : `${system} ${managementOf(system)}`;
 
 /**
  * Broker failures, by `brokerErrorKind`, worded for the system the server named (`Kafka`, `RabbitMQ`); no
@@ -57,12 +67,7 @@ const BROKER: Readonly<Record<string, (system: string | undefined) => BrokerRead
   }),
   NOT_AUTHORIZED: (system) => ({
     title: `${system ?? 'The broker'} refused this account`,
-    cause:
-      system === 'Kafka'
-        ? 'The account signed in, but no Kafka ACL allows it to do this.'
-        : system === 'RabbitMQ'
-          ? 'The account signed in, but its RabbitMQ permissions or tags do not allow this.'
-          : 'The account signed in, but the broker does not allow it to do this.',
+    cause: REFUSED[system ?? ''] ?? 'The account signed in, but the broker does not allow it to do this.',
     next:
       system === 'Kafka'
         ? 'Grant the account the ACL the operation needs (the detail names it), or use an account that has it.'
@@ -77,10 +82,10 @@ const BROKER: Readonly<Record<string, (system: string | undefined) => BrokerRead
   }),
   WRONG_PATH: (system) => ({
     title: `There is no ${managementOf(system)} at this address`,
-    cause: `The address answered, but not with a ${isArtemis(system) ? '' : `${system} `}${managementOf(system)}.`,
+    cause: `The address answered, but not with a ${endpointOf(system)}.`,
     next: isArtemis(system)
       ? 'Check the path. The Artemis console usually serves Jolokia at /console/jolokia.'
-      : `Check the address and path of the ${system} ${managementOf(system)}.`,
+      : `Check the address and path of the ${endpointOf(system)}.`,
     retry: false,
   }),
   TLS_FAILED: (system) => ({
