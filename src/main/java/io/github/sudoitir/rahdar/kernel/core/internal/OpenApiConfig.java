@@ -276,6 +276,9 @@ class OpenApiConfig {
         problem.addProperty("errors", new ArraySchema().items(fieldError).description("Invalid request fields."));
         problem.addProperty("brokerErrorKind", new StringSchema());
         problem.addProperty(
+                "system",
+                new StringSchema().description("Kafka, RabbitMQ or Artemis: the system a broker failure is of."));
+        problem.addProperty(
                 "account", new StringSchema().description("MANAGEMENT or CORE: the account a broker rejected."));
         problem.addProperty("refusalKind", new StringSchema());
         problem.addProperty("affectedCount", new IntegerSchema().format("int64"));

@@ -19,56 +19,88 @@ export interface Reading {
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null;
 const text = (value: unknown): string | undefined => (typeof value === 'string' && value ? value : undefined);
 
-/** Broker failures, by `brokerErrorKind`. The kind wins over the status, which only says who was at fault. */
-const BROKER: Readonly<Record<string, Omit<Reading, 'requestId' | 'detail'>>> = {
-  UNREACHABLE: {
-    title: 'The broker is unreachable',
-    cause: 'Nothing answered at the broker address.',
-    next: 'Check that the broker is running and that Rahdar can reach its address, then retry.',
+type BrokerReading = Omit<Reading, 'requestId' | 'detail'>;
+
+/** Whether a failure is the Artemis kind of broker's: the server names no system for an Artemis cluster. */
+const isArtemis = (system: string | undefined): boolean => system === undefined || system === 'Artemis';
+
+/** Where each system's management calls go, for the text of a misrouted address. */
+const managementOf = (system: string | undefined): string =>
+  system === 'Kafka' ? 'bootstrap server' : system === 'RabbitMQ' ? 'management API' : 'Jolokia agent';
+
+/**
+ * Broker failures, by `brokerErrorKind`, worded for the system the server named (`Kafka`, `RabbitMQ`); no
+ * system reads as the generic broker. The kind wins over the status, which only says who was at fault. No
+ * text here names Artemis for a Kafka or RabbitMQ cluster.
+ */
+const BROKER: Readonly<Record<string, (system: string | undefined) => BrokerReading>> = {
+  UNREACHABLE: (system) => ({
+    title: `${system ?? 'The broker'} is unreachable`,
+    cause: `Nothing answered at the ${system ?? 'broker'} address.`,
+    next: `Check that ${system ?? 'the broker'} is running and that Rahdar can reach its address, then retry.`,
     retry: true,
-  },
-  THROTTLED: {
-    title: 'Rahdar is throttling calls to this broker',
-    cause: 'Rahdar is already calling this broker as fast as its configured rate allows, so it held this call back.',
+  }),
+  THROTTLED: (system) => ({
+    title: `Rahdar is throttling calls to this ${system ?? 'broker'}`,
+    cause: `Rahdar is already calling this ${system ?? 'broker'} as fast as its configured rate allows, so it held this call back.`,
     next: 'Retry in a moment. The broker itself was not asked.',
     retry: true,
-  },
-  CREDENTIALS_REJECTED: {
-    title: 'The broker rejected the credentials',
-    cause: 'The broker refused the user name and password Rahdar holds for it.',
+  }),
+  CREDENTIALS_REJECTED: (system) => ({
+    title: `${system ?? 'The broker'} rejected the credentials`,
+    cause:
+      system === 'Kafka'
+        ? 'Kafka refused the SASL user and secret, or the client certificate, Rahdar holds for it.'
+        : `${system ?? 'The broker'} refused the user name and password Rahdar holds for it.`,
     next: "Update the account under the cluster's Connection settings, then retry.",
     retry: false,
-  },
-  NOT_ARTEMIS: {
+  }),
+  NOT_AUTHORIZED: (system) => ({
+    title: `${system ?? 'The broker'} refused this account`,
+    cause:
+      system === 'Kafka'
+        ? 'The account signed in, but no Kafka ACL allows it to do this.'
+        : system === 'RabbitMQ'
+          ? 'The account signed in, but its RabbitMQ permissions or tags do not allow this.'
+          : 'The account signed in, but the broker does not allow it to do this.',
+    next:
+      system === 'Kafka'
+        ? 'Grant the account the ACL the operation needs (the detail names it), or use an account that has it.'
+        : "Grant the account the permission, or use an account that has it, under the cluster's Connection settings.",
+    retry: false,
+  }),
+  NOT_ARTEMIS: () => ({
     title: 'There is no Artemis broker at this agent',
     cause: 'A Jolokia agent answered, but no Artemis broker is registered on it.',
     next: 'Point the cluster at the Jolokia agent of an Artemis broker.',
     retry: false,
-  },
-  WRONG_PATH: {
-    title: 'There is no Jolokia agent at this address',
-    cause: 'The address answered, but not with a Jolokia agent.',
-    next: 'Check the path. The Artemis console usually serves Jolokia at /console/jolokia.',
+  }),
+  WRONG_PATH: (system) => ({
+    title: `There is no ${managementOf(system)} at this address`,
+    cause: `The address answered, but not with a ${isArtemis(system) ? '' : `${system} `}${managementOf(system)}.`,
+    next: isArtemis(system)
+      ? 'Check the path. The Artemis console usually serves Jolokia at /console/jolokia.'
+      : `Check the address and path of the ${system} ${managementOf(system)}.`,
     retry: false,
-  },
-  TLS_FAILED: {
-    title: 'The TLS handshake with the broker failed',
-    cause: 'Rahdar could not establish a secure connection to the broker.',
-    next: "Check the broker's certificate and the cluster's TLS settings, then retry.",
+  }),
+  TLS_FAILED: (system) => ({
+    title: `The TLS handshake with ${system ?? 'the broker'} failed`,
+    cause: `Rahdar could not establish a secure connection to ${system ?? 'the broker'}.`,
+    next: `Check ${system ?? 'the broker'}'s certificate and the cluster's TLS settings, then retry.`,
     retry: false,
-  },
-  BAD_RESPONSE: {
-    title: 'The broker sent an unexpected response',
-    cause: 'The broker answered in a way Rahdar does not understand.',
-    next: "Retry. If it keeps happening, check the broker's logs.",
+  }),
+  BAD_RESPONSE: (system) => ({
+    title: `${system ?? 'The broker'} sent a response Rahdar cannot use`,
+    cause: `${system ?? 'The broker'} answered in a way Rahdar could not read or map. The detail has its own words.`,
+    next: `Retry. If it keeps happening, check ${system ?? 'the broker'}'s logs and the detail.`,
     retry: true,
-  },
-  UNSUPPORTED_VERSION: {
-    title: 'This Artemis version is not supported',
-    cause: 'Rahdar does not support the version this broker runs.',
-    next: 'Connect a broker on a supported Artemis version.',
+  }),
+  UNSUPPORTED_VERSION: (system) => ({
+    title: `This ${system ?? 'Artemis'} version is not supported`,
+    cause: `Rahdar does not support the ${system ?? 'Artemis'} release this cluster runs. The detail names the release.`,
+    next: `Connect a ${system ?? 'Artemis'} cluster on a supported release, or upgrade this one.`,
     retry: false,
-  },
+  }),
 };
 
 function seconds(n: number): string {
@@ -279,11 +311,17 @@ function problemOf(e: Record<string, unknown>, status: number): Problem {
 }
 
 /** A broker failure's reading; a rejection names the account, so the operator edits the right one. */
-function brokerReading(kind: string, broker: (typeof BROKER)[string], e: Record<string, unknown>): Reading {
+function brokerReading(
+  kind: string,
+  make: (system: string | undefined) => BrokerReading,
+  e: Record<string, unknown>,
+): Reading {
   const problem = isRecord(e.problem) ? e.problem : {};
+  const system = text(problem.system);
+  const broker = make(system);
   const account = problem.account === 'CORE' ? 'Core' : 'management';
   const cause =
-    kind === 'CREDENTIALS_REJECTED' && text(problem.account)
+    kind === 'CREDENTIALS_REJECTED' && text(problem.account) && isArtemis(system)
       ? `The broker refused the ${account} account Rahdar holds for it.`
       : broker.cause;
   return { ...broker, cause, detail: text(problem.detail) };

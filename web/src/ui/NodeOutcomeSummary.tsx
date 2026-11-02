@@ -202,7 +202,7 @@ function statusWords(
     case 'SKIPPED_NOT_LIVE':
       return { text: 'skipped — not live', tone: 'warning' };
     case 'UNSUPPORTED_VERSION':
-      return { text: 'skipped — Artemis release too old', tone: 'warning' };
+      return { text: 'skipped — broker release too old', tone: 'warning' };
     case 'FAILED':
       return { text: 'failed', tone: 'danger' };
     default:

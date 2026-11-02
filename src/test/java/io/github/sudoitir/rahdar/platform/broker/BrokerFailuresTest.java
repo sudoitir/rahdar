@@ -29,6 +29,7 @@ class BrokerFailuresTest {
                 Arguments.of(ErrorReasons.UNREACHABLE, BrokerConnectionException.Kind.UNREACHABLE),
                 Arguments.of(ErrorReasons.RATE_LIMITED, BrokerConnectionException.Kind.THROTTLED),
                 Arguments.of(ErrorReasons.CREDENTIALS_REJECTED, BrokerConnectionException.Kind.CREDENTIALS_REJECTED),
+                Arguments.of(ErrorReasons.NOT_AUTHORIZED, BrokerConnectionException.Kind.NOT_AUTHORIZED),
                 Arguments.of(ErrorReasons.UNEXPECTED_SYSTEM, BrokerConnectionException.Kind.NOT_ARTEMIS),
                 Arguments.of(ErrorReasons.ENDPOINT_NOT_FOUND, BrokerConnectionException.Kind.WRONG_PATH),
                 Arguments.of(ErrorReasons.TLS_HANDSHAKE_FAILED, BrokerConnectionException.Kind.TLS_FAILED),
@@ -46,6 +47,69 @@ class BrokerFailuresTest {
         assertThat(translated).isInstanceOf(BrokerConnectionException.class);
         assertThat(((BrokerConnectionException) translated).kind()).isEqualTo(kind);
         assertThat(translated).hasMessage("message for " + reason);
+    }
+
+    @Test
+    void aKafkaAnswerRahdarDoesNotMapIsNotReportedAsAMissingArtemisBroker() {
+        RuntimeException translated = BrokerFailures.translate(
+                failure(ErrorReasons.UNEXPECTED_SYSTEM, Map.of("kafka.code", "SomeKafkaException")));
+
+        BrokerConnectionException connection = (BrokerConnectionException) translated;
+        assertThat(connection.kind()).isEqualTo(BrokerConnectionException.Kind.BAD_RESPONSE);
+        assertThat(connection.system()).isEqualTo("Kafka");
+    }
+
+    @Test
+    void aRabbitMqAnswerRahdarDoesNotMapIsNotReportedAsAMissingArtemisBroker() {
+        BrokerConnectionException connection = (BrokerConnectionException) BrokerFailures.translate(
+                failure(ErrorReasons.UNEXPECTED_SYSTEM, Map.of("rabbitmq.http_status", "500")));
+
+        assertThat(connection.kind()).isEqualTo(BrokerConnectionException.Kind.WRONG_PATH);
+        assertThat(connection.system()).isEqualTo("RabbitMQ");
+    }
+
+    @Test
+    void anArtemisAgentThatIsNotABrokerStillReadsAsNotArtemis() {
+        BrokerConnectionException connection = (BrokerConnectionException)
+                BrokerFailures.translate(failure(ErrorReasons.UNEXPECTED_SYSTEM, Map.of("artemis.code", "x")));
+
+        assertThat(connection.kind()).isEqualTo(BrokerConnectionException.Kind.NOT_ARTEMIS);
+    }
+
+    @Test
+    void aKafkaRequestTheBrokersAreTooOldForIsAFeatureGapNotAnUnsupportedCluster() {
+        RuntimeException translated = BrokerFailures.translate(failure(
+                ErrorReasons.UNSUPPORTED_VERSION,
+                Map.of(
+                        "kafka.code",
+                        "UnsupportedVersionException",
+                        "kafka.error",
+                        "The node does not support LIST_TRANSACTIONS")));
+
+        assertThat(translated).isInstanceOf(ConflictException.class);
+        assertThat(translated.getMessage())
+                .contains("Kafka", "LIST_TRANSACTIONS")
+                .doesNotContain("Artemis");
+    }
+
+    @Test
+    void aKafkaAclRefusalCarriesTheSystemSoTheOperatorIsToldWhichBrokerRefused() {
+        BrokerConnectionException connection = (BrokerConnectionException) BrokerFailures.translate(
+                failure(ErrorReasons.NOT_AUTHORIZED, Map.of("kafka.code", "TopicAuthorizationException")));
+
+        assertThat(connection.kind()).isEqualTo(BrokerConnectionException.Kind.NOT_AUTHORIZED);
+        assertThat(connection.system()).isEqualTo("Kafka");
+    }
+
+    @Test
+    void theNativeErrorOfKafkaAndRabbitMqIsFoundWhereArtemisKeepsItsOwn() {
+        BrokerException kafka = failure(ErrorReasons.UNEXPECTED_SYSTEM, Map.of("kafka.error", "boom"));
+        BrokerException rabbit = failure(ErrorReasons.UNEXPECTED_SYSTEM, Map.of("rabbitmq.error", "bang"));
+
+        assertThat(BrokerFailures.answeredError(BrokerFailures.translate(kafka)))
+                .contains("boom");
+        assertThat(BrokerFailures.answeredError(BrokerFailures.translate(rabbit)))
+                .contains("bang");
     }
 
     static Stream<Arguments> refusalKinds() {

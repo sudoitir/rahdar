@@ -612,7 +612,8 @@ public class TopologyDiscovery {
         } catch (BrokerConnectionException e) {
             return switch (e.kind()) {
                 case THROTTLED -> new UrlProof(null, null, ManagementUrlProblem.UNREACHABLE, true);
-                case CREDENTIALS_REJECTED -> new UrlProof(null, null, ManagementUrlProblem.CREDENTIALS_REJECTED, false);
+                case CREDENTIALS_REJECTED, NOT_AUTHORIZED ->
+                    new UrlProof(null, null, ManagementUrlProblem.CREDENTIALS_REJECTED, false);
                 case UNREACHABLE -> new UrlProof(null, null, ManagementUrlProblem.UNREACHABLE, false);
                 case TLS_FAILED -> new UrlProof(null, null, ManagementUrlProblem.TLS_FAILED, false);
                 case NOT_ARTEMIS, WRONG_PATH, BAD_RESPONSE, UNSUPPORTED_VERSION ->

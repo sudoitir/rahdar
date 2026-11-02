@@ -151,7 +151,8 @@ describe('ErrorState', () => {
     ['NOT_ARTEMIS', 'There is no Artemis broker at this agent', 422, false],
     ['WRONG_PATH', 'There is no Jolokia agent at this address', 422, false],
     ['TLS_FAILED', 'The TLS handshake with the broker failed', 502, false],
-    ['BAD_RESPONSE', 'The broker sent an unexpected response', 502, true],
+    ['NOT_AUTHORIZED', 'The broker refused this account', 422, false],
+    ['BAD_RESPONSE', 'The broker sent a response Rahdar cannot use', 502, true],
     ['UNSUPPORTED_VERSION', 'This Artemis version is not supported', 422, false],
   ])('reads the broker error kind %s', (kind, title, status, retryable) => {
     renderWithProviders(
@@ -171,6 +172,20 @@ describe('ErrorState', () => {
     expect(screen.getByText('Nothing answered at the broker address.')).toBeInTheDocument();
     expect(screen.getByText('Connection refused: artemis-1:8161')).toBeInTheDocument();
     expect(screen.getByText(/Check that the broker is running/)).toBeInTheDocument();
+  });
+
+  it.each([
+    ['Kafka', 'BAD_RESPONSE', 'Kafka sent a response Rahdar cannot use'],
+    ['Kafka', 'NOT_AUTHORIZED', 'Kafka refused this account'],
+    ['Kafka', 'UNSUPPORTED_VERSION', 'This Kafka version is not supported'],
+    ['RabbitMQ', 'WRONG_PATH', 'There is no management API at this address'],
+    ['RabbitMQ', 'UNSUPPORTED_VERSION', 'This RabbitMQ version is not supported'],
+  ])('names %s, never Artemis, for the broker error kind %s', (system, kind, title) => {
+    const { container } = renderWithProviders(
+      <ErrorState error={apiError(422, { system }, { brokerErrorKind: kind })} />,
+    );
+    expect(screen.getByText(title)).toBeInTheDocument();
+    expect(container.textContent).not.toMatch(/Artemis|Jolokia/);
   });
 
   it('names the account the broker rejected', () => {

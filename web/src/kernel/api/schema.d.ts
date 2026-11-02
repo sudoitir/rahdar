@@ -5420,8 +5420,11 @@ export interface components {
              */
             versionSupport: "SUPPORTED" | "BELOW_MINIMUM" | "NEWER_THAN_TESTED" | "UNKNOWN";
             lastError?: string | null;
-            /** @enum {string|null} */
-            lastErrorKind?: "UNREACHABLE" | "THROTTLED" | "CREDENTIALS_REJECTED" | "NOT_ARTEMIS" | "WRONG_PATH" | "TLS_FAILED" | "BAD_RESPONSE" | "UNSUPPORTED_VERSION" | null;
+            /**
+             * @description Why the last call to the node failed. NOT_AUTHORIZED means the broker knows the account but an ACL or permission refused the call.
+             * @enum {string|null}
+             */
+            lastErrorKind?: "UNREACHABLE" | "THROTTLED" | "CREDENTIALS_REJECTED" | "NOT_AUTHORIZED" | "NOT_ARTEMIS" | "WRONG_PATH" | "TLS_FAILED" | "BAD_RESPONSE" | "UNSUPPORTED_VERSION" | null;
             /** Format: date-time */
             lastSeenAt?: string | null;
             /**
@@ -7962,6 +7965,8 @@ export interface components {
                 message?: string;
             }[];
             brokerErrorKind?: string;
+            /** @description Kafka, RabbitMQ or Artemis: the system a broker failure is of. */
+            system?: string;
             /** @description MANAGEMENT or CORE: the account a broker rejected. */
             account?: string;
             refusalKind?: string;
