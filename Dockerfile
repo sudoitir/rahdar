@@ -6,7 +6,7 @@
 # under QEMU for arm64 made the release image take ten times longer for no different output.
 
 # ── 1. Build the frontend ────────────────────────────────────────────────────
-FROM --platform=$BUILDPLATFORM node:24-bookworm-slim@sha256:a5f4366e834695d5f363b920c104953a535d3a9864d1bdf74566a0ebe01daee5 AS web
+FROM --platform=$BUILDPLATFORM node:24-bookworm-slim@sha256:c86ecead9e55a5210ac1727de38a4ca840bf03dcaf34dc9749addbf383b1920c AS web
 WORKDIR /web
 COPY web/package.json web/package-lock.json ./
 RUN npm ci
