@@ -1615,6 +1615,104 @@ class MessageServiceTest {
         assertThat(page.hasNext()).isFalse();
     }
 
+    /**
+     * One partition alternates records that have no timestamp. Page size stays 2. One, three and eight such holes
+     * are each delivered once, in timestamp, then partition, then offset order, and a missing timestamp sorts last.
+     */
+    @Test
+    void alternatingMissingTimestampsAreEachDeliveredOnceAcrossOneThreeAndEightHoles() {
+        for (int holes : List.of(1, 3, 8)) {
+            assertThat(walkAlternatingHoles(holes)).containsExactlyElementsOf(alternatingOrder(holes));
+        }
+    }
+
+    /** Pages the shipped browse from the earliest record until it ends. A loop fails the page bound. */
+    private List<String> walkAlternatingHoles(int holes) {
+        List<LogPage.LogRecord> partition0 = alternatingPartition(holes);
+        List<LogPage.LogRecord> partition1 = new ArrayList<>();
+        for (int index = 0; index <= holes; index++) {
+            partition1.add(timed(index, 50L + 50L * index));
+        }
+        long end0 = 10L + 2L * holes;
+        long end1 = holes + 1L;
+        when(extensions.require(CLUSTER, LogBounds.class)).thenReturn(logBounds);
+        when(logBounds.partitions(CLUSTER, TOPIC))
+                .thenReturn(new TreeMap<>(Map.of(
+                        0, new LogBounds.Bounds(10, end0),
+                        1, new LogBounds.Bounds(0, end1))));
+        when(messages.browseLog(eq(CLUSTER), eq(TOPIC), anyInt(), any(), anyInt(), any()))
+                .thenAnswer(invocation -> {
+                    int partition = invocation.getArgument(2);
+                    return slice(
+                            invocation.getArgument(3),
+                            invocation.getArgument(4),
+                            partition == 0 ? end0 : end1,
+                            partition == 0 ? partition0 : partition1);
+                });
+
+        MessagePageView page =
+                service.browseLog(CLUSTER, TOPIC, MessageService.LogStart.parse("earliest", null), null, null, 2);
+        List<String> seen = new ArrayList<>();
+        int pages = 0;
+        int cap = partition0.size() + partition1.size() + 2;
+        while (true) {
+            seen.addAll(positions(page));
+            pages++;
+            if (!page.hasNext()) {
+                break;
+            }
+            assertThat(pages)
+                    .as("holes %s still continuing after %s", holes, seen)
+                    .isLessThan(cap);
+            page = service.browseLog(
+                    CLUSTER, TOPIC, MessageService.LogStart.parse("earliest", null), continuation(page), null, 2);
+        }
+        assertThat(page.hasNext()).isFalse();
+        return seen;
+    }
+
+    /** Partition 0: a missing timestamp, then a timestamp, repeated {@code holes} times. Offsets start at 10. */
+    private static List<LogPage.LogRecord> alternatingPartition(int holes) {
+        List<LogPage.LogRecord> records = new ArrayList<>();
+        for (int hole = 0; hole < holes; hole++) {
+            records.add(timed(10L + 2L * hole, 0));
+            records.add(timed(11L + 2L * hole, 100L + 50L * hole));
+        }
+        return records;
+    }
+
+    /**
+     * The order a merged page must show: timestamp, then partition, then offset. A timestamp of zero is missing
+     * and sorts last. This is the log, not the page loop.
+     */
+    private static List<String> alternatingOrder(int holes) {
+        record Placed(int partition, long offset, long timestamp) {}
+        List<Placed> rows = new ArrayList<>();
+        for (LogPage.LogRecord record : alternatingPartition(holes)) {
+            rows.add(
+                    new Placed(0, record.message().messageId(), record.message().timestamp()));
+        }
+        for (int index = 0; index <= holes; index++) {
+            rows.add(new Placed(1, index, 50L + 50L * index));
+        }
+        rows.sort((left, right) -> {
+            boolean leftMissing = left.timestamp() <= 0;
+            boolean rightMissing = right.timestamp() <= 0;
+            if (leftMissing != rightMissing) {
+                return leftMissing ? 1 : -1;
+            }
+            if (!leftMissing && left.timestamp() != right.timestamp()) {
+                return Long.compare(left.timestamp(), right.timestamp());
+            }
+            int byPartition = Integer.compare(left.partition(), right.partition());
+            if (byPartition != 0) {
+                return byPartition;
+            }
+            return Long.compare(left.offset(), right.offset());
+        });
+        return rows.stream().map(row -> row.partition() + ":" + row.offset()).toList();
+    }
+
     @Test
     void latestDeliversAnOffsetLeftBehindInsideTheTailWithoutReadingPastIt() {
         when(extensions.require(CLUSTER, LogBounds.class)).thenReturn(logBounds);

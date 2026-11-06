@@ -20,12 +20,26 @@ export interface PartitionBrowse {
 }
 
 /**
- * One partition's place in a continuation: {@code partition:offset}, {@code partition:offset:end}, or
- * {@code partition:offset::10} / {@code partition:offset:end:10-12.14} when an earlier offset is still owed.
- * A plus is not accepted: a query string would turn it into a space.
+ * Characters the server writes into a continuation. The console does not parse owed offsets out of it.
+ * A plus is absent on purpose: a query string would turn it into a space.
  */
-const CONTINUATION = String.raw`\d+:\d+(?::\d*)?(?::\d+(?:-\d+)?(?:\.\d+(?:-\d+)*)?)?`;
-const AT = new RegExp(`^${CONTINUATION}(?:,${CONTINUATION})*$`);
+const CONTINUATION_ALPHABET = /^[0-9:,.-]+$/;
+
+/**
+ * Long enough for every unfinished partition to name its offset and the offsets it still owes.
+ * Anything longer is not a continuation this page can send back.
+ */
+const CONTINUATION_MAX = 65_536;
+
+/**
+ * The continuation to keep, or nothing. It must name a partition ({@code partition:offset}), stay inside
+ * {@link CONTINUATION_ALPHABET}, and fit in {@link CONTINUATION_MAX}. A bare number is one offset, not a
+ * continuation, so it is dropped and a bad link still opens.
+ */
+function continuationToken(at: string | undefined): string | undefined {
+  if (!at || at.length > CONTINUATION_MAX || !at.includes(':') || !CONTINUATION_ALPHABET.test(at)) return undefined;
+  return at;
+}
 
 /** The browse the address describes. Nothing in the address reads every partition from the earliest record. */
 export function browseOf(search: { partition?: number; from?: string; value?: string; at?: string }): PartitionBrowse {
@@ -39,7 +53,7 @@ export function browseOf(search: { partition?: number; from?: string; value?: st
     partition,
     from,
     value: needsValue ? search.value : undefined,
-    at: search.at && AT.test(search.at) ? search.at : undefined,
+    at: continuationToken(search.at),
   };
 }
 
@@ -66,7 +80,8 @@ export function browseAddress(raw: Record<string, unknown>): {
   const from = BROWSE_FROM.find((item) => item.value === raw.from)?.value;
   if (from) out.from = from;
   if ((from === 'offset' || from === 'time') && typeof raw.value === 'string' && raw.value) out.value = raw.value;
-  if (typeof raw.at === 'string' && AT.test(raw.at)) out.at = raw.at;
+  const at = typeof raw.at === 'string' ? continuationToken(raw.at) : undefined;
+  if (at) out.at = at;
   if (raw.messagePartition != null && raw.messagePartition !== '') {
     const messagePartition = Number(raw.messagePartition);
     if (Number.isInteger(messagePartition) && messagePartition >= 0) out.messagePartition = messagePartition;

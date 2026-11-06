@@ -8,7 +8,7 @@ import { notifications } from '@mantine/notifications';
 import { renderWithProviders } from '../../test/render.tsx';
 import { server } from '../../test/setup.ts';
 import { KAFKA_KINDS, KAFKA_SYSTEM } from '../../test/wire.ts';
-import { browseAddress, formatResume, messageQuery, orderLogRecords } from './partitionBrowse.ts';
+import { browseAddress, browseOf, formatResume, messageQuery, orderLogRecords } from './partitionBrowse.ts';
 
 let searchState: Record<string, unknown> = {};
 const searchListeners = new Set<() => void>();
@@ -324,6 +324,16 @@ describe('MessagesView on a partitioned log', () => {
     expect(browseAddress({ at: '0:12::10' }).at).toBe('0:12::10');
     expect(browseAddress({ at: '0:13:13:10.12,1:6' }).at).toBe('0:13:13:10.12,1:6');
     expect(browseAddress({ at: '120' }).at).toBeUndefined();
+    const threeHoles = formatResume([{ partition: 0, offset: 15, pending: '10.12.14' }]);
+    const eightSpans = Array.from({ length: 8 }, (_, index) => String(10 + index * 2)).join('.');
+    const eightHoles = formatResume([{ partition: 0, offset: 40, pending: eightSpans }]);
+    expect(threeHoles).toBe('0:15::10.12.14');
+    expect(eightSpans.split('.')).toHaveLength(8);
+    expect(eightHoles).toBe(`0:40::${eightSpans}`);
+    expect(browseAddress({ at: threeHoles }).at).toBe(threeHoles);
+    expect(browseAddress({ at: eightHoles }).at).toBe(eightHoles);
+    expect(browseOf({ at: threeHoles }).at).toBe(threeHoles);
+    expect(browseOf({ at: eightHoles }).at).toBe(eightHoles);
     expect(
       formatResume([
         { partition: 1, offset: 6 },
@@ -581,6 +591,32 @@ describe('MessagesView on a partitioned log', () => {
     expect(last.searchParams.has('partition')).toBe(false);
     expect(last.searchParams.has('value')).toBe(false);
     expect(last.searchParams.get('size')).toBe('200');
+  });
+
+  it('sends back every owed offset when the server names more than two', async () => {
+    const pending = '10.12.14';
+    const seen = mockKafka((url) =>
+      url.searchParams.has('at')
+        ? page([record(10, { partition: 0, bodyPreview: 'owed-10' })], mergedLog())
+        : page(
+            [
+              record(11, { partition: 0, bodyPreview: 'shown-11' }),
+              record(13, { partition: 0, bodyPreview: 'shown-13' }),
+            ],
+            mergedLog({ resume: [{ partition: 0, offset: 15, pending }] }),
+          ),
+    );
+    const user = userEvent.setup();
+    renderWithProviders(<MessagesView />);
+
+    expect(await screen.findByText('shown-11')).toBeInTheDocument();
+    await user.click(
+      screen.getByRole('button', { name: 'Next records, continuing each partition from its own offset' }),
+    );
+    expect(await screen.findByText('owed-10')).toBeInTheDocument();
+    expect(seen.at(-1)!.searchParams.get('at')).toBe(`0:15::${pending}`);
+    expect(seen.at(-1)!.searchParams.has('partition')).toBe(false);
+    expect(seen.at(-1)!.searchParams.has('value')).toBe(false);
   });
 
   it('purges a log by moving its position, and keeps the reason in the dialog when the run is refused', async () => {
