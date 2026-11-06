@@ -65,6 +65,35 @@ public record BrowsedMessage(
                 booleanProperties);
     }
 
+    /** The same message with one more boolean property, such as a log record that is a tombstone. */
+    public BrowsedMessage withBooleanProperty(String name, boolean value) {
+        Map<String, Boolean> extended = new HashMap<>(booleanProperties);
+        extended.put(name, value);
+        return new BrowsedMessage(
+                messageId,
+                type,
+                durable,
+                priority,
+                timestamp,
+                expiration,
+                size,
+                groupId,
+                correlationId,
+                replyTo,
+                userId,
+                body,
+                bodyEncoding,
+                bodyCompression,
+                contentType,
+                bodyTruncated,
+                observedLimitBytes,
+                stringProperties,
+                intProperties,
+                longProperties,
+                doubleProperties,
+                Map.copyOf(extended));
+    }
+
     /** First ~200 chars of the body, for the grid cell. */
     public String bodyPreview() {
         if (body == null) {

@@ -66,7 +66,8 @@ public class MessageController {
             @RequestParam(required = false) Integer size,
             @RequestParam(required = false) Integer partition,
             @RequestParam(required = false) String from,
-            @RequestParam(required = false) String value) {
+            @RequestParam(required = false) String value,
+            @RequestParam(required = false) String at) {
         ResourceQuery paging = ResourceQuery.ofPage(page, size);
         if (kinds.log(clusterId, kind)) {
             // A stream is one log, read by offset as partition 0.
@@ -80,15 +81,18 @@ public class MessageController {
                     paging.size());
         }
         if (kinds.partitioned(clusterId, kind)) {
-            // A partitioned log is read one partition at a time, from an offset or a time (ADR-0216), through a
-            // topic or through a group's subscription of it, which also says where the group stands.
+            // No partition reads every partition into one page. A partition focuses that one. A group's subscription
+            // of a topic reads the same log; focusing it also says where the group stands.
             Target target = logTarget(clusterId, kind, path);
             LogStart start = LogStart.parse(from, value);
+            if (partition == null) {
+                return target.resourceClass() == ResourceClass.SUBSCRIPTION
+                        ? messages.browseSubscriptionLog(clusterId, target.id(), start, at, filter, paging.size())
+                        : messages.browseLog(clusterId, target.id(), start, at, filter, paging.size());
+            }
             return target.resourceClass() == ResourceClass.SUBSCRIPTION
-                    ? messages.browseSubscriptionLog(
-                            clusterId, target.id(), requirePartition(partition), start, filter, paging.size())
-                    : messages.browseLog(
-                            clusterId, target.id(), requirePartition(partition), start, filter, paging.size());
+                    ? messages.browseSubscriptionLog(clusterId, target.id(), partition, start, filter, paging.size())
+                    : messages.browseLog(clusterId, target.id(), partition, start, filter, paging.size());
         }
         requireBrowsable(clusterId, kind, path);
         return messages.browse(
@@ -233,9 +237,11 @@ public class MessageController {
         }
     }
 
+    /** One record is addressed by its partition and its offset. A missing partition cannot name the record. */
     private static int requirePartition(Integer partition) {
         if (partition == null) {
-            throw new IllegalArgumentException("partition is required: a log is read one partition at a time.");
+            throw new IllegalArgumentException(
+                    "partition is required to read one record: an offset belongs to one partition.");
         }
         return partition;
     }
