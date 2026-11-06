@@ -10347,6 +10347,13 @@
           "schema" : {
             "type" : "string"
           }
+        }, {
+          "name" : "at",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
         } ],
         "responses" : {
           "200" : {
@@ -43373,12 +43380,32 @@
           }
         }
       },
-      "LogView" : {
+      "PartitionResume" : {
         "type" : "object",
         "properties" : {
           "partition" : {
             "type" : "integer",
             "format" : "int32"
+          },
+          "offset" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "end" : {
+            "type" : [ "integer", "null" ],
+            "format" : "int64",
+            "description" : "The offset the next read of this partition stops before, so a later page does not repeat a record already shown. Absent when the next read starts at offset and runs for a page."
+          }
+        },
+        "required" : [ "offset", "partition" ]
+      },
+      "LogView" : {
+        "type" : "object",
+        "properties" : {
+          "partition" : {
+            "type" : [ "integer", "null" ],
+            "format" : "int32",
+            "description" : "The partition this page was read from. Null when the page merges every partition."
           },
           "start" : {
             "type" : "integer",
@@ -43391,7 +43418,7 @@
           "next" : {
             "type" : [ "integer", "null" ],
             "format" : "int64",
-            "description" : "The offset the next page starts at; null at the end."
+            "description" : "The offset the next page of this one partition starts at; null at the end, and null when the page merges every partition (see resume)."
           },
           "retentionMoved" : {
             "type" : "boolean",
@@ -43404,10 +43431,17 @@
           "subscriptionPosition" : {
             "type" : [ "integer", "null" ],
             "format" : "int64",
-            "description" : "Where the group stands on this partition, when the log is read through a group's subscription: its committed offset (a share group's start offset). Absent when the log is read as a topic, or the group has no position on the partition."
+            "description" : "Where the group stands on this partition, when the log is read through a group's subscription: its committed offset (a share group's start offset). Absent when the log is read as a topic, or the group has no position on the partition. Null when the page merges every partition: the group stands on each partition separately."
+          },
+          "resume" : {
+            "type" : [ "array", "null" ],
+            "description" : "Where a merged page continues: one offset per partition that still has records. Empty when a merged page is finished. Null when the page is one partition, whose next offset is next. There is no offset that applies to every partition.",
+            "items" : {
+              "$ref" : "#/components/schemas/PartitionResume"
+            }
           }
         },
-        "required" : [ "end", "partition", "retentionMoved", "start", "uncommittedHidden" ]
+        "required" : [ "end", "retentionMoved", "start", "uncommittedHidden" ]
       },
       "MessagePageView" : {
         "type" : "object",
@@ -43528,6 +43562,11 @@
             "type" : [ "string", "null" ],
             "description" : "How key is written; null with no key.",
             "enum" : [ "TEXT", "BASE64", null ]
+          },
+          "partition" : {
+            "type" : [ "integer", "null" ],
+            "format" : "int32",
+            "description" : "The partition this record was read from. Null on a queue, which has none."
           }
         },
         "required" : [ "bodyTruncated", "durable", "expiration", "position", "priority", "propertyCount", "redactions", "size", "tombstone", "type" ]

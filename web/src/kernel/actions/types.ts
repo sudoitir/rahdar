@@ -82,6 +82,8 @@ export interface MessageTarget {
   position: string;
   /** The node the message was browsed on; absent for the live node. */
   node?: string;
+  /** The partition this record was read from. An offset belongs to that partition, including partition 0. */
+  partition?: number;
 }
 
 export interface RouteTarget extends ResourceRef {

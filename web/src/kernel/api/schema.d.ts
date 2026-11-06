@@ -8432,16 +8432,30 @@ export interface components {
             placements?: components["schemas"]["PlacementView"][];
             nodes?: components["schemas"]["NodeConfiguration"][];
         };
-        LogView: {
+        PartitionResume: {
             /** Format: int32 */
             partition: number;
+            /** Format: int64 */
+            offset: number;
+            /**
+             * Format: int64
+             * @description The offset the next read of this partition stops before, so a later page does not repeat a record already shown. Absent when the next read starts at offset and runs for a page.
+             */
+            end?: number | null;
+        };
+        LogView: {
+            /**
+             * Format: int32
+             * @description The partition this page was read from. Null when the page merges every partition.
+             */
+            partition?: number | null;
             /** Format: int64 */
             start: number;
             /** Format: int64 */
             end: number;
             /**
              * Format: int64
-             * @description The offset the next page starts at; null at the end.
+             * @description The offset the next page of this one partition starts at; null at the end, and null when the page merges every partition (see resume).
              */
             next?: number | null;
             /** @description The offset asked for was already removed by retention. */
@@ -8450,9 +8464,13 @@ export interface components {
             uncommittedHidden: boolean;
             /**
              * Format: int64
-             * @description Where the group stands on this partition, when the log is read through a group's subscription: its committed offset (a share group's start offset). Absent when the log is read as a topic, or the group has no position on the partition.
+             * @description Where the group stands on this partition, when the log is read through a group's subscription: its committed offset (a share group's start offset). Absent when the log is read as a topic, or the group has no position on the partition. Null when the page merges every partition: the group stands on each partition separately.
              */
             subscriptionPosition?: number | null;
+            /**
+             * @description Where a merged page continues: one offset per partition that still has records. Empty when a merged page is finished. Null when the page is one partition, whose next offset is next. There is no offset that applies to every partition.
+             */
+            resume?: components["schemas"]["PartitionResume"][] | null;
         };
         MessagePageView: {
             data: components["schemas"]["MessageSummaryView"][];
@@ -8514,6 +8532,11 @@ export interface components {
              * @enum {string|null}
              */
             keyEncoding?: "TEXT" | "BASE64" | null;
+            /**
+             * Format: int32
+             * @description The partition this record was read from. Null on a queue, which has none.
+             */
+            partition?: number | null;
         };
         MessageDetailView: {
             /** @description The message's position on its node, opaque. */

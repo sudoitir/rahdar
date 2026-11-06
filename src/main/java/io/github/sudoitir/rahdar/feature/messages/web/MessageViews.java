@@ -62,7 +62,12 @@ public final class MessageViews {
                     nullable = true,
                     allowableValues = {"TEXT", "BASE64"},
                     description = "How key is written; null with no key.")
-            String keyEncoding) {}
+            String keyEncoding,
+
+            @Schema(
+                    nullable = true,
+                    description = "The partition this record was read from. Null on a queue, which has none.")
+            Integer partition) {}
 
     /** One message, expanded: the full header set, the typed property maps, and the body. */
     public record MessageDetailView(
@@ -153,16 +158,39 @@ public final class MessageViews {
             String notice) {}
 
     /**
-     * Where a page of a partitioned log sits. {@code start} and {@code end} are the partition's first offset and
-     * the one after its last, so an offset asked for past the end is an empty page that says where the end is,
-     * and one before the start is read from the start with {@code retentionMoved} set.
+     * Where the next page of a merged read resumes on one partition. The offset belongs to that partition.
+     */
+    public record PartitionResume(
+            @Schema(requiredMode = REQUIRED) int partition,
+            @Schema(requiredMode = REQUIRED) long offset,
+
+            @Schema(
+                    nullable = true,
+                    description = "The offset the next read of this partition stops before, so a later page does not"
+                            + " repeat a record already shown. Absent when the next read starts at offset and runs"
+                            + " for a page.")
+            Long end) {}
+
+    /**
+     * Where a page of a partitioned log sits. When {@code partition} is set, {@code start} and {@code end} are that
+     * partition's first offset and the one after its last, so an offset asked for past the end is an empty page that
+     * says where the end is, and one before the start is read from the start with {@code retentionMoved} set.
+     * When {@code partition} is null the page merges every partition: {@code next} is null, and {@code resume} holds
+     * one offset per partition that still has records.
      */
     public record LogView(
-            @Schema(requiredMode = REQUIRED) int partition,
+            @Schema(
+                    nullable = true,
+                    description = "The partition this page was read from. Null when the page merges every partition.")
+            Integer partition,
+
             @Schema(requiredMode = REQUIRED) long start,
             @Schema(requiredMode = REQUIRED) long end,
 
-            @Schema(nullable = true, description = "The offset the next page starts at; null at the end.")
+            @Schema(
+                    nullable = true,
+                    description = "The offset the next page of this one partition starts at; null at the end, and"
+                            + " null when the page merges every partition (see resume).")
             Long next,
 
             @Schema(requiredMode = REQUIRED, description = "The offset asked for was already removed by retention.")
@@ -178,8 +206,16 @@ public final class MessageViews {
                     nullable = true,
                     description = "Where the group stands on this partition, when the log is read through a group's"
                             + " subscription: its committed offset (a share group's start offset). Absent when the"
-                            + " log is read as a topic, or the group has no position on the partition.")
-            Long subscriptionPosition) {}
+                            + " log is read as a topic, or the group has no position on the partition. Null when the page"
+                            + " merges every partition: the group stands on each partition separately.")
+            Long subscriptionPosition,
+
+            @Schema(
+                    nullable = true,
+                    description = "Where a merged page continues: one offset per partition that still has records."
+                            + " Empty when a merged page is finished. Null when the page is one partition, whose next"
+                            + " offset is next. There is no offset that applies to every partition.")
+            List<PartitionResume> resume) {}
 
     /**
      * A send whose outcome is unknown (HTTP 202): the message left, and the broker's confirmation never came

@@ -5,12 +5,13 @@ import { AUTO, localZone } from '../../kernel/time/timezone.ts';
 import { kindColumn, type Column } from '../../ui/table/index.ts';
 import type { DeadLetterSubscription, MessageSummaryView } from './api.ts';
 import { BodyPreview, SubscriptionLink } from './cells.tsx';
+import { writtenLabel } from './partitionBrowse.ts';
 
 /**
  * The columns of the message browser. The enqueue time is written in the display zone `zone`, which
  * the header states, so a view builds its columns again when the zone changes.
  */
-export function messageColumns(zone: string, partitioned = false): Column<MessageSummaryView>[] {
+export function messageColumns(zone: string, partitioned = false, showPartition = false): Column<MessageSummaryView>[] {
   // A record of a log has none of an Artemis message's priority, durability or properties; the server sends zeros.
   const own: Column<MessageSummaryView>[] = partitioned
     ? [
@@ -40,7 +41,15 @@ export function messageColumns(zone: string, partitioned = false): Column<Messag
     kind: 'number',
     priority: 'low',
   };
+  const partitionColumn: Column<MessageSummaryView> = {
+    id: 'partition',
+    header: 'Partition',
+    accessor: (m) => (m.partition == null ? '' : m.partition),
+    kind: 'number',
+    priority: 'essential',
+  };
   return [
+    ...(showPartition ? [partitionColumn] : []),
     {
       id: 'position',
       header: partitioned ? 'Offset' : 'Message ID',
@@ -51,7 +60,7 @@ export function messageColumns(zone: string, partitioned = false): Column<Messag
     {
       id: 'timestamp',
       header: partitioned ? 'Written' : 'Enqueued',
-      accessor: (m) => absoluteLabel(m.timestamp),
+      accessor: (m) => (partitioned ? writtenLabel(m.timestamp, absoluteLabel) : absoluteLabel(m.timestamp)),
       description: `When the broker enqueued the message, in ${zone === AUTO ? localZone() : zone}`,
       kind: 'time',
       priority: 'high',

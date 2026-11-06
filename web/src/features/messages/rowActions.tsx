@@ -54,7 +54,12 @@ function messagePath(target: MessageTarget) {
 }
 
 function messageSearch(target: MessageTarget) {
-  return { message: target.position, node: target.node };
+  return {
+    message: target.position,
+    node: target.node,
+    // 0 is a real partition. A missing partition is a queue, whose offset is not per partition.
+    ...(target.partition != null ? { messagePartition: target.partition } : {}),
+  };
 }
 
 export function OpenMessage({ clusterId, target }: Readonly<ActionProps<MessageTarget>>) {

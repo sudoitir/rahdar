@@ -46,6 +46,7 @@ import io.github.sudoitir.rahdar.feature.messages.web.MessageRequests.MessageAct
 import io.github.sudoitir.rahdar.feature.messages.web.MessageRequests.SendMessageRequest;
 import io.github.sudoitir.rahdar.feature.messages.web.MessageViews.MessageDetailView;
 import io.github.sudoitir.rahdar.feature.messages.web.MessageViews.MessagePageView;
+import io.github.sudoitir.rahdar.feature.messages.web.MessageViews.PartitionResume;
 import io.github.sudoitir.rahdar.kernel.audit.AuditEvent;
 import io.github.sudoitir.rahdar.kernel.audit.AuditService;
 import io.github.sudoitir.rahdar.kernel.core.ConflictException;
@@ -95,6 +96,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.UUID;
 import java.util.function.Supplier;
 import org.junit.jupiter.api.AfterEach;
@@ -1218,7 +1220,49 @@ class MessageServiceTest {
     }
 
     private static Position.AtOffsets at(long offset) {
-        return new Position.AtOffsets(Map.of(Shard.partition(PartitionId.of("0")), offset));
+        return atPartition(0, offset);
+    }
+
+    private static Position.AtOffsets atPartition(int partition, long offset) {
+        return new Position.AtOffsets(Map.of(Shard.partition(PartitionId.of(String.valueOf(partition))), offset));
+    }
+
+    /** The tail page when the read asked for {@code offset}, and an empty page otherwise. */
+    private static LogPage asked(Position position, long offset, Long next, List<LogPage.LogRecord> records) {
+        if (!(position instanceof Position.AtOffsets atOffsets)
+                || !atOffsets.offsets().containsValue(offset)) {
+            return new LogPage(List.of(), null);
+        }
+        return new LogPage(records, next);
+    }
+
+    private static LogPage.LogRecord timed(long offset, long timestamp) {
+        return new LogPage.LogRecord(
+                new BrowsedMessage(
+                        offset,
+                        3,
+                        true,
+                        4,
+                        timestamp,
+                        0L,
+                        1L,
+                        null,
+                        null,
+                        null,
+                        null,
+                        "v",
+                        BodyEncoding.TEXT,
+                        Compression.NONE,
+                        null,
+                        false,
+                        null,
+                        Map.of(),
+                        Map.of(),
+                        Map.of(),
+                        Map.of(),
+                        Map.of()),
+                false,
+                null);
     }
 
     // ---- a cluster read as one ------------------------------------------------------------------------
@@ -1391,6 +1435,70 @@ class MessageServiceTest {
         assertThat(page.log().retentionMoved()).isFalse();
         assertThat(page.hasNext()).isFalse();
         verify(messages, never()).browseLog(any(), any(), anyInt(), any(), anyInt(), any());
+    }
+
+    @Test
+    void latestAcrossPartitionsIsTheNewestTailsAndDoesNotContinuePastThem() {
+        when(extensions.require(CLUSTER, LogBounds.class)).thenReturn(logBounds);
+        when(logBounds.partitions(CLUSTER, TOPIC))
+                .thenReturn(new TreeMap<>(Map.of(0, new LogBounds.Bounds(0, 100), 1, new LogBounds.Bounds(0, 200))));
+        when(messages.browseLog(eq(CLUSTER), eq(TOPIC), eq(0), any(), anyInt(), any()))
+                .thenAnswer(invocation ->
+                        asked(invocation.getArgument(3), 98, null, List.of(timed(98, 10), timed(99, 11))));
+        when(messages.browseLog(eq(CLUSTER), eq(TOPIC), eq(1), any(), anyInt(), any()))
+                .thenAnswer(invocation ->
+                        asked(invocation.getArgument(3), 198, 200L, List.of(timed(198, 5_000), timed(199, 5_001))));
+
+        MessagePageView page =
+                service.browseLog(CLUSTER, TOPIC, MessageService.LogStart.parse("latest", null), null, null, 2);
+
+        assertThat(page.data())
+                .extracting(row -> row.partition() + ":" + row.position())
+                .containsExactly("1:198", "1:199");
+        assertThat(page.data()).extracting(row -> row.timestamp()).containsExactly(5_000L, 5_001L);
+        assertThat(page.hasNext()).isTrue();
+        assertThat(page.log().resume()).containsExactly(new PartitionResume(0, 98, null));
+
+        MessagePageView older =
+                service.browseLog(CLUSTER, TOPIC, MessageService.LogStart.parse("latest", null), "0:98", null, 2);
+
+        assertThat(older.data())
+                .extracting(row -> row.partition() + ":" + row.position())
+                .containsExactly("0:98", "0:99");
+        assertThat(older.data()).allSatisfy(row -> assertThat(row.timestamp()).isLessThan(5_000L));
+        assertThat(older.hasNext()).isFalse();
+        verify(messages, never()).browseLog(eq(CLUSTER), eq(TOPIC), eq(1), eq(atPartition(1, 200)), anyInt(), any());
+    }
+
+    @Test
+    void aLatestPageThatSplitsAPartitionContinuesBeforeTheRecordItShowed() {
+        when(extensions.require(CLUSTER, LogBounds.class)).thenReturn(logBounds);
+        when(logBounds.partitions(CLUSTER, TOPIC))
+                .thenReturn(new TreeMap<>(Map.of(0, new LogBounds.Bounds(0, 10), 1, new LogBounds.Bounds(0, 10))));
+        when(messages.browseLog(eq(CLUSTER), eq(TOPIC), eq(0), any(), anyInt(), any()))
+                .thenAnswer(
+                        invocation -> asked(invocation.getArgument(3), 8, 10L, List.of(timed(8, 10), timed(9, 100))));
+        when(messages.browseLog(eq(CLUSTER), eq(TOPIC), eq(1), any(), anyInt(), any()))
+                .thenAnswer(
+                        invocation -> asked(invocation.getArgument(3), 8, 10L, List.of(timed(8, 90), timed(9, 5_000))));
+
+        MessagePageView page =
+                service.browseLog(CLUSTER, TOPIC, MessageService.LogStart.parse("latest", null), null, null, 2);
+
+        assertThat(page.data())
+                .extracting(row -> row.partition() + ":" + row.position())
+                .containsExactly("0:9", "1:9");
+        assertThat(page.log().resume()).containsExactly(new PartitionResume(0, 8, 9L), new PartitionResume(1, 8, 9L));
+
+        MessagePageView older = service.browseLog(
+                CLUSTER, TOPIC, MessageService.LogStart.parse("latest", null), "0:8:9,1:8:9", null, 2);
+
+        assertThat(older.data())
+                .extracting(row -> row.partition() + ":" + row.position())
+                .containsExactly("0:8", "1:8");
+        assertThat(older.data()).allSatisfy(row -> assertThat(row.timestamp()).isLessThan(100L));
+        assertThat(older.hasNext()).isFalse();
+        assertThat(older.log().resume()).isEmpty();
     }
 
     @Test

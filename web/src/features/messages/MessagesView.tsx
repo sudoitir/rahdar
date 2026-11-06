@@ -18,7 +18,15 @@ import { PageHeader } from '../../ui/PageHeader.tsx';
 import { Toolbar } from '../../ui/Toolbar.tsx';
 import { DataTable } from '../../ui/table/index.ts';
 import { messageColumns } from './columns.ts';
-import { browseOf, SELECTOR_REFUSAL, type PartitionBrowse } from './partitionBrowse.ts';
+import {
+  browseOf,
+  formatResume,
+  MERGED_ORDER,
+  messageQuery,
+  orderLogRecords,
+  SELECTOR_REFUSAL,
+  type PartitionBrowse,
+} from './partitionBrowse.ts';
 import { PartitionControls, PartitionNotices } from './PartitionControls.tsx';
 import { useMessageGate } from './gates.ts';
 import { MessageDetailPanel } from './MessageDetailPanel.tsx';
@@ -37,7 +45,8 @@ const PAGE_SIZE = 200;
 
 const NO_ROWS: MessageSummaryView[] = [];
 
-const messageKey = (m: MessageSummaryView) => m.position;
+/** An offset repeats across partitions, so a merged row is named by both. A queue has only its position. */
+const messageKey = (m: MessageSummaryView) => (m.partition == null ? m.position : `${m.partition}:${m.position}`);
 
 /** "12 messages", or why the total is not known. */
 function countLabel(page: { count?: number | null; countUnavailable?: string | null }): string {
@@ -68,12 +77,15 @@ function MessagesEmpty({
   onClearSelector,
   partitioned,
   singleLog,
+  allPartitions,
 }: Readonly<{
   filtered: boolean;
   unreachable: string[];
   onClearSelector: () => void;
   partitioned: boolean;
   singleLog: boolean;
+  /** The browse reads every partition, so an empty page is not one partition's. */
+  allPartitions: boolean;
 }>) {
   if (singleLog && unreachable.length === 0) {
     return (
@@ -89,7 +101,11 @@ function MessagesEmpty({
       <EmptyState
         kind="empty"
         title="No records from here"
-        description="This partition has no committed record at or after the start you chose. Choose the earliest record, another partition or an earlier time."
+        description={
+          allPartitions
+            ? 'No partition has a committed record at or after the start you chose. Choose the earliest record, one partition or an earlier time.'
+            : 'This partition has no committed record at or after the start you chose. Choose the earliest record, another partition or an earlier time.'
+        }
       />
     );
   }
@@ -198,7 +214,7 @@ function useRowSelection(): {
 function messagesHeading(
   page: MessagePageView | undefined,
   partitioned: boolean,
-  partition: number,
+  partition: number | null,
   endpoints: readonly { id: string; name: string }[],
   singleLog?: string,
 ): string {
@@ -212,18 +228,7 @@ function messagesHeading(
     page.log?.uncommittedHidden === false
       ? ''
       : '. Only committed records are shown: those of a transaction that is still open or was aborted are not.';
-  return `Partition ${partition}${hidden}`;
-}
-
-/** What the browse asks for: one partition and a start, or a node, a selector and a page. */
-function messageQuery(
-  partitioned: boolean,
-  browse: PartitionBrowse,
-  search: { node?: string; filter?: string },
-  page: number,
-) {
-  if (partitioned) return { ...browse, size: PAGE_SIZE };
-  return { node: search.node, filter: search.filter, page, size: PAGE_SIZE };
+  return partition == null ? `Every partition${hidden}` : `Partition ${partition}${hidden}`;
 }
 
 /** The selector field of a queue, or the explanation that a log has no selector. */
@@ -244,6 +249,7 @@ function selectorField(partitioned: boolean, singleLog: boolean, filter: string)
 function browsePosition(
   partitioned: boolean,
   singleLog: boolean,
+  partition: number | null,
   log: MessagePageView['log'],
   page: number,
   lastPage: number | null,
@@ -251,13 +257,19 @@ function browsePosition(
   // A stream is read by offset; no consumer group stands anywhere on it.
   if (singleLog) return null;
   if (partitioned) {
+    // A merged page has no one offset for the group. Focusing a partition is what shows it.
+    if (partition == null) {
+      return (
+        <Text size="xs">The group stands on each partition separately. Focus one partition to see its offset.</Text>
+      );
+    }
     // Said in the toolbar, where its arrival moves nothing: the controls keep their place.
     if (log?.subscriptionPosition == null) {
       return <Text size="xs">The group's position on this partition is unavailable.</Text>;
     }
     return (
       <Text size="xs">
-        {`The group stands at offset ${log.subscriptionPosition.toLocaleString()} on partition ${log.partition}: records from there on it has not read yet.`}
+        {`The group stands at offset ${log.subscriptionPosition.toLocaleString()} on partition ${log.partition ?? partition}: records from there on it has not read yet.`}
       </Text>
     );
   }
@@ -332,7 +344,7 @@ interface HeaderDescription {
   /** Whether the kind cannot be browsed. */
   refused: boolean;
   page: MessagePageView | undefined;
-  partition: number;
+  partition: number | null;
   endpoints: readonly { id: string; name: string }[];
   logNoun: string | undefined;
   /** Whether the line keeps its height while the page loads. */
@@ -417,6 +429,8 @@ export function MessagesView() {
     partition?: number;
     from?: string;
     value?: string;
+    at?: string;
+    messagePartition?: number;
   };
   const navigate = useNavigate();
 
@@ -428,7 +442,7 @@ export function MessagesView() {
     [roleIds, subscriptionName],
   );
   const sendGate = useMessageGate(clusterId, 'message:send', 'Send messages', 'messageIo');
-  // A partitioned log is read from one partition and a start, not by selector, node and page.
+  // A partitioned log is read from every partition, or one focused partition, and a start. A queue uses a selector.
   const subscriptionKind = roleIds.loaded ? kindOf(roleIds.subscription(subscriptionName)) : undefined;
   const { partitioned, kindInfo, singleLog } = logShapeOf(
     subscriptionKind ?? kindOf(subscriptionName),
@@ -437,7 +451,10 @@ export function MessagesView() {
   // A kind the system cannot browse is refused before anything is read.
   const browseRefusal = browseRefusalOf(cluster.data, kindInfo);
   const browse = browseOf(search);
-  const columns = useMemo(() => messageColumns(zone, partitioned), [zone, partitioned]);
+  const columns = useMemo(
+    () => messageColumns(zone, partitioned, partitioned && !singleLog),
+    [zone, partitioned, singleLog],
+  );
   const [filter, setFilter] = useState(search.filter ?? '');
   const [debounced] = useDebouncedValue(filter, 250);
   // The open message is in the destination, so a link to one message opens it (non-negotiable #9).
@@ -446,8 +463,15 @@ export function MessagesView() {
     'resource',
     openId ? `${subscriptionRefWords(subscriptionName)} › message ${openId}` : subscriptionRefWords(subscriptionName),
   );
-  const setOpenId = (id: string | null) =>
-    navigate({ to: '.', search: (prev: Record<string, unknown>) => ({ ...prev, message: id ?? undefined }) });
+  const setOpenId = (id: string | null, recordPartition?: number | null) =>
+    navigate({
+      to: '.',
+      search: (prev: Record<string, unknown>) => ({
+        ...prev,
+        message: id ?? undefined,
+        messagePartition: id != null && recordPartition != null ? recordPartition : undefined,
+      }),
+    });
   const { selected, setSelected, toggleRow, toggleAll } = useRowSelection();
   const [sendOpen, setSendOpen] = useState(false);
   const page = search.page ?? 1;
@@ -475,7 +499,7 @@ export function MessagesView() {
   const messages = useMessages(
     clusterId,
     subscriptionName,
-    messageQuery(partitioned, browse, search, page),
+    messageQuery(partitioned, singleLog, browse, search, page, PAGE_SIZE),
     !browseRefusal,
   );
   const setBrowse = (next: PartitionBrowse) =>
@@ -483,10 +507,12 @@ export function MessagesView() {
       to: '.',
       search: (prev: Record<string, unknown>) => ({
         ...prev,
-        partition: next.partition,
+        partition: next.partition ?? undefined,
         from: next.from === 'earliest' ? undefined : next.from,
         value: next.value,
+        at: next.at,
         message: undefined,
+        messagePartition: undefined,
       }),
     });
 
@@ -552,7 +578,9 @@ export function MessagesView() {
     );
   }
 
-  const rows = messages.data?.data ?? NO_ROWS;
+  const rawRows = messages.data?.data ?? NO_ROWS;
+  // The server merges by the same order. Sorting here keeps a page that arrived partition by partition honest.
+  const rows = partitioned && !singleLog && browse.partition == null ? orderLogRecords(rawRows) : rawRows;
   // An unavailable total is stated, never read as zero: the page count is then unknown too.
   const total = messages.data?.count;
   const lastPage = lastPageOf(total);
@@ -591,7 +619,12 @@ export function MessagesView() {
                 browse={browse}
                 partitions={singleLog ? 1 : undefined}
                 onBrowse={setBrowse}
-                next={messages.data?.log?.next ?? null}
+                next={browse.partition == null ? null : (messages.data?.log?.next ?? null)}
+                resume={
+                  browse.partition == null && messages.data?.log?.resume?.length
+                    ? formatResume(messages.data.log.resume)
+                    : null
+                }
               />
             ) : null}
             <TextInput
@@ -610,7 +643,7 @@ export function MessagesView() {
         }
         end={
           <>
-            {browsePosition(partitioned, singleLog, messages.data?.log, page, lastPage)}
+            {browsePosition(partitioned, singleLog, browse.partition, messages.data?.log, page, lastPage)}
             <SelectionSlots
               clusterId={clusterId}
               subscription={subscription}
@@ -632,6 +665,11 @@ export function MessagesView() {
       />
 
       {/* Below the controls, so what the read has to say arrives under them and never pushes them down. */}
+      {partitioned && !singleLog && browse.partition == null ? (
+        <Notice tone="info" title="Every partition, one page">
+          {`${MERGED_ORDER} This page holds at most ${PAGE_SIZE} records. It is the next window of each partition, not one order of the whole log.`}
+        </Notice>
+      ) : null}
       {partitioned ? <PartitionNotices page={messages.data} browse={browse} /> : null}
 
       <DataTable
@@ -645,7 +683,7 @@ export function MessagesView() {
         error={
           messages.isError ? <ErrorState error={messages.error} onRetry={() => void messages.refetch()} /> : undefined
         }
-        onRowClick={(m) => setOpenId(m.position)}
+        onRowClick={(m) => setOpenId(m.position, m.partition)}
         selectable
         selected={selected}
         onToggleRow={toggleRow}
@@ -657,7 +695,12 @@ export function MessagesView() {
               <ResourceActions
                 kind="message"
                 clusterId={clusterId}
-                target={{ subscription, position: m.position, node: search.node }}
+                target={{
+                  subscription,
+                  position: m.position,
+                  node: search.node,
+                  ...(m.partition != null ? { partition: m.partition } : {}),
+                }}
                 restoreFocus={menu.restoreFocus}
               />
             ) : null,
@@ -669,6 +712,7 @@ export function MessagesView() {
             onClearSelector={clearSelector}
             partitioned={partitioned}
             singleLog={singleLog}
+            allPartitions={partitioned && !singleLog && browse.partition == null}
           />
         }
       />
@@ -679,7 +723,9 @@ export function MessagesView() {
         messageId={openId}
         node={search.node}
         filter={search.filter}
-        partition={partitioned ? browse.partition : undefined}
+        partition={
+          partitioned ? (singleLog ? 0 : (search.messagePartition ?? browse.partition ?? undefined)) : undefined
+        }
         onClose={() => setOpenId(null)}
       />
 

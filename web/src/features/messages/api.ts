@@ -39,10 +39,12 @@ export interface MessageBrowseParams {
   filter?: string;
   page?: number;
   size?: number;
-  /** A partitioned log is read from one partition, from a start; there are no pages. */
+  /** A focused partition. Absent reads every partition of a log. A stream is always 0. */
   partition?: number;
   from?: string;
   value?: string;
+  /** Merged-page continuation, {@code partition:offset} pairs. Not one offset for every partition. */
+  at?: string;
 }
 
 function messageSearch(params: MessageBrowseParams): string {
@@ -54,6 +56,7 @@ function messageSearch(params: MessageBrowseParams): string {
   if (params.partition !== undefined) sp.set('partition', String(params.partition));
   if (params.from) sp.set('from', params.from);
   if (params.value) sp.set('value', params.value);
+  if (params.at) sp.set('at', params.at);
   const s = sp.toString();
   return s ? `?${s}` : '';
 }
