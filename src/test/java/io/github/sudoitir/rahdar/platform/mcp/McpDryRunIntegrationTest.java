@@ -167,6 +167,8 @@ class McpDryRunIntegrationTest extends PostgresIntegrationTest {
 
     @Test
     void aRealRunWithoutTheQueueNameIsRefused() throws Exception {
+        // The shard shares one database. Earlier classes may already have audited a delete.
+        int before = messageAudits().size();
         JsonNode response = McpFixture.callTool(
                 mvc,
                 key,
@@ -187,13 +189,14 @@ class McpDryRunIntegrationTest extends PostgresIntegrationTest {
 
         assertThat(response.path("error").path("code").asInt()).isEqualTo(-32602);
         assertThat(response.path("error").path("message").asString()).contains(QUEUE);
-        // The refusal happens before the service is reached, so nothing is audited
-        // and nothing was touched. (Minting the key itself audits, hence the filter.)
-        assertThat(messageAudits()).isEmpty();
+        // The refusal happens before the service is reached, so this call adds no audit.
+        // Minting the key itself audits, hence the filter.
+        assertThat(messageAudits()).hasSize(before);
     }
 
     @Test
     void aRealRunWithNoConfirmAtAllIsRefused() throws Exception {
+        int before = messageAudits().size();
         JsonNode response = McpFixture.callTool(
                 mvc,
                 key,
@@ -211,7 +214,7 @@ class McpDryRunIntegrationTest extends PostgresIntegrationTest {
                         false));
 
         assertThat(response.path("error").path("code").asInt()).isEqualTo(-32602);
-        assertThat(messageAudits()).isEmpty();
+        assertThat(messageAudits()).hasSize(before);
     }
 
     private List<AuditEventEntity> messageAudits() {

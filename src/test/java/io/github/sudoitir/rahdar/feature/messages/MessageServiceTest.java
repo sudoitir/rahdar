@@ -46,6 +46,7 @@ import io.github.sudoitir.rahdar.feature.messages.web.MessageRequests.MessageAct
 import io.github.sudoitir.rahdar.feature.messages.web.MessageRequests.SendMessageRequest;
 import io.github.sudoitir.rahdar.feature.messages.web.MessageViews.MessageDetailView;
 import io.github.sudoitir.rahdar.feature.messages.web.MessageViews.MessagePageView;
+import io.github.sudoitir.rahdar.feature.messages.web.MessageViews.PartitionResume;
 import io.github.sudoitir.rahdar.kernel.audit.AuditEvent;
 import io.github.sudoitir.rahdar.kernel.audit.AuditService;
 import io.github.sudoitir.rahdar.kernel.core.ConflictException;
@@ -90,13 +91,17 @@ import io.github.sudoitir.rahdar.platform.governance.MessageContent;
 import io.github.sudoitir.rahdar.platform.scrape.QueueLocator;
 import io.github.sudoitir.rahdar.platform.scrape.QueueLocator.QueueLocation;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.UUID;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -1218,7 +1223,121 @@ class MessageServiceTest {
     }
 
     private static Position.AtOffsets at(long offset) {
-        return new Position.AtOffsets(Map.of(Shard.partition(PartitionId.of("0")), offset));
+        return atPartition(0, offset);
+    }
+
+    private static Position.AtOffsets atPartition(int partition, long offset) {
+        return new Position.AtOffsets(Map.of(Shard.partition(PartitionId.of(String.valueOf(partition))), offset));
+    }
+
+    /** The cursor the console sends back: partition order, with an owed range when the page left one behind. */
+    private static String continuation(MessagePageView page) {
+        return page.log().resume().stream()
+                .sorted(Comparator.comparingInt(PartitionResume::partition))
+                .map(MessageServiceTest::placed)
+                .collect(Collectors.joining(","));
+    }
+
+    private static String placed(PartitionResume item) {
+        if (item.pending() != null && !item.pending().isBlank()) {
+            String end = item.end() == null ? "" : Long.toString(item.end());
+            return item.partition() + ":" + item.offset() + ":" + end + ":" + item.pending();
+        }
+        if (item.end() != null) {
+            return item.partition() + ":" + item.offset() + ":" + item.end();
+        }
+        return item.partition() + ":" + item.offset();
+    }
+
+    private static List<String> positions(MessagePageView page) {
+        return page.data().stream()
+                .map(row -> row.partition() + ":" + row.position())
+                .toList();
+    }
+
+    private static long offsetOf(Position position) {
+        if (position instanceof Position.AtOffsets at && !at.offsets().isEmpty()) {
+            return at.offsets().values().iterator().next();
+        }
+        return -1;
+    }
+
+    /** The records at or after the asked offset, at most {@code size} of them, and nothing at or after {@code end}. */
+    private static LogPage slice(Position position, int size, long end, List<LogPage.LogRecord> log) {
+        if (!(position instanceof Position.AtOffsets at) || at.offsets().isEmpty() || size <= 0) {
+            return new LogPage(List.of(), null);
+        }
+        long offset = at.offsets().values().iterator().next();
+        if (offset >= end) {
+            return new LogPage(List.of(), null);
+        }
+        List<LogPage.LogRecord> records = log.stream()
+                .filter(record -> {
+                    long id = record.message().messageId();
+                    return id >= offset && id < end;
+                })
+                .limit(size)
+                .toList();
+        if (records.isEmpty()) {
+            return new LogPage(List.of(), null);
+        }
+        long next = records.getLast().message().messageId() + 1;
+        return new LogPage(records, next < end ? next : null);
+    }
+
+    /** A dense log whose timestamp is its offset, so a page follows offset order. */
+    private static LogPage dense(Position position, int size, long end) {
+        if (!(position instanceof Position.AtOffsets at) || at.offsets().isEmpty() || size <= 0) {
+            return new LogPage(List.of(), null);
+        }
+        long offset = at.offsets().values().iterator().next();
+        if (offset >= end) {
+            return new LogPage(List.of(), null);
+        }
+        List<LogPage.LogRecord> records = new ArrayList<>();
+        for (long id = offset; records.size() < size && id < end; id++) {
+            records.add(timed(id, id + 1));
+        }
+        long next = offset + records.size();
+        return new LogPage(records, next < end ? next : null);
+    }
+
+    /** The tail page when the read asked for {@code offset}, and an empty page otherwise. */
+    private static LogPage asked(Position position, long offset, Long next, List<LogPage.LogRecord> records) {
+        if (!(position instanceof Position.AtOffsets atOffsets)
+                || !atOffsets.offsets().containsValue(offset)) {
+            return new LogPage(List.of(), null);
+        }
+        return new LogPage(records, next);
+    }
+
+    private static LogPage.LogRecord timed(long offset, long timestamp) {
+        return new LogPage.LogRecord(
+                new BrowsedMessage(
+                        offset,
+                        3,
+                        true,
+                        4,
+                        timestamp,
+                        0L,
+                        1L,
+                        null,
+                        null,
+                        null,
+                        null,
+                        "v",
+                        BodyEncoding.TEXT,
+                        Compression.NONE,
+                        null,
+                        false,
+                        null,
+                        Map.of(),
+                        Map.of(),
+                        Map.of(),
+                        Map.of(),
+                        Map.of()),
+                false,
+                null);
     }
 
     // ---- a cluster read as one ------------------------------------------------------------------------
@@ -1391,6 +1510,261 @@ class MessageServiceTest {
         assertThat(page.log().retentionMoved()).isFalse();
         assertThat(page.hasNext()).isFalse();
         verify(messages, never()).browseLog(any(), any(), anyInt(), any(), anyInt(), any());
+    }
+
+    @Test
+    void latestAcrossPartitionsIsTheNewestTailsAndDoesNotContinuePastThem() {
+        when(extensions.require(CLUSTER, LogBounds.class)).thenReturn(logBounds);
+        when(logBounds.partitions(CLUSTER, TOPIC))
+                .thenReturn(new TreeMap<>(Map.of(0, new LogBounds.Bounds(0, 100), 1, new LogBounds.Bounds(0, 200))));
+        when(messages.browseLog(eq(CLUSTER), eq(TOPIC), eq(0), any(), anyInt(), any()))
+                .thenAnswer(invocation ->
+                        asked(invocation.getArgument(3), 98, null, List.of(timed(98, 10), timed(99, 11))));
+        when(messages.browseLog(eq(CLUSTER), eq(TOPIC), eq(1), any(), anyInt(), any()))
+                .thenAnswer(invocation ->
+                        asked(invocation.getArgument(3), 198, 200L, List.of(timed(198, 5_000), timed(199, 5_001))));
+
+        MessagePageView page =
+                service.browseLog(CLUSTER, TOPIC, MessageService.LogStart.parse("latest", null), null, null, 2);
+
+        assertThat(page.data())
+                .extracting(row -> row.partition() + ":" + row.position())
+                .containsExactly("1:198", "1:199");
+        assertThat(page.data()).extracting(row -> row.timestamp()).containsExactly(5_000L, 5_001L);
+        assertThat(page.hasNext()).isTrue();
+        assertThat(page.log().resume()).containsExactly(new PartitionResume(0, 98, null));
+
+        MessagePageView older =
+                service.browseLog(CLUSTER, TOPIC, MessageService.LogStart.parse("latest", null), "0:98", null, 2);
+
+        assertThat(older.data())
+                .extracting(row -> row.partition() + ":" + row.position())
+                .containsExactly("0:98", "0:99");
+        assertThat(older.data()).allSatisfy(row -> assertThat(row.timestamp()).isLessThan(5_000L));
+        assertThat(older.hasNext()).isFalse();
+        verify(messages, never()).browseLog(eq(CLUSTER), eq(TOPIC), eq(1), eq(atPartition(1, 200)), anyInt(), any());
+    }
+
+    @Test
+    void aLatestPageThatSplitsAPartitionContinuesBeforeTheRecordItShowed() {
+        when(extensions.require(CLUSTER, LogBounds.class)).thenReturn(logBounds);
+        when(logBounds.partitions(CLUSTER, TOPIC))
+                .thenReturn(new TreeMap<>(Map.of(0, new LogBounds.Bounds(0, 10), 1, new LogBounds.Bounds(0, 10))));
+        when(messages.browseLog(eq(CLUSTER), eq(TOPIC), eq(0), any(), anyInt(), any()))
+                .thenAnswer(
+                        invocation -> asked(invocation.getArgument(3), 8, 10L, List.of(timed(8, 10), timed(9, 100))));
+        when(messages.browseLog(eq(CLUSTER), eq(TOPIC), eq(1), any(), anyInt(), any()))
+                .thenAnswer(
+                        invocation -> asked(invocation.getArgument(3), 8, 10L, List.of(timed(8, 90), timed(9, 5_000))));
+
+        MessagePageView page =
+                service.browseLog(CLUSTER, TOPIC, MessageService.LogStart.parse("latest", null), null, null, 2);
+
+        assertThat(page.data())
+                .extracting(row -> row.partition() + ":" + row.position())
+                .containsExactly("0:9", "1:9");
+        assertThat(page.log().resume()).containsExactly(new PartitionResume(0, 8, 9L), new PartitionResume(1, 8, 9L));
+
+        MessagePageView older = service.browseLog(
+                CLUSTER, TOPIC, MessageService.LogStart.parse("latest", null), "0:8:9,1:8:9", null, 2);
+
+        assertThat(older.data())
+                .extracting(row -> row.partition() + ":" + row.position())
+                .containsExactly("0:8", "1:8");
+        assertThat(older.data()).allSatisfy(row -> assertThat(row.timestamp()).isLessThan(100L));
+        assertThat(older.hasNext()).isFalse();
+        assertThat(older.log().resume()).isEmpty();
+    }
+
+    @Test
+    void anEarlierOffsetThatSortsLaterIsDeliveredOnceAndTheReadContinuesPastTheShownRecord() {
+        when(extensions.require(CLUSTER, LogBounds.class)).thenReturn(logBounds);
+        when(logBounds.partitions(CLUSTER, TOPIC))
+                .thenReturn(new TreeMap<>(Map.of(0, new LogBounds.Bounds(10, 13), 1, new LogBounds.Bounds(5, 8))));
+        List<LogPage.LogRecord> partition0 = List.of(timed(10, 0), timed(11, 100), timed(12, 150));
+        List<LogPage.LogRecord> partition1 = List.of(timed(5, 200), timed(6, 300), timed(7, 400));
+        when(messages.browseLog(eq(CLUSTER), eq(TOPIC), anyInt(), any(), anyInt(), any()))
+                .thenAnswer(invocation -> {
+                    int partition = invocation.getArgument(2);
+                    return slice(
+                            invocation.getArgument(3),
+                            invocation.getArgument(4),
+                            partition == 0 ? 13 : 8,
+                            partition == 0 ? partition0 : partition1);
+                });
+
+        MessagePageView page =
+                service.browseLog(CLUSTER, TOPIC, MessageService.LogStart.parse("earliest", null), null, null, 2);
+        List<String> seen = new ArrayList<>();
+        seen.addAll(positions(page));
+
+        assertThat(positions(page)).containsExactly("0:11", "1:5");
+        assertThat(page.log().resume())
+                .containsExactly(new PartitionResume(0, 12, null, "10"), new PartitionResume(1, 6, null));
+
+        int pages = 1;
+        while (page.hasNext()) {
+            assertThat(pages).isLessThan(5);
+            page = service.browseLog(
+                    CLUSTER, TOPIC, MessageService.LogStart.parse("earliest", null), continuation(page), null, 2);
+            seen.addAll(positions(page));
+            pages++;
+        }
+
+        assertThat(seen).containsExactly("0:11", "1:5", "0:12", "1:6", "1:7", "0:10");
+        assertThat(page.hasNext()).isFalse();
+    }
+
+    /**
+     * One partition alternates records that have no timestamp. Page size stays 2. One, three and eight such holes
+     * are each delivered once, in timestamp, then partition, then offset order, and a missing timestamp sorts last.
+     */
+    @Test
+    void alternatingMissingTimestampsAreEachDeliveredOnceAcrossOneThreeAndEightHoles() {
+        for (int holes : List.of(1, 3, 8)) {
+            assertThat(walkAlternatingHoles(holes)).containsExactlyElementsOf(alternatingOrder(holes));
+        }
+    }
+
+    /** Pages the shipped browse from the earliest record until it ends. A loop fails the page bound. */
+    private List<String> walkAlternatingHoles(int holes) {
+        List<LogPage.LogRecord> partition0 = alternatingPartition(holes);
+        List<LogPage.LogRecord> partition1 = new ArrayList<>();
+        for (int index = 0; index <= holes; index++) {
+            partition1.add(timed(index, 50L + 50L * index));
+        }
+        long end0 = 10L + 2L * holes;
+        long end1 = holes + 1L;
+        when(extensions.require(CLUSTER, LogBounds.class)).thenReturn(logBounds);
+        when(logBounds.partitions(CLUSTER, TOPIC))
+                .thenReturn(new TreeMap<>(Map.of(
+                        0, new LogBounds.Bounds(10, end0),
+                        1, new LogBounds.Bounds(0, end1))));
+        when(messages.browseLog(eq(CLUSTER), eq(TOPIC), anyInt(), any(), anyInt(), any()))
+                .thenAnswer(invocation -> {
+                    int partition = invocation.getArgument(2);
+                    return slice(
+                            invocation.getArgument(3),
+                            invocation.getArgument(4),
+                            partition == 0 ? end0 : end1,
+                            partition == 0 ? partition0 : partition1);
+                });
+
+        MessagePageView page =
+                service.browseLog(CLUSTER, TOPIC, MessageService.LogStart.parse("earliest", null), null, null, 2);
+        List<String> seen = new ArrayList<>();
+        int pages = 0;
+        int cap = partition0.size() + partition1.size() + 2;
+        while (true) {
+            seen.addAll(positions(page));
+            pages++;
+            if (!page.hasNext()) {
+                break;
+            }
+            assertThat(pages)
+                    .as("holes %s still continuing after %s", holes, seen)
+                    .isLessThan(cap);
+            page = service.browseLog(
+                    CLUSTER, TOPIC, MessageService.LogStart.parse("earliest", null), continuation(page), null, 2);
+        }
+        assertThat(page.hasNext()).isFalse();
+        return seen;
+    }
+
+    /** Partition 0: a missing timestamp, then a timestamp, repeated {@code holes} times. Offsets start at 10. */
+    private static List<LogPage.LogRecord> alternatingPartition(int holes) {
+        List<LogPage.LogRecord> records = new ArrayList<>();
+        for (int hole = 0; hole < holes; hole++) {
+            records.add(timed(10L + 2L * hole, 0));
+            records.add(timed(11L + 2L * hole, 100L + 50L * hole));
+        }
+        return records;
+    }
+
+    /**
+     * The order a merged page must show: timestamp, then partition, then offset. A timestamp of zero is missing
+     * and sorts last. This is the log, not the page loop.
+     */
+    private static List<String> alternatingOrder(int holes) {
+        record Placed(int partition, long offset, long timestamp) {}
+        List<Placed> rows = new ArrayList<>();
+        for (LogPage.LogRecord record : alternatingPartition(holes)) {
+            rows.add(
+                    new Placed(0, record.message().messageId(), record.message().timestamp()));
+        }
+        for (int index = 0; index <= holes; index++) {
+            rows.add(new Placed(1, index, 50L + 50L * index));
+        }
+        rows.sort((left, right) -> {
+            boolean leftMissing = left.timestamp() <= 0;
+            boolean rightMissing = right.timestamp() <= 0;
+            if (leftMissing != rightMissing) {
+                return leftMissing ? 1 : -1;
+            }
+            if (!leftMissing && left.timestamp() != right.timestamp()) {
+                return Long.compare(left.timestamp(), right.timestamp());
+            }
+            int byPartition = Integer.compare(left.partition(), right.partition());
+            if (byPartition != 0) {
+                return byPartition;
+            }
+            return Long.compare(left.offset(), right.offset());
+        });
+        return rows.stream().map(row -> row.partition() + ":" + row.offset()).toList();
+    }
+
+    @Test
+    void latestDeliversAnOffsetLeftBehindInsideTheTailWithoutReadingPastIt() {
+        when(extensions.require(CLUSTER, LogBounds.class)).thenReturn(logBounds);
+        when(logBounds.partitions(CLUSTER, TOPIC))
+                .thenReturn(new TreeMap<>(Map.of(0, new LogBounds.Bounds(10, 13), 1, new LogBounds.Bounds(0, 3))));
+        List<LogPage.LogRecord> partition0 = List.of(timed(10, 0), timed(11, 100), timed(12, 50));
+        List<LogPage.LogRecord> partition1 = List.of(timed(0, 80), timed(1, 90), timed(2, 5_000));
+        List<String> reads = new ArrayList<>();
+        when(messages.browseLog(eq(CLUSTER), eq(TOPIC), anyInt(), any(), anyInt(), any()))
+                .thenAnswer(invocation -> {
+                    int partition = invocation.getArgument(2);
+                    Position position = invocation.getArgument(3);
+                    int size = invocation.getArgument(4);
+                    reads.add(partition + "@" + offsetOf(position) + "x" + size);
+                    return slice(position, size, partition == 0 ? 13 : 3, partition == 0 ? partition0 : partition1);
+                });
+
+        MessagePageView page =
+                service.browseLog(CLUSTER, TOPIC, MessageService.LogStart.parse("latest", null), null, null, 3);
+
+        assertThat(positions(page)).containsExactly("1:1", "0:11", "1:2");
+        assertThat(page.log().resume())
+                .containsExactly(new PartitionResume(0, 13, 13L, "10.12"), new PartitionResume(1, 0, 1L));
+
+        int firstReads = reads.size();
+        MessagePageView older = service.browseLog(
+                CLUSTER, TOPIC, MessageService.LogStart.parse("latest", null), continuation(page), null, 3);
+
+        assertThat(positions(older)).containsExactly("0:12", "1:0", "0:10");
+        assertThat(positions(older)).doesNotContain("0:11");
+        assertThat(older.hasNext()).isFalse();
+        assertThat(reads.subList(firstReads, reads.size()))
+                .contains("0@10x1", "0@12x1")
+                .noneMatch(read -> read.startsWith("0@11") || read.startsWith("0@13"));
+    }
+
+    @Test
+    void aPendingSpanIsReadAPageAtATime() {
+        when(extensions.require(CLUSTER, LogBounds.class)).thenReturn(logBounds);
+        when(logBounds.partitions(CLUSTER, TOPIC)).thenReturn(new TreeMap<>(Map.of(0, new LogBounds.Bounds(0, 1_000))));
+        List<String> reads = new ArrayList<>();
+        when(messages.browseLog(eq(CLUSTER), eq(TOPIC), anyInt(), any(), anyInt(), any()))
+                .thenAnswer(invocation -> {
+                    Position position = invocation.getArgument(3);
+                    int size = invocation.getArgument(4);
+                    reads.add(offsetOf(position) + "x" + size);
+                    return dense(position, size, 1_000);
+                });
+
+        service.browseLog(CLUSTER, TOPIC, MessageService.LogStart.parse("earliest", null), "0:500::0-499", null, 2);
+
+        assertThat(reads).containsExactly("0x2", "500x2");
     }
 
     @Test

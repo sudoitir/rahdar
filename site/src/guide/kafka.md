@@ -91,12 +91,26 @@ is unknown, and the cluster's health states that instead of counting it as healt
 
 ### Browsing messages
 
-A destination or group on a topic is read from **one partition**, from a start you choose: the earliest record,
-the latest, an **offset**, or a **time**. The address holds the browse, so it can be shared. The page says when
-the offset is past the end of the log (and where the log ends), and when retention removed the start of the
-partition, so the browse began later than you asked. Records of a transaction that is still open or was
-aborted are not shown. A record with a key and no value is a **tombstone** and says so. The message selector is
-disabled with its reason: Kafka cannot select records on the broker.
+A topic, or a group on a topic, is read from **every partition** in one table by default. **Partition** is its
+own column, next to **Offset**, **Written**, **Key**, **Size** and **Body**. The page holds at most 200 records.
+It is ordered by timestamp, then partition, then offset. A record with no timestamp says so. When a record sorts
+after one the page already showed, the next page still delivers that earlier record and keeps reading after the
+shown one. Offsets belong to their own partition: there is no single offset for the topic. The next page
+continues each partition from its own offset, such as `0:120,1:40`. An earlier offset that is still owed is
+named on that same place, as in `0:12::10`: partition 0 continues at offset 12 and still delivers offset 10.
+A read that must stop before a record already shown is `0:10:11`. Latest shows the newest records on the first
+page. A later page continues with older records and does not move on to a newer one.
+
+Choose **One partition** to focus a single partition. The start is the earliest record, the latest records, an
+**offset**, or a **time**. The same offset on every partition means that offset on each partition, not one
+offset across the topic. The address holds the browse — every partition or the focused partition, and the start —
+so it can be shared.
+
+The page says when an offset is past the end (on one partition, where that partition ends; across every
+partition, that each one ends at its own offset), and when retention removed the start, so the browse began
+later than asked. Records of a transaction that is still open or was aborted are not shown. A record with a key
+and no value is a **tombstone** and says so. The message selector is disabled with its reason: Kafka cannot
+select records on the broker.
 
 ### Purge and truncate
 

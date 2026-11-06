@@ -4,6 +4,7 @@ import { createRoute } from '@tanstack/react-router';
 import { CONTRACT, defineFeature } from '../../kernel/feature.ts';
 import { clusterRoute } from '../../kernel/routing/roots.ts';
 import { lazyFeatureView } from '../../kernel/routing/lazy.tsx';
+import { browseAddress } from './partitionBrowse.ts';
 import {
   BrowseSubscriptionMessages,
   CopyMessage,
@@ -20,6 +21,14 @@ export interface MessagesSearch {
   page?: number;
   /** The message whose detail is open — so a link to one message opens it. */
   message?: string;
+  /** The partition of the open record, when the offset alone does not name it. */
+  messagePartition?: number;
+  /** A focused partition. Absent reads every partition. */
+  partition?: number;
+  from?: 'earliest' | 'latest' | 'offset' | 'time';
+  value?: string;
+  /** Per-partition continuation of a merged page, {@code partition:offset} pairs. */
+  at?: string;
 }
 
 function validateMessagesSearch(raw: Record<string, unknown>): MessagesSearch {
@@ -31,6 +40,12 @@ function validateMessagesSearch(raw: Record<string, unknown>): MessagesSearch {
   }
   const page = Number(raw.page);
   if (Number.isFinite(page) && page > 1) out.page = Math.floor(page);
+  const browse = browseAddress(raw);
+  if (browse.partition !== undefined) out.partition = browse.partition;
+  if (browse.from) out.from = browse.from;
+  if (browse.value) out.value = browse.value;
+  if (browse.at) out.at = browse.at;
+  if (browse.messagePartition !== undefined) out.messagePartition = browse.messagePartition;
   return out;
 }
 

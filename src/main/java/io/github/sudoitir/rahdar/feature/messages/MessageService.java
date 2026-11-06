@@ -25,6 +25,7 @@ import io.github.sudoitir.rahdar.feature.messages.web.MessageViews.LogView;
 import io.github.sudoitir.rahdar.feature.messages.web.MessageViews.MessageDetailView;
 import io.github.sudoitir.rahdar.feature.messages.web.MessageViews.MessagePageView;
 import io.github.sudoitir.rahdar.feature.messages.web.MessageViews.MessageSummaryView;
+import io.github.sudoitir.rahdar.feature.messages.web.MessageViews.PartitionResume;
 import io.github.sudoitir.rahdar.kernel.audit.AuditEvent;
 import io.github.sudoitir.rahdar.kernel.audit.AuditService;
 import io.github.sudoitir.rahdar.kernel.core.ConflictException;
@@ -193,7 +194,7 @@ public class MessageService {
                 .toList();
         List<MessageSummaryView> rows = new ArrayList<>(browsed.size());
         for (int i = 0; i < browsed.size(); i++) {
-            rows.add(toSummary(browsed.get(i), governed.get(i), false, null, null));
+            rows.add(toSummary(browsed.get(i), governed.get(i), false, null, null, null));
         }
         clearViews.recordClear(context, "SUBSCRIPTION", queueName, governed);
         Long total = result.total();
@@ -257,6 +258,19 @@ public class MessageService {
     }
 
     /**
+     * One page of every partition of a log. Records are ordered by timestamp, then partition, then offset, and a
+     * record with no timestamp sorts last. {@code latest} keeps the newest records; a later page continues with older
+     * ones and does not move on to a newer record. {@code at} continues from a per-partition offset. The page reads
+     * at most {@code requestedSize} records from each partition and keeps that many, so it is a window, not the whole
+     * log. A continuation may also name earlier offsets that are still owed; those are read a page at a time, and the
+     * read still continues after the record the previous page showed.
+     */
+    public MessagePageView browseLog(
+            UUID clusterId, ResourceId log, LogStart from, String at, String filter, int requestedSize) {
+        return browseEvery(clusterId, log, from, at, filter, requestedSize);
+    }
+
+    /**
      * The same, through a group's subscription of the log: its records are those of the topic the subscription
      * reads, and the page says where the group stands on the partition.
      */
@@ -264,6 +278,13 @@ public class MessageService {
             UUID clusterId, ResourceId subscription, int partition, LogStart from, String filter, int requestedSize) {
         BacklogBreakdown.Breakdown breakdown = subscriptionLog(clusterId, subscription);
         return browseLog(clusterId, breakdown.destination(), breakdown, partition, from, filter, requestedSize);
+    }
+
+    /** Every partition of the topic a group's subscription reads, with where the group stands left to a focused read. */
+    public MessagePageView browseSubscriptionLog(
+            UUID clusterId, ResourceId subscription, LogStart from, String at, String filter, int requestedSize) {
+        BacklogBreakdown.Breakdown breakdown = subscriptionLog(clusterId, subscription);
+        return browseEvery(clusterId, breakdown.destination(), from, at, filter, requestedSize);
     }
 
     /** One record of the log a group's subscription reads. */
@@ -346,32 +367,11 @@ public class MessageService {
             LogRead read) {
         BacklogBreakdown.Breakdown through = read.through();
         clusterAccess.requireResource(clusterId, read.readOf(), MessagePermissions.MESSAGE_READ);
-        LogBounds.Bounds bounds = extensions.require(clusterId, LogBounds.class).of(clusterId, log, partition);
+        rejectFuture(from);
         int size = Math.min(requestedSize, BROKER_PAGE_CAP);
-        Shard shard = Shard.partition(PartitionId.of(String.valueOf(partition)));
-        boolean moved = false;
-        long offset = bounds.start();
-        switch (from.kind()) {
-            case LATEST -> offset = Math.max(bounds.start(), bounds.end() - size);
-            case OFFSET -> {
-                moved = from.offset() < bounds.start();
-                offset = Math.clamp(from.offset(), bounds.start(), bounds.end());
-            }
-            case EARLIEST, TIME -> {
-                // Earliest stays at the partition start. A time is placed by Position.AtTime below.
-            }
-        }
-        if (from.kind() == LogStart.Kind.TIME && from.time().isAfter(Instant.now())) {
-            throw new IllegalArgumentException("The start time " + from.time()
-                    + " is in the future, so no record can be at or after it. Choose a time that has passed, or"
-                    + " read from latest.");
-        }
-        Position at = from.kind() == LogStart.Kind.TIME
-                ? new Position.AtTime(from.time())
-                : new Position.AtOffsets(Map.of(shard, offset));
-        LogPage page = from.kind() != LogStart.Kind.TIME && offset >= bounds.end()
-                ? new LogPage(List.of(), null)
-                : messages.browseLog(clusterId, log, partition, at, size, filter);
+        LogBounds.Bounds bounds = extensions.require(clusterId, LogBounds.class).of(clusterId, log, partition);
+        PartitionRead readPartition = readPartition(clusterId, log, partition, bounds, from, filter, size);
+        LogPage page = readPartition.page();
         GovernContext context = contentPolicy.context(clusterId, log.name(), log.name());
         List<GovernedMessage> governed = page.records().stream()
                 .map(r -> contentPolicy.govern(context, content(r.message())))
@@ -380,7 +380,12 @@ public class MessageService {
         for (int i = 0; i < governed.size(); i++) {
             LogPage.LogRecord record = page.records().get(i);
             rows.add(toSummary(
-                    record.message(), governed.get(i), record.tombstone(), record.key(), record.keyEncoding()));
+                    record.message(),
+                    governed.get(i),
+                    record.tombstone(),
+                    record.key(),
+                    record.keyEncoding(),
+                    partition));
         }
         clearViews.recordClear(context, "DESTINATION", log.name(), governed);
         String notice =
@@ -398,7 +403,7 @@ public class MessageService {
                         bounds.start(),
                         bounds.end(),
                         page.next(),
-                        moved,
+                        readPartition.moved(),
                         read.uncommittedHidden(),
                         through == null
                                 ? null
@@ -407,10 +412,364 @@ public class MessageService {
                                         .map(BacklogBreakdown.PartitionLag::committed)
                                         .filter(Objects::nonNull)
                                         .findFirst()
-                                        .orElse(null)),
+                                        .orElse(null),
+                        null),
                 page.truncated(),
                 notice);
     }
+
+    /**
+     * Every partition in one page. {@code at} names the partitions that still have records and the offset to read
+     * each from; the others are finished. The order and the resume cursor are {@link LogMerge}'s.
+     */
+    private MessagePageView browseEvery(
+            UUID clusterId, ResourceId log, LogStart from, String at, String filter, int requestedSize) {
+        // A group's subscription is authorised before this is called. The topic itself is authorised either way.
+        clusterAccess.requireResource(clusterId, ResourceRef.destination(log.name()), MessagePermissions.MESSAGE_READ);
+        LogMerge.Continuation continuation = LogMerge.resume(at);
+        if (!continuation.continued()) {
+            rejectFuture(from);
+        }
+        int size = Math.min(requestedSize, BROKER_PAGE_CAP);
+        Map<Integer, LogBounds.Bounds> partitions =
+                extensions.require(clusterId, LogBounds.class).partitions(clusterId, log);
+        Map<Integer, LogMerge.Fetched> fetched = new LinkedHashMap<>();
+        boolean moved = false;
+        boolean sawPartition = false;
+        boolean allPastEnd = true;
+        boolean truncated = false;
+        for (var entry : partitions.entrySet()) {
+            PartitionFetch read = readOpenPartition(
+                    new PartitionTarget(clusterId, log, entry.getKey(), entry.getValue()),
+                    continuation,
+                    from,
+                    filter,
+                    size);
+            if (read == null) {
+                continue;
+            }
+            sawPartition = true;
+            moved |= read.moved();
+            allPastEnd &= read.pastEnd();
+            truncated |= read.truncated();
+            fetched.put(entry.getKey(), read.fetched());
+        }
+        // A continuation is already placed per partition. Only the first latest read picks the newest window.
+        LogMerge.Window window = !continuation.continued() && from.kind() == LogStart.Kind.LATEST
+                ? LogMerge.latest(fetched, size)
+                : LogMerge.page(fetched, size);
+        GovernContext context = contentPolicy.context(clusterId, log.name(), log.name());
+        List<GovernedMessage> governed = new ArrayList<>(window.records().size());
+        List<MessageSummaryView> rows = new ArrayList<>(window.records().size());
+        for (LogMerge.Tagged tagged : window.records()) {
+            LogPage.LogRecord record = tagged.record();
+            GovernedMessage governedMessage = contentPolicy.govern(context, content(record.message()));
+            governed.add(governedMessage);
+            rows.add(toSummary(
+                    record.message(),
+                    governedMessage,
+                    record.tombstone(),
+                    record.key(),
+                    record.keyEncoding(),
+                    tagged.partition()));
+        }
+        clearViews.recordClear(context, "DESTINATION", log.name(), governed);
+        List<PartitionResume> resume = window.resume().entrySet().stream()
+                .map(entry -> new PartitionResume(
+                        entry.getKey(),
+                        entry.getValue().offset(),
+                        entry.getValue().end(),
+                        entry.getValue().pendingText()))
+                .toList();
+        String notice = mergedNotice(from, continuation, window, sawPartition && allPastEnd);
+        return new MessagePageView(
+                rows,
+                1,
+                size,
+                null,
+                !resume.isEmpty(),
+                LOG_NOTE,
+                null,
+                new LogView(null, 0, 0, null, moved, true, null, resume),
+                truncated,
+                notice);
+    }
+
+    /** Why a merged page is empty or could not place a record, when the rows alone would not say it. */
+    private static String mergedNotice(
+            LogStart from, LogMerge.Continuation continuation, LogMerge.Window window, boolean allPastEnd) {
+        if (!continuation.continued() && from.kind() == LogStart.Kind.OFFSET && allPastEnd) {
+            return "Offset " + from.offset()
+                    + " is past the end of every partition. Each partition ends at its own offset.";
+        }
+        if (from.kind() == LogStart.Kind.TIME
+                && window.records().stream()
+                        .anyMatch(tagged -> tagged.record().message().timestamp() <= 0)) {
+            return "Some records carry no timestamp, so a start time cannot place them.";
+        }
+        return null;
+    }
+
+    /** A start time that has not happened yet matches nothing, so it is refused before any partition is read. */
+    private static void rejectFuture(LogStart from) {
+        if (from.kind() == LogStart.Kind.TIME && from.time().isAfter(Instant.now())) {
+            throw new IllegalArgumentException("The start time " + from.time()
+                    + " is in the future, so no record can be at or after it. Choose a time that has passed, or"
+                    + " read from latest.");
+        }
+    }
+
+    /**
+     * One partition of a merged read, or nothing when this continuation has already finished it. A partition the
+     * continuation does not name is finished. The first page names none, so every partition is read from {@code from}.
+     */
+    private PartitionFetch readOpenPartition(
+            PartitionTarget target, LogMerge.Continuation continuation, LogStart from, String filter, int size) {
+        if (continuation.continued() && !continuation.places().containsKey(target.partition())) {
+            return null;
+        }
+        LogMerge.Placed placed =
+                continuation.continued() ? continuation.places().get(target.partition()) : null;
+        return fetchPartition(target, from, placed, filter, size);
+    }
+
+    /**
+     * One partition of a merged read. The first page reads from {@code from}. A continuation reads the offsets it
+     * still owes, at most a page of them, and reads forward from its cursor unless that cursor is already at its
+     * end. A finished partition, one whose end is at or before its cursor and that owes nothing, is skipped.
+     */
+    private PartitionFetch fetchPartition(
+            PartitionTarget target, LogStart from, LogMerge.Placed placed, String filter, int size) {
+        if (placed == null) {
+            return firstFetch(target, from, filter, size);
+        }
+        // A bound at or before the cursor has nothing forward of what this page has already shown.
+        if (finished(placed)) {
+            return null;
+        }
+        PendingRead pending = readPending(target, placed, filter, size);
+        ForwardRead forward = readForward(target, placed, filter, size);
+        return combine(placed, pending, forward);
+    }
+
+    private PartitionFetch firstFetch(PartitionTarget target, LogStart from, String filter, int size) {
+        PartitionRead read = readPartition(
+                target.clusterId(), target.log(), target.partition(), target.bounds(), from, filter, size);
+        return new PartitionFetch(
+                new LogMerge.Fetched(read.page().records(), read.page().next()),
+                read.moved(),
+                read.pastEnd(),
+                read.page().truncated());
+    }
+
+    private static boolean finished(LogMerge.Placed placed) {
+        return placed.pending().isEmpty() && placed.end() != null && placed.end() <= placed.offset();
+    }
+
+    private PendingRead readPending(PartitionTarget target, LogMerge.Placed placed, String filter, int size) {
+        List<LogPage.LogRecord> records = new ArrayList<>();
+        List<LogMerge.Span> owed = new ArrayList<>();
+        int budget = size;
+        boolean moved = false;
+        boolean truncated = false;
+        boolean oweTheRest = false;
+        for (LogMerge.Span span : placed.pending()) {
+            LogMerge.Span clipped = clipPending(span, placed.end());
+            if (clipped == null) {
+                continue;
+            }
+            if (oweTheRest || budget <= 0) {
+                owed.add(clipped);
+                oweTheRest = true;
+            } else {
+                SpanTake take = takeSpan(target, clipped.from(), clipped.to(), filter, budget);
+                records.addAll(take.records());
+                budget -= take.records().size();
+                moved |= take.moved();
+                truncated |= take.truncated();
+                if (take.remainder() != null) {
+                    owed.add(take.remainder());
+                    oweTheRest = true;
+                }
+            }
+        }
+        return new PendingRead(records, owed, moved, truncated);
+    }
+
+    /** The span still inside an exclusive end, or null when it starts at or after that end. */
+    private static LogMerge.Span clipPending(LogMerge.Span span, Long end) {
+        if (end != null && span.from() >= end) {
+            return null;
+        }
+        if (end == null || span.to() < end) {
+            return span;
+        }
+        return new LogMerge.Span(span.from(), end - 1);
+    }
+
+    private ForwardRead readForward(PartitionTarget target, LogMerge.Placed placed, String filter, int size) {
+        if (placed.end() != null && placed.offset() >= placed.end()) {
+            return new ForwardRead(List.of(), null, placed.offset(), false, false, false);
+        }
+        int readSize = forwardSize(placed, size);
+        LogStart start = new LogStart(LogStart.Kind.OFFSET, placed.offset(), null);
+        PartitionRead read = readPartition(
+                target.clusterId(), target.log(), target.partition(), target.bounds(), start, filter, readSize);
+        Long end = placed.end();
+        List<LogPage.LogRecord> records = read.page().records().stream()
+                .filter(record -> end == null || record.message().messageId() < end)
+                .toList();
+        Long next = read.page().next();
+        if (end != null && next != null && next >= end) {
+            next = null;
+        }
+        return new ForwardRead(
+                records,
+                next,
+                forwardWatermark(placed, records, next),
+                read.moved(),
+                read.pastEnd(),
+                read.page().truncated());
+    }
+
+    private static int forwardSize(LogMerge.Placed placed, int size) {
+        if (placed.end() == null) {
+            return size;
+        }
+        long room = placed.end() - placed.offset();
+        if (room < size) {
+            return (int) room;
+        }
+        return size;
+    }
+
+    private static Long forwardWatermark(LogMerge.Placed placed, List<LogPage.LogRecord> records, Long next) {
+        if (next != null) {
+            return next;
+        }
+        if (!records.isEmpty()) {
+            return records.getLast().message().messageId() + 1;
+        }
+        return placed.offset();
+    }
+
+    private static PartitionFetch combine(LogMerge.Placed placed, PendingRead pending, ForwardRead forward) {
+        List<LogPage.LogRecord> records =
+                new ArrayList<>(pending.records().size() + forward.records().size());
+        records.addAll(pending.records());
+        records.addAll(forward.records());
+        return new PartitionFetch(
+                new LogMerge.Fetched(
+                        byOffset(records), forward.next(), placed.end(), pending.owed(), forward.watermark()),
+                pending.moved() || forward.moved(),
+                forward.pastEnd(),
+                pending.truncated() || forward.truncated());
+    }
+
+    /** At most {@code budget} records of one owed span, and the part of the span this read did not reach. */
+    private SpanTake takeSpan(PartitionTarget target, long from, long to, String filter, int budget) {
+        int take = budget;
+        long width = to - from;
+        if (width >= 0 && width < budget) {
+            take = (int) width + 1;
+        }
+        LogStart start = new LogStart(LogStart.Kind.OFFSET, from, null);
+        PartitionRead read = readPartition(
+                target.clusterId(), target.log(), target.partition(), target.bounds(), start, filter, take);
+        List<LogPage.LogRecord> got = read.page().records().stream()
+                .filter(record -> {
+                    long id = record.message().messageId();
+                    return id >= from && id <= to;
+                })
+                .toList();
+        Long next = read.page().next();
+        long consumed;
+        if (next != null && next > from) {
+            consumed = next;
+        } else if (!got.isEmpty()) {
+            consumed = got.getLast().message().messageId() + 1;
+        } else {
+            consumed = to + 1;
+        }
+        LogMerge.Span remainder = consumed <= to ? new LogMerge.Span(consumed, to) : null;
+        return new SpanTake(got, remainder, read.moved(), read.page().truncated());
+    }
+
+    /** Records in offset order, with one record per offset. */
+    private static List<LogPage.LogRecord> byOffset(List<LogPage.LogRecord> records) {
+        List<LogPage.LogRecord> sorted = new ArrayList<>(records);
+        sorted.sort(Comparator.comparingLong(record -> record.message().messageId()));
+        List<LogPage.LogRecord> unique = new ArrayList<>(sorted.size());
+        Long previous = null;
+        for (LogPage.LogRecord record : sorted) {
+            long id = record.message().messageId();
+            if (previous != null && previous.longValue() == id) {
+                continue;
+            }
+            unique.add(record);
+            previous = id;
+        }
+        return List.copyOf(unique);
+    }
+
+    /** The partition a merged read is asking one broker call about. */
+    private record PartitionTarget(UUID clusterId, ResourceId log, int partition, LogBounds.Bounds bounds) {}
+
+    /** Owed offsets read for one partition, and the spans this page did not reach. */
+    private record PendingRead(
+            List<LogPage.LogRecord> records, List<LogMerge.Span> owed, boolean moved, boolean truncated) {}
+
+    /** The forward read after the owed offsets, and the offset the next forward read starts at. */
+    private record ForwardRead(
+            List<LogPage.LogRecord> records,
+            Long next,
+            Long watermark,
+            boolean moved,
+            boolean pastEnd,
+            boolean truncated) {}
+
+    /** What one partition contributed to a merged page, and how its read was placed. */
+    private record PartitionFetch(LogMerge.Fetched fetched, boolean moved, boolean pastEnd, boolean truncated) {}
+
+    /** Records taken from an owed span, and the inclusive remainder still to read. */
+    private record SpanTake(
+            List<LogPage.LogRecord> records, LogMerge.Span remainder, boolean moved, boolean truncated) {}
+
+    /** One partition placed against its start and end, then read. An offset past the end reads nothing. */
+    private PartitionRead readPartition(
+            UUID clusterId,
+            ResourceId log,
+            int partition,
+            LogBounds.Bounds bounds,
+            LogStart from,
+            String filter,
+            int size) {
+        Shard shard = Shard.partition(PartitionId.of(String.valueOf(partition)));
+        boolean moved = false;
+        boolean pastEnd = false;
+        long offset = bounds.start();
+        switch (from.kind()) {
+            case LATEST -> offset = Math.max(bounds.start(), bounds.end() - size);
+            case OFFSET -> {
+                moved = from.offset() < bounds.start();
+                pastEnd = from.offset() > bounds.end();
+                offset = Math.clamp(from.offset(), bounds.start(), bounds.end());
+            }
+            case EARLIEST, TIME -> {
+                // Earliest stays at the partition start. A time is placed by Position.AtTime below.
+            }
+        }
+        Position at = from.kind() == LogStart.Kind.TIME
+                ? new Position.AtTime(from.time())
+                : new Position.AtOffsets(Map.of(shard, offset));
+        LogPage page = from.kind() != LogStart.Kind.TIME && offset >= bounds.end()
+                ? new LogPage(List.of(), null)
+                : messages.browseLog(clusterId, log, partition, at, size, filter);
+        return new PartitionRead(moved, pastEnd, page);
+    }
+
+    /** Where one partition's read was placed, and the page it returned. */
+    private record PartitionRead(boolean moved, boolean pastEnd, LogPage page) {}
 
     /**
      * Why a read from a time found nothing, or what it could not match: an empty page says where the partition's
@@ -1234,7 +1593,12 @@ public class MessageService {
     }
 
     private static MessageSummaryView toSummary(
-            BrowsedMessage m, GovernedMessage g, boolean tombstone, String key, BodyEncoding keyEncoding) {
+            BrowsedMessage m,
+            GovernedMessage g,
+            boolean tombstone,
+            String key,
+            BodyEncoding keyEncoding,
+            Integer partition) {
         String body = g.body();
         return new MessageSummaryView(
                 String.valueOf(m.messageId()),
@@ -1252,7 +1616,8 @@ public class MessageService {
                 GovernanceViews.redactions(g),
                 tombstone,
                 key,
-                keyEncoding == null ? null : keyEncoding.name());
+                keyEncoding == null ? null : keyEncoding.name(),
+                partition);
     }
 
     /** When the producer stamped the message, or null: a message with no time is not one from 1970. */

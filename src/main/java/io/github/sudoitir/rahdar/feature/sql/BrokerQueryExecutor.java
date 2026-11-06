@@ -344,9 +344,7 @@ public class BrokerQueryExecutor {
                 scan(
                         read,
                         page.records().stream()
-                                .map(r -> partitioned
-                                        ? r.message().withLongProperty("partition", partition.getKey())
-                                        : r.message())
+                                .map(r -> stamped(r, partitioned, partition.getKey()))
                                 .toList());
                 pages++;
                 if (page.next() == null || page.records().isEmpty()) {
@@ -355,6 +353,21 @@ public class BrokerQueryExecutor {
                 offset = page.next();
             }
             return new PartitionScan(pages, null);
+        }
+
+        /**
+         * The partition is a column on a partitioned log. A tombstone is a null value, not an empty one, so it keeps
+         * a property the row can be filtered on; the body alone cannot say which it is.
+         */
+        private static BrowsedMessage stamped(LogPage.LogRecord record, boolean partitioned, int partition) {
+            BrowsedMessage message = record.message();
+            if (partitioned) {
+                message = message.withLongProperty("partition", partition);
+            }
+            if (record.tombstone()) {
+                message = message.withBooleanProperty("tombstone", true);
+            }
+            return message;
         }
 
         /** A page of one target, or the outcome that ends the target because it could not be read. */
