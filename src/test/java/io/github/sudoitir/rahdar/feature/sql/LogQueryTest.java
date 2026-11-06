@@ -246,4 +246,43 @@ class LogQueryTest {
                 .hasMessageContaining("Apache Kafka")
                 .hasMessageContaining("Query the topic directly");
     }
+
+    @Test
+    void aTombstoneIsMarkedInsteadOfLookingLikeAnEmptyRecord() {
+        when(logs.resolve(any(), any(), anyList())).thenReturn(List.of(new LogTargets.Log(TOPIC, "orders", 2L)));
+        TreeMap<Integer, Bounds> partitions = new TreeMap<>();
+        partitions.put(0, new Bounds(0, 2));
+        when(logs.partitions(CLUSTER, TOPIC)).thenReturn(partitions);
+        when(logs.page(eq(CLUSTER), eq(TOPIC), eq(0), anyLong(), anyInt()))
+                .thenReturn(new LogPage(
+                        List.of(
+                                new LogRecord(record(0, "").message(), true, "order-0"),
+                                new LogRecord(record(1, "").message(), false, "order-1")),
+                        null));
+        SqlProperties properties = props(50_000);
+        QueryPlanner planner = planner(properties);
+        BrokerQueryExecutor executor = new BrokerQueryExecutor(
+                nodes,
+                new MessagePredicate(),
+                planner,
+                properties,
+                BrokerQueryExecutorTest.clearGovernance(),
+                messages,
+                logs);
+
+        QueryResult all = executor.execute(
+                CLUSTER,
+                planner.plan(CLUSTER, parser.parse("SELECT * FROM orders")),
+                new BrokerQueryExecutorTest.CountingSink());
+        QueryResult marked = executor.execute(
+                CLUSTER,
+                planner.plan(CLUSTER, parser.parse("SELECT * FROM orders WHERE props.tombstone = true")),
+                new BrokerQueryExecutorTest.CountingSink());
+
+        assertThat(all.rows()).extracting(Row::messageId).containsExactly(0L, 1L);
+        assertThat(all.rows().get(0).properties()).containsEntry("tombstone", true);
+        assertThat(all.rows().get(1).properties()).doesNotContainKey("tombstone");
+        assertThat(all.rows()).extracting(Row::body).containsExactly("", "");
+        assertThat(marked.rows()).extracting(Row::messageId).containsExactly(0L);
+    }
 }

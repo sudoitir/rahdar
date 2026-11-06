@@ -11,7 +11,7 @@ const LOG_NOTES: Record<string, { title: string; paragraphs: string[] }> = {
     paragraphs: [
       'FROM names a topic. Its records are read from the log, partition by partition, and every predicate is evaluated ' +
         'by Rahdar over what was read, up to the scan cap. Narrow a query with a LIMIT or a timestamp window.',
-      'messageId is the record offset, timestamp is the record time, and the partition is props.partition. The message index ' +
+      'messageId is the record offset, timestamp is the record time, and the partition is props.partition. A tombstone, a record with no value, has props.tombstone set; an empty body alone is not one. The message index ' +
         'captures Artemis queues only: a Kafka topic is queried directly, because its log is kept.',
     ],
   },
