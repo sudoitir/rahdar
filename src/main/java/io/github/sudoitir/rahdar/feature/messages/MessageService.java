@@ -262,7 +262,8 @@ public class MessageService {
      * record with no timestamp sorts last. {@code latest} keeps the newest records; a later page continues with older
      * ones and does not move on to a newer record. {@code at} continues from a per-partition offset. The page reads
      * at most {@code requestedSize} records from each partition and keeps that many, so it is a window, not the whole
-     * log.
+     * log. A continuation may also name earlier offsets that are still owed; those are read a page at a time, and the
+     * read still continues after the record the previous page showed.
      */
     public MessagePageView browseLog(
             UUID clusterId, ResourceId log, LogStart from, String at, String filter, int requestedSize) {
@@ -442,33 +443,16 @@ public class MessageService {
                 continue;
             }
             LogMerge.Placed placed = resumeAt == null ? null : resumeAt.get(entry.getKey());
-            // A bound at or before the start has nothing left that this page has not already shown.
-            if (placed != null && placed.end() != null && placed.end() <= placed.offset()) {
+            PartitionFetch read =
+                    fetchPartition(clusterId, log, entry.getKey(), entry.getValue(), from, placed, filter, size);
+            if (read == null) {
                 continue;
             }
             sawPartition = true;
-            int readSize = size;
-            if (placed != null && placed.end() != null) {
-                readSize = (int) Math.min(size, placed.end() - placed.offset());
-            }
-            LogStart start = placed == null ? from : new LogStart(LogStart.Kind.OFFSET, placed.offset(), null);
-            PartitionRead read =
-                    readPartition(clusterId, log, entry.getKey(), entry.getValue(), start, filter, readSize);
             moved |= read.moved();
             allPastEnd &= read.pastEnd();
-            truncated |= read.page().truncated();
-            List<LogPage.LogRecord> records = read.page().records();
-            Long next = read.page().next();
-            Long end = placed == null ? null : placed.end();
-            if (end != null) {
-                records = records.stream()
-                        .filter(record -> record.message().messageId() < end)
-                        .toList();
-                if (next != null && next >= end) {
-                    next = null;
-                }
-            }
-            fetched.put(entry.getKey(), new LogMerge.Fetched(records, next, end));
+            truncated |= read.truncated();
+            fetched.put(entry.getKey(), read.fetched());
         }
         // A continuation is already placed per partition. Only the first latest read picks the newest window.
         LogMerge.Window window = resumeAt == null && from.kind() == LogStart.Kind.LATEST
@@ -494,7 +478,8 @@ public class MessageService {
                 .map(entry -> new PartitionResume(
                         entry.getKey(),
                         entry.getValue().offset(),
-                        entry.getValue().end()))
+                        entry.getValue().end(),
+                        entry.getValue().pendingText()))
                 .toList();
         String notice = mergedNotice(from, resumeAt, window, sawPartition && allPastEnd);
         return new MessagePageView(
@@ -533,6 +518,168 @@ public class MessageService {
                     + " read from latest.");
         }
     }
+
+    /**
+     * One partition of a merged read. The first page reads from {@code from}. A continuation reads the offsets it
+     * still owes, at most a page of them, and reads forward from its cursor unless that cursor is already at its
+     * end. A finished partition, one whose end is at or before its cursor and that owes nothing, is skipped.
+     */
+    private PartitionFetch fetchPartition(
+            UUID clusterId,
+            ResourceId log,
+            int partition,
+            LogBounds.Bounds bounds,
+            LogStart from,
+            LogMerge.Placed placed,
+            String filter,
+            int size) {
+        if (placed == null) {
+            PartitionRead read = readPartition(clusterId, log, partition, bounds, from, filter, size);
+            return new PartitionFetch(
+                    new LogMerge.Fetched(read.page().records(), read.page().next()),
+                    read.moved(),
+                    read.pastEnd(),
+                    read.page().truncated());
+        }
+        // A bound at or before the cursor has nothing forward of what this page has already shown.
+        if (placed.pending().isEmpty() && placed.end() != null && placed.end() <= placed.offset()) {
+            return null;
+        }
+        List<LogPage.LogRecord> pendingRecords = new ArrayList<>();
+        List<LogMerge.Span> owed = new ArrayList<>();
+        int budget = size;
+        boolean moved = false;
+        boolean truncated = false;
+        boolean oweTheRest = false;
+        for (LogMerge.Span span : placed.pending()) {
+            long to = span.to();
+            if (placed.end() != null) {
+                if (span.from() >= placed.end()) {
+                    continue;
+                }
+                to = Math.min(to, placed.end() - 1);
+            }
+            if (oweTheRest || budget <= 0) {
+                owed.add(new LogMerge.Span(span.from(), to));
+                oweTheRest = true;
+                continue;
+            }
+            SpanTake take = takeSpan(clusterId, log, partition, bounds, span.from(), to, filter, budget);
+            pendingRecords.addAll(take.records());
+            budget -= take.records().size();
+            moved |= take.moved();
+            truncated |= take.truncated();
+            if (take.remainder() != null) {
+                owed.add(take.remainder());
+                oweTheRest = true;
+            }
+        }
+        List<LogPage.LogRecord> forwardRecords = List.of();
+        Long forwardNext = null;
+        Long watermark = placed.offset();
+        boolean pastEnd = false;
+        boolean forward = placed.end() == null || placed.offset() < placed.end();
+        if (forward) {
+            int readSize = size;
+            if (placed.end() != null) {
+                long room = placed.end() - placed.offset();
+                if (room <= 0) {
+                    forward = false;
+                } else if (room < size) {
+                    readSize = (int) room;
+                }
+            }
+            if (forward) {
+                LogStart start = new LogStart(LogStart.Kind.OFFSET, placed.offset(), null);
+                PartitionRead read = readPartition(clusterId, log, partition, bounds, start, filter, readSize);
+                moved |= read.moved();
+                pastEnd = read.pastEnd();
+                truncated |= read.page().truncated();
+                Long end = placed.end();
+                forwardRecords = read.page().records().stream()
+                        .filter(record -> end == null || record.message().messageId() < end)
+                        .toList();
+                Long next = read.page().next();
+                if (end != null && next != null && next >= end) {
+                    next = null;
+                }
+                forwardNext = next;
+                if (next != null) {
+                    watermark = next;
+                } else if (!forwardRecords.isEmpty()) {
+                    watermark = forwardRecords.getLast().message().messageId() + 1;
+                }
+            }
+        }
+        List<LogPage.LogRecord> records = new ArrayList<>(pendingRecords.size() + forwardRecords.size());
+        records.addAll(pendingRecords);
+        records.addAll(forwardRecords);
+        return new PartitionFetch(
+                new LogMerge.Fetched(byOffset(records), forwardNext, placed.end(), owed, watermark),
+                moved,
+                pastEnd,
+                truncated);
+    }
+
+    /** At most {@code budget} records of one owed span, and the part of the span this read did not reach. */
+    private SpanTake takeSpan(
+            UUID clusterId,
+            ResourceId log,
+            int partition,
+            LogBounds.Bounds bounds,
+            long from,
+            long to,
+            String filter,
+            int budget) {
+        int take = budget;
+        long width = to - from;
+        if (width >= 0 && width < budget) {
+            take = (int) width + 1;
+        }
+        LogStart start = new LogStart(LogStart.Kind.OFFSET, from, null);
+        PartitionRead read = readPartition(clusterId, log, partition, bounds, start, filter, take);
+        List<LogPage.LogRecord> got = read.page().records().stream()
+                .filter(record -> {
+                    long id = record.message().messageId();
+                    return id >= from && id <= to;
+                })
+                .toList();
+        Long next = read.page().next();
+        long consumed;
+        if (next != null && next > from) {
+            consumed = next;
+        } else if (!got.isEmpty()) {
+            consumed = got.getLast().message().messageId() + 1;
+        } else {
+            consumed = to + 1;
+        }
+        LogMerge.Span remainder = consumed <= to ? new LogMerge.Span(consumed, to) : null;
+        return new SpanTake(got, remainder, read.moved(), read.page().truncated());
+    }
+
+    /** Records in offset order, with one record per offset. */
+    private static List<LogPage.LogRecord> byOffset(List<LogPage.LogRecord> records) {
+        List<LogPage.LogRecord> sorted = new ArrayList<>(records);
+        sorted.sort(Comparator.comparingLong(record -> record.message().messageId()));
+        List<LogPage.LogRecord> unique = new ArrayList<>(sorted.size());
+        Long previous = null;
+        for (LogPage.LogRecord record : sorted) {
+            long id = record.message().messageId();
+            if (previous != null && previous.longValue() == id) {
+                continue;
+            }
+            unique.add(record);
+            previous = id;
+        }
+        return List.copyOf(unique);
+    }
+
+    /** What one partition contributed to a merged page, and how its read was placed. */
+    private record PartitionFetch(LogMerge.Fetched fetched, boolean moved, boolean pastEnd, boolean truncated) {}
+
+    /** Records taken from an owed span, and the inclusive remainder still to read. */
+    private record SpanTake(
+            List<LogPage.LogRecord> records, LogMerge.Span remainder, boolean moved, boolean truncated) {}
 
     /** One partition placed against its start and end, then read. An offset past the end reads nothing. */
     private PartitionRead readPartition(

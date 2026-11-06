@@ -321,6 +321,8 @@ describe('MessagesView on a partitioned log', () => {
     });
     expect(browseAddress({ at: '0:120,1:40' }).at).toBe('0:120,1:40');
     expect(browseAddress({ at: '0:10:11,1:40' }).at).toBe('0:10:11,1:40');
+    expect(browseAddress({ at: '0:12::10' }).at).toBe('0:12::10');
+    expect(browseAddress({ at: '0:13:13:10.12,1:6' }).at).toBe('0:13:13:10.12,1:6');
     expect(browseAddress({ at: '120' }).at).toBeUndefined();
     expect(
       formatResume([
@@ -328,6 +330,13 @@ describe('MessagesView on a partitioned log', () => {
         { partition: 0, offset: 10, end: 11 },
       ]),
     ).toBe('0:10:11,1:6');
+    expect(
+      formatResume([
+        { partition: 0, offset: 12, pending: '10' },
+        { partition: 1, offset: 6 },
+      ]),
+    ).toBe('0:12::10,1:6');
+    expect(formatResume([{ partition: 0, offset: 13, end: 13, pending: '10.12' }])).toBe('0:13:13:10.12');
 
     searchState = { from: 'latest' };
     const seen = mockKafka(() => page([record(1)], mergedLog()));

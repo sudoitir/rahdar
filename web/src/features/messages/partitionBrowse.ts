@@ -19,7 +19,13 @@ export interface PartitionBrowse {
   at?: string;
 }
 
-const AT = /^\d+:\d+(?::\d+)?(?:,\d+:\d+(?::\d+)?)*$/;
+/**
+ * One partition's place in a continuation: {@code partition:offset}, {@code partition:offset:end}, or
+ * {@code partition:offset::10} / {@code partition:offset:end:10-12.14} when an earlier offset is still owed.
+ * A plus is not accepted: a query string would turn it into a space.
+ */
+const CONTINUATION = String.raw`\d+:\d+(?::\d*)?(?::\d+(?:-\d+)?(?:\.\d+(?:-\d+)*)?)?`;
+const AT = new RegExp(`^${CONTINUATION}(?:,${CONTINUATION})*$`);
 
 /** The browse the address describes. Nothing in the address reads every partition from the earliest record. */
 export function browseOf(search: { partition?: number; from?: string; value?: string; at?: string }): PartitionBrowse {
@@ -131,14 +137,23 @@ export function writtenLabel(value: number | null | undefined, withTime: (ms: nu
 
 /**
  * {@code partition:offset} pairs, in partition order. {@code partition:offset:end} stops before {@code end} so the
- * next read does not repeat a record already shown. The text is the merged page's continuation.
+ * next read does not repeat a record already shown. {@code partition:offset::10} or
+ * {@code partition:offset:end:10-12.14} names inclusive offsets before {@code offset} that are still to deliver.
+ * The text is the merged page's continuation.
  */
-export function formatResume(resume: readonly { partition: number; offset: number; end?: number | null }[]): string {
+export function formatResume(
+  resume: readonly { partition: number; offset: number; end?: number | null; pending?: string | null }[],
+): string {
   return [...resume]
     .sort((left, right) => left.partition - right.partition)
-    .map((item) =>
-      item.end != null ? `${item.partition}:${item.offset}:${item.end}` : `${item.partition}:${item.offset}`,
-    )
+    .map((item) => {
+      const pending = item.pending?.trim();
+      if (pending) {
+        const end = item.end != null ? String(item.end) : '';
+        return `${item.partition}:${item.offset}:${end}:${pending}`;
+      }
+      return item.end != null ? `${item.partition}:${item.offset}:${item.end}` : `${item.partition}:${item.offset}`;
+    })
     .join(',');
 }
 

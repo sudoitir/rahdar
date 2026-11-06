@@ -2,6 +2,7 @@ package io.github.sudoitir.rahdar.feature.messages.web;
 
 import static io.swagger.v3.oas.annotations.media.Schema.RequiredMode.REQUIRED;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import io.github.sudoitir.rahdar.kernel.core.KindName;
 import io.github.sudoitir.rahdar.platform.governance.GovernanceViews.RedactionView;
 import io.github.sudoitir.rahdar.platform.governance.GovernanceViews.WithheldView;
@@ -159,6 +160,8 @@ public final class MessageViews {
 
     /**
      * Where the next page of a merged read resumes on one partition. The offset belongs to that partition.
+     * {@code pending} names earlier offsets that sorted after a record this page showed, so the next read delivers
+     * them without reading that record again.
      */
     public record PartitionResume(
             @Schema(requiredMode = REQUIRED) int partition,
@@ -169,7 +172,26 @@ public final class MessageViews {
                     description = "The offset the next read of this partition stops before, so a later page does not"
                             + " repeat a record already shown. Absent when the next read starts at offset and runs"
                             + " for a page.")
-            Long end) {}
+            Long end,
+
+            @JsonInclude(JsonInclude.Include.NON_EMPTY)
+            @Schema(
+                    nullable = true,
+                    description = "Inclusive offsets before offset that are still to deliver, as ranges such as 10 or"
+                            + " 10-12.14. Absent when the next read just continues at offset.")
+            String pending) {
+
+        /** A continuation that starts at {@code offset} and does not still owe an earlier one. */
+        public PartitionResume(int partition, long offset, Long end) {
+            this(partition, offset, end, null);
+        }
+
+        public PartitionResume {
+            if (pending != null && pending.isBlank()) {
+                pending = null;
+            }
+        }
+    }
 
     /**
      * Where a page of a partitioned log sits. When {@code partition} is set, {@code start} and {@code end} are that
@@ -212,9 +234,10 @@ public final class MessageViews {
 
             @Schema(
                     nullable = true,
-                    description = "Where a merged page continues: one offset per partition that still has records."
-                            + " Empty when a merged page is finished. Null when the page is one partition, whose next"
-                            + " offset is next. There is no offset that applies to every partition.")
+                    description = "Where a merged page continues: one offset per partition that still has records,"
+                            + " and any earlier offsets that page still owes. Empty when a merged page is finished."
+                            + " Null when the page is one partition, whose next offset is next. There is no offset that"
+                            + " applies to every partition.")
             List<PartitionResume> resume) {}
 
     /**

@@ -83,6 +83,64 @@ class LogMergeTest {
     }
 
     @Test
+    void anEarlierOffsetThatSortsLaterIsOwedWhileTheReadContinuesAfterTheShownRecord() {
+        Map<Integer, LogMerge.Fetched> fetched = new LinkedHashMap<>();
+        fetched.put(0, new LogMerge.Fetched(List.of(record(10, 0), record(11, 100)), 12L));
+        fetched.put(1, new LogMerge.Fetched(List.of(record(5, 200), record(6, 300)), 7L));
+
+        LogMerge.Window page = LogMerge.page(fetched, 2);
+
+        assertThat(page.records())
+                .extracting(tagged ->
+                        tagged.partition() + ":" + tagged.record().message().messageId())
+                .containsExactly("0:11", "1:5");
+        assertThat(page.resume())
+                .containsExactly(
+                        Map.entry(0, new LogMerge.Placed(12L, null, List.of(new LogMerge.Span(10, 10)))),
+                        Map.entry(1, new LogMerge.Placed(6L, null)));
+    }
+
+    @Test
+    void anOffsetLeftBetweenShownRecordsStaysOwedAndTheReadContinuesAfterThem() {
+        Map<Integer, LogMerge.Fetched> fetched = new LinkedHashMap<>();
+        fetched.put(0, new LogMerge.Fetched(List.of(record(10, 100), record(11, 0), record(12, 150)), 13L));
+        fetched.put(1, new LogMerge.Fetched(List.of(record(1, 120)), 2L));
+
+        LogMerge.Window page = LogMerge.page(fetched, 3);
+
+        assertThat(page.records())
+                .extracting(tagged ->
+                        tagged.partition() + ":" + tagged.record().message().messageId())
+                .containsExactly("0:10", "1:1", "0:12");
+        assertThat(page.resume())
+                .containsExactly(
+                        Map.entry(0, new LogMerge.Placed(13L, null, List.of(new LogMerge.Span(11, 11)))),
+                        Map.entry(1, new LogMerge.Placed(2L, null)));
+    }
+
+    @Test
+    void latestOwesAnOffsetLeftInsideTheTailAndDoesNotReadPastIt() {
+        Map<Integer, LogMerge.Fetched> tails = new LinkedHashMap<>();
+        tails.put(0, new LogMerge.Fetched(List.of(record(10, 0), record(11, 100), record(12, 50)), null));
+        tails.put(1, new LogMerge.Fetched(List.of(record(0, 80), record(1, 90), record(2, 5_000)), null));
+
+        LogMerge.Window page = LogMerge.latest(tails, 3);
+
+        assertThat(page.records())
+                .extracting(tagged ->
+                        tagged.partition() + ":" + tagged.record().message().messageId())
+                .containsExactly("1:1", "0:11", "1:2");
+        assertThat(page.resume())
+                .containsExactly(
+                        Map.entry(
+                                0,
+                                new LogMerge.Placed(
+                                        13L, 13L, List.of(new LogMerge.Span(10, 10), new LogMerge.Span(12, 12)))),
+                        Map.entry(1, new LogMerge.Placed(0L, 1L)));
+        assertThat(page.resume().get(0).pendingText()).isEqualTo("10.12");
+    }
+
+    @Test
     void aBlankContinuationReadsEveryPartitionAndABadOneIsRefused() {
         assertThat(LogMerge.resume(null)).isNull();
         assertThat(LogMerge.resume("  ")).isNull();
@@ -90,9 +148,16 @@ class LogMergeTest {
                 .containsExactly(
                         Map.entry(0, new LogMerge.Placed(120L, null)), Map.entry(1, new LogMerge.Placed(40L, null)));
         assertThat(LogMerge.resume("0:10:11")).containsExactly(Map.entry(0, new LogMerge.Placed(10L, 11L)));
+        assertThat(LogMerge.resume("0:12::10"))
+                .containsExactly(Map.entry(0, new LogMerge.Placed(12L, null, List.of(new LogMerge.Span(10, 10)))));
+        assertThat(LogMerge.resume("0:13:13:10.12"))
+                .containsExactly(Map.entry(
+                        0,
+                        new LogMerge.Placed(13L, 13L, List.of(new LogMerge.Span(10, 10), new LogMerge.Span(12, 12)))));
         assertThatThrownBy(() -> LogMerge.resume("120"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("partition:offset");
+        assertThatThrownBy(() -> LogMerge.resume("0:12::12")).isInstanceOf(IllegalArgumentException.class);
     }
 
     /** Partition 0 at 10 (t=100) and 11 (t=300); partition 1 at 5 (t=200) and 6 (no timestamp). */

@@ -43416,7 +43416,7 @@
           },
           "resume" : {
             "type" : [ "array", "null" ],
-            "description" : "Where a merged page continues: one offset per partition that still has records. Empty when a merged page is finished. Null when the page is one partition, whose next offset is next. There is no offset that applies to every partition.",
+            "description" : "Where a merged page continues: one offset per partition that still has records, and any earlier offsets that page still owes. Empty when a merged page is finished. Null when the page is one partition, whose next offset is next. There is no offset that applies to every partition.",
             "items" : {
               "$ref" : "#/components/schemas/PartitionResume"
             }
@@ -43567,6 +43567,10 @@
             "type" : [ "integer", "null" ],
             "format" : "int64",
             "description" : "The offset the next read of this partition stops before, so a later page does not repeat a record already shown. Absent when the next read starts at offset and runs for a page."
+          },
+          "pending" : {
+            "type" : [ "string", "null" ],
+            "description" : "Inclusive offsets before offset that are still to deliver, as ranges such as 10 or 10-12.14. Absent when the next read just continues at offset."
           }
         },
         "required" : [ "offset", "partition" ]
