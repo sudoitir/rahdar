@@ -44,7 +44,7 @@ export function messageColumns(zone: string, partitioned = false, showPartition 
   const partitionColumn: Column<MessageSummaryView> = {
     id: 'partition',
     header: 'Partition',
-    accessor: (m) => (m.partition == null ? '' : m.partition),
+    accessor: (m) => m.partition ?? '',
     kind: 'number',
     priority: 'essential',
   };

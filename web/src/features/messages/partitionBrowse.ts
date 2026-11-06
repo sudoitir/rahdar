@@ -57,6 +57,24 @@ export function browseOf(search: { partition?: number; from?: string; value?: st
   };
 }
 
+/**
+ * A whole number from the address, or nothing. Null, blank and {@code all} read every partition.
+ * {@code Number(null)} is 0, so absence must not become partition 0.
+ */
+function wholeNumber(value: unknown): number | undefined {
+  if (value == null || value === '' || value === 'all') return undefined;
+  const number = typeof value === 'number' ? value : Number(value);
+  if (!Number.isInteger(number) || number < 0) return undefined;
+  return number;
+}
+
+/** The start value an offset or a time browse keeps. Anything else is dropped. */
+function startValue(from: BrowseFrom | undefined, value: unknown): string | undefined {
+  if (from !== 'offset' && from !== 'time') return undefined;
+  if (typeof value !== 'string' || value === '') return undefined;
+  return value;
+}
+
 /** The part of the address that restores a browse. Invalid values are dropped, so a bad link still opens. */
 export function browseAddress(raw: Record<string, unknown>): {
   partition?: number;
@@ -72,20 +90,16 @@ export function browseAddress(raw: Record<string, unknown>): {
     at?: string;
     messagePartition?: number;
   } = {};
-  // Null, blank and "all" read every partition. Number(null) is 0, so absence must not become partition 0.
-  if (raw.partition !== 'all' && raw.partition != null && raw.partition !== '') {
-    const partition = typeof raw.partition === 'number' ? raw.partition : Number(raw.partition);
-    if (Number.isInteger(partition) && partition >= 0) out.partition = partition;
-  }
+  const partition = wholeNumber(raw.partition);
+  if (partition !== undefined) out.partition = partition;
   const from = BROWSE_FROM.find((item) => item.value === raw.from)?.value;
   if (from) out.from = from;
-  if ((from === 'offset' || from === 'time') && typeof raw.value === 'string' && raw.value) out.value = raw.value;
+  const value = startValue(from, raw.value);
+  if (value !== undefined) out.value = value;
   const at = typeof raw.at === 'string' ? continuationToken(raw.at) : undefined;
-  if (at) out.at = at;
-  if (raw.messagePartition != null && raw.messagePartition !== '') {
-    const messagePartition = Number(raw.messagePartition);
-    if (Number.isInteger(messagePartition) && messagePartition >= 0) out.messagePartition = messagePartition;
-  }
+  if (at !== undefined) out.at = at;
+  const messagePartition = wholeNumber(raw.messagePartition);
+  if (messagePartition !== undefined) out.messagePartition = messagePartition;
   return out;
 }
 

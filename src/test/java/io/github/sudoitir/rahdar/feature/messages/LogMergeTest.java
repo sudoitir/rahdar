@@ -142,15 +142,16 @@ class LogMergeTest {
 
     @Test
     void aBlankContinuationReadsEveryPartitionAndABadOneIsRefused() {
-        assertThat(LogMerge.resume(null)).isNull();
-        assertThat(LogMerge.resume("  ")).isNull();
-        assertThat(LogMerge.resume("0:120,1:40"))
+        assertThat(LogMerge.resume(null).continued()).isFalse();
+        assertThat(LogMerge.resume("  ").continued()).isFalse();
+        assertThat(LogMerge.resume("  ").places()).isEmpty();
+        assertThat(LogMerge.resume("0:120,1:40").places())
                 .containsExactly(
                         Map.entry(0, new LogMerge.Placed(120L, null)), Map.entry(1, new LogMerge.Placed(40L, null)));
-        assertThat(LogMerge.resume("0:10:11")).containsExactly(Map.entry(0, new LogMerge.Placed(10L, 11L)));
-        assertThat(LogMerge.resume("0:12::10"))
+        assertThat(LogMerge.resume("0:10:11").places()).containsExactly(Map.entry(0, new LogMerge.Placed(10L, 11L)));
+        assertThat(LogMerge.resume("0:12::10").places())
                 .containsExactly(Map.entry(0, new LogMerge.Placed(12L, null, List.of(new LogMerge.Span(10, 10)))));
-        assertThat(LogMerge.resume("0:13:13:10.12"))
+        assertThat(LogMerge.resume("0:13:13:10.12").places())
                 .containsExactly(Map.entry(
                         0,
                         new LogMerge.Placed(13L, 13L, List.of(new LogMerge.Span(10, 10), new LogMerge.Span(12, 12)))));

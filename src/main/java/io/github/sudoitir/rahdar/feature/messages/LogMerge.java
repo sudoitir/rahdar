@@ -97,6 +97,28 @@ public final class LogMerge {
     public record Window(List<Tagged> records, Map<Integer, Placed> resume) {}
 
     /**
+     * A merged continuation. {@code continued} is false when the caller has not sent one, so every partition is read
+     * from the start it asked for. An empty {@code places} map is not that signal: a continuation that names no
+     * partition has already finished every partition.
+     */
+    public record Continuation(boolean continued, Map<Integer, Placed> places) {
+        public Continuation {
+            places = places == null ? Map.of() : places;
+        }
+
+        private static Continuation none() {
+            return new Continuation(false, Map.of());
+        }
+    }
+
+    /** One parsed {@code partition:offset} piece. */
+    private record Parsed(int partition, Placed placed) {}
+
+    /** How a partition's candidate records split between this page and what it still owes. */
+    private record Account(
+            List<Long> shown, List<Long> unshown, long maxId, Long earliestOmitted, boolean shownAfterOmitted) {}
+
+    /**
      * {@code at} is {@code partition:offset} pairs, such as {@code 0:120,1:40}. A third number, {@code
      * partition:offset:end}, stops that read before {@code end}. A fourth, {@code partition:offset::10} or {@code
      * partition:offset:end:10-12.14}, names inclusive offsets before {@code offset} that are still to deliver, so a
@@ -104,30 +126,43 @@ public final class LogMerge {
      * has not continued, so every partition is read from the start it asked for. A partition named here is read from
      * that offset; one that is absent has already been read to its end.
      */
-    public static Map<Integer, Placed> resume(String at) {
+    public static Continuation resume(String at) {
         if (at == null || at.isBlank()) {
-            return null;
+            return Continuation.none();
         }
         SortedMap<Integer, Placed> out = new TreeMap<>();
         for (String part : at.split(",")) {
-            String[] bits = part.split(":", -1);
-            if (bits.length < 2 || bits.length > 4) {
-                throw badAt();
-            }
-            try {
-                int partition = Integer.parseInt(bits[0]);
-                long offset = Long.parseLong(bits[1]);
-                Long end = bits.length >= 3 && !bits[2].isEmpty() ? Long.parseLong(bits[2]) : null;
-                List<Span> pending = bits.length == 4 ? parsePending(bits[3], offset) : List.of();
-                if (partition < 0 || offset < 0 || (end != null && end < 0)) {
-                    throw badAt();
-                }
-                out.put(partition, new Placed(offset, end, pending));
-            } catch (NumberFormatException _) {
-                throw badAt();
-            }
+            Parsed parsed = parsePart(part);
+            out.put(parsed.partition(), parsed.placed());
         }
-        return Collections.unmodifiableSortedMap(out);
+        return new Continuation(true, Collections.unmodifiableSortedMap(out));
+    }
+
+    private static Parsed parsePart(String part) {
+        String[] bits = part.split(":", -1);
+        if (bits.length < 2 || bits.length > 4) {
+            throw badAt();
+        }
+        try {
+            int partition = Integer.parseInt(bits[0]);
+            long offset = Long.parseLong(bits[1]);
+            Long end = bound(bits);
+            List<Span> pending = bits.length == 4 ? parsePending(bits[3], offset) : List.of();
+            if (partition < 0 || offset < 0 || (end != null && end < 0)) {
+                throw badAt();
+            }
+            return new Parsed(partition, new Placed(offset, end, pending));
+        } catch (NumberFormatException _) {
+            throw badAt();
+        }
+    }
+
+    /** The exclusive end, when the third field is present. An empty field means there is no end. */
+    private static Long bound(String[] bits) {
+        if (bits.length < 3 || bits[2].isEmpty()) {
+            return null;
+        }
+        return Long.parseLong(bits[2]);
     }
 
     /**
@@ -188,6 +223,18 @@ public final class LogMerge {
      * shown offsets, must not be read again, and the offset after it must not be abandoned.
      */
     private static Placed resumeFor(int partition, Fetched fetched, List<Tagged> page, boolean followNext) {
+        Account account = account(partition, fetched, page);
+        if (!account.shownAfterOmitted() && fetched.owed().isEmpty()) {
+            return omittedOrNext(fetched, account.earliestOmitted(), followNext);
+        }
+        Placed stopped = olderThanShown(fetched, account, followNext);
+        if (stopped != null) {
+            return stopped;
+        }
+        return holesOrNext(fetched, account, followNext);
+    }
+
+    private static Account account(int partition, Fetched fetched, List<Tagged> page) {
         List<Long> unshown = new ArrayList<>();
         List<Long> shown = new ArrayList<>();
         long maxId = -1;
@@ -200,37 +247,49 @@ public final class LogMerge {
                 unshown.add(id);
             }
         }
-        Long end = fetched.end();
         Long earliestOmitted = unshown.stream().min(Long::compare).orElse(null);
         // A forward read from the earliest omitted offset would return a shown record that sits after it.
         boolean shownAfterOmitted = earliestOmitted != null && shown.stream().anyMatch(id -> id > earliestOmitted);
-        if (!shownAfterOmitted && fetched.owed().isEmpty()) {
-            if (earliestOmitted != null) {
-                return new Placed(earliestOmitted, end);
-            }
-            if (!followNext || fetched.next() == null) {
-                return null;
-            }
-            return new Placed(fetched.next(), end);
+        return new Account(shown, unshown, maxId, earliestOmitted, shownAfterOmitted);
+    }
+
+    /** The earliest omitted offset, or the forward cursor when this page kept every candidate. */
+    private static Placed omittedOrNext(Fetched fetched, Long earliestOmitted, boolean followNext) {
+        if (earliestOmitted != null) {
+            return new Placed(earliestOmitted, fetched.end());
         }
-        // A latest tail whose omitted offsets are all older than the ones it showed stops before the shown one.
-        if (!followNext && !shown.isEmpty() && fetched.owed().isEmpty() && earliestOmitted != null) {
-            long minShown = shown.stream().mapToLong(Long::longValue).min().orElseThrow();
-            boolean after = unshown.stream().anyMatch(id -> id > minShown);
-            if (!after) {
-                return new Placed(earliestOmitted, minShown);
-            }
+        if (!followNext || fetched.next() == null) {
+            return null;
         }
-        long mark = watermark(fetched, maxId);
+        return new Placed(fetched.next(), fetched.end());
+    }
+
+    /**
+     * A latest tail whose omitted offsets are all older than the ones it showed stops before the shown one. Null
+     * means this shape does not apply, and the caller continues with the offsets still owed.
+     */
+    private static Placed olderThanShown(Fetched fetched, Account account, boolean followNext) {
+        if (followNext || account.shown().isEmpty() || !fetched.owed().isEmpty() || account.earliestOmitted() == null) {
+            return null;
+        }
+        long minShown =
+                account.shown().stream().mapToLong(Long::longValue).min().orElseThrow();
+        boolean later = account.unshown().stream().anyMatch(id -> id > minShown);
+        if (later) {
+            return null;
+        }
+        return new Placed(account.earliestOmitted(), minShown);
+    }
+
+    private static Placed holesOrNext(Fetched fetched, Account account, boolean followNext) {
+        long mark = watermark(fetched, account.maxId());
+        Long end = fetched.end();
         // A conditional expression would unbox a null end. A forward page keeps the caller's end, which may be absent.
         Long bound = followNext || end != null ? end : Long.valueOf(mark);
-        List<Span> holes = new ArrayList<>(merge(spans(unshown), fetched.owed()));
+        List<Span> holes = new ArrayList<>(merge(spans(account.unshown()), fetched.owed()));
         holes.removeIf(span -> span.from() >= mark);
         if (holes.isEmpty()) {
-            if (!followNext || fetched.next() == null) {
-                return null;
-            }
-            return new Placed(fetched.next(), end);
+            return omittedOrNext(fetched, null, followNext);
         }
         return new Placed(mark, bound, holes);
     }

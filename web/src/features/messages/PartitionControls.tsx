@@ -20,6 +20,29 @@ const SCOPE = [
   { value: 'one', label: 'One partition' },
 ];
 
+/** What is wrong with a focused partition, or null when the browse is not asking for one. */
+function partitionProblem(
+  scope: Fields['scope'],
+  partitions: number | undefined,
+  value: number | string,
+): string | null {
+  if (scope === 'all' || partitions === 1) return null;
+  const number = Number(value);
+  if (Number.isInteger(number) && number >= 0) return null;
+  return 'Enter a partition number, from 0.';
+}
+
+/** The partition a browse focuses, or null when it reads every partition. One partition is always 0. */
+function chosenPartition(
+  partitions: number | undefined,
+  scope: Fields['scope'],
+  value: number | string,
+): number | null {
+  if (partitions !== 1 && scope !== 'one') return null;
+  if (partitions === 1) return 0;
+  return Number(value);
+}
+
 /**
  * Where to read a partitioned log. The default is every partition. One partition can be focused. The start is the
  * earliest record, the latest, an offset or a time. The address holds the browse, so Browse writes it. A merged
@@ -50,21 +73,15 @@ export function PartitionControls({
     },
     validateInputOnBlur: true,
     validate: {
-      partition: (v, values) =>
-        values.scope === 'all' || partitions === 1
-          ? null
-          : Number.isInteger(Number(v)) && Number(v) >= 0
-            ? null
-            : 'Enter a partition number, from 0.',
+      partition: (v, values) => partitionProblem(values.scope, partitions, v),
       value: (v, values) => startProblem(values.from, v),
     },
   });
   const needsValue = form.values.from === 'offset' || form.values.from === 'time';
   const onePartition = partitions !== 1 && form.values.scope === 'one';
   const submit = form.onSubmit((values) => {
-    const focused = partitions === 1 || values.scope === 'one';
     onBrowse({
-      partition: focused ? (partitions === 1 ? 0 : Number(values.partition)) : null,
+      partition: chosenPartition(partitions, values.scope, values.partition),
       from: values.from,
       value: values.from === 'offset' || values.from === 'time' ? values.value.trim() : undefined,
     });
