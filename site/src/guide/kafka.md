@@ -95,9 +95,11 @@ A topic, or a group on a topic, is read from **every partition** in one table by
 own column, next to **Offset**, **Written**, **Key**, **Size** and **Body**. The page holds at most 200 records.
 It is ordered by timestamp, then partition, then offset. A record with no timestamp says so. When a record sorts
 after one the page already showed, the next page still delivers that earlier record and keeps reading after the
-shown one. Offsets belong to their own partition: there is no single offset for the topic, and the next page
-continues each partition from its own offset. Latest shows the newest records on the first page. A later page
-continues with older records and does not move on to a newer one.
+shown one. Offsets belong to their own partition: there is no single offset for the topic. The next page
+continues each partition from its own offset, such as `0:120,1:40`. An earlier offset that is still owed is
+named on that same place, as in `0:12::10`: partition 0 continues at offset 12 and still delivers offset 10.
+A read that must stop before a record already shown is `0:10:11`. Latest shows the newest records on the first
+page. A later page continues with older records and does not move on to a newer one.
 
 Choose **One partition** to focus a single partition. The start is the earliest record, the latest records, an
 **offset**, or a **time**. The same offset on every partition means that offset on each partition, not one
