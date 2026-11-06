@@ -43380,25 +43380,6 @@
           }
         }
       },
-      "PartitionResume" : {
-        "type" : "object",
-        "properties" : {
-          "partition" : {
-            "type" : "integer",
-            "format" : "int32"
-          },
-          "offset" : {
-            "type" : "integer",
-            "format" : "int64"
-          },
-          "end" : {
-            "type" : [ "integer", "null" ],
-            "format" : "int64",
-            "description" : "The offset the next read of this partition stops before, so a later page does not repeat a record already shown. Absent when the next read starts at offset and runs for a page."
-          }
-        },
-        "required" : [ "offset", "partition" ]
-      },
       "LogView" : {
         "type" : "object",
         "properties" : {
@@ -43570,6 +43551,25 @@
           }
         },
         "required" : [ "bodyTruncated", "durable", "expiration", "position", "priority", "propertyCount", "redactions", "size", "tombstone", "type" ]
+      },
+      "PartitionResume" : {
+        "type" : "object",
+        "properties" : {
+          "partition" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "offset" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "end" : {
+            "type" : [ "integer", "null" ],
+            "format" : "int64",
+            "description" : "The offset the next read of this partition stops before, so a later page does not repeat a record already shown. Absent when the next read starts at offset and runs for a page."
+          }
+        },
+        "required" : [ "offset", "partition" ]
       },
       "MessageDetailView" : {
         "type" : "object",

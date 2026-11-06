@@ -157,7 +157,11 @@ export function PartitionNotices({
   if (browse.partition == null) {
     return (
       <>
-        {page.notice ? <Notice tone="info">{page.notice}</Notice> : null}
+        {page.notice ? (
+          <Notice tone="info" title="The start does not place this page">
+            {page.notice}
+          </Notice>
+        ) : null}
         {log.retentionMoved ? (
           <Notice tone="info" title="Retention removed the start of a partition">
             Records before a partition's log start are gone, so that partition is read from its start, not where it was

@@ -8432,17 +8432,6 @@ export interface components {
             placements?: components["schemas"]["PlacementView"][];
             nodes?: components["schemas"]["NodeConfiguration"][];
         };
-        PartitionResume: {
-            /** Format: int32 */
-            partition: number;
-            /** Format: int64 */
-            offset: number;
-            /**
-             * Format: int64
-             * @description The offset the next read of this partition stops before, so a later page does not repeat a record already shown. Absent when the next read starts at offset and runs for a page.
-             */
-            end?: number | null;
-        };
         LogView: {
             /**
              * Format: int32
@@ -8467,9 +8456,7 @@ export interface components {
              * @description Where the group stands on this partition, when the log is read through a group's subscription: its committed offset (a share group's start offset). Absent when the log is read as a topic, or the group has no position on the partition. Null when the page merges every partition: the group stands on each partition separately.
              */
             subscriptionPosition?: number | null;
-            /**
-             * @description Where a merged page continues: one offset per partition that still has records. Empty when a merged page is finished. Null when the page is one partition, whose next offset is next. There is no offset that applies to every partition.
-             */
+            /** @description Where a merged page continues: one offset per partition that still has records. Empty when a merged page is finished. Null when the page is one partition, whose next offset is next. There is no offset that applies to every partition. */
             resume?: components["schemas"]["PartitionResume"][] | null;
         };
         MessagePageView: {
@@ -8537,6 +8524,17 @@ export interface components {
              * @description The partition this record was read from. Null on a queue, which has none.
              */
             partition?: number | null;
+        };
+        PartitionResume: {
+            /** Format: int32 */
+            partition: number;
+            /** Format: int64 */
+            offset: number;
+            /**
+             * Format: int64
+             * @description The offset the next read of this partition stops before, so a later page does not repeat a record already shown. Absent when the next read starts at offset and runs for a page.
+             */
+            end?: number | null;
         };
         MessageDetailView: {
             /** @description The message's position on its node, opaque. */
@@ -16175,6 +16173,7 @@ export interface operations {
                 partition?: number;
                 from?: string;
                 value?: string;
+                at?: string;
             };
             header?: never;
             path: {
