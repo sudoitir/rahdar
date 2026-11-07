@@ -71,12 +71,21 @@ public abstract class PostgresIntegrationTest {
         registry.add("rahdar.plugins.messaging.reconcile-interval", () -> "1h");
     }
 
-    /** Rows dated in the past need partitions, which a purge in an earlier test may have dropped (ADR-0193). */
+    /**
+     * Rows dated in the past need partitions, which a purge in an earlier test may have dropped (ADR-0193).
+     *
+     * <p>Failed sign-ins from one address add up in this shared database, and thirty of them in ten minutes lock
+     * that address for every later test (ADR-0144). A success does not clear the counter. Loopback is the address
+     * of every client that does not pick its own, so each test starts with the source counters cleared. A test
+     * that throttles an address still does so inside one method.
+     */
     @BeforeEach
-    void partitionsForPastRows() {
+    void prepareSharedDatabase() {
         // Its own connection: some subclasses start the application themselves, outside the Spring test framework.
-        TestPartitions.ensureBack(new JdbcTemplate(
-                new DriverManagerDataSource(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword())));
+        JdbcTemplate jdbc = new JdbcTemplate(
+                new DriverManagerDataSource(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword()));
+        TestPartitions.ensureBack(jdbc);
+        jdbc.update("DELETE FROM login_attempt WHERE starts_with(key, 's:')");
     }
 
     /** What an application started outside the Spring test framework needs to use the shared database. */
