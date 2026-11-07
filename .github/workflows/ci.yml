@@ -161,11 +161,10 @@ jobs:
           cache: maven
       # Each system's real-broker tests run in that system's shards, once per end of its supported range: Artemis
       # through ArtemisIntegrationTest or ArtemisBrokers, Kafka through a Kafka container, RabbitMQ through
-      # RabbitMqBrokers. Every other class runs in the numbered shards, round-robin over the sorted paths so each
-      # gets a third and neighbouring heavy suites (Transfer*) land on different runners; no broker image matters
-      # there. The shard goes in as -Dtest, which replaces the pom's includes; an includesFile would be appended to
-      # them and every shard would run the whole suite.
-      # ponytail: count-balanced, not time-balanced; weigh by surefire report times if a shard lags.
+      # RabbitMqBrokers. Every other class runs in the numbered shards, packed by the class durations in
+      # .github/ci/backend-unit-weights.txt so the three shards finish together. A class missing from that file
+      # weighs the median. No broker image matters there. The shard goes in as -Dtest, which replaces the pom's
+      # includes; an includesFile would be appended to them and every shard would run the whole suite.
       - name: Pick shard ${{ matrix.shard }}
         env:
           SHARD: ${{ matrix.shard }}
@@ -180,8 +179,9 @@ jobs:
             artemis|kafka|rabbitmq) cp "$RUNNER_TEMP/$SHARD.txt" "$RUNNER_TEMP/picked.txt" ;;
             *)
               sort -u "$RUNNER_TEMP/artemis.txt" "$RUNNER_TEMP/kafka.txt" "$RUNNER_TEMP/rabbitmq.txt" > "$RUNNER_TEMP/brokers.txt"
-              comm -23 "$RUNNER_TEMP/tests.txt" "$RUNNER_TEMP/brokers.txt" \
-                | awk -v n=3 -v i="$SHARD" 'NR % n == i' > "$RUNNER_TEMP/picked.txt" ;;
+              comm -23 "$RUNNER_TEMP/tests.txt" "$RUNNER_TEMP/brokers.txt" > "$RUNNER_TEMP/unit.txt"
+              python3 .github/ci/pick-unit-shard.py "$SHARD" "$RUNNER_TEMP/unit.txt" .github/ci/backend-unit-weights.txt \
+                > "$RUNNER_TEMP/picked.txt" ;;
           esac
           sed 's|^src/test/java/||; s|\.java$||; s|/|.|g' "$RUNNER_TEMP/picked.txt" > "$RUNNER_TEMP/shard.txt"
           echo "$(wc -l < "$RUNNER_TEMP/shard.txt") test classes in this shard"
@@ -236,6 +236,13 @@ jobs:
       - run: npm run format:check
       - run: npm run lint
       # The browser project (ADR-0164): layout, contrast and focus where they happen.
+      # Chromium is restored from the action cache. The key is the browser revision, so it refreshes only
+      # when Playwright's browsers change. Apt packages from --with-deps still install on every run.
+      - name: Cache Playwright browsers
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-ms-playwright-${{ hashFiles('web/node_modules/playwright-core/browsers.json') }}
       - run: npx playwright install --with-deps chromium
       - run: npm run test:coverage
       - run: npm run test:browser
@@ -371,10 +378,18 @@ jobs:
           timeout 60 bash -c "until grep -q 'password:' '$RUNNER_TEMP/rahdar.log'; do sleep 1; done"
           echo "ADMIN_PASSWORD=$(awk '/password:/ {print $2; exit}' "$RUNNER_TEMP/rahdar.log")" >> "$GITHUB_ENV"
 
+      - name: Install web dependencies
+        working-directory: web
+        run: npm ci
+      # Same Playwright cache as the frontend job. browsers.json exists only after npm ci.
+      - name: Cache Playwright browsers
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-ms-playwright-${{ hashFiles('web/node_modules/playwright-core/browsers.json') }}
       - name: Install, use, update, roll back and remove the plugin
         working-directory: web
         run: |
-          npm ci
           npx playwright install --with-deps chromium
           RAHDAR=http://localhost:8080 NEW_PASSWORD="ci-$(openssl rand -hex 12)" \
           JAR_V1="$RUNNER_TEMP/acme-notes-1.0.0.jar" JAR_V2="$RUNNER_TEMP/acme-notes-1.0.1.jar" \
