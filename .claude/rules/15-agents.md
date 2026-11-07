@@ -28,8 +28,8 @@ Pick the smallest harness that does the job. Most tasks need neither agents nor 
   others), or `{model, effort}` from the table. Never leave a stage to inherit by accident.
 - Raise effort only when a check failed at the lower level, never pre-emptively. Lower
   thinking with effort, not with "think less" in the prompt.
-- Hand an agent a complete task with a finish line ("`just verify` passes") and accept
-  its result only with the evidence it returns.
+- Hand an agent a complete task with a finish line (the one test class or lint the change
+  touches) and accept its result only with the evidence it returns. CI runs `just verify`.
 
 ## Token spend
 
@@ -51,7 +51,7 @@ Every feature goes through OpenSpec (`00-workflow.md`), from proposal to merged 
 | --- | --- |
 | `/opsx:explore`, `/opsx:propose`, `design.md` | inline on Opus, or `planner` for a hard design question |
 | `/opsx:apply` | inline for small tasks; `implementer` per task when tasks are independent |
-| End of apply | one run of `just verify`, inline or via `verifier` when its output is long |
+| End of apply | the narrow check the change touches (one test class, one lint), inline or via `verifier` when its output is long. CI runs the full suite |
 | Before the PR | `reviewer` only for a risky diff: security, data loss, a public API, a migration |
 
 ## Skills: when to load which
