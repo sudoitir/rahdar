@@ -149,3 +149,59 @@ be refused with the reason, and a secret setting SHALL be refused.
 
 - **WHEN** an operator tries to change a setting that only changes on a restart
 - **THEN** the change is refused with a 409 that says the broker must be restarted with the new value
+
+### Requirement: An operator can create a topic from the destinations screen
+
+On a Kafka cluster, an operator with `destination:create` SHALL create a topic from the shared destinations screen. The form SHALL ask for the name, the partition count, the replication factor, and the settings the topic kind declares (`cleanup.policy`, `retention.ms`, `retention.bytes`, `max.message.bytes`, `min.insync.replicas`). The preview SHALL state the topic that will be created. Confirm SHALL be a held confirmation, SHALL go through the approval gate when a policy holds it, and SHALL be audited with the topic that was created. An operator without the permission SHALL see the action disabled, naming the permission, and the API SHALL refuse it. Creating a topic SHALL be offered only on a Kafka cluster.
+
+#### Scenario: Creating orders
+
+- **WHEN** an operator previews a topic `orders` with 6 partitions and replication factor 3 and confirms
+- **THEN** the topic exists with those values, and the audit records the create
+
+#### Scenario: Without the permission
+
+- **WHEN** an operator without `destination:create` opens the destinations screen of a Kafka cluster
+- **THEN** create is disabled and names the missing permission
+
+### Requirement: An operator can delete a topic after a preview
+
+An operator with `destination:delete` SHALL delete a topic after a preview that names every group still holding offsets on it and the record estimate. Confirm SHALL be a held confirmation, SHALL go through the approval gate when a policy holds it, SHALL send the preview's etag, and SHALL be audited with the groups and the estimate. A stale etag SHALL be refused and the operator SHALL be offered a fresh preview. An approved delete SHALL check the etag again when it runs. An internal topic SHALL keep the configuration screen's read-only treatment: delete is disabled with the reason that the cluster manages internal topics.
+
+#### Scenario: Deleting a topic two groups read
+
+- **WHEN** an operator previews deletion of a topic that `billing` and `search` still have offsets on, and confirms
+- **THEN** the preview names both groups and the record estimate, the topic is deleted, and the audit records both groups and the estimate
+
+#### Scenario: A group the preview did not name appears
+
+- **WHEN** a group that the preview did not name commits offsets on the topic, or the record estimate changes, between the preview and the confirmation
+- **THEN** the delete is refused as stale and the operator is offered a fresh preview
+
+### Requirement: An operator can add partitions after a preview
+
+An operator with `destination:update` SHALL raise a topic's partition count after the broker-validated preview. The preview SHALL show the current count and the new count, and SHALL say that records already written stay on their partitions and that a key can land on a new partition afterwards. Confirm SHALL be a held confirmation, SHALL go through the approval gate when a policy holds it, SHALL send the preview's etag, and SHALL be audited with both counts. A lower count SHALL leave confirm disabled with the reason. The form SHALL NOT ask for a replica assignment.
+
+#### Scenario: Adding partitions
+
+- **WHEN** an operator previews raising a topic from 6 partitions to 12 and confirms
+- **THEN** the topic has 12 partitions and the audit records 6 and 12
+
+#### Scenario: A lower count
+
+- **WHEN** an operator enters a partition count below the topic's current count
+- **THEN** confirm is disabled and the reason names both counts
+
+### Requirement: An operator can delete an empty group after a preview
+
+An operator with `subscription:delete` SHALL delete a group that has no members, after a preview of its state. A group with members, or a group that is rebalancing, SHALL name those members and SHALL leave confirm disabled. A streams group SHALL leave delete disabled with the reason the streams application owns it. The caller SHALL NOT remove members in order to delete the group. Confirm SHALL be a held confirmation, SHALL go through the approval gate when a policy holds it, SHALL send the preview's etag, and SHALL be audited. Where share groups are not available, delete of a share group SHALL stay disabled with that capability's reason.
+
+#### Scenario: Deleting an empty group
+
+- **WHEN** an operator previews deletion of an empty group and confirms
+- **THEN** the group is gone and the audit records its id and state
+
+#### Scenario: Members are running
+
+- **WHEN** an operator previews deletion of a group with two members
+- **THEN** the preview names both members and confirm is disabled

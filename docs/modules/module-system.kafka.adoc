@@ -17,6 +17,7 @@
 * `i.g.s.r.s.k.KafkaOffsets`
 * `i.g.s.r.s.k.KafkaTopicConfigChanges`
 * `i.g.s.r.s.k.KafkaTopicConfigs`
+* `i.g.s.r.s.k.KafkaTopicLifecycle`
 * `i.g.s.r.s.k.KafkaTransactionAborts`
 * `i.g.s.r.s.k.KafkaTransactions`
 
@@ -31,6 +32,7 @@ _Others_
 * `i.g.s.r.k.s.ClusterAccessGuard` (in Security)
 * `i.g.s.r.p.b.ConnectionSettingsSource` (in Broker connectivity)
 * `i.g.s.r.p.s.QueueSnapshots` (in Scraping)
+* `i.g.s.r.k.s.SettingsService` (in Settings)
 * `i.g.s.r.p.c.ClusterDirectory` (in Clusters)
 * `i.g.s.r.p.c.NodeStateRecorder` (in Clusters)
 |Events listened to

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Button, Stack, Text } from '@mantine/core';
+import { Button, Group, Stack, Text } from '@mantine/core';
 import { Link, useParams } from '@tanstack/react-router';
 
 import { useCan } from '../../kernel/auth/useCan.ts';
@@ -20,6 +20,7 @@ import { Section } from '../../ui/Section.tsx';
 import { StatusBadge } from '../../ui/StatusBadge.tsx';
 import { DataTable, type Column } from '../../ui/table/index.ts';
 import { useGroup, type GroupDetail, type GroupMember } from './api.ts';
+import { GroupDelete } from './GroupDelete.tsx';
 import { OffsetResetDialog } from './OffsetReset.tsx';
 import { stateWords, typeWords } from './words.ts';
 
@@ -76,11 +77,14 @@ export function GroupView() {
         ) : undefined
       }
       actions={
-        <CapabilityGate verdict={gate} what="resetting this group's offsets">
-          <Button disabled={gate.kind === 'blocked' || !group.data} onClick={() => setResetting(true)}>
-            Reset offsets…
-          </Button>
-        </CapabilityGate>
+        <Group gap="xs">
+          <GroupDelete clusterId={clusterId} groupId={groupId} group={group.data} unavailable={group.isError} />
+          <CapabilityGate verdict={gate} what="resetting this group's offsets">
+            <Button disabled={gate.kind === 'blocked' || !group.data} onClick={() => setResetting(true)}>
+              Reset offsets…
+            </Button>
+          </CapabilityGate>
+        </Group>
       }
     />
   );
