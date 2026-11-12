@@ -43,9 +43,6 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class KafkaTopicLifecycle {
 
-    /** A group named on a delete preview. The driver puts the group id after this prefix. */
-    static final String OFFSETS_KEPT = "kafka.offsets_kept.";
-
     /** The one outcome of a Kafka command. There is no per-broker fan-out. */
     static final String WHOLE_CLUSTER = "whole cluster";
 
@@ -327,8 +324,8 @@ public class KafkaTopicLifecycle {
         String note = "";
         Long current = null;
         for (AttributeChange change : preview.diff()) {
-            if (change.key().startsWith(OFFSETS_KEPT)) {
-                groups.add(change.key().substring(OFFSETS_KEPT.length()));
+            if (change.key().startsWith(KafkaKinds.OFFSETS_KEPT)) {
+                groups.add(change.key().substring(KafkaKinds.OFFSETS_KEPT.length()));
             } else if (KafkaKinds.NOTE.equals(change.key())) {
                 note = String.valueOf(change.after().orElse(""));
             } else if (KafkaKinds.PARTITIONS.equals(change.key())

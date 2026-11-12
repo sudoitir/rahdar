@@ -248,7 +248,7 @@ class KafkaTopicLifecycleApiTest {
                 Optional.of("Deleting this topic does not erase those groups' offsets.")));
         for (String group : groups) {
             diff.add(new AttributeChange(
-                    KafkaTopicLifecycle.OFFSETS_KEPT + group, Optional.empty(), Optional.of("offsets remain")));
+                    KafkaKinds.OFFSETS_KEPT + group, Optional.empty(), Optional.of("offsets remain")));
         }
         return new Preview(
                 diff,
