@@ -14533,6 +14533,25 @@
               }
             }
           },
+          "202" : {
+            "description" : "Held for approval: the operation has not run. X-Rahdar-Held-Operation names the request.",
+            "headers" : {
+              "X-Rahdar-Held-Operation" : {
+                "description" : "The held operation's id, when the operation was held.",
+                "schema" : {
+                  "type" : "string",
+                  "format" : "uuid"
+                }
+              }
+            },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/HeldOutcome"
+                }
+              }
+            }
+          },
           "4XX" : {
             "description" : "Client error",
             "content" : {

@@ -18766,6 +18766,17 @@ export interface operations {
                     "*/*": components["schemas"]["LifecycleOutcomeView"];
                 };
             };
+            /** @description Held for approval: the operation has not run. X-Rahdar-Held-Operation names the request. */
+            202: {
+                headers: {
+                    /** @description The held operation's id, when the operation was held. */
+                    "X-Rahdar-Held-Operation"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HeldOutcome"];
+                };
+            };
             /** @description Too many requests. Wait for Retry-After seconds. */
             429: {
                 headers: {
