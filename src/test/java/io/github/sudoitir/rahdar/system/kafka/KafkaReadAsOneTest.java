@@ -19,10 +19,10 @@ import io.github.sudoitir.rahdar.platform.broker.Attempt;
 import io.github.sudoitir.rahdar.platform.broker.BrokerSettings;
 import io.github.sudoitir.rahdar.platform.clusters.LifecycleOutcome;
 import io.github.sudoitir.rahdar.platform.clusters.ResourceTargets.Target;
-import io.github.sudoitir.rahdar.system.kafka.KafkaTopicLifecycle.ApplyRequest;
 import io.github.sudoitir.rahdar.system.kafka.KafkaTopicLifecycle.ClusterOutcome;
 import io.github.sudoitir.rahdar.system.kafka.KafkaTopicLifecycle.CreateRequest;
 import io.github.sudoitir.rahdar.system.kafka.KafkaTopicLifecycle.PreviewView;
+import io.github.sudoitir.rahdar.system.kafka.KafkaTopicLifecycle.TopicApplyRequest;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -83,7 +83,7 @@ class KafkaReadAsOneTest {
 
         LifecycleOutcome outcome = ok(door.deleteDestination(clusterId, topic(), false, true, "etag-1", "fp-1"));
 
-        verify(topics).deleteTopic(eq(clusterId), eq("orders"), eq(new ApplyRequest("etag-1", "fp-1", true)));
+        verify(topics).deleteTopic(eq(clusterId), eq("orders"), eq(new TopicApplyRequest("etag-1", "fp-1", true)));
         assertThat(outcome.dryRun()).isFalse();
         assertThat(outcome.nodes())
                 .singleElement()
@@ -106,7 +106,7 @@ class KafkaReadAsOneTest {
 
         ok(door.deleteSubscription(clusterId, group(), false, "etag-1"));
 
-        verify(topics).deleteGroup(eq(clusterId), eq("billing"), eq(new ApplyRequest("etag-1", null, false)));
+        verify(topics).deleteGroup(eq(clusterId), eq("billing"), eq(new TopicApplyRequest("etag-1", null, false)));
     }
 
     @Test

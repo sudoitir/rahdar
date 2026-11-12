@@ -44,11 +44,11 @@ import io.github.sudoitir.rahdar.kernel.settings.SettingsService;
 import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
 import io.github.sudoitir.rahdar.platform.broker.BrokerSettings;
 import io.github.sudoitir.rahdar.platform.broker.BulkCapExceededException;
-import io.github.sudoitir.rahdar.system.kafka.KafkaTopicLifecycle.ApplyRequest;
 import io.github.sudoitir.rahdar.system.kafka.KafkaTopicLifecycle.ClusterOutcome;
 import io.github.sudoitir.rahdar.system.kafka.KafkaTopicLifecycle.CreateRequest;
 import io.github.sudoitir.rahdar.system.kafka.KafkaTopicLifecycle.PartitionsRequest;
 import io.github.sudoitir.rahdar.system.kafka.KafkaTopicLifecycle.PreviewView;
+import io.github.sudoitir.rahdar.system.kafka.KafkaTopicLifecycle.TopicApplyRequest;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -120,7 +120,7 @@ class KafkaTopicLifecycleTest {
         PreviewView first = lifecycle.previewDelete(CLUSTER, "orders");
 
         assertThatThrownBy(() -> lifecycle.deleteTopic(
-                        CLUSTER, "orders", new ApplyRequest(first.etag(), first.fingerprint(), false)))
+                        CLUSTER, "orders", new TopicApplyRequest(first.etag(), first.fingerprint(), false)))
                 .isInstanceOf(KafkaStaleException.class);
         verify(operations, never()).execute(any(), any(), any(), any());
     }
@@ -131,7 +131,7 @@ class KafkaTopicLifecycleTest {
         org.mockito.Mockito.doReturn(null).when(gate).run(any(), any());
         PreviewView first = lifecycle.previewDelete(CLUSTER, "orders");
 
-        lifecycle.deleteTopic(CLUSTER, "orders", new ApplyRequest(first.etag(), first.fingerprint(), false));
+        lifecycle.deleteTopic(CLUSTER, "orders", new TopicApplyRequest(first.etag(), first.fingerprint(), false));
         verify(operations, never()).execute(any(), any(), any(), any());
 
         org.mockito.Mockito.doAnswer(
@@ -140,7 +140,7 @@ class KafkaTopicLifecycleTest {
                 .run(any(), any());
         when(operations.preview(any(), any(), any())).thenReturn(deletePreview(10, "etag-2", "billing"));
         assertThatThrownBy(() -> lifecycle.deleteTopic(
-                        CLUSTER, "orders", new ApplyRequest("etag-1", first.fingerprint(), false)))
+                        CLUSTER, "orders", new TopicApplyRequest("etag-1", first.fingerprint(), false)))
                 .isInstanceOf(KafkaStaleException.class);
         verify(operations, never()).execute(any(), any(), any(), any());
     }
@@ -152,12 +152,12 @@ class KafkaTopicLifecycleTest {
         assertThat(preview.overCap()).isTrue();
 
         assertThatThrownBy(() -> lifecycle.deleteTopic(
-                        CLUSTER, "orders", new ApplyRequest(preview.etag(), preview.fingerprint(), false)))
+                        CLUSTER, "orders", new TopicApplyRequest(preview.etag(), preview.fingerprint(), false)))
                 .isInstanceOf(BulkCapExceededException.class);
         verify(operations, never()).execute(any(), any(), any(), any());
 
-        ClusterOutcome outcome =
-                lifecycle.deleteTopic(CLUSTER, "orders", new ApplyRequest(preview.etag(), preview.fingerprint(), true));
+        ClusterOutcome outcome = lifecycle.deleteTopic(
+                CLUSTER, "orders", new TopicApplyRequest(preview.etag(), preview.fingerprint(), true));
         assertThat(outcome.scope()).isEqualTo("whole cluster");
         assertThat(outcome.status()).isEqualTo("APPLIED");
         @SuppressWarnings("unchecked")

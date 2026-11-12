@@ -78,12 +78,7 @@ export function GroupView() {
       }
       actions={
         <Group gap="xs">
-          <GroupDelete
-            clusterId={clusterId}
-            groupId={groupId}
-            group={group.data}
-            unavailable={group.isError}
-          />
+          <GroupDelete clusterId={clusterId} groupId={groupId} group={group.data} unavailable={group.isError} />
           <CapabilityGate verdict={gate} what="resetting this group's offsets">
             <Button disabled={gate.kind === 'blocked' || !group.data} onClick={() => setResetting(true)}>
               Reset offsets…

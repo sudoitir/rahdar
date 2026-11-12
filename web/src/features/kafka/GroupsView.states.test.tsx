@@ -4,7 +4,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderWithProviders } from '../../test/render.tsx';
 import { GroupsView } from './GroupsView.tsx';
 
-const search = vi.hoisted(() => ({ q: undefined as string | undefined, type: undefined as string | undefined, state: undefined as string | undefined }));
+const search = vi.hoisted(() => ({
+  q: undefined as string | undefined,
+  type: undefined as string | undefined,
+  state: undefined as string | undefined,
+}));
 const query = vi.hoisted(() => ({
   pending: false,
   error: false,

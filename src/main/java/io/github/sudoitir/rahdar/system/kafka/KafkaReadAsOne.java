@@ -11,9 +11,9 @@ import io.github.sudoitir.rahdar.platform.clusters.LifecycleOutcome;
 import io.github.sudoitir.rahdar.platform.clusters.LifecycleOutcome.NodeOutcome;
 import io.github.sudoitir.rahdar.platform.clusters.LifecycleOutcome.NodeStatus;
 import io.github.sudoitir.rahdar.platform.clusters.ResourceTargets.Target;
-import io.github.sudoitir.rahdar.system.kafka.KafkaTopicLifecycle.ApplyRequest;
 import io.github.sudoitir.rahdar.system.kafka.KafkaTopicLifecycle.CreateRequest;
 import io.github.sudoitir.rahdar.system.kafka.KafkaTopicLifecycle.PreviewView;
+import io.github.sudoitir.rahdar.system.kafka.KafkaTopicLifecycle.TopicApplyRequest;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -65,7 +65,7 @@ class KafkaReadAsOne implements ReadAsOneResource {
         if (fingerprint == null || fingerprint.isBlank()) {
             throw new KafkaStaleException(STALE);
         }
-        topics.deleteTopic(clusterId, target.name(), new ApplyRequest(etag, fingerprint, override));
+        topics.deleteTopic(clusterId, target.name(), new TopicApplyRequest(etag, fingerprint, override));
         return applied(IdentityBasis.INCARNATION);
     }
 
@@ -75,7 +75,7 @@ class KafkaReadAsOne implements ReadAsOneResource {
             return preview(topics.previewDeleteGroup(clusterId, target.name()), IdentityBasis.INCARNATION);
         }
         requireEtag(etag);
-        topics.deleteGroup(clusterId, target.name(), new ApplyRequest(etag, null, false));
+        topics.deleteGroup(clusterId, target.name(), new TopicApplyRequest(etag, null, false));
         return applied(IdentityBasis.INCARNATION);
     }
 

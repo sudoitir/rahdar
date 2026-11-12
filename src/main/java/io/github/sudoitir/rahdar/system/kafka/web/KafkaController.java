@@ -11,9 +11,9 @@ import io.github.sudoitir.rahdar.system.kafka.KafkaOffsets;
 import io.github.sudoitir.rahdar.system.kafka.KafkaTopicConfigChanges;
 import io.github.sudoitir.rahdar.system.kafka.KafkaTopicConfigs;
 import io.github.sudoitir.rahdar.system.kafka.KafkaTopicLifecycle;
-import io.github.sudoitir.rahdar.system.kafka.KafkaTopicLifecycle.ApplyRequest;
 import io.github.sudoitir.rahdar.system.kafka.KafkaTopicLifecycle.CreateRequest;
 import io.github.sudoitir.rahdar.system.kafka.KafkaTopicLifecycle.PartitionsRequest;
+import io.github.sudoitir.rahdar.system.kafka.KafkaTopicLifecycle.TopicApplyRequest;
 import io.github.sudoitir.rahdar.system.kafka.KafkaTransactionAborts;
 import io.github.sudoitir.rahdar.system.kafka.KafkaTransactions;
 import io.github.sudoitir.rahdar.system.kafka.web.KafkaViews.AbortPreview;
@@ -129,7 +129,7 @@ public class KafkaController {
     @HeldResponse
     @PostMapping("/topics/{topic}:delete")
     public KafkaTopicLifecycle.ClusterOutcome deleteTopic(
-            @PathVariable UUID clusterId, @PathVariable String topic, @RequestBody ApplyRequest request) {
+            @PathVariable UUID clusterId, @PathVariable String topic, @RequestBody TopicApplyRequest request) {
         return lifecycle.deleteTopic(clusterId, topic, request);
     }
 
@@ -155,7 +155,7 @@ public class KafkaController {
     @HeldResponse
     @PostMapping("/groups/{group}:delete")
     public KafkaTopicLifecycle.ClusterOutcome deleteGroup(
-            @PathVariable UUID clusterId, @PathVariable String group, @RequestBody ApplyRequest request) {
+            @PathVariable UUID clusterId, @PathVariable String group, @RequestBody TopicApplyRequest request) {
         return lifecycle.deleteGroup(clusterId, group, request);
     }
 

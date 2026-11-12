@@ -11,9 +11,9 @@ import io.github.sudoitir.rahdar.system.kafka.KafkaOffsetResets;
 import io.github.sudoitir.rahdar.system.kafka.KafkaTopicConfigChanges;
 import io.github.sudoitir.rahdar.system.kafka.KafkaTopicConfigs;
 import io.github.sudoitir.rahdar.system.kafka.KafkaTopicLifecycle;
-import io.github.sudoitir.rahdar.system.kafka.KafkaTopicLifecycle.ApplyRequest;
 import io.github.sudoitir.rahdar.system.kafka.KafkaTopicLifecycle.CreateRequest;
 import io.github.sudoitir.rahdar.system.kafka.KafkaTopicLifecycle.PartitionsRequest;
+import io.github.sudoitir.rahdar.system.kafka.KafkaTopicLifecycle.TopicApplyRequest;
 import io.github.sudoitir.rahdar.system.kafka.KafkaTransactionAborts;
 import io.github.sudoitir.rahdar.system.kafka.KafkaTransactions;
 import io.github.sudoitir.rahdar.system.kafka.web.KafkaViews.ConfigChangeRequest;
@@ -205,7 +205,8 @@ public class KafkaMcpActionTools {
         }
         return guard(() -> dry
                 ? lifecycle.previewDelete(id, topic)
-                : lifecycle.deleteTopic(id, topic, new ApplyRequest(etag, fingerprint, McpArgs.flag(override, false))));
+                : lifecycle.deleteTopic(
+                        id, topic, new TopicApplyRequest(etag, fingerprint, McpArgs.flag(override, false))));
     }
 
     @McpTool(
@@ -260,7 +261,7 @@ public class KafkaMcpActionTools {
         }
         return guard(() -> dry
                 ? lifecycle.previewDeleteGroup(id, group)
-                : lifecycle.deleteGroup(id, group, new ApplyRequest(etag, null, false)));
+                : lifecycle.deleteGroup(id, group, new TopicApplyRequest(etag, null, false)));
     }
 
     /** The settings a JSON object of names and values sets; empty when none. */

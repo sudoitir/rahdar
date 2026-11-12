@@ -138,9 +138,7 @@ function detail(over: Partial<GroupDetail> = {}): GroupDetail {
 }
 
 function Providers({ scheme, children }: { scheme: (typeof SCHEMES)[number]; children: ReactNode }) {
-  const [client] = useState(
-    () => new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } }),
-  );
+  const [client] = useState(() => new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } }));
   return (
     <MantineProvider theme={testTheme} forceColorScheme={scheme}>
       <QueryClientProvider client={client}>
@@ -232,7 +230,16 @@ describe('topic and group lifecycle on a desktop', () => {
         cleanup();
         gate.kind = 'allowed';
 
-        draw(<CreateTopicForm clusterId="k1" opened onClose={() => undefined} brokersReached={3} permissionReason={null} />, scheme);
+        draw(
+          <CreateTopicForm
+            clusterId="k1"
+            opened
+            onClose={() => undefined}
+            brokersReached={3}
+            permissionReason={null}
+          />,
+          scheme,
+        );
         const create = screen.getByRole('button', { name: 'Create topic' });
         const box = create.getBoundingClientRect();
         expect(box.bottom).toBeLessThanOrEqual(document.documentElement.clientHeight + 1);

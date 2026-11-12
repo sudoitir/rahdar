@@ -37,8 +37,8 @@ export function PreviewWords({ planned }: Readonly<{ planned: TopicPreview }>) {
       <Text size="sm">{count}</Text>
       {planned.overCap ? (
         <Text size="sm">
-          That estimate is over the safety cap of {planned.cap}. Holding delete overrides the cap, and the audit
-          records the override.
+          That estimate is over the safety cap of {planned.cap}. Holding delete overrides the cap, and the audit records
+          the override.
         </Text>
       ) : null}
     </>
@@ -80,8 +80,7 @@ export function DeleteTopicDialog({
   useEffect(() => {
     if (opened) run.current(topic, { onSuccess: setPlanned });
   }, [opened, topic]);
-  const blocked =
-    preview.error != null ? message(preview.error) : undefined;
+  const blocked = preview.error != null ? message(preview.error) : undefined;
   return (
     <ConfirmDialog
       opened={opened}
@@ -153,11 +152,7 @@ export function IncreasePartitionsDialog({
   const [planned, setPlanned] = useState<TopicPreview | null>(null);
   const asked = Number(count);
   const blocked =
-    preview.error != null
-      ? message(preview.error)
-      : planned
-        ? undefined
-        : 'Preview the new partition count first.';
+    preview.error != null ? message(preview.error) : planned ? undefined : 'Preview the new partition count first.';
   return (
     <ConfirmDialog
       opened={opened}

@@ -63,7 +63,7 @@ public class KafkaTopicLifecycle {
 
     /** Not {@code ApplyRequest}: that name is the broker-configuration apply body. */
     @Schema(name = "KafkaTopicApplyRequest")
-    public record ApplyRequest(String etag, String fingerprint, Boolean override) {}
+    public record TopicApplyRequest(String etag, String fingerprint, Boolean override) {}
 
     @Schema(name = "KafkaPartitionsRequest")
     public record PartitionsRequest(Integer partitions, String etag) {}
@@ -126,7 +126,7 @@ public class KafkaTopicLifecycle {
         return deleteView(clusterId, topic);
     }
 
-    public ClusterOutcome deleteTopic(UUID clusterId, String topic, ApplyRequest request) {
+    public ClusterOutcome deleteTopic(UUID clusterId, String topic, TopicApplyRequest request) {
         access.requireResource(clusterId, ResourceRef.destination(topic), ResourcePermissions.DESTINATION_DELETE);
         return gatedDelete(new DeleteParams(
                 clusterId, topic, request.etag(), request.fingerprint(), Boolean.TRUE.equals(request.override())));
@@ -151,7 +151,7 @@ public class KafkaTopicLifecycle {
         return view(group, preview, null, null);
     }
 
-    public ClusterOutcome deleteGroup(UUID clusterId, String group, ApplyRequest request) {
+    public ClusterOutcome deleteGroup(UUID clusterId, String group, TopicApplyRequest request) {
         access.requireResource(clusterId, ResourceRef.subscription(group), ResourcePermissions.SUBSCRIPTION_DELETE);
         return gatedGroup(new GroupDeleteParams(clusterId, group, request.etag()));
     }

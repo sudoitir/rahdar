@@ -64,7 +64,13 @@ export function GroupDelete({
   const [open, setOpen] = useState(false);
   const [planned, setPlanned] = useState<TopicPreview | null>(null);
   const blocked =
-    verdict.kind === 'blocked' ? verdict.reason : preview.error ? message(preview.error) : planned ? undefined : 'Loading the preview.';
+    verdict.kind === 'blocked'
+      ? verdict.reason
+      : preview.error
+        ? message(preview.error)
+        : planned
+          ? undefined
+          : 'Loading the preview.';
 
   return (
     <>

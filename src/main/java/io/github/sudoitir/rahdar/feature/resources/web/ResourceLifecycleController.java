@@ -83,6 +83,7 @@ public class ResourceLifecycleController {
         return respond(lifecycle.createQueue(clusterId, request, dryRun));
     }
 
+    @HeldResponse
     @PostMapping("/destinations")
     public LifecycleOutcomeView createDestination(
             @PathVariable UUID clusterId,

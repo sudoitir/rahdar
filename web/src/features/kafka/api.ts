@@ -317,7 +317,8 @@ export interface TopicCreateBody {
 
 export function usePreviewCreateTopic(clusterId: string) {
   return useMutation<TopicPreview, ApiError, TopicCreateBody>({
-    mutationFn: (body) => request(`${base(clusterId)}/topics:create-preview`, { method: 'POST', body: JSON.stringify(body) }),
+    mutationFn: (body) =>
+      request(`${base(clusterId)}/topics:create-preview`, { method: 'POST', body: JSON.stringify(body) }),
   });
 }
 
@@ -334,10 +335,12 @@ export function usePreviewDeleteTopic(clusterId: string) {
 }
 
 export function useDeleteTopic(clusterId: string) {
-  return useMutation<ClusterOutcome, ApiError, { topic: string; etag: string; fingerprint: string; override: boolean }>({
-    mutationFn: ({ topic, ...body }) =>
-      request(`${base(clusterId)}/topics/${seg(topic)}:delete`, { method: 'POST', body: JSON.stringify(body) }),
-  });
+  return useMutation<ClusterOutcome, ApiError, { topic: string; etag: string; fingerprint: string; override: boolean }>(
+    {
+      mutationFn: ({ topic, ...body }) =>
+        request(`${base(clusterId)}/topics/${seg(topic)}:delete`, { method: 'POST', body: JSON.stringify(body) }),
+    },
+  );
 }
 
 export function usePreviewIncreasePartitions(clusterId: string) {

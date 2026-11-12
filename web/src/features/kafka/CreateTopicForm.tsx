@@ -82,7 +82,8 @@ export function CreateTopicForm({
     settings: settings(),
   });
 
-  const errorText = (error: unknown) => (error instanceof ApiError ? error.message : 'The cluster could not be reached.');
+  const errorText = (error: unknown) =>
+    error instanceof ApiError ? error.message : 'The cluster could not be reached.';
 
   return (
     <ConfirmDialog

@@ -38,11 +38,11 @@ import io.github.sudoitir.rahdar.kernel.security.ResourceRef;
 import io.github.sudoitir.rahdar.kernel.settings.SettingsService;
 import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
 import io.github.sudoitir.rahdar.platform.broker.BrokerSettings;
-import io.github.sudoitir.rahdar.system.kafka.KafkaTopicLifecycle.ApplyRequest;
 import io.github.sudoitir.rahdar.system.kafka.KafkaTopicLifecycle.ClusterOutcome;
 import io.github.sudoitir.rahdar.system.kafka.KafkaTopicLifecycle.CreateRequest;
 import io.github.sudoitir.rahdar.system.kafka.KafkaTopicLifecycle.PartitionsRequest;
 import io.github.sudoitir.rahdar.system.kafka.KafkaTopicLifecycle.PreviewView;
+import io.github.sudoitir.rahdar.system.kafka.KafkaTopicLifecycle.TopicApplyRequest;
 import io.github.sudoitir.rahdar.system.kafka.mcp.KafkaMcpActionTools;
 import io.github.sudoitir.rahdar.system.kafka.web.KafkaController;
 import io.modelcontextprotocol.spec.McpError;
@@ -154,8 +154,8 @@ class KafkaTopicLifecycleApiTest {
                 .thenReturn(deletePreview(11, "etag-1", "billing"));
         PreviewView first = http.previewDelete(CLUSTER, "orders");
 
-        assertThatThrownBy(() ->
-                        http.deleteTopic(CLUSTER, "orders", new ApplyRequest(first.etag(), first.fingerprint(), false)))
+        assertThatThrownBy(() -> http.deleteTopic(
+                        CLUSTER, "orders", new TopicApplyRequest(first.etag(), first.fingerprint(), false)))
                 .isInstanceOf(KafkaStaleException.class);
         assertThatThrownBy(() -> tools.kafkaDeleteTopic(
                         CLUSTER.toString(), "orders", "etag-1", first.fingerprint(), false, false, "order"))
@@ -184,8 +184,8 @@ class KafkaTopicLifecycleApiTest {
         when(operations.preview(any(), any(), any())).thenReturn(deletePreview(4, "etag-1", "billing", "search"));
         PreviewView preview = http.previewDelete(CLUSTER, "orders");
 
-        ClusterOutcome outcome =
-                http.deleteTopic(CLUSTER, "orders", new ApplyRequest(preview.etag(), preview.fingerprint(), false));
+        ClusterOutcome outcome = http.deleteTopic(
+                CLUSTER, "orders", new TopicApplyRequest(preview.etag(), preview.fingerprint(), false));
 
         assertThat(outcome).isEqualTo(new ClusterOutcome("whole cluster", "APPLIED"));
         @SuppressWarnings("unchecked")

@@ -50,12 +50,36 @@ function mutation(pending: () => boolean, error: () => unknown) {
 }
 
 vi.mock('./api.ts', () => ({
-  usePreviewDeleteTopic: () => mutation(() => api.deletePending, () => api.deleteError),
-  useDeleteTopic: () => mutation(() => false, () => api.removedError),
-  usePreviewIncreasePartitions: () => mutation(() => api.partitionsPending, () => api.partitionsError),
-  useIncreasePartitions: () => mutation(() => false, () => null),
-  usePreviewDeleteGroup: () => mutation(() => api.groupPending, () => api.groupError),
-  useDeleteGroup: () => mutation(() => false, () => api.removedError),
+  usePreviewDeleteTopic: () =>
+    mutation(
+      () => api.deletePending,
+      () => api.deleteError,
+    ),
+  useDeleteTopic: () =>
+    mutation(
+      () => false,
+      () => api.removedError,
+    ),
+  usePreviewIncreasePartitions: () =>
+    mutation(
+      () => api.partitionsPending,
+      () => api.partitionsError,
+    ),
+  useIncreasePartitions: () =>
+    mutation(
+      () => false,
+      () => null,
+    ),
+  usePreviewDeleteGroup: () =>
+    mutation(
+      () => api.groupPending,
+      () => api.groupError,
+    ),
+  useDeleteGroup: () =>
+    mutation(
+      () => false,
+      () => api.removedError,
+    ),
 }));
 
 const target = { id: 'kafka.topic/orders', kind: 'kafka.topic', name: 'orders' };

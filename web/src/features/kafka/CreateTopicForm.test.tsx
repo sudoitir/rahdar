@@ -7,7 +7,13 @@ import { CreateTopicForm } from './CreateTopicForm.tsx';
 function renderForm(scheme: 'light' | 'dark', permissionReason: string | null = null) {
   document.documentElement.setAttribute('data-mantine-color-scheme', scheme);
   return renderWithProviders(
-    <CreateTopicForm clusterId="k1" opened onClose={() => undefined} brokersReached={3} permissionReason={permissionReason} />,
+    <CreateTopicForm
+      clusterId="k1"
+      opened
+      onClose={() => undefined}
+      brokersReached={3}
+      permissionReason={permissionReason}
+    />,
   );
 }
 
