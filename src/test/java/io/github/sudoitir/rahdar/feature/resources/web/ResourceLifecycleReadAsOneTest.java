@@ -70,7 +70,7 @@ class ResourceLifecycleReadAsOneTest {
     @Test
     void creatingAKafkaDestinationUsesTheHandler() {
         CreateDestinationRequest request = new CreateDestinationRequest("kafka.topic", "orders", Map.of("etag", "e"));
-        when(handler.createDestination(eq(CLUSTER), eq(request), eq(false))).thenReturn(applied());
+        when(handler.createDestination(CLUSTER, request, false)).thenReturn(applied());
 
         LifecycleOutcomeView view = controller.createDestination(CLUSTER, false, request);
 
