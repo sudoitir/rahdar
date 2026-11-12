@@ -5,6 +5,7 @@ import io.github.sudoitir.rahdar.feature.resources.LifecycleRequests.CreateDesti
 import io.github.sudoitir.rahdar.feature.resources.LifecycleRequests.CreateSubscriptionRequest;
 import io.github.sudoitir.rahdar.feature.resources.LifecycleRequests.UpdateResourceRequest;
 import io.github.sudoitir.rahdar.feature.resources.QueueLifecycleService;
+import io.github.sudoitir.rahdar.feature.resources.ReadAsOneResource;
 import io.github.sudoitir.rahdar.feature.resources.SubscriptionConfigurationReader;
 import io.github.sudoitir.rahdar.feature.resources.SubscriptionConfigurationReader.SubscriptionConfiguration;
 import io.github.sudoitir.rahdar.feature.resources.TruncateService;
@@ -23,7 +24,9 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -66,6 +69,7 @@ public class ResourceLifecycleController {
     private final ResourceTargets targets;
     private final TruncateService truncates;
     private final ClusterKinds clusters;
+    private final List<ReadAsOneResource> readAsOneResources;
 
     // ---- create ---------------------------------------------------------
 
@@ -79,6 +83,7 @@ public class ResourceLifecycleController {
         return respond(lifecycle.createQueue(clusterId, request, dryRun));
     }
 
+    @HeldResponse
     @PostMapping("/destinations")
     public LifecycleOutcomeView createDestination(
             @PathVariable UUID clusterId,
@@ -86,6 +91,10 @@ public class ResourceLifecycleController {
             @Valid @RequestBody CreateDestinationRequest request) {
         targets.requireKind(clusterId, request.kind(), ResourceClass.DESTINATION);
         requireCreatable(clusterId, request.kind());
+        Optional<ReadAsOneResource> handler = readAsOne(request.kind());
+        if (handler.isPresent()) {
+            return respond(handler.get().createDestination(clusterId, request, dryRun));
+        }
         return respond(lifecycle.createAddress(clusterId, request, dryRun));
     }
 
@@ -161,8 +170,21 @@ public class ResourceLifecycleController {
             @PathVariable String path,
             @RequestParam(defaultValue = "false") boolean dryRun,
             @RequestParam(defaultValue = "false") boolean override,
-            @RequestParam(defaultValue = "false") boolean disconnectConsumers) {
+            @RequestParam(defaultValue = "false") boolean disconnectConsumers,
+            @RequestParam(required = false) String etag,
+            @RequestParam(required = false) String fingerprint) {
         Target target = targets.require(clusterId, kind, path, ResourceClass.SUBSCRIPTION, ResourceClass.DESTINATION);
+        Optional<ReadAsOneResource> handler = readAsOne(kind);
+        if (handler.isPresent()) {
+            // disconnectConsumers is not forwarded: a Kafka group delete never removes members.
+            return respond(
+                    switch (target.resourceClass()) {
+                        case SUBSCRIPTION -> handler.get().deleteSubscription(clusterId, target, dryRun, etag);
+                        case DESTINATION ->
+                            handler.get().deleteDestination(clusterId, target, dryRun, override, etag, fingerprint);
+                        default -> throw new ConflictException(UNSUPPORTED, "This kind cannot be deleted here.");
+                    });
+        }
         return respond(
                 switch (target.resourceClass()) {
                     case SUBSCRIPTION ->
@@ -203,6 +225,12 @@ public class ResourceLifecycleController {
     }
 
     // ---- mapping --------------------------------------------------------
+
+    private Optional<ReadAsOneResource> readAsOne(String kind) {
+        return readAsOneResources.stream()
+                .filter(handler -> handler.supports(kind))
+                .findFirst();
+    }
 
     /** On a cluster read as one the driver creates the resource, so its kind must declare the verb (ADR-0224). */
     private void requireCreatable(UUID clusterId, String kind) {

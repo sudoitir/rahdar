@@ -10,6 +10,10 @@ import io.github.sudoitir.rahdar.system.kafka.KafkaOffsetResets;
 import io.github.sudoitir.rahdar.system.kafka.KafkaOffsets;
 import io.github.sudoitir.rahdar.system.kafka.KafkaTopicConfigChanges;
 import io.github.sudoitir.rahdar.system.kafka.KafkaTopicConfigs;
+import io.github.sudoitir.rahdar.system.kafka.KafkaTopicLifecycle;
+import io.github.sudoitir.rahdar.system.kafka.KafkaTopicLifecycle.CreateRequest;
+import io.github.sudoitir.rahdar.system.kafka.KafkaTopicLifecycle.PartitionsRequest;
+import io.github.sudoitir.rahdar.system.kafka.KafkaTopicLifecycle.TopicApplyRequest;
 import io.github.sudoitir.rahdar.system.kafka.KafkaTransactionAborts;
 import io.github.sudoitir.rahdar.system.kafka.KafkaTransactions;
 import io.github.sudoitir.rahdar.system.kafka.web.KafkaViews.AbortPreview;
@@ -63,6 +67,7 @@ public class KafkaController {
     private final KafkaHangingAborts hangingAborts;
     private final KafkaTopicConfigs configs;
     private final KafkaTopicConfigChanges configChanges;
+    private final KafkaTopicLifecycle lifecycle;
 
     @GetMapping("/groups")
     public GroupPage groups(
@@ -102,6 +107,56 @@ public class KafkaController {
     public ConfigPreview previewConfig(
             @PathVariable UUID clusterId, @PathVariable String topic, @RequestBody ConfigChangeRequest request) {
         return configs.preview(clusterId, topic, request);
+    }
+
+    @PostMapping("/topics:create-preview")
+    public KafkaTopicLifecycle.PreviewView previewCreate(
+            @PathVariable UUID clusterId, @RequestBody CreateRequest request) {
+        return lifecycle.previewCreate(clusterId, request);
+    }
+
+    @HeldResponse
+    @PostMapping("/topics:create")
+    public KafkaTopicLifecycle.ClusterOutcome create(@PathVariable UUID clusterId, @RequestBody CreateRequest request) {
+        return lifecycle.create(clusterId, request);
+    }
+
+    @PostMapping("/topics/{topic}:delete-preview")
+    public KafkaTopicLifecycle.PreviewView previewDelete(@PathVariable UUID clusterId, @PathVariable String topic) {
+        return lifecycle.previewDelete(clusterId, topic);
+    }
+
+    @HeldResponse
+    @PostMapping("/topics/{topic}:delete")
+    public KafkaTopicLifecycle.ClusterOutcome deleteTopic(
+            @PathVariable UUID clusterId, @PathVariable String topic, @RequestBody TopicApplyRequest request) {
+        return lifecycle.deleteTopic(clusterId, topic, request);
+    }
+
+    @PostMapping("/topics/{topic}:partitions-preview")
+    public KafkaTopicLifecycle.PreviewView previewPartitions(
+            @PathVariable UUID clusterId, @PathVariable String topic, @RequestBody PartitionsRequest request) {
+        return lifecycle.previewPartitions(clusterId, topic, request.partitions());
+    }
+
+    @HeldResponse
+    @PostMapping("/topics/{topic}:partitions")
+    public KafkaTopicLifecycle.ClusterOutcome increasePartitions(
+            @PathVariable UUID clusterId, @PathVariable String topic, @RequestBody PartitionsRequest request) {
+        return lifecycle.increasePartitions(clusterId, topic, request);
+    }
+
+    @PostMapping("/groups/{group}:delete-preview")
+    public KafkaTopicLifecycle.PreviewView previewDeleteGroup(
+            @PathVariable UUID clusterId, @PathVariable String group) {
+        return lifecycle.previewDeleteGroup(clusterId, group);
+    }
+
+    @HeldResponse
+    @PostMapping("/groups/{group}:delete")
+    public KafkaTopicLifecycle.ClusterOutcome deleteGroup(
+            @PathVariable UUID clusterId, @PathVariable String group, @RequestBody TopicApplyRequest request) {
+        return lifecycle.deleteGroup(clusterId, group, request);
     }
 
     @HeldResponse

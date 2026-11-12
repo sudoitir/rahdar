@@ -71,8 +71,11 @@ class McpToolSchemaBudgetTest extends PostgresIntegrationTest {
      * {@code kafka_preview_offset_reset} take {@code topic} and {@code cursor} to page one topic's partitions
      * (the answer is otherwise capped to the top 20), and {@code kafka_topic_config} takes
      * {@code onlyOverridden} and {@code keys}, which is what keeps its answer to the settings that matter.
+     * Raised from 139 for topic create, topic delete, partition increase and empty-group delete. Each tool
+     * previews by default and a real run carries the etag and the subject's name, which is the same gate the
+     * console uses and has no shorter shape.
      */
-    private static final int AVERAGE_TOKEN_BUDGET_PER_TOOL = 139;
+    private static final int AVERAGE_TOKEN_BUDGET_PER_TOOL = 140;
 
     /**
      * A tool that needs more than this is describing too much; split it or collapse it.

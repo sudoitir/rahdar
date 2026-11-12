@@ -32,6 +32,7 @@ export function ConfirmDialog({
   confirmLabel,
   dismissLabel = 'Cancel',
   tone = 'default',
+  hold = false,
   pending = false,
   blocked,
   result,
@@ -84,7 +85,7 @@ export function ConfirmDialog({
         <DialogActions>{cancel}</DialogActions>
       </>
     );
-  } else if (tone === 'danger') {
+  } else if (tone === 'danger' || hold) {
     controls = (
       <>
         {reason}
@@ -129,7 +130,7 @@ export function ConfirmDialog({
       closeOnClickOutside={!pending}
     >
       <Stack gap="md" aria-busy={pending}>
-        <Text component="div" size="sm">
+        <Text component="div" size="sm" className={classes.consequence}>
           {consequence}
         </Text>
         {controls}
@@ -158,6 +159,8 @@ export type ConfirmDialogProps = Readonly<{
   dismissLabel?: string;
   /** `danger` for an action that removes or overwrites, confirmed by holding; defaults to `default`. */
   tone?: 'default' | 'danger';
+  /** Hold to confirm without the danger colour, for a create that is not destruction. */
+  hold?: boolean;
   /** The action is running: the button is busy and the dialog cannot be dismissed. */
   pending?: boolean;
   /**

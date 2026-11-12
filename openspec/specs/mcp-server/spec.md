@@ -673,3 +673,22 @@ The MCP server SHALL offer, for Kafka clusters only, tools to list groups with l
 #### Scenario: A read-only token
 - **WHEN** an assistant whose token is read-only calls the offset reset tool
 - **THEN** the call is refused and nothing is previewed or held
+
+### Requirement: Topic and group lifecycle are MCP tools
+
+The MCP server SHALL offer, for Kafka clusters only, tools to preview and create a topic, preview and delete a topic, preview and increase a topic's partition count, and preview and delete an empty group. A mutating tool SHALL return its preview first, need the same permission as the screen, be held by the approval gate like the screen, send the preview's etag, and be audited. A tool SHALL NOT remove a group's members. A tool SHALL refuse an internal topic with the same reason as the screen.
+
+#### Scenario: An assistant deletes a topic
+
+- **WHEN** an assistant calls the delete-topic tool
+- **THEN** it first receives the preview naming the groups and the record estimate, and the delete runs only after confirmation and any approval the policy requires
+
+#### Scenario: A read-only token
+
+- **WHEN** an assistant whose token is read-only calls the create-topic tool
+- **THEN** the call is refused and nothing is previewed or held
+
+#### Scenario: A group with members
+
+- **WHEN** an assistant calls the delete-group tool for a group with members
+- **THEN** the preview names the members, the delete is refused, and the members stay in the group

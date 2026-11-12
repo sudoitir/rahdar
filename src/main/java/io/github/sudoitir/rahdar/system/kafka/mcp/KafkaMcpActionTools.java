@@ -10,6 +10,10 @@ import io.github.sudoitir.rahdar.system.kafka.KafkaHangingTransactions;
 import io.github.sudoitir.rahdar.system.kafka.KafkaOffsetResets;
 import io.github.sudoitir.rahdar.system.kafka.KafkaTopicConfigChanges;
 import io.github.sudoitir.rahdar.system.kafka.KafkaTopicConfigs;
+import io.github.sudoitir.rahdar.system.kafka.KafkaTopicLifecycle;
+import io.github.sudoitir.rahdar.system.kafka.KafkaTopicLifecycle.CreateRequest;
+import io.github.sudoitir.rahdar.system.kafka.KafkaTopicLifecycle.PartitionsRequest;
+import io.github.sudoitir.rahdar.system.kafka.KafkaTopicLifecycle.TopicApplyRequest;
 import io.github.sudoitir.rahdar.system.kafka.KafkaTransactionAborts;
 import io.github.sudoitir.rahdar.system.kafka.KafkaTransactions;
 import io.github.sudoitir.rahdar.system.kafka.web.KafkaViews.ConfigChangeRequest;
@@ -42,11 +46,14 @@ public class KafkaMcpActionTools {
     private final KafkaTransactionAborts aborts;
     private final KafkaHangingTransactions hanging;
     private final KafkaHangingAborts hangingAborts;
+    private final KafkaTopicLifecycle lifecycle;
 
     /** The id of a hanging transaction that kafka_list_transactions returns. */
     private static final String HANGING_PREFIX = "kafka.hanging-transaction/";
 
     private static final String CLUSTER_ID = "clusterId";
+
+    private static final String TOPIC = "topic";
 
     @McpTool(
             name = "kafka_reset_offsets",
@@ -94,7 +101,7 @@ public class KafkaMcpActionTools {
             @McpToolParam(required = false) Boolean dryRun,
             @McpToolParam(required = false) String confirm) {
         UUID id = McpArgs.uuid(CLUSTER_ID, clusterId);
-        McpArgs.required("topic", topic);
+        McpArgs.required(TOPIC, topic);
         boolean dry = McpArgs.flag(dryRun, true);
         Map<String, String> overrides = overrides(set);
         List<String> removals = KafkaMcpReadTools.topicList(remove);
@@ -142,6 +149,123 @@ public class KafkaMcpActionTools {
         }
         return guard(
                 () -> dry ? transactions.abortPreview(id, transactionalId) : aborts.abort(id, transactionalId, etag));
+    }
+
+    @McpTool(
+            name = "kafka_create_topic",
+            description = "Create a topic. Previews by default and creates nothing; a real run needs the etag.",
+            annotations =
+                    @McpTool.McpAnnotations(
+                            readOnlyHint = false,
+                            destructiveHint = false,
+                            idempotentHint = true,
+                            openWorldHint = false))
+    // One parameter per tool argument: the MCP schema is the parameter list.
+    @SuppressWarnings("java:S107")
+    public McpSchema.CallToolResult kafkaCreateTopic(
+            @McpToolParam(required = true) String clusterId,
+            @McpToolParam(required = true) String topic,
+            @McpToolParam(required = false) Integer partitions,
+            @McpToolParam(required = false) Integer replicationFactor,
+            @McpToolParam(required = false) String settings,
+            @McpToolParam(required = false) String etag,
+            @McpToolParam(required = false) Boolean dryRun,
+            @McpToolParam(required = false) String confirm) {
+        UUID id = McpArgs.uuid(CLUSTER_ID, clusterId);
+        McpArgs.required(TOPIC, topic);
+        boolean dry = McpArgs.flag(dryRun, true);
+        CreateRequest request =
+                new CreateRequest(topic, partitions, replicationFactor, overrides(settings), dry ? null : etag);
+        if (!dry) {
+            McpArgs.required("etag", etag);
+            McpArgs.confirm(topic, confirm);
+        }
+        return guard(() -> dry ? lifecycle.previewCreate(id, request) : lifecycle.create(id, request));
+    }
+
+    @McpTool(
+            name = "kafka_delete_topic",
+            description = "Delete a topic. Previews by default, naming groups and the record estimate.",
+            annotations =
+                    @McpTool.McpAnnotations(
+                            readOnlyHint = false,
+                            destructiveHint = true,
+                            idempotentHint = true,
+                            openWorldHint = false))
+    public McpSchema.CallToolResult kafkaDeleteTopic(
+            @McpToolParam(required = true) String clusterId,
+            @McpToolParam(required = true) String topic,
+            @McpToolParam(required = false) String etag,
+            @McpToolParam(required = false) String fingerprint,
+            @McpToolParam(required = false) Boolean override,
+            @McpToolParam(required = false) Boolean dryRun,
+            @McpToolParam(required = false) String confirm) {
+        UUID id = McpArgs.uuid(CLUSTER_ID, clusterId);
+        McpArgs.required(TOPIC, topic);
+        boolean dry = McpArgs.flag(dryRun, true);
+        if (!dry) {
+            McpArgs.required("etag", etag);
+            McpArgs.confirm(topic, confirm);
+        }
+        return guard(() -> dry
+                ? lifecycle.previewDelete(id, topic)
+                : lifecycle.deleteTopic(
+                        id, topic, new TopicApplyRequest(etag, fingerprint, McpArgs.flag(override, false))));
+    }
+
+    @McpTool(
+            name = "kafka_increase_partitions",
+            description = "Raise a topic's partition count. Previews by default; a lower count is refused.",
+            annotations =
+                    @McpTool.McpAnnotations(
+                            readOnlyHint = false,
+                            destructiveHint = true,
+                            idempotentHint = true,
+                            openWorldHint = false))
+    public McpSchema.CallToolResult kafkaIncreasePartitions(
+            @McpToolParam(required = true) String clusterId,
+            @McpToolParam(required = true) String topic,
+            @McpToolParam(required = true) Integer partitions,
+            @McpToolParam(required = false) String etag,
+            @McpToolParam(required = false) Boolean dryRun,
+            @McpToolParam(required = false) String confirm) {
+        UUID id = McpArgs.uuid(CLUSTER_ID, clusterId);
+        McpArgs.required(TOPIC, topic);
+        boolean dry = McpArgs.flag(dryRun, true);
+        if (!dry) {
+            McpArgs.required("etag", etag);
+            McpArgs.confirm(topic, confirm);
+        }
+        return guard(() -> dry
+                ? lifecycle.previewPartitions(id, topic, partitions)
+                : lifecycle.increasePartitions(id, topic, new PartitionsRequest(partitions, etag)));
+    }
+
+    @McpTool(
+            name = "kafka_delete_group",
+            description = "Delete an empty group. A group with members is refused and its members stay.",
+            annotations =
+                    @McpTool.McpAnnotations(
+                            readOnlyHint = false,
+                            destructiveHint = true,
+                            idempotentHint = true,
+                            openWorldHint = false))
+    public McpSchema.CallToolResult kafkaDeleteGroup(
+            @McpToolParam(required = true) String clusterId,
+            @McpToolParam(required = true) String group,
+            @McpToolParam(required = false) String etag,
+            @McpToolParam(required = false) Boolean dryRun,
+            @McpToolParam(required = false) String confirm) {
+        UUID id = McpArgs.uuid(CLUSTER_ID, clusterId);
+        McpArgs.required("group", group);
+        boolean dry = McpArgs.flag(dryRun, true);
+        if (!dry) {
+            McpArgs.required("etag", etag);
+            McpArgs.confirm(group, confirm);
+        }
+        return guard(() -> dry
+                ? lifecycle.previewDeleteGroup(id, group)
+                : lifecycle.deleteGroup(id, group, new TopicApplyRequest(etag, null, false)));
     }
 
     /** The settings a JSON object of names and values sets; empty when none. */

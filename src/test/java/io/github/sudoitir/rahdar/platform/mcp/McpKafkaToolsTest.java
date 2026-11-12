@@ -180,7 +180,14 @@ class McpKafkaToolsTest extends PostgresIntegrationTest {
 
         assertThat(listedTools())
                 .contains("kafka_list_groups", "kafka_preview_offset_reset", "kafka_topic_config")
-                .doesNotContain("kafka_reset_offsets", "kafka_set_topic_config", "kafka_abort_transaction");
+                .doesNotContain(
+                        "kafka_reset_offsets",
+                        "kafka_set_topic_config",
+                        "kafka_abort_transaction",
+                        "kafka_create_topic",
+                        "kafka_delete_topic",
+                        "kafka_increase_partitions",
+                        "kafka_delete_group");
 
         JsonNode refused = call("kafka_reset_offsets", reset(Map.of("confirm", "billing")));
 

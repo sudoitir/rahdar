@@ -4,3 +4,4 @@ dist/
 *.local
 node_modules/.tmp/
 coverage/
+__screenshots__/

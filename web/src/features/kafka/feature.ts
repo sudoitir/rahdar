@@ -4,7 +4,9 @@ import { createRoute } from '@tanstack/react-router';
 import { CONTRACT, defineFeature } from '../../kernel/feature.ts';
 import { lazyFeatureView } from '../../kernel/routing/lazy.tsx';
 import { clusterRoute } from '../../kernel/routing/roots.ts';
+import { CreateTopicForm } from './CreateTopicForm.tsx';
 import { TopicConfiguration } from './rowActions.tsx';
+import { DeleteTopic, IncreasePartitions } from './TopicLifecycleActions.tsx';
 import { validateAclSearch, validateGroupsSearch } from './search.ts';
 
 const view = <K extends string>(load: () => Promise<Record<K, () => React.ReactNode>>, name: K) =>
@@ -106,6 +108,9 @@ export const kafkaFeature = defineFeature({
   slots: {
     'destination.actions': [
       { id: 'kafka.topic.configuration', order: 15, section: 'open', Component: TopicConfiguration },
+      { id: 'kafka.topic.partitions', order: 16, section: 'operate', Component: IncreasePartitions },
+      { id: 'kafka.topic.delete', order: 20, section: 'destroy', Component: DeleteTopic },
     ],
+    'destinations.create': [{ id: 'kafka.topic.create', order: 10, system: 'kafka', Component: CreateTopicForm }],
   },
 });

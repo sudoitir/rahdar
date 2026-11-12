@@ -281,11 +281,13 @@ describe('ResourceView page structure', () => {
       await waitFor(() => expect(screen.getByRole('button', { name: 'New destination' })).toBeDisabled());
     });
 
-    it('is not offered by a system with no form, nor on the other views', async () => {
+    it('opens the Kafka topic form, and is not offered on the other views', async () => {
       serve({ system: KAFKA_SYSTEM, kinds: KAFKA_KINDS });
+      const user = userEvent.setup();
       const { unmount } = renderWithProviders(<ResourceView kind="destinations" />);
-      await screen.findAllByText(/No destinations/);
-      expect(screen.queryByRole('button', { name: 'New destination' })).not.toBeInTheDocument();
+      await waitFor(() => expect(screen.getByRole('button', { name: 'New destination' })).toBeEnabled());
+      await user.click(screen.getByRole('button', { name: 'New destination' }));
+      expect(await screen.findByRole('dialog', { name: 'Create topic' })).toBeInTheDocument();
       unmount();
 
       serve({ system: RABBITMQ_SYSTEM, kinds: RABBITMQ_KINDS });

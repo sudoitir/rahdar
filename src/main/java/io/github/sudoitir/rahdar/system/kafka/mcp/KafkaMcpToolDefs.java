@@ -20,6 +20,14 @@ public final class KafkaMcpToolDefs {
 
     private static final String CONFIRM_GROUP = "A real run needs confirm equal to the group's name.";
 
+    private static final String TOPIC = "topic";
+
+    private static final String DRY_RUN = "dryRun";
+
+    private static final String TOPIC_NAME = "The topic name.";
+
+    private static final String CONFIRM_TOPIC = "A real run needs confirm equal to the topic name.";
+
     public static final List<McpToolDef> ALL = List.of(
             read(
                     "kafka_list_groups",
@@ -53,7 +61,7 @@ public final class KafkaMcpToolDefs {
             read(
                     "kafka_topic_config",
                     "A topic's settings with their source and default, and whether they can be changed.",
-                    Param.note("topic", "The topic's name.")),
+                    Param.note(TOPIC, "The topic's name.")),
             mutate(
                     "kafka_set_topic_config",
                     "Set or remove a topic's settings.",
@@ -61,8 +69,7 @@ public final class KafkaMcpToolDefs {
                             "set", "{ \"<setting>\": \"<value>\" }", "Overrides to set, by the broker's setting name."),
                     Param.note("remove", "Comma-separated overrides to remove; the setting falls back."),
                     Param.note(
-                            "dryRun",
-                            McpToolDef.DRY_RUN + " The preview carries the etag and the broker's validation."),
+                            DRY_RUN, McpToolDef.DRY_RUN + " The preview carries the etag and the broker's validation."),
                     Param.note("etag", ETAG),
                     Param.note(CONFIRM, "A real run needs confirm equal to the topic's name.")),
             read(
@@ -81,7 +88,7 @@ public final class KafkaMcpToolDefs {
                                     + " ones it has missed, and the hanging transactions found on the partitions"
                                     + " (open there, unknown to the coordinator, holding readers back). Finding them"
                                     + " reads every partition in scope."),
-                    Param.note("topic", "With hangingOnly, only this topic's partitions.")),
+                    Param.note(TOPIC, "With hangingOnly, only this topic's partitions.")),
             mutate(
                     "kafka_abort_transaction",
                     "Abort a transaction or a hanging transaction, fencing its producer.",
@@ -89,9 +96,43 @@ public final class KafkaMcpToolDefs {
                             "transactionalId",
                             "From kafka_list_transactions: a transactional id the coordinator has missed, or the id of"
                                     + " a hanging transaction, such as kafka.hanging-transaction/orders/0/4711."),
-                    Param.note("dryRun", McpToolDef.DRY_RUN + " The preview names what the abort releases."),
+                    Param.note(DRY_RUN, McpToolDef.DRY_RUN + " The preview names what the abort releases."),
                     Param.note("etag", ETAG),
-                    Param.note(CONFIRM, "A real run needs confirm equal to the transactional id.")));
+                    Param.note(CONFIRM, "A real run needs confirm equal to the transactional id.")),
+            mutate(
+                    "kafka_create_topic",
+                    "Create a topic. Previews first and creates nothing until confirmed.",
+                    Param.note(TOPIC, TOPIC_NAME),
+                    Param.note(
+                            "settings",
+                            "JSON of cleanup.policy, retention.ms, retention.bytes, max.message.bytes, min.insync.replicas."),
+                    Param.note(DRY_RUN, McpToolDef.DRY_RUN),
+                    Param.note("etag", ETAG),
+                    Param.note(CONFIRM, CONFIRM_TOPIC)),
+            mutate(
+                    "kafka_delete_topic",
+                    "Delete a topic after a preview that names groups and the record estimate.",
+                    Param.note(TOPIC, TOPIC_NAME),
+                    Param.note("fingerprint", "The preview's fingerprint of groups and the estimate."),
+                    Param.note("override", "Pass true only to pass the bulk safety cap. The override is audited."),
+                    Param.note(DRY_RUN, McpToolDef.DRY_RUN),
+                    Param.note("etag", ETAG),
+                    Param.note(CONFIRM, CONFIRM_TOPIC)),
+            mutate(
+                    "kafka_increase_partitions",
+                    "Raise a topic's partition count. A lower count is refused.",
+                    Param.note(TOPIC, TOPIC_NAME),
+                    Param.note("partitions", "The new count, higher than the current one."),
+                    Param.note(DRY_RUN, McpToolDef.DRY_RUN),
+                    Param.note("etag", ETAG),
+                    Param.note(CONFIRM, CONFIRM_TOPIC)),
+            mutate(
+                    "kafka_delete_group",
+                    "Delete an empty group. A group with members is refused and its members stay.",
+                    Param.note("group", "The group id."),
+                    Param.note(DRY_RUN, McpToolDef.DRY_RUN),
+                    Param.note("etag", ETAG),
+                    Param.note(CONFIRM, CONFIRM_GROUP)));
 
     private KafkaMcpToolDefs() {}
 

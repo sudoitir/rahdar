@@ -7,7 +7,7 @@
 
 /* The fill is a second copy of the button, in the fill's colours, shown through a clip that opens from
    the inline start while the button is held. The hold's length is `--as-hold-duration`, a function of the control
-   and not decoration, so reduced motion leaves it alone. */
+   and not decoration. Reduced motion drops the fill transition; the hold itself still has to finish. */
 .root {
   --hold-color: var(--mantine-color-signal-filled);
   --hold-text: var(--mantine-color-white);
@@ -86,4 +86,10 @@
 .hint {
   font-size: var(--mantine-font-size-xs);
   color: var(--as-text-dimmed);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .root[data-holding] .fill {
+    transition: none;
+  }
 }
