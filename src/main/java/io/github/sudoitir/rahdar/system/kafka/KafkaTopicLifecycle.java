@@ -60,14 +60,18 @@ public class KafkaTopicLifecycle {
     private final ActorResolver actors;
     private final SettingsService settings;
 
+    @Schema(name = "KafkaTopicCreateRequest")
     public record CreateRequest(
             String name, Integer partitions, Integer replicationFactor, Map<String, String> settings, String etag) {}
 
+    /** Not {@code ApplyRequest}: that name is the broker-configuration apply body. */
+    @Schema(name = "KafkaTopicApplyRequest")
     public record ApplyRequest(String etag, String fingerprint, Boolean override) {}
 
+    @Schema(name = "KafkaPartitionsRequest")
     public record PartitionsRequest(Integer partitions, String etag) {}
 
-    @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
+    @Schema(name = "KafkaTopicPreview", requiredMode = Schema.RequiredMode.REQUIRED)
     public record PreviewView(
             String name,
             String etag,
@@ -82,7 +86,7 @@ public class KafkaTopicLifecycle {
             long cap,
             boolean overCap) {}
 
-    @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
+    @Schema(name = "KafkaClusterOutcome", requiredMode = Schema.RequiredMode.REQUIRED)
     public record ClusterOutcome(String scope, String status) {}
 
     public record CreateParams(

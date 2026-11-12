@@ -1204,6 +1204,102 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/clusters/{clusterId}/kafka/topics:create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["create_8"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/clusters/{clusterId}/kafka/topics:create-preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["previewCreate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/clusters/{clusterId}/kafka/topics/{topic}:partitions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["increasePartitions"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/clusters/{clusterId}/kafka/topics/{topic}:partitions-preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["previewPartitions"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/clusters/{clusterId}/kafka/topics/{topic}:delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["deleteTopic"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/clusters/{clusterId}/kafka/topics/{topic}:delete-preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["previewDelete"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/clusters/{clusterId}/kafka/topics/{topic}/config:preview": {
         parameters: {
             query?: never;
@@ -1278,6 +1374,38 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["previewHangingAbort"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/clusters/{clusterId}/kafka/groups/{group}:delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["deleteGroup"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/clusters/{clusterId}/kafka/groups/{group}:delete-preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["previewDeleteGroup"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1613,7 +1741,7 @@ export interface paths {
         };
         get: operations["list_8"];
         put?: never;
-        post: operations["create_8"];
+        post: operations["create_9"];
         delete?: never;
         options?: never;
         head?: never;
@@ -6084,6 +6212,50 @@ export interface components {
             topic: string;
             /** Format: int32 */
             partition: number;
+        };
+        KafkaTopicCreateRequest: {
+            name?: string;
+            /** Format: int32 */
+            partitions?: number;
+            /** Format: int32 */
+            replicationFactor?: number;
+            settings?: {
+                [key: string]: string;
+            };
+            etag?: string;
+        };
+        KafkaClusterOutcome: {
+            scope?: string;
+            status?: string;
+        };
+        KafkaTopicPreview: {
+            name?: string;
+            etag?: string;
+            fingerprint?: string;
+            note?: string;
+            groups?: string[];
+            /** Format: int64 */
+            estimate?: number;
+            accuracy?: string;
+            /** Format: int32 */
+            partitions?: number;
+            /** Format: int32 */
+            replicationFactor?: number;
+            /** Format: int32 */
+            currentPartitions?: number;
+            /** Format: int64 */
+            cap: number;
+            overCap: boolean;
+        };
+        KafkaPartitionsRequest: {
+            /** Format: int32 */
+            partitions?: number;
+            etag?: string;
+        };
+        KafkaTopicApplyRequest: {
+            etag?: string;
+            fingerprint?: string;
+            override?: boolean;
         };
         ConfigChangeRequest: {
             /** @description Settings to override, by name. */
@@ -17187,6 +17359,423 @@ export interface operations {
             };
         };
     };
+    create_8: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Makes the request safe to retry. Within 24 hours a repeat by the same user with the same method, path, query and body returns the first result with `Idempotent-Replayed: true` and applies nothing again. The same key with another request is 422 `idempotency-key-reused`; while the first is still running it is 409 `idempotency-in-progress`. 1 to 255 printable ASCII characters; not accepted on multipart uploads. Server errors and 401, 403 and 429 are not recorded, so the retry runs. */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                clusterId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["KafkaTopicCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["KafkaClusterOutcome"];
+                };
+            };
+            /** @description Held for approval: the operation has not run. X-Rahdar-Held-Operation names the request. */
+            202: {
+                headers: {
+                    /** @description The held operation's id, when the operation was held. */
+                    "X-Rahdar-Held-Operation"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HeldOutcome"];
+                };
+            };
+            /** @description Too many requests. Wait for Retry-After seconds. */
+            429: {
+                headers: {
+                    /** @description Seconds to wait before retrying. */
+                    "Retry-After"?: number;
+                    /** @description Requests allowed in the window (API tokens). */
+                    "RateLimit-Limit"?: number;
+                    /** @description Requests left in the window (API tokens). */
+                    "RateLimit-Remaining"?: number;
+                    /** @description Seconds until the window resets (API tokens). */
+                    "RateLimit-Reset"?: number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Client error */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Server error */
+            "5XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
+    previewCreate: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Makes the request safe to retry. Within 24 hours a repeat by the same user with the same method, path, query and body returns the first result with `Idempotent-Replayed: true` and applies nothing again. The same key with another request is 422 `idempotency-key-reused`; while the first is still running it is 409 `idempotency-in-progress`. 1 to 255 printable ASCII characters; not accepted on multipart uploads. Server errors and 401, 403 and 429 are not recorded, so the retry runs. */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                clusterId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["KafkaTopicCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["KafkaTopicPreview"];
+                };
+            };
+            /** @description Too many requests. Wait for Retry-After seconds. */
+            429: {
+                headers: {
+                    /** @description Seconds to wait before retrying. */
+                    "Retry-After"?: number;
+                    /** @description Requests allowed in the window (API tokens). */
+                    "RateLimit-Limit"?: number;
+                    /** @description Requests left in the window (API tokens). */
+                    "RateLimit-Remaining"?: number;
+                    /** @description Seconds until the window resets (API tokens). */
+                    "RateLimit-Reset"?: number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Client error */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Server error */
+            "5XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
+    increasePartitions: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Makes the request safe to retry. Within 24 hours a repeat by the same user with the same method, path, query and body returns the first result with `Idempotent-Replayed: true` and applies nothing again. The same key with another request is 422 `idempotency-key-reused`; while the first is still running it is 409 `idempotency-in-progress`. 1 to 255 printable ASCII characters; not accepted on multipart uploads. Server errors and 401, 403 and 429 are not recorded, so the retry runs. */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                clusterId: string;
+                topic: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["KafkaPartitionsRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["KafkaClusterOutcome"];
+                };
+            };
+            /** @description Held for approval: the operation has not run. X-Rahdar-Held-Operation names the request. */
+            202: {
+                headers: {
+                    /** @description The held operation's id, when the operation was held. */
+                    "X-Rahdar-Held-Operation"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HeldOutcome"];
+                };
+            };
+            /** @description Too many requests. Wait for Retry-After seconds. */
+            429: {
+                headers: {
+                    /** @description Seconds to wait before retrying. */
+                    "Retry-After"?: number;
+                    /** @description Requests allowed in the window (API tokens). */
+                    "RateLimit-Limit"?: number;
+                    /** @description Requests left in the window (API tokens). */
+                    "RateLimit-Remaining"?: number;
+                    /** @description Seconds until the window resets (API tokens). */
+                    "RateLimit-Reset"?: number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Client error */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Server error */
+            "5XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
+    previewPartitions: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Makes the request safe to retry. Within 24 hours a repeat by the same user with the same method, path, query and body returns the first result with `Idempotent-Replayed: true` and applies nothing again. The same key with another request is 422 `idempotency-key-reused`; while the first is still running it is 409 `idempotency-in-progress`. 1 to 255 printable ASCII characters; not accepted on multipart uploads. Server errors and 401, 403 and 429 are not recorded, so the retry runs. */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                clusterId: string;
+                topic: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["KafkaPartitionsRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["KafkaTopicPreview"];
+                };
+            };
+            /** @description Too many requests. Wait for Retry-After seconds. */
+            429: {
+                headers: {
+                    /** @description Seconds to wait before retrying. */
+                    "Retry-After"?: number;
+                    /** @description Requests allowed in the window (API tokens). */
+                    "RateLimit-Limit"?: number;
+                    /** @description Requests left in the window (API tokens). */
+                    "RateLimit-Remaining"?: number;
+                    /** @description Seconds until the window resets (API tokens). */
+                    "RateLimit-Reset"?: number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Client error */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Server error */
+            "5XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
+    deleteTopic: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Makes the request safe to retry. Within 24 hours a repeat by the same user with the same method, path, query and body returns the first result with `Idempotent-Replayed: true` and applies nothing again. The same key with another request is 422 `idempotency-key-reused`; while the first is still running it is 409 `idempotency-in-progress`. 1 to 255 printable ASCII characters; not accepted on multipart uploads. Server errors and 401, 403 and 429 are not recorded, so the retry runs. */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                clusterId: string;
+                topic: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["KafkaTopicApplyRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["KafkaClusterOutcome"];
+                };
+            };
+            /** @description Held for approval: the operation has not run. X-Rahdar-Held-Operation names the request. */
+            202: {
+                headers: {
+                    /** @description The held operation's id, when the operation was held. */
+                    "X-Rahdar-Held-Operation"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HeldOutcome"];
+                };
+            };
+            /** @description Too many requests. Wait for Retry-After seconds. */
+            429: {
+                headers: {
+                    /** @description Seconds to wait before retrying. */
+                    "Retry-After"?: number;
+                    /** @description Requests allowed in the window (API tokens). */
+                    "RateLimit-Limit"?: number;
+                    /** @description Requests left in the window (API tokens). */
+                    "RateLimit-Remaining"?: number;
+                    /** @description Seconds until the window resets (API tokens). */
+                    "RateLimit-Reset"?: number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Client error */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Server error */
+            "5XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
+    previewDelete: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Makes the request safe to retry. Within 24 hours a repeat by the same user with the same method, path, query and body returns the first result with `Idempotent-Replayed: true` and applies nothing again. The same key with another request is 422 `idempotency-key-reused`; while the first is still running it is 409 `idempotency-in-progress`. 1 to 255 printable ASCII characters; not accepted on multipart uploads. Server errors and 401, 403 and 429 are not recorded, so the retry runs. */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                clusterId: string;
+                topic: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["KafkaTopicPreview"];
+                };
+            };
+            /** @description Too many requests. Wait for Retry-After seconds. */
+            429: {
+                headers: {
+                    /** @description Seconds to wait before retrying. */
+                    "Retry-After"?: number;
+                    /** @description Requests allowed in the window (API tokens). */
+                    "RateLimit-Limit"?: number;
+                    /** @description Requests left in the window (API tokens). */
+                    "RateLimit-Remaining"?: number;
+                    /** @description Seconds until the window resets (API tokens). */
+                    "RateLimit-Reset"?: number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Client error */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Server error */
+            "5XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
     previewConfig: {
         parameters: {
             query?: never;
@@ -17492,6 +18081,143 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["HangingAbortPreview"];
+                };
+            };
+            /** @description Too many requests. Wait for Retry-After seconds. */
+            429: {
+                headers: {
+                    /** @description Seconds to wait before retrying. */
+                    "Retry-After"?: number;
+                    /** @description Requests allowed in the window (API tokens). */
+                    "RateLimit-Limit"?: number;
+                    /** @description Requests left in the window (API tokens). */
+                    "RateLimit-Remaining"?: number;
+                    /** @description Seconds until the window resets (API tokens). */
+                    "RateLimit-Reset"?: number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Client error */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Server error */
+            "5XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
+    deleteGroup: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Makes the request safe to retry. Within 24 hours a repeat by the same user with the same method, path, query and body returns the first result with `Idempotent-Replayed: true` and applies nothing again. The same key with another request is 422 `idempotency-key-reused`; while the first is still running it is 409 `idempotency-in-progress`. 1 to 255 printable ASCII characters; not accepted on multipart uploads. Server errors and 401, 403 and 429 are not recorded, so the retry runs. */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                clusterId: string;
+                group: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["KafkaTopicApplyRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["KafkaClusterOutcome"];
+                };
+            };
+            /** @description Held for approval: the operation has not run. X-Rahdar-Held-Operation names the request. */
+            202: {
+                headers: {
+                    /** @description The held operation's id, when the operation was held. */
+                    "X-Rahdar-Held-Operation"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HeldOutcome"];
+                };
+            };
+            /** @description Too many requests. Wait for Retry-After seconds. */
+            429: {
+                headers: {
+                    /** @description Seconds to wait before retrying. */
+                    "Retry-After"?: number;
+                    /** @description Requests allowed in the window (API tokens). */
+                    "RateLimit-Limit"?: number;
+                    /** @description Requests left in the window (API tokens). */
+                    "RateLimit-Remaining"?: number;
+                    /** @description Seconds until the window resets (API tokens). */
+                    "RateLimit-Reset"?: number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Client error */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Server error */
+            "5XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
+    previewDeleteGroup: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Makes the request safe to retry. Within 24 hours a repeat by the same user with the same method, path, query and body returns the first result with `Idempotent-Replayed: true` and applies nothing again. The same key with another request is 422 `idempotency-key-reused`; while the first is still running it is 409 `idempotency-in-progress`. 1 to 255 printable ASCII characters; not accepted on multipart uploads. Server errors and 401, 403 and 429 are not recorded, so the retry runs. */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                clusterId: string;
+                group: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["KafkaTopicPreview"];
                 };
             };
             /** @description Too many requests. Wait for Retry-After seconds. */
@@ -19099,7 +19825,7 @@ export interface operations {
             };
         };
     };
-    create_8: {
+    create_9: {
         parameters: {
             query?: never;
             header?: {
@@ -21416,6 +22142,8 @@ export interface operations {
                 dryRun?: boolean;
                 override?: boolean;
                 disconnectConsumers?: boolean;
+                etag?: string;
+                fingerprint?: string;
             };
             header?: {
                 /** @description Makes the request safe to retry. Within 24 hours a repeat by the same user with the same method, path, query and body returns the first result with `Idempotent-Replayed: true` and applies nothing again. The same key with another request is 422 `idempotency-key-reused`; while the first is still running it is 409 `idempotency-in-progress`. 1 to 255 printable ASCII characters; not accepted on multipart uploads. Server errors and 401, 403 and 429 are not recorded, so the retry runs. */
