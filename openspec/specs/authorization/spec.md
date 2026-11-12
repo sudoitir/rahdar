@@ -416,3 +416,17 @@ The built-in operator role SHALL hold the new permissions except `access-rule:wr
 #### Scenario: An operator cannot change access rules
 - **WHEN** an operator with the built-in operator role previews removing an ACL
 - **THEN** the action is disabled naming `access-rule:write`, and the API refuses it
+
+### Requirement: Deleting a Kafka group uses the subscription delete permission
+
+Deleting a Kafka consumer group SHALL require `subscription:delete`, the permission that destroys a subscription. It SHALL NOT require a new permission name. An operator without that permission SHALL see delete disabled, naming the permission, and the API and the MCP tool SHALL refuse the call. `destination:create` SHALL cover creating a topic, `destination:delete` SHALL cover deleting a topic, and `destination:update` SHALL cover increasing a topic's partition count.
+
+#### Scenario: Group delete without subscription delete
+
+- **WHEN** an operator without `subscription:delete` opens a Kafka group
+- **THEN** delete is disabled and names `subscription:delete`, and the API refuses the call
+
+#### Scenario: Topic create uses destination create
+
+- **WHEN** an operator with `destination:create` and without `subscription:delete` creates a topic
+- **THEN** the topic is created, and that operator still cannot delete a group
