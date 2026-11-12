@@ -50,9 +50,10 @@ interface FormValues {
 }
 
 /** A number from a field and a string the operator typed are the same setting once they are text. */
-function settingText(value: unknown): string {
-  if (value == null) return '';
-  return String(value).trim();
+function settingText(value: SettingValue | null | undefined): string {
+  if (typeof value === 'number') return Number.isFinite(value) ? String(value) : '';
+  if (typeof value === 'string') return value.trim();
+  return '';
 }
 
 function sameTopic(left: TopicCreateBody | null, right: TopicCreateBody | null): boolean {

@@ -171,8 +171,9 @@ export function IncreasePartitionsDialog({
       blocked={blocked}
       onClose={onClose}
       onConfirm={() => {
-        if (!planned || planned.partitions == null) return;
-        apply.mutate({ topic, partitions: planned.partitions, etag: planned.etag }, { onSuccess: () => onClose() });
+        const partitions = planned?.partitions;
+        if (partitions == null || planned == null) return;
+        apply.mutate({ topic, partitions, etag: planned.etag }, { onSuccess: () => onClose() });
       }}
       consequence={
         <Stack gap="sm">
