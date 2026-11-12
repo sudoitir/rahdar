@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useActionHost } from '../../kernel/actions/hostContext.ts';
 import { ApiError } from '../../kernel/api/request.ts';
+import { holdButton } from '../../test/hold.ts';
 import { renderWithProviders } from '../../test/render.tsx';
 import { GroupDelete } from './GroupDelete.tsx';
 import { DeleteTopic, IncreasePartitions } from './TopicLifecycleActions.tsx';
@@ -21,6 +22,8 @@ const api = vi.hoisted(() => ({
   groupError: null as unknown,
   removedError: null as unknown,
   planned: null as TopicPreview | null,
+  previewed: [] as { topic: string; partitions: number }[],
+  applied: [] as { topic: string; partitions: number; etag: string }[],
 }));
 
 vi.mock('../../kernel/auth/useResourceGate.ts', () => ({
@@ -60,16 +63,35 @@ vi.mock('./api.ts', () => ({
       () => false,
       () => api.removedError,
     ),
-  usePreviewIncreasePartitions: () =>
-    mutation(
-      () => api.partitionsPending,
-      () => api.partitionsError,
-    ),
-  useIncreasePartitions: () =>
-    mutation(
-      () => false,
-      () => null,
-    ),
+  usePreviewIncreasePartitions: () => ({
+    mutate: (input: { topic: string; partitions: number }, opts?: { onSuccess?: (value: TopicPreview) => void }) => {
+      api.previewed.push(input);
+      const base = api.planned ?? {
+        name: input.topic,
+        etag: `etag-${input.partitions}`,
+        fingerprint: 'fp-1',
+        note: 'Records already written stay on their partitions.',
+        groups: [],
+        estimate: null,
+        accuracy: 'estimate',
+        partitions: input.partitions,
+        replicationFactor: null,
+        currentPartitions: 6,
+        cap: 1000,
+        overCap: false,
+      };
+      opts?.onSuccess?.({ ...base, partitions: input.partitions, etag: `etag-${input.partitions}` });
+    },
+    isPending: api.partitionsPending,
+    error: api.partitionsError,
+  }),
+  useIncreasePartitions: () => ({
+    mutate: (input: { topic: string; partitions: number; etag: string }) => {
+      api.applied.push(input);
+    },
+    isPending: false,
+    error: null,
+  }),
   usePreviewDeleteGroup: () =>
     mutation(
       () => api.groupPending,
@@ -148,6 +170,8 @@ beforeEach(() => {
   api.groupError = null;
   api.removedError = null;
   api.planned = preview();
+  api.previewed = [];
+  api.applied = [];
 });
 
 describe('topic delete and partition increase', () => {
@@ -209,6 +233,33 @@ describe('topic delete and partition increase', () => {
     expect(screen.getByText(/A key can land on a new partition afterwards/)).toBeInTheDocument();
     expect(screen.getAllByText(/it has 6, not 2/).length).toBeGreaterThan(0);
     expect(screen.getByRole('button', { name: 'Add partitions' })).toBeDisabled();
+  });
+
+  it('adds only the partition count that was previewed', async () => {
+    scheme('light');
+    const user = userEvent.setup();
+    renderWithProviders(<TopicMenu action="partitions" />);
+    await open(/Add partitions/);
+    const hold = screen.getByRole('button', { name: 'Add partitions' });
+    expect(hold).toBeDisabled();
+    expect(screen.getByText('Preview the new partition count first.')).toBeInTheDocument();
+    await holdButton(hold);
+    expect(api.applied).toEqual([]);
+    expect(screen.queryByText('Confirmed.')).not.toBeInTheDocument();
+
+    await user.type(screen.getByLabelText('New partition count'), '12');
+    await user.click(screen.getByRole('button', { name: 'Preview partitions' }));
+    expect(api.previewed).toEqual([{ topic: 'orders', partitions: 12 }]);
+    expect(screen.getByRole('button', { name: 'Add partitions' })).toBeEnabled();
+
+    await user.clear(screen.getByLabelText('New partition count'));
+    await user.type(screen.getByLabelText('New partition count'), '20');
+    expect(screen.getByRole('button', { name: 'Add partitions' })).toBeDisabled();
+    expect(api.applied).toEqual([]);
+
+    await user.click(screen.getByRole('button', { name: 'Preview partitions' }));
+    await holdButton(screen.getByRole('button', { name: 'Add partitions' }));
+    expect(api.applied).toEqual([{ topic: 'orders', partitions: 20, etag: 'etag-20' }]);
   });
 
   it.each(['light', 'dark'] as const)('keeps an internal topic visible and says why in %s', async (color) => {

@@ -56,8 +56,9 @@ is not stated.
 ### Requirement: A lifecycle command targets the cluster and reports per node
 
 The system SHALL accept a lifecycle command against a cluster rather than a single
-node, SHALL determine the target nodes from observed live topology rather than from
-stored configuration, and SHALL return an outcome for every node it considered.
+node. Where the resource is created on each node, the system SHALL determine the
+target nodes from observed live topology rather than from stored configuration, and
+SHALL return an outcome for every node it considered.
 
 Each node outcome SHALL state whether the operation was applied, would be applied,
 was already satisfied, was skipped because the node was not live, or failed —
@@ -69,9 +70,13 @@ it never received the command.
 The system SHALL NOT attempt to undo the nodes on which the operation succeeded
 when it fails on another node. It SHALL instead report the resulting divergence.
 
+Where the destination is one cluster-wide resource, the system SHALL NOT invent a
+per-node fan-out. It SHALL return one outcome for the cluster. A Kafka topic is
+such a resource.
+
 #### Scenario: A node that is down is skipped, not failed
 
-- **WHEN** a lifecycle command is issued to a cluster in which one node is not live
+- **WHEN** a lifecycle command is issued to a cluster in which one node is not live, and the resource is created on each node
 - **THEN** the live nodes are changed, the node that is not live is reported as
   skipped, and the command is not reported as failed on its account
 
@@ -86,6 +91,11 @@ when it fails on another node. It SHALL instead report the resulting divergence.
 - **WHEN** an operator re-issues a lifecycle command after a partial failure
 - **THEN** the nodes already in the requested state report as already satisfied and
   the previously failed node is attempted again
+
+#### Scenario: A Kafka topic is one outcome
+
+- **WHEN** an operator creates a Kafka topic
+- **THEN** the result is one outcome for the cluster, and it does not list a success per broker
 
 ### Requirement: Every lifecycle command has a dry run
 
@@ -125,6 +135,20 @@ explicitly overrides the cap.
 
 - **WHEN** the same operator repeats the destroy with an explicit override
 - **THEN** the operation proceeds and the override is recorded
+
+### Requirement: Destroying a Kafka topic counts against the bulk safety cap
+
+Destroying a Kafka topic SHALL be evaluated against the same bulk safety cap as any other bulk destructive operation, using the topic's record estimate. An estimate above the cap SHALL be refused unless the caller explicitly overrides the cap, and the refusal SHALL state the estimate and the cap. An override SHALL be recorded. The estimate SHALL be labeled as an estimate, with the same condition a lag uses.
+
+#### Scenario: A large topic is refused by default
+
+- **WHEN** an operator deletes a topic whose record estimate is above the safety cap
+- **THEN** the delete is refused and the refusal states the estimate and the cap
+
+#### Scenario: An explicit override proceeds
+
+- **WHEN** the same operator repeats the delete with an explicit override
+- **THEN** the delete proceeds and the override is recorded on the audit
 
 ### Requirement: A live subscription can be paused, resumed, and reconfigured within limits
 

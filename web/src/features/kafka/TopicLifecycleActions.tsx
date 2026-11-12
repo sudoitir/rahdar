@@ -151,11 +151,14 @@ export function IncreasePartitionsDialog({
   const apply = useIncreasePartitions(clusterId);
   const [count, setCount] = useState<number | string>('');
   const [planned, setPlanned] = useState<TopicPreview | null>(null);
+  const live = useRef(count);
+  live.current = count;
   const asked = Number(count);
+  const previewed = planned?.partitions != null && planned.partitions === asked;
   let blocked: string | undefined;
   if (preview.error != null) {
     blocked = message(preview.error);
-  } else if (!planned) {
+  } else if (!previewed) {
     blocked = 'Preview the new partition count first.';
   }
   return (
@@ -168,20 +171,39 @@ export function IncreasePartitionsDialog({
       blocked={blocked}
       onClose={onClose}
       onConfirm={() => {
-        if (!planned) return;
-        apply.mutate({ topic, partitions: asked, etag: planned.etag }, { onSuccess: () => onClose() });
+        const partitions = planned?.partitions;
+        if (partitions == null || planned == null) return;
+        apply.mutate({ topic, partitions, etag: planned.etag }, { onSuccess: () => onClose() });
       }}
       consequence={
         <Stack gap="sm">
           <Text size="sm">
             Records already written stay on their partitions. A key can land on a new partition afterwards.
           </Text>
-          <NumberInput label="New partition count" value={count} onChange={setCount} />
+          <NumberInput
+            label="New partition count"
+            value={count}
+            onChange={(value) => {
+              setCount(value);
+              setPlanned(null);
+            }}
+          />
           <Button
             type="button"
             variant="default"
             disabled={!asked}
-            onClick={() => preview.mutate({ topic, partitions: asked }, { onSuccess: setPlanned })}
+            onClick={() => {
+              const next = Number(live.current);
+              preview.mutate(
+                { topic, partitions: next },
+                {
+                  onSuccess: (value) => {
+                    if (Number(live.current) !== next) return;
+                    setPlanned(value);
+                  },
+                },
+              );
+            }}
           >
             Preview partitions
           </Button>
