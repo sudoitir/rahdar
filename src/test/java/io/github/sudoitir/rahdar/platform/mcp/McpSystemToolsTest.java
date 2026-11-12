@@ -135,7 +135,11 @@ class McpSystemToolsTest {
                         "kafka_set_topic_config",
                         "kafka_list_acls",
                         "kafka_list_transactions",
-                        "kafka_abort_transaction");
+                        "kafka_abort_transaction",
+                        "kafka_create_topic",
+                        "kafka_delete_topic",
+                        "kafka_increase_partitions",
+                        "kafka_delete_group");
     }
 
     @Test

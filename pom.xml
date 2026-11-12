@@ -42,10 +42,10 @@
 
     <properties>
         <java.version>25</java.version>
-        <!-- Above Spring Boot 4.1.0's managed 11.0.24, which carries three critical CVEs
-             (GHSA-9xv2-5v5q-p794, GHSA-gcx9-497g-6cp6, GHSA-h3x4-894j-xpx5). Drop once the
-             Boot BOM manages 11.0.25 or later; OSV-Scanner in CI flags any regression. -->
-        <tomcat.version>11.0.25</tomcat.version>
+        <!-- Above Spring Boot 4.1.2's managed Tomcat, which still ships 11.0.25. That build has
+             critical advisories fixed in 11.0.27 (CVE-2026-76183, CVE-2026-101296, CVE-2026-101356).
+             Drop once the Boot BOM manages 11.0.27 or later; the image scan flags any regression. -->
+        <tomcat.version>11.0.27</tomcat.version>
         <!-- Above Spring Boot 4.1.1's managed Jackson 3.1.5 and 2.21.5, which carry three advisories
              (GHSA-gx83-3vf8-gh7j, GHSA-q4xh-88c3-wmh7, GHSA-wjgm-6hv5-3cvf). Drop once the Boot BOM
              manages 3.1.6 and 2.21.6 or later. -->
@@ -55,7 +55,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 
         <!-- The broker SDK and its Artemis driver (ADR-0203). Never a SNAPSHOT on main: CI refuses one. -->
-        <openbroker.version>0.10.0</openbroker.version>
+        <openbroker.version>0.11.0</openbroker.version>
         <!-- The RabbitMQ driver needs amqp-client 5.37; Spring Boot's dependency management would pin an older one. -->
         <rabbit-amqp-client.version>5.37.0</rabbit-amqp-client.version>
         <testcontainers.version>2.0.5</testcontainers.version>

@@ -1,3 +1,9 @@
+/* The consequence scrolls. The hold stays in view when the window is short or zoomed. */
+.consequence {
+  overflow: auto;
+  max-height: calc(100dvh - 16rem);
+}
+
 /* Why the action cannot be armed: the words carry it, the warning edge repeats it. */
 .blocked {
   border-inline-start: 0.25rem solid var(--as-warning);

@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+
 import { describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -69,5 +71,12 @@ describe('HoldToConfirm', () => {
     rerender(<HoldToConfirm label="Delete queue" disabled describedBy="why" onConfirm={onConfirm} />);
     await holdButton(screen.getByRole('button', { name: 'Delete queue' }));
     expect(onConfirm).not.toHaveBeenCalled();
+  });
+
+  it('stops the fill transition when reduced motion is on, and keeps the hold duration', () => {
+    const css = readFileSync(`${import.meta.dirname}/HoldToConfirm.module.css`, 'utf8');
+    expect(css).toContain('@media (prefers-reduced-motion: reduce)');
+    expect(css).toContain('transition: none');
+    expect(css).toContain('var(--as-hold-duration)');
   });
 });

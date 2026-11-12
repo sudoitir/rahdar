@@ -229,6 +229,7 @@ Rel(RahdarApplication.RahdarApplication.Kafka, RahdarApplication.RahdarApplicati
 Rel(RahdarApplication.RahdarApplication.Kafka, RahdarApplication.RahdarApplication.Resources, "depends on", $techn="", $tags="", $link="")
 Rel(RahdarApplication.RahdarApplication.Kafka, RahdarApplication.RahdarApplication.Scraping, "uses", $techn="", $tags="", $link="")
 Rel(RahdarApplication.RahdarApplication.Kafka, RahdarApplication.RahdarApplication.Security, "uses", $techn="", $tags="", $link="")
+Rel(RahdarApplication.RahdarApplication.Kafka, RahdarApplication.RahdarApplication.Settings, "uses", $techn="", $tags="", $link="")
 Rel(RahdarApplication.RahdarApplication.MCPserver, RahdarApplication.RahdarApplication.Approvalgatecontract, "depends on", $techn="", $tags="", $link="")
 Rel(RahdarApplication.RahdarApplication.MCPserver, RahdarApplication.RahdarApplication.Auditlog, "uses", $techn="", $tags="", $link="")
 Rel(RahdarApplication.RahdarApplication.MCPserver, RahdarApplication.RahdarApplication.Brokerconnectivity, "uses", $techn="", $tags="", $link="")

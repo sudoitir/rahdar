@@ -276,3 +276,99 @@ export function useKafkaBrokers(clusterId: string): UseQueryResult<Brokers, ApiE
     refetchInterval: 15_000,
   });
 }
+
+// ── Topic and group lifecycle ────────────────────────────────────────────────
+
+export const TOPIC_SETTINGS = [
+  'cleanup.policy',
+  'retention.ms',
+  'retention.bytes',
+  'max.message.bytes',
+  'min.insync.replicas',
+] as const;
+
+export interface TopicPreview {
+  name: string;
+  etag: string;
+  fingerprint: string;
+  note: string;
+  groups: string[];
+  estimate: number | null;
+  accuracy: string;
+  partitions: number | null;
+  replicationFactor: number | null;
+  currentPartitions: number | null;
+  cap: number;
+  overCap: boolean;
+}
+
+export interface ClusterOutcome {
+  scope: string;
+  status: string;
+}
+
+export interface TopicCreateBody {
+  name: string;
+  partitions: number;
+  replicationFactor: number;
+  settings: Record<string, string>;
+  etag?: string;
+}
+
+export function usePreviewCreateTopic(clusterId: string) {
+  return useMutation<TopicPreview, ApiError, TopicCreateBody>({
+    mutationFn: (body) =>
+      request(`${base(clusterId)}/topics:create-preview`, { method: 'POST', body: JSON.stringify(body) }),
+  });
+}
+
+export function useCreateTopic(clusterId: string) {
+  return useMutation<ClusterOutcome, ApiError, TopicCreateBody>({
+    mutationFn: (body) => request(`${base(clusterId)}/topics:create`, { method: 'POST', body: JSON.stringify(body) }),
+  });
+}
+
+export function usePreviewDeleteTopic(clusterId: string) {
+  return useMutation<TopicPreview, ApiError, string>({
+    mutationFn: (topic) => request(`${base(clusterId)}/topics/${seg(topic)}:delete-preview`, { method: 'POST' }),
+  });
+}
+
+export function useDeleteTopic(clusterId: string) {
+  return useMutation<ClusterOutcome, ApiError, { topic: string; etag: string; fingerprint: string; override: boolean }>(
+    {
+      mutationFn: ({ topic, ...body }) =>
+        request(`${base(clusterId)}/topics/${seg(topic)}:delete`, { method: 'POST', body: JSON.stringify(body) }),
+    },
+  );
+}
+
+export function usePreviewIncreasePartitions(clusterId: string) {
+  return useMutation<TopicPreview, ApiError, { topic: string; partitions: number }>({
+    mutationFn: ({ topic, partitions }) =>
+      request(`${base(clusterId)}/topics/${seg(topic)}:partitions-preview`, {
+        method: 'POST',
+        body: JSON.stringify({ partitions }),
+      }),
+  });
+}
+
+export function useIncreasePartitions(clusterId: string) {
+  return useMutation<ClusterOutcome, ApiError, { topic: string; partitions: number; etag: string }>({
+    mutationFn: ({ topic, ...body }) =>
+      request(`${base(clusterId)}/topics/${seg(topic)}:partitions`, { method: 'POST', body: JSON.stringify(body) }),
+  });
+}
+
+export function usePreviewDeleteGroup(clusterId: string) {
+  return useMutation<TopicPreview, ApiError, string>({
+    mutationFn: (group) => request(`${base(clusterId)}/groups/${seg(group)}:delete-preview`, { method: 'POST' }),
+  });
+}
+
+export function useDeleteGroup(clusterId: string) {
+  return useMutation<ClusterOutcome, ApiError, { group: string; etag: string }>({
+    mutationFn: ({ group, etag }) =>
+      request(`${base(clusterId)}/groups/${seg(group)}:delete`, { method: 'POST', body: JSON.stringify({ etag }) }),
+  });
+}

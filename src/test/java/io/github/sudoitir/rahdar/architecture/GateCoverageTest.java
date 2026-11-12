@@ -93,8 +93,17 @@ class GateCoverageTest extends PostgresIntegrationTest {
                     "feature.plugins.web.PluginAdminController.upload",
                     "stores a pending upload; plugin.activate-upload installs it"),
             Map.entry(
-                    "feature.resources.web.ResourceLifecycleController.createDestination",
-                    "creates and removes nothing"),
+                    "system.kafka.web.KafkaController.previewCreate",
+                    "a preview changes nothing; topics:create runs it"),
+            Map.entry(
+                    "system.kafka.web.KafkaController.previewDelete",
+                    "a preview changes nothing; the topic delete runs it"),
+            Map.entry(
+                    "system.kafka.web.KafkaController.previewDeleteGroup",
+                    "a preview changes nothing; the group delete runs it"),
+            Map.entry(
+                    "system.kafka.web.KafkaController.previewPartitions",
+                    "a preview changes nothing; the partition increase runs it"),
             Map.entry(
                     "feature.resources.web.ResourceLifecycleController.createSubscription",
                     "creates and removes nothing"),
