@@ -12,6 +12,10 @@ import io.github.sudoitir.rahdar.system.kafka.KafkaBrokerConfigChanges.BrokerCon
 import io.github.sudoitir.rahdar.system.kafka.KafkaHangingAborts.HangingAbortParams;
 import io.github.sudoitir.rahdar.system.kafka.KafkaOffsetResets.OffsetResetParams;
 import io.github.sudoitir.rahdar.system.kafka.KafkaTopicConfigChanges.ConfigChangeParams;
+import io.github.sudoitir.rahdar.system.kafka.KafkaTopicLifecycle.CreateParams;
+import io.github.sudoitir.rahdar.system.kafka.KafkaTopicLifecycle.DeleteParams;
+import io.github.sudoitir.rahdar.system.kafka.KafkaTopicLifecycle.GroupDeleteParams;
+import io.github.sudoitir.rahdar.system.kafka.KafkaTopicLifecycle.PartitionsParams;
 import io.github.sudoitir.rahdar.system.kafka.KafkaTransactionAborts.AbortParams;
 import io.github.sudoitir.rahdar.system.kafka.web.KafkaViews.Acl;
 import java.util.List;
@@ -165,6 +169,75 @@ class KafkaGatedOperations {
                         DisplayRow.of("Producer id", String.valueOf(p.producerId()))),
                 aborts::estimate,
                 aborts::replay,
+                clusters,
+                Set.of());
+    }
+
+    @Bean
+    GatedOperation<CreateParams> topicCreate(KafkaTopicLifecycle lifecycle, ClusterEnvironmentIndex clusters) {
+        return new Operation<>(
+                "destination.create",
+                CreateParams.class,
+                CreateParams::clusterId,
+                p -> "Create topic " + p.name() + " on " + clusters.labelOf(p.clusterId()),
+                p -> List.of(
+                        DisplayRow.of(CLUSTER, clusters.labelOf(p.clusterId())),
+                        DisplayRow.of("Topic", p.name()),
+                        DisplayRow.of("Partitions", String.valueOf(p.partitions())),
+                        DisplayRow.of("Replication factor", String.valueOf(p.replicationFactor()))),
+                lifecycle::estimateCreate,
+                lifecycle::replayCreate,
+                clusters,
+                Set.of());
+    }
+
+    @Bean
+    GatedOperation<DeleteParams> topicDelete(KafkaTopicLifecycle lifecycle, ClusterEnvironmentIndex clusters) {
+        return new Operation<>(
+                "kafka.topic.delete",
+                DeleteParams.class,
+                DeleteParams::clusterId,
+                p -> "Delete topic " + p.topic() + " on " + clusters.labelOf(p.clusterId()),
+                p -> List.of(
+                        DisplayRow.of(CLUSTER, clusters.labelOf(p.clusterId())),
+                        DisplayRow.of("Topic", p.topic()),
+                        DisplayRow.of("Override the safety cap", p.override() ? "yes" : "no")),
+                lifecycle::estimateDelete,
+                lifecycle::replayDelete,
+                clusters,
+                Set.of());
+    }
+
+    @Bean
+    GatedOperation<PartitionsParams> increasePartitions(
+            KafkaTopicLifecycle lifecycle, ClusterEnvironmentIndex clusters) {
+        return new Operation<>(
+                "destination.increase-partitions",
+                PartitionsParams.class,
+                PartitionsParams::clusterId,
+                p -> "Raise partitions of " + p.topic() + " to " + p.partitions() + " on "
+                        + clusters.labelOf(p.clusterId()),
+                p -> List.of(
+                        DisplayRow.of(CLUSTER, clusters.labelOf(p.clusterId())),
+                        DisplayRow.of("Topic", p.topic()),
+                        DisplayRow.of("Partitions", String.valueOf(p.partitions()))),
+                lifecycle::estimatePartitions,
+                lifecycle::replayPartitions,
+                clusters,
+                Set.of());
+    }
+
+    @Bean
+    GatedOperation<GroupDeleteParams> deleteGroup(KafkaTopicLifecycle lifecycle, ClusterEnvironmentIndex clusters) {
+        return new Operation<>(
+                "kafka.group.delete",
+                GroupDeleteParams.class,
+                GroupDeleteParams::clusterId,
+                p -> "Delete group " + p.group() + " on " + clusters.labelOf(p.clusterId()),
+                p -> List.of(
+                        DisplayRow.of(CLUSTER, clusters.labelOf(p.clusterId())), DisplayRow.of("Group", p.group())),
+                lifecycle::estimateGroup,
+                lifecycle::replayGroup,
                 clusters,
                 Set.of());
     }

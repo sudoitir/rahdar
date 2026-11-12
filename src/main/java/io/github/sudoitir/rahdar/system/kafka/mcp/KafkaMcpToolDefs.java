@@ -91,7 +91,41 @@ public final class KafkaMcpToolDefs {
                                     + " a hanging transaction, such as kafka.hanging-transaction/orders/0/4711."),
                     Param.note("dryRun", McpToolDef.DRY_RUN + " The preview names what the abort releases."),
                     Param.note("etag", ETAG),
-                    Param.note(CONFIRM, "A real run needs confirm equal to the transactional id.")));
+                    Param.note(CONFIRM, "A real run needs confirm equal to the transactional id.")),
+            mutate(
+                    "kafka_create_topic",
+                    "Create a topic. Previews first and creates nothing until confirmed.",
+                    Param.note("topic", "The topic name."),
+                    Param.note(
+                            "settings",
+                            "JSON of cleanup.policy, retention.ms, retention.bytes, max.message.bytes, min.insync.replicas."),
+                    Param.note("dryRun", McpToolDef.DRY_RUN),
+                    Param.note("etag", ETAG),
+                    Param.note(CONFIRM, "A real run needs confirm equal to the topic name.")),
+            mutate(
+                    "kafka_delete_topic",
+                    "Delete a topic after a preview that names groups and the record estimate.",
+                    Param.note("topic", "The topic name."),
+                    Param.note("fingerprint", "The preview's fingerprint of groups and the estimate."),
+                    Param.note("override", "Pass true only to pass the bulk safety cap. The override is audited."),
+                    Param.note("dryRun", McpToolDef.DRY_RUN),
+                    Param.note("etag", ETAG),
+                    Param.note(CONFIRM, "A real run needs confirm equal to the topic name.")),
+            mutate(
+                    "kafka_increase_partitions",
+                    "Raise a topic's partition count. A lower count is refused.",
+                    Param.note("topic", "The topic name."),
+                    Param.note("partitions", "The new count, higher than the current one."),
+                    Param.note("dryRun", McpToolDef.DRY_RUN),
+                    Param.note("etag", ETAG),
+                    Param.note(CONFIRM, "A real run needs confirm equal to the topic name.")),
+            mutate(
+                    "kafka_delete_group",
+                    "Delete an empty group. A group with members is refused and its members stay.",
+                    Param.note("group", "The group id."),
+                    Param.note("dryRun", McpToolDef.DRY_RUN),
+                    Param.note("etag", ETAG),
+                    Param.note(CONFIRM, CONFIRM_GROUP)));
 
     private KafkaMcpToolDefs() {}
 
