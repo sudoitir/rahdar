@@ -23,6 +23,7 @@ import io.github.sudoitir.rahdar.system.kafka.KafkaTopicLifecycle.ClusterOutcome
 import io.github.sudoitir.rahdar.system.kafka.KafkaTopicLifecycle.CreateRequest;
 import io.github.sudoitir.rahdar.system.kafka.KafkaTopicLifecycle.PreviewView;
 import io.github.sudoitir.rahdar.system.kafka.KafkaTopicLifecycle.TopicApplyRequest;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -51,7 +52,9 @@ class KafkaReadAsOneTest {
 
     @Test
     void aRealDeleteWithoutAnEtagDoesNotPreviewOrDelete() {
-        assertThatThrownBy(() -> door.deleteDestination(UUID.randomUUID(), topic(), false, false, " ", null))
+        UUID clusterId = UUID.randomUUID();
+        Target orders = topic();
+        assertThatThrownBy(() -> door.deleteDestination(clusterId, orders, false, false, " ", null))
                 .isInstanceOf(KafkaStaleException.class);
         verifyNoInteractions(topics);
     }
@@ -83,7 +86,7 @@ class KafkaReadAsOneTest {
 
         LifecycleOutcome outcome = ok(door.deleteDestination(clusterId, topic(), false, true, "etag-1", "fp-1"));
 
-        verify(topics).deleteTopic(eq(clusterId), eq("orders"), eq(new TopicApplyRequest("etag-1", "fp-1", true)));
+        verify(topics).deleteTopic(clusterId, "orders", new TopicApplyRequest("etag-1", "fp-1", true));
         assertThat(outcome.dryRun()).isFalse();
         assertThat(outcome.nodes())
                 .singleElement()
@@ -92,7 +95,9 @@ class KafkaReadAsOneTest {
 
     @Test
     void aGroupDeleteWithoutAnEtagDoesNotRunAndNeverRemovesMembers() {
-        assertThatThrownBy(() -> door.deleteSubscription(UUID.randomUUID(), group(), false, null))
+        UUID clusterId = UUID.randomUUID();
+        Target billing = group();
+        assertThatThrownBy(() -> door.deleteSubscription(clusterId, billing, false, null))
                 .isInstanceOf(KafkaStaleException.class);
         verifyNoInteractions(topics);
     }
@@ -106,15 +111,16 @@ class KafkaReadAsOneTest {
 
         ok(door.deleteSubscription(clusterId, group(), false, "etag-1"));
 
-        verify(topics).deleteGroup(eq(clusterId), eq("billing"), eq(new TopicApplyRequest("etag-1", null, false)));
+        verify(topics).deleteGroup(clusterId, "billing", new TopicApplyRequest("etag-1", null, false));
     }
 
     @Test
     void aCreateWithoutAnEtagDoesNotCreate() {
         CreateDestinationRequest request = new CreateDestinationRequest(
                 "kafka.topic", "orders", Map.of(KafkaKinds.PARTITIONS, 6, KafkaKinds.REPLICATION_FACTOR, 3));
+        UUID clusterId = UUID.randomUUID();
 
-        assertThatThrownBy(() -> door.createDestination(UUID.randomUUID(), request, false))
+        assertThatThrownBy(() -> door.createDestination(clusterId, request, false))
                 .isInstanceOf(KafkaStaleException.class);
         verifyNoInteractions(topics);
     }
@@ -141,10 +147,60 @@ class KafkaReadAsOneTest {
         CreateDestinationRequest request = new CreateDestinationRequest(
                 "kafka.topic", "orders", Map.of(KafkaKinds.REPLICAS, List.of(1), "etag", "e"));
 
-        assertThatThrownBy(() -> door.createDestination(UUID.randomUUID(), request, false))
+        UUID clusterId = UUID.randomUUID();
+        assertThatThrownBy(() -> door.createDestination(clusterId, request, false))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("does not assign replicas");
         verifyNoInteractions(topics);
+    }
+
+    @Test
+    void theDoorOwnsATopicAndAGroup() {
+        assertThat(door.supports(KafkaKinds.TOPIC.toString())).isTrue();
+        assertThat(door.supports(KafkaKinds.GROUP.toString())).isTrue();
+        assertThat(door.supports("artemis.address")).isFalse();
+    }
+
+    @Test
+    void aRealCreateSendsTheEtagAndASettingNamedDirectly() {
+        UUID clusterId = UUID.randomUUID();
+        when(topics.create(any(), any())).thenReturn(new ClusterOutcome("whole cluster", "APPLIED"));
+        when(settings.intValue(BrokerSettings.BULK_CAP)).thenReturn(1000);
+        Map<String, Object> attributes = new LinkedHashMap<>();
+        attributes.put("etag", "etag-1");
+        attributes.put(KafkaKinds.PARTITIONS, "6");
+        attributes.put(KafkaKinds.REPLICATION_FACTOR, " ");
+        attributes.put("cleanup.policy", "delete");
+        attributes.put("retention.ms", null);
+        CreateDestinationRequest request = new CreateDestinationRequest("kafka.topic", "orders", attributes);
+
+        LifecycleOutcome outcome = ok(door.createDestination(clusterId, request, false));
+
+        verify(topics)
+                .create(clusterId, new CreateRequest("orders", 6, null, Map.of("cleanup.policy", "delete"), "etag-1"));
+        assertThat(outcome.dryRun()).isFalse();
+    }
+
+    @Test
+    void aBlankFingerprintAndAnEmptyPreviewStayOffTheBroker() {
+        UUID clusterId = UUID.randomUUID();
+        Target orders = topic();
+        assertThatThrownBy(() -> door.deleteDestination(clusterId, orders, false, false, "etag-1", " "))
+                .isInstanceOf(KafkaStaleException.class);
+        assertThatThrownBy(() -> door.deleteDestination(clusterId, orders, false, false, "etag-1", null))
+                .isInstanceOf(KafkaStaleException.class);
+        verify(topics, never()).deleteTopic(any(), any(), any());
+
+        when(topics.previewDelete(any(), eq("orders"))).thenReturn(emptyPreview());
+        LifecycleOutcome outcome = ok(door.deleteDestination(clusterId, orders, true, false, null, null));
+        assertThat(outcome.nodes().getFirst().error())
+                .contains("No group has offsets")
+                .contains("The record count is unavailable.");
+
+        when(topics.previewDeleteGroup(any(), eq("billing"))).thenReturn(preview());
+        ok(door.deleteSubscription(clusterId, group(), true, null));
+        verify(topics).previewDeleteGroup(any(), eq("billing"));
+        verify(topics, never()).deleteGroup(any(), any(), any());
     }
 
     private static PreviewView preview() {
@@ -159,6 +215,22 @@ class KafkaReadAsOneTest {
                 null,
                 null,
                 6,
+                1000,
+                false);
+    }
+
+    private static PreviewView emptyPreview() {
+        return new PreviewView(
+                "orders",
+                "etag-1",
+                "fp-1",
+                "Deleting this topic does not erase those groups' offsets.",
+                List.of(),
+                null,
+                "unavailable",
+                null,
+                null,
+                null,
                 1000,
                 false);
     }

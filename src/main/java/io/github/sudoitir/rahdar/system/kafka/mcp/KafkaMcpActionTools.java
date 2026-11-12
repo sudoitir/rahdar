@@ -53,6 +53,8 @@ public class KafkaMcpActionTools {
 
     private static final String CLUSTER_ID = "clusterId";
 
+    private static final String TOPIC = "topic";
+
     @McpTool(
             name = "kafka_reset_offsets",
             description = "Move an empty group's offsets, from a kafka_preview_offset_reset preview's etag.",
@@ -99,7 +101,7 @@ public class KafkaMcpActionTools {
             @McpToolParam(required = false) Boolean dryRun,
             @McpToolParam(required = false) String confirm) {
         UUID id = McpArgs.uuid(CLUSTER_ID, clusterId);
-        McpArgs.required("topic", topic);
+        McpArgs.required(TOPIC, topic);
         boolean dry = McpArgs.flag(dryRun, true);
         Map<String, String> overrides = overrides(set);
         List<String> removals = KafkaMcpReadTools.topicList(remove);
@@ -158,6 +160,8 @@ public class KafkaMcpActionTools {
                             destructiveHint = false,
                             idempotentHint = true,
                             openWorldHint = false))
+    // One parameter per tool argument: the MCP schema is the parameter list.
+    @SuppressWarnings("java:S107")
     public McpSchema.CallToolResult kafkaCreateTopic(
             @McpToolParam(required = true) String clusterId,
             @McpToolParam(required = true) String topic,
@@ -168,7 +172,7 @@ public class KafkaMcpActionTools {
             @McpToolParam(required = false) Boolean dryRun,
             @McpToolParam(required = false) String confirm) {
         UUID id = McpArgs.uuid(CLUSTER_ID, clusterId);
-        McpArgs.required("topic", topic);
+        McpArgs.required(TOPIC, topic);
         boolean dry = McpArgs.flag(dryRun, true);
         CreateRequest request =
                 new CreateRequest(topic, partitions, replicationFactor, overrides(settings), dry ? null : etag);
@@ -197,7 +201,7 @@ public class KafkaMcpActionTools {
             @McpToolParam(required = false) Boolean dryRun,
             @McpToolParam(required = false) String confirm) {
         UUID id = McpArgs.uuid(CLUSTER_ID, clusterId);
-        McpArgs.required("topic", topic);
+        McpArgs.required(TOPIC, topic);
         boolean dry = McpArgs.flag(dryRun, true);
         if (!dry) {
             McpArgs.required("etag", etag);
@@ -226,7 +230,7 @@ public class KafkaMcpActionTools {
             @McpToolParam(required = false) Boolean dryRun,
             @McpToolParam(required = false) String confirm) {
         UUID id = McpArgs.uuid(CLUSTER_ID, clusterId);
-        McpArgs.required("topic", topic);
+        McpArgs.required(TOPIC, topic);
         boolean dry = McpArgs.flag(dryRun, true);
         if (!dry) {
             McpArgs.required("etag", etag);

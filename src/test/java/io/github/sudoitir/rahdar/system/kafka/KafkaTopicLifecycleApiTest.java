@@ -132,19 +132,13 @@ class KafkaTopicLifecycleApiTest {
         http.previewDeleteGroup(CLUSTER, "billing");
 
         verify(access)
-                .requireCreate(
-                        eq(CLUSTER), eq(ResourceRef.destination("orders")), eq(ResourcePermissions.DESTINATION_CREATE));
+                .requireCreate(CLUSTER, ResourceRef.destination("orders"), ResourcePermissions.DESTINATION_CREATE);
         verify(access)
-                .requireResource(
-                        eq(CLUSTER), eq(ResourceRef.destination("orders")), eq(ResourcePermissions.DESTINATION_DELETE));
+                .requireResource(CLUSTER, ResourceRef.destination("orders"), ResourcePermissions.DESTINATION_DELETE);
         verify(access)
-                .requireResource(
-                        eq(CLUSTER), eq(ResourceRef.destination("orders")), eq(ResourcePermissions.DESTINATION_UPDATE));
+                .requireResource(CLUSTER, ResourceRef.destination("orders"), ResourcePermissions.DESTINATION_UPDATE);
         verify(access)
-                .requireResource(
-                        eq(CLUSTER),
-                        eq(ResourceRef.subscription("billing")),
-                        eq(ResourcePermissions.SUBSCRIPTION_DELETE));
+                .requireResource(CLUSTER, ResourceRef.subscription("billing"), ResourcePermissions.SUBSCRIPTION_DELETE);
     }
 
     @Test
@@ -153,12 +147,13 @@ class KafkaTopicLifecycleApiTest {
                 .thenReturn(deletePreview(10, "etag-1", "billing"))
                 .thenReturn(deletePreview(11, "etag-1", "billing"));
         PreviewView first = http.previewDelete(CLUSTER, "orders");
+        TopicApplyRequest request = new TopicApplyRequest(first.etag(), first.fingerprint(), false);
+        String cluster = CLUSTER.toString();
+        String fingerprint = first.fingerprint();
 
-        assertThatThrownBy(() -> http.deleteTopic(
-                        CLUSTER, "orders", new TopicApplyRequest(first.etag(), first.fingerprint(), false)))
-                .isInstanceOf(KafkaStaleException.class);
-        assertThatThrownBy(() -> tools.kafkaDeleteTopic(
-                        CLUSTER.toString(), "orders", "etag-1", first.fingerprint(), false, false, "order"))
+        assertThatThrownBy(() -> http.deleteTopic(CLUSTER, "orders", request)).isInstanceOf(KafkaStaleException.class);
+        assertThatThrownBy(
+                        () -> tools.kafkaDeleteTopic(cluster, "orders", "etag-1", fingerprint, false, false, "order"))
                 .isInstanceOf(McpError.class);
         verify(operations, never()).execute(any(), any(), any(), any());
     }
@@ -237,6 +232,36 @@ class KafkaTopicLifecycleApiTest {
                         any(Operation.Delete.class),
                         eq(Scope.whole()),
                         any());
+    }
+
+    @Test
+    void createAndPartitionIncreaseApplyOnceForTheCluster() {
+        when(operations.preview(any(), any(), any())).thenReturn(createPreview("etag-1"));
+        CreateRequest request = new CreateRequest("orders", 6, 3, Map.of("cleanup.policy", "delete"), "etag-1");
+        String cluster = CLUSTER.toString();
+
+        assertThat(http.create(CLUSTER, request)).isEqualTo(new ClusterOutcome("whole cluster", "APPLIED"));
+        CallToolResult created = tools.kafkaCreateTopic(
+                cluster, "orders", 6, 3, "{\"cleanup.policy\":\"compact\"}", "etag-1", false, "orders");
+        CallToolResult previewed = tools.kafkaCreateTopic(cluster, "orders", 6, 3, null, null, null, null);
+
+        assertThat(created.isError()).isNotEqualTo(Boolean.TRUE);
+        assertThat(previewed.isError()).isNotEqualTo(Boolean.TRUE);
+        assertThat(created.toString()).contains("whole cluster").doesNotContain(SECRET);
+
+        when(operations.preview(any(), any(), any())).thenReturn(deletePreview(4, "etag-1"));
+        PartitionsRequest partitions = new PartitionsRequest(12, "etag-1");
+        assertThat(http.increasePartitions(CLUSTER, "orders", partitions))
+                .isEqualTo(new ClusterOutcome("whole cluster", "APPLIED"));
+        CallToolResult raised = tools.kafkaIncreasePartitions(cluster, "orders", 12, "etag-1", false, "orders");
+        CallToolResult raisedPreview = tools.kafkaIncreasePartitions(cluster, "orders", 12, null, true, null);
+        assertThat(raised.isError()).isNotEqualTo(Boolean.TRUE);
+        assertThat(raisedPreview.isError()).isNotEqualTo(Boolean.TRUE);
+
+        when(operations.preview(any(), any(), any())).thenReturn(groupPreview("etag-1"));
+        assertThat(http.deleteGroup(CLUSTER, "billing", new TopicApplyRequest("etag-1", null, false)))
+                .isEqualTo(new ClusterOutcome("whole cluster", "APPLIED"));
+        verify(operations, org.mockito.Mockito.atLeastOnce()).execute(any(), any(), eq(Scope.whole()), any());
     }
 
     private static Preview deletePreview(long records, String etag, String... groups) {

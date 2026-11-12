@@ -81,18 +81,19 @@ export function DeleteTopicDialog({
     if (opened) run.current(topic, { onSuccess: setPlanned });
   }, [opened, topic]);
   const blocked = preview.error != null ? message(preview.error) : undefined;
+  let confirmLabel = 'Delete topic';
+  if (planned?.overCap) {
+    confirmLabel = `Delete ${topic} over the safety cap`;
+  } else if (planned) {
+    const count = planned.estimate ?? 'an unknown number of';
+    confirmLabel = `Delete ${topic}, about ${count} records`;
+  }
   return (
     <ConfirmDialog
       opened={opened}
       tone="danger"
       title={`Delete ${topic}`}
-      confirmLabel={
-        planned?.overCap
-          ? `Delete ${topic} over the safety cap`
-          : planned
-            ? `Delete ${topic}, about ${planned.estimate ?? 'an unknown number of'} records`
-            : 'Delete topic'
-      }
+      confirmLabel={confirmLabel}
       pending={preview.isPending || remove.isPending}
       blocked={blocked}
       onClose={onClose}
@@ -151,8 +152,12 @@ export function IncreasePartitionsDialog({
   const [count, setCount] = useState<number | string>('');
   const [planned, setPlanned] = useState<TopicPreview | null>(null);
   const asked = Number(count);
-  const blocked =
-    preview.error != null ? message(preview.error) : planned ? undefined : 'Preview the new partition count first.';
+  let blocked: string | undefined;
+  if (preview.error != null) {
+    blocked = message(preview.error);
+  } else if (!planned) {
+    blocked = 'Preview the new partition count first.';
+  }
   return (
     <ConfirmDialog
       opened={opened}

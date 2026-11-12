@@ -118,20 +118,23 @@ export function CreateTopicForm({
               ? 'The partition count and replication factor are required.'
               : `This cluster reached ${brokersReached} brokers. Nothing is created until you hold Create topic.`}
           </Text>
-          {FIELDS.map((field) =>
-            field.name === 'cleanup.policy' ? (
-              <Select
-                key={field.name}
-                label={field.label}
-                data={['delete', 'compact', 'compact,delete']}
-                {...form.getInputProps(field.name)}
-              />
-            ) : field.name === 'name' ? (
-              <TextInput key={field.name} label={field.label} {...form.getInputProps(field.name)} />
-            ) : (
-              <NumberInput key={field.name} label={field.label} {...form.getInputProps(field.name)} />
-            ),
-          )}
+          {FIELDS.map((field) => {
+            const props = form.getInputProps(field.name);
+            if (field.name === 'cleanup.policy') {
+              return (
+                <Select
+                  key={field.name}
+                  label={field.label}
+                  data={['delete', 'compact', 'compact,delete']}
+                  {...props}
+                />
+              );
+            }
+            if (field.name === 'name') {
+              return <TextInput key={field.name} label={field.label} {...props} />;
+            }
+            return <NumberInput key={field.name} label={field.label} {...props} />;
+          })}
           {planned ? (
             <Text size="sm">
               {planned.note} {planned.name} will have {planned.partitions ?? body().partitions} partitions and

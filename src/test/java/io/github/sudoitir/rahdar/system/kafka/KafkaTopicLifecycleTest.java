@@ -118,9 +118,9 @@ class KafkaTopicLifecycleTest {
                 .thenReturn(deletePreview(120, "etag-1", "billing"))
                 .thenReturn(deletePreview(120, "etag-1", "billing", "search"));
         PreviewView first = lifecycle.previewDelete(CLUSTER, "orders");
+        TopicApplyRequest request = new TopicApplyRequest(first.etag(), first.fingerprint(), false);
 
-        assertThatThrownBy(() -> lifecycle.deleteTopic(
-                        CLUSTER, "orders", new TopicApplyRequest(first.etag(), first.fingerprint(), false)))
+        assertThatThrownBy(() -> lifecycle.deleteTopic(CLUSTER, "orders", request))
                 .isInstanceOf(KafkaStaleException.class);
         verify(operations, never()).execute(any(), any(), any(), any());
     }
@@ -139,8 +139,8 @@ class KafkaTopicLifecycleTest {
                 .when(gate)
                 .run(any(), any());
         when(operations.preview(any(), any(), any())).thenReturn(deletePreview(10, "etag-2", "billing"));
-        assertThatThrownBy(() -> lifecycle.deleteTopic(
-                        CLUSTER, "orders", new TopicApplyRequest("etag-1", first.fingerprint(), false)))
+        TopicApplyRequest stale = new TopicApplyRequest("etag-1", first.fingerprint(), false);
+        assertThatThrownBy(() -> lifecycle.deleteTopic(CLUSTER, "orders", stale))
                 .isInstanceOf(KafkaStaleException.class);
         verify(operations, never()).execute(any(), any(), any(), any());
     }
@@ -151,8 +151,8 @@ class KafkaTopicLifecycleTest {
         PreviewView preview = lifecycle.previewDelete(CLUSTER, "orders");
         assertThat(preview.overCap()).isTrue();
 
-        assertThatThrownBy(() -> lifecycle.deleteTopic(
-                        CLUSTER, "orders", new TopicApplyRequest(preview.etag(), preview.fingerprint(), false)))
+        TopicApplyRequest overCap = new TopicApplyRequest(preview.etag(), preview.fingerprint(), false);
+        assertThatThrownBy(() -> lifecycle.deleteTopic(CLUSTER, "orders", overCap))
                 .isInstanceOf(BulkCapExceededException.class);
         verify(operations, never()).execute(any(), any(), any(), any());
 
@@ -181,12 +181,10 @@ class KafkaTopicLifecycleTest {
     void aReadOnlyTokenIsRefusedBeforeThePreview() {
         doThrow(new NotFoundException("permission"))
                 .when(access)
-                .requireCreate(
-                        eq(CLUSTER), eq(ResourceRef.destination("orders")), eq(ResourcePermissions.DESTINATION_CREATE));
+                .requireCreate(CLUSTER, ResourceRef.destination("orders"), ResourcePermissions.DESTINATION_CREATE);
 
-        assertThatThrownBy(() -> lifecycle.previewCreate(
-                        CLUSTER, new CreateRequest("orders", 6, 3, Map.of("cleanup.policy", "delete"), null)))
-                .isInstanceOf(NotFoundException.class);
+        CreateRequest request = new CreateRequest("orders", 6, 3, Map.of("cleanup.policy", "delete"), null);
+        assertThatThrownBy(() -> lifecycle.previewCreate(CLUSTER, request)).isInstanceOf(NotFoundException.class);
         verify(operations, never()).preview(any(), any(), any());
     }
 

@@ -63,14 +63,14 @@ export function GroupDelete({
   const remove = useDeleteGroup(clusterId);
   const [open, setOpen] = useState(false);
   const [planned, setPlanned] = useState<TopicPreview | null>(null);
-  const blocked =
-    verdict.kind === 'blocked'
-      ? verdict.reason
-      : preview.error
-        ? message(preview.error)
-        : planned
-          ? undefined
-          : 'Loading the preview.';
+  let blocked: string | undefined;
+  if (verdict.kind === 'blocked') {
+    blocked = verdict.reason;
+  } else if (preview.error) {
+    blocked = message(preview.error);
+  } else if (!planned) {
+    blocked = 'Loading the preview.';
+  }
 
   return (
     <>

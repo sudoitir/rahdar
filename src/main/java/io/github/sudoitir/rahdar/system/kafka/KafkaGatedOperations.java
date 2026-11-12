@@ -36,6 +36,8 @@ class KafkaGatedOperations {
 
     private static final String CLUSTER = "Cluster";
 
+    private static final String TOPIC = "Topic";
+
     @Bean
     GatedOperation<OffsetResetParams> offsetReset(KafkaOffsetResets resets, ClusterEnvironmentIndex clusters) {
         return new Operation<>(
@@ -66,7 +68,7 @@ class KafkaGatedOperations {
                 p -> "Change settings of topic " + p.topic() + " on " + clusters.labelOf(p.clusterId()),
                 p -> List.of(
                         DisplayRow.of(CLUSTER, clusters.labelOf(p.clusterId())),
-                        DisplayRow.of("Topic", p.topic()),
+                        DisplayRow.of(TOPIC, p.topic()),
                         DisplayRow.of("Set", changes.shown(p)),
                         DisplayRow.of(
                                 "Remove overrides",
@@ -182,7 +184,7 @@ class KafkaGatedOperations {
                 p -> "Create topic " + p.name() + " on " + clusters.labelOf(p.clusterId()),
                 p -> List.of(
                         DisplayRow.of(CLUSTER, clusters.labelOf(p.clusterId())),
-                        DisplayRow.of("Topic", p.name()),
+                        DisplayRow.of(TOPIC, p.name()),
                         DisplayRow.of("Partitions", String.valueOf(p.partitions())),
                         DisplayRow.of("Replication factor", String.valueOf(p.replicationFactor()))),
                 lifecycle::estimateCreate,
@@ -200,7 +202,7 @@ class KafkaGatedOperations {
                 p -> "Delete topic " + p.topic() + " on " + clusters.labelOf(p.clusterId()),
                 p -> List.of(
                         DisplayRow.of(CLUSTER, clusters.labelOf(p.clusterId())),
-                        DisplayRow.of("Topic", p.topic()),
+                        DisplayRow.of(TOPIC, p.topic()),
                         DisplayRow.of("Override the safety cap", p.override() ? "yes" : "no")),
                 lifecycle::estimateDelete,
                 lifecycle::replayDelete,
@@ -219,7 +221,7 @@ class KafkaGatedOperations {
                         + clusters.labelOf(p.clusterId()),
                 p -> List.of(
                         DisplayRow.of(CLUSTER, clusters.labelOf(p.clusterId())),
-                        DisplayRow.of("Topic", p.topic()),
+                        DisplayRow.of(TOPIC, p.topic()),
                         DisplayRow.of("Partitions", String.valueOf(p.partitions()))),
                 lifecycle::estimatePartitions,
                 lifecycle::replayPartitions,

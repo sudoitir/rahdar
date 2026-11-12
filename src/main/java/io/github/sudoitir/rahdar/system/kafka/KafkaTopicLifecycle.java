@@ -9,6 +9,7 @@ import io.github.sudoitir.openbroker.model.ResourcePath;
 import io.github.sudoitir.openbroker.model.Scope;
 import io.github.sudoitir.openbroker.operation.AttributeChange;
 import io.github.sudoitir.openbroker.operation.Operation;
+import io.github.sudoitir.openbroker.operation.Operations;
 import io.github.sudoitir.openbroker.operation.Precondition;
 import io.github.sudoitir.openbroker.operation.Preview;
 import io.github.sudoitir.rahdar.feature.resources.ResourcePermissions;
@@ -16,6 +17,7 @@ import io.github.sudoitir.rahdar.kernel.audit.AuditEvent;
 import io.github.sudoitir.rahdar.kernel.audit.AuditService;
 import io.github.sudoitir.rahdar.kernel.gate.Effect;
 import io.github.sudoitir.rahdar.kernel.gate.Gated;
+import io.github.sudoitir.rahdar.kernel.gate.OperationGate;
 import io.github.sudoitir.rahdar.kernel.security.ActorResolver;
 import io.github.sudoitir.rahdar.kernel.security.ClusterAccessGuard;
 import io.github.sudoitir.rahdar.kernel.security.ResourceRef;
@@ -46,16 +48,26 @@ public class KafkaTopicLifecycle {
     /** The one outcome of a Kafka command. There is no per-broker fan-out. */
     static final String WHOLE_CLUSTER = "whole cluster";
 
+    private static final String PARTITIONS = "partitions";
+
+    private static final String DESTINATION = "DESTINATION";
+
+    private static final String STATUS = "status";
+
+    private static final String SCOPE = "scope";
+
+    private static final String APPLIED = "APPLIED";
+
     /** The topic settings a create may name. Any other key is refused before the broker is asked. */
     static final Set<String> SETTINGS =
             Set.of("cleanup.policy", "retention.ms", "retention.bytes", "max.message.bytes", "min.insync.replicas");
 
     private final BrokerGateway gateway;
     private final ClusterAccessGuard access;
-    private final io.github.sudoitir.rahdar.kernel.gate.OperationGate gate;
+    private final OperationGate gate;
     private final AuditService audit;
     private final ActorResolver actors;
-    private final SettingsService settings;
+    private final SettingsService settingsService;
 
     @Schema(name = "KafkaTopicCreateRequest")
     public record CreateRequest(
@@ -170,7 +182,7 @@ public class KafkaTopicLifecycle {
 
     public Effect estimatePartitions(PartitionsParams p) {
         PreviewView preview = previewPartitions(p.clusterId(), p.topic(), p.partitions());
-        return new Effect(p.partitions(), "partitions", preview.etag(), preview.note());
+        return new Effect(p.partitions(), PARTITIONS, preview.etag(), preview.note());
     }
 
     public Effect estimateGroup(GroupDeleteParams p) {
@@ -222,12 +234,12 @@ public class KafkaTopicLifecycle {
         Map<String, Object> before = Map.of(
                 "name",
                 p.name(),
-                "partitions",
+                PARTITIONS,
                 String.valueOf(p.partitions()),
                 "replicationFactor",
                 String.valueOf(p.replicationFactor()));
         AuditEvent event = audit.begin(
-                actors.resolve(), "CREATE_TOPIC", "DESTINATION", p.name(), p.clusterId(), null, before, false);
+                actors.resolve(), "CREATE_TOPIC", DESTINATION, p.name(), p.clusterId(), null, before, false);
         KafkaFailures.call(() -> operations(p.clusterId())
                 .execute(
                         topic(p.name()),
@@ -235,7 +247,7 @@ public class KafkaTopicLifecycle {
                         Scope.whole(),
                         Precondition.ifMatch(p.etag()))
                 .orThrow());
-        audit.finish(event, false, 1, null, Map.of("status", "APPLIED", "scope", WHOLE_CLUSTER));
+        audit.finish(event, false, 1, null, Map.of(STATUS, APPLIED, SCOPE, WHOLE_CLUSTER));
         return applied();
     }
 
@@ -247,7 +259,7 @@ public class KafkaTopicLifecycle {
                     "The groups or the record estimate changed since the preview. Preview again.");
         }
         long estimate = preview.estimate() == null ? 0 : preview.estimate();
-        long cap = settings.intValue(BrokerSettings.BULK_CAP);
+        long cap = settingsService.intValue(BrokerSettings.BULK_CAP);
         if (estimate > cap && !p.override()) {
             throw new BulkCapExceededException(estimate, cap);
         }
@@ -255,10 +267,10 @@ public class KafkaTopicLifecycle {
         params.put("groups", preview.groups());
         params.put("estimate", estimate);
         params.put("accuracy", preview.accuracy());
-        params.put("partitions", preview.currentPartitions());
+        params.put(PARTITIONS, preview.currentPartitions());
         params.put("override", p.override());
         AuditEvent event = audit.begin(
-                actors.resolve(), "DELETE_TOPIC", "DESTINATION", p.topic(), p.clusterId(), null, params, false);
+                actors.resolve(), "DELETE_TOPIC", DESTINATION, p.topic(), p.clusterId(), null, params, false);
         KafkaFailures.call(() -> operations(p.clusterId())
                 .execute(topic(p.topic()), Operation.delete(), Scope.whole(), Precondition.ifMatch(p.etag()))
                 .orThrow());
@@ -267,7 +279,7 @@ public class KafkaTopicLifecycle {
                 false,
                 estimate,
                 null,
-                Map.of("status", "APPLIED", "scope", WHOLE_CLUSTER, "groups", preview.groups()));
+                Map.of(STATUS, APPLIED, SCOPE, WHOLE_CLUSTER, "groups", preview.groups()));
         return applied();
     }
 
@@ -277,7 +289,7 @@ public class KafkaTopicLifecycle {
         Map<String, Object> params =
                 Map.of("from", String.valueOf(preview.currentPartitions()), "to", String.valueOf(p.partitions()));
         AuditEvent event = audit.begin(
-                actors.resolve(), "INCREASE_PARTITIONS", "DESTINATION", p.topic(), p.clusterId(), null, params, false);
+                actors.resolve(), "INCREASE_PARTITIONS", DESTINATION, p.topic(), p.clusterId(), null, params, false);
         KafkaFailures.call(() -> operations(p.clusterId())
                 .execute(
                         topic(p.topic()),
@@ -290,7 +302,7 @@ public class KafkaTopicLifecycle {
                 false,
                 p.partitions(),
                 null,
-                Map.of("from", params.get("from"), "to", params.get("to"), "scope", WHOLE_CLUSTER));
+                Map.of("from", params.get("from"), "to", params.get("to"), SCOPE, WHOLE_CLUSTER));
         return applied();
     }
 
@@ -309,7 +321,7 @@ public class KafkaTopicLifecycle {
         KafkaFailures.call(() -> operations(p.clusterId())
                 .execute(group(p.group()), Operation.delete(), Scope.whole(), Precondition.ifMatch(p.etag()))
                 .orThrow());
-        audit.finish(event, false, 1, null, Map.of("status", "APPLIED", "scope", WHOLE_CLUSTER));
+        audit.finish(event, false, 1, null, Map.of(STATUS, APPLIED, SCOPE, WHOLE_CLUSTER));
         return applied();
     }
 
@@ -341,7 +353,7 @@ public class KafkaTopicLifecycle {
                     case Count.Estimate(var _) -> "estimate";
                     case Count.Unavailable(var _) -> "unavailable";
                 };
-        long cap = settings.intValue(BrokerSettings.BULK_CAP);
+        long cap = settingsService.intValue(BrokerSettings.BULK_CAP);
         boolean over = estimate != null && estimate > cap;
         return new PreviewView(
                 name,
@@ -404,7 +416,7 @@ public class KafkaTopicLifecycle {
                 .build();
     }
 
-    private io.github.sudoitir.openbroker.operation.Operations operations(UUID clusterId) {
+    private Operations operations(UUID clusterId) {
         ClusterConnection connection = gateway.cluster(clusterId);
         return connection.operations();
     }
@@ -418,6 +430,6 @@ public class KafkaTopicLifecycle {
     }
 
     private static ClusterOutcome applied() {
-        return new ClusterOutcome(WHOLE_CLUSTER, "APPLIED");
+        return new ClusterOutcome(WHOLE_CLUSTER, APPLIED);
     }
 }
