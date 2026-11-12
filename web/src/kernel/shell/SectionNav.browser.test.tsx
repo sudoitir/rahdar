@@ -96,7 +96,8 @@ describe('SectionNav in a real browser', () => {
     for (const link of links) {
       const style = getComputedStyle(link);
       expect(style.display).toBe('flex');
-      expect(style.justifyContent).toBe('flex-start');
+      // Chromium's computed value of `justify-content: flex-start` is `flow-start`.
+      expect(['flex-start', 'start', 'flow-start']).toContain(style.justifyContent);
       expect(style.textAlign).toBe('start');
       expect(link.getBoundingClientRect().height).toBeGreaterThanOrEqual(36);
       expect(link.getBoundingClientRect().width).toBeGreaterThanOrEqual(nav.clientWidth - 24);
