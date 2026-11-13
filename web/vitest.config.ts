@@ -88,6 +88,9 @@ export default defineConfig({
           browser: {
             enabled: true,
             headless: true,
+            // An import map is a script. The tester page enforces Trusted Types, which refuse a
+            // string assigned to a script, so mocks stay on request interception.
+            importMapMocks: false,
             provider: playwright(),
             // The widest window the console is laid out for (ADR-0164); a test sets its own container width.
             instances: [{ browser: 'chromium', viewport: { width: 1920, height: 1080 } }],

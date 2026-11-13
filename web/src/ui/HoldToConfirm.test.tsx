@@ -60,6 +60,23 @@ describe('HoldToConfirm', () => {
     expect(onConfirm).toHaveBeenCalledTimes(2);
   });
 
+  it('can be held again when the action starts before the pointer is released', async () => {
+    const onConfirm = vi.fn();
+    const { rerender } = renderWithProviders(<HoldToConfirm label="Delete queue" onConfirm={onConfirm} />);
+    const button = screen.getByRole('button', { name: 'Delete queue' });
+
+    fireEvent.mouseDown(button);
+    await wait(80);
+    expect(onConfirm).toHaveBeenCalledOnce();
+    rerender(<HoldToConfirm label="Delete queue" loading onConfirm={onConfirm} />);
+    expect(screen.getByRole('button', { name: 'Delete queue' })).toBeEnabled();
+    fireEvent.mouseUp(screen.getByRole('button', { name: 'Delete queue' }));
+
+    rerender(<HoldToConfirm label="Delete queue" onConfirm={onConfirm} />);
+    await holdButton(screen.getByRole('button', { name: 'Delete queue' }));
+    expect(onConfirm).toHaveBeenCalledTimes(2);
+  });
+
   it('is busy while the action runs and cannot be held again, and disabled it cannot be held at all', async () => {
     const onConfirm = vi.fn();
     const { rerender } = renderWithProviders(<HoldToConfirm label="Delete queue" loading onConfirm={onConfirm} />);

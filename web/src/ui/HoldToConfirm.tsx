@@ -125,6 +125,9 @@ export function HoldToConfirm({
   };
 
   const holding = hint === 'holding';
+  // useLongPress drops a later press when the previous one never saw a release. Disabling the
+  // button as the action starts swallows that release, so it stays enabled until the pointer is up.
+  const awaitingRelease = hint === 'holding' || hint === 'done';
   return (
     <div className={classes.wrap}>
       <button
@@ -133,7 +136,7 @@ export function HoldToConfirm({
         data-tone={tone}
         data-holding={holding || undefined}
         data-done={hint === 'done' || undefined}
-        disabled={inactive}
+        disabled={inactive && !awaitingRelease}
         aria-busy={loading || undefined}
         aria-describedby={[describedBy, hintId].filter(Boolean).join(' ')}
         onKeyDown={onKeyDown}
