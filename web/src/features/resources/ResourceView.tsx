@@ -244,9 +244,7 @@ function ResourceEmpty({
       kind="empty"
       title={reach === 'teams' ? `No ${nouns} in your teams on this cluster` : `No ${nouns} right now`}
       description={
-        perNode
-          ? `${about} This view is a live read across every serving node, one request per node per load.`
-          : about
+        perNode ? `${about} This view is a live read across every serving node, one request per node per load.` : about
       }
     />
   );
