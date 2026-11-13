@@ -1,6 +1,6 @@
 # ADR-0225: Kafka topic and group lifecycle is one preview, one refusal, one audit
 
-- **Status**: accepted
+- **Status**: accepted; a group on a topic on the shared subscription route is amended by [ADR-0226](0226-a-kafka-kind-does-not-run-the-artemis-queue-lifecycle.md)
 - **Date**: 2026-11-12
 - **Deciders**: Mahdi Amirabdollahi
 

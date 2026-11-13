@@ -1205,8 +1205,12 @@ The console SHALL be laid out for desktop windows 1280 pixels wide and wider, an
 Every page SHALL have exactly one top-level heading that names the view, and its section headings SHALL follow it without skipping a level. The cluster a page belongs to SHALL be stated next to that heading, not as a second top-level heading.
 
 #### Scenario: A cluster page has one top-level heading
-- **WHEN** an operator opens the subscriptions page of a cluster
+- **WHEN** an operator opens the subscriptions page of an Artemis cluster
 - **THEN** the page's only top-level heading is "Subscriptions", and the cluster's name and environment are shown beside it
+
+#### Scenario: A Kafka subscriptions page is headed by the kind label
+- **WHEN** an operator opens the subscriptions page of a Kafka cluster
+- **THEN** the page's only top-level heading is "Groups on topics"
 
 ### Requirement: The console's typefaces ship with Rahdar
 

@@ -1,4 +1,11 @@
-import { ARTEMIS_KINDS, destinationId, subscriptionId, subscriptionIdentity } from '../../test/wire.ts';
+import {
+  ARTEMIS_KINDS,
+  destinationId,
+  KAFKA_KINDS,
+  KAFKA_SYSTEM,
+  subscriptionId,
+  subscriptionIdentity,
+} from '../../test/wire.ts';
 import { beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 import { delay, http, HttpResponse } from 'msw';
 import { act, screen, waitFor, within } from '@testing-library/react';
@@ -609,6 +616,93 @@ describe('SubscriptionsView with a subscription named like markup', () => {
     const cells = await screen.findAllByRole('gridcell');
     expect(cells.some((cell) => cell.textContent?.includes(name))).toBe(true);
     expect(document.body.querySelector('script, img, [onerror]')).toBeNull();
+  });
+});
+
+describe('SubscriptionsView on a Kafka cluster', () => {
+  const row = {
+    ...subscription('billing'),
+    id: 'kafka.group-topic/billing/orders',
+    kind: 'kafka.group-topic',
+    kindLabel: { singular: 'Group on topic', plural: 'Groups on topics' },
+    destination: 'kafka.topic/orders',
+    totalConsumerCount: 2,
+    backlog: { value: 12, accuracy: 'ESTIMATE', reason: 'The end offset moves while it is read.', breakdown: true },
+  };
+
+  function asKafka(subscriptions: object[] = [row], kinds: readonly object[] = KAFKA_KINDS) {
+    search = {};
+    serve({ subscriptions: subscriptions as ReturnType<typeof subscription>[] });
+    server.use(
+      http.get('*/api/v1/clusters/c1', () =>
+        HttpResponse.json({
+          id: 'c1',
+          name: 'events',
+          system: KAFKA_SYSTEM,
+          topology: { nodes: [] },
+          kinds,
+          capabilities: { managementWrite: { status: 'AVAILABLE', reason: 'ok', brokerXmlSnippet: null } },
+        }),
+      ),
+    );
+  }
+
+  it('heads the page with the kind label and lists group, topic, lag and members', async () => {
+    asKafka();
+    renderWithProviders(<SubscriptionsView />);
+
+    expect(await screen.findByRole('heading', { level: 1, name: 'Groups on topics' })).toBeInTheDocument();
+    const grid = screen.getByRole('grid', { name: 'Groups on topics' });
+    for (const name of ['Group', 'Topic', 'Lag', 'Members']) {
+      expect(within(grid).getByRole('columnheader', { name })).toBeInTheDocument();
+    }
+    for (const name of ['Type', 'Durable', 'State']) {
+      expect(within(grid).queryByRole('columnheader', { name })).not.toBeInTheDocument();
+    }
+    expect(within(grid).getByText('billing')).toBeInTheDocument();
+    expect(within(grid).getByText('orders')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'New subscription' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: 'New subscription form' })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/ring size/i)).not.toBeInTheDocument();
+  });
+
+  it('keeps create visible and disabled, including when the kind lists create, and does not open an Artemis form', async () => {
+    const kinds = KAFKA_KINDS.map((k) =>
+      k.id === 'kafka.group-topic' ? { ...k, verbs: [...k.verbs, 'create', 'delete'] } : k,
+    );
+    asKafka([row], kinds);
+    const user = userEvent.setup();
+    renderWithProviders(<SubscriptionsView />);
+
+    expect(await screen.findByRole('button', { name: 'New group on topic' })).toBeDisabled();
+    await user.click(screen.getByRole('button', { name: 'Why creating a group on a topic is unavailable' }));
+    expect(await screen.findByText(/Apache Kafka groups on topics cannot be created/)).toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: 'New subscription form' })).not.toBeInTheDocument();
+  });
+
+  it('says a group appears only after a committed offset or a live assignment', async () => {
+    asKafka([]);
+    renderWithProviders(<SubscriptionsView />);
+
+    expect(await screen.findByText(/committed offset or a live assignment/)).toBeInTheDocument();
+    expect(screen.getByText(/Groups with neither stay on Consumer groups/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Create the first subscription' })).not.toBeInTheDocument();
+  });
+
+  it('does not delete a group on a topic from the row, and does not offer to remove members', async () => {
+    const kinds = KAFKA_KINDS.map((k) => (k.id === 'kafka.group-topic' ? { ...k, verbs: [...k.verbs, 'delete'] } : k));
+    asKafka([row], kinds);
+    const user = userEvent.setup();
+    renderWithProviders(<SubscriptionsView />);
+
+    await user.click(await screen.findByRole('button', { name: 'Actions for billing' }));
+    const menu = await screen.findByRole('menu', { name: 'Actions for billing' });
+    const del = await within(menu).findByRole('menuitem', { name: /Delete subscription/ });
+    expect(del).toHaveAttribute('aria-disabled', 'true');
+    expect(del).toHaveTextContent('Delete an empty group from Consumer groups.');
+    await user.click(del);
+    expect(await screen.findByText(/This does not remove members/)).toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: /Delete billing/ })).not.toBeInTheDocument();
   });
 });
 

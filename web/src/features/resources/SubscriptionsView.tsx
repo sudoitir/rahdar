@@ -16,7 +16,7 @@ import { BacklogDrawer, type BacklogTarget } from '../../kernel/backlog/BacklogD
 import { SubscriptionDetailDrawer } from './SubscriptionDetailDrawer.tsx';
 import { CreateSubscriptionForm } from './CreateSubscriptionForm.tsx';
 import { useCan } from '../../kernel/auth/useCan.ts';
-import { verbRefusal } from '../../kernel/auth/kindVerbs.ts';
+import { inSentence, kafkaSubscriptionRefusal, verbRefusal } from '../../kernel/auth/kindVerbs.ts';
 import { useClusterSlot } from '../../kernel/shell/useClusterSlot.ts';
 import type { SubscriptionSelection } from '../../kernel/slots.ts';
 import { ResourceActions } from '../../kernel/actions/ResourceActions.tsx';
@@ -30,11 +30,18 @@ const PAGE_SIZE = 200;
 
 const rowKey = (r: SubscriptionView) => `${destinationOf(r)}::${r.name}::${routingTypeOf(r)}`;
 
-/** What the selection says, in words. */
-function selectionWords(count: number, total: number, matching: string, allMatching: boolean): string {
-  if (count === 0) return 'No subscriptions selected. Select subscriptions in the grid to act on them together.';
-  if (allMatching) return `All ${total.toLocaleString()} subscriptions${matching} are selected.`;
-  return `${count.toLocaleString()} ${count === 1 ? 'subscription' : 'subscriptions'} selected`;
+/** What the selection says, in words. `one` and `many` are the row's name mid-sentence. */
+function selectionWords(
+  count: number,
+  total: number,
+  matching: string,
+  allMatching: boolean,
+  one: string,
+  many: string,
+): string {
+  if (count === 0) return `No ${many} selected. Select ${many} in the grid to act on them together.`;
+  if (allMatching) return `All ${total.toLocaleString()} ${many}${matching} are selected.`;
+  return `${count.toLocaleString()} ${count === 1 ? one : many} selected`;
 }
 
 /** How many subscriptions are picked, and the actions that apply to them. */
@@ -46,6 +53,8 @@ function SelectionBar({
   canSelectAll,
   onSelectAll,
   onClear,
+  one,
+  many,
   children,
 }: Readonly<{
   count: number;
@@ -55,17 +64,20 @@ function SelectionBar({
   canSelectAll: boolean;
   onSelectAll: () => void;
   onClear: () => void;
+  /** The row's name, mid-sentence: "subscription" or "group on topic". */
+  one: string;
+  many: string;
   children: React.ReactNode;
 }>) {
   return (
-    <Group gap="sm" justify="space-between" role="region" aria-label="Selected subscriptions">
+    <Group gap="sm" justify="space-between" role="region" aria-label={`Selected ${many}`}>
       <Group gap="xs">
         <Text size="sm" fw={count > 0 ? 600 : undefined}>
-          {selectionWords(count, total, matching, allMatching)}
+          {selectionWords(count, total, matching, allMatching, one, many)}
         </Text>
         {canSelectAll ? (
           <Button size="xs" variant="subtle" onClick={onSelectAll}>
-            {`Select all ${total.toLocaleString()} subscriptions${matching}`}
+            {`Select all ${total.toLocaleString()} ${many}${matching}`}
           </Button>
         ) : null}
         {count > 0 ? (
@@ -85,6 +97,9 @@ function SubscriptionsEmpty({
   unreachable,
   reach,
   mayCreate,
+  one,
+  many,
+  kafka,
   onClearFilter,
   onCreate,
 }: Readonly<{
@@ -93,15 +108,21 @@ function SubscriptionsEmpty({
   /** How the caller reaches subscriptions on this cluster; a team member sees only theirs, and may see none. */
   reach: 'grant' | 'teams' | 'none' | 'unknown';
   mayCreate: boolean;
+  /** The row's name, mid-sentence. */
+  one: string;
+  many: string;
+  /** A Kafka cluster has no create form: a row appears from an offset or an assignment. */
+  kafka: boolean;
   onClearFilter: () => void;
   onCreate: () => void;
 }>) {
+  const Many = many.charAt(0).toUpperCase() + many.slice(1);
   if (filterText) {
     return (
       <EmptyState
         kind="filtered"
-        title={`No subscription matches "${filterText}"`}
-        description="Subscriptions may still exist on this cluster; none of them match this filter."
+        title={`No ${one} matches "${filterText}"`}
+        description={`${Many} may still exist on this cluster; none of them match this filter.`}
         onClearFilters={onClearFilter}
       />
     );
@@ -115,7 +136,7 @@ function SubscriptionsEmpty({
             ? `${unreachable[0]} could not be reached`
             : `${unreachable.length} nodes could not be reached`
         }
-        description={`There may be subscriptions here that Rahdar cannot currently see. ${
+        description={`There may be ${many} here that Rahdar cannot currently see. ${
           unreachable.length === 1 ? 'This node' : 'These nodes'
         } did not answer the last scrape, so this is an incomplete view rather than an empty cluster.`}
         nodes={unreachable}
@@ -127,23 +148,33 @@ function SubscriptionsEmpty({
       <EmptyState
         kind="empty"
         title="You're not in any team on this cluster"
-        description="Subscriptions here belong to teams, and you are in none that owns subscriptions on this cluster. Ask a platform administrator to add you to a team."
+        description={`${Many} here belong to teams, and you are in none that owns ${many} on this cluster. Ask a platform administrator to add you to a team.`}
       />
     );
   }
   return (
     <EmptyState
       kind="empty"
-      title={reach === 'teams' ? 'No subscriptions in your teams on this cluster' : 'No subscriptions yet'}
+      title={
+        reach === 'teams'
+          ? `No ${many} in your teams on this cluster`
+          : kafka
+            ? `No ${many} yet`
+            : 'No subscriptions yet'
+      }
       description={
-        <>
-          A subscription is where messages wait for a consumer. Rahdar fills this grid from each broker's{' '}
-          <code>listSubscriptions</code>, so a subscription appears here within a scrape tick of being created or of the
-          first message produced to its destination.
-        </>
+        kafka ? (
+          'A group appears here only after a committed offset or a live assignment. Groups with neither stay on Consumer groups.'
+        ) : (
+          <>
+            A subscription is where messages wait for a consumer. Rahdar fills this grid from each broker's{' '}
+            <code>listSubscriptions</code>, so a subscription appears here within a scrape tick of being created or of
+            the first message produced to its destination.
+          </>
+        )
       }
       action={
-        mayCreate ? (
+        mayCreate && !kafka ? (
           <Button size="xs" variant="light" onClick={onCreate}>
             Create the first subscription
           </Button>
@@ -291,11 +322,24 @@ export function SubscriptionsView() {
   // system none of whose subscription kinds can be created says so, instead of offering a form that cannot work.
   const createSlot = useClusterSlot('subscriptions.create', clusterId);
   const subscriptionKinds = (cluster.data?.kinds ?? []).filter((k) => k.resourceClass === 'SUBSCRIPTION');
+  const system = cluster.data?.system?.id;
+  const kafka = system === 'kafka';
+  const groupOnTopic =
+    subscriptionKinds.find((k) => k.id === 'kafka.group-topic') ??
+    (subscriptionKinds.length === 1 ? subscriptionKinds[0] : undefined);
+  // A Kafka kind cannot be created on this route, even when the driver lists the verb: the driver's create refuses,
+  // and the Artemis form would write a queue. The control stays, disabled.
+  const kafkaRefusal = kafkaSubscriptionRefusal(cluster.data?.system, groupOnTopic, 'create');
   const createRefusal =
-    cluster.data?.system && subscriptionKinds.length > 0 && !subscriptionKinds.some((k) => k.verbs.includes('create'))
+    kafkaRefusal ??
+    (cluster.data?.system && subscriptionKinds.length > 0 && !subscriptionKinds.some((k) => k.verbs.includes('create'))
       ? verbRefusal(cluster.data.system.name, subscriptionKinds[0].label, 'create')
-      : undefined;
+      : undefined);
   const createGate = createRefusal ? ({ kind: 'blocked', reason: createRefusal } as const) : capabilityGate;
+  const one = kafka ? inSentence(groupOnTopic?.label.singular ?? 'Group on topic') : 'subscription';
+  const many = kafka ? inSentence(groupOnTopic?.label.plural ?? 'Groups on topics') : 'subscriptions';
+  const title = kafka ? (groupOnTopic?.label.plural ?? 'Groups on topics') : 'Subscriptions';
+  const createLabel = kafka ? `New ${one}` : 'New subscription';
   const unreachable = (cluster.data?.topology.nodes ?? [])
     .flatMap((n) => n.endpoints)
     .filter((e) => e.lastError)
@@ -309,7 +353,6 @@ export function SubscriptionsView() {
     navigate({ to: '.', search: (prev: Record<string, unknown>) => ({ ...prev, page: next > 1 ? next : undefined }) });
 
   const [backlogOf, setBacklogOf] = useState<BacklogTarget | null>(null);
-  const system = cluster.data?.system?.id;
   const columns = useMemo(
     () => subscriptionColumns((row) => setBacklogOf({ clusterId, id: row.id, name: row.name }), system),
     [clusterId, system],
@@ -333,16 +376,20 @@ export function SubscriptionsView() {
   return (
     <Page fill>
       <PageHeader
-        title="Subscriptions"
-        description="Every subscription across the cluster's nodes, with its backlog and consumers. Select a row to open its detail and actions."
+        title={title}
+        description={
+          kafka
+            ? 'Each group on one topic, with its lag and its members. Select a row to open its detail and actions.'
+            : "Every subscription across the cluster's nodes, with its backlog and consumers. Select a row to open its detail and actions."
+        }
       />
       <Toolbar
-        label="Subscription filters"
+        label={kafka ? 'Group on topic filters' : 'Subscription filters'}
         start={
           <TextInput
             ref={filterRef}
-            label="Filter subscriptions"
-            placeholder="Subscription or destination name"
+            label={`Filter ${many}`}
+            placeholder={kafka ? 'Group or topic name' : 'Subscription or destination name'}
             value={filter}
             onChange={(e) => typeFilter(e.currentTarget.value)}
             w="17.5rem"
@@ -351,9 +398,12 @@ export function SubscriptionsView() {
         }
         end={
           mayCreate ? (
-            <CapabilityGate verdict={createGate} what="creating a subscription">
+            <CapabilityGate
+              verdict={createGate}
+              what={kafka ? 'creating a group on a topic' : 'creating a subscription'}
+            >
               <Button size="xs" disabled={createGate.kind === 'blocked'} onClick={() => setCreateOpen(true)}>
-                New subscription
+                {createLabel}
               </Button>
             </CapabilityGate>
           ) : undefined
@@ -369,6 +419,8 @@ export function SubscriptionsView() {
         canSelectAll={!allMatching && pageAllPicked && total > rows.length}
         onSelectAll={() => setAllMatching(true)}
         onClear={clearSelection}
+        one={one}
+        many={many}
       >
         {selectionSlot.map(({ id, Component }) => (
           <Component key={id} clusterId={clusterId} selection={selection} count={count} clear={clearSelection} />
@@ -376,7 +428,7 @@ export function SubscriptionsView() {
       </SelectionBar>
 
       <DataTable
-        label="Subscriptions"
+        label={title}
         storageKey="subscriptions"
         height="fill"
         columns={columns}
@@ -395,7 +447,7 @@ export function SubscriptionsView() {
           // The count and position live in the pager, stated once. Not before the first page lands:
           // "No subscriptions" while loading would claim there are none.
           end: query.data ? (
-            <Pager page={page} pageSize={PAGE_SIZE} total={total} onChange={setPage} label="subscriptions" />
+            <Pager page={page} pageSize={PAGE_SIZE} total={total} onChange={setPage} label={many} />
           ) : undefined,
         }}
         rowMenu={{
@@ -415,6 +467,9 @@ export function SubscriptionsView() {
             unreachable={unreachable}
             reach={reach('subscription:read', clusterId)}
             mayCreate={mayCreate}
+            one={one}
+            many={many}
+            kafka={kafka}
             onClearFilter={clearFilter}
             onCreate={() => setCreateOpen(true)}
           />
@@ -423,7 +478,7 @@ export function SubscriptionsView() {
 
       <SubscriptionDetailDrawer subscription={selected} missing={missing} onClose={() => setSelected(null)} />
       <BacklogDrawer target={backlogOf} onClose={() => setBacklogOf(null)} />
-      {createSlot.length > 0 ? (
+      {kafka ? null : createSlot.length > 0 ? (
         createSlot.map(({ id, Component }) => (
           <Component key={id} clusterId={clusterId} opened={createOpen} onClose={() => setCreateOpen(false)} />
         ))

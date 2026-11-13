@@ -129,6 +129,7 @@ describe('ResourceView', () => {
 
     expect(await screen.findByText('No consumers right now')).toBeInTheDocument();
     expect(screen.getByText(/A consumer is a client attached to a subscription/)).toBeInTheDocument();
+    expect(screen.getByText(/one request per node per load/)).toBeInTheDocument();
   });
 
   it('says the filter emptied it, and clears the filter from the destination', async () => {
@@ -269,8 +270,8 @@ describe('ResourceView page structure', () => {
       const user = userEvent.setup();
       renderWithProviders(<ResourceView kind="destinations" />);
 
-      expect(await screen.findByRole('button', { name: 'New destination' })).toBeDisabled();
-      await user.click(screen.getByRole('button', { name: 'Why creating a destination is unavailable' }));
+      expect(await screen.findByRole('button', { name: 'New topic' })).toBeDisabled();
+      await user.click(screen.getByRole('button', { name: 'Why creating a topic is unavailable' }));
       expect(await screen.findByText(/Apache Kafka topics cannot be created/)).toBeInTheDocument();
     });
 
@@ -285,8 +286,12 @@ describe('ResourceView page structure', () => {
       serve({ system: KAFKA_SYSTEM, kinds: KAFKA_KINDS });
       const user = userEvent.setup();
       const { unmount } = renderWithProviders(<ResourceView kind="destinations" />);
-      await waitFor(() => expect(screen.getByRole('button', { name: 'New destination' })).toBeEnabled());
-      await user.click(screen.getByRole('button', { name: 'New destination' }));
+      expect(await screen.findByRole('heading', { level: 1, name: 'Topics' })).toBeInTheDocument();
+      expect(screen.getByText(/A topic is a destination on this cluster/)).toBeInTheDocument();
+      expect(screen.queryByText(/one request per node per load/)).not.toBeInTheDocument();
+      await waitFor(() => expect(screen.getByRole('button', { name: 'New topic' })).toBeEnabled());
+      expect(screen.queryByRole('button', { name: 'New destination' })).not.toBeInTheDocument();
+      await user.click(screen.getByRole('button', { name: 'New topic' }));
       expect(await screen.findByRole('dialog', { name: 'Create topic' })).toBeInTheDocument();
       unmount();
 

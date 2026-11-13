@@ -89,6 +89,16 @@ is unknown, and the cluster's health states that instead of counting it as healt
 
 ## The shared screens on Kafka
 
+### Groups on topics
+
+**Messaging → Subscriptions** is headed **Groups on topics**. The columns are the group, the topic, the lag and the members. A group appears in this list only after a committed offset or a live assignment. A group with neither stays on **Messaging → Consumer groups**.
+
+There is nothing to create here, so the create control stays visible and disabled: the driver cannot make a group on a topic by hand. Routing type, durability, pause and ring size are not on this page. Purge and an offset reset stay available on a group on a topic. Deleting an empty group stays on the group's own page. Deleting the row does not remove the group's members.
+
+### Topics
+
+**Resources → Destinations** is headed **Topics**, and the create control reads **New topic**. The form asks for the name, the partition count, the replication factor, and the settings the topic kind declares (`cleanup.policy`, `retention.ms`, `retention.bytes`, `max.message.bytes`, `min.insync.replicas`). Confirm by pressing and holding. It needs `destination:create`.
+
 ### Browsing messages
 
 A topic, or a group on a topic, is read from **every partition** in one table by default. **Partition** is its

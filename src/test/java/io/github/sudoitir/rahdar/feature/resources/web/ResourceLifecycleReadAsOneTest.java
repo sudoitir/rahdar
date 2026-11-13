@@ -15,6 +15,8 @@ import io.github.sudoitir.openbroker.model.ResourceClass;
 import io.github.sudoitir.openbroker.model.ResourceId;
 import io.github.sudoitir.openbroker.model.ResourcePath;
 import io.github.sudoitir.rahdar.feature.resources.LifecycleRequests.CreateDestinationRequest;
+import io.github.sudoitir.rahdar.feature.resources.LifecycleRequests.CreateSubscriptionRequest;
+import io.github.sudoitir.rahdar.feature.resources.LifecycleRequests.UpdateResourceRequest;
 import io.github.sudoitir.rahdar.feature.resources.QueueLifecycleService;
 import io.github.sudoitir.rahdar.feature.resources.ReadAsOneResource;
 import io.github.sudoitir.rahdar.feature.resources.SubscriptionConfigurationReader;
@@ -47,12 +49,13 @@ class ResourceLifecycleReadAsOneTest {
     private final ResourceTargets targets = mock(ResourceTargets.class);
     private final ReadAsOneResource handler = mock(ReadAsOneResource.class);
     private final QueueLifecycleService queues = mock(QueueLifecycleService.class);
+    private final ClusterKinds kinds = mock(ClusterKinds.class);
     private final ResourceLifecycleController controller = new ResourceLifecycleController(
             queues,
             mock(SubscriptionConfigurationReader.class),
             targets,
             mock(TruncateService.class),
-            mock(ClusterKinds.class),
+            kinds,
             List.of(handler));
 
     private final Target topic =
@@ -84,6 +87,7 @@ class ResourceLifecycleReadAsOneTest {
 
     @Test
     void deletingUsesTheHandlerAndNeverForwardsMemberRemoval() {
+        when(kinds.systemId(CLUSTER)).thenReturn("kafka");
         when(targets.require(any(), eq("kafka.topic"), eq("orders"), any(ResourceClass[].class)))
                 .thenReturn(topic);
         when(handler.deleteDestination(CLUSTER, topic, false, true, "etag", "fp"))
@@ -99,6 +103,59 @@ class ResourceLifecycleReadAsOneTest {
         verify(handler).deleteSubscription(CLUSTER, group, false, "etag");
         verify(queues, never()).deleteQueue(any(), any(Target.class), anyBoolean(), anyBoolean(), anyBoolean());
         verify(queues, never()).deleteAddress(any(), any(Target.class), anyBoolean());
+    }
+
+    @Test
+    void aKafkaSubscriptionCreateDoesNotCallCreateQueue() {
+        when(kinds.systemId(CLUSTER)).thenReturn("kafka");
+        CreateSubscriptionRequest request =
+                new CreateSubscriptionRequest("kafka.group-topic", "billing", "kafka.topic/orders", Map.of());
+
+        assertThatThrownBy(() -> controller.createSubscription(CLUSTER, false, request))
+                .isInstanceOf(ConflictException.class)
+                .satisfies(
+                        error -> assertThat(((ConflictException) error).slug()).isEqualTo("unsupported-on-kind"));
+
+        verify(queues, never()).createQueue(any(), any(), anyBoolean());
+    }
+
+    @Test
+    void deletingPausingAndUpdatingAKafkaSubscriptionDoesNotCallTheQueueLifecycle() {
+        when(kinds.systemId(CLUSTER)).thenReturn("kafka");
+        Target row = new Target(
+                new ResourceId(KafkaKinds.GROUP_TOPIC, ResourcePath.of("billing", "orders")),
+                ResourceClass.SUBSCRIPTION);
+        when(targets.require(any(), eq("kafka.group-topic"), eq("billing/orders"), any(ResourceClass[].class)))
+                .thenReturn(row);
+
+        assertThatThrownBy(() -> controller.delete(
+                        CLUSTER, "kafka.group-topic", "billing/orders", false, false, true, null, null))
+                .isInstanceOf(ConflictException.class)
+                .satisfies(
+                        error -> assertThat(((ConflictException) error).slug()).isEqualTo("unsupported-on-kind"));
+        assertThatThrownBy(() -> controller.pause(CLUSTER, "kafka.group-topic", "billing/orders", false))
+                .isInstanceOf(ConflictException.class)
+                .satisfies(
+                        error -> assertThat(((ConflictException) error).slug()).isEqualTo("unsupported-on-kind"));
+        assertThatThrownBy(() -> controller.update(
+                        CLUSTER, "kafka.group-topic", "billing/orders", false, new UpdateResourceRequest(Map.of())))
+                .isInstanceOf(ConflictException.class)
+                .satisfies(
+                        error -> assertThat(((ConflictException) error).slug()).isEqualTo("unsupported-on-kind"));
+        assertThatThrownBy(() -> controller.resume(CLUSTER, "kafka.group-topic", "billing/orders", false))
+                .isInstanceOf(ConflictException.class)
+                .satisfies(
+                        error -> assertThat(((ConflictException) error).slug()).isEqualTo("unsupported-on-kind"));
+        assertThatThrownBy(() -> controller.resetCounters(CLUSTER, "kafka.group-topic", "billing/orders", false))
+                .isInstanceOf(ConflictException.class)
+                .satisfies(
+                        error -> assertThat(((ConflictException) error).slug()).isEqualTo("unsupported-on-kind"));
+
+        verify(queues, never()).deleteQueue(any(), any(Target.class), anyBoolean(), anyBoolean(), anyBoolean());
+        verify(queues, never()).setPaused(any(), any(), anyBoolean(), anyBoolean());
+        verify(queues, never()).resetCounter(any(), any(), anyBoolean());
+        verify(queues, never()).updateQueue(any(), any(), any(), anyBoolean());
+        verify(handler, never()).deleteSubscription(any(), any(), anyBoolean(), any());
     }
 
     @Test

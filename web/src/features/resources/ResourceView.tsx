@@ -31,7 +31,7 @@ import type { ActionKind, ActionTargets } from '../../kernel/actions/types.ts';
 import type { ApiError } from '../../kernel/api/request.ts';
 import type { UseQueryResult } from '@tanstack/react-query';
 import { useCan } from '../../kernel/auth/useCan.ts';
-import { verbRefusal } from '../../kernel/auth/kindVerbs.ts';
+import { inSentence, verbRefusal } from '../../kernel/auth/kindVerbs.ts';
 import { useClusterSlot } from '../../kernel/shell/useClusterSlot.ts';
 import { CapabilityGate } from '../../ui/CapabilityGate.tsx';
 import type { GateVerdict } from '../../ui/capabilityGate.ts';
@@ -190,6 +190,7 @@ function ResourceEmpty({
   filterText,
   unreachable,
   reach,
+  perNode,
   onClearFilter,
 }: Readonly<{
   noun: string;
@@ -198,6 +199,8 @@ function ResourceEmpty({
   unreachable: string[];
   /** How the caller reaches this resource on the cluster; only destinations are owned by teams. */
   reach: 'grant' | 'teams' | 'none' | 'unknown';
+  /** False when the page names one kind read as a single cluster, such as a topic. */
+  perNode: boolean;
   onClearFilter: () => void;
 }>) {
   const nouns = `${noun}s`;
@@ -240,7 +243,9 @@ function ResourceEmpty({
     <EmptyState
       kind="empty"
       title={reach === 'teams' ? `No ${nouns} in your teams on this cluster` : `No ${nouns} right now`}
-      description={`${about} This view is a live read across every serving node, one request per node per load.`}
+      description={
+        perNode ? `${about} This view is a live read across every serving node, one request per node per load.` : about
+      }
     />
   );
 }
@@ -261,7 +266,6 @@ export function ResourceView({ kind }: Readonly<{ kind: Kind }>) {
   const search = useSearch({ strict: false }) as { q?: string; sort?: string; page?: number };
   const navigate = useNavigate();
   const config = CONFIG[kind] as unknown as KindConfig<{ nodeName: string }>;
-  const title = kind.charAt(0).toUpperCase() + kind.slice(1);
 
   const [filter, setFilter] = useState(search.q ?? '');
   const [debounced] = useDebouncedValue(filter, 250);
@@ -293,6 +297,19 @@ export function ResourceView({ kind }: Readonly<{ kind: Kind }>) {
   const createSlot = useClusterSlot('destinations.create', kind === 'destinations' ? clusterId : undefined);
   const cluster = useCluster(clusterId);
   const destinationKinds = (cluster.data?.kinds ?? []).filter((k) => k.resourceClass === 'DESTINATION');
+  // One destination kind uses that kind's label (Topics, New topic). Artemis and RabbitMQ keep the role words.
+  const systemId = cluster.data?.system?.id;
+  const kindLabel =
+    kind === 'destinations' &&
+    destinationKinds.length === 1 &&
+    systemId !== 'artemis' &&
+    systemId !== 'rabbitmq' &&
+    systemId
+      ? destinationKinds[0].label
+      : undefined;
+  const title = kindLabel?.plural ?? kind.charAt(0).toUpperCase() + kind.slice(1);
+  const createName = kindLabel ? `New ${inSentence(kindLabel.singular)}` : 'New destination';
+  const noun = kindLabel ? inSentence(kindLabel.singular) : config.noun;
   const createRefusal =
     cluster.data?.system && destinationKinds.length > 0 && !destinationKinds.some((k) => k.verbs.includes('create'))
       ? verbRefusal(cluster.data.system.name, destinationKinds[0].label, 'create')
@@ -324,14 +341,17 @@ export function ResourceView({ kind }: Readonly<{ kind: Kind }>) {
 
   return (
     <Page fill>
-      <PageHeader title={title} description={config.summary} />
+      <PageHeader
+        title={title}
+        description={kindLabel ? `${kindLabel.plural} on this cluster, read live from the brokers.` : config.summary}
+      />
       <Toolbar
         label={`${title} filters`}
         start={
           <TextInput
             ref={filterRef}
-            label={`Filter ${kind}`}
-            placeholder={config.filter}
+            label={`Filter ${title.toLowerCase()}`}
+            placeholder={kindLabel ? `${kindLabel.singular} name` : config.filter}
             value={filter}
             onChange={(e) => setFilter(e.currentTarget.value)}
             w="17.5rem"
@@ -340,9 +360,9 @@ export function ResourceView({ kind }: Readonly<{ kind: Kind }>) {
         }
         end={
           offerCreate ? (
-            <CapabilityGate verdict={createGate} what="creating a destination">
+            <CapabilityGate verdict={createGate} what={`creating a ${noun}`}>
               <Button size="xs" disabled={createGate.kind === 'blocked'} onClick={() => setCreateOpen(true)}>
-                New destination
+                {createName}
               </Button>
             </CapabilityGate>
           ) : undefined
@@ -363,7 +383,13 @@ export function ResourceView({ kind }: Readonly<{ kind: Kind }>) {
         toolbar={{
           // Not before the first page lands: "No destinations" while loading would claim there are none.
           end: query.data ? (
-            <Pager page={page} pageSize={PAGE_SIZE} total={total} onChange={setPage} label={`${config.noun}s`} />
+            <Pager
+              page={page}
+              pageSize={PAGE_SIZE}
+              total={total}
+              onChange={setPage}
+              label={kindLabel ? inSentence(kindLabel.plural) : `${config.noun}s`}
+            />
           ) : undefined,
         }}
         rowMenu={{
@@ -379,11 +405,14 @@ export function ResourceView({ kind }: Readonly<{ kind: Kind }>) {
         }}
         empty={
           <ResourceEmpty
-            noun={config.noun}
-            about={config.about}
+            noun={noun}
+            about={
+              kindLabel ? `A ${noun} is a destination on this cluster. Create one with ${createName}.` : config.about
+            }
             filterText={search.q ?? ''}
             unreachable={unreachable}
             reach={kind === 'destinations' ? reach('destination:read', clusterId) : 'grant'}
+            perNode={!kindLabel}
             onClearFilter={() => {
               setFilter('');
               void navigate({

@@ -80,6 +80,9 @@ public class ResourceLifecycleController {
             @Valid @RequestBody CreateSubscriptionRequest request) {
         targets.requireKind(clusterId, request.kind(), ResourceClass.SUBSCRIPTION);
         requireCreatable(clusterId, request.kind());
+        // A Kafka subscription is not created here. The driver refuses a group on a topic, and this route must
+        // not write an Artemis queue (ADR-0226).
+        requireNotKafkaQueue(clusterId, "This kind cannot be created here.");
         return respond(lifecycle.createQueue(clusterId, request, dryRun));
     }
 
@@ -151,6 +154,7 @@ public class ResourceLifecycleController {
             @RequestParam(defaultValue = "false") boolean dryRun,
             @Valid @RequestBody UpdateResourceRequest request) {
         Target target = targets.require(clusterId, kind, path, ResourceClass.SUBSCRIPTION);
+        requireNotKafkaQueue(clusterId, "This kind cannot be edited here.");
         return respond(lifecycle.updateQueue(clusterId, target.name(), request, dryRun));
     }
 
@@ -185,6 +189,10 @@ public class ResourceLifecycleController {
                         default -> throw new ConflictException(UNSUPPORTED, "This kind cannot be deleted here.");
                     });
         }
+        // A group on a topic is not an Artemis queue, and this route does not remove its members (ADR-0226).
+        if (kafka(clusterId)) {
+            throw new ConflictException(UNSUPPORTED, "This kind cannot be deleted here.");
+        }
         return respond(
                 switch (target.resourceClass()) {
                     case SUBSCRIPTION ->
@@ -201,6 +209,7 @@ public class ResourceLifecycleController {
             @PathVariable String path,
             @RequestParam(defaultValue = "false") boolean dryRun) {
         Target target = targets.require(clusterId, kind, path, ResourceClass.SUBSCRIPTION);
+        requireNotKafkaQueue(clusterId, "This kind cannot be paused here.");
         return respond(lifecycle.setPaused(clusterId, target.name(), true, dryRun));
     }
 
@@ -211,6 +220,7 @@ public class ResourceLifecycleController {
             @PathVariable String path,
             @RequestParam(defaultValue = "false") boolean dryRun) {
         Target target = targets.require(clusterId, kind, path, ResourceClass.SUBSCRIPTION);
+        requireNotKafkaQueue(clusterId, "This kind cannot be resumed here.");
         return respond(lifecycle.setPaused(clusterId, target.name(), false, dryRun));
     }
 
@@ -221,6 +231,7 @@ public class ResourceLifecycleController {
             @PathVariable String path,
             @RequestParam(defaultValue = "false") boolean dryRun) {
         Target target = targets.require(clusterId, kind, path, ResourceClass.SUBSCRIPTION);
+        requireNotKafkaQueue(clusterId, "This kind cannot have its counters reset here.");
         return respond(lifecycle.resetCounter(clusterId, target.name(), dryRun));
     }
 
@@ -230,6 +241,17 @@ public class ResourceLifecycleController {
         return readAsOneResources.stream()
                 .filter(handler -> handler.supports(kind))
                 .findFirst();
+    }
+
+    /** A Kafka cluster is not changed through the Artemis queue lifecycle (ADR-0226). */
+    private boolean kafka(UUID clusterId) {
+        return "kafka".equals(clusters.systemId(clusterId));
+    }
+
+    private void requireNotKafkaQueue(UUID clusterId, String message) {
+        if (kafka(clusterId)) {
+            throw new ConflictException(UNSUPPORTED, message);
+        }
     }
 
     /** On a cluster read as one the driver creates the resource, so its kind must declare the verb (ADR-0224). */
