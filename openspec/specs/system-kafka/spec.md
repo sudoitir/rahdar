@@ -150,6 +150,36 @@ be refused with the reason, and a secret setting SHALL be refused.
 - **WHEN** an operator tries to change a setting that only changes on a restart
 - **THEN** the change is refused with a 409 that says the broker must be restarted with the new value
 
+### Requirement: A Kafka subscriptions page uses the group-on-topic label
+
+On a Kafka cluster the subscriptions page SHALL be headed "Groups on topics". Its columns SHALL be the group, the topic, the lag and the members. It SHALL NOT offer a routing type, durability, a paused state, a ring size, or a working create. The create control SHALL stay visible and disabled, because a group on a topic cannot be created by hand. An empty page SHALL say that a group appears only after a committed offset or a live assignment, and that a group with neither stays on Consumer groups.
+
+`POST /subscriptions` for a Kafka kind, and delete, pause, resume, update and reset-counters of a Kafka kind, SHALL NOT run the Artemis queue lifecycle. A Kafka kind the driver cannot create SHALL be refused `unsupported-on-kind`. Delete of a group on a topic SHALL NOT delete an Artemis queue and SHALL NOT remove the group's members. Purge, offset reset, and delete of an empty group on the group page SHALL stay.
+
+#### Scenario: The subscriptions page of a Kafka cluster
+
+- **WHEN** an operator opens the subscriptions page of a Kafka cluster that has no group on a topic
+- **THEN** the heading is "Groups on topics", the columns are group, topic, lag and members, create is visible and disabled, and the page says a group appears only after a committed offset or a live assignment
+
+#### Scenario: Creating a subscription is refused
+
+- **WHEN** a caller posts a Kafka kind to the shared subscription create route
+- **THEN** the request is refused as unsupported on that kind and no queue is created
+
+#### Scenario: Deleting a group on a topic does not remove members
+
+- **WHEN** an operator deletes a group-on-topic row
+- **THEN** no queue is deleted and the group's members stay; an empty group is still deleted from the group's own page
+
+### Requirement: A Kafka destinations page uses the topic label
+
+When a cluster has one destination kind, the destinations page and its create control SHALL use that kind's label. On a Kafka cluster that heading is "Topics" and the control reads "New topic". The Kafka create form SHALL remain the topic form. Artemis and RabbitMQ SHALL keep the labels they already show.
+
+#### Scenario: New topic
+
+- **WHEN** an operator opens the destinations page of a Kafka cluster
+- **THEN** the heading is "Topics" and the create control reads "New topic" and opens the topic form
+
 ### Requirement: An operator can create a topic from the destinations screen
 
 On a Kafka cluster, an operator with `destination:create` SHALL create a topic from the shared destinations screen. The form SHALL ask for the name, the partition count, the replication factor, and the settings the topic kind declares (`cleanup.policy`, `retention.ms`, `retention.bytes`, `max.message.bytes`, `min.insync.replicas`). The preview SHALL state the topic that will be created. Confirm SHALL be a held confirmation, SHALL go through the approval gate when a policy holds it, and SHALL be audited with the topic that was created. An operator without the permission SHALL see the action disabled, naming the permission, and the API SHALL refuse it. Creating a topic SHALL be offered only on a Kafka cluster.

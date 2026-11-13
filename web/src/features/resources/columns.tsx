@@ -69,7 +69,7 @@ export const resourceColumns = {
   destinations: ({ clusterId, system }: ColumnDeps): Column<DestinationView>[] => [
     {
       id: 'name',
-      header: 'Destination',
+      header: system === 'kafka' ? 'Topic' : 'Destination',
       accessor: (r) => r.name,
       kind: 'identifier',
       priority: 'essential',

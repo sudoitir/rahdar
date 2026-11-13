@@ -156,8 +156,11 @@ describe('ClusterViewNav', () => {
     await waitFor(() => expect(screen.queryByRole('link', { name: 'Configuration' })).not.toBeInTheDocument());
     expect(screen.queryByRole('link', { name: 'Setup review' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Config diff' })).not.toBeInTheDocument();
-    // Everything that is not tied to a system stays.
+    // The rail keeps the role word. Creating a subscription is not a Kafka action; creating a topic is the
+    // destinations page's "New topic", not a second nav entry.
     expect(screen.getByRole('link', { name: 'Subscriptions' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'New subscription' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'New subscription' })).not.toBeInTheDocument();
   });
 
   it('lists the shared views of a RabbitMQ cluster and neither the Artemis-only nor the Kafka-only ones', async () => {

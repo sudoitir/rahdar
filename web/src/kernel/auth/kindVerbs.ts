@@ -20,8 +20,27 @@ const REFUSALS: Record<string, (subject: string) => string> = {
 };
 
 /** A label mid-sentence: "Queues" becomes "queues", while "ACLs" keeps its capitals. */
-const inSentence = (label: string): string =>
+export const inSentence = (label: string): string =>
   /^[A-Z][A-Z]/.test(label) ? label : label.charAt(0).toLowerCase() + label.slice(1);
+
+/**
+ * The shared subscription route does not create, pause, edit or delete a Kafka subscription. Delete of an
+ * empty group stays on Consumer groups, and this row never removes members (ADR-0226).
+ */
+export function kafkaSubscriptionRefusal(
+  system: { id: string; name: string } | null | undefined,
+  kind: { resourceClass: string; label: { plural: string } } | undefined,
+  verb: string,
+): string | undefined {
+  if (system?.id !== 'kafka' || kind?.resourceClass !== 'SUBSCRIPTION') return undefined;
+  if (verb === 'delete') {
+    return 'Delete an empty group from Consumer groups. This does not remove members.';
+  }
+  if (verb === 'create' || verb === 'pause' || verb === 'update' || verb === 'resume') {
+    return verbRefusal(system.name, kind.label, verb);
+  }
+  return undefined;
+}
 
 /** Why a kind cannot take a verb, built from its system and its plural label: "Artemis addresses cannot be purged." */
 export function verbRefusal(systemName: string, kindLabel: { plural: string }, verb: string): string {
@@ -42,6 +61,8 @@ export function useKindVerbRefusal(
 ): Extract<GateVerdict, { kind: 'blocked' }> | undefined {
   const cluster = useClusterKinds(clusterId);
   const known = cluster?.kinds?.find((k) => k.id === kind);
+  const kafka = kafkaSubscriptionRefusal(cluster?.system, known, verb);
+  if (kafka) return { kind: 'blocked', reason: kafka };
   if (!cluster?.system || !known || known.verbs.includes(verb)) return undefined;
   return { kind: 'blocked', reason: verbRefusal(cluster.system.name, known.label, verb) };
 }

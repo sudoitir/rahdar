@@ -30,6 +30,8 @@ export function subscriptionColumns(
   onBreakdown?: (row: SubscriptionView) => void,
   system?: string,
 ): Column<SubscriptionView>[] {
+  // A group on a topic is not an Artemis queue: the row is the group, the topic, the lag and the members.
+  if (system === 'kafka') return kafkaGroupTopicColumns(onBreakdown);
   // A RabbitMQ queue lives in a virtual host, not under a destination, and has no routing type: the same name can
   // exist in two virtual hosts, so the host is what tells the rows apart.
   const rabbit = system === 'rabbitmq';
@@ -154,6 +156,53 @@ export function subscriptionColumns(
     },
   ];
   return rabbit ? columns.filter((c) => c.id !== 'routingType') : columns;
+}
+
+/** Groups on topics: no routing type, durability or pause. Lag keeps the backlog's estimate and unavailable states. */
+function kafkaGroupTopicColumns(onBreakdown?: (row: SubscriptionView) => void): Column<SubscriptionView>[] {
+  return [
+    {
+      id: 'group',
+      header: 'Group',
+      accessor: (r) => r.name,
+      kind: 'identifier',
+      priority: 'essential',
+      sortKey: 'name',
+    },
+    {
+      id: 'topic',
+      header: 'Topic',
+      accessor: (r) => destinationOf(r),
+      kind: 'identifier',
+      priority: 'essential',
+      sortKey: 'destination',
+    },
+    {
+      id: 'lag',
+      header: 'Lag',
+      description:
+        'Records the group has not read on this topic. ≈ marks an estimate, and Unavailable says why the figure could not be read',
+      accessor: (r) => backlogWords(r.backlog),
+      cell: (r) =>
+        createElement(BacklogCell, {
+          backlog: r.backlog,
+          subject: r.name,
+          onBreakdown: onBreakdown && (() => onBreakdown(r)),
+        }),
+      kind: 'number',
+      priority: 'high',
+      sortKey: 'depth',
+    },
+    {
+      id: 'members',
+      header: 'Members',
+      description: 'Members assigned to the group',
+      accessor: (r) => r.totalConsumerCount,
+      kind: 'number',
+      priority: 'high',
+      sortKey: 'consumers',
+    },
+  ];
 }
 
 /**

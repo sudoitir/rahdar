@@ -6,7 +6,7 @@ TBD - created by archiving change 19d-broker-neutral-surface. Update Purpose aft
 ## Requirements
 
 ### Requirement: An estate view across systems
-The UI SHALL show clusters of every connected system side by side on its landing page, with comparable health, and a list of subscriptions across them. Shared screens SHALL use role nouns, with each row's native kind label. An action a system cannot perform SHALL appear disabled with the reason from the capability model, never hidden without explanation and never failing after the click. System-only screens SHALL appear only for clusters of that system.
+The UI SHALL show clusters of every connected system side by side on its landing page, with comparable health, and a list of subscriptions across them. Shared screens SHALL use role nouns, with each row's native kind label, except that a Kafka cluster's subscriptions page SHALL be headed by the driver's plural "Groups on topics". The estate table, which lists every system together, SHALL keep the role noun "Subscriptions". An action a system cannot perform SHALL appear disabled with the reason from the capability model, never hidden without explanation and never failing after the click. System-only screens SHALL appear only for clusters of that system.
 
 #### Scenario: A mixed estate
 - **WHEN** an operator opens the estate view with an Artemis cluster and a cluster of another system
@@ -45,7 +45,11 @@ Every screen SHALL show a resource's kind with the label its system's driver dec
 
 #### Scenario: Kafka's words
 - **WHEN** an operator opens the subscriptions table with a Kafka cluster in the estate
-- **THEN** Kafka rows show "Group on topic" or "Share group on topic", and Artemis rows show "Queue"
+- **THEN** the table is headed "Subscriptions", Kafka rows show "Group on topic" or "Share group on topic", and Artemis rows show "Queue"
+
+#### Scenario: A Kafka cluster's subscriptions page
+- **WHEN** an operator opens the subscriptions page of a Kafka cluster
+- **THEN** the page heading is "Groups on topics", not "Subscriptions"
 
 #### Scenario: A plural from the driver
 - **WHEN** an action is refused for every selected Kafka subscription
