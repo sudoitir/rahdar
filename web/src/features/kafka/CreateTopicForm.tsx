@@ -86,7 +86,8 @@ function sameTopic(left: TopicCreateBody | null, right: TopicCreateBody | null):
 
 function replicationProblem(value: number | string, brokers: number | null): string | null {
   const factor = Number(value);
-  if (!(factor >= 1)) return 'Enter a replication factor of at least 1.';
+  // Number('') is 0. A value that is not a number must stay refused: NaN < 1 is false.
+  if (Number.isNaN(factor) || factor < 1) return 'Enter a replication factor of at least 1.';
   if (brokers === 0) return 'This connection reached no brokers, so a topic cannot be created yet.';
   if (brokers != null && factor > brokers) {
     return `Enter a replication factor from 1 to ${brokers}, the brokers this connection reached.`;
