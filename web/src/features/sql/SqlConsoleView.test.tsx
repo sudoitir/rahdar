@@ -5,6 +5,7 @@ import userEvent from '@testing-library/user-event';
 
 import { renderWithProviders } from '../../test/render.tsx';
 import { EventSourceStub, server } from '../../test/setup.ts';
+import { ARTEMIS_KINDS, KAFKA_KINDS } from '../../test/wire.ts';
 
 const search = { current: {} as { q?: string; live?: boolean } };
 
@@ -59,7 +60,9 @@ function answered(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function mockCluster(over: { permissions?: string[]; messageIo?: object; subscriptions?: object[] } = {}) {
+function mockCluster(
+  over: { permissions?: string[]; messageIo?: object; subscriptions?: object[]; kinds?: object[] } = {},
+) {
   server.use(
     http.get('*/api/v1/clusters/c1', () =>
       HttpResponse.json({
@@ -67,6 +70,7 @@ function mockCluster(over: { permissions?: string[]; messageIo?: object; subscri
         name: 'prod',
         description: null,
         topology: { clusterId: 'c1', nodes: [] },
+        ...(over.kinds ? { kinds: over.kinds } : {}),
         capabilities: {
           managementRead: AVAILABLE,
           managementWrite: AVAILABLE,
@@ -507,7 +511,7 @@ describe('SqlConsoleView', () => {
   });
 });
 
-const messageRow = (messageId: number, body = `order ${messageId}`) => ({
+const messageRow = (messageId: number, body = `order ${messageId}`, over: Record<string, unknown> = {}) => ({
   nodeId: 'n1',
   nodeName: 'primary',
   subscription: 'artemis.queue/ORDER.IN',
@@ -525,6 +529,7 @@ const messageRow = (messageId: number, body = `order ${messageId}`) => ({
   source: 'BROKER',
   observedAt: null,
   lastSeenAt: null,
+  ...over,
 });
 
 const doneFrame = (over: Record<string, unknown> = {}) => ({
@@ -1017,12 +1022,14 @@ describe('SqlConsoleView other panels', () => {
   });
 
   it('opens a result row in the message detail, and closes it again', async () => {
-    mockCluster();
+    mockCluster({ kinds: ARTEMIS_KINDS });
     mockPlan();
+    const seen: URL[] = [];
     server.use(
-      http.get('*/api/v1/clusters/c1/resources/artemis.queue/ORDER.IN/messages/11', () =>
-        HttpResponse.json({ title: 'Message gone', detail: 'It was consumed.' }, { status: 404 }),
-      ),
+      http.get('*/api/v1/clusters/c1/resources/artemis.queue/ORDER.IN/messages/11', ({ request }) => {
+        seen.push(new URL(request.url));
+        return HttpResponse.json({ title: 'Message gone', detail: 'It was consumed.' }, { status: 404 });
+      }),
     );
     const user = userEvent.setup();
     renderWithProviders(<SqlConsoleView />);
@@ -1032,9 +1039,72 @@ describe('SqlConsoleView other panels', () => {
 
     await user.click(await screen.findByText('order 4471'));
 
+    await vi.waitFor(() => expect(seen).toHaveLength(1));
+    expect(seen[0].pathname).toContain('/resources/artemis.queue/ORDER.IN/messages/11');
+    expect(seen[0].searchParams.has('partition')).toBe(false);
     const dialog = await screen.findByRole('dialog');
     await user.keyboard('{Escape}');
     await vi.waitFor(() => expect(dialog).not.toBeInTheDocument());
+  });
+
+  it('opens a Kafka record on the topic and partition it was read from, including partition 0', async () => {
+    mockCluster({ kinds: KAFKA_KINDS });
+    mockPlan();
+    const seen: URL[] = [];
+    server.use(
+      http.get('*/api/v1/clusters/c1/resources/:kind/:name/messages/:id', ({ request }) => {
+        seen.push(new URL(request.url));
+        return HttpResponse.json({ title: 'Record', detail: 'gone' }, { status: 404 });
+      }),
+    );
+    const user = userEvent.setup();
+    renderWithProviders(<SqlConsoleView />);
+    await run(user);
+    emit(
+      'row',
+      messageRow(11, 'order 4471', {
+        subscription: 'kafka.topic/orders',
+        destination: 'kafka.topic/orders',
+        properties: { partition: 0 },
+      }),
+    );
+    emit('done', doneFrame());
+
+    await user.click(await screen.findByText('order 4471'));
+
+    await vi.waitFor(() => expect(seen).toHaveLength(1));
+    expect(seen[0].pathname).toContain('/resources/kafka.topic/orders/messages/11');
+    expect(seen[0].searchParams.get('partition')).toBe('0');
+  });
+
+  it('opens a Kafka record on a partition other than 0', async () => {
+    mockCluster({ kinds: KAFKA_KINDS });
+    mockPlan();
+    const seen: URL[] = [];
+    server.use(
+      http.get('*/api/v1/clusters/c1/resources/:kind/:name/messages/:id', ({ request }) => {
+        seen.push(new URL(request.url));
+        return HttpResponse.json({ title: 'Record', detail: 'gone' }, { status: 404 });
+      }),
+    );
+    const user = userEvent.setup();
+    renderWithProviders(<SqlConsoleView />);
+    await run(user);
+    emit(
+      'row',
+      messageRow(40, 'order 40', {
+        subscription: 'kafka.topic/orders',
+        destination: 'kafka.topic/orders',
+        properties: { partition: 2 },
+      }),
+    );
+    emit('done', doneFrame());
+
+    await user.click(await screen.findByText('order 40'));
+
+    await vi.waitFor(() => expect(seen).toHaveLength(1));
+    expect(seen[0].pathname).toContain('/resources/kafka.topic/orders/messages/40');
+    expect(seen[0].searchParams.get('partition')).toBe('2');
   });
 });
 

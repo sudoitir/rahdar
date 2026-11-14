@@ -27,6 +27,12 @@ import classes from './SqlConsoleView.module.css';
 
 const STARTER = 'SELECT *\nFROM "ORDER.IN"\nORDER BY timestamp DESC\nLIMIT 100';
 
+/** The partition stamped on a log row, including 0. A queue or a stream has none. */
+function recordPartition(row: SqlRowView): number | undefined {
+  const value = row.properties?.partition;
+  return typeof value === 'number' && Number.isInteger(value) && value >= 0 ? value : undefined;
+}
+
 /** The editor's and the results' share of the workspace, in %, remembered in this browser. */
 const SPLIT_KEY = 'as:sql:split';
 const DEFAULT_SPLIT = [36, 64];
@@ -249,14 +255,17 @@ export function SqlConsoleView() {
 
       <SyntaxHelp opened={helpOpen} onClose={() => setHelpOpen(false)} onLoadExample={setText} system={system} />
 
-      {/* Identity is (node, subscription, messageId), so the detail request carries all three. An indexed row may
-          already be gone from the broker — the panel reports that as the read failure it is, rather than as
-          an empty message. */}
+      {/* A queue is (node, subscription, messageId). A log is its own resource, and a topic also needs the
+          partition stamped on the row: an offset belongs to one partition. An indexed row may already be
+          gone from the broker — the panel reports that as the read failure it is, rather than as an empty
+          message. */}
       <MessageDetailPanel
         clusterId={clusterId}
         subscriptionName={openRow ? nameOf(openRow.subscription) : ''}
+        resourceId={openRow?.subscription}
         messageId={openRow ? String(openRow.messageId) : null}
         node={openRow?.nodeId}
+        partition={openRow ? recordPartition(openRow) : undefined}
         onClose={() => setOpenRow(null)}
       />
 

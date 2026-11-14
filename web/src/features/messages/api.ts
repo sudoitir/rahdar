@@ -93,10 +93,16 @@ export function useMessageDetail(
   filter?: string,
   /** The partition a record of a log is read from, whose offset is the record's id. */
   partition?: number,
+  /**
+   * The resource's canonical id, when the caller already has it. A bare name is rebuilt as the
+   * cluster's subscription kind, which is the wrong resource for a topic.
+   */
+  resourceId?: string,
 ): UseQueryResult<MessageDetailView, ApiError> {
   const ids = useRoleIds(clusterId);
+  const addressed = resourceId || subscriptionName;
   return useQuery({
-    queryKey: keys.message(clusterId, subscriptionName, messageId ?? 'none', node, filter, partition),
+    queryKey: keys.message(clusterId, addressed, messageId ?? 'none', node, filter, partition),
     queryFn: () => {
       const sp = new URLSearchParams();
       if (node) sp.set('node', node);
@@ -104,11 +110,12 @@ export function useMessageDetail(
       if (partition !== undefined) sp.set('partition', String(partition));
       const qs = sp.toString();
       const query = qs ? `?${qs}` : '';
+      const id = resourceId || ids.subscription(subscriptionName);
       return request<MessageDetailView>(
-        `${messagesBase(clusterId, ids.subscription(subscriptionName))}/${encodeURIComponent(messageId ?? '')}${query}`,
+        `${messagesBase(clusterId, id)}/${encodeURIComponent(messageId ?? '')}${query}`,
       );
     },
-    enabled: messageId !== null && ids.loaded,
+    enabled: messageId !== null && (Boolean(resourceId) || ids.loaded),
   });
 }
 

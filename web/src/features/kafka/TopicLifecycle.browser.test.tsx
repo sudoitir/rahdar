@@ -240,10 +240,12 @@ describe('topic and group lifecycle on a desktop', () => {
           />,
           scheme,
         );
+        await userEvent.click(screen.getByRole('button', { name: 'Advanced configuration' }));
         const create = screen.getByRole('button', { name: 'Create topic' });
         const box = create.getBoundingClientRect();
         expect(box.bottom).toBeLessThanOrEqual(document.documentElement.clientHeight + 1);
         expect(box.top).toBeGreaterThanOrEqual(0);
+        expect(screen.getByRole('button', { name: 'Preview topic' })).toHaveAttribute('data-variant', 'default');
         expect(screen.getAllByLabelText('cleanup.policy').length).toBeGreaterThan(0);
         await shot(`${prefix}-create`);
         cleanup();
