@@ -269,10 +269,11 @@ export type KafkaBroker = Schemas['BrokerRow'];
 export type QuorumVoter = Schemas['QuorumVoter'];
 export type Brokers = Schemas['Brokers'];
 
-export function useKafkaBrokers(clusterId: string): UseQueryResult<Brokers, ApiError> {
+export function useKafkaBrokers(clusterId: string, enabled = true): UseQueryResult<Brokers, ApiError> {
   return useQuery({
     queryKey: keys.brokers(clusterId),
     queryFn: () => request<Brokers>(`${base(clusterId)}/brokers`),
+    enabled,
     refetchInterval: 15_000,
   });
 }
@@ -323,8 +324,12 @@ export function usePreviewCreateTopic(clusterId: string) {
 }
 
 export function useCreateTopic(clusterId: string) {
+  const qc = useQueryClient();
   return useMutation<ClusterOutcome, ApiError, TopicCreateBody>({
     mutationFn: (body) => request(`${base(clusterId)}/topics:create`, { method: 'POST', body: JSON.stringify(body) }),
+    // The topic list is the cluster's destinations, not a kafka key. Leave it cached and the new topic
+    // stays missing until the next poll.
+    onSuccess: () => void qc.invalidateQueries({ queryKey: clusterKey(clusterId) }),
   });
 }
 
