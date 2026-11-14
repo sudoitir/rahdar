@@ -292,6 +292,7 @@ export function MessageDetailPanel({
   node,
   filter,
   partition,
+  resourceId,
   onClose,
 }: Readonly<{
   clusterId: string;
@@ -300,9 +301,11 @@ export function MessageDetailPanel({
   node?: string;
   filter?: string;
   partition?: number;
+  /** Canonical id of the row's resource. A name alone is read as the cluster's subscription kind. */
+  resourceId?: string;
   onClose: () => void;
 }>) {
-  const detail = useMessageDetail(clusterId, subscriptionName, messageId, node, filter, partition);
+  const detail = useMessageDetail(clusterId, subscriptionName, messageId, node, filter, partition, resourceId);
   const m = detail.data;
   // Absolute timestamps here read the display zone from module state, so this
   // subscribes the view to a zone change (`app/timezone.ts`).
