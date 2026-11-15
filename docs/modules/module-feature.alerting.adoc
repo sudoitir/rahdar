@@ -31,6 +31,7 @@ _Others_
 * `i.g.s.r.f.a.AlertingSettings`
 * `i.g.s.r.f.a.InstallationSignalSource` (via `i.g.s.r.f.a.AuditDeliverySignal`)
 * `i.g.s.r.f.a.ChannelConfigValidator`
+* `i.g.s.r.f.a.DestinationPolicy`
 * `i.g.s.r.f.a.NotificationSender` (via `i.g.s.r.f.a.EmailSender`)
 * `i.g.s.r.f.a.AlertCondition` (via `i.g.s.r.f.a.GaugeCondition`)
 * `i.g.s.r.f.a.NotificationHttpConfig`
