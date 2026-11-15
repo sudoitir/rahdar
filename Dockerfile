@@ -1,11 +1,10 @@
 # syntax=docker/dockerfile:1
-# Rahdar — single image: React SPA baked into the Spring Boot jar.
+# Rahdar: one image, the React SPA baked into the Spring Boot jar.
 #
-# The SPA and the jar are the same bytes on every architecture, so both build stages run on the
-# runner's own platform ($BUILDPLATFORM); only the runtime stage is per-target. Building them
-# under QEMU for arm64 made the release image take ten times longer for no different output.
+# Both build stages run on the runner's own platform. Their output is identical on every
+# architecture, and building them under QEMU for arm64 was ten times slower for no different bytes.
 
-# ── 1. Build the frontend ────────────────────────────────────────────────────
+# ── 1. Frontend ──────────────────────────────────────────────────────────────
 FROM --platform=$BUILDPLATFORM node:24-bookworm-slim@sha256:c86ecead9e55a5210ac1727de38a4ca840bf03dcaf34dc9749addbf383b1920c AS web
 WORKDIR /web
 COPY web/package.json web/package-lock.json ./
@@ -13,8 +12,8 @@ RUN npm ci
 COPY web/ ./
 RUN npm run build
 
-# ── 2. Build the jar (frontend copied in via the `frontend` profile is skipped;
-#      we pass the already-built dist straight through instead) ───────────────
+# ── 2. Jar ───────────────────────────────────────────────────────────────────
+# The `frontend` profile is skipped: the stage above already built dist.
 FROM --platform=$BUILDPLATFORM maven:3.9-eclipse-temurin-25@sha256:93b8a14ea2f412782e4e842651273b4d903e35cc496284f178fbbe2d67d00976 AS app
 WORKDIR /src
 COPY pom.xml ./
@@ -24,16 +23,12 @@ COPY --from=web /web/dist/ ./src/main/resources/static/
 RUN mvn -q -B clean package -DskipTests
 
 # ── 3. Runtime (Ubuntu 26.04 LTS "resolute") ─────────────────────────────────
+# Distribution security updates are applied here: a fix reaches the archive days before a new
+# base image carries it, and the image scan fails on a fixable high finding.
+# - apt is upgraded first with retries off, so a cached layer cannot keep a vulnerable apt.
+# - resolute-security is enabled because the release pocket lacks some fixes (libbrotli1).
+# - Pebble ships outside any package and Rahdar never runs it, so it goes with its Go runtime.
 FROM eclipse-temurin:25-jre-resolute@sha256:41d9263c0d5b2a74d89af6e29e73b04298bc65e3cb705d03e9e2271ef49fef84 AS runtime
-# The distribution's security updates are applied at build time: a fix often reaches the Ubuntu
-# archive days before a new base image does, and the image scan fails on a fixable high finding.
-# The base image's release pocket does not carry those fixes (libbrotli1 CVE-2026-111497 is in
-# resolute-security), so the updates and security pockets are enabled before the upgrade.
-# apt itself is upgraded first, with retries off: CVE-2026-109518 is fixed in 3.2.1ubuntu0.1, and a
-# cached upgrade layer would keep the vulnerable package. A plain upgrade can also leave apt behind
-# when the new package needs a dependency it did not have.
-# Ubuntu's base also ships Pebble, a service manager outside any package, so no upgrade patches it;
-# Rahdar never runs it, so it is removed with its Go runtime and that runtime's vulnerabilities.
 RUN groupadd -r rahdar && useradd -r -g rahdar rahdar \
     && printf '%s\n' \
         'deb http://archive.ubuntu.com/ubuntu resolute-updates main universe' \

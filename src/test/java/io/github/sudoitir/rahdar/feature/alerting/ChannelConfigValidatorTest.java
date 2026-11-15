@@ -9,7 +9,7 @@ import tools.jackson.databind.json.JsonMapper;
 class ChannelConfigValidatorTest {
 
     private final ChannelConfigValidator validator =
-            new ChannelConfigValidator(JsonMapper.builder().build());
+            new ChannelConfigValidator(JsonMapper.builder().build(), new DestinationPolicy());
 
     private static final String EMAIL = """
             {"host":"smtp.example.com","port":587,"security":"STARTTLS","from":"rahdar@example.com","to":%s}""";

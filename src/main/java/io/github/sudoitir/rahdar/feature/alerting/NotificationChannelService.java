@@ -234,6 +234,17 @@ public class NotificationChannelService {
                 .filter(s -> s.kind().equals(kind))
                 .findFirst()
                 .orElseThrow(() -> new IllegalStateException("No sender for channel kind " + kind));
+        // The server is about to fetch this channel's destination, so a channel stored before the rule existed is
+        // checked here too (ADR-0227): the test button must not become a request to an address of the caller's
+        // choosing.
+        try {
+            validator.requireDestination(kind, config, secret);
+        } catch (IllegalArgumentException e) {
+            audit.fail(event, e.getMessage());
+            return new ChannelTestResultView(false, true, e.getMessage(), 0);
+        }
+        // The stored destination is checked again: a channel saved before the rule existed has never been.
+        validator.requireDestination(kind, config, secret);
         // A PagerDuty test opens an incident and resolves it at once, so no test leaves a page open.
         List<AlertPayloads.Item> items = "PAGERDUTY".equals(kind)
                 ? List.of(

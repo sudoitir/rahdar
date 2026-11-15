@@ -199,12 +199,22 @@ class SecretLeakTest extends PostgresIntegrationTest {
 
     @Test
     void aFailedWebhookDeliveryDoesNotEchoTheSecretUrl(CapturedOutput output) throws Exception {
+        // A destination the policy accepts and the connection cannot reach: the failure must not name the URL.
+        send(post("/api/v1/channels/test")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"kind\":\"SLACK\",\"secret\":\"https://slack.invalid/services/T/B/" + WEBHOOK_PATH_SECRET
+                        + "\"}"));
+
+        assertThat(seen.getLast()).contains("Slack request failed");
+        assertThat(seen.getLast() + output.getAll()).doesNotContain(WEBHOOK_PATH_SECRET);
+
+        // A destination the policy refuses must not repeat it either (ADR-0227).
         send(post("/api/v1/channels/test")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"kind\":\"SLACK\",\"secret\":\"http://127.0.0.1:1/services/T/B/" + WEBHOOK_PATH_SECRET
                         + "\"}"));
 
-        assertThat(seen.getLast()).contains("Slack request failed");
+        assertThat(seen.getLast()).contains("secret:");
         assertThat(seen.getLast() + output.getAll()).doesNotContain(WEBHOOK_PATH_SECRET);
     }
 

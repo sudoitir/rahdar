@@ -101,6 +101,25 @@ class EndpointProtectionTest extends PostgresIntegrationTest {
      * and the surrounding {@code /actuator/**} rule is {@code permitAll}, so without
      * its own explicit rule it would be callable by anyone who can reach the port.
      */
+    /**
+     * The metrics are installation-wide: a series names every cluster by id and every destination by name, so an
+     * anonymous read shows a scope-limited caller what the scope walk hides (ADR-0228).
+     */
+    @Test
+    void readingTheMetricsRequiresAuthentication() throws Exception {
+        MockMvc mvc = MockMvcBuilders.webAppContextSetup(webContext)
+                .apply(springSecurity())
+                .build();
+
+        for (String path : List.of("/actuator/prometheus", "/actuator/metrics")) {
+            int status = mvc.perform(MockMvcRequestBuilders.get(path))
+                    .andReturn()
+                    .getResponse()
+                    .getStatus();
+            assertThat(status).as(path).isEqualTo(401);
+        }
+    }
+
     @Test
     void refreshingTheEnvironmentRequiresAuthentication() throws Exception {
         MockMvc mvc = MockMvcBuilders.webAppContextSetup(webContext)
@@ -114,5 +133,24 @@ class EndpointProtectionTest extends PostgresIntegrationTest {
                 .getStatus();
 
         assertThat(status).isEqualTo(401);
+    }
+
+    /**
+     * The metrics are tagged with every cluster's id and every destination's name, so an anonymous read would show a
+     * caller what the scope walk says they may not see (ADR-0228).
+     */
+    @Test
+    void theMetricsRequireAuthentication() throws Exception {
+        MockMvc mvc = MockMvcBuilders.webAppContextSetup(webContext)
+                .apply(springSecurity())
+                .build();
+
+        for (String path : List.of("/actuator/prometheus", "/actuator/metrics", "/actuator/metrics/jvm.threads.live")) {
+            int status = mvc.perform(MockMvcRequestBuilders.get(path))
+                    .andReturn()
+                    .getResponse()
+                    .getStatus();
+            assertThat(status).as(path).isEqualTo(401);
+        }
     }
 }

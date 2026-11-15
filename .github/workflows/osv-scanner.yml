@@ -33,11 +33,13 @@ jobs:
       runs-on: ubuntu-26.04
       # Reporting is the reusable workflow's job; `gate` below decides what fails.
       fail-on-vuln: false
+      # The application's manifest and the two lockfiles are what ships. The plugin template pins a
+      # provided Rahdar at the oldest release a plugin may build against, so its tree describes that
+      # release's codecs; scanning it would fail this run for codecs this build already overrides.
       scan-args: |-
         -L pom.xml
         -L web/package-lock.json
         -L site/package-lock.json
-        -L examples/plugin-template/pom.xml
 
   gate:
     runs-on: ubuntu-26.04
@@ -59,6 +61,5 @@ jobs:
             -L pom.xml
             -L web/package-lock.json
             -L site/package-lock.json
-            -L examples/plugin-template/pom.xml
       - name: Fail on a finding that has a fix
         run: .github/scripts/osv-gate.sh results.json

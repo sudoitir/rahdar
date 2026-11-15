@@ -96,7 +96,21 @@ the same names. `node` is always the broker's `host:port`, never its URL.
 | `hikaricp_connections_{active,idle,max,pending}` | Rahdar's database pool. |
 | `jvm_threads_live_threads` | Live threads in Rahdar. Steady in normal operation. |
 
-`/actuator/prometheus` is not authenticated, as before: keep it off the public network.
+`/actuator/prometheus` and `/actuator/metrics` require the installation-wide `settings:read`
+permission. The series name every cluster by id and every destination by name, so an anonymous
+read would show a caller what the scope walk says they may not see. The scraper authenticates with
+an API token that holds `settings:read`:
+
+```yaml
+scrape_configs:
+  - job_name: rahdar
+    scheme: https
+    authorization:
+      type: Bearer
+      credentials_file: /etc/prometheus/rahdar.token
+    static_configs:
+      - targets: ["rahdar.example:8080"]
+```
 
 ## Dashboard and alert rules
 

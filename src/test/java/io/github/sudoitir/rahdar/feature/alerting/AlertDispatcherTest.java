@@ -25,6 +25,7 @@ import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import tools.jackson.databind.json.JsonMapper;
 
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -58,7 +59,13 @@ class AlertDispatcherTest {
         when(settings.intValue(AlertingSettings.MAX_ATTEMPTS)).thenReturn(3);
         when(settings.duration(AlertingSettings.INITIAL_BACKOFF)).thenReturn(Duration.ofSeconds(1));
         when(settings.duration(AlertingSettings.MAX_BACKOFF)).thenReturn(Duration.ofMinutes(1));
-        dispatcher = new AlertDispatcher(deliveries, channels, List.of(slackSender), vault, settings);
+        dispatcher = new AlertDispatcher(
+                deliveries,
+                channels,
+                List.of(slackSender),
+                vault,
+                settings,
+                new ChannelConfigValidator(JsonMapper.builder().build(), new DestinationPolicy()));
         channel = new NotificationChannelEntity("ops-slack", "SLACK", "{}", new byte[] {1});
         when(channels.findById(channelId)).thenReturn(Optional.of(channel));
         when(vault.open(any(), any())).thenReturn("https://hooks.slack.com/services/x");
@@ -111,6 +118,20 @@ class AlertDispatcherTest {
         Duration untilNext = Duration.between(
                 captor.getValue().getCreatedAt(), captor.getValue().getNextAttemptAt());
         assertThat(untilNext).isGreaterThanOrEqualTo(Duration.ofSeconds(29));
+    }
+
+    @Test
+    void aChannelPointedInsideTheNetworkIsRecordedDeadWithoutSending() {
+        when(vault.open(any(), any())).thenReturn("https://127.0.0.1/services/x");
+        when(deliveries.claimDue(20)).thenReturn(List.of(pending()));
+
+        dispatcher.dispatch();
+
+        var captor = ArgumentCaptor.forClass(AlertDeliveryEntity.class);
+        Mockito.verify(deliveries).save(captor.capture());
+        assertThat(captor.getValue().getState()).isEqualTo("DEAD");
+        assertThat(captor.getValue().getLastError()).contains("internal");
+        Mockito.verify(slackSender, Mockito.never()).send(Mockito.anyLong(), any(), any(), any());
     }
 
     @Test

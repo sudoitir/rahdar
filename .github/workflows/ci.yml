@@ -507,11 +507,14 @@ jobs:
       runs-on: ubuntu-26.04
       # Reporting is the reusable workflow's job; `osv-gate` decides what fails.
       fail-on-vuln: false
+      # What ships: the application's manifest and the two lockfiles. The plugin template is not scanned:
+      # its one dependency is a `provided` Rahdar, pinned to the oldest release a plugin may build against,
+      # so its tree describes that release's codecs rather than this build's — and it fails on every older
+      # release until they are upgraded. A dependency added to the template itself is caught by its own job.
       scan-args: |-
         -L pom.xml
         -L web/package-lock.json
         -L site/package-lock.json
-        -L examples/plugin-template/pom.xml
 
   osv-gate:
     needs: [changes, osv]

@@ -6235,14 +6235,14 @@ export interface components {
             note?: string;
             groups?: string[];
             /** Format: int64 */
-            estimate?: number;
+            estimate?: number | null;
             accuracy?: string;
             /** Format: int32 */
-            partitions?: number;
+            partitions?: number | null;
             /** Format: int32 */
-            replicationFactor?: number;
+            replicationFactor?: number | null;
             /** Format: int32 */
-            currentPartitions?: number;
+            currentPartitions?: number | null;
             /** Format: int64 */
             cap: number;
             overCap: boolean;

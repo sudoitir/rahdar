@@ -87,11 +87,11 @@ public class KafkaTopicLifecycle {
             String fingerprint,
             String note,
             List<String> groups,
-            Long estimate,
+            @Schema(nullable = true) Long estimate,
             String accuracy,
-            Integer partitions,
-            Integer replicationFactor,
-            Integer currentPartitions,
+            @Schema(nullable = true) Integer partitions,
+            @Schema(nullable = true) Integer replicationFactor,
+            @Schema(nullable = true) Integer currentPartitions,
             long cap,
             boolean overCap) {}
 
@@ -240,12 +240,11 @@ public class KafkaTopicLifecycle {
                 String.valueOf(p.replicationFactor()));
         AuditEvent event = audit.begin(
                 actors.resolve(), "CREATE_TOPIC", DESTINATION, p.name(), p.clusterId(), null, before, false);
+        // No precondition: a create's preview etag is the constant "this name is absent", and the driver
+        // enforces an ifMatch by reading the topic — which does not exist yet, so it answers 404 and no
+        // topic is ever created. The re-preview above, under the caller's etag, refuses a stale confirmation.
         KafkaFailures.call(() -> operations(p.clusterId())
-                .execute(
-                        topic(p.name()),
-                        new Operation.Create(attributes(request)),
-                        Scope.whole(),
-                        Precondition.ifMatch(p.etag()))
+                .execute(topic(p.name()), new Operation.Create(attributes(request)), Scope.whole(), Precondition.none())
                 .orThrow());
         audit.finish(event, false, 1, null, Map.of(STATUS, APPLIED, SCOPE, WHOLE_CLUSTER));
         return applied();

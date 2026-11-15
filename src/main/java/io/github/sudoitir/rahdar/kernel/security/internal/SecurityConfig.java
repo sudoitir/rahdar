@@ -157,6 +157,16 @@ public class SecurityConfig {
                         // at request time rather than at startup.
                         .access((authentication, context) ->
                                 new AuthorizationDecision(perm.can(SettingsPermissions.SETTINGS_WRITE)))
+                        // Metrics name every cluster by id and every destination by name, so reading them anonymously
+                        // bypasses the scope walk entirely: a caller who may see no queue still reads its name and
+                        // its traffic. They answer only to the installation-wide settings read permission, so a
+                        // scraper authenticates with a token instead of reading them off an open port (ADR-0228).
+                        .requestMatchers("/actuator/prometheus", "/actuator/metrics", "/actuator/metrics/**")
+                        .access((authentication, context) ->
+                                new AuthorizationDecision(perm.can(SettingsPermissions.SETTINGS_READ)))
+                        // Whatever else the actuator exposes is not a surface Rahdar offers over HTTP.
+                        .requestMatchers("/actuator/**")
+                        .denyAll()
                         .requestMatchers("/api/**", "/mcp", "/mcp/**")
                         .authenticated()
                         // A plugin's UI runs with the full rights of whoever is viewing it

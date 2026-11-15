@@ -109,9 +109,9 @@ class NotificationChannelsControllerTest extends PostgresIntegrationTest {
 
     @Test
     void aFailedTestOfAnUnsavedConfigurationIsAResultNotAnError() throws Exception {
-        // Port 9 (discard) on loopback: nothing listens, so the connection is refused at once.
+        // An unroutable public name: it does not resolve, so the send fails, and that failure is the result.
         String body = """
-                {"kind":"TEAMS","config":"{}","secret":"http://127.0.0.1:9/hook"}""";
+                {"kind":"TEAMS","config":"{}","secret":"https://alerting.invalid/hook"}""";
         mvc.perform(post("/api/v1/channels/test")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
@@ -126,6 +126,22 @@ class NotificationChannelsControllerTest extends PostgresIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(invalid))
                 .andExpect(status().isBadRequest());
+    }
+
+    /**
+     * The test endpoint is not a way to reach the server's own network: a destination that is plain HTTP or resolves
+     * inside it is refused before anything is sent (ADR-0227).
+     */
+    @Test
+    void aTestOfAnInternalDestinationIsRefusedBeforeItIsFetched() throws Exception {
+        for (String secret : new String[] {"https://127.0.0.1:9/hook", "http://127.0.0.1:9/hook"}) {
+            String body = """
+                    {"kind":"TEAMS","config":"{}","secret":"%s"}""".formatted(secret);
+            mvc.perform(post("/api/v1/channels/test")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(body))
+                    .andExpect(status().isBadRequest());
+        }
     }
 
     private static void assertThatBodyNeverMentionsTheSecret(String body) {
