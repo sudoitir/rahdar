@@ -121,6 +121,20 @@ class AlertDispatcherTest {
     }
 
     @Test
+    void aChannelPointedInsideTheNetworkIsRecordedDeadWithoutSending() {
+        when(vault.open(any(), any())).thenReturn("https://127.0.0.1/services/x");
+        when(deliveries.claimDue(20)).thenReturn(List.of(pending()));
+
+        dispatcher.dispatch();
+
+        var captor = ArgumentCaptor.forClass(AlertDeliveryEntity.class);
+        Mockito.verify(deliveries).save(captor.capture());
+        assertThat(captor.getValue().getState()).isEqualTo("DEAD");
+        assertThat(captor.getValue().getLastError()).contains("internal");
+        Mockito.verify(slackSender, Mockito.never()).send(Mockito.anyLong(), any(), any(), any());
+    }
+
+    @Test
     void reachingMaxAttemptsEndsDead() {
         AlertDeliveryEntity delivery = pending();
         for (int i = 0; i < 2; i++) {
