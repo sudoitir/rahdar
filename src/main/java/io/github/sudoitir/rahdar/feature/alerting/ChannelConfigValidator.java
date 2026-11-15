@@ -2,7 +2,6 @@ package io.github.sudoitir.rahdar.feature.alerting;
 
 import jakarta.mail.internet.AddressException;
 import jakarta.mail.internet.InternetAddress;
-import java.net.URI;
 import java.util.Base64;
 import java.util.Set;
 import org.springframework.stereotype.Component;
@@ -24,9 +23,11 @@ public class ChannelConfigValidator {
             Set.of(EmailChannelConfig.STARTTLS, EmailChannelConfig.TLS, EmailChannelConfig.NONE);
 
     private final ObjectMapper mapper;
+    private final DestinationPolicy destinations;
 
-    public ChannelConfigValidator(ObjectMapper mapper) {
+    public ChannelConfigValidator(ObjectMapper mapper, DestinationPolicy destinations) {
         this.mapper = mapper;
+        this.destinations = destinations;
     }
 
     /**
@@ -47,6 +48,33 @@ public class ChannelConfigValidator {
             case "EMAIL" -> validateEmail(EmailChannelConfig.parse(configJson, mapper));
             default -> throw new IllegalArgumentException("unknown channel kind: " + kind);
         }
+        requireDestination(kind, config, secret);
+    }
+
+    /**
+     * Whether this channel may send where it points (ADR-0227). Called at save, at the test button and before every
+     * delivery: a channel saved before the rule existed carries a destination nobody has checked. A URL kept in the
+     * secret is skipped here when the caller is not setting a new one; the test and delivery paths pass the stored
+     * secret, so it is checked there.
+     */
+    public void requireDestination(String kind, String configJson, String secret) {
+        requireDestination(kind, parseConfig(configJson), secret);
+    }
+
+    private void requireDestination(String kind, JsonNode config, String secret) {
+        switch (kind) {
+            case "WEBHOOK", "PAGERDUTY" -> requireIfSet("url", text(config, "url"));
+            case "SLACK", "TEAMS" -> requireIfSet("secret", secret == null || secret.isBlank() ? null : secret.trim());
+            default -> {
+                // EMAIL: an on-premise installation sends through its own SMTP relay, which is internal by design.
+            }
+        }
+    }
+
+    private void requireIfSet(String field, String value) {
+        if (value != null) {
+            destinations.requirePublic(field, value);
+        }
     }
 
     private JsonNode parseConfig(String configJson) {
@@ -62,7 +90,7 @@ public class ChannelConfigValidator {
         return config;
     }
 
-    private static void validateWebhook(JsonNode config, String secret, boolean hasSecret, boolean secretStored) {
+    private void validateWebhook(JsonNode config, String secret, boolean hasSecret, boolean secretStored) {
         requireUrl("url", text(config, "url"));
         requireSecret(SECRET, hasSecret, secretStored, "a signing secret");
         if (hasSecret) {
@@ -70,14 +98,14 @@ public class ChannelConfigValidator {
         }
     }
 
-    private static void validateWebhookUrlSecret(String secret, boolean hasSecret, boolean secretStored, String what) {
+    private void validateWebhookUrlSecret(String secret, boolean hasSecret, boolean secretStored, String what) {
         requireSecret(SECRET, hasSecret, secretStored, what);
         if (hasSecret) {
             requireUrl(SECRET, secret.trim());
         }
     }
 
-    private static void validatePagerDuty(JsonNode config, String secret, boolean hasSecret, boolean secretStored) {
+    private void validatePagerDuty(JsonNode config, String secret, boolean hasSecret, boolean secretStored) {
         String url = text(config, "url");
         if (url != null) {
             requireUrl("url", url);
@@ -125,23 +153,8 @@ public class ChannelConfigValidator {
         }
     }
 
-    private static void requireUrl(String field, String value) {
-        if (value == null || value.isBlank()) {
-            throw new IllegalArgumentException(field + ": a URL is required");
-        }
-        URI uri;
-        try {
-            uri = URI.create(value.trim());
-        } catch (IllegalArgumentException _) {
-            throw new IllegalArgumentException(field + ": not a valid URL");
-        }
-        String scheme = uri.getScheme();
-        if (scheme == null || !(scheme.equalsIgnoreCase("https") || scheme.equalsIgnoreCase("http"))) {
-            throw new IllegalArgumentException(field + ": must be an http or https URL");
-        }
-        if (uri.getHost() == null || uri.getHost().isBlank()) {
-            throw new IllegalArgumentException(field + ": the URL must name a host");
-        }
+    private void requireUrl(String field, String value) {
+        destinations.requirePublic(field, value);
     }
 
     private static void requireSecret(String field, boolean hasSecret, boolean secretStored, String what) {

@@ -32,6 +32,7 @@ public class AlertDispatcher {
     private final List<NotificationSender> senders;
     private final SecretVault vault;
     private final SettingsService settings;
+    private final ChannelConfigValidator validator;
 
     /** Scheduled by {@code JobRunner} on {@code alerting.dispatch-interval}. */
     @Transactional
@@ -63,6 +64,26 @@ public class AlertDispatcher {
                     : vault.open(channel.getId() + "|" + channel.getKind(), channel.getSealed());
         } catch (RuntimeException e) {
             delivery.recordDead("Failed to decrypt channel secret: " + e.getMessage());
+            deliveries.save(delivery);
+            return;
+        }
+
+        // A channel saved before ADR-0227 carries a destination nobody has checked; the delivery path refuses it
+        // rather than letting the server fetch an internal address.
+        try {
+            validator.requireDestination(channel.getKind(), channel.getConfig(), secret);
+        } catch (IllegalArgumentException e) {
+            delivery.recordDead(e.getMessage());
+            deliveries.save(delivery);
+            return;
+        }
+
+        // A channel stored before the destination rule existed is refused here too, so no delivery ever reaches it
+        // (ADR-0227). It is a permanent failure: the operator has to point the channel somewhere public.
+        try {
+            validator.requireDestination(channel.getKind(), channel.getConfig(), secret);
+        } catch (IllegalArgumentException e) {
+            delivery.recordDead("The channel's destination is refused: " + e.getMessage());
             deliveries.save(delivery);
             return;
         }

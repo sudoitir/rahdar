@@ -25,6 +25,7 @@ import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import tools.jackson.databind.json.JsonMapper;
 
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -58,7 +59,13 @@ class AlertDispatcherTest {
         when(settings.intValue(AlertingSettings.MAX_ATTEMPTS)).thenReturn(3);
         when(settings.duration(AlertingSettings.INITIAL_BACKOFF)).thenReturn(Duration.ofSeconds(1));
         when(settings.duration(AlertingSettings.MAX_BACKOFF)).thenReturn(Duration.ofMinutes(1));
-        dispatcher = new AlertDispatcher(deliveries, channels, List.of(slackSender), vault, settings);
+        dispatcher = new AlertDispatcher(
+                deliveries,
+                channels,
+                List.of(slackSender),
+                vault,
+                settings,
+                new ChannelConfigValidator(JsonMapper.builder().build(), new DestinationPolicy()));
         channel = new NotificationChannelEntity("ops-slack", "SLACK", "{}", new byte[] {1});
         when(channels.findById(channelId)).thenReturn(Optional.of(channel));
         when(vault.open(any(), any())).thenReturn("https://hooks.slack.com/services/x");
