@@ -3,7 +3,7 @@
 - **Status**: accepted
 - **Date**: 2026-11-15
 - **Deciders**: Mahdi Amirabdollahi
-- **Related**: [ADR-0036](0036-four-eyes-approval-for-destructive-operations.md), [ADR-0105](0105-email-teams-and-pagerduty-notification-channels.md)
+- **Related**: [ADR-0036](0036-notification-delivery-queue-and-channel-signing.md), [ADR-0105](0105-email-teams-and-pagerduty-notification-channels.md)
 
 ## Context
 
