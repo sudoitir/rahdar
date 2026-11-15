@@ -22,7 +22,7 @@
         <!-- The oldest Rahdar this plugin supports. Its API jar is what the plugin compiles
              against, and it becomes plugin.json's rahdar.since, so Rahdar refuses the plugin
              on anything older. -->
-        <rahdar.version>2026.10.5</rahdar.version>
+        <rahdar.version>2026.11.9</rahdar.version>
         <rahdar.since>${rahdar.version}</rahdar.since>
         <!-- Rahdar's extension contract; a plugin built for another is refused. -->
         <rahdar.contract>18</rahdar.contract>
