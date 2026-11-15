@@ -87,11 +87,11 @@ public class KafkaTopicLifecycle {
             String fingerprint,
             String note,
             List<String> groups,
-            Long estimate,
+            @Schema(nullable = true) Long estimate,
             String accuracy,
-            Integer partitions,
-            Integer replicationFactor,
-            Integer currentPartitions,
+            @Schema(nullable = true) Integer partitions,
+            @Schema(nullable = true) Integer replicationFactor,
+            @Schema(nullable = true) Integer currentPartitions,
             long cap,
             boolean overCap) {}
 
