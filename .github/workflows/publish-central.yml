@@ -3,8 +3,8 @@ name: Publish to Maven Central
 # A maintainer publishes a release to Maven Central by hand: Actions → Publish to Maven Central → Run
 # workflow, with the release's version, or `gh workflow run publish-central.yml -f version=YYYY.MM.N`.
 # Central limits how much a namespace publishes, so a release no longer goes there on its own
-# (ADR-0205). One run publishes the release's plugin API and its Java client. Docker Hub, npm and the
-# GitHub release still come from every release in ci.yml.
+# (ADR-0205). One run publishes the release's plugin API and its Java client. The image, the GitHub
+# Release and npm come from release.yml; :dev and the build cache come from ci.yml (ADR-0229).
 on:
   workflow_dispatch:
     inputs:

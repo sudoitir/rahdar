@@ -2,7 +2,7 @@
 
 - **Status**: accepted; amends [ADR-0126](0126-pull-requests-verify-main-releases-what-changed.md) (Central
   gets a release when its inputs changed) and [ADR-0151](0151-published-generated-clients.md)
-  (every release publishes the Java client)
+  (every release publishes the Java client); the Docker Hub image, the GitHub Release and npm are a maintainer's step since [ADR-0229](0229-stable-releases-are-cut-by-hand.md)
 - **Date**: 2026-10-20
 - **Deciders**: Mahdi Amirabdollahi
 

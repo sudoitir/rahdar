@@ -9,11 +9,6 @@ Rahdar needs two things: a PostgreSQL database, and network reach to your
 brokers' management endpoints. Your Artemis clusters already exist and are
 registered through the UI — nothing here starts a broker.
 
-::: warning Alpha
-Published images are pre-stable dev builds (`sudoit1/rahdar:dev`; no
-`:latest` is published yet). Expect breaking changes between releases.
-:::
-
 ## With `just`, from a clone
 
 [`just`](https://github.com/casey/just#packages) is the task runner this repo

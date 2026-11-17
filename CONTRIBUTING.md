@@ -42,7 +42,7 @@ just fmt        # Palantir Java Format (Spotless) + eslint --fix
   touches, in parallel: backend (three shards), frontend, the plugin template end to
   end, the image, the site, OSV for changed manifests and actionlint for changed
   workflows. The one required check is `ci-ok`, and the branch must be up to date
-  with `main`. After the merge, `main` releases without re-testing (ADR-0126).
+  with `main`. After the merge, `main` publishes `:dev` without re-testing. A stable release is the Release workflow (ADR-0126, ADR-0229).
 - Coverage: `./mvnw verify` writes `target/site/jacoco/index.html`, and
   `npm run test:coverage` in `web/` writes `web/coverage/index.html`. CI reports both
   in the job summary (ADR-0128).

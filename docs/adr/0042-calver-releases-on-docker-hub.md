@@ -2,7 +2,7 @@
 
 - **Status**: accepted; the changelog mechanics below are superseded by
   [ADR-0051](0051-changelog-generated-from-commits.md), and the release trigger
-  (every push) by [ADR-0084](0088-path-filtered-ci-and-releases.md); amended by [ADR-0102](0102-the-plugin-api-is-published-to-central-and-npm.md) (a release also publishes the plugin API), and by [ADR-0139](0139-release-attestations-and-image-scan.md) (releases are attested)
+  (every push) by [ADR-0084](0088-path-filtered-ci-and-releases.md); amended by [ADR-0102](0102-the-plugin-api-is-published-to-central-and-npm.md) (a release also publishes the plugin API), and by [ADR-0139](0139-release-attestations-and-image-scan.md) (releases are attested); a stable release is cut by hand and main publishes `:dev` since [ADR-0229](0229-stable-releases-are-cut-by-hand.md)
 - **Date**: 2026-09-05
 - **Deciders**: Mahdi Amirabdollahi
 

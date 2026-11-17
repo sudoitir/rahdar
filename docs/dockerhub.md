@@ -26,15 +26,11 @@ data of their own, most without a restart. When a plugin needs one, Rahdar resta
 itself if the container has a restart policy — the compose file sets
 `RAHDAR_PLUGINS_RESTART_SUPERVISED=true` beside `restart: unless-stopped`.
 
-> **⚠️ Alpha.** Under active development, not yet feature-complete. These images are
-> **pre-stable dev builds** — the `:dev` tag is the moving pointer and there is no
-> `:latest` yet. Expect breaking changes.
-
 **Documentation:** [rahdar.dev](https://rahdar.dev/) ([Kafka guide](https://rahdar.dev/guide/kafka), [RabbitMQ guide](https://rahdar.dev/guide/rabbitmq))
 &nbsp;·&nbsp; **Source and issues:**
 [github.com/sudoitir/rahdar](https://github.com/sudoitir/rahdar)
 
-Every image is signed by the project's release workflow and carries SLSA provenance and a
+Every image is signed by the workflow that published it and carries SLSA provenance and a
 CycloneDX SBOM: [verify a release](https://rahdar.dev/guide/verify-releases).
 
 
@@ -129,13 +125,15 @@ graph and queue grid only update on the 5-second poll.
 
 | Tag | What it is |
 |---|---|
-| `:dev` | the newest build; moves with every release |
-| `:YYYY.MM` | the newest build of that calendar month; moves within it |
-| `:YYYY.MM.N` | one exact release; **immutable**, never republished |
+| `:dev` | the newest build from `main`; moves when the application changes |
+| `:latest`, `:stable` | the current stable release; both names are the same image |
+| `:YYYY.MM` | the newest stable release of that calendar month |
+| `:YYYY.MM.N` | one stable release; **immutable**, never republished |
 
-`linux/amd64` and `linux/arm64`. Versioning is CalVer and the number carries no
-compatibility promise — a release's breaking changes are listed at the top of its
-[release notes](https://github.com/sudoitir/rahdar/releases).
+`linux/amd64` and `linux/arm64`. `:dev` is published on every application change to `main`.
+A stable release is cut by hand and moves `:latest`, `:stable` and the month tag.
+Versioning is CalVer and the number carries no compatibility promise — a release's breaking
+changes are listed at the top of its [release notes](https://github.com/sudoitir/rahdar/releases).
 
 ## Licence
 

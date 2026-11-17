@@ -16,7 +16,7 @@
 [English](README.md) · **简体中文** · [فارسی](README.fa.md)
 
 [![CI](https://github.com/sudoitir/rahdar/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/sudoitir/rahdar/actions/workflows/ci.yml)
-[![Latest release](https://img.shields.io/github/v/release/sudoitir/rahdar?include_prereleases&sort=semver&label=release)](https://github.com/sudoitir/rahdar/releases)
+[![Latest release](https://img.shields.io/github/v/release/sudoitir/rahdar?sort=semver&label=release)](https://github.com/sudoitir/rahdar/releases)
 [![Docker pulls](https://img.shields.io/docker/pulls/sudoit1/rahdar?logo=docker&label=pulls)](https://hub.docker.com/r/sudoit1/rahdar)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/sudoitir/rahdar/badge)](https://scorecard.dev/viewer/?uri=github.com/sudoitir/rahdar)
 [![Quality Gate](https://sonarcloud.io/api/project_badges/measure?project=sudoitir_rahdar&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=sudoitir_rahdar)
@@ -36,10 +36,6 @@
 [讨论区](https://github.com/sudoitir/rahdar/discussions)
 
 </div>
-
-> [!WARNING]
-> **Alpha 阶段。** 项目仍在快速迭代，功能尚不完整。目前发布的镜像都是稳定版之前的 dev 构建
-> （`sudoit1/rahdar:dev`，还没有 `:latest`），后续版本可能包含不兼容的变更。
 
 <picture><source media="(prefers-color-scheme: dark)" srcset="docs/img/readme/estate-dark.webp"><img src="docs/img/readme/estate-light.webp" alt="资产视图：一个 Apache Artemis 集群和一个 Apache Kafka 集群及其健康状况，下方是一张按积压排序的订阅表，Kafka 的延迟标为估算值。"></picture>
 
@@ -184,7 +180,16 @@ just verify          # 运行 CI 的全部检查
 
 ## 版本发布
 
-每次改动应用本身的合并都会自动发布一个版本。版本号采用 CalVer（`YYYY.MM.PATCH`），Docker Hub 上同时打三个标签：`2026.09.3`（固定不变）、`2026.09`（当月）和 `dev`（最新）。首个稳定版之前不提供 `:latest`。每个版本都附带可直接运行的 jar 及其 `.sha256`，发布说明由提交信息自动生成（见 [GitHub Releases](https://github.com/sudoitir/rahdar/releases)）。插件 API（Maven Central）和 SDK（npm）随改动它们的版本一同发布。
+每次改动应用本身并合入 `main`，都会发布移动标签 `sudoit1/rahdar:dev`。稳定版由维护者手工发布：Actions → Release，或 `gh workflow run release.yml -f ref=main`。这一次会给该提交打上 CalVer（`YYYY.MM.PATCH`），并把同一个镜像推成四个名字：`2026.11.0`（不可变）、`2026.11`（该月的稳定版）、`latest` 和 `stable`（同一个镜像）。可运行的 jar 及其 `.sha256` 附在 [GitHub Release](https://github.com/sudoitir/rahdar/releases) 上，发布说明由提交信息生成。稳定版改动了 `@rahdar/plugin-sdk` 时 npm 会发布它，`@rahdar/client` 则随每个稳定版发布。插件 API 和 Java 客户端要等维护者把该版本发布到 Maven Central。
+
+| 标签 | 含义 |
+| --- | --- |
+| `:dev` | `main` 上的最新构建；应用一变它就动 |
+| `:latest`、`:stable` | 当前稳定版；两个名字是同一个镜像 |
+| `:YYYY.MM` | 该月最新的稳定版 |
+| `:YYYY.MM.N` | 一个稳定版；不可变，不会再次发布 |
+
+安装若不能跟着动，请钉住版本标签。破坏性变更写在该版本说明的开头。
 
 ## 许可证
 

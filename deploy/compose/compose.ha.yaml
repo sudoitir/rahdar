@@ -13,6 +13,8 @@
 name: rahdar-ha
 
 x-rahdar: &rahdar
+  # :dev is the moving build from main. :latest and :stable name the current
+  # stable release. Pin a CalVer tag when the install must not move.
   image: ${RAHDAR_IMAGE:-sudoit1/rahdar:dev}
   environment:
     RAHDAR_DB_URL: jdbc:postgresql://postgres:5432/${DB_NAME}

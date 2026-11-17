@@ -7,10 +7,6 @@ description: 用已发布的镜像运行 Rahdar 与它的 Postgres，注册第�
 
 Rahdar 需要两样东西：一个 PostgreSQL 数据库，以及能够访问你的 Broker 管理端点的网络连通性。你的 Artemis 集群本来就存在，通过界面注册即可——这里没有任何东西会启动一个 Broker。
 
-::: warning Alpha 阶段
-已发布的镜像都是预发布的 dev 构建（`sudoit1/rahdar:dev`，尚未发布 `:latest`）。版本之间可能出现破坏性变更。
-:::
-
 ## 从克隆仓库开始，使用 `just`
 
 [`just`](https://github.com/casey/just#packages) 是本仓库使用的任务运行器。单独执行 `just` 会分组列出全部任务。

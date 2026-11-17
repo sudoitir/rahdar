@@ -16,7 +16,7 @@
 [English](README.md) · [简体中文](README.zh.md) · **فارسی**
 
 [![CI](https://github.com/sudoitir/rahdar/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/sudoitir/rahdar/actions/workflows/ci.yml)
-[![Latest release](https://img.shields.io/github/v/release/sudoitir/rahdar?include_prereleases&sort=semver&label=release)](https://github.com/sudoitir/rahdar/releases)
+[![Latest release](https://img.shields.io/github/v/release/sudoitir/rahdar?sort=semver&label=release)](https://github.com/sudoitir/rahdar/releases)
 [![Docker pulls](https://img.shields.io/docker/pulls/sudoit1/rahdar?logo=docker&label=pulls)](https://hub.docker.com/r/sudoit1/rahdar)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/sudoitir/rahdar/badge)](https://scorecard.dev/viewer/?uri=github.com/sudoitir/rahdar)
 [![Quality Gate](https://sonarcloud.io/api/project_badges/measure?project=sudoitir_rahdar&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=sudoitir_rahdar)
@@ -36,9 +36,6 @@
 [گفت‌وگوها](https://github.com/sudoitir/rahdar/discussions)
 
 </div>
-
-> [!WARNING]
-> **نسخهٔ آلفا.** پروژه در حال توسعهٔ فعال است و هنوز همهٔ قابلیت‌هایش را ندارد. ایمیج‌های منتشرشده، بیلدهای dev پیش از نسخهٔ پایدارند (`sudoit1/rahdar:dev`؛ هنوز `:latest` نداریم). منتظر تغییرات ناسازگار باشید.
 
 <picture><source media="(prefers-color-scheme: dark)" srcset="docs/img/readme/estate-dark.webp"><img src="docs/img/readme/estate-light.webp" alt="estate با یک کلاستر Apache Artemis و یک کلاستر Apache Kafka و سلامتشان، بالای یک جدول از subscriptionها که بر اساس backlog مرتب شده و lag در Kafka در آن به‌عنوان تخمین علامت خورده است."></picture>
 
@@ -210,7 +207,16 @@ just verify          # همهٔ بررسی‌های CI
 
 ## انتشار نسخه‌ها
 
-هر merge که اپلیکیشن را تغییر دهد یک نسخهٔ جدید منتشر می‌کند. شمارهٔ نسخه به شکل CalVer (`YYYY.MM.PATCH`) است و روی Docker Hub سه تگ می‌گیرد: `2026.09.3` (تغییرناپذیر)، `2026.09` (همان ماه) و `dev` (آخرین نسخه). تا اولین نسخهٔ پایدار، تگ `:latest` نداریم. فایل jar قابل‌اجرا همراه `.sha256` به هر نسخه پیوست می‌شود و یادداشت‌های انتشار از پیام‌های commit ساخته می‌شوند ([GitHub Releases](https://github.com/sudoitir/rahdar/releases)). API پلاگین (Maven Central) و SDK (npm) همراه نسخه‌هایی منتشر می‌شوند که تغییرشان می‌دهند.
+هر merge به `main` که اپلیکیشن را تغییر دهد `sudoit1/rahdar:dev` را منتشر می‌کند؛ این تگ متحرک است. نسخهٔ پایدار را با دست می‌سازیم: Actions → Release، یا `gh workflow run release.yml -f ref=main`. آن اجرا کامیت را با CalVer (`YYYY.MM.PATCH`) تگ می‌کند و یک ایمیج را با چهار نام می‌فرستد: `2026.11.0` (تغییرناپذیر)، `2026.11` (پایدار همان ماه)، `latest` و `stable` (همان ایمیج). فایل jar و `.sha256` آن به [GitHub Release](https://github.com/sudoitir/rahdar/releases) پیوست می‌شود و یادداشت‌ها از پیام‌های commit ساخته می‌شوند. npm بستهٔ `@rahdar/plugin-sdk` را وقتی نسخهٔ پایدار آن را تغییر داده باشد منتشر می‌کند، و `@rahdar/client` را با هر نسخهٔ پایدار. API پلاگین و کلاینت جاوا وقتی به Maven Central می‌رسند که نگهدارنده همان نسخه را آنجا منتشر کند.
+
+| تگ | چیست |
+| --- | --- |
+| `:dev` | تازه‌ترین بیلد `main`؛ با تغییر اپلیکیشن جابه‌جا می‌شود |
+| `:latest`، `:stable` | نسخهٔ پایدار جاری؛ هر دو نام یک ایمیج‌اند |
+| `:YYYY.MM` | تازه‌ترین نسخهٔ پایدار آن ماه |
+| `:YYYY.MM.N` | یک نسخهٔ پایدار؛ تغییرناپذیر |
+
+برای نصبی که نباید جابه‌جا شود یک تگ نسخه را پین کنید. تغییرات ناسازگار بالای یادداشت همان نسخه آمده‌اند.
 
 ## مجوز
 
