@@ -9,8 +9,9 @@
 # a reference, not a turnkey deployment: put Postgres on managed infrastructure
 # and terminate TLS at your ingress for anything serious. Helm chart lands in v1.0.
 #
-# The default image is a pre-stable dev build (tag :dev). There is no stable
-# release yet — pin a CalVer tag (e.g. :2026.09.0) once you depend on it.
+# :dev is the moving build from main. A stable release is :latest and :stable
+# (the same image) plus an immutable CalVer tag such as :2026.11.0. Pin the
+# version when the install must not move.
 
 name: rahdar
 

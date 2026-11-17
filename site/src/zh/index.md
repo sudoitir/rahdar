@@ -60,8 +60,4 @@ just up          # 两个 Rahdar 副本 + HAProxy + Postgres，自动生成密�
 
 你的 Broker 本来就存在：Rahdar 只负责纳管，不会去启动它们。在界面中用 Artemis 管理 URL、Kafka 引导服务器或 RabbitMQ 管理 URL 注册集群，保存之前会检查能否连到每一个 Broker。[完整快速开始 →](/zh/guide/quickstart)
 
-::: warning Alpha 阶段
-仍在积极开发中，功能尚未完备。已发布的镜像都是预发布的 dev 构建（`sudoit1/rahdar:dev`，暂无 `:latest`）。请预期会有破坏性变更。
-:::
-
 <small>Apache、Apache Kafka、Kafka、Apache ActiveMQ、ActiveMQ 与 Artemis 是 Apache 软件基金会的商标；RabbitMQ 是其所有者的商标。Rahdar 与它们没有关联，也未获得它们的认可。</small>

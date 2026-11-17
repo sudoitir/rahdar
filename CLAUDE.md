@@ -152,10 +152,11 @@ development, demos and tests in `deploy/compose/dev/`.
 Pull requests carry the verification: parallel, path-filtered jobs behind the one required
 `ci-ok` check, on a branch up to date with `main`; `gh pr merge <n> --merge --auto` merges a ready PR, and
 the `pr-auto-update` workflow updates the waiting PRs from `main` one at a time, oldest auto-merge first (ADR-0170). `main` does not re-test. Every push to `main`
-that changes a build input cuts a CalVer release to Docker Hub (image, git tag, GitHub
-pre-release), and npm gets it when its inputs changed; Maven Central gets a release only when a
-maintainer runs `publish-central.yml` for it (ADR-0205); docs-, site- and
-CI-only pushes release nothing (ADR-0088, ADR-0126). See `.claude/rules/10-release.md` for the versioning. There is no
+that changes a build input publishes `sudoit1/rahdar:dev` and the build cache. A stable
+release (CalVer tag, `:latest` and `:stable`, GitHub Release, npm) is cut by hand with
+`release.yml`; Maven Central gets a release only when a maintainer runs `publish-central.yml`
+for that tag (ADR-0205, ADR-0229). Docs-, site- and
+CI-only pushes publish no image (ADR-0088, ADR-0126). See `.claude/rules/10-release.md` for the versioning. There is no
 `CHANGELOG.md`: each release's notes are its GitHub release body (tag only, nothing is
 committed; ADR-0129), and the commit message is the release note — `.claude/rules/05-commits.md` (Conventional Commits,
 ADR-0051). `just changelog` previews the pending release.

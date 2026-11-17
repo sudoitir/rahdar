@@ -60,8 +60,4 @@ just up          # دو replica از Rahdar + HAProxy + Postgres، با کلید
 
 بروکرهای شما از پیش وجود دارند؛ Rahdar آن‌ها را ثبت می‌کند، اجرا نمی‌کند. کلاستر را در رابط کاربری با URL مدیریتی Artemis، bootstrap serverهای Kafka یا URLهای مدیریت RabbitMQ ثبت کنید؛ پیش از ذخیره، بررسی می‌شود که به تک‌تک بروکرها می‌رسد. [شروع سریع کامل ←](/fa/guide/quickstart)
 
-::: warning مرحلهٔ Alpha
-در حال توسعهٔ فعال و هنوز کامل نیست. ایمیج‌های منتشرشده buildهای پیش‌پایدار dev هستند (`sudoit1/rahdar:dev`؛ هنوز `:latest` وجود ندارد). منتظر تغییرات ناسازگار باشید.
-:::
-
 <small>Apache، Apache Kafka، Kafka، Apache ActiveMQ، ActiveMQ و Artemis نشان‌های تجاری بنیاد نرم‌افزار Apache هستند؛ RabbitMQ نشان تجاری مالک آن است. Rahdar به آن‌ها وابسته نیست و از سوی آن‌ها تأیید نشده است.</small>

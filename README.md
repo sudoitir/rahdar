@@ -17,7 +17,7 @@ anything destructive, and an approval gate that holds people and assistants alik
 **English** · [简体中文](README.zh.md) · [فارسی](README.fa.md)
 
 [![CI](https://github.com/sudoitir/rahdar/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/sudoitir/rahdar/actions/workflows/ci.yml)
-[![Latest release](https://img.shields.io/github/v/release/sudoitir/rahdar?include_prereleases&sort=semver&label=release)](https://github.com/sudoitir/rahdar/releases)
+[![Latest release](https://img.shields.io/github/v/release/sudoitir/rahdar?sort=semver&label=release)](https://github.com/sudoitir/rahdar/releases)
 [![Docker pulls](https://img.shields.io/docker/pulls/sudoit1/rahdar?logo=docker&label=pulls)](https://hub.docker.com/r/sudoit1/rahdar)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/sudoitir/rahdar/badge)](https://scorecard.dev/viewer/?uri=github.com/sudoitir/rahdar)
 [![Quality Gate](https://sonarcloud.io/api/project_badges/measure?project=sudoitir_rahdar&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=sudoitir_rahdar)
@@ -37,11 +37,6 @@ anything destructive, and an approval gate that holds people and assistants alik
 [Discussions](https://github.com/sudoitir/rahdar/discussions)
 
 </div>
-
-> [!WARNING]
-> **Alpha.** Under active development and not yet feature-complete. Published images
-> are pre-stable dev builds (`sudoit1/rahdar:dev`; there is no `:latest` yet).
-> Expect breaking changes.
 
 <picture><source media="(prefers-color-scheme: dark)" srcset="docs/img/readme/estate-dark.webp"><img src="docs/img/readme/estate-light.webp" alt="The estate with an Apache Artemis cluster and an Apache Kafka cluster and their health, above one table of subscriptions sorted by backlog, where Kafka lag is marked as an estimate."></picture>
 
@@ -314,13 +309,25 @@ Every feature goes through **OpenSpec** and significant decisions are recorded a
 
 ## Releases
 
-A merge that changes the application publishes a release, versioned with CalVer
-`YYYY.MM.PATCH` and tagged three ways on Docker Hub: `2026.09.3` (immutable), `2026.09`
-(that month) and `dev` (the latest). There is no `:latest` until the first stable
-release. Each release attaches the runnable jar with its `.sha256`, and its notes are
-generated from the commit messages ([releases](https://github.com/sudoitir/rahdar/releases), [changelog](https://rahdar.dev/reference/changelog/)). The plugin SDK
-(npm) is published with the releases that change it; the plugin API and the Java client reach Maven Central
-when a maintainer publishes a release there.
+A merge to `main` that changes the application publishes `sudoit1/rahdar:dev`, the moving
+build. A stable release is cut by hand: Actions → Release, or
+`gh workflow run release.yml -f ref=main`. That run tags the commit with CalVer
+`YYYY.MM.PATCH` and pushes one image under four names: `2026.11.0` (immutable), `2026.11`
+(that month's stable), `latest` and `stable` (the same image). The runnable jar and its
+`.sha256` are attached to the [GitHub Release](https://github.com/sudoitir/rahdar/releases),
+and the notes are generated from the commit messages
+([changelog](https://rahdar.dev/reference/changelog/)). npm publishes `@rahdar/plugin-sdk`
+when a stable release changes it, and `@rahdar/client` with every stable release. The plugin
+API and the Java client reach Maven Central when a maintainer publishes that release there.
+
+| Tag | What it is |
+| --- | --- |
+| `:dev` | the newest build from `main`; it moves when the application changes |
+| `:latest`, `:stable` | the current stable release; both names are the same image |
+| `:YYYY.MM` | the newest stable release of that month |
+| `:YYYY.MM.N` | one stable release; immutable, never republished |
+
+Pin a version tag for an install that must not move. A release's breaking changes are listed at the top of its notes.
 
 ## Licence
 

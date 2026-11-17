@@ -19,7 +19,7 @@ See [ADR-0042](../../docs/adr/0042-calver-releases-on-docker-hub.md) for why.
   sequence is expected and fine; a republished tag is not.
 - Do not tag manually and do not add a version-bump commit.
 
-## Every source push to `main` is a release
+## A push to `main` publishes `:dev`
 
 Pull requests carry the whole verification; `main` does not re-test ([ADR-0126](../../docs/adr/0126-pull-requests-verify-main-releases-what-changed.md)).
 The ruleset requires the one `ci-ok` check on a branch that is up to date with `main`,
@@ -27,37 +27,58 @@ so the merge commit is the tree CI verified. A ready PR gets `gh pr merge <n> --
 `pr-auto-update` workflow brings it up to date in its turn (one PR at a time, oldest auto-merge first), and it merges when CI is green
 ([ADR-0170](../../docs/adr/0170-auto-update-keeps-pull-requests-up-to-date.md)).
 
-A push to `main` releases when it changes what the image is built from
+A push to `main` publishes `sudoit1/rahdar:dev` when it changes what the image is built from
 (`src/`, `web/`, `clients/`, `pom.xml`, the Maven wrapper, `Dockerfile`, `.dockerignore`). A docs-,
-site- or CI-only push releases nothing; its commits appear in the next release's
-changelog. The path lists live in the `changes` job of `ci.yml`
+site- or CI-only push publishes no image; its commits appear in the next stable release's
+notes. The path lists live in the `changes` job of `ci.yml`
 ([ADR-0088](../../docs/adr/0088-path-filtered-ci-and-releases.md)).
 
-The `release` job in `.github/workflows/ci.yml` does all of it, with no manual step:
+The `dev` job in `ci.yml` does that and nothing else ([ADR-0229](../../docs/adr/0229-stable-releases-are-cut-by-hand.md)):
 
-- renders the release notes from the commits since the previous tag, then tags the
-  merge commit and pushes only the tag. It commits nothing, so `main` never moves on a
-  release and no open pull request falls behind because of one
+- sets the project version to `dev` in the working tree and commits nothing;
+- pushes `sudoit1/rahdar:dev` (`linux/amd64` + `linux/arm64`) and writes the build cache
+  `sudoit1/rahdar:buildcache`;
+- attests the image keylessly with `actions/attest` (ADR-0139). The signer workflow is `ci.yml`.
+
+No git tag, no GitHub Release, and no npm publish.
+
+## A stable release is a maintainer's step
+
+Actions → Release → Run workflow, with a commit on `main` (the default is `main`), or
+`gh workflow run release.yml -f ref=main`. One run of `release.yml`:
+
+- refuses a commit that is not on `main`;
+- computes the CalVer, tags that commit and pushes only the tag, before the image. It commits
+  nothing, so `main` never moves and no open pull request falls behind
   ([ADR-0129](../../docs/adr/0129-releases-tag-the-merge-commit-and-commit-nothing.md));
-- pushes the image to Docker Hub — `sudoit1/rahdar`, `linux/amd64` +
-  `linux/arm64`, tags `:<version>` (immutable), `:<YYYY.MM>` (moving month pointer),
-  `:dev` (moving channel pointer);
-- attests the image and the jar keylessly with `actions/attest` (ADR-0139): SLSA provenance and
-  a CycloneDX SBOM (Syft) for each, the image's pushed to Docker Hub as OCI referrers;
-- creates a GitHub Release with the notes as its body and the
-  `rahdar-<version>.jar`, its `.sha256`, its provenance bundle (`.jar.intoto.jsonl`) and
-  both SBOMs (`.jar.cdx.json`, `.image.cdx.json`) attached, then verifies the attestations with
-  the commands in `site/src/guide/verify-releases.md` and dispatches `pages.yml`
-  so the site's changelog lists it (a release made with the workflow token triggers
-  no workflow on its own).
+- pushes one image as `:<version>` (immutable), `:<YYYY.MM>` (the month's stable), `:latest` and
+  `:stable` (the same digest). It does not move `:dev` and does not write the build cache;
+- attests the image and the jar (signer workflow `release.yml`), opens the GitHub Release
+  (`prerelease: false`) with the notes and the same assets as before, verifies the attestations,
+  and dispatches `pages.yml`;
+- publishes npm from this file: `@rahdar/plugin-sdk` when `web/packages`, `web/src/sdk`,
+  `web/src/kernel` or the web manifests changed since the newest version on npm, and
+  `@rahdar/client` on every stable release, from the release's `web/openapi.json` (ADR-0151).
 
-After it, npm gets the release:
+npm trusted publishing is bound to the workflow file name. `@rahdar/plugin-sdk` and `@rahdar/client`
+trust `release.yml` (repository `sudoitir/rahdar`, no environment). A release whose npm jobs fail
+for that reason is re-run after the publisher is saved; the image and the GitHub Release are
+already published.
 
-- `publish-sdk`: `@rahdar/plugin-sdk`, when `web/packages`, `web/src/sdk`, `web/src/kernel` or the
-  web manifests changed since the newest version on npm, so a failed publish is retried by the next
-  release. Its job stays in `ci.yml`: npm trusted publishing is bound to that file name;
-- `publish-client-ts`: `@rahdar/client`, on **every** release, generated from the release's
-  `web/openapi.json` (ADR-0151). The release also attaches `rahdar-<version>.openapi.json`.
+The job summary prints `gh workflow run publish-central.yml -f version=YYYY.MM.N`.
+
+`hub-description` in `ci.yml` pushes `docs/dockerhub.md` as the Docker Hub repository description
+whenever that file changes on `main`. It does not wait for a stable release, and `release.yml` does
+not update the page. That file is the Hub's landing page and is **not** `README.md`.
+`DOCKERHUB_TOKEN` must be a PAT with **read, write and delete** scope: the description endpoint
+rejects a repo-scoped token with `Forbidden`.
+
+A pull request that changes the image inputs scans the built image with Grype and fails on a
+critical or high finding that has a fix; bump the base-image digest or the dependency.
+
+The compose fallback and `.env.example` stay on `:dev`, because `:latest` exists only after the
+first run of `release.yml`. `just setup` pins `RAHDAR_IMAGE` to the newest CalVer tag, which is a
+stable release.
 
 ## Maven Central is a maintainer's step
 
@@ -72,31 +93,6 @@ to Maven Central → Run workflow with the release's version, or
 
 It refuses a version that is not a release tag. Runs do not overlap.
 
-A pull request that changes the image inputs scans the built image with Grype and fails on a
-critical or high finding that has a fix; bump the base-image digest or the dependency.
-
-`hub-description` pushes `docs/dockerhub.md` as the Docker Hub repository description
-whenever that file changes, with or without a release. That file is the Hub's landing
-page and is **not** `README.md`; edit it when the run instructions or the screenshots
-change. `DOCKERHUB_TOKEN` must be a PAT with **read, write and delete** scope: the
-description endpoint rejects a repo-scoped token with `Forbidden`.
-
-## Dev channel (pre-stable)
-
-There is no stable release yet. Until there is:
-
-- **no `:latest` tag** is published — `:dev` is the moving pointer;
-- GitHub Releases are created with `prerelease: true`.
-
-### Going stable
-
-When the project cuts its first stable release, three edits flip the channel:
-
-1. `ci.yml` — add `:latest` to the `build-push-action` tag list.
-2. `ci.yml` — drop `prerelease: true` from the `action-gh-release` step.
-3. `deploy/compose/compose.prod.yaml` + `deploy/compose/.env.example` — change the
-   `RAHDAR_IMAGE` default from `:dev` to `:latest`.
-
 ## Changelog
 
 Each release's notes are its GitHub release body, generated from the commit messages
@@ -109,8 +105,8 @@ of those without a file from GitHub Releases when it builds. There is no
   [`05-commits.md`](05-commits.md) for the Conventional Commits format, which
   types produce an entry, and how a breaking change announces itself.
 - `just changelog` renders what the next release will say.
-- CI renders the notes with `git-cliff` (pinned in `cliff.toml` and
-  `.github/workflows/ci.yml`) and splices `changelog/unreleased.md` when it changed
+- `release.yml` renders the notes with `git-cliff` (pinned in `cliff.toml` and
+  `release.yml`) and splices `changelog/unreleased.md` when it changed
   since the previous release. Never hand-edit a released file or a release body — each
   is a historical record.
 

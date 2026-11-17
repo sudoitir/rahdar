@@ -1,15 +1,15 @@
 name: CI
 
-# Pull requests carry the whole verification; main only releases (ADR-0126). The ruleset requires
-# `ci-ok` on a branch that is up to date with main, so the merge commit is the commit CI tested.
-# This file's name is load-bearing: npm trusted publishing is bound to `ci.yml`.
+# Pull requests carry the whole verification; main publishes the moving :dev image
+# (ADR-0126, ADR-0229). The ruleset requires `ci-ok` on a branch that is up to date with
+# main, so the merge commit is the commit CI tested. A stable release is release.yml.
 on:
   push:
     branches: [main]
   pull_request:
 
-# A newer push supersedes a PR's run, but never main's: main's run is a release, which tags
-# before it pushes the image, so cancelling it burns a version with nothing published.
+# A newer push supersedes a PR's run, but never main's: main publishes :dev, and cancelling
+# a multi-arch push leaves a partial manifest.
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
@@ -19,11 +19,9 @@ permissions:
 
 # Persistent build cache, stored as a separate tag in the public Docker Hub repo.
 # Anonymous pull works, so PR builds (no login) can still warm from it; only the
-# release job writes it. Survives across runs without GHA's 10 GB eviction.
+# dev job writes it. Survives across runs without GHA's 10 GB eviction.
 env:
   BUILDCACHE: sudoit1/rahdar:buildcache
-  # Pinned: the changelog is a published artifact, not a best-effort render.
-  GIT_CLIFF: git-cliff@2.13.1
 
 jobs:
   # Which parts of the tree this push or PR touches (ADR-0088, ADR-0126). A push compares
@@ -734,61 +732,25 @@ jobs:
       - run: echo "CI is green."
 
   # ---------------------------------------------------------------------------------------------
-  # Main: no re-test. Release what the merge changed, and only that.
+  # Main: no re-test. Publish :dev for what the merge changed, and only that (ADR-0229).
   # ---------------------------------------------------------------------------------------------
 
-  # A push to main that changes what the image is built from cuts a CalVer release.
-  # A docs- or CI-only push releases nothing; its commits land in the next release's
-  # notes. See .claude/rules/10-release.md, ADR-0088 and ADR-0126.
-  release:
+  # A push to main that changes what the image is built from publishes :dev.
+  # A docs- or CI-only push publishes nothing. A stable release is release.yml.
+  dev:
     needs: changes
     if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.changes.outputs.release == 'true'
     runs-on: ubuntu-26.04
     timeout-minutes: 45
     permissions:
-      contents: write
-      # To rebuild the site's changelog once the release exists (ADR-0129).
-      actions: write
-      # Keyless attestations of the image and the jar (ADR-0139).
+      contents: read
+      # Keyless attestation of the image (ADR-0139).
       id-token: write
       attestations: write
-    outputs:
-      version: ${{ steps.ver.outputs.version }}
-    concurrency:
-      group: release
-      cancel-in-progress: false
     steps:
-      # The release tags the merge commit and commits nothing, so main never moves and no
-      # open pull request falls behind because of a release (ADR-0129).
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          fetch-depth: 0
-
-      # Version = date + one past the highest PATCH already tagged this month.
-      # Only tags matching the canonical CalVer shape are candidates, so a stray
-      # or hand-made tag can neither be parsed as a PATCH nor shift the counter.
-      - name: Compute CalVer version
-        id: ver
-        run: |
-          set -euo pipefail
-          BASE=$(date -u +%Y.%m)
-          LAST=$(git tag -l "$BASE.*" | grep -E '^[0-9]{4}\.[0-9]{2}\.[0-9]+$' | sort -V | tail -1 || true)
-          if [ -z "$LAST" ]; then PATCH=0; else PATCH=$(( ${LAST##*.} + 1 )); fi
-          VERSION="$BASE.$PATCH"
-          echo "$VERSION" | grep -qE '^[0-9]{4}\.[0-9]{2}\.[0-9]+$' \
-            || { echo "::error::computed version '$VERSION' is not CalVer"; exit 1; }
-          # A version tag is published to Docker Hub immutably, so it must never be
-          # reused. The local tag list can be stale; the remote is the authority.
-          if git ls-remote --exit-code --tags origin "refs/tags/$VERSION" >/dev/null 2>&1; then
-            echo "::error::tag $VERSION already exists on origin — refusing to republish"
-            exit 1
-          fi
-          {
-            echo "version=$VERSION"
-            echo "month=$BASE"
-            echo "date=$(date -u +%Y-%m-%d)"
-          } >> "$GITHUB_OUTPUT"
-          echo "→ releasing $VERSION"
+          persist-credentials: false
 
       - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
         with:
@@ -796,73 +758,14 @@ jobs:
           java-version: "25"
           cache: maven
 
-      - name: Set project version and build the jar
+      # The working tree only. Nothing is committed, and no tag is pushed. The image's
+      # own version is `dev`, so a stable release (which bakes in the CalVer) is a
+      # separate build.
+      - name: Set the dev version
+        id: date
         run: |
-          ./mvnw -B versions:set -DnewVersion="${{ steps.ver.outputs.version }}" -DgenerateBackupPoms=false
-          ./mvnw -B -Pfrontend -DskipTests package
-
-      - name: Stage release assets
-        run: |
-          V=${{ steps.ver.outputs.version }}
-          cp target/rahdar-exec.jar "rahdar-$V.jar"
-          sha256sum "rahdar-$V.jar" > "rahdar-$V.jar.sha256"
-          # The Grafana dashboard and Prometheus rules, as their own asset (ADR-0147).
-          tar -czf "rahdar-observability-$V.tar.gz" deploy/observability
-          sha256sum "rahdar-observability-$V.tar.gz" > "rahdar-observability-$V.tar.gz.sha256"
-          # The API document of this release, with the release as its version (ADR-0151).
-          jq --arg v "$V" '.info.version = $v' web/openapi.json > "rahdar-$V.openapi.json"
-          sha256sum "rahdar-$V.openapi.json" > "rahdar-$V.openapi.json.sha256"
-
-      # Signed SLSA provenance and a CycloneDX SBOM for the jar, verifiable with
-      # `gh attestation verify` and no key of ours (ADR-0139). The bundle is a release asset too.
-      - uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
-        with:
-          file: rahdar-${{ steps.ver.outputs.version }}.jar
-          format: cyclonedx-json
-          output-file: rahdar-${{ steps.ver.outputs.version }}.jar.cdx.json
-          upload-artifact: false
-      - name: Attest the jar's provenance
-        id: jar-provenance
-        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
-        with:
-          subject-path: rahdar-${{ steps.ver.outputs.version }}.jar
-      - uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
-        with:
-          subject-path: rahdar-${{ steps.ver.outputs.version }}.jar
-          sbom-path: rahdar-${{ steps.ver.outputs.version }}.jar.cdx.json
-      - name: Stage the jar's provenance bundle
-        run: cp "${{ steps.jar-provenance.outputs.bundle-path }}" "rahdar-${{ steps.ver.outputs.version }}.jar.intoto.jsonl"
-      - uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
-        with:
-          subject-path: rahdar-${{ steps.ver.outputs.version }}.openapi.json
-
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version: "24"
-
-      # The release notes are generated from the commit messages since the previous tag and
-      # become the GitHub release body, their one home (ADR-0051, ADR-0129).
-      - name: Write the release notes
-        run: |
-          set -euo pipefail
-          V=${{ steps.ver.outputs.version }}
-          npx -y "$GIT_CLIFF" --config cliff.toml --unreleased --tag "$V" -o "$RUNNER_TEMP/cliff.md"
-          python3 scripts/release-notes.py "$RUNNER_TEMP/cliff.md" release-notes.md
-          echo "→ release body:"; cat release-notes.md
-
-      # Reserve the version BEFORE anything immutable is published. If the image push were
-      # first and this step then failed, the next run would compute the same version and
-      # overwrite an already-published Docker Hub tag. Burning a version number on a later
-      # failure is the cheaper outcome. Only the tag is pushed: tags are outside the main
-      # ruleset, and the tagged commit is the merge commit CI verified.
-      - name: Tag the release
-        run: |
-          set -euo pipefail
-          V=${{ steps.ver.outputs.version }}
-          git config user.name  "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git tag -a "$V" -m "Release $V" "${{ github.sha }}"
-          git push origin "refs/tags/$V"
+          ./mvnw -B versions:set -DnewVersion=dev -DgenerateBackupPoms=false
+          echo "date=$(date -u +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
 
       - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
@@ -871,7 +774,7 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build and push image
+      - name: Build and push the dev image
         id: push
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
@@ -884,20 +787,19 @@ jobs:
           sbom: false
           # Registry cache: not size-capped like GHA, shared across every run and
           # readable by PR builds. mode=max caches the web/maven build stages too.
+          # This is the only job that writes the cache.
           cache-from: |
             type=registry,ref=${{ env.BUILDCACHE }}
             type=gha
           cache-to: type=registry,ref=${{ env.BUILDCACHE }},mode=max,image-manifest=true,oci-mediatypes=true
           tags: |
-            ${{ secrets.DOCKERHUB_USERNAME }}/rahdar:${{ steps.ver.outputs.version }}
-            ${{ secrets.DOCKERHUB_USERNAME }}/rahdar:${{ steps.ver.outputs.month }}
             ${{ secrets.DOCKERHUB_USERNAME }}/rahdar:dev
           labels: |
             org.opencontainers.image.title=Rahdar
             org.opencontainers.image.description=Cluster-wide management and observability for Apache Kafka, RabbitMQ and Apache ActiveMQ Artemis
-            org.opencontainers.image.version=${{ steps.ver.outputs.version }}
+            org.opencontainers.image.version=dev
             org.opencontainers.image.revision=${{ github.sha }}
-            org.opencontainers.image.created=${{ steps.ver.outputs.date }}
+            org.opencontainers.image.created=${{ steps.date.outputs.date }}
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.licenses=Apache-2.0
 
@@ -906,7 +808,7 @@ jobs:
         with:
           image: docker.io/${{ secrets.DOCKERHUB_USERNAME }}/rahdar@${{ steps.push.outputs.digest }}
           format: cyclonedx-json
-          output-file: rahdar-${{ steps.ver.outputs.version }}.image.cdx.json
+          output-file: rahdar-dev.image.cdx.json
           upload-artifact: false
       - uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
         with:
@@ -917,55 +819,27 @@ jobs:
         with:
           subject-name: index.docker.io/${{ secrets.DOCKERHUB_USERNAME }}/rahdar
           subject-digest: ${{ steps.push.outputs.digest }}
-          sbom-path: rahdar-${{ steps.ver.outputs.version }}.image.cdx.json
+          sbom-path: rahdar-dev.image.cdx.json
           push-to-registry: true
 
-      - name: Create GitHub release
-        uses: softprops/action-gh-release@8a0cd651e5b2365bd640854a3fa5dfc70e4875f3 # v3.0.4
-        with:
-          tag_name: ${{ steps.ver.outputs.version }}
-          name: ${{ steps.ver.outputs.version }}
-          body_path: release-notes.md
-          prerelease: true
-          files: |
-            rahdar-${{ steps.ver.outputs.version }}.jar
-            rahdar-${{ steps.ver.outputs.version }}.jar.sha256
-            rahdar-observability-${{ steps.ver.outputs.version }}.tar.gz
-            rahdar-observability-${{ steps.ver.outputs.version }}.tar.gz.sha256
-            rahdar-${{ steps.ver.outputs.version }}.openapi.json
-            rahdar-${{ steps.ver.outputs.version }}.openapi.json.sha256
-            rahdar-${{ steps.ver.outputs.version }}.jar.intoto.jsonl
-            rahdar-${{ steps.ver.outputs.version }}.jar.cdx.json
-            rahdar-${{ steps.ver.outputs.version }}.image.cdx.json
-
-      # What users run (site/src/guide/verify-releases.md): if it fails here, the release fails.
-      - name: Verify the attestations as a user would
+      # What users run for :dev (site/src/guide/verify-releases.md). Signer is this file.
+      - name: Verify the attestation as a user would
         env:
           GH_TOKEN: ${{ github.token }}
           IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/rahdar
         run: |
           set -euo pipefail
-          V=${{ steps.ver.outputs.version }}
           SIGNER=(--repo "$GITHUB_REPOSITORY" --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/ci.yml")
-          gh attestation verify "rahdar-$V.jar" "${SIGNER[@]}"
-          gh attestation verify "rahdar-$V.jar" "${SIGNER[@]}" --predicate-type https://cyclonedx.org/bom
-          gh attestation verify "rahdar-$V.openapi.json" "${SIGNER[@]}"
-          gh attestation verify "oci://docker.io/$IMAGE:$V" "${SIGNER[@]}"
-          gh attestation verify "oci://docker.io/$IMAGE:$V" "${SIGNER[@]}" --predicate-type https://cyclonedx.org/bom
+          gh attestation verify "oci://docker.io/$IMAGE:dev" "${SIGNER[@]}"
+          gh attestation verify "oci://docker.io/$IMAGE:dev" "${SIGNER[@]}" --predicate-type https://cyclonedx.org/bom
           # Docker Hub lists a freshly pushed referrer only after a delay, which has run past a
           # minute, so give it five.
           for i in {1..30}; do
-            gh attestation verify "oci://docker.io/$IMAGE:$V" "${SIGNER[@]}" --bundle-from-oci && break
+            gh attestation verify "oci://docker.io/$IMAGE:dev" "${SIGNER[@]}" --bundle-from-oci && break
             [ "$i" -lt 30 ] || exit 1
             sleep 10
           done
 
-      # A release made with the workflow token triggers no workflow, so the site that lists the
-      # release notes is rebuilt explicitly.
-      - name: Rebuild the site's changelog
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh workflow run pages.yml --ref main
 
   # The Docker Hub landing page, whenever its source changes; no release needed for that. The
   # credential needs read, write AND delete scope: the description API rejects a repo-scoped PAT.
@@ -991,85 +865,3 @@ jobs:
           # Docker Hub does not resolve repo-relative paths, so without this the
           # screenshots render broken even when the push succeeds.
           enable-url-completion: true
-
-  # The plugin SDK on npm (ADR-0102), versioned like Rahdar (2026.09.0 is npm 2026.9.0). Only when
-  # what the SDK is built from changed since the newest version on npm (ADR-0126). Trusted
-  # publishing through GitHub's OIDC: npmjs.com trusts this workflow file, so no npm token is stored.
-  publish-sdk:
-    needs: release
-    runs-on: ubuntu-26.04
-    timeout-minutes: 15
-    permissions:
-      contents: read
-      id-token: write
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ needs.release.outputs.version }}
-          fetch-depth: 0
-          persist-credentials: false
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version: "24"
-          registry-url: https://registry.npmjs.org
-          package-manager-cache: false
-      - name: Did the SDK's inputs change since the newest version on npm?
-        id: needed
-        run: |
-          V="${{ needs.release.outputs.version }}"
-          NPM=$(npm view @rahdar/plugin-sdk version 2>/dev/null || true)
-          # npm drops the month's leading zero: 2026.9.3 is the tag 2026.09.3.
-          LAST=$([ -n "$NPM" ] && echo "$NPM" | awk -F. '{ printf "%d.%02d.%d", $1, $2, $3 }' || true)
-          if [ -n "$LAST" ] && git rev-parse -q --verify "refs/tags/$LAST" >/dev/null \
-            && git diff --quiet "$LAST" "$V" -- web/packages web/src/sdk web/src/kernel web/package.json web/package-lock.json; then
-            echo "SDK unchanged since $LAST on npm: nothing to publish."
-            echo "publish=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "SDK changed since ${LAST:-nothing on npm}: publishing $V."
-            echo "publish=true" >> "$GITHUB_OUTPUT"
-          fi
-      - name: Build @rahdar/plugin-sdk
-        if: steps.needed.outputs.publish == 'true'
-        working-directory: web
-        run: |
-          npm ci
-          node packages/plugin-sdk/build.mjs "${{ needs.release.outputs.version }}"
-      - name: Publish
-        if: steps.needed.outputs.publish == 'true'
-        working-directory: web/packages/plugin-sdk/dist
-        # Trusted publishing (OIDC) needs npm 11.5.1 or later.
-        run: |
-          npx -y semver@7 -r '>=11.5.1' "$(npm -v)" >/dev/null || { echo "npm $(npm -v) is too old to publish"; exit 1; }
-          npm publish --access public --provenance
-
-  # The TypeScript client on npm (ADR-0151), versioned like Rahdar (2026.09.0 is npm 2026.9.0) and
-  # built from the release's own OpenAPI document, so every release publishes one. Trusted
-  # publishing through GitHub's OIDC, as for the SDK; the package's trusted publisher is set up once
-  # on npmjs.com (workflow ci.yml, no environment).
-  publish-client-ts:
-    needs: release
-    runs-on: ubuntu-26.04
-    timeout-minutes: 15
-    permissions:
-      contents: read
-      id-token: write
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ needs.release.outputs.version }}
-          persist-credentials: false
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version: "24"
-          registry-url: https://registry.npmjs.org
-          package-manager-cache: false
-      - name: Build @rahdar/client
-        working-directory: web
-        run: |
-          npm ci
-          node packages/client/build.mjs "${{ needs.release.outputs.version }}"
-      - name: Publish
-        working-directory: web/packages/client/dist
-        run: |
-          npx -y semver@7 -r '>=11.5.1' "$(npm -v)" >/dev/null || { echo "npm $(npm -v) is too old to publish"; exit 1; }
-          npm publish --access public --provenance
