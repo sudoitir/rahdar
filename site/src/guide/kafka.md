@@ -1,6 +1,6 @@
 ---
 title: Apache Kafka
-description: What Rahdar shows and does for a Kafka cluster - consumer groups and lag, offset reset, topic configuration, ACLs, transactions and brokers - and how the shared screens behave on a partitioned log.
+description: What Rahdar shows and does for a Kafka cluster - consumer groups and lag, offset reset, topic configuration, partition placement, replication, ACLs, transactions and brokers - and how the shared screens behave on a partitioned log.
 ---
 
 # Apache Kafka
@@ -87,6 +87,21 @@ leads, and its under-replicated and offline partitions. In KRaft mode the **cont
 leader, the voters, their lag and the majority. In ZooKeeper mode there is no quorum to read: the page says it
 is unknown, and the cluster's health states that instead of counting it as healthy.
 
+## Partitions and replication
+
+A topic's row has **Partitions**. The table keeps each partition's replicas in the broker's order. The first replica is the **preferred leader**. When another replica is leading, the row says so and does not rearrange the list. Each replica shows whether it is in sync, its bytes on that broker, and its **offset lag** as the broker reports it. Bytes are not a record count, and they do not include remote storage. A future replica, from a log-directory move that has not finished, is named as future.
+
+**Local log start** and the **tiered offset** appear when the cluster can report them. A topic that is not tiered says so, and its local start matches the log start. A cluster that cannot answer the read says why, and the numbers are not invented. A broker that misses the log-directory read is named once. The replicas on the brokers that answered are still shown.
+
+**Observe → Replication** lists only the partitions that are under-replicated, have an offline replica, or are not on their preferred leader. A cluster with none of those says so and shows no table. Nothing on this screen writes by itself.
+
+Two actions, both previewed, confirmed by holding, and audited:
+
+- **Elect preferred leaders** for the partitions you select. A partition already led by its first replica is left as it is. There is no unclean election.
+- **Reassign** one partition. The form starts from the replicas it has. **Suggest placement** keeps those replicas and adds a broker for a rack that is not yet represented. The suggestion is labeled as a suggestion. Closing the form sends nothing. The preview shows both replica sets, both replication factors, the bytes to copy as an estimate, the throttle in bytes per second, and a duration estimate. A throttle is required. A replication factor below the topic's `min.insync.replicas` leaves confirm disabled and names both numbers. When the move finishes, a throttle this move added is removed, and a throttle that was already set is put back. The preview says which of those will happen.
+
+A move that is in progress is listed, and cancelling it is its own preview and confirmation. Both actions need `destination:update`. Without it they stay visible and disabled, and they name the permission. Where the broker cannot do the operation, the action stays visible and disabled with the broker's reason.
+
 ## The shared screens on Kafka
 
 ### Groups on topics
@@ -146,7 +161,7 @@ and the API refuses them with the same reason. The same holds for any action the
 | Permission | Allows |
 | --- | --- |
 | `subscription:seek` | Reset a group's offsets. |
-| `destination:update` | Change a topic's configuration. |
+| `destination:update` | Change a topic's configuration, elect a preferred leader, or reassign replicas. |
 | `destination:truncate` | Truncate a topic. |
 | `access-rule:read` | List ACLs. |
 | `access-rule:write` | Add and remove ACLs. |
