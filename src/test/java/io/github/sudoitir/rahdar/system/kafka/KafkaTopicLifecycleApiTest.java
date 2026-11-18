@@ -93,7 +93,7 @@ class KafkaTopicLifecycleApiTest {
                 .when(gate)
                 .run(any(), any());
         KafkaTopicLifecycle lifecycle = new KafkaTopicLifecycle(gateway, access, gate, audit, actors, settings);
-        http = new KafkaController(null, null, null, null, null, null, null, null, null, null, null, lifecycle);
+        http = new KafkaController(null, null, null, null, null, null, null, null, null, null, null, lifecycle, null);
         tools = new KafkaMcpActionTools(null, null, null, null, null, null, null, lifecycle);
     }
 
