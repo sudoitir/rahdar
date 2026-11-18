@@ -29,6 +29,9 @@ import io.github.sudoitir.rahdar.kernel.security.ResourceRef;
 import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
 import io.github.sudoitir.rahdar.system.kafka.internal.persistence.KafkaReassignmentEntity;
 import io.github.sudoitir.rahdar.system.kafka.internal.persistence.KafkaReassignmentRepository;
+import io.github.sudoitir.rahdar.system.kafka.web.KafkaReplicationViews.CancelOutcome;
+import io.github.sudoitir.rahdar.system.kafka.web.KafkaReplicationViews.CancelPartition;
+import io.github.sudoitir.rahdar.system.kafka.web.KafkaReplicationViews.CancelPreview;
 import io.github.sudoitir.rahdar.system.kafka.web.KafkaReplicationViews.ElectionOutcome;
 import io.github.sudoitir.rahdar.system.kafka.web.KafkaReplicationViews.ElectionPreview;
 import io.github.sudoitir.rahdar.system.kafka.web.KafkaReplicationViews.PartitionSelection;
@@ -89,6 +92,8 @@ public class KafkaReplication {
             long throttleBytesPerSecond,
             String etag) {}
 
+    public record CancelParams(UUID clusterId, List<NamedPartition> partitions, String etag) {}
+
     public ElectionPreview previewElection(UUID clusterId, PartitionSelection request) {
         List<NamedPartition> named = named(request == null ? null : request.partitions());
         named.forEach(partition -> requireUpdate(clusterId, partition.topic()));
@@ -120,6 +125,20 @@ public class KafkaReplication {
         KafkaEtags.require(request.etag(), preview.etag());
         return gatedReassign(new ReassignParams(
                 clusterId, topic, partition, replicas(request), request.throttleBytesPerSecond(), request.etag()));
+    }
+
+    public CancelPreview previewCancel(UUID clusterId, PartitionSelection request) {
+        List<NamedPartition> named = named(request == null ? null : request.partitions(), EMPTY_CANCEL);
+        named.forEach(partition -> requireUpdate(clusterId, partition.topic()));
+        return cancelPlan(clusterId, named).view();
+    }
+
+    public CancelOutcome cancel(UUID clusterId, PartitionSelection request) {
+        List<NamedPartition> named = named(request == null ? null : request.partitions(), EMPTY_CANCEL);
+        named.forEach(partition -> requireUpdate(clusterId, partition.topic()));
+        CancelPreview preview = cancelPlan(clusterId, named).view();
+        KafkaEtags.require(request.etag(), preview.etag());
+        return gatedCancel(new CancelParams(clusterId, named, request.etag()));
     }
 
     public ReassignmentList reassignments(UUID clusterId) {
@@ -173,6 +192,15 @@ public class KafkaReplication {
         runReassign(p);
     }
 
+    public Effect estimateCancel(CancelParams p) {
+        CancelPreview preview = cancelPlan(p.clusterId(), p.partitions()).view();
+        return new Effect(preview.partitions().size(), "partitions", preview.etag(), preview.note());
+    }
+
+    public void replayCancel(CancelParams p) {
+        runCancel(p);
+    }
+
     @Gated("kafka.partition.elect")
     private ElectionOutcome gatedElect(ElectParams p) {
         return gate.run(io.github.sudoitir.rahdar.kernel.gate.Operation.of(p), () -> runElect(p));
@@ -181,6 +209,11 @@ public class KafkaReplication {
     @Gated("kafka.partition.reassign")
     private ReassignOutcome gatedReassign(ReassignParams p) {
         return gate.run(io.github.sudoitir.rahdar.kernel.gate.Operation.of(p), () -> runReassign(p));
+    }
+
+    @Gated("kafka.partition.cancel-reassignment")
+    private CancelOutcome gatedCancel(CancelParams p) {
+        return gate.run(io.github.sudoitir.rahdar.kernel.gate.Operation.of(p), () -> runCancel(p));
     }
 
     private ElectionOutcome runElect(ElectParams p) {
@@ -488,10 +521,100 @@ public class KafkaReplication {
         return new ResourceId(KafkaKinds.PARTITION, ResourcePath.of(topic, Integer.toString(partition)));
     }
 
+    private static final String EMPTY_CANCEL =
+            "A cancel names one partition. An empty set is refused, and nothing was sent.";
+
+    private CancelPlan cancelPlan(UUID clusterId, List<NamedPartition> partitions) {
+        List<CancelPart> parts = new ArrayList<>();
+        for (NamedPartition partition : partitions) {
+            Preview preview = KafkaFailures.call(() -> gateway.cluster(clusterId)
+                    .operations()
+                    .preview(
+                            partitionId(partition.topic(), partition.partition()),
+                            cancel(partition.partition()),
+                            Scope.whole()));
+            parts.add(new CancelPart(
+                    partition.topic(),
+                    partition.partition(),
+                    preview.etag(),
+                    replicas(preview, false),
+                    replicas(preview, true)));
+        }
+        List<String> etagParts = parts.stream()
+                .map(part -> part.topic() + "\0" + part.partition() + "\0" + part.driverEtag())
+                .toList();
+        List<CancelPartition> shown = parts.stream()
+                .map(part -> new CancelPartition(part.topic(), part.partition(), part.before(), part.after()))
+                .toList();
+        return new CancelPlan(
+                new CancelPreview(shown, KafkaEtags.of(etagParts), "Cancels the in-progress reassignment."), parts);
+    }
+
+    private CancelOutcome runCancel(CancelParams p) {
+        CancelPlan plan = cancelPlan(p.clusterId(), p.partitions());
+        KafkaEtags.require(p.etag(), plan.view().etag());
+        Map<String, List<Integer>> before = new LinkedHashMap<>();
+        Map<String, List<Integer>> after = new LinkedHashMap<>();
+        plan.parts().forEach(part -> {
+            before.put(part.topic() + "-" + part.partition(), part.before());
+            after.put(part.topic() + "-" + part.partition(), part.after());
+        });
+        AuditEvent event = audit.begin(
+                actors.resolve(),
+                "CANCEL_REASSIGNMENT",
+                DESTINATION,
+                plan.parts().isEmpty() ? "" : plan.parts().getFirst().topic(),
+                p.clusterId(),
+                null,
+                Map.of("replicas", before),
+                false);
+        try {
+            for (CancelPart part : plan.parts()) {
+                KafkaFailures.call(() -> gateway.cluster(p.clusterId())
+                        .operations()
+                        .execute(
+                                partitionId(part.topic(), part.partition()),
+                                cancel(part.partition()),
+                                Scope.whole(),
+                                Precondition.ifMatch(part.driverEtag()))
+                        .orThrow());
+            }
+            audit.finish(
+                    event,
+                    false,
+                    plan.parts().size(),
+                    null,
+                    Map.of("replicas", after, "scope", KafkaTopicLifecycle.WHOLE_CLUSTER));
+            return new CancelOutcome(
+                    KafkaTopicLifecycle.WHOLE_CLUSTER, "APPLIED", plan.view().partitions());
+        } catch (RuntimeException e) {
+            audit.fail(event, e.getMessage());
+            throw e;
+        }
+    }
+
+    private static Operation.Reassign cancel(int partition) {
+        return new Operation.Reassign(Map.of(PartitionId.of(Integer.toString(partition)), List.of()));
+    }
+
+    private static List<Integer> replicas(Preview preview, boolean after) {
+        for (AttributeChange change : preview.diff()) {
+            if (KafkaKinds.REPLICAS.equals(change.key())) {
+                return KafkaPlacement.ints((after ? change.after() : change.before()).orElse(null));
+            }
+        }
+        return List.of();
+    }
+
     private static List<NamedPartition> named(List<SelectedPartition> partitions) {
+        return named(
+                partitions,
+                "A preferred election names one partition. An empty set is refused, and electing every partition is not sent.");
+    }
+
+    private static List<NamedPartition> named(List<SelectedPartition> partitions, String empty) {
         if (partitions == null || partitions.isEmpty()) {
-            throw new IllegalArgumentException(
-                    "A preferred election names one partition. An empty set is refused, and electing every partition is not sent.");
+            throw new IllegalArgumentException(empty);
         }
         Map<String, NamedPartition> unique = new TreeMap<>();
         for (SelectedPartition partition : partitions) {
@@ -617,4 +740,9 @@ public class KafkaReplication {
             String note) {}
 
     private record ElectionPlan(ElectionPreview view, List<ElectionPart> parts) {}
+
+    private record CancelPart(
+            String topic, int partition, String driverEtag, List<Integer> before, List<Integer> after) {}
+
+    private record CancelPlan(CancelPreview view, List<CancelPart> parts) {}
 }

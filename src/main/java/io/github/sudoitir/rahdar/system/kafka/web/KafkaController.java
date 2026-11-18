@@ -18,6 +18,8 @@ import io.github.sudoitir.rahdar.system.kafka.KafkaTopicLifecycle.PartitionsRequ
 import io.github.sudoitir.rahdar.system.kafka.KafkaTopicLifecycle.TopicApplyRequest;
 import io.github.sudoitir.rahdar.system.kafka.KafkaTransactionAborts;
 import io.github.sudoitir.rahdar.system.kafka.KafkaTransactions;
+import io.github.sudoitir.rahdar.system.kafka.web.KafkaReplicationViews.CancelOutcome;
+import io.github.sudoitir.rahdar.system.kafka.web.KafkaReplicationViews.CancelPreview;
 import io.github.sudoitir.rahdar.system.kafka.web.KafkaReplicationViews.ElectionOutcome;
 import io.github.sudoitir.rahdar.system.kafka.web.KafkaReplicationViews.ElectionPreview;
 import io.github.sudoitir.rahdar.system.kafka.web.KafkaReplicationViews.PartitionPage;
@@ -301,5 +303,16 @@ public class KafkaController {
     @GetMapping("/reassignments")
     public ReassignmentList reassignments(@PathVariable UUID clusterId) {
         return replication.reassignments(clusterId);
+    }
+
+    @PostMapping("/reassignments:cancel-preview")
+    public CancelPreview previewCancel(@PathVariable UUID clusterId, @RequestBody PartitionSelection request) {
+        return replication.previewCancel(clusterId, request);
+    }
+
+    @HeldResponse
+    @PostMapping("/reassignments:cancel")
+    public CancelOutcome cancel(@PathVariable UUID clusterId, @RequestBody PartitionSelection request) {
+        return replication.cancel(clusterId, request);
     }
 }

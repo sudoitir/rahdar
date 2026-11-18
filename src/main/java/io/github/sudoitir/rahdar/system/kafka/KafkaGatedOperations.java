@@ -11,6 +11,7 @@ import io.github.sudoitir.rahdar.system.kafka.KafkaAclChanges.AclChangeParams;
 import io.github.sudoitir.rahdar.system.kafka.KafkaBrokerConfigChanges.BrokerConfigParams;
 import io.github.sudoitir.rahdar.system.kafka.KafkaHangingAborts.HangingAbortParams;
 import io.github.sudoitir.rahdar.system.kafka.KafkaOffsetResets.OffsetResetParams;
+import io.github.sudoitir.rahdar.system.kafka.KafkaReplication.CancelParams;
 import io.github.sudoitir.rahdar.system.kafka.KafkaReplication.ElectParams;
 import io.github.sudoitir.rahdar.system.kafka.KafkaReplication.ReassignParams;
 import io.github.sudoitir.rahdar.system.kafka.KafkaTopicConfigChanges.ConfigChangeParams;
@@ -282,6 +283,27 @@ class KafkaGatedOperations {
                         DisplayRow.of("Throttle bytes per second", String.valueOf(p.throttleBytesPerSecond()))),
                 replication::estimateReassign,
                 replication::replayReassign,
+                clusters,
+                Set.of());
+    }
+
+    @Bean
+    GatedOperation<CancelParams> cancelReassignment(KafkaReplication replication, ClusterEnvironmentIndex clusters) {
+        return new Operation<>(
+                "kafka.partition.cancel-reassignment",
+                CancelParams.class,
+                CancelParams::clusterId,
+                p -> "Cancel " + p.partitions().size() + " replica moves on " + clusters.labelOf(p.clusterId()),
+                p -> List.of(
+                        DisplayRow.of(CLUSTER, clusters.labelOf(p.clusterId())),
+                        DisplayRow.of(
+                                "Partitions",
+                                p.partitions().stream()
+                                        .map(part -> part.topic() + "-" + part.partition())
+                                        .toList()
+                                        .toString())),
+                replication::estimateCancel,
+                replication::replayCancel,
                 clusters,
                 Set.of());
     }

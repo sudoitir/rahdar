@@ -47,6 +47,8 @@ import io.github.sudoitir.rahdar.kernel.security.ClusterAccessGuard;
 import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
 import io.github.sudoitir.rahdar.system.kafka.internal.persistence.KafkaReassignmentEntity;
 import io.github.sudoitir.rahdar.system.kafka.internal.persistence.KafkaReassignmentRepository;
+import io.github.sudoitir.rahdar.system.kafka.web.KafkaReplicationViews.CancelOutcome;
+import io.github.sudoitir.rahdar.system.kafka.web.KafkaReplicationViews.CancelPreview;
 import io.github.sudoitir.rahdar.system.kafka.web.KafkaReplicationViews.ElectionOutcome;
 import io.github.sudoitir.rahdar.system.kafka.web.KafkaReplicationViews.ElectionPreview;
 import io.github.sudoitir.rahdar.system.kafka.web.KafkaReplicationViews.PartitionSelection;
@@ -302,6 +304,36 @@ class KafkaReplicationTest {
         assertThat(reassign.options().raw(KafkaPlacement.THROTTLE_OPTION)).contains(1_000L);
     }
 
+    @Test
+    void cancelLeavesTheReplicasFromBeforeTheMoveAndDoesNotChangeAThrottleItDidNotStore() {
+        when(operations.preview(any(), any(), any())).thenReturn(cancelPreview());
+        PartitionSelection selection = new PartitionSelection(List.of(new SelectedPartition("orders", 0)), null);
+
+        CancelPreview preview = replication.previewCancel(CLUSTER, selection);
+        CancelOutcome outcome =
+                replication.cancel(CLUSTER, new PartitionSelection(selection.partitions(), preview.etag()));
+
+        assertThat(outcome.partitions()).hasSize(1);
+        assertThat(outcome.partitions().getFirst().currentReplicas()).containsExactly(1, 2, 3);
+        assertThat(outcome.partitions().getFirst().replicas()).containsExactly(1, 2);
+        ArgumentCaptor<Operation> sent = ArgumentCaptor.forClass(Operation.class);
+        verify(operations).execute(any(), sent.capture(), eq(Scope.whole()), eq(Precondition.ifMatch("etag-c")));
+        Operation.Reassign reassign = (Operation.Reassign) sent.getValue();
+        assertThat(reassign.assignments().get(PartitionId.of("0"))).isEmpty();
+        assertThat(reassign.options().asMap()).isEmpty();
+        verify(reassignments, never()).save(any());
+        verify(reassignments, never()).delete(any());
+    }
+
+    @Test
+    void anEmptyCancelIsRefusedBeforeAnyDriverCall() {
+        assertThatThrownBy(() -> replication.previewCancel(CLUSTER, new PartitionSelection(List.of(), null)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("nothing was sent");
+        verify(operations, never()).preview(any(), any(), any());
+        verify(operations, never()).execute(any(), any(), any(), any());
+    }
+
     private static Partial<ResourcePage> page(Resource resource) {
         return Partial.complete(new ResourcePage(List.of(resource), Optional.empty()), List.of());
     }
@@ -357,6 +389,17 @@ class KafkaReplicationTest {
                 Set.of(),
                 new Estimate(bytes, "By"),
                 etag,
+                EtagBasis.CONFIGURATION,
+                PreconditionEnforcement.CHECKED_BEFORE);
+    }
+
+    private static Preview cancelPreview() {
+        return new Preview(
+                List.of(new AttributeChange(
+                        KafkaKinds.REPLICAS, Optional.of(List.of(1, 2, 3)), Optional.of(List.of(1, 2)))),
+                Set.of(),
+                new Estimate(Count.exact(0), "{replica}"),
+                "etag-c",
                 EtagBasis.CONFIGURATION,
                 PreconditionEnforcement.CHECKED_BEFORE);
     }
