@@ -1,4 +1,4 @@
-import { IconAdjustments } from '@tabler/icons-react';
+import { IconAdjustments, IconListDetails } from '@tabler/icons-react';
 import { useNavigate } from '@tanstack/react-router';
 
 import { useResourceGate } from '../../kernel/auth/useResourceGate.ts';
@@ -23,6 +23,29 @@ export function TopicConfiguration({ clusterId, target }: Readonly<ActionProps<D
     <ActionMenuItem
       label="Configuration"
       icon={<IconAdjustments size="1rem" aria-hidden />}
+      verdict={verdict}
+      href={clusterHref(clusterId, path)}
+      onSelect={() => navigate({ to: `/clusters/${clusterId}/${path}` })}
+    />
+  );
+}
+
+/** "Partitions" on a topic's row: where each replica sits, in the cluster's order. */
+export function TopicPartitions({ clusterId, target }: Readonly<ActionProps<DestinationTarget>>) {
+  const navigate = useNavigate();
+  const { hidden, verdict } = useResourceGate({
+    clusterId,
+    noun: 'destination',
+    permission: 'destination:read',
+    label: 'Read partitions',
+    resource: target.snapshot,
+  });
+  if (target.kind !== KAFKA_TOPIC || hidden) return null;
+  const path = `kafka/topics/${encodeURIComponent(target.name)}`;
+  return (
+    <ActionMenuItem
+      label="Partitions"
+      icon={<IconListDetails size="1rem" aria-hidden />}
       verdict={verdict}
       href={clusterHref(clusterId, path)}
       onSelect={() => navigate({ to: `/clusters/${clusterId}/${path}` })}

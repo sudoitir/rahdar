@@ -1,13 +1,19 @@
-import { IconBuildingBroadcastTower, IconLock, IconUsersGroup, IconArrowsTransferUp } from '@tabler/icons-react';
+import {
+  IconBuildingBroadcastTower,
+  IconLock,
+  IconStack2,
+  IconUsersGroup,
+  IconArrowsTransferUp,
+} from '@tabler/icons-react';
 import { createRoute } from '@tanstack/react-router';
 
 import { CONTRACT, defineFeature } from '../../kernel/feature.ts';
 import { lazyFeatureView } from '../../kernel/routing/lazy.tsx';
 import { clusterRoute } from '../../kernel/routing/roots.ts';
 import { CreateTopicForm } from './CreateTopicForm.tsx';
-import { TopicConfiguration } from './rowActions.tsx';
+import { TopicConfiguration, TopicPartitions } from './rowActions.tsx';
 import { DeleteTopic, IncreasePartitions } from './TopicLifecycleActions.tsx';
-import { validateAclSearch, validateGroupsSearch } from './search.ts';
+import { validateAclSearch, validateGroupsSearch, validateReplicationSearch } from './search.ts';
 
 const view = <K extends string>(load: () => Promise<Record<K, () => React.ReactNode>>, name: K) =>
   lazyFeatureView('kafka', load, name, 'kafka');
@@ -29,6 +35,19 @@ const topicConfigRoute = createRoute({
   getParentRoute: () => clusterRoute,
   path: 'kafka/topics/$topic/config',
   component: view(() => import('./TopicConfigView.tsx'), 'TopicConfigView'),
+});
+
+const partitionsRoute = createRoute({
+  getParentRoute: () => clusterRoute,
+  path: 'kafka/topics/$topic',
+  component: view(() => import('./PartitionsView.tsx'), 'PartitionsView'),
+});
+
+const replicationRoute = createRoute({
+  getParentRoute: () => clusterRoute,
+  path: 'kafka/replication',
+  component: view(() => import('./ReplicationView.tsx'), 'ReplicationView'),
+  validateSearch: validateReplicationSearch,
 });
 
 const brokerConfigRoute = createRoute({
@@ -58,14 +77,24 @@ const brokersRoute = createRoute({
 
 /**
  * Apache Kafka (ADR-0216): consumer groups with their offsets and the reset of them, topic and broker configuration,
- * ACLs, transactions and brokers. Every view is for a Kafka cluster; another system's cluster answers its
- * addresses with the not-found page.
+ * ACLs, transactions, brokers, partition placement and replication. Every view is for a Kafka cluster;
+ * another system's cluster answers its addresses with the not-found page.
  */
 export const kafkaFeature = defineFeature({
   contract: CONTRACT,
   id: 'kafka',
   routes: {
-    cluster: [groupsRoute, groupRoute, topicConfigRoute, aclsRoute, transactionsRoute, brokersRoute, brokerConfigRoute],
+    cluster: [
+      groupsRoute,
+      groupRoute,
+      topicConfigRoute,
+      partitionsRoute,
+      aclsRoute,
+      transactionsRoute,
+      brokersRoute,
+      brokerConfigRoute,
+      replicationRoute,
+    ],
   },
   nav: [
     {
@@ -96,6 +125,15 @@ export const kafkaFeature = defineFeature({
       permission: 'cluster:read',
     },
     {
+      group: 'observe',
+      order: 12,
+      label: 'Replication',
+      icon: IconStack2,
+      path: 'kafka/replication',
+      system: 'kafka',
+      permission: 'destination:read',
+    },
+    {
       group: 'configuration',
       order: 40,
       label: 'ACLs',
@@ -107,6 +145,7 @@ export const kafkaFeature = defineFeature({
   ],
   slots: {
     'destination.actions': [
+      { id: 'kafka.topic.placement', order: 14, section: 'open', Component: TopicPartitions },
       { id: 'kafka.topic.configuration', order: 15, section: 'open', Component: TopicConfiguration },
       { id: 'kafka.topic.partitions', order: 16, section: 'operate', Component: IncreasePartitions },
       { id: 'kafka.topic.delete', order: 20, section: 'destroy', Component: DeleteTopic },
