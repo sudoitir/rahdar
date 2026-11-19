@@ -15,6 +15,8 @@
 * `i.g.s.r.s.k.KafkaHangingTransactions`
 * `i.g.s.r.s.k.KafkaOffsetResets`
 * `i.g.s.r.s.k.KafkaOffsets`
+* `i.g.s.r.s.k.KafkaPartitionReads`
+* `i.g.s.r.s.k.KafkaReplication`
 * `i.g.s.r.s.k.KafkaTopicConfigChanges`
 * `i.g.s.r.s.k.KafkaTopicConfigs`
 * `i.g.s.r.s.k.KafkaTopicLifecycle`
