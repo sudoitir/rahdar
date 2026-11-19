@@ -286,7 +286,7 @@ public class KafkaReplication {
                     .operations()
                     .execute(
                             partitionId(p.topic(), p.partition()),
-                            reassign(p.partition(), p.replicas(), p.throttleBytesPerSecond()),
+                            move(p.partition(), p.replicas(), p.throttleBytesPerSecond()),
                             Scope.whole(),
                             Precondition.ifMatch(preview.etag()))
                     .orThrow());
@@ -350,7 +350,7 @@ public class KafkaReplication {
                 resource.attributes().raw(KafkaKinds.REPLICAS).orElse(null));
         Preview preview = KafkaFailures.call(() -> gateway.cluster(clusterId)
                 .operations()
-                .preview(partitionId(topic, partition), reassign(partition, replicas, throttle), Scope.whole()));
+                .preview(partitionId(topic, partition), move(partition, replicas, throttle), Scope.whole()));
         Count count = preview.estimate().count();
         Long bytes =
                 switch (count) {
@@ -508,7 +508,7 @@ public class KafkaReplication {
         access.requireResource(clusterId, ResourceRef.destination(topic), ResourcePermissions.DESTINATION_UPDATE);
     }
 
-    private static Operation.Reassign reassign(int partition, List<Integer> replicas, long throttle) {
+    private static Operation.Reassign move(int partition, List<Integer> replicas, long throttle) {
         List<NodeId> nodes =
                 replicas.stream().map(id -> NodeId.of(Integer.toString(id))).toList();
         Attributes options = Attributes.builder()
@@ -531,7 +531,7 @@ public class KafkaReplication {
                     .operations()
                     .preview(
                             partitionId(partition.topic(), partition.partition()),
-                            cancel(partition.partition()),
+                            stop(partition.partition()),
                             Scope.whole()));
             parts.add(new CancelPart(
                     partition.topic(),
@@ -574,7 +574,7 @@ public class KafkaReplication {
                         .operations()
                         .execute(
                                 partitionId(part.topic(), part.partition()),
-                                cancel(part.partition()),
+                                stop(part.partition()),
                                 Scope.whole(),
                                 Precondition.ifMatch(part.driverEtag()))
                         .orThrow());
@@ -593,7 +593,7 @@ public class KafkaReplication {
         }
     }
 
-    private static Operation.Reassign cancel(int partition) {
+    private static Operation.Reassign stop(int partition) {
         return new Operation.Reassign(Map.of(PartitionId.of(Integer.toString(partition)), List.of()));
     }
 
