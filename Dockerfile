@@ -5,7 +5,7 @@
 # architecture, and building them under QEMU for arm64 was ten times slower for no different bytes.
 
 # ── 1. Frontend ──────────────────────────────────────────────────────────────
-FROM --platform=$BUILDPLATFORM node:24-bookworm-slim@sha256:c86ecead9e55a5210ac1727de38a4ca840bf03dcaf34dc9749addbf383b1920c AS web
+FROM --platform=$BUILDPLATFORM node:24-bookworm-slim@sha256:dc26ae92c9fb15cf6b1d63e20f0944b2efe0f115b20e00be48fb23fceb061c54 AS web
 WORKDIR /web
 COPY web/package.json web/package-lock.json ./
 RUN npm ci
