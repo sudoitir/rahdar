@@ -62,6 +62,7 @@ import io.github.sudoitir.rahdar.system.kafka.web.KafkaReplicationViews.Selected
 import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -110,12 +111,11 @@ class KafkaReplicationTest {
         replication = new KafkaReplication(
                 gateway,
                 new KafkaPartitionReads(gateway, access),
-                reassignments,
+                new KafkaReassignmentLog(reassignments, Clock.systemUTC()),
                 access,
                 gate,
                 audit,
-                actors,
-                Clock.systemUTC());
+                actors);
     }
 
     @BeforeEach
@@ -214,8 +214,8 @@ class KafkaReplicationTest {
     void aFactorBelowMinInSyncReplicasNamesBothNumbersAndAltersNothing() {
         minInSync = 2;
 
-        assertThatThrownBy(() -> replication.reassign(
-                        CLUSTER, "orders", 0, new ReplicaMoveRequest(List.of(1), 1_000L, "etag-1")))
+        ReplicaMoveRequest oneReplica = new ReplicaMoveRequest(List.of(1), 1_000L, "etag-1");
+        assertThatThrownBy(() -> replication.reassign(CLUSTER, "orders", 0, oneReplica))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Replication factor 1")
                 .hasMessageContaining("min.insync.replicas 2");
@@ -387,9 +387,8 @@ class KafkaReplicationTest {
                 .etag();
         when(operations.execute(any(), any(), any(), any())).thenThrow(new IllegalStateException("down"));
 
-        assertThatThrownBy(() -> replication.elect(
-                        CLUSTER, new PartitionSelection(List.of(new SelectedPartition("orders", 0)), etag)))
-                .isInstanceOf(IllegalStateException.class);
+        PartitionSelection stale = new PartitionSelection(List.of(new SelectedPartition("orders", 0)), etag);
+        assertThatThrownBy(() -> replication.elect(CLUSTER, stale)).isInstanceOf(IllegalStateException.class);
         verify(audit).fail(event, "down");
     }
 
@@ -411,20 +410,20 @@ class KafkaReplicationTest {
 
     @Test
     void aReplicaListThatNamesNothingOrTheSameBrokerTwiceIsRefused() {
-        assertThatThrownBy(() -> replication.previewElection(
-                        CLUSTER, new PartitionSelection(List.of(new SelectedPartition(" ", 0)), null)))
+        PartitionSelection blankTopic = new PartitionSelection(List.of(new SelectedPartition(" ", 0)), null);
+        assertThatThrownBy(() -> replication.previewElection(CLUSTER, blankTopic))
                 .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> replication.previewReassign(
-                        CLUSTER, "orders", 0, new ReplicaMoveRequest(java.util.Arrays.asList(1, null), 1_000L, null)))
+        ReplicaMoveRequest missingBroker = new ReplicaMoveRequest(Arrays.asList(1, null), 1_000L, null);
+        assertThatThrownBy(() -> replication.previewReassign(CLUSTER, "orders", 0, missingBroker))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("broker number");
-        assertThatThrownBy(() -> replication.previewReassign(
-                        CLUSTER, "orders", 0, new ReplicaMoveRequest(List.of(1, 1), 1_000L, null)))
+        ReplicaMoveRequest twice = new ReplicaMoveRequest(List.of(1, 1), 1_000L, null);
+        assertThatThrownBy(() -> replication.previewReassign(CLUSTER, "orders", 0, twice))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("twice");
-        assertThatThrownBy(() -> replication.previewElection(
-                        CLUSTER,
-                        new PartitionSelection(java.util.Arrays.asList(new SelectedPartition("orders", null)), null)))
+        PartitionSelection missingNumber =
+                new PartitionSelection(Arrays.asList(new SelectedPartition("orders", null)), null);
+        assertThatThrownBy(() -> replication.previewElection(CLUSTER, missingNumber))
                 .isInstanceOf(IllegalArgumentException.class);
         verify(operations, never()).preview(any(), any(), any());
     }
@@ -462,18 +461,19 @@ class KafkaReplicationTest {
                 .previewReassign(CLUSTER, "orders", 0, new ReplicaMoveRequest(List.of(1, 2, 3), 1_000L, null))
                 .etag();
         when(operations.execute(any(), any(), any(), any())).thenThrow(new IllegalStateException("down"));
-        assertThatThrownBy(() -> replication.reassign(
-                        CLUSTER, "orders", 0, new ReplicaMoveRequest(List.of(1, 2, 3), 1_000L, moveEtag)))
+        ReplicaMoveRequest move = new ReplicaMoveRequest(List.of(1, 2, 3), 1_000L, moveEtag);
+        assertThatThrownBy(() -> replication.reassign(CLUSTER, "orders", 0, move))
                 .isInstanceOf(IllegalStateException.class);
 
         when(operations.preview(any(), any(), any())).thenReturn(cancelPreview());
         String cancelEtag = replication
                 .previewCancel(CLUSTER, new PartitionSelection(List.of(new SelectedPartition("orders", 0)), null))
                 .etag();
-        assertThatThrownBy(() -> replication.cancel(
-                        CLUSTER, new PartitionSelection(List.of(new SelectedPartition("orders", 0)), cancelEtag)))
+        PartitionSelection cancelSelection =
+                new PartitionSelection(List.of(new SelectedPartition("orders", 0)), cancelEtag);
+        assertThatThrownBy(() -> replication.cancel(CLUSTER, cancelSelection))
                 .isInstanceOf(IllegalStateException.class);
-        verify(audit, org.mockito.Mockito.atLeast(2)).fail(eq(event), eq("down"));
+        verify(audit, org.mockito.Mockito.atLeast(2)).fail(event, "down");
     }
 
     @Test
@@ -521,7 +521,8 @@ class KafkaReplicationTest {
 
     @Test
     void anEmptyCancelIsRefusedBeforeAnyDriverCall() {
-        assertThatThrownBy(() -> replication.previewCancel(CLUSTER, new PartitionSelection(List.of(), null)))
+        PartitionSelection empty = new PartitionSelection(List.of(), null);
+        assertThatThrownBy(() -> replication.previewCancel(CLUSTER, empty))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("nothing was sent");
         verify(operations, never()).preview(any(), any(), any());

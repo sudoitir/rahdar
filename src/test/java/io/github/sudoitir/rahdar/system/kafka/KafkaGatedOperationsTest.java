@@ -70,17 +70,18 @@ class KafkaGatedOperationsTest {
         ReassignParams move = new ReassignParams(CLUSTER, "orders", 0, List.of(1, 2), 1_000L, "etag");
         CancelParams cancel = new CancelParams(CLUSTER, List.of(new NamedPartition("orders", 0)), "etag");
 
-        GatedOperation<ElectParams> election = beans.electPreferred(replication, clusters);
+        KafkaReplicationGatedOperations replicationBeans = new KafkaReplicationGatedOperations();
+        GatedOperation<ElectParams> election = replicationBeans.electPreferred(replication, clusters);
         assertThat(election.summary(elect)).contains("1 partitions").contains("prod-eu");
         assertThat(election.display(elect)).extracting(DisplayRow::label).contains("Cluster", "Partitions");
         assertThat(election.scope(elect).clusterId()).isEqualTo(CLUSTER);
         assertThat(election.traits(elect)).isNotEmpty();
 
-        GatedOperation<ReassignParams> reassign = beans.reassignReplicas(replication, clusters);
+        GatedOperation<ReassignParams> reassign = replicationBeans.reassignReplicas(replication, clusters);
         assertThat(reassign.summary(move)).contains("orders-0").contains("prod-eu");
         assertThat(reassign.display(move)).extracting(DisplayRow::to).contains("[1, 2]", "1000");
 
-        GatedOperation<CancelParams> stop = beans.cancelReassignment(replication, clusters);
+        GatedOperation<CancelParams> stop = replicationBeans.cancelReassignment(replication, clusters);
         assertThat(stop.summary(cancel)).contains("1 replica").contains("prod-eu");
         assertThat(stop.display(cancel)).extracting(DisplayRow::label).contains("Partitions");
         stop.replay(cancel);

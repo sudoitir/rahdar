@@ -35,6 +35,8 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class KafkaPartitionReads {
 
+    private static final String TOPIC = "topic";
+
     /** Everything a placement row shows. An empty projection would also do, and would read more than the row uses. */
     static final Set<String> PROJECTION = Set.of(
             KafkaKinds.LEADER,
@@ -60,7 +62,7 @@ public class KafkaPartitionReads {
     public PartitionPage partitions(UUID clusterId, String topic, String cursor, Integer limit) {
         access.requireResource(clusterId, ResourceRef.destination(topic), Permissions.DESTINATION_READ);
         ResourceQuery query = ResourceQuery.of(KafkaKinds.PARTITION)
-                .where(Map.of("topic", topic))
+                .where(Map.of(TOPIC, topic))
                 .project(PROJECTION)
                 .limit(KafkaPlacement.pageSize(limit));
         if (cursor != null && !cursor.isBlank()) {
@@ -113,7 +115,7 @@ public class KafkaPartitionReads {
         return KafkaGroups.read(
                         gateway.cluster(clusterId),
                         ResourceQuery.of(KafkaKinds.PARTITION)
-                                .where(Map.of("topic", topic))
+                                .where(Map.of(TOPIC, topic))
                                 .named(Integer.toString(partition))
                                 .project(PROJECTION))
                 .items()
@@ -126,7 +128,7 @@ public class KafkaPartitionReads {
     private List<Resource> readAll(UUID clusterId, String topic) {
         ResourceQuery query = ResourceQuery.of(KafkaKinds.PARTITION).project(PROJECTION);
         if (topic != null && !topic.isBlank()) {
-            query = query.where(Map.of("topic", topic));
+            query = query.where(Map.of(TOPIC, topic));
         }
         List<Resource> all = new ArrayList<>();
         Optional<String> cursor = Optional.empty();

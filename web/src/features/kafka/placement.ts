@@ -185,7 +185,7 @@ export function wholeThrottle(value: number | string): number | undefined {
 const base = (clusterId: string) => `/clusters/${clusterId}/kafka`;
 const seg = encodeURIComponent;
 
-const withQuery = (path: string, query: string) => `${path}${query ? `?${query}` : ''}`;
+const withQuery = (path: string, query: string) => (query ? `${path}?${query}` : path);
 
 const partitionsKey = (clusterId: string, topic: string) => clusterKey(clusterId, 'kafka', 'partitions', topic);
 const replicationKey = (clusterId: string, topic: string) => clusterKey(clusterId, 'kafka', 'replication', topic);

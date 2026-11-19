@@ -8,8 +8,6 @@ import io.github.sudoitir.rahdar.system.kafka.KafkaHangingAborts;
 import io.github.sudoitir.rahdar.system.kafka.KafkaHangingTransactions;
 import io.github.sudoitir.rahdar.system.kafka.KafkaOffsetResets;
 import io.github.sudoitir.rahdar.system.kafka.KafkaOffsets;
-import io.github.sudoitir.rahdar.system.kafka.KafkaPartitionReads;
-import io.github.sudoitir.rahdar.system.kafka.KafkaReplication;
 import io.github.sudoitir.rahdar.system.kafka.KafkaTopicConfigChanges;
 import io.github.sudoitir.rahdar.system.kafka.KafkaTopicConfigs;
 import io.github.sudoitir.rahdar.system.kafka.KafkaTopicLifecycle;
@@ -18,17 +16,6 @@ import io.github.sudoitir.rahdar.system.kafka.KafkaTopicLifecycle.PartitionsRequ
 import io.github.sudoitir.rahdar.system.kafka.KafkaTopicLifecycle.TopicApplyRequest;
 import io.github.sudoitir.rahdar.system.kafka.KafkaTransactionAborts;
 import io.github.sudoitir.rahdar.system.kafka.KafkaTransactions;
-import io.github.sudoitir.rahdar.system.kafka.web.KafkaReplicationViews.CancelOutcome;
-import io.github.sudoitir.rahdar.system.kafka.web.KafkaReplicationViews.CancelPreview;
-import io.github.sudoitir.rahdar.system.kafka.web.KafkaReplicationViews.ElectionOutcome;
-import io.github.sudoitir.rahdar.system.kafka.web.KafkaReplicationViews.ElectionPreview;
-import io.github.sudoitir.rahdar.system.kafka.web.KafkaReplicationViews.PartitionPage;
-import io.github.sudoitir.rahdar.system.kafka.web.KafkaReplicationViews.PartitionSelection;
-import io.github.sudoitir.rahdar.system.kafka.web.KafkaReplicationViews.ReassignOutcome;
-import io.github.sudoitir.rahdar.system.kafka.web.KafkaReplicationViews.ReassignPreview;
-import io.github.sudoitir.rahdar.system.kafka.web.KafkaReplicationViews.ReassignmentList;
-import io.github.sudoitir.rahdar.system.kafka.web.KafkaReplicationViews.ReplicaMoveRequest;
-import io.github.sudoitir.rahdar.system.kafka.web.KafkaReplicationViews.ReplicaSuggestion;
 import io.github.sudoitir.rahdar.system.kafka.web.KafkaViews.AbortPreview;
 import io.github.sudoitir.rahdar.system.kafka.web.KafkaViews.AbortRequest;
 import io.github.sudoitir.rahdar.system.kafka.web.KafkaViews.AbortResult;
@@ -81,8 +68,6 @@ public class KafkaController {
     private final KafkaTopicConfigs configs;
     private final KafkaTopicConfigChanges configChanges;
     private final KafkaTopicLifecycle lifecycle;
-    private final KafkaPartitionReads partitionReads;
-    private final KafkaReplication replication;
 
     @GetMapping("/groups")
     public GroupPage groups(
@@ -242,77 +227,5 @@ public class KafkaController {
     public HangingAbortResult abortHanging(@PathVariable UUID clusterId, @RequestBody HangingAbortRequest request) {
         return hangingAborts.abort(
                 clusterId, request.topic(), request.partition(), request.producerId(), request.etag());
-    }
-
-    @GetMapping("/topics/{topic}/partitions")
-    public PartitionPage partitions(
-            @PathVariable UUID clusterId,
-            @PathVariable String topic,
-            @RequestParam(required = false) String cursor,
-            @RequestParam(required = false) Integer limit) {
-        return partitionReads.partitions(clusterId, topic, cursor, limit);
-    }
-
-    /** Partitions that are under-replicated, offline, or not on their preferred leader. */
-    @GetMapping("/replication")
-    public PartitionPage replication(
-            @PathVariable UUID clusterId,
-            @RequestParam(required = false) String topic,
-            @RequestParam(required = false) String cursor,
-            @RequestParam(required = false) Integer limit) {
-        return partitionReads.replication(clusterId, topic, cursor, limit);
-    }
-
-    /** A rack suggestion. It keeps the current replicas and changes nothing. */
-    @GetMapping("/topics/{topic}/partitions/{partition}:suggestion")
-    public ReplicaSuggestion suggest(
-            @PathVariable UUID clusterId, @PathVariable String topic, @PathVariable int partition) {
-        return partitionReads.suggest(clusterId, topic, partition);
-    }
-
-    @PostMapping("/replication:elect-preview")
-    public ElectionPreview previewElection(@PathVariable UUID clusterId, @RequestBody PartitionSelection request) {
-        return replication.previewElection(clusterId, request);
-    }
-
-    @HeldResponse
-    @PostMapping("/replication:elect")
-    public ElectionOutcome elect(@PathVariable UUID clusterId, @RequestBody PartitionSelection request) {
-        return replication.elect(clusterId, request);
-    }
-
-    @PostMapping("/topics/{topic}/partitions/{partition}:reassign-preview")
-    public ReassignPreview previewReassign(
-            @PathVariable UUID clusterId,
-            @PathVariable String topic,
-            @PathVariable int partition,
-            @RequestBody ReplicaMoveRequest request) {
-        return replication.previewReassign(clusterId, topic, partition, request);
-    }
-
-    @HeldResponse
-    @PostMapping("/topics/{topic}/partitions/{partition}:reassign")
-    public ReassignOutcome reassign(
-            @PathVariable UUID clusterId,
-            @PathVariable String topic,
-            @PathVariable int partition,
-            @RequestBody ReplicaMoveRequest request) {
-        return replication.reassign(clusterId, topic, partition, request);
-    }
-
-    @GetMapping("/reassignments")
-    public ReassignmentList reassignments(@PathVariable UUID clusterId) {
-        return replication.reassignments(clusterId);
-    }
-
-    @PostMapping("/reassignments:cancel-preview")
-    public CancelPreview previewCancel(@PathVariable UUID clusterId, @RequestBody PartitionSelection request) {
-        return replication.previewCancel(clusterId, request);
-    }
-
-    @HeldResponse
-    @PostMapping("/reassignments:cancel")
-    public CancelOutcome cancel(@PathVariable UUID clusterId, @RequestBody PartitionSelection request) {
-        return replication.cancel(clusterId, request);
     }
 }
