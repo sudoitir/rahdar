@@ -27,7 +27,8 @@ class KafkaClusterDeletedTest {
             null,
             null,
             Clock.systemUTC(),
-            mock(KafkaHealthStore.class));
+            mock(KafkaHealthStore.class),
+            null);
     private final KafkaClusterDeleted deleted = new KafkaClusterDeleted(partitions, scrape);
 
     @Test

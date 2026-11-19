@@ -8,6 +8,7 @@ import io.github.sudoitir.rahdar.platform.mcp.McpErrors;
 import io.github.sudoitir.rahdar.system.kafka.KafkaHangingAborts;
 import io.github.sudoitir.rahdar.system.kafka.KafkaHangingTransactions;
 import io.github.sudoitir.rahdar.system.kafka.KafkaOffsetResets;
+import io.github.sudoitir.rahdar.system.kafka.KafkaReplication;
 import io.github.sudoitir.rahdar.system.kafka.KafkaTopicConfigChanges;
 import io.github.sudoitir.rahdar.system.kafka.KafkaTopicConfigs;
 import io.github.sudoitir.rahdar.system.kafka.KafkaTopicLifecycle;
@@ -16,9 +17,13 @@ import io.github.sudoitir.rahdar.system.kafka.KafkaTopicLifecycle.PartitionsRequ
 import io.github.sudoitir.rahdar.system.kafka.KafkaTopicLifecycle.TopicApplyRequest;
 import io.github.sudoitir.rahdar.system.kafka.KafkaTransactionAborts;
 import io.github.sudoitir.rahdar.system.kafka.KafkaTransactions;
+import io.github.sudoitir.rahdar.system.kafka.web.KafkaReplicationViews.PartitionSelection;
+import io.github.sudoitir.rahdar.system.kafka.web.KafkaReplicationViews.ReplicaMoveRequest;
+import io.github.sudoitir.rahdar.system.kafka.web.KafkaReplicationViews.SelectedPartition;
 import io.github.sudoitir.rahdar.system.kafka.web.KafkaViews.ConfigChangeRequest;
 import io.github.sudoitir.rahdar.system.kafka.web.KafkaViews.OffsetRequest;
 import io.modelcontextprotocol.spec.McpSchema;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -47,6 +52,7 @@ public class KafkaMcpActionTools {
     private final KafkaHangingTransactions hanging;
     private final KafkaHangingAborts hangingAborts;
     private final KafkaTopicLifecycle lifecycle;
+    private final KafkaReplication replication;
 
     /** The id of a hanging transaction that kafka_list_transactions returns. */
     private static final String HANGING_PREFIX = "kafka.hanging-transaction/";
@@ -268,6 +274,115 @@ public class KafkaMcpActionTools {
                 : lifecycle.deleteGroup(id, group, new TopicApplyRequest(etag, null, false)));
     }
 
+    @McpTool(
+            name = "kafka_elect_preferred",
+            description = "Elect the preferred leader of named partitions, from the preview's etag.",
+            annotations =
+                    @McpTool.McpAnnotations(
+                            readOnlyHint = false,
+                            destructiveHint = false,
+                            idempotentHint = true,
+                            openWorldHint = false))
+    public McpSchema.CallToolResult kafkaElectPreferred(
+            @McpToolParam(required = true) String clusterId,
+            @McpToolParam(required = true) String partitions,
+            @McpToolParam(required = true) String etag,
+            @McpToolParam(required = true) String confirm) {
+        UUID id = McpArgs.uuid(CLUSTER_ID, clusterId);
+        McpArgs.required("partitions", partitions);
+        McpArgs.required("etag", etag);
+        McpArgs.confirm(partitions, confirm);
+        return guard(() -> replication.elect(id, new PartitionSelection(selection(partitions), etag)));
+    }
+
+    @McpTool(
+            name = "kafka_reassign",
+            description = "Move a partition's replicas at a positive throttle, from the preview's etag.",
+            annotations =
+                    @McpTool.McpAnnotations(
+                            readOnlyHint = false,
+                            destructiveHint = true,
+                            idempotentHint = false,
+                            openWorldHint = false))
+    public McpSchema.CallToolResult kafkaReassign(
+            @McpToolParam(required = true) String clusterId,
+            @McpToolParam(required = true) String topic,
+            @McpToolParam(required = true) Integer partition,
+            @McpToolParam(required = true) String replicas,
+            @McpToolParam(required = true) Long throttleBytesPerSecond,
+            @McpToolParam(required = true) String etag,
+            @McpToolParam(required = true) String confirm) {
+        UUID id = McpArgs.uuid(CLUSTER_ID, clusterId);
+        McpArgs.required(TOPIC, topic);
+        if (partition == null) {
+            throw McpErrors.invalidParams("partition is required.");
+        }
+        McpArgs.required("etag", etag);
+        McpArgs.confirm(topic + "-" + partition, confirm);
+        return guard(() -> replication.reassign(
+                id, topic, partition, new ReplicaMoveRequest(brokers(replicas), throttleBytesPerSecond, etag)));
+    }
+
+    @McpTool(
+            name = "kafka_cancel_reassignment",
+            description = "Cancel named in-progress replica moves, from the preview's etag.",
+            annotations =
+                    @McpTool.McpAnnotations(
+                            readOnlyHint = false,
+                            destructiveHint = false,
+                            idempotentHint = true,
+                            openWorldHint = false))
+    public McpSchema.CallToolResult kafkaCancelReassignment(
+            @McpToolParam(required = true) String clusterId,
+            @McpToolParam(required = true) String partitions,
+            @McpToolParam(required = true) String etag,
+            @McpToolParam(required = true) String confirm) {
+        UUID id = McpArgs.uuid(CLUSTER_ID, clusterId);
+        McpArgs.required("partitions", partitions);
+        McpArgs.required("etag", etag);
+        McpArgs.confirm(partitions, confirm);
+        return guard(() -> replication.cancel(id, new PartitionSelection(selection(partitions), etag)));
+    }
+
+    /** {@code topic:partition} entries separated by commas. An empty value is an empty selection. */
+    static List<SelectedPartition> selection(String partitions) {
+        if (partitions == null || partitions.isBlank()) {
+            return List.of();
+        }
+        List<SelectedPartition> out = new ArrayList<>();
+        for (String part : partitions.split(",")) {
+            String trimmed = part.trim();
+            int colon = trimmed.lastIndexOf(':');
+            if (colon <= 0 || colon == trimmed.length() - 1) {
+                throw new IllegalArgumentException("A partition is topic:number, not " + trimmed + ".");
+            }
+            try {
+                out.add(new SelectedPartition(
+                        trimmed.substring(0, colon), Integer.valueOf(trimmed.substring(colon + 1))));
+            } catch (NumberFormatException e) {
+                throw new IllegalArgumentException("A partition number is a whole number: " + trimmed + ".");
+            }
+        }
+        return out;
+    }
+
+    /** Broker numbers separated by commas. */
+    static List<Integer> brokers(String replicas) {
+        if (replicas == null || replicas.isBlank()) {
+            return List.of();
+        }
+        List<Integer> out = new ArrayList<>();
+        for (String part : replicas.split(",")) {
+            String trimmed = part.trim();
+            try {
+                out.add(Integer.valueOf(trimmed));
+            } catch (NumberFormatException e) {
+                throw new IllegalArgumentException("A replica is a broker number, not " + trimmed + ".");
+            }
+        }
+        return out;
+    }
+
     /** The settings a JSON object of names and values sets; empty when none. */
     private static Map<String, String> overrides(String set) {
         if (set == null || set.isBlank()) {
@@ -279,7 +394,7 @@ public class KafkaMcpActionTools {
     }
 
     /** A preview that went stale is a conflict the model can act on: preview again. */
-    private static McpSchema.CallToolResult guard(Supplier<Object> body) {
+    static McpSchema.CallToolResult guard(Supplier<Object> body) {
         return McpErrors.guard(() -> {
             try {
                 return body.get();

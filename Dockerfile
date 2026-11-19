@@ -24,11 +24,12 @@ RUN mvn -q -B clean package -DskipTests
 
 # ── 3. Runtime (Ubuntu 26.04 LTS "resolute") ─────────────────────────────────
 # Distribution security updates are applied here: a fix reaches the archive days before a new
-# base image carries it, and the image scan fails on a fixable high finding.
+# base image carries it, and the image scan fails on a fixable high finding. The base is Temurin
+# 25.0.5, which carries the OpenJDK fixes the previous pin did not.
 # - apt is upgraded first with retries off, so a cached layer cannot keep a vulnerable apt.
 # - resolute-security is enabled because the release pocket lacks some fixes (libbrotli1).
 # - Pebble ships outside any package and Rahdar never runs it, so it goes with its Go runtime.
-FROM eclipse-temurin:25-jre-resolute@sha256:41d9263c0d5b2a74d89af6e29e73b04298bc65e3cb705d03e9e2271ef49fef84 AS runtime
+FROM eclipse-temurin:25-jre-resolute@sha256:480ef64e4540d45b0301e8afb7873bd3fa61ce93c5f66273eb569420718f38e2 AS runtime
 RUN groupadd -r rahdar && useradd -r -g rahdar rahdar \
     && printf '%s\n' \
         'deb http://archive.ubuntu.com/ubuntu resolute-updates main universe' \

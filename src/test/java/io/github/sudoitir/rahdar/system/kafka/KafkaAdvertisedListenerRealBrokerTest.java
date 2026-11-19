@@ -95,19 +95,39 @@ class KafkaAdvertisedListenerRealBrokerTest extends PostgresIntegrationTest {
                 Broker second = new Broker(IMAGE, 2, voters, UNREACHABLE).withNetwork(network)) {
             Startables.deepStart(first, second).join();
 
-            ConnectionCheck check = check(first.bootstrap());
-
-            assertThat(check.nodes())
-                    .extracting(n -> n.id() + ":" + n.outcome())
-                    .containsExactlyInAnyOrder("1:OK", "2:UNREACHABLE");
-            assertThat(check.nodes().stream()
-                            .filter(n -> n.id().equals("2"))
-                            .findFirst()
-                            .orElseThrow())
-                    .satisfies(node -> {
-                        assertThat(node.address()).isEqualTo(UNREACHABLE);
-                        assertThat(node.cause()).isEqualTo("DNS");
-                    });
+            // Kafka 3.9 can name the second broker from the controller quorum (kafka-2:9094) before its
+            // client listener is in the metadata. Poll here: the check needs the signed-in user.
+            AssertionError last = null;
+            long deadline = System.nanoTime() + Duration.ofSeconds(45).toNanos();
+            while (System.nanoTime() < deadline) {
+                try {
+                    ConnectionCheck check = check(first.bootstrap());
+                    assertThat(check.nodes())
+                            .extracting(n -> n.id() + ":" + n.outcome())
+                            .containsExactlyInAnyOrder("1:OK", "2:UNREACHABLE");
+                    assertThat(check.nodes().stream()
+                                    .filter(n -> n.id().equals("2"))
+                                    .findFirst()
+                                    .orElseThrow())
+                            .satisfies(node -> {
+                                assertThat(node.address()).isEqualTo(UNREACHABLE);
+                                assertThat(node.cause()).isEqualTo("DNS");
+                            });
+                    last = null;
+                    break;
+                } catch (AssertionError e) {
+                    last = e;
+                    try {
+                        Thread.sleep(Duration.ofSeconds(1));
+                    } catch (InterruptedException interrupted) {
+                        Thread.currentThread().interrupt();
+                        throw e;
+                    }
+                }
+            }
+            if (last != null) {
+                throw last;
+            }
         }
     }
 

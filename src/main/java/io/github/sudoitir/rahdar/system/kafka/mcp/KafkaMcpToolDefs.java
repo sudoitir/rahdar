@@ -132,7 +132,57 @@ public final class KafkaMcpToolDefs {
                     Param.note("group", "The group id."),
                     Param.note(DRY_RUN, McpToolDef.DRY_RUN),
                     Param.note("etag", ETAG),
-                    Param.note(CONFIRM, CONFIRM_GROUP)));
+                    Param.note(CONFIRM, CONFIRM_GROUP)),
+            read(
+                    "kafka_list_partitions",
+                    "One page of a topic's partitions, in replica order, with who leads and how many bytes.",
+                    Param.note(TOPIC, TOPIC_NAME),
+                    Param.note("cursor", "The next value of the previous page.")),
+            read(
+                    "kafka_list_replication",
+                    "Partitions that are under-replicated, offline, or not led by their first replica.",
+                    Param.note(TOPIC, "Limit the page to this topic. Omit for the cluster.")),
+            read(
+                    "kafka_suggest_replicas",
+                    "A suggestion that keeps every current replica and adds one broker per missing rack. It moves nothing.",
+                    Param.note(TOPIC, TOPIC_NAME),
+                    Param.note("partition", "The partition number.")),
+            read(
+                    "kafka_preview_preferred_election",
+                    "What electing the preferred leader would change. An empty list is refused and nothing is sent.",
+                    Param.note(
+                            "partitions", "topic:partition entries separated by commas, such as orders:0,orders:1.")),
+            mutate(
+                    "kafka_elect_preferred",
+                    "Elect the preferred leader of the named partitions. There is no unclean election.",
+                    Param.note("partitions", "The same topic:partition list as the preview."),
+                    Param.note("etag", ETAG),
+                    Param.note(CONFIRM, "A real run needs confirm equal to the partitions list.")),
+            read(
+                    "kafka_preview_reassign",
+                    "What a replica move would copy. A missing throttle or a factor below min.insync.replicas is refused.",
+                    Param.note(TOPIC, TOPIC_NAME),
+                    Param.note("replicas", "Broker numbers in the new order, separated by commas."),
+                    Param.note("throttleBytesPerSecond", "Required. A positive number of bytes per second.")),
+            mutate(
+                    "kafka_reassign",
+                    "Move one partition's replicas at the preview's throttle.",
+                    Param.note(TOPIC, TOPIC_NAME),
+                    Param.note("replicas", "The same broker list as the preview."),
+                    Param.note("throttleBytesPerSecond", "The same positive throttle as the preview."),
+                    Param.note("etag", ETAG),
+                    Param.note(CONFIRM, "A real run needs confirm equal to topic-partition, such as orders-0.")),
+            read("kafka_list_reassignments", "In-progress replica moves, and which of them this product started."),
+            read(
+                    "kafka_preview_cancel_reassignment",
+                    "The replicas a cancel would leave. Sends nothing.",
+                    Param.note("partitions", "topic:partition entries separated by commas.")),
+            mutate(
+                    "kafka_cancel_reassignment",
+                    "Cancel named in-progress replica moves. A move this product did not start keeps its throttle.",
+                    Param.note("partitions", "The same topic:partition list as the preview."),
+                    Param.note("etag", ETAG),
+                    Param.note(CONFIRM, "A real run needs confirm equal to the partitions list.")));
 
     private KafkaMcpToolDefs() {}
 

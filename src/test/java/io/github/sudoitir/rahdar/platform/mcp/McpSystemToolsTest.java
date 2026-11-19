@@ -139,7 +139,17 @@ class McpSystemToolsTest {
                         "kafka_create_topic",
                         "kafka_delete_topic",
                         "kafka_increase_partitions",
-                        "kafka_delete_group");
+                        "kafka_delete_group",
+                        "kafka_list_partitions",
+                        "kafka_list_replication",
+                        "kafka_suggest_replicas",
+                        "kafka_preview_preferred_election",
+                        "kafka_elect_preferred",
+                        "kafka_preview_reassign",
+                        "kafka_reassign",
+                        "kafka_list_reassignments",
+                        "kafka_preview_cancel_reassignment",
+                        "kafka_cancel_reassignment");
     }
 
     @Test

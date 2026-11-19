@@ -27,3 +27,14 @@ export function validateAclSearch(raw: Record<string, unknown>): AclSearch {
   if (typeof raw.resource === 'string' && raw.resource) out.resource = raw.resource;
   return out;
 }
+
+export interface ReplicationSearch {
+  topic?: string;
+}
+
+/** The replication address's topic filter, kept only when it names one. */
+export function validateReplicationSearch(raw: Record<string, unknown>): ReplicationSearch {
+  const out: ReplicationSearch = {};
+  if (typeof raw.topic === 'string' && raw.topic) out.topic = raw.topic;
+  return out;
+}

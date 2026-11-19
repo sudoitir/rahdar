@@ -105,6 +105,15 @@ class GateCoverageTest extends PostgresIntegrationTest {
                     "system.kafka.web.KafkaController.previewPartitions",
                     "a preview changes nothing; the partition increase runs it"),
             Map.entry(
+                    "system.kafka.web.KafkaController.previewElection",
+                    "a preview changes nothing; replication:elect runs it"),
+            Map.entry(
+                    "system.kafka.web.KafkaController.previewReassign",
+                    "a preview changes nothing; the replica move runs it"),
+            Map.entry(
+                    "system.kafka.web.KafkaController.previewCancel",
+                    "a preview changes nothing; reassignments:cancel runs it"),
+            Map.entry(
                     "feature.resources.web.ResourceLifecycleController.createSubscription",
                     "creates and removes nothing"),
             Map.entry(

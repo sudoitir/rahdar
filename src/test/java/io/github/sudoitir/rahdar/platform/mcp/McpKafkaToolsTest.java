@@ -187,7 +187,10 @@ class McpKafkaToolsTest extends PostgresIntegrationTest {
                         "kafka_create_topic",
                         "kafka_delete_topic",
                         "kafka_increase_partitions",
-                        "kafka_delete_group");
+                        "kafka_delete_group",
+                        "kafka_elect_preferred",
+                        "kafka_reassign",
+                        "kafka_cancel_reassignment");
 
         JsonNode refused = call("kafka_reset_offsets", reset(Map.of("confirm", "billing")));
 

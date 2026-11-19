@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -46,6 +47,7 @@ import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 
 /** The scrape keeps a Kafka cluster's stored brokers true: one that joined is added, one that left is marked. */
 class KafkaScrapeTest {
@@ -60,9 +62,10 @@ class KafkaScrapeTest {
     private final AuditService audit = mock(AuditService.class);
     private final ActorResolver actors = mock(ActorResolver.class);
     private final KafkaHealthStore healthStore = mock(KafkaHealthStore.class);
+    private final KafkaThrottleRestore throttles = mock(KafkaThrottleRestore.class);
     private final MutableClock clock = new MutableClock();
-    private final KafkaScrape scrape =
-            new KafkaScrape(gateway, clusters, recorder, partitions, meters, audit, actors, clock, healthStore);
+    private final KafkaScrape scrape = new KafkaScrape(
+            gateway, clusters, recorder, partitions, meters, audit, actors, clock, healthStore, throttles);
 
     /** A clock the test moves. */
     private static final class MutableClock extends Clock {
@@ -267,6 +270,21 @@ class KafkaScrapeTest {
         scrape.nodes(CLUSTER, 1);
 
         verify(partitions, never()).refresh(any());
+        verify(throttles, never()).restore(any());
+    }
+
+    @Test
+    void aFinishedMoveRestoresItsThrottleOnlyAfterThePartitionRefresh() {
+        clusterReports(broker("1"));
+        ClusterNode one = stored("1");
+        when(clusters.nodes(CLUSTER)).thenReturn(List.of(one));
+        when(partitions.due(CLUSTER)).thenReturn(true);
+
+        scrape.nodes(CLUSTER, 1);
+
+        InOrder order = inOrder(partitions, throttles);
+        order.verify(partitions).refresh(CLUSTER);
+        order.verify(throttles).restore(CLUSTER);
     }
 
     @Test
