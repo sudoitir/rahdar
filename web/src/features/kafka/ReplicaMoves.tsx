@@ -45,6 +45,12 @@ function message(error: unknown): string {
   return error instanceof ApiError ? error.message : 'The cluster could not be reached.';
 }
 
+function blockedMessage(previewError: unknown, applyError: unknown): string | undefined {
+  if (previewError) return message(previewError);
+  if (applyError) return message(applyError);
+  return undefined;
+}
+
 /** Election, reassignment and cancel all need destination:update. Offered until the grants are known. */
 function useReplicaGate(clusterId: string): GateVerdict {
   const { can, loading } = useCan();
@@ -160,7 +166,7 @@ function ElectDialog({
   useEffect(() => {
     run.current({ partitions: selection }, { onSuccess: setPlanned });
   }, [selection]);
-  const blocked = preview.error ? message(preview.error) : apply.error ? message(apply.error) : undefined;
+  const blocked = blockedMessage(preview.error, apply.error);
   const only = rows.length === 1 ? rows[0] : undefined;
   const confirmLabel = only
     ? `Elect the preferred leader of ${only.topic} partition ${only.partition}`
@@ -480,7 +486,7 @@ function CancelDialog({
   useEffect(() => {
     run.current({ partitions: selection }, { onSuccess: setPlanned });
   }, [selection]);
-  const blocked = preview.error ? message(preview.error) : apply.error ? message(apply.error) : undefined;
+  const blocked = blockedMessage(preview.error, apply.error);
   return (
     <ConfirmDialog
       opened

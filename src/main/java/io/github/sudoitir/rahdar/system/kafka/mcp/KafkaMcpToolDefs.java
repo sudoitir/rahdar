@@ -22,6 +22,8 @@ public final class KafkaMcpToolDefs {
 
     private static final String TOPIC = "topic";
 
+    private static final String PARTITIONS = "partitions";
+
     private static final String DRY_RUN = "dryRun";
 
     private static final String TOPIC_NAME = "The topic name.";
@@ -122,7 +124,7 @@ public final class KafkaMcpToolDefs {
                     "kafka_increase_partitions",
                     "Raise a topic's partition count. A lower count is refused.",
                     Param.note(TOPIC, TOPIC_NAME),
-                    Param.note("partitions", "The new count, higher than the current one."),
+                    Param.note(PARTITIONS, "The new count, higher than the current one."),
                     Param.note(DRY_RUN, McpToolDef.DRY_RUN),
                     Param.note("etag", ETAG),
                     Param.note(CONFIRM, CONFIRM_TOPIC)),
@@ -150,12 +152,11 @@ public final class KafkaMcpToolDefs {
             read(
                     "kafka_preview_preferred_election",
                     "What electing the preferred leader would change. An empty list is refused and nothing is sent.",
-                    Param.note(
-                            "partitions", "topic:partition entries separated by commas, such as orders:0,orders:1.")),
+                    Param.note(PARTITIONS, "topic:partition entries separated by commas, such as orders:0,orders:1.")),
             mutate(
                     "kafka_elect_preferred",
                     "Elect the preferred leader of the named partitions. There is no unclean election.",
-                    Param.note("partitions", "The same topic:partition list as the preview."),
+                    Param.note(PARTITIONS, "The same topic:partition list as the preview."),
                     Param.note("etag", ETAG),
                     Param.note(CONFIRM, "A real run needs confirm equal to the partitions list.")),
             read(
@@ -176,11 +177,11 @@ public final class KafkaMcpToolDefs {
             read(
                     "kafka_preview_cancel_reassignment",
                     "The replicas a cancel would leave. Sends nothing.",
-                    Param.note("partitions", "topic:partition entries separated by commas.")),
+                    Param.note(PARTITIONS, "topic:partition entries separated by commas.")),
             mutate(
                     "kafka_cancel_reassignment",
                     "Cancel named in-progress replica moves. A move this product did not start keeps its throttle.",
-                    Param.note("partitions", "The same topic:partition list as the preview."),
+                    Param.note(PARTITIONS, "The same topic:partition list as the preview."),
                     Param.note("etag", ETAG),
                     Param.note(CONFIRM, "A real run needs confirm equal to the partitions list.")));
 

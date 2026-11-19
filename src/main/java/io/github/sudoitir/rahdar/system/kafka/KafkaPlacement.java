@@ -114,21 +114,28 @@ final class KafkaPlacement {
     static List<Rack> racks(List<NodeDescription> nodes) {
         List<Rack> out = new ArrayList<>();
         for (NodeDescription node : nodes) {
-            if (!node.functions().contains(NodeFunction.BROKER)) {
-                continue;
+            Rack rack = rack(node);
+            if (rack != null) {
+                out.add(rack);
             }
-            Integer id = brokerId(node.nativeId());
-            if (id == null) {
-                continue;
-            }
-            String rack = node.attributes()
-                    .raw(RACK)
-                    .map(String::valueOf)
-                    .filter(value -> !value.isBlank())
-                    .orElse(null);
-            out.add(new Rack(id, rack));
         }
         return out;
+    }
+
+    private static Rack rack(NodeDescription node) {
+        if (!node.functions().contains(NodeFunction.BROKER)) {
+            return null;
+        }
+        Integer id = brokerId(node.nativeId());
+        if (id == null) {
+            return null;
+        }
+        String rack = node.attributes()
+                .raw(RACK)
+                .map(String::valueOf)
+                .filter(value -> !value.isBlank())
+                .orElse(null);
+        return new Rack(id, rack);
     }
 
     static PartitionRow row(Resource resource) {
@@ -198,7 +205,7 @@ final class KafkaPlacement {
                 throw new NumberFormatException(cursor);
             }
             return offset;
-        } catch (NumberFormatException e) {
+        } catch (NumberFormatException _) {
             throw new IllegalArgumentException("Not a cursor: " + cursor);
         }
     }
@@ -224,7 +231,7 @@ final class KafkaPlacement {
         if (raw instanceof String text) {
             try {
                 return Integer.valueOf(text);
-            } catch (NumberFormatException e) {
+            } catch (NumberFormatException _) {
                 return null;
             }
         }
@@ -292,7 +299,7 @@ final class KafkaPlacement {
         }
         try {
             return Integer.valueOf(nativeId);
-        } catch (NumberFormatException e) {
+        } catch (NumberFormatException _) {
             return null;
         }
     }

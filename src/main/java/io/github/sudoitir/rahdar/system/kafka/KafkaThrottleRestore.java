@@ -33,6 +33,8 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 class KafkaThrottleRestore {
 
+    private static final String BROKER_PREFIX = "broker.";
+
     private final BrokerGateway gateway;
     private final KafkaReassignmentRepository reassignments;
 
@@ -45,7 +47,7 @@ class KafkaThrottleRestore {
             try {
                 writeBack(clusterId, row);
                 reassignments.delete(row);
-            } catch (RuntimeException e) {
+            } catch (RuntimeException _) {
                 log.warn(
                         "Replication throttle was not restored topic={} partition={}",
                         row.getTopic(),
@@ -76,7 +78,7 @@ class KafkaThrottleRestore {
                     .map(String::valueOf)
                     .filter(value -> !value.isBlank())
                     .isPresent();
-        } catch (NotFoundException e) {
+        } catch (NotFoundException _) {
             return false;
         }
     }
@@ -136,12 +138,12 @@ class KafkaThrottleRestore {
 
     /** {@code broker.<id>.<setting>} or {@code topic.<setting>}, as the driver names a throttle key. */
     private static Target target(String key) {
-        if (key.startsWith("broker.")) {
-            int second = key.indexOf('.', "broker.".length());
+        if (key.startsWith(BROKER_PREFIX)) {
+            int second = key.indexOf('.', BROKER_PREFIX.length());
             if (second < 0) {
                 throw new IllegalArgumentException("Not a throttle key: " + key);
             }
-            return new Target(true, key.substring("broker.".length(), second));
+            return new Target(true, key.substring(BROKER_PREFIX.length(), second));
         }
         if (key.startsWith("topic.")) {
             return new Target(false, null);
@@ -150,8 +152,8 @@ class KafkaThrottleRestore {
     }
 
     private static String setting(String key) {
-        if (key.startsWith("broker.")) {
-            return key.substring(key.indexOf('.', "broker.".length()) + 1);
+        if (key.startsWith(BROKER_PREFIX)) {
+            return key.substring(key.indexOf('.', BROKER_PREFIX.length()) + 1);
         }
         return key.substring("topic.".length());
     }

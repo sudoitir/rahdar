@@ -27,8 +27,6 @@ import io.github.sudoitir.rahdar.kernel.security.ClusterAccessGuard;
 import io.github.sudoitir.rahdar.kernel.security.Permissions;
 import io.github.sudoitir.rahdar.kernel.security.ResourceRef;
 import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
-import io.github.sudoitir.rahdar.system.kafka.internal.persistence.KafkaReassignmentEntity;
-import io.github.sudoitir.rahdar.system.kafka.internal.persistence.KafkaReassignmentRepository;
 import io.github.sudoitir.rahdar.system.kafka.web.KafkaReplicationViews.CancelOutcome;
 import io.github.sudoitir.rahdar.system.kafka.web.KafkaReplicationViews.CancelPartition;
 import io.github.sudoitir.rahdar.system.kafka.web.KafkaReplicationViews.CancelPreview;
@@ -38,10 +36,8 @@ import io.github.sudoitir.rahdar.system.kafka.web.KafkaReplicationViews.Partitio
 import io.github.sudoitir.rahdar.system.kafka.web.KafkaReplicationViews.ReassignOutcome;
 import io.github.sudoitir.rahdar.system.kafka.web.KafkaReplicationViews.ReassignPreview;
 import io.github.sudoitir.rahdar.system.kafka.web.KafkaReplicationViews.ReassignmentList;
-import io.github.sudoitir.rahdar.system.kafka.web.KafkaReplicationViews.ReassignmentRow;
 import io.github.sudoitir.rahdar.system.kafka.web.KafkaReplicationViews.ReplicaMoveRequest;
 import io.github.sudoitir.rahdar.system.kafka.web.KafkaReplicationViews.SelectedPartition;
-import java.time.Clock;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -70,14 +66,19 @@ public class KafkaReplication {
 
     private static final String DURATION_UNAVAILABLE = "The duration is unavailable";
 
+    private static final String SCOPE = "scope";
+
+    private static final String APPLIED = "APPLIED";
+
+    private static final String REPLICAS = "replicas";
+
     private final BrokerGateway gateway;
     private final KafkaPartitionReads reads;
-    private final KafkaReassignmentRepository reassignments;
+    private final KafkaReassignmentLog stored;
     private final ClusterAccessGuard access;
     private final OperationGate gate;
     private final AuditService audit;
     private final ActorResolver actors;
-    private final Clock clock;
 
     /** One partition an election or a cancel names, in a stable order. */
     public record NamedPartition(String topic, int partition) {}
@@ -143,29 +144,7 @@ public class KafkaReplication {
 
     public ReassignmentList reassignments(UUID clusterId) {
         access.requireCluster(clusterId, Permissions.DESTINATION_READ);
-        Map<String, KafkaReassignmentEntity> stored = new LinkedHashMap<>();
-        reassignments
-                .findByClusterId(clusterId)
-                .forEach(row -> stored.put(key(row.getTopic(), row.getPartition()), row));
-        Map<String, ReassignmentRow> rows = new LinkedHashMap<>();
-        for (Resource resource : moving(clusterId)) {
-            String topic = KafkaPlacement.topic(resource);
-            int partition = KafkaPlacement.partition(resource);
-            String id = key(topic, partition);
-            rows.put(
-                    id,
-                    new ReassignmentRow(
-                            topic,
-                            partition,
-                            resource.attributes()
-                                    .raw(KafkaKinds.REASSIGNMENT)
-                                    .map(String::valueOf)
-                                    .orElse(null),
-                            stored.containsKey(id)));
-        }
-        stored.forEach(
-                (id, row) -> rows.putIfAbsent(id, new ReassignmentRow(row.getTopic(), row.getPartition(), null, true)));
-        return new ReassignmentList(List.copyOf(rows.values()));
+        return stored.list(clusterId, moving(clusterId));
     }
 
     public Effect estimateElect(ElectParams p) {
@@ -219,42 +198,35 @@ public class KafkaReplication {
     private ElectionOutcome runElect(ElectParams p) {
         ElectionPlan plan = electionPlan(p.clusterId(), p.partitions());
         KafkaEtags.require(p.etag(), plan.view().etag());
-        Map<String, String> before = new LinkedHashMap<>();
-        Map<String, String> after = new LinkedHashMap<>();
-        plan.parts().forEach(part -> {
-            before.put(label(part), part.leaderBefore());
-            after.put(label(part), part.leaderAfter());
-        });
         AuditEvent event = audit.begin(
                 actors.resolve(),
                 "ELECT_PREFERRED_LEADERS",
                 DESTINATION,
-                plan.parts().isEmpty() ? "" : plan.parts().getFirst().topic(),
+                plan.firstTopic(),
                 p.clusterId(),
                 null,
-                Map.of("leaders", before),
+                Map.of("leaders", plan.leadersBefore()),
                 false);
         try {
-            int elected = 0;
-            int already = 0;
-            for (ElectionPart part : plan.parts()) {
+            int already = plan.countAlready((topic, partition, driverEtag, alreadyPreferred) -> {
                 OperationResult result = KafkaFailures.call(() -> gateway.cluster(p.clusterId())
                         .operations()
                         .execute(
-                                partitionId(part.topic(), part.partition()),
+                                partitionId(topic, partition),
                                 new Operation.ElectLeader(Election.PREFERRED),
                                 Scope.whole(),
-                                Precondition.ifMatch(part.driverEtag()))
+                                Precondition.ifMatch(driverEtag))
                         .orThrow());
-                if (result.alreadyInState() || part.already()) {
-                    already++;
-                } else {
-                    elected++;
-                }
-            }
+                return result.alreadyInState() || alreadyPreferred;
+            });
+            int elected = plan.size() - already;
             audit.finish(
-                    event, false, elected, null, Map.of("leaders", after, "scope", KafkaTopicLifecycle.WHOLE_CLUSTER));
-            return new ElectionOutcome(KafkaTopicLifecycle.WHOLE_CLUSTER, "APPLIED", elected, already);
+                    event,
+                    false,
+                    elected,
+                    null,
+                    Map.of("leaders", plan.leadersAfter(), SCOPE, KafkaTopicLifecycle.WHOLE_CLUSTER));
+            return new ElectionOutcome(KafkaTopicLifecycle.WHOLE_CLUSTER, APPLIED, elected, already);
         } catch (RuntimeException e) {
             audit.fail(event, e.getMessage());
             throw e;
@@ -271,7 +243,7 @@ public class KafkaReplication {
                 p.clusterId(), p.topic(), p.partition(), p.replicas(), p.throttleBytesPerSecond(), minInSync);
         KafkaEtags.require(p.etag(), preview.etag());
         Map<String, Object> before =
-                Map.of("replicas", preview.currentReplicas(), "throttle", p.throttleBytesPerSecond());
+                Map.of(REPLICAS, preview.currentReplicas(), "throttle", p.throttleBytesPerSecond());
         AuditEvent event = audit.begin(
                 actors.resolve(),
                 "REASSIGN_REPLICAS",
@@ -291,7 +263,8 @@ public class KafkaReplication {
                             Precondition.ifMatch(preview.etag()))
                     .orThrow());
             if (!result.alreadyInState()) {
-                remember(p.clusterId(), p.topic(), p.partition(), event.getId(), previousOf(result), addedOf(result));
+                stored.remember(
+                        p.clusterId(), p.topic(), p.partition(), event.getId(), previousOf(result), addedOf(result));
             }
             audit.finish(
                     event,
@@ -299,13 +272,13 @@ public class KafkaReplication {
                     1,
                     null,
                     Map.of(
-                            "replicas",
+                            REPLICAS,
                             preview.replicas(),
                             "throttleOutcome",
                             preview.throttleOutcome(),
-                            "scope",
+                            SCOPE,
                             KafkaTopicLifecycle.WHOLE_CLUSTER));
-            return new ReassignOutcome(KafkaTopicLifecycle.WHOLE_CLUSTER, "APPLIED", preview.throttleOutcome());
+            return new ReassignOutcome(KafkaTopicLifecycle.WHOLE_CLUSTER, APPLIED, preview.throttleOutcome());
         } catch (RuntimeException e) {
             audit.fail(event, e.getMessage());
             throw e;
@@ -313,8 +286,7 @@ public class KafkaReplication {
     }
 
     private ElectionPlan electionPlan(UUID clusterId, List<NamedPartition> partitions) {
-        List<ElectionPart> parts = new ArrayList<>();
-        for (NamedPartition partition : partitions) {
+        return ElectionPlan.collect(partitions, partition -> {
             Resource resource = reads.find(clusterId, partition.topic(), partition.partition());
             Integer leader = KafkaPlacement.integer(
                     resource.attributes().raw(KafkaKinds.LEADER).orElse(null));
@@ -329,18 +301,9 @@ public class KafkaReplication {
             String note = note(preview);
             boolean already = note.startsWith(ALREADY);
             String after = already || replicas.isEmpty() ? text(leader) : Integer.toString(replicas.getFirst());
-            parts.add(new ElectionPart(
-                    partition.topic(), partition.partition(), preview.etag(), text(leader), after, already, note));
-        }
-        int wouldChange = (int) parts.stream().filter(part -> !part.already()).count();
-        int already = parts.size() - wouldChange;
-        List<String> etagParts = parts.stream()
-                .map(part -> part.topic() + "\0" + part.partition() + "\0" + part.driverEtag())
-                .toList();
-        String note = parts.size() == 1
-                ? parts.getFirst().note()
-                : wouldChange + " partitions would move to their first replica. " + already + " are already preferred.";
-        return new ElectionPlan(new ElectionPreview(wouldChange, already, KafkaEtags.of(etagParts), note), parts);
+            return new ElectionPart(
+                    partition.topic(), partition.partition(), preview.etag(), text(leader), after, already, note);
+        });
     }
 
     private ReassignPreview reassignPlan(
@@ -356,7 +319,7 @@ public class KafkaReplication {
                 switch (count) {
                     case Count.Exact(var value) -> value;
                     case Count.Estimate(var value) -> value;
-                    case Count.Unavailable(var ignored) -> null;
+                    case Count.Unavailable(var _) -> null;
                 };
         String bytesUnavailable = count instanceof Count.Unavailable(var reason) ? reason : null;
         String rawNote = note(preview);
@@ -384,34 +347,6 @@ public class KafkaReplication {
                 throttleOutcome,
                 throttle,
                 preview.etag());
-    }
-
-    private void remember(
-            UUID clusterId,
-            String topic,
-            int partition,
-            Long operationId,
-            Map<String, String> previous,
-            List<String> added) {
-        long auditId = operationId == null ? 0L : operationId;
-        Optional<KafkaReassignmentEntity> found =
-                reassignments.findByClusterIdAndTopicAndPartition(clusterId, topic, partition);
-        if (found.isEmpty()) {
-            reassignments.save(new KafkaReassignmentEntity(
-                    clusterId, topic, partition, auditId, previous, String.join(",", added), clock.instant()));
-            return;
-        }
-        KafkaReassignmentEntity row = found.get();
-        Map<String, String> merged = new LinkedHashMap<>(row.getPreviousThrottle());
-        LinkedHashSet<String> keys = new LinkedHashSet<>(split(row.getAddedKeys()));
-        previous.forEach((key, value) -> {
-            if (!merged.containsKey(key) && !keys.contains(key)) {
-                merged.put(key, value);
-            }
-        });
-        keys.addAll(added);
-        row.replace(auditId, merged, String.join(",", keys));
-        reassignments.save(row);
     }
 
     private boolean existingThrottle(UUID clusterId, String topic, List<Integer> replicas) {
@@ -525,68 +460,51 @@ public class KafkaReplication {
             "A cancel names one partition. An empty set is refused, and nothing was sent.";
 
     private CancelPlan cancelPlan(UUID clusterId, List<NamedPartition> partitions) {
-        List<CancelPart> parts = new ArrayList<>();
-        for (NamedPartition partition : partitions) {
+        return CancelPlan.collect(partitions, partition -> {
             Preview preview = KafkaFailures.call(() -> gateway.cluster(clusterId)
                     .operations()
                     .preview(
                             partitionId(partition.topic(), partition.partition()),
                             stop(partition.partition()),
                             Scope.whole()));
-            parts.add(new CancelPart(
+            return new CancelPart(
                     partition.topic(),
                     partition.partition(),
                     preview.etag(),
                     replicas(preview, false),
-                    replicas(preview, true)));
-        }
-        List<String> etagParts = parts.stream()
-                .map(part -> part.topic() + "\0" + part.partition() + "\0" + part.driverEtag())
-                .toList();
-        List<CancelPartition> shown = parts.stream()
-                .map(part -> new CancelPartition(part.topic(), part.partition(), part.before(), part.after()))
-                .toList();
-        return new CancelPlan(
-                new CancelPreview(shown, KafkaEtags.of(etagParts), "Cancels the in-progress reassignment."), parts);
+                    replicas(preview, true));
+        });
     }
 
     private CancelOutcome runCancel(CancelParams p) {
         CancelPlan plan = cancelPlan(p.clusterId(), p.partitions());
         KafkaEtags.require(p.etag(), plan.view().etag());
-        Map<String, List<Integer>> before = new LinkedHashMap<>();
-        Map<String, List<Integer>> after = new LinkedHashMap<>();
-        plan.parts().forEach(part -> {
-            before.put(part.topic() + "-" + part.partition(), part.before());
-            after.put(part.topic() + "-" + part.partition(), part.after());
-        });
         AuditEvent event = audit.begin(
                 actors.resolve(),
                 "CANCEL_REASSIGNMENT",
                 DESTINATION,
-                plan.parts().isEmpty() ? "" : plan.parts().getFirst().topic(),
+                plan.firstTopic(),
                 p.clusterId(),
                 null,
-                Map.of("replicas", before),
+                Map.of(REPLICAS, plan.replicasBefore()),
                 false);
         try {
-            for (CancelPart part : plan.parts()) {
-                KafkaFailures.call(() -> gateway.cluster(p.clusterId())
-                        .operations()
-                        .execute(
-                                partitionId(part.topic(), part.partition()),
-                                stop(part.partition()),
-                                Scope.whole(),
-                                Precondition.ifMatch(part.driverEtag()))
-                        .orThrow());
-            }
+            plan.each((topic, partition, driverEtag) -> KafkaFailures.call(() -> gateway.cluster(p.clusterId())
+                    .operations()
+                    .execute(
+                            partitionId(topic, partition),
+                            stop(partition),
+                            Scope.whole(),
+                            Precondition.ifMatch(driverEtag))
+                    .orThrow()));
             audit.finish(
                     event,
                     false,
-                    plan.parts().size(),
+                    plan.size(),
                     null,
-                    Map.of("replicas", after, "scope", KafkaTopicLifecycle.WHOLE_CLUSTER));
+                    Map.of(REPLICAS, plan.replicasAfter(), SCOPE, KafkaTopicLifecycle.WHOLE_CLUSTER));
             return new CancelOutcome(
-                    KafkaTopicLifecycle.WHOLE_CLUSTER, "APPLIED", plan.view().partitions());
+                    KafkaTopicLifecycle.WHOLE_CLUSTER, APPLIED, plan.view().partitions());
         } catch (RuntimeException e) {
             audit.fail(event, e.getMessage());
             throw e;
@@ -711,23 +629,8 @@ public class KafkaReplication {
         return List.copyOf(out);
     }
 
-    private static List<String> split(String addedKeys) {
-        if (addedKeys == null || addedKeys.isBlank()) {
-            return List.of();
-        }
-        return List.of(addedKeys.split(","));
-    }
-
     private static String text(Integer leader) {
         return leader == null ? "none" : Integer.toString(leader);
-    }
-
-    private static String label(ElectionPart part) {
-        return part.topic() + "-" + part.partition();
-    }
-
-    private static String key(String topic, int partition) {
-        return topic + "\0" + partition;
     }
 
     private record ElectionPart(
@@ -739,10 +642,129 @@ public class KafkaReplication {
             boolean already,
             String note) {}
 
-    private record ElectionPlan(ElectionPreview view, List<ElectionPart> parts) {}
+    private record ElectionPlan(ElectionPreview view, List<ElectionPart> parts) {
+
+        static ElectionPlan collect(List<NamedPartition> partitions, ElectionOne one) {
+            List<ElectionPart> parts = new ArrayList<>();
+            for (NamedPartition partition : partitions) {
+                parts.add(one.describe(partition));
+            }
+            int wouldChange =
+                    (int) parts.stream().filter(part -> !part.already()).count();
+            int already = parts.size() - wouldChange;
+            List<String> etagParts = parts.stream()
+                    .map(part -> part.topic() + "\0" + part.partition() + "\0" + part.driverEtag())
+                    .toList();
+            String note = parts.size() == 1
+                    ? parts.getFirst().note()
+                    : wouldChange + " partitions would move to their first replica. " + already
+                            + " are already preferred.";
+            return new ElectionPlan(new ElectionPreview(wouldChange, already, KafkaEtags.of(etagParts), note), parts);
+        }
+
+        String firstTopic() {
+            return parts.isEmpty() ? "" : parts.getFirst().topic();
+        }
+
+        int size() {
+            return parts.size();
+        }
+
+        Map<String, String> leadersBefore() {
+            return leaders(false);
+        }
+
+        Map<String, String> leadersAfter() {
+            return leaders(true);
+        }
+
+        int countAlready(ElectionSend send) {
+            int already = 0;
+            for (ElectionPart part : parts) {
+                if (send.already(part.topic(), part.partition(), part.driverEtag(), part.already())) {
+                    already++;
+                }
+            }
+            return already;
+        }
+
+        private Map<String, String> leaders(boolean after) {
+            Map<String, String> leaders = new LinkedHashMap<>();
+            for (ElectionPart part : parts) {
+                leaders.put(part.topic() + "-" + part.partition(), after ? part.leaderAfter() : part.leaderBefore());
+            }
+            return leaders;
+        }
+
+        @FunctionalInterface
+        interface ElectionOne {
+            ElectionPart describe(NamedPartition partition);
+        }
+
+        @FunctionalInterface
+        interface ElectionSend {
+            boolean already(String topic, int partition, String driverEtag, boolean alreadyPreferred);
+        }
+    }
 
     private record CancelPart(
             String topic, int partition, String driverEtag, List<Integer> before, List<Integer> after) {}
 
-    private record CancelPlan(CancelPreview view, List<CancelPart> parts) {}
+    private record CancelPlan(CancelPreview view, List<CancelPart> parts) {
+
+        static CancelPlan collect(List<NamedPartition> partitions, CancelOne one) {
+            List<CancelPart> parts = new ArrayList<>();
+            for (NamedPartition partition : partitions) {
+                parts.add(one.describe(partition));
+            }
+            List<String> etagParts = parts.stream()
+                    .map(part -> part.topic() + "\0" + part.partition() + "\0" + part.driverEtag())
+                    .toList();
+            List<CancelPartition> shown = parts.stream()
+                    .map(part -> new CancelPartition(part.topic(), part.partition(), part.before(), part.after()))
+                    .toList();
+            return new CancelPlan(
+                    new CancelPreview(shown, KafkaEtags.of(etagParts), "Cancels the in-progress reassignment."), parts);
+        }
+
+        String firstTopic() {
+            return parts.isEmpty() ? "" : parts.getFirst().topic();
+        }
+
+        int size() {
+            return parts.size();
+        }
+
+        Map<String, List<Integer>> replicasBefore() {
+            return replicas(false);
+        }
+
+        Map<String, List<Integer>> replicasAfter() {
+            return replicas(true);
+        }
+
+        void each(CancelSend send) {
+            for (CancelPart part : parts) {
+                send.cancel(part.topic(), part.partition(), part.driverEtag());
+            }
+        }
+
+        private Map<String, List<Integer>> replicas(boolean after) {
+            Map<String, List<Integer>> replicas = new LinkedHashMap<>();
+            for (CancelPart part : parts) {
+                replicas.put(part.topic() + "-" + part.partition(), after ? part.after() : part.before());
+            }
+            return replicas;
+        }
+
+        @FunctionalInterface
+        interface CancelOne {
+            CancelPart describe(NamedPartition partition);
+        }
+
+        @FunctionalInterface
+        interface CancelSend {
+            void cancel(String topic, int partition, String driverEtag);
+        }
+    }
 }

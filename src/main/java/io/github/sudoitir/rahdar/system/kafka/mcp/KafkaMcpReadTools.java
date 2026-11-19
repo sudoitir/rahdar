@@ -129,7 +129,7 @@ public class KafkaMcpReadTools {
             @McpToolParam(required = false) Boolean onlyOverridden,
             @McpToolParam(required = false) String keys) {
         UUID id = McpArgs.uuid(CLUSTER_ID, clusterId);
-        McpArgs.required("topic", topic);
+        McpArgs.required(TOPIC, topic);
         return McpErrors.guard(() -> KafkaMcpViews.config(configs.read(id, topic), onlyOverridden, keys));
     }
 

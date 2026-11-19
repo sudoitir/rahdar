@@ -359,7 +359,7 @@ public class KafkaMcpActionTools {
             try {
                 out.add(new SelectedPartition(
                         trimmed.substring(0, colon), Integer.valueOf(trimmed.substring(colon + 1))));
-            } catch (NumberFormatException e) {
+            } catch (NumberFormatException _) {
                 throw new IllegalArgumentException("A partition number is a whole number: " + trimmed + ".");
             }
         }
@@ -376,7 +376,7 @@ public class KafkaMcpActionTools {
             String trimmed = part.trim();
             try {
                 out.add(Integer.valueOf(trimmed));
-            } catch (NumberFormatException e) {
+            } catch (NumberFormatException _) {
                 throw new IllegalArgumentException("A replica is a broker number, not " + trimmed + ".");
             }
         }
