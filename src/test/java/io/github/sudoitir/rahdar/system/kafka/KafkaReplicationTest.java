@@ -430,12 +430,113 @@ class KafkaReplicationTest {
     }
 
     @Test
+    void anInProgressReassignmentIsListedBesideOneThisProductStored() {
+        when(resources.read(any(ResourceQuery.class)))
+                .thenReturn(Partial.complete(
+                        new ResourcePage(List.of(moving("orders", 0), moving("billing", 1)), Optional.empty()),
+                        List.of()));
+        when(reassignments.findByClusterId(CLUSTER))
+                .thenReturn(List.of(
+                        new KafkaReassignmentEntity(CLUSTER, "orders", 0, 1L, Map.of(), "", java.time.Instant.EPOCH)));
+
+        var items = replication.reassignments(CLUSTER).items();
+
+        assertThat(items).hasSize(2);
+        assertThat(items)
+                .filteredOn(row -> row.topic().equals("orders"))
+                .singleElement()
+                .satisfies(row -> {
+                    assertThat(row.reassignment()).contains("adding");
+                    assertThat(row.startedHere()).isTrue();
+                });
+        assertThat(items)
+                .filteredOn(row -> row.topic().equals("billing"))
+                .singleElement()
+                .satisfies(row -> assertThat(row.startedHere()).isFalse());
+    }
+
+    @Test
+    void aBrokerThatRejectsTheMoveOrTheCancelIsAuditedAsFailed() {
+        when(operations.preview(any(), any(), any())).thenReturn(reassignPreview("etag-1", Count.exact(4), "About 1s"));
+        String moveEtag = replication
+                .previewReassign(CLUSTER, "orders", 0, new ReplicaMoveRequest(List.of(1, 2, 3), 1_000L, null))
+                .etag();
+        when(operations.execute(any(), any(), any(), any())).thenThrow(new IllegalStateException("down"));
+        assertThatThrownBy(() -> replication.reassign(
+                        CLUSTER, "orders", 0, new ReplicaMoveRequest(List.of(1, 2, 3), 1_000L, moveEtag)))
+                .isInstanceOf(IllegalStateException.class);
+
+        when(operations.preview(any(), any(), any())).thenReturn(cancelPreview());
+        String cancelEtag = replication
+                .previewCancel(CLUSTER, new PartitionSelection(List.of(new SelectedPartition("orders", 0)), null))
+                .etag();
+        assertThatThrownBy(() -> replication.cancel(
+                        CLUSTER, new PartitionSelection(List.of(new SelectedPartition("orders", 0)), cancelEtag)))
+                .isInstanceOf(IllegalStateException.class);
+        verify(audit, org.mockito.Mockito.atLeast(2)).fail(eq(event), eq("down"));
+    }
+
+    @Test
+    void aTopicThrottleIsPutBackAndAResultWithoutAMapStoresNothingNew() {
+        minInSync = 1;
+        when(resources.read(any(ResourceQuery.class))).thenAnswer(invocation -> {
+            ResourceQuery query = invocation.getArgument(0);
+            if (KafkaKinds.TOPIC.equals(query.kind().orElseThrow())) {
+                return page(config("kafka.topic", "orders", "leader.replication.throttled.replicas", "0:1"));
+            }
+            return page(partition(2, List.of(1, 2)));
+        });
+        when(operations.preview(any(), any(), any()))
+                .thenReturn(new Preview(
+                        List.of(),
+                        Set.of(),
+                        new Estimate(Count.exact(1), "By"),
+                        "etag-1",
+                        EtagBasis.CONFIGURATION,
+                        PreconditionEnforcement.CHECKED_BEFORE));
+        when(operations.execute(any(), any(), any(), any()))
+                .thenReturn(Partial.complete(
+                        new OperationResult(
+                                OptionalLong.empty(),
+                                Optional.of(new Resource(
+                                        ResourceId.of("kafka.partition", "orders", "0"),
+                                        Attributes.builder()
+                                                .putRaw(KafkaKinds.THROTTLE_PREVIOUS, "not-a-map")
+                                                .putRaw(KafkaKinds.THROTTLE_ADDED, "not-a-list")
+                                                .build(),
+                                        List.of(),
+                                        List.of(),
+                                        java.time.Instant.EPOCH)),
+                                false),
+                        List.of()));
+        String etag = replication
+                .previewReassign(CLUSTER, "orders", 0, new ReplicaMoveRequest(List.of(1, 2, 3), 1_000L, null))
+                .etag();
+
+        var outcome =
+                replication.reassign(CLUSTER, "orders", 0, new ReplicaMoveRequest(List.of(1, 2, 3), 1_000L, etag));
+
+        assertThat(outcome.throttleOutcome()).isEqualTo(KafkaPlacement.THROTTLE_RESTORED);
+    }
+
+    @Test
     void anEmptyCancelIsRefusedBeforeAnyDriverCall() {
         assertThatThrownBy(() -> replication.previewCancel(CLUSTER, new PartitionSelection(List.of(), null)))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("nothing was sent");
         verify(operations, never()).preview(any(), any(), any());
         verify(operations, never()).execute(any(), any(), any(), any());
+    }
+
+    private static Resource moving(String topic, int partition) {
+        return new Resource(
+                ResourceId.of("kafka.partition", topic, Integer.toString(partition)),
+                Attributes.builder()
+                        .putRaw(KafkaKinds.REASSIGNMENT, "replicas=[1],adding=[1],removing=[]")
+                        .build(),
+                List.of(),
+                List.of(),
+                java.time.Instant.EPOCH);
     }
 
     private static Partial<ResourcePage> page(Resource resource) {

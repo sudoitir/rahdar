@@ -1,6 +1,7 @@
 package io.github.sudoitir.rahdar.system.kafka;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import io.github.sudoitir.openbroker.kafka.admin.KafkaKinds;
 import io.github.sudoitir.openbroker.model.Attributes;
@@ -79,6 +80,20 @@ class KafkaPlacementTest {
         assertThat(KafkaPlacement.suggest(List.of(2, 1), brokers)).containsExactly(2, 1, 3, 4);
         assertThat(KafkaPlacement.suggest(List.of(1, 3), brokers)).containsExactly(1, 3, 4);
         assertThat(KafkaPlacement.suggest(List.of(1, 3, 4), brokers)).containsExactly(1, 3, 4);
+        assertThat(KafkaPlacement.suggest(List.of(1), List.of(new Rack(1, " "), new Rack(7, "a"))))
+                .containsExactly(1, 7);
+    }
+
+    @Test
+    void aPageSizeAndACursorStayInsideTheirBounds() {
+        assertThat(KafkaPlacement.pageSize(null)).isEqualTo(100);
+        assertThat(KafkaPlacement.pageSize(0)).isEqualTo(1);
+        assertThat(KafkaPlacement.pageSize(10_000)).isEqualTo(500);
+        assertThat(KafkaPlacement.cursor(null)).isZero();
+        assertThat(KafkaPlacement.cursor("  ")).isZero();
+        assertThat(KafkaPlacement.cursor("4")).isEqualTo(4);
+        assertThatThrownBy(() -> KafkaPlacement.cursor("-1")).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> KafkaPlacement.cursor("next")).isInstanceOf(IllegalArgumentException.class);
     }
 
     private static Resource partition(Integer leader, List<Integer> replicas, List<Integer> inSync) {

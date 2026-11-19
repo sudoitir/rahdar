@@ -124,6 +124,15 @@ class KafkaPartitionReadsTest {
     }
 
     @Test
+    void aCursorContinuesATopicPageAndAPastTheEndReplicationPageIsEmpty() {
+        listing(partition("orders", 0, 2, List.of(1, 2), List.of(1), null));
+
+        assertThat(reads.partitions(CLUSTER, "orders", "more", 2).items()).hasSize(1);
+        assertThat(reads.replication(CLUSTER, "orders", "9", null).items()).isEmpty();
+        assertThat(reads.replication(CLUSTER, " ", null, null).items()).isNotEmpty();
+    }
+
+    @Test
     void aReadWithoutPermissionDoesNotListPartitions() {
         doThrow(new NotFoundException("permission"))
                 .when(access)

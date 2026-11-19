@@ -24,6 +24,7 @@ import io.github.sudoitir.openbroker.operation.Operation;
 import io.github.sudoitir.openbroker.operation.OperationResult;
 import io.github.sudoitir.openbroker.operation.Operations;
 import io.github.sudoitir.openbroker.operation.Precondition;
+import io.github.sudoitir.rahdar.kernel.core.NotFoundException;
 import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
 import io.github.sudoitir.rahdar.system.kafka.internal.persistence.KafkaReassignmentEntity;
 import io.github.sudoitir.rahdar.system.kafka.internal.persistence.KafkaReassignmentRepository;
@@ -97,6 +98,33 @@ class KafkaThrottleRestoreTest {
 
         verify(operations, never()).execute(any(), any(), any(), any());
         verify(repository, never()).delete(any());
+    }
+
+    @Test
+    void aWriteThatFailsLeavesTheRowForTheNextScrape() {
+        KafkaReassignmentEntity row = row();
+        when(repository.findByClusterId(CLUSTER)).thenReturn(List.of(row));
+        when(resources.read(any(ResourceQuery.class))).thenReturn(page(false));
+        when(operations.execute(any(), any(), any(), any())).thenThrow(new IllegalStateException("down"));
+
+        restore.restore(CLUSTER);
+
+        verify(repository, never()).delete(any());
+    }
+
+    @Test
+    void aMissingPartitionIsTreatedAsFinishedAndABadKeyIsLeftForLater() {
+        KafkaReassignmentEntity missing = new KafkaReassignmentEntity(
+                CLUSTER, "orders", 0, 1L, Map.of("topic.leader.replication.throttled.rate", "1"), "", Instant.EPOCH);
+        KafkaReassignmentEntity bad =
+                new KafkaReassignmentEntity(CLUSTER, "orders", 1, 1L, Map.of("nope", "1"), "", Instant.EPOCH);
+        when(repository.findByClusterId(CLUSTER)).thenReturn(List.of(missing, bad));
+        when(resources.read(any(ResourceQuery.class))).thenThrow(new NotFoundException("partition"));
+
+        restore.restore(CLUSTER);
+
+        verify(operations).execute(any(), any(), any(), any());
+        verify(repository, times(1)).delete(any());
     }
 
     private static KafkaReassignmentEntity row() {
