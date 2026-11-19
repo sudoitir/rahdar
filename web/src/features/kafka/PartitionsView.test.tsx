@@ -45,12 +45,9 @@ describe("a topic's partitions", () => {
     renderAppAt('/clusters/k1/kafka/topics/orders');
 
     const grid = await screen.findByRole('grid', { name: 'Partitions of orders' });
-    const first = within(grid).getByText('Broker 2, 100 bytes on this broker, offset lag 0', { selector: 'span' });
-    const second = within(grid).getByText('Broker 1, 80 bytes on this broker, offset lag 3, future', {
-      selector: 'span',
-    });
-    expect(first.compareDocumentPosition(second) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(within(grid).getByText('The preferred leader is not leading.')).toBeInTheDocument();
+    const replicas = within(grid).getByRole('gridcell', { name: /2: 100 bytes, lag 0/ });
+    expect(replicas).toHaveTextContent('2: 100 bytes, lag 0 · 1: 80 bytes, lag 3, future');
+    expect(within(grid).getByText('Broker 1, not preferred')).toBeInTheDocument();
     expect(within(grid).queryByRole('columnheader', { name: 'Eligible leaders' })).not.toBeInTheDocument();
   });
 
@@ -91,7 +88,7 @@ describe("a topic's partitions", () => {
 
     const grid = await screen.findByRole('grid', { name: 'Partitions of orders' });
     expect(within(grid).getByText('not tiered')).toBeInTheDocument();
-    expect(within(grid).getByText(/bytes on this broker not reported/)).toBeInTheDocument();
+    expect(within(grid).getByText(/size not reported/)).toBeInTheDocument();
     expect(within(grid).queryByText('0')).not.toBeInTheDocument();
   });
 

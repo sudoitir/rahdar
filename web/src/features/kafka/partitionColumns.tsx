@@ -1,4 +1,3 @@
-import { Stack } from '@mantine/core';
 import { Link } from '@tanstack/react-router';
 
 import linkClasses from '../../ui/InlineLink.module.css';
@@ -19,16 +18,22 @@ function replicaLine(replica: ReplicaOnBroker): string {
   return `Broker ${replica.broker}, ${bytes}, ${lag}${future}`;
 }
 
-/**
- * Replica lines in the cluster's order. The leader is not moved to the front: order is `replicas`,
- * and a broker that only appears on a broker is kept in the order that list already has.
- */
-export function replicaLines(row: PartitionRow): string[] {
+/** The same facts, short enough that two replicas fit on the grid's one line. The long form is the reveal. */
+function replicaCompact(replica: ReplicaOnBroker): string {
+  const bytes = replica.bytes == null ? 'size not reported' : `${replica.bytes.toLocaleString()} bytes`;
+  const lag = replica.offsetLag == null ? 'lag not reported' : `lag ${replica.offsetLag.toLocaleString()}`;
+  return `${replica.broker}: ${bytes}, ${lag}${replica.future ? ', future' : ''}`;
+}
+
+function replicasInOrder(row: PartitionRow): ReplicaOnBroker[] {
   const byBroker = new Map(row.replicasOnBroker.map((replica) => [replica.broker, replica]));
   const listed = row.replicas.length > 0 ? row.replicas : row.replicasOnBroker.map((replica) => replica.broker);
-  return listed.map((broker) =>
-    replicaLine(byBroker.get(broker) ?? { broker, bytes: null, offsetLag: null, future: false }),
-  );
+  return listed.map((broker) => byBroker.get(broker) ?? { broker, bytes: null, offsetLag: null, future: false });
+}
+
+/** Replica lines in the cluster's order. The leader is not moved to the front. */
+export function replicaLines(row: PartitionRow): string[] {
+  return replicasInOrder(row).map(replicaLine);
 }
 
 /** The tiered offset, or the reason it is absent. Never a blank and never a stand-in zero. */
@@ -53,13 +58,10 @@ export function logDirMisses(rows: readonly PartitionRow[]): string[] {
 
 const brokers = (ids: readonly number[]): string => (ids.length === 0 ? 'None' : ids.join(', '));
 
-function leaderCell(row: PartitionRow) {
-  return (
-    <Stack gap={2} align="flex-start">
-      <span>{row.leader == null ? 'No leader' : `Broker ${row.leader}`}</span>
-      <span>{row.preferredLeader ? 'Preferred leader' : 'The preferred leader is not leading.'}</span>
-    </Stack>
-  );
+/** One line. The grid row is a fixed height, so a second line is clipped and the operator never sees it. */
+function leaderWords(row: PartitionRow): string {
+  const who = row.leader == null ? 'No leader' : `Broker ${row.leader}`;
+  return row.preferredLeader ? who : `${who}. The preferred leader is not leading.`;
 }
 
 /** Placement columns. Eligible leaders are included only when the page's rows keep that field. */
@@ -117,29 +119,23 @@ export function partitionColumns(options: {
     {
       id: 'leader',
       header: 'Leader',
-      accessor: (row) =>
-        row.preferredLeader
-          ? `Broker ${row.leader ?? 'none'} is the preferred leader`
-          : `Broker ${row.leader ?? 'none'}. The preferred leader is not leading.`,
-      cell: leaderCell,
+      accessor: leaderWords,
+      cell: (row) =>
+        row.preferredLeader || row.leader == null
+          ? leaderWords(row)
+          : `Broker ${row.leader}, not preferred`,
       kind: 'text',
-      wrap: true,
       priority: 'essential',
     },
     {
       id: 'replicas',
       header: 'Replicas',
       description: 'Broker order, bytes on this broker, offset lag, and future when the replica is one',
-      accessor: (row) => replicaLines(row).join('; '),
-      cell: (row) => (
-        <Stack gap={2} align="flex-start">
-          {replicaLines(row).map((line) => (
-            <span key={line}>{line}</span>
-          ))}
-        </Stack>
-      ),
+      accessor: (row) => replicaLines(row).join(' · '),
+      cell: (row) => replicasInOrder(row).map(replicaCompact).join(' · '),
       kind: 'text',
-      wrap: true,
+      max: 72,
+      grow: true,
       priority: 'essential',
     },
     {
