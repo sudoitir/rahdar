@@ -6,8 +6,12 @@ import io.github.sudoitir.rahdar.system.kafka.KafkaAcls;
 import io.github.sudoitir.rahdar.system.kafka.KafkaGroups;
 import io.github.sudoitir.rahdar.system.kafka.KafkaHangingTransactions;
 import io.github.sudoitir.rahdar.system.kafka.KafkaOffsets;
+import io.github.sudoitir.rahdar.system.kafka.KafkaPartitionReads;
+import io.github.sudoitir.rahdar.system.kafka.KafkaReplication;
 import io.github.sudoitir.rahdar.system.kafka.KafkaTopicConfigs;
 import io.github.sudoitir.rahdar.system.kafka.KafkaTransactions;
+import io.github.sudoitir.rahdar.system.kafka.web.KafkaReplicationViews.PartitionSelection;
+import io.github.sudoitir.rahdar.system.kafka.web.KafkaReplicationViews.ReplicaMoveRequest;
 import io.github.sudoitir.rahdar.system.kafka.web.KafkaViews.HangingPage;
 import io.github.sudoitir.rahdar.system.kafka.web.KafkaViews.OffsetRequest;
 import io.github.sudoitir.rahdar.system.kafka.web.KafkaViews.TransactionPage;
@@ -31,12 +35,16 @@ public class KafkaMcpReadTools {
 
     private static final String CLUSTER_ID = "clusterId";
 
+    private static final String TOPIC = "topic";
+
     private final KafkaGroups groups;
     private final KafkaOffsets offsets;
     private final KafkaTopicConfigs configs;
     private final KafkaAcls acls;
     private final KafkaTransactions transactions;
     private final KafkaHangingTransactions hanging;
+    private final KafkaPartitionReads partitions;
+    private final KafkaReplication replication;
 
     @McpTool(
             name = "kafka_list_groups",
@@ -121,7 +129,7 @@ public class KafkaMcpReadTools {
             @McpToolParam(required = false) Boolean onlyOverridden,
             @McpToolParam(required = false) String keys) {
         UUID id = McpArgs.uuid(CLUSTER_ID, clusterId);
-        McpArgs.required("topic", topic);
+        McpArgs.required(TOPIC, topic);
         return McpErrors.guard(() -> KafkaMcpViews.config(configs.read(id, topic), onlyOverridden, keys));
     }
 
@@ -178,6 +186,137 @@ public class KafkaMcpReadTools {
                             + " hanging: open on a partition and unknown to the coordinator. Abort either with"
                             + " kafka_abort_transaction.");
         });
+    }
+
+    @McpTool(
+            name = "kafka_list_partitions",
+            description = "One page of a topic's partitions: leader, replica order, sync and bytes.",
+            annotations =
+                    @McpTool.McpAnnotations(
+                            readOnlyHint = true,
+                            destructiveHint = false,
+                            idempotentHint = true,
+                            openWorldHint = false))
+    public McpSchema.CallToolResult kafkaListPartitions(
+            @McpToolParam(required = true) String clusterId,
+            @McpToolParam(required = true) String topic,
+            @McpToolParam(required = false) String cursor,
+            @McpToolParam(required = false) Integer limit) {
+        UUID id = McpArgs.uuid(CLUSTER_ID, clusterId);
+        McpArgs.required(TOPIC, topic);
+        return McpErrors.guard(() -> partitions.partitions(id, topic, cursor, limit));
+    }
+
+    @McpTool(
+            name = "kafka_list_replication",
+            description = "Partitions that are under-replicated, offline, or not on the preferred leader.",
+            annotations =
+                    @McpTool.McpAnnotations(
+                            readOnlyHint = true,
+                            destructiveHint = false,
+                            idempotentHint = true,
+                            openWorldHint = false))
+    public McpSchema.CallToolResult kafkaListReplication(
+            @McpToolParam(required = true) String clusterId,
+            @McpToolParam(required = false) String topic,
+            @McpToolParam(required = false) String cursor,
+            @McpToolParam(required = false) Integer limit) {
+        UUID id = McpArgs.uuid(CLUSTER_ID, clusterId);
+        return McpErrors.guard(() -> partitions.replication(id, topic, cursor, limit));
+    }
+
+    @McpTool(
+            name = "kafka_suggest_replicas",
+            description = "A rack suggestion that keeps the current replicas. It moves nothing.",
+            annotations =
+                    @McpTool.McpAnnotations(
+                            readOnlyHint = true,
+                            destructiveHint = false,
+                            idempotentHint = true,
+                            openWorldHint = false))
+    public McpSchema.CallToolResult kafkaSuggestReplicas(
+            @McpToolParam(required = true) String clusterId,
+            @McpToolParam(required = true) String topic,
+            @McpToolParam(required = true) Integer partition) {
+        UUID id = McpArgs.uuid(CLUSTER_ID, clusterId);
+        McpArgs.required(TOPIC, topic);
+        if (partition == null) {
+            throw McpErrors.invalidParams("partition is required.");
+        }
+        return McpErrors.guard(() -> partitions.suggest(id, topic, partition));
+    }
+
+    @McpTool(
+            name = "kafka_preview_preferred_election",
+            description = "What a preferred-leader election would change. Sends nothing.",
+            annotations =
+                    @McpTool.McpAnnotations(
+                            readOnlyHint = true,
+                            destructiveHint = false,
+                            idempotentHint = true,
+                            openWorldHint = false))
+    public McpSchema.CallToolResult kafkaPreviewPreferredElection(
+            @McpToolParam(required = true) String clusterId, @McpToolParam(required = true) String partitions) {
+        UUID id = McpArgs.uuid(CLUSTER_ID, clusterId);
+        return KafkaMcpActionTools.guard(() -> replication.previewElection(
+                id, new PartitionSelection(KafkaMcpActionTools.selection(partitions), null)));
+    }
+
+    @McpTool(
+            name = "kafka_preview_reassign",
+            description = "What a throttled replica move would copy. Sends nothing without a positive throttle.",
+            annotations =
+                    @McpTool.McpAnnotations(
+                            readOnlyHint = true,
+                            destructiveHint = false,
+                            idempotentHint = true,
+                            openWorldHint = false))
+    public McpSchema.CallToolResult kafkaPreviewReassign(
+            @McpToolParam(required = true) String clusterId,
+            @McpToolParam(required = true) String topic,
+            @McpToolParam(required = true) Integer partition,
+            @McpToolParam(required = true) String replicas,
+            @McpToolParam(required = true) Long throttleBytesPerSecond) {
+        UUID id = McpArgs.uuid(CLUSTER_ID, clusterId);
+        McpArgs.required(TOPIC, topic);
+        if (partition == null) {
+            throw McpErrors.invalidParams("partition is required.");
+        }
+        return KafkaMcpActionTools.guard(() -> replication.previewReassign(
+                id,
+                topic,
+                partition,
+                new ReplicaMoveRequest(KafkaMcpActionTools.brokers(replicas), throttleBytesPerSecond, null)));
+    }
+
+    @McpTool(
+            name = "kafka_list_reassignments",
+            description = "In-progress replica moves, and which of them this product started.",
+            annotations =
+                    @McpTool.McpAnnotations(
+                            readOnlyHint = true,
+                            destructiveHint = false,
+                            idempotentHint = true,
+                            openWorldHint = false))
+    public McpSchema.CallToolResult kafkaListReassignments(@McpToolParam(required = true) String clusterId) {
+        UUID id = McpArgs.uuid(CLUSTER_ID, clusterId);
+        return McpErrors.guard(() -> replication.reassignments(id));
+    }
+
+    @McpTool(
+            name = "kafka_preview_cancel_reassignment",
+            description = "The replicas a cancel would leave. Sends nothing.",
+            annotations =
+                    @McpTool.McpAnnotations(
+                            readOnlyHint = true,
+                            destructiveHint = false,
+                            idempotentHint = true,
+                            openWorldHint = false))
+    public McpSchema.CallToolResult kafkaPreviewCancelReassignment(
+            @McpToolParam(required = true) String clusterId, @McpToolParam(required = true) String partitions) {
+        UUID id = McpArgs.uuid(CLUSTER_ID, clusterId);
+        return KafkaMcpActionTools.guard(() ->
+                replication.previewCancel(id, new PartitionSelection(KafkaMcpActionTools.selection(partitions), null)));
     }
 
     /** What the transactions tool answers: the coordinator's open transactions, and the hanging ones when asked for. */

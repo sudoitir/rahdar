@@ -1,6 +1,7 @@
 package io.github.sudoitir.rahdar.system.kafka;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.awaitility.Awaitility.await;
 
 import com.github.dockerjava.api.command.InspectContainerResponse;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterService;
@@ -95,18 +96,24 @@ class KafkaAdvertisedListenerRealBrokerTest extends PostgresIntegrationTest {
                 Broker second = new Broker(IMAGE, 2, voters, UNREACHABLE).withNetwork(network)) {
             Startables.deepStart(first, second).join();
 
-            ConnectionCheck check = check(first.bootstrap());
-
-            assertThat(check.nodes())
-                    .extracting(n -> n.id() + ":" + n.outcome())
-                    .containsExactlyInAnyOrder("1:OK", "2:UNREACHABLE");
-            assertThat(check.nodes().stream()
-                            .filter(n -> n.id().equals("2"))
-                            .findFirst()
-                            .orElseThrow())
-                    .satisfies(node -> {
-                        assertThat(node.address()).isEqualTo(UNREACHABLE);
-                        assertThat(node.cause()).isEqualTo("DNS");
+            // Kafka 3.9 can name the second broker from the controller quorum (kafka-2:9094) before its
+            // client listener is in the metadata. Poll on this thread so the signed-in user stays in scope.
+            await().atMost(Duration.ofSeconds(45))
+                    .pollInterval(Duration.ofSeconds(1))
+                    .pollInSameThread()
+                    .untilAsserted(() -> {
+                        ConnectionCheck check = check(first.bootstrap());
+                        assertThat(check.nodes())
+                                .extracting(n -> n.id() + ":" + n.outcome())
+                                .containsExactlyInAnyOrder("1:OK", "2:UNREACHABLE");
+                        assertThat(check.nodes().stream()
+                                        .filter(n -> n.id().equals("2"))
+                                        .findFirst()
+                                        .orElseThrow())
+                                .satisfies(node -> {
+                                    assertThat(node.address()).isEqualTo(UNREACHABLE);
+                                    assertThat(node.cause()).isEqualTo("DNS");
+                                });
                     });
         }
     }

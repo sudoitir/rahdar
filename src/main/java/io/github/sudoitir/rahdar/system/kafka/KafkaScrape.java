@@ -66,6 +66,7 @@ class KafkaScrape implements ClusterScrape {
     private final ActorResolver actors;
     private final Clock clock;
     private final KafkaHealthStore healthStore;
+    private final KafkaThrottleRestore throttles;
 
     /** What the scrape last wrote of each cluster's health and when, so an unchanged verdict is rewritten only now and then. */
     private final Map<UUID, Written> written = new ConcurrentHashMap<>();
@@ -102,6 +103,7 @@ class KafkaScrape implements ClusterScrape {
         if (partitions.due(clusterId)) {
             round(clusterId, "partitions");
             partitions.refresh(clusterId);
+            throttles.restore(clusterId);
         }
         publish(KafkaHealth.judge(clusterId, described, partitions.offline(clusterId), partitions.tried(clusterId)));
     }

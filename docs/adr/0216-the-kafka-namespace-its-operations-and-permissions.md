@@ -1,6 +1,6 @@
 # ADR-0216: The Kafka namespace, its operations and its permissions
 
-- **Status**: accepted
+- **Status**: accepted; partition placement and replica moves are added by [ADR-0230](0230-kafka-partition-placement-and-replication.md)
 - **Date**: 2026-10-28
 - **Deciders**: Mahdi Amirabdollahi
 
