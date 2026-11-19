@@ -45,6 +45,10 @@ import io.github.sudoitir.rahdar.kernel.security.Actor;
 import io.github.sudoitir.rahdar.kernel.security.ActorResolver;
 import io.github.sudoitir.rahdar.kernel.security.ClusterAccessGuard;
 import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
+import io.github.sudoitir.rahdar.system.kafka.KafkaReplication.CancelParams;
+import io.github.sudoitir.rahdar.system.kafka.KafkaReplication.ElectParams;
+import io.github.sudoitir.rahdar.system.kafka.KafkaReplication.NamedPartition;
+import io.github.sudoitir.rahdar.system.kafka.KafkaReplication.ReassignParams;
 import io.github.sudoitir.rahdar.system.kafka.internal.persistence.KafkaReassignmentEntity;
 import io.github.sudoitir.rahdar.system.kafka.internal.persistence.KafkaReassignmentRepository;
 import io.github.sudoitir.rahdar.system.kafka.web.KafkaReplicationViews.CancelOutcome;
@@ -323,6 +327,106 @@ class KafkaReplicationTest {
         assertThat(reassign.options().asMap()).isEmpty();
         verify(reassignments, never()).save(any());
         verify(reassignments, never()).delete(any());
+    }
+
+    @Test
+    void aStoredMoveTheClusterNoLongerListsIsStillShown() {
+        when(reassignments.findByClusterId(CLUSTER))
+                .thenReturn(List.of(
+                        new KafkaReassignmentEntity(CLUSTER, "billing", 1, 4L, Map.of(), "", java.time.Instant.EPOCH)));
+
+        var listed = replication.reassignments(CLUSTER);
+
+        assertThat(listed.items()).singleElement().satisfies(row -> {
+            assertThat(row.topic()).isEqualTo("billing");
+            assertThat(row.reassignment()).isNull();
+            assertThat(row.startedHere()).isTrue();
+        });
+    }
+
+    @Test
+    void anApproverCanEstimateAndReplayEachMove() {
+        when(operations.preview(any(), any(), any())).thenAnswer(invocation -> {
+            Operation operation = invocation.getArgument(1);
+            if (operation instanceof Operation.ElectLeader) {
+                return electionPreview("etag-e", true);
+            }
+            if (operation instanceof Operation.Reassign reassign
+                    && reassign.assignments().values().stream().anyMatch(List::isEmpty)) {
+                return cancelPreview();
+            }
+            return reassignPreview("etag-1", Count.exact(12), "About 1s");
+        });
+        String electEtag = replication
+                .previewElection(CLUSTER, new PartitionSelection(List.of(new SelectedPartition("orders", 0)), null))
+                .etag();
+        String moveEtag = replication
+                .previewReassign(CLUSTER, "orders", 0, new ReplicaMoveRequest(List.of(1, 2, 3), 1_000L, null))
+                .etag();
+        String cancelEtag = replication
+                .previewCancel(CLUSTER, new PartitionSelection(List.of(new SelectedPartition("orders", 0)), null))
+                .etag();
+        ElectParams elect = new ElectParams(CLUSTER, List.of(new NamedPartition("orders", 0)), electEtag);
+        ReassignParams move = new ReassignParams(CLUSTER, "orders", 0, List.of(1, 2, 3), 1_000L, moveEtag);
+        CancelParams cancel = new CancelParams(CLUSTER, List.of(new NamedPartition("orders", 0)), cancelEtag);
+
+        assertThat(replication.estimateElect(elect).detail()).contains("Already the preferred leader");
+        assertThat(replication.estimateReassign(move).unit()).isEqualTo("bytes");
+        assertThat(replication.estimateCancel(cancel).count()).isEqualTo(1);
+        replication.replayElect(elect);
+        replication.replayReassign(move);
+        replication.replayCancel(cancel);
+        verify(operations, org.mockito.Mockito.atLeast(3)).execute(any(), any(), any(), any());
+    }
+
+    @Test
+    void aBrokerThatRejectsTheElectionIsAuditedAsFailed() {
+        when(operations.preview(any(), any(), any())).thenReturn(electionPreview("etag-e", false));
+        String etag = replication
+                .previewElection(CLUSTER, new PartitionSelection(List.of(new SelectedPartition("orders", 0)), null))
+                .etag();
+        when(operations.execute(any(), any(), any(), any())).thenThrow(new IllegalStateException("down"));
+
+        assertThatThrownBy(() -> replication.elect(
+                        CLUSTER, new PartitionSelection(List.of(new SelectedPartition("orders", 0)), etag)))
+                .isInstanceOf(IllegalStateException.class);
+        verify(audit).fail(event, "down");
+    }
+
+    @Test
+    void aSecondBaselineKeepsAThrottleTheFirstMoveAlreadyStored() {
+        KafkaReassignmentEntity row = new KafkaReassignmentEntity(
+                CLUSTER, "orders", 0, 1L, Map.of("kept", "9"), "kept", java.time.Instant.EPOCH);
+        when(reassignments.findByClusterIdAndTopicAndPartition(CLUSTER, "orders", 0))
+                .thenReturn(Optional.of(row));
+        when(operations.preview(any(), any(), any())).thenReturn(reassignPreview("etag-1", Count.exact(4), "About 1s"));
+        when(operations.execute(any(), any(), any(), any()))
+                .thenReturn(Partial.complete(OperationResult.already(), List.of()));
+
+        replication.reassign(CLUSTER, "orders", 0, new ReplicaMoveRequest(List.of(1, 2, 3), 1_000L, "etag-1"));
+
+        assertThat(row.getPreviousThrottle()).containsEntry("kept", "9");
+        assertThat(row.getAddedKeys()).contains("kept");
+    }
+
+    @Test
+    void aReplicaListThatNamesNothingOrTheSameBrokerTwiceIsRefused() {
+        assertThatThrownBy(() -> replication.previewElection(
+                        CLUSTER, new PartitionSelection(List.of(new SelectedPartition(" ", 0)), null)))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> replication.previewReassign(
+                        CLUSTER, "orders", 0, new ReplicaMoveRequest(java.util.Arrays.asList(1, null), 1_000L, null)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("broker number");
+        assertThatThrownBy(() -> replication.previewReassign(
+                        CLUSTER, "orders", 0, new ReplicaMoveRequest(List.of(1, 1), 1_000L, null)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("twice");
+        assertThatThrownBy(() -> replication.previewElection(
+                        CLUSTER,
+                        new PartitionSelection(java.util.Arrays.asList(new SelectedPartition("orders", null)), null)))
+                .isInstanceOf(IllegalArgumentException.class);
+        verify(operations, never()).preview(any(), any(), any());
     }
 
     @Test

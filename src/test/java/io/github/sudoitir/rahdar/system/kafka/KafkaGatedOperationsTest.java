@@ -3,15 +3,21 @@ package io.github.sudoitir.rahdar.system.kafka;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import io.github.sudoitir.rahdar.kernel.gate.DisplayRow;
 import io.github.sudoitir.rahdar.kernel.gate.GatedOperation;
 import io.github.sudoitir.rahdar.platform.clusters.ClusterEnvironmentIndex;
+import io.github.sudoitir.rahdar.system.kafka.KafkaReplication.CancelParams;
+import io.github.sudoitir.rahdar.system.kafka.KafkaReplication.ElectParams;
+import io.github.sudoitir.rahdar.system.kafka.KafkaReplication.NamedPartition;
+import io.github.sudoitir.rahdar.system.kafka.KafkaReplication.ReassignParams;
 import io.github.sudoitir.rahdar.system.kafka.KafkaTopicLifecycle.CreateParams;
 import io.github.sudoitir.rahdar.system.kafka.KafkaTopicLifecycle.DeleteParams;
 import io.github.sudoitir.rahdar.system.kafka.KafkaTopicLifecycle.GroupDeleteParams;
 import io.github.sudoitir.rahdar.system.kafka.KafkaTopicLifecycle.PartitionsParams;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -54,5 +60,30 @@ class KafkaGatedOperationsTest {
         GroupDeleteParams params = new GroupDeleteParams(CLUSTER, "billing", "etag");
         assertThat(group.summary(params)).isEqualTo("Delete group billing on prod-eu");
         assertThat(group.display(params)).extracting(DisplayRow::label).containsExactly("Cluster", "Group");
+    }
+
+    @Test
+    void anApproverReadsAPreferredElectionAReplicaMoveAndACancel() {
+        KafkaReplication replication = mock(KafkaReplication.class);
+        when(clusters.environmentOf(CLUSTER)).thenReturn(UUID.randomUUID());
+        ElectParams elect = new ElectParams(CLUSTER, List.of(new NamedPartition("orders", 0)), "etag");
+        ReassignParams move = new ReassignParams(CLUSTER, "orders", 0, List.of(1, 2), 1_000L, "etag");
+        CancelParams cancel = new CancelParams(CLUSTER, List.of(new NamedPartition("orders", 0)), "etag");
+
+        GatedOperation<ElectParams> election = beans.electPreferred(replication, clusters);
+        assertThat(election.summary(elect)).contains("1 partitions").contains("prod-eu");
+        assertThat(election.display(elect)).extracting(DisplayRow::label).contains("Cluster", "Partitions");
+        assertThat(election.scope(elect).clusterId()).isEqualTo(CLUSTER);
+        assertThat(election.traits(elect)).isNotEmpty();
+
+        GatedOperation<ReassignParams> reassign = beans.reassignReplicas(replication, clusters);
+        assertThat(reassign.summary(move)).contains("orders-0").contains("prod-eu");
+        assertThat(reassign.display(move)).extracting(DisplayRow::to).contains("[1, 2]", "1000");
+
+        GatedOperation<CancelParams> stop = beans.cancelReassignment(replication, clusters);
+        assertThat(stop.summary(cancel)).contains("1 replica").contains("prod-eu");
+        assertThat(stop.display(cancel)).extracting(DisplayRow::label).contains("Partitions");
+        stop.replay(cancel);
+        verify(replication).replayCancel(cancel);
     }
 }
