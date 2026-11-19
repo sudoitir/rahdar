@@ -63,11 +63,7 @@ function InSync() {
         title="Replication"
         description="Partitions that are under-replicated, have an offline replica, or are not led by their first replica."
       />
-      <EmptyState
-        kind="empty"
-        title="In sync"
-        description="Every partition is in sync and on its preferred leader."
-      />
+      <EmptyState kind="empty" title="In sync" description="Every partition is in sync and on its preferred leader." />
     </Page>
   );
 }

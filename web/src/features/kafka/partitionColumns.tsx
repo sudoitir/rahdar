@@ -121,9 +121,7 @@ export function partitionColumns(options: {
       header: 'Leader',
       accessor: leaderWords,
       cell: (row) =>
-        row.preferredLeader || row.leader == null
-          ? leaderWords(row)
-          : `Broker ${row.leader}, not preferred`,
+        row.preferredLeader || row.leader == null ? leaderWords(row) : `Broker ${row.leader}, not preferred`,
       kind: 'text',
       priority: 'essential',
     },
