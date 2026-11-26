@@ -46,6 +46,7 @@ logs/
 
 # Claude Code local overrides (per-machine)
 .claude/settings.local.json
+.superpowers/
 
 # UI sweep captures and saved sessions (web/scripts/sweep.ts)
 web/.sweep/

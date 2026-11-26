@@ -25,6 +25,7 @@ A browsed value is wire bytes. Showing only those hides the record. Replacing th
 - An operator can see a registry without being able to change it, and cannot change it without a preview.
 - One new table, and columns on `kafka_connection`. Recreate the database; this release is before the first stable one.
 - A cluster with no registry keeps the screen, with the actions disabled and the reason stated.
+- A live SQL read of a Kafka log shows the decoded record. A captured or indexed row stays undecoded: the tap drains a queue, not a topic side, and the index stores no decoded view. A later change that stores that view on the message index should revisit it. This change does not.
 - There is no plugin-API change, so `Contract.VERSION` stays.
 
 ## Alternatives considered
