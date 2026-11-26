@@ -46816,6 +46816,14 @@
               "type" : "null"
             } ],
             "description" : "The record a schema id decoded to, or why it did not. Null when this row was not decoded."
+          },
+          "decodedKey" : {
+            "anyOf" : [ {
+              "$ref" : "#/components/schemas/DecodedRecordView"
+            }, {
+              "type" : "null"
+            } ],
+            "description" : "The key decoded with the topic's key binding."
           }
         },
         "required" : [ "bodyTruncated", "durable", "expiration", "messageId", "messageType", "priority", "size" ]
@@ -47838,6 +47846,14 @@
               "type" : "null"
             } ],
             "description" : "The record a schema id decoded to, or why it did not. Never an empty stand-in."
+          },
+          "decodedKey" : {
+            "anyOf" : [ {
+              "$ref" : "#/components/schemas/DecodedRecordView"
+            }, {
+              "type" : "null"
+            } ],
+            "description" : "The key decoded with the topic's key binding, or why it did not."
           }
         },
         "required" : [ "bodyEncoding", "bodyTruncated", "booleanProperties", "doubleProperties", "durable", "expiration", "intProperties", "longProperties", "position", "priority", "redactions", "size", "stringProperties", "tombstone", "type", "withheld" ]

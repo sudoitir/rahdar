@@ -2,6 +2,7 @@ package io.github.sudoitir.rahdar.platform.broker;
 
 import io.github.sudoitir.openbroker.kafka.schema.DecodedRecord;
 import io.github.sudoitir.openbroker.kafka.schema.SchemaCatalog;
+import io.github.sudoitir.openbroker.messaging.Blob;
 import io.github.sudoitir.openbroker.messaging.MessageBody;
 import io.github.sudoitir.rahdar.kernel.core.DecodedRecordView;
 import java.util.LinkedHashMap;
@@ -41,6 +42,14 @@ public final class SchemaDecoding {
             return DecodedRecordView.undecoded(DecodedRecord.NO_SCHEMA_ID);
         }
         return view(catalog.decode(serde, body));
+    }
+
+    /** A key has no tombstone. A missing key is not decoded. */
+    public DecodedRecordView key(Blob key) {
+        if (catalog == null || key == null) {
+            return null;
+        }
+        return view(catalog.decode(serde, MessageBody.of(key.toByteArray())));
     }
 
     static DecodedRecordView view(DecodedRecord decoded) {

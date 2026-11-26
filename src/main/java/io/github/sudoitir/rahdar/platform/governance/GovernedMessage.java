@@ -24,7 +24,8 @@ public record GovernedMessage(
         List<Withheld> withheld,
         Map<String, String> sealable,
         int policyVersion,
-        DecodedRecordView decoded) {
+        DecodedRecordView decoded,
+        DecodedRecordView decodedKey) {
 
     public GovernedMessage(
             Map<String, String> headers,
@@ -34,7 +35,7 @@ public record GovernedMessage(
             List<Withheld> withheld,
             Map<String, String> sealable,
             int policyVersion) {
-        this(headers, properties, body, redactions, withheld, sealable, policyVersion, null);
+        this(headers, properties, body, redactions, withheld, sealable, policyVersion, null, null);
     }
 
     /** One sensitive value: where it is, what it is, what was done, and whether it was served clear by grant. */

@@ -17,7 +17,8 @@ public record MessageContent(
         String body,
         boolean base64,
         String contentType,
-        DecodedRecordView decoded) {
+        DecodedRecordView decoded,
+        DecodedRecordView decodedKey) {
 
     public MessageContent(
             Map<String, String> headers,
@@ -25,7 +26,17 @@ public record MessageContent(
             String body,
             boolean base64,
             String contentType) {
-        this(headers, properties, body, base64, contentType, null);
+        this(headers, properties, body, base64, contentType, null, null);
+    }
+
+    public MessageContent(
+            Map<String, String> headers,
+            Map<String, Object> properties,
+            String body,
+            boolean base64,
+            String contentType,
+            DecodedRecordView decoded) {
+        this(headers, properties, body, base64, contentType, decoded, null);
     }
 
     public MessageContent {

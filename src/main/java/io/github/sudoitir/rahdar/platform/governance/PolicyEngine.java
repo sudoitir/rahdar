@@ -78,7 +78,8 @@ final class PolicyEngine {
                 governed.withheld(),
                 Collections.unmodifiableMap(sealable),
                 governed.policyVersion(),
-                governed.decoded());
+                governed.decoded(),
+                governed.decodedKey());
     }
 
     /** Detectors only, for free text such as audit parameters: no rules, no findings, never clear. */
@@ -125,7 +126,8 @@ final class PolicyEngine {
                     List.copyOf(withheld),
                     Map.of(),
                     policy.version(),
-                    decoded(content.decoded()));
+                    decoded(content.decoded()),
+                    decoded(content.decodedKey()));
         }
 
         /** The decoded record, with each field masked by the body rule that names its path. */

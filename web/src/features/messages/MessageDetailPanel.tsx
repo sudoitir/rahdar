@@ -286,13 +286,42 @@ function messageBody(m: MessageDetailView) {
  * A decoded record is the primary view, with the bytes behind a disclosure. An undecoded payload shows
  * the bytes and the reason, never an empty record standing in for it.
  */
+function KeyRecord({ decodedKey }: Readonly<{ decodedKey: MessageDetailView['decodedKey'] }>) {
+  if (!decodedKey) return null;
+  if (decodedKey.record != null) {
+    return (
+      <Section headingLevel={3} title="Key record" description={decodedKey.subject ?? undefined}>
+        <JsonTree value={decodedKey.record} />
+      </Section>
+    );
+  }
+  // A plain key has no schema id. That is not a failure, and neither is a cluster with no registry.
+  if (decodedKey.reason && decodedKey.reason !== 'no-schema-id' && decodedKey.reason !== 'no-registry') {
+    return (
+      <Notice tone="warning" title="This key was not decoded">
+        {DECODE_REASONS[decodedKey.reason] ?? decodedKey.reason}
+      </Notice>
+    );
+  }
+  return null;
+}
+
 function Payload({ m }: Readonly<{ m: MessageDetailView }>) {
   const body = messageBody(m);
   const decoded = m.decoded;
-  if (!decoded) return body;
+  const keyRecord = <KeyRecord decodedKey={m.decodedKey} />;
+  if (!decoded) {
+    return (
+      <Stack gap="sm">
+        {keyRecord}
+        {body}
+      </Stack>
+    );
+  }
   if (decoded.reason || decoded.record == null) {
     return (
       <Stack gap="sm">
+        {keyRecord}
         <Notice tone="warning" title="This payload was not decoded">
           {DECODE_REASONS[decoded.reason ?? ''] ?? decoded.reason ?? 'The payload was not decoded.'}
         </Notice>
@@ -305,6 +334,7 @@ function Payload({ m }: Readonly<{ m: MessageDetailView }>) {
     .join(' · ');
   return (
     <Stack gap="sm">
+      {keyRecord}
       <Section headingLevel={3} title="Record" description={meta || undefined}>
         <JsonTree value={decoded.record} />
       </Section>

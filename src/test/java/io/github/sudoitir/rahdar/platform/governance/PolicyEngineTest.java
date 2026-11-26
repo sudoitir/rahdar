@@ -86,6 +86,25 @@ class PolicyEngineTest {
     }
 
     @Test
+    void aBodyRuleMasksTheSameFieldOfADecodedKey() {
+        DecodedRecordView key = new DecodedRecordView(
+                "AVRO",
+                9,
+                "orders-key",
+                Map.of("email", "ada@example.com"),
+                null,
+                "{\"email\":\"ada@example.com\"}",
+                Map.of());
+        MessageContent content = new MessageContent(Map.of(), Map.of(), "{}", false, "application/json", null, key);
+
+        GovernedMessage governed = engine(List.of(rule("orders", RuleTarget.BODY_PATH, "email", DataClass.EMAIL)), 1024)
+                .govern(masked("orders"), content, false);
+
+        assertThat(governed.decodedKey().serialized()).doesNotContain("ada@example.com");
+        assertThat(String.valueOf(governed.decodedKey().record())).doesNotContain("ada@example.com");
+    }
+
+    @Test
     void anAuthorizationPropertyIsDroppedEvenForClearAccess() {
         MessageContent content = props(Map.of("Authorization", "Basic dXNlcjpwYXNz"), null);
 

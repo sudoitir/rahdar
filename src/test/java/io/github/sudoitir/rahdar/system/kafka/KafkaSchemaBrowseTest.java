@@ -1,6 +1,7 @@
 package io.github.sudoitir.rahdar.system.kafka;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -10,6 +11,7 @@ import io.github.sudoitir.openbroker.kafka.schema.SchemaCatalog;
 import io.github.sudoitir.openbroker.kafka.schema.SchemaType;
 import io.github.sudoitir.openbroker.kafka.schema.Subject;
 import io.github.sudoitir.openbroker.kafka.schema.SubjectVersion;
+import io.github.sudoitir.openbroker.messaging.Blob;
 import io.github.sudoitir.openbroker.messaging.Message;
 import io.github.sudoitir.openbroker.messaging.MessageBody;
 import io.github.sudoitir.openbroker.messaging.MessageHeaders;
@@ -92,6 +94,18 @@ class KafkaSchemaBrowseTest {
 
         assertThat(browsed.decoded().subject()).isEqualTo("orders-value");
         assertThat(browsed.body()).contains("sku");
+    }
+
+    @Test
+    void aKeyBindingDecodesTheKey() {
+        SchemaCatalog catalog = mock(SchemaCatalog.class);
+        when(catalog.decode(eq("avro"), anyBody()))
+                .thenReturn(new DecodedRecord.Decoded(SchemaType.AVRO, 9, "orders-key", Map.of("id", 1)));
+
+        DecodedRecordView view = new SchemaDecoding(catalog, "avro").key(Blob.of(new byte[] {1, 2}));
+
+        assertThat(view.subject()).isEqualTo("orders-key");
+        assertThat(view.record()).isEqualTo(Map.of("id", 1));
     }
 
     @Test

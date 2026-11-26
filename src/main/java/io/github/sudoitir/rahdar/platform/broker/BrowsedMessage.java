@@ -28,7 +28,8 @@ public record BrowsedMessage(
         Map<String, Long> longProperties,
         Map<String, Double> doubleProperties,
         Map<String, Boolean> booleanProperties,
-        DecodedRecordView decoded) {
+        DecodedRecordView decoded,
+        DecodedRecordView decodedKey) {
 
     /** A message whose payload was not passed to a schema registry. */
     public BrowsedMessage(
@@ -77,6 +78,7 @@ public record BrowsedMessage(
                 longProperties,
                 doubleProperties,
                 booleanProperties,
+                null,
                 null);
     }
 
@@ -115,7 +117,8 @@ public record BrowsedMessage(
                 Map.copyOf(extended),
                 doubleProperties,
                 booleanProperties,
-                decoded);
+                decoded,
+                decodedKey);
     }
 
     /** The same message with one more boolean property, such as a log record that is a tombstone. */
@@ -145,7 +148,37 @@ public record BrowsedMessage(
                 longProperties,
                 doubleProperties,
                 Map.copyOf(extended),
-                decoded);
+                decoded,
+                decodedKey);
+    }
+
+    /** The same message with its key decoded by the key binding. */
+    public BrowsedMessage withDecodedKey(DecodedRecordView decodedKey) {
+        return new BrowsedMessage(
+                messageId,
+                type,
+                durable,
+                priority,
+                timestamp,
+                expiration,
+                size,
+                groupId,
+                correlationId,
+                replyTo,
+                userId,
+                body,
+                bodyEncoding,
+                bodyCompression,
+                contentType,
+                bodyTruncated,
+                observedLimitBytes,
+                stringProperties,
+                intProperties,
+                longProperties,
+                doubleProperties,
+                booleanProperties,
+                decoded,
+                decodedKey);
     }
 
     /** First ~200 chars of the body, for the grid cell. */

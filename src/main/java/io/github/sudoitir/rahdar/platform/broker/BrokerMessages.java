@@ -128,11 +128,17 @@ public class BrokerMessages {
             }
             SchemaCatalog catalog = c.unwrap(SchemaCatalog.class).orElse(null);
             String topic = log.name();
-            SchemaDecoding decoding = new SchemaDecoding(catalog, bindings.serde(clusterId, topic, "value"));
+            SchemaDecoding values = new SchemaDecoding(catalog, bindings.serde(clusterId, topic, "value"));
+            SchemaDecoding keys = new SchemaDecoding(catalog, bindings.serde(clusterId, topic, "key"));
             Within<LogPage.LogRecord> kept = within(result.messages(), m -> {
                 BrowsedMessages.Key key = BrowsedMessages.keyOf(m);
+                BrowsedMessage value = BrowsedMessages.of(m, values);
+                BrowsedMessage browsed = m.headers()
+                        .key()
+                        .map(blob -> value.withDecodedKey(keys.key(blob)))
+                        .orElse(value);
                 return new LogPage.LogRecord(
-                        BrowsedMessages.of(m, decoding),
+                        browsed,
                         m.body().isTombstone(),
                         key == null ? null : key.text(),
                         key == null ? null : key.encoding());

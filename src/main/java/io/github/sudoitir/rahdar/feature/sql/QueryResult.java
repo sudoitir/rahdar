@@ -69,7 +69,9 @@ public record QueryResult(
             /** The log this row was read from, as a resource id text; null for a queue. */
             String log,
             /** The record a schema id decoded to, or why it did not. Null when this row was not decoded. */
-            DecodedRecordView decoded) {
+            DecodedRecordView decoded,
+            /** The key decoded with the key binding, or null when the record had no key or no registry. */
+            DecodedRecordView decodedKey) {
 
         /** A row of a queue, or of the index. */
         public Row(
@@ -126,6 +128,7 @@ public record QueryResult(
                     lastSeenAt,
                     origin,
                     sourceMessageId,
+                    null,
                     null,
                     null);
         }

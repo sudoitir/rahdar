@@ -97,6 +97,20 @@ describe('MessageDetailPanel', () => {
     expect(screen.getByText('PPPPP')).toBeInTheDocument();
   });
 
+  it('shows a decoded key beside the record', async () => {
+    mockDetail(
+      detail({
+        decoded: { type: 'AVRO', schemaId: 7, subject: 'orders-value', record: { sku: 'A-1' } },
+        decodedKey: { type: 'AVRO', schemaId: 9, subject: 'orders-key', record: { id: 1 } },
+      }),
+    );
+    renderWithProviders(<MessageDetailPanel {...base} messageId="146" />);
+
+    expect(await screen.findByRole('heading', { name: 'Key record' })).toBeInTheDocument();
+    expect(screen.getByText('orders-key')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Record' })).toBeInTheDocument();
+  });
+
   it('shows an undecoded payload as bytes with the reason, never an empty record', async () => {
     mockDetail(detail({ body: 'PPPPP', decoded: { reason: 'no-schema-id' } }));
     renderWithProviders(<MessageDetailPanel {...base} messageId="146" />);

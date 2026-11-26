@@ -94,7 +94,8 @@ public class SqlGovernance {
                 row.origin(),
                 row.sourceMessageId(),
                 row.log(),
-                content.decoded() != null ? content.decoded() : row.decoded());
+                content.decoded() != null ? content.decoded() : row.decoded(),
+                content.decodedKey() != null ? content.decodedKey() : row.decodedKey());
     }
 
     static MessageContent content(Row row) {
@@ -103,7 +104,8 @@ public class SqlGovernance {
         headers.put(HEADER_GROUP_ID, row.groupId());
         headers.put(HEADER_USER_ID, row.userId());
         headers.put(HEADER_REPLY_TO, row.replyTo());
-        return new MessageContent(headers, row.properties(), row.body(), row.bodyBase64(), null, row.decoded());
+        return new MessageContent(
+                headers, row.properties(), row.body(), row.bodyBase64(), null, row.decoded(), row.decodedKey());
     }
 
     /**
@@ -152,7 +154,8 @@ public class SqlGovernance {
                 longs,
                 doubles,
                 booleans,
-                g.decoded());
+                g.decoded(),
+                g.decodedKey());
     }
 
     /**

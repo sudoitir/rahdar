@@ -15,10 +15,10 @@ A browsed value is wire bytes. Showing only those hides the record. Replacing th
 ## Decision
 
 - `schema:read` and `schema:write` are cluster-scoped catalogue permissions. `schema:write` requires `schema:read`. Neither is implied by `destination:update` or `message:read`. Viewer holds read. Operator holds both. Decoding a record the caller may read does not require `schema:write`.
-- A preview writes nothing and carries an etag. Apply, including an approval released later, checks that etag again. A stale etag writes nothing. A permanent delete is its own preview and says the schemas cannot be restored. Confirm is the existing press-and-hold. The audit records before and after, never a credential.
+- A preview writes nothing and carries an etag. Apply, including an approval released later, checks that etag again. A stale etag writes nothing. A permanent delete is its own preview and says the schemas cannot be restored. Confirm is the existing press-and-hold, for a registration, a compatibility change and a delete. The audit records before and after, never a credential.
 - A registry that is not configured, or that refuses an operation, is `schema-unavailable` (409) with the system and the registry's reason. The credential is not in that body.
 - Bindings are stored here, one row per topic side, and the serde name is passed to the driver on each decode. A name is never a class name. The driver holds no per-topic state.
-- A browsed message gains a decoded field: the record, or a reason. A tombstone is `no-schema-id`, not an empty record. A truncated body is `truncated`. The wire bytes stay in the body. The record is what the page shows; the bytes sit behind a disclosure. The same field is on the message the content policy reads, so a body rule masks it with the rest.
+- A browsed message gains a decoded field: the record, or a reason. The key is decoded the same way, with the topic's key binding when one is set, and shown beside the record. A tombstone is `no-schema-id`, not an empty record. A truncated body is `truncated`. The wire bytes stay in the body. The record is what the page shows; the bytes sit behind a disclosure. The same fields are on the message the content policy reads, so a body rule masks them with the rest.
 
 ## Consequences
 

@@ -499,7 +499,8 @@ public class BrokerQueryExecutor {
                     null,
                     null,
                     target.log(),
-                    message.decoded());
+                    message.decoded(),
+                    message.decodedKey());
         }
     }
 

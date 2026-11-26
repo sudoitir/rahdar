@@ -84,7 +84,8 @@ public final class BrowsedMessages {
                 longs,
                 doubles,
                 booleans,
-                decoded);
+                decoded,
+                null);
     }
 
     /** A record's key and how it is written: text when it reads as text, base64 when it does not. */

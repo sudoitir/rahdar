@@ -127,7 +127,10 @@ public final class MessageViews {
             @Schema(
                     nullable = true,
                     description = "The record a schema id decoded to, or why it did not. Never an empty stand-in.")
-            DecodedRecordView decoded) {}
+            DecodedRecordView decoded,
+
+            @Schema(nullable = true, description = "The key decoded with the topic's key binding, or why it did not.")
+            DecodedRecordView decodedKey) {}
 
     /** A page of messages: the shared list envelope plus the node it was read from. */
     public record MessagePageView(

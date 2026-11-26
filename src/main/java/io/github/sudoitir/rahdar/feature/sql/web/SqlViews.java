@@ -144,7 +144,10 @@ public final class SqlViews {
                     nullable = true,
                     description =
                             "The record a schema id decoded to, or why it did not. Null when this row was not decoded.")
-            DecodedRecordView decoded) {}
+            DecodedRecordView decoded,
+
+            @Schema(nullable = true, description = "The key decoded with the topic's key binding.")
+            DecodedRecordView decodedKey) {}
 
     @Schema(description = "What one node contributed, including nothing and why.")
     public record SqlNodeOutcomeView(

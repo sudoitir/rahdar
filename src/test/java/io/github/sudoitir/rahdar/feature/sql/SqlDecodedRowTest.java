@@ -45,7 +45,8 @@ class SqlDecodedRowTest {
                 null,
                 null,
                 "kafka.topic/orders",
-                decoded);
+                decoded,
+                null);
 
         MessageContent content = SqlGovernance.content(row);
 
