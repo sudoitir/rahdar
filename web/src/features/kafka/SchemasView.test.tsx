@@ -181,4 +181,88 @@ describe('schema subjects', () => {
     expect(within(again).getByRole('button', { name: 'Set registry default compatibility' })).toBeEnabled();
     expect(within(again).queryByText('Registry default is FULL.')).not.toBeInTheDocument();
   });
+
+  it('narrows the list as a subject filter is typed, and says how many match', async () => {
+    mockKafkaCluster();
+    server.use(
+      http.get('*/api/v1/clusters/k1/kafka/schemas', ({ request }) => {
+        const filter = new URL(request.url).searchParams.get('filter');
+        if (filter === 'orders') return HttpResponse.json({ items: [SUBJECT], next: null });
+        return HttpResponse.json({
+          items: [SUBJECT, { name: 'payments-value', compatibility: 'FULL', compatibilityNote: null, versions: 1 }],
+          next: null,
+        });
+      }),
+    );
+    const user = userEvent.setup();
+    renderAppAt('/clusters/k1/kafka/schemas');
+
+    expect(await screen.findByRole('link', { name: 'payments-value' })).toBeInTheDocument();
+    expect(screen.getByText('2 subjects')).toBeInTheDocument();
+    await user.type(screen.getByRole('textbox', { name: 'Subject' }), 'orders');
+    expect(await screen.findByText('1 matching subject')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'payments-value' })).not.toBeInTheDocument();
+  });
+
+  it('loads the next page of subjects', async () => {
+    mockKafkaCluster();
+    server.use(
+      http.get('*/api/v1/clusters/k1/kafka/schemas', ({ request }) => {
+        const cursor = new URL(request.url).searchParams.get('cursor');
+        if (cursor === 'c2') {
+          return HttpResponse.json({
+            items: [{ name: 'payments-value', compatibility: 'FULL', compatibilityNote: null, versions: 1 }],
+            next: null,
+          });
+        }
+        return HttpResponse.json({ items: [SUBJECT], next: 'c2' });
+      }),
+    );
+    const user = userEvent.setup();
+    renderAppAt('/clusters/k1/kafka/schemas');
+
+    expect(await screen.findByRole('link', { name: 'orders-value' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Load more subjects' }));
+    expect(await screen.findByRole('link', { name: 'payments-value' })).toBeInTheDocument();
+    expect(screen.getByText('2 subjects')).toBeInTheDocument();
+  });
+
+  it('opens registration and dismisses it without writing', async () => {
+    serve({ items: [SUBJECT], next: null });
+    const user = userEvent.setup();
+    renderAppAt('/clusters/k1/kafka/schemas');
+
+    await user.click(await screen.findByRole('button', { name: 'Register a schema' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Register a schema' });
+    await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(screen.getByRole('link', { name: 'orders-value' })).toBeInTheDocument();
+  });
+
+  it('retries a failed listing and then shows the subjects', async () => {
+    let fail = true;
+    mockKafkaCluster();
+    server.use(
+      http.get('*/api/v1/clusters/k1/kafka/schemas', () =>
+        fail
+          ? HttpResponse.json({ title: 'Failed', detail: 'The registry did not answer.' }, { status: 500 })
+          : HttpResponse.json({ items: [SUBJECT], next: null }),
+      ),
+    );
+    const user = userEvent.setup();
+    renderAppAt('/clusters/k1/kafka/schemas');
+
+    expect(await screen.findByText('The registry did not answer.')).toBeInTheDocument();
+    fail = false;
+    await user.click(screen.getByRole('button', { name: 'Retry' }));
+    expect(await screen.findByRole('link', { name: 'orders-value' })).toBeInTheDocument();
+  });
+
+  it('keeps Schemas listed without schema:read and names that permission', async () => {
+    mockKafkaCluster(['cluster:read']);
+    renderAppAt('/clusters/k1');
+
+    const schemas = await screen.findByRole('link', { name: 'Schemas', description: /schema:read/ });
+    expect(schemas).toHaveAttribute('aria-disabled', 'true');
+  });
 });

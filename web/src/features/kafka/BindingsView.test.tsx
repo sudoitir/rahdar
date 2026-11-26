@@ -117,4 +117,96 @@ describe('schema bindings', () => {
     await user.click(why);
     expect(await screen.findByText(/schema:write/)).toBeInTheDocument();
   });
+
+  it('says there is no binding, and what a binding is for', async () => {
+    serve();
+    renderAppAt('/clusters/k1/kafka/schemas?tab=bindings');
+
+    expect(await screen.findByText('No bindings')).toBeInTheDocument();
+    expect(screen.getByText(/overrides the serde for one topic's key or value/)).toBeInTheDocument();
+  });
+
+  it('shows a failure to list bindings as an error, and a retry reads them again', async () => {
+    let fail = true;
+    mockKafkaCluster();
+    server.use(
+      http.get('http://localhost:3000/api/v1/clusters/k1/kafka/schemas/bindings', () =>
+        fail
+          ? HttpResponse.json({ title: 'Failed', detail: 'The registry did not answer.' }, { status: 500 })
+          : HttpResponse.json({ items: [] }),
+      ),
+    );
+    const user = userEvent.setup();
+    renderAppAt('/clusters/k1/kafka/schemas?tab=bindings');
+
+    expect(await screen.findByText('The registry did not answer.')).toBeInTheDocument();
+    expect(screen.queryByText('No bindings')).not.toBeInTheDocument();
+    fail = false;
+    await user.click(screen.getByRole('button', { name: 'Retry' }));
+    expect(await screen.findByText('No bindings')).toBeInTheDocument();
+  });
+
+  it('dismisses a binding preview without writing', async () => {
+    const calls: string[] = [];
+    serve();
+    server.use(
+      http.post('*/api/v1/clusters/k1/kafka/schemas/bindings\\:preview', () => {
+        calls.push('preview');
+        return HttpResponse.json(PREVIEW);
+      }),
+    );
+    const user = userEvent.setup();
+    renderAppAt('/clusters/k1/kafka/schemas?tab=bindings');
+
+    await user.type(await screen.findByRole('textbox', { name: 'Topic' }), 'orders');
+    await user.click(screen.getByRole('button', { name: 'Save binding' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Save binding for orders value' });
+    await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(calls).toEqual(['preview']);
+  });
+
+  it('says the registry moved and a fresh preview reads the binding again', async () => {
+    let previews = 0;
+    serve();
+    server.use(
+      http.post('*/api/v1/clusters/k1/kafka/schemas/bindings\\:preview', () => {
+        previews += 1;
+        return HttpResponse.json(PREVIEW);
+      }),
+      http.put('*/api/v1/clusters/k1/kafka/schemas/bindings', () =>
+        HttpResponse.json({ title: 'Precondition failed', detail: 'It changed.' }, { status: 412 }),
+      ),
+    );
+    const user = userEvent.setup();
+    renderAppAt('/clusters/k1/kafka/schemas?tab=bindings');
+
+    await user.type(await screen.findByRole('textbox', { name: 'Topic' }), 'orders');
+    await user.click(screen.getByRole('button', { name: 'Save binding' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Save binding for orders value' });
+    await holdButton(within(dialog).getByRole('button', { name: 'Save binding for orders value' }));
+    expect(await within(dialog).findByText(/The registry moved since this preview/)).toBeInTheDocument();
+    await user.click(within(dialog).getByRole('button', { name: 'Preview again' }));
+    await waitFor(() => expect(previews).toBe(2));
+    expect(within(dialog).queryByText(/The registry moved since this preview/)).not.toBeInTheDocument();
+  });
+
+  it('states why a save was refused and writes nothing', async () => {
+    serve();
+    server.use(
+      http.post('*/api/v1/clusters/k1/kafka/schemas/bindings\\:preview', () => HttpResponse.json(PREVIEW)),
+      http.put('*/api/v1/clusters/k1/kafka/schemas/bindings', () =>
+        HttpResponse.json({ title: 'Failed', detail: 'The registry refused the binding.' }, { status: 500 }),
+      ),
+    );
+    const user = userEvent.setup();
+    renderAppAt('/clusters/k1/kafka/schemas?tab=bindings');
+
+    await user.type(await screen.findByRole('textbox', { name: 'Topic' }), 'orders');
+    await user.click(screen.getByRole('button', { name: 'Save binding' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Save binding for orders value' });
+    await holdButton(within(dialog).getByRole('button', { name: 'Save binding for orders value' }));
+    expect(await within(dialog).findByText('The registry refused the binding.')).toBeInTheDocument();
+    expect(within(dialog).queryByText(/Saved the value serde/)).not.toBeInTheDocument();
+  });
 });

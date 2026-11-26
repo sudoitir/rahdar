@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { Button } from '@mantine/core';
+import { http, HttpResponse } from 'msw';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { holdButton, holdByKeyboard } from '../../test/hold.ts';
 import { renderWithProviders } from '../../test/render.tsx';
+import { server } from '../../test/setup.ts';
 import { RegisterSchemaDialog } from './RegisterSchemaDialog.tsx';
 import { SchemaReview } from './SchemaReview.tsx';
 import type { SchemaPreview } from './schemasApi.ts';
@@ -67,6 +69,104 @@ describe('the registration form', () => {
     const disclosure = within(dialog).getByRole('button', { name: 'Schema text' });
     expect(disclosure).toHaveAttribute('aria-expanded', 'true');
     expect(await within(dialog).findByText('Enter the schema text.')).toBeInTheDocument();
+  });
+
+  it('says how many characters are entered while the schema text stays closed', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<RegisterSchemaDialog clusterId="k1" opened onClose={() => {}} />);
+    const dialog = await screen.findByRole('dialog', { name: 'Register a schema' });
+    expect(within(dialog).getByText('Not entered yet.')).toBeInTheDocument();
+
+    const disclosure = within(dialog).getByRole('button', { name: 'Schema text' });
+    await user.click(disclosure);
+    await user.type(within(dialog).getByRole('textbox', { name: 'Schema' }), 'abc');
+    await user.click(disclosure);
+
+    expect(disclosure).toHaveAttribute('aria-expanded', 'false');
+    expect(within(dialog).getByText('3 characters entered.')).toBeInTheDocument();
+    expect(within(dialog).queryByRole('textbox', { name: 'Schema' })).not.toBeInTheDocument();
+  });
+
+  it('registers the previewed schema after a hold, and names the version', async () => {
+    const calls: string[] = [];
+    server.use(
+      http.post('*/api/v1/clusters/k1/kafka/schemas\\:register-preview', async ({ request }) => {
+        calls.push(`preview:${((await request.json()) as { subject: string }).subject}`);
+        return HttpResponse.json({ ...PREVIEW, action: 'register', subject: 'orders-value' });
+      }),
+      http.post('*/api/v1/clusters/k1/kafka/schemas\\:register', () => {
+        calls.push('register');
+        return HttpResponse.json({ version: 3, id: 9 });
+      }),
+    );
+    const user = userEvent.setup();
+    renderWithProviders(<RegisterSchemaDialog clusterId="k1" opened onClose={() => {}} />);
+    const dialog = await screen.findByRole('dialog', { name: 'Register a schema' });
+    await user.type(within(dialog).getByRole('textbox', { name: 'Subject' }), 'orders-value');
+    await user.click(within(dialog).getByRole('button', { name: 'Schema text' }));
+    await user.click(within(dialog).getByRole('textbox', { name: 'Schema' }));
+    await user.paste('record Order');
+    await user.click(within(dialog).getByRole('button', { name: 'Preview registration' }));
+
+    const review = await screen.findByRole('dialog', { name: 'Register schema orders-value' });
+    expect(review).toHaveTextContent('Nothing has been written.');
+    expect(calls).toEqual(['preview:orders-value']);
+    await holdButton(within(review).getByRole('button', { name: 'Register schema orders-value' }));
+    expect(await within(review).findByText('Registered version 3 (id 9).')).toBeInTheDocument();
+    expect(calls).toEqual(['preview:orders-value', 'register']);
+  });
+
+  it('says the registry moved and a fresh preview reads the schema again', async () => {
+    let previews = 0;
+    server.use(
+      http.post('*/api/v1/clusters/k1/kafka/schemas\\:register-preview', () => {
+        previews += 1;
+        return HttpResponse.json({ ...PREVIEW, action: 'register', subject: 'orders-value' });
+      }),
+      http.post('*/api/v1/clusters/k1/kafka/schemas\\:register', () =>
+        HttpResponse.json({ title: 'Precondition failed', detail: 'A version landed.' }, { status: 412 }),
+      ),
+    );
+    const user = userEvent.setup();
+    renderWithProviders(<RegisterSchemaDialog clusterId="k1" opened onClose={() => {}} />);
+    const dialog = await screen.findByRole('dialog', { name: 'Register a schema' });
+    await user.type(within(dialog).getByRole('textbox', { name: 'Subject' }), 'orders-value');
+    await user.click(within(dialog).getByRole('button', { name: 'Schema text' }));
+    await user.click(within(dialog).getByRole('textbox', { name: 'Schema' }));
+    await user.paste('record Order');
+    await user.click(within(dialog).getByRole('button', { name: 'Preview registration' }));
+
+    const review = await screen.findByRole('dialog', { name: 'Register schema orders-value' });
+    await holdButton(within(review).getByRole('button', { name: 'Register schema orders-value' }));
+    expect(await within(review).findByText(/The registry moved since this preview/)).toBeInTheDocument();
+    expect(within(review).getByRole('button', { name: 'Register schema orders-value' })).toBeDisabled();
+    await user.click(within(review).getByRole('button', { name: 'Preview again' }));
+    await waitFor(() => expect(previews).toBe(2));
+    expect(within(review).queryByText(/The registry moved since this preview/)).not.toBeInTheDocument();
+  });
+
+  it('dismisses the form without writing', async () => {
+    const onClose = vi.fn();
+    function Host() {
+      const [open, setOpen] = useState(true);
+      return (
+        <RegisterSchemaDialog
+          clusterId="k1"
+          opened={open}
+          onClose={() => {
+            onClose();
+            setOpen(false);
+          }}
+        />
+      );
+    }
+    const user = userEvent.setup();
+    renderWithProviders(<Host />);
+    await user.click(
+      within(await screen.findByRole('dialog', { name: 'Register a schema' })).getByRole('button', { name: 'Cancel' }),
+    );
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(onClose).toHaveBeenCalledOnce();
   });
 });
 

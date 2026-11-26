@@ -111,6 +111,45 @@ describe('MessageDetailPanel', () => {
     expect(screen.getByRole('heading', { name: 'Record' })).toBeInTheDocument();
   });
 
+  it('shows an undecoded key with the reason, and does not treat a plain key as a failure', async () => {
+    mockDetail(
+      detail({
+        decodedKey: { reason: 'schema-not-found' },
+        decoded: { reason: 'truncated', serialized: null, record: null },
+        body: 'PPPPP',
+      }),
+    );
+    renderWithProviders(<MessageDetailPanel {...base} messageId="146" />);
+
+    expect(await screen.findByText('This key was not decoded')).toBeInTheDocument();
+    expect(screen.getByText('The registry does not hold the schema id this payload names.')).toBeInTheDocument();
+    expect(screen.getByText('The body was cut short of its schema, so it was not decoded.')).toBeInTheDocument();
+    expect(screen.getByText('PPPPP')).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Record' })).not.toBeInTheDocument();
+  });
+
+  it('does not call a key with no schema id a failure', async () => {
+    mockDetail(detail({ decodedKey: { reason: 'no-schema-id' }, body: 'PPPPP' }));
+    renderWithProviders(<MessageDetailPanel {...base} messageId="146" />);
+
+    expect(await screen.findByText('String properties')).toBeInTheDocument();
+    expect(screen.queryByText('This key was not decoded')).not.toBeInTheDocument();
+    expect(screen.getByText('PPPPP')).toBeInTheDocument();
+  });
+
+  it('downloads a text body as a text file, not as base64', async () => {
+    const user = userEvent.setup();
+    const spy = vi.spyOn(downloads, 'download').mockImplementation(() => {});
+    mockDetail(detail({ body: '{"sku":"A-1"}', bodyEncoding: 'TEXT' }));
+    renderWithProviders(<MessageDetailPanel {...base} messageId="146" />);
+
+    await user.click(await screen.findByRole('button', { name: 'Download' }));
+    const [name, body] = spy.mock.calls[0];
+    expect(name).toBe('message-146.json');
+    expect(body).toBe('{"sku":"A-1"}');
+    spy.mockRestore();
+  });
+
   it('shows an undecoded payload as bytes with the reason, never an empty record', async () => {
     mockDetail(detail({ body: 'PPPPP', decoded: { reason: 'no-schema-id' } }));
     renderWithProviders(<MessageDetailPanel {...base} messageId="146" />);
