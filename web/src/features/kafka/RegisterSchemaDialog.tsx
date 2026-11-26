@@ -140,10 +140,12 @@ export function RegisterSchemaDialog({
                     {...form.getInputProps('schema')}
                   />
                 ) : (
-                  <Text size="xs" c="dimmed">
-                    {form.values.schema.trim()
-                      ? `${form.values.schema.trim().length} characters entered.`
-                      : 'Not entered yet.'}
+                  <Text size="xs" c={form.errors.schema ? 'var(--as-danger)' : 'dimmed'}>
+                    {form.errors.schema
+                      ? form.errors.schema
+                      : form.values.schema.trim()
+                        ? `${form.values.schema.trim().length} characters entered.`
+                        : 'Not entered yet.'}
                   </Text>
                 )}
               </Stack>
