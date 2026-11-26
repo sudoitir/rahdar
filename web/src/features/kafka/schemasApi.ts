@@ -40,6 +40,15 @@ export const COMPATIBILITY_LEVELS = [
   'NONE',
 ] as const;
 
+/** Pretty-print schema text when it is JSON. Anything else is left as the registry sent it. */
+export function prettySchema(text: string): string {
+  try {
+    return JSON.stringify(JSON.parse(text), null, 2);
+  } catch {
+    return text;
+  }
+}
+
 export const SCHEMA_TYPE_LABEL: Record<(typeof SCHEMA_TYPES)[number], string> = {
   AVRO: 'Avro',
   PROTOBUF: 'Protobuf',

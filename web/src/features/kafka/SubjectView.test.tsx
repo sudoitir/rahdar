@@ -7,6 +7,7 @@ import { holdButton } from '../../test/hold.ts';
 import { renderAppAt } from '../../test/render.tsx';
 import { server } from '../../test/setup.ts';
 import { mockKafkaCluster } from '../../test/kafkaCluster.ts';
+import { prettySchema } from './schemasApi.ts';
 
 const SUBJECT = {
   name: 'orders-value',
@@ -49,7 +50,9 @@ describe('a schema subject', () => {
     expect(await screen.findByText('AVRO')).toBeInTheDocument();
     expect(screen.getByText('BACKWARD')).toBeInTheDocument();
     expect(screen.getByText('1, 2 (deleted)')).toBeInTheDocument();
-    expect(screen.getByText('{"type":"record","name":"Order"}')).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Schema of orders-value' }).textContent).toBe(
+      prettySchema(SUBJECT.schemaText),
+    );
   });
 
   it('soft-deletes only after a hold, and says it cannot be undone from here', async () => {
@@ -100,5 +103,12 @@ describe('a schema subject', () => {
     await user.click(await screen.findByRole('button', { name: 'Permanently delete' }));
     const dialog = await screen.findByRole('dialog', { name: 'Permanently delete subject orders-value' });
     expect(dialog).toHaveTextContent('The schemas cannot be restored.');
+  });
+});
+
+describe('prettySchema', () => {
+  it('pretty-prints JSON and leaves other text alone', () => {
+    expect(prettySchema('{"type":"record","name":"Order"}')).toBe('{\n  "type": "record",\n  "name": "Order"\n}');
+    expect(prettySchema('syntax = "proto3";')).toBe('syntax = "proto3";');
   });
 });

@@ -20,6 +20,7 @@ import { SchemaReview } from './SchemaReview.tsx';
 import classes from './Schemas.module.css';
 import {
   COMPATIBILITY_LEVELS,
+  prettySchema,
   registryReason,
   schemaWriteGate,
   useDeleteSubject,
@@ -186,7 +187,7 @@ export function SubjectView() {
               Schema
             </Text>
             <pre className={classes.schema} tabIndex={0} role="region" aria-label={`Schema of ${name}`}>
-              {data.schemaText ?? 'This subject has no schema text.'}
+              {data.schemaText ? prettySchema(data.schemaText) : 'This subject has no schema text.'}
             </pre>
           </section>
           <Group>
