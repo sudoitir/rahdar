@@ -28,7 +28,7 @@ jobs:
       actions: read
       contents: read
       security-events: write
-    uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@b1d267aea5211fa648d9d442fa64b90dbdcbdd36 # v2.7.0
+    uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@32d3cd482bdadfb38b186c0ad1b031902d55d932 # v2.7.1
     with:
       runs-on: ubuntu-26.04
       # Reporting is the reusable workflow's job; `gate` below decides what fails.
@@ -49,7 +49,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Scan
-        uses: google/osv-scanner-action/osv-scanner-action@9a96bc4d2b09685b6142bcfe25a3dc17cb2d7347 # v2.6.0
+        uses: google/osv-scanner-action/osv-scanner-action@d3c1414ded37de590f207572e37a7d180f1d0ef7 # v2.6.0
         env:
           GOTOOLCHAIN: auto
         # A scan with findings exits non-zero; the gate judges the results file.
