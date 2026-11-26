@@ -1,6 +1,7 @@
 package io.github.sudoitir.rahdar.system.kafka;
 
 import io.github.sudoitir.openbroker.kafka.KafkaOptions;
+import java.net.URI;
 import java.util.Map;
 import java.util.Set;
 
@@ -27,6 +28,10 @@ final class KafkaRegistryConfig {
         if (KafkaOptions.REGISTRY_CONFLUENT.equals(resolved) && !isHttp(url)) {
             throw new IllegalArgumentException("registryUrl must be an http or https URL.");
         }
+        if (KafkaOptions.REGISTRY_CONFLUENT.equals(resolved) && hasUserInfo(url)) {
+            throw new IllegalArgumentException(
+                    "registryUrl must not contain an account. Store the credential in the registry credential field.");
+        }
     }
 
     static void put(Map<String, String> options, String kind, String url, String credentials) {
@@ -50,5 +55,14 @@ final class KafkaRegistryConfig {
     private static boolean isHttp(String url) {
         String trimmed = url.strip();
         return trimmed.startsWith("https://") || trimmed.startsWith("http://");
+    }
+
+    /** An account in the URL would be sent in the clear and would bypass the sealed credential. */
+    private static boolean hasUserInfo(String url) {
+        try {
+            return URI.create(url.strip()).getUserInfo() != null;
+        } catch (IllegalArgumentException e) {
+            return url.contains("@");
+        }
     }
 }

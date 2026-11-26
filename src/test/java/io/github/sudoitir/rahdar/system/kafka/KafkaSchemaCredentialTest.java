@@ -1,6 +1,7 @@
 package io.github.sudoitir.rahdar.system.kafka;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 
 import io.github.sudoitir.openbroker.BrokerDrivers;
@@ -37,6 +38,13 @@ class KafkaSchemaCredentialTest {
         ProblemDetail problem = Problems.of(HttpStatus.CONFLICT, "schema-unavailable", "Unavailable", SECRET);
 
         assertThat(problem.getDetail()).doesNotContain("registry-secret-value");
+    }
+
+    @Test
+    void aRegistryUrlMustNotCarryAnAccount() {
+        assertThatThrownBy(() -> KafkaRegistryConfig.require("confluent", "https://user:secret@registry.example"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("must not contain an account");
     }
 
     @Test
