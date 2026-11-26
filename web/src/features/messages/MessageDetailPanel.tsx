@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { Button, CopyButton, Drawer, Group, SegmentedControl, Stack, Text } from '@mantine/core';
+import { useMemo, useState, type ReactNode } from 'react';
+import { Button, Collapse, CopyButton, Drawer, Group, SegmentedControl, Stack, Text } from '@mantine/core';
 import { CodeHighlight } from '@mantine/code-highlight';
 
 import { useMessageDetail, type MessageDetailView } from './api.ts';
@@ -244,6 +244,75 @@ function TruncationNotice({ m }: Readonly<{ m: MessageDetailView }>) {
   );
 }
 
+const DECODE_REASONS: Record<string, string> = {
+  'no-schema-id': 'This payload has no schema id. A tombstone is not an empty record.',
+  'schema-not-found': 'The registry does not hold the schema id this payload names.',
+  'serde-not-registered': 'This installation does not run the serde named for this payload.',
+  'serde-refused': 'The serde refused this payload.',
+  'no-registry': 'This payload was not decoded (no-registry).',
+  truncated: 'The body was cut short of its schema, so it was not decoded.',
+};
+
+/** The bytes, behind a disclosure, once a record is the thing to read. */
+function RawBytes({ children }: Readonly<{ children: ReactNode }>) {
+  const [open, setOpen] = useState(false);
+  return (
+    <Stack gap="xs">
+      <Button variant="subtle" size="compact-sm" aria-expanded={open} onClick={() => setOpen((value) => !value)}>
+        {open ? 'Hide raw bytes' : 'Show raw bytes'}
+      </Button>
+      <Collapse expanded={open}>{children}</Collapse>
+    </Stack>
+  );
+}
+
+function messageBody(m: MessageDetailView) {
+  return (
+    <MessageBody
+      body={m.body ?? null}
+      bodyEncoding={m.bodyEncoding}
+      bodyCompression={m.bodyCompression}
+      contentType={m.contentType}
+      bodyTruncated={m.bodyTruncated}
+      stringProperties={m.stringProperties}
+      messageId={m.position}
+      redactions={m.redactions}
+      withheld={m.withheld}
+    />
+  );
+}
+
+/**
+ * A decoded record is the primary view, with the bytes behind a disclosure. An undecoded payload shows
+ * the bytes and the reason, never an empty record standing in for it.
+ */
+function Payload({ m }: Readonly<{ m: MessageDetailView }>) {
+  const body = messageBody(m);
+  const decoded = m.decoded;
+  if (!decoded) return body;
+  if (decoded.reason || decoded.record == null) {
+    return (
+      <Stack gap="sm">
+        <Notice tone="warning" title="This payload was not decoded">
+          {DECODE_REASONS[decoded.reason ?? ''] ?? decoded.reason ?? 'The payload was not decoded.'}
+        </Notice>
+        {body}
+      </Stack>
+    );
+  }
+  const meta = [decoded.type, decoded.subject, decoded.schemaId != null ? `id ${decoded.schemaId}` : null]
+    .filter((part) => part)
+    .join(' · ');
+  return (
+    <Stack gap="sm">
+      <Section headingLevel={3} title="Record" description={meta || undefined}>
+        <JsonTree value={decoded.record} />
+      </Section>
+      <RawBytes>{body}</RawBytes>
+    </Stack>
+  );
+}
+
 /** The message itself: its headers, every property table, the body, and the truncation notice. */
 function MessageDetailContent({ m }: Readonly<{ m: MessageDetailView }>) {
   return (
@@ -268,17 +337,7 @@ function MessageDetailContent({ m }: Readonly<{ m: MessageDetailView }>) {
         redactions={m.redactions}
       />
 
-      <MessageBody
-        body={m.body ?? null}
-        bodyEncoding={m.bodyEncoding}
-        bodyCompression={m.bodyCompression}
-        contentType={m.contentType}
-        bodyTruncated={m.bodyTruncated}
-        stringProperties={m.stringProperties}
-        messageId={m.position}
-        redactions={m.redactions}
-        withheld={m.withheld}
-      />
+      <Payload m={m} />
 
       <TruncationNotice m={m} />
     </Stack>
