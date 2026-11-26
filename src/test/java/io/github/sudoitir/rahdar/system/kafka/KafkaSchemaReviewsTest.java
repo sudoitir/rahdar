@@ -11,10 +11,12 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import io.github.sudoitir.openbroker.BrokerException;
+import io.github.sudoitir.openbroker.ClusterConnection;
 import io.github.sudoitir.openbroker.Dispatch;
 import io.github.sudoitir.openbroker.ErrorInfo;
 import io.github.sudoitir.openbroker.ErrorReasons;
 import io.github.sudoitir.openbroker.Status;
+import io.github.sudoitir.openbroker.access.Assessment;
 import io.github.sudoitir.openbroker.kafka.schema.SchemaCatalog;
 import io.github.sudoitir.openbroker.kafka.schema.SchemaType;
 import io.github.sudoitir.openbroker.kafka.schema.SubjectVersion;
@@ -34,8 +36,12 @@ import io.github.sudoitir.rahdar.kernel.gate.OperationGate;
 import io.github.sudoitir.rahdar.kernel.security.Actor;
 import io.github.sudoitir.rahdar.kernel.security.ActorResolver;
 import io.github.sudoitir.rahdar.kernel.security.ClusterAccessGuard;
+import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
 import io.github.sudoitir.rahdar.system.kafka.KafkaSchemaReviews.SchemaPreview;
 import io.github.sudoitir.rahdar.system.kafka.KafkaSchemaReviews.SchemaWriteParams;
+import io.github.sudoitir.rahdar.system.kafka.internal.persistence.KafkaConnectionEntity;
+import io.github.sudoitir.rahdar.system.kafka.internal.persistence.KafkaConnectionRepository;
+import io.github.sudoitir.rahdar.system.kafka.web.KafkaSchemaProblemAdvice;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -44,6 +50,7 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
+import org.springframework.http.ProblemDetail;
 
 /** A schema preview writes nothing, and a stale or forbidden apply writes nothing either. */
 class KafkaSchemaReviewsTest {
@@ -159,6 +166,29 @@ class KafkaSchemaReviewsTest {
                         new SchemaWriteParams(CLUSTER, "register", "orders-value", "AVRO", "{}", null, null, "then")))
                 .isInstanceOf(StalePreviewException.class);
         verify(catalog, never()).register(any(), any(), any(), any());
+    }
+
+    @Test
+    void anUnavailableRegistryKeepsTheDriversReason() {
+        String reason = "registry kind 'confluent' is configured but could not be reached";
+        BrokerGateway gateway = mock(BrokerGateway.class);
+        ClusterConnection connection = mock(ClusterConnection.class);
+        SchemaCatalog catalog = mock(SchemaCatalog.class);
+        KafkaConnectionRepository connections = mock(KafkaConnectionRepository.class);
+        when(gateway.cluster(CLUSTER)).thenReturn(connection);
+        when(connection.unwrap(SchemaCatalog.class)).thenReturn(Optional.of(catalog));
+        when(catalog.capability()).thenReturn(Assessment.unavailable(reason, Optional.empty()));
+        when(connections.findById(CLUSTER))
+                .thenReturn(Optional.of(new KafkaConnectionEntity(
+                        CLUSTER, "k:9092", "PLAINTEXT", null, null, "confluent", "https://r", null)));
+        KafkaSchemaRegistry registry = new KafkaSchemaRegistry(gateway, connections, mock(ClusterAccessGuard.class));
+
+        assertThatThrownBy(() -> registry.catalog(CLUSTER))
+                .isInstanceOf(SchemaUnavailableException.class)
+                .hasMessage(reason);
+        ProblemDetail problem =
+                new KafkaSchemaProblemAdvice().onUnavailable(new SchemaUnavailableException("confluent", reason));
+        assertThat(problem.getDetail()).isEqualTo(reason);
     }
 
     @Test
