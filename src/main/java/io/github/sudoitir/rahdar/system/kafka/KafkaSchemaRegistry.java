@@ -5,7 +5,11 @@ import io.github.sudoitir.openbroker.ClusterConnection;
 import io.github.sudoitir.openbroker.Status;
 import io.github.sudoitir.openbroker.access.Assessment;
 import io.github.sudoitir.openbroker.kafka.schema.SchemaCatalog;
+import io.github.sudoitir.openbroker.kafka.schema.Subject;
+import io.github.sudoitir.openbroker.kafka.schema.Subjects;
+import io.github.sudoitir.openbroker.messaging.Cursor;
 import io.github.sudoitir.rahdar.kernel.core.NotFoundException;
+import io.github.sudoitir.rahdar.kernel.security.ClusterAccessGuard;
 import io.github.sudoitir.rahdar.platform.broker.BrokerGateway;
 import io.github.sudoitir.rahdar.system.kafka.internal.persistence.KafkaConnectionEntity;
 import io.github.sudoitir.rahdar.system.kafka.internal.persistence.KafkaConnectionRepository;
@@ -26,6 +30,27 @@ public class KafkaSchemaRegistry {
 
     private final BrokerGateway gateway;
     private final KafkaConnectionRepository connections;
+    private final ClusterAccessGuard access;
+
+    /** A page of subjects. The filter applies to this page; the cursor is the registry's. */
+    public Subjects subjects(UUID clusterId, String cursor, String filter) {
+        access.requireCluster(clusterId, KafkaModule.SCHEMA_READ);
+        Subjects page = call(clusterId, catalog -> catalog.subjects(new Cursor(cursor == null ? "" : cursor)));
+        if (filter == null || filter.isBlank()) {
+            return page;
+        }
+        String needle = filter;
+        return new Subjects(
+                page.items().stream()
+                        .filter(subject -> subject.name().contains(needle))
+                        .toList(),
+                page.next());
+    }
+
+    public Subject subject(UUID clusterId, String name) {
+        access.requireCluster(clusterId, KafkaModule.SCHEMA_READ);
+        return call(clusterId, catalog -> catalog.subject(name));
+    }
 
     public SchemaCatalog open(UUID clusterId) {
         ClusterConnection connection = gateway.cluster(clusterId);
