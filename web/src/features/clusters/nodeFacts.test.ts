@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { displayZonePreference, setDisplayZone } from '../../kernel/time/timezone.ts';
 import type { LogicalNodeView, NodeEndpointView, TopologyView } from './api.ts';
 import { allNodeFacts, lastSeenWords, nodeFacts, pairVerdict, withoutTrailingStops } from './nodeFacts.ts';
 
@@ -233,9 +234,17 @@ describe('lastSeenWords', () => {
   const now = Date.parse('2026-09-30T14:00:42Z');
 
   it('says how long ago, and the exact time', () => {
-    const seen = lastSeenWords('2026-09-30T14:00:00Z', now);
-    expect(seen.relative).toBe('42s ago');
-    expect(seen.absolute).toMatch(/2026-09-30 \d\d:00:00/);
+    // The label is written in the operator's chosen zone, so pin one: on a machine whose zone is
+    // UTC+03:30 the minutes are not :00 and the absolute part read as the test's own failure.
+    const was = displayZonePreference();
+    setDisplayZone('UTC');
+    try {
+      const seen = lastSeenWords('2026-09-30T14:00:00Z', now);
+      expect(seen.relative).toBe('42s ago');
+      expect(seen.absolute).toBe('2026-09-30 14:00:00Z');
+    } finally {
+      setDisplayZone(was);
+    }
   });
 
   it('says just now inside a second', () => {

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Select, Stack, Textarea, TextInput } from '@mantine/core';
+import { Select, Stack, Text, Textarea, TextInput } from '@mantine/core';
 import { useForm } from '@mantine/form';
 
 import { ConfirmDialog } from '../../ui/ConfirmDialog.tsx';

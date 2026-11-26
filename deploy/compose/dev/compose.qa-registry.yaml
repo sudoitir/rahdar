@@ -1,0 +1,22 @@
+# Rahdar — QA overlay: one Apollo-compatible schema registry beside the dev stack's Kafka.
+#
+#   docker compose -p rahdar-qa-<name> -f deploy/compose/dev/compose.dev.yaml \
+#                  -f deploy/compose/dev/compose.isolated.yaml \
+#                  -f deploy/compose/dev/compose.qa-registry.yaml up -d
+#
+# Apicurio rather than Confluent's image: it speaks the same v7 API Rahdar's driver does (`/apis/ccompat/v7`)
+# under a licence this project can run and its tests already use. QA only — the dev stack has no registry.
+services:
+  apicurio:
+    image: apicurio/apicurio-registry:3.3.5
+    hostname: apicurio
+    networks:
+      default:
+        aliases:
+          - schema-registry
+    ports: !reset []
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/apis/ccompat/v7/subjects >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 24
