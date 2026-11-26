@@ -29,11 +29,11 @@ public final class BrowsedMessages {
     private BrowsedMessages() {}
 
     public static BrowsedMessage of(Message m) {
-        return of(m, SchemaDecoding.none());
+        return of(m, SchemaDecoder.RecordDecoder.none());
     }
 
     /** The one place a browsed message's decoded field is filled. */
-    public static BrowsedMessage of(Message m, SchemaDecoding decoding) {
+    public static BrowsedMessage of(Message m, SchemaDecoder.RecordDecoder decoding) {
         MessageHeaders h = m.headers();
         boolean tombstone = m.body().isTombstone();
         Body body0 = body(m);

@@ -6,12 +6,12 @@ import io.github.sudoitir.openbroker.Dispatch;
 import io.github.sudoitir.openbroker.ErrorReasons;
 import io.github.sudoitir.openbroker.NodeId;
 import io.github.sudoitir.openbroker.Status;
-import io.github.sudoitir.openbroker.kafka.schema.SchemaCatalog;
 import io.github.sudoitir.openbroker.messaging.BrowseRequest;
 import io.github.sudoitir.openbroker.messaging.BulkOutcome;
 import io.github.sudoitir.openbroker.messaging.Count;
 import io.github.sudoitir.openbroker.messaging.Message;
 import io.github.sudoitir.openbroker.messaging.MessageAction;
+import io.github.sudoitir.openbroker.messaging.MessageBody;
 import io.github.sudoitir.openbroker.messaging.MessageField;
 import io.github.sudoitir.openbroker.messaging.MessageFilter;
 import io.github.sudoitir.openbroker.messaging.MessageHandler;
@@ -71,17 +71,20 @@ public class BrokerMessages {
     private static final String RECEIVE_PURPOSE = "receive messages over";
 
     private final BrokerGateway gateway;
-    private final SchemaBindingLookup bindings;
+    private final SchemaDecoder decoder;
 
     public BrokerMessages(BrokerGateway gateway) {
-        this.gateway = gateway;
-        this.bindings = (cluster, topic, side) -> null;
+        this(gateway, SchemaDecoder.none());
     }
 
     @Autowired
-    public BrokerMessages(BrokerGateway gateway, ObjectProvider<SchemaBindingLookup> bindings) {
+    public BrokerMessages(BrokerGateway gateway, ObjectProvider<SchemaDecoder> decoders) {
+        this(gateway, decoders.getIfAvailable(SchemaDecoder::none));
+    }
+
+    private BrokerMessages(BrokerGateway gateway, SchemaDecoder decoder) {
         this.gateway = gateway;
-        this.bindings = bindings.getIfAvailable(() -> (cluster, topic, side) -> null);
+        this.decoder = decoder;
     }
 
     /** One page of a queue on a node, 1-based, with the broker's own count of the queue. */
@@ -126,16 +129,13 @@ public class BrokerMessages {
                 }
                 throw e;
             }
-            SchemaCatalog catalog = c.unwrap(SchemaCatalog.class).orElse(null);
-            String topic = log.name();
-            SchemaDecoding values = new SchemaDecoding(catalog, bindings.serde(clusterId, topic, "value"));
-            SchemaDecoding keys = new SchemaDecoding(catalog, bindings.serde(clusterId, topic, "key"));
+            SchemaDecoder.Sides sides = decoder.open(clusterId, log.name());
             Within<LogPage.LogRecord> kept = within(result.messages(), m -> {
                 BrowsedMessages.Key key = BrowsedMessages.keyOf(m);
-                BrowsedMessage value = BrowsedMessages.of(m, values);
+                BrowsedMessage value = BrowsedMessages.of(m, sides.values());
                 BrowsedMessage browsed = m.headers()
                         .key()
-                        .map(blob -> value.withDecodedKey(keys.key(blob)))
+                        .map(blob -> value.withDecodedKey(sides.keys().value(MessageBody.of(blob), false)))
                         .orElse(value);
                 return new LogPage.LogRecord(
                         browsed,

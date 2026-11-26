@@ -1,10 +1,11 @@
-package io.github.sudoitir.rahdar.platform.broker;
+package io.github.sudoitir.rahdar.system.kafka;
 
 import io.github.sudoitir.openbroker.kafka.schema.DecodedRecord;
 import io.github.sudoitir.openbroker.kafka.schema.SchemaCatalog;
 import io.github.sudoitir.openbroker.messaging.Blob;
 import io.github.sudoitir.openbroker.messaging.MessageBody;
 import io.github.sudoitir.rahdar.kernel.core.DecodedRecordView;
+import io.github.sudoitir.rahdar.platform.broker.SchemaDecoder;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -14,23 +15,19 @@ import tools.jackson.databind.json.JsonMapper;
  * Turns a payload into a {@link DecodedRecordView}. A truncated body is not decoded. A tombstone is
  * {@code no-schema-id}, not an empty record.
  */
-public final class SchemaDecoding {
+final class SchemaDecoding implements SchemaDecoder.RecordDecoder {
 
     private static final JsonMapper JSON = JsonMapper.builder().build();
 
     private final SchemaCatalog catalog;
     private final String serde;
 
-    public SchemaDecoding(SchemaCatalog catalog, String serde) {
+    SchemaDecoding(SchemaCatalog catalog, String serde) {
         this.catalog = catalog;
         this.serde = serde;
     }
 
-    /** No registry, so the message stays undecoded and the field stays empty. */
-    public static SchemaDecoding none() {
-        return new SchemaDecoding(null, null);
-    }
-
+    @Override
     public DecodedRecordView value(MessageBody body, boolean truncated) {
         if (catalog == null) {
             return null;
@@ -45,7 +42,7 @@ public final class SchemaDecoding {
     }
 
     /** A key has no tombstone. A missing key is not decoded. */
-    public DecodedRecordView key(Blob key) {
+    DecodedRecordView key(Blob key) {
         if (catalog == null || key == null) {
             return null;
         }

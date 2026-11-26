@@ -21,7 +21,6 @@ import io.github.sudoitir.openbroker.model.Shard;
 import io.github.sudoitir.rahdar.kernel.core.DecodedRecordView;
 import io.github.sudoitir.rahdar.platform.broker.BrowsedMessage;
 import io.github.sudoitir.rahdar.platform.broker.BrowsedMessages;
-import io.github.sudoitir.rahdar.platform.broker.SchemaDecoding;
 import io.github.sudoitir.rahdar.system.kafka.web.KafkaSchemaViews;
 import java.util.List;
 import java.util.Map;
