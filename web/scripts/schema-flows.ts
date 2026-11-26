@@ -26,7 +26,8 @@ function fail(what: string) {
 
 async function check(what: string, act: () => Promise<boolean>) {
   try {
-    (await act()) ? pass(what) : fail(what);
+    if (await act()) pass(what);
+    else fail(what);
   } catch (error) {
     fail(`${what}: ${(error as Error).message.split('\n')[0]}`);
   }
