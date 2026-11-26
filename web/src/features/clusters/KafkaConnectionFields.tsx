@@ -113,6 +113,45 @@ export function KafkaConnectionFields({
         </>
       ) : null}
 
+      <Select
+        label="Schema registry"
+        description="None, or a Confluent-compatible registry."
+        data={[
+          { value: 'none', label: 'None' },
+          { value: 'confluent', label: 'Confluent-compatible' },
+        ]}
+        allowDeselect={false}
+        {...form.getInputProps('registryKind')}
+        onChange={(value) => {
+          form.setFieldValue('registryKind', value === 'confluent' ? 'confluent' : 'none');
+          if (value !== 'confluent') {
+            form.setFieldValue('registryUrl', '');
+            form.clearFieldError('registryUrl');
+          }
+        }}
+      />
+      {f.registryKind === 'confluent' ? (
+        <>
+          <TextInput
+            label="Registry URL"
+            description="An http or https URL. For example: https://registry:8081"
+            autoComplete="off"
+            spellCheck={false}
+            {...form.getInputProps('registryUrl')}
+          />
+          <PasswordInput
+            label="Registry credential"
+            description={
+              editing
+                ? 'Leave empty to keep the stored one. Separate from the broker SASL credential.'
+                : 'Optional. Separate from the broker SASL credential, as user:password.'
+            }
+            autoComplete="off"
+            {...form.getInputProps('registryCredentials')}
+          />
+        </>
+      ) : null}
+
       <Button
         variant="subtle"
         size="compact-sm"

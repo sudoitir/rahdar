@@ -12,6 +12,11 @@ export interface KafkaFields {
   token: string;
   tlsBundle: string;
   clientId: string;
+  registryKind: 'none' | 'confluent';
+  registryUrl: string;
+  registryCredentials: string;
+  /** Whether a registry credential is already stored. Not sent. */
+  registrySecretStored: boolean;
 }
 
 export const KAFKA_EMPTY: KafkaFields = {
@@ -23,9 +28,16 @@ export const KAFKA_EMPTY: KafkaFields = {
   token: '',
   tlsBundle: '',
   clientId: '',
+  registryKind: 'none',
+  registryUrl: '',
+  registryCredentials: '',
+  registrySecretStored: false,
 };
 
-export const KAFKA_PAIRS: [string, string][] = [['username', 'password']];
+export const KAFKA_PAIRS: [string, string][] = [
+  ['username', 'password'],
+  ['registryKind', 'registryUrl'],
+];
 
 export const PROTOCOLS: { value: SecurityProtocol; label: string }[] = [
   { value: 'PLAINTEXT', label: 'Plaintext (no encryption, no authentication)' },
@@ -66,7 +78,7 @@ export function secretRequired(values: KafkaFields, stored: KafkaConnection | nu
 
 /** What is wrong with the values as they stand, by field; the form can be sent only when this is empty. */
 export function kafkaProblems(values: KafkaFields, stored: KafkaConnection | null = null): Record<string, string> {
-  const problems: Record<string, string> = {};
+  const problems: Record<string, string> = { ...registryProblems(values, stored) };
   const { problem } = bootstrapOf(values);
   if (problem) problems.bootstrap = problem;
   if (!usesSasl(values.securityProtocol)) return problems;
@@ -119,11 +131,36 @@ export function kafkaConnection(values: KafkaFields): KafkaConnection {
     ...(credentials ? { credentials } : {}),
     ...(usesTls(values.securityProtocol) && values.tlsBundle ? { tlsBundle: values.tlsBundle } : {}),
     ...(values.clientId ? { clientId: values.clientId } : {}),
+    registryKind: values.registryKind,
+    ...(values.registryKind === 'confluent' && values.registryUrl.trim()
+      ? { registryUrl: values.registryUrl.trim() }
+      : {}),
+    ...(values.registryCredentials.trim() ? { registryCredentials: values.registryCredentials } : {}),
   };
 }
 
+/** Kind and URL go together. A changed registry never reuses a stored credential. */
+function registryProblems(values: KafkaFields, stored: KafkaConnection | null): Record<string, string> {
+  const problems: Record<string, string> = {};
+  const url = values.registryUrl.trim();
+  if (values.registryKind === 'confluent') {
+    if (!url) problems.registryUrl = 'Enter the registry URL, or set the registry kind to none.';
+    else if (!/^https?:\/\//i.test(url)) problems.registryUrl = 'registryUrl must be an http or https URL.';
+  } else if (url) {
+    problems.registryKind = 'Set the registry kind to Confluent-compatible, or clear the URL.';
+  }
+  const storedKind = stored?.registryKind ?? 'none';
+  const storedUrl = stored?.registryUrl ?? '';
+  const changed = Boolean(stored) && (values.registryKind !== storedKind || url !== storedUrl);
+  if (changed && values.registrySecretStored && values.registryKind === 'confluent' && !values.registryCredentials.trim()) {
+    problems.registryCredentials =
+      'Enter the registry credential again: the stored one is never sent to a registry the cluster did not already use.';
+  }
+  return problems;
+}
+
 /** The form's starting values for a stored connection: never a secret. */
-export function kafkaFieldsOf(stored: KafkaConnection): KafkaFields {
+export function kafkaFieldsOf(stored: KafkaConnection, registrySecretStored = false): KafkaFields {
   const username = stored.credentials && 'username' in stored.credentials ? stored.credentials.username : '';
   return {
     bootstrap: stored.bootstrapServers.join('\n'),
@@ -134,6 +171,10 @@ export function kafkaFieldsOf(stored: KafkaConnection): KafkaFields {
     token: '',
     tlsBundle: stored.tlsBundle ?? '',
     clientId: stored.clientId ?? '',
+    registryKind: stored.registryKind ?? 'none',
+    registryUrl: stored.registryUrl ?? '',
+    registryCredentials: '',
+    registrySecretStored,
   };
 }
 
@@ -145,6 +186,8 @@ export function storedKafka(detail: {
   username?: string | null;
   tlsBundle?: string | null;
   clientId?: string | null;
+  registryKind?: 'none' | 'confluent';
+  registryUrl?: string | null;
 }): KafkaConnection {
   return {
     system: 'kafka',
@@ -154,5 +197,7 @@ export function storedKafka(detail: {
     ...(detail.username ? { credentials: { username: detail.username } } : {}),
     ...(detail.tlsBundle ? { tlsBundle: detail.tlsBundle } : {}),
     ...(detail.clientId ? { clientId: detail.clientId } : {}),
+    ...(detail.registryKind ? { registryKind: detail.registryKind } : {}),
+    ...(detail.registryUrl ? { registryUrl: detail.registryUrl } : {}),
   };
 }
