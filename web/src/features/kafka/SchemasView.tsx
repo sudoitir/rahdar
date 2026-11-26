@@ -15,6 +15,7 @@ import { Page } from '../../ui/Page.tsx';
 import { PageHeader } from '../../ui/PageHeader.tsx';
 import { Toolbar } from '../../ui/Toolbar.tsx';
 import { DataTable } from '../../ui/table/index.ts';
+import { BindingsView } from './BindingsView.tsx';
 import { RegisterSchemaDialog } from './RegisterSchemaDialog.tsx';
 import { schemaColumns } from './schemaColumns.tsx';
 import { registryReason, schemaWriteGate, useSchemaSubjects } from './schemasApi.ts';
@@ -167,13 +168,7 @@ export function SchemasView() {
               {
                 id: 'bindings',
                 title: 'Bindings',
-                panel: (
-                  <EmptyState
-                    kind="empty"
-                    title="Bindings"
-                    description="A binding names the serde that decodes one topic's key or value. This installation runs only the serdes it ships."
-                  />
-                ),
+                panel: <BindingsView clusterId={clusterId} />,
               },
             ],
           },
