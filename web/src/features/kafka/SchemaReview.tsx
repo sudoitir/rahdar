@@ -20,6 +20,14 @@ export function ReviewSummary({ preview }: Readonly<{ preview: SchemaPreview }>)
       value: preview.existingVersionId == null ? 'Yes' : `Id ${preview.existingVersionId}`,
     });
   }
+  // The note may contain the statement anywhere, not only as its opening. A note that is only the
+  // statement still shows it once: beyond() trims a leading copy, and an empty remainder is not rendered.
+  const rest =
+    preview.note && notSaid(preview.note, preview.compatibilityOutcome) && !preview.checkOnApply
+      ? beyond(preview.note, preview.statement)
+      : '';
+  const noteShown = preview.checkOnApply ? preview.note : rest;
+  const noteSaysStatement = !!noteShown && !!preview.statement && noteShown.includes(preview.statement);
   return (
     <Stack gap="sm">
       <DescriptionList items={items} label="What this would change" />
@@ -30,14 +38,10 @@ export function ReviewSummary({ preview }: Readonly<{ preview: SchemaPreview }>)
       <Text size="sm" fw={600}>
         After
       </Text>
-      <Lines lines={preview.after ?? []} />
-      {preview.statement ? <Text size="sm">{preview.statement}</Text> : null}
+      <Lines lines={preview.after ?? []} empty={preview.action === 'delete' ? 'Removed' : undefined} />
+      {preview.statement && !noteSaysStatement ? <Text size="sm">{preview.statement}</Text> : null}
       {preview.checkOnApply && preview.note ? <Text size="sm">{preview.note}</Text> : null}
-      {/* The note is the server's sentence, which may open with the statement already shown, or be the
-          compatibility outcome already listed. Neither is said twice. */}
-      {preview.note && notSaid(preview.note, preview.compatibilityOutcome) && !preview.checkOnApply ? (
-        <Text size="sm">{beyond(preview.note, preview.statement)}</Text>
-      ) : null}
+      {rest ? <Text size="sm">{rest}</Text> : null}
     </Stack>
   );
 }
@@ -52,8 +56,8 @@ function notSaid(note: string, ...said: (string | null | undefined)[]) {
   return !said.some((text) => text === note);
 }
 
-function Lines({ lines }: Readonly<{ lines: string[] }>) {
-  if (lines.length === 0) return <Text size="sm">None</Text>;
+function Lines({ lines, empty = 'None' }: Readonly<{ lines: string[]; empty?: string }>) {
+  if (lines.length === 0) return <Text size="sm">{empty}</Text>;
   return (
     <ul className={classes.lines}>
       {lines.map((line) => (

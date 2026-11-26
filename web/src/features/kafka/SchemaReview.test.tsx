@@ -79,6 +79,8 @@ describe('a schema review', () => {
     await user.click(screen.getByRole('button', { name: 'Delete subject orders-value' }));
     const dialog = await screen.findByRole('dialog', { name: 'Delete subject orders-value' });
     expect(dialog).toHaveTextContent('Nothing has been written.');
+    expect(dialog).toHaveTextContent('Removed');
+    expect(dialog).not.toHaveTextContent('None');
     await user.click(screen.getByRole('button', { name: 'Cancel' }));
 
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
@@ -123,7 +125,7 @@ describe('a schema review', () => {
       />,
     );
     const dialog = screen.getByRole('dialog', { name: 'Permanently delete subject orders-value' });
-    expect(screen.getAllByText('Nothing has been written.')).toHaveLength(1);
+    expect(dialog.textContent?.match(/Nothing has been written\./g)).toHaveLength(1);
     expect(dialog).toHaveTextContent('This soft-deletes the subject and then deletes the schema');
   });
 
