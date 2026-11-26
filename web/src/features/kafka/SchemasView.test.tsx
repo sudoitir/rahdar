@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { http, HttpResponse } from 'msw';
-import { screen } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { renderAppAt } from '../../test/render.tsx';
@@ -122,5 +122,48 @@ describe('schema subjects', () => {
     expect(screen.getByRole('button', { name: 'Register a schema' })).toBeDisabled();
     await user.click(why);
     expect(await screen.findByText(/schema:write/)).toBeInTheDocument();
+  });
+
+  it('reviews the registry default and applies it with a click', async () => {
+    const calls: { path: string; body: Record<string, unknown> }[] = [];
+    serve({ items: [], next: null });
+    server.use(
+      http.post('*/api/v1/clusters/k1/kafka/schemas\\:default-compatibility-preview', async ({ request }) => {
+        calls.push({ path: 'preview', body: (await request.json()) as Record<string, unknown> });
+        return HttpResponse.json({
+          etag: 'd1',
+          subject: null,
+          action: 'default-compatibility',
+          before: ['compatibility=BACKWARD'],
+          after: ['compatibility=FULL'],
+          compatibilityOutcome: null,
+          checkOnApply: false,
+          alreadyRegistered: false,
+          existingVersionId: null,
+          note: null,
+          statement: 'Nothing has been written.',
+          writesNothing: true,
+        });
+      }),
+      http.post('*/api/v1/clusters/k1/kafka/schemas\\:default-compatibility', async ({ request }) => {
+        calls.push({ path: 'apply', body: (await request.json()) as Record<string, unknown> });
+        return HttpResponse.json('FULL');
+      }),
+    );
+    const user = userEvent.setup();
+    renderAppAt('/clusters/k1/kafka/schemas');
+
+    expect(await screen.findByText('Read in the review, before anything is written.')).toBeInTheDocument();
+    await user.click(screen.getByRole('combobox', { name: 'New level' }));
+    await user.click(await screen.findByRole('option', { name: 'FULL' }));
+    await user.click(screen.getByRole('button', { name: 'Review registry default' }));
+
+    const dialog = await screen.findByRole('dialog', { name: 'Set registry default compatibility' });
+    expect(dialog).toHaveTextContent('compatibility=BACKWARD');
+    expect(dialog).toHaveTextContent('Nothing has been written.');
+    await user.click(screen.getByRole('button', { name: 'Set registry default compatibility' }));
+
+    await waitFor(() => expect(calls.map((call) => call.path)).toEqual(['preview', 'apply']));
+    expect(calls[1].body).toMatchObject({ level: 'FULL', etag: 'd1' });
   });
 });

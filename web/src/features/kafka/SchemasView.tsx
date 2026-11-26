@@ -17,6 +17,7 @@ import { Toolbar } from '../../ui/Toolbar.tsx';
 import { DataTable } from '../../ui/table/index.ts';
 import { BindingsView } from './BindingsView.tsx';
 import { RegisterSchemaDialog } from './RegisterSchemaDialog.tsx';
+import { RegistryDefault } from './RegistryDefault.tsx';
 import { schemaColumns } from './schemaColumns.tsx';
 import { registryReason, schemaWriteGate, useSchemaSubjects } from './schemasApi.ts';
 import type { SchemasSearch } from './search.ts';
@@ -67,6 +68,7 @@ function Subjects({ clusterId, q }: Readonly<{ clusterId: string; q: string }>) 
   return (
     <>
       {unavailable ? <Unavailable clusterId={clusterId} reason={unavailable} /> : null}
+      <RegistryDefault clusterId={clusterId} />
       <Toolbar
         label="Subject filters"
         start={

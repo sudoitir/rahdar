@@ -5,8 +5,8 @@ import linkClasses from '../../ui/InlineLink.module.css';
 import type { SchemaSubjectRow } from './schemasApi.ts';
 
 /**
- * Subject, versions and compatibility. The list row has no schema type — that is on the subject — so
- * this does not invent one.
+ * Subject, versions and compatibility. The list row has no schema type, so there is no latest-type
+ * column; the subject page shows the type. A type on the row is what would put the column here.
  */
 export function schemaColumns(clusterId: string): Column<SchemaSubjectRow>[] {
   return [
