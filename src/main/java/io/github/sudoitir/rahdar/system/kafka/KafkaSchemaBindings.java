@@ -95,11 +95,16 @@ public class KafkaSchemaBindings implements SchemaBindingLookup {
                 null,
                 Map.of("topic", p.topic(), "side", p.side(), "before", current == null ? "" : current),
                 false);
-        bindings.findByClusterIdAndTopicAndSide(p.clusterId(), p.topic(), p.side())
-                .ifPresentOrElse(
-                        row -> row.changeSerde(p.serde()),
-                        () -> bindings.save(
-                                new KafkaSchemaBindingEntity(p.clusterId(), p.topic(), p.side(), p.serde())));
+        try {
+            bindings.findByClusterIdAndTopicAndSide(p.clusterId(), p.topic(), p.side())
+                    .ifPresentOrElse(
+                            row -> row.changeSerde(p.serde()),
+                            () -> bindings.save(
+                                    new KafkaSchemaBindingEntity(p.clusterId(), p.topic(), p.side(), p.serde())));
+        } catch (RuntimeException e) {
+            KafkaSchemaReviews.close(audit, event, e);
+            throw e;
+        }
         audit.finish(event, false, 1, null, Map.of("serde", p.serde(), "status", "APPLIED"));
         return new BindingView(p.topic(), p.side(), p.serde());
     }

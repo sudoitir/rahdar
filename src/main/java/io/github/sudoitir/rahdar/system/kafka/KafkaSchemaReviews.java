@@ -8,6 +8,7 @@ import io.github.sudoitir.openbroker.operation.Precondition;
 import io.github.sudoitir.openbroker.operation.Preview;
 import io.github.sudoitir.rahdar.kernel.audit.AuditEvent;
 import io.github.sudoitir.rahdar.kernel.audit.AuditService;
+import io.github.sudoitir.rahdar.kernel.core.ConflictException;
 import io.github.sudoitir.rahdar.kernel.core.SecretRedactor;
 import io.github.sudoitir.rahdar.kernel.gate.Effect;
 import io.github.sudoitir.rahdar.kernel.gate.Gated;
@@ -90,9 +91,7 @@ public class KafkaSchemaReviews {
             String etag) {}
 
     public SchemaPreview previewRegister(UUID clusterId, String subject, SchemaType type, String schema) {
-        access.requireCluster(clusterId, KafkaModule.SCHEMA_WRITE);
-        Preview preview = registries.call(clusterId, catalog -> catalog.previewRegister(subject, type, schema));
-        return of(subject, "register", preview);
+        return loadRegister(clusterId, subject, type, schema).view();
     }
 
     public VersionView register(UUID clusterId, String subject, SchemaType type, String schema, String etag) {
@@ -103,9 +102,7 @@ public class KafkaSchemaReviews {
     }
 
     public SchemaPreview previewCompatibility(UUID clusterId, String subject, CompatibilityLevel level) {
-        access.requireCluster(clusterId, KafkaModule.SCHEMA_WRITE);
-        Preview preview = registries.call(clusterId, catalog -> catalog.previewCompatibility(subject, level));
-        return of(subject, "compatibility", preview);
+        return loadCompatibility(clusterId, subject, level).view();
     }
 
     public CompatibilityLevel setCompatibility(UUID clusterId, String subject, CompatibilityLevel level, String etag) {
@@ -116,9 +113,7 @@ public class KafkaSchemaReviews {
     }
 
     public SchemaPreview previewDefault(UUID clusterId, CompatibilityLevel level) {
-        access.requireCluster(clusterId, KafkaModule.SCHEMA_WRITE);
-        Preview preview = registries.call(clusterId, catalog -> catalog.previewCompatibilityDefault(level));
-        return of(null, "default-compatibility", preview);
+        return loadDefault(clusterId, level).view();
     }
 
     public CompatibilityLevel setDefault(UUID clusterId, CompatibilityLevel level, String etag) {
@@ -129,16 +124,7 @@ public class KafkaSchemaReviews {
     }
 
     public SchemaPreview previewDelete(UUID clusterId, String subject, boolean permanent) {
-        access.requireCluster(clusterId, KafkaModule.SCHEMA_WRITE);
-        Preview preview = registries.call(clusterId, catalog -> catalog.previewDelete(subject, permanent));
-        SchemaPreview view = of(subject, "delete", preview);
-        if (permanent) {
-            return withNote(view, PERMANENT_DELETE);
-        }
-        if (view.note() == null || !view.note().contains(NOTHING_WRITTEN)) {
-            return withNote(view, NOTHING_WRITTEN);
-        }
-        return view;
+        return loadDelete(clusterId, subject, permanent).view();
     }
 
     public void delete(UUID clusterId, String subject, boolean permanent, String etag) {
@@ -184,21 +170,30 @@ public class KafkaSchemaReviews {
     }
 
     private VersionView runRegister(UUID clusterId, String subject, SchemaType type, String schema, String etag) {
-        SchemaPreview preview = previewRegister(clusterId, subject, type, schema);
-        KafkaEtags.require(etag, preview.etag());
-        Map<String, Object> before = before(subject, preview);
-        AuditEvent event =
-                audit.begin(actors.resolve(), "REGISTER_SCHEMA", SCHEMA, subject, clusterId, null, before, false);
-        SubjectVersion version = registries.call(
-                clusterId, catalog -> catalog.register(subject, type, schema, Precondition.ifMatch(etag)));
-        audit.finish(event, false, preview.alreadyRegistered() ? 0 : 1, null, after(version));
+        Issued issued = loadRegister(clusterId, subject, type, schema);
+        KafkaEtags.require(etag, issued.view().etag());
+        AuditEvent event = audit.begin(
+                actors.resolve(),
+                "REGISTER_SCHEMA",
+                SCHEMA,
+                subject,
+                clusterId,
+                null,
+                before(subject, issued.view()),
+                false);
+        SubjectVersion version = attempt(
+                event,
+                () -> registries.call(
+                        clusterId,
+                        catalog -> catalog.register(subject, type, schema, Precondition.ifMatch(issued.driverEtag()))));
+        audit.finish(event, false, issued.view().alreadyRegistered() ? 0 : 1, null, after(version));
         return new VersionView(
                 version.id(), version.version(), version.type().name(), version.schema(), version.deleted());
     }
 
     private CompatibilityLevel runCompatibility(UUID clusterId, String subject, CompatibilityLevel level, String etag) {
-        SchemaPreview preview = previewCompatibility(clusterId, subject, level);
-        KafkaEtags.require(etag, preview.etag());
+        Issued issued = loadCompatibility(clusterId, subject, level);
+        KafkaEtags.require(etag, issued.view().etag());
         AuditEvent event = audit.begin(
                 actors.resolve(),
                 "SET_SCHEMA_COMPATIBILITY",
@@ -206,17 +201,21 @@ public class KafkaSchemaReviews {
                 subject,
                 clusterId,
                 null,
-                before(subject, preview),
+                before(subject, issued.view()),
                 false);
-        CompatibilityLevel applied = registries.call(
-                clusterId, catalog -> catalog.setCompatibility(subject, level, Precondition.ifMatch(etag)));
+        CompatibilityLevel applied = attempt(
+                event,
+                () -> registries.call(
+                        clusterId,
+                        catalog ->
+                                catalog.setCompatibility(subject, level, Precondition.ifMatch(issued.driverEtag()))));
         audit.finish(event, false, 1, null, Map.of("compatibility", applied.name(), "status", APPLIED));
         return applied;
     }
 
     private CompatibilityLevel runDefault(UUID clusterId, CompatibilityLevel level, String etag) {
-        SchemaPreview preview = previewDefault(clusterId, level);
-        KafkaEtags.require(etag, preview.etag());
+        Issued issued = loadDefault(clusterId, level);
+        KafkaEtags.require(etag, issued.view().etag());
         AuditEvent event = audit.begin(
                 actors.resolve(),
                 "SET_SCHEMA_COMPATIBILITY_DEFAULT",
@@ -224,17 +223,20 @@ public class KafkaSchemaReviews {
                 "default",
                 clusterId,
                 null,
-                before("default", preview),
+                before("default", issued.view()),
                 false);
-        CompatibilityLevel applied = registries.call(
-                clusterId, catalog -> catalog.setCompatibilityDefault(level, Precondition.ifMatch(etag)));
+        CompatibilityLevel applied = attempt(
+                event,
+                () -> registries.call(
+                        clusterId,
+                        catalog -> catalog.setCompatibilityDefault(level, Precondition.ifMatch(issued.driverEtag()))));
         audit.finish(event, false, 1, null, Map.of("compatibility", applied.name(), "status", APPLIED));
         return applied;
     }
 
     private void runDelete(UUID clusterId, String subject, boolean permanent, String etag) {
-        SchemaPreview preview = previewDelete(clusterId, subject, permanent);
-        KafkaEtags.require(etag, preview.etag());
+        Issued issued = loadDelete(clusterId, subject, permanent);
+        KafkaEtags.require(etag, issued.view().etag());
         AuditEvent event = audit.begin(
                 actors.resolve(),
                 permanent ? "DELETE_SCHEMA_PERMANENT" : "DELETE_SCHEMA",
@@ -242,14 +244,77 @@ public class KafkaSchemaReviews {
                 subject,
                 clusterId,
                 null,
-                before(subject, preview),
+                before(subject, issued.view()),
                 false);
-        registries.call(clusterId, catalog -> {
-            catalog.delete(subject, permanent, Precondition.ifMatch(etag));
-            return null;
-        });
+        attempt(
+                event,
+                () -> registries.call(clusterId, catalog -> {
+                    catalog.delete(subject, permanent, Precondition.ifMatch(issued.driverEtag()));
+                    return null;
+                }));
         audit.finish(event, false, 1, null, Map.of("permanent", permanent, "status", APPLIED));
     }
+
+    private Issued loadRegister(UUID clusterId, String subject, SchemaType type, String schema) {
+        access.requireCluster(clusterId, KafkaModule.SCHEMA_WRITE);
+        Preview driver = registries.call(clusterId, catalog -> catalog.previewRegister(subject, type, schema));
+        return issued(subject, "register", "register", driver);
+    }
+
+    private Issued loadCompatibility(UUID clusterId, String subject, CompatibilityLevel level) {
+        access.requireCluster(clusterId, KafkaModule.SCHEMA_WRITE);
+        Preview driver = registries.call(clusterId, catalog -> catalog.previewCompatibility(subject, level));
+        return issued(subject, "compatibility", "compatibility", driver);
+    }
+
+    private Issued loadDefault(UUID clusterId, CompatibilityLevel level) {
+        access.requireCluster(clusterId, KafkaModule.SCHEMA_WRITE);
+        Preview driver = registries.call(clusterId, catalog -> catalog.previewCompatibilityDefault(level));
+        return issued(null, "default-compatibility", "default-compatibility", driver);
+    }
+
+    private Issued loadDelete(UUID clusterId, String subject, boolean permanent) {
+        access.requireCluster(clusterId, KafkaModule.SCHEMA_WRITE);
+        Preview driver = registries.call(clusterId, catalog -> catalog.previewDelete(subject, permanent));
+        Issued issued = issued(subject, "delete", permanent ? "permanent" : "soft", driver);
+        SchemaPreview view = issued.view();
+        if (permanent) {
+            view = withNote(view, PERMANENT_DELETE);
+        } else if (view.note() == null || !view.note().contains(NOTHING_WRITTEN)) {
+            view = withNote(view, NOTHING_WRITTEN);
+        }
+        return new Issued(view, driver.etag());
+    }
+
+    /** The review etag binds the driver's state to the intent, so one preview cannot authorise another. */
+    private static Issued issued(String subject, String action, String intent, Preview driver) {
+        return new Issued(of(subject, action, driver, intentEtag(driver.etag(), intent)), driver.etag());
+    }
+
+    private static String intentEtag(String driverEtag, String intent) {
+        return KafkaEtags.of(List.of(driverEtag, intent));
+    }
+
+    private <T> T attempt(AuditEvent event, Supplier<T> action) {
+        try {
+            return action.get();
+        } catch (RuntimeException e) {
+            close(audit, event, e);
+            throw e;
+        }
+    }
+
+    static void close(AuditService audit, AuditEvent event, RuntimeException failure) {
+        String detail = SecretRedactor.redact(failure.getMessage());
+        if (failure instanceof ConflictException conflict
+                && KafkaSchemaRegistry.DELETE_IN_DOUBT.equals(conflict.slug())) {
+            audit.inDoubt(event, detail);
+        } else {
+            audit.fail(event, detail);
+        }
+    }
+
+    private record Issued(SchemaPreview view, String driverEtag) {}
 
     private static Map<String, Object> before(String subject, SchemaPreview preview) {
         Map<String, Object> before = new LinkedHashMap<>();
@@ -263,7 +328,7 @@ public class KafkaSchemaReviews {
         return Map.of("id", version.id(), "version", version.version(), "status", APPLIED);
     }
 
-    static SchemaPreview of(String subject, String action, Preview preview) {
+    static SchemaPreview of(String subject, String action, Preview preview, String reviewEtag) {
         List<String> before = new ArrayList<>();
         List<String> after = new ArrayList<>();
         String note = null;
@@ -291,7 +356,7 @@ public class KafkaSchemaReviews {
             outcome = note;
         }
         return new SchemaPreview(
-                preview.etag(),
+                reviewEtag,
                 subject,
                 action,
                 before,

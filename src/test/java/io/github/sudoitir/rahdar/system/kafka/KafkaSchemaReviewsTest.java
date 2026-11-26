@@ -4,7 +4,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -17,6 +20,7 @@ import io.github.sudoitir.openbroker.ErrorInfo;
 import io.github.sudoitir.openbroker.ErrorReasons;
 import io.github.sudoitir.openbroker.Status;
 import io.github.sudoitir.openbroker.access.Assessment;
+import io.github.sudoitir.openbroker.kafka.schema.CompatibilityLevel;
 import io.github.sudoitir.openbroker.kafka.schema.SchemaCatalog;
 import io.github.sudoitir.openbroker.kafka.schema.SchemaType;
 import io.github.sudoitir.openbroker.kafka.schema.SubjectVersion;
@@ -24,6 +28,7 @@ import io.github.sudoitir.openbroker.messaging.Count;
 import io.github.sudoitir.openbroker.operation.AttributeChange;
 import io.github.sudoitir.openbroker.operation.Estimate;
 import io.github.sudoitir.openbroker.operation.EtagBasis;
+import io.github.sudoitir.openbroker.operation.Precondition;
 import io.github.sudoitir.openbroker.operation.PreconditionEnforcement;
 import io.github.sudoitir.openbroker.operation.Preview;
 import io.github.sudoitir.rahdar.kernel.audit.AuditEvent;
@@ -41,6 +46,7 @@ import io.github.sudoitir.rahdar.system.kafka.KafkaSchemaReviews.SchemaPreview;
 import io.github.sudoitir.rahdar.system.kafka.KafkaSchemaReviews.SchemaWriteParams;
 import io.github.sudoitir.rahdar.system.kafka.internal.persistence.KafkaConnectionEntity;
 import io.github.sudoitir.rahdar.system.kafka.internal.persistence.KafkaConnectionRepository;
+import io.github.sudoitir.rahdar.system.kafka.internal.persistence.KafkaSchemaBindingRepository;
 import io.github.sudoitir.rahdar.system.kafka.web.KafkaSchemaProblemAdvice;
 import java.util.List;
 import java.util.Optional;
@@ -61,6 +67,8 @@ class KafkaSchemaReviewsTest {
     private final KafkaSchemaRegistry registries = mock(KafkaSchemaRegistry.class);
     private final ClusterAccessGuard access = mock(ClusterAccessGuard.class);
     private final OperationGate gate = mock(OperationGate.class);
+    private final AuditService audit = mock(AuditService.class);
+    private final ActorResolver actors = mock(ActorResolver.class);
     private final KafkaSchemaReviews reviews;
 
     KafkaSchemaReviewsTest() {
@@ -68,9 +76,7 @@ class KafkaSchemaReviewsTest {
             Function<SchemaCatalog, ?> call = invocation.getArgument(1);
             return call.apply(catalog);
         });
-        ActorResolver actors = mock(ActorResolver.class);
         when(actors.resolve()).thenReturn(mock(Actor.class));
-        AuditService audit = mock(AuditService.class);
         when(audit.begin(any(), any(), any(), any(), any(), any(), any(), anyBoolean()))
                 .thenReturn(mock(AuditEvent.class));
         Mockito.doAnswer(invocation -> {
@@ -127,7 +133,7 @@ class KafkaSchemaReviewsTest {
                 .thenReturn(new SubjectVersion(7, 1, SchemaType.AVRO, "{}", false));
 
         SchemaPreview preview = reviews.previewRegister(CLUSTER, "orders-value", SchemaType.AVRO, "{}");
-        var version = reviews.register(CLUSTER, "orders-value", SchemaType.AVRO, "{}", "etag-1");
+        var version = reviews.register(CLUSTER, "orders-value", SchemaType.AVRO, "{}", preview.etag());
 
         assertThat(preview.alreadyRegistered()).isTrue();
         assertThat(reviews.estimate(new SchemaWriteParams(
@@ -135,7 +141,7 @@ class KafkaSchemaReviewsTest {
                         .count())
                 .isZero();
         assertThat(version.id()).isEqualTo(7);
-        verify(catalog).register(eq("orders-value"), eq(SchemaType.AVRO), eq("{}"), any());
+        verify(catalog).register(eq("orders-value"), eq(SchemaType.AVRO), eq("{}"), eq(Precondition.ifMatch("etag-1")));
     }
 
     @Test
@@ -248,6 +254,110 @@ class KafkaSchemaReviewsTest {
                 .contains("soft-deleted")
                 .contains("in doubt")
                 .doesNotContain("not found");
+        assertThat(((ConflictException) translated).slug()).isEqualTo(KafkaSchemaRegistry.DELETE_IN_DOUBT);
+    }
+
+    @Test
+    void aThrownRegistryErrorLeavesTheAuditFailedAndRedacted() {
+        when(catalog.previewRegister(any(), any(), any())).thenReturn(preview("etag-1", "ok"));
+        when(catalog.register(any(), any(), any(), any()))
+                .thenThrow(new ConflictException("schema-refused", "password=registry-secret-value"));
+        String etag = reviews.previewRegister(CLUSTER, "orders-value", SchemaType.AVRO, "{}")
+                .etag();
+
+        assertThatThrownBy(() -> reviews.register(CLUSTER, "orders-value", SchemaType.AVRO, "{}", etag))
+                .isInstanceOf(ConflictException.class);
+        verify(audit).fail(any(), argThat(KafkaSchemaReviewsTest::redacted));
+        verify(audit, never()).inDoubt(any(), any());
+        verify(audit, never()).finish(any(), anyBoolean(), anyLong(), any(), any());
+    }
+
+    @Test
+    void aPermanentDeleteInDoubtIsRecordedAsInDoubt() {
+        when(catalog.previewDelete("orders-value", true)).thenReturn(preview("etag-1", "gone"));
+        doThrow(new ConflictException(KafkaSchemaRegistry.DELETE_IN_DOUBT, "password=registry-secret-value"))
+                .when(catalog)
+                .delete(any(), anyBoolean(), any());
+        String etag = reviews.previewDelete(CLUSTER, "orders-value", true).etag();
+
+        assertThatThrownBy(() -> reviews.delete(CLUSTER, "orders-value", true, etag))
+                .isInstanceOf(ConflictException.class);
+        verify(audit).inDoubt(any(), argThat(KafkaSchemaReviewsTest::redacted));
+        verify(audit, never()).fail(any(), any());
+        verify(catalog).delete(eq("orders-value"), eq(true), eq(Precondition.ifMatch("etag-1")));
+    }
+
+    @Test
+    void aSoftDeleteEtagDoesNotAuthoriseAPermanentDelete() {
+        when(catalog.previewDelete("orders-value", false)).thenReturn(preview("etag-1", "Nothing has been written."));
+        when(catalog.previewDelete("orders-value", true)).thenReturn(preview("etag-1", "gone"));
+        String soft = reviews.previewDelete(CLUSTER, "orders-value", false).etag();
+
+        assertThat(soft)
+                .isNotEqualTo(
+                        reviews.previewDelete(CLUSTER, "orders-value", true).etag());
+        assertThatThrownBy(() -> reviews.delete(CLUSTER, "orders-value", true, soft))
+                .isInstanceOf(StalePreviewException.class);
+        assertThatThrownBy(() -> reviews.replay(
+                        new SchemaWriteParams(CLUSTER, "delete", "orders-value", null, null, null, true, soft)))
+                .isInstanceOf(StalePreviewException.class);
+        verify(catalog, never()).delete(any(), anyBoolean(), any());
+        verify(audit, never()).begin(any(), any(), any(), any(), any(), any(), any(), anyBoolean());
+    }
+
+    @Test
+    void aPermanentDeleteUsesItsOwnEtagAndTheDriverState() {
+        when(catalog.previewDelete("orders-value", true)).thenReturn(preview("etag-1", "gone"));
+        String etag = reviews.previewDelete(CLUSTER, "orders-value", true).etag();
+
+        reviews.delete(CLUSTER, "orders-value", true, etag);
+
+        verify(catalog).delete(eq("orders-value"), eq(true), eq(Precondition.ifMatch("etag-1")));
+        verify(audit).finish(any(), eq(false), eq(1L), any(), any());
+    }
+
+    @Test
+    void aChangedSubjectStateStillRefusesThePermanentDelete() {
+        when(catalog.previewDelete("orders-value", true))
+                .thenReturn(preview("etag-1", "gone"))
+                .thenReturn(preview("etag-2", "gone"));
+        String etag = reviews.previewDelete(CLUSTER, "orders-value", true).etag();
+
+        assertThatThrownBy(() -> reviews.delete(CLUSTER, "orders-value", true, etag))
+                .isInstanceOf(StalePreviewException.class);
+        verify(catalog, never()).delete(any(), anyBoolean(), any());
+    }
+
+    @Test
+    void aRegisterPreviewDoesNotAuthoriseACompatibilityChange() {
+        when(catalog.previewRegister(any(), any(), any())).thenReturn(preview("etag-1", "ok"));
+        when(catalog.previewCompatibility(any(), any())).thenReturn(preview("etag-1", "ok"));
+        String registerEtag = reviews.previewRegister(CLUSTER, "orders-value", SchemaType.AVRO, "{}")
+                .etag();
+
+        assertThatThrownBy(() ->
+                        reviews.setCompatibility(CLUSTER, "orders-value", CompatibilityLevel.BACKWARD, registerEtag))
+                .isInstanceOf(StalePreviewException.class);
+        verify(catalog, never()).setCompatibility(any(), any(), any());
+    }
+
+    @Test
+    void aThrownBindingSaveLeavesTheAuditFailedAndRedacted() {
+        KafkaSchemaBindingRepository repository = mock(KafkaSchemaBindingRepository.class);
+        when(repository.findByClusterIdAndTopicAndSide(CLUSTER, "orders", "value"))
+                .thenReturn(Optional.empty());
+        when(repository.save(any())).thenThrow(new IllegalStateException("password=registry-secret-value"));
+        KafkaSchemaBindings bindings = new KafkaSchemaBindings(repository, access, gate, audit, actors);
+        String etag = bindings.preview(CLUSTER, "orders", "value", "avro").etag();
+
+        assertThatThrownBy(() -> bindings.apply(CLUSTER, "orders", "value", "avro", etag))
+                .isInstanceOf(IllegalStateException.class);
+        verify(audit).fail(any(), argThat(KafkaSchemaReviewsTest::redacted));
+        verify(audit, never()).finish(any(), anyBoolean(), anyLong(), any(), any());
+    }
+
+    private static boolean redacted(String detail) {
+        return detail.contains("[redacted]") && !detail.contains("registry-secret-value");
     }
 
     private static Preview preview(String etag, String note, AttributeChange... extra) {

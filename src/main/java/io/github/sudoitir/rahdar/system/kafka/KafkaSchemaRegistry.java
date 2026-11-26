@@ -88,10 +88,13 @@ public class KafkaSchemaRegistry {
                 .orElseThrow(() -> new NotFoundException("cluster", clusterId));
     }
 
+    /** A permanent delete that stopped after the soft-delete. The subject may already be gone. */
+    static final String DELETE_IN_DOUBT = "schema-delete-in-doubt";
+
     static RuntimeException translate(String system, BrokerException e) {
         if (e.dispatch() == Dispatch.IN_DOUBT) {
             return new ConflictException(
-                    "schema-delete-in-doubt",
+                    DELETE_IN_DOUBT,
                     "The subject was soft-deleted, and the permanent delete did not finish. The state is in doubt.",
                     e);
         }
