@@ -112,6 +112,7 @@ describe('schema subjects', () => {
     expect(await screen.findByText('Rahdar failed to complete the request')).toBeInTheDocument();
     expect(screen.getByText('The registry did not answer.')).toBeInTheDocument();
     expect(screen.queryByText('No subjects')).not.toBeInTheDocument();
+    expect(screen.queryByText('0 subjects')).not.toBeInTheDocument();
   });
 
   it('keeps Register visible without schema:write and names that permission', async () => {

@@ -99,7 +99,13 @@ function Subjects({ clusterId, q }: Readonly<{ clusterId: string; q: string }>) 
             ) : null}
             {subjects.isSuccess && !unavailable && !subjects.hasNextPage ? (
               <Text size="xs" c="dimmed">
-                {rows.length === 1 ? '1 subject' : `${rows.length} subjects`}
+                {filtered
+                  ? rows.length === 1
+                    ? '1 matching subject'
+                    : `${rows.length} matching subjects`
+                  : rows.length === 1
+                    ? '1 subject'
+                    : `${rows.length} subjects`}
               </Text>
             ) : null}
           </>

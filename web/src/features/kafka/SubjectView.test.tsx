@@ -52,7 +52,7 @@ describe('a schema subject', () => {
     expect(screen.getByText('{"type":"record","name":"Order"}')).toBeInTheDocument();
   });
 
-  it('soft-deletes only after a hold, and says the subject can be restored', async () => {
+  it('soft-deletes only after a hold, and says it cannot be undone from here', async () => {
     const calls: { method: string; url: string; match?: string }[] = [];
     serve();
     server.use(
