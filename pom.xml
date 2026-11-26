@@ -144,6 +144,14 @@
                 <artifactId>lz4-java</artifactId>
                 <version>1.14.0</version>
             </dependency>
+            <!-- The OTLP exporter's okhttp 5.5.0 calls Okio.socket, which apicurio-registry-protobuf-schema-utilities'
+                 nearer okio-jvm 3.10.2 lacks. 3.18.1 is the version that exporter declares. Drop once that utility
+                 depends on an okio that has Okio.socket. -->
+            <dependency>
+                <groupId>com.squareup.okio</groupId>
+                <artifactId>okio-jvm</artifactId>
+                <version>3.18.1</version>
+            </dependency>
             <!-- Spring Boot 4.x no longer manages the Testcontainers versions itself. -->
             <dependency>
                 <groupId>org.springframework.ai</groupId>
