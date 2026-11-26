@@ -27,6 +27,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
+import tools.jackson.databind.json.JsonMapper;
 
 /** Browse names a decoded record, a tombstone, a truncated body and an unknown schema, and never an empty stand-in. */
 class KafkaSchemaBrowseTest {
@@ -118,6 +119,13 @@ class KafkaSchemaBrowseTest {
         assertThat(view.versions()).hasSize(1);
         assertThat(view.versions().getFirst().deleted()).isTrue();
         assertThat(view.schemaText()).isEqualTo("{\"type\":\"record\"}");
+    }
+
+    @Test
+    void anUndecodedRecordOmitsTheFieldsTheContractTypesAsNonNull() throws Exception {
+        String json = JsonMapper.builder().build().writeValueAsString(DecodedRecordView.undecoded("no-schema-id"));
+
+        assertThat(json).isEqualTo("{\"reason\":\"no-schema-id\"}");
     }
 
     private static String anyName() {
