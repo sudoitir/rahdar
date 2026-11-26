@@ -22,6 +22,7 @@ import io.github.sudoitir.rahdar.kernel.core.DecodedRecordView;
 import io.github.sudoitir.rahdar.platform.broker.BrowsedMessage;
 import io.github.sudoitir.rahdar.platform.broker.BrowsedMessages;
 import io.github.sudoitir.rahdar.system.kafka.web.KafkaSchemaViews;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -126,6 +127,38 @@ class KafkaSchemaBrowseTest {
         String json = JsonMapper.builder().build().writeValueAsString(DecodedRecordView.undecoded("no-schema-id"));
 
         assertThat(json).isEqualTo("{\"reason\":\"no-schema-id\"}");
+    }
+
+    @Test
+    void nestedFieldsAndListItemsAreAddressable() {
+        SchemaCatalog catalog = mock(SchemaCatalog.class);
+        when(catalog.decode(anyName(), anyBody()))
+                .thenReturn(new DecodedRecord.Decoded(
+                        SchemaType.JSON,
+                        1,
+                        "orders-value",
+                        Map.of("order", Map.of("items", List.of(Map.of("sku", "a"))))));
+
+        DecodedRecordView view = new SchemaDecoding(catalog, "json").value(MessageBody.of(new byte[] {1}), false);
+
+        assertThat(view.paths()).containsEntry("order.items[*].sku", "a");
+    }
+
+    @Test
+    void aNullFieldIsOmittedAndAMissingCatalogDecodesNothing() {
+        SchemaCatalog catalog = mock(SchemaCatalog.class);
+        Map<String, Object> record = new LinkedHashMap<>();
+        record.put("id", 1);
+        record.put("note", null);
+        when(catalog.decode(anyName(), anyBody()))
+                .thenReturn(new DecodedRecord.Decoded(SchemaType.JSON, 1, "orders-value", record));
+
+        DecodedRecordView view = new SchemaDecoding(catalog, "json").value(MessageBody.of(new byte[] {1}), false);
+
+        assertThat(view.paths()).containsEntry("id", "1").doesNotContainKey("note");
+        assertThat(new SchemaDecoding(null, "json").value(MessageBody.of(new byte[] {1}), false))
+                .isNull();
+        assertThat(new SchemaDecoding(catalog, "json").key(null)).isNull();
     }
 
     private static String anyName() {

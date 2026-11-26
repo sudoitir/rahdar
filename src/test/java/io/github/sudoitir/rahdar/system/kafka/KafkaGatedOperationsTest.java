@@ -13,6 +13,7 @@ import io.github.sudoitir.rahdar.system.kafka.KafkaReplication.CancelParams;
 import io.github.sudoitir.rahdar.system.kafka.KafkaReplication.ElectParams;
 import io.github.sudoitir.rahdar.system.kafka.KafkaReplication.NamedPartition;
 import io.github.sudoitir.rahdar.system.kafka.KafkaReplication.ReassignParams;
+import io.github.sudoitir.rahdar.system.kafka.KafkaSchemaBindings.BindingParams;
 import io.github.sudoitir.rahdar.system.kafka.KafkaSchemaReviews.SchemaWriteParams;
 import io.github.sudoitir.rahdar.system.kafka.KafkaTopicLifecycle.CreateParams;
 import io.github.sudoitir.rahdar.system.kafka.KafkaTopicLifecycle.DeleteParams;
@@ -104,5 +105,31 @@ class KafkaGatedOperationsTest {
                 .contains(tuple("Permanent", "yes — the schemas cannot be restored"));
         assertThat(soft).extracting(DisplayRow::to).anyMatch(value -> value != null && value.startsWith("no"));
         assertThat(level).extracting(DisplayRow::label, DisplayRow::to).contains(tuple("Compatibility", "BACKWARD"));
+    }
+
+    @Test
+    void anApproverReadsASchemaChangeAndABindingBeforeReleasingIt() {
+        KafkaSchemaReviews reviews = mock(KafkaSchemaReviews.class);
+        KafkaSchemaBindings bindings = mock(KafkaSchemaBindings.class);
+        String schema = "x".repeat(200);
+        SchemaWriteParams params = new SchemaWriteParams(CLUSTER, "register", null, "AVRO", schema, null, null, "e");
+        SchemaWriteParams shortSchema =
+                new SchemaWriteParams(CLUSTER, "register", "orders-value", "AVRO", "{}", null, null, "e");
+        BindingParams bind = new BindingParams(CLUSTER, "orders", "value", "avro", "e");
+
+        GatedOperation<SchemaWriteParams> write = beans.schemaWrite(reviews, clusters);
+        GatedOperation<BindingParams> binding = beans.schemaBinding(bindings, clusters);
+        write.replay(params);
+        binding.replay(bind);
+
+        assertThat(write.summary(params)).isEqualTo("Change schema register on prod-eu");
+        assertThat(write.display(params))
+                .extracting(DisplayRow::label, DisplayRow::to)
+                .contains(tuple("Subject", "default"), tuple("Schema", "x".repeat(117) + "..."));
+        assertThat(write.display(shortSchema)).extracting(DisplayRow::to).contains("{}");
+        assertThat(binding.summary(bind)).isEqualTo("Bind orders value to avro on prod-eu");
+        assertThat(binding.display(bind)).extracting(DisplayRow::label).contains("Topic", "Side", "Serde");
+        verify(reviews).replay(params);
+        verify(bindings).replay(bind);
     }
 }

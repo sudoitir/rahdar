@@ -3,8 +3,12 @@ package io.github.sudoitir.rahdar.system.kafka;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import io.github.sudoitir.openbroker.BrokerDrivers;
@@ -37,9 +41,11 @@ import io.github.sudoitir.rahdar.platform.clusters.ClusterRegistrar.Resolved;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterRequests.KafkaCredentials;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterRequests.RegisterClusterRequest.KafkaConnection;
 import io.github.sudoitir.rahdar.platform.clusters.web.ClusterRequests.UpdateClusterRequest.KafkaConnectionUpdate;
+import io.github.sudoitir.rahdar.platform.clusters.web.ClusterViews.KafkaConnectionDetail;
 import io.github.sudoitir.rahdar.system.kafka.internal.persistence.KafkaConnectionEntity;
 import io.github.sudoitir.rahdar.system.kafka.internal.persistence.KafkaConnectionRepository;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -471,6 +477,132 @@ class KafkaRegistrarTest {
 
         assertThat(((KafkaConnection) resolved.connection()).credentials()).isNull();
         assertThat(resolved.account().secret()).isNull();
+    }
+
+    @Test
+    void aNewRegistryCredentialIsUsedAndTheStoredOneIsNotOpened() {
+        UUID id = storedConfluent();
+
+        Resolved resolved = registrar.edited(
+                id,
+                new KafkaConnectionUpdate(
+                        KafkaModule.SYSTEM,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        "confluent",
+                        "https://other.example",
+                        "user:new"));
+
+        KafkaConnection connection = (KafkaConnection) resolved.connection();
+        assertThat(connection.registryUrl()).isEqualTo("https://other.example");
+        assertThat(connection.registryCredentials()).isEqualTo("user:new");
+        verify(registrySecrets, never()).open(any(), any());
+    }
+
+    @Test
+    void changingTheRegistryRefusesToSendTheStoredCredential() {
+        UUID id = storedConfluent();
+
+        assertThatThrownBy(() -> registrar.edited(
+                        id,
+                        new KafkaConnectionUpdate(
+                                KafkaModule.SYSTEM,
+                                null,
+                                null,
+                                null,
+                                null,
+                                null,
+                                null,
+                                "confluent",
+                                "https://other",
+                                null)))
+                .hasMessageContaining("Enter the registry credential again");
+        verify(registrySecrets, never()).open(any(), any());
+    }
+
+    @Test
+    void anUnchangedRegistryKeepsTheStoredCredentialAndClearingDropsIt() {
+        UUID id = storedConfluent();
+        when(registrySecrets.open(id, new byte[] {9})).thenReturn("user:stored");
+
+        KafkaConnection kept = (KafkaConnection) registrar
+                .edited(
+                        id,
+                        new KafkaConnectionUpdate(
+                                KafkaModule.SYSTEM, null, null, null, null, null, "renamed", null, null, null))
+                .connection();
+        KafkaConnection cleared = (KafkaConnection) registrar
+                .edited(
+                        id,
+                        new KafkaConnectionUpdate(
+                                KafkaModule.SYSTEM, null, null, null, null, null, null, "none", null, null))
+                .connection();
+
+        assertThat(kept.registryCredentials()).isEqualTo("user:stored");
+        assertThat(kept.registryUrl()).isEqualTo("https://registry.example");
+        assertThat(cleared.registryKind()).isEqualTo(KafkaOptions.REGISTRY_NONE);
+        assertThat(cleared.registryCredentials()).isNull();
+        assertThat(cleared.registryUrl()).isNull();
+    }
+
+    @Test
+    void aConfluentCredentialIsSealedBeforeItIsStoredAndANoneIsNot() {
+        UUID id = UUID.randomUUID();
+        when(connections.findById(id)).thenReturn(Optional.empty());
+        when(registrySecrets.seal(id, "user:secret")).thenReturn(new byte[] {3});
+
+        registrar.store(
+                id,
+                new KafkaConnection(
+                        KafkaModule.SYSTEM,
+                        List.of("k1:9092"),
+                        KafkaOptions.PLAINTEXT,
+                        null,
+                        null,
+                        null,
+                        null,
+                        "confluent",
+                        "https://r",
+                        "user:secret"));
+        registrar.store(id, plaintext("k1"));
+
+        verify(connections)
+                .save(argThat(row -> "confluent".equals(row.getRegistryKind())
+                        && Arrays.equals(new byte[] {3}, row.getRegistrySecret())));
+        verify(registrySecrets).seal(id, "user:secret");
+        verify(registrySecrets, never()).seal(eq(id), eq(null));
+    }
+
+    @Test
+    void aStoredRegistryIsReportedWithoutItsCredential() {
+        UUID id = storedConfluent();
+
+        KafkaConnectionDetail detail = registrar.detail(id);
+
+        assertThat(detail.registryKind()).isEqualTo("confluent");
+        assertThat(detail.registryUrl()).isEqualTo("https://registry.example");
+        assertThat(detail.registrySecretStored()).isTrue();
+        assertThat(detail.toString()).doesNotContain("user:stored");
+    }
+
+    private UUID storedConfluent() {
+        UUID id = UUID.randomUUID();
+        when(connections.findById(id))
+                .thenReturn(Optional.of(new KafkaConnectionEntity(
+                        id,
+                        "k1:9092",
+                        KafkaOptions.PLAINTEXT,
+                        null,
+                        null,
+                        "confluent",
+                        "https://registry.example",
+                        new byte[] {9})));
+        when(settings.coreSettings(id)).thenReturn(new CoreConnectionSettings(id, null, null, null, false));
+        return id;
     }
 
     @Test

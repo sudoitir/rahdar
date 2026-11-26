@@ -10,6 +10,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -37,6 +38,7 @@ import io.github.sudoitir.rahdar.kernel.core.ConflictException;
 import io.github.sudoitir.rahdar.kernel.core.NotFoundException;
 import io.github.sudoitir.rahdar.kernel.core.ResourceForbiddenException;
 import io.github.sudoitir.rahdar.kernel.core.StalePreviewException;
+import io.github.sudoitir.rahdar.kernel.gate.Effect;
 import io.github.sudoitir.rahdar.kernel.gate.OperationGate;
 import io.github.sudoitir.rahdar.kernel.security.Actor;
 import io.github.sudoitir.rahdar.kernel.security.ActorResolver;
@@ -354,6 +356,102 @@ class KafkaSchemaReviewsTest {
                 .isInstanceOf(IllegalStateException.class);
         verify(audit).fail(any(), argThat(KafkaSchemaReviewsTest::redacted));
         verify(audit, never()).finish(any(), anyBoolean(), anyLong(), any(), any());
+    }
+
+    @Test
+    void aCompatibilityChangeAppliesTheLevelThePreviewNamed() {
+        when(catalog.previewCompatibility("orders-value", CompatibilityLevel.BACKWARD))
+                .thenReturn(preview(
+                        "etag-1",
+                        "The compatibility check happens on apply.",
+                        new AttributeChange("compatibility", Optional.empty(), Optional.of("BACKWARD")),
+                        new AttributeChange("owner", Optional.of("billing"), Optional.empty())));
+        when(catalog.setCompatibility(any(), any(), any())).thenReturn(CompatibilityLevel.BACKWARD);
+        String etag = reviews.previewCompatibility(CLUSTER, "orders-value", CompatibilityLevel.BACKWARD)
+                .etag();
+
+        SchemaPreview view = reviews.previewCompatibility(CLUSTER, "orders-value", CompatibilityLevel.BACKWARD);
+        CompatibilityLevel applied =
+                reviews.setCompatibility(CLUSTER, "orders-value", CompatibilityLevel.BACKWARD, etag);
+        reviews.replay(
+                new SchemaWriteParams(CLUSTER, "compatibility", "orders-value", null, null, "BACKWARD", null, etag));
+
+        assertThat(view.checkOnApply()).isTrue();
+        assertThat(view.compatibilityOutcome()).isEqualTo("BACKWARD");
+        assertThat(view.after()).containsExactly("compatibility=BACKWARD");
+        assertThat(view.before()).containsExactly("owner=billing");
+        assertThat(applied).isEqualTo(CompatibilityLevel.BACKWARD);
+        verify(catalog, times(2))
+                .setCompatibility(
+                        eq("orders-value"), eq(CompatibilityLevel.BACKWARD), eq(Precondition.ifMatch("etag-1")));
+        verify(audit, times(2)).finish(any(), eq(false), eq(1L), any(), any());
+    }
+
+    @Test
+    void theRegistryDefaultAppliesOnlyWithItsOwnPreview() {
+        when(catalog.previewCompatibilityDefault(CompatibilityLevel.NONE)).thenReturn(preview("etag-1", "ok"));
+        when(catalog.setCompatibilityDefault(any(), any())).thenReturn(CompatibilityLevel.NONE);
+        String etag = reviews.previewDefault(CLUSTER, CompatibilityLevel.NONE).etag();
+
+        SchemaPreview view = reviews.previewDefault(CLUSTER, CompatibilityLevel.NONE);
+        CompatibilityLevel applied = reviews.setDefault(CLUSTER, CompatibilityLevel.NONE, etag);
+        reviews.replay(new SchemaWriteParams(CLUSTER, "default-compatibility", null, null, null, "NONE", null, etag));
+
+        assertThat(view.subject()).isNull();
+        assertThat(view.action()).isEqualTo("default-compatibility");
+        assertThat(applied).isEqualTo(CompatibilityLevel.NONE);
+        verify(catalog, times(2))
+                .setCompatibilityDefault(eq(CompatibilityLevel.NONE), eq(Precondition.ifMatch("etag-1")));
+        verify(audit, times(2))
+                .begin(
+                        any(),
+                        eq("SET_SCHEMA_COMPATIBILITY_DEFAULT"),
+                        any(),
+                        eq("default"),
+                        any(),
+                        any(),
+                        any(),
+                        anyBoolean());
+    }
+
+    @Test
+    void aNewSchemaCountsAsOneChangeAndWritesNothing() {
+        when(catalog.previewRegister(any(), any(), any())).thenReturn(preview("etag-1", "ok"));
+
+        Effect effect = reviews.estimate(
+                new SchemaWriteParams(CLUSTER, "register", "orders-value", "AVRO", "{}", null, null, null));
+
+        assertThat(effect.count()).isEqualTo(1);
+        assertThat(effect.unit()).isEqualTo("schema");
+        assertThat(effect.etag())
+                .isEqualTo(reviews.previewRegister(CLUSTER, "orders-value", SchemaType.AVRO, "{}")
+                        .etag());
+        verify(catalog, never()).register(any(), any(), any(), any());
+    }
+
+    @Test
+    void anUnknownSchemaActionIsRefused() {
+        SchemaWriteParams unknown = new SchemaWriteParams(CLUSTER, "rename", null, null, null, null, null, null);
+
+        assertThatThrownBy(() -> reviews.estimate(unknown))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Unknown schema action.");
+        assertThatThrownBy(() -> reviews.replay(unknown))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Unknown schema action.");
+        verify(catalog, never()).previewRegister(any(), any(), any());
+        verify(audit, never()).begin(any(), any(), any(), any(), any(), any(), any(), anyBoolean());
+    }
+
+    @Test
+    void aSoftDeletePreviewSaysNothingWasWrittenEvenWhenTheDriverDoesNot() {
+        when(catalog.previewDelete("orders-value", false)).thenReturn(preview("etag-1", "hidden from new lookups"));
+
+        SchemaPreview view = reviews.previewDelete(CLUSTER, "orders-value", false);
+
+        assertThat(view.note()).isEqualTo(KafkaSchemaReviews.NOTHING_WRITTEN);
+        assertThat(view.writesNothing()).isTrue();
+        verify(catalog, never()).delete(any(), anyBoolean(), any());
     }
 
     private static boolean redacted(String detail) {
