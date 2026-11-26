@@ -40,6 +40,11 @@ Project-level scoping:
   grid, not each cell or row, handles Enter, Space and the menu keys (ADR-0108, ADR-0160). The rules
   ask for `<td>`, `<tr>` and `<th>` in place of the grid roles, for a tab stop on every role, and for
   a key handler beside every click handler.
+- `typescript:S6845` in `web/src/features/kafka/SubjectView.tsx` only: the schema text is read-only
+  and it scrolls once it is longer than `24rem`. A scroll region with no tab stop cannot be scrolled
+  by keyboard and fails axe's `scrollable-region-focusable`, so this one takes a tab stop. The rule
+  wants a tab stop only on interactive elements; here the tab stop is the accessibility fix rather
+  than a violation of it, and every other scroll region in the console has the same shape.
 
 ## Consequences
 

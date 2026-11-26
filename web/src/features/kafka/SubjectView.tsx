@@ -44,6 +44,24 @@ function knownLevel(level: string | null | undefined): string {
   return '';
 }
 
+/**
+ * The schema text, in a block that scrolls once it is long. A scrolling block with no tab stop cannot
+ * be scrolled by keyboard, which fails axe's `scrollable-region-focusable`; so the block takes one.
+ * It is read-only text, which is why it is a scrollable region with a name rather than a control.
+ */
+function SchemaBlock({ name, text }: Readonly<{ name: string; text: string }>) {
+  return (
+    <section>
+      <Text size="sm" fw={600} mb="xs">
+        Schema
+      </Text>
+      <section className={classes.schema} tabIndex={0} aria-label={`Schema of ${name}`}>
+        {schemaBody(text)}
+      </section>
+    </section>
+  );
+}
+
 function schemaBody(text: string | null | undefined): string {
   return text ? prettySchema(text) : 'This subject has no schema text.';
 }
@@ -304,14 +322,7 @@ export function SubjectView() {
               { term: 'Versions', value: versionWords(data.versions) },
             ]}
           />
-          <section>
-            <Text size="sm" fw={600} mb="xs">
-              Schema
-            </Text>
-            <section className={classes.schema} tabIndex={0} aria-label={`Schema of ${name}`}>
-              {schemaBody(data.schemaText)}
-            </section>
-          </section>
+          <SchemaBlock name={name} text={data.schemaText} />
           <Group>
             <CapabilityGate verdict={gate} what="setting compatibility">
               <Button

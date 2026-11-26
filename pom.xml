@@ -120,13 +120,18 @@
         <!-- The data grid is an ARIA grid of divs on CSS-grid tracks with one roving tab stop (ADR-0020,
              ADR-0108, ADR-0160); these three rules ask for native table elements and a tab stop on every
              row, grid and cell. Only GridTable.tsx, only these rules. -->
-        <sonar.issue.ignore.multicriteria>grid1,grid2,grid3</sonar.issue.ignore.multicriteria>
+        <sonar.issue.ignore.multicriteria>grid1,grid2,grid3,scroll4</sonar.issue.ignore.multicriteria>
         <sonar.issue.ignore.multicriteria.grid1.ruleKey>typescript:S6819</sonar.issue.ignore.multicriteria.grid1.ruleKey>
         <sonar.issue.ignore.multicriteria.grid1.resourceKey>web/src/ui/table/GridTable.tsx</sonar.issue.ignore.multicriteria.grid1.resourceKey>
         <sonar.issue.ignore.multicriteria.grid2.ruleKey>typescript:S6852</sonar.issue.ignore.multicriteria.grid2.ruleKey>
         <sonar.issue.ignore.multicriteria.grid2.resourceKey>web/src/ui/table/GridTable.tsx</sonar.issue.ignore.multicriteria.grid2.resourceKey>
         <sonar.issue.ignore.multicriteria.grid3.ruleKey>typescript:S1082</sonar.issue.ignore.multicriteria.grid3.ruleKey>
         <sonar.issue.ignore.multicriteria.grid3.resourceKey>web/src/ui/table/GridTable.tsx</sonar.issue.ignore.multicriteria.grid3.resourceKey>
+        <!-- A scroll region takes a tab stop so it can be scrolled by keyboard; without one axe's
+             scrollable-region-focusable fails, and S6845 flags the tab stop. The rule cannot be met
+             without the accessibility bug it would cause. ADR-0140 records the reason. -->
+        <sonar.issue.ignore.multicriteria.scroll4.ruleKey>typescript:S6845</sonar.issue.ignore.multicriteria.scroll4.ruleKey>
+        <sonar.issue.ignore.multicriteria.scroll4.resourceKey>web/src/features/kafka/SubjectView.tsx</sonar.issue.ignore.multicriteria.scroll4.resourceKey>
     </properties>
 
     <dependencyManagement>
