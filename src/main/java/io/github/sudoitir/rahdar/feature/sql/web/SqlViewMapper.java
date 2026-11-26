@@ -86,7 +86,8 @@ public class SqlViewMapper {
                 row.origin(),
                 row.sourceMessageId(),
                 GovernanceViews.redactions(governed),
-                GovernanceViews.withheld(governed));
+                GovernanceViews.withheld(governed),
+                governed.decoded());
     }
 
     public SqlNodeOutcomeView toView(Of ids, QueryResult.NodeOutcome outcome) {

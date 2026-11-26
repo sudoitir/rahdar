@@ -46500,6 +46500,34 @@
         },
         "required" : [ "value" ]
       },
+      "DecodedRecordView" : {
+        "type" : "object",
+        "properties" : {
+          "type" : {
+            "type" : "string"
+          },
+          "schemaId" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "subject" : {
+            "type" : "string"
+          },
+          "record" : { },
+          "reason" : {
+            "type" : "string"
+          },
+          "serialized" : {
+            "type" : "string"
+          },
+          "paths" : {
+            "type" : "object",
+            "additionalProperties" : {
+              "type" : "string"
+            }
+          }
+        }
+      },
       "ProblemDetail" : {
         "type" : "object",
         "properties" : {
@@ -46780,6 +46808,14 @@
             "items" : {
               "$ref" : "#/components/schemas/WithheldView"
             }
+          },
+          "decoded" : {
+            "anyOf" : [ {
+              "$ref" : "#/components/schemas/DecodedRecordView"
+            }, {
+              "type" : "null"
+            } ],
+            "description" : "The record a schema id decoded to, or why it did not. Null when this row was not decoded."
           }
         },
         "required" : [ "bodyTruncated", "durable", "expiration", "messageId", "messageType", "priority", "size" ]
@@ -47673,34 +47709,6 @@
           }
         },
         "required" : [ "offset", "partition" ]
-      },
-      "DecodedRecordView" : {
-        "type" : "object",
-        "properties" : {
-          "type" : {
-            "type" : "string"
-          },
-          "schemaId" : {
-            "type" : "integer",
-            "format" : "int32"
-          },
-          "subject" : {
-            "type" : "string"
-          },
-          "record" : { },
-          "reason" : {
-            "type" : "string"
-          },
-          "serialized" : {
-            "type" : "string"
-          },
-          "paths" : {
-            "type" : "object",
-            "additionalProperties" : {
-              "type" : "string"
-            }
-          }
-        }
       },
       "MessageDetailView" : {
         "type" : "object",

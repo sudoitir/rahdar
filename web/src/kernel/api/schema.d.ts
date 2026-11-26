@@ -8686,6 +8686,18 @@ export interface components {
       /** Format: int64 */
       value: number;
     };
+    DecodedRecordView: {
+      type?: string;
+      /** Format: int32 */
+      schemaId?: number;
+      subject?: string;
+      record?: unknown;
+      reason?: string;
+      serialized?: string;
+      paths?: {
+        [key: string]: string;
+      };
+    };
     ProblemDetail: {
       /** Format: uri */
       type?: string;
@@ -8810,6 +8822,8 @@ export interface components {
       redactions?: components['schemas']['RedactionView'][];
       /** @description Content of this row that was not shown, and why. */
       withheld?: components['schemas']['WithheldView'][];
+      /** @description The record a schema id decoded to, or why it did not. Null when this row was not decoded. */
+      decoded?: components['schemas']['DecodedRecordView'] | null;
     };
     /** @description What one node contributed, including nothing and why. */
     SqlNodeOutcomeView: {
@@ -9227,18 +9241,6 @@ export interface components {
       end?: number | null;
       /** @description Inclusive offsets before offset that are still to deliver, as ranges such as 10 or 10-12.14. Absent when the next read just continues at offset. */
       pending?: string | null;
-    };
-    DecodedRecordView: {
-      type?: string;
-      /** Format: int32 */
-      schemaId?: number;
-      subject?: string;
-      record?: unknown;
-      reason?: string;
-      serialized?: string;
-      paths?: {
-        [key: string]: string;
-      };
     };
     MessageDetailView: {
       /** @description The message's position on its node, opaque. */
