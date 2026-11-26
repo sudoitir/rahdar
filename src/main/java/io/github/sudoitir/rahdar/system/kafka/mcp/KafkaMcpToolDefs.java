@@ -183,7 +183,53 @@ public final class KafkaMcpToolDefs {
                     "Cancel named in-progress replica moves. A move this product did not start keeps its throttle.",
                     Param.note(PARTITIONS, "The same topic:partition list as the preview."),
                     Param.note("etag", ETAG),
-                    Param.note(CONFIRM, "A real run needs confirm equal to the partitions list.")));
+                    Param.note(CONFIRM, "A real run needs confirm equal to the partitions list.")),
+            read(
+                    "kafka_schema_subjects",
+                    "A page of a Kafka cluster's schema subjects.",
+                    Param.note("cursor", "The next value of the previous page; absent for the first."),
+                    Param.note("q", "Part of the subject's name.")),
+            read(
+                    "kafka_schema_subject",
+                    "One subject's versions, schema text and compatibility. A soft-deleted version stays listed.",
+                    Param.note("subject", "The subject's name.")),
+            mutate(
+                    "kafka_register_schema",
+                    "Register a schema under a subject. Previews by default; a real run needs the etag.",
+                    Param.note("subject", "The subject name."),
+                    Param.note("type", "AVRO, PROTOBUF or JSON."),
+                    Param.note("schema", "The schema text."),
+                    Param.note(DRY_RUN, McpToolDef.DRY_RUN),
+                    Param.note("etag", ETAG),
+                    Param.note(CONFIRM, "A real run needs confirm equal to the subject name.")),
+            mutate(
+                    "kafka_set_schema_compatibility",
+                    "Set a subject's compatibility, or the registry default when subject is omitted.",
+                    Param.note("subject", "The subject. Omit to set the registry default."),
+                    Param.note(
+                            "level",
+                            "BACKWARD, BACKWARD_TRANSITIVE, FORWARD, FORWARD_TRANSITIVE, FULL, FULL_TRANSITIVE or NONE."),
+                    Param.note(DRY_RUN, McpToolDef.DRY_RUN),
+                    Param.note("etag", ETAG),
+                    Param.note(CONFIRM, "A real run needs confirm equal to the subject, or 'default'.")),
+            mutate(
+                    "kafka_delete_subject",
+                    "Delete a subject. permanent soft-deletes and then deletes the schema, which cannot be restored.",
+                    Param.note("subject", "The subject name."),
+                    Param.note("permanent", "True soft-deletes and then deletes the schema. False soft-deletes only."),
+                    Param.note(
+                            DRY_RUN, McpToolDef.DRY_RUN + " A permanent preview says the schemas cannot be restored."),
+                    Param.note("etag", ETAG),
+                    Param.note(CONFIRM, "A real run needs confirm equal to the subject name.")),
+            mutate(
+                    "kafka_set_schema_binding",
+                    "Bind a topic side to a serde this installation runs. A class name is refused.",
+                    Param.note(TOPIC, TOPIC_NAME),
+                    Param.note("side", "key or value."),
+                    Param.note("serde", "avro, protobuf or json. Never a class name."),
+                    Param.note(DRY_RUN, McpToolDef.DRY_RUN),
+                    Param.note("etag", ETAG),
+                    Param.note(CONFIRM, "A real run needs confirm equal to the topic name.")));
 
     private KafkaMcpToolDefs() {}
 
