@@ -31,6 +31,28 @@ function serve(items: object[] = [], permissions: string[] = ['*']) {
 }
 
 describe('schema bindings', () => {
+  it("shows the registry's own reason when it refuses the listing, not a bare error", async () => {
+    mockKafkaCluster(['*']);
+    server.use(
+      http.get('http://localhost:3000/api/v1/clusters/k1/kafka/schemas/bindings', () =>
+        HttpResponse.json(
+          {
+            type: 'https://rahdar.dev/problems/schema-unavailable',
+            title: 'The schema registry is unavailable',
+            status: 409,
+            detail: 'confluent has no bindings endpoint.',
+          },
+          { status: 409, headers: { 'Content-Type': 'application/problem+json' } },
+        ),
+      ),
+    );
+    renderAppAt('/clusters/k1/kafka/schemas?tab=bindings');
+
+    expect(await screen.findByText('The schema registry is unavailable')).toBeInTheDocument();
+    expect(screen.getByText('confluent has no bindings endpoint.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument();
+  });
+
   it('lists a topic side and its serde', async () => {
     serve([{ topic: 'orders', side: 'value', serde: 'avro' }]);
     renderAppAt('/clusters/k1/kafka/schemas?tab=bindings');

@@ -61,7 +61,8 @@ export function BindingsView({ clusterId }: Readonly<{ clusterId: string }>) {
   const [shown, setShown] = useState<SchemaPreview | null>(null);
   const [applied, setApplied] = useState<string | null>(null);
 
-  const unavailable = registryReason(cluster.data?.capabilities.findings, null);
+  // A registry that refuses the listing answers 409 with its own reason, as the subjects screen reads it.
+  const unavailable = registryReason(cluster.data?.capabilities.findings, bindings.error);
   const gate = schemaWriteGate(can('schema:write', clusterId), loading, unavailable);
   const rows = bindings.data?.items ?? [];
 
@@ -150,7 +151,9 @@ export function BindingsView({ clusterId }: Readonly<{ clusterId: string }>) {
         rowKey={(row) => `${row.topic ?? ''}:${row.side ?? ''}`}
         loading={bindings.isPending}
         error={
-          bindings.isError ? <ErrorState error={bindings.error} onRetry={() => void bindings.refetch()} /> : undefined
+          bindings.isError && !unavailable ? (
+            <ErrorState error={bindings.error} onRetry={() => void bindings.refetch()} />
+          ) : undefined
         }
         empty={
           <EmptyState
