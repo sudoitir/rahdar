@@ -152,7 +152,12 @@ function registryProblems(values: KafkaFields, stored: KafkaConnection | null): 
   const storedKind = stored?.registryKind ?? 'none';
   const storedUrl = stored?.registryUrl ?? '';
   const changed = Boolean(stored) && (values.registryKind !== storedKind || url !== storedUrl);
-  if (changed && values.registrySecretStored && values.registryKind === 'confluent' && !values.registryCredentials.trim()) {
+  if (
+    changed &&
+    values.registrySecretStored &&
+    values.registryKind === 'confluent' &&
+    !values.registryCredentials.trim()
+  ) {
     problems.registryCredentials =
       'Enter the registry credential again: the stored one is never sent to a registry the cluster did not already use.';
   }

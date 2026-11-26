@@ -115,7 +115,13 @@ export function SubjectView() {
 
   const fail = (error: { status: number; message: string }, action: ActionVerb, what: string) => {
     if (error.status === 412) return;
-    notify.settle(error, { action, subject: what, cause: error.message, next: 'Preview again. Nothing was written.', onHeld: close });
+    notify.settle(error, {
+      action,
+      subject: what,
+      cause: error.message,
+      next: 'Preview again. Nothing was written.',
+      onHeld: close,
+    });
   };
 
   const run = () => {
@@ -161,7 +167,9 @@ export function SubjectView() {
       />
       {unavailable ? <UnavailableNotice clusterId={clusterId} reason={unavailable} /> : null}
       {detail.isPending ? <LoadingState label="Loading the subject" blockSize="16rem" /> : null}
-      {detail.isError && !unavailable ? <ErrorState error={detail.error} onRetry={() => void detail.refetch()} /> : null}
+      {detail.isError && !unavailable ? (
+        <ErrorState error={detail.error} onRetry={() => void detail.refetch()} />
+      ) : null}
       {data ? (
         <Stack gap="md">
           <DescriptionList

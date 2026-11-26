@@ -103,36 +103,37 @@ function Subjects({ clusterId, q }: Readonly<{ clusterId: string; q: string }>) 
         }
       />
       {unavailable ? null : (
-      <DataTable
-        label="Schema subjects"
-        storageKey="kafka.schemas"
-        height="fill"
-        columns={columns}
-        data={rows}
-        rowKey={(row) => row.name ?? ''}
-        loading={subjects.isPending}
-        error={failed ? <ErrorState error={subjects.error} onRetry={() => void subjects.refetch()} /> : undefined}
-        empty={
-          filtered ? (
-            <EmptyState
-              kind="filtered"
-              title="No subject matches this filter"
-              description="Subjects may still exist; none of this page matches the filter."
-              onClearFilters={() => {
-                setDraft('');
-                writeQ('');
-              }}
-            />
-          ) : (
-            <EmptyState
-              kind="empty"
-              title="No subjects"
-              description="A subject is a named schema, usually a topic's key or value, with a compatibility level and one version per registration."
-              action={gate.kind === 'allowed' ? register : undefined}
-            />
-          )
-        }
-      />
+        <DataTable
+          label="Schema subjects"
+          storageKey="kafka.schemas"
+          height="fill"
+          columns={columns}
+          data={rows}
+          rowKey={(row) => row.name ?? ''}
+          loading={subjects.isPending}
+          error={failed ? <ErrorState error={subjects.error} onRetry={() => void subjects.refetch()} /> : undefined}
+          empty={
+            filtered ? (
+              <EmptyState
+                kind="filtered"
+                title="No subject matches this filter"
+                description="Subjects may still exist; none of this page matches the filter."
+                onClearFilters={() => {
+                  setDraft('');
+                  writeQ.cancel();
+                  void navigate({ to: '.', search: (prev: Record<string, unknown>) => ({ ...prev, q: undefined }) });
+                }}
+              />
+            ) : (
+              <EmptyState
+                kind="empty"
+                title="No subjects"
+                description="A subject is a named schema, usually a topic's key or value, with a compatibility level and one version per registration."
+                action={gate.kind === 'allowed' ? register : undefined}
+              />
+            )
+          }
+        />
       )}
       <RegisterSchemaDialog clusterId={clusterId} opened={registering} onClose={() => setRegistering(false)} />
     </>

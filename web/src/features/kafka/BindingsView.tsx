@@ -89,10 +89,7 @@ export function BindingsView({ clusterId }: Readonly<{ clusterId: string }>) {
   const fetchPreview = form.onSubmit((values) => {
     apply.reset();
     const chosen = values.choice === NAMED ? values.name.trim() : values.choice;
-    preview.mutate(
-      { topic: values.topic.trim(), side: values.side, serde: chosen },
-      { onSuccess: setShown },
-    );
+    preview.mutate({ topic: values.topic.trim(), side: values.side, serde: chosen }, { onSuccess: setShown });
   }, focusFirstInvalid(form.getInputNode));
 
   const run = () => {
@@ -162,7 +159,9 @@ export function BindingsView({ clusterId }: Readonly<{ clusterId: string }>) {
         data={rows}
         rowKey={(row) => `${row.topic ?? ''}:${row.side ?? ''}`}
         loading={bindings.isPending}
-        error={bindings.isError ? <ErrorState error={bindings.error} onRetry={() => void bindings.refetch()} /> : undefined}
+        error={
+          bindings.isError ? <ErrorState error={bindings.error} onRetry={() => void bindings.refetch()} /> : undefined
+        }
         empty={
           <EmptyState
             kind="empty"

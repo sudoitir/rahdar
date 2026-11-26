@@ -71,6 +71,44 @@ describe('MessageDetailPanel', () => {
     expect(screen.queryByText(/00000000/)).not.toBeInTheDocument();
   });
 
+  it('shows a decoded record first and keeps the raw bytes behind a disclosure', async () => {
+    mockDetail(
+      detail({
+        decoded: {
+          type: 'AVRO',
+          schemaId: 7,
+          subject: 'orders-value',
+          record: { sku: 'A-1' },
+          reason: null,
+          serialized: '{"sku":"A-1"}',
+          paths: { sku: 'A-1' },
+        },
+      }),
+    );
+    const user = userEvent.setup();
+    renderWithProviders(<MessageDetailPanel {...base} messageId="146" />);
+
+    expect(await screen.findByRole('heading', { name: 'Record' })).toBeInTheDocument();
+    expect(screen.getByText('sku')).toBeInTheDocument();
+    const raw = screen.getByRole('button', { name: 'Show raw bytes' });
+    expect(raw).toHaveAttribute('aria-expanded', 'false');
+    await user.click(raw);
+    expect(screen.getByRole('button', { name: 'Hide raw bytes' })).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByText('PPPPP')).toBeInTheDocument();
+  });
+
+  it('shows an undecoded payload as bytes with the reason, never an empty record', async () => {
+    mockDetail(detail({ body: 'PPPPP', decoded: { reason: 'no-schema-id' } }));
+    renderWithProviders(<MessageDetailPanel {...base} messageId="146" />);
+
+    expect(await screen.findByText('This payload was not decoded')).toBeInTheDocument();
+    expect(screen.getByText(/no schema id/)).toBeInTheDocument();
+    expect(screen.getByText('PPPPP')).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Record' })).not.toBeInTheDocument();
+    expect(screen.queryByText('{}')).not.toBeInTheDocument();
+    expect(screen.queryByText('The body is an empty object or array.')).not.toBeInTheDocument();
+  });
+
   it('shows the truncation banner with the broker.xml snippet when bodyTruncated', async () => {
     mockDetail(detail({ bodyTruncated: true, observedLimitBytes: 256 }));
     renderWithProviders(<MessageDetailPanel {...base} messageId="146" />);

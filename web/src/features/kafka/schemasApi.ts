@@ -64,8 +64,9 @@ export function registryReason(
 
 /** Write actions stay visible. Unknown stays enabled. A refusal names the driver's reason, then `schema:write`. */
 export function schemaWriteGate(permitted: boolean, loading: boolean, unavailable: string | null): GateVerdict {
-  if (loading) return { kind: 'allowed', uncertain: false };
+  // A known refusal blocks even while grants are still loading. Unknown stays enabled.
   if (unavailable) return { kind: 'blocked', reason: unavailable };
+  if (loading) return { kind: 'allowed', uncertain: false };
   if (!permitted) {
     return {
       kind: 'blocked',
@@ -115,7 +116,8 @@ function invalidate(clusterId: string) {
 
 export function usePreviewRegister(clusterId: string) {
   return useMutation<SchemaPreview, ApiError, { subject: string; type: string; schema: string }>({
-    mutationFn: (body) => request(`${root(clusterId)}:register-preview`, { method: 'POST', body: JSON.stringify(body) }),
+    mutationFn: (body) =>
+      request(`${root(clusterId)}:register-preview`, { method: 'POST', body: JSON.stringify(body) }),
   });
 }
 
