@@ -130,7 +130,9 @@ function Subjects({ clusterId, q }: Readonly<{ clusterId: string; q: string }>) 
               </Button>
             ) : null}
             {subjects.isSuccess && !unavailable && !subjects.hasNextPage ? (
-              <Text size="xs" c="dimmed">{subjectCount(filtered, rows.length)}</Text>
+              <Text size="xs" c="dimmed">
+                {subjectCount(filtered, rows.length)}
+              </Text>
             ) : null}
           </>
         }

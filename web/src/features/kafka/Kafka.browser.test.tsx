@@ -33,7 +33,6 @@ afterAll(() => onlineManager.setOnline(true));
 
 const LONG = 'customer-order-fulfilment-backlog-on-the-eu-west-primary-consumer-group-v2';
 
-
 const SUBJECT: SchemaSubject = {
   name: 'orders-value',
   type: 'AVRO',
