@@ -7,6 +7,8 @@ import io.github.sudoitir.rahdar.system.kafka.KafkaAclChanges.AclChangeParams;
 import io.github.sudoitir.rahdar.system.kafka.KafkaBrokerConfigChanges.BrokerConfigParams;
 import io.github.sudoitir.rahdar.system.kafka.KafkaHangingAborts.HangingAbortParams;
 import io.github.sudoitir.rahdar.system.kafka.KafkaOffsetResets.OffsetResetParams;
+import io.github.sudoitir.rahdar.system.kafka.KafkaSchemaBindings.BindingParams;
+import io.github.sudoitir.rahdar.system.kafka.KafkaSchemaReviews.SchemaWriteParams;
 import io.github.sudoitir.rahdar.system.kafka.KafkaTopicConfigChanges.ConfigChangeParams;
 import io.github.sudoitir.rahdar.system.kafka.KafkaTopicLifecycle.CreateParams;
 import io.github.sudoitir.rahdar.system.kafka.KafkaTopicLifecycle.DeleteParams;
@@ -233,6 +235,42 @@ class KafkaGatedOperations {
                         DisplayRow.of(CLUSTER, clusters.labelOf(p.clusterId())), DisplayRow.of("Group", p.group())),
                 lifecycle::estimateGroup,
                 lifecycle::replayGroup,
+                clusters,
+                Set.of());
+    }
+
+    @Bean
+    GatedOperation<SchemaWriteParams> schemaWrite(KafkaSchemaReviews reviews, ClusterEnvironmentIndex clusters) {
+        return new KafkaGatedOperation<>(
+                "schema.write",
+                SchemaWriteParams.class,
+                SchemaWriteParams::clusterId,
+                p -> "Change schema " + p.action() + " on " + clusters.labelOf(p.clusterId()),
+                p -> List.of(
+                        DisplayRow.of(CLUSTER, clusters.labelOf(p.clusterId())),
+                        DisplayRow.of("Action", p.action()),
+                        DisplayRow.of("Subject", p.subject() == null ? "default" : p.subject())),
+                reviews::estimate,
+                reviews::replay,
+                clusters,
+                Set.of());
+    }
+
+    @Bean
+    GatedOperation<BindingParams> schemaBinding(KafkaSchemaBindings bindings, ClusterEnvironmentIndex clusters) {
+        return new KafkaGatedOperation<>(
+                "schema.binding",
+                BindingParams.class,
+                BindingParams::clusterId,
+                p -> "Bind " + p.topic() + " " + p.side() + " to " + p.serde() + " on "
+                        + clusters.labelOf(p.clusterId()),
+                p -> List.of(
+                        DisplayRow.of(CLUSTER, clusters.labelOf(p.clusterId())),
+                        DisplayRow.of(TOPIC, p.topic()),
+                        DisplayRow.of("Side", p.side()),
+                        DisplayRow.of("Serde", p.serde())),
+                bindings::estimate,
+                bindings::replay,
                 clusters,
                 Set.of());
     }
