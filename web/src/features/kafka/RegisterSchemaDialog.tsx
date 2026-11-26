@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Select, Stack, Text, Textarea, TextInput, UnstyledButton } from '@mantine/core';
 import { IconChevronRight } from '@tabler/icons-react';
 import { useForm } from '@mantine/form';
@@ -19,6 +19,13 @@ import {
 } from './schemasApi.ts';
 
 const REGISTER: ActionVerb = { verb: 'Register', past: 'Registered', progressive: 'Registering' };
+
+function schemaEntry(error: ReactNode, schema: string): ReactNode {
+  if (error) return error;
+  const text = schema.trim();
+  if (text.length === 0) return 'Not entered yet.';
+  return `${text.length} characters entered.`;
+}
 
 /**
  * Subject, type and schema. Submitting fetches the preview and shows it. It never applies:
@@ -141,11 +148,7 @@ export function RegisterSchemaDialog({
                   />
                 ) : (
                   <Text size="xs" c={form.errors.schema ? 'var(--as-danger)' : 'dimmed'}>
-                    {form.errors.schema
-                      ? form.errors.schema
-                      : form.values.schema.trim()
-                        ? `${form.values.schema.trim().length} characters entered.`
-                        : 'Not entered yet.'}
+                    {schemaEntry(form.errors.schema, form.values.schema)}
                   </Text>
                 )}
               </Stack>

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { Button, Text, TextInput } from '@mantine/core';
 import { useDebouncedCallback } from '@mantine/hooks';
 import { Link, useNavigate, useParams, useSearch } from '@tanstack/react-router';
@@ -36,6 +36,38 @@ function Unavailable({ clusterId, reason }: Readonly<{ clusterId: string; reason
     >
       {reason}
     </Notice>
+  );
+}
+
+/** "1 subject", "4 subjects", "1 matching subject", "4 matching subjects". */
+function subjectCount(filtered: boolean, count: number): string {
+  const noun = count === 1 ? 'subject' : 'subjects';
+  return `${count}${filtered ? ' matching' : ''} ${noun}`;
+}
+
+function SubjectsEmpty({
+  filtered,
+  canRegister,
+  register,
+  onClear,
+}: Readonly<{ filtered: boolean; canRegister: boolean; register: ReactNode; onClear: () => void }>) {
+  if (!filtered) {
+    return (
+      <EmptyState
+        kind="empty"
+        title="No subjects"
+        description="A subject is a named schema, usually a topic's key or value, with a compatibility level and one version per registration."
+        action={canRegister ? register : undefined}
+      />
+    );
+  }
+  return (
+    <EmptyState
+      kind="filtered"
+      title="No subject matches this filter"
+      description="Clear it to see every subject."
+      onClearFilters={onClear}
+    />
   );
 }
 
@@ -98,15 +130,7 @@ function Subjects({ clusterId, q }: Readonly<{ clusterId: string; q: string }>) 
               </Button>
             ) : null}
             {subjects.isSuccess && !unavailable && !subjects.hasNextPage ? (
-              <Text size="xs" c="dimmed">
-                {filtered
-                  ? rows.length === 1
-                    ? '1 matching subject'
-                    : `${rows.length} matching subjects`
-                  : rows.length === 1
-                    ? '1 subject'
-                    : `${rows.length} subjects`}
-              </Text>
+              <Text size="xs" c="dimmed">{subjectCount(filtered, rows.length)}</Text>
             ) : null}
           </>
         }
@@ -122,25 +146,16 @@ function Subjects({ clusterId, q }: Readonly<{ clusterId: string; q: string }>) 
           loading={subjects.isPending}
           error={failed ? <ErrorState error={subjects.error} onRetry={() => void subjects.refetch()} /> : undefined}
           empty={
-            filtered ? (
-              <EmptyState
-                kind="filtered"
-                title="No subject matches this filter"
-                description="Clear it to see every subject."
-                onClearFilters={() => {
-                  setDraft('');
-                  writeQ.cancel();
-                  void navigate({ to: '.', search: (prev: Record<string, unknown>) => ({ ...prev, q: undefined }) });
-                }}
-              />
-            ) : (
-              <EmptyState
-                kind="empty"
-                title="No subjects"
-                description="A subject is a named schema, usually a topic's key or value, with a compatibility level and one version per registration."
-                action={gate.kind === 'allowed' ? register : undefined}
-              />
-            )
+            <SubjectsEmpty
+              filtered={filtered}
+              canRegister={gate.kind === 'allowed'}
+              register={register}
+              onClear={() => {
+                setDraft('');
+                writeQ.cancel();
+                void navigate({ to: '.', search: (prev: Record<string, unknown>) => ({ ...prev, q: undefined }) });
+              }}
+            />
           }
         />
       )}

@@ -330,7 +330,7 @@ function Payload({ m }: Readonly<{ m: MessageDetailView }>) {
     );
   }
   const meta = [decoded.type, decoded.subject, decoded.schemaId != null ? `id ${decoded.schemaId}` : null]
-    .filter((part) => part)
+    .filter(Boolean)
     .join(' · ');
   return (
     <Stack gap="sm">

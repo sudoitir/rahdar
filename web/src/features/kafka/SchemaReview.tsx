@@ -53,7 +53,7 @@ function beyond(note: string, statement?: string | null) {
 }
 
 function notSaid(note: string, ...said: (string | null | undefined)[]) {
-  return !said.some((text) => text === note);
+  return !said.includes(note);
 }
 
 function Lines({ lines, empty = 'None' }: Readonly<{ lines: string[]; empty?: string }>) {

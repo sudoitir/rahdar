@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import { Button, Group, Select, Stack, Text } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { Link, useParams } from '@tanstack/react-router';
@@ -44,11 +44,96 @@ function knownLevel(level: string | null | undefined): string {
   return '';
 }
 
+function schemaBody(text: string | null | undefined): string {
+  return text ? prettySchema(text) : 'This subject has no schema text.';
+}
+
 function versionWords(versions: { version: number; deleted: boolean }[] | undefined): string {
   if (!versions || versions.length === 0) return 'None';
   return versions
     .map((version) => (version.deleted ? `${version.version} (deleted)` : String(version.version)))
     .join(', ');
+}
+
+function SubjectReviews({
+  shown,
+  mode,
+  name,
+  permanent,
+  levelTitle,
+  deleteTitle,
+  pendingLevel,
+  pendingDelete,
+  stale,
+  applyError,
+  applied,
+  onClose,
+  onConfirm,
+  onRefreshLevel,
+  onRefreshDelete,
+}: Readonly<{
+  shown: SchemaPreview | null;
+  mode: Mode;
+  name: string;
+  permanent: boolean;
+  levelTitle: string;
+  deleteTitle: string;
+  pendingLevel: boolean;
+  pendingDelete: boolean;
+  stale: boolean;
+  applyError: { status: number } | null;
+  applied: string | null;
+  onClose: () => void;
+  onConfirm: () => void;
+  onRefreshLevel: () => void;
+  onRefreshDelete: () => void;
+}>) {
+  const problem = applyError && !stale ? applyError : undefined;
+  const result = applied ? <Text size="sm">{applied}</Text> : undefined;
+  return (
+    <>
+      <SchemaReview
+        opened={shown !== null && mode === 'level'}
+        onClose={onClose}
+        title={levelTitle}
+        confirmLabel={levelTitle}
+        tone="danger"
+        preview={shown}
+        pending={pendingLevel}
+        stale={stale}
+        error={problem}
+        onConfirm={onConfirm}
+        onRefresh={onRefreshLevel}
+        result={result}
+      />
+      <SchemaReview
+        opened={shown !== null && mode === 'delete'}
+        onClose={onClose}
+        title={deleteTitle}
+        confirmLabel={deleteTitle}
+        tone="danger"
+        lead={softDeleteLead(permanent, name)}
+        preview={shown}
+        pending={pendingDelete}
+        stale={stale}
+        error={problem}
+        onConfirm={onConfirm}
+        onRefresh={onRefreshDelete}
+        result={result}
+      />
+    </>
+  );
+}
+
+/** A permanent delete's consequence is the preview's own note; a soft delete has none, so say its effect. */
+function softDeleteLead(permanent: boolean, name: string): ReactNode {
+  if (permanent) return undefined;
+  return (
+    <Text size="sm">
+      This hides subject {name} from the default list. It stays readable as a deleted subject, and it cannot be undone
+      from here.
+    </Text>
+  );
 }
 
 /** The driver's reason, with the link to where the connection is set. */
@@ -223,9 +308,9 @@ export function SubjectView() {
             <Text size="sm" fw={600} mb="xs">
               Schema
             </Text>
-            <pre className={classes.schema} tabIndex={0} role="region" aria-label={`Schema of ${name}`}>
-              {data.schemaText ? prettySchema(data.schemaText) : 'This subject has no schema text.'}
-            </pre>
+            <section className={classes.schema} tabIndex={0} aria-label={`Schema of ${name}`}>
+              {schemaBody(data.schemaText)}
+            </section>
           </section>
           <Group>
             <CapabilityGate verdict={gate} what="setting compatibility">
@@ -287,42 +372,22 @@ export function SubjectView() {
           </form>
         }
       />
-      <SchemaReview
-        opened={shown !== null && mode === 'level'}
-        onClose={close}
-        title={levelTitle}
-        confirmLabel={levelTitle}
-        tone="danger"
-        preview={shown}
-        pending={setLevel.isPending}
+      <SubjectReviews
+        shown={shown}
+        mode={mode}
+        name={name}
+        permanent={permanent}
+        levelTitle={levelTitle}
+        deleteTitle={deleteTitle}
+        pendingLevel={setLevel.isPending}
+        pendingDelete={remove.isPending}
         stale={stale}
-        error={applyError && !stale ? applyError : undefined}
-        onConfirm={run}
-        onRefresh={() => fetchLevel()}
-        result={applied ? <Text size="sm">{applied}</Text> : undefined}
-      />
-      <SchemaReview
-        opened={shown !== null && mode === 'delete'}
+        applyError={applyError}
+        applied={applied}
         onClose={close}
-        title={deleteTitle}
-        confirmLabel={deleteTitle}
-        tone="danger"
-        lead={
-          /* A permanent delete's consequence is the preview's own note; a soft delete has none, so say its effect. */
-          permanent ? undefined : (
-            <Text size="sm">
-              This hides subject {name} from the default list. It stays readable as a deleted subject, and it cannot be
-              undone from here.
-            </Text>
-          )
-        }
-        preview={shown}
-        pending={remove.isPending}
-        stale={stale}
-        error={applyError && !stale ? applyError : undefined}
         onConfirm={run}
-        onRefresh={() => fetchDelete(permanent)}
-        result={applied ? <Text size="sm">{applied}</Text> : undefined}
+        onRefreshLevel={() => fetchLevel()}
+        onRefreshDelete={() => fetchDelete(permanent)}
       />
     </Page>
   );

@@ -11,6 +11,34 @@ import classes from './Clusters.module.css';
 import { KAFKA_PAIRS, MECHANISMS, PROTOCOLS, usesSasl, usesTls, type KafkaFields } from './kafkaConnection.ts';
 import type { SecurityProtocol } from './api.ts';
 
+function ProtocolNote({ protocol }: Readonly<{ protocol: SecurityProtocol }>) {
+  if (protocol === 'SASL_PLAINTEXT') {
+    return (
+      <Notice title="The credentials travel unencrypted" tone="warning">
+        SASL over plaintext sends the username and password, or the token, in the clear. You can still register the
+        cluster; choose SASL over TLS if the brokers offer it.
+      </Notice>
+    );
+  }
+  if (protocol === 'PLAINTEXT') {
+    return (
+      <Text size="xs" c="dimmed">
+        Nothing is encrypted and Rahdar does not authenticate.
+      </Text>
+    );
+  }
+  return null;
+}
+
+function registryCredentialHint(editing: boolean): string {
+  if (editing) return 'Leave empty to keep the stored one. Separate from the broker SASL credential.';
+  return 'Optional. Separate from the broker SASL credential, as user:password.';
+}
+
+function passwordComplete(editing: boolean): 'new-password' | 'off' {
+  return editing ? 'new-password' : 'off';
+}
+
 /**
  * A Kafka connection's fields, shared by registration and the connection edit: bootstrap servers shown as
  * the entries they parse to, the security protocol, the SASL mechanism and credentials only where the
@@ -61,17 +89,7 @@ export function KafkaConnectionFields({
           if (value && !usesSasl(value as SecurityProtocol)) form.clearFieldError('saslMechanism');
         }}
       />
-      {f.securityProtocol === 'SASL_PLAINTEXT' ? (
-        <Notice title="The credentials travel unencrypted" tone="warning">
-          SASL over plaintext sends the username and password, or the token, in the clear. You can still register the
-          cluster; choose SASL over TLS if the brokers offer it.
-        </Notice>
-      ) : null}
-      {f.securityProtocol === 'PLAINTEXT' ? (
-        <Text size="xs" c="dimmed">
-          Nothing is encrypted and Rahdar does not authenticate.
-        </Text>
-      ) : null}
+      <ProtocolNote protocol={f.securityProtocol} />
 
       {sasl ? (
         <>
@@ -91,7 +109,7 @@ export function KafkaConnectionFields({
               <PasswordInput
                 label="Password"
                 description={keep}
-                autoComplete={editing ? 'new-password' : 'off'}
+                autoComplete={passwordComplete(editing)}
                 {...form.getInputProps('password')}
               />
             </FieldRow>
@@ -141,11 +159,7 @@ export function KafkaConnectionFields({
           />
           <PasswordInput
             label="Registry credential"
-            description={
-              editing
-                ? 'Leave empty to keep the stored one. Separate from the broker SASL credential.'
-                : 'Optional. Separate from the broker SASL credential, as user:password.'
-            }
+            description={registryCredentialHint(editing)}
             autoComplete="off"
             {...form.getInputProps('registryCredentials')}
           />
