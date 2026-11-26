@@ -8,8 +8,10 @@ import io.github.sudoitir.openbroker.operation.Precondition;
 import io.github.sudoitir.openbroker.operation.Preview;
 import io.github.sudoitir.rahdar.kernel.audit.AuditEvent;
 import io.github.sudoitir.rahdar.kernel.audit.AuditService;
+import io.github.sudoitir.rahdar.kernel.core.SecretRedactor;
 import io.github.sudoitir.rahdar.kernel.gate.Effect;
 import io.github.sudoitir.rahdar.kernel.gate.Gated;
+import io.github.sudoitir.rahdar.kernel.gate.Operation;
 import io.github.sudoitir.rahdar.kernel.gate.OperationGate;
 import io.github.sudoitir.rahdar.kernel.security.ActorResolver;
 import io.github.sudoitir.rahdar.kernel.security.ClusterAccessGuard;
@@ -39,7 +41,9 @@ public class KafkaSchemaReviews {
             "This soft-deletes the subject and then deletes the schema. The schemas cannot be restored. "
                     + NOTHING_WRITTEN;
 
-    private static final String ALREADY = "Already registered";
+    /** The driver's sentence, after "Nothing has been written. ". Match by containment, not prefix. */
+    static final String ALREADY = "Already registered; applying creates no second version.";
+
     private static final String CHECK_ON_APPLY = "The compatibility check happens on apply.";
     private static final String SCHEMA = "SCHEMA";
     private static final String APPLIED = "APPLIED";
@@ -164,7 +168,7 @@ public class KafkaSchemaReviews {
 
     @Gated("schema.write")
     private <T> T gated(SchemaWriteParams params, Supplier<T> run) {
-        return gate.run(io.github.sudoitir.rahdar.kernel.gate.Operation.of(params), run);
+        return gate.run(Operation.of(params), run);
     }
 
     private SchemaPreview previewOf(SchemaWriteParams p) {
@@ -281,7 +285,7 @@ public class KafkaSchemaReviews {
                 add(after, change.key(), now);
             }
         }
-        boolean already = note != null && note.startsWith(ALREADY);
+        boolean already = note != null && note.contains(ALREADY);
         boolean checkOnApply = note != null && note.contains(CHECK_ON_APPLY);
         if (outcome == null && note != null && (note.contains("compatible") || note.contains("incompatible"))) {
             outcome = note;
@@ -296,7 +300,7 @@ public class KafkaSchemaReviews {
                 checkOnApply,
                 already,
                 existing,
-                note,
+                SecretRedactor.redact(note),
                 NOTHING_WRITTEN,
                 true);
     }

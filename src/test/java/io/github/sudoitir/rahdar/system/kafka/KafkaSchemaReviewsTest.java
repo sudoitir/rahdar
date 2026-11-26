@@ -121,13 +121,19 @@ class KafkaSchemaReviewsTest {
         when(catalog.previewRegister(any(), any(), any()))
                 .thenReturn(preview(
                         "etag-1",
-                        "Already registered; applying creates no second version.",
+                        "Nothing has been written. Already registered; applying creates no second version.",
                         new AttributeChange("schema.id", Optional.of(7), Optional.of(7))));
         when(catalog.register(any(), any(), any(), any()))
                 .thenReturn(new SubjectVersion(7, 1, SchemaType.AVRO, "{}", false));
 
+        SchemaPreview preview = reviews.previewRegister(CLUSTER, "orders-value", SchemaType.AVRO, "{}");
         var version = reviews.register(CLUSTER, "orders-value", SchemaType.AVRO, "{}", "etag-1");
 
+        assertThat(preview.alreadyRegistered()).isTrue();
+        assertThat(reviews.estimate(new SchemaWriteParams(
+                                CLUSTER, "register", "orders-value", "AVRO", "{}", null, null, "etag-1"))
+                        .count())
+                .isZero();
         assertThat(version.id()).isEqualTo(7);
         verify(catalog).register(eq("orders-value"), eq(SchemaType.AVRO), eq("{}"), any());
     }
@@ -143,6 +149,41 @@ class KafkaSchemaReviewsTest {
         assertThat(view.note()).contains(KafkaSchemaReviews.NOTHING_WRITTEN);
         assertThat(view.action()).isEqualTo("delete");
         assertThat(view.writesNothing()).isTrue();
+        verify(catalog, never()).delete(any(), anyBoolean(), any());
+    }
+
+    @Test
+    void aDriverNoteDoesNotCarryACredentialIntoThePreview() {
+        when(catalog.previewRegister(any(), any(), any()))
+                .thenReturn(preview("etag-1", "The registry refused password=registry-secret-value"));
+
+        SchemaPreview view = reviews.previewRegister(CLUSTER, "orders-value", SchemaType.AVRO, "{}");
+
+        assertThat(view.note()).doesNotContain("registry-secret-value");
+        assertThat(view.note()).contains("[redacted]");
+    }
+
+    @Test
+    void aPreviewIsRefusedWithoutSchemaWrite() {
+        Mockito.doThrow(new ResourceForbiddenException("schema:write", "cluster", CLUSTER.toString()))
+                .when(access)
+                .requireCluster(CLUSTER, KafkaModule.SCHEMA_WRITE);
+
+        assertThatThrownBy(() -> reviews.previewRegister(CLUSTER, "orders-value", SchemaType.AVRO, "{}"))
+                .isInstanceOf(ResourceForbiddenException.class)
+                .hasMessageContaining("schema:write");
+        verify(catalog, never()).previewRegister(any(), any(), any());
+    }
+
+    @Test
+    void aDeleteIsRefusedWithoutSchemaWrite() {
+        Mockito.doThrow(new ResourceForbiddenException("schema:write", "cluster", CLUSTER.toString()))
+                .when(access)
+                .requireCluster(CLUSTER, KafkaModule.SCHEMA_WRITE);
+
+        assertThatThrownBy(() -> reviews.delete(CLUSTER, "orders-value", false, "etag-1"))
+                .isInstanceOf(ResourceForbiddenException.class)
+                .hasMessageContaining("schema:write");
         verify(catalog, never()).delete(any(), anyBoolean(), any());
     }
 
