@@ -203,9 +203,11 @@ describe('a subject the operator cannot change', () => {
     renderAppAt('/clusters/k1/kafka/schemas/orders-value');
 
     const why = await screen.findByRole('button', { name: 'Why setting compatibility is unavailable' });
-    expect(screen.getByRole('button', { name: 'Set compatibility' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Delete subject' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Permanently delete' })).toBeDisabled();
+    // The three controls are gated on the same verdict, but the gate is recomputed when the grant
+    // answer lands, so each is asserted until it settles rather than once on the frame that rendered it.
+    for (const name of ['Set compatibility', 'Delete subject', 'Permanently delete']) {
+      await waitFor(() => expect(screen.getByRole('button', { name })).toBeDisabled());
+    }
     await user.click(why);
     expect(await screen.findByText(/schema:write/)).toBeInTheDocument();
   });
