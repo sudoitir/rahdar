@@ -59,8 +59,8 @@ describe('schema bindings', () => {
 
     const table = await screen.findByRole('table', { name: 'Schema bindings' });
     expect(await within(table).findByRole('rowheader', { name: 'orders' })).toBeInTheDocument();
-    expect(within(table).getByRole('cell', { name: 'value' })).toBeInTheDocument();
-    expect(within(table).getByRole('cell', { name: 'avro' })).toBeInTheDocument();
+    expect(within(table).getByRole('cell', { name: 'Value' })).toBeInTheDocument();
+    expect(within(table).getByRole('cell', { name: 'Avro' })).toBeInTheDocument();
   });
 
   it('saves only after a hold, and a click does nothing', async () => {

@@ -39,11 +39,28 @@ const SIDES = [
   { value: 'value', label: 'Value' },
 ];
 
+function choiceLabel(choices: readonly { value: string; label: string }[], raw: string | null | undefined) {
+  if (!raw) return '';
+  return choices.find((choice) => choice.value === raw)?.label ?? raw;
+}
+
 function bindingColumns(): Column<SchemaBinding>[] {
   return [
     { id: 'topic', header: 'Topic', accessor: (row) => row.topic ?? '', kind: 'identifier', priority: 'essential' },
-    { id: 'side', header: 'Side', accessor: (row) => row.side ?? '', kind: 'status', priority: 'essential' },
-    { id: 'serde', header: 'Serde', accessor: (row) => row.serde ?? '', kind: 'code', priority: 'high' },
+    {
+      id: 'side',
+      header: 'Side',
+      accessor: (row) => choiceLabel(SIDES, row.side),
+      kind: 'status',
+      priority: 'essential',
+    },
+    {
+      id: 'serde',
+      header: 'Serde',
+      accessor: (row) => choiceLabel(SERDE_CHOICES, row.serde),
+      kind: 'code',
+      priority: 'high',
+    },
   ];
 }
 
