@@ -132,13 +132,7 @@ export function BindingsView({ clusterId }: Readonly<{ clusterId: string }>) {
         <FieldRow>
           <TextInput label="Topic" {...form.getInputProps('topic')} />
           <Select label="Side" data={SIDES} allowDeselect={false} {...form.getInputProps('side')} />
-          <Select
-            label="Serde"
-            description="Avro, Protobuf or JSON Schema."
-            data={SERDE_CHOICES}
-            allowDeselect={false}
-            {...form.getInputProps('choice')}
-          />
+          <Select label="Serde" data={SERDE_CHOICES} allowDeselect={false} {...form.getInputProps('choice')} />
           <CapabilityGate verdict={gate} what="saving a binding">
             <Button type="submit" disabled={gate.kind === 'blocked'} loading={preview.isPending}>
               Save binding
